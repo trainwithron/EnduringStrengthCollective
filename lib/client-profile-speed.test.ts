@@ -34,7 +34,7 @@ describe("the client profile loads its data in three waves, not one query after 
     expect(dataPart).toContain("const [{ data: upcomingRows }, { data: frozenRows }] = await Promise.all([");
   });
   it("the slow parts stream in behind a Suspense so the rest of the profile shows first", () => {
-    for (const name of ["ClientProgramsSection", "ClientNutrition", "ExerciseProgressionLoader", "ClientCalendarSection", "ClientMessagesSection"]) {
+    for (const name of ["ClientProgramsSection", "ClientNutrition", "ClientCalendarSection", "ClientMessagesSection"]) {
       const at = page.lastIndexOf(`<${name}`);
       expect(at).toBeGreaterThan(0);
       expect(page.slice(Math.max(0, at - 400), at)).toContain("<Suspense");
@@ -42,7 +42,7 @@ describe("the client profile loads its data in three waves, not one query after 
   });
   it("the slow set_logs trend query is no longer part of the page's own waiting", () => {
     expect(page).not.toContain('.from("set_logs")');
-    // the trend is read from the rolled-up rows (one row per workout and exercise), still behind its own Suspense
-    expect(read("components/coach/desktop/exercise-progression-loader.tsx")).toContain('rpc("client_exercise_rollup"');
+    // the exercise trends are built from the rolled-up rows (one row per workout and exercise), read in the first wait
+    expect(dataPart).toContain('supabase.rpc("client_exercise_rollup"');
   });
 });

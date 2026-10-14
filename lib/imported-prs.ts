@@ -95,3 +95,14 @@ export function dailyBestByExercise(rows: RollupRow[]): Record<string, { date: s
   return out;
 }
 
+
+// The imported workouts that have no workout log of their own, one entry each: when, and how much weight was lifted. These are what the profile's workout count and volume add to the logged ones.
+export function importedWorkouts(rows: RollupRow[]): { sessionId: string; at: string; volume: number }[] {
+  const bySession = new Map<string, { sessionId: string; at: string; volume: number }>();
+  for (const r of countedImports(rows)) {
+    const entry = bySession.get(r.sessionId) ?? { sessionId: r.sessionId, at: r.at, volume: 0 };
+    entry.volume += r.volume;
+    bySession.set(r.sessionId, entry);
+  }
+  return Array.from(bySession.values());
+}

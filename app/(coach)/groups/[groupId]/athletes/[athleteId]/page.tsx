@@ -1,6 +1,13 @@
 import { isEmailConfigured } from "@/lib/email";
 import { mergeLoggedList } from "@/lib/logged-list";
-import { hindsightPrs, importedTotals, parseRollup } from "@/lib/imported-prs";
+import { hindsightPrs, importedWorkouts, parseRollup } from "@/lib/imported-prs";
+import { ProgressStats } from "@/components/coach/progress/progress-stats";
+import { TrainingMaxCards } from "@/components/coach/progress/training-max-cards";
+import { BodyOverlayChart } from "@/components/coach/progress/body-overlay-chart";
+import { LoggedSearch } from "@/components/coach/progress/logged-search";
+import { dateKeyInZone, type StatEvent } from "@/lib/progress-periods";
+import { defaultMetric, planCards, summarizeExercises, type LadderInput } from "@/lib/progress-cards";
+import { isSearching, matchesLoggedSearch, namesBySessionFrom, readSearchWords } from "@/lib/logged-search";
 import { sorenessShown } from "@/lib/wellness";
 import { ClientAssessmentsSection } from "@/components/coach/desktop/client-assessments-section";
 import { ViewAsClientLink } from "@/components/coach/desktop/view-as-client-label";
@@ -17,7 +24,6 @@ import { ClientFoodLogOnly } from "@/components/coach/nutrition/client-food-log-
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { SectionLoading } from "@/components/coach/desktop/section-loading";
-import { ExerciseProgressionLoader } from "@/components/coach/desktop/exercise-progression-loader";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { getActiveAnchor } from "@/lib/active-anchor";
@@ -87,13 +93,15 @@ function last7DatesForTargets(startKey: string, endKey: string): string[] {
 export default async function AthleteProfilePage(
   props: {
     params: Promise<{ groupId: string; athleteId: string }>;
-    searchParams?: Promise<{ tab?: string; month?: string; draft?: string }>;
+    searchParams?: Promise<{ tab?: string; month?: string; draft?: string; q?: string; from?: string; to?: string }>;
   }
 ) {
   const params = await props.params;
   const searchParamsResolved = await props.searchParams;
   const tabParam = searchParamsResolved?.tab;
   const monthParam = searchParamsResolved?.month;
+  // The Logged workouts search on Overview (exercise or date, and between two dates).
+  const searchWords = readSearchWords(searchParamsResolved);
   // A drafted note (an expiry check-in, a come-back note) opens in the Messages box for the coach to edit; capped.
   const draftParam = (searchParamsResolved?.draft ?? "").slice(0, 600);
   const requestedTab = isClientProfileTab(tabParam) ? tabParam : "overview";
@@ -154,6 +162,9 @@ export default async function AthleteProfilePage(
     { data: coachMovementPatterns },
     { data: importedSessions, count: importedTotal },
     { data: rollupRows },
+    { data: progressPrefs },
+    { data: pinRows },
+    { data: intakeRows },
   ] = await Promise.all([
     supabase
       .from("group_memberships")
@@ -177,7 +188,7 @@ export default async function AthleteProfilePage(
     // case, in exchange for removing a real sequential round trip.
     supabase
       .from("programs")
-      .select("id, name")
+      .select("id, name, training_intent")
       .eq("group_id", params.groupId)
       .eq("athlete_id", params.athleteId)
       .eq("is_active", true)
@@ -186,7 +197,7 @@ export default async function AthleteProfilePage(
       .maybeSingle(),
     supabase
       .from("programs")
-      .select("id, name")
+      .select("id, name, training_intent")
       .eq("group_id", params.groupId)
       .is("athlete_id", null)
       .eq("is_active", true)
@@ -274,7 +285,7 @@ export default async function AthleteProfilePage(
       .eq("athlete_id", params.athleteId)
       .eq("group_id", params.groupId)
       .order("logged_date", { ascending: false })
-      .limit(20),
+      .limit(1000),
     // Coach-set calorie targets over time — deliberately the target,
     // not actual intake, since nothing in this app logs what a client
     // really ate.
@@ -390,7 +401,7 @@ export default async function AthleteProfilePage(
       .or(`and(sender_id.eq.${user.id},recipient_id.eq.${params.athleteId}),and(sender_id.eq.${params.athleteId},recipient_id.eq.${user.id})`)
       .order("created_at", { ascending: false })
       .limit(200),
-    supabase.from("movement_patterns").select("id, name").eq("created_by", user.id).order("name"),
+    supabase.from("movement_patterns").select("id, name, movement_pattern_exercises ( exercise_name, tier )").eq("created_by", user.id).order("name"),
     // Imported past history (the History page's uploads) is plain history: listed with the logged workouts, marked Imported. It has no workout_logs row, so it never counts in the Workouts, Volume or PRs numbers.
     supabase
       .from("athlete_sessions")
@@ -400,9 +411,14 @@ export default async function AthleteProfilePage(
       .eq("is_historical", true)
       .eq("status", "completed")
       .order("started_at", { ascending: false })
-      .limit(50),
+      .limit(300),
     // Every counted set, rolled up to one row per workout and exercise (an unclear imported point is never in it): imported history counts in the totals and records below.
     supabase.rpc("client_exercise_rollup", { p_athlete: params.athleteId, p_group: params.groupId }),
+    // This coach's own Progress choices (cards or list, weight or volume), kept on their account, and the exercises they pinned for this client.
+    supabase.from("coach_progress_prefs").select("view_mode, metric").eq("coach_id", user.id).maybeSingle(),
+    supabase.from("client_progress_pins").select("exercise_name, pinned_at").eq("coach_id", user.id).eq("athlete_id", params.athleteId).eq("group_id", params.groupId).order("pinned_at", { ascending: true }),
+    // What the client logged to eat, a total for each day (skipped meals and entries without calories left out).
+    supabase.rpc("client_daily_intake", { p_athlete: params.athleteId, p_group: params.groupId }),
   ]);
 
   if (membership?.role !== "coach") {
@@ -613,9 +629,11 @@ export default async function AthleteProfilePage(
 
   // Logged workouts, plus imported history (which has no workout log). A record in imported history is found in hindsight, in date order, and is never celebrated or announced.
   const rollup = parseRollup(rollupRows);
-  const importedSums = importedTotals(rollup);
-  const totalCompleted = (allLogs?.length ?? 0) + importedSums.workouts;
-  const totalVolume = (allLogs ?? []).reduce((sum, l) => sum + (l.total_volume ?? 0), 0) + importedSums.volume;
+  const importedList = importedWorkouts(rollup);
+  const statEvents: StatEvent[] = [
+    ...(allLogs ?? []).map((l) => ({ date: dateKeyInZone(l.created_at as string, displayZone), volume: (l.total_volume as number | null) ?? 0 })),
+    ...importedList.map((w) => ({ date: dateKeyInZone(w.at, displayZone), volume: w.volume })),
+  ];
 
   const prEntries: { exerciseName: string; date: string }[] = [];
   for (const log of allLogs ?? []) {
@@ -625,14 +643,43 @@ export default async function AthleteProfilePage(
   }
   for (const pr of hindsightPrs(rollup)) prEntries.push({ exerciseName: pr.exerciseName, date: pr.date });
   prEntries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const prDateKeys = prEntries.map((p) => dateKeyInZone(p.date, displayZone));
+  const progressToday = dateKeyInZone(new Date().toISOString(), displayZone);
 
   const RECENT_LOGS_LIMIT = 50;
+  const namesBySession = namesBySessionFrom(rollup.map((r) => ({ sessionId: r.sessionId, exerciseName: r.exerciseName })));
+  const searching = isSearching(searchWords);
+  const logsForList = (allLogs ?? []).filter((l: any) => matchesLoggedSearch({ sessionId: l.session_id as string, dateKey: dateKeyInZone(l.created_at as string, displayZone) }, namesBySession, searchWords));
+  const importedForList = (importedSessions ?? []).filter((x: any) => matchesLoggedSearch({ sessionId: x.id as string, dateKey: dateKeyInZone(x.started_at as string, displayZone) }, namesBySession, searchWords));
   const loggedList = mergeLoggedList<any>(
-    (allLogs ?? []) as any[],
-    (importedSessions ?? []).map((s: any) => ({ id: s.id as string, started_at: s.started_at as string, exercises: (s.session_exercises?.[0]?.count as number | undefined) ?? 0 })),
+    logsForList as any[],
+    importedForList.map((x: any) => ({ id: x.id as string, started_at: x.started_at as string, exercises: (x.session_exercises?.[0]?.count as number | undefined) ?? 0 })),
     RECENT_LOGS_LIMIT
   );
-  const loggedListTotal = (allLogs?.length ?? 0) + (importedTotal ?? importedSessions?.length ?? 0);
+  const loggedListTotal = logsForList.length + (searching ? importedForList.length : importedTotal ?? importedSessions?.length ?? 0);
+
+  // The Progress cards: pinned first, then the big five by most logged, then the rest (lib/progress-cards.ts).
+  const ladders: LadderInput[] = ((coachMovementPatterns ?? []) as any[]).map((p) => ({
+    patternName: p.name as string,
+    exercises: ((p.movement_pattern_exercises ?? []) as any[]).map((e) => ({ name: e.exercise_name as string, tier: (e.tier as "A" | "B" | "C" | null) ?? null })),
+  }));
+  const pinnedNames = (pinRows ?? []).map((p: any) => p.exercise_name as string);
+  const cardPlan = planCards(summarizeExercises(rollup), ladders, pinnedNames);
+  const maxByName = new Map((trainingMaxRows ?? []).map((r: any) => [String(r.exercise_name).trim().toLowerCase(), r.estimated_max as number]));
+  const trainingIntent = ((personalProgram ?? sharedProgramRaw) as { training_intent?: string | null } | null)?.training_intent ?? null;
+  const cardMetric = defaultMetric(trainingIntent, ((progressPrefs?.metric as "weight" | "volume" | null | undefined) ?? null));
+  const cardData = cardPlan.cards.map((c) => ({
+    name: c.name,
+    sessions: c.sessions,
+    // the estimate is worked out from every counted set (imported history included), the same sets the stored training max is built from
+    bestE1rm: c.bestE1rm ?? maxByName.get(c.name.trim().toLowerCase()) ?? null,
+    bestWeight: c.bestWeight,
+    weightSeries: c.weightSeries,
+    volumeSeries: c.volumeSeries,
+    pinned: pinnedNames.some((n) => n.trim().toLowerCase() === c.name.trim().toLowerCase()),
+  }));
+  const overlayWeight = (weightLogs ?? []).map((w: any) => ({ date: w.logged_date as string, value: Number(w.weight) })).sort((a, b) => a.date.localeCompare(b.date));
+  const overlayIntake = (intakeRows ?? []).map((r: any) => ({ date: String(r.log_date), value: Number(r.calories) }));
 
   // Last-7-days habit compliance — the one piece of this that's actually
   // measurable today. Macro targets are coach-set but nothing logs what
@@ -1082,22 +1129,7 @@ export default async function AthleteProfilePage(
             <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
               Stats
             </h2>
-            <div className="flex gap-6 pb-4 border-b border-steel/15">
-              <div>
-                <p className="font-display text-2xl">{totalCompleted}</p>
-                <p className="font-body text-xs text-steel">Workouts</p>
-              </div>
-              <div>
-                <p className="font-display text-2xl">
-                  {Math.round(totalVolume).toLocaleString()}
-                </p>
-                <p className="font-body text-xs text-steel">Volume (lbs)</p>
-              </div>
-              <div>
-                <p className="font-display text-2xl">{prEntries.length}</p>
-                <p className="font-body text-xs text-steel">PRs</p>
-              </div>
-            </div>
+            <ProgressStats events={statEvents} prDates={prDateKeys} todayKey={progressToday} />
 
             {prEntries.length > 0 && (
               <div className="py-4 border-b border-steel/15">
@@ -1192,27 +1224,17 @@ export default async function AthleteProfilePage(
           </div>
 
           <div data-tab="progress">
-          {(trainingMaxRows ?? []).length > 0 && (
-            <section>
-              <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
-                Estimated Training Maxes
-              </h2>
-              <p className="font-body text-xs text-steel mb-2">
-                Auto-estimated from logged sets (weight, reps, and RPE) — never a typed-in number, and only ever
-                moves up as a harder set gets logged.
-              </p>
-              <div className="divide-y divide-steel/15">
-                {(trainingMaxRows ?? []).map((row) => (
-                  <div key={row.exercise_name} className="flex items-center justify-between py-2">
-                    <span className="font-body text-sm">{row.exercise_name}</span>
-                    <span className="font-body text-sm text-rust font-medium">
-                      {Math.round(row.estimated_max)} lbs
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
+          <TrainingMaxCards
+            cards={cardData}
+            visible={cardPlan.visible}
+            label={cardPlan.label}
+            athleteId={params.athleteId}
+            groupId={params.groupId}
+            coachId={user.id}
+            initialView={progressPrefs?.view_mode === "list" ? "list" : "cards"}
+            initialMetric={cardMetric}
+            canPin={!selfView}
+          />
           </div>
 
           <div data-tab="program">
@@ -1598,35 +1620,7 @@ export default async function AthleteProfilePage(
         </div>
 
         <div>
-          <div data-tab="progress">
-          <section>
-            <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
-              Progress
-            </h2>
-            <div className="grid grid-cols-2 gap-8 pb-6 mb-6 border-b border-steel/15">
-              <div>
-                <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">
-                  Exercise
-                </p>
-                <Suspense fallback={<SectionLoading />}>
-                  <ExerciseProgressionLoader athleteId={params.athleteId} groupId={params.groupId} />
-                </Suspense>
-              </div>
-              <div>
-                <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">
-                  Calorie target
-                </p>
-                <TrendChart
-                  points={calorieTrend}
-                  unit=" cal"
-                  emptyLabel="No calorie targets set yet."
-                />
-              </div>
-            </div>
-          </section>
-          </div>
-
-          <div data-tab="overview progress">
+          <div data-tab="overview">
           <section>
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 mb-2">
           <h2 className="font-display uppercase text-sm tracking-wide text-steel">
@@ -1642,8 +1636,9 @@ export default async function AthleteProfilePage(
             Import or add past history
           </Link>
           </div>
+          <LoggedSearch action={`/groups/${params.groupId}/athletes/${params.athleteId}`} q={searchWords.q} from={searchWords.from} to={searchWords.to} />
           {loggedList.length === 0 ? (
-            <p className="font-body text-sm text-steel py-2">No completed workouts yet.</p>
+            <p className="font-body text-sm text-steel py-2">{searching ? "No workouts match that search." : "No completed workouts yet."}</p>
           ) : (
             <div className="divide-y divide-steel/15">
               {loggedList.map(({ key, date, imported, log }) =>
@@ -1746,32 +1741,9 @@ export default async function AthleteProfilePage(
             </RosterSection>
           )}
 
-          <section>
-            <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
-              Body weight
-            </h2>
-            <TrendChart
-              points={(weightLogs ?? [])
-                .slice()
-                .reverse()
-                .map((w) => ({ date: w.logged_date, value: w.weight }))}
-              unit=" lbs"
-            />
-            {weightLogs && weightLogs.length > 0 ? (
-              <div className="divide-y divide-steel/15 mt-2">
-                {weightLogs.map((w) => (
-                  <div key={w.id} className="py-2 flex items-center justify-between">
-                    <span className="font-body text-sm text-steel">
-                      {new Date(w.logged_date + "T00:00:00").toLocaleDateString()}
-                    </span>
-                    <span className="font-body text-sm">{w.weight} lbs</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="font-body text-sm text-steel py-2">No weight logged yet.</p>
-            )}
-          </section>
+          <div data-tab="progress">
+            <BodyOverlayChart weight={overlayWeight} target={calorieTrend} intake={overlayIntake} todayKey={progressToday} />
+          </div>
         </div>
       </div>
 

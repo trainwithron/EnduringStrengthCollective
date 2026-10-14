@@ -6,6 +6,9 @@ const WIDTH = 560;
 const HEIGHT = 140;
 const PADDING = 28;
 
+// The top and bottom numbers of the axis: at most one decimal, with thousands separators (a volume or an average is never printed as 286.42857142857144).
+const shown = (v: number) => (Math.round(v * 10) / 10).toLocaleString("en-US");
+
 // Hand-rolled SVG line chart — no charting library, matching how this app
 // already avoids dependencies for small visual pieces (e.g. the PR burst
 // animation, the icon generator). Draws the real data as a solid line and
@@ -62,11 +65,11 @@ export function TrendChart({
           <circle key={i} cx={p.x} cy={p.y} r={i === plotted.length - 1 ? 3.5 : 2.5} fill="#D2703B" />
         ))}
         <text x={PADDING} y={12} fontSize="10" fill="#8A8168" fontFamily="Inter, sans-serif">
-          {maxValue}
+          {shown(maxValue)}
           {unit}
         </text>
         <text x={PADDING} y={HEIGHT - PADDING + 16} fontSize="10" fill="#8A8168" fontFamily="Inter, sans-serif">
-          {minValue}
+          {shown(minValue)}
           {unit}
         </text>
       </svg>

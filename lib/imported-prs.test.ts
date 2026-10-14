@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { dailyBestByExercise, hindsightPrs, importedTotals, parseRollup, type RollupRow } from "@/lib/imported-prs";
+import { dailyBestByExercise, hindsightPrs, importedTotals, importedWorkouts, parseRollup, type RollupRow } from "@/lib/imported-prs";
 
 const read = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
 
@@ -62,6 +62,25 @@ describe("records found in hindsight", () => {
   });
 });
 
+describe("imported workouts, one entry each", () => {
+  it("when and how much, for the imported workouts that have no log of their own", () => {
+    const rows = [
+      row("2025-01-01", "Squat", 100, { sessionId: "i1" }),
+      row("2025-01-01", "Bench", 100, { sessionId: "i1" }),
+      row("2025-02-01", "Squat", 100, { sessionId: "i2" }),
+      row("2025-04-01", "Squat", 100, { sessionId: "promoted", hasLog: true }),
+      row("2025-03-01", "Squat", 100, { sessionId: "live", imported: false, hasLog: true }),
+    ];
+    const list = importedWorkouts(rows);
+    expect(list.map((w) => [w.sessionId, w.volume])).toEqual([
+      ["i1", 1000],
+      ["i2", 500],
+    ]);
+    expect(list[0].at.slice(0, 10)).toBe("2025-01-01");
+    expect(importedWorkouts([])).toEqual([]);
+  });
+});
+
 describe("totals", () => {
   it("imported workouts without a log add to the workout count and the volume; live ones and promoted ones do not (they are in the logs)", () => {
     const rows = [
@@ -101,13 +120,12 @@ describe("the profile uses it", () => {
   const page = read("app/(coach)/groups/[groupId]/athletes/[athleteId]/page.tsx");
   it("totals and records add the imported history to the logged workouts, in the first wait", () => {
     expect(page).toContain('supabase.rpc("client_exercise_rollup"');
-    expect(page).toContain("const totalCompleted = (allLogs?.length ?? 0) + importedSums.workouts;");
+    expect(page).toContain("...importedList.map((w) => ({ date: dateKeyInZone(w.at, displayZone), volume: w.volume })),");
     expect(page).toContain("hindsightPrs(rollup)");
     expect(page).not.toContain("Includes imported history");
   });
-  it("the exercise graph reads the same rows and no longer reads set logs directly", () => {
-    const loader = read("components/coach/desktop/exercise-progression-loader.tsx");
-    expect(loader).toContain("client_exercise_rollup");
-    expect(loader).not.toContain('.from("set_logs")');
+  it("the cards and graphs are built from the same rows, never from set logs read on the page", () => {
+    expect(page).toContain("planCards(summarizeExercises(rollup)");
+    expect(page).not.toContain('.from("set_logs")');
   });
 });
