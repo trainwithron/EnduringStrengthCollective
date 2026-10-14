@@ -36,6 +36,7 @@ $g118$;
 --     clients / one group), and whether a buyer of a program also joins the coach's client space (default yes). "Public page" stays the existing is_public flag.
 --   * pro_shop_links (a link card, for example Printful): show on the coach's public page, and the same audience. The existing Featured flag stays "Client Home and first in the shop"; the public page used
 --     to show the featured cards, so every card that is featured today is also marked public now and nobody's public page changes.
+-- "One group" with no group (the group was deleted) is allowed to exist: the code shows such a card to no one, and deleting a group is never blocked by a card that pointed at it.
 -- Existing rows keep behaving exactly as before (everyone, same places). Re-runnable.
 
 alter table public.coach_packages
@@ -52,11 +53,11 @@ alter table public.pro_shop_links
 
 alter table public.coach_packages drop constraint if exists coach_packages_audience_check;
 alter table public.coach_packages add constraint coach_packages_audience_check
-  check (audience in ('everyone', 'not_one_on_one', 'only_one_on_one', 'one_group') and (audience <> 'one_group' or audience_group_id is not null));
+  check (audience in ('everyone', 'not_one_on_one', 'only_one_on_one', 'one_group'));
 
 alter table public.pro_shop_links drop constraint if exists pro_shop_links_audience_check;
 alter table public.pro_shop_links add constraint pro_shop_links_audience_check
-  check (audience in ('everyone', 'not_one_on_one', 'only_one_on_one', 'one_group') and (audience <> 'one_group' or audience_group_id is not null));
+  check (audience in ('everyone', 'not_one_on_one', 'only_one_on_one', 'one_group'));
 
 -- The public page showed the featured cards: keep exactly that for every coach.
 update public.pro_shop_links set show_on_public = true where featured = true and show_on_public = false;
