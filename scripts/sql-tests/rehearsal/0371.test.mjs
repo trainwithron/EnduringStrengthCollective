@@ -45,7 +45,9 @@ export default {
       }
       const jumbled = await sets(await exercise(await session(5, true), "Squat"), [[200, 5], [200, 5], [2, 5]]);
       const tenX = await sets(await exercise(await session(6, true), "Squat"), [[2000, 5]]);
+      for (const day of [11, 12, 13]) await sets(await exercise(await session(day, true), "Bench"), [[135, 5], [135, 5]]);
       const noReps = await sets(await exercise(await session(7, true), "Bench"), [[135, null]]);
+      const weightOnlyCarry = await sets(await exercise(await session(14, true), "Suitcase Carry"), [[70, null], [70, null], [70, null]]);
       const manyReps = await sets(await exercise(await session(8, true), "Row"), [[50, 150]]);
       const carry = await sets(await exercise(await session(9, true), "Farmer carry"), [[100, null, { time: 30 }]]);
       const bodyweight = await sets(await exercise(await session(9, true), "Pull-up"), [[0, 8]]);
@@ -62,6 +64,7 @@ export default {
       h.check("a weight ten times the usual is marked", (await flagOf(tenX[0])).data_flag_reason === "Weight far above the usual for this exercise");
       h.check("a weight with no reps is marked", (await flagOf(noReps[0])).data_flag_reason === "Weight but no reps");
       h.check("reps over 100 is marked", (await flagOf(manyReps[0])).data_flag_reason === "Reps over 100");
+      h.check("an exercise that is always logged weight-only (a carry) is NOT marked", (await flagOf(weightOnlyCarry[0])).data_flag === null && (await flagOf(weightOnlyCarry[2])).data_flag === null);
       h.check("a timed carry with a weight and no reps is NOT marked", (await flagOf(carry[0])).data_flag === null);
       h.check("an unloaded bodyweight move (weight 0) is NOT marked", (await flagOf(bodyweight[0])).data_flag === null);
       h.check("a live set that looks the same is never marked", (await flagOf(live[2])).data_flag === null);

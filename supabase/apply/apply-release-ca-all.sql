@@ -102,7 +102,7 @@ create trigger set_logs_guard_flag_update
 
 -- The rules, one place. Only imported (historical) sets are questioned, and only completed ones.
 --   1. reps over 100
---   2. a weight with no reps (and no time, distance or height: a carry or a timed hold is fine)
+--   2. a weight with no reps (and no time, distance or height), for an exercise the client otherwise logs WITH reps: an exercise that is always weight-only (a carry) is fine
 --   3. a weight eight times the usual for that exercise (the client's median weight; needs 5 weighted sets to judge)
 --   4. the last set of an exercise far below the others (under a quarter of them, when the others agree with each other: 20, 20, 2)
 -- A weight of 0 is never questioned (an unloaded bodyweight move).
@@ -138,7 +138,8 @@ begin
   usual as (
     select exercise_name,
            percentile_cont(0.5) within group (order by weight) as median,
-           count(*) as n
+           count(*) as n,
+           avg(case when reps > 0 then 1.0 else 0.0 end) as rep_share
     from sets
     where weight > 0 and (data_flag is null or data_flag = 'accepted')
     group by exercise_name
@@ -147,7 +148,8 @@ begin
     select st.id,
            case
              when st.reps > 100 then 'Reps over 100'
-             when st.weight > 0 and coalesce(st.reps, 0) = 0 and st.time_seconds is null and st.distance is null and st.height is null then 'Weight but no reps'
+             when st.weight > 0 and coalesce(st.reps, 0) = 0 and st.time_seconds is null and st.distance is null and st.height is null
+                  and coalesce(u.rep_share, 0) >= 0.5 then 'Weight but no reps'
              when st.weight > 0 and u.n >= 5 and st.weight >= 8 * u.median then 'Weight far above the usual for this exercise'
              when st.weight > 0 and o.n >= 2 and st.set_order = o.last_order_all and st.weight < 0.25 * o.min_weight and o.min_weight >= 0.75 * o.max_weight
                then 'Last set far below the others'
