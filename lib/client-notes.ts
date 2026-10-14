@@ -66,6 +66,12 @@ export function pushRaw(raw: RawEntry[], text: string, now: Date): RawEntry[] {
   return t ? [...kept, { text: t, at: now.toISOString() }].slice(-MAX_RAW) : kept;
 }
 
+// The raw words still inside the 30 days (an older entry is never shown, even before the next write removes it).
+export function freshRaw(raw: RawEntry[], now: Date = new Date()): RawEntry[] {
+  const cutoff = now.getTime() - RAW_KEEP_DAYS * 86400000;
+  return raw.filter((r) => new Date(r.at).getTime() >= cutoff);
+}
+
 // A bullet written from a rule the coach just taught ("Back limits: no barbell squats"), added without any AI call.
 export function ruleBullet(whenLabels: string[], thenText: string, whenKeys: string[], today: string): NoteBullet | null {
   const text = cleanBullet(whenLabels.length > 0 ? `${whenLabels.join(" and ")}: ${thenText.charAt(0).toLowerCase()}${thenText.slice(1)}` : thenText);

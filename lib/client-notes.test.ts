@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { MAX_BULLETS, MAX_BULLET_CHARS, NOTES_HEADING, NOTES_SYSTEM, addBullet, cleanBullet, mergeFromAi, normalizeBullets, notesBlock, notesUserText, pushRaw, ruleBullet, tagsFromNotes } from "@/lib/client-notes";
+import { MAX_BULLETS, MAX_BULLET_CHARS, NOTES_HEADING, freshRaw, NOTES_SYSTEM, addBullet, cleanBullet, mergeFromAi, normalizeBullets, notesBlock, notesUserText, pushRaw, ruleBullet, tagsFromNotes } from "@/lib/client-notes";
 
 const read = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
 
@@ -33,6 +33,11 @@ describe("Past AI build notes stay short", () => {
     const raw = [{ text: "old", at: "2026-08-01T12:00:00Z" }, { text: "recent", at: "2026-10-01T12:00:00Z" }];
     expect(pushRaw(raw, "new words", now).map((r) => r.text)).toEqual(["recent", "new words"]);
     expect(pushRaw(raw, "   ", now).map((r) => r.text)).toEqual(["recent"]);
+  });
+  it("and an older entry is never shown, even before the next write removes it", () => {
+    const now = new Date("2026-10-14T12:00:00Z");
+    expect(freshRaw([{ text: "old", at: "2026-08-01T12:00:00Z" }, { text: "recent", at: "2026-10-01T12:00:00Z" }], now).map((r) => r.text)).toEqual(["recent"]);
+    expect(read("lib/client-notes-server.ts")).toContain("freshRaw(row?.raw as RawEntry[])");
   });
 });
 

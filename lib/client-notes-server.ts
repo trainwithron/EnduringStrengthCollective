@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { addBullet, notesBlock, ruleBullet, type NoteBullet, type RawEntry } from "@/lib/client-notes";
+import { addBullet, freshRaw, notesBlock, ruleBullet, type NoteBullet, type RawEntry } from "@/lib/client-notes";
 import { labelFor } from "@/lib/context-tags";
 
 // Reads one client's Past AI build notes as the coach (row policies keep it theirs). Nothing here ever throws into an AI path: no notes, or the table not there yet, is simply an empty list.
@@ -8,7 +8,7 @@ export async function loadClientNotes(supabase: SupabaseClient, coachId: string,
   try {
     const { data } = await supabase.from("client_ai_notes").select("bullets, raw").eq("coach_id", coachId).eq("athlete_id", athleteId).maybeSingle();
     const row = data as { bullets?: NoteBullet[] | null; raw?: RawEntry[] | null } | null;
-    return { bullets: Array.isArray(row?.bullets) ? (row?.bullets as NoteBullet[]) : [], raw: Array.isArray(row?.raw) ? (row?.raw as RawEntry[]) : [] };
+    return { bullets: Array.isArray(row?.bullets) ? (row?.bullets as NoteBullet[]) : [], raw: Array.isArray(row?.raw) ? freshRaw(row?.raw as RawEntry[]) : [] };
   } catch {
     return { bullets: [], raw: [] };
   }
