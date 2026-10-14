@@ -315,6 +315,8 @@ export function ProgramBuilderDesktop({
         {!embedded && (
           <AiProgramBuilderBox
             programId={programId}
+            groupId={groupId}
+            athleteId={athleteId}
             days={days}
             trainingDaysCount={trainingDays && trainingDays.length > 0 ? trainingDays.length : null}
             demoLibrary={demoLibrary}

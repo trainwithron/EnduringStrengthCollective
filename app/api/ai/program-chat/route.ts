@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
+import { loadLearnedLines } from "@/lib/learned-for-prompt";
 import { callClaude, extractJson, isAiConfigured } from "@/lib/anthropic-client";
 import { AiRateLimitedError, aiInputTooLong } from "@/lib/ai-usage";
 
@@ -65,7 +66,7 @@ export async function POST(request: Request) {
 
   const { data: program } = await supabase
     .from("programs")
-    .select("id, name, group_id, ai_sequencing_notes")
+    .select("id, name, group_id, ai_sequencing_notes, athlete_id")
     .eq("id", programId)
     .maybeSingle();
   if (!program) return NextResponse.json({ error: "Program not found." }, { status: 404 });
@@ -139,10 +140,9 @@ export async function POST(request: Request) {
     .eq("coach_id", user.id)
     .order("created_at", { ascending: false })
     .limit(50);
-  const existingPrefsText =
-    existingPrefs && existingPrefs.length > 0
-      ? existingPrefs.map((p) => `- When ${p.condition_text}: ${p.preference_text}`).join("\n")
-      : "(none yet)";
+  const taughtLines = await loadLearnedLines(supabase, user.id, (program as { athlete_id?: string | null }).athlete_id ?? null);
+  const prefLines = [...(existingPrefs ?? []).map((p) => `- When ${p.condition_text}: ${p.preference_text}`), ...taughtLines.map((l) => `- ${l}`)];
+  const existingPrefsText = prefLines.length > 0 ? prefLines.join("\n") : "(none yet)";
 
   let reply = "I wasn't able to answer that — try asking again.";
   let proposedRule: { condition: string; preference: string } | null = null;

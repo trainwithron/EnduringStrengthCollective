@@ -7,6 +7,7 @@ import { BUILDER_ONE_WORKOUT_SELECT, mapWorkoutRowToBuilderDay } from "@/lib/pro
 import { AiRunPanel } from "@/components/coach/desktop/ai-run-panel";
 import { MicButton } from "@/components/shared/mic-button";
 import { TemplateSuggestion } from "@/components/coach/desktop/template-suggestion";
+import { LearnLine } from "@/components/coach/desktop/learn-line";
 import { fixTargetFrom, parseBuildRequest, planSlots, scopeLimitFrom } from "@/lib/ai-day-request";
 import type { DaySlot } from "@/lib/ai-day-slots";
 import type { BuilderDay } from "@/lib/types";
@@ -21,6 +22,8 @@ const COULDNT = "Couldn't build that day. Try Resume, or tell it what to change.
 // correction so far. It only fills EMPTY days; it never wipes a day the coach built.
 export function AiProgramBuilderBox({
   programId,
+  groupId,
+  athleteId = null,
   days,
   trainingDaysCount,
   demoLibrary,
@@ -28,6 +31,9 @@ export function AiProgramBuilderBox({
   onDay,
 }: {
   programId: string;
+  groupId: string;
+  // The client this program is for, when it is a personal copy (the rules the AI learns are matched to the client's clauses).
+  athleteId?: string | null;
   days: BuilderDay[];
   trainingDaysCount: number | null;
   demoLibrary: DemoRow[];
@@ -39,6 +45,8 @@ export function AiProgramBuilderBox({
   const [line, setLine] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [flags, setFlags] = useState<string[]>([]);
+  // A correction typed while paused: after it is applied the app offers, once, to remember it ("I'll remember: ...").
+  const [learn, setLearn] = useState<{ id: number; correction: string } | null>(null);
   // What he asked for in this run, shown beside the box (read-only).
   const [shownRequest, setShownRequest] = useState("");
   const [shownCorrections, setShownCorrections] = useState<string[]>([]);
@@ -184,6 +192,7 @@ export function AiProgramBuilderBox({
     if (said) {
       corrections.current = [...corrections.current, said];
       setShownCorrections([...corrections.current]);
+      setLearn({ id: Date.now(), correction: said });
       setText("");
       const named = fixTargetFrom(said);
       const target: DaySlot | null = named ? { week: named.week ?? lastBuilt.current?.week ?? 1, day: named.day } : lastBuilt.current;
@@ -260,6 +269,7 @@ export function AiProgramBuilderBox({
         )}
       </div>
       {phase === "idle" && <TemplateSuggestion text={text} />}
+      {learn && <LearnLine key={learn.id} correction={learn.correction} programId={programId} groupId={groupId} athleteId={athleteId} />}
       {line && (
         <p className="font-body text-sm text-chalk mt-2" role="status">
           {line}

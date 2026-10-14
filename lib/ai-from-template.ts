@@ -81,6 +81,8 @@ export interface TemplatePickInput {
   injuryContext: string | null;
   youthBlock: string | null;
   retryNote?: string | null;
+  // What this coach has taught the AI that fits this client; under the safety rules, only adds.
+  learnedBlock?: string | null;
 }
 
 export function buildTemplatePickUserText(input: TemplatePickInput): string {
@@ -89,6 +91,7 @@ export function buildTemplatePickUserText(input: TemplatePickInput): string {
   parts.push(`About the person (from the coach):\n${input.text.trim() || "(nothing written)"}`);
   if (input.injuryContext) parts.push(`Client injury or health context:\n${input.injuryContext}`);
   if (input.youthBlock) parts.push(input.youthBlock);
+  if (input.learnedBlock) parts.push(input.learnedBlock);
   parts.push(
     "Slots and their candidates:\n" +
       input.slots

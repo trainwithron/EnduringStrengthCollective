@@ -11,6 +11,7 @@ import { scanConstraints } from "@/lib/constraint-scan";
 import { parseRestSpan } from "@/lib/rest-time";
 import { DEFAULT_TRACKED_FIELDS } from "@/lib/exercise-fields";
 import type { TrackedField } from "@/lib/exercise-fields";
+import { learnedBlock, loadLearnedLines } from "@/lib/learned-for-prompt";
 import { resolveAiExerciseName, exercisesWanted, allowsRepeats, applyTimedConsistency, dedupeDay, isMobilityTitle, longDayFlag, mobilityDaysWanted, mobilityInstruction, mobilityRole, plainLibraryName, ruleKey } from "@/lib/ai-day-rules";
 import { DAY_MAX_TOKENS, TOO_LONG_MESSAGE, TRUNCATED_RETRY_NOTE, buildDaySystemPrompt, buildDayUserText, checkRunToken, issueRunToken, readDayResult, runTokenIsStale, truncatedRetryTimeoutMs, type BuiltDay } from "@/lib/ai-day-run";
 
@@ -132,6 +133,8 @@ export async function POST(request: Request) {
     if (await athleteIsMinor(supabase, athleteId)) youthBlock = YOUTH_PROMPT_BLOCK;
   }
 
+  // What the coach has taught the AI that fits THIS client (their clauses, level and age band decide which rules reach it).
+  const taught = learnedBlock(await loadLearnedLines(supabase, user.id, athleteId));
   const [{ data: libraryRows }, { data: aliasRows }] = await Promise.all([
     supabase.from("exercise_library").select("name, category").eq("created_by", user.id).order("name").limit(3000),
     supabase.from("exercise_aliases").select("raw_name, exercise_name").eq("coach_id", user.id),
@@ -150,7 +153,7 @@ export async function POST(request: Request) {
     const text = await callClaude({
       meta: { feature: "program_day", userId: user!.id },
       system: buildDaySystemPrompt({ youthBlock, hasInjury: injuryContext !== null }),
-      userText: buildDayUserText({ slot: { week, day }, instruction, corrections, built, fixing: mode === "fix" ? targetBuilt : null, youthBlock, injuryContext, libraryText, mobilityNote, retryNote }),
+      userText: buildDayUserText({ slot: { week, day }, instruction, corrections, built, fixing: mode === "fix" ? targetBuilt : null, youthBlock, injuryContext, libraryText, mobilityNote, retryNote, learnedBlock: taught }),
       maxTokens: DAY_MAX_TOKENS,
       timeoutMs,
     });

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { LEARN_INTRO } from "@/lib/learning-rule";
 
 export interface LearnedLine {
   // A learned rule (undo) or a preference the coach saved in the program chat (remove).
@@ -11,6 +12,8 @@ export interface LearnedLine {
   text: string;
   evidence: string | null;
   reason: string | null;
+  // Who a taught rule reaches ("For clients with back limits").
+  when?: string | null;
 }
 
 // "What I've learned about how you coach": one plain list of everything the builder has been told to do your way (from your edits you said Yes to, and from the program chat), each
@@ -62,6 +65,7 @@ export function LearnedList({
   return (
     <section id="how-you-coach" className="mt-10 border-t border-steel/20 pt-6 max-w-2xl" aria-label="What I've learned about how you coach">
       <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-1">What I&apos;ve learned about how you coach</h2>
+      <p className="font-body text-xs text-steel mb-1">{LEARN_INTRO}</p>
       <p className="font-body text-xs text-steel mb-3">
         {shown.length === 0
           ? "Nothing yet. As you change what the AI builds, I'll notice and ask once."
@@ -73,6 +77,7 @@ export function LearnedList({
             <li key={l.kind + l.id} className="flex items-start gap-3 px-3 py-2">
               <div className="flex-1 min-w-0">
                 <p className="font-body text-sm text-chalk">{l.text}</p>
+                {l.when && <p className="font-body text-xs text-steel">{l.when}</p>}
                 {l.evidence && <p className="font-body text-xs text-steel">{l.evidence}</p>}
                 {l.reason && <p className="font-body text-xs text-steel">Your reason: {l.reason}</p>}
               </div>

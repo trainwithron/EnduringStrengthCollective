@@ -7,6 +7,7 @@ import { checkAndSpendCoachCredits, canRunAiAction } from "@/lib/coach-credits";
 import { hasFlaggedMusculoskeletalConcern } from "@/lib/athlete-injury-flag";
 import { athleteIsMinor, YOUTH_PROMPT_BLOCK } from "@/lib/youth-block";
 import { scanConstraints } from "@/lib/constraint-scan";
+import { learnedBlock, loadLearnedLines } from "@/lib/learned-for-prompt";
 import { choicesForSlot, slotLabel, type LadderRung, type Level, type Side, type SlotTier } from "@/lib/slot-templates";
 import { dayHeading, type TemplateSlot } from "@/lib/use-template";
 import {
@@ -115,12 +116,13 @@ export async function POST(request: Request) {
     if (await athleteIsMinor(supabase, clientId)) youthBlock = YOUTH_PROMPT_BLOCK;
   }
   const level = levelUsed(text, storedLevel ?? chosenLevel);
+  const taught = learnedBlock(await loadLearnedLines(supabase, user.id, clientId));
 
   async function attempt(retryNote: string | null) {
     const answer = await callClaude({
       meta: { feature: "program_template", userId: user!.id },
       system: TEMPLATE_PICK_SYSTEM,
-      userText: buildTemplatePickUserText({ slots: slotCandidates, level, text, injuryContext, youthBlock, retryNote }),
+      userText: buildTemplatePickUserText({ slots: slotCandidates, level, text, injuryContext, youthBlock, retryNote, learnedBlock: taught }),
       maxTokens: 4000,
       timeoutMs: retryNote ? 25_000 : 30_000,
     });

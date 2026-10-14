@@ -11,6 +11,7 @@ import { matchExercise, matchTopN, type LibraryExercise } from "@/lib/exercise-m
 import { scanConstraints } from "@/lib/constraint-scan";
 import { clampAiRow } from "@/lib/ai-row-clamps";
 import { athleteIsMinor, YOUTH_PROMPT_BLOCK } from "@/lib/youth-block";
+import { loadLearnedLines } from "@/lib/learned-for-prompt";
 import { buildProgrammingProfile, libraryContext, mentionsExercise, rankLibrary, type LibraryItem } from "@/lib/builder-context";
 
 // The longest description the builder will read. A longer one is almost certainly pasted text, not a request.
@@ -310,8 +311,11 @@ export async function POST(request: Request) {
     .order("created_at", { ascending: false })
     .limit(100);
 
+  // Rules the coach taught that fit this client (their clauses, level and age band decide which reach it).
+  const taughtLines = await loadLearnedLines(supabase, user.id, typeof athleteId === "string" && athleteId ? athleteId : null);
   const preferenceLines = [
     ...(prefRows ?? []).map((p) => `- When ${p.condition_text}: ${p.preference_text}`),
+    ...taughtLines.map((l) => `- ${l} (taught by this coach)`),
     ...(spotterPrefRows ?? []).map(
       (p) => `- When ${p.condition_text}: ${p.preference_text} (from Programming Spotter feedback)`
     ),

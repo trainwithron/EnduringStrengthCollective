@@ -92,6 +92,8 @@ export interface DayPromptInput {
   // Extra, per-day instructions the server works out: how many mobility days this week, and (on a retry) what the first try got wrong.
   mobilityNote?: string | null;
   retryNote?: string | null;
+  // What this coach has taught the AI that applies to this client (lib/learned-for-prompt.ts), already worded; it sits under the safety rules and can only add.
+  learnedBlock?: string | null;
 }
 
 export function buildDaySystemPrompt(input: { youthBlock: string | null; hasInjury: boolean }): string {
@@ -145,6 +147,7 @@ export function buildDayUserText(input: DayPromptInput): string {
   const parts: string[] = [];
   parts.push(`Coach's exercise library:\n${input.libraryText}`);
   if (input.injuryContext) parts.push(`Client injury or health context:\n${input.injuryContext}`);
+  if (input.learnedBlock) parts.push(input.learnedBlock);
   parts.push(input.built.length > 0 ? `Days already built in this program (do not repeat them):\n${input.built.map(dayLine).join("\n")}` : "No days are built yet.");
   if (input.corrections.length > 0) parts.push(`Corrections the coach has given so far (all still apply):\n${input.corrections.map((c) => `- ${c}`).join("\n")}`);
   if (input.fixing) parts.push(`Fix this day, changing only what the correction asks and keeping the rest as it is:\n${dayLine(input.fixing)}`);

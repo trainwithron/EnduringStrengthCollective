@@ -301,6 +301,14 @@
   "file": "apply-release-bw-all.sql"
  },
  {
+  "id": "release-by",
+  "name": "Release BY (the AI you can train, first release: clauses on a client, rules that apply only to the clients they fit; run BEFORE the code that goes with it is live)",
+  "steps": [
+   "119"
+  ],
+  "file": "apply-release-by-all.sql"
+ },
+ {
   "id": "release-bx",
   "name": "Release BX (the one product shelf: where each package and Pro Shop card shows and who sees it; run BEFORE the code that goes with it is live)",
   "steps": [
