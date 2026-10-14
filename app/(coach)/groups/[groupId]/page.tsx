@@ -856,6 +856,7 @@ export default async function GroupHubPage(
                 wellnessCheckin={wellnessCheckin}
                 mealLine={mealLine}
                 sessionsLeft={sessionsLeft}
+                ownChoice={isCoach && !isActingAsOther && athleteId === user?.id}
               />
               {isToday && weekClasses && (
                 <section aria-label="Group classes this week">
