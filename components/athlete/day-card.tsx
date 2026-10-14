@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { sessionBalanceLine } from "@/lib/session-credit-copy";
+import { VIEW_PROGRAM_LABEL, startLabel, weekdayName } from "@/lib/coach-log-choice";
 import { Lock, Check } from "lucide-react";
 import { TodayWidget, type TodayMacros, type TodayHabit } from "./today-widget";
 import { WeightLogWidget, type WeightLogEntry } from "./weight-log-widget";
@@ -36,6 +37,7 @@ export function DayCard({
   nextLabel = null,
   mealLine = null,
   sessionsLeft = null,
+  ownChoice = false,
 }: {
   groupId: string;
   athleteId: string;
@@ -58,10 +60,13 @@ export function DayCard({
   mealLine?: string | null;
   // The client's sessions left, shown beside "Book a session" when they have any.
   sessionsLeft?: number | null;
+  // A coach looking at their OWN training: today's workout offers the same small choice as the client Log page, "Start [Day]'s workout" and "View whole program".
+  ownChoice?: boolean;
 }) {
   return (
     <div className="space-y-4">
       <WorkoutSection
+        ownChoice={ownChoice}
         groupId={groupId}
         dateKey={dateKey}
         dateLabel={dateLabel}
@@ -87,6 +92,7 @@ export function DayCard({
 }
 
 function WorkoutSection({
+  ownChoice = false,
   groupId,
   dateKey,
   dateLabel,
@@ -98,6 +104,7 @@ function WorkoutSection({
   wellnessCheckin,
   nextLabel,
 }: {
+  ownChoice?: boolean;
   groupId: string;
   dateKey: string;
   dateLabel: string;
@@ -183,9 +190,10 @@ function WorkoutSection({
                           : "font-body text-sm text-rust"
                       }
                     >
-                      {isToday ? "Start workout" : "View planned workout"}
+                      {isToday ? (ownChoice ? startLabel(weekdayOfDate(dateKey)) : "Start workout") : "View planned workout"}
                     </Link>
                   )}
+                  {ownChoice && x.status === "planned" && isToday && <ViewWholeProgramLink groupId={groupId} programId={x.programId} />}
                   {x.status === "missed" && <p className="font-body text-sm text-steel">Not logged.</p>}
                   {x.status === "locked" && (
                     <p className="font-body text-sm text-steel flex items-center gap-1.5">
@@ -308,11 +316,27 @@ function WorkoutSection({
                 : "font-body text-sm text-rust"
             }
           >
-            {isToday ? "Start workout" : "View planned workout"}
+            {isToday ? (ownChoice ? startLabel(weekdayOfDate(dateKey)) : "Start workout") : "View planned workout"}
           </Link>
         )}
+        {ownChoice && isToday && workout.status === "planned" && <ViewWholeProgramLink groupId={groupId} programId={sessions?.[0]?.programId ?? null} />}
       </div>
     </div>
+  );
+}
+
+// "Tuesday" for a calendar date (yyyy-mm-dd); the date is already the coach's own day, so the weekday is read straight from it.
+function weekdayOfDate(dateKey: string): string {
+  return weekdayName(new Date(`${dateKey}T12:00:00Z`), "UTC");
+}
+
+// The second half of the coach's own choice: the whole program (every week and day open), one tap away.
+function ViewWholeProgramLink({ groupId, programId }: { groupId: string; programId: string | null }) {
+  if (!programId) return null;
+  return (
+    <Link href={`/groups/${groupId}/programs/${programId}`} className="mt-2 w-full h-11 flex items-center justify-center border border-steel/40 text-chalk font-body text-sm">
+      {VIEW_PROGRAM_LABEL}
+    </Link>
   );
 }
 
