@@ -10,6 +10,7 @@ import { WhatTheyAte } from "@/components/coach/nutrition/what-they-ate";
 import { CoachLogNutrients } from "@/components/coach/nutrition/coach-log-nutrients";
 import { GroceryListSection } from "@/components/coach/nutrition/grocery-list-section";
 import { FoodTrackingSwitch } from "@/components/coach/nutrition/food-tracking-switch";
+import { MacrosOffSwitch } from "@/components/coach/nutrition/macros-off-switch";
 import { PreferencesSection } from "@/components/coach/nutrition/preferences-section";
 import { ClientAnswersPanel } from "@/components/coach/nutrition/client-answers-panel";
 import { PlanTriesPanel, type PlanTryView } from "@/components/coach/nutrition/plan-tries-panel";
@@ -536,6 +537,7 @@ export async function ClientNutrition({
       </div>
 
       <FoodTrackingSwitch athleteId={athleteId} groupId={groupId} clientName={clientName} />
+      <MacrosOffSwitch athleteId={athleteId} groupId={groupId} clientName={clientName} />
 
       <section>
         <SectionHeading id="targets" title="Targets" note="What they should eat each day, what the weekly check-in suggests, and where it came from." />

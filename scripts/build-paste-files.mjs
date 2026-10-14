@@ -2307,6 +2307,20 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["the Stage 2 learning tables exist", "to_regclass('public.coach_learned_rules') is not null and to_regclass('public.coach_edit_events') is not null"],
     ],
   },
+  {
+    n: "120",
+    slug: "0370",
+    title: "0370 The Needs attention list can be quieted: Not now (a week) and No macros for a client",
+    migrations: ["0370"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes on screen until the code that goes with it is live. Then every item on Needs attention has Not now (hidden for a week, back only if still true), the macros item also has No macros for [name], and the client's Nutrition tab shows Macros are off for [name] with Turn on. Run it BEFORE the code.",
+    undo: "drop table if exists public.attention_snoozes;" + String.fromCharCode(10) + "alter table public.group_memberships drop column if exists coach_sets_macros;",
+    undoWhy: "Only if step 120 misbehaves. Removes the one-week hides and the No macros setting (every nudge then shows as it did before).",
+    rows: [
+      ["0370 is not already applied (no snooze table yet)", "to_regclass('public.attention_snoozes') is null"],
+      ["the memberships table exists", "to_regclass('public.group_memberships') is not null"],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -2417,6 +2431,7 @@ const BUNDLES = [
   { id: "release-bl", name: "Release BL (four exercises added to Coach Ron's library for the FitPros history; run any time)", steps: ["106"] },
   { id: "release-bk", name: "Release BK (move Coach Ron's own training into his personal space; run AFTER he has opened Coach Ron (you) once and removed the programs he does not want)", steps: ["105"] },
   { id: "release-bw", name: "Release BW (a rest can be a range such as 60-90; run AFTER Release BV and BEFORE the code that goes with it is live)", steps: ["117"] },
+  { id: "release-bz", name: "Release BZ (Needs attention: Not now for a week, and No macros for a client; run BEFORE the code that goes with it is live)", steps: ["120"] },
   { id: "release-by", name: "Release BY (the AI you can train, rules that apply only to the clients they fit, Past AI build notes for each client; run BEFORE the code that goes with it is live)", steps: ["119"] },
   { id: "release-bx", name: "Release BX (the one product shelf: where each package and Pro Shop card shows and who sees it; run BEFORE the code that goes with it is live)", steps: ["118"] },
   { id: "release-bv", name: "Release BV (template slots survive Duplicate; a program with a slot cannot be assigned to a client; run AFTER Release BU and BEFORE the code that goes with it is live)", steps: ["116"] },
@@ -2638,6 +2653,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
     m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
+    m("0370", "to_regclass('public.attention_snoozes') is not null"),
     m("0369", "to_regclass('public.client_ai_notes') is not null"),
     m("0368", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_packages' and column_name = 'audience')"),
     m("0366", "position('is_slot' in pg_get_functiondef(to_regprocedure('public.duplicate_program(uuid, uuid, uuid, uuid, text, date)'))) > 0"),

@@ -301,6 +301,14 @@
   "file": "apply-release-bw-all.sql"
  },
  {
+  "id": "release-bz",
+  "name": "Release BZ (Needs attention: Not now for a week, and No macros for a client; run BEFORE the code that goes with it is live)",
+  "steps": [
+   "120"
+  ],
+  "file": "apply-release-bz-all.sql"
+ },
+ {
   "id": "release-by",
   "name": "Release BY (the AI you can train, rules that apply only to the clients they fit, Past AI build notes for each client; run BEFORE the code that goes with it is live)",
   "steps": [

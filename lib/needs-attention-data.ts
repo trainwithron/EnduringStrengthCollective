@@ -10,6 +10,7 @@ import {
   type ReminderRule,
 } from "@/lib/coaching-suggestions";
 import { isStillOnboarding } from "@/lib/client-onboarding";
+import { firstNameOf, isSnoozed } from "@/lib/attention-snooze";
 import type { NeedsAttentionItem } from "@/components/coach/desktop/needs-attention-panel";
 
 function dateKey(d: Date): string {
@@ -51,11 +52,25 @@ export async function getNeedsAttentionItems(
 
   const today = new Date();
 
-  const { data: allAthleteRows } = await supabase
+  // coach_sets_macros is the "No macros for [name]" switch; a database that does not have the column yet reads as on for everyone.
+  const withMacrosSwitch = await supabase
     .from("group_memberships")
-    .select("profile_id, group_id, client_tier, joined_at, profiles ( full_name, intake_required )")
+    .select("profile_id, group_id, client_tier, joined_at, coach_sets_macros, profiles ( full_name, intake_required )")
     .in("group_id", groupIds)
     .eq("role", "athlete");
+  const allAthleteRows = withMacrosSwitch.error
+    ? (
+        await supabase
+          .from("group_memberships")
+          .select("profile_id, group_id, client_tier, joined_at, profiles ( full_name, intake_required )")
+          .in("group_id", groupIds)
+          .eq("role", "athlete")
+      ).data
+    : withMacrosSwitch.data;
+  // "Not now": items the coach put off for a week stay hidden until that day passes (and come back only if they are still true).
+  const { data: snoozeRows } = await supabase.from("attention_snoozes").select("athlete_id, trigger_key, until_date").eq("coach_id", coachId);
+  const snoozed = (athleteId: string, triggerKey: string) =>
+    (snoozeRows ?? []).some((r: any) => r.athlete_id === athleteId && r.trigger_key === triggerKey && isSnoozed(r.until_date as string, new Date()));
 
   interface AthleteRow {
     athleteId: string;
@@ -63,6 +78,7 @@ export async function getNeedsAttentionItems(
     groupId: string;
     groupName: string;
     clientTier: "one_on_one" | "online" | "group" | null;
+    macrosOff: boolean;
   }
 
   // Someone who just joined, or has not finished their intake, is still getting started: nothing is overdue for them yet.
@@ -86,6 +102,8 @@ export async function getNeedsAttentionItems(
     groupId: a.group_id as string,
     groupName: groupNameById.get(a.group_id) ?? "Group",
     clientTier: a.client_tier as "one_on_one" | "online" | "group" | null,
+    // "No macros for [name]": this coach does not set macros for this client.
+    macrosOff: a.coach_sets_macros === false,
   }));
 
   const athleteInfos: AthleteProgramInfo[] = [];
@@ -127,7 +145,7 @@ export async function getNeedsAttentionItems(
   nextWeekStart.setDate(today.getDate() + 1);
   const nextWeekEnd = new Date(today);
   nextWeekEnd.setDate(today.getDate() + 7);
-  const macroEligibleAthletes = allAthletes.filter((a) => a.clientTier !== "group");
+  const macroEligibleAthletes = allAthletes.filter((a) => a.clientTier !== "group" && !a.macrosOff);
   const macroEligibleIds = macroEligibleAthletes.map((a) => a.athleteId);
 
   const { data: macroRows } =
@@ -180,8 +198,9 @@ export async function getNeedsAttentionItems(
     (existingSuggestionEvents ?? []).filter((r: any) => r.trigger_key === "macros_missing").map((r: any) => r.linked_athlete_id)
   );
 
-  const activeSuggestions = rawSuggestions.filter((s) => !programEndingHandled.has(s.athleteId));
-  const activeMacroSuggestions = rawMacroSuggestions.filter((s) => !macrosHandled.has(s.athleteId));
+  const activeSuggestions = rawSuggestions.filter((s) => !programEndingHandled.has(s.athleteId) && !snoozed(s.athleteId, "program_ending"));
+  const activeMacroSuggestions = rawMacroSuggestions.filter((s) => !macrosHandled.has(s.athleteId) && !snoozed(s.athleteId, "macros_missing"));
+  const firstNames = new Map(allAthletes.map((a) => [a.athleteId, firstNameOf(a.athleteName)]));
 
   const needsAttentionItems: NeedsAttentionItem[] = [];
 
@@ -210,6 +229,7 @@ export async function getNeedsAttentionItems(
       groupId: s.groupId,
       title: s.title,
       triggerKey: "program_ending",
+      firstName: firstNames.get(s.athleteId) ?? "this client",
       suggestedDateKey,
       alreadyOnCalendar: suggestionMode === "auto_add",
     });
@@ -239,6 +259,7 @@ export async function getNeedsAttentionItems(
       groupId: s.groupId,
       title: s.title,
       triggerKey: "macros_missing",
+      firstName: firstNames.get(s.athleteId) ?? "this client",
       suggestedDateKey,
       alreadyOnCalendar: suggestionMode === "auto_add",
     });

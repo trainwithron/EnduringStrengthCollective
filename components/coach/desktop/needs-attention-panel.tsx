@@ -3,11 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { firstNameOf, snoozeUntil } from "@/lib/attention-snooze";
 
 export interface NeedsAttentionItem {
   athleteId: string;
   groupId: string;
   title: string;
+  // The client's first name, for "No macros for [name]".
+  firstName?: string;
   triggerKey: "program_ending" | "macros_missing";
   suggestedDateKey: string; // "YYYY-MM-DD" — where an "Add to calendar" click lands it
   alreadyOnCalendar: boolean; // true when auto-add mode already placed it
@@ -90,49 +93,47 @@ export function NeedsAttentionPanel({
     setBusyKey(null);
   }
 
-  async function handleDismiss(item: NeedsAttentionItem) {
+  // The item that was auto-added to the calendar goes with it when it is put off or switched off (it is added again if it is still true after).
+  async function removeAutoAdded(supabase: ReturnType<typeof createBrowserClient>, athleteId: string, triggerKey: string) {
+    await supabase.from("calendar_events").delete().eq("coach_id", coachId).eq("event_type", "suggestion").eq("trigger_key", triggerKey).eq("linked_athlete_id", athleteId).eq("status", "active");
+  }
+
+  // "Not now": hidden for this client for a week; it comes back only if it is still true after.
+  async function handleNotNow(item: NeedsAttentionItem) {
     setBusyKey(keyOf(item));
     const supabase = createBrowserClient();
-    await supabase.from("calendar_events").upsert(
-      {
-        coach_id: coachId,
-        title: item.title,
-        event_date: item.suggestedDateKey,
-        event_type: "suggestion",
-        trigger_key: item.triggerKey,
-        linked_athlete_id: item.athleteId,
-        linked_group_id: item.groupId,
-        status: "dismissed",
-      },
-      { onConflict: "coach_id,linked_athlete_id,trigger_key", ignoreDuplicates: true }
-    );
+    const until = snoozeUntil(new Date());
+    const { error } = await supabase.from("attention_snoozes").upsert({ coach_id: coachId, athlete_id: item.athleteId, group_id: item.groupId, trigger_key: item.triggerKey, until_date: until }, { onConflict: "coach_id,athlete_id,trigger_key" });
+    if (!error) await removeAutoAdded(supabase, item.athleteId, item.triggerKey);
+    setBusyKey(null);
+    router.refresh();
+  }
+
+  // "No macros for [name]": this coach does not set macros for this client, so the nudge stops for good (turn it back on from the client's Nutrition tab).
+  async function handleNoMacros(item: NeedsAttentionItem) {
+    setBusyKey(keyOf(item));
+    const supabase = createBrowserClient();
+    const { data, error } = await supabase.from("group_memberships").update({ coach_sets_macros: false }).eq("group_id", item.groupId).eq("profile_id", item.athleteId).select("coach_sets_macros");
+    if (!error && data && data.length > 0) await removeAutoAdded(supabase, item.athleteId, "macros_missing");
     setBusyKey(null);
     router.refresh();
   }
 
   if (items.length === 0) return null;
 
-  const dismissable = items.filter((i) => !i.alreadyOnCalendar);
+  const dismissable = items;
 
-  // One quiet action for the whole list: marks every item not yet on the calendar as dismissed, the same record a single
-  // Dismiss writes, so they stay gone until something genuinely new comes up.
+  // One quiet action for the whole list: puts every item off for a week.
   async function handleDismissAll() {
     if (dismissable.length === 0) return;
     setBusyKey("all");
     const supabase = createBrowserClient();
-    await supabase.from("calendar_events").upsert(
-      dismissable.map((item) => ({
-        coach_id: coachId,
-        title: item.title,
-        event_date: item.suggestedDateKey,
-        event_type: "suggestion",
-        trigger_key: item.triggerKey,
-        linked_athlete_id: item.athleteId,
-        linked_group_id: item.groupId,
-        status: "dismissed",
-      })),
-      { onConflict: "coach_id,linked_athlete_id,trigger_key", ignoreDuplicates: true }
+    const until = snoozeUntil(new Date());
+    const { error } = await supabase.from("attention_snoozes").upsert(
+      dismissable.map((item) => ({ coach_id: coachId, athlete_id: item.athleteId, group_id: item.groupId, trigger_key: item.triggerKey, until_date: until })),
+      { onConflict: "coach_id,athlete_id,trigger_key" }
     );
+    if (!error) for (const item of dismissable.filter((i) => i.alreadyOnCalendar)) await removeAutoAdded(supabase, item.athleteId, item.triggerKey);
     setBusyKey(null);
     router.refresh();
   }
@@ -160,7 +161,7 @@ export function NeedsAttentionPanel({
             disabled={busy}
             className="font-body text-xs text-steel underline underline-offset-2 disabled:opacity-40"
           >
-            {busyKey === "all" ? "Clearing…" : "Dismiss all"}
+            {busyKey === "all" ? "Clearing…" : "Not now for all"}
           </button>
         )}
       </div>
@@ -169,10 +170,11 @@ export function NeedsAttentionPanel({
           {items.map((item) => (
             <div key={keyOf(item)} className="py-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
               <p className="font-body text-xs leading-snug flex-1 min-w-[10rem]">{item.title}</p>
-              {item.alreadyOnCalendar ? (
-                <p className="font-body text-xs text-steel">On your calendar</p>
-              ) : (
-                <div className="flex items-center gap-1.5 shrink-0">
+              <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                {item.alreadyOnCalendar ? (
+                  <span className="font-body text-xs text-steel">On your calendar</span>
+                ) : (
+                  <>
                   {notifyStatus[keyOf(item)] && <span className="font-body text-xs text-steel">{notifyStatus[keyOf(item)]}</span>}
                   <button
                     type="button"
@@ -192,16 +194,27 @@ export function NeedsAttentionPanel({
                   >
                     Add
                   </button>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleNotNow(item)}
+                  disabled={busy}
+                  className="min-h-11 sm:min-h-7 px-2 border border-steel/30 text-steel font-body text-xs disabled:opacity-40"
+                >
+                  Not now
+                </button>
+                {item.triggerKey === "macros_missing" && (
                   <button
                     type="button"
-                    onClick={() => handleDismiss(item)}
+                    onClick={() => handleNoMacros(item)}
                     disabled={busy}
-                    className="h-7 px-2 border border-steel/30 text-steel font-body text-xs disabled:opacity-40"
+                    className="min-h-11 sm:min-h-7 px-2 border border-steel/30 text-steel font-body text-xs disabled:opacity-40"
                   >
-                    Dismiss
+                    No macros for {item.firstName ?? firstNameOf(item.title)}
                   </button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           ))}
         </div>
