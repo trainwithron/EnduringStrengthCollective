@@ -110,9 +110,10 @@ describe("where it shows", () => {
     const page = read("app/(coach)/groups/[groupId]/athletes/[athleteId]/history/page.tsx");
     expect(page).toContain("UnclearPointsReview");
     expect(page).toContain("{IMPORT_BASELINE_NOTE} {IMPORT_UNITS_NOTE}");
-    expect(read("components/coach/fitpros-history-import.tsx")).toContain("await flagUnclearSets(supabase, groupId, athleteId)");
+    expect(read("components/coach/fitpros-history-import.tsx")).toContain("await settleImportedHistory(supabase, groupId, athleteId)");
     const uploader = read("components/coach/exercise-history-uploader.tsx");
-    expect((uploader.match(/flagUnclearSets\(supabase, groupId, athleteId\)/g) ?? []).length).toBe(2);
+    expect(uploader.split("await settleImportedHistory(supabase, groupId, athleteId)").length - 1).toBe(2);
+    expect(uploader).toContain("await recomputeTrainingMaxes(supabase, athleteId)");
   });
   it("the session shows the mark under the exercise, and only a viewer who is not the client can decide", () => {
     expect(read("app/sessions/[sessionId]/page.tsx")).toContain("weight_confirmed, data_flag, data_flag_reason )");

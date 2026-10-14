@@ -42,6 +42,7 @@ describe("the client profile loads its data in three waves, not one query after 
   });
   it("the slow set_logs trend query is no longer part of the page's own waiting", () => {
     expect(page).not.toContain('.from("set_logs")');
-    expect(read("components/coach/desktop/exercise-progression-loader.tsx")).toContain('.from("set_logs")');
+    // the trend is read from the rolled-up rows (one row per workout and exercise), still behind its own Suspense
+    expect(read("components/coach/desktop/exercise-progression-loader.tsx")).toContain('rpc("client_exercise_rollup"');
   });
 });

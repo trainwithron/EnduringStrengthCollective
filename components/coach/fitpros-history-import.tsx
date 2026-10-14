@@ -16,7 +16,7 @@ import {
   type ImportedSession,
 } from "@/lib/fitpros-history-import";
 import type { PlannedWorkout } from "@/lib/fitpros-history";
-import { flagUnclearSets, unclearFoundLine } from "@/lib/unclear-points";
+import { settleImportedHistory, recomputeTrainingMaxes, unclearFoundLine } from "@/lib/unclear-points";
 import { existingLibraryName } from "@/lib/exercise-search";
 
 function todayKey(): string {
@@ -131,8 +131,8 @@ export function FitprosHistoryImport({ athleteId, groupId, athleteName }: { athl
     // The plan is made again here from exactly that start date, so what is written is what was just confirmed, never a screen that is a moment out of date.
     const finalPlan = planFitprosImport(workouts, program.workouts, start, new Set(program.takenWorkoutIds));
     const result = await runFitprosImport(supabase, { athleteId, groupId, plan: finalPlan, existingKeys });
-    // Jumbled or impossible sets are marked (kept as entered, not counted) by one check in the database.
-    const unclear = result.imported > 0 ? await flagUnclearSets(supabase, groupId, athleteId) : 0;
+    // Jumbled or impossible sets are marked (kept as entered, not counted) by one check in the database; then what counts is folded into the training maxes.
+    const unclear = result.imported > 0 ? await settleImportedHistory(supabase, groupId, athleteId) : 0;
     setBusy(false);
     const linked = finalPlan.filter((w) => w.programWorkoutId).length;
     setMessage(`Imported ${result.imported} workout${result.imported === 1 ? "" : "s"}${result.skippedAlreadyThere ? `, ${result.skippedAlreadyThere} already there` : ""} (${linked} matched to program days, ${finalPlan.length - linked} plain history).${moved ? ` The program start is now ${start}.` : ""}${result.failed.length ? ` ${result.failed.length} did not save: ${result.failed.join("; ")}` : ""}${unclear > 0 ? ` ${unclearFoundLine(unclear)}` : ""}`);
@@ -142,10 +142,11 @@ export function FitprosHistoryImport({ athleteId, groupId, athleteName }: { athl
 
   async function undo() {
     if (busy) return;
-    if (!(await confirmDialog({ message: `Remove the ${existing.length} workout${existing.length === 1 ? "" : "s"} imported from FitPros for ${athleteName}? Anything else in their history stays. Training maxes the import raised are not lowered.`, confirmLabel: "Remove import", destructive: true }))) return;
+    if (!(await confirmDialog({ message: `Remove the ${existing.length} workout${existing.length === 1 ? "" : "s"} imported from FitPros for ${athleteName}? Anything else in their history stays. Their totals, graphs, estimated maxes and records are worked out again without it.`, confirmLabel: "Remove import", destructive: true }))) return;
     setBusy(true);
     const supabase = createBrowserClient();
     const result = await undoFitprosImport(supabase, groupId, athleteId);
+    if (!result.error && result.removed > 0) await recomputeTrainingMaxes(supabase, athleteId);
     setBusy(false);
     if (result.error) {
       setError(result.error);
@@ -160,7 +161,7 @@ export function FitprosHistoryImport({ athleteId, groupId, athleteName }: { athl
     <section className="border border-steel/20 p-4 mt-8 max-w-3xl">
       <h2 className="font-display uppercase text-sm tracking-wide text-steel">FitPros</h2>
       <p className="font-body text-sm text-steel mt-1 max-w-2xl">
-        Choose the FitPros history file for {athleteName}. You see what would be saved first; nothing is saved until you press Import. Imported workouts show in History, are not counted as new records, and send no notifications. The star rating and workout notes are left out.
+        Choose the FitPros history file for {athleteName}. You see what would be saved first; nothing is saved until you press Import. Imported workouts count in the client&apos;s totals, graphs, estimated maxes and records (worked out in date order), and send no notifications, celebrations or share cards. The star rating and workout notes are left out.
       </p>
 
       {program === undefined ? (

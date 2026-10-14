@@ -1,5 +1,6 @@
 import { isEmailConfigured } from "@/lib/email";
 import { mergeLoggedList } from "@/lib/logged-list";
+import { INCLUDES_IMPORTED_TAG, hindsightPrs, importedTotals, parseRollup } from "@/lib/imported-prs";
 import { sorenessShown } from "@/lib/wellness";
 import { ClientAssessmentsSection } from "@/components/coach/desktop/client-assessments-section";
 import { ViewAsClientLink } from "@/components/coach/desktop/view-as-client-label";
@@ -152,6 +153,7 @@ export default async function AthleteProfilePage(
     { data: threadRows },
     { data: coachMovementPatterns },
     { data: importedSessions, count: importedTotal },
+    { data: rollupRows },
   ] = await Promise.all([
     supabase
       .from("group_memberships")
@@ -399,6 +401,8 @@ export default async function AthleteProfilePage(
       .eq("status", "completed")
       .order("started_at", { ascending: false })
       .limit(50),
+    // Every counted set, rolled up to one row per workout and exercise (an unclear imported point is never in it): imported history counts in the totals and records below.
+    supabase.rpc("client_exercise_rollup", { p_athlete: params.athleteId, p_group: params.groupId }),
   ]);
 
   if (membership?.role !== "coach") {
@@ -607,15 +611,19 @@ export default async function AthleteProfilePage(
   );
   const assignedPackageIds = (assignmentRows ?? []).map((a) => a.coach_package_id);
 
-  const totalCompleted = allLogs?.length ?? 0;
-  const totalVolume = (allLogs ?? []).reduce((sum, l) => sum + (l.total_volume ?? 0), 0);
+  // Logged workouts, plus imported history (which has no workout log). A record in imported history is found in hindsight, in date order, and is never celebrated or announced.
+  const rollup = parseRollup(rollupRows);
+  const importedSums = importedTotals(rollup);
+  const totalCompleted = (allLogs?.length ?? 0) + importedSums.workouts;
+  const totalVolume = (allLogs ?? []).reduce((sum, l) => sum + (l.total_volume ?? 0), 0) + importedSums.volume;
 
-  const prEntries: { exerciseName: string; date: string }[] = [];
+  const prEntries: { exerciseName: string; date: string; imported?: boolean }[] = [];
   for (const log of allLogs ?? []) {
     for (const name of log.new_prs ?? []) {
       prEntries.push({ exerciseName: name, date: log.created_at });
     }
   }
+  for (const pr of hindsightPrs(rollup)) prEntries.push({ exerciseName: pr.exerciseName, date: pr.date, imported: true });
   prEntries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const RECENT_LOGS_LIMIT = 50;
@@ -624,7 +632,7 @@ export default async function AthleteProfilePage(
     (importedSessions ?? []).map((s: any) => ({ id: s.id as string, started_at: s.started_at as string, exercises: (s.session_exercises?.[0]?.count as number | undefined) ?? 0 })),
     RECENT_LOGS_LIMIT
   );
-  const loggedListTotal = totalCompleted + (importedTotal ?? importedSessions?.length ?? 0);
+  const loggedListTotal = (allLogs?.length ?? 0) + (importedTotal ?? importedSessions?.length ?? 0);
 
   // Last-7-days habit compliance — the one piece of this that's actually
   // measurable today. Macro targets are coach-set but nothing logs what
@@ -1090,6 +1098,9 @@ export default async function AthleteProfilePage(
                 <p className="font-body text-xs text-steel">PRs</p>
               </div>
             </div>
+            {importedSums.workouts > 0 && (
+              <p className="font-body text-xs text-steel mt-2">{INCLUDES_IMPORTED_TAG}</p>
+            )}
 
             {prEntries.length > 0 && (
               <div className="py-4 border-b border-steel/15">
@@ -1102,6 +1113,7 @@ export default async function AthleteProfilePage(
                       {pr.exerciseName}{" "}
                       <span className="text-steel text-xs">
                         &middot; {new Date(pr.date).toLocaleDateString("en-US", { timeZone: displayZone })}
+                        {pr.imported ? <> &middot; imported</> : null}
                       </span>
                     </p>
                   ))}

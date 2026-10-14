@@ -40,6 +40,18 @@ export async function flagUnclearSets(supabase: SupabaseClient, groupId: string,
   return typeof data === "number" ? data : 0;
 }
 
+// Rebuilds the athlete's estimated training maxes from the sets that count (an unclear point never does), so an import, a removal or a decision about an unclear point gives the right number.
+export async function recomputeTrainingMaxes(supabase: SupabaseClient, athleteId: string): Promise<void> {
+  await supabase.rpc("recompute_training_maxes", { p_athlete: athleteId, p_exercise: null });
+}
+
+// After any history is written or removed: mark what looks unclear, then fold what counts into the training maxes. Returns how many sets were newly marked.
+export async function settleImportedHistory(supabase: SupabaseClient, groupId: string, athleteId: string): Promise<number> {
+  const marked = await flagUnclearSets(supabase, groupId, athleteId);
+  await recomputeTrainingMaxes(supabase, athleteId);
+  return marked;
+}
+
 export async function listUnclearPoints(supabase: SupabaseClient, groupId: string, athleteId: string): Promise<UnclearPoint[]> {
   const { data } = await supabase
     .from("set_logs")

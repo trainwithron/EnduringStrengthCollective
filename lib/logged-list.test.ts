@@ -43,11 +43,13 @@ describe("the profile", () => {
     expect(page).toContain("No completed workouts yet.");
     expect(page).toContain("loggedList.length === 0");
   });
-  it("the Workouts, Volume and PRs numbers still come from the workout logs only (imported history never counts)", () => {
-    expect(page).toContain("const totalCompleted = allLogs?.length ?? 0;");
+  it("the Workouts, Volume and PRs numbers are the logged workouts plus the counted imported history (lib/imported-prs.ts)", () => {
+    expect(page).toContain("const totalCompleted = (allLogs?.length ?? 0) + importedSums.workouts;");
     expect(page).toContain("const totalVolume = (allLogs ?? []).reduce");
     expect(page).toContain("for (const log of allLogs ?? []) {");
-    // imported sessions are read as plain history, for the list only (in the first batch of waits, no extra queries)
+    // the Logged workouts list's own count is the logs plus the imported sessions it lists, never the stats total
+    expect(page).toContain("const loggedListTotal = (allLogs?.length ?? 0) + (importedTotal ?? importedSessions?.length ?? 0);");
+    // imported sessions are read for the list in the first batch of waits, with no extra queries
     expect(page).not.toContain("importedSetRows");
     expect(page).toContain('.eq("is_historical", true)');
   });

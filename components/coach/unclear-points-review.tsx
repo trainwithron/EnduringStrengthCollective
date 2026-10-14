@@ -9,6 +9,7 @@ import {
   UNCLEAR_LABEL,
   fixUnclearPoint,
   flagUnclearSets,
+  recomputeTrainingMaxes,
   listUnclearPoints,
   setUnclearPointCounted,
   type UnclearPoint,
@@ -42,6 +43,7 @@ export function UnclearPointsReview({ athleteId, groupId, initial }: { athleteId
       const supabase = createBrowserClient();
       const marked = await flagUnclearSets(supabase, groupId, athleteId);
       if (marked > 0 && !cancelled) {
+        await recomputeTrainingMaxes(supabase, athleteId);
         await reload();
         router.refresh();
       }

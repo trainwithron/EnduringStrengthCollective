@@ -301,6 +301,14 @@
   "file": "apply-release-bw-all.sql"
  },
  {
+  "id": "release-cb",
+  "name": "Release CB (imported history counts in totals, graphs, estimated maxes and records; training maxes are rebuilt from the sets; run AFTER Release CA, BEFORE the code that goes with it is live)",
+  "steps": [
+   "122"
+  ],
+  "file": "apply-release-cb-all.sql"
+ },
+ {
   "id": "release-ca",
   "name": "Release CA (unclear data points in imported history are marked and kept out of the numbers; run BEFORE the code that goes with it is live)",
   "steps": [
