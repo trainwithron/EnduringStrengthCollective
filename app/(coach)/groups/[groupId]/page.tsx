@@ -58,6 +58,8 @@ import {
 } from "@/lib/program-day-contexts";
 import type { RosterMember } from "@/lib/types";
 import { loadMyTraining } from "@/lib/my-training";
+import { linksForViewer } from "@/lib/shelf";
+import { loadShelfViewer } from "@/lib/shelf-viewer";
 import { FeaturedShopCards } from "@/components/athlete/pro-shop-list";
 import { ClassesList } from "@/components/athlete/classes-list";
 import { loadClassCards } from "@/lib/class-cards";
@@ -217,14 +219,19 @@ export default async function GroupHubPage(
       const { data: shopRows } = await inOrg(
         supabase
           .from("pro_shop_links")
-          .select("id, title, category, description, url, image_url, discount_code, discount_description, click_count, featured")
+          .select("id, title, category, description, url, image_url, discount_code, discount_description, click_count, featured, audience, audience_group_id")
           .eq("coach_id", shopCoachId)
           .eq("featured", true),
         await orgIdOfGroup(supabase, params.groupId)
       )
         .order("created_at", { ascending: true })
-        .limit(3);
-      featuredShop = (shopRows ?? []).map((r: any) => ({
+        .limit(12);
+      // Only the cards open to this client (audience, and no supplements for a client known to be under 18); at most three are shown.
+      const shelfViewer = await loadShelfViewer(supabase, { groupKind: (group as { group_kind?: string } | null)?.group_kind, athleteId, coachPreview: false });
+      featuredShop = linksForViewer(
+        (shopRows ?? []).map((r: any) => ({ ...r, audienceGroupId: r.audience_group_id ?? null })),
+        shelfViewer
+      ).slice(0, 3).map((r: any) => ({
         id: r.id,
         title: r.title,
         category: r.category,

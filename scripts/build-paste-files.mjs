@@ -2277,6 +2277,20 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["Release BV is applied (Duplicate knows about slots)", "position('is_slot' in pg_get_functiondef(to_regprocedure('public.duplicate_program(uuid, uuid, uuid, uuid, text, date)'))) > 0"],
     ],
   },
+  {
+    n: "118",
+    slug: "0368",
+    title: "0368 The one product shelf: where each package and Pro Shop card shows (public page, Client Home, Pro Shop) and who in the app sees it (everyone, not the one-on-one clients, only the one-on-one clients, one group); a program buyer can join the coach's client space",
+    migrations: ["0368"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes on screen until the code that goes with it is live. Every existing package and Pro Shop card keeps showing exactly where it did, to everyone. Cards that are featured today are also marked for the public page, so no coach's public page changes. Run it BEFORE the code.",
+    undo: "alter table public.coach_packages drop constraint if exists coach_packages_audience_check;" + "\n" + "alter table public.pro_shop_links drop constraint if exists pro_shop_links_audience_check;" + "\n" + "alter table public.coach_packages drop column if exists show_on_home, drop column if exists show_in_pro_shop, drop column if exists audience, drop column if exists audience_group_id, drop column if exists buyer_joins_space;" + "\n" + "alter table public.pro_shop_links drop column if exists show_on_public, drop column if exists audience, drop column if exists audience_group_id;",
+    undoWhy: "Only if step 118 misbehaves. Removes the placement and audience settings (every card goes back to showing as it did before: the public page then shows nothing from the Pro Shop until the code is rolled back too).",
+    rows: [
+      ["0368 is not already applied (no placement columns yet)", "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_packages' and column_name = 'audience')"],
+      ["the Pro Shop table has the Featured flag", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'pro_shop_links' and column_name = 'featured')"],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -2387,6 +2401,7 @@ const BUNDLES = [
   { id: "release-bl", name: "Release BL (four exercises added to Coach Ron's library for the FitPros history; run any time)", steps: ["106"] },
   { id: "release-bk", name: "Release BK (move Coach Ron's own training into his personal space; run AFTER he has opened Coach Ron (you) once and removed the programs he does not want)", steps: ["105"] },
   { id: "release-bw", name: "Release BW (a rest can be a range such as 60-90; run AFTER Release BV and BEFORE the code that goes with it is live)", steps: ["117"] },
+  { id: "release-bx", name: "Release BX (the one product shelf: where each package and Pro Shop card shows and who sees it; run BEFORE the code that goes with it is live)", steps: ["118"] },
   { id: "release-bv", name: "Release BV (template slots survive Duplicate; a program with a slot cannot be assigned to a client; run AFTER Release BU and BEFORE the code that goes with it is live)", steps: ["116"] },
   { id: "release-bu", name: "Release BU (pattern and class templates: a one-sided mark on ladder exercises, plus empty columns for slots and a client's level; run BEFORE the code that goes with it is live)", steps: ["115"] },
   { id: "release-bt", name: "Release BT (a group session belongs to one organization; run BEFORE the code that goes with it is live)", steps: ["114"] },
@@ -2606,6 +2621,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
     m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
+    m("0368", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_packages' and column_name = 'audience')"),
     m("0366", "position('is_slot' in pg_get_functiondef(to_regprocedure('public.duplicate_program(uuid, uuid, uuid, uuid, text, date)'))) > 0"),
     m("0365", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'movement_pattern_exercises' and column_name = 'is_unilateral')"),
     m("0364", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_sessions' and column_name = 'organization_id')"),

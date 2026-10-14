@@ -58,7 +58,7 @@ describe("the public page and the setup screen", () => {
     expect(page).toContain("createServiceRoleClient");
     expect(page).not.toMatch(/gtag|analytics|pixel|athlete|full_name.*athlete/i);
     expect(page).toContain('.eq("is_public", true)');
-    expect(page).toContain('.eq("featured", true)');
+    expect(page).toContain('.eq("show_on_public", true)');
     // the outbound shop cards are the shared storefront card, which opens each link in a new tab with rel noopener noreferrer
     expect(page).toContain("<ShopCard");
     expect(read("components/shared/shop-card.tsx")).toContain('rel="noopener noreferrer"');

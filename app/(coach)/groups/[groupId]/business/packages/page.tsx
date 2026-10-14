@@ -48,7 +48,7 @@ export default async function PackagesPage(
 
   const { data: packageRows } = await supabase
     .from("coach_packages")
-    .select("id, group_id, name, sessions_per_week, billing_type, sessions_granted, rate_cents, is_active, is_public, default_program_id, group_access_group_id")
+    .select("id, group_id, name, sessions_per_week, billing_type, sessions_granted, rate_cents, is_active, is_public, default_program_id, group_access_group_id, show_on_home, show_in_pro_shop, audience, audience_group_id, buyer_joins_space")
     .eq("coach_id", user.id)
     .in("group_id", orgGroupIds)
     .order("sessions_per_week", { ascending: true });
@@ -69,6 +69,11 @@ export default async function PackagesPage(
     isActive: p.is_active,
     defaultProgramId: p.default_program_id,
     groupAccessGroupId: p.group_access_group_id ?? null,
+    showOnHome: p.show_on_home === true,
+    showInProShop: p.show_in_pro_shop === true,
+    audience: p.audience ?? "everyone",
+    audienceGroupId: p.audience_group_id ?? null,
+    buyerJoinsSpace: p.buyer_joins_space !== false,
   }));
 
   // Same "shared, not-yet-personalized programs only" query the existing

@@ -301,6 +301,14 @@
   "file": "apply-release-bw-all.sql"
  },
  {
+  "id": "release-bx",
+  "name": "Release BX (the one product shelf: where each package and Pro Shop card shows and who sees it; run BEFORE the code that goes with it is live)",
+  "steps": [
+   "118"
+  ],
+  "file": "apply-release-bx-all.sql"
+ },
+ {
   "id": "release-bv",
   "name": "Release BV (template slots survive Duplicate; a program with a slot cannot be assigned to a client; run AFTER Release BU and BEFORE the code that goes with it is live)",
   "steps": [
