@@ -20,10 +20,15 @@ import { createBrowserClient } from "@/lib/supabase/client";
 XLSX.set_cptable(cptable);
 import {
   detectColumns,
+  bestExerciseColumn,
+  looksLikeNumbersNotNames,
+  EXERCISE_NUMBERS_MESSAGE,
+  normalizeHeader,
   parseImportRows,
   mergeIdenticalSetRows,
   groupIntoWeeks,
   parseRestSeconds,
+  type ColumnMapping,
   type ParsedImportRow,
 } from "@/lib/workout-import-parser";
 import {
@@ -190,6 +195,8 @@ export function ImportWizard({
   const [summary, setSummary] = useState<ImportSummary | null>(null);
   const [doneHref, setDoneHref] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingImport | null>(null);
+  // A spreadsheet whose exercise column could not be found, or looks like numbers: the coach picks the column with the names (the best guess is already chosen) before anything is read.
+  const [columnFix, setColumnFix] = useState<{ header: string[]; body: string[][]; fileName: string; mapping: ColumnMapping; chosen: number | null } | null>(null);
   const [finalizing, setFinalizing] = useState(false);
   // A ref, not state — guards against a file input somehow firing its
   // change handler more than once for the same upload (observed during
@@ -261,14 +268,29 @@ export function ImportWizard({
     }
 
     const [header, ...body] = rows.map((r) => r.map((c) => String(c)));
-    const mapping = detectColumns(header);
+    readWithMapping(header, body, detectColumns(header), file.name);
+  }
+
+  // Reads the rows with the chosen columns. The exercise column must hold names: if it is missing, or more than half of what is in it is plain numbers (1, 2, 3 ...), nothing is read and the
+  // coach is asked to pick the column with the names instead of getting a program of exercises called "1", "2" and "3".
+  function readWithMapping(header: string[], body: string[][], mapping: ColumnMapping, fileName: string) {
+    const stop = (message: string) => {
+      setStatus("error");
+      setError(message);
+      processingRef.current = false;
+    };
+    const askForColumn = (message: string) => {
+      setColumnFix({ header, body, fileName, mapping, chosen: bestExerciseColumn(header, body) });
+      stop(message);
+    };
+    setColumnFix(null);
 
     if (mapping.exercise == null) {
-      setStatus("error");
-      setError(
-        "Couldn't find an Exercise column in this file — make sure one column is clearly headed \"Exercise\" (or similar) and try again."
-      );
-      processingRef.current = false;
+      askForColumn("Couldn't tell which column holds the exercise names. Pick it below.");
+      return;
+    }
+    if (looksLikeNumbersNotNames(body.map((r) => String(r[mapping.exercise as number] ?? "")))) {
+      askForColumn(EXERCISE_NUMBERS_MESSAGE);
       return;
     }
 
@@ -279,13 +301,11 @@ export function ImportWizard({
     // boundary — see mergeIdenticalSetRows' own doc comment.
     const parsed = mergeIdenticalSetRows(parseImportRows(body, mapping));
     if (parsed.length === 0) {
-      setStatus("error");
-      setError("No rows had a value in the Exercise column.");
-      processingRef.current = false;
+      stop("No rows had a value in the Exercise column.");
       return;
     }
 
-    prepareImport(parsed, file.name.replace(/\.(csv|xlsx|xls)$/i, ""), `Imported from ${file.name}`);
+    prepareImport(parsed, fileName.replace(/\.(csv|xlsx|xls)$/i, ""), `Imported from ${fileName}`);
   }
 
   // Pure — matches every exercise against the coach's real library and
@@ -317,6 +337,13 @@ export function ImportWizard({
     creditCharged: boolean = false,
     extras: { constraintFlags?: string[]; youth?: boolean; readNote?: string } = {}
   ) {
+    // The same check for every source (a spreadsheet, a photo, a PDF, pasted text, AI): a program whose exercises are called "1", "2", "3" is never created.
+    if (looksLikeNumbersNotNames(parsed.map((r) => r.exerciseName))) {
+      setStatus("error");
+      setError(EXERCISE_NUMBERS_MESSAGE);
+      processingRef.current = false;
+      return;
+    }
     setStatusLabel("Matching exercises…");
 
     const resolutions = new Map<string, { exerciseName: string; trackedFields: TrackedField[] }>();
@@ -1253,6 +1280,40 @@ export function ImportWizard({
           <p className="font-body text-xs text-rust mt-3" role="alert">
             {error}
           </p>
+        )}
+        {status === "error" && columnFix && (
+          <div className="mt-3 border border-steel/30 p-3">
+            <label className="block font-body text-xs text-steel">
+              Column with the exercise names
+              <select
+                value={columnFix.chosen ?? ""}
+                onChange={(e) => setColumnFix({ ...columnFix, chosen: e.target.value === "" ? null : Number(e.target.value) })}
+                className="mt-1 block h-11 sm:h-9 w-full max-w-xs bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm"
+              >
+                <option value="">Choose a column</option>
+                {columnFix.header.map((h, i) => (
+                  <option key={i} value={i}>
+                    {normalizeHeader(h) || `Column ${i + 1}`}
+                    {columnFix.body[0]?.[i] ? ` (for example: ${String(columnFix.body[0][i]).slice(0, 30)})` : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              disabled={columnFix.chosen == null}
+              onClick={() => {
+                if (columnFix.chosen == null) return;
+                setError(null);
+                processingRef.current = true;
+                setStatus("working");
+                readWithMapping(columnFix.header, columnFix.body, { ...columnFix.mapping, exercise: columnFix.chosen }, columnFix.fileName);
+              }}
+              className="mt-2 h-11 sm:h-9 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
+            >
+              Use this column
+            </button>
+          </div>
         )}
         <details className="mt-4">
           <summary className="font-body text-xs text-steel cursor-pointer">Prefer to use your own AI? Copy this prompt</summary>

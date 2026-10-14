@@ -43,17 +43,30 @@ export const IMPORT_COLUMNS: ImportColumn[] = [
   "prescription",
 ];
 
-// Best-effort auto-detection of which spreadsheet column is which — exact
-// header match wins, otherwise the first header containing the alias as a
-// substring (e.g. "Weight (lbs)" contains "weight").
+// A header the way it is compared: lower case, underscores and hyphens read as spaces, runs of spaces as one ("Exercise_Name" is "exercise name").
+export function normalizeHeader(header: string): string {
+  return (header ?? "").toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+const COUNTER_WORDS = ["no", "num", "number", "nr", "order", "index", "id", "count", "counter", "position", "pos", "seq", "sequence"];
+
+// A column that only numbers the rows ("Exercise #", "Exercise_#", "Exercise No", "Exercise Number", "Set #"): never the column that holds the names or the set count.
+export function isCounterHeader(header: string): boolean {
+  const h = normalizeHeader(header);
+  if (h.includes("#")) return true;
+  return h.split(/[^a-z0-9]+/).some((token) => COUNTER_WORDS.includes(token));
+}
+
+// Best-effort auto-detection of which spreadsheet column is which. An exact header match wins ("Exercise_Name" and "exercise name" are the same). Otherwise a header that CONTAINS the alias
+// ("Weight (lbs)" contains "weight"), but never a column that only counts the rows ("Exercise #"), and for the exercise column one that also says "name" is preferred.
 export function detectColumns(headerRow: string[]): ColumnMapping {
   const mapping: ColumnMapping = {};
-  const normalizedHeaders = headerRow.map((h) => (h ?? "").toLowerCase().trim());
+  const normalizedHeaders = headerRow.map((h) => normalizeHeader(h ?? ""));
 
   for (const col of IMPORT_COLUMNS) {
     const aliases = HEADER_ALIASES[col];
     let exactIndex = -1;
-    let containsIndex = -1;
+    const containing: number[] = [];
     for (let i = 0; i < normalizedHeaders.length; i++) {
       const h = normalizedHeaders[i];
       if (!h) continue;
@@ -61,15 +74,42 @@ export function detectColumns(headerRow: string[]): ColumnMapping {
         exactIndex = i;
         break;
       }
-      if (containsIndex === -1 && aliases.some((a) => h.includes(a))) {
-        containsIndex = i;
-      }
+      if (aliases.some((a) => h.includes(a)) && !isCounterHeader(headerRow[i] ?? "")) containing.push(i);
     }
-    const found = exactIndex >= 0 ? exactIndex : containsIndex;
+    let found = exactIndex;
+    if (found < 0 && containing.length > 0) {
+      found = col === "exercise" ? containing.find((i) => normalizedHeaders[i].includes("name")) ?? containing[0] : containing[0];
+    }
     if (found >= 0) mapping[col] = found;
   }
 
   return mapping;
+}
+
+export const EXERCISE_NUMBERS_MESSAGE = "The exercise column looks like numbers, not names. Pick the column with the exercise names.";
+
+// More than half of the exercise "names" being plain numbers (1, 2, 3 ...) means the wrong column was read. Stops a junk import before anything is written.
+export function looksLikeNumbersNotNames(values: string[]): boolean {
+  const filled = values.map((v) => (v ?? "").toString().trim()).filter(Boolean);
+  if (filled.length === 0) return false;
+  const numeric = filled.filter((v) => /^\d+([.,]\d+)?$/.test(v)).length;
+  return numeric / filled.length > 0.5;
+}
+
+// The column most likely to hold the exercise names, for the picker to start on: not a counter, mostly text, and a header that says exercise, movement, lift or name scores highest.
+export function bestExerciseColumn(headerRow: string[], body: string[][]): number | null {
+  let best: { index: number; score: number } | null = null;
+  for (let i = 0; i < headerRow.length; i++) {
+    if (isCounterHeader(headerRow[i] ?? "")) continue;
+    const values = body.map((r) => (r[i] ?? "").toString().trim()).filter(Boolean);
+    if (values.length === 0 || looksLikeNumbersNotNames(values)) continue;
+    const h = normalizeHeader(headerRow[i] ?? "");
+    const textShare = values.filter((v) => /[a-z]/i.test(v)).length / values.length;
+    const distinct = new Set(values.map((v) => v.toLowerCase())).size / values.length;
+    const score = textShare * 2 + distinct + (/(exercise|movement|lift)/.test(h) ? 3 : 0) + (h.includes("name") ? 2 : 0);
+    if (!best || score > best.score) best = { index: i, score };
+  }
+  return best ? best.index : null;
 }
 
 export interface ParsedImportRow {
@@ -117,12 +157,13 @@ export function parseImportRows(dataRows: string[][], mapping: ColumnMapping): P
     // out of a combined "Reps: N x M" free-text column.
     let reps = cell(row, mapping.reps) || null;
     if (!reps && prescription) {
-      const repsFromText = extractFromPrescription(prescription, /reps?:\s*(\d+(?:\.\d+)?)/i);
+      // "Reps: 5 x 3" is 5 reps; "Reps: 3 sets" only says there are three sets and is not a rep target.
+      const repsFromText = extractFromPrescription(prescription, /reps?:\s*(\d+(?:\.\d+)?)(?![\d.])(?!\s*sets?\b)/i);
       reps = repsFromText != null ? String(repsFromText) : null;
     }
 
     const timeSeconds = prescription
-      ? extractFromPrescription(prescription, /time\s*\(sec\):\s*(\d+(?:\.\d+)?)/i)
+      ? extractFromPrescription(prescription, /time\s*\(sec\):\s*(\d+(?:\.\d+)?)(?![\d.])(?!\s*sets?\b)/i)
       : null;
 
     const weightRaw = cell(row, mapping.weight).replace(/[^0-9.]/g, "");
