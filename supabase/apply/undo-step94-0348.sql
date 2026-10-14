@@ -78,6 +78,7 @@ drop policy if exists "org_wall_header" on public.workout_assignments;
 drop policy if exists "org_wall_header" on public.workout_logs;
 drop policy if exists "org_wall_header" on public.workout_notes;
 drop policy if exists "org_wall_header" on public.workouts;
+do $u$ declare r record; begin for r in select schemaname, tablename from pg_policies where policyname = 'org_wall_header' and schemaname = 'public' loop execute format('drop policy %I on %I.%I', 'org_wall_header', r.schemaname, r.tablename); end loop; end $u$;
 drop function if exists public.group_in_active_org(uuid);
 drop function if exists public.request_workspace_org();
 drop function if exists public.org_wall_header_enabled();

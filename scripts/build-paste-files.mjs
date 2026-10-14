@@ -1939,6 +1939,8 @@ alter table public.coach_availability_windows drop column if exists session_minu
     afterwards: "Nothing visible changes: the rule is installed but switched off, so every request behaves exactly as before. It adds one extra rule (named org_wall_header) to each table whose rows belong to a group, and three helper functions. Run it BEFORE the code that goes with it is live; step 95 switches it on.",
     undo: [
       ...(/tables text\[\] := array\[([\s\S]*?)\];/.exec(migrationSql("0348"))[1].match(/'([a-z_]+)'/g).map((q) => q.replace(/'/g, ""))).map((t) => `drop policy if exists "org_wall_header" on public.${t};`),
+      // Tables made after this step carry the same rule (the review notes, quotes, smaller goals, the AI notes ...): take it off every table that has it, so the function can be dropped.
+      "do $u$ declare r record; begin for r in select schemaname, tablename from pg_policies where policyname = 'org_wall_header' and schemaname = 'public' loop execute format('drop policy %I on %I.%I', 'org_wall_header', r.schemaname, r.tablename); end loop; end $u$;",
       "drop function if exists public.group_in_active_org(uuid);",
       "drop function if exists public.request_workspace_org();",
       "drop function if exists public.org_wall_header_enabled();",

@@ -50,6 +50,35 @@ export default {
       await h.as(client);
       h.check("the client never reads their own notes", (await db.query(`select count(*)::int as n from public.client_ai_notes`)).rows[0].n === 0);
 
+      // The organization wall: a coach who works in TWO organizations, with the request naming the workspace of one of them, reads none of the other organization's client notes, even by a direct query.
+      await h.asSuper();
+      const ownerB = await h.user("TR Owner B");
+      const both = await h.user("TR Coach Both");
+      const clientA = await h.user("TR Client A");
+      const clientB = await h.user("TR Client B");
+      const orgA = await h.org(both);
+      const orgB = await h.org(ownerB);
+      await h.orgMember(orgB, both, "coach");
+      const gA = await h.group(orgA, both, "team", "TR wall A");
+      const gB = await h.group(orgB, both, "team", "TR wall B");
+      await h.member(gA, clientA);
+      await h.member(gB, clientB);
+      await h.asSuper();
+      await db.query(`insert into public.client_ai_notes (coach_id, athlete_id, group_id, bullets) values ($1, $2, $3, '[{"text":"A note","date":"2026-10-14"}]'), ($1, $4, $5, '[{"text":"B note","date":"2026-10-14"}]')`, [both, clientA, gA, clientB, gB]);
+      await db.exec(`create or replace function public.org_wall_header_enabled() returns boolean language sql stable set search_path = public as $$ select true $$`);
+      const header = (g) => db.query(`select set_config('request.headers', $1, false)`, [JSON.stringify({ "x-workspace-group": g })]);
+      const seen = async () => (await db.query(`select athlete_id from public.client_ai_notes order by 1`)).rows.map((r) => r.athlete_id);
+      await h.as(both);
+      await header(gA);
+      h.check("workspace A: only organization A's client notes are readable", JSON.stringify(await seen()) === JSON.stringify([clientA]));
+      await header(gB);
+      h.check("workspace B: only organization B's client notes are readable", JSON.stringify(await seen()) === JSON.stringify([clientB]));
+      await header(gA);
+      h.check("workspace A: writing a note into organization B's client is refused", (await msg(db, `insert into public.client_ai_notes (coach_id, athlete_id, group_id) values ($1, $2, $3)`, [both, clientB, gB])).length > 0);
+      await h.asSuper();
+      await db.query(`select set_config('request.headers', '{}', false)`);
+      await db.exec(`create or replace function public.org_wall_header_enabled() returns boolean language sql stable set search_path = public as $$ select false $$`);
+
       await h.asSuper();
       await db.query(`delete from public.profiles where id = $1`, [client]).catch(() => {});
       h.check("the notes go with the client", (await db.query(`select count(*)::int as n from public.client_ai_notes where athlete_id = $1`, [client])).rows[0].n === 0);

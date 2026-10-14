@@ -88,6 +88,17 @@ alter table public.coach_edit_events
 
 alter table public.coach_learning_settings add column if not exists intro_seen_at timestamptz;
 
+-- The organization wall (Release AZ), the same rule the other group tables carry: a coach working in one organization cannot read another organization's client notes, even by a direct query.
+do $$
+begin
+  if to_regprocedure('public.group_in_active_org(uuid)') is not null
+     and not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'client_ai_notes' and policyname = 'org_wall_header') then
+    create policy "org_wall_header" on public.client_ai_notes as restrictive for all to authenticated
+      using (public.group_in_active_org(group_id)) with check (public.group_in_active_org(group_id));
+  end if;
+end
+$$;
+
 commit;
 
 -- Read-only result (after the commit): every row must say in_place = true.
