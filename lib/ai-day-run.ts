@@ -101,7 +101,8 @@ export function buildDaySystemPrompt(input: { youthBlock: string | null; hasInju
   "title": string,            // short name for the day's PURPOSE, e.g. "Upper heavy", "Mobility", "Full body" (never just "Day 2"; keep the coach's naming style if the days so far use one)
   "exercises": [
     {
-      "exerciseName": string, // an EXACT name from the coach's exercise library below when one fits
+      "exerciseName": string, // an EXACT name from the coach's exercise library below when one fits; an exercise the coach NAMED goes in exactly as the coach wrote it
+      "coachNamed": boolean,  // true only when this row is an exercise the coach named in their request or a correction (written exactly as they wrote it); false otherwise
       "sets": number,         // integer, at least 1
       "reps": string | null,  // e.g. "8", "8-10", "AMRAP"; null only for pure time-based work
       "weight": number | null,// null unless the coach gave a real number
@@ -115,7 +116,8 @@ export function buildDaySystemPrompt(input: { youthBlock: string | null; hasInju
 Rules:
 - Build ONE coherent day of 5 to 8 exercises (a mobility day can be a few more short items, but never more than 10) that fits the program so far and what the coach described. If the coach says how many exercises a day should have, or asks for short or long sessions, follow that instead of this number. Never write the same exercise twice in one day unless the coach asked for that. Do not repeat a day that is already built; vary the focus or the exercises sensibly, keeping the program's style (sets x reps, order of movement patterns, number of exercises).
 - Everything the coach has said (the request and every correction) is a HARD requirement. A correction such as "no barbell squats, his back" means no barbell squats in this day or any later day.
-- Exercises you choose yourself must come only from the library below, using the exact names. If the coach names an exercise that is not in the library, use it exactly as named.
+- When the coach NAMES a specific exercise (even a very specific or unusual one, such as a postural-restoration or rehab move), include it in the day EXACTLY as the coach wrote it: do not rename it, shorten it, swap it for a similar library exercise, or ask whether it exists. If the coach is vague ("a hip mobility drill"), choose from the library instead.
+- Exercises you choose yourself must come only from the library below, using the exact names.
 - One row per exercise, not one row per set (3x8 is ONE row with sets=3, reps="8").
 - Timed work (foam rolling, stretches, holds, planks, breathing) is a time: put it in timeSeconds, set reps to null, and use the same time every time that item appears in the program.
 - Prefer the library's plainest name for a movement (singular, no grip in brackets), for example "Dumbbell Curl" rather than "Dumbbell Bicep Curls (Supinated Grip)", when the library has it.
@@ -163,6 +165,8 @@ export interface DayExercise {
   rpe: number | null;
   rest: string | null;
   timeSeconds: number | null;
+  // The coach named this exercise in their request: it is kept exactly as named and never replaced by a library match.
+  coachNamed?: boolean;
 }
 
 export interface DayResult {
@@ -191,6 +195,7 @@ export function readDayResult(parsed: unknown, fallbackTitle: string): DayResult
       rpe: num(r.rpe),
       rest: typeof r.rest === "string" && r.rest.trim() ? r.rest.trim().slice(0, 40) : null,
       timeSeconds: num(r.timeSeconds),
+      coachNamed: r.coachNamed === true,
     }));
   }
   const title = typeof p.title === "string" && p.title.trim() ? p.title.trim().slice(0, 60) : fallbackTitle;

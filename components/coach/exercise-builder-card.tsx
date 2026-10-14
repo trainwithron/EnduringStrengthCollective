@@ -10,7 +10,7 @@ import { BuilderDemoThumb } from "@/components/coach/builder-demo-thumb";
 import { builderDemoFor, type BuilderDemo } from "@/lib/builder-demo";
 import { summarizeSets } from "@/lib/exercise-summary";
 import { cleanDisplayName } from "@/lib/exercise-alias-seed";
-import type { AliasEntry } from "@/lib/exercise-matching";
+import { matchExercise, type AliasEntry } from "@/lib/exercise-matching";
 import { ExerciseMediaPicker } from "./exercise-media-picker";
 import type { BuilderExercise, ExerciseSetTarget } from "@/lib/types";
 import {
@@ -254,6 +254,27 @@ export function ExerciseBuilderCard({
   const [addFieldOpen, setAddFieldOpen] = useState(false);
   const [presetMenuOpen, setPresetMenuOpen] = useState(false);
   const [restMenuOpen, setRestMenuOpen] = useState(false);
+  // An exercise the coach named (to the AI, or typed) that is not in their library is kept as named; it is marked, with a one-tap way to add it. Once it is in the library the same name simply links to it.
+  const [addedToLibrary, setAddedToLibrary] = useState(false);
+  const notInLibrary =
+    !addedToLibrary &&
+    !(loggedBySet && Object.keys(loggedBySet).length > 0) &&
+    exercise.exerciseName.trim() !== "" &&
+    !exercise.slot &&
+    exerciseLibrary.length > 0 &&
+    !["exact", "alias"].includes(matchExercise(exercise.exerciseName, exerciseLibrary.map((name) => ({ name })), exerciseAliases).confidence);
+  async function addToLibrary() {
+    const supabase = createBrowserClient();
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) return;
+    const { error } = await supabase.from("exercise_library").upsert({ created_by: userData.user.id, name: exercise.exerciseName.trim() }, { onConflict: "created_by,name", ignoreDuplicates: true });
+    if (error) {
+      flashSaveError("Couldn't add that to your library — try again.");
+      return;
+    }
+    setAddedToLibrary(true);
+    flashSaved();
+  }
   const [presetBusy, setPresetBusy] = useState(false);
   const [notesDraft, setNotesDraft] = useState(exercise.notes ?? "");
   const [busy, setBusy] = useState(false);
@@ -853,6 +874,14 @@ export function ExerciseBuilderCard({
               tierByName={exerciseTierByName}
               demoLibrary={demoLibrary}
             />
+          )}
+          {notInLibrary && (
+            <p className="mt-0.5 flex flex-wrap items-center gap-x-2 font-body text-xs text-steel">
+              <span>Not in your library</span>
+              <button type="button" onClick={addToLibrary} className="min-h-11 sm:min-h-0 text-rust underline underline-offset-2">
+                Add to my library
+              </button>
+            </p>
           )}
         </div>
       </div>

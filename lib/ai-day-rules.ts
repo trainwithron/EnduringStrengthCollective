@@ -1,6 +1,9 @@
 // Small, pure rules the AI Program Builder applies to the day it just wrote (and tells the model before it writes): no repeated exercise in a day, how many mobility days a week, timed work
 // written the same way every day, plain library names, and a sensible day length. Pure, so each is tested.
 
+import { matchExercise, sameQualifiers, type AliasEntry } from "@/lib/exercise-matching";
+import { mentionsExercise } from "@/lib/builder-context";
+
 export interface DayRow {
   exerciseName: string;
   sets: number;
@@ -137,4 +140,60 @@ export function exercisesWanted(text: string): number | null {
 
 export function longDayFlag(week: number, day: number, count: number, wanted: number | null = null): string | null {
   return count > Math.max(MAX_SENSIBLE_DAY, wanted ?? 0) ? `Week ${week}, Day ${day} has ${count} exercises, which is a long day. Worth a look.` : null;
+}
+
+// ---- exercises the coach names are sacred ----
+// When the coach's own request names a specific exercise ("right heel lift hemi bridge adductor rock back"), that exercise goes in EXACTLY as named, even when the library has nothing close: the library
+// never replaces or renames it. An exercise the AI chose itself is snapped to the library only on a confident match (the same movement with the same implement, side and position); otherwise it stays as written.
+
+const NEGATORS = /\b(no|not|never|without|avoid|skip|except|exclude|excluding|don'?t|dont|remove)\b/i;
+const normWords = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+// The coach named this exercise in their own words, and did not name it to leave it out ("no barbell back squat"). The model's own claim ("coachNamed") counts only when the coach's text really contains the
+// exercise: every word of its name is there (a plural counts), and none of those words follows a leave-out word. A claim the text does not back up is ignored, so the safety checks still apply.
+const singular = (w: string) => (w.length > 3 && w.endsWith("s") && !w.endsWith("ss") ? w.slice(0, -1) : w);
+export function coachNamedExercise(request: string, name: string, aiMarked: boolean): boolean {
+  const n = normWords(name);
+  if (!n) return false;
+  const words = n.split(" ");
+  const textWords = new Set(normWords(request).split(" ").map(singular));
+  const allThere = words.every((w) => textWords.has(singular(w)));
+  if (!allThere) return false;
+  // A leave-out word earlier in the same sentence as any word of the name (in either form) means the coach asked to avoid it.
+  for (const clause of request.split(/[.;!?\n]+/)) {
+    const c = ` ${normWords(clause)} `;
+    for (const w of words) {
+      for (const form of new Set([w, singular(w), `${singular(w)}s`])) {
+        const at = c.indexOf(` ${form} `);
+        if (at >= 0 && NEGATORS.test(c.slice(0, at + 1))) return false;
+      }
+    }
+  }
+  if (aiMarked) return true;
+  // A long, specific name that appears word for word is the coach's even when the model forgot to say so.
+  return words.length >= 3 && mentionsExercise(request, name);
+}
+
+export interface ResolvedName {
+  name: string;
+  coachNamed: boolean;
+}
+
+// The name a day-builder row is saved under. Coach-named: the coach's words, using the library's own spelling only when it is the very same exercise (identical name, an alias, or a spelling variant).
+// AI-chosen: a library match is taken only when it is confident, then the plainest library name.
+export function resolveAiExerciseName(
+  e: { exerciseName: string; coachNamed?: boolean },
+  request: string,
+  library: { name: string }[],
+  aliases: AliasEntry[],
+  plain: (name: string) => string
+): ResolvedName {
+  const coachNamed = coachNamedExercise(request, e.exerciseName, e.coachNamed === true);
+  const m = matchExercise(e.exerciseName, library, aliases);
+  if (coachNamed) {
+    const same = m.exerciseName && (m.confidence === "exact" || m.confidence === "alias");
+    return { name: same ? (m.exerciseName as string) : e.exerciseName.trim(), coachNamed: true };
+  }
+  const confident = m.exerciseName && (m.confidence !== "fuzzy" || sameQualifiers(e.exerciseName, m.exerciseName));
+  return { name: plain(confident ? (m.exerciseName as string) : e.exerciseName), coachNamed: false };
 }
