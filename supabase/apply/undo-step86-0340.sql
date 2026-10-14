@@ -29,6 +29,7 @@ drop trigger if exists workouts_enforce_athlete_in_group on public.workouts;
 drop trigger if exists group_workout_exercises_enforce_athlete_in_group on public.group_workout_exercises;
 drop trigger if exists booking_waitlist_entries_enforce_athlete_in_group on public.booking_waitlist_entries;
 drop trigger if exists game_score_entries_enforce_athlete_in_group on public.game_score_entries;
+do $undo$ declare r record; begin for r in select c.relname, t.tgname from pg_trigger t join pg_class c on c.oid = t.tgrelid where t.tgfoid = 'public.enforce_athlete_in_group'::regproc and not t.tgisinternal loop execute format('drop trigger if exists %I on public.%I', r.tgname, r.relname); end loop; end $undo$;
 drop function if exists public.enforce_athlete_in_group();
 drop trigger if exists group_memberships_guard_org_move on public.group_memberships;
 drop function if exists public.guard_membership_org_move();
