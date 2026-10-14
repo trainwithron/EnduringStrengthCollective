@@ -8,6 +8,7 @@ import { AiRunPanel } from "@/components/coach/desktop/ai-run-panel";
 import { MicButton } from "@/components/shared/mic-button";
 import { TemplateSuggestion } from "@/components/coach/desktop/template-suggestion";
 import { LearnLine } from "@/components/coach/desktop/learn-line";
+import { appliedLine, type AppliedRule } from "@/lib/learned-for-prompt";
 import { fixTargetFrom, parseBuildRequest, planSlots, scopeLimitFrom } from "@/lib/ai-day-request";
 import type { DaySlot } from "@/lib/ai-day-slots";
 import type { BuilderDay } from "@/lib/types";
@@ -47,6 +48,12 @@ export function AiProgramBuilderBox({
   const [flags, setFlags] = useState<string[]>([]);
   // A correction typed while paused: after it is applied the app offers, once, to remember it ("I'll remember: ...").
   const [learn, setLearn] = useState<{ id: number; correction: string } | null>(null);
+  // The rules the AI used for the days it built, each with its reason and an Undo.
+  const [applied, setApplied] = useState<AppliedRule[]>([]);
+  async function undoApplied(rule: AppliedRule) {
+    const res = await fetch(`/api/learned-rules/${rule.id}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "undo" }) }).catch(() => null);
+    if (res?.ok) setApplied((prev) => prev.filter((a) => a.id !== rule.id));
+  }
   // What he asked for in this run, shown beside the box (read-only).
   const [shownRequest, setShownRequest] = useState("");
   const [shownCorrections, setShownCorrections] = useState<string[]>([]);
@@ -66,7 +73,7 @@ export function AiProgramBuilderBox({
   const daysRef = useRef(days);
   daysRef.current = days;
 
-  async function callDay(mode: "build" | "fix", slot: DaySlot): Promise<{ ok: true; workoutId: string; flags: string[] } | { ok: false; message: string }> {
+  async function callDay(mode: "build" | "fix", slot: DaySlot): Promise<{ ok: true; workoutId: string; flags: string[]; applied: AppliedRule[] } | { ok: false; message: string }> {
     try {
       const res = await fetch("/api/ai/build-day", {
         method: "POST",
@@ -76,7 +83,7 @@ export function AiProgramBuilderBox({
       const data = await readAiJson(res);
       if (!res.ok || !data.workoutId) return { ok: false, message: (data.error as string | undefined) ?? COULDNT };
       if (typeof data.runToken === "string") token.current = data.runToken;
-      return { ok: true, workoutId: data.workoutId as string, flags: Array.isArray(data.flags) ? (data.flags as string[]) : [] };
+      return { ok: true, workoutId: data.workoutId as string, flags: Array.isArray(data.flags) ? (data.flags as string[]) : [], applied: Array.isArray(data.applied) ? (data.applied as AppliedRule[]) : [] };
     } catch {
       return { ok: false, message: COULDNT };
     }
@@ -118,6 +125,7 @@ export function AiProgramBuilderBox({
       }
       await show(result.workoutId);
       if (result.flags.length > 0) setFlags((prev) => [...prev, ...result.flags].slice(-6));
+      if (result.applied.length > 0) setApplied((prev) => [...prev.filter((a) => !result.applied.some((n) => n.id === a.id)), ...result.applied]);
       lastBuilt.current = slot;
       finishedWeeks.current.add(slot.week);
       queue.current.shift();
@@ -208,6 +216,7 @@ export function AiProgramBuilderBox({
         }
         await show(fixed.workoutId);
         if (fixed.flags.length > 0) setFlags((prev) => [...prev, ...fixed.flags].slice(-6));
+        if (fixed.applied.length > 0) setApplied((prev) => [...prev.filter((a) => !fixed.applied.some((n) => n.id === a.id)), ...fixed.applied]);
       }
     }
     void runQueue();
@@ -269,6 +278,18 @@ export function AiProgramBuilderBox({
         )}
       </div>
       {phase === "idle" && <TemplateSuggestion text={text} />}
+      {applied.length > 0 && (
+        <ul className="mt-2 space-y-1" aria-label="Rules applied">
+          {applied.map((a) => (
+            <li key={a.id} className="flex items-start gap-2 font-body text-xs text-steel">
+              <span className="flex-1 min-w-0">{appliedLine(a)}</span>
+              <button type="button" onClick={() => void undoApplied(a)} className="min-h-11 px-2 underline shrink-0">
+                Undo
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       {learn && <LearnLine key={learn.id} correction={learn.correction} programId={programId} groupId={groupId} athleteId={athleteId} />}
       {line && (
         <p className="font-body text-sm text-chalk mt-2" role="status">

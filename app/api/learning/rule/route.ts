@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { ALL_KEYS, labelFor } from "@/lib/clauses";
 import { LEARN_INTRO, proposeRule, sameRule, withScope, type RuleScope } from "@/lib/learning-rule";
-import { loadClientKeys } from "@/lib/learned-for-prompt";
+import { isSilent, loadClientKeys } from "@/lib/learned-for-prompt";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const KNOWN = new Set(ALL_KEYS.map((k) => k.key));
@@ -53,6 +53,21 @@ export async function POST(request: Request) {
 
   if (action === "propose") {
     if (!askingOn) return NextResponse.json({ skip: true });
+    // The ladder: a rule the coach has confirmed three times is already applied, so the same correction is not asked about again (it still counts as one more confirmation).
+    const { data: known } = await supabase
+      .from("coach_learned_rules")
+      .select("id, kind, then_text, when_keys, scope, client_id, confirmations")
+      .eq("coach_id", user.id)
+      .eq("status", "confirmed")
+      .eq("kind", proposal.kind)
+      .limit(100);
+    const match = ((known ?? []) as { id: string; kind: string; then_text: string | null; when_keys: string[] | null; scope: string; client_id: string | null; confirmations: number }[]).find((r) =>
+      sameRule(proposal, r, proposal.scope === "client" ? athleteId : null)
+    );
+    if (match && isSilent(match)) {
+      await supabase.from("coach_learned_rules").update({ confirmations: match.confirmations + 1 }).eq("id", match.id);
+      return NextResponse.json({ skip: true, known: true });
+    }
     return NextResponse.json({
       proposal,
       whenLabels: proposal.whenKeys.map((k) => labelFor(k)),

@@ -5,7 +5,7 @@ import { clauseKey, derivedKeys, inferClauseKeys, ruleApplies, splitCorrection }
 import { LEARN_INTRO, WHY_CHIPS, WHY_PROMPT, proposeRule, ruleKind, sameRule, withScope } from "@/lib/learning-rule";
 import { detectSwapPatterns, patternKey } from "@/lib/edit-patterns";
 import { isWriteRequest } from "@/lib/workspace-mutation";
-import { learnedBlock, learnedLines, LEARNED_HEADING } from "@/lib/learned-for-prompt";
+import { appliedLine, isSilent, learnedBlock, learnedLines, LEARNED_HEADING, SILENT_AFTER, toApplied } from "@/lib/learned-for-prompt";
 
 const read = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
 
@@ -118,7 +118,7 @@ describe("what the AI is told", () => {
   });
   it("every AI path that writes or explains a program is given it", () => {
     for (const f of ["app/api/ai/build-day/route.ts", "app/api/ai/pick-template/route.ts", "app/api/ai/generate-program/route.ts", "app/api/ai/program-chat/route.ts"]) {
-      expect(read(f), f).toContain("loadLearnedLines(");
+      expect(read(f), f).toMatch(/loadLearnedLines\(|loadApplicableRules\(/);
     }
     expect(read("lib/ai-day-run.ts")).toContain("if (input.learnedBlock) parts.push(input.learnedBlock);");
     expect(read("lib/ai-from-template.ts")).toContain("if (input.learnedBlock) parts.push(input.learnedBlock);");
@@ -168,5 +168,39 @@ describe("a taught rule has no from/to names and must not break the swap code", 
     expect(read("app/(coach)/groups/[groupId]/programs/[programId]/page.tsx")).toContain('.eq("kind", "swap")');
     expect(read("app/api/learned-rules/[ruleId]/route.ts")).toContain('rule.kind !== "swap" && body.action !== "undo"');
     expect(read("app/api/ai/learn-reason/route.ts")).toContain('rule.kind !== "swap"');
+  });
+});
+
+// Release R2: once a rule has been confirmed three times it is applied without asking, and every use shows its reason with an Undo.
+describe("the ladder: ask, then apply quietly, always showing why", () => {
+  it("silent after three confirmations", () => {
+    expect(SILENT_AFTER).toBe(3);
+    expect(isSilent({ confirmations: 1 })).toBe(false);
+    expect(isSilent({ confirmations: 2 })).toBe(false);
+    expect(isSilent({ confirmations: 3 })).toBe(true);
+    expect(isSilent({})).toBe(false);
+  });
+  it("the line says what was applied and why, with the count", () => {
+    expect(appliedLine({ text: "No barbell squats", because: "back limits", confirmations: 3 })).toBe("Applied your rule: no barbell squats (because: back limits; you confirmed this 3 times)");
+    expect(appliedLine({ text: "Rest 60-90", because: "your preference", confirmations: 1 })).toBe("Applied your rule: rest 60-90 (because: your preference; you confirmed this once)");
+  });
+  it("the reason is the coach's own words when he gave them, otherwise the clauses, otherwise his preference", () => {
+    const applied = toApplied([
+      { id: "a", kind: "avoid", then_text: "No barbell squats", when_keys: ["back_limit"], scope: "clauses", client_id: null, confirmations: 3, reason_text: null },
+      { id: "b", kind: "avoid", then_text: "No lunges", when_keys: [], scope: "client", client_id: "x", confirmations: 1, reason_text: "her knee" },
+      { id: "c", kind: "rest", then_text: "Rest 60-90", when_keys: [], scope: "all", client_id: null, confirmations: 2, reason_text: null },
+    ]);
+    expect(applied.map((a) => a.because)).toEqual(["back limits", "her knee", "your preference"]);
+    expect(applied.map((a) => a.silent)).toEqual([true, false, false]);
+  });
+  it("a correction already confirmed three times is not asked about again, only counted; the day builder shows what it used, with Undo", () => {
+    const route = read("app/api/learning/rule/route.ts");
+    expect(route).toContain("if (match && isSilent(match))");
+    expect(route).toContain("return NextResponse.json({ skip: true, known: true });");
+    expect(read("app/api/ai/build-day/route.ts")).toContain("applied: toApplied(taughtRules)");
+    const box = read("components/coach/desktop/ai-program-builder-box.tsx");
+    expect(box).toContain("appliedLine(a)");
+    expect(box).toContain("undoApplied(a)");
+    expect(read("components/coach/learned-section.tsx")).toContain("I apply it without asking.");
   });
 });

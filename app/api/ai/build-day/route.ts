@@ -11,7 +11,7 @@ import { scanConstraints } from "@/lib/constraint-scan";
 import { parseRestSpan } from "@/lib/rest-time";
 import { DEFAULT_TRACKED_FIELDS } from "@/lib/exercise-fields";
 import type { TrackedField } from "@/lib/exercise-fields";
-import { learnedBlock, loadLearnedLines } from "@/lib/learned-for-prompt";
+import { learnedBlock, linesFor, loadApplicableRules, toApplied } from "@/lib/learned-for-prompt";
 import { resolveAiExerciseName, exercisesWanted, allowsRepeats, applyTimedConsistency, dedupeDay, isMobilityTitle, longDayFlag, mobilityDaysWanted, mobilityInstruction, mobilityRole, plainLibraryName, ruleKey } from "@/lib/ai-day-rules";
 import { DAY_MAX_TOKENS, TOO_LONG_MESSAGE, TRUNCATED_RETRY_NOTE, buildDaySystemPrompt, buildDayUserText, checkRunToken, issueRunToken, readDayResult, runTokenIsStale, truncatedRetryTimeoutMs, type BuiltDay } from "@/lib/ai-day-run";
 
@@ -134,7 +134,8 @@ export async function POST(request: Request) {
   }
 
   // What the coach has taught the AI that fits THIS client (their clauses, level and age band decide which rules reach it).
-  const taught = learnedBlock(await loadLearnedLines(supabase, user.id, athleteId));
+  const taughtRules = await loadApplicableRules(supabase, user.id, athleteId);
+  const taught = learnedBlock(linesFor(taughtRules));
   const [{ data: libraryRows }, { data: aliasRows }] = await Promise.all([
     supabase.from("exercise_library").select("name, category").eq("created_by", user.id).order("name").limit(3000),
     supabase.from("exercise_aliases").select("raw_name, exercise_name").eq("coach_id", user.id),
@@ -279,6 +280,8 @@ export async function POST(request: Request) {
       title: dayTitle,
       exerciseCount: rows.length - failed,
       flags,
+      // The rules used for this day, shown to the coach with their reason and an Undo.
+      applied: toApplied(taughtRules),
       runToken: issueRunToken(user.id, programId, (run.ok ? run.days : 0) + 1, Date.now(), run.ok ? run.issuedAt : startedAt),
     });
   } catch (err) {

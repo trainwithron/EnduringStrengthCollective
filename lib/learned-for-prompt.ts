@@ -5,11 +5,14 @@ import { derivedKeys, labelFor, ruleApplies } from "@/lib/clauses";
 // is a coach-wide preference, or it was made for that one client); the AI is only handed the sentences. The block always sits UNDER the hard safety, injury and youth rules and says it can only add.
 
 export interface LearnedRuleRow {
+  id?: string;
   kind: string;
   then_text: string | null;
   when_keys: string[] | null;
   scope: string | null;
   client_id: string | null;
+  reason_text?: string | null;
+  confirmations?: number | null;
 }
 
 // The clause keys a client has: the clauses the coach wrote on their profile plus the level and age band the app can read.
@@ -29,23 +32,62 @@ export async function loadClientKeys(supabase: SupabaseClient, coachId: string, 
   }
 }
 
-// The sentences that apply to this client (at most 20, most specific first).
-export function learnedLines(rules: LearnedRuleRow[], client: { athleteId: string | null; keys: string[] }): string[] {
+// The ladder: a rule the coach has confirmed this many times is applied without asking again. Before that, repeating the same correction asks again (and counts as another confirmation).
+export const SILENT_AFTER = 3;
+
+export function isSilent(rule: { confirmations?: number | null }): boolean {
+  return (rule.confirmations ?? 1) >= SILENT_AFTER;
+}
+
+// The rules that apply to this client (at most 20, most specific first).
+export function applicableRules(rules: LearnedRuleRow[], client: { athleteId: string | null; keys: string[] }): LearnedRuleRow[] {
   return rules
     .filter((r) => !!r.then_text && ruleApplies({ scope: r.scope, whenKeys: r.when_keys, clientId: r.client_id }, client))
     .sort((a, b) => (b.when_keys?.length ?? 0) - (a.when_keys?.length ?? 0) || (a.then_text ?? "").localeCompare(b.then_text ?? ""))
-    .slice(0, 20)
+    .slice(0, 20);
+}
+
+// The sentences for rules already matched to a client.
+export function linesFor(rules: LearnedRuleRow[]): string[] {
+  return rules.map((r) => {
+    const when = (r.when_keys ?? []).length > 0 && r.scope === "clauses" ? ` (for clients with ${(r.when_keys ?? []).map((k) => labelFor(k).toLowerCase()).join(" and ")})` : "";
+    return `${r.then_text}${when}`;
+  });
+}
+
+export function learnedLines(rules: LearnedRuleRow[], client: { athleteId: string | null; keys: string[] }): string[] {
+  return linesFor(applicableRules(rules, client));
+}
+
+// What the coach sees when rules were used: "Applied your rule: no barbell squats (because: back limits; you confirmed this 3 times)", with Undo.
+export interface AppliedRule {
+  id: string;
+  text: string;
+  because: string;
+  confirmations: number;
+  silent: boolean;
+}
+
+export function appliedLine(a: { text: string; because: string; confirmations: number }): string {
+  const times = a.confirmations === 1 ? "once" : `${a.confirmations} times`;
+  return `Applied your rule: ${a.text.charAt(0).toLowerCase()}${a.text.slice(1)} (because: ${a.because}; you confirmed this ${times})`;
+}
+
+export function toApplied(rules: LearnedRuleRow[]): AppliedRule[] {
+  return rules
+    .filter((r) => !!r.id)
     .map((r) => {
-      const when = (r.when_keys ?? []).length > 0 && r.scope === "clauses" ? ` (for clients with ${(r.when_keys ?? []).map((k) => labelFor(k).toLowerCase()).join(" and ")})` : "";
-      return `${r.then_text}${when}`;
+      const keys = r.when_keys ?? [];
+      const because = r.reason_text?.trim() ? r.reason_text.trim() : keys.length > 0 && r.scope === "clauses" ? keys.map((k) => labelFor(k).toLowerCase()).join(" and ") : r.scope === "client" ? "this client" : "your preference";
+      return { id: r.id as string, text: r.then_text ?? "", because, confirmations: r.confirmations ?? 1, silent: isSilent(r) };
     });
 }
 
-export async function loadLearnedLines(supabase: SupabaseClient, coachId: string, athleteId: string | null): Promise<string[]> {
+export async function loadApplicableRules(supabase: SupabaseClient, coachId: string, athleteId: string | null): Promise<LearnedRuleRow[]> {
   try {
     const { data } = await supabase
       .from("coach_learned_rules")
-      .select("kind, then_text, when_keys, scope, client_id")
+      .select("id, kind, then_text, when_keys, scope, client_id, reason_text, confirmations")
       .eq("coach_id", coachId)
       .eq("status", "confirmed")
       .not("then_text", "is", null)
@@ -53,10 +95,14 @@ export async function loadLearnedLines(supabase: SupabaseClient, coachId: string
     const rules = (data ?? []) as LearnedRuleRow[];
     if (rules.length === 0) return [];
     const keys = await loadClientKeys(supabase, coachId, athleteId);
-    return learnedLines(rules, { athleteId, keys });
+    return applicableRules(rules, { athleteId, keys });
   } catch {
     return [];
   }
+}
+
+export async function loadLearnedLines(supabase: SupabaseClient, coachId: string, athleteId: string | null): Promise<string[]> {
+  return linesFor(await loadApplicableRules(supabase, coachId, athleteId));
 }
 
 export const LEARNED_HEADING = "What this coach has taught you (their own preferences for this kind of client). They can only ADD to the hard rules above: the safety, injury and youth rules always win, and anything the coach said in this request wins over these.";
