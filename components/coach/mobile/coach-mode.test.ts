@@ -32,7 +32,9 @@ describe("coach mode: a coach logging a workout for a client on the phone", () =
   it("finishing goes straight back to the coach's home, no share card, and no feed post for a client under 18", () => {
     const btn = read("components/session/complete-workout-button.tsx");
     expect(btn).toContain("if (coachMode) navHref = coachMode.homeHref;");
-    expect(btn).toContain("&& !coachMode?.clientIsMinor;");
+    // a coach logging for a client under 18 posts nothing and needs no share link (the rule itself is in lib/announce-workout-log.ts)
+    expect(btn).toContain("skipPost: !!coachMode?.clientIsMinor,");
+    expect(btn).toContain("skipLink: !!coachMode,");
     expect(btn).toContain("coachMode ? coachMode.homeHref : existingPost");
   });
   it("it never uses the act-as cookie, which would write as the client", () => {

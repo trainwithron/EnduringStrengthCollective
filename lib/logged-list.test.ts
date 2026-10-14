@@ -48,7 +48,7 @@ describe("the profile", () => {
     expect(page).toContain("...(allLogs ?? []).map((l) => ({ date: dateKeyInZone(l.created_at as string, displayZone)");
     expect(page).toContain("for (const log of allLogs ?? []) {");
     // the Logged workouts list's own count is the logs plus the imported sessions it lists (or those that match a search), never the stats total
-    expect(page).toContain("const loggedListTotal = logsForList.length + (searching ? importedForList.length : importedTotal ?? importedSessions?.length ?? 0);");
+    expect(page).toContain("const loggedListTotal = logsForList.length + (searching ? importedForList.length : Math.max(0, (importedTotal ?? importedSessions?.length ?? 0) - promotedAmongImported));");
     // imported sessions are read for the list in the first batch of waits, with no extra queries
     expect(page).not.toContain("importedSetRows");
     expect(page).toContain('.eq("is_historical", true)');

@@ -5,6 +5,8 @@ import { ProgressStats } from "@/components/coach/progress/progress-stats";
 import { TrainingMaxCards } from "@/components/coach/progress/training-max-cards";
 import { BodyOverlayChart } from "@/components/coach/progress/body-overlay-chart";
 import { LoggedSearch } from "@/components/coach/progress/logged-search";
+import { MakePrCountButton } from "@/components/coach/progress/make-pr-count-button";
+import { coachControlFor } from "@/lib/pr-promotion";
 import { dateKeyInZone, type StatEvent } from "@/lib/progress-periods";
 import { defaultMetric, planCards, summarizeExercises, type LadderInput } from "@/lib/progress-cards";
 import { isSearching, matchesLoggedSearch, namesBySessionFrom, readSearchWords } from "@/lib/logged-search";
@@ -165,6 +167,7 @@ export default async function AthleteProfilePage(
     { data: progressPrefs },
     { data: pinRows },
     { data: intakeRows },
+    { data: promotionRows },
   ] = await Promise.all([
     supabase
       .from("group_memberships")
@@ -419,6 +422,8 @@ export default async function AthleteProfilePage(
     supabase.from("client_progress_pins").select("exercise_name, pinned_at").eq("coach_id", user.id).eq("athlete_id", params.athleteId).eq("group_id", params.groupId).order("pinned_at", { ascending: true }),
     // What the client logged to eat, a total for each day (skipped meals and entries without calories left out).
     supabase.rpc("client_daily_intake", { p_athlete: params.athleteId, p_group: params.groupId }),
+    // The records this coach asked the client to count as real ones (private to the coach who asked).
+    supabase.from("pr_promotions").select("session_id, exercise_name, status, answered_at").eq("athlete_id", params.athleteId).eq("group_id", params.groupId).eq("requested_by", user.id),
   ]);
 
   if (membership?.role !== "coach") {
@@ -635,13 +640,13 @@ export default async function AthleteProfilePage(
     ...importedList.map((w) => ({ date: dateKeyInZone(w.at, displayZone), volume: w.volume })),
   ];
 
-  const prEntries: { exerciseName: string; date: string }[] = [];
+  const prEntries: { exerciseName: string; date: string; sessionId?: string }[] = [];
   for (const log of allLogs ?? []) {
     for (const name of log.new_prs ?? []) {
       prEntries.push({ exerciseName: name, date: log.created_at });
     }
   }
-  for (const pr of hindsightPrs(rollup)) prEntries.push({ exerciseName: pr.exerciseName, date: pr.date });
+  for (const pr of hindsightPrs(rollup)) prEntries.push({ exerciseName: pr.exerciseName, date: pr.date, sessionId: pr.sessionId });
   prEntries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const prDateKeys = prEntries.map((p) => dateKeyInZone(p.date, displayZone));
   const progressToday = dateKeyInZone(new Date().toISOString(), displayZone);
@@ -650,13 +655,16 @@ export default async function AthleteProfilePage(
   const namesBySession = namesBySessionFrom(rollup.map((r) => ({ sessionId: r.sessionId, exerciseName: r.exerciseName })));
   const searching = isSearching(searchWords);
   const logsForList = (allLogs ?? []).filter((l: any) => matchesLoggedSearch({ sessionId: l.session_id as string, dateKey: dateKeyInZone(l.created_at as string, displayZone) }, namesBySession, searchWords));
-  const importedForList = (importedSessions ?? []).filter((x: any) => matchesLoggedSearch({ sessionId: x.id as string, dateKey: dateKeyInZone(x.started_at as string, displayZone) }, namesBySession, searchWords));
+  // An imported workout the client agreed to count has a workout log now: it is listed once, as that log.
+  const loggedSessionIds = new Set((allLogs ?? []).map((l: any) => l.session_id as string));
+  const promotedAmongImported = (importedSessions ?? []).filter((x: any) => loggedSessionIds.has(x.id as string)).length;
+  const importedForList = (importedSessions ?? []).filter((x: any) => !loggedSessionIds.has(x.id as string)).filter((x: any) => matchesLoggedSearch({ sessionId: x.id as string, dateKey: dateKeyInZone(x.started_at as string, displayZone) }, namesBySession, searchWords));
   const loggedList = mergeLoggedList<any>(
     logsForList as any[],
     importedForList.map((x: any) => ({ id: x.id as string, started_at: x.started_at as string, exercises: (x.session_exercises?.[0]?.count as number | undefined) ?? 0 })),
     RECENT_LOGS_LIMIT
   );
-  const loggedListTotal = logsForList.length + (searching ? importedForList.length : importedTotal ?? importedSessions?.length ?? 0);
+  const loggedListTotal = logsForList.length + (searching ? importedForList.length : Math.max(0, (importedTotal ?? importedSessions?.length ?? 0) - promotedAmongImported));
 
   // The Progress cards: pinned first, then the big five by most logged, then the rest (lib/progress-cards.ts).
   const ladders: LadderInput[] = ((coachMovementPatterns ?? []) as any[]).map((p) => ({
@@ -1143,6 +1151,22 @@ export default async function AthleteProfilePage(
                       <span className="text-steel text-xs">
                         &middot; {new Date(pr.date).toLocaleDateString("en-US", { timeZone: displayZone })}
                       </span>
+                      {pr.sessionId && !selfView ? (
+                        <>
+                          {" "}
+                          <MakePrCountButton
+                            sessionId={pr.sessionId}
+                            exerciseName={pr.exerciseName}
+                            clientName={(profile?.full_name as string | undefined)?.split(" ")[0] ?? "the client"}
+                            control={coachControlFor(
+                              (promotionRows ?? [])
+                                .filter((r: any) => r.session_id === pr.sessionId && r.exercise_name === pr.exerciseName)
+                                .map((r: any) => ({ status: r.status as "asked" | "agreed" | "declined", answeredAt: (r.answered_at as string | null) ?? null }))[0],
+                              new Date()
+                            )}
+                          />
+                        </>
+                      ) : null}
                     </p>
                   ))}
                 </div>

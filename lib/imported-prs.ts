@@ -41,6 +41,7 @@ export function importedTotals(rows: RollupRow[]): { workouts: number; volume: n
 }
 
 export interface HindsightPr {
+  sessionId: string;
   exerciseName: string;
   date: string;
   weight: number;
@@ -68,7 +69,7 @@ export function hindsightPrs(rows: RollupRow[]): HindsightPr[] {
     const name = key(row.exerciseName);
     const prior = best.get(name);
     if (row.imported && !row.hasLog && prior !== undefined && row.bestWeight > prior) {
-      found.push({ exerciseName: row.exerciseName, date: row.at, weight: row.bestWeight });
+      found.push({ sessionId: row.sessionId, exerciseName: row.exerciseName, date: row.at, weight: row.bestWeight });
     }
     pending.push({ name, weight: row.bestWeight });
   }

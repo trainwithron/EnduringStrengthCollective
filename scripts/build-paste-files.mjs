@@ -2375,6 +2375,27 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["the org wall check exists", "to_regprocedure('public.group_in_active_org(uuid)') is not null"],
     ],
   },
+  {
+    n: "124",
+    slug: "0374",
+    title: "0374 A coach can ask a client to count a record from imported history as a real one",
+    migrations: ["0374"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes on screen until the code that goes with it is live. Then a coach can tap Make this PR count on a record found in imported history; the client gets one notification and a one-tap yes. On yes that one imported workout gets a workout log dated when it was done, so the record shows everywhere like any other, with its original date. A workout log dated more than a day ago no longer brings an inactive client back.",
+    undo: [
+      "delete from public.notifications where type = 'pr_promotion';",
+      "drop function if exists public.answer_pr_promotion(uuid, boolean);",
+      "drop function if exists public.ask_pr_promotion(uuid, text);",
+      "drop table if exists public.pr_promotions;",
+      fnFromMigration("0281", "resurface_inactive_client"),
+    ].join(String.fromCharCode(10)),
+    undoWhy: "Only if step 124 misbehaves. Removes the asks and the notifications about them and puts back the old rule for bringing an inactive client back. It does NOT remove a workout log already made by a yes (that is real history now).",
+    rows: [
+      ["0374 is not already applied (no promotions table yet)", "to_regclass('public.pr_promotions') is null"],
+      ["the notifications table and the inactive-client rule exist", "to_regclass('public.notifications') is not null and to_regprocedure('public.resurface_inactive_client()') is not null"],
+      ["the org wall check exists", "to_regprocedure('public.group_in_active_org(uuid)') is not null"],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -2485,6 +2506,7 @@ const BUNDLES = [
   { id: "release-bl", name: "Release BL (four exercises added to Coach Ron's library for the FitPros history; run any time)", steps: ["106"] },
   { id: "release-bk", name: "Release BK (move Coach Ron's own training into his personal space; run AFTER he has opened Coach Ron (you) once and removed the programs he does not want)", steps: ["105"] },
   { id: "release-bw", name: "Release BW (a rest can be a range such as 60-90; run AFTER Release BV and BEFORE the code that goes with it is live)", steps: ["117"] },
+  { id: "release-cd", name: "Release CD (a coach can ask a client to count a record from imported history as a real one; run BEFORE the code that goes with it is live)", steps: ["124"] },
   { id: "release-cc", name: "Release CC (the Progress tab: your card and graph choices, pinned exercises, and the daily calories a client logged; run BEFORE the code that goes with it is live)", steps: ["123"] },
   { id: "release-cb", name: "Release CB (imported history counts in totals, graphs, estimated maxes and records; training maxes are rebuilt from the sets; run AFTER Release CA, BEFORE the code that goes with it is live)", steps: ["122"] },
   { id: "release-ca", name: "Release CA (unclear data points in imported history are marked and kept out of the numbers; run BEFORE the code that goes with it is live)", steps: ["121"] },
@@ -2710,6 +2732,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
     m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
+    m("0374", "to_regclass('public.pr_promotions') is not null"),
     m("0373", "to_regclass('public.client_progress_pins') is not null"),
     m("0372", "to_regprocedure('public.client_exercise_rollup(uuid, uuid)') is not null"),
     m("0371", "to_regprocedure('public.flag_unclear_sets(uuid, uuid)') is not null"),

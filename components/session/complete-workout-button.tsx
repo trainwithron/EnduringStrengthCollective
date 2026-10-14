@@ -11,6 +11,7 @@ import { isHighPriorityClient } from "@/lib/notification-priority";
 import { checkAndNotifyLowSessionBalance } from "@/lib/notify-low-session-balance";
 import { notifyWebhookEvent } from "@/lib/notify-webhook-event";
 import { refreshEquipmentLoadRatios } from "@/lib/equipment-load-ratio-gather";
+import { announceWorkoutLog } from "@/lib/announce-workout-log";
 
 // This project has no generated Supabase Database type, so a fresh RPC's
 // result falls back to an untyped shape — spelled out explicitly here
@@ -285,58 +286,22 @@ export function CompleteWorkoutButton({
       }
     }
 
-    // The athlete's own broadcast preference is captured onto the post
-    // itself — not just read live — so the card renders consistently even
-    // if they change this setting later.
-    const shouldPost =
-      broadcastLevel !== "private" && !(broadcastLevel === "prs_only" && newPrs.length === 0) && !coachMode?.clientIsMinor;
-    // A "checkin only" post never reveals PR content, so it never belongs
-    // in the PR Board channel even when a PR genuinely happened.
-    const channel = broadcastLevel !== "checkin_only" && newPrs.length > 0 ? "pr_board" : "general";
+    // The feed card (the athlete's own sharing choice is kept on the post) and the link to the celebratory share card: one shared function, also used when a client agrees to count a record from
+    // imported history (lib/announce-workout-log.ts). A coach logging for a client under 18 posts nothing, and a coach goes back to their own home, so no share link is needed there.
+    const announced = await announceWorkoutLog(supabase, {
+      workoutLogId: result.workout_log_id,
+      athleteId: result.athlete_id,
+      groupId: result.group_id,
+      broadcastLevel,
+      hasPrs: newPrs.length > 0,
+      skipPost: !!coachMode?.clientIsMinor,
+      skipLink: !!coachMode,
+    });
 
-    let postId: string | null = null;
-    if (shouldPost) {
-      // One card per workout, even if completion ran twice.
-      const { data: alreadyPosted } = await supabase
-        .from("posts")
-        .select("id")
-        .eq("workout_log_id", result.workout_log_id)
-        .eq("post_type", "workout_summary")
-        .maybeSingle();
-      const { data: post } = alreadyPosted
-        ? { data: alreadyPosted }
-        : await supabase
-        .from("posts")
-        .insert({
-          group_id: result.group_id,
-          author_id: result.athlete_id,
-          post_type: "workout_summary",
-          workout_log_id: result.workout_log_id,
-          channel,
-          broadcast_level: broadcastLevel === "private" ? "full" : broadcastLevel,
-        })
-        .select("id")
-        .single();
-      postId = post?.id ?? null;
-    }
-
-    // Every completed workout gets a celebratory, shareable card instead of
-    // silently landing back on the group hub — that's the actual feedback
-    // moment a client (or a coach logging in-person) gets after finishing.
-    // The card is built from the workout itself when there is no feed post (a client who keeps their workouts off the group feed, or a one-on-one client).
+    // Every completed workout gets a celebratory, shareable card instead of silently landing back on the group hub.
     let navHref = `/groups/${result.group_id}`;
     if (coachMode) navHref = coachMode.homeHref;
-    else if (postId) navHref = `/share/${postId}`;
-    else {
-      // The link is signed by the server, so only the client (or their coach) can make it.
-      try {
-        const res = await fetch("/api/share/sign", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workoutLogId: result.workout_log_id }) });
-        const data = res.ok ? await res.json() : null;
-        if (data?.href) navHref = data.href as string;
-      } catch {
-        // Fall back to Home: the workout itself is saved either way.
-      }
-    }
+    else if (announced.href) navHref = announced.href;
 
     // RPE comes first (own-session only, same reasoning as the weight
     // nudge below — it's the athlete's own subjective read on the session
