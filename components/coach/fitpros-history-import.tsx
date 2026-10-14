@@ -161,7 +161,7 @@ export function FitprosHistoryImport({ athleteId, groupId, athleteName }: { athl
     <section className="border border-steel/20 p-4 mt-8 max-w-3xl">
       <h2 className="font-display uppercase text-sm tracking-wide text-steel">FitPros</h2>
       <p className="font-body text-sm text-steel mt-1 max-w-2xl">
-        Choose the FitPros history file for {athleteName}. You see what would be saved first; nothing is saved until you press Import. Imported workouts count in the client&apos;s totals, graphs, estimated maxes and records (worked out in date order), and send no notifications, celebrations or share cards. The star rating and workout notes are left out.
+        Choose the FitPros history file for {athleteName}. You see what would be saved first; nothing is saved until you press Import. The star rating and workout notes are left out.
       </p>
 
       {program === undefined ? (
