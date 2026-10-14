@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { confirmDialog } from "@/components/shared/confirm-dialog";
+import { ShelfPlacementControls } from "@/components/coach/desktop/shelf-placement-controls";
+import { PRODUCT_KIND_LABEL, isAudience, productKind, type Audience } from "@/lib/shelf";
 
 export interface CoachPackageRow {
   id: string;
@@ -17,6 +19,12 @@ export interface CoachPackageRow {
   isPublic: boolean;
   defaultProgramId: string | null;
   groupAccessGroupId?: string | null;
+  // The one product shelf (release BX): where it shows and who sees it in the app.
+  showOnHome?: boolean;
+  showInProShop?: boolean;
+  audience?: string | null;
+  audienceGroupId?: string | null;
+  buyerJoinsSpace?: boolean;
 }
 
 export interface AccessGroupOption {
@@ -202,9 +210,10 @@ export function PackageManager({
             </thead>
             <tbody>
               {active.map((p) => (
-                <tr key={p.id} className="border-b border-steel/15">
+                <Fragment key={p.id}>
+                <tr className="border-b border-steel/15">
                   <td className="py-3 font-body text-sm">
-                    {p.name}
+                    {p.name} <span className="font-body text-xs text-steel">&middot; {PRODUCT_KIND_LABEL[productKind(p)]}</span>
                     {p.isPublic && siteLinkBase && (
                       <button
                         type="button"
@@ -259,6 +268,26 @@ export function PackageManager({
                     </button>
                   </td>
                 </tr>
+                <tr className="border-b border-steel/15">
+                  <td colSpan={9} className="pb-3">
+                    <ShelfPlacementControls
+                      target="package"
+                      id={p.id}
+                      isProgram={productKind(p) === "program"}
+                      publicChecked={p.isPublic}
+                      onTogglePublic={() => handleTogglePublic(p)}
+                      groups={accessGroups}
+                      initial={{
+                        showOnHome: p.showOnHome ?? false,
+                        showInProShop: p.showInProShop ?? false,
+                        audience: (isAudience(p.audience) ? p.audience : "everyone") as Audience,
+                        audienceGroupId: p.audienceGroupId ?? null,
+                        buyerJoinsSpace: p.buyerJoinsSpace !== false,
+                      }}
+                    />
+                  </td>
+                </tr>
+                </Fragment>
               ))}
             </tbody>
           </table>

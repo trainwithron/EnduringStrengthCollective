@@ -6,6 +6,8 @@ import { safeWebUrl } from "@/lib/coach-site";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { Trash2 } from "lucide-react";
+import { ShelfPlacementControls } from "@/components/coach/desktop/shelf-placement-controls";
+import { isAudience, type Audience } from "@/lib/shelf";
 
 export interface ProShopLink {
   id: string;
@@ -19,6 +21,10 @@ export interface ProShopLink {
   clickCount: number;
   // Shown on the coach's public website (2-3 cards) and first in the client's Pro Shop.
   featured?: boolean;
+  // The one product shelf (release BX): on the public page, and who sees it in the app.
+  showOnPublic?: boolean;
+  audience?: string | null;
+  audienceGroupId?: string | null;
 }
 
 const CATEGORIES = [
@@ -33,7 +39,7 @@ const CATEGORIES = [
 const ALLOWED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
-export function ProShopManager({ initialLinks, organizationId }: { initialLinks: ProShopLink[]; organizationId: string | null }) {
+export function ProShopManager({ initialLinks, organizationId, groups = [] }: { initialLinks: ProShopLink[]; organizationId: string | null; groups?: { id: string; name: string }[] }) {
   const router = useRouter();
   const [links, setLinks] = useState(initialLinks);
   const [title, setTitle] = useState("");
@@ -222,8 +228,14 @@ export function ProShopManager({ initialLinks, organizationId }: { initialLinks:
                   </p>
                   <label className="inline-flex items-center gap-2 min-h-11 font-body text-xs text-chalk cursor-pointer">
                     <input type="checkbox" checked={!!l.featured} onChange={() => handleFeatured(l)} className="w-4 h-4 accent-[#D2703B]" />
-                    Feature on my website and first in the shop
+                    Feature on Client Home and first in the shop
                   </label>
+                  <ShelfPlacementControls
+                    target="link"
+                    id={l.id}
+                    groups={groups}
+                    initial={{ showOnPublic: !!l.showOnPublic, audience: (isAudience(l.audience) ? l.audience : "everyone") as Audience, audienceGroupId: l.audienceGroupId ?? null }}
+                  />
                 </div>
               </div>
               <button

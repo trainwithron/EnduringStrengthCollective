@@ -1,7 +1,8 @@
 import type { CSSProperties, ReactNode } from "react";
 
 // One storefront card, used by the client's Pro Shop, the coach's preview of it and the public mini site, so they always match: a large 4:3 picture (a quiet placeholder when there is none), the
-// name, one short line (the description, two lines at most), and one clear "Shop" button that opens the outbound link in a new tab. No checkout, no prices.
+// name, one short line (the description, two lines at most), and one clear "Shop" button that opens the outbound link in a new tab. A "buy" card (a package the coach sells) also shows its price and a "Buy"
+// button, but is drawn ONLY when buying is really possible (canBuy): a visitor never meets a dead Buy. In this release nothing passes canBuy, so no Buy card appears anywhere.
 // Colors come from the page: the app's own theme by default, or the public page's palette when `colors` is given.
 export interface ShopCardColors {
   card: string;
@@ -23,9 +24,16 @@ export interface ShopCardProps {
   onOpen?: () => void;
   colors?: ShopCardColors;
   id?: string;
+  // "shop" (default) is an outbound link; "buy" is a product with a price.
+  kind?: "shop" | "buy";
+  price?: string | null;
+  canBuy?: boolean;
 }
 
-export function ShopCard({ title, description, imageUrl, href, buttonLabel = "Shop", note, onOpen, colors, id }: ShopCardProps) {
+export function ShopCard({ title, description, imageUrl, href, buttonLabel, note, onOpen, colors, id, kind = "shop", price = null, canBuy = false }: ShopCardProps) {
+  // A Buy card with no working checkout behind it is not drawn at all.
+  if (kind === "buy" && !canBuy) return null;
+  const label = buttonLabel ?? (kind === "buy" ? "Buy" : "Shop");
   const cardStyle: CSSProperties | undefined = colors ? { background: colors.card, color: colors.text } : undefined;
   const mutedStyle: CSSProperties | undefined = colors ? { color: colors.muted } : undefined;
   const buttonStyle: CSSProperties | undefined = colors ? { background: colors.accent, color: colors.accentText } : undefined;
@@ -51,6 +59,7 @@ export function ShopCard({ title, description, imageUrl, href, buttonLabel = "Sh
             {description}
           </p>
         ) : null}
+        {kind === "buy" && price ? <p className={`font-body text-sm font-semibold ${colors ? "" : "text-chalk"}`}>{price}</p> : null}
         {note ? <div className={`font-body text-xs ${colors ? "" : "text-positive"}`}>{note}</div> : null}
         <div className="mt-auto pt-2">
           <a
@@ -61,7 +70,7 @@ export function ShopCard({ title, description, imageUrl, href, buttonLabel = "Sh
             className={`flex min-h-11 w-full items-center justify-center px-4 font-display font-bold uppercase tracking-wide text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${colors ? "" : "bg-rust text-graphite"}`}
             style={buttonStyle}
           >
-            {buttonLabel}
+            {label}
             <span className="sr-only"> {title} (opens in a new tab)</span>
           </a>
         </div>

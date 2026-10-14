@@ -51,7 +51,7 @@ async function load(slugParam: string, preview: boolean) {
   const [{ data: packages }, { data: shop }] = await Promise.all([
     db.from("coach_packages").select("id, name, sessions_per_week, billing_type, sessions_granted, rate_cents").eq("coach_id", page.coach_id).in("group_id", orgGroupIdList.length > 0 ? orgGroupIdList : ["00000000-0000-0000-0000-000000000000"]).eq("is_active", true).eq("is_public", true).order("sessions_per_week", { ascending: true }).limit(6),
     org
-      ? db.from("pro_shop_links").select("id, title, description, url, image_url").eq("coach_id", page.coach_id).eq("organization_id", org.id).eq("featured", true).order("sort_order", { ascending: true }).limit(3)
+      ? db.from("pro_shop_links").select("id, title, description, url, image_url").eq("coach_id", page.coach_id).eq("organization_id", org.id).eq("show_on_public", true).eq("audience", "everyone").order("sort_order", { ascending: true }).limit(3)
       : Promise.resolve({ data: [] as { id: string; title: string; description: string | null; url: string; image_url: string | null }[] }),
   ]);
 
