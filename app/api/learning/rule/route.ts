@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
-import { ALL_KEYS, labelFor } from "@/lib/clauses";
+import { ALL_KEYS, labelFor } from "@/lib/context-tags";
 import { LEARN_INTRO, proposeRule, sameRule, withScope, type RuleScope } from "@/lib/learning-rule";
+import { addRuleNote } from "@/lib/client-notes-server";
 import { isSilent, loadClientKeys } from "@/lib/learned-for-prompt";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const KNOWN = new Set(ALL_KEYS.map((k) => k.key));
 
 // "I'll remember..." after a correction. Everything is the coach's own (row policies). Two steps: PROPOSE reads the correction and says what would be remembered and for whom (nothing is saved); SAVE writes
-// the rule once the coach says Yes (or changes who it applies to), and puts the clause on the client when the rule is for clients with that clause. The coach can turn the questions off; then nothing is
+// the rule once the coach says Yes (or changes who it applies to), and notes the reason on the client as a short Past AI build note when the rule is for clients with that context. The coach can turn the questions off; then nothing is
 // proposed and nothing is asked, though nothing is lost either.
 export async function POST(request: Request) {
   const supabase = await createServerClient();
@@ -78,11 +79,11 @@ export async function POST(request: Request) {
   }
 
   if (action === "save") {
-    const scope: RuleScope | "client" | "all" | "clauses" = body.scope === "client" || body.scope === "all" || body.scope === "clauses" ? body.scope : proposal.scope;
+    const scope: RuleScope | "client" | "all" | "context" = body.scope === "client" || body.scope === "all" || body.scope === "context" ? body.scope : proposal.scope;
     if (scope === "client" && !athleteId) return NextResponse.json({ error: "Pick the client." }, { status: 400 });
-    // Reason tags picked by hand: known keys only, plus clauses the coach named (kept as their own words).
+    // Reason tags picked by hand: known keys only, known keys only.
     const picked: string[] = Array.isArray(body.whenKeys) ? body.whenKeys.filter((k: unknown): k is string => typeof k === "string" && (KNOWN.has(k) || /^[a-z0-9_]{1,40}$/.test(k))).slice(0, 6) : [];
-    const final = scope === "clauses" ? withScope(proposal, "clauses", picked.length > 0 ? picked : proposal.whenKeys) : scope === "client" ? { ...withScope(proposal, "client"), scope: "client" as RuleScope } : withScope(proposal, "all");
+    const final = scope === "context" ? withScope(proposal, "context", picked.length > 0 ? picked : proposal.whenKeys) : scope === "client" ? { ...withScope(proposal, "client"), scope: "client" as RuleScope } : withScope(proposal, "all");
 
     const { data: existing } = await supabase
       .from("coach_learned_rules")
@@ -126,16 +127,9 @@ export async function POST(request: Request) {
       ruleId = rule.id;
     }
 
-    // A rule for clients with a clause puts that clause on this client when they do not have it yet (the coach just told us they do).
-    if (final.scope === "clauses" && athleteId && groupId) {
-      const have = new Set(clientKeys);
-      const toAdd = final.whenKeys.filter((k) => !have.has(k) && !k.startsWith("level_") && !k.startsWith("age_"));
-      if (toAdd.length > 0) {
-        await supabase.from("client_clauses").upsert(
-          toAdd.map((k) => ({ coach_id: user.id, athlete_id: athleteId, group_id: groupId, key: k, label: labelFor(k) })),
-          { onConflict: "coach_id,athlete_id,key", ignoreDuplicates: true }
-        );
-      }
+    // The reason is remembered with the client as a short Past AI build note (that is also how the app knows later that these rules fit them).
+    if (final.scope === "context" && athleteId && groupId) {
+      await addRuleNote(supabase, { coachId: user.id, athleteId, groupId, whenKeys: final.whenKeys, thenText: final.thenText });
     }
     // The correction and its context are kept as an event (best effort: the rule is already saved).
     if (body.programId && UUID.test(body.programId)) {
@@ -146,7 +140,7 @@ export async function POST(request: Request) {
         from_name: null,
         to_name: null,
         detail: { text: correction.slice(0, 300) },
-        context: { clauses: clientKeys, scope: final.scope, when: final.whenKeys },
+        context: { tags: clientKeys, scope: final.scope, when: final.whenKeys },
         why: whyText,
         reason_tags: whyChips,
         source: "pause_correction",

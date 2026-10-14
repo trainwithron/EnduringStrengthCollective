@@ -12,6 +12,7 @@ import { scanConstraints } from "@/lib/constraint-scan";
 import { clampAiRow } from "@/lib/ai-row-clamps";
 import { athleteIsMinor, YOUTH_PROMPT_BLOCK } from "@/lib/youth-block";
 import { loadLearnedLines } from "@/lib/learned-for-prompt";
+import { loadClientNotes } from "@/lib/client-notes-server";
 import { buildProgrammingProfile, libraryContext, mentionsExercise, rankLibrary, type LibraryItem } from "@/lib/builder-context";
 
 // The longest description the builder will read. A longer one is almost certainly pasted text, not a request.
@@ -311,11 +312,12 @@ export async function POST(request: Request) {
     .order("created_at", { ascending: false })
     .limit(100);
 
-  // Rules the coach taught that fit this client (their clauses, level and age band decide which reach it).
+  // Rules the coach taught that fit this client (the client's notes, level and age band decide which reach it).
   const taughtLines = await loadLearnedLines(supabase, user.id, typeof athleteId === "string" && athleteId ? athleteId : null);
   const preferenceLines = [
     ...(prefRows ?? []).map((p) => `- When ${p.condition_text}: ${p.preference_text}`),
     ...taughtLines.map((l) => `- ${l} (taught by this coach)`),
+    ...(await loadClientNotes(supabase, user.id, typeof athleteId === "string" && athleteId ? athleteId : null)).bullets.map((b) => `- Past AI build note for this client: ${b.text} (${b.date})`),
     ...(spotterPrefRows ?? []).map(
       (p) => `- When ${p.condition_text}: ${p.preference_text} (from Programming Spotter feedback)`
     ),

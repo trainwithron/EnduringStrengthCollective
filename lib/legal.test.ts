@@ -130,6 +130,7 @@ describe("the AI paragraph covers every route that calls the AI", () => {
     "app/api/ai/parse-session-nl/route.ts",
     "app/api/ai/parse-workout/route.ts",
     "app/api/ai/pick-template/route.ts",
+    "app/api/learning/notes/route.ts",
     "app/api/ai/program-chat/route.ts",
     "app/api/ai/suggest-patterns/route.ts",
     "app/api/biomech-tags/suggest/route.ts",

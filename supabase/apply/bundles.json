@@ -302,7 +302,7 @@
  },
  {
   "id": "release-by",
-  "name": "Release BY (the AI you can train, first release: clauses on a client, rules that apply only to the clients they fit; run BEFORE the code that goes with it is live)",
+  "name": "Release BY (the AI you can train, rules that apply only to the clients they fit, Past AI build notes for each client; run BEFORE the code that goes with it is live)",
   "steps": [
    "119"
   ],

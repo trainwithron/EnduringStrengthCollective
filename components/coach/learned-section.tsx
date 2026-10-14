@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { LearnedList, type LearnedLine } from "@/components/coach/learned-list";
 import { CoachConversation } from "@/components/coach/coach-conversation";
 import { askingLessThanBefore } from "@/lib/edit-patterns";
-import { labelFor } from "@/lib/clauses";
+import { labelFor } from "@/lib/context-tags";
 import { isSilent } from "@/lib/learned-for-prompt";
 
 // Server side of "What I've learned about how you coach": reads the coach's own rows (row security keeps it theirs) and hands the plain list to the screen. If the learning tables are not
@@ -25,7 +25,7 @@ export async function LearnedSection({ supabase, coachId }: { supabase: Supabase
       text: r.kind === "swap" ? (r.rule_text ?? `Use ${r.to_name} instead of ${r.from_name}.`) : (r.then_text ?? r.rule_text ?? ""),
       evidence: r.kind === "swap" ? `You made this change in ${r.evidence_count} of ${r.evidence_total} programs.` : `You confirmed this ${r.confirmations ?? 1} ${(r.confirmations ?? 1) === 1 ? "time" : "times"}.${isSilent(r) ? " I apply it without asking." : " I'll check with you if you do this again."}`,
       reason: r.reason_text,
-      when: r.kind === "swap" ? null : r.scope === "clauses" && (r.when_keys ?? []).length > 0 ? `For clients with ${(r.when_keys ?? []).map((k) => labelFor(k).toLowerCase()).join(" and ")}` : r.scope === "client" ? "For one client" : "For all your clients",
+      when: r.kind === "swap" ? null : r.scope === "context" && (r.when_keys ?? []).length > 0 ? `For clients with ${(r.when_keys ?? []).map((k) => labelFor(k).toLowerCase()).join(" and ")}` : r.scope === "client" ? "For one client" : "For all your clients",
     })),
     ...((prefsRes.data ?? []) as { id: string; condition_text: string; preference_text: string }[])
       .filter((p) => !linked.has(p.id))

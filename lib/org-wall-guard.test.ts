@@ -21,6 +21,7 @@ const REVIEWED_PERMISSION_ONLY = new Set([
   "lib/ai-budget-server.ts",
   "lib/coach-credits.ts",
   "lib/package-group-access.ts",
+  "lib/reference-context.ts",
   "lib/real-coach.ts",
   "lib/user-is-coach.ts",
   "lib/coach-groups.ts",

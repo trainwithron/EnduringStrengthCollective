@@ -10,6 +10,7 @@ import { TemplateSuggestion } from "@/components/coach/desktop/template-suggesti
 import { LearnLine } from "@/components/coach/desktop/learn-line";
 import { appliedLine, type AppliedRule } from "@/lib/learned-for-prompt";
 import { LikeClientSuggestion } from "@/components/coach/desktop/like-client";
+import { PastAiNotes } from "@/components/coach/desktop/past-ai-notes";
 import { fixTargetFrom, parseBuildRequest, planSlots, scopeLimitFrom } from "@/lib/ai-day-request";
 import type { DaySlot } from "@/lib/ai-day-slots";
 import type { BuilderDay } from "@/lib/types";
@@ -34,7 +35,7 @@ export function AiProgramBuilderBox({
 }: {
   programId: string;
   groupId: string;
-  // The client this program is for, when it is a personal copy (the rules the AI learns are matched to the client's clauses).
+  // The client this program is for, when it is a personal copy (the rules the AI learns are matched to what is known about the client).
   athleteId?: string | null;
   days: BuilderDay[];
   trainingDaysCount: number | null;
@@ -51,8 +52,17 @@ export function AiProgramBuilderBox({
   const [learn, setLearn] = useState<{ id: number; correction: string } | null>(null);
   // The rules the AI used for the days it built, each with its reason and an Undo.
   const [applied, setApplied] = useState<AppliedRule[]>([]);
-  // Clauses to use for this request only ("like Rob"): sent with every day, not stored on anyone unless the coach says so.
-  const likeKeys = useRef<string[]>([]);
+  // "Like Rob": the client the AI should look at as a reference for this request; sent with every day, never stored.
+  const referenceId = useRef<string | null>(null);
+  // What the coach told the AI for this client is sent once, when the run is done, to be kept as a few short notes (nothing is shown or asked).
+  const notesSent = useRef("");
+  function rememberForClient() {
+    if (!athleteId) return;
+    const said = [request.current, ...corrections.current].join("|");
+    if (!request.current.trim() || notesSent.current === said) return;
+    notesSent.current = said;
+    void fetch("/api/learning/notes", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "learn", groupId, athleteId, text: request.current, corrections: corrections.current }) }).catch(() => {});
+  }
   async function undoApplied(rule: AppliedRule) {
     const res = await fetch(`/api/learned-rules/${rule.id}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "undo" }) }).catch(() => null);
     if (res?.ok) setApplied((prev) => prev.filter((a) => a.id !== rule.id));
@@ -81,7 +91,7 @@ export function AiProgramBuilderBox({
       const res = await fetch("/api/ai/build-day", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ programId, week: slot.week, day: slot.day, mode, instruction: request.current, corrections: corrections.current, runToken: token.current ?? undefined, extraClauseKeys: likeKeys.current }),
+        body: JSON.stringify({ programId, week: slot.week, day: slot.day, mode, instruction: request.current, corrections: corrections.current, runToken: token.current ?? undefined, referenceClientId: referenceId.current }),
       });
       const data = await readAiJson(res);
       if (!res.ok || !data.workoutId) return { ok: false, message: (data.error as string | undefined) ?? COULDNT };
@@ -134,6 +144,7 @@ export function AiProgramBuilderBox({
       queue.current.shift();
     }
     setPhase("done");
+    rememberForClient();
     const weeks = [...finishedWeeks.current].sort((a, b) => a - b);
     const top = weeks.length > 0 ? weeks[weeks.length - 1] : (lastBuilt.current?.week ?? 1);
     setLine(weeks.length <= 1 ? `Done. Week ${top} is in the builder.` : "Done. Your days are in the builder.");
@@ -281,7 +292,8 @@ export function AiProgramBuilderBox({
         )}
       </div>
       {phase === "idle" && <TemplateSuggestion text={text} />}
-      {(phase === "idle" || phase === "paused") && <LikeClientSuggestion text={text} groupId={groupId} athleteId={athleteId} onUse={(keys) => { likeKeys.current = keys; }} />}
+      {(phase === "idle" || phase === "paused") && <LikeClientSuggestion text={text} groupId={groupId} athleteId={athleteId} onUse={(id) => { referenceId.current = id; }} />}
+      {athleteId && <PastAiNotes athleteId={athleteId} groupId={groupId} />}
       {applied.length > 0 && (
         <ul className="mt-2 space-y-1" aria-label="Rules applied">
           {applied.map((a) => (

@@ -7,7 +7,9 @@ import { checkAndSpendCoachCredits, canRunAiAction } from "@/lib/coach-credits";
 import { hasFlaggedMusculoskeletalConcern } from "@/lib/athlete-injury-flag";
 import { athleteIsMinor, YOUTH_PROMPT_BLOCK } from "@/lib/youth-block";
 import { scanConstraints } from "@/lib/constraint-scan";
-import { cleanExtraKeys, learnedBlock, loadLearnedLines } from "@/lib/learned-for-prompt";
+import { learnedBlock, loadLearnedLines } from "@/lib/learned-for-prompt";
+import { loadNotesBlock } from "@/lib/client-notes-server";
+import { loadReferenceBlock } from "@/lib/reference-context";
 import { choicesForSlot, slotLabel, type LadderRung, type Level, type Side, type SlotTier } from "@/lib/slot-templates";
 import { dayHeading, type TemplateSlot } from "@/lib/use-template";
 import {
@@ -116,13 +118,16 @@ export async function POST(request: Request) {
     if (await athleteIsMinor(supabase, clientId)) youthBlock = YOUTH_PROMPT_BLOCK;
   }
   const level = levelUsed(text, storedLevel ?? chosenLevel);
-  const taught = learnedBlock(await loadLearnedLines(supabase, user.id, clientId, cleanExtraKeys(body.extraClauseKeys)));
+  const taught = learnedBlock(await loadLearnedLines(supabase, user.id, clientId));
+  const notes = await loadNotesBlock(supabase, user.id, clientId);
+  const referenceId = typeof body.referenceClientId === "string" && /^[0-9a-f-]{36}$/i.test(body.referenceClientId) ? body.referenceClientId : null;
+  const reference = await loadReferenceBlock(supabase, user.id, referenceId, program.group_id as string);
 
   async function attempt(retryNote: string | null) {
     const answer = await callClaude({
       meta: { feature: "program_template", userId: user!.id },
       system: TEMPLATE_PICK_SYSTEM,
-      userText: buildTemplatePickUserText({ slots: slotCandidates, level, text, injuryContext, youthBlock, retryNote, learnedBlock: taught }),
+      userText: buildTemplatePickUserText({ slots: slotCandidates, level, text, injuryContext, youthBlock, retryNote, learnedBlock: taught, notesBlock: notes, referenceBlock: reference }),
       maxTokens: 4000,
       timeoutMs: retryNote ? 25_000 : 30_000,
     });

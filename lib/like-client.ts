@@ -1,7 +1,5 @@
-import { CLAUSES } from "@/lib/clauses";
-
-// "Like Rob": when the coach types that a new client needs what another client needed ("similar to Rob's bad back", "same protocols as Rob Derrick", "like Rob"), the AI starts from that client's CLAUSES
-// (and the rules attached to them). It is a one-time COPY used as a starting point, never a live link. Or the coach names a clause directly ("this client has a no rotation clause"). Pure, so it is tested.
+// "Like Rob": when the coach types that a new client needs what another client needed ("similar to Rob's bad back", "same protocols as Rob Derrick", "like Rob"), the AI LOOKS at how the coach programs for
+// that client (their program and saved notes) as reference for this one request. Nothing is copied or stored. Pure, so it is tested.
 
 export interface NamedClient {
   id: string;
@@ -24,8 +22,8 @@ const norm = (s: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
-const LEAD = /(?:^|[^a-z])(?:like|similar to|same as|same protocols? as|same clauses? as|same thing as|just like|as with|same restrictions? as)\s+([a-z][a-z'-]*(?:\s+[a-z][a-z'-]*)?)/i;
-const POSSESSIVE = /(?:^|[^a-z])([a-z][a-z-]*(?:\s+[a-z][a-z-]*)?)'s\s+(?:protocols?|clauses?|restrictions?|limits?|limitations?|bad|back|knee|shoulder|hip|injur)/i;
+const LEAD = /(?:^|[^a-z])(?:like|similar to|same as|same protocols? as|same thing as|just like|as with|same restrictions? as)\s+([a-z][a-z'-]*(?:\s+[a-z][a-z'-]*)?)/i;
+const POSSESSIVE = /(?:^|[^a-z])([a-z][a-z-]*(?:\s+[a-z][a-z-]*)?)'s\s+(?:protocols?|restrictions?|limits?|limitations?|bad|back|knee|shoulder|hip|injur)/i;
 
 // Which of the coach's clients does the text point at? Never the client the work is already for (`exceptId`). First name or full name; two clients with that first name => options.
 export function findLikeReference<T extends NamedClient>(text: string, clients: T[], exceptId: string | null = null): LikeReference<T> | null {
@@ -47,10 +45,4 @@ export function findLikeReference<T extends NamedClient>(text: string, clients: 
     }
   }
   return null;
-}
-
-// Clauses the coach named directly: "this client has a no rotation clause", "add the back limits clause".
-export function namedClausesIn(text: string): string[] {
-  const t = norm(text);
-  return CLAUSES.filter((c) => t.includes(`${c.label.toLowerCase()} clause`) || t.includes(`clause ${c.label.toLowerCase()}`) || t.includes(`clause for ${c.label.toLowerCase()}`)).map((c) => c.key);
 }

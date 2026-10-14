@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { clauseKey, derivedKeys, inferClauseKeys, ruleApplies, splitCorrection } from "@/lib/clauses";
+import { derivedKeys, inferTagKeys, ruleApplies, splitCorrection } from "@/lib/context-tags";
 import { LEARN_INTRO, WHY_CHIPS, WHY_PROMPT, proposeRule, ruleKind, sameRule, withScope } from "@/lib/learning-rule";
 import { detectSwapPatterns, patternKey } from "@/lib/edit-patterns";
 import { isWriteRequest } from "@/lib/workspace-mutation";
@@ -15,20 +15,20 @@ describe("a correction becomes a rule with its reason", () => {
     const p = proposeRule({ correction: "no barbell squats, his back" })!;
     expect(p.thenText).toBe("No barbell squats");
     expect(p.whenKeys).toEqual(["back_limit"]);
-    expect(p.scope).toBe("clauses");
+    expect(p.scope).toBe("context");
     expect(p.kind).toBe("avoid");
     expect(p.summary).toBe("I'll remember: no barbell squats for clients with back limits.");
   });
-  it("a movement name is not a reason: 'barbell back squat' and 'hip thrust' add no clause", () => {
-    expect(inferClauseKeys("no barbell back squats", false)).toEqual([]);
-    expect(inferClauseKeys("skip the hip thrusts", false)).toEqual([]);
+  it("a movement name is not a reason: 'barbell back squat' and 'hip thrust' add no context tag", () => {
+    expect(inferTagKeys("no barbell back squats", false)).toEqual([]);
+    expect(inferTagKeys("skip the hip thrusts", false)).toEqual([]);
     expect(proposeRule({ correction: "no barbell back squats" })!.scope).toBe("all");
   });
   it("a part named as the problem counts even in the instruction", () => {
-    expect(inferClauseKeys("no deadlifts, bad knee", true)).toEqual(["knee_limit"]);
-    expect(inferClauseKeys("avoid it with back pain", false)).toEqual(["back_limit"]);
-    expect(inferClauseKeys("her lower back hurts", true)).toEqual(["back_limit"]);
-    expect(inferClauseKeys("back off the volume", true)).toEqual([]);
+    expect(inferTagKeys("no deadlifts, bad knee", true)).toEqual(["knee_limit"]);
+    expect(inferTagKeys("avoid it with back pain", false)).toEqual(["back_limit"]);
+    expect(inferTagKeys("her lower back hurts", true)).toEqual(["back_limit"]);
+    expect(inferTagKeys("back off the volume", true)).toEqual([]);
   });
   it("with no reason it is a preference about how the coach works, for all clients", () => {
     const p = proposeRule({ correction: "rest 60-90" })!;
@@ -65,23 +65,23 @@ describe("changing who a rule applies to", () => {
   it("this client only, all clients, or the reasons he picks", () => {
     expect(withScope(base, "client").summary).toBe("I'll remember: no barbell squats for this client.");
     expect(withScope(base, "all").summary).toBe("I'll remember: no barbell squats.");
-    expect(withScope(base, "clauses", ["back_limit", "level_beginner"]).summary).toBe("I'll remember: no barbell squats for clients with back limits and beginner.");
-    expect(withScope(base, "clauses", []).whenKeys).toEqual(["back_limit"]);
+    expect(withScope(base, "context", ["back_limit", "level_beginner"]).summary).toBe("I'll remember: no barbell squats for clients with back limits and beginner.");
+    expect(withScope(base, "context", []).whenKeys).toEqual(["back_limit"]);
   });
   it("kinds of rule are told apart and a repeat is recognised", () => {
     expect(ruleKind("no barbell squats")).toBe("avoid");
-    expect(sameRule({ kind: "avoid", thenText: "No barbell squats", whenKeys: ["back_limit"], scope: "clauses" }, { kind: "avoid", then_text: "no barbell squats.", when_keys: ["back_limit"], scope: "clauses", client_id: null }, null)).toBe(true);
-    expect(sameRule({ kind: "avoid", thenText: "No barbell squats", whenKeys: [], scope: "all" }, { kind: "avoid", then_text: "No barbell squats", when_keys: ["back_limit"], scope: "clauses", client_id: null }, null)).toBe(false);
+    expect(sameRule({ kind: "avoid", thenText: "No barbell squats", whenKeys: ["back_limit"], scope: "context" }, { kind: "avoid", then_text: "no barbell squats.", when_keys: ["back_limit"], scope: "context", client_id: null }, null)).toBe(true);
+    expect(sameRule({ kind: "avoid", thenText: "No barbell squats", whenKeys: [], scope: "all" }, { kind: "avoid", then_text: "No barbell squats", when_keys: ["back_limit"], scope: "context", client_id: null }, null)).toBe(false);
   });
 });
 
 describe("which rules reach which client", () => {
-  const back = { scope: "clauses", whenKeys: ["back_limit"], clientId: null };
-  it("a clause rule reaches only a client with every clause it names", () => {
+  const back = { scope: "context", whenKeys: ["back_limit"], clientId: null };
+  it("a context rule reaches only a client with every tag it names", () => {
     expect(ruleApplies(back, { athleteId: "a", keys: ["back_limit", "level_beginner"] })).toBe(true);
     expect(ruleApplies(back, { athleteId: "a", keys: ["knee_limit"] })).toBe(false);
-    expect(ruleApplies({ scope: "clauses", whenKeys: ["back_limit", "no_rotation"], clientId: null }, { athleteId: "a", keys: ["back_limit"] })).toBe(false);
-    expect(ruleApplies({ scope: "clauses", whenKeys: [], clientId: null }, { athleteId: "a", keys: ["back_limit"] })).toBe(false);
+    expect(ruleApplies({ scope: "context", whenKeys: ["back_limit", "no_rotation"], clientId: null }, { athleteId: "a", keys: ["back_limit"] })).toBe(false);
+    expect(ruleApplies({ scope: "context", whenKeys: [], clientId: null }, { athleteId: "a", keys: ["back_limit"] })).toBe(false);
     expect(ruleApplies(back, { athleteId: null, keys: [] })).toBe(false);
   });
   it("a coach-wide rule reaches everyone; a client rule only that client", () => {
@@ -95,13 +95,12 @@ describe("which rules reach which client", () => {
     expect(derivedKeys({ dateOfBirth: "1970-01-01" }, new Date("2026-10-13T12:00:00Z"))).toEqual(["age_50_plus"]);
     // a client under 18 gets no age band (the youth rules handle them)
     expect(derivedKeys({ dateOfBirth: "2015-01-01" }, new Date("2026-10-13T12:00:00Z"))).toEqual([]);
-    expect(clauseKey("Ankle stability!")).toBe("ankle_stability");
   });
 });
 
 describe("what the AI is told", () => {
   const rules = [
-    { kind: "avoid", then_text: "No barbell squats", when_keys: ["back_limit"], scope: "clauses", client_id: null },
+    { kind: "avoid", then_text: "No barbell squats", when_keys: ["back_limit"], scope: "context", client_id: null },
     { kind: "rest", then_text: "Rest 60-90", when_keys: [], scope: "all", client_id: null },
     { kind: "avoid", then_text: "No lunges", when_keys: [], scope: "client", client_id: "sam" },
     { kind: "swap", then_text: null, when_keys: [], scope: "all", client_id: null },
@@ -141,10 +140,10 @@ describe("how it asks", () => {
     expect(read("components/coach/learned-list.tsx")).toContain("{LEARN_INTRO}");
     expect(read("components/coach/learned-section.tsx")).toContain("For clients with");
   });
-  it("the route respects the off switch and keeps clauses on the client the coach just described", () => {
+  it("the route respects the off switch and remembers the reason with the client the coach just described", () => {
     const route = read("app/api/learning/rule/route.ts");
     expect(route).toContain("if (!askingOn) return NextResponse.json({ skip: true });");
-    expect(route).toContain("client_clauses");
+    expect(route).toContain("addRuleNote(supabase,");
     expect(route).toContain("That client isn't yours.");
   });
 });
@@ -184,9 +183,9 @@ describe("the ladder: ask, then apply quietly, always showing why", () => {
     expect(appliedLine({ text: "No barbell squats", because: "back limits", confirmations: 3 })).toBe("Applied your rule: no barbell squats (because: back limits; you confirmed this 3 times)");
     expect(appliedLine({ text: "Rest 60-90", because: "your preference", confirmations: 1 })).toBe("Applied your rule: rest 60-90 (because: your preference; you confirmed this once)");
   });
-  it("the reason is the coach's own words when he gave them, otherwise the clauses, otherwise his preference", () => {
+  it("the reason is the coach's own words when he gave them, otherwise the context, otherwise his preference", () => {
     const applied = toApplied([
-      { id: "a", kind: "avoid", then_text: "No barbell squats", when_keys: ["back_limit"], scope: "clauses", client_id: null, confirmations: 3, reason_text: null },
+      { id: "a", kind: "avoid", then_text: "No barbell squats", when_keys: ["back_limit"], scope: "context", client_id: null, confirmations: 3, reason_text: null },
       { id: "b", kind: "avoid", then_text: "No lunges", when_keys: [], scope: "client", client_id: "x", confirmations: 1, reason_text: "her knee" },
       { id: "c", kind: "rest", then_text: "Rest 60-90", when_keys: [], scope: "all", client_id: null, confirmations: 2, reason_text: null },
     ]);

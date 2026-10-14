@@ -1,14 +1,15 @@
-// A CLAUSE is a named thing to program around on one client: "Back limits", "No rotation", "Limited overhead range". The coach adds them on the client's profile, and what the AI learns from the coach's
-// corrections is attached to clauses ("when a client has back limits: no barbell squats"). Only the clause name is kept, never medical text. Pure, so it is tested.
+// CONTEXT TAGS: the few things about a client that decide which of the coach's taught rules apply ("back limits", "no rotation", "limited overhead range", beginner, 50 and over). They are worked out
+// invisibly (the coach's notes on the client, the AI build notes, the client's level and age band, the reason the coach gave for a correction) and are never a feature the coach manages. Tags only,
+// never medical text. Pure, so it is tested.
 
-export interface ClauseDef {
+export interface TagDef {
   key: string;
   label: string;
-  // Words in a coach's correction or reason that point at this clause.
+  // Words in a coach's correction or reason that point at this tag.
   words: string[];
 }
 
-export const CLAUSES: ClauseDef[] = [
+export const TAGS: TagDef[] = [
   { key: "back_limit", label: "Back limits", words: ["back", "spine", "spinal", "lumbar", "disc", "sciatica", "herniated"] },
   { key: "no_rotation", label: "No rotation", words: ["rotation", "rotate", "rotating", "twisting", "twist"] },
   { key: "overhead_limit", label: "Limited overhead range", words: ["overhead"] },
@@ -19,7 +20,7 @@ export const CLAUSES: ClauseDef[] = [
   { key: "neck_limit", label: "Neck limits", words: ["neck", "cervical"] },
 ];
 
-// Context a client has without the coach writing anything: their level and age band. Rules can use them like clauses.
+// Context a client has without anyone writing anything: their level and age band. Rules can use them like any other tag.
 export const DERIVED: { key: string; label: string }[] = [
   { key: "level_beginner", label: "Beginner" },
   { key: "level_advanced", label: "Advanced" },
@@ -28,19 +29,10 @@ export const DERIVED: { key: string; label: string }[] = [
   { key: "age_50_plus", label: "50 and over" },
 ];
 
-export const ALL_KEYS: { key: string; label: string }[] = [...CLAUSES.map((c) => ({ key: c.key, label: c.label })), ...DERIVED];
+export const ALL_KEYS: { key: string; label: string }[] = [...TAGS.map((c) => ({ key: c.key, label: c.label })), ...DERIVED];
 
 export function labelFor(key: string, custom: Record<string, string> = {}): string {
   return ALL_KEYS.find((c) => c.key === key)?.label ?? custom[key] ?? key.replace(/_/g, " ");
-}
-
-// A coach-named clause ("no rotation clause", "Ankle stability") as a stable key.
-export function clauseKey(label: string): string {
-  return label
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "")
-    .slice(0, 40);
 }
 
 const words = (text: string) => text.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
@@ -57,12 +49,12 @@ export function splitCorrection(text: string): { head: string; reason: string } 
   return { head: m[1].trim(), reason: m[2].trim() };
 }
 
-// The clauses a piece of writing points at. In a REASON ("his back", "because of her knee") a body-part word counts; in an instruction ("no hip thrusts") only a part named as the problem counts
-// ("bad knee", "back pain"), so a movement name never adds a clause. Whole words only.
-export function inferClauseKeys(text: string, isReason: boolean = true): string[] {
+// The tags a piece of writing points at. In a REASON ("his back", "because of her knee") a body-part word counts; in an instruction ("no hip thrusts") only a part named as the problem counts
+// ("bad knee", "back pain"), so a movement name never adds a tag. Whole words only.
+export function inferTagKeys(text: string, isReason: boolean = true): string[] {
   const w = words(text);
   const out: string[] = [];
-  for (const c of CLAUSES) {
+  for (const c of TAGS) {
     const hit = w.some((word, i) => {
       if (!c.words.includes(word)) return false;
       const problem = POSSESSIVE.has(w[i - 1] ?? "") || TROUBLE.has(w[i + 1] ?? "") || TROUBLE.has(w[i + 2] ?? "");
@@ -95,7 +87,7 @@ export interface RuleLike {
   clientId: string | null | undefined;
 }
 
-// Whether a learned rule reaches this client: a coach-wide rule always; a client rule only for that client; a clause rule only when the client has EVERY clause it names.
+// Whether a learned rule reaches this client: a coach-wide rule always; a client rule only for that client; a tag rule only when the client has EVERY tag it names.
 export function ruleApplies(rule: RuleLike, client: { athleteId: string | null; keys: string[] }): boolean {
   const scope = rule.scope ?? "all";
   if (scope === "all") return true;

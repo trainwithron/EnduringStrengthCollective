@@ -69,6 +69,7 @@ export type AiFeature =
   | "biomech_tag_suggest"
   | "pattern_sort_suggest"
   | "program_template"
+  | "client_notes_summary"
   // system/automatic (logged, never limited)
   | "session_pattern_check"
   | "coach_briefing"
@@ -88,6 +89,7 @@ export const AI_INPUT_LIMITS: Partial<Record<AiFeature, number>> = {
   biomech_tag_suggest: 120,
   pattern_sort_suggest: 1500,
   program_template: 600,
+  client_notes_summary: 1500,
 };
 
 // A plain message to show when the text is too long, or null when it is fine.
@@ -130,6 +132,8 @@ const POLICY: Record<AiFeature, FeaturePolicy> = {
   pattern_sort_suggest: { enforce: true, burstLimit: 12, monthlyCeiling: 300 },
   // "Pick for me" on a template: one call for the whole template, charged as one program run only after a usable answer, so this ceiling (like program generation's) only bounds failed attempts.
   program_template: { enforce: true, monthlyCeiling: 150 },
+  // The short list of important facts kept about a client after the coach builds or corrects with them chosen: one small call, no credit charged, so its own ceiling bounds it.
+  client_notes_summary: { enforce: true, burstLimit: 12, monthlyCeiling: 600 },
   session_pattern_check: { enforce: false },
   coach_briefing: { enforce: false },
   spotter_cornerstone: { enforce: false },

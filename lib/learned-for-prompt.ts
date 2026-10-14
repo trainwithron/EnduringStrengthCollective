@@ -1,7 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { derivedKeys, labelFor, ruleApplies } from "@/lib/clauses";
+import { derivedKeys, labelFor, ruleApplies } from "@/lib/context-tags";
+import { tagsFromNotes } from "@/lib/client-notes";
+import { loadClientNotes } from "@/lib/client-notes-server";
 
-// What the coach has taught the AI, as it applies to ONE client, ready to put into any AI prompt. Rules are matched by code (a rule reaches a client only when the client has every clause it names, or it
+// What the coach has taught the AI, as it applies to ONE client, ready to put into any AI prompt. Rules are matched by code (a rule reaches a client only when the client has every tag it names, or it
 // is a coach-wide preference, or it was made for that one client); the AI is only handed the sentences. The block always sits UNDER the hard safety, injury and youth rules and says it can only add.
 
 export interface LearnedRuleRow {
@@ -15,18 +17,21 @@ export interface LearnedRuleRow {
   confirmations?: number | null;
 }
 
-// The clause keys a client has: the clauses the coach wrote on their profile plus the level and age band the app can read.
+// The context tags a client has, worked out invisibly: what the coach has written about them (their notes on the client and the Past AI build notes), their level and their age band. Tags only; the text
+// is read here and never kept or shown.
 export async function loadClientKeys(supabase: SupabaseClient, coachId: string, athleteId: string | null): Promise<string[]> {
   if (!athleteId) return [];
   try {
-    const [{ data: clauses }, { data: seats }, { data: intake }] = await Promise.all([
-      supabase.from("client_clauses").select("key").eq("coach_id", coachId).eq("athlete_id", athleteId),
+    const [notes, { data: seats }, { data: intake }, { data: coachNotes }] = await Promise.all([
+      loadClientNotes(supabase, coachId, athleteId),
       supabase.from("group_memberships").select("training_level").eq("profile_id", athleteId).not("training_level", "is", null).limit(1),
       supabase.from("client_intake").select("date_of_birth").eq("athlete_id", athleteId).maybeSingle(),
+      supabase.from("athlete_notes").select("body").eq("athlete_id", athleteId),
     ]);
     const level = ((seats ?? []) as { training_level: string | null }[])[0]?.training_level ?? null;
     const dob = (intake as { date_of_birth?: string | null } | null)?.date_of_birth ?? null;
-    return [...new Set([...((clauses ?? []) as { key: string }[]).map((c) => c.key), ...derivedKeys({ level, dateOfBirth: dob })])];
+    const noteText = ((coachNotes ?? []) as { body: string | null }[]).map((n) => n.body ?? "").join(" ");
+    return [...new Set([...tagsFromNotes(notes.bullets, noteText || null), ...derivedKeys({ level, dateOfBirth: dob })])];
   } catch {
     return [];
   }
@@ -50,7 +55,7 @@ export function applicableRules(rules: LearnedRuleRow[], client: { athleteId: st
 // The sentences for rules already matched to a client.
 export function linesFor(rules: LearnedRuleRow[]): string[] {
   return rules.map((r) => {
-    const when = (r.when_keys ?? []).length > 0 && r.scope === "clauses" ? ` (for clients with ${(r.when_keys ?? []).map((k) => labelFor(k).toLowerCase()).join(" and ")})` : "";
+    const when = (r.when_keys ?? []).length > 0 && r.scope === "context" ? ` (for clients with ${(r.when_keys ?? []).map((k) => labelFor(k).toLowerCase()).join(" and ")})` : "";
     return `${r.then_text}${when}`;
   });
 }
@@ -78,13 +83,12 @@ export function toApplied(rules: LearnedRuleRow[]): AppliedRule[] {
     .filter((r) => !!r.id)
     .map((r) => {
       const keys = r.when_keys ?? [];
-      const because = r.reason_text?.trim() ? r.reason_text.trim() : keys.length > 0 && r.scope === "clauses" ? keys.map((k) => labelFor(k).toLowerCase()).join(" and ") : r.scope === "client" ? "this client" : "your preference";
+      const because = r.reason_text?.trim() ? r.reason_text.trim() : keys.length > 0 && r.scope === "context" ? keys.map((k) => labelFor(k).toLowerCase()).join(" and ") : r.scope === "client" ? "this client" : "your preference";
       return { id: r.id as string, text: r.then_text ?? "", because, confirmations: r.confirmations ?? 1, silent: isSilent(r) };
     });
 }
 
-// extraKeys: clauses the coach asked to use for THIS request only ("like Rob"), added to the client's own.
-export async function loadApplicableRules(supabase: SupabaseClient, coachId: string, athleteId: string | null, extraKeys: string[] = []): Promise<LearnedRuleRow[]> {
+export async function loadApplicableRules(supabase: SupabaseClient, coachId: string, athleteId: string | null): Promise<LearnedRuleRow[]> {
   try {
     const { data } = await supabase
       .from("coach_learned_rules")
@@ -95,20 +99,15 @@ export async function loadApplicableRules(supabase: SupabaseClient, coachId: str
       .limit(200);
     const rules = (data ?? []) as LearnedRuleRow[];
     if (rules.length === 0) return [];
-    const keys = [...new Set([...(await loadClientKeys(supabase, coachId, athleteId)), ...extraKeys])];
+    const keys = await loadClientKeys(supabase, coachId, athleteId);
     return applicableRules(rules, { athleteId, keys });
   } catch {
     return [];
   }
 }
 
-export async function loadLearnedLines(supabase: SupabaseClient, coachId: string, athleteId: string | null, extraKeys: string[] = []): Promise<string[]> {
-  return linesFor(await loadApplicableRules(supabase, coachId, athleteId, extraKeys));
-}
-
-// Clause keys the screen sends for one request ("like Rob"): plain slugs only, at most ten.
-export function cleanExtraKeys(v: unknown): string[] {
-  return Array.isArray(v) ? v.filter((k): k is string => typeof k === "string" && /^[a-z0-9_]{1,40}$/.test(k)).slice(0, 10) : [];
+export async function loadLearnedLines(supabase: SupabaseClient, coachId: string, athleteId: string | null): Promise<string[]> {
+  return linesFor(await loadApplicableRules(supabase, coachId, athleteId));
 }
 
 export const LEARNED_HEADING = "What this coach has taught you (their own preferences for this kind of client). They can only ADD to the hard rules above: the safety, injury and youth rules always win, and anything the coach said in this request wins over these.";

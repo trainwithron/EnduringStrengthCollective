@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { loadLearnedLines } from "@/lib/learned-for-prompt";
+import { loadClientNotes } from "@/lib/client-notes-server";
 import { callClaude, extractJson, isAiConfigured } from "@/lib/anthropic-client";
 import { AiRateLimitedError, aiInputTooLong } from "@/lib/ai-usage";
 
@@ -141,7 +142,8 @@ export async function POST(request: Request) {
     .order("created_at", { ascending: false })
     .limit(50);
   const taughtLines = await loadLearnedLines(supabase, user.id, (program as { athlete_id?: string | null }).athlete_id ?? null);
-  const prefLines = [...(existingPrefs ?? []).map((p) => `- When ${p.condition_text}: ${p.preference_text}`), ...taughtLines.map((l) => `- ${l}`)];
+  const pastNotes = (await loadClientNotes(supabase, user.id, (program as { athlete_id?: string | null }).athlete_id ?? null)).bullets.map((b) => `- Past AI build note for this client: ${b.text} (${b.date})`);
+  const prefLines = [...(existingPrefs ?? []).map((p) => `- When ${p.condition_text}: ${p.preference_text}`), ...taughtLines.map((l) => `- ${l}`), ...pastNotes];
   const existingPrefsText = prefLines.length > 0 ? prefLines.join("\n") : "(none yet)";
 
   let reply = "I wasn't able to answer that — try asking again.";

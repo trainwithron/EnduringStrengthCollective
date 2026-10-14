@@ -2,13 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { MicButton } from "@/components/shared/mic-button";
-import { ALL_KEYS } from "@/lib/clauses";
+import { ALL_KEYS } from "@/lib/context-tags";
 import { WHY_CHIPS, WHY_PROMPT } from "@/lib/learning-rule";
 
 interface Proposal {
   summary: string;
   whenKeys: string[];
-  scope: "all" | "clauses" | "client";
+  scope: "all" | "context" | "client";
 }
 interface Proposed {
   proposal: Proposal;
@@ -26,7 +26,7 @@ export function LearnLine({ correction, programId, groupId, athleteId }: { corre
   const [data, setData] = useState<Proposed | null>(null);
   const [whyChips, setWhyChips] = useState<string[]>([]);
   const [whyText, setWhyText] = useState("");
-  const [scope, setScope] = useState<"all" | "clauses" | "client">("all");
+  const [scope, setScope] = useState<"all" | "context" | "client">("all");
   const [keys, setKeys] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [savedLine, setSavedLine] = useState<string | null>(null);
@@ -76,7 +76,7 @@ export function LearnLine({ correction, programId, groupId, athleteId }: { corre
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function save(chosen: { scope: "all" | "clauses" | "client"; whenKeys: string[] }) {
+  async function save(chosen: { scope: "all" | "context" | "client"; whenKeys: string[] }) {
     setError(null);
     const { ok, json } = await post({ action: "save", scope: chosen.scope, whenKeys: chosen.whenKeys, whyText: whyText || null, whyChips });
     if (!ok) {
@@ -172,11 +172,11 @@ export function LearnLine({ correction, programId, groupId, athleteId }: { corre
               All my clients
             </label>
             <label className="flex items-center gap-2 min-h-11 font-body text-sm text-chalk cursor-pointer">
-              <input type="radio" name="learn-scope" checked={scope === "clauses"} onChange={() => setScope("clauses")} />
+              <input type="radio" name="learn-scope" checked={scope === "context"} onChange={() => setScope("context")} />
               Pick the reasons
             </label>
           </div>
-          {scope === "clauses" && (
+          {scope === "context" && (
             <div className="flex flex-wrap gap-2">
               {ALL_KEYS.map((k) => (
                 <button
@@ -192,7 +192,7 @@ export function LearnLine({ correction, programId, groupId, athleteId }: { corre
             </div>
           )}
           <div className="flex gap-2">
-            <button type="button" disabled={scope === "clauses" && keys.length === 0} onClick={() => void save({ scope, whenKeys: scope === "clauses" ? keys : [] })} className={`${button} bg-rust text-graphite disabled:opacity-40`}>
+            <button type="button" disabled={scope === "context" && keys.length === 0} onClick={() => void save({ scope, whenKeys: scope === "context" ? keys : [] })} className={`${button} bg-rust text-graphite disabled:opacity-40`}>
               Save
             </button>
             <button type="button" onClick={() => setState("confirm")} className={`${button} text-steel`}>

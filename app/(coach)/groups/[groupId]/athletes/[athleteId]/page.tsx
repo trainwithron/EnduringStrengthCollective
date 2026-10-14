@@ -20,7 +20,6 @@ import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { getActiveAnchor } from "@/lib/active-anchor";
 import { AthleteNotesEditor } from "@/components/coach/athlete-notes-editor";
-import { ClientClauses } from "@/components/coach/client-clauses";
 import { SessionCreditsControl } from "@/components/coach/session-credits-control";
 import { buildCreditPicture, fetchBookingCounts } from "@/lib/credit-picture";
 import { coachCreditSentence } from "@/lib/credit-sentence";
@@ -1514,9 +1513,6 @@ export default async function AthleteProfilePage(
           </div>
 
           <div data-tab="forms">
-          <section className="mb-8">
-            <ClientClauses athleteId={params.athleteId} groupId={params.groupId} coachId={user.id} />
-          </section>
           <section>
             <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
               Coach notes

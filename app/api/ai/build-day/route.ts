@@ -11,7 +11,9 @@ import { scanConstraints } from "@/lib/constraint-scan";
 import { parseRestSpan } from "@/lib/rest-time";
 import { DEFAULT_TRACKED_FIELDS } from "@/lib/exercise-fields";
 import type { TrackedField } from "@/lib/exercise-fields";
-import { cleanExtraKeys, learnedBlock, linesFor, loadApplicableRules, toApplied } from "@/lib/learned-for-prompt";
+import { learnedBlock, linesFor, loadApplicableRules, toApplied } from "@/lib/learned-for-prompt";
+import { loadNotesBlock } from "@/lib/client-notes-server";
+import { loadReferenceBlock } from "@/lib/reference-context";
 import { resolveAiExerciseName, exercisesWanted, allowsRepeats, applyTimedConsistency, dedupeDay, isMobilityTitle, longDayFlag, mobilityDaysWanted, mobilityInstruction, mobilityRole, plainLibraryName, ruleKey } from "@/lib/ai-day-rules";
 import { DAY_MAX_TOKENS, TOO_LONG_MESSAGE, TRUNCATED_RETRY_NOTE, buildDaySystemPrompt, buildDayUserText, checkRunToken, issueRunToken, readDayResult, runTokenIsStale, truncatedRetryTimeoutMs, type BuiltDay } from "@/lib/ai-day-run";
 
@@ -133,9 +135,12 @@ export async function POST(request: Request) {
     if (await athleteIsMinor(supabase, athleteId)) youthBlock = YOUTH_PROMPT_BLOCK;
   }
 
-  // What the coach has taught the AI that fits THIS client (their clauses, level and age band decide which rules reach it).
-  const taughtRules = await loadApplicableRules(supabase, user.id, athleteId, cleanExtraKeys(body.extraClauseKeys));
+  // What the coach has taught the AI that fits THIS client (the client's notes, level and age band decide which rules reach it).
+  const taughtRules = await loadApplicableRules(supabase, user.id, athleteId);
   const taught = learnedBlock(linesFor(taughtRules));
+  const notes = await loadNotesBlock(supabase, user.id, athleteId);
+  const referenceId = typeof body.referenceClientId === "string" && /^[0-9a-f-]{36}$/i.test(body.referenceClientId) ? body.referenceClientId : null;
+  const reference = await loadReferenceBlock(supabase, user.id, referenceId, groupId);
   const [{ data: libraryRows }, { data: aliasRows }] = await Promise.all([
     supabase.from("exercise_library").select("name, category").eq("created_by", user.id).order("name").limit(3000),
     supabase.from("exercise_aliases").select("raw_name, exercise_name").eq("coach_id", user.id),
@@ -154,7 +159,7 @@ export async function POST(request: Request) {
     const text = await callClaude({
       meta: { feature: "program_day", userId: user!.id },
       system: buildDaySystemPrompt({ youthBlock, hasInjury: injuryContext !== null }),
-      userText: buildDayUserText({ slot: { week, day }, instruction, corrections, built, fixing: mode === "fix" ? targetBuilt : null, youthBlock, injuryContext, libraryText, mobilityNote, retryNote, learnedBlock: taught }),
+      userText: buildDayUserText({ slot: { week, day }, instruction, corrections, built, fixing: mode === "fix" ? targetBuilt : null, youthBlock, injuryContext, libraryText, mobilityNote, retryNote, learnedBlock: taught, notesBlock: notes, referenceBlock: reference }),
       maxTokens: DAY_MAX_TOKENS,
       timeoutMs,
     });
