@@ -9,6 +9,7 @@ import { MicButton } from "@/components/shared/mic-button";
 import { TemplateSuggestion } from "@/components/coach/desktop/template-suggestion";
 import { LearnLine } from "@/components/coach/desktop/learn-line";
 import { appliedLine, type AppliedRule } from "@/lib/learned-for-prompt";
+import { LikeClientSuggestion } from "@/components/coach/desktop/like-client";
 import { fixTargetFrom, parseBuildRequest, planSlots, scopeLimitFrom } from "@/lib/ai-day-request";
 import type { DaySlot } from "@/lib/ai-day-slots";
 import type { BuilderDay } from "@/lib/types";
@@ -50,6 +51,8 @@ export function AiProgramBuilderBox({
   const [learn, setLearn] = useState<{ id: number; correction: string } | null>(null);
   // The rules the AI used for the days it built, each with its reason and an Undo.
   const [applied, setApplied] = useState<AppliedRule[]>([]);
+  // Clauses to use for this request only ("like Rob"): sent with every day, not stored on anyone unless the coach says so.
+  const likeKeys = useRef<string[]>([]);
   async function undoApplied(rule: AppliedRule) {
     const res = await fetch(`/api/learned-rules/${rule.id}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "undo" }) }).catch(() => null);
     if (res?.ok) setApplied((prev) => prev.filter((a) => a.id !== rule.id));
@@ -78,7 +81,7 @@ export function AiProgramBuilderBox({
       const res = await fetch("/api/ai/build-day", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ programId, week: slot.week, day: slot.day, mode, instruction: request.current, corrections: corrections.current, runToken: token.current ?? undefined }),
+        body: JSON.stringify({ programId, week: slot.week, day: slot.day, mode, instruction: request.current, corrections: corrections.current, runToken: token.current ?? undefined, extraClauseKeys: likeKeys.current }),
       });
       const data = await readAiJson(res);
       if (!res.ok || !data.workoutId) return { ok: false, message: (data.error as string | undefined) ?? COULDNT };
@@ -278,6 +281,7 @@ export function AiProgramBuilderBox({
         )}
       </div>
       {phase === "idle" && <TemplateSuggestion text={text} />}
+      {(phase === "idle" || phase === "paused") && <LikeClientSuggestion text={text} groupId={groupId} athleteId={athleteId} onUse={(keys) => { likeKeys.current = keys; }} />}
       {applied.length > 0 && (
         <ul className="mt-2 space-y-1" aria-label="Rules applied">
           {applied.map((a) => (

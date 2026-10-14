@@ -8,6 +8,7 @@ import { assignProgramToClient, duplicateProgram } from "@/lib/program-duplicati
 import { localDateKey } from "@/lib/timezone";
 import type { LadderRung, Level, Side, SlotTier } from "@/lib/slot-templates";
 import { readAiJson } from "@/lib/ai-fetch";
+import { LikeClientSuggestion } from "@/components/coach/desktop/like-client";
 import { NOTHING_FITS_MESSAGE, PICK_FAILED_MESSAGE, TEMPLATE_PICK_MAX_TEXT, YOUR_REQUEST_TAG, type TemplatePick } from "@/lib/ai-from-template";
 import { LEVELS, MAKE_FAILED_MESSAGE, NO_LADDER_MESSAGE, buildReview, dayHeading, defaultProgramName, everySlotFilled, madeMessage, type TemplateSlot } from "@/lib/use-template";
 
@@ -51,6 +52,8 @@ export function UseTemplatePanel({
   const [aiError, setAiError] = useState<string | null>(null);
   const [aiPicks, setAiPicks] = useState<Record<string, TemplatePick>>({});
   const [aiFlags, setAiFlags] = useState<string[]>([]);
+  // Clauses to use for this request only ("like Rob").
+  const [likeKeys, setLikeKeys] = useState<string[]>([]);
 
   useEffect(() => {
     const supabase = createBrowserClient();
@@ -130,7 +133,7 @@ export function UseTemplatePanel({
       const response = await fetch("/api/ai/pick-template", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ programId, text: aiText, level, clientId: clientId || null }),
+        body: JSON.stringify({ programId, text: aiText, level, clientId: clientId || null, extraClauseKeys: likeKeys }),
       });
       const data = await readAiJson(response);
       if (!response.ok || !data || !Array.isArray(data.picks)) {
@@ -277,6 +280,7 @@ export function UseTemplatePanel({
                     className="w-full mt-1 bg-graphite border border-steel/30 text-chalk px-2 py-2 font-body text-sm focus:outline-none focus:border-rust"
                   />
                 </label>
+                <LikeClientSuggestion text={aiText} groupId={groupId} athleteId={clientId || null} onUse={setLikeKeys} />
                 <button type="button" onClick={pickForMe} disabled={picking || aiText.trim() === ""} className="mt-2 min-h-11 px-4 border border-rust text-rust font-body text-sm disabled:opacity-40">
                   {picking ? "Picking…" : "Pick for me"}
                 </button>

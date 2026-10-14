@@ -83,7 +83,8 @@ export function toApplied(rules: LearnedRuleRow[]): AppliedRule[] {
     });
 }
 
-export async function loadApplicableRules(supabase: SupabaseClient, coachId: string, athleteId: string | null): Promise<LearnedRuleRow[]> {
+// extraKeys: clauses the coach asked to use for THIS request only ("like Rob"), added to the client's own.
+export async function loadApplicableRules(supabase: SupabaseClient, coachId: string, athleteId: string | null, extraKeys: string[] = []): Promise<LearnedRuleRow[]> {
   try {
     const { data } = await supabase
       .from("coach_learned_rules")
@@ -94,15 +95,20 @@ export async function loadApplicableRules(supabase: SupabaseClient, coachId: str
       .limit(200);
     const rules = (data ?? []) as LearnedRuleRow[];
     if (rules.length === 0) return [];
-    const keys = await loadClientKeys(supabase, coachId, athleteId);
+    const keys = [...new Set([...(await loadClientKeys(supabase, coachId, athleteId)), ...extraKeys])];
     return applicableRules(rules, { athleteId, keys });
   } catch {
     return [];
   }
 }
 
-export async function loadLearnedLines(supabase: SupabaseClient, coachId: string, athleteId: string | null): Promise<string[]> {
-  return linesFor(await loadApplicableRules(supabase, coachId, athleteId));
+export async function loadLearnedLines(supabase: SupabaseClient, coachId: string, athleteId: string | null, extraKeys: string[] = []): Promise<string[]> {
+  return linesFor(await loadApplicableRules(supabase, coachId, athleteId, extraKeys));
+}
+
+// Clause keys the screen sends for one request ("like Rob"): plain slugs only, at most ten.
+export function cleanExtraKeys(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((k): k is string => typeof k === "string" && /^[a-z0-9_]{1,40}$/.test(k)).slice(0, 10) : [];
 }
 
 export const LEARNED_HEADING = "What this coach has taught you (their own preferences for this kind of client). They can only ADD to the hard rules above: the safety, injury and youth rules always win, and anything the coach said in this request wins over these.";
