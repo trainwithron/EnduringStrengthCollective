@@ -176,7 +176,7 @@ export function CompleteWorkoutButton({
             .eq("post_type", "workout_summary")
             .maybeSingle()
         : { data: null };
-      finishNavigation(coachMode ? coachMode.homeHref : existingPost ? `/share/${existingPost.id}` : `/groups/${existingSession.group_id}`);
+      finishNavigation(existingPost && !coachMode?.clientIsMinor ? `/share/${existingPost.id}` : coachMode ? coachMode.homeHref : `/groups/${existingSession.group_id}`);
       return;
     }
 
@@ -287,7 +287,7 @@ export function CompleteWorkoutButton({
     }
 
     // The feed card (the athlete's own sharing choice is kept on the post) and the link to the celebratory share card: one shared function, also used when a client agrees to count a record from
-    // imported history (lib/announce-workout-log.ts). A coach logging for a client under 18 posts nothing, and a coach goes back to their own home, so no share link is needed there.
+    // imported history (lib/announce-workout-log.ts). A coach logging for a client under 18 posts nothing and gets no card; a coach logging for any other client gets the client's card (to share or send), and goes back to their own home if the card cannot be made.
     const announced = await announceWorkoutLog(supabase, {
       workoutLogId: result.workout_log_id,
       athleteId: result.athlete_id,
@@ -295,13 +295,13 @@ export function CompleteWorkoutButton({
       broadcastLevel,
       hasPrs: newPrs.length > 0,
       skipPost: !!coachMode?.clientIsMinor,
-      skipLink: !!coachMode,
+      skipLink: !!coachMode?.clientIsMinor,
     });
 
     // Every completed workout gets a celebratory, shareable card instead of silently landing back on the group hub.
     let navHref = `/groups/${result.group_id}`;
-    if (coachMode) navHref = coachMode.homeHref;
-    else if (announced.href) navHref = announced.href;
+    if (announced.href) navHref = announced.href;
+    else if (coachMode) navHref = coachMode.homeHref;
 
     // RPE comes first (own-session only, same reasoning as the weight
     // nudge below — it's the athlete's own subjective read on the session

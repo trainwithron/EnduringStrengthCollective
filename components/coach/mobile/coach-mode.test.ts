@@ -29,13 +29,14 @@ describe("coach mode: a coach logging a workout for a client on the phone", () =
     expect(page).toContain("coachMode={coachModeClient ? { homeHref: coachHomeHref, clientIsMinor: coachModeClient.isMinor } : undefined}");
     expect(read("components/logging/session-logger.tsx")).toContain("coachMode={coachMode}");
   });
-  it("finishing goes straight back to the coach's home, no share card, and no feed post for a client under 18", () => {
+  it("finishing shows the client's workout card (back to the coach's home only if the card cannot be made), and nothing is posted or shown for a client under 18", () => {
     const btn = read("components/session/complete-workout-button.tsx");
-    expect(btn).toContain("if (coachMode) navHref = coachMode.homeHref;");
-    // a coach logging for a client under 18 posts nothing and needs no share link (the rule itself is in lib/announce-workout-log.ts)
+    expect(btn).toContain("if (announced.href) navHref = announced.href;");
+    expect(btn).toContain("else if (coachMode) navHref = coachMode.homeHref;");
+    // a coach logging for a client under 18 posts nothing and gets no card (the rule itself is in lib/announce-workout-log.ts)
     expect(btn).toContain("skipPost: !!coachMode?.clientIsMinor,");
-    expect(btn).toContain("skipLink: !!coachMode,");
-    expect(btn).toContain("coachMode ? coachMode.homeHref : existingPost");
+    expect(btn).toContain("skipLink: !!coachMode?.clientIsMinor,");
+    expect(btn).toContain("existingPost && !coachMode?.clientIsMinor ?");
   });
   it("it never uses the act-as cookie, which would write as the client", () => {
     for (const rel of ["components/coach/mobile/coach-mode-bar.tsx", "app/(coach)/groups/[groupId]/athletes/[athleteId]/log/[workoutId]/page.tsx"]) {

@@ -64,7 +64,7 @@ describe("finishing a workout always ends on the card", () => {
   it("goes to the card by the post id, or the workout's own id when there is no post", () => {
     const src = readFileSync(new URL("../components/session/complete-workout-button.tsx", import.meta.url), "utf8");
     const announce = readFileSync(new URL("../lib/announce-workout-log.ts", import.meta.url), "utf8");
-    expect(src).toContain("else if (announced.href) navHref = announced.href;");
+    expect(src).toContain("if (announced.href) navHref = announced.href;");
     expect(announce).toContain("/api/share/sign");
     expect(announce).toContain("if (postId) return { postId, href: `/share/${postId}` };");
   });
