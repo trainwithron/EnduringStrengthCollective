@@ -18,15 +18,15 @@ const calendarSection = src("./client-calendar-section.tsx");
 const css = src("../../../app/globals.css");
 
 describe("the tab strip", () => {
-  it("has the eight tabs in the order the coach sees them", () => {
-    expect(CLIENT_PROFILE_TABS.map((t) => t.label)).toEqual(["Overview", "Messages", "Programs", "Nutrition", "Calendar", "Progress", "Forms & notes", "Billing & settings"]);
-    expect(isClientProfileTab("messages")).toBe(true);
+  it("has the seven tabs in the order the coach sees them (Messages is a box on Overview, not a tab)", () => {
+    expect(CLIENT_PROFILE_TABS.map((t) => t.label)).toEqual(["Overview", "Programs", "Nutrition", "Calendar", "Progress", "Forms & notes", "Billing & settings"]);
+    expect(isClientProfileTab("messages")).toBe(false);
     expect(isClientProfileTab("calendar")).toBe(true);
     expect(isClientProfileTab("nonsense")).toBe(false);
   });
   it("every tab is a button on this page (none leaves the profile), and the strip wraps instead of scrolling", () => {
     const html = renderToStaticMarkup(createElement(ClientProfileTabs, { groupId: "g1", athleteId: "a1", initial: "overview" }));
-    expect((html.match(/<button/g) ?? []).length).toBe(8);
+    expect((html.match(/<button/g) ?? []).length).toBe(7);
     // History is no longer a link in the strip: it is reached from Logged workouts ("Import or add past history")
     expect((html.match(/<a /g) ?? []).length).toBe(0);
     expect(html).not.toContain(">History<");
@@ -34,9 +34,9 @@ describe("the tab strip", () => {
     expect(html).not.toContain("overflow-x-auto");
     expect(html).toContain('aria-pressed="true"');
   });
-  it("Messages and Calendar are loaded when opened; the others are already on the page", () => {
-    expect(LOADED_ON_OPEN).toEqual(["messages", "calendar"]);
-    for (const tab of ["messages", "calendar"]) expect(css).toContain(`#client-profile-body[data-active-tab="${tab}"] [data-tab]:not([data-tab~="${tab}"])`);
+  it("Calendar is loaded when opened; the others are already on the page", () => {
+    expect(LOADED_ON_OPEN).toEqual(["calendar"]);
+    for (const tab of ["calendar"]) expect(css).toContain(`#client-profile-body[data-active-tab="${tab}"] [data-tab]:not([data-tab~="${tab}"])`);
   });
 });
 
@@ -51,9 +51,9 @@ describe("the profile page", () => {
     expect(page).toContain("activeProgram.name");
     expect(page.slice(page.indexOf("Joined {new Date"), page.indexOf("{profileFlag && ("))).toContain("activeProgram");
   });
-  it("Messages and Calendar show their content right below the tabs, and only load it when that tab is open", () => {
-    expect(page).toContain('initialTab === "messages" && (');
-    expect(page).toContain('<ClientMessagesSection');
+  it("Calendar shows its content right below the tabs and only loads it when that tab is open; the conversation is a small box on Overview", () => {
+    expect(page).toContain("<OverviewMessageBox");
+    expect(page).not.toContain('data-tab="messages"');
     expect(page).toContain('initialTab === "calendar" && (');
     expect(page).toContain("<ClientCalendarSection");
     expect(page).toContain("tab=calendar&month=");
@@ -71,8 +71,8 @@ describe("the profile page", () => {
   it("the full pages stay (deep links, the phone) and use the very same pieces", () => {
     expect(calendarPage).toContain("<ClientCalendarSection");
     expect(messagesPage).toContain("loadDirectThread(");
-    expect(src("./client-messages-section.tsx")).toContain("loadDirectThread(");
-    expect(src("./client-messages-section.tsx")).not.toContain("Open on its own page"); // the coach on a computer has no separate message page any more
+    expect(src("./overview-message-box.tsx")).toContain("loadDirectThread(");
+    expect(src("./overview-message-box.tsx")).not.toContain("Open on its own page"); // the coach on a computer has no separate message page any more
   });
 });
 

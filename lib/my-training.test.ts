@@ -110,8 +110,10 @@ describe("The coach as their own client (personal space)", () => {
     expect(route).toContain("/my-training/open?group=${spaceId}");
     expect(read("app/my-training/page.tsx")).toContain('redirect("/my-space?view=client")');
   });
-  it("on their own profile the Messages and Billing tabs and the video check-in are gone", () => {
-    expect(read("lib/client-profile-tabs.ts")).toContain('SELF_HIDDEN_TABS: ClientProfileTab[] = ["messages", "settings"]');
+  it("on their own profile the Billing tab, the message box and the video check-in are gone", () => {
+    expect(read("lib/client-profile-tabs.ts")).toContain('SELF_HIDDEN_TABS: ClientProfileTab[] = ["settings"]');
+    const profilePage = read("app/(coach)/groups/[groupId]/athletes/[athleteId]/page.tsx");
+    expect(profilePage.slice(profilePage.indexOf("<OverviewMessageBox") - 60, profilePage.indexOf("<OverviewMessageBox"))).toContain("!selfView");
     const page = read("app/(coach)/groups/[groupId]/athletes/[athleteId]/page.tsx");
     expect(page).toContain("hide={selfView ? SELF_HIDDEN_TABS : []}");
     expect(page).toContain("{!selfView && <VideoCheckinRecorder");

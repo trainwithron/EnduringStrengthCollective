@@ -34,7 +34,7 @@ describe("the client profile loads its data in three waves, not one query after 
     expect(dataPart).toContain("const [{ data: upcomingRows }, { data: frozenRows }] = await Promise.all([");
   });
   it("the slow parts stream in behind a Suspense so the rest of the profile shows first", () => {
-    for (const name of ["ClientProgramsSection", "ClientNutrition", "ClientCalendarSection", "ClientMessagesSection"]) {
+    for (const name of ["ClientProgramsSection", "ClientNutrition", "ClientCalendarSection"]) {
       const at = page.lastIndexOf(`<${name}`);
       expect(at).toBeGreaterThan(0);
       expect(page.slice(Math.max(0, at - 400), at)).toContain("<Suspense");

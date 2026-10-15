@@ -301,6 +301,14 @@
   "file": "apply-release-bw-all.sql"
  },
  {
+  "id": "release-cf",
+  "name": "Release CF (a client's health screening line on Overview stays gone once acknowledged, until a new flagged answer; run BEFORE the code that goes with it is live)",
+  "steps": [
+   "126"
+  ],
+  "file": "apply-release-cf-all.sql"
+ },
+ {
   "id": "release-ce",
   "name": "Release CE (InBody scans from a photo of the result sheet, with the photo kept in a private bucket; run BEFORE the code that goes with it is live)",
   "steps": [

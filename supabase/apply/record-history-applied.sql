@@ -67,6 +67,7 @@ from (
     ('2026100600331', 'purchase_grants_once', '0331_purchase_grants_once.sql', to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null),
     ('2026100600338', 'guardian_links_scoped', '0338_guardian_links_scoped.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'guardian_links' and column_name = 'expires_at')),
     ('2026100600367', 'rest_range', '0367_rest_range.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')),
+    ('2026100600376', 'parq_acknowledged_count', '0376_parq_acknowledged_count.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'athlete_injury_flag_acknowledgements' and column_name = 'flagged_count')),
     ('2026100600375', 'inbody_scans', '0375_inbody_scans.sql', to_regclass('public.body_scans') is not null),
     ('2026100600374', 'promote_imported_pr', '0374_promote_imported_pr.sql', to_regclass('public.pr_promotions') is not null),
     ('2026100600373', 'progress_tab', '0373_progress_tab.sql', to_regclass('public.client_progress_pins') is not null),

@@ -55,7 +55,9 @@ import { DeleteClientControl } from "@/components/coach/delete-client-control";
 import { SetAsideControl } from "@/components/coach/set-aside-control";
 import { AddSocialOnlyMembershipControl } from "@/components/coach/add-social-only-membership-control";
 import { ClientProgramActions } from "@/components/coach/client-program-actions";
-import { ClientMessagesSection } from "@/components/coach/desktop/client-messages-section";
+import { OverviewMessageBox } from "@/components/coach/desktop/overview-message-box";
+import { ParqFlagNotice } from "@/components/coach/desktop/parq-flag-notice";
+import { parqNoticeNeeded } from "@/lib/parq-notice";
 import { ClientCalendarSection } from "@/components/coach/desktop/client-calendar-section";
 import { MinorConsentControl } from "@/components/coach/minor-consent-control";
 import { ClientSignInPanel } from "@/components/coach/client-signin-panel";
@@ -107,6 +109,8 @@ export default async function AthleteProfilePage(
   const searchWords = readSearchWords(searchParamsResolved);
   // A drafted note (an expiry check-in, a come-back note) opens in the Messages box for the coach to edit; capped.
   const draftParam = (searchParamsResolved?.draft ?? "").slice(0, 600);
+  // The conversation is a small box on Overview now. An old ?tab=messages address, or a drafted note, opens it.
+  const openMessages = (tabParam as string | undefined) === "messages" || draftParam !== "";
   const requestedTab = isClientProfileTab(tabParam) ? tabParam : "overview";
   const supabase = await createServerClient();
   const {
@@ -169,6 +173,7 @@ export default async function AthleteProfilePage(
     { data: pinRows },
     { data: intakeRows },
     { data: promotionRows },
+    { data: parqAckRow },
   ] = await Promise.all([
     supabase
       .from("group_memberships")
@@ -400,7 +405,7 @@ export default async function AthleteProfilePage(
     // What the client said they need the most help with: found in the real conversation, never stored separately and never shown to the client.
     supabase
       .from("direct_messages")
-      .select("sender_id, body, created_at")
+      .select("id, sender_id, recipient_id, body, created_at, read_at")
       .eq("group_id", params.groupId)
       .or(`and(sender_id.eq.${user.id},recipient_id.eq.${params.athleteId}),and(sender_id.eq.${params.athleteId},recipient_id.eq.${user.id})`)
       .order("created_at", { ascending: false })
@@ -425,6 +430,8 @@ export default async function AthleteProfilePage(
     supabase.rpc("client_daily_intake", { p_athlete: params.athleteId, p_group: params.groupId }),
     // The records this coach asked the client to count as real ones (private to the coach who asked).
     supabase.from("pr_promotions").select("session_id, exercise_name, status, answered_at").eq("athlete_id", params.athleteId).eq("group_id", params.groupId).eq("requested_by", user.id),
+    // What this coach has acknowledged of the client's health screening: the number of flagged answers they had seen (athlete_injury_flag_acknowledgements.flagged_count).
+    supabase.from("athlete_injury_flag_acknowledgements").select("flagged_count").eq("coach_id", user.id).eq("athlete_id", params.athleteId).maybeSingle(),
   ]);
 
   if (membership?.role !== "coach") {
@@ -625,6 +632,12 @@ export default async function AthleteProfilePage(
   const subGoals: SubGoalView[] = ((subGoalRows ?? []) as any[]).map((r: any) => ({ id: r.id as string, title: r.title as string, targetDate: (r.target_date as string | null) ?? null, proposedBy: r.proposed_by as string, status: r.status as SubGoalStatus }));
   const parQAnswers = (intake?.par_q_answers as { question: string; answer: boolean }[]) ?? [];
   const parQFlaggedCount = parQAnswers.filter((a) => a.answer).length;
+  // The health screening line on Overview: only while there are more flagged answers than this coach has acknowledged.
+  const parqNotice = !selfView && parqNoticeNeeded(parQFlaggedCount, (parqAckRow as { flagged_count?: number | null } | null)?.flagged_count);
+  // The small message box: the latest messages the page already read (nothing is marked read by loading them) and how many from the client are still unread.
+  const messageRows = (threadRows ?? []) as { id: string; sender_id: string; recipient_id: string; body: string; created_at: string; read_at: string | null }[];
+  const messagePreview = messageRows.slice(0, 4).reverse().map((m) => ({ id: m.id, sender_id: m.sender_id, body: m.body, created_at: m.created_at }));
+  const unreadMessages = messageRows.filter((m) => m.sender_id === params.athleteId && m.read_at == null).length;
   const hasAboutInfo = !!(
     profileDetails?.bio ||
     profileDetails?.birthday ||
@@ -976,13 +989,6 @@ export default async function AthleteProfilePage(
 
       <div id="client-profile-body" data-active-tab={initialTab}>
         <ClientProfileTabs groupId={params.groupId} athleteId={params.athleteId} initial={initialTab} hide={selfView ? SELF_HIDDEN_TABS : []} />
-        <div data-tab="messages" className="mb-8">
-          {initialTab === "messages" && (
-            <Suspense fallback={<SectionLoading />}>
-              <ClientMessagesSection groupId={params.groupId} athleteId={params.athleteId} viewerId={user.id} clientName={profile?.full_name ?? "Client"} initialDraft={draftParam} />
-            </Suspense>
-          )}
-        </div>
         <div data-tab="calendar" className="mb-8">
           {initialTab === "calendar" && (
             <Suspense fallback={<SectionLoading />}>
@@ -1032,7 +1038,36 @@ export default async function AthleteProfilePage(
 
       <div className="profile-grid grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6 lg:gap-10 items-start">
         <div className="space-y-8 min-w-0">
-          <div data-tab="overview">
+          <div data-tab="overview" className="space-y-4">
+          {!selfView && (
+            <OverviewMessageBox
+              groupId={params.groupId}
+              viewerId={user.id}
+              viewerName={(viewerProfile as { full_name?: string | null } | null)?.full_name ?? "You"}
+              athleteId={params.athleteId}
+              clientName={profile?.full_name ?? "Client"}
+              preview={messagePreview}
+              unread={unreadMessages}
+              initialOpen={openMessages}
+              initialDraft={draftParam}
+            />
+          )}
+          {!selfView && signInStatus !== "active" && (
+            <p className="font-body text-sm text-steel">
+              Hasn&apos;t signed in yet.{" "}
+              <Link href={`/groups/${params.groupId}/athletes/${params.athleteId}?tab=settings`} className="text-rust underline underline-offset-2">
+                Sign-in options
+              </Link>
+            </p>
+          )}
+          {injuryStatusRow?.is_injured && (
+            <p>
+              <span className="inline-block font-body text-xs border border-rust text-rust px-2 py-0.5">Injured</span>
+            </p>
+          )}
+          {parqNotice && <ParqFlagNotice athleteId={params.athleteId} coachId={user.id} flagged={parQFlaggedCount} />}
+          </div>
+          <div data-tab="settings">
           {!selfView && signInStatus !== "active" && (
             <ClientSignInPanel
               groupId={params.groupId}
@@ -1045,7 +1080,7 @@ export default async function AthleteProfilePage(
             />
           )}
           </div>
-          <div data-tab="overview">
+          <div data-tab="settings">
           {!selfView && signInStatus === "active" && (
             <>
               {/* Off until the email sender is set up (Oct 7): the safeguard for this tool is a notice to the OLD address, and mail is not on yet, so a coach
@@ -1067,7 +1102,7 @@ export default async function AthleteProfilePage(
             </>
           )}
           </div>
-          <div data-tab="overview forms">
+          <div data-tab="settings">
           {(
             <RosterSection
               title="Personal Info"
@@ -1076,8 +1111,8 @@ export default async function AthleteProfilePage(
                   ? `Bio, contact & health screening (${parQFlaggedCount} flagged)`
                   : "Bio, contact & health screening"
               }
-              needsAttentionCount={parQFlaggedCount}
-              defaultExpanded={parQFlaggedCount > 0}
+              needsAttentionCount={parqNotice ? parQFlaggedCount : 0}
+              defaultExpanded={parqNotice}
             >
               <div className="space-y-4">
                 {hasAboutInfo && (
@@ -1123,15 +1158,6 @@ export default async function AthleteProfilePage(
               </div>
             </RosterSection>
           )}
-          </div>
-          <div data-tab="overview">
-          <InjuryStatusToggle
-            athleteId={params.athleteId}
-            groupId={params.groupId}
-            coachId={user.id}
-            initialIsInjured={injuryStatusRow?.is_injured ?? false}
-            initialSurplusPct={injuryStatusRow?.surplus_pct ?? 0}
-          />
           </div>
           <div data-tab="overview progress">
           <section>
@@ -1431,7 +1457,7 @@ export default async function AthleteProfilePage(
           </div>
 
           <div data-tab="overview forms">
-          {latestGoalRow?.status !== "proposed" && (
+          {selfView && latestGoalRow?.status !== "proposed" && (
             <section>
               <details className="border border-steel/20 p-3">
                 <summary className="font-body text-xs text-steel uppercase tracking-wide font-bold cursor-pointer">{selfView ? "Set a goal" : "Suggest a goal"}</summary>
@@ -1451,6 +1477,8 @@ export default async function AthleteProfilePage(
               viewerId={user.id}
               otherName={(profile?.full_name ?? "").trim().split(/\s+/)[0] || "your client"}
               items={subGoals}
+              heading="Goals"
+              mainGoalForm={latestGoalRow?.status !== "proposed" ? <GoalProposalForm athleteId={params.athleteId} groupId={params.groupId} suggestedBy={user.id} /> : undefined}
             />
           )}
           {latestGoalRow?.status === "proposed" && latestGoalRow.created_by === params.athleteId && (
@@ -1776,6 +1804,16 @@ export default async function AthleteProfilePage(
       </div>
 
       <div data-tab="nutrition" className="border-t border-steel/20 pt-6 mt-8">
+        {/* It only changes nutrition check-ins and meal plans (calories are held at maintenance), so it lives here; an Injured tag shows on Overview while it is on. */}
+        <div className="mb-6 max-w-xl">
+          <InjuryStatusToggle
+            athleteId={params.athleteId}
+            groupId={params.groupId}
+            coachId={user.id}
+            initialIsInjured={injuryStatusRow?.is_injured ?? false}
+            initialSurplusPct={injuryStatusRow?.surplus_pct ?? 0}
+          />
+        </div>
         <Suspense fallback={<SectionLoading />}>
           {macrosEnabled ? (
             <ClientNutrition

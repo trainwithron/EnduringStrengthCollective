@@ -4,12 +4,12 @@ import { resolve } from "node:path";
 
 const read = (p: string) => readFileSync(resolve(__dirname, p), "utf8").replace(/\r\n/g, "\n");
 const page = read("../app/(coach)/groups/[groupId]/messages/[otherId]/page.tsx");
-const section = read("../components/coach/desktop/client-messages-section.tsx");
+const section = read("../components/coach/desktop/overview-message-box.tsx");
 const profile = read("../app/(coach)/groups/[groupId]/athletes/[athleteId]/page.tsx");
 const tabs = read("../components/coach/desktop/client-profile-tabs.tsx");
 
 describe("a coach on a computer has no separate message page", () => {
-  it("the old address redirects to the client's Messages tab", () => {
+  it("the old address redirects to the client's profile, where an old ?tab=messages address opens the message box on Overview", () => {
     expect(page).toContain("if (viewerIsCoach && !showMobileView) {");
     expect(page).toContain("redirect(`/groups/${params.groupId}/athletes/${params.otherId}?tab=messages${draft}`);");
   });
@@ -43,10 +43,12 @@ describe("a coach on a computer has no separate message page", () => {
     expect(page).not.toContain("window.location");
     expect(page).not.toContain("router.replace");
   });
-  it("leaving the Messages tab still closes the conversation by address, so a hidden thread never marks new messages read", () => {
+  it("loading the profile never marks anything read: the page only peeks, and the thread (which marks read) opens only when the coach taps the box", () => {
+    expect(profile).not.toContain("loadDirectThread(");
+    expect(profile).toContain("const unreadMessages = messageRows.filter(");
+    expect(section).toContain('if (mode === "closed" || messages !== null) return;');
     expect(tabs).toContain("router.push");
-    expect(tabs).toContain("router.push");
-    expect(profile).toContain('initialTab === "messages" && (');
-    expect(profile).toContain('<ClientMessagesSection');
+    expect(profile).toContain('(tabParam as string | undefined) === "messages" || draftParam !== ""');
+    expect(profile).toContain("initialOpen={openMessages}");
   });
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { SUB_GOALS_EMPTY, SUB_GOALS_HEADING, nextSubGoalStatus, subGoalPill, visibleSubGoals, type SubGoalAction, type SubGoalView } from "@/lib/sub-goals";
@@ -13,17 +13,24 @@ export function SubGoalsSection({
   viewerId,
   otherName,
   items,
+  heading = SUB_GOALS_HEADING,
+  mainGoalForm,
 }: {
   groupId: string;
   athleteId: string;
   viewerId: string;
   otherName: string;
   items: SubGoalView[];
+  // The coach's view calls the section "Goals" and passes the existing main-goal suggestion form: the one button then offers both (a smaller goal, or their main goal).
+  heading?: string;
+  mainGoalForm?: ReactNode;
 }) {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
   const [adding, setAdding] = useState(false);
+  const [choosing, setChoosing] = useState(false);
+  const [suggestingMain, setSuggestingMain] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const shown = visibleSubGoals(items);
@@ -64,8 +71,8 @@ export function SubGoalsSection({
 
   const small = "inline-flex items-center justify-center min-h-11 px-4 font-body text-sm border";
   return (
-    <section aria-label={SUB_GOALS_HEADING} className="border border-steel/20 p-4 mb-6">
-      <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">{SUB_GOALS_HEADING}</h2>
+    <section aria-label={heading} className="border border-steel/20 p-4 mb-6">
+      <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">{heading}</h2>
       {shown.length === 0 ? (
         <p className="font-body text-sm text-steel">{SUB_GOALS_EMPTY}</p>
       ) : (
@@ -123,9 +130,28 @@ export function SubGoalsSection({
             </button>
           </div>
         </div>
+      ) : suggestingMain ? (
+        <div className="mt-3">
+          {mainGoalForm}
+          <button type="button" onClick={() => setSuggestingMain(false)} className={`${small} text-chalk border-steel/40 mt-2`}>
+            Cancel
+          </button>
+        </div>
+      ) : choosing ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button type="button" onClick={() => { setChoosing(false); setAdding(true); }} className={`${small} text-rust border-rust`}>
+            A smaller goal
+          </button>
+          <button type="button" onClick={() => { setChoosing(false); setSuggestingMain(true); }} className={`${small} text-rust border-rust`}>
+            Suggest their main goal
+          </button>
+          <button type="button" onClick={() => setChoosing(false)} className={`${small} text-chalk border-steel/40`}>
+            Cancel
+          </button>
+        </div>
       ) : (
-        <button type="button" onClick={() => setAdding(true)} className={`${small} text-rust border-rust mt-3`}>
-          Add a smaller goal
+        <button type="button" onClick={() => (mainGoalForm ? setChoosing(true) : setAdding(true))} className={`${small} text-rust border-rust mt-3`}>
+          {mainGoalForm ? "Add or suggest a goal" : "Add a smaller goal"}
         </button>
       )}
       {error && (

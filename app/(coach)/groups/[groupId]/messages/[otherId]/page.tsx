@@ -54,7 +54,7 @@ export default async function MessageThreadPage(
     notFound();
   }
 
-  // A coach on a computer has no separate message page: the conversation is the Messages tab of that client's profile, so Back goes back to where they were. This address stays as a
+  // A coach on a computer has no separate message page: the conversation is the small message box on that client's Overview, so Back goes back to where they were. This address stays as a
   // redirect for old bell, text and link targets; a drafted note rides along. (On a phone the page below is still used.)
   if (viewerIsCoach && !showMobileView) {
     const draft = initialDraft ? `&draft=${encodeURIComponent(initialDraft)}` : "";
