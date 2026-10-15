@@ -73,7 +73,7 @@ describe("buildSchedule", () => {
       [{ id: "c1", title: "Boot camp", startAt: "2026-10-05T15:00:00Z", endAt: "2026-10-05T16:00:00Z", capacity: 8, joined: 5, waitlisted: 0, groupId: "g1" }]
     );
     expect(rows.map((r) => r.title)).toEqual(["Ann", "Boot camp", "Bo"]);
-    expect(rows[1]).toMatchObject({ kind: "class", detail: "5 of 8 spots taken", href: "/groups/g1/group-sessions" });
+    expect(rows[1]).toMatchObject({ kind: "class", detail: "5 of 8 spots taken", href: "/groups/g1/group-sessions", groupId: "g1" });
   });
   it("drops a class's hidden anchor booking (the coach's own booking)", () => {
     const rows = buildSchedule("coach", [booking("anchor", "coach", "2026-10-05T15:00:00Z")], []);

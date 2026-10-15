@@ -118,6 +118,7 @@ export function attentionHeadline(total: number): string {
 
 export interface ScheduleEntry {
   id: string;
+  groupId: string; // the group the session or class belongs to: its calendar day is /groups/{groupId}/calendar/{date}
   kind: "session" | "class";
   title: string;
   detail: string;
@@ -139,6 +140,7 @@ export function buildSchedule(coachId: string, bookings: BookingSource[], classe
     entries.push({
       id: `booking:${b.id}`,
       kind: "session",
+      groupId: b.groupId,
       title: b.athleteName,
       detail: b.groupName,
       startAt: b.startAt,
@@ -152,6 +154,7 @@ export function buildSchedule(coachId: string, bookings: BookingSource[], classe
     entries.push({
       id: `class:${c.id}`,
       kind: "class",
+      groupId: c.groupId,
       title: c.title,
       detail: c.waitlisted > 0 ? `${spots}, ${c.waitlisted} waiting` : spots,
       startAt: c.startAt,

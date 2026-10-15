@@ -9,6 +9,7 @@ import { ProgramCardGrid, type ProgramCardData } from "@/components/coach/deskto
 import { computeProgramCardVisuals } from "@/lib/program-card-data";
 import { SwappableTerm } from "@/components/coach/swappable-term";
 import { ALL_PROGRAMS_HREF } from "@/lib/programs-scope";
+import { ProgramImportLauncher } from "@/components/coach/desktop/program-import-launcher";
 
 export default async function ProgramsListPage(
   props: {
@@ -90,12 +91,7 @@ export default async function ProgramsListPage(
           {cards.length} {cards.length === 1 ? "program" : "programs"}
         </p>
         <div className="flex items-center gap-4 mt-4">
-          <Link
-            href={`/groups/${params.groupId}/programs/import`}
-            className="font-body text-xs text-rust"
-          >
-            Import or build with AI →
-          </Link>
+          <ProgramImportLauncher groupId={params.groupId} />
           <Link
             href={`/groups/${params.groupId}/programs/new`}
             className="font-body text-xs text-rust"

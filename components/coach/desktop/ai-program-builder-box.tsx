@@ -6,6 +6,8 @@ import { readAiJson } from "@/lib/ai-fetch";
 import { BUILDER_ONE_WORKOUT_SELECT, mapWorkoutRowToBuilderDay } from "@/lib/program-builder-data";
 import { AiRunPanel } from "@/components/coach/desktop/ai-run-panel";
 import { MicButton } from "@/components/shared/mic-button";
+import { ProgramImportLauncher, ProgramImportPanel } from "@/components/coach/desktop/program-import-launcher";
+import { detectImportKind } from "@/lib/import-input-kind";
 import { TemplateSuggestion } from "@/components/coach/desktop/template-suggestion";
 import { LearnLine } from "@/components/coach/desktop/learn-line";
 import { appliedLine, type AppliedRule } from "@/lib/learned-for-prompt";
@@ -151,9 +153,18 @@ export function AiProgramBuilderBox({
     setOfferWeek(top < 24 ? top + 1 : null);
   }
 
-  function ask() {
+  // Pasted program text (several lines of sets and reps, day or week headers, a table) is not a request to build: the coach is asked first, and nothing is written to this program until they choose.
+  const [programChoice, setProgramChoice] = useState<string | null>(null);
+  const [importText, setImportText] = useState<string | null>(null);
+
+  function ask(skipProgramCheck = false) {
     const said = text.trim();
     if (!said || phase === "building") return;
+    if (!skipProgramCheck && phase !== "paused" && detectImportKind({ text: said }).kind === "pasted_program") {
+      setProgramChoice(said);
+      return;
+    }
+    setProgramChoice(null);
     request.current = said;
     corrections.current = [];
     setShownRequest(said);
@@ -259,10 +270,16 @@ export function AiProgramBuilderBox({
     <section className="border border-steel/25 bg-surface/40 p-3 max-w-3xl w-full lg:flex-1 min-w-0" aria-label="AI Program Builder">
       <h2 className="font-display uppercase text-sm tracking-wide text-steel">AI Program Builder</h2>
       <p className="font-body text-xs text-steel mt-1">Saved as you go. Nothing reaches the client until you assign it.</p>
+      <div className="mt-1">
+        <ProgramImportLauncher groupId={groupId} athleteId={athleteId} />
+      </div>
       <div className="mt-2 flex flex-col sm:flex-row gap-2">
         <textarea
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            setText(e.target.value);
+            setProgramChoice(null);
+          }}
           rows={2}
           placeholder={phase === "paused" ? "What should it change?" : "Tell it what to build, or say: finish the week using Day 1"}
           aria-label="Tell the AI what to build"
@@ -286,11 +303,30 @@ export function AiProgramBuilderBox({
             Resume
           </button>
         ) : (
-          <button type="button" onClick={ask} disabled={!text.trim()} className="min-h-11 px-5 bg-rust text-graphite font-display font-bold uppercase tracking-wide disabled:opacity-40 sm:self-start">
+          <button type="button" onClick={() => ask()} disabled={!text.trim()} className="min-h-11 px-5 bg-rust text-graphite font-display font-bold uppercase tracking-wide disabled:opacity-40 sm:self-start">
             Ask
           </button>
         )}
       </div>
+      {programChoice !== null && (
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1" role="status">
+          <p className="font-body text-sm text-chalk">This looks like a full program. Import it?</p>
+          <button
+            type="button"
+            onClick={() => {
+              setImportText(programChoice);
+              setProgramChoice(null);
+            }}
+            className="min-h-11 px-4 bg-rust text-graphite font-body text-sm font-medium"
+          >
+            Import it
+          </button>
+          <button type="button" onClick={() => ask(true)} className="min-h-11 px-4 border border-steel/40 text-chalk font-body text-sm">
+            Build from it
+          </button>
+        </div>
+      )}
+      {importText !== null && <ProgramImportPanel groupId={groupId} athleteId={athleteId} text={importText} onClose={() => setImportText(null)} />}
       {phase === "idle" && <TemplateSuggestion text={text} />}
       {(phase === "idle" || phase === "paused") && <LikeClientSuggestion text={text} groupId={groupId} athleteId={athleteId} onUse={(id) => { referenceId.current = id; }} />}
       {athleteId && <PastAiNotes athleteId={athleteId} groupId={groupId} />}

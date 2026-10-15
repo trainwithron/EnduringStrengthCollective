@@ -1,9 +1,15 @@
 import Link from "next/link";
 import { formatInTimezone } from "@/lib/format-in-timezone";
+import { dateKeyInZone } from "@/lib/timezone";
 import { attentionHeadline, KIND_LABEL, rankAttention, type AttentionItem, type ScheduleEntry } from "@/lib/your-day";
 
 // The first thing on a coach's Home: today's sessions and classes in order, and one ranked list of what needs them. Each row opens the
-// place to act; the detailed panels further down (replies, payments, insights) are where the actions themselves live.
+// place to act; the detailed panels further down (replies, payments, insights) are where the actions themselves live. In the schedule, the NAME opens the client's profile (a class opens its
+// group sessions) and the TIME opens the coach's calendar on that day.
+export function scheduleCalendarHref(entry: { groupId: string; startAt: string }, timezone: string): string {
+  return `/groups/${entry.groupId}/calendar/${dateKeyInZone(timezone, new Date(entry.startAt))}`;
+}
+
 export function YourDayPanel({
   schedule,
   attention,
@@ -25,19 +31,21 @@ export function YourDayPanel({
         ) : (
           <ul className="space-y-2">
             {schedule.map((e) => (
-              <li key={e.id}>
-                <Link href={e.href} className="flex items-baseline justify-between gap-3 group">
-                  <span className="min-w-0">
-                    <span className="font-body text-sm text-chalk group-hover:underline">{e.title}</span>
-                    {e.kind === "class" && <span className="font-body text-xs text-steel ml-2">Class</span>}
-                    {e.needsPayment && (
-                      <span className="ml-2 font-body text-xs text-rust border border-rust/50 rounded-token-pill px-1.5 py-0.5">Needs payment</span>
-                    )}
-                    <span className="block font-body text-xs text-steel truncate">{e.detail}</span>
-                  </span>
-                  <span className="font-body text-xs text-steel shrink-0 tabular-nums">
-                    {formatInTimezone(e.startAt, timezone, "time")}
-                  </span>
+              <li key={e.id} className="flex items-baseline justify-between gap-3">
+                <Link href={e.href} className="min-w-0 group">
+                  <span className="font-body text-sm text-chalk group-hover:underline">{e.title}</span>
+                  {e.kind === "class" && <span className="font-body text-xs text-steel ml-2">Class</span>}
+                  {e.needsPayment && (
+                    <span className="ml-2 font-body text-xs text-rust border border-rust/50 rounded-token-pill px-1.5 py-0.5">Needs payment</span>
+                  )}
+                  <span className="block font-body text-xs text-steel truncate">{e.detail}</span>
+                </Link>
+                <Link
+                  href={scheduleCalendarHref(e, timezone)}
+                  aria-label={`Open the calendar for ${e.title} at ${formatInTimezone(e.startAt, timezone, "time")}`}
+                  className="font-body text-xs text-steel shrink-0 tabular-nums min-h-11 min-w-11 inline-flex items-center justify-end hover:text-chalk hover:underline"
+                >
+                  {formatInTimezone(e.startAt, timezone, "time")}
                 </Link>
               </li>
             ))}

@@ -37,7 +37,7 @@ describe("the AI Program Builder builds one week unless asked for more", () => {
     expect(box).toContain("Continue into Week {offerWeek}");
   });
   it("never continues by itself: the offered week starts only from the button", () => {
-    const afterRun = box.slice(box.indexOf("setOfferWeek(top < 24 ? top + 1 : null)"), box.indexOf("function ask()"));
+    const afterRun = box.slice(box.indexOf("setOfferWeek(top < 24 ? top + 1 : null)"), box.indexOf("function ask("));
     expect(afterRun).not.toContain("runQueue()");
     expect(box).toContain("onClick={() => continueInto(offerWeek)}");
   });

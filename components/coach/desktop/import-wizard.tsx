@@ -167,6 +167,9 @@ export function ImportWizard({
   initialAliases,
   initialAiPrompt,
   autoGenerate,
+  initialFile,
+  initialText,
+  onActivity,
 }: {
   coachId: string;
   groupId: string;
@@ -187,6 +190,12 @@ export function ImportWizard({
   // before.
   initialAiPrompt?: string;
   autoGenerate?: boolean;
+  // The Programs page opens this in a panel after the coach picked a file: it starts on that file straight away, exactly as if it had been dropped into the box.
+  initialFile?: File | null;
+  // Pasted program text handed over from the AI builder box ("This looks like a full program. Import it?"): it is read as it is, exactly like pasted text in the wizard's own box.
+  initialText?: string | null;
+  // Tells the panel whether something is in progress (reading a file, or a review that has not been finished), so closing it by accident can be guarded.
+  onActivity?: (active: boolean) => void;
 }) {
   const router = useRouter();
   const [status, setStatus] = useState<Status>("idle");
@@ -198,6 +207,22 @@ export function ImportWizard({
   // A spreadsheet whose exercise column could not be found, or looks like numbers: the coach picks the column with the names (the best guess is already chosen) before anything is read.
   const [columnFix, setColumnFix] = useState<{ header: string[]; body: string[][]; fileName: string; mapping: ColumnMapping; chosen: number | null } | null>(null);
   const [finalizing, setFinalizing] = useState(false);
+  const startedWithFile = useRef(false);
+  useEffect(() => {
+    if (startedWithFile.current) return;
+    if (initialFile) {
+      startedWithFile.current = true;
+      void handleBoxFile(initialFile);
+    } else if (initialText && initialText.trim()) {
+      startedWithFile.current = true;
+      void handleAiTextImport(initialText.trim(), "Pasted program", "Imported from pasted text (AI)");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFile, initialText]);
+  useEffect(() => {
+    onActivity?.(status === "working" || pending != null || finalizing);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, pending, finalizing]);
   // A ref, not state — guards against a file input somehow firing its
   // change handler more than once for the same upload (observed during
   // dev with hot-reload; state alone isn't synchronous enough to close

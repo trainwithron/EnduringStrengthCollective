@@ -34,11 +34,20 @@ function extensionOf(name: string): string {
 // A pasted program looks like several lines where most carry a sets-by-reps pattern ("3x8", "4 x 10", "5 sets of 5", "3 sets x 8 reps"). A one-paragraph description does not.
 const SETS_REPS = /\b\d{1,2}\s*(?:x|×|by)\s*\d{1,3}\b|\b\d{1,2}\s*sets?\s*(?:of|x|×)\s*\d{1,3}\b/i;
 
+// Day or week headers ("Day 1", "Week 2 - Day 3", "DAY A") and rows of a table pasted from a spreadsheet (cells split by tabs or pipes).
+const DAY_OR_WEEK_HEADER = /^(?:#+\s*)?(?:week|day)\s*[0-9a-z]{1,2}\b/i;
+
 export function looksLikePastedProgram(text: string): boolean {
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0);
   if (lines.length < 4) return false;
   const withScheme = lines.filter((l) => SETS_REPS.test(l)).length;
-  return withScheme >= 3;
+  if (withScheme >= 3) return true;
+  // Two or more day or week headers with at least three other lines under them: a program laid out by days.
+  const headers = lines.filter((l) => DAY_OR_WEEK_HEADER.test(l)).length;
+  if (headers >= 2 && lines.length - headers >= 3) return true;
+  // A table: at least four rows where cells are split by tabs or pipes (a spreadsheet pasted into the box).
+  const tableRows = lines.filter((l) => (l.match(/\t/g) ?? []).length >= 2 || (l.match(/\|/g) ?? []).length >= 2).length;
+  return tableRows >= 4;
 }
 
 export function detectImportKind(input: ImportInput): ImportDecision {

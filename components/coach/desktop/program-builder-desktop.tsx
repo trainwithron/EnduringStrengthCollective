@@ -3,6 +3,8 @@
 import type { DemoRow } from "@/lib/exercise-demo";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ProgramAssignPanel } from "@/components/coach/desktop/program-assign-panel";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { BuilderDay } from "@/lib/types";
 import { isRestDayTitle } from "@/lib/empty-sweep";
@@ -108,6 +110,9 @@ export function ProgramBuilderDesktop({
   // old global flashSaved/flashSaveError directly.
   const saveToastChannel = useMemo(() => createSaveToastChannel(), []);
   const { flashSaved, flashSaveError } = saveToastChannel;
+  const router = useRouter();
+  // "Assign to clients": the one existing assign panel (with its sign-off of an AI draft, its double-click guard and its same-organization rule) opened on this program.
+  const [assignOpen, setAssignOpen] = useState(false);
   const [name, setName] = useState(programName);
   const [lastSavedName, setLastSavedName] = useState(programName);
   const [days, setDays] = useState<BuilderDay[]>(initialDays);
@@ -297,12 +302,14 @@ export function ProgramBuilderDesktop({
           >
             Print or PDF
           </a>
+          <button
+            type="button"
+            onClick={() => setAssignOpen(true)}
+            className="inline-flex items-center h-11 sm:h-9 font-body text-xs text-rust border border-rust px-3"
+          >
+            Assign to clients
+          </button>
           {toolbarExtra}
-          {!embedded && (
-            <Link href={`/groups/${groupId}/programs/import`} className="inline-flex items-center h-9 font-body text-xs text-steel hover:text-chalk px-1 underline underline-offset-2">
-              Import a program
-            </Link>
-          )}
           {startDate && trainingDays && trainingDays.length > 0 && (
             <Link
               href={`/groups/${groupId}/programs/${programId}/calendar`}
@@ -312,6 +319,9 @@ export function ProgramBuilderDesktop({
             </Link>
           )}
         </div>
+        {assignOpen && (
+          <ProgramAssignPanel programId={programId} programName={name} groupId={groupId} aiDraft={aiDraft} onClose={() => setAssignOpen(false)} onChanged={() => router.refresh()} />
+        )}
         {!embedded && (
           <AiProgramBuilderBox
             programId={programId}

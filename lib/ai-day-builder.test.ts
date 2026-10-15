@@ -40,7 +40,9 @@ describe("The AI Program Builder box", () => {
     expect(builder).toContain("<AiProgramBuilderBox");
     expect(builder).toMatch(/\{!embedded && \(\n\s+<AiProgramBuilderBox/);
     expect(builder).toContain("function handleAiDay(day: BuilderDay)");
-    expect(builder).toContain("Import a program");
+    // Import program lives inside the AI box now (above the mic and Ask), not as a link in the toolbar
+    expect(builder).not.toContain("Import a program");
+    expect(read("components/coach/desktop/ai-program-builder-box.tsx")).toContain("<ProgramImportLauncher groupId={groupId} athleteId={athleteId} />");
   });
 });
 
@@ -76,7 +78,9 @@ describe("Build program and New program make the program at once", () => {
     expect(page).not.toContain("NewProgramForm");
     expect(page).not.toContain("Start blank");
     expect(page).not.toContain("Build with AI");
-    expect(page).toContain('searchParams.method === "ai"');
+    // an old ?method=ai link does the same thing now: the builder opens with its AI box (there is no import page to send it to)
+    expect(page).not.toContain('searchParams.method === "ai"');
+    expect(page).not.toContain("programs/import");
   });
   it("the name is [First name]'s program for a client and New program otherwise, made in the browser, once", () => {
     const c = read("components/coach/create-and-open-program.tsx");
