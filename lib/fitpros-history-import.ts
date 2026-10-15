@@ -149,6 +149,7 @@ export async function runFitprosImport(
         session_exercise_id: idByOrder.get(order) as string,
         set_order: setOrder,
         weight: s.weight,
+        ...(s.unclearReason ? { data_flag: "unclear", data_flag_reason: s.unclearReason } : {}),
         reps: s.reps,
         time_seconds: s.timeSeconds,
         height: s.height,

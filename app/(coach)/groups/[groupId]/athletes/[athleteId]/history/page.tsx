@@ -66,38 +66,39 @@ export default async function ClientHistoryPage(
         >
           ← Back to {athleteName}
         </Link>
-        <h1 className="font-display font-bold text-2xl uppercase mb-1">{athleteName}&apos;s history</h1>
-        <p className="font-body text-sm text-steel mb-6 max-w-2xl">
-          Backfill training history from before {athleteName} joined — a recent PR, a working max, or a spreadsheet
-          of past sessions. Every entry is flagged self-reported, not gym-verified, and feeds the AI program
-          builder&apos;s training-max grounding without creating a fake logged workout or PR celebration.
-        </p>
-
-        <p className="font-body text-sm text-steel mb-6 max-w-2xl">
-          {IMPORT_BASELINE_NOTE} {IMPORT_UNITS_NOTE}
-        </p>
-
-        <div className="mb-8">
-          <HistoryImportAccessToggle
-            groupId={params.groupId}
-            athleteId={params.athleteId}
-            athleteName={athleteName}
-            initialEnabled={athleteMembership?.history_import_enabled ?? false}
-          />
-        </div>
+        <h1 className="font-display font-bold text-2xl uppercase mb-1">Import client history</h1>
 
         <HistoryImportPicker athleteId={params.athleteId} groupId={params.groupId} athleteName={athleteName} />
 
-        <UnclearPointsReview athleteId={params.athleteId} groupId={params.groupId} initial={unclearPoints} />
-
-        <div id="history-upload" className="mt-8 scroll-mt-20">
+        <div className="mt-8">
           <ExerciseHistoryUploader
             athleteId={params.athleteId}
             groupId={params.groupId}
             exerciseSuggestions={exerciseSuggestions}
             viewerIsCoach
+            parts={{ quick: true, spreadsheet: false, entries: true }}
           />
         </div>
+
+        <UnclearPointsReview athleteId={params.athleteId} groupId={params.groupId} initial={unclearPoints} />
+
+        <details className="mt-8 max-w-2xl border border-steel/20 p-4">
+          <summary className="font-body text-sm text-steel cursor-pointer">How this works</summary>
+          <div className="mt-3 space-y-3 font-body text-sm text-steel">
+            <p>
+              Backfill training history from before {athleteName} joined: a recent PR, a working max, or a spreadsheet of past sessions. Every entry is flagged self-reported, not gym-verified, and feeds the AI program
+              builder&apos;s training-max grounding without creating a fake logged workout or PR celebration.
+            </p>
+            <p>{IMPORT_BASELINE_NOTE}</p>
+            <p>{IMPORT_UNITS_NOTE}</p>
+            <HistoryImportAccessToggle
+              groupId={params.groupId}
+              athleteId={params.athleteId}
+              athleteName={athleteName}
+              initialEnabled={athleteMembership?.history_import_enabled ?? false}
+            />
+          </div>
+        </details>
       </div>
     </CoachDesktopShell>
   );

@@ -6,6 +6,8 @@
 // describes ACTUALLY LOGGED history — a real calendar date, a real
 // numeric rep count, one row per set actually performed.
 
+import { parseWeightCell, planUnits, unitFromText, weightInPounds, type UnitPlan, type WeightUnit } from "@/lib/weight-units";
+
 export type HistoryColumn = "date" | "exercise" | "weight" | "reps" | "rpe";
 
 const HEADER_ALIASES: Record<HistoryColumn, string[]> = {
@@ -91,7 +93,9 @@ function normalizeDateParts(year: number, month: number, day: number): string | 
 export interface ParsedHistoryRow {
   date: string; // "YYYY-MM-DD"
   exerciseName: string;
-  weight: number | null;
+  weight: number | null; // always pounds (a kilogram weight is converted here)
+  // Set when this row's weight names a different unit than the rest of the file: it is imported flagged as an unclear data point, never silently converted by a guess.
+  unclearReason?: string;
   reps: number | null;
   rpe: number | null;
 }
@@ -99,23 +103,39 @@ export interface ParsedHistoryRow {
 export interface HistoryParseResult {
   rows: ParsedHistoryRow[];
   skippedCount: number;
+  units: UnitPlan; // the unit the file was read in, and where that came from
+}
+
+// The unit the weight column's header names ("Weight (kg)"), or null when it names none.
+export function headerUnitOf(header: string[], mapping: HistoryColumnMapping): WeightUnit | null {
+  return mapping.weight == null ? null : unitFromText(header[mapping.weight] ?? "");
 }
 
 // Rows missing an exercise name, a parseable date, or BOTH weight and
 // reps are skipped (a row with no real training data isn't a set worth
 // recording) — counted, never silently dropped without a trace, so the
 // upload UI can tell the coach "N rows skipped."
-export function parseHistoryRows(dataRows: string[][], mapping: HistoryColumnMapping): HistoryParseResult {
+export function parseHistoryRows(
+  dataRows: string[][],
+  mapping: HistoryColumnMapping,
+  options: { headerUnit?: WeightUnit | null; chosenUnit?: WeightUnit } = {}
+): HistoryParseResult {
   const rows: ParsedHistoryRow[] = [];
   let skippedCount = 0;
+  // Which unit the file is in: its header, else the unit written in its cells, else the coach's choice (pounds unless they picked kilograms).
+  const units = planUnits({
+    headerUnit: options.headerUnit ?? null,
+    cellUnits: dataRows.map((r) => parseWeightCell(cell(r, mapping.weight)).unit),
+    chosen: options.chosenUnit ?? "lb",
+  });
 
   for (const row of dataRows) {
     const exerciseName = cell(row, mapping.exercise);
     const dateRaw = cell(row, mapping.date);
     const date = parseFlexibleDate(dateRaw);
 
-    const weightRaw = cell(row, mapping.weight).replace(/[^0-9.]/g, "");
-    const weight = weightRaw ? parseFloat(weightRaw) : null;
+    const converted = weightInPounds(parseWeightCell(cell(row, mapping.weight)), units);
+    const weight = converted.pounds;
     const repsRaw = cell(row, mapping.reps).replace(/[^0-9.]/g, "");
     const reps = repsRaw ? parseInt(repsRaw, 10) : null;
     const rpeRaw = cell(row, mapping.rpe);
@@ -132,10 +152,11 @@ export function parseHistoryRows(dataRows: string[][], mapping: HistoryColumnMap
       date,
       exerciseName,
       weight: weight != null && Number.isFinite(weight) ? weight : null,
+      ...(converted.unclearReason ? { unclearReason: converted.unclearReason } : {}),
       reps: reps != null && Number.isFinite(reps) ? reps : null,
       rpe: rpe != null && Number.isFinite(rpe) ? rpe : null,
     });
   }
 
-  return { rows, skippedCount };
+  return { rows, skippedCount, units };
 }

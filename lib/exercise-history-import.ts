@@ -146,6 +146,8 @@ export async function importHistoryRows(
         session_exercise_id: exerciseId,
         set_order: setOrder,
         weight: row.weight,
+        // a weight that names a different unit than the rest of the file is imported flagged (only a coach's write can carry the mark)
+        ...(row.unclearReason ? { data_flag: "unclear", data_flag_reason: row.unclearReason } : {}),
         reps: row.reps,
         rpe: row.rpe,
         status: "completed",

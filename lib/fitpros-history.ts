@@ -6,13 +6,18 @@
 
 import { findLibraryVariant, type AliasEntry } from "@/lib/exercise-matching";
 import { mergeAliases, resolveTypedAlias } from "@/lib/exercise-alias-seed";
+import { parseWeightCell, planUnits, weightInPounds, type WeightUnit } from "@/lib/weight-units";
 
 export const MAX_DURATION_SECONDS = 4 * 3600;
 export const MIN_DAY_MATCH = 0.5;
 
 export interface FitprosSet {
   reps: number | null;
-  weight: number | null;
+  weight: number | null; // pounds once parseFitprosExport has finished (a kilogram weight is converted there)
+  // Set when this weight names a different unit than the rest of the file: imported flagged as an unclear data point, never converted by a guess.
+  unclearReason?: string;
+  // Only while parsing: the unit written after this weight ("205lb", "100kg"), if any.
+  weightUnit?: WeightUnit | null;
   timeSeconds: number | null;
   height: number | null;
   distance: number | null;
@@ -94,11 +99,16 @@ function parseExerciseLine(line: string, date: string, flags: string[]): Fitpros
 
   // The weight column can also carry a height ("height 20in") or, for carries, a distance sits in the time column ("25yd").
   const weights: (number | null)[] = [];
+  const weightUnits: (WeightUnit | null)[] = [];
   const heights: (number | null)[] = [];
   for (const t of weightCell) {
     const h = parseLabelled(t, "height", "in");
     if (h != null) heights.push(h);
-    else weights.push(numberOrNull(t));
+    else {
+      const parsed = parseWeightCell(t);
+      weights.push(parsed.value);
+      weightUnits.push(parsed.unit);
+    }
   }
   const times: (number | null)[] = [];
   const distances: (number | null)[] = [];
@@ -122,6 +132,7 @@ function parseExerciseLine(line: string, date: string, flags: string[]): Fitpros
     sets.push({
       reps: reps[i] ?? null,
       weight: weights[i] ?? null,
+      weightUnit: weightUnits[i] ?? null,
       timeSeconds: times[i] ?? null,
       height: heights[i] ?? heights[0] ?? null,
       distance: distances[i] ?? null,
@@ -130,7 +141,7 @@ function parseExerciseLine(line: string, date: string, flags: string[]): Fitpros
   return { name, sets, note };
 }
 
-export function parseFitprosExport(text: string): { workouts: FitprosWorkout[]; skippedLines: number } {
+export function parseFitprosExport(text: string, chosenUnit: WeightUnit = "lb"): { workouts: FitprosWorkout[]; skippedLines: number } {
   const workouts: FitprosWorkout[] = [];
   let skipped = 0;
   for (const raw of text.split(/\r?\n/)) {
@@ -159,6 +170,21 @@ export function parseFitprosExport(text: string): { workouts: FitprosWorkout[]; 
     }
     const ex = parseExerciseLine(line, current.date, current.flags);
     if (ex) current.exercises.push(ex);
+  }
+  // Pounds or kilograms: what the file's weights say (lb or kg after each weight), else the coach's choice. A weight that names the other unit is flagged, not guessed at.
+  const plan = planUnits({ headerUnit: null, cellUnits: workouts.flatMap((w) => w.exercises.flatMap((e) => e.sets.map((x) => x.weightUnit ?? null))), chosen: chosenUnit });
+  for (const w of workouts) {
+    for (const e of w.exercises) {
+      for (const set of e.sets) {
+        const converted = weightInPounds({ value: set.weight, unit: set.weightUnit ?? null }, plan);
+        set.weight = converted.pounds;
+        if (converted.unclearReason) {
+          set.unclearReason = converted.unclearReason;
+          w.flags.push(`${w.date} ${e.name}: a weight names a different unit than the rest of the file; imported as an unclear data point`);
+        }
+        delete set.weightUnit;
+      }
+    }
   }
   return { workouts, skippedLines: skipped };
 }

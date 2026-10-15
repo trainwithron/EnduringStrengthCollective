@@ -46,7 +46,7 @@ describe("unclear data points", () => {
     expect(unclearLabel("accepted")).toBe(UNCLEAR_COUNTED_LABEL);
     expect(unclearLabel(null)).toBeNull();
     expect(IMPORT_BASELINE_NOTE).toContain("baseline");
-    expect(IMPORT_UNITS_NOTE).toBe("Imports are read as pounds.");
+    expect(IMPORT_UNITS_NOTE).toContain("unless you choose kilograms");
   });
 
   it("the import report: nothing for none, singular and plural", () => {
@@ -109,7 +109,8 @@ describe("where it shows", () => {
   it("History page: the baseline note, the review list; the FitPros import and the other uploads run the check", () => {
     const page = read("app/(coach)/groups/[groupId]/athletes/[athleteId]/history/page.tsx");
     expect(page).toContain("UnclearPointsReview");
-    expect(page).toContain("{IMPORT_BASELINE_NOTE} {IMPORT_UNITS_NOTE}");
+    expect(page).toContain("<p>{IMPORT_BASELINE_NOTE}</p>");
+    expect(page).toContain("<p>{IMPORT_UNITS_NOTE}</p>");
     expect(read("components/coach/fitpros-history-import.tsx")).toContain("await settleImportedHistory(supabase, groupId, athleteId)");
     const uploader = read("components/coach/exercise-history-uploader.tsx");
     expect(uploader.split("await settleImportedHistory(supabase, groupId, athleteId)").length - 1).toBe(2);

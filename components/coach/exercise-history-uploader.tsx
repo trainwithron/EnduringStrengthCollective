@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import * as XLSX from "xlsx";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { ExerciseNameInput } from "@/components/coach/exercise-name-input";
-import { detectHistoryColumns, parseHistoryRows, type ParsedHistoryRow } from "@/lib/history-import-parser";
+import { detectHistoryColumns, headerUnitOf, parseHistoryRows, type ParsedHistoryRow } from "@/lib/history-import-parser";
+import { WeightUnitChoice } from "@/components/coach/weight-unit-choice";
+import { poundsFrom, type WeightUnit } from "@/lib/weight-units";
 import {
   insertManualHistoryEntry,
   importHistoryRows,
@@ -32,11 +34,14 @@ export function ExerciseHistoryUploader({
   groupId,
   exerciseSuggestions,
   viewerIsCoach,
+  parts = { quick: true, spreadsheet: true, entries: true },
 }: {
   athleteId: string;
   groupId: string;
   exerciseSuggestions: string[];
   viewerIsCoach: boolean;
+  // Which blocks to show. The coach's History page shows Quick entry and the entries list here and opens the spreadsheet import from its one Import button.
+  parts?: { quick?: boolean; spreadsheet?: boolean; entries?: boolean };
 }) {
   const [entries, setEntries] = useState<HistoricalEntryGroup[] | null>(null);
 
@@ -47,8 +52,16 @@ export function ExerciseHistoryUploader({
 
   useEffect(() => {
     refreshEntries();
+    // The spreadsheet import (opened from the Import button, a separate copy of this component) tells the list to look again.
+    const again = () => void refreshEntries();
+    window.addEventListener("history-entries-changed", again);
+    return () => window.removeEventListener("history-entries-changed", again);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [athleteId]);
+
+  // Pounds or kilograms for what is typed or uploaded here (pounds unless changed). A file that names its own unit wins.
+  const [quickUnit, setQuickUnit] = useState<WeightUnit>("lb");
+  const [csvUnit, setCsvUnit] = useState<WeightUnit>("lb");
 
   // ---- Manual quick-entry -------------------------------------------
   const [manualExercise, setManualExercise] = useState("");
@@ -72,7 +85,7 @@ export function ExerciseHistoryUploader({
       athleteId,
       groupId,
       exerciseName: manualExercise.trim(),
-      weight: manualWeight.trim() ? parseFloat(manualWeight) : null,
+      weight: manualWeight.trim() && Number.isFinite(parseFloat(manualWeight)) ? poundsFrom(parseFloat(manualWeight), quickUnit) : null,
       reps: manualReps.trim() ? parseInt(manualReps, 10) : null,
       rpe: manualRpe.trim() ? parseFloat(manualRpe) : null,
       date: manualDate,
@@ -124,7 +137,13 @@ export function ExerciseHistoryUploader({
       return;
     }
 
-    const { rows: parsed, skippedCount } = parseHistoryRows(body, mapping);
+    const { rows: parsed, skippedCount, units } = parseHistoryRows(body, mapping, { headerUnit: headerUnitOf(header, mapping), chosenUnit: csvUnit });
+    // A file that mixes pounds and kilograms is imported with the odd rows marked unclear, and only a coach can write that mark: an athlete's own upload of such a file is stopped.
+    if (units.mixed && !viewerIsCoach) {
+      setCsvStatus("error");
+      setCsvError("This file mixes pounds and kilograms. Ask your coach to import it, or make every weight use one unit.");
+      return;
+    }
     if (parsed.length === 0) {
       setCsvStatus("error");
       setCsvError("No usable rows found — every row needs a date, an exercise name, and a weight or rep count.");
@@ -145,6 +164,7 @@ export function ExerciseHistoryUploader({
     setCsvSkippedCount(0);
     setCsvStatus("idle");
     await refreshEntries();
+    window.dispatchEvent(new Event("history-entries-changed"));
   }
 
   // ---- Review / delete ------------------------------------------------
@@ -161,6 +181,7 @@ export function ExerciseHistoryUploader({
 
   return (
     <div className="space-y-8 max-w-2xl">
+      {parts.quick !== false && (
       <div className="border border-steel/20 bg-surface/40 p-6">
         <h3 className="font-display uppercase text-sm tracking-wide mb-1">Quick entry</h3>
         <p className="font-body text-xs text-steel mb-4">
@@ -174,7 +195,7 @@ export function ExerciseHistoryUploader({
           <input
             type="number"
             inputMode="decimal"
-            placeholder="Weight (lbs)"
+            placeholder={quickUnit === "kg" ? "Weight (kg)" : "Weight (lbs)"}
             value={manualWeight}
             onChange={(e) => setManualWeight(e.target.value)}
             className="h-10 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
@@ -204,6 +225,9 @@ export function ExerciseHistoryUploader({
             className="h-10 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
           />
         </div>
+        <div className="mb-3">
+          <WeightUnitChoice value={quickUnit} onChange={setQuickUnit} />
+        </div>
         {manualError && (
           <p className="font-body text-xs text-rust mb-2" role="alert">
             {manualError}
@@ -218,13 +242,20 @@ export function ExerciseHistoryUploader({
           {manualSaving ? "Saving…" : "Add entry"}
         </button>
       </div>
+      )}
 
+      {parts.spreadsheet !== false && (
       <div className="border border-steel/20 bg-surface/40 p-6">
         <h3 className="font-display uppercase text-sm tracking-wide mb-1">Import a spreadsheet</h3>
         <p className="font-body text-xs text-steel mb-4">
           Upload a .csv or .xlsx file with Date, Exercise, Weight, and Reps columns (any order, RPE optional).
           Nothing is saved until you confirm.
         </p>
+        {csvStatus === "idle" && (
+          <div className="mb-3">
+            <WeightUnitChoice value={csvUnit} onChange={setCsvUnit} />
+          </div>
+        )}
         {csvStatus === "idle" && (
           <input
             type="file"
@@ -293,7 +324,9 @@ export function ExerciseHistoryUploader({
         )}
         {csvStatus === "importing" && <p className="font-body text-xs text-steel">Importing…</p>}
       </div>
+      )}
 
+      {parts.entries !== false && (
       <div className="border border-steel/20 bg-surface/40 p-6">
         <h3 className="font-display uppercase text-sm tracking-wide mb-3">
           {viewerIsCoach ? "Entries logged so far" : "Your history so far"}
@@ -332,6 +365,7 @@ export function ExerciseHistoryUploader({
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

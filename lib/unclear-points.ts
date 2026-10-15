@@ -6,7 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export const UNCLEAR_LABEL = "Unclear data point (not counted)";
 export const UNCLEAR_COUNTED_LABEL = "Unclear data point (counted)";
 export const IMPORT_BASELINE_NOTE = "Imported history gives you a baseline. It won't be perfect: values are backdated and some may need fixing by hand.";
-export const IMPORT_UNITS_NOTE = "Imports are read as pounds.";
+export const IMPORT_UNITS_NOTE = "Weights are read in the unit the file says. If it does not say, they are read as pounds unless you choose kilograms; kilograms are converted to pounds when saved.";
 
 export type DataFlag = "unclear" | "accepted";
 

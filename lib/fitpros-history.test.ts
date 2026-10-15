@@ -187,7 +187,8 @@ describe("Moving the program start is checked, never assumed", () => {
     const picker = src("components/coach/history-import-picker.tsx");
     expect(picker).toContain("Where is the history from?");
     expect(picker.match(/^\s+Import$/gm)?.length).toBe(1);
-    expect(picker).toContain("Other (CSV or Excel)");
+    expect(picker).toContain("Spreadsheet (CSV or Excel)");
+    expect(picker).not.toContain("Other (CSV or Excel)");
     expect(src("app/(coach)/groups/[groupId]/athletes/[athleteId]/history/page.tsx")).not.toContain("FitPros");
   });
 });

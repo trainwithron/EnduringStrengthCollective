@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { confirmDialog } from "@/components/shared/confirm-dialog";
-import { importKeys, parseFitprosExport, planFitprosImport, summarizePlan, weekOfDate, type FitprosWorkout } from "@/lib/fitpros-history";
+import { importKeys, parseFitprosExport, planFitprosImport, summarizePlan, weekOfDate } from "@/lib/fitpros-history";
+import { WeightUnitChoice } from "@/components/coach/weight-unit-choice";
+import type { WeightUnit } from "@/lib/weight-units";
 import {
   listImportedSessions,
   loadProgramForImport,
@@ -30,7 +32,14 @@ export function FitprosHistoryImport({ athleteId, groupId, athleteName }: { athl
   const router = useRouter();
   const [program, setProgram] = useState<ImportProgram | null | undefined>(undefined);
   const [existing, setExisting] = useState<ImportedSession[]>([]);
-  const [workouts, setWorkouts] = useState<FitprosWorkout[] | null>(null);
+  // The file as read, and the unit the coach picked before choosing it (pounds unless changed; a file that writes lb or kg after its weights is read by what it says). The workouts are worked out from both.
+  const [fileText, setFileText] = useState<string | null>(null);
+  const [unit, setUnit] = useState<WeightUnit>("lb");
+  const workouts = useMemo(() => {
+    if (!fileText) return null;
+    const parsed = parseFitprosExport(fileText, unit).workouts;
+    return parsed.length > 0 ? parsed : null;
+  }, [fileText, unit]);
   const [plan, setPlan] = useState<PlannedWorkout[] | null>(null);
   const [moveStart, setMoveStart] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -100,13 +109,13 @@ export function FitprosHistoryImport({ athleteId, groupId, athleteName }: { athl
     setMoveStart(false);
     if (!file) return;
     const text = await file.text();
-    const parsed = parseFitprosExport(text);
+    const parsed = parseFitprosExport(text, unit);
     if (parsed.workouts.length === 0) {
-      setWorkouts(null);
+      setFileText(null);
       setError("That file has no workouts in it. Use the FitPros text export.");
       return;
     }
-    setWorkouts(parsed.workouts);
+    setFileText(text);
   }
 
   async function runImport() {
@@ -173,6 +182,9 @@ export function FitprosHistoryImport({ athleteId, groupId, athleteName }: { athl
           <p className="font-body text-xs text-steel mt-3">
             Program: <span className="text-chalk">{program.name}</span> · {currentStart ? `starts ${currentStart}` : "no start date"}
           </p>
+          <div className="mt-3">
+            <WeightUnitChoice value={unit} onChange={setUnit} />
+          </div>
           <label className="mt-3 inline-flex min-h-11 items-center font-body text-sm cursor-pointer">
             <span className="border border-steel/40 px-3 py-2 text-chalk">Choose the FitPros file</span>
             <input type="file" accept=".txt,text/plain" className="hidden" onChange={(e) => void onFile(e.target.files?.[0] ?? null)} />
