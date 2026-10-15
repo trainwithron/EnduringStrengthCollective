@@ -85,6 +85,11 @@ describe("program text pasted into the AI builder box", () => {
     expect(looksLikePastedProgram(wordy)).toBe(false);
     expect(detectImportKind({ text: "Make week 2 harder, 3 sets of 5 on the main lifts" }).kind).toBe("description");
     expect(looksLikePastedProgram("Day 1\nDay 2\nSquat")).toBe(false); // too short to be a program
+    // "Day of rest", "Day is long" and similar sentences are not day headers
+    expect(looksLikePastedProgram(["Day of rest on Sunday.", "Day is long, so keep it short.", "Week off after week four.", "Keep the squats heavy.", "No overhead work."].join("\n"))).toBe(false);
+    // real headers: Day A, a markdown heading with a week number
+    expect(looksLikePastedProgram(["Day A", "Squat", "Bench", "Row", "Day B", "Deadlift"].join("\n"))).toBe(true);
+    expect(looksLikePastedProgram(["## Week 12", "Squat", "Bench", "Row", "## Week 13", "Deadlift"].join("\n"))).toBe(true);
   });
   it("the box asks first and writes nothing: one plain line with Import it and Build from it", () => {
     const box = read("components/coach/desktop/ai-program-builder-box.tsx");

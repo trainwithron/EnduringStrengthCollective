@@ -35,7 +35,7 @@ function extensionOf(name: string): string {
 const SETS_REPS = /\b\d{1,2}\s*(?:x|×|by)\s*\d{1,3}\b|\b\d{1,2}\s*sets?\s*(?:of|x|×)\s*\d{1,3}\b/i;
 
 // Day or week headers ("Day 1", "Week 2 - Day 3", "DAY A") and rows of a table pasted from a spreadsheet (cells split by tabs or pipes).
-const DAY_OR_WEEK_HEADER = /^(?:#+\s*)?(?:week|day)\s*[0-9a-z]{1,2}\b/i;
+const DAY_OR_WEEK_HEADER = /^(?:#+\s*)?(?:week|day)\s*(?:\d{1,2}|[a-z])\b/i;
 
 export function looksLikePastedProgram(text: string): boolean {
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0);
