@@ -60,6 +60,8 @@ export function BirthdayForm({
     setSaving(false);
     if (isUnder13(dob, new Date()) && !consentVerified) {
       setBlocked(true);
+      // Tell the coach a child is waiting (best effort; the child's screen does not depend on it).
+      void fetch("/api/intake/minor-consent-notice", { method: "POST" }).catch(() => {});
       return;
     }
     router.push(nextUrl);

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { checked } from "@/lib/checked-write";
 
 type Method = "signed_form" | "phone_or_video_call" | "email" | "other";
 
@@ -32,31 +33,43 @@ export function MinorConsentControl({
   const [notes, setNotes] = useState(initialNotes);
   const [verifiedAt, setVerifiedAt] = useState(initialVerifiedAt);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function persist(nextVerified: boolean) {
     setSaving(true);
+    setError(null);
     const supabase = createBrowserClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
     const now = new Date().toISOString();
 
-    await supabase.from("minor_consent").upsert(
-      {
-        athlete_id: athleteId,
-        group_id: groupId,
-        verified: nextVerified,
-        verified_by: nextVerified ? user?.id ?? null : null,
-        verified_at: nextVerified ? now : null,
-        method,
-        notes: notes.trim() || null,
-      },
-      { onConflict: "athlete_id" }
+    // Consent is only shown as verified (or undone) once the database has really kept it: a refused or failed save leaves the screen as it was.
+    const result = await checked(
+      supabase
+        .from("minor_consent")
+        .upsert(
+          {
+            athlete_id: athleteId,
+            group_id: groupId,
+            verified: nextVerified,
+            verified_by: nextVerified ? user?.id ?? null : null,
+            verified_at: nextVerified ? now : null,
+            method,
+            notes: notes.trim() || null,
+          },
+          { onConflict: "athlete_id" }
+        )
+        .select("athlete_id"),
+      { expectRows: true, message: "Couldn't save the consent. Nothing was changed. Try again." }
     );
-
+    setSaving(false);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
     setVerified(nextVerified);
     setVerifiedAt(nextVerified ? now : null);
-    setSaving(false);
   }
 
   return (
@@ -118,6 +131,11 @@ export function MinorConsentControl({
       >
         {saving ? "Saving…" : verified ? "Undo verification" : "Mark parental consent verified"}
       </button>
+      {error && (
+        <p className="font-body text-xs text-rust" role="alert">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

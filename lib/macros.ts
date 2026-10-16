@@ -109,6 +109,9 @@ export interface ArchetypeMacroSplit {
   resolvedCalories: number;
 }
 
+// When the protein alone (or protein and carbs) already uses up the calories, fat would come out negative. A small floor of essential fat is used instead (the day then lands a little over the calories asked for).
+export const MIN_ARCHETYPE_FAT_G = 20;
+
 export function computeArchetypeMacros(
   calories: number,
   bodyWeightLbs: number,
@@ -121,10 +124,10 @@ export function computeArchetypeMacros(
 
   if (archetype === "carnivore") {
     carbsG = 0;
-    fatG = Math.round((calories - proteinG * 4) / 9);
+    fatG = Math.max(MIN_ARCHETYPE_FAT_G, Math.round((calories - proteinG * 4) / 9));
   } else if (archetype === "keto") {
     carbsG = 25;
-    fatG = Math.round((calories - proteinG * 4 - 25 * 4) / 9);
+    fatG = Math.max(MIN_ARCHETYPE_FAT_G, Math.round((calories - proteinG * 4 - 25 * 4) / 9));
   } else {
     fatG = Math.max(45, Math.round((calories * 0.25) / 9));
     carbsG = Math.max(50, Math.round((calories - proteinG * 4 - fatG * 9) / 4));

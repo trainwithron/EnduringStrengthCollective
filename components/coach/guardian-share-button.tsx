@@ -43,22 +43,22 @@ export function GuardianShareButton({
       setBusy(false);
       return;
     }
-    const newToken = crypto.randomUUID();
+    // The secret in the link is made by the database (whatever is sent is ignored) and read back here.
     const { data, error } = await supabase
       .from("guardian_links")
       .insert({
         athlete_id: athleteId,
         group_id: groupId,
-        access_token: newToken,
         created_by: user.id,
       })
-      .select("expires_at")
+      .select("access_token, expires_at")
       .single();
-    if (error) {
-      setError("Couldn't make the link. A parent link can only be made for a client under 13 in a group you coach.");
+    const made = data as { access_token?: string; expires_at?: string | null } | null;
+    if (error || !made?.access_token) {
+      setError("Couldn't make the link. A parent link can only be made for a client under 13 in a group you coach, after parental consent is verified.");
     } else {
-      setToken(newToken);
-      setExpiresAt((data as { expires_at?: string | null } | null)?.expires_at ?? null);
+      setToken(made.access_token);
+      setExpiresAt(made.expires_at ?? null);
       router.refresh();
     }
     setBusy(false);

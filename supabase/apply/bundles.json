@@ -301,6 +301,14 @@
   "file": "apply-release-bw-all.sql"
  },
  {
+  "id": "release-cj",
+  "name": "Release CJ (minors and health closures: training partners, parent links, weigh-ins, scan photos and saves, consent notice; run BEFORE the code that goes with it is live)",
+  "steps": [
+   "133"
+  ],
+  "file": "apply-release-cj-all.sql"
+ },
+ {
   "id": "release-ci",
   "name": "Release CI (a day number is unique inside a week of a program; a one-on-one space follows its client name; run in order 130, 131, 132, BEFORE the code that goes with it is live)",
   "steps": [

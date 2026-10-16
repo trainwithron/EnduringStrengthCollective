@@ -1,5 +1,4 @@
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import type { GeneratedMeal } from "@/lib/meal-engine";
 import { dateKeyInZone, DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { isValidTimeZone } from "@/lib/format-in-timezone";
 
@@ -30,6 +29,25 @@ export interface GuardianView {
 export function underThirteenOn(dateOfBirth: string, todayKey: string): boolean {
   const [y, m, d] = todayKey.split("-");
   return dateOfBirth > `${Number(y) - 13}-${m}-${d}`;
+}
+
+// What a stored meal plan holds: meals is an object keyed by day type ({ daily: [...] } or { train: [...], rest: [...] }), each entry with its mealId, title and targets, and macros is the same keys
+// with the day's totals. (The first version of this page read meals as a plain list of the full engine objects and failed on every real plan.)
+interface StoredMeal {
+  mealId?: string | number;
+  title?: string;
+  proteinTarget?: number;
+}
+
+export function guardianMealsFrom(meals: unknown, macros: unknown): { meals: { id: string; title: string }[]; prescribedProtein: number } {
+  const byBucket = meals && typeof meals === "object" && !Array.isArray(meals) ? (meals as Record<string, unknown>) : {};
+  const key = ["daily", "train", "rest"].find((k) => Array.isArray(byBucket[k]) && (byBucket[k] as unknown[]).length > 0);
+  const entries = (key ? (byBucket[key] as StoredMeal[]) : []).filter((m) => m && (m.mealId != null || m.title));
+  const bucketMacros = macros && typeof macros === "object" && key ? ((macros as Record<string, { protein?: number | null }>)[key] ?? null) : null;
+  const summed = entries.reduce((sum, m) => sum + (Number.isFinite(m.proteinTarget) ? (m.proteinTarget as number) : 0), 0);
+  // The plan's own protein for the day when it has one, else what the meals add up to.
+  const prescribedProtein = bucketMacros?.protein != null && Number.isFinite(bucketMacros.protein) ? (bucketMacros.protein as number) : summed;
+  return { meals: entries.map((m) => ({ id: String(m.mealId ?? m.title), title: m.title ?? "Meal" })), prescribedProtein };
 }
 
 export async function getGuardianView(token: string): Promise<GuardianView | null> {
@@ -64,24 +82,26 @@ export async function getGuardianView(token: string): Promise<GuardianView | nul
   const [{ data: mealPlan }, { data: logRows }] = await Promise.all([
     supabase
       .from("meal_plans")
-      .select("meals")
+      .select("meals, macros")
       .eq("athlete_id", link.athlete_id)
+      .eq("group_id", link.group_id)
       .eq("log_date", todayKey)
       .maybeSingle(),
     supabase
       .from("food_log_entries")
       .select("meal_slot, status, protein_g")
       .eq("athlete_id", link.athlete_id)
+      .eq("group_id", link.group_id)
       .eq("log_date", todayKey),
   ]);
 
-  const generatedMeals = ((mealPlan?.meals as unknown) ?? []) as GeneratedMeal[];
-  const statusBySlot = new Map((logRows ?? []).map((r) => [r.meal_slot, r.status as string]));
+  const plan = guardianMealsFrom(mealPlan?.meals, (mealPlan as { macros?: unknown } | null)?.macros);
+  const statusBySlot = new Map((logRows ?? []).map((r) => [String(r.meal_slot), r.status as string]));
 
-  const meals: GuardianMeal[] = generatedMeals.map((m) => {
-    const status = statusBySlot.get(m.spec.id);
+  const meals: GuardianMeal[] = plan.meals.map((m) => {
+    const status = statusBySlot.get(m.id);
     return {
-      title: m.spec.title,
+      title: m.title,
       status:
         status === "ate_it" || status === "modified" || status === "skipped" ? status : "not_logged",
     };
@@ -93,7 +113,7 @@ export async function getGuardianView(token: string): Promise<GuardianView | nul
   // was actually eaten (ate_it/modified — skipped/not-logged genuinely
   // contributed 0) meaningfully trails the day's own prescribed total.
   const anyResolved = (logRows ?? []).length > 0;
-  const prescribedProtein = generatedMeals.reduce((sum, m) => sum + m.spec.proteinTarget, 0);
+  const prescribedProtein = plan.prescribedProtein;
   const loggedProtein = (logRows ?? [])
     .filter((r) => r.status === "ate_it" || r.status === "modified")
     .reduce((sum, r) => sum + (r.protein_g ?? 0), 0);

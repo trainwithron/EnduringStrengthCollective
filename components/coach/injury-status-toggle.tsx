@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { checked } from "@/lib/checked-write";
 
 // coach_em_up_finley_funston_transcript.md — real client-safety gap:
 // undereating while injured measurably delays recovery, but the
@@ -28,34 +29,45 @@ export function InjuryStatusToggle({
   const [isInjured, setIsInjured] = useState(initialIsInjured);
   const [surplusPct, setSurplusPct] = useState(initialSurplusPct);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  async function persist(nextIsInjured: boolean, nextSurplusPct: number) {
+  // True when the database kept it. The check-in engine reads this row to keep an injured client out of a calorie deficit, so a failed save must never look like a saved one.
+  async function persist(nextIsInjured: boolean, nextSurplusPct: number): Promise<boolean> {
     setSaving(true);
+    setError(null);
     const supabase = createBrowserClient();
-    await supabase.from("athlete_injury_status").upsert(
-      {
-        athlete_id: athleteId,
-        group_id: groupId,
-        is_injured: nextIsInjured,
-        surplus_pct: nextSurplusPct,
-        marked_by: coachId,
-        marked_at: nextIsInjured ? new Date().toISOString() : null,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "athlete_id" }
+    const result = await checked(
+      supabase
+        .from("athlete_injury_status")
+        .upsert(
+          {
+            athlete_id: athleteId,
+            group_id: groupId,
+            is_injured: nextIsInjured,
+            surplus_pct: nextSurplusPct,
+            marked_by: coachId,
+            marked_at: nextIsInjured ? new Date().toISOString() : null,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "athlete_id" }
+        )
+        .select("athlete_id"),
+      { expectRows: true, message: "Couldn't save that. The injury setting was not changed. Try again." }
     );
     setSaving(false);
+    if (!result.ok) setError(result.error);
+    return result.ok;
   }
 
   async function handleToggle() {
     const next = !isInjured;
-    setIsInjured(next);
-    await persist(next, surplusPct);
+    if (await persist(next, surplusPct)) setIsInjured(next);
   }
 
   async function handleSurplusChange(value: number) {
+    const before = surplusPct;
     setSurplusPct(value);
-    if (isInjured) await persist(true, value);
+    if (isInjured && !(await persist(true, value))) setSurplusPct(before);
   }
 
   return (
@@ -87,6 +99,11 @@ export function InjuryStatusToggle({
           />
           <span className="text-xs">% (0 = maintenance only, up to a real 5-10% surplus)</span>
         </label>
+      )}
+      {error && (
+        <p className="font-body text-xs text-rust mt-2" role="alert">
+          {error}
+        </p>
       )}
     </div>
   );

@@ -53,3 +53,28 @@ describe("the migration scopes who can make a link", () => {
     expect(sql).not.toContain("revoke execute on function public.training_partner_is_restricted");
   });
 });
+
+import { guardianMealsFrom } from "@/lib/guardian-view";
+
+describe("the parent view reads a real stored meal plan (an object keyed by day type, not a list)", () => {
+  const entry = (mealId: string, title: string, proteinTarget: number) => ({ mealId, title, proteinTarget, carbsTarget: 40, fatTarget: 10, recipes: [] });
+  it("a daily plan gives its meals and the plan's own protein for the day", () => {
+    const r = guardianMealsFrom({ daily: [entry("1", "Breakfast", 30), entry("2", "Lunch", 40)] }, { daily: { calories: 2000, protein: 150 } });
+    expect(r.meals).toEqual([{ id: "1", title: "Breakfast" }, { id: "2", title: "Lunch" }]);
+    expect(r.prescribedProtein).toBe(150);
+  });
+  it("without plan macros the protein is what the meals add up to; a train/rest plan uses the first filled day type", () => {
+    const r = guardianMealsFrom({ train: [entry("1", "Pre", 25), entry("2", "Post", 35)], rest: [] }, null);
+    expect(r.meals.map((m) => m.title)).toEqual(["Pre", "Post"]);
+    expect(r.prescribedProtein).toBe(60);
+  });
+  it("anything else (null, a list, an empty plan) is an empty plan and never throws", () => {
+    for (const bad of [null, undefined, [], "x", 5, {}, { daily: [] }, { daily: "no" }]) {
+      expect(guardianMealsFrom(bad, null)).toEqual({ meals: [], prescribedProtein: 0 });
+    }
+  });
+  it("the page only reads this group's plan and food log", () => {
+    const src = readFileSync(join(__dirname, "guardian-view.ts"), "utf8");
+    expect(src.match(/\.eq\("group_id", link\.group_id\)/g)?.length).toBeGreaterThanOrEqual(2);
+  });
+});

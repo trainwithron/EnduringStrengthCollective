@@ -21,6 +21,8 @@ export const ALLERGEN_TERMS: Record<AllergenKey, string[]> = {
     "paneer", "yogurt", "yoghurt", "kefir", "skyr", "cream", "custard", "buttermilk", "lactose", "curd", "half and half", "ice cream",
     "queso", "provolone", "swiss", "gruyere", "pecorino", "romano", "alfredo", "bechamel", "tzatziki", "labneh", "quark", "creamer", "latte", "cappuccino", "gelato",
     "milk chocolate", "ranch", "cheesecake", "buttercream",
+    // Shakes, powders and bars are usually made with whey or milk protein, so they are flagged for a dairy allergy unless they say they are plant based.
+    "protein shake", "protein powder", "protein bar", "milkshake",
   ],
   egg: [
     "egg", "albumin", "ovalbumin", "mayonnaise", "mayo", "aioli", "hollandaise", "meringue", "eggnog", "omelet", "omelette", "frittata", "quiche", "souffle", "shakshuka",
@@ -60,6 +62,7 @@ export const SAFE_PHRASES: Partial<Record<AllergenKey, string[]>> = {
     "shea butter", "cream of tartar", "coconut whipped cream", "oat cream", "soy yogurt", "almond yogurt", "plant milk", "plant based milk", "dairy free",
     "butter lettuce", "butter bean", "butter squash", "cream of rice", "cream of coconut", "vegan cheese", "vegan butter", "vegan yogurt", "vegan yoghurt", "vegan cream",
     "vegan milk", "cashew cheese", "plant based cheese", "plant based butter", "plant based yogurt", "bean curd", "non dairy", "swiss chard", "romano bean", "romano pepper",
+    "pea protein", "plant protein", "plant based protein", "vegan protein", "soy protein", "rice protein", "hemp protein", "brown rice protein",
   ],
   egg: ["flax egg", "chia egg", "egg free", "egg replacer", "vegan mayo", "vegan mayonnaise", "eggless"],
   "wheat or gluten": [

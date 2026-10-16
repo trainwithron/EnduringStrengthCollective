@@ -158,3 +158,12 @@ describe("only a person's own upload paths are removed with them", () => {
     expect(pathBelongsToPerson("post-media", "g1/x.png", "u1")).toBe(true);
   });
 });
+
+import { STORAGE_FILES } from "@/lib/account-deletion";
+describe("InBody scan photos go when the account goes", () => {
+  it("the bucket is listed with its table and owner, and only the person's own folder is removed", () => {
+    expect(STORAGE_FILES).toContainEqual({ bucket: "inbody-scans", table: "body_scans", column: "photo_path", owner: "athlete_id" });
+    expect(pathBelongsToPerson("inbody-scans", "g1/u1/scan.jpg", "u1")).toBe(true);
+    expect(pathBelongsToPerson("inbody-scans", "g1/u2/scan.jpg", "u1")).toBe(false);
+  });
+});
