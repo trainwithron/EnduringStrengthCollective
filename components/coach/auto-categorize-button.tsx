@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { isBadExerciseName } from "@/lib/exercise-name-guard";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { classifyExerciseCategory, type ExerciseCategory } from "@/lib/exercise-category-classifier";
 import type { LibraryExerciseRow } from "./exercise-library-list";
@@ -31,7 +32,8 @@ export function AutoCategorizeButton({
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [applying, setApplying] = useState(false);
 
-  const uncategorized = exercises.filter((e) => !e.category);
+  // A name that is only numbers or carries sets and reps (an old junk row) is left out: the database refuses any change to such a row, and one of them in a bulk update would fail the whole group.
+  const uncategorized = exercises.filter((e) => !e.category && !isBadExerciseName(e.name));
 
   function handleOpen() {
     const seeded: Record<string, string> = {};

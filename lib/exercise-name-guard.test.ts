@@ -130,3 +130,10 @@ describe("where the guard is used", () => {
     expect(src("components/coach/desktop/day-card.tsx")).toContain("usableExerciseNames(fullLibrary)");
   });
 });
+
+describe("old junk rows under the NOT VALID database check", () => {
+  it("the bulk auto-categorize leaves them out, so one cannot fail the whole group", () => {
+    const btn = src("components/coach/auto-categorize-button.tsx");
+    expect(btn).toContain("!e.category && !isBadExerciseName(e.name)");
+  });
+});
