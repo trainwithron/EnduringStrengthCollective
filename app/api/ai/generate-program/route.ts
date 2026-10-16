@@ -10,7 +10,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { matchExercise, matchTopN, type LibraryExercise } from "@/lib/exercise-matching";
 import { scanConstraints } from "@/lib/constraint-scan";
 import { clampAiRow } from "@/lib/ai-row-clamps";
-import { athleteAgeStatus, clampYouthRows, YOUTH_PROMPT_BLOCK } from "@/lib/youth-block";
+import { athleteAgeStatus, clampYouthRows, effectiveAgeStatus, YOUTH_PROMPT_BLOCK } from "@/lib/youth-block";
 import { PAIN_MONITORING_GUIDANCE } from "@/lib/pain-guidance";
 import { loadLearnedLines } from "@/lib/learned-for-prompt";
 import { loadClientNotes } from "@/lib/client-notes-server";
@@ -223,7 +223,7 @@ export async function POST(request: Request) {
         supabase.from("athlete_notes").select("body").eq("athlete_id", athleteId).eq("group_id", groupId).maybeSingle(),
       ]);
       // Under 18, or no birthdate on file: the youth protections apply (an unknown age is never treated as an adult).
-      ageStatus = await athleteAgeStatus(supabase, athleteId);
+      ageStatus = effectiveAgeStatus(await athleteAgeStatus(supabase, athleteId), athleteId === user.id);
       isYouth = ageStatus !== "adult";
       const flagged = hasFlaggedMusculoskeletalConcern((intakeRow?.par_q_answers as any[]) ?? []);
       const noteText = noteRow?.body?.trim() || null;

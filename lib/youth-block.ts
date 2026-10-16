@@ -41,6 +41,11 @@ export async function athleteAgeStatus(supabase: SupabaseClient, athleteId: stri
   return ageStatusFromDob((data as { date_of_birth?: string | null } | null)?.date_of_birth);
 }
 
+// A coach building a program for THEMSELVES (their own personal space) with no birthdate on file is treated as an adult; an unknown age only gets the youth protections for someone else's client. A birthdate that says under 18 still wins.
+export function effectiveAgeStatus(status: AgeStatus, buildingForSelf: boolean): AgeStatus {
+  return buildingForSelf && status === "unknown" ? "adult" : status;
+}
+
 export const UNKNOWN_AGE_BANNER_TEXT = "This client has no birthdate on file, so the program was built with the youth protections (technique first, no max testing, effort at RPE 8 or lower). Add their birthdate to remove them, and review the program with that in mind.";
 
 export const YOUTH_RPE_CAP = 8;
