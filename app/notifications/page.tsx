@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createCrossOrgServerClient as createServerClient } from "@/lib/supabase/server";
 import { CoachHomeShell } from "@/components/coach/coach-home-shell";
 import { NotificationList, type CenterEntry } from "@/components/notifications/notification-list";
+import { LoadFailed } from "@/components/ui/load-failed";
 import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { isValidTimeZone } from "@/lib/format-in-timezone";
 import { CHOOSE_ORGANIZATION_PATH, getActiveAnchor } from "@/lib/active-anchor";
@@ -16,7 +17,7 @@ export default async function NotificationsPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [{ data: profile }, { data: memberships }, { data: rows }] = await Promise.all([
+  const [{ data: profile }, { data: memberships }, { data: rows, error: rowsError }] = await Promise.all([
     supabase.from("profiles").select("timezone").eq("id", user.id).maybeSingle(),
     supabase.from("group_memberships").select("group_id, role").eq("profile_id", user.id),
     supabase
@@ -54,7 +55,7 @@ export default async function NotificationsPage() {
   const content = (
     <div className="max-w-2xl">
       <h1 className="font-display font-bold text-2xl uppercase mb-6">Notifications</h1>
-      <NotificationList initial={entries} timezone={timezone} />
+      {rowsError ? <LoadFailed /> : <NotificationList initial={entries} timezone={timezone} />}
     </div>
   );
 

@@ -50,6 +50,15 @@ async function handler(request: Request) {
   let sent = 0;
   let smsSent = 0;
   for (const booking of upcoming ?? []) {
+    // The reminder is CLAIMED first (only if nobody has yet): if marking it fails, nothing is sent, so a failed write can never make the same reminder go out again on every run, and two overlapping runs
+    // cannot both send it.
+    const { data: claimed, error: claimError } = await supabase
+      .from("bookings")
+      .update({ reminder_sent_at: now.toISOString() })
+      .eq("id", booking.id)
+      .is("reminder_sent_at", null)
+      .select("id");
+    if (claimError || (claimed ?? []).length === 0) continue;
     const coachName = (booking as any).profiles?.full_name ?? "your coach";
     // In the client's own time zone (this runs in UTC): their profile first, then their coach's.
     const when = formatInTimezone(
@@ -79,11 +88,7 @@ async function handler(request: Request) {
     });
     if (smsResult.sent) smsSent += 1;
 
-    // Mark as sent regardless of whether a real push subscription
-    // existed to deliver to (count === 0) — the reminder "happened" for
-    // this booking either way, and retrying every tick for a client
-    // with push notifications off would just waste cron time forever.
-    await supabase.from("bookings").update({ reminder_sent_at: now.toISOString() }).eq("id", booking.id);
+    // (Marked as sent above, whether or not a push subscription existed: the reminder "happened" for this booking either way.)
     if (count > 0) sent += 1;
   }
 

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { notifyPush } from "@/lib/push-notify";
+import { checked } from "@/lib/checked-write";
 import { ReportUserButton } from "./report-user-button";
 
 export interface BrowseProfile {
@@ -48,12 +49,21 @@ export function TrainingPartnerBrowseList({
     setSending(false);
   }
 
+  // A block is only shown as done once it has really been saved: a block that did not save would leave the person able to message the one who blocked them.
   async function block(athleteId: string) {
+    setError(null);
     const supabase = createBrowserClient();
-    await supabase.from("training_partner_blocks").insert({
-      blocker_id: myAthleteId,
-      blocked_id: athleteId,
-    });
+    const result = await checked(
+      supabase.from("training_partner_blocks").insert({
+        blocker_id: myAthleteId,
+        blocked_id: athleteId,
+      }),
+      { message: "Couldn't block that person. Nothing was changed. Try again." }
+    );
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
     setHidden((prev) => new Set(prev).add(athleteId));
   }
 
@@ -69,6 +79,11 @@ export function TrainingPartnerBrowseList({
 
   return (
     <div className="space-y-3">
+      {error && !openRequestFor && (
+        <p className="font-body text-sm text-rust" role="alert">
+          {error}
+        </p>
+      )}
       {visible.map((p) => (
         <div key={p.athleteId} className="border border-steel/20 p-4">
           <div className="flex items-start justify-between gap-3">

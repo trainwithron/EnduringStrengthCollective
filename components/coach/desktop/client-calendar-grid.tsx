@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { checked } from "@/lib/checked-write";
 import { AssignWorkoutForm, type WorkoutOption } from "./assign-workout-form";
 import { DailyMacrosForm } from "./daily-macros-form";
 import { SOURCE_LABEL, type MacroSource } from "@/lib/macro-resolution";
@@ -74,6 +75,7 @@ export function ClientCalendarGrid({
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   const [assigning, setAssigning] = useState<string | null>(null);
+  const [dropError, setDropError] = useState<string | null>(null);
   const router = useRouter();
 
   function toggle(key: string) {
@@ -82,6 +84,7 @@ export function ClientCalendarGrid({
 
   async function handleDropWorkout(dateKey: string, workout: DraggedWorkoutDay) {
     setAssigning(dateKey);
+    setDropError(null);
     const supabase = createBrowserClient();
     const {
       data: { user },
@@ -90,16 +93,23 @@ export function ClientCalendarGrid({
       // Same upsert AssignWorkoutForm's own "Save" button already does —
       // one drop is equivalent to picking this workout from that
       // dropdown and saving, just faster.
-      await supabase.from("workout_assignments").upsert(
-        {
-          athlete_id: athleteId,
-          group_id: groupId,
-          scheduled_date: dateKey,
-          workout_id: workout.workoutId,
-          created_by: user.id,
-        },
-        { onConflict: "athlete_id,scheduled_date" }
+      const result = await checked(
+        supabase
+          .from("workout_assignments")
+          .upsert(
+            {
+              athlete_id: athleteId,
+              group_id: groupId,
+              scheduled_date: dateKey,
+              workout_id: workout.workoutId,
+              created_by: user.id,
+            },
+            { onConflict: "athlete_id,scheduled_date" }
+          )
+          .select("athlete_id"),
+        { expectRows: true, message: "Couldn't put that workout on that day. Nothing was changed. Try again." }
       );
+      if (!result.ok) setDropError(result.error);
     }
     setAssigning(null);
     router.refresh();
@@ -107,6 +117,11 @@ export function ClientCalendarGrid({
 
   return (
     <div className="border border-steel/15">
+      {dropError && (
+        <p className="font-body text-sm text-rust px-2 py-1.5" role="alert">
+          {dropError}
+        </p>
+      )}
       <div className="grid grid-cols-7 gap-px bg-steel/15">
         {WEEKDAY_LABELS.map((label) => (
           <div

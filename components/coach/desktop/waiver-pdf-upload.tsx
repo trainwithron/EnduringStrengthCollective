@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { checked } from "@/lib/checked-write";
 
 const MAX_BYTES = 10 * 1024 * 1024;
 
@@ -42,17 +43,19 @@ export function WaiverPdfUpload({
       .from("waiver-documents")
       .upload(newPath, file);
     if (uploadError) {
-      setError(uploadError.message);
+      setError("Couldn't upload that file. Try again.");
       setUploading(false);
       return;
     }
 
-    const { error: dbError } = await supabase
-      .from("organizations")
-      .update({ waiver_pdf_path: newPath })
-      .eq("id", organizationId);
-    if (dbError) {
-      setError(dbError.message);
+    const saved = await checked(supabase.from("organizations").update({ waiver_pdf_path: newPath }).eq("id", organizationId).select("id"), {
+      expectRows: true,
+      message: "Couldn't attach that file to your waiver. Try again.",
+    });
+    if (!saved.ok) {
+      // the file is not attached to anything, so it is not left behind
+      await supabase.storage.from("waiver-documents").remove([newPath]);
+      setError(saved.error);
       setUploading(false);
       return;
     }
@@ -68,7 +71,15 @@ export function WaiverPdfUpload({
     setUploading(true);
     setError(null);
     const supabase = createBrowserClient();
-    await supabase.from("organizations").update({ waiver_pdf_path: null }).eq("id", organizationId);
+    const cleared = await checked(supabase.from("organizations").update({ waiver_pdf_path: null }).eq("id", organizationId).select("id"), {
+      expectRows: true,
+      message: "Couldn't remove the waiver file. It was not changed. Try again.",
+    });
+    if (!cleared.ok) {
+      setError(cleared.error);
+      setUploading(false);
+      return;
+    }
     if (path) {
       await supabase.storage.from("waiver-documents").remove([path]);
     }

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { checked } from "@/lib/checked-write";
 import { fieldDef, orderTrackedFields, type TrackedField } from "@/lib/exercise-fields";
 import { recapSetValue, type RecapExercise } from "@/lib/session-recap-data";
 import { ChevronDown, ChevronUp } from "lucide-react";
@@ -39,38 +40,56 @@ export function RecapExerciseRow({
   const [note, setNote] = useState(exercise.coachNote);
   const [saving, setSaving] = useState(false);
   const [visibleToAthlete, setVisibleToAthlete] = useState(exercise.visibleToAthlete);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   async function handleNoteBlur() {
     if (note === exercise.coachNote) return;
     setSaving(true);
+    setSaveError(null);
     const supabase = createBrowserClient();
-    await supabase
-      .from("session_exercise_coach_notes")
-      .upsert(
-        { session_exercise_id: exercise.sessionExerciseId, group_id: groupId, body: note, updated_at: new Date().toISOString() },
-        { onConflict: "session_exercise_id" }
-      );
+    const result = await checked(
+      supabase
+        .from("session_exercise_coach_notes")
+        .upsert(
+          { session_exercise_id: exercise.sessionExerciseId, group_id: groupId, body: note, updated_at: new Date().toISOString() },
+          { onConflict: "session_exercise_id" }
+        )
+        .select("session_exercise_id"),
+      { expectRows: true, message: "Couldn't save the note. Try again." }
+    );
     setSaving(false);
+    if (!result.ok) setSaveError(result.error);
   }
 
   // Immediate-persist, same convention as every other toggle in this app
   // — the checkbox's own on-screen state is the source of truth, so a
   // stale note body never accidentally overwrites what's already saved.
   async function handleVisibilityChange(next: boolean) {
+    const before = visibleToAthlete;
     setVisibleToAthlete(next);
+    setSaveError(null);
     const supabase = createBrowserClient();
-    await supabase
-      .from("session_exercise_coach_notes")
-      .upsert(
-        {
-          session_exercise_id: exercise.sessionExerciseId,
-          group_id: groupId,
-          body: note,
-          visible_to_athlete: next,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "session_exercise_id" }
-      );
+    const result = await checked(
+      supabase
+        .from("session_exercise_coach_notes")
+        .upsert(
+          {
+            session_exercise_id: exercise.sessionExerciseId,
+            group_id: groupId,
+            body: note,
+            visible_to_athlete: next,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "session_exercise_id" }
+        )
+        .select("session_exercise_id"),
+      { expectRows: true, message: "Couldn't change whether the client sees this note. It was not changed. Try again." }
+    );
+    if (!result.ok) {
+      // whether a client can read a coach's note is never left showing the wrong way
+      setVisibleToAthlete(before);
+      setSaveError(result.error);
+    }
   }
 
   const fields = orderTrackedFields(exercise.trackedFields);
@@ -152,6 +171,11 @@ export function RecapExerciseRow({
                 Show to client next time they do this exercise
               </span>
             </label>
+            {saveError && (
+              <p className="font-body text-xs text-rust mt-2" role="alert">
+                {saveError}
+              </p>
+            )}
           </div>
         </div>
       )}

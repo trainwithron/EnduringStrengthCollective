@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { checked } from "@/lib/checked-write";
 import { Trash2 } from "lucide-react";
 
 export interface ClientTagRow {
@@ -54,25 +55,47 @@ export function ClientTagManager({
   }
 
   async function handleDelete(tagId: string) {
+    const before = tags;
+    setError(null);
     setTags((prev) => prev.filter((t) => t.id !== tagId));
     const supabase = createBrowserClient();
-    await supabase.from("client_tags").delete().eq("id", tagId);
+    const removed = await checked(supabase.from("client_tags").delete().eq("id", tagId).select("id"), { expectRows: true, message: "Couldn't delete that tag. Nothing was changed. Try again." });
+    if (!removed.ok) {
+      setTags(before);
+      setError(removed.error);
+    }
   }
 
+  // Which tag decides who a revenue split applies to. The screen only changes after the database has kept it; if the second step fails, the first is put back so the organization is never left with no gating tag
+  // that the coach did not choose.
   async function handleSetGate(tagId: string, next: boolean) {
-    setTags((prev) => prev.map((t) => ({ ...t, gatesRevenueSplit: t.id === tagId ? next : false })));
+    const before = tags;
+    const previousGate = tags.find((t) => t.gatesRevenueSplit)?.id ?? null;
+    setError(null);
     const supabase = createBrowserClient();
     // Unset any other gating tag first — the partial unique index only
     // allows one true value per org at a time, so setting this one true
     // while another is still true would fail the constraint.
     if (next) {
-      await supabase
-        .from("client_tags")
-        .update({ gates_revenue_split: false })
-        .eq("organization_id", organizationId)
-        .neq("id", tagId);
+      const unset = await checked(supabase.from("client_tags").update({ gates_revenue_split: false }).eq("organization_id", organizationId).neq("id", tagId).select("id"), {
+        message: "Couldn't change the revenue split tag. Nothing was changed. Try again.",
+      });
+      if (!unset.ok) {
+        setError(unset.error);
+        return;
+      }
     }
-    await supabase.from("client_tags").update({ gates_revenue_split: next }).eq("id", tagId);
+    const set = await checked(supabase.from("client_tags").update({ gates_revenue_split: next }).eq("id", tagId).select("id"), {
+      expectRows: true,
+      message: "Couldn't change the revenue split tag. It was put back the way it was. Try again.",
+    });
+    if (!set.ok) {
+      if (next && previousGate && previousGate !== tagId) await supabase.from("client_tags").update({ gates_revenue_split: true }).eq("id", previousGate);
+      setTags(before);
+      setError(set.error);
+      return;
+    }
+    setTags((prev) => prev.map((t) => ({ ...t, gatesRevenueSplit: t.id === tagId ? next : false })));
   }
 
   return (

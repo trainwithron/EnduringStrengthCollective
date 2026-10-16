@@ -16,13 +16,17 @@ const MAX_ROWS = 3;
 
 export function ClientsRailWidget({ groupId }: { groupId: string }) {
   const [items, setItems] = useState<NeedsAttentionItem[] | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     async function run() {
-      const res = await fetch(`/api/coach/needs-attention?groupId=${groupId}`);
-      const data = await res.json().catch(() => ({ items: [] }));
-      if (!cancelled) setItems(data.items ?? []);
+      const res = await fetch(`/api/coach/needs-attention?groupId=${groupId}`).catch(() => null);
+      const data = res && res.ok ? await res.json().catch(() => null) : null;
+      if (cancelled) return;
+      // A failed check is never shown as "nothing needs a look".
+      if (!data || !Array.isArray(data.items)) setFailed(true);
+      else setItems(data.items);
     }
     run();
     return () => {
@@ -33,7 +37,9 @@ export function ClientsRailWidget({ groupId }: { groupId: string }) {
   return (
     <div>
       <RailWidgetHeader title="Needs attention" />
-      {items === null ? (
+      {failed ? (
+        <RailWidgetEmpty text="Couldn't check. Open Clients to see." />
+      ) : items === null ? (
         <RailWidgetLoading />
       ) : items.length === 0 ? (
         <RailWidgetEmpty text="Nothing needs a look right now." />

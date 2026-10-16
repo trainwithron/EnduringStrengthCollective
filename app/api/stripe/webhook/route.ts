@@ -256,11 +256,13 @@ async function createRevenueSplitTransfers(
         },
         { idempotencyKey: `split-${eventId}-${share.profileId}` }
       );
-      await supabase
+      // The transfer is already made. If remembering it fails, the failure is thrown so the event is sent again; the retry finds this transfer through the same idempotency key (never a second payout).
+      const { error: transferSaveError } = await supabase
         .from("revenue_split_transfers")
         .update({ stripe_transfer_id: transfer.id })
         .eq("stripe_event_id", eventId)
         .eq("coach_id", share.profileId);
+      if (transferSaveError) throw transferSaveError;
     }
   }
 
@@ -394,7 +396,8 @@ export async function POST(request: Request) {
             });
             if (packError) throw packError;
           } else if (typeof session.subscription === "string") {
-            await supabase.from("lift_off_subscriptions").upsert(
+            // A failed write is thrown so Stripe sends the event again: the coach has paid, so their plan must not stay unrecorded.
+            const { error: liftOffStartError } = await supabase.from("lift_off_subscriptions").upsert(
               {
                 coach_id: coachId,
                 stripe_subscription_id: session.subscription,
@@ -403,6 +406,7 @@ export async function POST(request: Request) {
               },
               { onConflict: "coach_id" }
             );
+            if (liftOffStartError) throw liftOffStartError;
           }
           break;
         }
@@ -648,10 +652,11 @@ export async function POST(request: Request) {
             ? "enabled"
             : "restricted"
           : "pending";
-        await supabase
+        const { error: connectStatusError } = await supabase
           .from("organization_memberships")
           .update({ stripe_connect_status: status })
           .eq("stripe_connect_account_id", account.id);
+        if (connectStatusError) throw connectStatusError;
         break;
       }
 

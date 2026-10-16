@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LoadFailed } from "@/components/ui/load-failed";
 import { redirectOneOnOneToAnchor } from "@/lib/coach-wide-redirect";
 import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
@@ -92,7 +93,7 @@ export default async function SessionLedgerPage(
   // Every athlete across every group in the org, each group's assigned
   // trainer(s), and every real session_credits balance in one batch —
   // three independent queries, not N+1 per group.
-  const [{ data: athleteRows }, { data: coachRows }, { data: creditRows }] = await Promise.all([
+  const [{ data: athleteRows, error: athleteError }, { data: coachRows }, { data: creditRows, error: creditError }] = await Promise.all([
     supabase
       .from("group_memberships")
       .select("group_id, profile_id, profiles ( full_name )")
@@ -161,7 +162,9 @@ export default async function SessionLedgerPage(
         </p>
       </div>
 
-      {rows.length === 0 ? (
+      {athleteError || creditError ? (
+        <LoadFailed />
+      ) : rows.length === 0 ? (
         <p className="font-body text-sm text-steel">No clients across your organization yet.</p>
       ) : (
         <div className="divide-y divide-steel/15 border-y border-steel/15">

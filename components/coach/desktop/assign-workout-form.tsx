@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { checked } from "@/lib/checked-write";
 
 export interface WorkoutOption {
   id: string;
@@ -29,9 +30,11 @@ export function AssignWorkoutForm({
   const [saving, setSaving] = useState(false);
   const [hasAssignment, setHasAssignment] = useState(!!initialWorkoutId || !!initialNote);
   const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSave() {
     setSaving(true);
+    setError(null);
     const supabase = createBrowserClient();
     const {
       data: { user },
@@ -41,30 +44,46 @@ export function AssignWorkoutForm({
       return;
     }
 
-    await supabase.from("workout_assignments").upsert(
-      {
-        athlete_id: athleteId,
-        group_id: groupId,
-        scheduled_date: date,
-        workout_id: workoutId || null,
-        note: note.trim() || null,
-        created_by: user.id,
-      },
-      { onConflict: "athlete_id,scheduled_date" }
+    // The workout is shown as assigned only after the database has kept it.
+    const result = await checked(
+      supabase
+        .from("workout_assignments")
+        .upsert(
+          {
+            athlete_id: athleteId,
+            group_id: groupId,
+            scheduled_date: date,
+            workout_id: workoutId || null,
+            note: note.trim() || null,
+            created_by: user.id,
+          },
+          { onConflict: "athlete_id,scheduled_date" }
+        )
+        .select("athlete_id"),
+      { expectRows: true, message: "Couldn't assign that workout. Nothing was changed. Try again." }
     );
-    setHasAssignment(true);
     setSaving(false);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    setHasAssignment(true);
     router.refresh();
   }
 
   async function handleClear() {
     setSaving(true);
+    setError(null);
     const supabase = createBrowserClient();
-    await supabase
-      .from("workout_assignments")
-      .delete()
-      .eq("athlete_id", athleteId)
-      .eq("scheduled_date", date);
+    const cleared = await checked(
+      supabase.from("workout_assignments").delete().eq("athlete_id", athleteId).eq("scheduled_date", date).select("athlete_id"),
+      { expectRows: true, message: "Couldn't clear that day. Nothing was changed. Try again." }
+    );
+    if (!cleared.ok) {
+      setError(cleared.error);
+      setSaving(false);
+      return;
+    }
     setWorkoutId("");
     setNote("");
     setHasAssignment(false);
@@ -113,6 +132,11 @@ export function AssignWorkoutForm({
           </button>
         )}
       </div>
+      {error && (
+        <p className="font-body text-xs text-rust" role="alert">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

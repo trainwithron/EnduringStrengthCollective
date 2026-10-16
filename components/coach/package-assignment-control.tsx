@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { checked } from "@/lib/checked-write";
 
 export interface PrivatePackageOption {
   id: string;
@@ -32,30 +33,41 @@ export function PackageAssignmentControl({
 }) {
   const [assignedIds, setAssignedIds] = useState(new Set(initialAssignedIds));
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function toggle(packageId: string) {
     setBusyId(packageId);
+    setError(null);
     const isAssigned = assignedIds.has(packageId);
     if (isAssigned) {
       // Removing an assignment has no side effect to run — still a
       // direct RLS write, same as before.
       const supabase = createBrowserClient();
-      await supabase
-        .from("package_assignments")
-        .delete()
-        .eq("coach_package_id", packageId)
-        .eq("athlete_id", athleteId);
+      const removed = await checked(
+        supabase.from("package_assignments").delete().eq("coach_package_id", packageId).eq("athlete_id", athleteId).select("coach_package_id"),
+        { expectRows: true, message: "Couldn't take that package away. Nothing was changed. Try again." }
+      );
+      if (!removed.ok) {
+        setError(removed.error);
+        setBusyId(null);
+        return;
+      }
     } else {
       // Assigning goes through a server route instead of a direct
       // insert — a linked program (package_program_linking_scoping.md)
       // needs duplicateProgram() to actually run, which only exists as
       // a real TypeScript function, not something reachable from a
       // plain RLS-gated insert.
-      await fetch("/api/coach/package-assignments", {
+      const res = await fetch("/api/coach/package-assignments", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ packageId, athleteId }),
-      });
+      }).catch(() => null);
+      if (!res || !res.ok) {
+        setError("Couldn't give that package to this client. Nothing was changed. Try again.");
+        setBusyId(null);
+        return;
+      }
     }
     setAssignedIds((prev) => {
       const next = new Set(prev);
@@ -71,6 +83,11 @@ export function PackageAssignmentControl({
       <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">
         Assigned to this client
       </p>
+      {error && (
+        <p className="font-body text-sm text-rust mb-2" role="alert">
+          {error}
+        </p>
+      )}
       {privatePackages.length === 0 ? (
         <p className="font-body text-sm text-steel">
           No private packages yet — create one from the Packages page to assign custom pricing here.

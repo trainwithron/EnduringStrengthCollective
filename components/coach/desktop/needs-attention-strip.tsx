@@ -26,15 +26,23 @@ export function NeedsAttentionStrip({ coachId, groupId }: { coachId: string; gro
   const groupIds = useOrgGroupIds(groupId);
   const [items, setItems] = useState<NeedsAttentionItem[] | null>(null);
   const [idleContent, setIdleContent] = useState<IdleSlotContent | null>(null);
+  // "Nothing needs attention" is only said when the check really came back empty; a failed check says so.
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!groupIds || groupIds.length === 0) return;
     let cancelled = false;
     async function run() {
-      const res = await fetch(`/api/coach/needs-attention?groupIds=${groupIds!.join(",")}`);
-      const data = await res.json().catch(() => ({ items: [] }));
+      const res = await fetch(`/api/coach/needs-attention?groupIds=${groupIds!.join(",")}`).catch(() => null);
+      const data = res && res.ok ? await res.json().catch(() => null) : null;
       if (cancelled) return;
-      const realItems: NeedsAttentionItem[] = data.items ?? [];
+      if (!data || !Array.isArray(data.items)) {
+        setFailed(true);
+        return;
+      }
+      setFailed(false);
+      const realItems: NeedsAttentionItem[] = data.items;
       setItems(realItems);
 
       if (realItems.length === 0) {
@@ -74,7 +82,25 @@ export function NeedsAttentionStrip({ coachId, groupId }: { coachId: string; gro
     return () => {
       cancelled = true;
     };
-  }, [coachId, groupId, groupIds]);
+  }, [coachId, groupId, groupIds, attempt]);
+
+  if (failed) {
+    return (
+      <div className="border border-rust/40 bg-surface/30 p-3 mb-3" role="alert">
+        <p className="font-body text-xs text-chalk leading-snug">Couldn&apos;t check what needs your attention.</p>
+        <button
+          type="button"
+          onClick={() => {
+            setFailed(false);
+            setAttempt((n) => n + 1);
+          }}
+          className="mt-1 min-h-9 font-body text-xs text-rust underline underline-offset-2"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
 
   if (items === null) return null; // Still loading — no flash of empty state.
 

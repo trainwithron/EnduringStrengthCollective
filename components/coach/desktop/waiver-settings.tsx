@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { checked } from "@/lib/checked-write";
 import { DEFAULT_WAIVER_TEXT } from "@/lib/intake-waiver";
 import { WaiverPdfUpload } from "./waiver-pdf-upload";
 
@@ -17,14 +18,21 @@ export function WaiverSettings({
   const [text, setText] = useState(initialWaiverText ?? DEFAULT_WAIVER_TEXT);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
+  // "Saved." appears only when the database kept the text (an organization the person does not run would come back with no row and no error).
   async function handleBlur() {
     setSaving(true);
     setSaved(false);
+    setError(null);
     const supabase = createBrowserClient();
-    await supabase.from("organizations").update({ waiver_text: text }).eq("id", organizationId);
+    const result = await checked(supabase.from("organizations").update({ waiver_text: text }).eq("id", organizationId).select("id"), {
+      expectRows: true,
+      message: "Couldn't save the waiver text. It was not changed. Try again.",
+    });
     setSaving(false);
-    setSaved(true);
+    if (result.ok) setSaved(true);
+    else setError(result.error);
   }
 
   return (
@@ -52,6 +60,11 @@ export function WaiverSettings({
         <p className="font-body text-xs text-steel mt-1">
           {saving ? "Saving…" : saved ? "Saved." : ""}
         </p>
+        {error && (
+          <p className="font-body text-xs text-rust mt-1" role="alert">
+            {error}
+          </p>
+        )}
       </div>
 
       <p className="font-body text-xs text-steel max-w-[65ch]">
