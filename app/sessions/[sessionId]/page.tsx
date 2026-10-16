@@ -22,6 +22,7 @@ import { findDemo, type DemoRow } from "@/lib/exercise-demo";
 import { getReadForViewer, type ReadForViewer } from "@/lib/read-content/for-viewer";
 import { athleteIsMinor } from "@/lib/youth-block";
 import { CoachModeBar } from "@/components/coach/mobile/coach-mode-bar";
+import { shareHref } from "@/lib/share-token";
 
 export default async function SessionPage(
   props: {
@@ -137,6 +138,15 @@ export default async function SessionPage(
   const exerciseSwipeDirection: "vertical" | "horizontal" | null =
     (swipeProfile?.exercise_swipe_direction as "vertical" | "horizontal" | null) ?? null;
   const sharePostId: string | null = (workoutLogForShare?.posts as any)?.id ?? null;
+  // The workout card is on every finished workout, for the client and the coach: its feed post when there is one, else the card built from the workout itself (a signed link).
+  let workoutCardHref: string | null = sharePostId ? `/share/${sharePostId}` : null;
+  if (!workoutCardHref && workoutLogForShare?.id) {
+    try {
+      workoutCardHref = shareHref(workoutLogForShare.id as string);
+    } catch {
+      workoutCardHref = null;
+    }
+  }
 
   // Prescribed values for the "extra" fields (RPE, RIR, tempo, etc.) —
   // shown as a placeholder hint during logging, never pre-committed into
@@ -597,12 +607,9 @@ export default async function SessionPage(
             rest off. The client can already resume this exact session
             the moment they open it themselves (existingSession handles
             that); this just makes sure they know to. */}
-        {sharePostId && (
-          <Link
-            href={`/share/${sharePostId}`}
-            className="inline-block mt-3 font-body text-xs text-rust"
-          >
-            View share card &rarr;
+        {workoutCardHref && (
+          <Link href={workoutCardHref} className="inline-flex items-center min-h-11 mt-3 font-body text-sm text-rust underline underline-offset-2">
+            View workout card &rarr;
           </Link>
         )}
       </header>
