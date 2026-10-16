@@ -222,26 +222,29 @@ describe("M11 and M12 creating a group", () => {
           calls.push(`insert ${table}`);
           return Promise.resolve({ error: table === "group_memberships" && seatFails ? { message: "no" } : null });
         },
-        delete: () => ({ eq: (_c: string, id: string) => (calls.push(`delete ${table} ${id.length > 0 ? "x" : ""}`), Promise.resolve({ error: null })) }),
       }),
     };
     return { db, calls };
   }
-  it("the creator is seated as coach; if the seat cannot be made the group is removed again", async () => {
+  it("the creator is seated as coach; if the seat cannot be made the group is taken back through the server (a signed-in person cannot delete a group)", async () => {
+    const discarded: string[] = [];
+    const discard = async (id: string) => (discarded.push(id), true);
     const good = fakeGroups(false);
-    const made = await createGroupWithCoach(good.db, { userId: "u", name: "Team", organizationId: "o", kind: "team" });
+    const made = await createGroupWithCoach(good.db, { userId: "u", name: "Team", organizationId: "o", kind: "team", discard });
     expect(made.id).toBeTruthy();
     expect(good.calls).toEqual(["insert groups", "insert group_memberships"]);
+    expect(discarded).toEqual([]);
     const bad = fakeGroups(true);
-    const failed = await createGroupWithCoach(bad.db, { userId: "u", name: "Team", organizationId: "o", kind: "team" });
+    const failed = await createGroupWithCoach(bad.db, { userId: "u", name: "Team", organizationId: "o", kind: "team", discard });
     expect(failed).toEqual({ id: null, error: "Couldn't create the group. Try again." });
-    expect(bad.calls).toEqual(["insert groups", "insert group_memberships", "delete groups x"]);
+    expect(bad.calls).toEqual(["insert groups", "insert group_memberships"]); // no direct delete from the browser
+    expect(discarded).toHaveLength(1);
   });
   it("closing the add-client box before anyone was added removes the empty space (never one that has a client)", () => {
     const add = src("components/coach/desktop/add-client-button.tsx");
     expect(add).toContain("if (createdGroupIdRef.current && !added) void removeEmptySpace(createdGroupIdRef.current);");
-    expect(add).toContain('.eq("role", "athlete")');
-    expect(add).toContain("if ((count ?? 0) === 0)");
+    expect(add).toContain("await discardEmptyGroup(groupIdToCheck)");
+    expect(add).not.toContain('.from("groups").delete()');
   });
 });
 

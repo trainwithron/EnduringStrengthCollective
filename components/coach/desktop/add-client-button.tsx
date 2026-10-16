@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { createGroupWithCoach } from "@/lib/create-group";
+import { discardEmptyGroup } from "@/lib/discard-empty-group";
 import { useRouter } from "next/navigation";
 import { UserPlus } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -76,10 +77,9 @@ export function AddClientButton({
   }
 
   // Closing the box after the client's space was made but before anyone was added to it: the empty space is removed, so abandoned tries do not pile up as empty groups. A space that has a client is never touched.
+  // (Through the server, which checks it is new, yours and empty: a signed-in person cannot delete a group directly.)
   async function removeEmptySpace(groupIdToCheck: string) {
-    const supabase = createBrowserClient();
-    const { count } = await supabase.from("group_memberships").select("profile_id", { count: "exact", head: true }).eq("group_id", groupIdToCheck).eq("role", "athlete");
-    if ((count ?? 0) === 0) await supabase.from("groups").delete().eq("id", groupIdToCheck);
+    await discardEmptyGroup(groupIdToCheck);
   }
 
   function reset() {

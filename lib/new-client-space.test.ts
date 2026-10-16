@@ -16,7 +16,7 @@ describe("Adding a client: the creator of a new group seats themselves", () => {
     // every screen makes the group through the one helper, which seats the creator as coach and removes the group again if the seat cannot be made
     const helper = read("lib/create-group.ts");
     expect(helper).toContain('from("group_memberships").insert({ group_id: id, profile_id: userId, role: "coach" })');
-    expect(helper).toContain('await supabase.from("groups").delete().eq("id", id)');
+    expect(helper).toContain("await discard(id);");
     for (const p of ["components/coach/desktop/add-client-button.tsx", "components/coach/desktop/group-switcher.tsx", "components/coach/desktop/workspace-menu.tsx", "components/coach/mobile/spot-clients-groups-panel.tsx", "components/coach/change-client-group-control.tsx"]) {
       expect(read(p), p).toContain("createGroupWithCoach(");
     }
