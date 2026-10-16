@@ -63,7 +63,7 @@ describe("the pieces that make the choice stick", () => {
     expect(page).not.toContain("full_name");
     const route = read("app/choose-organization/select/route.ts");
     expect(route).toContain("groups.filter((g) => g.orgId === orgId)");
-    expect(route).toContain('rawNext.startsWith("/") && !rawNext.startsWith("//")');
+    expect(route).toContain('safeNextPath(rawNext, url.origin, "/dashboard")');
   });
   it("Ask Spot does not guess an organization either", () => {
     expect(read("app/api/collective-intelligence/chat/route.ts")).toContain("!activeAnchor.needsChoice");

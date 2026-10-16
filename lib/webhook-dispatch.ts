@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isSafeWebhookUrl, WEBHOOK_TIMEOUT_MS } from "@/lib/webhook-url";
+import { hostResolvesPublic, isSafeWebhookUrl, WEBHOOK_TIMEOUT_MS } from "@/lib/webhook-url";
+import { lookup } from "node:dns/promises";
 
 export type WebhookEventType = "client_added" | "workout_completed" | "pr_hit" | "package_purchased";
 
@@ -69,7 +70,7 @@ export async function attemptWebhookDelivery(
   let delivered = false;
   // The address is checked again right before the call (a coach can write the table directly), the call gives up after a few seconds, and a redirect is not followed: this runs inside
   // the Stripe webhook and other requests that must not hang on someone else's slow server, and it should not be made to reach an address inside our own network (a name that only resolves to a private address is not caught by the address check; the call is a one-way post whose answer is never shown).
-  if (isSafeWebhookUrl(params.targetUrl)) {
+  if (isSafeWebhookUrl(params.targetUrl) && (await hostResolvesPublic(params.targetUrl, async (h) => (await lookup(h, { all: true })).map((r) => r.address)))) {
     try {
       const res = await fetch(params.targetUrl, {
         method: "POST",

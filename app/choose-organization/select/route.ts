@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { safeNextPath } from "@/lib/safe-next";
 import { createServerClient } from "@/lib/supabase/server";
 import { getCoachedGroups, LAST_WORKSPACE_GROUP_COOKIE, pickAnchorGroup } from "@/lib/coach-groups";
 
@@ -14,7 +15,7 @@ export async function GET(request: Request) {
 
   const orgId = url.searchParams.get("org") ?? "";
   const rawNext = url.searchParams.get("next") ?? "/dashboard";
-  const next = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/dashboard";
+  const next = safeNextPath(rawNext, url.origin, "/dashboard");
 
   const groups = await getCoachedGroups(supabase, user.id);
   const inOrg = groups.filter((g) => g.orgId === orgId);

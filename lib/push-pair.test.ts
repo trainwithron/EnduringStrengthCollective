@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { clampPush, mayPushTo } from "@/lib/push-pair";
 
 // A stand-in database: tables of rows, filtered by every .eq() in the chain.
@@ -46,14 +48,19 @@ describe("mayPushTo", () => {
   it("does not let one teammate push another (neither is the coach)", async () => {
     expect(await mayPushTo(db, "client", "teammate")).toBe(false);
   });
-  it("lets a coach and the organization owner reach each other, but not two ordinary coaches", async () => {
-    expect(await mayPushTo(db, "coach", "owner")).toBe(true);
-    expect(await mayPushTo(db, "owner", "coach")).toBe(true);
+  it("no longer lets an organization owner or admin push free text to a coach (or the reverse), or two ordinary coaches", async () => {
+    expect(await mayPushTo(db, "coach", "owner")).toBe(false);
+    expect(await mayPushTo(db, "owner", "coach")).toBe(false);
     expect(await mayPushTo(db, "coach", "coach2")).toBe(false);
   });
-  it("lets accepted training partners reach each other, in both directions", async () => {
-    expect(await mayPushTo(db, "client", "other-client")).toBe(true);
-    expect(await mayPushTo(db, "other-client", "client")).toBe(true);
+  it("no longer lets accepted training partners push each other free text (their requests are server notices)", async () => {
+    expect(await mayPushTo(db, "client", "other-client")).toBe(false);
+    expect(await mayPushTo(db, "other-client", "client")).toBe(false);
+  });
+  it("the route limits pushes to one person to ten an hour and only opens in-app paths", () => {
+    const route = readFileSync(join(__dirname, "..", "app/api/push/send/route.ts"), "utf8");
+    expect(route).toContain('rateLimitResponse("push-to", profileId, 10, 3600)');
+    expect(route).toContain("safePushPath(payload.url)");
   });
   it("refuses someone they share nothing with", async () => {
     expect(await mayPushTo(db, "stranger", "coach")).toBe(false);

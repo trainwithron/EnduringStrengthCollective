@@ -73,13 +73,15 @@ export async function POST(request: Request) {
   }
   if (tier === null || tierForBalance(balance) === null) return NextResponse.json({ notified: null });
 
-  const [{ data: athleteProfile }, { data: coachRows }, { data: group }] = await Promise.all([
+  const [{ data: athleteProfile }, { data: coachRows }, { data: group }, { data: athleteSeat }] = await Promise.all([
     db.from("profiles").select("full_name").eq("id", athleteId).maybeSingle(),
     db.from("group_memberships").select("profile_id").eq("group_id", groupId).eq("role", "coach"),
     db.from("groups").select("organization_id").eq("id", groupId).maybeSingle(),
+    db.from("group_memberships").select("private_from_org").eq("group_id", groupId).eq("profile_id", athleteId).eq("role", "athlete").maybeSingle(),
   ]);
   const recipients = new Set<string>((coachRows ?? []).map((r: any) => r.profile_id as string));
-  if (group?.organization_id) {
+  // The organization owner is not told about a client who is private from the organization.
+  if (group?.organization_id && !(athleteSeat as { private_from_org?: boolean } | null)?.private_from_org) {
     const { data: ownerRows } = await db
       .from("organization_memberships")
       .select("profile_id")

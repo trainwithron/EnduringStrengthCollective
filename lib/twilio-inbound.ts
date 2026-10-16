@@ -28,11 +28,12 @@ export type SmsKeyword = "stop" | "start" | "help" | "other";
 
 // Twilio's standard opt-out / opt-in / help keywords (case-insensitive,
 // whole message, surrounding whitespace ignored).
-const STOP_WORDS = new Set(["stop", "stopall", "unsubscribe", "cancel", "end", "quit"]);
+// Punctuation and extra spaces do not matter ("STOP.", "Stop!", " stop  all "), and the other common ways of saying it count too (REVOKE, OPT OUT, OPTOUT).
+const STOP_WORDS = new Set(["stop", "stopall", "stop all", "unsubscribe", "cancel", "end", "quit", "revoke", "optout", "opt out"]);
 const START_WORDS = new Set(["start", "yes", "unstop"]);
 
 export function classifySmsKeyword(body: string | null | undefined): SmsKeyword {
-  const word = (body ?? "").trim().toLowerCase();
+  const word = (body ?? "").toLowerCase().replace(/[^a-z]+/g, " ").trim();
   if (STOP_WORDS.has(word)) return "stop";
   if (START_WORDS.has(word)) return "start";
   if (word === "help") return "help";

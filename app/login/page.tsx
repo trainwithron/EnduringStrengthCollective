@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
+import { safeNextPath } from "@/lib/safe-next";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -62,8 +63,9 @@ function LoginForm() {
     // Honor ?next= from the auth middleware redirect, but only a same-origin
     // relative path — never forward an external URL from the query string.
     const next = searchParams.get("next");
-    if (next && next.startsWith("/") && !next.startsWith("//")) {
-      router.push(next);
+    const safeNext = next ? safeNextPath(next, window.location.origin, "") : "";
+    if (safeNext) {
+      router.push(safeNext);
       router.refresh();
       return;
     }

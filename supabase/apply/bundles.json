@@ -301,6 +301,15 @@
   "file": "apply-release-bw-all.sql"
  },
  {
+  "id": "release-ck",
+  "name": "Release CK (a text STOP sticks to the phone number; shared lists owner-only; private clients stay private from organization admins; ten more tables refuse non-member rows; audit trail for access-changing rows; run in order 134, 135, BEFORE the code that goes with it is live)",
+  "steps": [
+   "134",
+   "135"
+  ],
+  "file": "apply-release-ck-all.sql"
+ },
+ {
   "id": "release-cj",
   "name": "Release CJ (minors and health closures: training partners, parent links, weigh-ins, scan photos and saves, consent notice; run BEFORE the code that goes with it is live)",
   "steps": [

@@ -56,3 +56,14 @@ describe("twimlResponse", () => {
     expect(twimlResponse("a < b & c")).toContain("<Message>a &lt; b &amp; c</Message>");
   });
 });
+
+describe("classifySmsKeyword is tolerant of how people actually type", () => {
+  it("punctuation, case and spacing do not hide a STOP", () => {
+    for (const w of ["STOP.", "Stop!", " stop  all ", "S T O P".replace(/ /g, ""), "Opt out", "OPTOUT", "revoke", "End.", "Unsubscribe!!"]) expect(classifySmsKeyword(w), w).toBe("stop");
+    expect(classifySmsKeyword("START!")).toBe("start");
+    expect(classifySmsKeyword("Help?")).toBe("help");
+  });
+  it("a sentence that merely contains a keyword is still not one", () => {
+    for (const w of ["please stop texting me", "I will start monday", "no help needed", ""]) expect(classifySmsKeyword(w), w).toBe("other");
+  });
+});

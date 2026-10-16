@@ -40,6 +40,12 @@ export async function loadUnclaimedClient(
   if (profile.claimed_at) {
     return { ok: false, status: 409, error: "They've already signed in — this is their account now." };
   }
+  // "Claimed" is only stamped by the claim flow. A client who signed in any other way (a password reset, an emailed link) has no stamp but HAS signed in; the sign-in record the login service keeps is the truth, so a coach
+  // can never mint a link for, or change the email of, an account its owner has already used.
+  const { data: authUser } = await serviceRole.auth.admin.getUserById(athleteId);
+  if (authUser?.user?.last_sign_in_at) {
+    return { ok: false, status: 409, error: "They've already signed in — this is their account now." };
+  }
   return { ok: true, fullName: profile.full_name };
 }
 

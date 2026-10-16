@@ -4,6 +4,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { sendPushToProfile } from "@/lib/send-push";
 import { clampPush, mayPushTo } from "@/lib/push-pair";
 import { rateLimitResponse } from "@/lib/rate-limit";
+import { safePushPath } from "@/lib/push-url";
 
 export async function POST(request: Request) {
   const supabase = await createServerClient();
@@ -35,6 +36,9 @@ export async function POST(request: Request) {
   if (!(await mayPushTo(db, user.id, profileId))) {
     return NextResponse.json({ sent: 0 });
   }
-  const sent = await sendPushToProfile(db, profileId, title, body, typeof payload.url === "string" ? payload.url : "/");
+  // One person is never pinged more than ten times an hour through this route, whoever sends.
+  const limitedTarget = await rateLimitResponse("push-to", profileId, 10, 3600);
+  if (limitedTarget) return limitedTarget;
+  const sent = await sendPushToProfile(db, profileId, title, body, safePushPath(payload.url));
   return NextResponse.json({ sent });
 }

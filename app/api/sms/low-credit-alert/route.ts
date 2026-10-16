@@ -39,7 +39,7 @@ export async function POST(request: Request) {
 
   const { data: athleteMember } = await serviceRole
     .from("group_memberships")
-    .select("profile_id")
+    .select("profile_id, private_from_org")
     .eq("group_id", groupId)
     .eq("profile_id", athleteId)
     .eq("role", "athlete")
@@ -48,10 +48,13 @@ export async function POST(request: Request) {
 
   const { data: creditsRow } = await serviceRole
     .from("session_credits")
-    .select("balance")
+    .select("balance, payment_hold")
     .eq("athlete_id", athleteId)
     .eq("group_id", groupId)
     .maybeSingle();
+
+  // A client the coach has put on hold is never alerted about (the push route has always skipped them).
+  if ((creditsRow as { payment_hold?: boolean } | null)?.payment_hold) return NextResponse.json({ sent: false, reason: "payment_hold" });
 
   const balance = creditsRow?.balance;
   const tier = balance !== undefined && balance !== null ? tierForBalance(balance) : null;
@@ -66,7 +69,8 @@ export async function POST(request: Request) {
   const athleteName = athleteProfile?.full_name ?? "A client";
   const recipients = new Set<string>((coachRows ?? []).map((r) => r.profile_id));
 
-  if (group?.organization_id) {
+  // The organization owner is not told about a client who is private from the organization.
+  if (group?.organization_id && !(athleteMember as { private_from_org?: boolean }).private_from_org) {
     const { data: ownerRows } = await serviceRole
       .from("organization_memberships")
       .select("profile_id")

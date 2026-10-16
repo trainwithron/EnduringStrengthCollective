@@ -29,3 +29,32 @@ export function isSafeWebhookUrl(raw: string | null | undefined): boolean {
   if (/(^|\.)(localhost|local|internal|localdomain|lan|home|corp|intranet)$/.test(host)) return false;
   return true;
 }
+
+// The address check above only reads the NAME. A name can point at a private address, so right before a call the name is looked up and every address it resolves to must be public. (A name that changes its
+// answer between this lookup and the call is not caught by this alone; the call has a short timeout, follows no redirects and shows nobody its answer.)
+export function isPrivateAddress(address: string): boolean {
+  const a = address.toLowerCase().replace(/^\[|\]$/g, "");
+  if (a.includes(":")) {
+    const mapped = /^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.exec(a);
+    if (mapped) return isPrivateIpv4(mapped[1]);
+    return a === "::" || a === "::1" || /^f[cd][0-9a-f]{2}:/.test(a) || /^fe[89ab][0-9a-f]:/.test(a) || /^ff[0-9a-f]{2}:/.test(a);
+  }
+  return isPrivateIpv4(a);
+}
+
+export type Resolver = (host: string) => Promise<string[]>;
+
+export async function hostResolvesPublic(rawUrl: string, resolve: Resolver): Promise<boolean> {
+  let host: string;
+  try {
+    host = new URL(rawUrl).hostname.toLowerCase().replace(/\.$/, "");
+  } catch {
+    return false;
+  }
+  try {
+    const addresses = await resolve(host);
+    return addresses.length > 0 && addresses.every((x) => !isPrivateAddress(x));
+  } catch {
+    return false;
+  }
+}

@@ -42,7 +42,7 @@ describe("isSafeWebhookUrl", () => {
   it("is checked when saved and again before every call, which cannot hang or follow a redirect", () => {
     expect(read("app/api/zapier/subscriptions/route.ts")).toContain("isSafeWebhookUrl(target_url)");
     const d = read("lib/webhook-dispatch.ts");
-    expect(d).toContain("if (isSafeWebhookUrl(params.targetUrl))");
+    expect(d).toContain("if (isSafeWebhookUrl(params.targetUrl) && (await hostResolvesPublic(params.targetUrl");
     expect(d).toContain('redirect: "error"');
     expect(d).toContain("AbortSignal.timeout(WEBHOOK_TIMEOUT_MS)");
   });
