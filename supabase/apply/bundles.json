@@ -301,6 +301,23 @@
   "file": "apply-release-bw-all.sql"
  },
  {
+  "id": "release-ch",
+  "name": "Release CH (moving a client moves all of their records; program-day and session exercise names can never be only numbers or carry sets and reps; run BEFORE the code that goes with it is live)",
+  "steps": [
+   "128",
+   "129"
+  ],
+  "file": "apply-release-ch-all.sql"
+ },
+ {
+  "id": "release-cg",
+  "name": "Release CG (the exercise library refuses names made only of numbers; run BEFORE the code that goes with it is live)",
+  "steps": [
+   "127"
+  ],
+  "file": "apply-release-cg-all.sql"
+ },
+ {
   "id": "release-cf",
   "name": "Release CF (a client's health screening line on Overview stays gone once acknowledged, until a new flagged answer; run BEFORE the code that goes with it is live)",
   "steps": [

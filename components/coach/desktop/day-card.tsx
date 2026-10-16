@@ -1,7 +1,7 @@
 "use client";
 
 import { confirmDialog } from "@/components/shared/confirm-dialog";
-import { usableExerciseNames } from "@/lib/exercise-name-guard";
+import { exerciseNameProblem, usableExerciseNames } from "@/lib/exercise-name-guard";
 import type { DemoRow } from "@/lib/exercise-demo";
 import { NONE_COLLAPSED, allCollapsed, toggleAll, toggleCollapsed } from "@/lib/collapse-state";
 import { ClientPreviewButton } from "@/components/coach/desktop/client-preview";
@@ -302,6 +302,12 @@ export function DayCard({
     const parsed = parseQuickEntry(quickEntryDraft);
     if (!parsed) {
       setQuickEntryError('Try "Exercise 3x8", "Exercise 3x8 @7" or "Plank 60s"');
+      return;
+    }
+    // "10 3x8" would read as an exercise named 10: a name that is only numbers (or carries sets and reps) is never added.
+    const nameProblem = exerciseNameProblem(parsed.exerciseName);
+    if (nameProblem) {
+      setQuickEntryError(nameProblem);
       return;
     }
     if (addItemBusy) return;

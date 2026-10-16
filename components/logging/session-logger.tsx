@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { cleanExerciseName, exerciseNameProblem } from "@/lib/exercise-name-guard";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { SetSaveBanner, SetSaveProvider } from "./set-save-context";
 import type { SessionExerciseEntry, SetLogEntry } from "@/lib/types";
@@ -132,6 +133,7 @@ export function SessionLogger({
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [newExerciseName, setNewExerciseName] = useState("");
   const [addExerciseBusy, setAddExerciseBusy] = useState(false);
+  const [addNameProblem, setAddNameProblem] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // A client can bolt on extras mid-session (machine's free, feeling
@@ -199,8 +201,15 @@ export function SessionLogger({
   }
 
   async function handleAddExercise() {
-    const name = newExerciseName.trim();
+    const name = cleanExerciseName(newExerciseName);
     if (!name || addExerciseBusy || addedCount >= MAX_ADDED_EXERCISES) return;
+    // Never an exercise named with only numbers or with its sets and reps.
+    const problem = exerciseNameProblem(name);
+    if (problem) {
+      setAddNameProblem(problem);
+      return;
+    }
+    setAddNameProblem(null);
     setAddExerciseBusy(true);
     try {
       const supabase = createBrowserClient();
@@ -351,12 +360,15 @@ export function SessionLogger({
               You&apos;ve added the max of {MAX_ADDED_EXERCISES} extra exercises for this workout.
             </p>
           ) : addingExercise ? (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <input
                 type="text"
                 autoFocus
                 value={newExerciseName}
-                onChange={(e) => setNewExerciseName(e.target.value)}
+                onChange={(e) => {
+                  setNewExerciseName(e.target.value);
+                  setAddNameProblem(null);
+                }}
                 placeholder="Exercise name"
                 aria-label="Exercise name"
                 className="flex-1 h-11 bg-surface border border-steel/30 text-chalk px-3 font-body focus:outline-none focus:border-rust"
@@ -369,6 +381,11 @@ export function SessionLogger({
               >
                 Add
               </button>
+              {addNameProblem && (
+                <p className="basis-full font-body text-xs text-rust" role="alert">
+                  {addNameProblem}
+                </p>
+              )}
             </div>
           ) : (
             <div className="space-y-2">

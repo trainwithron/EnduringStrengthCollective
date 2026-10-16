@@ -15,6 +15,7 @@ import {
   type HistoricalEntryGroup,
 } from "@/lib/exercise-history-import";
 import { recomputeTrainingMaxes, settleImportedHistory } from "@/lib/unclear-points";
+import { NUMERIC_NAMES_MESSAGE, exerciseNameProblem } from "@/lib/exercise-name-guard";
 
 function todayDateKey(): string {
   return new Date().toISOString().slice(0, 10);
@@ -110,6 +111,8 @@ export function ExerciseHistoryUploader({
   const [csvError, setCsvError] = useState<string | null>(null);
   const [csvRows, setCsvRows] = useState<ParsedHistoryRow[]>([]);
   const [csvSkippedCount, setCsvSkippedCount] = useState(0);
+  // After an import where some rows did not save: what was saved, and what is still waiting (the file stays open on only those rows).
+  const [csvNotice, setCsvNotice] = useState<string | null>(null);
 
   async function handleCsvFile(file: File) {
     setCsvStatus("idle");
@@ -137,6 +140,7 @@ export function ExerciseHistoryUploader({
       return;
     }
 
+    setCsvNotice(null);
     const { rows: parsed, skippedCount, units } = parseHistoryRows(body, mapping, { headerUnit: headerUnitOf(header, mapping), chosenUnit: csvUnit });
     // A file that mixes pounds and kilograms is imported with the odd rows marked unclear, and only a coach can write that mark: an athlete's own upload of such a file is stopped.
     if (units.mixed && !viewerIsCoach) {
@@ -150,6 +154,14 @@ export function ExerciseHistoryUploader({
       return;
     }
 
+    // A name that is only numbers, or carries sets and reps, means the Exercise column was read wrongly: nothing is imported.
+    const badName = parsed.find((r) => exerciseNameProblem(r.exerciseName));
+    if (badName) {
+      setCsvStatus("error");
+      setCsvError(`${NUMERIC_NAMES_MESSAGE} One of the names read was "${badName.exerciseName}".`);
+      return;
+    }
+
     setCsvRows(parsed);
     setCsvSkippedCount(skippedCount);
     setCsvStatus("reviewing");
@@ -158,13 +170,26 @@ export function ExerciseHistoryUploader({
   async function handleCsvConfirm() {
     setCsvStatus("importing");
     const supabase = createBrowserClient();
-    await importHistoryRows(supabase, { athleteId, groupId, rows: csvRows });
-    await settleImportedHistory(supabase, groupId, athleteId);
+    const result = await importHistoryRows(supabase, { athleteId, groupId, rows: csvRows });
+    if (result.error) {
+      setCsvStatus("error");
+      setCsvError(result.error);
+      return;
+    }
+    if (result.importedCount > 0) await settleImportedHistory(supabase, groupId, athleteId);
+    await refreshEntries();
+    window.dispatchEvent(new Event("history-entries-changed"));
+    if (result.failedRows.length > 0) {
+      // Never "done" when some did not save: say how many did, which dates did not, and keep the file open on just those rows.
+      setCsvRows(result.failedRows);
+      setCsvNotice(`${result.importedCount} of ${result.totalRows} saved. These dates did not save: ${result.failedDates.join(", ")}. Press Import again to try only those; what was saved is not repeated.`);
+      setCsvStatus("reviewing");
+      return;
+    }
+    setCsvNotice(null);
     setCsvRows([]);
     setCsvSkippedCount(0);
     setCsvStatus("idle");
-    await refreshEntries();
-    window.dispatchEvent(new Event("history-entries-changed"));
   }
 
   // ---- Review / delete ------------------------------------------------
@@ -284,6 +309,11 @@ export function ExerciseHistoryUploader({
         )}
         {csvStatus === "reviewing" && (
           <div>
+            {csvNotice && (
+              <p className="font-body text-sm text-rust mb-2" role="alert">
+                {csvNotice}
+              </p>
+            )}
             <p className="font-body text-sm text-chalk mb-2">
               Ready to import {csvRows.length} entr{csvRows.length === 1 ? "y" : "ies"}
               {csvSkippedCount > 0 ? ` (${csvSkippedCount} row${csvSkippedCount === 1 ? "" : "s"} skipped)` : ""}.

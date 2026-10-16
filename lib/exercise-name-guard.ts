@@ -88,3 +88,14 @@ export function splitPrescriptionName(text: string): SplitName | null {
   if (!parsed || isBadExerciseName(parsed.exerciseName)) return null;
   return { name: capitalizeWords(parsed.exerciseName.trim()), sets: parsed.sets, reps: parsed.reps, timeSeconds: parsed.timeSeconds, rpe: parsed.rpe };
 }
+
+// The one cleaning and checking every writer of an exercise name uses (a program day, a logged session, an import): spaces tidied, and a name that is empty, only numbers, or carrying sets and reps refused with a plain message.
+export function cleanExerciseName(raw: string | null | undefined): string {
+  return (raw ?? "").replace(/\s+/g, " ").trim();
+}
+
+export function exerciseNameProblem(raw: string | null | undefined): string | null {
+  const name = cleanExerciseName(raw);
+  if (!name) return "Give the exercise a name.";
+  return isBadExerciseName(name) ? badExerciseNameMessage(name) : null;
+}

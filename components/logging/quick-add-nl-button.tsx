@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { exerciseNameProblem } from "@/lib/exercise-name-guard";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { SessionExerciseEntry } from "@/lib/types";
 
@@ -62,6 +63,11 @@ export function QuickAddNlButton({
 
   async function handleConfirm() {
     if (!draft || draft.length === 0) return;
+    const badName = draft.find((ex) => exerciseNameProblem(ex.exerciseName));
+    if (badName) {
+      setError(exerciseNameProblem(badName.exerciseName));
+      return;
+    }
     setSaving(true);
     try {
       const supabase = createBrowserClient();

@@ -139,11 +139,11 @@ export function ChangeClientGroupControl({
         setMoving(false);
         return;
       }
-      const { data: membership } = await supabase
-        .from("organization_memberships")
-        .select("organization_id")
-        .eq("profile_id", user.id)
-        .maybeSingle();
+      // The organization of the group the client is in now (a coach in two organizations has two memberships; a lookup by person alone would fail or pick the wrong one).
+      const { data: current } = await supabase.from("groups").select("organization_id").eq("id", currentGroupId).maybeSingle();
+      const { data: membership } = current?.organization_id
+        ? await supabase.from("organization_memberships").select("organization_id").eq("organization_id", current.organization_id).eq("profile_id", user.id).maybeSingle()
+        : { data: null };
       if (!membership) {
         setError("Couldn't find your organization — try again.");
         setMoving(false);

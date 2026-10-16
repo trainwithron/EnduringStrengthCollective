@@ -3,6 +3,7 @@
 // the program's own workout and its lines to the program's own exercises (so the day shows as done), plus duration, the per-exercise note, and set time, height and distance.
 // An import is recognised again by the second in its time stamp (lib/fitpros-history.ts), so running it twice never doubles anything and "Undo this import" removes only these sessions.
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { cleanExerciseName, exerciseNameProblem } from "@/lib/exercise-name-guard";
 import { importKeys, isImportMarker, markerTimestamp, resolveNamesAgainstLibrary, IMPORT_MARKER_FIRST_SECOND, type PlannedWorkout, type ProgramWorkoutInfo } from "@/lib/fitpros-history";
 
 export interface ImportProgram {
@@ -106,6 +107,12 @@ export async function runFitprosImport(
       result.skippedAlreadyThere++;
       continue;
     }
+    // Nothing is written for a day with an exercise name that is only numbers or carries sets and reps (the file was probably laid out wrongly).
+    const badName = w.exercises.find((e) => exerciseNameProblem(e.savedName));
+    if (badName) {
+      result.failed.push(`${w.date}: ${exerciseNameProblem(badName.savedName)}`);
+      continue;
+    }
     const nth = Number(keys[i].split("#")[1]);
     const started = markerTimestamp(w.date, nth);
     const completed = w.durationSeconds ? new Date(new Date(started).getTime() + w.durationSeconds * 1000).toISOString() : started;
@@ -129,7 +136,7 @@ export async function runFitprosImport(
     }
     const exerciseRows = w.exercises.map((e, order) => ({
       session_id: session.id as string,
-      exercise_name: e.savedName.trim(),
+      exercise_name: cleanExerciseName(e.savedName),
       exercise_order: order,
       group_workout_exercise_id: e.programExerciseId,
       is_added: e.programExerciseId == null,

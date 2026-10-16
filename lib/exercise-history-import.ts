@@ -19,6 +19,7 @@
 // data.ts), which is the entire point — closing the cold-start gap.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ParsedHistoryRow } from "./history-import-parser";
+import { cleanExerciseName, exerciseNameProblem } from "./exercise-name-guard";
 
 export interface ManualHistoryEntry {
   athleteId: string;
@@ -56,6 +57,8 @@ export async function insertManualHistoryEntry(
   supabase: SupabaseClient,
   entry: ManualHistoryEntry
 ): Promise<{ error: string | null }> {
+  const nameProblem = exerciseNameProblem(entry.exerciseName);
+  if (nameProblem) return { error: nameProblem };
   const session = await createHistoricalSession(supabase, entry);
   if (!session) return { error: "Couldn't save this entry — try again." };
 
@@ -63,7 +66,7 @@ export async function insertManualHistoryEntry(
     .from("session_exercises")
     .insert({
       session_id: session.id,
-      exercise_name: entry.exerciseName.trim(),
+      exercise_name: cleanExerciseName(entry.exerciseName),
       exercise_order: 0,
       is_added: true,
     })
@@ -88,6 +91,10 @@ export async function insertManualHistoryEntry(
 
 export interface HistoryImportResult {
   importedCount: number;
+  // How many rows there were, how many did not save, the dates they belong to, and those rows themselves (so a second try can send only these).
+  totalRows: number;
+  failedRows: ParsedHistoryRow[];
+  failedDates: string[];
   error: string | null;
 }
 
@@ -103,7 +110,10 @@ export async function importHistoryRows(
   params: { athleteId: string; groupId: string; rows: ParsedHistoryRow[] }
 ): Promise<HistoryImportResult> {
   const { athleteId, groupId, rows } = params;
-  if (rows.length === 0) return { importedCount: 0, error: null };
+  if (rows.length === 0) return { importedCount: 0, totalRows: 0, failedRows: [], failedDates: [], error: null };
+  // Nothing is written when a name is only numbers or carries sets and reps (the file's columns were probably read wrongly).
+  const badRow = rows.find((r) => exerciseNameProblem(r.exerciseName));
+  if (badRow) return { importedCount: 0, totalRows: rows.length, failedRows: rows, failedDates: [], error: exerciseNameProblem(badRow.exerciseName) };
 
   const rowsByDate = new Map<string, ParsedHistoryRow[]>();
   for (const row of rows) {
@@ -113,10 +123,16 @@ export async function importHistoryRows(
   }
 
   let importedCount = 0;
+  const failedRows: ParsedHistoryRow[] = [];
+  const failedDates = new Set<string>();
 
   for (const [date, dateRows] of rowsByDate.entries()) {
     const session = await createHistoricalSession(supabase, { athleteId, groupId, date });
-    if (!session) continue;
+    if (!session) {
+      failedRows.push(...dateRows);
+      failedDates.add(date);
+      continue;
+    }
 
     const exerciseIdByName = new Map<string, string>();
     const setOrderByExercise = new Map<string, number>();
@@ -128,13 +144,17 @@ export async function importHistoryRows(
           .from("session_exercises")
           .insert({
             session_id: session.id,
-            exercise_name: row.exerciseName.trim(),
+            exercise_name: cleanExerciseName(row.exerciseName),
             exercise_order: exerciseIdByName.size,
             is_added: true,
           })
           .select("id")
           .single();
-        if (!exerciseRow) continue;
+        if (!exerciseRow) {
+          failedRows.push(row);
+          failedDates.add(date);
+          continue;
+        }
         const newExerciseId = exerciseRow.id as string;
         exerciseId = newExerciseId;
         exerciseIdByName.set(row.exerciseName, newExerciseId);
@@ -157,11 +177,14 @@ export async function importHistoryRows(
       if (!setError) {
         importedCount++;
         setOrderByExercise.set(row.exerciseName, setOrder + 1);
+      } else {
+        failedRows.push(row);
+        failedDates.add(date);
       }
     }
   }
 
-  return { importedCount, error: null };
+  return { importedCount, totalRows: rows.length, failedRows, failedDates: Array.from(failedDates).sort(), error: null };
 }
 
 export interface HistoricalEntryGroup {

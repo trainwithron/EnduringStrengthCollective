@@ -2447,6 +2447,34 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["the exercise library and the aliases exist", "to_regclass('public.exercise_library') is not null and to_regclass('public.exercise_aliases') is not null"],
     ],
   },
+  {
+    n: "128",
+    slug: "0378",
+    title: "0378 Moving a client to another group moves all of their records",
+    migrations: ["0378"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes on screen until a client is moved. After that, the client's intake form, photos, goals, nutrition phases, check-ins, food log, body scans, consent, credit ledger and every other record of theirs go to the new group with them, instead of staying behind in the old one. The old group's own structures (who attended its group sessions, its package access, kiosk PINs and check-ins, game scores) stay.",
+    undo: fnFromMigration("0340", "move_client_to_group"),
+    undoWhy: "Only if step 128 misbehaves. Puts back the earlier function that moves only sixteen tables. Records that were already moved stay moved.",
+    rows: [
+      ["0378 is not already applied (the move does not yet find every table)", "to_regprocedure('public.move_client_to_group(uuid, uuid, uuid)') is not null and pg_get_functiondef(to_regprocedure('public.move_client_to_group(uuid, uuid, uuid)')) not like '%information_schema.columns%'"],
+      ["the session coach notes and progression rules tables exist", "to_regclass('public.session_coach_notes') is not null and to_regclass('public.exercise_progressions') is not null"],
+    ],
+  },
+  {
+    n: "129",
+    slug: "0379",
+    title: "0379 A program day or logged session exercise can never be named with only numbers or with its sets and reps",
+    migrations: ["0379"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes on screen. From now on a program day or a logged session refuses an exercise whose name is only digits, commas, dots and spaces (10,10,10) or that carries its sets and reps (Sumo Squat 3x10). The rows already there (77 logged exercises and 1 program exercise) are not touched or deleted; an edit to one of those rows is refused until it is renamed or removed.",
+    undo: "alter table public.group_workout_exercises drop constraint if exists group_workout_exercises_name_not_digits;\nalter table public.session_exercises drop constraint if exists session_exercises_name_not_digits;",
+    undoWhy: "Only if step 129 misbehaves. Removes the two rules; nothing else changes.",
+    rows: [
+      ["0379 is not already applied (no rules yet)", "not exists (select 1 from pg_constraint where conname in ('group_workout_exercises_name_not_digits', 'session_exercises_name_not_digits'))"],
+      ["the program exercises and session exercises tables exist", "to_regclass('public.group_workout_exercises') is not null and to_regclass('public.session_exercises') is not null"],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -2557,6 +2585,7 @@ const BUNDLES = [
   { id: "release-bl", name: "Release BL (four exercises added to Coach Ron's library for the FitPros history; run any time)", steps: ["106"] },
   { id: "release-bk", name: "Release BK (move Coach Ron's own training into his personal space; run AFTER he has opened Coach Ron (you) once and removed the programs he does not want)", steps: ["105"] },
   { id: "release-bw", name: "Release BW (a rest can be a range such as 60-90; run AFTER Release BV and BEFORE the code that goes with it is live)", steps: ["117"] },
+  { id: "release-ch", name: "Release CH (moving a client moves all of their records; program-day and session exercise names can never be only numbers or carry sets and reps; run BEFORE the code that goes with it is live)", steps: ["128", "129"] },
   { id: "release-cg", name: "Release CG (the exercise library refuses names made only of numbers; run BEFORE the code that goes with it is live)", steps: ["127"] },
   { id: "release-cf", name: "Release CF (a client's health screening line on Overview stays gone once acknowledged, until a new flagged answer; run BEFORE the code that goes with it is live)", steps: ["126"] },
   { id: "release-ce", name: "Release CE (InBody scans from a photo of the result sheet, with the photo kept in a private bucket; run BEFORE the code that goes with it is live)", steps: ["125"] },
@@ -2786,6 +2815,8 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
     m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
+    m("0379", "exists (select 1 from pg_constraint where conname = 'session_exercises_name_not_digits' and conrelid = 'public.session_exercises'::regclass) and exists (select 1 from pg_constraint where conname = 'group_workout_exercises_name_not_digits' and conrelid = 'public.group_workout_exercises'::regclass)"),
+    m("0378", "pg_get_functiondef(to_regprocedure('public.move_client_to_group(uuid, uuid, uuid)')) like '%information_schema.columns%'"),
     m("0377", "exists (select 1 from pg_constraint where conname = 'exercise_library_name_not_digits' and conrelid = 'public.exercise_library'::regclass) and exists (select 1 from pg_constraint where conname = 'exercise_aliases_target_not_digits' and conrelid = 'public.exercise_aliases'::regclass)"),
     m("0376", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'athlete_injury_flag_acknowledgements' and column_name = 'flagged_count')"),
     m("0375", "to_regclass('public.body_scans') is not null"),

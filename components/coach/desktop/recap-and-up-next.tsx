@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { exerciseNameProblem } from "@/lib/exercise-name-guard";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { SessionRecap } from "@/lib/session-recap-data";
@@ -94,6 +95,12 @@ export function RecapAndUpNext({
     if (!swapTarget) return;
     const trimmed = swapDraft.trim();
     if (!trimmed || trimmed === swapTarget.name) {
+      setSwapTarget(null);
+      return;
+    }
+    const nameProblem = exerciseNameProblem(trimmed);
+    if (nameProblem) {
+      flashSaveError(nameProblem);
       setSwapTarget(null);
       return;
     }

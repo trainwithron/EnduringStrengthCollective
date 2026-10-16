@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cleanImportedProgramName, PROGRAM_NAME_MAX, tidyProgramName } from "@/lib/program-name";
 import { readAiJson } from "@/lib/ai-fetch";
-import { isBadExerciseName, isNumericOnlyName } from "@/lib/exercise-name-guard";
+import { isBadExerciseName, isNumericOnlyName, isPrescriptionName } from "@/lib/exercise-name-guard";
 import * as XLSX from "xlsx";
 import * as cptable from "xlsx/dist/cpexcel.full.mjs";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -367,6 +367,14 @@ export function ImportWizard({
     if (looksLikeNumbersNotNames(parsed.map((r) => r.exerciseName))) {
       setStatus("error");
       setError(EXERCISE_NUMBERS_MESSAGE);
+      processingRef.current = false;
+      return;
+    }
+    // A name that carries its sets and reps ("Bench 3x10") is never made into an exercise: the program day would refuse it.
+    const withReps = parsed.map((r) => r.exerciseName).find((n) => isPrescriptionName(n));
+    if (withReps) {
+      setStatus("error");
+      setError(`Some exercise names have sets and reps in them, for example "${withReps}". Put the sets and reps in their own columns, then import again.`);
       processingRef.current = false;
       return;
     }
