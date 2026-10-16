@@ -87,7 +87,7 @@ describe("names that carry sets and reps", () => {
     for (const n of ["Sumo Squat 3x10", "Bench 3 x 8-12", "Bench 3×5", "bench 5x5 @7", "Squat 3 sets", "Squat 3 sets of 10", "Squat 10 reps", "Row @7", "10x10"]) expect(isPrescriptionName(n)).toBe(true);
   });
   it("real names are untouched", () => {
-    for (const n of ["Sumo Squat", "21s", "5/3/1", "Day 1", "Hex Bar Deadlift", "Barbell Back Squat", "3 Rep Pause Squat", "1.5 Rep Squat", "Wall Sit", "T-Bar Row 2"]) {
+    for (const n of ["Sumo Squat", "21s", "5/3/1", "Day 1", "Hex Bar Deadlift", "Barbell Back Squat", "3 Rep Pause Squat", "1.5 Rep Squat", "Wall Sit", "T-Bar Row 2", "Pause Squat @ 3 sec"]) {
       expect(isPrescriptionName(n)).toBe(false);
       expect(isBadExerciseName(n)).toBe(false);
     }
@@ -135,5 +135,16 @@ describe("old junk rows under the NOT VALID database check", () => {
   it("the bulk auto-categorize leaves them out, so one cannot fail the whole group", () => {
     const btn = src("components/coach/auto-categorize-button.tsx");
     expect(btn).toContain("!e.category && !isBadExerciseName(e.name)");
+  });
+});
+
+import { friendlyDbError, OLD_JUNK_ROW_MESSAGE } from "@/lib/exercise-name-guard";
+describe("an edit the database refuses on an old junk row", () => {
+  it("is said in plain words, other messages unchanged", () => {
+    expect(friendlyDbError('new row for relation "exercise_library" violates check constraint "exercise_library_name_not_digits"')).toBe(OLD_JUNK_ROW_MESSAGE);
+    expect(friendlyDbError("network down")).toBe("network down");
+    const list = src("components/coach/exercise-library-list.tsx");
+    expect(list.match(/reportEditFailure\(/g)?.length).toBeGreaterThanOrEqual(4);
+    expect(src("components/coach/exercise-media-picker.tsx")).toContain("friendlyDbError(dbError.message)");
   });
 });

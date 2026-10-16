@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { friendlyDbError } from "@/lib/exercise-name-guard";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { extractYoutubeId } from "@/lib/youtube";
 
@@ -89,7 +90,7 @@ export function ExerciseMediaPicker({
       );
 
     if (dbError) {
-      setError(dbError.message);
+      setError(friendlyDbError(dbError.message));
       setUploading(false);
       return;
     }
@@ -120,7 +121,7 @@ export function ExerciseMediaPicker({
       );
 
     if (dbError) {
-      setError(dbError.message);
+      setError(friendlyDbError(dbError.message));
       return;
     }
 
@@ -144,7 +145,7 @@ export function ExerciseMediaPicker({
       );
 
     if (dbError) {
-      setError(dbError.message);
+      setError(friendlyDbError(dbError.message));
       return;
     }
 

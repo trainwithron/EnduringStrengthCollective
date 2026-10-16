@@ -13,7 +13,7 @@ import { BiomechTagPicker, type BiomechTagOption, type BiomechTagSelection } fro
 import { generateBiomechBreakdown } from "@/lib/biomech-breakdown";
 import { ExerciseQrCodeButton } from "./exercise-qr-code-button";
 import { Trash2, Trophy } from "lucide-react";
-import { badExerciseNameMessage, isBadExerciseName } from "@/lib/exercise-name-guard";
+import { OLD_JUNK_ROW_MESSAGE, badExerciseNameMessage, isBadExerciseName } from "@/lib/exercise-name-guard";
 import { NO_FILTERS, filtersActive, matchesFilters, patternFilterOptions, tagChip, type ClassFilter, type LibraryFilters, type SideFilter } from "@/lib/library-sort";
 import { PATTERN_NAMES, TIER_KEY } from "@/lib/starter-ladders";
 
@@ -310,25 +310,30 @@ export function ExerciseLibraryList({
     setSubmitting(false);
   }
 
+  // A change that did not save is said plainly (an old row named with only numbers or with its sets and reps cannot be edited; it can be removed).
+  async function reportEditFailure(error: { message?: string } | null) {
+    if (error) setNameProblem(OLD_JUNK_ROW_MESSAGE);
+  }
+
   async function handleCategoryChange(id: string, category: string) {
     const value = category || null;
     setExercises((prev) => prev.map((e) => (e.id === id ? { ...e, category: value } : e)));
     const supabase = createBrowserClient();
-    await supabase.from("exercise_library").update({ category: value }).eq("id", id);
+    await reportEditFailure((await supabase.from("exercise_library").update({ category: value }).eq("id", id)).error);
   }
 
   async function handleEquipmentTypeChange(id: string, equipmentType: string) {
     const value = (equipmentType || null) as EquipmentType | null;
     setExercises((prev) => prev.map((e) => (e.id === id ? { ...e, equipmentType: value } : e)));
     const supabase = createBrowserClient();
-    await supabase.from("exercise_library").update({ equipment_type: value }).eq("id", id);
+    await reportEditFailure((await supabase.from("exercise_library").update({ equipment_type: value }).eq("id", id)).error);
   }
 
   async function handleDescriptionChange(id: string, description: string) {
     const value = description.trim() || null;
     setExercises((prev) => prev.map((e) => (e.id === id ? { ...e, description: value } : e)));
     const supabase = createBrowserClient();
-    await supabase.from("exercise_library").update({ description: value }).eq("id", id);
+    await reportEditFailure((await supabase.from("exercise_library").update({ description: value }).eq("id", id)).error);
   }
 
   async function handleDelete(id: string) {

@@ -44,7 +44,7 @@ export function noSetsWarning(withoutSets: number, total: number): string | null
 const SETS_X_REPS = /\d+\s*[x×]\s*\d+/i;
 const SETS_WORD = /\d+\s*sets?\b/i;
 const REPS_AT_END = /\d+\s*reps?\s*$/i;
-const AT_RPE = /@\s*\d/;
+const AT_RPE = /@\s*\d[\d.]*\s*$/; // only a trailing RPE ("Row @7"); "Pause Squat @ 3 sec" is a real name
 
 export function isPrescriptionName(name: string | null | undefined): boolean {
   const text = (name ?? "").trim();
@@ -60,6 +60,13 @@ export function isBadExerciseName(name: string | null | undefined): boolean {
 
 export function badExerciseNameMessage(name: string): string {
   return isNumericOnlyName(name) ? "A name made only of numbers can't be added to your library." : PRESCRIPTION_MESSAGE;
+}
+
+export const OLD_JUNK_ROW_MESSAGE = "That change didn't save. This exercise is named with only numbers or with sets and reps, so it can't be edited. Remove it and add it again with a real name.";
+
+// A database refusal of such a name, said in plain words; any other message is passed on unchanged.
+export function friendlyDbError(message: string): string {
+  return /exercise_(library_name_not_digits|aliases_target_not_digits)/.test(message) ? OLD_JUNK_ROW_MESSAGE : message;
 }
 
 export function usableExerciseNames(names: string[]): string[] {

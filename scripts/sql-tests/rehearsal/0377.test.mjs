@@ -14,7 +14,7 @@ export default {
       for (const name of bad) {
         h.check(`"${name}" is refused as a library name`, !!(await tryQ(db, `insert into public.exercise_library (created_by, name) values ($1, $2)`, [coach, name])).error);
       }
-      const good = ["5/3/1", "21s", "Day 1", "Hex Bar Deadlift", "Barbell Back Squat", "1.5 Rep Squat", "3 Rep Pause Squat", "Reps Row", "Sets Of Three", "Zercher Squat", "T-Bar Row 2", "Wall Sit"];
+      const good = ["5/3/1", "21s", "Day 1", "Hex Bar Deadlift", "Barbell Back Squat", "1.5 Rep Squat", "3 Rep Pause Squat", "Reps Row", "Sets Of Three", "Zercher Squat", "T-Bar Row 2", "Wall Sit", "Pause Squat @ 3 sec", "Pause Bench @ 2 Second Hold"];
       for (const name of good) {
         const r = await tryQ(db, `insert into public.exercise_library (created_by, name) values ($1, $2) returning name`, [coach, name]);
         h.check(`"${name}" is still accepted${r.error ? ": " + r.error : ""}`, !r.error && r.rows[0].name === name);

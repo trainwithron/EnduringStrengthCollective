@@ -28,12 +28,12 @@ do $$
 begin
   if not exists (select 1 from pg_constraint where conname = 'exercise_library_name_not_digits' and conrelid = 'public.exercise_library'::regclass) then
     alter table public.exercise_library add constraint exercise_library_name_not_digits check (
-      name !~ '^[0-9][0-9., ]*$' and name !~* '[0-9]+\s*[x\u00d7]\s*[0-9]+' and name !~* '[0-9]+\s*sets?\y' and name !~* '[0-9]+\s*reps?\s*$' and name !~ '@\s*[0-9]'
+      name !~ '^[0-9][0-9., ]*$' and name !~* '[0-9]+\s*[x\u00d7]\s*[0-9]+' and name !~* '[0-9]+\s*sets?\y' and name !~* '[0-9]+\s*reps?\s*$' and name !~ '@\s*[0-9][0-9.]*\s*$'
     ) not valid;
   end if;
   if not exists (select 1 from pg_constraint where conname = 'exercise_aliases_target_not_digits' and conrelid = 'public.exercise_aliases'::regclass) then
     alter table public.exercise_aliases add constraint exercise_aliases_target_not_digits check (
-      exercise_name !~ '^[0-9][0-9., ]*$' and exercise_name !~* '[0-9]+\s*[x\u00d7]\s*[0-9]+' and exercise_name !~* '[0-9]+\s*sets?\y' and exercise_name !~* '[0-9]+\s*reps?\s*$' and exercise_name !~ '@\s*[0-9]'
+      exercise_name !~ '^[0-9][0-9., ]*$' and exercise_name !~* '[0-9]+\s*[x\u00d7]\s*[0-9]+' and exercise_name !~* '[0-9]+\s*sets?\y' and exercise_name !~* '[0-9]+\s*reps?\s*$' and exercise_name !~ '@\s*[0-9][0-9.]*\s*$'
     ) not valid;
   end if;
 end $$;
