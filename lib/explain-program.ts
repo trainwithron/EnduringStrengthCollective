@@ -1,4 +1,5 @@
-import { AiTruncatedError } from "@/lib/anthropic-client";
+// Not imported from the AI client: this file is also used by the browser panel, and the client pulls in server-only code. The error is recognised by its name.
+const isTruncated = (err: unknown) => err instanceof Error && err.name === "AiTruncatedError";
 
 // "Ask why" beside the AI Program Builder. Ron's rule: if it takes a thousand words to say why something was done, there is no good reason. So the answer is the ONE real reason in a sentence or two,
 // or a plain admission that there is none. Never a long justification, and never cut-off text.
@@ -22,13 +23,13 @@ export async function answerConcisely(ask: (strict: boolean) => Promise<string>)
     const first = (await ask(false)).trim();
     if (first) return first;
   } catch (err) {
-    if (!(err instanceof AiTruncatedError)) throw err;
+    if (!isTruncated(err)) throw err;
   }
   try {
     const second = (await ask(true)).trim();
     return second || null;
   } catch (err) {
-    if (err instanceof AiTruncatedError) return null;
+    if (isTruncated(err)) return null;
     throw err;
   }
 }
