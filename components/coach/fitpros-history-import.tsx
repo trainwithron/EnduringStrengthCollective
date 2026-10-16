@@ -20,7 +20,7 @@ import {
 import type { PlannedWorkout } from "@/lib/fitpros-history";
 import { settleImportedHistory, recomputeTrainingMaxes, unclearFoundLine } from "@/lib/unclear-points";
 import { existingLibraryName } from "@/lib/exercise-search";
-import { fitprosLayoutMessage, isNumericOnlyName, noSetsWarning } from "@/lib/exercise-name-guard";
+import { badExerciseNameMessage, fitprosLayoutMessage, isBadExerciseName, isNumericOnlyName, noSetsWarning } from "@/lib/exercise-name-guard";
 
 function todayKey(): string {
   const d = new Date();
@@ -96,8 +96,8 @@ export function FitprosHistoryImport({ athleteId, groupId, athleteName }: { athl
   // Adds one imported name to the coach's library (never a second row for a spelling of one that is there), then the plan is matched again.
   async function addToLibrary(name: string) {
     if (busy) return;
-    if (isNumericOnlyName(name)) {
-      setError("A name made only of numbers can't be added to your library.");
+    if (isBadExerciseName(name)) {
+      setError(badExerciseNameMessage(name));
       return;
     }
     setBusy(true);

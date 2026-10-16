@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isBadExerciseName } from "@/lib/exercise-name-guard";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError, AiTruncatedError, AiTimeoutError } from "@/lib/anthropic-client";
@@ -145,7 +146,7 @@ export async function POST(request: Request) {
     supabase.from("exercise_library").select("name, category").eq("created_by", user.id).order("name").limit(3000),
     supabase.from("exercise_aliases").select("raw_name, exercise_name").eq("coach_id", user.id),
   ]);
-  const libraryItems: LibraryItem[] = (libraryRows ?? []).map((r: any) => ({ name: r.name as string, category: (r.category as string | null) ?? null, pattern: null, tier: null }));
+  const libraryItems: LibraryItem[] = (libraryRows ?? []).filter((r: any) => !isBadExerciseName(r.name as string)).map((r: any) => ({ name: r.name as string, category: (r.category as string | null) ?? null, pattern: null, tier: null }));
   const shown = rankLibrary(libraryItems, `${instruction} ${corrections.join(" ")}`);
   const libraryText = libraryContext(shown, libraryItems.length);
 

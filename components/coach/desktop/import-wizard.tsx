@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cleanImportedProgramName, PROGRAM_NAME_MAX, tidyProgramName } from "@/lib/program-name";
 import { readAiJson } from "@/lib/ai-fetch";
-import { isNumericOnlyName } from "@/lib/exercise-name-guard";
+import { isBadExerciseName, isNumericOnlyName } from "@/lib/exercise-name-guard";
 import * as XLSX from "xlsx";
 import * as cptable from "xlsx/dist/cpexcel.full.mjs";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -496,11 +496,11 @@ export function ImportWizard({
 
     for (const name of createdExercises) {
       // Never a library row (or alias) made only of numbers, whatever reached this point.
-      if (isNumericOnlyName(name)) continue;
+      if (isBadExerciseName(name)) continue;
       await supabase.from("exercise_library").insert({ created_by: coachId, name, category: null });
     }
     for (const alias of newAliases) {
-      if (isNumericOnlyName(alias.rawName) || isNumericOnlyName(alias.exerciseName)) continue;
+      if (isBadExerciseName(alias.rawName) || isBadExerciseName(alias.exerciseName)) continue;
       await supabase
         .from("exercise_aliases")
         .upsert(

@@ -1,6 +1,7 @@
 "use client";
 
 import { confirmDialog } from "@/components/shared/confirm-dialog";
+import { badExerciseNameMessage, isBadExerciseName, splitPrescriptionName, PRESCRIPTION_MESSAGE } from "@/lib/exercise-name-guard";
 import type { DemoRow } from "@/lib/exercise-demo";
 import { useEffect, useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -11,6 +12,7 @@ import { BuilderDemoThumb } from "@/components/coach/builder-demo-thumb";
 import { builderDemoFor, type BuilderDemo } from "@/lib/builder-demo";
 import { summarizeSets } from "@/lib/exercise-summary";
 import { cleanDisplayName } from "@/lib/exercise-alias-seed";
+import { existingLibraryName } from "@/lib/exercise-search";
 import { matchExercise, type AliasEntry } from "@/lib/exercise-matching";
 import { ExerciseMediaPicker } from "./exercise-media-picker";
 import type { BuilderExercise, ExerciseSetTarget } from "@/lib/types";
@@ -255,6 +257,14 @@ export function ExerciseBuilderCard({
     const supabase = createBrowserClient();
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) return;
+    if (isBadExerciseName(exercise.exerciseName)) {
+      flashSaveError(badExerciseNameMessage(exercise.exerciseName));
+      return;
+    }
+    if (exercise.exerciseName.trim().length < 3) {
+      flashSaveError("That name is too short to add to your library.");
+      return;
+    }
     const { error } = await supabase.from("exercise_library").upsert({ created_by: userData.user.id, name: exercise.exerciseName.trim() }, { onConflict: "created_by,name", ignoreDuplicates: true });
     if (error) {
       flashSaveError("Couldn't add that to your library — try again.");
@@ -294,9 +304,40 @@ export function ExerciseBuilderCard({
   // A day the client has already logged this exercise on: its cells show what they did (read-only) instead of the prescription.
   const isLoggedDay = !!loggedBySet && Object.keys(loggedBySet).length > 0;
 
+  // The sets that were typed after the name, put on this card when it has none (never over sets the coach already entered).
+  async function applyPrescription(p: NonNullable<ReturnType<typeof splitPrescriptionName>>) {
+    const supabase = createBrowserClient();
+    const rows = Array.from({ length: p.sets }, (_, i) => ({
+      group_workout_exercise_id: exercise.id,
+      set_order: i,
+      target_reps: p.reps,
+      target_time_seconds: p.timeSeconds,
+      target_rpe: p.rpe,
+    }));
+    const { data, error } = await supabase.from("group_workout_exercise_sets").insert(rows).select(SET_ROW_SELECT);
+    if (error || !data) {
+      flashSaveError("Renamed, but the sets didn't save — try adding them manually.");
+      return;
+    }
+    onSetsChange(data.map(mapSetRow));
+  }
+
   async function handleNameCommit(name: string, aliasUsed?: string) {
-    const trimmed = name.trim();
+    let trimmed = name.trim();
     if (!trimmed) return;
+    // A name typed with its sets and reps ("sumo squat 3x10") is split like the Quick add box does: the words before are the name, and the sets are applied to this card only when it has none.
+    // A prescription that cannot be read is refused; it is never kept as the name.
+    let prescription: ReturnType<typeof splitPrescriptionName> = null;
+    if (isBadExerciseName(trimmed)) {
+      prescription = splitPrescriptionName(trimmed);
+      if (!prescription) {
+        flashSaveError(isBadExerciseName(trimmed) && !splitPrescriptionName(trimmed) ? PRESCRIPTION_MESSAGE : badExerciseNameMessage(trimmed));
+        setNameDraft(exercise.displayName ?? exercise.exerciseName);
+        return;
+      }
+      trimmed = existingLibraryName(prescription.name, exerciseLibrary) ?? prescription.name;
+      aliasUsed = undefined;
+    }
     // A name longer than the database accepts is not used as the shown name (the real exercise is still saved).
     const display = cleanDisplayName(aliasUsed);
     // Nothing to save when the real exercise and the shown name are both unchanged. (Text typed over an aliased row that equals what it already shows is that same row.)
@@ -314,16 +355,8 @@ export function ExerciseBuilderCard({
     onUpdate({ exerciseName: trimmed, displayName: display });
     setNameDraft(display ?? trimmed);
     flashSaved();
-
-    const { data: userData } = await supabase.auth.getUser();
-    if (userData.user) {
-      await supabase
-        .from("exercise_library")
-        .upsert(
-          { created_by: userData.user.id, name: trimmed },
-          { onConflict: "created_by,name", ignoreDuplicates: true }
-        );
-    }
+    if (prescription && exercise.sets.length === 0) await applyPrescription(prescription);
+    // Nothing is added to the library here. A typed name that is not in the library stays as named and shows "Not in your library"; it enters the library only by tapping Add to my library.
   }
 
   async function handleMovementPatternChange(value: string) {

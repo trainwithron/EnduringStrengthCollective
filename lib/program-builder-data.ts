@@ -1,4 +1,5 @@
 import { sortByUsage } from "@/lib/exercise-search";
+import { usableExerciseNames } from "@/lib/exercise-name-guard";
 import { mergeAliases } from "@/lib/exercise-alias-seed";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DEFAULT_TRACKED_FIELDS, mapSetRow } from "./exercise-fields";
@@ -132,7 +133,7 @@ export async function getProgramBuilderData(
       usage.set(ex.exercise_name, (usage.get(ex.exercise_name) ?? 0) + 1);
     }
   }
-  const exerciseLibrary = sortByUsage(Array.from(new Set(demoRows.map((r) => r.name))), usage);
+  const exerciseLibrary = sortByUsage(usableExerciseNames(Array.from(new Set(demoRows.map((r) => r.name)))), usage);
 
   const exerciseAliases = (aliasRows ?? []).map((a) => ({
     rawName: a.raw_name,

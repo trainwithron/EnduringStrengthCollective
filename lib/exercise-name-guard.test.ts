@@ -75,3 +75,58 @@ describe("no-sets warning", () => {
     expect(s.withoutSets).toBe(1);
   });
 });
+
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { isBadExerciseName, isPrescriptionName, splitPrescriptionName, usableExerciseNames, PRESCRIPTION_MESSAGE, badExerciseNameMessage } from "@/lib/exercise-name-guard";
+
+const src = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
+
+describe("names that carry sets and reps", () => {
+  it("are recognised", () => {
+    for (const n of ["Sumo Squat 3x10", "Bench 3 x 8-12", "Bench 3×5", "bench 5x5 @7", "Squat 3 sets", "Squat 3 sets of 10", "Squat 10 reps", "Row @7", "10x10"]) expect(isPrescriptionName(n)).toBe(true);
+  });
+  it("real names are untouched", () => {
+    for (const n of ["Sumo Squat", "21s", "5/3/1", "Day 1", "Hex Bar Deadlift", "Barbell Back Squat", "3 Rep Pause Squat", "1.5 Rep Squat", "Wall Sit", "T-Bar Row 2"]) {
+      expect(isPrescriptionName(n)).toBe(false);
+      expect(isBadExerciseName(n)).toBe(false);
+    }
+  });
+  it("sumo squat 3x10 splits to Sumo Squat + 3x10, like the Quick add box", () => {
+    expect(splitPrescriptionName("sumo squat 3x10")).toEqual({ name: "Sumo Squat", sets: 3, reps: "10", timeSeconds: null, rpe: null });
+    expect(splitPrescriptionName("Bench 5x5 @7")).toEqual({ name: "Bench", sets: 5, reps: "5", timeSeconds: null, rpe: 7 });
+    expect(splitPrescriptionName("Row 3x8-12")?.reps).toBe("8-12");
+    expect(splitPrescriptionName("Sumo Squat")).toBeNull();
+    expect(splitPrescriptionName("Squat 3 sets of 10")).toBeNull(); // cannot be read: refused, never kept as a name
+    expect(splitPrescriptionName("3x10")).toBeNull();
+  });
+  it("bad names are kept out of every suggestion list, with plain messages", () => {
+    expect(usableExerciseNames(["Sumo Squat", "Sumo Squat 3x10", "1", "8,8,8", "5/3/1", "21s"])).toEqual(["Sumo Squat", "5/3/1", "21s"]);
+    expect(badExerciseNameMessage("Sumo Squat 3x10")).toBe("That looks like sets and reps, not an exercise name.");
+    expect(PRESCRIPTION_MESSAGE).toBe("That looks like sets and reps, not an exercise name.");
+    expect(badExerciseNameMessage("20")).toBe("A name made only of numbers can't be added to your library.");
+  });
+});
+
+describe("where the guard is used", () => {
+  const card = src("components/coach/exercise-builder-card.tsx");
+  it("the builder card no longer adds anything to the library by itself; Add to my library is the only way and is guarded", () => {
+    const commit = card.slice(card.indexOf("async function handleNameCommit"), card.indexOf("async function handleMovementPatternChange"));
+    expect(commit).not.toContain("exercise_library");
+    expect(commit).toContain("splitPrescriptionName(trimmed)");
+    expect(commit).toContain("exercise.sets.length === 0");
+    const add = card.slice(card.indexOf("async function addToLibrary"), card.indexOf("const [presetBusy"));
+    expect(add).toContain("isBadExerciseName(exercise.exerciseName)");
+    expect(add).toContain("length < 3");
+  });
+  it("every library and alias insert, and every suggestion list, is guarded", () => {
+    expect(src("components/coach/desktop/import-wizard.tsx")).toContain("isBadExerciseName(name)");
+    expect(src("components/coach/desktop/import-wizard.tsx")).toContain("isBadExerciseName(alias.exerciseName)");
+    expect(src("components/coach/fitpros-history-import.tsx")).toContain("isBadExerciseName(name)");
+    expect(src("components/coach/exercise-library-list.tsx")).toContain("isBadExerciseName(trimmed)");
+    expect(src("components/coach/exercise-name-input.tsx")).toContain("usableExerciseNames(suggestions)");
+    expect(src("lib/program-builder-data.ts")).toContain("usableExerciseNames(");
+    expect(src("app/api/ai/build-day/route.ts")).toContain("isBadExerciseName(r.name");
+    expect(src("components/coach/desktop/day-card.tsx")).toContain("usableExerciseNames(fullLibrary)");
+  });
+});

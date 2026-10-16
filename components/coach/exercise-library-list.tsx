@@ -13,6 +13,7 @@ import { BiomechTagPicker, type BiomechTagOption, type BiomechTagSelection } fro
 import { generateBiomechBreakdown } from "@/lib/biomech-breakdown";
 import { ExerciseQrCodeButton } from "./exercise-qr-code-button";
 import { Trash2, Trophy } from "lucide-react";
+import { badExerciseNameMessage, isBadExerciseName } from "@/lib/exercise-name-guard";
 import { NO_FILTERS, filtersActive, matchesFilters, patternFilterOptions, tagChip, type ClassFilter, type LibraryFilters, type SideFilter } from "@/lib/library-sort";
 import { PATTERN_NAMES, TIER_KEY } from "@/lib/starter-ladders";
 
@@ -80,6 +81,7 @@ export function ExerciseLibraryList({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [alreadyThere, setAlreadyThere] = useState<string | null>(null);
+  const [nameProblem, setNameProblem] = useState<string | null>(null);
   // The "required for new exercises going forward" rule
   // (corrective_exercise_biomechanical_tagging_idea.md) — held locally
   // until the exercise is actually created, since there's no row/id to
@@ -240,6 +242,12 @@ export function ExerciseLibraryList({
     // exercise_library, so there's nothing to make NOT NULL without
     // breaking the 256 exercises that predate this feature).
     if (!trimmed || newTags.length === 0) return;
+    // Never a name made only of numbers or carrying sets and reps ("Sumo Squat 3x10"): those are not exercise names.
+    if (isBadExerciseName(trimmed)) {
+      setNameProblem(badExerciseNameMessage(trimmed));
+      return;
+    }
+    setNameProblem(null);
     // Already in the library under another spelling ("deadlifts" for "Deadlift"): point to it instead of making a second row.
     const existingName = existingLibraryName(trimmed, exercises.map((e) => e.name));
     if (existingName) {
@@ -441,6 +449,11 @@ export function ExerciseLibraryList({
           Add
         </button>
       </div>
+      {nameProblem && (
+        <p className="font-body text-xs text-rust mt-2" role="alert">
+          {nameProblem}
+        </p>
+      )}
       {alreadyThere && (
         <p className="font-body text-xs text-steel mt-2" role="status">
           {alreadyThere} is already in your library, so it was not added again. It is shown below.

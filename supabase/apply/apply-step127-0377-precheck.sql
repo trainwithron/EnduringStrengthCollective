@@ -1,4 +1,4 @@
--- STEP 127 (PRECHECK, run first, changes nothing): 0377 A library exercise can never be named with only numbers
+-- STEP 127 (PRECHECK, run first, changes nothing): 0377 A library exercise can never be named with only numbers or with its sets and reps
 --
 -- Paste into the Supabase SQL editor and run. Every row must say ok = true.
 -- If any row says false: do NOT run the apply file. Copy the result table and send it back.
@@ -7,6 +7,6 @@ from (
   values
     ('0377 is not already applied (no rule yet)',
       not exists (select 1 from pg_constraint where conname = 'exercise_library_name_not_digits' and conrelid = 'public.exercise_library'::regclass)),
-    ('the exercise library exists',
-      to_regclass('public.exercise_library') is not null)
+    ('the exercise library and the aliases exist',
+      to_regclass('public.exercise_library') is not null and to_regclass('public.exercise_aliases') is not null)
 ) as checks(check_name, ok);

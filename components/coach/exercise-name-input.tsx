@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { usableExerciseNames } from "@/lib/exercise-name-guard";
 import { createPortal } from "react-dom";
 import { clampedLeft, clampedWidth } from "@/lib/viewport-clamp";
 import type { AliasEntry } from "@/lib/exercise-matching";
@@ -47,6 +48,8 @@ export function ExerciseNameInput({
   const valueAtFocusRef = useRef<string | null>(null);
 
   const trimmed = value.trim();
+  // Nothing made only of numbers or carrying sets and reps is ever offered (an old "Sumo Squat 3x10" entry stays out of the list).
+  suggestions = usableExerciseNames(suggestions);
   // With text, a live list of every library exercise whose name or alias matches it anywhere (best matches first). Empty input keeps the plain browse-everything list.
   const rows = trimmed
     ? searchExercises(trimmed, suggestions, aliases).map((r) => ({ name: r.name, viaAlias: r.viaAlias }))

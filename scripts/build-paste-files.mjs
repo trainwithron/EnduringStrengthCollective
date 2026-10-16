@@ -2436,15 +2436,15 @@ alter table public.coach_availability_windows drop column if exists session_minu
   {
     n: "127",
     slug: "0377",
-    title: "0377 A library exercise can never be named with only numbers",
+    title: "0377 A library exercise can never be named with only numbers or with its sets and reps",
     migrations: ["0377"],
     sees: "Success. No rows returned.",
-    afterwards: "Nothing changes on screen. From now on the library refuses a new exercise or a rename whose name is only digits, commas, dots and spaces (1, 8,8,8, 20). Names such as 5/3/1, 21s, Day 1 and 10x10 are fine. The rows already there are not touched or deleted.",
-    undo: "alter table public.exercise_library drop constraint if exists exercise_library_name_not_digits;",
+    afterwards: "Nothing changes on screen. From now on the library refuses a new exercise or a rename whose name is only digits, commas, dots and spaces (1, 8,8,8, 20) or that carries its sets and reps (Sumo Squat 3x10, Squat 3 sets, Row @7), and an alias cannot point to such a name. Names such as 5/3/1, 21s, Day 1 and Hex Bar Deadlift are fine. The rows already there are not touched or deleted.",
+    undo: "alter table public.exercise_library drop constraint if exists exercise_library_name_not_digits;\nalter table public.exercise_aliases drop constraint if exists exercise_aliases_target_not_digits;",
     undoWhy: "Only if step 127 misbehaves. Removes the rule; nothing else changes.",
     rows: [
       ["0377 is not already applied (no rule yet)", "not exists (select 1 from pg_constraint where conname = 'exercise_library_name_not_digits' and conrelid = 'public.exercise_library'::regclass)"],
-      ["the exercise library exists", "to_regclass('public.exercise_library') is not null"],
+      ["the exercise library and the aliases exist", "to_regclass('public.exercise_library') is not null and to_regclass('public.exercise_aliases') is not null"],
     ],
   },
 ];
@@ -2786,7 +2786,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
     m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
-    m("0377", "exists (select 1 from pg_constraint where conname = 'exercise_library_name_not_digits' and conrelid = 'public.exercise_library'::regclass)"),
+    m("0377", "exists (select 1 from pg_constraint where conname = 'exercise_library_name_not_digits' and conrelid = 'public.exercise_library'::regclass) and exists (select 1 from pg_constraint where conname = 'exercise_aliases_target_not_digits' and conrelid = 'public.exercise_aliases'::regclass)"),
     m("0376", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'athlete_injury_flag_acknowledgements' and column_name = 'flagged_count')"),
     m("0375", "to_regclass('public.body_scans') is not null"),
     m("0374", "to_regclass('public.pr_promotions') is not null"),
