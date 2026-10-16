@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createGroupWithCoach } from "@/lib/create-group";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { ChevronDown, Plus, Search, Pencil } from "lucide-react";
@@ -260,26 +261,14 @@ export function GroupSwitcher({
     // table's own SELECT policy (membership-gated) can't see it, and
     // Postgres rejects an INSERT ... RETURNING whose row fails the
     // SELECT policy check outright, not just the RETURNING data.
-    const newGroupId = crypto.randomUUID();
-    const { error: groupError } = await supabase.from("groups").insert({
-      id: newGroupId,
-      name: trimmed,
-      created_by: user.id,
-      organization_id: membership.organization_id,
-      group_kind: newKind,
-    });
-
-    if (groupError) {
+    const made = await createGroupWithCoach(supabase, { userId: user.id, name: trimmed, organizationId: membership.organization_id, kind: newKind });
+    if (!made.id) {
       setCreating(false);
-      setError("Couldn't create the group — try again.");
+      setError(made.error ?? "Couldn't create the group — try again.");
       return;
     }
 
-    await supabase
-      .from("group_memberships")
-      .insert({ group_id: newGroupId, profile_id: user.id, role: "coach" });
-
-    router.push(`/groups/${newGroupId}/dashboard`);
+    router.push(`/groups/${made.id}/dashboard`);
   }
 
   const initials = groupName

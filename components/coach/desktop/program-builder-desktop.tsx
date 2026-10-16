@@ -1,6 +1,7 @@
 "use client";
 
 import type { DemoRow } from "@/lib/exercise-demo";
+import { insertProgramDay } from "@/lib/program-days";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -228,20 +229,10 @@ export function ProgramBuilderDesktop({
       const nextWeek = weekNumbers.length > 0 ? Math.max(...weekNumbers) + 1 : 1;
 
       const supabase = createBrowserClient();
-      const { data: newRow, error: insertError } = await supabase
-        .from("workouts")
-        .insert({
-          program_id: programId,
-          group_id: groupId,
-          title: "Day 1",
-          week_number: nextWeek,
-          day_index: 1,
-        })
-        .select("id, title, week_number, day_index")
-        .single();
+      const { row: newRow, error: insertError } = await insertProgramDay(supabase, { programId, groupId, weekNumber: "next", title: () => "Day 1" });
 
       if (insertError || !newRow) {
-        flashSaveError("Couldn't add that week — try again.");
+        flashSaveError(insertError ?? "Couldn't add that week — try again.");
         return;
       }
 

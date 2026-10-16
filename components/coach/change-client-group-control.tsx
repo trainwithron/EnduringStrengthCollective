@@ -1,6 +1,7 @@
 "use client";
 
 import { confirmDialog } from "@/components/shared/confirm-dialog";
+import { createGroupWithCoach } from "@/lib/create-group";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -149,21 +150,13 @@ export function ChangeClientGroupControl({
         setMoving(false);
         return;
       }
-      const newGroupId = crypto.randomUUID();
-      const { error: groupError } = await supabase.from("groups").insert({
-        id: newGroupId,
-        name: trimmedNewName,
-        created_by: user.id,
-        organization_id: membership.organization_id,
-        group_kind: "one_on_one",
-      });
-      if (groupError) {
-        setError("Couldn't create the group — try again.");
+      const made = await createGroupWithCoach(supabase, { userId: user.id, name: trimmedNewName, organizationId: membership.organization_id, kind: "one_on_one" });
+      if (!made.id) {
+        setError(made.error ?? "Couldn't create the group — try again.");
         setMoving(false);
         return;
       }
-      await supabase.from("group_memberships").insert({ group_id: newGroupId, profile_id: user.id, role: "coach" });
-      targetGroupId = newGroupId;
+      targetGroupId = made.id;
     }
 
     const { error: rpcError } = await supabase.rpc("move_client_to_group", {

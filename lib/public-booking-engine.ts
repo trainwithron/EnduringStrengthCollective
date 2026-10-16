@@ -64,7 +64,7 @@ export interface PublicBookingStore {
   findGuestClient(coachId: string, email: string): Promise<{ athleteId: string; groupId: string } | null>;
   // Counts one new visitor against the coach's daily limit; false once the limit is reached.
   allowNewGuestClient(coachId: string): Promise<boolean>;
-  createGuestClient(coachId: string, name: string): Promise<{ ok: true; athleteId: string; groupId: string } | { ok: false; message: string }>;
+  createGuestClient(coachId: string, name: string, organizationId?: string | null): Promise<{ ok: true; athleteId: string; groupId: string } | { ok: false; message: string }>;
   discardGuestClient(athleteId: string, groupId: string): Promise<void>;
   book(args: { coachId: string; athleteId: string; groupId: string; start: Date; end: Date; sessionTypeId: string | null }): Promise<
     { ok: true; bookingId: string } | { ok: false; message: string }
@@ -199,7 +199,7 @@ export async function createPublicBooking(store: PublicBookingStore, input: Publ
     if (!(await store.allowNewGuestClient(page.coachId))) {
       return { ok: false, status: 429, error: "This page can't take new visitors right now. Please try again tomorrow, or contact your coach directly." };
     }
-    const made = await store.createGuestClient(page.coachId, guest.value.name);
+    const made = await store.createGuestClient(page.coachId, guest.value.name, type.organizationId ?? null);
     if (!made.ok) return { ok: false, status: 502, error: "We couldn't complete your booking. Please try again in a moment." };
     client = { athleteId: made.athleteId, groupId: made.groupId };
     created = true;

@@ -103,6 +103,8 @@ export interface PublicSessionTypeRow {
   displayPriceCents: number | null;
   publicVisible: boolean;
   sortOrder: number;
+  // The organization this session type belongs to (a coach in two organizations has a page for each kind of session): the visitor's client record is made there.
+  organizationId?: string | null;
 }
 
 export interface PublicSessionTypeView {

@@ -13,7 +13,8 @@ import { BiomechTagPicker, type BiomechTagOption, type BiomechTagSelection } fro
 import { generateBiomechBreakdown } from "@/lib/biomech-breakdown";
 import { ExerciseQrCodeButton } from "./exercise-qr-code-button";
 import { Trash2, Trophy } from "lucide-react";
-import { OLD_JUNK_ROW_MESSAGE, badExerciseNameMessage, isBadExerciseName } from "@/lib/exercise-name-guard";
+import { badExerciseNameMessage, editFailureMessage, isBadExerciseName } from "@/lib/exercise-name-guard";
+import { addLibraryExercise } from "@/lib/library-write";
 import { NO_FILTERS, filtersActive, matchesFilters, patternFilterOptions, tagChip, type ClassFilter, type LibraryFilters, type SideFilter } from "@/lib/library-sort";
 import { PATTERN_NAMES, TIER_KEY } from "@/lib/starter-ladders";
 
@@ -258,16 +259,19 @@ export function ExerciseLibraryList({
     }
     setSubmitting(true);
     const supabase = createBrowserClient();
-    const { data } = await supabase
-      .from("exercise_library")
-      .insert({
-        created_by: coachId,
-        name: trimmed,
-        category: newCategory || null,
-        equipment_type: newEquipmentType || null,
-      })
-      .select("id, name, video_path, youtube_url, category, equipment_type, description")
-      .single();
+    const added = await addLibraryExercise(supabase, {
+      userId: coachId,
+      name: trimmed,
+      existingNames: exercises.map((e) => e.name),
+      fields: { category: newCategory || null, equipment_type: newEquipmentType || null },
+      select: "id, name, video_path, youtube_url, category, equipment_type, description",
+    });
+    if (!added.ok) {
+      setNameProblem(added.error);
+      setSubmitting(false);
+      return;
+    }
+    const data = added.row as { id: string; name: string; video_path: string | null; youtube_url: string | null; category: string | null; equipment_type: EquipmentType | null; description: string | null } | null;
 
     if (data) {
       // Independent of the exercise_library row above — tags key off
@@ -312,7 +316,8 @@ export function ExerciseLibraryList({
 
   // A change that did not save is said plainly (an old row named with only numbers or with its sets and reps cannot be edited; it can be removed).
   async function reportEditFailure(error: { message?: string } | null) {
-    if (error) setNameProblem(OLD_JUNK_ROW_MESSAGE);
+    const message = editFailureMessage(error);
+    if (message) setNameProblem(message);
   }
 
   async function handleCategoryChange(id: string, category: string) {

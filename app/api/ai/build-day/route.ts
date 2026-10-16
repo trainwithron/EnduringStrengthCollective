@@ -206,14 +206,9 @@ export async function POST(request: Request) {
     const rows = first.rows;
     const dayTitle = role === "must" && !isMobilityTitle(result.title) ? "Mobility" : result.title;
 
-    // Spend once per run, only after a day really came back.
-    if (!run.ok) {
-      const spend = await checkAndSpendCoachCredits(createServiceRoleClient(), user.id, "program_generation");
-      if (!spend.ok) return NextResponse.json({ error: spend.error }, { status: 402 });
-    }
-
     // Write the day: an empty day is filled, a missing day is made, a day being fixed has its exercises replaced.
     let workoutId = target?.id ?? null;
+    let madeWorkout = false;
     if (!workoutId) {
       const { data: created, error: createError } = await supabase
         .from("workouts")
@@ -222,6 +217,7 @@ export async function POST(request: Request) {
         .single();
       if (createError || !created) return NextResponse.json({ error: "Couldn't build that day. Try Resume, or tell it what to change." }, { status: 500 });
       workoutId = created.id as string;
+      madeWorkout = true;
     }
     // An empty day that already exists with a placeholder name ("Day 2") takes the purpose name the day was given.
     if (target && mode === "build" && /^(day\s*\d*)?$/i.test((target.title ?? "").trim()) && !/^day\s*\d*$/i.test(dayTitle.trim())) {
@@ -269,10 +265,22 @@ export async function POST(request: Request) {
       const { error: setError } = await supabase.from("group_workout_exercise_sets").insert(sets);
       if (setError) failed++;
     }
-    if (failed === rows.length) {
-      // Nothing usable was written: remove what part-way rows there are and leave the day as it was.
+    // Put the day back the way it was: what this try wrote is removed, and a day this try made is removed too. The old exercises of a day being fixed are never touched until everything new is in.
+    const undoWrite = async () => {
       if (newIds.length > 0) await supabase.from("group_workout_exercises").delete().in("id", newIds);
+      if (madeWorkout && workoutId) await supabase.from("workouts").delete().eq("id", workoutId);
+    };
+    if (failed > 0) {
+      await undoWrite();
       return NextResponse.json({ error: "Couldn't build that day. Try Resume, or tell it what to change." }, { status: 500 });
+    }
+    // The credit is spent once per run, only now that the whole day is really written.
+    if (!run.ok) {
+      const spend = await checkAndSpendCoachCredits(createServiceRoleClient(), user.id, "program_generation");
+      if (!spend.ok) {
+        await undoWrite();
+        return NextResponse.json({ error: spend.error }, { status: 402 });
+      }
     }
     if (oldIds.length > 0) await supabase.from("group_workout_exercises").delete().in("id", oldIds);
 
@@ -284,7 +292,7 @@ export async function POST(request: Request) {
       week,
       day,
       title: dayTitle,
-      exerciseCount: rows.length - failed,
+      exerciseCount: rows.length,
       flags,
       // The rules used for this day, shown to the coach with their reason and an Undo.
       applied: toApplied(taughtRules),

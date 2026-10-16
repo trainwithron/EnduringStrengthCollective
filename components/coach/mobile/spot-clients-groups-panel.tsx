@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createGroupWithCoach } from "@/lib/create-group";
 import { useTerm } from "@/components/coach/terminology-provider";
 import { useRouter } from "next/navigation";
 import { Dumbbell, Plus } from "lucide-react";
@@ -264,16 +265,14 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
     // Generated client-side, not read back via .select() — a fresh group
     // has no group_memberships row yet, so its own membership-gated
     // SELECT policy can't see it immediately after INSERT ... RETURNING.
-    const newGroupId = crypto.randomUUID();
-    const { error: groupError } = await supabase.from("groups").insert({ id: newGroupId, name: trimmed, created_by: user.id, organization_id: membership.organization_id, group_kind: newGroupKind });
-    if (groupError) {
+    const made = await createGroupWithCoach(supabase, { userId: user.id, name: trimmed, organizationId: membership.organization_id, kind: newGroupKind });
+    if (!made.id) {
       setCreating(false);
-      setError("Couldn't create the group — try again.");
+      setError(made.error ?? "Couldn't create the group — try again.");
       return;
     }
-    await supabase.from("group_memberships").insert({ group_id: newGroupId, profile_id: user.id, role: "coach" });
     onNavigated();
-    router.push(`/groups/${newGroupId}/dashboard`);
+    router.push(`/groups/${made.id}/dashboard`);
   }
 
   const filteredClients = (clients ?? []).filter(

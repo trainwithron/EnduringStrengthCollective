@@ -19,7 +19,7 @@ import {
 } from "@/lib/fitpros-history-import";
 import type { PlannedWorkout } from "@/lib/fitpros-history";
 import { settleImportedHistory, recomputeTrainingMaxes, unclearFoundLine } from "@/lib/unclear-points";
-import { existingLibraryName } from "@/lib/exercise-search";
+import { addLibraryExercise } from "@/lib/library-write";
 import { badExerciseNameMessage, fitprosLayoutMessage, isBadExerciseName, isNumericOnlyName, noSetsWarning } from "@/lib/exercise-name-guard";
 
 function todayKey(): string {
@@ -105,10 +105,9 @@ export function FitprosHistoryImport({ athleteId, groupId, athleteName }: { athl
     const supabase = createBrowserClient();
     const { data: userData } = await supabase.auth.getUser();
     const { data: library } = await supabase.from("exercise_library").select("name");
-    const taken = existingLibraryName(name, (library ?? []).map((r) => r.name as string));
-    if (!taken && userData.user) {
-      const { error: insertError } = await supabase.from("exercise_library").insert({ created_by: userData.user.id, name: name.trim() });
-      if (insertError) setError("Couldn't add that to your library. Try again.");
+    if (userData.user) {
+      const added = await addLibraryExercise(supabase, { userId: userData.user.id, name, existingNames: (library ?? []).map((r) => r.name as string) });
+      if (!added.ok) setError(added.error);
     }
     if (plan) setPlan(await markLibrary(supabase, plan));
     setBusy(false);

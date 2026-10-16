@@ -51,26 +51,32 @@ export async function mintClaimLink(
   athleteId: string,
   origin: string
 ): Promise<{ ok: true; link: string; expiresAt: string } | { ok: false }> {
+  const token = generateClaimToken();
+  const expiresAt = new Date(Date.now() + CLAIM_LINK_LIFETIME_HOURS * 60 * 60 * 1000).toISOString();
+  // The new link is made FIRST; the earlier ones are retired only once it exists, so a failed write never leaves the client with no working link.
+  const { data: made, error } = await serviceRole
+    .from("client_invites")
+    .insert({
+      athlete_id: athleteId,
+      token_hash: hashClaimToken(token),
+      created_by: coachId,
+      expires_at: expiresAt,
+    })
+    .select("id")
+    .single();
+  if (error || !made) return { ok: false };
+
   const retiredAt = new Date().toISOString();
   const { error: retireError } = await serviceRole
     .from("client_invites")
     .update({ used_at: retiredAt, revoked_at: retiredAt, revoked_by: coachId })
     .eq("athlete_id", athleteId)
-    .is("used_at", null);
+    .is("used_at", null)
+    .neq("id", made.id);
   if (retireError) {
     // revoked_* columns not there yet: retire the old link the way this always worked.
-    await serviceRole.from("client_invites").update({ used_at: retiredAt }).eq("athlete_id", athleteId).is("used_at", null);
+    await serviceRole.from("client_invites").update({ used_at: retiredAt }).eq("athlete_id", athleteId).is("used_at", null).neq("id", made.id);
   }
-
-  const token = generateClaimToken();
-  const expiresAt = new Date(Date.now() + CLAIM_LINK_LIFETIME_HOURS * 60 * 60 * 1000).toISOString();
-  const { error } = await serviceRole.from("client_invites").insert({
-    athlete_id: athleteId,
-    token_hash: hashClaimToken(token),
-    created_by: coachId,
-    expires_at: expiresAt,
-  });
-  if (error) return { ok: false };
   return { ok: true, link: `${origin}/claim/${token}`, expiresAt };
 }
 

@@ -301,6 +301,16 @@
   "file": "apply-release-bw-all.sql"
  },
  {
+  "id": "release-ci",
+  "name": "Release CI (a day number is unique inside a week of a program; a one-on-one space follows its client name; run in order 130, 131, 132, BEFORE the code that goes with it is live)",
+  "steps": [
+   "130",
+   "131",
+   "132"
+  ],
+  "file": "apply-release-ci-all.sql"
+ },
+ {
   "id": "release-ch",
   "name": "Release CH (moving a client moves all of their records; program-day and session exercise names can never be only numbers or carry sets and reps; run BEFORE the code that goes with it is live)",
   "steps": [

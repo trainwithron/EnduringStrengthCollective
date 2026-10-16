@@ -22,7 +22,7 @@ describe("the one name check every writer uses", () => {
       "lib/fitpros-history-import.ts",
       "lib/exercise-history-import.ts",
       "components/coach/desktop/day-card.tsx",
-      "components/coach/desktop/recap-and-up-next.tsx",
+      "lib/rename-program-exercise.ts",
       "components/logging/session-logger.tsx",
       "components/logging/quick-add-nl-button.tsx",
       "components/coach/exercise-builder-card.tsx",

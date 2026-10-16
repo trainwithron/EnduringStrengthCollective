@@ -14,6 +14,8 @@ import { summarizeSets } from "@/lib/exercise-summary";
 import { cleanDisplayName } from "@/lib/exercise-alias-seed";
 import { existingLibraryName } from "@/lib/exercise-search";
 import { ExerciseProgressionControl } from "./exercise-progression-control";
+import { renameProgramExercise } from "@/lib/rename-program-exercise";
+import { addLibraryExercise } from "@/lib/library-write";
 import { matchExercise, type AliasEntry } from "@/lib/exercise-matching";
 import { ExerciseMediaPicker } from "./exercise-media-picker";
 import type { BuilderExercise, ExerciseSetTarget } from "@/lib/types";
@@ -266,9 +268,9 @@ export function ExerciseBuilderCard({
       flashSaveError("That name is too short to add to your library.");
       return;
     }
-    const { error } = await supabase.from("exercise_library").upsert({ created_by: userData.user.id, name: exercise.exerciseName.trim() }, { onConflict: "created_by,name", ignoreDuplicates: true });
-    if (error) {
-      flashSaveError("Couldn't add that to your library — try again.");
+    const added = await addLibraryExercise(supabase, { userId: userData.user.id, name: exercise.exerciseName, existingNames: exerciseLibrary });
+    if (!added.ok) {
+      flashSaveError(added.error);
       return;
     }
     setAddedToLibrary(true);
@@ -345,12 +347,10 @@ export function ExerciseBuilderCard({
     if (trimmed === exercise.exerciseName && display === exercise.displayName) return;
     if (!aliasUsed && exercise.displayName && trimmed === exercise.displayName) return;
     const supabase = createBrowserClient();
-    const { error: updateError } = await supabase
-      .from("group_workout_exercises")
-      .update({ exercise_name: trimmed, display_name: display })
-      .eq("id", exercise.id);
-    if (updateError) {
-      flashSaveError("Couldn't rename that exercise — try again.");
+    // The shared rename: checks the name, sets the shown name, and moves the program's progression rule with the exercise.
+    const renamed = await renameProgramExercise(supabase, { exerciseId: exercise.id, workoutId, oldName: exercise.exerciseName, newName: trimmed, displayName: display });
+    if (renamed.error) {
+      flashSaveError(renamed.error);
       return;
     }
     onUpdate({ exerciseName: trimmed, displayName: display });

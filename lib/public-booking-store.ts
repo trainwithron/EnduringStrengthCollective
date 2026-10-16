@@ -50,7 +50,7 @@ export function publicBookingStore(db: any): PublicBookingStore {
     async sessionTypes(coachId): Promise<PublicSessionTypeRow[]> {
       const { data, error } = await db
         .from("session_types")
-        .select("id, name, duration_minutes, location_kind, location_text, description, display_price_cents, public_visible, sort_order")
+        .select("id, name, duration_minutes, location_kind, location_text, description, display_price_cents, public_visible, sort_order, organization_id")
         .eq("coach_id", coachId)
         .eq("public_visible", true)
         .order("sort_order", { ascending: true });
@@ -65,6 +65,7 @@ export function publicBookingStore(db: any): PublicBookingStore {
         displayPriceCents: r.display_price_cents ?? null,
         publicVisible: !!r.public_visible,
         sortOrder: r.sort_order ?? 0,
+        organizationId: r.organization_id ?? null,
       }));
     },
 
@@ -114,14 +115,11 @@ export function publicBookingStore(db: any): PublicBookingStore {
       return rateLimitAllows(`pb-new-guest:${coachId}`, MAX_NEW_GUESTS_PER_DAY, 86400);
     },
 
-    async createGuestClient(coachId, name) {
-      const { data: membership } = await db
-        .from("organization_memberships")
-        .select("organization_id")
-        .eq("profile_id", coachId)
-        .order("created_at", { ascending: true })
-        .limit(1)
-        .maybeSingle();
+    async createGuestClient(coachId, name, organizationId) {
+      // The organization of the session type that was booked, when the coach belongs to it; only otherwise the coach's oldest organization.
+      let query = db.from("organization_memberships").select("organization_id").eq("profile_id", coachId);
+      if (organizationId) query = query.eq("organization_id", organizationId);
+      const { data: membership } = await query.order("created_at", { ascending: true }).limit(1).maybeSingle();
       if (!membership) return { ok: false as const, message: "no organization" };
 
       const groupId = crypto.randomUUID();

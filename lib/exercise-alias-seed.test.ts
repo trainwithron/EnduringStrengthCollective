@@ -100,7 +100,9 @@ const read = (p: string) => readFileSync(resolve(__dirname, p), "utf8").replace(
 describe("the coach's name travels: saved, shown, copied", () => {
   it("picking through an alias saves the real exercise and the alias; any other rename clears the alias", () => {
     const card = read("../components/coach/exercise-builder-card.tsx");
-    expect(card).toContain(".update({ exercise_name: trimmed, display_name: display })");
+    // the shared rename writes the name and the shown (alias) name together
+    expect(card).toContain("displayName: display });");
+    expect(read("../lib/rename-program-exercise.ts")).toContain(".update({ exercise_name: name, display_name: displayName })");
     expect(card).toContain("cleanDisplayName(aliasUsed)");
     expect(card).toContain("onUpdate({ exerciseName: trimmed, displayName: display });");
     expect(card).toContain("useState(exercise.displayName ?? exercise.exerciseName)");

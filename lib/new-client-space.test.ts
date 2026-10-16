@@ -13,7 +13,12 @@ describe("Adding a client: the creator of a new group seats themselves", () => {
     expect(sql).toContain("profile_id = (select auth.uid())");
   });
   it("the screens that make a group and then seat their creator still do exactly that (the database rule is the fix)", () => {
-    expect(read("components/coach/desktop/add-client-button.tsx")).toContain('from("group_memberships").insert({ group_id: newGroupId, profile_id: user.id, role: "coach" })');
-    expect(read("components/coach/desktop/group-switcher.tsx")).toContain('role: "coach"');
+    // every screen makes the group through the one helper, which seats the creator as coach and removes the group again if the seat cannot be made
+    const helper = read("lib/create-group.ts");
+    expect(helper).toContain('from("group_memberships").insert({ group_id: id, profile_id: userId, role: "coach" })');
+    expect(helper).toContain('await supabase.from("groups").delete().eq("id", id)');
+    for (const p of ["components/coach/desktop/add-client-button.tsx", "components/coach/desktop/group-switcher.tsx", "components/coach/desktop/workspace-menu.tsx", "components/coach/mobile/spot-clients-groups-panel.tsx", "components/coach/change-client-group-control.tsx"]) {
+      expect(read(p), p).toContain("createGroupWithCoach(");
+    }
   });
 });

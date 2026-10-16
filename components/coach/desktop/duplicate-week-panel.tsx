@@ -362,6 +362,7 @@ export function DuplicateWeekPanel({
       data: { user },
     } = await supabase.auth.getUser();
     const generatedDays: BuilderDay[] = [];
+    const createdDayIds: string[] = [];
     let anyFailed = false;
 
     for (let offset = 0; offset < weekCount; offset++) {
@@ -383,6 +384,7 @@ export function DuplicateWeekPanel({
           anyFailed = true;
           continue;
         }
+        createdDayIds.push(workoutRow.id as string);
 
         const items: BuilderItem[] = [];
 
@@ -442,7 +444,25 @@ export function DuplicateWeekPanel({
             }
             const { data: slotSets, error: slotSetsError } = await supabase
               .from("group_workout_exercise_sets")
-              .insert(src.sets.map((st, i) => ({ group_workout_exercise_id: slotRow.id, set_order: i, target_reps: st.targetReps })))
+              .insert(
+                src.sets.map((st, i) => ({
+                  group_workout_exercise_id: slotRow.id,
+                  set_order: i,
+                  target_reps: st.targetReps,
+                  target_weight: st.targetWeight,
+                  target_rpe: st.targetRpe,
+                  target_rir: st.targetRir,
+                  target_tempo: st.targetTempo,
+                  target_time_seconds: st.targetTimeSeconds,
+                  target_height: st.targetHeight,
+                  target_distance: st.targetDistance,
+                  target_rest_seconds: st.targetRestSeconds,
+                  target_rest_max_seconds: st.targetRestMaxSeconds ?? null,
+                  target_pace: st.targetPace,
+                  rep_min: st.repMin,
+                  rep_max: st.repMax,
+                }))
+              )
               .select(SET_ROW_SELECT);
             if (slotSetsError) anyFailed = true;
             items.push({ ...src, id: slotRow.id, order: itemOrder, sets: (slotSets ?? []).map(mapSetRow) });
@@ -604,18 +624,17 @@ export function DuplicateWeekPanel({
       }
     }
 
+    // All or nothing: if any part did not save, every day this run made is removed again, so the program never keeps weeks with missing exercises or sets.
+    if (anyFailed) {
+      if (createdDayIds.length > 0) await supabase.from("workouts").delete().in("id", createdDayIds);
+      setGenerating(false);
+      flashSaveError("Couldn't add those weeks, so nothing was added. Try again.");
+      return;
+    }
     onGenerated(generatedDays);
     setGenerating(false);
     setOpen(false);
-    if (anyFailed) {
-      flashSaveError(
-        generatedDays.length > 0
-          ? "Some of the generated weeks didn't save fully — check them before relying on them."
-          : "Couldn't generate those weeks — try again."
-      );
-    } else {
-      flashSaved();
-    }
+    flashSaved();
   }
 
   if (!open) {

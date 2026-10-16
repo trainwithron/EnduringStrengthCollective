@@ -69,6 +69,12 @@ export function friendlyDbError(message: string): string {
   return /exercise_(library_name_not_digits|aliases_target_not_digits)/.test(message) ? OLD_JUNK_ROW_MESSAGE : message;
 }
 
+// What to say when an edit of a library row did not save: the plain junk-row message only when the database's name rule is what refused it; anything else is a plain "try again".
+export function editFailureMessage(error: { message?: string } | null | undefined): string | null {
+  if (!error) return null;
+  return friendlyDbError(error.message ?? "") === OLD_JUNK_ROW_MESSAGE ? OLD_JUNK_ROW_MESSAGE : "That change didn't save. Try again.";
+}
+
 export function usableExerciseNames(names: string[]): string[] {
   return names.filter((n) => !isBadExerciseName(n));
 }

@@ -37,18 +37,21 @@ import { isRestDayTitle } from "@/lib/empty-sweep";
 // a word, e.g. "Barbell Bench Press" vs "Barbell Overhead Press"), which
 // means a short real prefix like that doesn't cross it. This adds one
 // narrower, safe fallback specifically for quick-add: if exactly one
-// library exercise starts with what was typed, reuse it — never applied
-// when it's ambiguous between two or more candidates.
-function resolveQuickAddExerciseName(typedName: string, fullLibrary: string[]): string {
+// library exercise starts with what was typed, reuse it. When two or more
+// start with it, nothing is guessed and nothing half-typed is saved ("Sumo S"):
+// the coach is asked to type a little more.
+export function resolveQuickAddExerciseName(typedName: string, fullLibrary: string[]): { name: string } | { ambiguous: string[] } {
   const library = usableExerciseNames(fullLibrary);
   const match = matchExercise(typedName, library.map((name) => ({ name })), []);
   // A near match is used only when it is the same movement with the same implement, side and position; what someone typed is never swapped for a different exercise.
-  if (match.exerciseName && (match.confidence !== "fuzzy" || sameQualifiers(typedName, match.exerciseName))) return match.exerciseName;
+  if (match.exerciseName && (match.confidence !== "fuzzy" || sameQualifiers(typedName, match.exerciseName))) return { name: match.exerciseName };
 
   const normalizedTyped = typedName.trim().toLowerCase();
   const prefixMatches = library.filter((name) => name.toLowerCase().startsWith(normalizedTyped));
   // A library exercise keeps its own casing; a brand-new typed name gets a capital on each word.
-  return prefixMatches.length === 1 ? prefixMatches[0] : capitalizeWords(typedName);
+  if (prefixMatches.length === 1) return { name: prefixMatches[0] };
+  if (prefixMatches.length > 1) return { ambiguous: prefixMatches.slice(0, 3) };
+  return { name: capitalizeWords(typedName) };
 }
 
 export function DayCard({
@@ -317,7 +320,12 @@ export function DayCard({
       const supabase = createBrowserClient();
       const nextOrder = day.items.length > 0 ? Math.max(...day.items.map((i) => i.order)) + 1 : 0;
 
-      const resolvedExerciseName = resolveQuickAddExerciseName(parsed.exerciseName, exerciseLibrary);
+      const resolved = resolveQuickAddExerciseName(parsed.exerciseName, exerciseLibrary);
+      if ("ambiguous" in resolved) {
+        setQuickEntryError(`"${parsed.exerciseName}" could be ${resolved.ambiguous.join(", ")}. Type a little more of the name.`);
+        return;
+      }
+      const resolvedExerciseName = resolved.name;
 
       const { data: newRow, error: insertError } = await supabase
         .from("group_workout_exercises")

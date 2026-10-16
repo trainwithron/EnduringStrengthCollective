@@ -3,7 +3,8 @@
 // browser) so this stays testable without touching File/ArrayBuffer APIs.
 
 import { normalizeTimedRow } from "@/lib/timed-exercise";
-import { isNumericOnlyName } from "@/lib/exercise-name-guard";
+import { isNumericOnlyName, splitPrescriptionName } from "@/lib/exercise-name-guard";
+import { poundsFrom } from "@/lib/weight-units";
 
 export type ImportColumn =
   | "week"
@@ -130,7 +131,13 @@ export interface ParsedImportRow {
   rpe: number | null;
   rest: string | null;
   timeSeconds: number | null;
+  // What the weight cell said when it was not a plain number ("135-185", "BW+25", "60%"): kept as a note instead of being turned into a wrong number.
+  weightNote?: string | null;
+  // The set count was more than the limit and was cut to it.
+  setsCapped?: boolean;
 }
+
+export const MAX_IMPORT_SETS = 20;
 
 function cell(row: string[], index: number | undefined): string {
   if (index == null) return "";
@@ -150,20 +157,35 @@ function extractFromPrescription(text: string, label: RegExp): number | null {
 // likewise a blank "Week" falls back to "Week 1".
 export function parseImportRows(dataRows: string[][], mapping: ColumnMapping): ParsedImportRow[] {
   const rows: ParsedImportRow[] = [];
+  // A blank Week or Day cell (a merged cell in a spreadsheet) means "the same as the row above", not "back to Day 1".
+  let lastWeek = "Week 1";
+  let lastDay = "Day 1";
 
   for (const row of dataRows) {
-    const exerciseName = cell(row, mapping.exercise);
+    let exerciseName = cell(row, mapping.exercise);
     if (!exerciseName) continue;
 
-    const week = cell(row, mapping.week) || "Week 1";
-    const day = cell(row, mapping.day) || "Day 1";
+    const week = cell(row, mapping.week) || lastWeek;
+    const day = cell(row, mapping.day) || lastDay;
+    lastWeek = week;
+    lastDay = day;
     const setsRaw = cell(row, mapping.sets);
-    const sets = setsRaw ? parseInt(setsRaw, 10) || 1 : 1;
+    const setsParsed = setsRaw ? parseInt(setsRaw, 10) || 1 : 1;
+    let sets = Math.min(Math.max(setsParsed, 1), MAX_IMPORT_SETS);
+    const setsCapped = setsParsed > MAX_IMPORT_SETS;
     const prescription = cell(row, mapping.prescription);
+
+    // An exercise cell that carries its own prescription ("Bench 3x10 @7"): the name is the words before it, and the sets and reps fill in only what the row does not say itself.
+    const split = splitPrescriptionName(exerciseName);
+    if (split) {
+      exerciseName = split.name;
+      if (!setsRaw) sets = Math.min(split.sets, MAX_IMPORT_SETS);
+    }
 
     // A dedicated Reps column wins; otherwise fall back to pulling a number
     // out of a combined "Reps: N x M" free-text column.
     let reps = cell(row, mapping.reps) || null;
+    if (!reps && split?.reps) reps = split.reps;
     if (!reps && prescription) {
       // "Reps: 5 x 3" is 5 reps; "Reps: 3 sets" only says there are three sets and is not a rep target.
       const repsFromText = extractFromPrescription(prescription, /reps?:\s*(\d+(?:\.\d+)?)(?![\d.])(?!\s*sets?\b)/i);
@@ -174,10 +196,13 @@ export function parseImportRows(dataRows: string[][], mapping: ColumnMapping): P
       ? extractFromPrescription(prescription, /time\s*\(sec\):\s*(\d+(?:\.\d+)?)(?![\d.])(?!\s*sets?\b)/i)
       : null;
 
-    const weightRaw = cell(row, mapping.weight).replace(/[^0-9.]/g, "");
-    const weight = weightRaw ? parseFloat(weightRaw) : null;
+    // Only a plain number, with lb or kg after it if at all, is a weight. "135-185", "BW+25" and "60%" are kept as a note and the weight is left blank.
+    const weightText = cell(row, mapping.weight);
+    const weightMatch = weightText.match(/^(\d+(?:\.\d+)?)\s*(lb|lbs|kg)?$/i);
+    const weight = weightMatch ? (weightMatch[2]?.toLowerCase() === "kg" ? poundsFrom(parseFloat(weightMatch[1]), "kg") : parseFloat(weightMatch[1])) : null;
+    const weightNote = weightText && !weightMatch ? weightText : null;
     const rpeRaw = cell(row, mapping.rpe);
-    const rpe = rpeRaw ? parseFloat(rpeRaw) : null;
+    const rpe = rpeRaw ? parseFloat(rpeRaw) : split?.rpe ?? null;
     const rest = cell(row, mapping.rest) || null;
 
     // A duration in the reps place ("60 sec") or a bare number on a plank or wall sit is a time, not reps.
@@ -191,7 +216,9 @@ export function parseImportRows(dataRows: string[][], mapping: ColumnMapping): P
         weight: weight != null && Number.isFinite(weight) ? weight : null,
         rpe: rpe != null && Number.isFinite(rpe) ? rpe : null,
         rest,
-        timeSeconds,
+        timeSeconds: timeSeconds ?? split?.timeSeconds ?? null,
+        ...(weightNote ? { weightNote } : {}),
+        ...(setsCapped ? { setsCapped } : {}),
       })
     );
   }
@@ -273,9 +300,26 @@ export function parseRestSeconds(text: string | null | undefined): number | null
   return Math.round(unit.startsWith("m") ? n * 60 : n);
 }
 
+// What to tell the coach about cells that were not read as plain numbers or were cut to a limit; empty when everything was read as written.
+export function importReadWarnings(rows: ParsedImportRow[]): string[] {
+  const out: string[] = [];
+  const unreadable = rows.filter((r) => r.weightNote);
+  if (unreadable.length > 0) {
+    out.push(`${unreadable.length} weight${unreadable.length === 1 ? "" : "s"} could not be read as a plain number (for example "${unreadable[0].weightNote}"). ${unreadable.length === 1 ? "It is" : "They are"} in the exercise notes and the weight is left blank.`);
+  }
+  const capped = rows.filter((r) => r.setsCapped);
+  if (capped.length > 0) {
+    out.push(`${capped.length} exercise${capped.length === 1 ? " had" : "s had"} more than ${MAX_IMPORT_SETS} sets; ${capped.length === 1 ? "it was" : "they were"} cut to ${MAX_IMPORT_SETS}. Check ${capped.length === 1 ? "it" : "them"}.`);
+  }
+  return out;
+}
+
 export interface ImportedExercise {
   exerciseName: string;
   sets: number;
+  // The weight cell, when it was not a plain number; saved as the exercise's note.
+  note?: string | null;
+  setsCapped?: boolean;
   reps: string | null;
   weight: number | null;
   rpe: number | null;
@@ -321,14 +365,28 @@ export function groupIntoWeeks(rows: ParsedImportRow[]): ImportedWeek[] {
       rpe: row.rpe,
       timeSeconds: row.timeSeconds,
       restSeconds: parseRestSeconds(row.rest),
+      ...(row.weightNote ? { note: `Weight: ${row.weightNote}` } : {}),
+      ...(row.setsCapped ? { setsCapped: true } : {}),
     });
   }
 
+  // The week number is the number after "Week" or "Wk" ("Phase 1 Week 2" is week 2), else a label that is only a number; when that is missing or already used by an earlier week, the next free number in the order the weeks appear.
+  const used = new Set<number>();
+  const numbers = weekOrder.map((week) => {
+    const named = week.match(/\b(?:week|wk)\.?\s*(\d+)/i) ?? week.match(/^\s*(\d+)\s*$/);
+    let n = named ? parseInt(named[1], 10) : 0;
+    if (n < 1 || used.has(n)) {
+      n = 1;
+      while (used.has(n)) n++;
+    }
+    used.add(n);
+    return n;
+  });
+
   return weekOrder.map((week, i) => {
-    const match = week.match(/(\d+)/);
     return {
       weekLabel: week,
-      weekNumber: match ? parseInt(match[1], 10) : i + 1,
+      weekNumber: numbers[i],
       days: dayOrderByWeek.get(week)!.map((day) => ({
         dayLabel: day,
         exercises: exercisesByWeekDay.get(`${week} ${day}`)!,

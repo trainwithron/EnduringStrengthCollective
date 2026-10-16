@@ -37,7 +37,7 @@ describe("where it is applied", () => {
   });
   it("the quick-add line: a new exercise is capitalized, a library exercise keeps its own casing", () => {
     const card = read("components/coach/desktop/day-card.tsx");
-    expect(card).toContain("prefixMatches[0] : capitalizeWords(typedName)");
-    expect(card).toContain("return match.exerciseName;");
+    expect(card).toContain("return { name: capitalizeWords(typedName) };");
+    expect(card).toContain("{ name: match.exerciseName }");
   });
 });

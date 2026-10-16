@@ -73,6 +73,7 @@ export function QuickAddNlButton({
       const supabase = createBrowserClient();
       const newEntries: SessionExerciseEntry[] = [];
       let order = nextExerciseOrder;
+      let failedExercises = 0;
 
       for (const ex of draft) {
         const insertPayload: Record<string, unknown> = {
@@ -91,7 +92,10 @@ export function QuickAddNlButton({
           .insert(insertPayload)
           .select("id, exercise_name, exercise_order, is_swapped, is_added, tracked_fields")
           .single();
-        if (!sessionExercise) continue;
+        if (!sessionExercise) {
+          failedExercises++;
+          continue;
+        }
 
         const setRows = Array.from({ length: ex.sets }, (_, i) => ({
           session_exercise_id: sessionExercise.id,
@@ -100,13 +104,14 @@ export function QuickAddNlButton({
           reps: ex.reps,
           rpe: ex.rpe,
         }));
-        const { data: sets } = await supabase
+        const { data: sets, error: setsError } = await supabase
           .from("set_logs")
           .insert(setRows)
           .select(
             "id, set_order, weight, reps, rpe, rir, tempo, time_seconds, height, distance, rest_seconds, pace, status"
           );
 
+        if (setsError) failedExercises++;
         newEntries.push({
           id: sessionExercise.id,
           exerciseName: sessionExercise.exercise_name,
@@ -136,6 +141,12 @@ export function QuickAddNlButton({
       }
 
       onAdded(newEntries);
+      // Never "done" when some did not save: say how many, and keep what was typed so it can be tried again.
+      if (failedExercises > 0) {
+        setError(`${failedExercises} of ${draft.length} exercise${draft.length === 1 ? "" : "s"} did not save. Check the list above and add what is missing.`);
+        setDraft(null);
+        return;
+      }
       setOpen(false);
       setText("");
       setDraft(null);
@@ -166,6 +177,11 @@ export function QuickAddNlButton({
             {ex.rpe != null ? ` (RPE ${ex.rpe})` : ""}
           </p>
         ))}
+        {error && (
+          <p className="font-body text-xs text-rust" role="alert">
+            {error}
+          </p>
+        )}
         <div className="flex items-center gap-2 pt-1">
           <button
             type="button"

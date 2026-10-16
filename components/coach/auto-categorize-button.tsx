@@ -31,6 +31,7 @@ export function AutoCategorizeButton({
   const [open, setOpen] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [applying, setApplying] = useState(false);
+  const [failedCount, setFailedCount] = useState(0);
 
   // A name that is only numbers or carries sets and reps (an old junk row) is left out: the database refuses any change to such a row, and one of them in a bulk update would fail the whole group.
   const uncategorized = exercises.filter((e) => !e.category && !isBadExerciseName(e.name));
@@ -60,12 +61,20 @@ export function AutoCategorizeButton({
     }
 
     const supabase = createBrowserClient();
+    let failed = 0;
+    setFailedCount(0);
     for (const [category, ids] of idsByCategory) {
-      await supabase.from("exercise_library").update({ category }).in("id", ids);
-      for (const id of ids) onApplied(id, category);
+      const { error } = await supabase.from("exercise_library").update({ category }).in("id", ids);
+      // A category that did not save is not painted on the screen as if it had.
+      if (error) failed += ids.length;
+      else for (const id of ids) onApplied(id, category);
     }
 
     setApplying(false);
+    if (failed > 0) {
+      setFailedCount(failed);
+      return;
+    }
     setOpen(false);
   }
 
@@ -108,6 +117,11 @@ export function AutoCategorizeButton({
             )}
           </div>
 
+          {failedCount > 0 && (
+            <p className="px-4 pb-2 font-body text-xs text-rust" role="alert">
+              {failedCount} categor{failedCount === 1 ? "y" : "ies"} did not save, so {failedCount === 1 ? "it was" : "they were"} not applied. Try again.
+            </p>
+          )}
           <div className="p-4 border-t border-steel/20 flex items-center justify-end gap-3">
             <button
               type="button"

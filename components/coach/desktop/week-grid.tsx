@@ -1,6 +1,7 @@
 "use client";
 
 import { confirmDialog } from "@/components/shared/confirm-dialog";
+import { insertProgramDay, saveDayOrder } from "@/lib/program-days";
 import type { DemoRow } from "@/lib/exercise-demo";
 import { NONE_COLLAPSED, allCollapsed, toggleAll, toggleCollapsed } from "@/lib/collapse-state";
 import { ClientPreviewButton } from "@/components/coach/desktop/client-preview";
@@ -138,10 +139,7 @@ export function WeekGrid({
 
   async function persistDayOrder(nextDays: BuilderDay[]) {
     const supabase = createBrowserClient();
-    const results = await Promise.all(
-      nextDays.map((d, i) => supabase.from("workouts").update({ day_index: i + 1 }).eq("id", d.id))
-    );
-    if (results.some((r) => r.error)) {
+    if (!(await saveDayOrder(supabase, nextDays.map((d) => d.id)))) {
       flashSaveError("Couldn't save the new day order — reload to check.");
       return;
     }
@@ -173,22 +171,11 @@ export function WeekGrid({
     setAddDayBusy(true);
     try {
       const supabase = createBrowserClient();
-      const nextDayIndex = days.length > 0 ? Math.max(...days.map((d) => d.dayIndex)) + 1 : 1;
-
-      const { data: newRow, error: insertError } = await supabase
-        .from("workouts")
-        .insert({
-          program_id: programId,
-          group_id: groupId,
-          title: `Day ${nextDayIndex}`,
-          week_number: weekNumber,
-          day_index: nextDayIndex,
-        })
-        .select("id, title, week_number, day_index")
-        .single();
+      // The next free day number is read from what is saved (not from this screen), and retried if someone else took it at the same moment.
+      const { row: newRow, error: insertError } = await insertProgramDay(supabase, { programId, groupId, weekNumber, title: (n) => `Day ${n}` });
 
       if (insertError || !newRow) {
-        flashSaveError("Couldn't add that day — try again.");
+        flashSaveError(insertError ?? "Couldn't add that day — try again.");
         return;
       }
 

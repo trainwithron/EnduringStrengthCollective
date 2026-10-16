@@ -232,6 +232,17 @@ for (const s of steps) {
         ('568e84b6-b85c-476c-b160-7b6b64e21caa', 'Rob Derrick', '136394ed-f108-4283-bcb7-310a1ac6cbc8', 'b0000000-0000-4000-8000-000000000001', 'one_on_one');
     `);
   }
+  if (s.n === "130") {
+    // The one program whose Day 1 and Day 2 both carry day number 1, with the same ids and order as live.
+    await db.exec(`
+      insert into public.programs (id, group_id, name, created_by) values ('a7b5f600-3b62-4ec0-a016-d518f3f39a3e', '${G164}', 'Dont mess with the Johann', '${RON64}');
+      insert into public.workouts (id, program_id, group_id, title, week_number, day_index, created_at) values
+        ('0f92ad85-c134-4731-b027-446254949a76', 'a7b5f600-3b62-4ec0-a016-d518f3f39a3e', '${G164}', 'Day 1', 1, 1, '2026-09-28 20:49:26+00'),
+        ('fd73bdb4-1510-4b32-a521-219222921c12', 'a7b5f600-3b62-4ec0-a016-d518f3f39a3e', '${G164}', 'Day 2', 1, 1, '2026-09-29 20:18:22+00'),
+        ('27c5131f-b421-4eeb-b2e4-3291ce60d67c', 'a7b5f600-3b62-4ec0-a016-d518f3f39a3e', '${G164}', 'Day 3', 1, 2, '2026-09-28 20:58:00+00'),
+        ('33a67f22-e93d-4585-849f-c9894d0bc89f', 'a7b5f600-3b62-4ec0-a016-d518f3f39a3e', '${G164}', 'Day 4', 1, 3, '2026-09-29 20:47:23+00');
+    `);
+  }
   if (s.n === "111") {
     // Coach Ron's library with the old names (plus the four FitPros ones from step 106), program lines, a session, a record, a client's two maxes (one per old name), aliases and a post that use them;
     // another coach with some of the same names whose library and programs must not change at all; and a name only that other coach has, which must never reach the shared catalog.
@@ -276,6 +287,10 @@ for (const s of steps) {
     const gone = (await db.query("select count(*)::int as n from public.groups where id in ('e2425435-950a-409d-8d4e-e24d92f21652', '568e84b6-b85c-476c-b160-7b6b64e21caa')")).rows[0].n;
     const logged = (await db.query("select count(*)::int as n from public.orphan_group_cleanup_log")).rows[0].n;
     check("step 109 removed the two empty Rob Derrick groups and logged them: " + gone + " left, " + logged + " logged", gone === 0 && logged === 2);
+  }
+  if (s.n === "130") {
+    const got = (await db.query("select title, day_index from public.workouts where program_id = 'a7b5f600-3b62-4ec0-a016-d518f3f39a3e' order by day_index")).rows.map((r) => r.title + "=" + r.day_index).join(", ");
+    check("step 130 gave the four days the numbers 1, 2, 3, 4 in the order they showed: " + got, got === "Day 1=1, Day 2=2, Day 3=3, Day 4=4");
   }
   if (s.n === "105") {
     const one = async (sql) => (await db.query(sql)).rows[0];

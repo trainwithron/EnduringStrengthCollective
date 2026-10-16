@@ -73,7 +73,10 @@ describe("where the name is committed", () => {
     expect(read("components/coach/exercise-name-input.tsx")).toContain("existingLibraryName(text, suggestions) ?? capitalizeWords(text)");
     const list = read("components/coach/exercise-library-list.tsx");
     expect(list).toContain("const existingName = existingLibraryName(trimmed, exercises.map((e) => e.name));");
-    expect(list.indexOf("existingLibraryName(trimmed")).toBeLessThan(list.indexOf('.from("exercise_library")\n      .insert('));
+    // the add goes through the one helper, which also looks for an existing spelling before it inserts
+    expect(list).toContain("addLibraryExercise(supabase");
+    const helper = read("lib/library-write.ts");
+    expect(helper.indexOf("existingLibraryName(clean")).toBeLessThan(helper.indexOf('.from("exercise_library").insert'));
   });
 });
 

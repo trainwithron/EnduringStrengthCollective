@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { createGroupWithCoach } from "@/lib/create-group";
 import { useRouter } from "next/navigation";
 import { UserPlus } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -74,7 +75,15 @@ export function AddClientButton({
     setSelectedGroupId((prev) => prev || list.find((g) => g.id === groupId)?.id || list[0]?.id || "");
   }
 
+  // Closing the box after the client's space was made but before anyone was added to it: the empty space is removed, so abandoned tries do not pile up as empty groups. A space that has a client is never touched.
+  async function removeEmptySpace(groupIdToCheck: string) {
+    const supabase = createBrowserClient();
+    const { count } = await supabase.from("group_memberships").select("profile_id", { count: "exact", head: true }).eq("group_id", groupIdToCheck).eq("role", "athlete");
+    if ((count ?? 0) === 0) await supabase.from("groups").delete().eq("id", groupIdToCheck);
+  }
+
   function reset() {
+    if (createdGroupIdRef.current && !added) void removeEmptySpace(createdGroupIdRef.current);
     setOpen(false);
     setStep("choose");
     setFullName("");
@@ -104,20 +113,13 @@ export function AddClientButton({
       setError("Couldn't find your business. Try again.");
       return null;
     }
-    const newGroupId = crypto.randomUUID();
-    const { error: groupError } = await supabase.from("groups").insert({ id: newGroupId, name: name.trim() || "New client", created_by: user.id, organization_id: membership.organization_id, group_kind: "one_on_one" });
-    if (groupError) {
+    const made = await createGroupWithCoach(supabase, { userId: user.id, name: name.trim() || "New client", organizationId: membership.organization_id, kind: "one_on_one" });
+    if (!made.id) {
       setError("Couldn't set up their space. Try again.");
       return null;
     }
-    const { error: coachError } = await supabase.from("group_memberships").insert({ group_id: newGroupId, profile_id: user.id, role: "coach" });
-    if (coachError) {
-      await supabase.from("groups").delete().eq("id", newGroupId);
-      setError("Couldn't set up their space. Try again.");
-      return null;
-    }
-    createdGroupIdRef.current = newGroupId;
-    return newGroupId;
+    createdGroupIdRef.current = made.id;
+    return made.id;
   }
 
   async function addByName(e: React.FormEvent) {

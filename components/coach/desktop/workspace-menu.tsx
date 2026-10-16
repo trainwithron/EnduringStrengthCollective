@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createGroupWithCoach } from "@/lib/create-group";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronDown, Plus } from "lucide-react";
@@ -102,19 +103,15 @@ export function WorkspaceMenu({ groupId, orgName, large = false }: { groupId: st
       return;
     }
     // Generated here rather than read back after the insert: a new group has no membership row yet, so it cannot be selected back.
-    const newGroupId = crypto.randomUUID();
-    const { error: groupError } = await supabase
-      .from("groups")
-      .insert({ id: newGroupId, name, created_by: user.id, organization_id: current.organization_id, group_kind: newKind });
-    if (groupError) {
+    const made = await createGroupWithCoach(supabase, { userId: user.id, name, organizationId: current.organization_id, kind: newKind });
+    if (!made.id) {
       setBusy(false);
-      setError("Couldn't create the group. Try again.");
+      setError(made.error ?? "Couldn't create the group. Try again.");
       return;
     }
-    await supabase.from("group_memberships").insert({ group_id: newGroupId, profile_id: user.id, role: "coach" });
     setBusy(false);
     setOpen(false);
-    router.push(`/groups/${newGroupId}/dashboard`);
+    router.push(`/groups/${made.id}/dashboard`);
   }
 
   const itemClass = "flex items-center h-10 px-3 font-body text-sm text-chalk hover:bg-surface active:text-rust w-full text-left";

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { cleanImportedProgramName, PROGRAM_NAME_MAX, tidyProgramName } from "@/lib/program-name";
 import { readAiJson } from "@/lib/ai-fetch";
 import { isBadExerciseName, isNumericOnlyName, isPrescriptionName } from "@/lib/exercise-name-guard";
+import { addLibraryExercise } from "@/lib/library-write";
 import * as XLSX from "xlsx";
 import * as cptable from "xlsx/dist/cpexcel.full.mjs";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -26,6 +27,7 @@ import {
   EXERCISE_NUMBERS_MESSAGE,
   normalizeHeader,
   parseImportRows,
+  importReadWarnings,
   mergeIdenticalSetRows,
   groupIntoWeeks,
   parseRestSeconds,
@@ -106,6 +108,8 @@ interface ImportSummary {
   // Days, exercises or sets that failed to save. Non-zero means the program
   // is incomplete and the coach must check it, not trust it.
   failedWrites: number;
+  // Cells that were not read as plain numbers, or were cut to a limit (see importReadWarnings), plus library or progression writes that failed.
+  notices: string[];
 }
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -488,6 +492,9 @@ export function ImportWizard({
     // The name the coach confirmed on the review screen: trimmed, and never blank.
     const programName = tidyProgramName(importData.programName);
     const resolutions = new Map(importData.resolutions);
+    // Things the coach should know after the import (cells not read as plain numbers, writes that did not save), shown on the done screen.
+    const notices: string[] = [];
+    let libraryFailures = 0;
 
     const createdExercises: string[] = [...autoNewExercises];
     const newAliases: { rawName: string; exerciseName: string }[] = [];
@@ -505,17 +512,20 @@ export function ImportWizard({
     for (const name of createdExercises) {
       // Never a library row (or alias) made only of numbers, whatever reached this point.
       if (isBadExerciseName(name)) continue;
-      await supabase.from("exercise_library").insert({ created_by: coachId, name, category: null });
+      const added = await addLibraryExercise(supabase, { userId: coachId, name, existingNames: [], fields: { category: null } });
+      if (!added.ok) libraryFailures++;
     }
     for (const alias of newAliases) {
       if (isBadExerciseName(alias.rawName) || isBadExerciseName(alias.exerciseName)) continue;
-      await supabase
+      const { error: aliasError } = await supabase
         .from("exercise_aliases")
         .upsert(
           { coach_id: coachId, raw_name: alias.rawName, exercise_name: alias.exerciseName },
           { onConflict: "coach_id,raw_name" }
         );
+      if (aliasError) libraryFailures++;
     }
+    if (libraryFailures > 0) notices.push(`${libraryFailures} new exercise${libraryFailures === 1 ? "" : "s"} or name match${libraryFailures === 1 ? "" : "es"} did not save to your library. The program uses the names as written; add them from the exercise card if you want them in your library.`);
 
     const weeks = groupIntoWeeks(parsed);
 
@@ -568,17 +578,19 @@ export function ImportWizard({
     // present for a GZCLP-generated program, so every other import path
     // (CSV/photo/AI-generate/DUP) is completely unaffected.
     if (importData.progressionRules && importData.progressionRules.length > 0) {
-      await supabase.from("exercise_progressions").insert(
+      // The rule is filed under the exercise's name as it was saved (matched to the library), or it would never find its exercise.
+      const { error: ruleError } = await supabase.from("exercise_progressions").insert(
         importData.progressionRules.map((rule) => ({
           program_id: programRow.id,
           group_id: groupId,
-          exercise_name: rule.exerciseName,
+          exercise_name: resolutions.get(normalizeName(rule.exerciseName))?.exerciseName ?? rule.exerciseName,
           model: rule.model,
           config: rule.config,
           tier_label: rule.tierLabel,
           created_by: coachId,
         }))
       );
+      if (ruleError) notices.push("The progression rules did not save. Open the program and set them again.");
     }
 
     // Finalizing an import never deactivates the client's other programs:
@@ -619,6 +631,7 @@ export function ImportWizard({
               exercise_name: resolution.exerciseName,
               exercise_order: exIndex,
               tracked_fields: resolution.trackedFields,
+              ...(ex.note ? { notes: ex.note } : {}),
             })
             .select("id")
             .single();
@@ -665,6 +678,7 @@ export function ImportWizard({
       draft: importData.isAiSourced,
       programId: programRow.id,
       failedWrites,
+      notices: [...importReadWarnings(parsed), ...notices],
     });
     setDoneHref(`/groups/${groupId}/programs/${programRow.id}`);
     setPending(null);
@@ -1128,6 +1142,15 @@ export function ImportWizard({
           {summary.weekCount === 1 ? "" : "s"} — {summary.matchedCount} exercise
           {summary.matchedCount === 1 ? "" : "s"} matched your existing library.
         </p>
+        {summary.notices.length > 0 && (
+          <div className="mb-4 border border-rust/40 bg-rust/5 p-3" role="status">
+            {summary.notices.map((n, i) => (
+              <p key={i} className="font-body text-xs text-chalk leading-snug">
+                {n}
+              </p>
+            ))}
+          </div>
+        )}
         {summary.failedWrites > 0 && (
           <div className="mb-4 border border-rust/60 bg-rust/10 p-3" role="alert">
             <p className="font-body text-xs text-chalk leading-snug">

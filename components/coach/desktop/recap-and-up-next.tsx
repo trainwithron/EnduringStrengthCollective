@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { exerciseNameProblem } from "@/lib/exercise-name-guard";
+import { renameProgramExercise } from "@/lib/rename-program-exercise";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { SessionRecap } from "@/lib/session-recap-data";
@@ -98,26 +98,18 @@ export function RecapAndUpNext({
       setSwapTarget(null);
       return;
     }
-    const nameProblem = exerciseNameProblem(trimmed);
-    if (nameProblem) {
-      flashSaveError(nameProblem);
-      setSwapTarget(null);
-      return;
-    }
     const supabase = createBrowserClient();
     // is_swapped lives on session_exercises (a per-athlete-session flag,
     // used elsewhere for the athlete's own in-session swap flow) — this
     // is renaming the shared TEMPLATE row (group_workout_exercises),
     // which has no such column at all.
-    const { error } = await supabase
-      .from("group_workout_exercises")
-      .update({ exercise_name: trimmed })
-      .eq("id", swapTarget.id);
-    if (error) {
-      flashSaveError();
+    // The same rename the builder uses: the name is checked, the shown (alias) name is cleared with it, and the program's progression rule follows.
+    const renamed = await renameProgramExercise(supabase, { exerciseId: swapTarget.id, workoutId: nextWorkout?.workoutId ?? "", oldName: swapTarget.name, newName: trimmed, displayName: null });
+    if (renamed.error) {
+      flashSaveError(renamed.error);
     } else {
       setExercises((prev) =>
-        prev.map((ex) => (ex.id === swapTarget.id ? { ...ex, exerciseName: trimmed } : ex))
+        prev.map((ex) => (ex.id === swapTarget.id ? { ...ex, exerciseName: renamed.name } : ex))
       );
       flashSaved();
     }

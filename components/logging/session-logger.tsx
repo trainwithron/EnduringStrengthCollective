@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { cleanExerciseName, exerciseNameProblem } from "@/lib/exercise-name-guard";
+import { existingLibraryName } from "@/lib/exercise-search";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { SetSaveBanner, SetSaveProvider } from "./set-save-context";
 import type { SessionExerciseEntry, SetLogEntry } from "@/lib/types";
@@ -201,7 +202,9 @@ export function SessionLogger({
   }
 
   async function handleAddExercise() {
-    const name = cleanExerciseName(newExerciseName);
+    // A spelling of an exercise in the coach's library is added under the library's own name.
+    const typed = cleanExerciseName(newExerciseName);
+    const name = typed ? existingLibraryName(typed, (demoLibrary ?? []).map((r) => r.name)) ?? typed : typed;
     if (!name || addExerciseBusy || addedCount >= MAX_ADDED_EXERCISES) return;
     // Never an exercise named with only numbers or with its sets and reps.
     const problem = exerciseNameProblem(name);
@@ -227,7 +230,10 @@ export function SessionLogger({
         .select("id, exercise_name, exercise_order, is_swapped, is_added, tracked_fields")
         .single();
 
-      if (!sessionExercise) return;
+      if (!sessionExercise) {
+        setAddNameProblem("Couldn't add that exercise. Try again.");
+        return;
+      }
 
       const { data: sets } = await supabase
         .from("set_logs")
