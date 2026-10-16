@@ -30,6 +30,6 @@ describe("the prompt panel and Ask why", () => {
     expect(route).toContain('feature: "program_chat"');
     expect(route).toContain("aiInputTooLong");
     expect(route).not.toMatch(/\.(insert|update|delete|upsert)\(/);
-    expect(route).toContain("you only explain");
+    expect(readFileSync(join(__dirname, "..", "lib/explain-program.ts"), "utf8")).toContain("you only explain");
   });
 });

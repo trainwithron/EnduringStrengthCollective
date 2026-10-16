@@ -3,19 +3,22 @@
 import { useState } from "react";
 import { readAiJson } from "@/lib/ai-fetch";
 import { MicButton } from "@/components/shared/mic-button";
+import { EXPLAIN_MAX_EXCHANGES, TELL_ME_MORE_QUESTION, type Exchange } from "@/lib/explain-program";
 
 // Beside the AI Program Builder: what the coach asked for in this run (their request and every change they asked for, read-only, collapsible) so they can compare it with what they got, and an
 // "Ask why" box under it. The answer only explains; it never changes the program.
 export function AiRunPanel({ programId, request, corrections }: { programId: string; request: string; corrections: string[] }) {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<string | null>(null);
+  // The last few exchanges, kept in this panel only (never stored): once there is an answer, the next question is a follow-up that gets the fuller explanation.
+  const [thread, setThread] = useState<Exchange[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (!request) return null;
 
-  async function explain() {
-    const q = question.trim();
+  async function explain(asked?: string) {
+    const q = (asked ?? question).trim();
     if (!q || busy) return;
     setBusy(true);
     setError(null);
@@ -23,13 +26,15 @@ export function AiRunPanel({ programId, request, corrections }: { programId: str
       const res = await fetch("/api/ai/explain-program", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ programId, question: q, request, corrections }),
+        body: JSON.stringify({ programId, question: q, request, corrections, thread }),
       });
       const data = await readAiJson(res);
       if (!res.ok || typeof data.answer !== "string") {
         setError((data.error as string | undefined) ?? "Couldn't answer that. Try again.");
       } else {
         setAnswer(data.answer);
+        setThread((t) => [...t, { question: q, answer: data.answer as string }].slice(-EXPLAIN_MAX_EXCHANGES));
+        setQuestion("");
       }
     } catch {
       setError("Couldn't answer that. Try again.");
@@ -85,9 +90,27 @@ export function AiRunPanel({ programId, request, corrections }: { programId: str
           <p className="font-body text-xs text-steel">It only explains. It changes nothing unless you ask.</p>
         </div>
         {answer && (
-          <p className="font-body text-sm text-chalk whitespace-pre-wrap break-words mt-3" role="status">
-            {answer}
-          </p>
+          <>
+            <p className="font-body text-sm text-chalk whitespace-pre-wrap break-words mt-3" role="status">
+              {answer}
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-4">
+              <button type="button" onClick={() => void explain(TELL_ME_MORE_QUESTION)} disabled={busy} className="min-h-11 font-body text-sm text-rust underline underline-offset-2 disabled:opacity-40">
+                Tell me more
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setThread([]);
+                  setAnswer(null);
+                  setError(null);
+                }}
+                className="min-h-11 font-body text-sm text-steel underline underline-offset-2"
+              >
+                Start over
+              </button>
+            </div>
+          </>
         )}
         {error && (
           <p className="font-body text-xs text-rust mt-2" role="alert">

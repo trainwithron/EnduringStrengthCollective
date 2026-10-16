@@ -24,10 +24,10 @@ describe("voice typing in the AI Program Builder", () => {
   it("the mic shows it is recording, names its two states, and keeps listening until tapped again", () => {
     expect(mic).toContain("animate-pulse");
     expect(mic).toContain("stopLabel ??");
-    expect(mic).toContain("rec.continuous = continuous");
+    expect(read("lib/mic-session.ts")).toContain("next.continuous = continuous");
   });
   it("only the newly heard words are added, so a long dictation is not repeated", () => {
-    expect(mic).toContain(".slice(e.resultIndex ?? 0)");
+    expect(read("lib/mic-session.ts")).toContain("e.resultIndex ?? 0");
   });
   it("a browser with no speech support gets a quiet disabled button with the plain tooltip, not a broken one", () => {
     expect(mic).toContain("disabled title={unsupportedHint}");

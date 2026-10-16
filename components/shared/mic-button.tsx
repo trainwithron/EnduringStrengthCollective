@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createMicSession } from "@/lib/mic-session";
 
 // A small microphone for any text box: tap, talk, and what was said is handed to onText. It uses the browser's own speech recognition (nothing is uploaded by us, no server),
 // and simply does not appear in a browser without it. Reusable wherever a coach may talk instead of type.
-// Optional: startLabel/stopLabel name the two states for screen readers; continuous keeps listening through pauses until tapped again (what was said is added as it is heard); unsupportedHint shows a
+// Optional: startLabel/stopLabel name the two states for screen readers; continuous keeps listening through pauses until tapped again (it starts again by itself when the browser ends a session on a silence, and
+// what was said is added as it is heard, so nothing is lost; the logic is in lib/mic-session.ts); unsupportedHint shows a
 // quiet disabled button with that tooltip in a browser that cannot do speech, instead of showing nothing.
 export function MicButton({
   onText,
@@ -23,12 +25,14 @@ export function MicButton({
 }) {
   const [supported, setSupported] = useState(false);
   const [listening, setListening] = useState(false);
-  const recRef = useRef<any>(null);
+  const sessionRef = useRef<ReturnType<typeof createMicSession> | null>(null);
+  const onTextRef = useRef(onText);
+  onTextRef.current = onText;
 
   useEffect(() => {
     const w = window as any;
     setSupported(!!(w.SpeechRecognition || w.webkitSpeechRecognition));
-    return () => recRef.current?.stop?.();
+    return () => sessionRef.current?.stop();
   }, []);
 
   if (!supported) {
@@ -42,34 +46,18 @@ export function MicButton({
 
   function toggle() {
     if (listening) {
-      recRef.current?.stop?.();
+      sessionRef.current?.stop();
       return;
     }
     const w = window as any;
     const Rec = w.SpeechRecognition || w.webkitSpeechRecognition;
-    const rec = new Rec();
-    rec.lang = "en-US";
-    rec.interimResults = false;
-    rec.continuous = continuous;
-    rec.onresult = (e: any) => {
-      // Only what was newly finished: with continuous listening the results list keeps growing, so reading all of it again would repeat the earlier words.
-      const said = Array.from(e.results as ArrayLike<any>)
-        .slice(e.resultIndex ?? 0)
-        .filter((r) => r.isFinal !== false)
-        .map((r) => r[0]?.transcript ?? "")
-        .join(" ")
-        .trim();
-      if (said) onText(said);
-    };
-    rec.onend = () => setListening(false);
-    rec.onerror = () => setListening(false);
-    recRef.current = rec;
-    setListening(true);
-    try {
-      rec.start();
-    } catch {
-      setListening(false);
-    }
+    sessionRef.current = createMicSession({
+      make: () => new Rec(),
+      continuous,
+      onText: (text) => onTextRef.current(text),
+      onListening: setListening,
+    });
+    sessionRef.current.start();
   }
 
   return (
