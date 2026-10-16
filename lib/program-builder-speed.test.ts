@@ -34,7 +34,7 @@ describe("the builder page and the Spotter", () => {
   const page = read("app/(coach)/groups/[groupId]/programs/[programId]/page.tsx");
   it("access and the program are read together, and the builder's three reads are one batch", () => {
     expect(page).toContain("const [{ data: membership }, { data: program }] = await Promise.all([");
-    expect(page).toContain("const [data, { data: roleRow, error: roleError }, { data: askedRule }] = await Promise.all([");
+    expect(page).toContain("const [data, { data: roleRow, error: roleError }, { data: askedRule }, { data: progressionRules }] = await Promise.all([");
   });
   it("the Spotter reads the days and the dismissals together", () => {
     expect(read("lib/programming-spotter-gather.ts")).toContain("const [{ data: workouts }, { data: dismissalRows }] = await Promise.all([");

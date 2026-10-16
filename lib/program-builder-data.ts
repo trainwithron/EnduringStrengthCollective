@@ -51,6 +51,8 @@ export interface ProgramBuilderData {
   dayProgress: { dayNumber: number; totalDays: number } | null;
   totalVolumeLbs: number;
   spotterFlags: SpotterFlag[];
+  // The program's days could not be read just now (the read itself failed). The page then says so and offers a retry instead of drawing an empty program.
+  loadFailed: boolean;
 }
 
 export async function getProgramBuilderData(
@@ -77,7 +79,7 @@ export async function getProgramBuilderData(
   // Everything below depends only on the program row, so it all runs as ONE batch instead of ten queries one after another.
   const [
     { data: group },
-    { data: workoutRows },
+    { data: workoutRows, error: workoutsError },
     { data: libraryRows },
     { data: aliasRows },
     { data: patternRows },
@@ -235,6 +237,7 @@ export async function getProgramBuilderData(
     dayProgress,
     totalVolumeLbs,
     spotterFlags,
+    loadFailed: !!workoutsError,
   };
 }
 

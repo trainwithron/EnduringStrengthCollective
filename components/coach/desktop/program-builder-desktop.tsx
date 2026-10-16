@@ -1,7 +1,7 @@
 "use client";
 
 import type { DemoRow } from "@/lib/exercise-demo";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ProgramAssignPanel } from "@/components/coach/desktop/program-assign-panel";
@@ -17,6 +17,8 @@ import { ProgramAssignedClients } from "@/components/coach/desktop/program-assig
 import { ProgramCardMenu } from "./program-card-menu";
 import { SaveToast } from "./save-toast";
 import { SaveStatusBar } from "./save-status-bar";
+import { ProgramProgressionPanel } from "./program-progression-panel";
+import type { Rule } from "@/lib/program-progression";
 import { SaveToastChannelContext } from "./save-toast-channel";
 import { createSaveToastChannel } from "@/lib/save-toast";
 import { ProgramChatPanel } from "./program-chat-panel";
@@ -43,6 +45,7 @@ export function ProgramBuilderDesktop({
   initialTrainingDays,
   initialVisibilityWindow,
   initialTrainingIntent,
+  initialProgressions = [],
   initialExpandedWeek = null,
   embedded = false,
   toolbarExtra,
@@ -82,6 +85,8 @@ export function ProgramBuilderDesktop({
   initialTrainingDays: number[] | null;
   initialVisibilityWindow: VisibilityWindow;
   initialTrainingIntent: TrainingIntent | null;
+  // The program's progression rules (exercise_progressions) as saved, for the Progression choice in the toolbar.
+  initialProgressions?: Rule[];
   // Programs mini-view polish — a week number to auto-expand on load
   // (from the mini-view's own `?week=N` link), so jumping here from a
   // specific day in the condensed card-stack view actually lands you on
@@ -116,6 +121,37 @@ export function ProgramBuilderDesktop({
   const [name, setName] = useState(programName);
   const [lastSavedName, setLastSavedName] = useState(programName);
   const [days, setDays] = useState<BuilderDay[]>(initialDays);
+  // Something typed that has not been saved yet (every field saves when the coach leaves it): closing or reloading the tab then asks first. "Saved" clears it.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const unsavedRef = useRef(false);
+  useEffect(() => {
+    const root = rootRef.current;
+    const onInput = () => {
+      unsavedRef.current = true;
+    };
+    root?.addEventListener("input", onInput);
+    const unsubscribe = saveToastChannel.subscribeSaveToast((event) => {
+      if (event.kind === "saved") unsavedRef.current = false;
+    });
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!unsavedRef.current) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    // Coming back to the page from the browser's own history (a restored copy) always shows what is saved.
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) router.refresh();
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    window.addEventListener("pageshow", onPageShow);
+    return () => {
+      root?.removeEventListener("input", onInput);
+      unsubscribe();
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      window.removeEventListener("pageshow", onPageShow);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // A day with no exercises and no "Rest day" name (and no log, session, note, date or assignment) is not worth keeping: the ones the program is opened with go as it opens, once. Days added while
   // building are never in that list, so nothing is swept under the coach. The server checks each day again and a brand-new program is left alone.
   useEffect(() => {
@@ -251,7 +287,7 @@ export function ProgramBuilderDesktop({
 
   return (
     <SaveToastChannelContext.Provider value={saveToastChannel}>
-    <div>
+    <div ref={rootRef}>
       <SaveToast />
       <div className="pb-6 border-b border-steel/20 mb-6">
         <div className="flex items-start justify-between gap-3">
@@ -287,13 +323,8 @@ export function ProgramBuilderDesktop({
             {programDescription}
           </p>
         )}
+        <ProgramProgressionPanel programId={programId} groupId={groupId} days={days} initialRules={initialProgressions} onDaysChange={setDays} />
         <div className="flex flex-wrap gap-3 mt-4">
-          <Link
-            href={`/groups/${groupId}/programs/${programId}/progressions`}
-            className="inline-flex items-center h-9 font-body text-xs text-rust border border-rust px-3"
-          >
-            Exercise Progressions
-          </Link>
           <a
             href={`/print/programs/${programId}`}
             target="_blank"

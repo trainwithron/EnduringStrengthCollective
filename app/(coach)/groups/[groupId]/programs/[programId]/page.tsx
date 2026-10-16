@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { UnavailableState } from "@/components/ui/unavailable-state";
 import { ProgramBuilderDesktop } from "@/components/coach/desktop/program-builder-desktop";
+import { ProgramLoadRetry } from "@/components/coach/desktop/program-load-retry";
 import { AssignToClientBanner } from "@/components/coach/assign-to-client-banner";
 import { loadAssignedTo } from "@/lib/program-assigned";
 import { AiDraftBanner } from "@/components/coach/ai-draft-banner";
@@ -27,6 +28,9 @@ import { getProgramBuilderData } from "@/lib/program-builder-data";
 import { Lock } from "lucide-react";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { ProgramPlainView } from "@/components/shared/program-plain-view-server";
+
+// Always the saved program, never a copy kept from an earlier visit.
+export const dynamic = "force-dynamic";
 
 export default async function ProgramDetailPage(
   props: {
@@ -272,7 +276,7 @@ async function CoachProgramBuilder({
 }) {
   const supabase = await createServerClient();
   // The builder's data, the program's label/order, and the quiet question after a sign-off do not depend on each other: one batch.
-  const [data, { data: roleRow, error: roleError }, { data: askedRule }] = await Promise.all([
+  const [data, { data: roleRow, error: roleError }, { data: askedRule }, { data: progressionRules }] = await Promise.all([
     getProgramBuilderData(supabase, { groupId, programId, coachId }),
     // Label and order come from a later migration; until it is applied the read fails and the
     // control just explains that. Nothing else depends on it.
@@ -287,6 +291,7 @@ async function CoachProgramBuilder({
       .eq("asked_for_program_id", programId)
       .gte("created_at", new Date(Date.now() - 7 * 86400000).toISOString())
       .maybeSingle(),
+    supabase.from("exercise_progressions").select("exercise_name, model, config").eq("program_id", programId),
   ]);
   const isAiDraft = (roleRow as { ai_draft?: boolean } | null)?.ai_draft === true;
   const roleInfo = {
@@ -326,8 +331,9 @@ async function CoachProgramBuilder({
           text={suggestionText({ from: askedRule.from_name, to: askedRule.to_name, count: askedRule.evidence_count, total: askedRule.evidence_total })}
         />
       )}
-      <ProgrammingSpotterPanel programId={programId} flags={data.spotterFlags} />
-      <ProgramBuilderDesktop
+      {data.loadFailed && <ProgramLoadRetry />}
+      {!data.loadFailed && <ProgrammingSpotterPanel programId={programId} flags={data.spotterFlags} />}
+      {!data.loadFailed && <ProgramBuilderDesktop
         programId={programId}
         groupId={groupId}
         aiDraft={isAiDraft}
@@ -355,8 +361,9 @@ async function CoachProgramBuilder({
         initialTrainingDays={data.initialTrainingDays}
         initialVisibilityWindow={data.initialVisibilityWindow}
         initialTrainingIntent={data.initialTrainingIntent}
+        initialProgressions={(progressionRules ?? []) as { exercise_name: string; model: string; config: unknown }[]}
         initialExpandedWeek={requestedWeek}
-      />
+      />}
     </CoachDesktopShell>
   );
 }

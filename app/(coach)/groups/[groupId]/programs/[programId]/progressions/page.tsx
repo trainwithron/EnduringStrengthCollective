@@ -5,6 +5,8 @@ import { createServerClient } from "@/lib/supabase/server";
 import { ProgressionRow } from "@/components/coach/progression-row";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 
+export const dynamic = "force-dynamic";
+
 export default async function ProgressionsPage(
   props: {
     params: Promise<{ groupId: string; programId: string }>;
@@ -71,7 +73,7 @@ export default async function ProgressionsPage(
     <main className="max-w-4xl pb-10">
       <header className="pb-6 border-b border-steel/20">
         <Link
-          href={`/groups/${params.groupId}/programs/${params.programId}`}
+          href={`/groups/${params.groupId}/programs/${params.programId}?edit=1`}
           className="font-body text-xs text-steel uppercase tracking-wide"
         >
           &larr; Back to {program.name}

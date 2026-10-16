@@ -13,6 +13,7 @@ import { builderDemoFor, type BuilderDemo } from "@/lib/builder-demo";
 import { summarizeSets } from "@/lib/exercise-summary";
 import { cleanDisplayName } from "@/lib/exercise-alias-seed";
 import { existingLibraryName } from "@/lib/exercise-search";
+import { ExerciseProgressionControl } from "./exercise-progression-control";
 import { matchExercise, type AliasEntry } from "@/lib/exercise-matching";
 import { ExerciseMediaPicker } from "./exercise-media-picker";
 import type { BuilderExercise, ExerciseSetTarget } from "@/lib/types";
@@ -406,7 +407,11 @@ export function ExerciseBuilderCard({
     const repMin = minRaw.trim() === "" ? null : Number(minRaw);
     const repMax = maxRaw.trim() === "" ? null : Number(maxRaw);
     const setIds = exercise.sets.map((s) => s.id);
-    if (setIds.length === 0) return;
+    if (setIds.length === 0) {
+      // Nothing to put the range on yet: say so instead of quietly keeping nothing.
+      if (repMin != null || repMax != null) flashSaveError("Add a set first, then set the rep range.");
+      return;
+    }
     const supabase = createBrowserClient();
     const { error } = await supabase
       .from("group_workout_exercise_sets")
@@ -1185,6 +1190,21 @@ export function ExerciseBuilderCard({
                   className="w-14 h-8 bg-graphite border border-steel/30 text-chalk px-1 font-body text-xs text-center focus:outline-none focus:border-rust"
                 />
               </div>
+              {!exercise.slot && (
+                <ExerciseProgressionControl
+                  workoutId={workoutId}
+                  groupId={groupId}
+                  exerciseName={exercise.exerciseName}
+                  setIds={exercise.sets.map((s) => s.id)}
+                  onSaved={(lo, hi) => {
+                    setRepMinDraft(lo == null ? "" : String(lo));
+                    setRepMaxDraft(hi == null ? "" : String(hi));
+                    onSetsChange(exercise.sets.map((s) => ({ ...s, repMin: lo, repMax: hi })));
+                  }}
+                  onFlashSaved={flashSaved}
+                  onFlashError={flashSaveError}
+                />
+              )}
               <ExerciseMediaPicker
                 exerciseName={exercise.exerciseName}
                 videoPath={liveDemo && !liveDemo.storedUnder ? liveDemo.demo.videoPath : null}
