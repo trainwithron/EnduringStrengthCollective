@@ -2433,6 +2433,20 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["the acknowledgements table exists", "to_regclass('public.athlete_injury_flag_acknowledgements') is not null"],
     ],
   },
+  {
+    n: "127",
+    slug: "0377",
+    title: "0377 A library exercise can never be named with only numbers",
+    migrations: ["0377"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes on screen. From now on the library refuses a new exercise or a rename whose name is only digits, commas, dots and spaces (1, 8,8,8, 20). Names such as 5/3/1, 21s, Day 1 and 10x10 are fine. The rows already there are not touched or deleted.",
+    undo: "alter table public.exercise_library drop constraint if exists exercise_library_name_not_digits;",
+    undoWhy: "Only if step 127 misbehaves. Removes the rule; nothing else changes.",
+    rows: [
+      ["0377 is not already applied (no rule yet)", "not exists (select 1 from pg_constraint where conname = 'exercise_library_name_not_digits' and conrelid = 'public.exercise_library'::regclass)"],
+      ["the exercise library exists", "to_regclass('public.exercise_library') is not null"],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -2543,6 +2557,7 @@ const BUNDLES = [
   { id: "release-bl", name: "Release BL (four exercises added to Coach Ron's library for the FitPros history; run any time)", steps: ["106"] },
   { id: "release-bk", name: "Release BK (move Coach Ron's own training into his personal space; run AFTER he has opened Coach Ron (you) once and removed the programs he does not want)", steps: ["105"] },
   { id: "release-bw", name: "Release BW (a rest can be a range such as 60-90; run AFTER Release BV and BEFORE the code that goes with it is live)", steps: ["117"] },
+  { id: "release-cg", name: "Release CG (the exercise library refuses names made only of numbers; run BEFORE the code that goes with it is live)", steps: ["127"] },
   { id: "release-cf", name: "Release CF (a client's health screening line on Overview stays gone once acknowledged, until a new flagged answer; run BEFORE the code that goes with it is live)", steps: ["126"] },
   { id: "release-ce", name: "Release CE (InBody scans from a photo of the result sheet, with the photo kept in a private bucket; run BEFORE the code that goes with it is live)", steps: ["125"] },
   { id: "release-cd", name: "Release CD (a coach can ask a client to count a record from imported history as a real one; run BEFORE the code that goes with it is live)", steps: ["124"] },
@@ -2771,6 +2786,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
     m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
+    m("0377", "exists (select 1 from pg_constraint where conname = 'exercise_library_name_not_digits' and conrelid = 'public.exercise_library'::regclass)"),
     m("0376", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'athlete_injury_flag_acknowledgements' and column_name = 'flagged_count')"),
     m("0375", "to_regclass('public.body_scans') is not null"),
     m("0374", "to_regclass('public.pr_promotions') is not null"),

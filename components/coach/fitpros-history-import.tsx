@@ -20,6 +20,7 @@ import {
 import type { PlannedWorkout } from "@/lib/fitpros-history";
 import { settleImportedHistory, recomputeTrainingMaxes, unclearFoundLine } from "@/lib/unclear-points";
 import { existingLibraryName } from "@/lib/exercise-search";
+import { fitprosLayoutMessage, isNumericOnlyName, noSetsWarning } from "@/lib/exercise-name-guard";
 
 function todayKey(): string {
   const d = new Date();
@@ -35,11 +36,14 @@ export function FitprosHistoryImport({ athleteId, groupId, athleteName }: { athl
   // The file as read, and the unit the coach picked before choosing it (pounds unless changed; a file that writes lb or kg after its weights is read by what it says). The workouts are worked out from both.
   const [fileText, setFileText] = useState<string | null>(null);
   const [unit, setUnit] = useState<WeightUnit>("lb");
+  const parsedFile = useMemo(() => (fileText ? parseFitprosExport(fileText, unit) : null), [fileText, unit]);
+  // Lines that look like sets, not exercise names, stop the import: nothing is previewed or written until the file is fixed.
+  const layoutProblem = parsedFile && parsedFile.problems.length > 0 ? fitprosLayoutMessage(parsedFile.problems) : null;
   const workouts = useMemo(() => {
-    if (!fileText) return null;
-    const parsed = parseFitprosExport(fileText, unit).workouts;
-    return parsed.length > 0 ? parsed : null;
-  }, [fileText, unit]);
+    if (!parsedFile || layoutProblem) return null;
+    return parsedFile.workouts.length > 0 ? parsedFile.workouts : null;
+  }, [parsedFile, layoutProblem]);
+  const [confirmedLayout, setConfirmedLayout] = useState(false);
   const [plan, setPlan] = useState<PlannedWorkout[] | null>(null);
   const [moveStart, setMoveStart] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -84,11 +88,18 @@ export function FitprosHistoryImport({ athleteId, groupId, athleteName }: { athl
   const summary = plan ? summarizePlan(plan) : null;
   const toImport = plan ? plan.filter((_, i) => !existingKeys.has(keys[i])).length : 0;
   const notInLibrary = plan ? Array.from(new Set(plan.flatMap((w) => w.exercises.filter((e) => e.inLibrary === false && !e.programExerciseId).map((e) => e.savedName)))) : [];
+  // Many exercises with no sets (and no note) mean the layout was probably misread: one explicit confirm before Import works.
+  const noSetsText = summary ? noSetsWarning(summary.withoutSets, summary.exerciseLines) : null;
+  const noSets = !!noSetsText && !confirmedLayout;
   const weekNow = effectiveStart ? weekOfDate(effectiveStart, todayKey()) : null;
 
   // Adds one imported name to the coach's library (never a second row for a spelling of one that is there), then the plan is matched again.
   async function addToLibrary(name: string) {
     if (busy) return;
+    if (isNumericOnlyName(name)) {
+      setError("A name made only of numbers can't be added to your library.");
+      return;
+    }
     setBusy(true);
     setError(null);
     const supabase = createBrowserClient();
@@ -107,10 +118,11 @@ export function FitprosHistoryImport({ athleteId, groupId, athleteName }: { athl
     setMessage(null);
     setError(null);
     setMoveStart(false);
+    setConfirmedLayout(false);
     if (!file) return;
     const text = await file.text();
     const parsed = parseFitprosExport(text, unit);
-    if (parsed.workouts.length === 0) {
+    if (parsed.workouts.length === 0 && parsed.problems.length === 0) {
       setFileText(null);
       setError("That file has no workouts in it. Use the FitPros text export.");
       return;
@@ -119,7 +131,7 @@ export function FitprosHistoryImport({ athleteId, groupId, athleteName }: { athl
   }
 
   async function runImport() {
-    if (!workouts || !program || busy) return;
+    if (!workouts || !program || busy || noSets) return;
     setBusy(true);
     setError(null);
     setMessage(null);
@@ -190,6 +202,11 @@ export function FitprosHistoryImport({ athleteId, groupId, athleteName }: { athl
             <input type="file" accept=".txt,text/plain" className="hidden" onChange={(e) => void onFile(e.target.files?.[0] ?? null)} />
           </label>
 
+          {layoutProblem && (
+            <p className="font-body text-sm text-rust mt-4" role="alert">
+              {layoutProblem}
+            </p>
+          )}
           {plan && summary && (
             <div className="mt-4 space-y-4">
               <p className="font-body text-sm text-chalk">
@@ -267,7 +284,17 @@ export function FitprosHistoryImport({ athleteId, groupId, athleteName }: { athl
                 </details>
               )}
 
-              <button type="button" disabled={busy || toImport === 0} onClick={() => void runImport()} className="min-h-11 bg-rust text-graphite font-display font-bold uppercase tracking-wide px-4 disabled:opacity-40">
+              {noSetsText && (
+                <div className="border border-rust/50 p-3 font-body text-sm" role="alert">
+                  <p className="text-rust">{noSetsText}</p>
+                  <label className="flex items-start gap-2 min-h-11 cursor-pointer mt-1">
+                    <input type="checkbox" checked={confirmedLayout} onChange={(e) => setConfirmedLayout(e.target.checked)} className="mt-1" />
+                    <span>Import anyway</span>
+                  </label>
+                </div>
+              )}
+
+              <button type="button" disabled={busy || toImport === 0 || noSets} onClick={() => void runImport()} className="min-h-11 bg-rust text-graphite font-display font-bold uppercase tracking-wide px-4 disabled:opacity-40">
                 {busy ? "Importing…" : toImport === 0 ? "Nothing new to import" : `Import ${toImport} workout${toImport === 1 ? "" : "s"}`}
               </button>
             </div>

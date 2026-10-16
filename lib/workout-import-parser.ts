@@ -3,6 +3,7 @@
 // browser) so this stays testable without touching File/ArrayBuffer APIs.
 
 import { normalizeTimedRow } from "@/lib/timed-exercise";
+import { isNumericOnlyName } from "@/lib/exercise-name-guard";
 
 export type ImportColumn =
   | "week"
@@ -91,12 +92,16 @@ export function detectColumns(headerRow: string[]): ColumnMapping {
 
 export const EXERCISE_NUMBERS_MESSAGE = "The exercise column looks like numbers, not names. Pick the column with the exercise names.";
 
-// More than half of the exercise "names" being plain numbers (1, 2, 3 ...) means the wrong column was read. Stops a junk import before anything is written.
+// Any exercise "name" that is only digits, commas, dots and spaces (1, 8,8,8, 20) means the wrong column was read. Stops a junk import before anything is written.
 export function looksLikeNumbersNotNames(values: string[]): boolean {
+  return values.some((v) => isNumericOnlyName((v ?? "").toString()));
+}
+
+// More than half of a column being plain numbers: a counter or a measurement, never the column to offer as the exercise names.
+function mostlyNumbers(values: string[]): boolean {
   const filled = values.map((v) => (v ?? "").toString().trim()).filter(Boolean);
   if (filled.length === 0) return false;
-  const numeric = filled.filter((v) => /^\d+([.,]\d+)?$/.test(v)).length;
-  return numeric / filled.length > 0.5;
+  return filled.filter((v) => isNumericOnlyName(v)).length / filled.length > 0.5;
 }
 
 // The column most likely to hold the exercise names, for the picker to start on: not a counter, mostly text, and a header that says exercise, movement, lift or name scores highest.
@@ -105,7 +110,7 @@ export function bestExerciseColumn(headerRow: string[], body: string[][]): numbe
   for (let i = 0; i < headerRow.length; i++) {
     if (isCounterHeader(headerRow[i] ?? "")) continue;
     const values = body.map((r) => (r[i] ?? "").toString().trim()).filter(Boolean);
-    if (values.length === 0 || looksLikeNumbersNotNames(values)) continue;
+    if (values.length === 0 || mostlyNumbers(values)) continue;
     const h = normalizeHeader(headerRow[i] ?? "");
     const textShare = values.filter((v) => /[a-z]/i.test(v)).length / values.length;
     const distinct = new Set(values.map((v) => v.toLowerCase())).size / values.length;

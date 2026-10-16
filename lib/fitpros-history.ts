@@ -7,6 +7,7 @@
 import { findLibraryVariant, type AliasEntry } from "@/lib/exercise-matching";
 import { mergeAliases, resolveTypedAlias } from "@/lib/exercise-alias-seed";
 import { parseWeightCell, planUnits, weightInPounds, type WeightUnit } from "@/lib/weight-units";
+import { isNumericOnlyName } from "@/lib/exercise-name-guard";
 
 export const MAX_DURATION_SECONDS = 4 * 3600;
 export const MIN_DAY_MATCH = 0.5;
@@ -141,9 +142,11 @@ function parseExerciseLine(line: string, date: string, flags: string[]): Fitpros
   return { name, sets, note };
 }
 
-export function parseFitprosExport(text: string, chosenUnit: WeightUnit = "lb"): { workouts: FitprosWorkout[]; skippedLines: number } {
+export function parseFitprosExport(text: string, chosenUnit: WeightUnit = "lb"): { workouts: FitprosWorkout[]; skippedLines: number; problems: string[] } {
   const workouts: FitprosWorkout[] = [];
   let skipped = 0;
+  // Lines that look like sets (or reps) with no exercise to belong to. They are never turned into an exercise; the import stops until the file is fixed.
+  const problems: string[] = [];
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trimEnd();
     if (!line.trim() || line.startsWith("# ")) continue;
@@ -168,6 +171,31 @@ export function parseFitprosExport(text: string, chosenUnit: WeightUnit = "lb"):
       skipped++;
       continue;
     }
+    // A line with no exercise name: it starts with a badge (FIRST TIME, PR 3) or only with numbers (8,8,8). Both layouts are tolerated: its cells (reps | weights | time | rpe | notes) belong to the
+    // exercise on the line before when that one has no sets yet. A badge followed by a real name is an ordinary exercise line with the badge left off.
+    const cells = line.split("|").map((c) => c.trim());
+    const first = cells[0] ?? "";
+    const badge = BADGE.test(first);
+    if (badge || isNumericOnlyName(first)) {
+      const rest = badge ? cells.slice(1) : cells;
+      if (badge && rest[0] && /[A-Za-z]/.test(rest[0]) && !isNumericOnlyName(rest[0])) {
+        const named = parseExerciseLine(rest.join(" | "), current.date, current.flags);
+        if (named) current.exercises.push(named);
+        continue;
+      }
+      if (rest.every((c) => c === "")) continue;
+      const previous = current.exercises[current.exercises.length - 1];
+      if (previous && previous.sets.length === 0) {
+        const filled = parseExerciseLine([previous.name, ...rest].join(" | "), current.date, current.flags);
+        if (filled && filled.sets.length > 0) {
+          previous.sets = filled.sets;
+          previous.note = previous.note ?? filled.note;
+          continue;
+        }
+      }
+      problems.push(line.trim());
+      continue;
+    }
     const ex = parseExerciseLine(line, current.date, current.flags);
     if (ex) current.exercises.push(ex);
   }
@@ -186,7 +214,7 @@ export function parseFitprosExport(text: string, chosenUnit: WeightUnit = "lb"):
       }
     }
   }
-  return { workouts, skippedLines: skipped };
+  return { workouts, skippedLines: skipped, problems };
 }
 
 // ---- matching to the program -------------------------------------------------------------------------
@@ -341,12 +369,15 @@ export function resolveNamesAgainstLibrary(plan: PlannedWorkout[], libraryNames:
 
 export function summarizePlan(plan: PlannedWorkout[]) {
   const exerciseLines = plan.reduce((n, w) => n + w.exercises.length, 0);
+  // Exercises with no sets and no note: a few are normal (a note-only line), many mean the layout was misread.
+  const withoutSets = plan.reduce((n, w) => n + w.exercises.filter((e) => e.sets.length === 0 && !e.note).length, 0);
   const sets = plan.reduce((n, w) => n + w.exercises.reduce((m, e) => m + e.sets.length, 0), 0);
   return {
     workouts: plan.length,
     linked: plan.filter((w) => w.programWorkoutId).length,
     unlinked: plan.filter((w) => !w.programWorkoutId).length,
     exerciseLines,
+    withoutSets,
     sets,
     flags: plan.flatMap((w) => w.flags),
   };

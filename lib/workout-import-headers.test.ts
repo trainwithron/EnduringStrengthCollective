@@ -78,10 +78,10 @@ describe("finding the columns", () => {
 });
 
 describe("the safety net", () => {
-  it("more than half plain numbers is the wrong column", () => {
+  it("any name that is only numbers is the wrong column", () => {
     expect(looksLikeNumbersNotNames(["1", "2", "3", "4"])).toBe(true);
     expect(looksLikeNumbersNotNames(["1", "2", "Squat"])).toBe(true);
-    expect(looksLikeNumbersNotNames(["1", "Squat", "Bench", "Row"])).toBe(false);
+    expect(looksLikeNumbersNotNames(["1", "Squat", "Bench", "Row"])).toBe(true); // any one is enough
     expect(looksLikeNumbersNotNames(["Squat", "Bench"])).toBe(false);
     expect(looksLikeNumbersNotNames(["", ""])).toBe(false);
     expect(looksLikeNumbersNotNames(["1.5", "2,5"])).toBe(true);
