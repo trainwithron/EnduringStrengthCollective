@@ -5,6 +5,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 export const RUN_TTL_MS = 2 * 60 * 60 * 1000;
 import { MAX_DAYS_PER_RUN, daysPerWeekOf, type DaySlot } from "@/lib/ai-day-slots";
 import { clampAiRow } from "@/lib/ai-row-clamps";
+import { PAIN_MONITORING_GUIDANCE } from "@/lib/pain-guidance";
 
 export { MAX_DAYS_PER_RUN, daysPerWeekOf };
 export type { DaySlot };
@@ -16,8 +17,12 @@ interface RunPayload {
   d: number; // days built so far in this run
 }
 
+// Signs the run token. If no secret is configured at all, it fails closed in production (a token anyone can forge would let a caller skip the one-credit-per-run rule); the fixed fallback exists only for local development.
 function secret(): string {
-  return process.env.AI_RUN_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || "dev-only-secret";
+  const configured = process.env.AI_RUN_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (configured) return configured;
+  if (process.env.NODE_ENV === "production") throw new Error("AI run secret is not configured");
+  return "dev-only-secret";
 }
 
 function sign(body: string): string {
@@ -129,7 +134,7 @@ Rules:
 - Where the coach has named equipment or machines as allowed, they are allowed; where the coach has said to leave something out, leave it out.${
     input.hasInjury
       ? `
-- This program is for a client with a flagged injury or health concern, given below. Treat it as a hard constraint: avoid or substantially modify anything that could reasonably aggravate the stated area.`
+- This program is for a client with a flagged injury or health concern, given below. Treat it as a hard constraint: avoid or substantially modify anything that could reasonably aggravate the stated area. ${PAIN_MONITORING_GUIDANCE}`
       : ""
   }${
     input.youthBlock

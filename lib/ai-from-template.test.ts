@@ -87,7 +87,7 @@ describe("one call, charged once, never on a failure", () => {
     expect(route).toContain('membership?.role !== "coach"');
     expect(route).toContain('canRunAiAction(supabase, user.id, "program_generation")');
     expect(route).toContain("hasFlaggedMusculoskeletalConcern");
-    expect(route).toContain("athleteIsMinor");
+    expect(route).toContain("athleteAgeStatus");
     expect(route).toContain('feature: "program_template"');
     expect(route).toContain("TEMPLATE_PICK_TRUNCATED_NOTE");
   });

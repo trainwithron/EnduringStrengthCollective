@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
-import { isBadExerciseName } from "@/lib/exercise-name-guard";
+import { isBadExerciseName, cleanExerciseName, exerciseNameProblem } from "@/lib/exercise-name-guard";
+import { existingLibraryName } from "@/lib/exercise-search";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError, AiTruncatedError, AiTimeoutError } from "@/lib/anthropic-client";
 import { AiRateLimitedError } from "@/lib/ai-usage";
 import { checkAndSpendCoachCredits, canRunAiAction } from "@/lib/coach-credits";
 import { hasFlaggedMusculoskeletalConcern } from "@/lib/athlete-injury-flag";
-import { athleteIsMinor, YOUTH_PROMPT_BLOCK } from "@/lib/youth-block";
+import { athleteAgeStatus, clampYouthRows, UNKNOWN_AGE_BANNER_TEXT, YOUTH_PROMPT_BLOCK } from "@/lib/youth-block";
 import { libraryContext, rankLibrary, type LibraryItem } from "@/lib/builder-context";
 import { scanConstraints } from "@/lib/constraint-scan";
 import { parseRestSpan } from "@/lib/rest-time";
@@ -122,6 +123,7 @@ export async function POST(request: Request) {
   // The client's injury and age context, the same rules the whole-program builder follows.
   let injuryContext: string | null = null;
   let youthBlock: string | null = null;
+  let youthUnknownAge = false;
   const athleteId = program.athlete_id as string | null;
   if (athleteId) {
     const [{ data: intakeRow }, { data: noteRow }] = await Promise.all([
@@ -133,7 +135,10 @@ export async function POST(request: Request) {
     if (flagged || noteText) {
       injuryContext = `This client has flagged a musculoskeletal or health concern${flagged ? " on their intake screening" : ""}.${noteText ? ` The coach's own note: "${noteText}"` : ""}`;
     }
-    if (await athleteIsMinor(supabase, athleteId)) youthBlock = YOUTH_PROMPT_BLOCK;
+    // Under 18, or no birthdate on file: the youth protections apply (an unknown age is never treated as an adult).
+    const ageStatus = await athleteAgeStatus(supabase, athleteId);
+    if (ageStatus !== "adult") youthBlock = YOUTH_PROMPT_BLOCK;
+    if (ageStatus === "unknown") youthUnknownAge = true;
   }
 
   // What the coach has taught the AI that fits THIS client (the client's notes, level and age band decide which rules reach it).
@@ -167,14 +172,20 @@ export async function POST(request: Request) {
     const parsed = readDayResult(JSON.parse(extractJson(text)), `Day ${day}`);
     if (!parsed) return null;
     // An exercise the coach named stays exactly as named (the library never renames it); only the ones the AI chose are snapped to the library, and only on a confident match.
-    const snapped = parsed.exercises.map((e) => {
-      const r = resolveAiExerciseName(e, sayings, libraryList, aliases, (n) => plainLibraryName(n, libraryNames));
-      return { ...e, exerciseName: r.name, coachNamed: r.coachNamed };
-    });
-    const tidy = applyTimedConsistency(dedupeDay(snapped, allowRepeat).rows, knownTimes);
+    const snapped = parsed.exercises
+      .map((e) => {
+        const r = resolveAiExerciseName(e, sayings, libraryList, aliases, (n) => plainLibraryName(n, libraryNames));
+        // No control characters in a name, spaces tidied; a name that is empty, only numbers or carrying sets and reps is not an exercise and is left out (it would be refused when saved).
+        return { ...e, exerciseName: cleanExerciseName(r.name.replace(/[\u0000-\u001f\u007f]/g, " ")), coachNamed: r.coachNamed };
+      })
+      .filter((e) => !exerciseNameProblem(e.exerciseName));
+    const timed = applyTimedConsistency(dedupeDay(snapped, allowRepeat).rows, knownTimes);
+    // A young client (or one with no birthdate on file) never gets more than RPE 8 whatever the model wrote; reps outside the moderate range are noted for the coach.
+    const youthPass = youthBlock ? clampYouthRows(timed) : { rows: timed, flags: [] as string[] };
+    const tidy = youthPass.rows;
     // The coach's own named exercises are never flagged or replaced by the "worth a look" checks.
     const scan = scanConstraints(sayings, tidy.filter((r) => !r.coachNamed).map((r) => ({ week: `Week ${week}`, day: `Day ${day}`, exerciseName: r.exerciseName, sets: r.sets, reps: r.reps, weight: r.weight, rpe: r.rpe, rest: r.rest, timeSeconds: r.timeSeconds }) as never));
-    return { result: { ...parsed, exercises: tidy }, rows: tidy, scan };
+    return { result: { ...parsed, exercises: tidy }, rows: tidy, scan, youthFlags: youthPass.flags };
   }
   // A flag that says a chosen exercise breaks something the coach said to leave out (not the softer "check this" notes).
   const isHard = (flag: string) => /conflicts with "no |which your description said to leave out/.test(flag);
@@ -287,6 +298,12 @@ export async function POST(request: Request) {
     const longDay = longDayFlag(week, day, rows.length, exercisesWanted(sayings));
     const flags = scanConstraints(`${instruction}. ${corrections.join(". ")}`, rows.filter((r) => !r.coachNamed).map((r) => ({ week: `Week ${week}`, day: `Day ${day}`, exerciseName: r.exerciseName, sets: r.sets, reps: r.reps, weight: r.weight, rpe: r.rpe, rest: r.rest, timeSeconds: r.timeSeconds }) as never));
     if (longDay) flags.push(longDay);
+    flags.push(...(first.youthFlags ?? []));
+    // Exercises the AI chose that are not in the coach's library are said so (they are kept as written; the coach decides).
+    for (const r of rows) {
+      if (!r.coachNamed && !existingLibraryName(r.exerciseName, libraryNames)) flags.push(`${r.exerciseName} is not in your library.`);
+    }
+    if (youthUnknownAge) flags.push(UNKNOWN_AGE_BANNER_TEXT);
     return NextResponse.json({
       workoutId,
       week,

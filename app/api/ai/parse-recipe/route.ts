@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError } from "@/lib/anthropic-client";
+import { clampPer100g } from "@/lib/ai-nutrition-clamp";
 import { AiRateLimitedError, aiInputTooLong } from "@/lib/ai-usage";
 import { userIsCoach } from "@/lib/user-is-coach";
 
@@ -110,9 +111,10 @@ export async function POST(request: Request) {
       return {
         label: typeof ing?.label === "string" ? ing.label : "Ingredient",
         role: finalRole,
-        proteinPer100g: finalRole === "fixed" ? 0 : Math.max(0, Number(ing?.proteinPer100g) || 0),
-        carbsPer100g: finalRole === "fixed" ? 0 : Math.max(0, Number(ing?.carbsPer100g) || 0),
-        fatPer100g: finalRole === "fixed" ? 0 : Math.max(0, Number(ing?.fatPer100g) || 0),
+        // Food per 100 g can't have more than 100 g of any macro; a believable number or zero, never what the model happened to say.
+        proteinPer100g: finalRole === "fixed" ? 0 : clampPer100g({ calories: 0, proteinG: Number(ing?.proteinPer100g) || 0, carbsG: 0, fatG: 0 }).proteinG,
+        carbsPer100g: finalRole === "fixed" ? 0 : clampPer100g({ calories: 0, proteinG: 0, carbsG: Number(ing?.carbsPer100g) || 0, fatG: 0 }).carbsG,
+        fatPer100g: finalRole === "fixed" ? 0 : clampPer100g({ calories: 0, proteinG: 0, carbsG: 0, fatG: Number(ing?.fatPer100g) || 0 }).fatG,
         fixedDisplayText:
           finalRole === "fixed" ? (typeof ing?.fixedDisplayText === "string" ? ing.fixedDisplayText : ing?.label ?? "Ingredient") : null,
       };

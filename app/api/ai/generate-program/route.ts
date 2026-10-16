@@ -10,7 +10,8 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { matchExercise, matchTopN, type LibraryExercise } from "@/lib/exercise-matching";
 import { scanConstraints } from "@/lib/constraint-scan";
 import { clampAiRow } from "@/lib/ai-row-clamps";
-import { athleteIsMinor, YOUTH_PROMPT_BLOCK } from "@/lib/youth-block";
+import { athleteAgeStatus, clampYouthRows, YOUTH_PROMPT_BLOCK } from "@/lib/youth-block";
+import { PAIN_MONITORING_GUIDANCE } from "@/lib/pain-guidance";
 import { loadLearnedLines } from "@/lib/learned-for-prompt";
 import { loadClientNotes } from "@/lib/client-notes-server";
 import { buildProgrammingProfile, libraryContext, mentionsExercise, rankLibrary, type LibraryItem } from "@/lib/builder-context";
@@ -47,13 +48,7 @@ const INJURY_JSON_FIELD = `,
 // genuinely contested in the literature (JOSPT 2020 systematic review
 // found no clear causal link between lumbar flexion and back-pain risk),
 // so this system prompt never bakes it in as settled fact.
-const PAIN_MONITORING_GUIDANCE = `If you reference how the client should judge pain/discomfort during or after a
-flagged movement, ground it in this real clinical model rather than inventing your own rule: mild discomfort up to
-about 5 out of 10 during or shortly after training is generally an acceptable signal to keep going, PROVIDED it
-settles back to baseline by the next morning and does not get worse week over week. Sharp, sudden, or worsening
-pain is never acceptable — that always means stop and the coach should follow up. Do not assert that any single
-movement pattern (e.g. spinal flexion) is categorically unsafe — that specific claim is genuinely contested in the
-current literature, not settled fact.`;
+
 
 const ADHERENCE_JSON_FIELD = `,
   "adherenceCheck": {
@@ -214,6 +209,7 @@ export async function POST(request: Request) {
   // action like this).
   let injuryContextText: string | null = null;
   let isYouth = false;
+  let ageStatus: "minor" | "adult" | "unknown" = "adult";
   if (typeof athleteId === "string" && athleteId) {
     const { data: athleteMembership } = await supabase
       .from("group_memberships")
@@ -226,7 +222,9 @@ export async function POST(request: Request) {
         supabase.from("client_intake").select("par_q_answers").eq("athlete_id", athleteId).maybeSingle(),
         supabase.from("athlete_notes").select("body").eq("athlete_id", athleteId).eq("group_id", groupId).maybeSingle(),
       ]);
-      isYouth = await athleteIsMinor(supabase, athleteId);
+      // Under 18, or no birthdate on file: the youth protections apply (an unknown age is never treated as an adult).
+      ageStatus = await athleteAgeStatus(supabase, athleteId);
+      isYouth = ageStatus !== "adult";
       const flagged = hasFlaggedMusculoskeletalConcern((intakeRow?.par_q_answers as any[]) ?? []);
       const noteText = noteRow?.body?.trim() || null;
       if (flagged || noteText) {
@@ -340,7 +338,17 @@ export async function POST(request: Request) {
     .select("profile_id, profiles ( full_name )")
     .eq("group_id", groupId)
     .eq("role", "athlete");
-  const athleteIds = (athleteRows ?? []).map((r) => r.profile_id);
+  // Only the clients the request is about: the one it is attached to and any the description names (first or full name), at most ten. A whole roster's training maxes are never put in a prompt.
+  const requestLower = String(prompt ?? "").toLowerCase();
+  const namedRows = (athleteRows ?? [])
+    .filter((r: any) => {
+      if (athleteId && r.profile_id === athleteId) return true;
+      const full = String(r.profiles?.full_name ?? "").trim().toLowerCase();
+      const first = (full.split(/\s+/)[0] ?? "").replace(/[^a-z0-9]/g, "");
+      return (full.length >= 3 && requestLower.includes(full)) || (first.length >= 3 && new RegExp("\\b" + first + "\\b").test(requestLower));
+    })
+    .slice(0, 10);
+  const athleteIds = namedRows.map((r) => r.profile_id);
   const { data: trainingMaxRows } =
     athleteIds.length > 0
       ? await supabase
@@ -349,7 +357,7 @@ export async function POST(request: Request) {
           .in("athlete_id", athleteIds)
       : { data: [] as { athlete_id: string; exercise_name: string; estimated_max: number }[] };
   const nameByAthleteId = new Map(
-    (athleteRows ?? []).map((r: any) => [r.profile_id, r.profiles?.full_name ?? "Client"])
+    namedRows.map((r: any) => [r.profile_id, r.profiles?.full_name ?? "Client"])
   );
   const maxesByAthlete = new Map<string, string[]>();
   for (const row of trainingMaxRows ?? []) {
@@ -470,7 +478,7 @@ export async function POST(request: Request) {
 
     // An empty library gives nothing to match against — the prompt
     // already told the model to invent sensible names in that case.
-    const enforcedRows =
+    const enforcedRowsRaw =
       libraryForMatching.length === 0
         ? rows
         : rows.map((row) => {
@@ -501,6 +509,10 @@ export async function POST(request: Request) {
             return row;
           });
 
+    // A young client (or one with no birthdate on file) never gets more than RPE 8, whatever the model wrote; reps outside the moderate range are flagged for the coach.
+    const youthClamp = isYouth ? clampYouthRows(enforcedRowsRaw) : { rows: enforcedRowsRaw, flags: [] as string[] };
+    const enforcedRows = youthClamp.rows;
+
     // Spend happens only now, on a genuine success — a failed/truncated/
     // empty-rows generation above never reaches here and never costs a
     // credit (coach_output_foolproofing's own "a bad output inside a
@@ -518,8 +530,10 @@ export async function POST(request: Request) {
       libraryFlags,
       adherenceCheck,
       // A second, deterministic look at the description against the rows (independent of the AI's own self-report), and whether the client is a minor.
-      constraintFlags: scanConstraints(prompt, enforcedRows),
+      constraintFlags: [...scanConstraints(prompt, enforcedRows), ...youthClamp.flags],
       youth: isYouth,
+      // Under 18 is stated as a fact; no birthdate on file is stated as exactly that.
+      youthUnknownAge: isYouth && ageStatus === "unknown",
     });
   } catch (err) {
     if (err instanceof AiRateLimitedError) {

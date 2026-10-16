@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError } from "@/lib/anthropic-client";
+import { clampMealMacros, userBelongsToAGroup } from "@/lib/ai-nutrition-clamp";
 import { AiRateLimitedError } from "@/lib/ai-usage";
 
 // V2 #3 from calorie_tracking_ux_research_and_plan.md — AI photo
@@ -35,6 +36,7 @@ export async function POST(request: Request) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  if (!(await userBelongsToAGroup(supabase, user.id))) return NextResponse.json({ error: "Join a group first to use this." }, { status: 403 });
 
   if (!isAiConfigured()) {
     return NextResponse.json(
@@ -77,10 +79,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       description: parsed.description,
-      calories: Math.max(0, Math.round(parsed.calories)),
-      proteinG: Math.max(0, Math.round(parsed.proteinG)),
-      carbsG: Math.max(0, Math.round(parsed.carbsG)),
-      fatG: Math.max(0, Math.round(parsed.fatG)),
+      ...clampMealMacros(parsed),
     });
   } catch (err) {
     if (err instanceof AiRateLimitedError) {

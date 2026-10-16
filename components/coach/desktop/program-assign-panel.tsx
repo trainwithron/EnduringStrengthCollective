@@ -9,6 +9,8 @@ import { loadAssignedTo, type AssignedInstance } from "@/lib/program-assigned";
 import { assignProgramToClient } from "@/lib/program-duplication";
 import { removeProgramMessage } from "@/lib/program-archive";
 import { APPROVE_AND_ASSIGN_FAILED, ensureSignedOff } from "@/components/coach/approve-and-assign";
+import { assignNotices } from "@/lib/assign-notice";
+import { hasFlaggedMusculoskeletalConcern, type ParQAnswer } from "@/lib/athlete-injury-flag";
 import { notifyPush } from "@/lib/push-notify";
 import { localDateKey } from "@/lib/timezone";
 import { useTerm } from "@/components/coach/terminology-provider";
@@ -122,6 +124,36 @@ export function ProgramAssignPanel({ programId, programName, groupId, aiDraft, o
 
   const list = targets();
   const count = list.length + (selected.has("me") ? 1 : 0);
+
+  // What is on file NOW for the people about to receive this program (age, birthdate missing, a flagged health concern): the coach is told before it goes, not only when it was built.
+  const [notices, setNotices] = useState<string[]>([]);
+  const listKey = list.map((t) => t.athleteId).sort().join(",");
+  useEffect(() => {
+    const ids = listKey ? listKey.split(",") : [];
+    if (ids.length === 0) {
+      setNotices([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await createBrowserClient().from("client_intake").select("athlete_id, date_of_birth, par_q_answers").in("athlete_id", ids);
+      if (cancelled) return;
+      const byId = new Map(((data ?? []) as { athlete_id: string; date_of_birth: string | null; par_q_answers: unknown }[]).map((r) => [r.athlete_id, r]));
+      const names = new Map((clients ?? []).map((c) => [c.id, c.fullName]));
+      setNotices(
+        assignNotices(
+          ids.map((id) => ({
+            name: names.get(id) ?? "A client",
+            dateOfBirth: byId.get(id)?.date_of_birth ?? null,
+            parqFlagged: hasFlaggedMusculoskeletalConcern((byId.get(id)?.par_q_answers as ParQAnswer[]) ?? []),
+          }))
+        )
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [listKey, clients]);
 
   async function removeOne(a: AssignedInstance) {
     if (busy) return;
@@ -280,6 +312,16 @@ export function ProgramAssignPanel({ programId, programName, groupId, aiDraft, o
             Start date
             <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full min-h-11 mt-1 bg-graphite border border-steel/30 text-chalk px-2 font-body text-base sm:text-sm focus:outline-none focus:border-rust" />
           </label>
+
+          {notices.length > 0 && (
+            <div className="mt-3 border border-rust/40 bg-rust/5 p-3" role="note">
+              {notices.map((n, i) => (
+                <p key={i} className="font-body text-xs text-chalk leading-snug">
+                  {n}
+                </p>
+              ))}
+            </div>
+          )}
 
           <button type="button" disabled={busy || count === 0} onClick={() => void assign()} className="w-full min-h-11 mt-3 bg-rust text-graphite font-display font-bold uppercase tracking-wide disabled:opacity-40">
             {busy ? progress ?? "Assigning…" : count > 0 ? `Assign to ${count}` : "Assign"}

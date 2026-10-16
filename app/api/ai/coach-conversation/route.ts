@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { MAX_RULE_TEXT } from "@/lib/ai-nutrition-clamp";
 import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError } from "@/lib/anthropic-client";
 import { AiRateLimitedError, aiInputTooLong } from "@/lib/ai-usage";
@@ -91,6 +92,8 @@ export async function POST(request: Request) {
         const { conv, messages } = await load();
         if (!conv || conv.status !== "active") return NextResponse.json({ error: "This conversation is finished." }, { status: 409 });
         if (conv.readback) return NextResponse.json({ error: "Check the read-back first." }, { status: 409 });
+        // A hard stop: the model is told to wrap up at the last turn, but if it keeps asking, the conversation still ends here and costs nothing more.
+        if (conv.coach_turns > chapter.maxCoachTurns) return NextResponse.json({ error: "This conversation has gone on long enough. Skip this chapter or start it again." }, { status: 409 });
         const { data: saved } = await supabase.from("coach_conversation_messages").insert({ conversation_id: conv.id, coach_id: user.id, role: "coach", body: text }).select("id").single();
         const turns = conv.coach_turns + 1;
         await supabase.from("coach_conversations").update({ coach_turns: turns, updated_at: now() }).eq("id", conv.id);
@@ -129,7 +132,7 @@ export async function POST(request: Request) {
               .slice(0, 6)
           : [];
         if (rules.length > 0) {
-          const { error } = await supabase.from("coach_program_preferences").insert(rules.map((r) => ({ coach_id: user.id, condition_text: r.condition, preference_text: r.preference })));
+          const { error } = await supabase.from("coach_program_preferences").insert(rules.map((r) => ({ coach_id: user.id, condition_text: r.condition.slice(0, MAX_RULE_TEXT), preference_text: r.preference.slice(0, MAX_RULE_TEXT) })));
           if (error) return NextResponse.json({ error: "That didn't save. Nothing was changed." }, { status: 500 });
         }
         await supabase.from("coach_conversations").update({ status: "done", updated_at: now() }).eq("id", conv.id);

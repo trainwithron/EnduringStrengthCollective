@@ -5,7 +5,7 @@ import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError, AiTrunca
 import { AiRateLimitedError } from "@/lib/ai-usage";
 import { checkAndSpendCoachCredits, canRunAiAction } from "@/lib/coach-credits";
 import { hasFlaggedMusculoskeletalConcern } from "@/lib/athlete-injury-flag";
-import { athleteIsMinor, YOUTH_PROMPT_BLOCK } from "@/lib/youth-block";
+import { athleteAgeStatus, YOUTH_PROMPT_BLOCK } from "@/lib/youth-block";
 import { scanConstraints } from "@/lib/constraint-scan";
 import { learnedBlock, loadLearnedLines } from "@/lib/learned-for-prompt";
 import { loadNotesBlock } from "@/lib/client-notes-server";
@@ -115,7 +115,8 @@ export async function POST(request: Request) {
     const flagged = hasFlaggedMusculoskeletalConcern((intakeRow?.par_q_answers as any[]) ?? []);
     const noteText = noteRow?.body?.trim() || null;
     if (flagged || noteText) injuryContext = `This client has flagged a musculoskeletal or health concern${flagged ? " on their intake screening" : ""}.${noteText ? ` The coach's own note: "${noteText}"` : ""}`;
-    if (await athleteIsMinor(supabase, clientId)) youthBlock = YOUTH_PROMPT_BLOCK;
+    // Under 18, or no birthdate on file: the youth protections apply (an unknown age is never treated as an adult).
+    if ((await athleteAgeStatus(supabase, clientId)) !== "adult") youthBlock = YOUTH_PROMPT_BLOCK;
   }
   const level = levelUsed(text, storedLevel ?? chosenLevel);
   const taught = learnedBlock(await loadLearnedLines(supabase, user.id, clientId));
@@ -144,6 +145,8 @@ export async function POST(request: Request) {
       parsed = await attempt(TEMPLATE_PICK_TRUNCATED_NOTE);
     }
     const picks = readTemplatePicks(parsed, slotCandidates, text);
+    // Charged only for a usable answer: if not one slot got an exercise, the coach pays nothing and is told to try again.
+    if (!picks.some((p) => p.exercise)) return NextResponse.json({ error: PICK_FAILED_MESSAGE }, { status: 502 });
     const spend = await checkAndSpendCoachCredits(createServiceRoleClient(), user.id, "program_generation");
     if (!spend.ok) return NextResponse.json({ error: spend.error }, { status: 402 });
     // The same "worth a look" checks as the day builder, on everything the AI chose itself (an exercise the coach named is theirs, never flagged).

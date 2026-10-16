@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { MAX_RULE_TEXT } from "@/lib/ai-nutrition-clamp";
 import { createServerClient } from "@/lib/supabase/server";
 import { preferenceFor } from "@/lib/edit-patterns";
 
@@ -30,7 +31,7 @@ export async function POST(request: Request, props: { params: Promise<{ ruleId: 
       const p = preferenceFor({ from: rule.from_name, to: rule.to_name });
       const { data: pref, error } = await supabase
         .from("coach_program_preferences")
-        .insert({ coach_id: user.id, condition_text: p.condition, preference_text: p.preference, source_program_id: rule.asked_for_program_id })
+        .insert({ coach_id: user.id, condition_text: String(p.condition).slice(0, MAX_RULE_TEXT), preference_text: String(p.preference).slice(0, MAX_RULE_TEXT), source_program_id: rule.asked_for_program_id })
         .select("id")
         .single();
       if (error || !pref) return fail();

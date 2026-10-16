@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { MAX_RULE_TEXT } from "@/lib/ai-nutrition-clamp";
 import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, isAiConfigured } from "@/lib/anthropic-client";
 import { AiRateLimitedError, aiInputTooLong } from "@/lib/ai-usage";
@@ -53,7 +54,7 @@ export async function POST(request: Request) {
       return `Week ${w.week_number}, Day ${w.day_index} (${w.title}): ${items.join("; ") || "no exercises"}`;
     })
     .join("\n");
-  const prefsText = (prefs ?? []).length > 0 ? (prefs ?? []).map((p: any) => `- When ${p.condition_text}: ${p.preference_text}`).join("\n") : "(none)";
+  const prefsText = (prefs ?? []).length > 0 ? (prefs ?? []).map((p: any) => `- When ${String(p.condition_text).slice(0, MAX_RULE_TEXT)}: ${String(p.preference_text).slice(0, MAX_RULE_TEXT)}`).join("\n") : "(none)";
 
   try {
     const answer = await answerConcisely((strict) => {

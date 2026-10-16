@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError } from "@/lib/anthropic-client";
+import { clampAiRow } from "@/lib/ai-row-clamps";
+import { cleanExerciseName, exerciseNameProblem } from "@/lib/exercise-name-guard";
 import { AiRateLimitedError, aiInputTooLong } from "@/lib/ai-usage";
 import { userIsCoach } from "@/lib/user-is-coach";
 
@@ -88,13 +90,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Couldn't parse that — try again." }, { status: 502 });
     }
 
-    const exercises: ParsedExercise[] = parsed.filter(isValidExercise).map((r) => ({
-      exerciseName: r.exerciseName,
-      sets: Math.max(1, Math.round(r.sets)),
-      reps: typeof r.reps === "number" ? Math.max(0, Math.round(r.reps)) : null,
-      weight: typeof r.weight === "number" ? r.weight : null,
-      rpe: typeof r.rpe === "number" ? r.rpe : null,
-    }));
+    // The same limits and name check every other AI-written exercise gets: sets 1 to 20, effort 1 to 10, a believable weight, and a name that is neither empty, only numbers, nor carrying sets and reps.
+    const exercises: ParsedExercise[] = parsed
+      .filter(isValidExercise)
+      .map((r) => {
+        const clamped = clampAiRow({
+          sets: Math.round(r.sets),
+          reps: typeof r.reps === "number" ? String(Math.max(0, Math.round(r.reps))) : null,
+          weight: typeof r.weight === "number" ? r.weight : null,
+          rpe: typeof r.rpe === "number" ? r.rpe : null,
+          rest: null,
+          timeSeconds: null,
+        });
+        return {
+          exerciseName: cleanExerciseName(r.exerciseName).replace(/[\u0000-\u001f\u007f]/g, ""),
+          sets: clamped.sets,
+          reps: clamped.reps != null ? Number(clamped.reps) : null,
+          weight: clamped.weight,
+          rpe: clamped.rpe,
+        };
+      })
+      .filter((r) => !exerciseNameProblem(r.exerciseName));
 
     if (exercises.length === 0) {
       return NextResponse.json(

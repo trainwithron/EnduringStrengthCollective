@@ -50,7 +50,7 @@ import { generateGzclpProgram, type GzclpLiftInput, type GzclpProgressionRule } 
 import { AiOutputWrongButton } from "@/components/coach/ai-output-wrong-button";
 import { validateProgramRows } from "@/lib/program-validation";
 import { MicButton } from "@/components/shared/mic-button";
-import { YOUTH_BANNER_TEXT } from "@/lib/youth-block";
+import { UNKNOWN_AGE_BANNER_TEXT, YOUTH_BANNER_TEXT } from "@/lib/youth-block";
 import { AiUsageMeter } from "@/components/coach/ai-usage-meter";
 import { detectImportKind } from "@/lib/import-input-kind";
 import { buildImportPrompt } from "@/lib/import-prompt";
@@ -161,6 +161,8 @@ interface PendingImport {
   checkFlags: string[];
   // True when the client is under 18: the program was built technique-first, and the review screen says so.
   youth: boolean;
+  // The youth protections applied only because no birthdate is on file.
+  youthUnknownAge?: boolean;
 }
 
 export function ImportWizard({
@@ -365,7 +367,7 @@ export function ImportWizard({
     libraryFlags: { exerciseName: string; flaggedReason: string }[] = [],
     adherenceCheck: PendingImport["adherenceCheck"] = null,
     creditCharged: boolean = false,
-    extras: { constraintFlags?: string[]; youth?: boolean; readNote?: string } = {}
+    extras: { constraintFlags?: string[]; youth?: boolean; youthUnknownAge?: boolean; readNote?: string } = {}
   ) {
     // The same check for every source (a spreadsheet, a photo, a PDF, pasted text, AI): a program whose exercises are called "1", "2", "3" is never created.
     if (looksLikeNumbersNotNames(parsed.map((r) => r.exerciseName))) {
@@ -452,6 +454,7 @@ export function ImportWizard({
       adherenceCheck,
       checkFlags,
       youth: extras.youth === true,
+      youthUnknownAge: extras.youthUnknownAge === true,
     };
 
     if (fuzzyMatches.length === 0 && !isAiSourced) {
@@ -848,7 +851,7 @@ export function ImportWizard({
         data.libraryFlags ?? [],
         data.adherenceCheck ?? null,
         true,
-        { constraintFlags: Array.isArray(data.constraintFlags) ? data.constraintFlags : [], youth: data.youth === true }
+        { constraintFlags: Array.isArray(data.constraintFlags) ? data.constraintFlags : [], youth: data.youth === true, youthUnknownAge: data.youthUnknownAge === true }
       );
     } catch (err) {
       setStatus("error");
@@ -1008,7 +1011,7 @@ export function ImportWizard({
         </p>
         {pending.isAiSourced && pending.youth && (
           <div className="mb-4 border border-rust/40 bg-rust/5 p-3" role="note">
-            <p className="font-body text-xs text-chalk leading-snug">{YOUTH_BANNER_TEXT}</p>
+            <p className="font-body text-xs text-chalk leading-snug">{pending.youthUnknownAge ? UNKNOWN_AGE_BANNER_TEXT : YOUTH_BANNER_TEXT}</p>
           </div>
         )}
         {pending.isAiSourced && pending.checkFlags.length > 0 && (

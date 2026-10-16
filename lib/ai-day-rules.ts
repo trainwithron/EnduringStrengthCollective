@@ -4,6 +4,8 @@
 import { matchExercise, sameQualifiers, type AliasEntry } from "@/lib/exercise-matching";
 import { mentionsExercise } from "@/lib/builder-context";
 
+import { isTimedHold } from "@/lib/timed-exercise";
+
 export interface DayRow {
   exerciseName: string;
   sets: number;
@@ -82,19 +84,21 @@ export function mobilityInstruction(role: MobilityRole, wanted: number | null): 
 
 // ---- timed work is written the same way every day ----
 
-const TIMED_NAME = /\b(foam roll(?:ing)?|stretch(?:es)?|hold|holds|plank|breathing|couch stretch|hang|dead hang|isometric|iso hold)\b/i;
+// Foam rolling, stretches and breathing are always timed; holds (a plank, a wall sit, a dead hang) are decided by the same rule the rest of the app uses (isTimedHold), so "Hang Clean" and "Plank Row" stay reps.
+const TIMED_ONLY = /\b(foam roll(?:ing)?|stretch(?:es)?|breathing|couch stretch)\b/i;
 
 export function isTimedName(name: string): boolean {
-  return TIMED_NAME.test(name);
+  return isTimedHold(name) || TIMED_ONLY.test(name);
 }
 
-// A timed item (foam rolling, a stretch, a hold) is a time, not a "1 set": it reuses the time it already has on another day of the program, else the time the model gave, else 60 seconds.
-export function applyTimedConsistency<T extends DayRow>(rows: T[], known: Map<string, number>): T[] {
+// A timed item with no time of its own (foam rolling, a stretch, a hold) is a time, not a "1 set": it takes the time it already has on another day of the program, else 60 seconds. What the coach typed, and a
+// time or set count the model itself wrote, are never changed.
+export function applyTimedConsistency<T extends DayRow & { coachNamed?: boolean }>(rows: T[], known: Map<string, number>): T[] {
   return rows.map((r) => {
-    if (!isTimedName(r.exerciseName)) return r;
+    if (r.coachNamed || !isTimedName(r.exerciseName)) return r;
+    if (r.timeSeconds != null) return r;
     const prior = known.get(ruleKey(r.exerciseName));
-    const time = prior ?? r.timeSeconds ?? 60;
-    return { ...r, timeSeconds: time, reps: null, sets: prior != null && r.sets > 1 ? 1 : r.sets };
+    return { ...r, timeSeconds: prior ?? 60, reps: null };
   });
 }
 

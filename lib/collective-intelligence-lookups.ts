@@ -232,8 +232,10 @@ export async function getExerciseTrend(
 export async function getReadinessHistory(
   supabase: SupabaseClient,
   athlete: ResolvedAthlete,
-  windowDays: number
+  windowDaysAsked: number
 ): Promise<LookupResult | null> {
+  // A window of 1 to 365 days, whatever the model asked for.
+  const windowDays = Math.min(365, Math.max(1, Math.round(Number.isFinite(windowDaysAsked) ? windowDaysAsked : 7)));
   const { data } = await supabase
     .from("wellness_checkins")
     .select("sleep_quality, soreness, energy, log_date")

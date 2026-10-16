@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { userBelongsToAGroup } from "@/lib/ai-nutrition-clamp";
 import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError } from "@/lib/anthropic-client";
 import { AiRateLimitedError } from "@/lib/ai-usage";
@@ -13,6 +14,7 @@ export async function POST(request: Request) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  if (!(await userBelongsToAGroup(supabase, user.id))) return NextResponse.json({ error: "Join a group first to use this." }, { status: 403 });
 
   if (!isAiConfigured()) {
     return NextResponse.json({ error: "Reading a sheet from a photo isn't available yet. You can type the numbers in." }, { status: 503 });

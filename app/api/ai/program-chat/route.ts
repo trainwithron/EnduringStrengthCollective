@@ -148,6 +148,8 @@ export async function POST(request: Request) {
 
   let reply = "I wasn't able to answer that — try asking again.";
   let proposedRule: { condition: string; preference: string } | null = null;
+  // True only when the model really answered. A canned "couldn't answer" reply is shown but never saved, so it does not sit in the thread (and in later prompts) as if the assistant had said it.
+  let answered = false;
 
   try {
     const response = await callClaude({
@@ -162,7 +164,10 @@ export async function POST(request: Request) {
       maxTokens: 1024,
     });
     const parsed = JSON.parse(extractJson(response));
-    if (typeof parsed.reply === "string" && parsed.reply.trim()) reply = parsed.reply.trim();
+    if (typeof parsed.reply === "string" && parsed.reply.trim()) {
+      reply = parsed.reply.trim();
+      answered = true;
+    }
     if (
       parsed.proposedRule &&
       typeof parsed.proposedRule.condition === "string" &&
@@ -182,14 +187,16 @@ export async function POST(request: Request) {
     // reply/proposedRule keep their fallback values above.
   }
 
-  const { error: insertError } = await supabase.from("coach_chat_messages").insert([
-    { thread_id: threadId, coach_id: user.id, role: "coach", body: message, lookups_used: [] },
-    { thread_id: threadId, coach_id: user.id, role: "assistant", body: reply, lookups_used: [] },
-  ]);
-  if (insertError) {
-    console.error("Failed to persist program chat messages:", insertError);
+  if (answered) {
+    const { error: insertError } = await supabase.from("coach_chat_messages").insert([
+      { thread_id: threadId, coach_id: user.id, role: "coach", body: message, lookups_used: [] },
+      { thread_id: threadId, coach_id: user.id, role: "assistant", body: reply, lookups_used: [] },
+    ]);
+    if (insertError) {
+      console.error("Failed to persist program chat messages:", insertError);
+    }
+    await supabase.from("coach_chat_threads").update({ last_message_at: new Date().toISOString() }).eq("id", threadId);
   }
-  await supabase.from("coach_chat_threads").update({ last_message_at: new Date().toISOString() }).eq("id", threadId);
 
   return NextResponse.json({ threadId, reply, proposedRule });
 }

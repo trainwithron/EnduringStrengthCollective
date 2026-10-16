@@ -23,3 +23,42 @@ export const YOUTH_PROMPT_BLOCK = `This client is under 18. Treat the following 
 
 // What the coach reads on the review screen (shown to the coach for approval before release).
 export const YOUTH_BANNER_TEXT = "This client is under 18. The program was built technique-first, with no max testing and no maximal loads. Please review it with that in mind.";
+
+// ---- age unknown is NOT adult ----
+
+export type AgeStatus = "minor" | "adult" | "unknown";
+
+export function ageStatusFromDob(dateOfBirth: string | null | undefined, asOf: Date = new Date()): AgeStatus {
+  if (!dateOfBirth || !/^\d{4}-\d{2}-\d{2}/.test(dateOfBirth)) return "unknown";
+  return isMinorDob(dateOfBirth, asOf) ? "minor" : "adult";
+}
+
+// The age of a client for the AI builder: a client with no birthdate on file is "unknown", and unknown gets the youth protections (RPE 8 or lower, moderate reps, technique first) until a birthdate says otherwise.
+// A read that fails is "unknown" too, never "adult".
+export async function athleteAgeStatus(supabase: SupabaseClient, athleteId: string): Promise<AgeStatus> {
+  const { data, error } = await supabase.from("client_intake").select("date_of_birth").eq("athlete_id", athleteId).maybeSingle();
+  if (error) return "unknown";
+  return ageStatusFromDob((data as { date_of_birth?: string | null } | null)?.date_of_birth);
+}
+
+export const UNKNOWN_AGE_BANNER_TEXT = "This client has no birthdate on file, so the program was built with the youth protections (technique first, no max testing, effort at RPE 8 or lower). Add their birthdate to remove them, and review the program with that in mind.";
+
+export const YOUTH_RPE_CAP = 8;
+export const YOUTH_REP_LOW = 6;
+export const YOUTH_REP_HIGH = 15;
+
+// Whatever the model wrote, a youth program never asks for more than RPE 8 and says so when the reps leave the moderate range. Pure; returns the rows (RPE capped) and plain notes for the coach.
+export function clampYouthRows<T extends { exerciseName: string; reps: string | null; rpe: number | null }>(rows: T[]): { rows: T[]; flags: string[] } {
+  const flags: string[] = [];
+  const out = rows.map((r) => {
+    let next = r;
+    if (r.rpe != null && r.rpe > YOUTH_RPE_CAP) next = { ...next, rpe: YOUTH_RPE_CAP };
+    const nums = (r.reps ?? "").match(/\d+/g)?.map(Number) ?? [];
+    if (nums.length > 0 && !/amrap/i.test(r.reps ?? "") && (Math.min(...nums) < YOUTH_REP_LOW || Math.max(...nums) > YOUTH_REP_HIGH)) {
+      flags.push(`${r.exerciseName} is written as ${r.reps} reps, outside the moderate range for a young client (${YOUTH_REP_LOW} to ${YOUTH_REP_HIGH}). Worth a look.`);
+    }
+    return next;
+  });
+  if (rows.some((r, i) => r.rpe !== out[i].rpe)) flags.push(`Effort was lowered to RPE ${YOUTH_RPE_CAP} where it was higher, because this client is under 18 or has no birthdate on file.`);
+  return { rows: out, flags };
+}

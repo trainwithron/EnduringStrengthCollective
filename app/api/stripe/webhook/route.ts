@@ -247,15 +247,20 @@ async function createRevenueSplitTransfers(
         if (earlier?.stripe_transfer_id) continue;
       }
 
-      const transfer = await stripe.transfers.create(
-        {
-          amount: share.amountCents,
-          currency: "usd",
-          destination: member.stripe_connect_account_id,
-          transfer_group: eventId,
-        },
-        { idempotencyKey: `split-${eventId}-${share.profileId}` }
-      );
+      // Stripe forgets an idempotency key after a day. If this event is being handled again later and the transfer was already made, it is found by its transfer group instead of being paid a second time.
+      const existingTransfers = await stripe.transfers.list({ transfer_group: eventId, destination: member.stripe_connect_account_id, limit: 10 });
+      const existingTransfer = existingTransfers.data.find((t) => t.amount === share.amountCents && !t.reversed);
+      const transfer =
+        existingTransfer ??
+        (await stripe.transfers.create(
+          {
+            amount: share.amountCents,
+            currency: "usd",
+            destination: member.stripe_connect_account_id,
+            transfer_group: eventId,
+          },
+          { idempotencyKey: `split-${eventId}-${share.profileId}` }
+        ));
       // The transfer is already made. If remembering it fails, the failure is thrown so the event is sent again; the retry finds this transfer through the same idempotency key (never a second payout).
       const { error: transferSaveError } = await supabase
         .from("revenue_split_transfers")

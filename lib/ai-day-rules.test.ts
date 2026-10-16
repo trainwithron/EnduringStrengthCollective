@@ -71,6 +71,22 @@ describe("timed work is written the same way every day", () => {
     expect(applyTimedConsistency([row("Foam Rolling", { sets: 1, reps: null })], new Map())[0].timeSeconds).toBe(60);
     expect(applyTimedConsistency([row("Couch Stretch", { timeSeconds: 120, reps: null, sets: 1 })], new Map())[0].timeSeconds).toBe(120);
   });
+  it("a time or a set count the model wrote is kept, and the coach's own rows are never touched", () => {
+    const known = new Map([["foam rolling", 300]]);
+    expect(applyTimedConsistency([row("Foam Rolling", { sets: 3, reps: null, timeSeconds: 45 })], known)[0]).toMatchObject({ timeSeconds: 45, sets: 3 });
+    expect(applyTimedConsistency([row("Foam Rolling", { sets: 3, reps: null, timeSeconds: null })], known)[0]).toMatchObject({ timeSeconds: 300, sets: 3 });
+    const named = applyTimedConsistency([{ ...row("Plank", { sets: 4, reps: "10", timeSeconds: null }), coachNamed: true }], known)[0];
+    expect(named).toMatchObject({ reps: "10", timeSeconds: null, sets: 4 });
+  });
+  it("only real holds are timed: Hang Clean and Plank Row stay in reps", () => {
+    for (const name of ["Hang Clean", "Hang Power Snatch", "Plank Row", "Plank Jack"]) {
+      const out = applyTimedConsistency([row(name, { sets: 4, reps: "3", timeSeconds: null })], new Map())[0];
+      expect(out, name).toMatchObject({ reps: "3", timeSeconds: null, sets: 4 });
+    }
+    for (const name of ["Forearm Plank", "Dead Hang", "Wall Sit", "Couch Stretch", "Foam Rolling Quads"]) {
+      expect(applyTimedConsistency([row(name, { sets: 2, reps: "1", timeSeconds: null })], new Map())[0].timeSeconds, name).toBe(60);
+    }
+  });
 });
 
 describe("plain library names", () => {
