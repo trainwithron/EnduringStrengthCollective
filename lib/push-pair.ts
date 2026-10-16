@@ -34,3 +34,8 @@ export function clampPush(title: unknown, body: unknown): { title: string; body:
   const b = typeof body === "string" ? body.trim().slice(0, 140) : "";
   return { title: t, body: b };
 }
+
+// The rate-limit bucket for pushes from one sender to one recipient. Per sender AND recipient: a coach receives pushes from every client, so a cap on the recipient alone would starve them.
+export function pushPairKey(senderId: string, recipientId: string): string {
+  return `${senderId}:${recipientId}`;
+}

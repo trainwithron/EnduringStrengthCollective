@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { UsdaFoodPicker } from "./usda-food-picker";
+import { checked } from "@/lib/checked-write";
 
 export interface BuiltinIngredientMappingRow {
   key: string;
@@ -17,16 +18,29 @@ export interface BuiltinIngredientMappingRow {
 // to every group's Key nutrients grid immediately.
 export function BuiltinIngredientMappings({ initialRows }: { initialRows: BuiltinIngredientMappingRow[] }) {
   const [rows, setRows] = useState(initialRows);
+  const [error, setError] = useState<string | null>(null);
 
   async function handlePicked(key: string, fdcId: number | null, description: string | null) {
     const supabase = createBrowserClient();
     const { data: userData } = await supabase.auth.getUser();
-    await supabase.from("builtin_ingredient_usda_mappings").upsert({
-      ingredient_key: key,
-      usda_fdc_id: fdcId,
-      mapped_by: userData.user?.id ?? null,
-      updated_at: new Date().toISOString(),
-    });
+    setError(null);
+    // A mapping can be changed only by the coach who made it (or the platform admin): said plainly instead of looking saved.
+    const result = await checked(
+      supabase
+        .from("builtin_ingredient_usda_mappings")
+        .upsert({
+          ingredient_key: key,
+          usda_fdc_id: fdcId,
+          mapped_by: userData.user?.id ?? null,
+          updated_at: new Date().toISOString(),
+        })
+        .select("ingredient_key"),
+      { expectRows: true, message: "That mapping was made by another coach, so only they can change it. Nothing was saved." }
+    );
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, usdaFdcId: fdcId, usdaDescription: description } : r)));
   }
 
@@ -38,6 +52,11 @@ export function BuiltinIngredientMappings({ initialRows }: { initialRows: Builti
         {mappedCount}/{rows.length} mapped — these power the Key nutrients estimate for every
         built-in recipe across every coach&apos;s clients.
       </p>
+      {error && (
+        <p className="font-body text-sm text-rust mb-3" role="alert">
+          {error}
+        </p>
+      )}
       <div className="border border-steel/20 divide-y divide-steel/15">
         {rows.map((row) => (
           <div key={row.key} className="grid grid-cols-[1fr_2fr] gap-3 items-center p-2.5">

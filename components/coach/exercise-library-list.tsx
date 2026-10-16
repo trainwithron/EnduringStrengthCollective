@@ -15,6 +15,9 @@ import { ExerciseQrCodeButton } from "./exercise-qr-code-button";
 import { Trash2, Trophy } from "lucide-react";
 import { badExerciseNameMessage, editFailureMessage, isBadExerciseName } from "@/lib/exercise-name-guard";
 import { addLibraryExercise } from "@/lib/library-write";
+import { checked } from "@/lib/checked-write";
+
+const TAG_OWNER_MESSAGE = "That tag was added by another coach, so only they can change it. Nothing was saved.";
 import { NO_FILTERS, filtersActive, matchesFilters, patternFilterOptions, tagChip, type ClassFilter, type LibraryFilters, type SideFilter } from "@/lib/library-sort";
 import { PATTERN_NAMES, TIER_KEY } from "@/lib/starter-ladders";
 
@@ -124,11 +127,12 @@ export function ExerciseLibraryList({
         ...prev,
         [exerciseName]: (prev[exerciseName] ?? []).filter((t) => t.tagId !== tagId),
       }));
-      await supabase
-        .from("exercise_biomech_tags")
-        .delete()
-        .eq("exercise_name", exerciseName)
-        .eq("tag_id", tagId);
+      const removed = await checked(supabase.from("exercise_biomech_tags").delete().eq("exercise_name", exerciseName).eq("tag_id", tagId).select("id"), { expectRows: true, message: TAG_OWNER_MESSAGE });
+      if (!removed.ok) {
+        // put the tag back on screen: another coach added it, and only they can remove it
+        setTagsByExercise((prev) => ({ ...prev, [exerciseName]: current }));
+        setNameProblem(removed.error);
+      }
     } else {
       setTagsByExercise((prev) => ({
         ...prev,
@@ -149,11 +153,12 @@ export function ExerciseLibraryList({
       [exerciseName]: (prev[exerciseName] ?? []).map((t) => (t.tagId === tagId ? { ...t, role } : t)),
     }));
     const supabase = createBrowserClient();
-    await supabase
-      .from("exercise_biomech_tags")
-      .update({ role })
-      .eq("exercise_name", exerciseName)
-      .eq("tag_id", tagId);
+    const before = tagsByExercise[exerciseName] ?? [];
+    const updated = await checked(supabase.from("exercise_biomech_tags").update({ role }).eq("exercise_name", exerciseName).eq("tag_id", tagId).select("id"), { expectRows: true, message: TAG_OWNER_MESSAGE });
+    if (!updated.ok) {
+      setTagsByExercise((prev) => ({ ...prev, [exerciseName]: before }));
+      setNameProblem(updated.error);
+    }
   }
 
   async function handleSuggestTags(exerciseName: string, target: "new" | string) {

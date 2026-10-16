@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { clampPush, mayPushTo } from "@/lib/push-pair";
+import { clampPush, mayPushTo, pushPairKey } from "@/lib/push-pair";
 
 // A stand-in database: tables of rows, filtered by every .eq() in the chain.
 function fakeDb(tables: Record<string, Record<string, string>[]>) {
@@ -59,7 +59,11 @@ describe("mayPushTo", () => {
   });
   it("the route limits pushes to one person to ten an hour and only opens in-app paths", () => {
     const route = readFileSync(join(__dirname, "..", "app/api/push/send/route.ts"), "utf8");
-    expect(route).toContain('rateLimitResponse("push-to", profileId, 10, 3600)');
+    // keyed by sender AND recipient, so ten clients writing to one coach each get their own ten
+    expect(route).toContain('rateLimitResponse("push-to", pushPairKey(user.id, profileId), 10, 3600)');
+    expect(pushPairKey("clientA", "coach")).not.toBe(pushPairKey("clientB", "coach"));
+    expect(pushPairKey("clientA", "coach")).not.toBe(pushPairKey("clientA", "other"));
+    expect(pushPairKey("clientA", "coach")).toBe(pushPairKey("clientA", "coach"));
     expect(route).toContain("safePushPath(payload.url)");
   });
   it("refuses someone they share nothing with", async () => {
