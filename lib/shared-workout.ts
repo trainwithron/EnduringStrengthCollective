@@ -11,6 +11,9 @@ import { computeRelativeStrengthMilestone } from "@/lib/relative-strength-milest
 import { believableDurationSeconds } from "@/lib/share-image";
 import { loadSharedSource } from "@/lib/shared-workout-source";
 import { parseShareParam, verifyShareSignature } from "@/lib/share-token";
+import { readLoggedSets } from "@/lib/read-logged-sets";
+import { countsForProgress } from "@/lib/set-types";
+import { pickRecordSet } from "@/lib/record-set";
 
 // Shared by the public /share/[postId] page and the in-feed expanded
 // card (fetched via /api/workout-share/[postId]) so both surfaces
@@ -91,18 +94,20 @@ export async function getSharedWorkout(postId: string, opts: { fullName?: boolea
   // exercise rather than assuming weight is always present.
   const bestByExercise = new Map<
     string,
-    { weight: number; reps: number; distance: number | null; timeSeconds: number | null; paceSeconds: number | null }
+    { weight: number; reps: number; distance: number | null; timeSeconds: number | null; holdSeconds: number | null; paceSeconds: number | null }
   >();
+  // The session's counted weighted sets per exercise (the card names the set that earned a record, not just the heaviest).
+  const weightedSetsByExercise = new Map<string, { weight: number; reps: number }[]>();
   if (workoutLog.session_id && broadcastLevel !== "checkin_only") {
-    const { data: sets } = await supabase
-      .from("set_logs")
-      .select(
-        "weight, reps, distance, time_seconds, pace, status, session_exercises!inner ( session_id, exercise_name )"
-      )
-      .eq("session_exercises.session_id", workoutLog.session_id)
-      .eq("status", "completed");
+    // Counted sets only, like the database's records: a warm-up or drop set is never on the card as a best.
+    const { data: sets } = await readLoggedSets(
+      supabase,
+      "weight, reps, distance, time_seconds, pace, set_type, status, session_exercises!inner ( session_id, exercise_name )",
+      (q) => q.eq("session_exercises.session_id", workoutLog.session_id).eq("status", "completed")
+    );
 
     for (const row of (sets ?? []) as any[]) {
+      if (!countsForProgress(row.set_type)) continue;
       const name = row.session_exercises.exercise_name;
       const weight = row.weight ?? 0;
       const existing = bestByExercise.get(name) ?? {
@@ -110,17 +115,27 @@ export async function getSharedWorkout(postId: string, opts: { fullName?: boolea
         reps: 1,
         distance: null,
         timeSeconds: null,
+        holdSeconds: null,
         paceSeconds: null,
       };
       if (weight > existing.weight) {
         existing.weight = weight;
         existing.reps = row.reps ?? 1;
       }
+      if (weight > 0) {
+        const list = weightedSetsByExercise.get(name) ?? [];
+        list.push({ weight, reps: row.reps ?? 1 });
+        weightedSetsByExercise.set(name, list);
+      }
       if (row.distance != null && (existing.distance == null || row.distance > existing.distance)) {
         existing.distance = row.distance;
       }
-      if (row.time_seconds != null && (existing.timeSeconds == null || row.time_seconds < existing.timeSeconds)) {
-        existing.timeSeconds = row.time_seconds;
+      if (row.time_seconds != null && (row.distance != null || row.pace != null)) {
+        // a timed distance: the shortest time is the best
+        if (existing.timeSeconds == null || row.time_seconds < existing.timeSeconds) existing.timeSeconds = row.time_seconds;
+      } else if (row.time_seconds != null) {
+        // a hold (time with no distance and no pace): the longest time is the best
+        if (existing.holdSeconds == null || row.time_seconds > existing.holdSeconds) existing.holdSeconds = row.time_seconds;
       }
       const paceSeconds = parseNumericPaceSecondsPerUnit(row.pace);
       if (paceSeconds != null && (existing.paceSeconds == null || paceSeconds < existing.paceSeconds)) {
@@ -154,6 +169,40 @@ export async function getSharedWorkout(postId: string, opts: { fullName?: boolea
   // going to have a weight at all. An exercise with none of the four
   // (shouldn't happen if it's genuinely in new_prs, but matches the
   // original "no data, skip it" behavior) is filtered out below.
+  // For an exercise with a new record, the card shows the set that earned it: among the session's sets, the ones no earlier set matched (as heavy for as many reps), and of those the strongest by estimated 1RM.
+  // (A record is per number of reps, so it is not always the heaviest set of the session.)
+  if (newPrs.length > 0 && weightedSetsByExercise.size > 0) {
+    const prNames = newPrs.filter((n) => weightedSetsByExercise.has(n));
+    if (prNames.length > 0) {
+      const { data: priorForPrs } = await readLoggedSets(
+        supabase,
+        "weight, reps, set_type, status, session_exercises!inner ( session_id, exercise_name, athlete_sessions!inner ( athlete_id ) )",
+        (q) =>
+          q
+            .in("session_exercises.exercise_name", prNames)
+            .eq("session_exercises.athlete_sessions.athlete_id", post.author_id)
+            .neq("session_exercises.session_id", workoutLog.session_id)
+            .eq("status", "completed")
+      );
+      const priorByName = new Map<string, { weight: number; reps: number }[]>();
+      for (const row of (priorForPrs ?? []) as any[]) {
+        if (!countsForProgress(row.set_type) || row.weight == null) continue;
+        const name = row.session_exercises.exercise_name as string;
+        const list = priorByName.get(name) ?? [];
+        list.push({ weight: row.weight, reps: row.reps ?? 0 });
+        priorByName.set(name, list);
+      }
+      for (const name of prNames) {
+        const earned = pickRecordSet(weightedSetsByExercise.get(name) ?? [], priorByName.get(name) ?? []);
+        const best = bestByExercise.get(name);
+        if (earned && best) {
+          best.weight = earned.weight;
+          best.reps = earned.reps;
+        }
+      }
+    }
+  }
+
   const prList = newPrs
     .map((name) => {
       const best = bestByExercise.get(name);
@@ -170,6 +219,10 @@ export async function getSharedWorkout(postId: string, opts: { fullName?: boolea
       }
       if (best.timeSeconds != null) {
         return { name, primary: formatPaceSecondsToClock(best.timeSeconds), secondary: "new time PR" };
+      }
+      if (best.holdSeconds != null) {
+        // a hold: the longest is the record
+        return { name, primary: formatPaceSecondsToClock(best.holdSeconds), secondary: "new hold PR" };
       }
       if (best.paceSeconds != null) {
         return { name, primary: formatPaceSecondsToClock(best.paceSeconds), secondary: "new pace PR" };
@@ -372,19 +425,18 @@ export async function getSharedWorkout(postId: string, opts: { fullName?: boolea
 
     if (bodyweight != null) {
       const exerciseNamesThisSession = Array.from(bestByExercise.keys());
-      const { data: priorSetRows } = await serviceClient
-        .from("set_logs")
-        .select(
-          "weight, reps, status, session_exercises!inner ( session_id, exercise_name, athlete_sessions!inner ( athlete_id ) )"
-        )
-        .in("session_exercises.exercise_name", exerciseNamesThisSession)
-        .eq("status", "completed");
+      const { data: priorSetRows } = await readLoggedSets(
+        serviceClient,
+        "weight, reps, set_type, status, session_exercises!inner ( session_id, exercise_name, athlete_sessions!inner ( athlete_id ) )",
+        (q) => q.in("session_exercises.exercise_name", exerciseNamesThisSession).eq("status", "completed")
+      );
 
       const priorBestEst1RmByName = new Map<string, number>();
       for (const row of (priorSetRows ?? []) as any[]) {
         const sessionExercise = row.session_exercises;
         if (sessionExercise.session_id === workoutLog.session_id) continue;
         if (sessionExercise.athlete_sessions?.athlete_id !== post.author_id) continue;
+        if (!countsForProgress(row.set_type)) continue;
         if (row.weight == null || row.reps == null) continue;
         const est = estimateOneRepMax(row.weight, row.reps);
         if (est == null) continue;

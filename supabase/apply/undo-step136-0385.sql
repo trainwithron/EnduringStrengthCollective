@@ -1,4 +1,4 @@
--- UNDO for step 136 (0385). Only if step 136 misbehaves. Puts back the earlier training-max, record and workout-completion functions exactly and removes the set-type columns (every set is then an ordinary set again).
+-- UNDO for step 136 (0385). Only if step 136 misbehaves. Run it ONLY while the Release C code is not live (or after that code has been rolled back): the app writes the set type, and it fails once the column is gone. Puts back the earlier training-max, record and workout-completion functions exactly, removes the set-type columns (every set is then an ordinary set again) and removes the new hold records. The old shortest-hold records that step 136 replaced are not brought back (they were the wrong way round).
 -- WHAT YOU SHOULD SEE: "Success. No rows returned."   Then tell Spot, and do not run the step again until Spot says why it failed.
 begin;
 drop trigger if exists set_logs_set_type_recompute on public.set_logs;
@@ -59,6 +59,7 @@ begin
   return v_count;
 end;
 $$;
+drop function if exists public.recompute_training_maxes_internal(uuid, text);
 create or replace function public.recompute_training_max()
 returns trigger
 language plpgsql
@@ -455,6 +456,7 @@ begin
   return query select v_log_id, v_session.athlete_id, v_session.group_id, v_total_volume, v_total_sets, coalesce(v_new_prs, '{}'), coalesce(v_new_records, '{}'), v_credit_consumed;
 end;
 $function$;
+delete from public.exercise_records where tracked_field = 'hold_seconds';
 alter table public.set_logs drop constraint if exists set_logs_set_type_check;
 alter table public.set_logs drop column if exists set_type;
 alter table public.group_workout_exercise_sets drop constraint if exists group_workout_exercise_sets_set_type_check;

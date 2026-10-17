@@ -470,7 +470,8 @@ export function ExerciseSetGrid({
   const unlocked =
     !gamificationEnabled ||
     isExerciseUnlocked(
-      sets.map((s) => ({
+      // a warm-up or drop set never unlocks anything (it is not a record)
+      sets.filter((s) => s.setType !== "warmup" && s.setType !== "drop").map((s) => ({
         weight: s.weight,
         reps: s.reps,
         targetWeight: s.targetWeight ?? null,

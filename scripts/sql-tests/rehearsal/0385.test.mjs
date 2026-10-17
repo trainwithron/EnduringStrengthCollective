@@ -141,9 +141,17 @@ export default {
       await set(eC, 1, { weight: 100, reps: 5 });
       await putMax("Legacy C", 410, 300, 10);
       await db.query(`update public.set_logs set data_flag = 'unclear' where id = $1`, [typo]);
-      // D: no counted set of 1 to 12 reps left (only a 15-rep set): nothing supports the row
+      // D: a max resting only on a 15-rep set (the earlier rules had no rep limit) is kept too
       await set(await exercise(await session(33, "completed"), "Legacy D"), 0, { weight: 100, reps: 15 });
       await putMax("Legacy D", 150, 100, 15);
+      // D2: nothing counted is left behind the row (its only set is a warm-up): it is dropped
+      await set(await exercise(await session(36, "completed"), "Legacy D2"), 0, { weight: 100, reps: 15, set_type: "warmup" });
+      await putMax("Legacy D2", 150, 100, 15);
+      // G: a 15-rep max plus a lower 5-rep set: the 5-rep estimate must not shrink it
+      const eG = await exercise(await session(37, "completed"), "Legacy G");
+      await set(eG, 0, { weight: 135, reps: 15 });
+      await set(eG, 1, { weight: 135, reps: 5 });
+      await putMax("Legacy G", 200, 135, 15);
       // E: a 12-rep set and a heavier 3-rep set: the new estimate (higher) replaces the stored one
       const eE = await exercise(await session(34, "completed"), "Legacy E");
       await set(eE, 0, { weight: 100, reps: 12 });
@@ -156,11 +164,52 @@ export default {
       h.check("a max that rests only on a 10-rep set is kept, not wiped", (await maxOf("Legacy A")) === 205);
       h.check("a lower 5-rep estimate does not shrink a stored max (205 stays, not 180)", (await maxOf("Legacy B")) === 205);
       h.check("a max from a set marked unclear can still come down (to the 100 x 5 = 120)", (await maxOf("Legacy C")) === 120);
-      h.check("a max with no counted set of 1 to 12 reps behind it is dropped", (await maxOf("Legacy D")) === null);
+      h.check("a max that rests only on a 15-rep set is kept, not wiped", (await maxOf("Legacy D")) === 150);
+      h.check("a max with no counted set at all behind it is dropped", (await maxOf("Legacy D2")) === null);
+      h.check("a lower 5-rep estimate does not shrink a max that rests on a 15-rep set (200 stays)", (await maxOf("Legacy G")) === 200);
       h.check("a higher 1-to-8-rep estimate replaces a stored max (200 x 3 = 226.7)", (await maxOf("Legacy E")) === 226.7);
       h.check("the earlier maxes in this test are unchanged by the recompute", (await maxOf("Bench")) === 130 && (await maxOf("Row")) === 170);
       const nineUp = await set(await exercise(await session(35, "completed"), "Legacy F"), 0, { weight: 100, reps: 9 });
       h.check("a NEW set of 9 reps makes no max going forward", nineUp && (await maxOf("Legacy F")) === null);
+
+      // ---- a hold and a timed distance for the same exercise in one session both complete (each has its own record field)
+      sid = await session(40, "in_progress");
+      e = await exercise(sid, "Row");
+      await set(e, 0, { time_seconds: 600, distance: 2000 });
+      await set(e, 1, { time_seconds: 300 });
+      await h.as(client);
+      const both = await tryQ(db, `select * from public.complete_workout_session($1)`, [sid]);
+      await h.asSuper();
+      h.check("a session with a timed distance and a time-only hold for one exercise completes" + (both.error ? ": " + both.error : ""), !both.error);
+      const fields = (await db.query(`select tracked_field from public.exercise_records where group_id = $1 and exercise_name = 'Row' and superseded_at is null order by tracked_field`, [group])).rows.map((r) => r.tracked_field);
+      h.check("...and the hold and the timed-distance records live side by side (hold_seconds and time_seconds)", fields.includes("hold_seconds") && fields.includes("time_seconds"), JSON.stringify(fields));
+
+      // ---- the old shortest-hold records are replaced by the real longest hold (the end of the migration, run here on a hand-made old row)
+      const eW1 = await exercise(await session(41, "completed"), "Wall sit");
+      await set(eW1, 0, { time_seconds: 40 });
+      await set(await exercise(await session(42, "completed"), "Wall sit"), 0, { time_seconds: 70 });
+      await set(await exercise(await session(43, "completed"), "Wall sit"), 0, { time_seconds: 200, set_type: "warmup" });
+      await db.query(`insert into public.exercise_records (group_id, exercise_name, tracked_field, direction, value, athlete_id, achieved_at) values ($1, 'Wall sit', 'time_seconds', 'lower_better', 40, $2, now())`, [group, client]);
+      const migrationText = (await import("node:fs")).readFileSync(new URL("../../../supabase/migrations/0385_set_types_and_records.sql", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+      const tail = migrationText.slice(migrationText.indexOf("-- Hold records."));
+      h.check("the end of the migration is found", tail.length > 100);
+      await db.exec(tail);
+      const old = await h.one(`select count(*)::int as n from public.exercise_records where group_id = $1 and exercise_name = 'Wall sit' and tracked_field = 'time_seconds' and superseded_at is null`, [group]);
+      h.check("the old shortest-hold row is no longer live", old.n === 0);
+      const hold = await h.one(`select value from public.exercise_records where group_id = $1 and exercise_name = 'Wall sit' and tracked_field = 'hold_seconds' and superseded_at is null`, [group]);
+      h.check("the real longest counted hold (70, not the warm-up's 200) is the record now", Number(hold.value) === 70, JSON.stringify(hold));
+      const runRow = await h.one(`select count(*)::int as n from public.exercise_records where group_id = $1 and exercise_name = 'Run' and tracked_field = 'time_seconds' and superseded_at is null`, [group]);
+      h.check("a timed-distance record is left as it was", runRow.n === 1);
+      sid = await session(44, "in_progress");
+      e = await exercise(sid, "Wall sit");
+      await set(e, 0, { time_seconds: 60 });
+      h.check("a hold shorter than the real longest is not announced as a record", !(await finish(sid)).includes("Wall sit"));
+
+      // ---- the set-type trigger does not run the caller check again
+      const trig = await h.one(`select prosrc from pg_proc where proname = 'recompute_on_set_type_change'`);
+      h.check("the set-type trigger calls the rebuild that has no caller check", trig.prosrc.includes("recompute_training_maxes_internal") && !/recompute_training_maxes\(/.test(trig.prosrc));
+      const aclInternal = await h.one(`select has_function_privilege('authenticated', 'public.recompute_training_maxes_internal(uuid, text)', 'execute') as a, has_function_privilege('anon', 'public.recompute_training_maxes_internal(uuid, text)', 'execute') as b`);
+      h.check("the internal rebuild is not callable by signed-in users or visitors", aclInternal.a === false && aclInternal.b === false, JSON.stringify(aclInternal));
 
       // ---- permissions did not change
       const acl = await h.one(`select has_function_privilege('authenticated', 'public.recompute_on_set_type_change()', 'execute') as a, has_function_privilege('anon', 'public.recompute_on_set_type_change()', 'execute') as b, has_function_privilege('anon', 'public.complete_workout_session(uuid)', 'execute') as c`);

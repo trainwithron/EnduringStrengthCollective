@@ -14,14 +14,7 @@ export type ProgressionModel =
 import { roundLoad, DEFAULT_STEP } from "@/lib/load-rounding";
 import { countsForProgress } from "@/lib/set-types";
 
-// The set_type column arrives with its database step. Until it is there the same read is made without it (every set then counts as a working set), so goals never vanish because of the order things were released in.
-async function readLoggedSets(supabase: any, columns: string, narrow: (q: any) => any): Promise<{ data: any[] | null }> {
-  const first = await narrow(supabase.from("set_logs").select(columns));
-  if (first.error && /set_type/.test(String(first.error.message ?? ""))) {
-    return narrow(supabase.from("set_logs").select(columns.replace("set_type,", "")));
-  }
-  return first;
-}
+import { readLoggedSets } from "@/lib/read-logged-sets";
 
 export type ProgressionUnit = "lbs" | "percent";
 
@@ -203,7 +196,10 @@ export function resolveProgressionTarget({
       if (!previousOccurrenceLog) return { weight: null, reps: null };
       const { repRangeLow, repRangeHigh, weightIncrement, unit } = config as DoubleProgressionConfig;
       // EVERY counted set has to reach the top of the range before the weight goes up; the weakest set decides the next rep goal. (Without the list, the single logged set is all there is.)
-      const weights = previousOccurrenceLog.sets && previousOccurrenceLog.sets.length > 0 ? previousOccurrenceLog.sets : [previousOccurrenceLog];
+      // A set checked off with no reps typed (0 here) says nothing about how many reps were done, so it does not decide the goal.
+      const listed = previousOccurrenceLog.sets && previousOccurrenceLog.sets.length > 0 ? previousOccurrenceLog.sets : [previousOccurrenceLog];
+      const withReps = listed.filter((s) => s.reps > 0);
+      const weights = withReps.length > 0 ? withReps : [previousOccurrenceLog];
       const lowestReps = Math.min(...weights.map((s) => s.reps));
       const w = previousOccurrenceLog.weight;
       if (lowestReps >= repRangeHigh) {
@@ -409,17 +405,27 @@ export async function getProgressionGoalsBatch(
           )
         : { data: [] };
 
-    // Last (highest set_order) completed set per (exercise name, workout) —
-    // the AMRAP set.
+    // The AMRAP set per (exercise name, workout): the set marked as-many-as-possible when one is marked (the last such set if several), else the last (highest set_order) working set. A back-off set after
+    // the AMRAP is never the one judged.
     const amrapByNameAndWorkout = new Map<string, number>();
     const bestOrderSeen = new Map<string, number>();
+    const amrapMarked = new Set<string>();
     for (const row of (t1Query.data ?? []) as any[]) {
-      // Warm-up and drop sets never count; an as-many-as-possible set is THE top set when one is marked.
+      // Warm-up and drop sets never count.
       if (!countsForProgress(row.set_type)) continue;
       const name = row.session_exercises.exercise_name as string;
       const workoutId = row.session_exercises.athlete_sessions.workout_id as string;
       const key = `${name}::${workoutId}`;
       const order = row.set_order ?? 0;
+      if (row.set_type === "amrap") {
+        if (!amrapMarked.has(key) || order > (bestOrderSeen.get(key) ?? -1)) {
+          amrapMarked.add(key);
+          bestOrderSeen.set(key, order);
+          amrapByNameAndWorkout.set(key, row.reps ?? 0);
+        }
+        continue;
+      }
+      if (amrapMarked.has(key) || row.set_type === "backoff") continue;
       if (!bestOrderSeen.has(key) || order > bestOrderSeen.get(key)!) {
         bestOrderSeen.set(key, order);
         amrapByNameAndWorkout.set(key, row.reps ?? 0);

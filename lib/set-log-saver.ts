@@ -210,6 +210,15 @@ export async function writeSetLogRow(
   payload: Record<string, unknown>
 ): Promise<boolean> {
   const { data, error } = await client.from("set_logs").update(payload).eq("id", id).select("id");
+  // The set_type column arrives with its database step. If the code is live before that step, the merged update (weight, reps, status and the set type together) would fail on the missing column and
+  // take the logged values with it: write the rest without the set type instead (the warm-up mark simply is not stored until the step is applied).
+  if (error && "set_type" in payload && /set_type/.test(String((error as { message?: unknown }).message ?? ""))) {
+    const { set_type: _dropped, ...rest } = payload;
+    void _dropped;
+    if (Object.keys(rest).length === 0) return true;
+    const second = await client.from("set_logs").update(rest).eq("id", id).select("id");
+    return !second.error && Array.isArray(second.data) && second.data.length === 1;
+  }
   return !error && Array.isArray(data) && data.length === 1;
 }
 

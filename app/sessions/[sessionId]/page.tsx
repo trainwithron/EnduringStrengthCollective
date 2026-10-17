@@ -16,6 +16,8 @@ import { findCorrelatingWeightSuggestion, resolveWeightSuggestion } from "@/lib/
 import { findAthleteVisibleCoachNoteForExercise } from "@/lib/exercise-note-history";
 import { parseNumericReps } from "@/lib/program-card-visuals";
 import { computePriorBest } from "@/lib/obstacle-unlock";
+import { readLoggedSets } from "@/lib/read-logged-sets";
+import { countsForProgress } from "@/lib/set-types";
 import { computeVolumeHistory } from "@/lib/exercise-volume-history";
 import { ExitWorkoutButton } from "@/components/session/exit-workout-button";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
@@ -218,20 +220,21 @@ export default async function SessionPage(
     new Set((sessionExercises ?? []).map((se: any) => se.exercise_name as string))
   );
   const { data: priorRows } = exerciseNamesInSession.length > 0
-    ? await supabase
-        .from("set_logs")
-        .select(
-          `
-          weight, reps, rpe, rir, set_order, completed_at,
+    ? await readLoggedSets(
+        supabase,
+        `
+          weight, reps, rpe, rir, set_order, set_type, completed_at,
           session_exercises!inner (
             exercise_name, group_workout_exercise_id, session_id,
             athlete_sessions!inner ( athlete_id )
           )
-        `
-        )
-        .in("session_exercises.exercise_name", exerciseNamesInSession)
-        .eq("session_exercises.athlete_sessions.athlete_id", session.athlete_id)
-        .eq("status", "completed")
+        `,
+        (q) =>
+          q
+            .in("session_exercises.exercise_name", exerciseNamesInSession)
+            .eq("session_exercises.athlete_sessions.athlete_id", session.athlete_id)
+            .eq("status", "completed")
+      )
     : { data: [] as any[] };
 
   // Obstacle-unlock mechanic (lib/obstacle-unlock.ts) — this athlete's
@@ -260,20 +263,28 @@ export default async function SessionPage(
       string,
       { weight: number | null; reps: number | null; sessionId: string; completedAt: string | null }[]
     >();
+    // A warm-up or drop set from an earlier session never counts as the best to beat (the database does not call it a record either); it still counts as work done in the volume history.
+    const countedRowsByName = new Map<string, typeof rowsByName extends Map<string, infer R> ? R : never>();
     for (const row of (priorRows ?? []) as any[]) {
       if (row.session_exercises.session_id === params.sessionId) continue;
       const name = row.session_exercises.exercise_name as string;
       const list = rowsByName.get(name) ?? [];
-      list.push({
+      const entry = {
         weight: row.weight,
         reps: row.reps,
         sessionId: row.session_exercises.session_id,
         completedAt: row.completed_at,
-      });
+      };
+      list.push(entry);
       rowsByName.set(name, list);
+      if (countsForProgress(row.set_type)) {
+        const counted = countedRowsByName.get(name) ?? [];
+        counted.push(entry);
+        countedRowsByName.set(name, counted);
+      }
     }
     for (const [name, rows] of rowsByName) {
-      priorBestByExerciseName.set(name, computePriorBest(rows));
+      priorBestByExerciseName.set(name, computePriorBest(countedRowsByName.get(name) ?? []));
       volumeHistoryByExerciseName.set(name, computeVolumeHistory(rows));
     }
   }
@@ -309,6 +320,8 @@ export default async function SessionPage(
     { loggedAt: string; weight: number | null; targetReps: number | null; targetRpe: number | null; targetRir: number | null }[]
   >();
   for (const row of (priorRows ?? []) as any[]) {
+    // Weight suggestions are made from working sets only (a warm-up's weight says nothing about what to load).
+    if (!countsForProgress(row.set_type)) continue;
     const name = row.session_exercises.exercise_name as string;
     const templateId = row.session_exercises.group_workout_exercise_id as string | null;
     const targets = templateId
