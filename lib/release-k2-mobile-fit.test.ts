@@ -16,6 +16,10 @@ describe("Release K2: fits a phone", () => {
     expect(shell).toContain("<CoachHomeMobileMenu />");
     const menu = src("components/coach/coach-home-mobile-menu.tsx");
     for (const part of ["<ClientFinder", 'href="/notifications"', "<ExitDesktopModeButton", "<DownloadAppButton", "<SignOutButton", "w-11 h-11"]) expect(menu, part).toContain(part);
+    // Escape closes it and returns focus to its button; Sign out is a 44px, normal-size target
+    expect(menu).toContain('e.key === "Escape"');
+    expect(menu).toContain("buttonRef.current?.focus()");
+    expect(menu).toContain("[&_button]:min-h-11 [&_button]:text-sm");
   });
   it("the exercise library's tabs scroll sideways and its toolbar wraps instead of running off the screen", () => {
     expect(src("components/coach/exercise-library-tabs.tsx")).toContain("overflow-x-auto");

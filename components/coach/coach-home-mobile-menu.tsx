@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { ClientFinder } from "@/components/coach/desktop/client-finder";
@@ -12,9 +12,23 @@ import { SignOutButton } from "@/components/group/sign-out-button";
 // is unreachable on a narrow screen. The sidebar itself returns from the lg breakpoint.
 export function CoachHomeMobileMenu() {
   const [open, setOpen] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  // Escape closes the menu and puts focus back on its button.
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setOpen(false);
+        buttonRef.current?.focus();
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
   return (
     <div className="relative">
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
@@ -32,7 +46,9 @@ export function CoachHomeMobileMenu() {
           </Link>
           <ExitDesktopModeButton />
           <DownloadAppButton />
-          <SignOutButton />
+          <div className="[&_button]:min-h-11 [&_button]:text-sm">
+            <SignOutButton />
+          </div>
         </div>
       )}
     </div>
