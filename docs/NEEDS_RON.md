@@ -17,7 +17,7 @@
 ## Release C3 (progression safety rules, no paste) - the report's RECOMMENDED defaults, all ASSUMED, each a constant in lib/progression-guards.ts
 - Break: 21-34 days since the exercise was last done = start at 95 percent; 35-55 days = 90 percent; 56+ days = no number, "check with your coach" (nothing is applied automatically). (The research report said 14 and 28; raised on review so an exercise a program schedules every other week is not cut every time. A gap close to that exercise's own usual gap, from its last two logged times, is never a break either.)
 - Miss ladder (double progression only): hold the weight after the 1st and 2nd consecutive miss at one weight; the 3rd miss makes the next goal 90 percent (rounded down). A miss = any set at the heaviest weight under the bottom of the rep range. Only that exercise moves. A scheduled session that was not done is never a miss.
-- Under 18 or age not known: a goal is never more than 5 lb above last time.
+- REMOVED (Ron, Oct 17: "the five-pound cap is absolute silliness... it's just progressive overload"): there is no age-based cap on a step up. The step is the coach's progression increment (5 lb, or 2.5 kg for a kilogram client, when the coach has not set one), the same for every athlete. The other rules here stay: the break rules, the miss ladder, and ask-the-coach after a long layoff.
 - NOT DONE: deloads (reactive-only per the report, nothing automatic exists to turn off), the coach "ask me" notices (a long-break exercise just says so on the athlete's screen; there is no coach alert), the +5 lb cap is lb-based (kg clients get the same number converted).
 
 ## Release C2 (kilograms, no paste)

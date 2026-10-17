@@ -14,18 +14,8 @@ export type ProgressionModel =
 import { roundLoad, DEFAULT_STEP } from "@/lib/load-rounding";
 import { countsForProgress } from "@/lib/set-types";
 import { applyContractGuards, consecutiveMisses, daysBetween, usualGapDays, type GoalStatus, type PastSession } from "@/lib/progression-guards";
-import { athleteAgeStatus, effectiveAgeStatus, isCoachSomewhere } from "@/lib/youth-block";
 
 import { readLoggedSets } from "@/lib/read-logged-sets";
-
-// Under 18, or an age that is not known, gets the smaller step-up cap. The one exception to "unknown": a coach looking at their OWN program (they are an adult by definition, the same rule as the builder).
-// A client with no birthday on file who opens their own workout is still unknown and still capped.
-async function isAgeProtected(supabase: any, athleteId: string): Promise<boolean> {
-  const viewer = await supabase.auth.getUser().then((r: any) => r?.data?.user?.id ?? null).catch(() => null);
-  const status = await athleteAgeStatus(supabase, athleteId);
-  const coachOnOwnProgram = viewer === athleteId && status === "unknown" ? await isCoachSomewhere(supabase, athleteId) : false;
-  return effectiveAgeStatus(status, coachOnOwnProgram) !== "adult";
-}
 
 // The recent sessions of each named exercise, most recent first, with the heaviest counted weight of each and when it was done: what the safety rules need for the models that do not read the last session
 // themselves (GZCLP T1 and waves from a training max).
@@ -466,9 +456,7 @@ export async function getProgressionGoalsBatch(
   // set is the LAST set in the occurrence, not the highest-weight one;
   // every T1 set is prescribed at the same weight, so "highest weight"
   // is meaningless here).
-  // The safety rules (a break, the step-up cap for someone under 18 or of unknown age) also apply to the models that do not use the generic loop below: GZCLP T1 and waves from a training max.
-  let ageProtectedMemo: boolean | null = null;
-  const ageProtected = async () => (ageProtectedMemo ??= await isAgeProtected(supabase, athleteId));
+  // The safety rules (a break, the miss ladder) also apply to the models that do not use the generic loop below: GZCLP T1 and waves from a training max. There is no cap by age: the step is the coach's increment.
   const recentHistory = await loadRecentHistory(
     supabase,
     athleteId,
@@ -483,7 +471,6 @@ export async function getProgressionGoalsBatch(
       daysSince: daysBetween(sessions[0].lastDone, new Date()),
       normalGapDays: usualGapDays(intervalsOf(sessions.map((s) => s.lastDone))),
       missStreak: 0,
-      protectedAge: await ageProtected(),
     });
   };
 
@@ -627,9 +614,6 @@ export async function getProgressionGoalsBatch(
     best.sets = (setsByNameAndWorkout.get(key) ?? []).filter((s) => s.weight === best.weight);
   }
 
-  // Under 18, or an age that is not known, gets the smaller step-up cap (a coach on their own program is the only unknown-age exception).
-  const ageIsProtected = await ageProtected();
-
   for (const r of resolved) {
     const referenceLog = r.referenceWorkoutId
       ? bestByNameAndWorkout.get(`${r.performanceName}::${r.referenceWorkoutId}`) ?? null
@@ -645,7 +629,7 @@ export async function getProgressionGoalsBatch(
       referenceLog,
       previousOccurrenceLog,
     });
-    // The contract's safety rules on top of the rule's number: a break, the miss ladder, a step-up cap for someone under 18 or of unknown age.
+    // The contract's safety rules on top of the rule's number: a break and the miss ladder.
     const recent: PastSession[] = r.recentWorkoutIds
       .map((id) => ({ sets: (setsByNameAndWorkout.get(`${r.performanceName}::${id}`) ?? []).slice() }))
       .filter((s) => s.sets.length > 0);
@@ -659,7 +643,6 @@ export async function getProgressionGoalsBatch(
       daysSince: daysBetween(lastDone, new Date()),
       normalGapDays,
       missStreak,
-      protectedAge: ageIsProtected,
     });
     if (target.weight != null || target.reps != null || target.status === "ask_coach") {
       result.set(r.slotId, target);

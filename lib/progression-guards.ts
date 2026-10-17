@@ -6,14 +6,14 @@ import type { ProgressionTarget } from "@/lib/progressions";
 //   * A break: 21 to 34 days since the exercise was last done, start back at 95 percent; 35 to 55 days, 90 percent; 56 days or more, no number is suggested (the athlete is told to check with the coach).
 //     (Raised from 14 and 28 days so an exercise a program schedules every other week is not a break each time; and a gap close to the exercise's own usual gap is never a break, see normalGapDays.)
 //   * A ladder for misses (double progression): the weight is held after the 1st and 2nd consecutive miss at one weight, and after the 3rd the next goal is 90 percent of it. Only that exercise moves.
-//   * Under 18 (or an age not known): a goal never jumps more than 5 lb above what was lifted last time.
+//   * There is NO age-based cap on a step up (Ron, Oct 17: "it's not a cap, it's just progressive overload"): the size of a step is the coach's progression increment (5 lb, or 2.5 kg for a kilogram client, when
+//     the coach has not set one), the same for every athlete whatever their age.
 //   * A session that was scheduled but not done is not a miss and does not move any number (there is simply no previous log to build on).
 export const GAP_5_PCT_FROM_DAYS = 21;
 export const GAP_10_PCT_FROM_DAYS = 35;
 export const GAP_ASK_COACH_FROM_DAYS = 56;
 export const RESET_AFTER_MISSES = 3;
 export const RESET_FACTOR = 0.9;
-export const MINOR_MAX_JUMP_LBS = 5;
 export const USUAL_GAP_SLACK_DAYS = 7;
 // An interval this long between two sessions is itself a break, not the exercise's rhythm, unless it keeps repeating (an exercise a program schedules every fourth week).
 export const BREAK_INTERVAL_DAYS = 21;
@@ -92,13 +92,11 @@ export function applyContractGuards(args: {
   daysSince: number | null;
   // Consecutive misses at the last weight (double progression only; 0 for the other models).
   missStreak: number;
-  // Under 18 or age not known.
-  protectedAge: boolean;
   // How many days there normally are between this exercise's sessions (from its last two logged times), or null when that is not known. An exercise a program schedules every other week or every fourth
   // week is not "a break" each time it comes up: the break rules apply only when the gap is clearly longer than usual.
   normalGapDays?: number | null;
 }): GuardedTarget {
-  const { target, previousWeight, missStreak, protectedAge } = args;
+  const { target, previousWeight, missStreak } = args;
   if (previousWeight == null || previousWeight <= 0) return target;
   const usual = args.normalGapDays;
   // The exercise's usual rhythm only keeps the 95 and 90 percent restarts away; it never silences the ask-the-coach rule (a long layoff is a long layoff).
@@ -130,10 +128,6 @@ export function applyContractGuards(args: {
   if (missStreak >= 1) {
     if (keepsRule(previousWeight)) return { ...target, status: target.status ?? "suggest" };
     return { weight: previousWeight, reps: target.reps, status: "hold", reason: `You missed the reps at ${previousWeight} last time. Stay at ${previousWeight} and try again.` };
-  }
-  if (protectedAge && target.weight != null && target.weight - previousWeight > MINOR_MAX_JUMP_LBS) {
-    const weight = previousWeight + MINOR_MAX_JUMP_LBS;
-    return { ...target, weight, status: "suggest", reason: `${target.reason ? target.reason + " " : ""}Held to a ${MINOR_MAX_JUMP_LBS} lb step up for your age: ${weight}.` };
   }
   return { ...target, status: target.status ?? "suggest" };
 }
