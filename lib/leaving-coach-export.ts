@@ -7,7 +7,9 @@ import { runPool } from "@/lib/run-pool";
 // can download never changes afterwards: not with the gym's new notes, not with clients who joined later. The coach reaches it through app/api/coach/exit-export, which checks who they are and that the 30 days
 // have not passed, and hands out a short-lived link.
 export const EXIT_EXPORT_BUCKET = "coach-exit-exports";
-const MAX_EXPORT_BYTES = 450 * 1024 * 1024;
+// The zip is held in memory twice while it is stored (the pieces, then the file), inside a function with about a gigabyte: 150 MB keeps that well inside it. A bigger export is not stored; the link then falls
+// back to the live read in app/api/coach/exit-export (a download that is streamed and never held in memory).
+export const MAX_EXPORT_BYTES = 150 * 1024 * 1024;
 
 // The clients' sign-in emails for the export, looked up with the server key for clients already read.
 export const emailsForExport = (db: any) => async (ids: string[]) => {

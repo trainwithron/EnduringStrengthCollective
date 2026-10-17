@@ -1,7 +1,7 @@
 -- UNDO for step 148 (0396). Only if step 148 misbehaves. Run it only while the Release L code is not live (the Team page, Home and the announcement read the column). Coaches already marked leaving lose the mark and become ordinary members of that organization again, still coaching the clients they kept.
 -- WHAT YOU SHOULD SEE: "Success. No rows returned."   Then tell Spot, and do not run the step again until Spot says why it failed.
 begin;
-insert into public.group_memberships (group_id, profile_id, role) select g.id, om.profile_id, 'coach' from public.organization_memberships om join public.groups g on g.id = any (om.departing_group_ids) and g.organization_id = om.organization_id where om.access_ended_at is not null on conflict do nothing;
+insert into public.group_memberships (group_id, profile_id, role) select g.id, om.profile_id, 'coach' from public.organization_memberships om join public.groups g on g.id = any (om.departing_group_ids) and g.organization_id = om.organization_id where om.access_ended_at is not null and om.fired_at is null on conflict do nothing;
 delete from public.organization_memberships where fired_at is not null;
 create or replace function public.coach_in_org(p_org uuid)
 returns boolean
@@ -340,6 +340,10 @@ drop policy if exists "push_subscriptions_select_org_owner" on public.push_subsc
 create policy "push_subscriptions_select_org_owner" on public.push_subscriptions for select to authenticated using (exists (select 1 from public.organization_memberships om_owner join public.organization_memberships om_caller on om_caller.organization_id = om_owner.organization_id where om_owner.profile_id = push_subscriptions.profile_id and om_owner.role = 'owner' and om_caller.profile_id = (select auth.uid())));
 drop policy if exists "org_memberships_select_self" on public.organization_memberships;
 drop function if exists public.complete_departure(uuid, uuid);
+alter table public.organization_memberships drop column if exists departing_org_name;
+-- the stored exports: their rows are removed here, but the files themselves can only be removed in the Storage section of the dashboard (bucket coach-exit-exports)
+delete from storage.objects where bucket_id = 'coach-exit-exports';
+delete from storage.buckets where id = 'coach-exit-exports';
 alter table public.organization_memberships drop column if exists export_created_at, drop column if exists export_path, drop column if exists clients_notified_at;
 alter table public.organization_memberships drop column if exists closure_notified_at, drop column if exists reminded_1d_at, drop column if exists reminded_3d_at, drop column if exists departure_notified_at, drop column if exists access_ended_at, drop column if exists fired_at;
 alter table public.organization_memberships drop column if exists departing_group_ids;

@@ -86,6 +86,13 @@ describe("wiring of the seven days", () => {
     expect(sql).toContain("insert into storage.buckets");
     expect(sql).toContain("coach-exit-exports");
   });
+  it("the undo puts back only the seats of coaches who were NOT let go, and clears the stored exports", () => {
+    const undo = src("supabase/apply/undo-step148-0396.sql");
+    expect(undo).toContain("where om.access_ended_at is not null and om.fired_at is null");
+    expect(undo).toContain("delete from storage.objects where bucket_id = 'coach-exit-exports'");
+    expect(src("app/api/cron/departing-coaches/route.ts")).toContain(".remove([s.export_path])");
+    expect(src("lib/leaving-coach.ts")).toContain("departing_org_name");
+  });
   it("an ended coach sees why and the way to their export instead of a dead end", () => {
     const home = src("app/(coach)/dashboard/page.tsx");
     expect(home.indexOf("filter((d) => d.endedAt)")).toBeGreaterThan(-1);

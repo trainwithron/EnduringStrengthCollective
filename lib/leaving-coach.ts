@@ -14,13 +14,13 @@ export async function loadMyDepartures(supabase: any, userId: string): Promise<M
   try {
     const { data, error } = await supabase
       .from("organization_memberships")
-      .select("organization_id, departing_since, fired_at, access_ended_at, organizations ( name, display_name )")
+      .select("organization_id, departing_since, fired_at, access_ended_at, departing_org_name, organizations ( name, display_name )")
       .eq("profile_id", userId)
       .not("departing_since", "is", null);
     if (error || !Array.isArray(data)) return [];
     return data.map((r: any) => ({
       organizationId: r.organization_id as string,
-      organizationName: (r.organizations?.display_name || r.organizations?.name || "your organization") as string,
+      organizationName: (r.departing_org_name || r.organizations?.display_name || r.organizations?.name || "your organization") as string,
       since: r.departing_since as string,
       fired: !!r.fired_at,
       endedAt: (r.access_ended_at as string | null) ?? null,

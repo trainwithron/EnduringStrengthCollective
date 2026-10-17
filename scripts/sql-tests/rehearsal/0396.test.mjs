@@ -179,6 +179,7 @@ export default {
       h.check("the owner removes a coach who is leaving on good terms" + (r.error ? ": " + r.error : ""), !r.error);
       await h.asSuper();
       let qm = (await db.query(`select fired_at, access_ended_at, departing_since from public.organization_memberships where organization_id = $1 and profile_id = $2`, [org2, quitter])).rows[0];
+      h.check("the organization's name is remembered on the row", (await count(`select count(*)::int as n from public.organization_memberships where organization_id = $1 and profile_id = $2 and departing_org_name = 'LD Gym'`, [org2, quitter])) === 1);
       h.check("the quitter is leaving, not let go, and keeps coaching", qm.departing_since != null && qm.fired_at == null && qm.access_ended_at == null && (await seat(gQ, quitter)));
       await h.asService();
       r = await tryQ(db, `select public.end_departure_access($1, $2) as ended`, [org2, quitter]);

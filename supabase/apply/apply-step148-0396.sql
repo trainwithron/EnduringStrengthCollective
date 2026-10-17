@@ -41,6 +41,8 @@ alter table public.organization_memberships add column if not exists clients_not
 -- The coach's one export, made once when coaching access ended and kept in a private bucket (no policies: only the server key reaches it), so it never changes after that moment.
 alter table public.organization_memberships add column if not exists export_path text;
 alter table public.organization_memberships add column if not exists export_created_at timestamptz;
+-- The organization's name as it was when they were marked leaving: once their seats are gone they can no longer read the organization, and their Home still has to say which one it was.
+alter table public.organization_memberships add column if not exists departing_org_name text;
 insert into storage.buckets (id, name, public, file_size_limit)
 values ('coach-exit-exports', 'coach-exit-exports', false, 524288000)
 on conflict (id) do nothing;
@@ -336,7 +338,8 @@ begin
     update public.organization_memberships
       set departing_since = coalesce(departing_since, now()),
           role = 'coach',
-          departing_group_ids = (select coalesce(array_agg(distinct x), '{}') from unnest(departing_group_ids || v_kept_ids) as x)
+          departing_group_ids = (select coalesce(array_agg(distinct x), '{}') from unnest(departing_group_ids || v_kept_ids) as x),
+          departing_org_name = coalesce(departing_org_name, (select coalesce(nullif(o.display_name, ''), o.name) from public.organizations o where o.id = p_org))
       where organization_id = p_org and profile_id = p_coach;
   else
     delete from public.organization_memberships where organization_id = p_org and profile_id = p_coach;

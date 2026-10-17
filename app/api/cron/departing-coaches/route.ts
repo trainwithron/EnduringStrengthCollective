@@ -5,9 +5,9 @@ import { appOrigin } from "@/lib/app-url";
 import { readByIds } from "@/lib/read-by-ids";
 import { runPool } from "@/lib/run-pool";
 import { athleteAgeStatus } from "@/lib/youth-block";
-import { departurePlan, daysLeftToChoose, windowEndsAt, type DepartureRow } from "@/lib/leaving-coach-policy";
+import { departurePlan, daysLeftToChoose, windowEndsAt, exportLinkStillWorks, EXPORT_LINK_DAYS, type DepartureRow } from "@/lib/leaving-coach-policy";
 import { remindCoach, sendCoachTheirExport, tellClientCoachClosed, tellCoachTheyAreLeaving } from "@/lib/leaving-coach-notify";
-import { storeExitExport } from "@/lib/leaving-coach-export";
+import { storeExitExport, EXIT_EXPORT_BUCKET } from "@/lib/leaving-coach-export";
 
 // Every six hours: walks the coaches who are leaving (migration 0396). For each, once only: the notice that they are leaving, the reminders with three days and one day left, ending coaching access when the
 // seven days are over (the database does it, and only for a coach who is leaving, not let go, and past seven days); then, for a coach whose access has ended: make and store their ONE export (so it never
@@ -67,6 +67,20 @@ async function handler(request: Request) {
     await db.from("organization_memberships").update({ [column]: null }).eq("organization_id", row.organization_id).eq("profile_id", row.profile_id);
   };
 
+  // The stored file is removed when its 30 days end (the clients' records themselves stay where they are, under RETENTION_DAYS). Idempotent: a file already gone is simply forgotten.
+  const expiredBefore = new Date(Date.now() - EXPORT_LINK_DAYS * 86_400_000).toISOString();
+  const { data: stale } = await db.from("organization_memberships").select("organization_id, profile_id, export_path").not("export_path", "is", null).lt("access_ended_at", expiredBefore).limit(100);
+  let expired = 0;
+  for (const s of (stale ?? []) as { organization_id: string; profile_id: string; export_path: string }[]) {
+    const { error: removeError } = await db.storage.from(EXIT_EXPORT_BUCKET).remove([s.export_path]);
+    if (removeError) {
+      console.error("departing-coaches: could not remove an expired export:", removeError.message);
+      continue;
+    }
+    await db.from("organization_memberships").update({ export_path: null }).eq("organization_id", s.organization_id).eq("profile_id", s.profile_id);
+    expired++;
+  }
+
   const stats = { told: 0, reminded: 0, ended: 0, exports: 0, coachesTold: 0, clientsTold: 0 };
   await runPool(
     (data ?? []) as unknown as Row[],
@@ -117,7 +131,7 @@ async function handler(request: Request) {
 
       // 1. The coach's one export, made now and kept as it is. Nothing else happens until it exists (the next run tries again if it could not be made).
       let exportPath = row.export_path;
-      if (!exportPath && groupIds.length > 0) {
+      if (!exportPath && groupIds.length > 0 && exportLinkStillWorks(endedAt, now)) {
         exportPath = await storeExitExport(db, { coachId: row.profile_id, organizationId: row.organization_id, groupIds, orgName });
         if (!exportPath) return;
         await db.from("organization_memberships").update({ export_path: exportPath, export_created_at: new Date().toISOString() }).eq("organization_id", row.organization_id).eq("profile_id", row.profile_id);
@@ -155,7 +169,7 @@ async function handler(request: Request) {
     { deadlineMs: 270_000 }
   );
 
-  return NextResponse.json({ looked: (data ?? []).length, ...stats });
+  return NextResponse.json({ looked: (data ?? []).length, expiredExports: expired, ...stats });
 }
 
 export const GET = withCronRun("departing-coaches", handler);
