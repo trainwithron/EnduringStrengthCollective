@@ -19,7 +19,12 @@ export function inQuietHours(hour: number, start: number | null | undefined, end
 }
 
 export function isQuietNow(prefs: Pick<PushPrefs, "quietStart" | "quietEnd" | "timeZone">, now: Date = new Date()): boolean {
-  return inQuietHours(nowInZone(prefs.timeZone || DEFAULT_COACH_TIMEZONE, now).getUTCHours(), prefs.quietStart, prefs.quietEnd);
+  try {
+    return inQuietHours(nowInZone(prefs.timeZone || DEFAULT_COACH_TIMEZONE, now).getUTCHours(), prefs.quietStart, prefs.quietEnd);
+  } catch {
+    // an unreadable time zone on a profile means no quiet hours (a push is never lost to a bad setting)
+    return false;
+  }
 }
 
 // What the phone is shown: the real words, or the generic line when the person asked for private lock screens.

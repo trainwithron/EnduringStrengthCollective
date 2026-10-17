@@ -3,7 +3,19 @@
 export const PUSHED_BY_JOB = ["booking_request", "late_change", "schedule_request", "request_decision"] as const;
 export type PushedByJob = (typeof PUSHED_BY_JOB)[number];
 
-export const STALE_PUSH_HOURS = 6;
+// A notice older than this is not news and is closed without a push. Long enough that a notice made at the start of a long quiet-hours window (22:00 to 07:00) is still pushed when the window ends.
+export const STALE_PUSH_HOURS = 16;
+
+// What the phone is shown for each: the kind of thing, never a name (the details are in the app). A person who turns the private lock screen on sees even less.
+const BODIES: Record<PushedByJob, string> = {
+  booking_request: "Open the app to answer it.",
+  late_change: "Open the app to see it.",
+  schedule_request: "Open the app to answer it.",
+  request_decision: "Open the app to see the answer.",
+};
+export function pushBodyFor(type: string): string {
+  return (BODIES as Record<string, string>)[type] ?? "Open the app to see it.";
+}
 
 const TITLES: Record<PushedByJob, string> = {
   booking_request: "New booking request",

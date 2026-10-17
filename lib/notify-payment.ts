@@ -17,10 +17,12 @@ export async function notifyPaymentReceived(
     const dollars = (args.amountCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
     const body = `${name} paid ${dollars}${args.what ? ` for ${args.what}` : ""}.`;
     const link = `/groups/${args.groupId}/business`;
+    // The notice in the app has the details; the phone's lock screen does not (a client's name and an amount are not for anyone who glances at the phone).
+    const lockScreenBody = "Open the app to see who paid.";
     for (const coachId of coachIds) {
       const { error } = await db.from("notifications").insert({ profile_id: coachId, group_id: args.groupId, type: "payment_received", body, link_path: link, pushed_at: new Date().toISOString() });
       if (error) console.error("[payment notice] the notification was refused:", error.message);
-      await sendPushToProfile(db, coachId, "Payment received", body, link).catch(() => 0);
+      await sendPushToProfile(db, coachId, "Payment received", lockScreenBody, link).catch(() => 0);
     }
     return { coaches: coachIds.length };
   } catch (e) {
