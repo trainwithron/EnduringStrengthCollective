@@ -7,7 +7,7 @@ import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError, AiTrunca
 import { AiRateLimitedError } from "@/lib/ai-usage";
 import { checkAndSpendCoachCredits, canRunAiAction } from "@/lib/coach-credits";
 import { hasFlaggedMusculoskeletalConcern } from "@/lib/athlete-injury-flag";
-import { athleteAgeStatus, clampYouthRows, UNKNOWN_AGE_BANNER_TEXT, YOUTH_PROMPT_BLOCK } from "@/lib/youth-block";
+import { athleteAgeStatus, clampYouthRows, effectiveAgeStatus, UNKNOWN_AGE_BANNER_TEXT, YOUTH_PROMPT_BLOCK } from "@/lib/youth-block";
 import { libraryContext, rankLibrary, type LibraryItem } from "@/lib/builder-context";
 import { scanConstraints } from "@/lib/constraint-scan";
 import { parseRestSpan } from "@/lib/rest-time";
@@ -136,7 +136,7 @@ export async function POST(request: Request) {
       injuryContext = `This client has flagged a musculoskeletal or health concern${flagged ? " on their intake screening" : ""}.${noteText ? ` The coach's own note: "${noteText}"` : ""}`;
     }
     // Under 18, or no birthdate on file: the youth protections apply (an unknown age is never treated as an adult).
-    const ageStatus = await athleteAgeStatus(supabase, athleteId);
+    const ageStatus = effectiveAgeStatus(await athleteAgeStatus(supabase, athleteId), athleteId === user.id);
     if (ageStatus !== "adult") youthBlock = YOUTH_PROMPT_BLOCK;
     if (ageStatus === "unknown") youthUnknownAge = true;
   }

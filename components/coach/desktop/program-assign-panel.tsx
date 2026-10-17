@@ -136,8 +136,13 @@ export function ProgramAssignPanel({ programId, programName, groupId, aiDraft, o
     }
     let cancelled = false;
     (async () => {
-      const { data } = await createBrowserClient().from("client_intake").select("athlete_id, date_of_birth, par_q_answers").in("athlete_id", ids);
+      const { data, error: intakeError } = await createBrowserClient().from("client_intake").select("athlete_id, date_of_birth, par_q_answers").in("athlete_id", ids);
       if (cancelled) return;
+      // A failed read says nothing (it must not claim every client has no birthdate).
+      if (intakeError) {
+        setNotices([]);
+        return;
+      }
       const byId = new Map(((data ?? []) as { athlete_id: string; date_of_birth: string | null; par_q_answers: unknown }[]).map((r) => [r.athlete_id, r]));
       const names = new Map((clients ?? []).map((c) => [c.id, c.fullName]));
       setNotices(

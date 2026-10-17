@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { ageStatusFromDob, athleteAgeStatus, clampYouthRows, YOUTH_RPE_CAP } from "@/lib/youth-block";
+import { ageStatusFromDob, athleteAgeStatus, clampYouthRows, effectiveAgeStatus, YOUTH_RPE_CAP } from "@/lib/youth-block";
 import { assignNotices } from "@/lib/assign-notice";
 import { clampMealMacros, clampPer100g, userBelongsToAGroup } from "@/lib/ai-nutrition-clamp";
 import { PAIN_MONITORING_GUIDANCE } from "@/lib/pain-guidance";
@@ -24,6 +24,18 @@ describe("an unknown age is never treated as an adult", () => {
   });
   it("the three AI routes use it", () => {
     for (const p of ["app/api/ai/build-day/route.ts", "app/api/ai/generate-program/route.ts", "app/api/ai/pick-template/route.ts"]) expect(src(p), p).toContain("athleteAgeStatus");
+  });
+});
+
+describe("a coach building their own program is not capped for want of a birthdate", () => {
+  it("unknown becomes adult for oneself only; a birthdate that says minor still wins; someone else's unknown stays unknown", () => {
+    expect(effectiveAgeStatus("unknown", true)).toBe("adult");
+    expect(effectiveAgeStatus("unknown", false)).toBe("unknown");
+    expect(effectiveAgeStatus("minor", true)).toBe("minor");
+    for (const p of ["app/api/ai/build-day/route.ts", "app/api/ai/generate-program/route.ts", "app/api/ai/pick-template/route.ts"]) expect(src(p), p).toContain("effectiveAgeStatus(");
+  });
+  it("the Assign screen does not claim 'no birthdate' when the read failed", () => {
+    expect(src("components/coach/desktop/program-assign-panel.tsx")).toContain("if (intakeError) {");
   });
 });
 
