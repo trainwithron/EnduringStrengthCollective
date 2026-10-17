@@ -124,9 +124,13 @@ export default async function BrandingPage(
     .select("profile_id, role, profiles ( full_name )")
     .eq("organization_id", orgMembership.organization_id)
     .order("role", { ascending: true });
+  // Who is marked leaving (migration 0396): a separate read, so a database without the column yet just shows no marks.
+  const { data: leavingRows } = await supabase.from("organization_memberships").select("profile_id").eq("organization_id", orgMembership.organization_id).not("departing_since", "is", null);
+  const leavingIds = new Set((leavingRows ?? []).map((r: { profile_id: string }) => r.profile_id));
 
   const members = (memberRows ?? []).map((m) => ({
     profileId: m.profile_id,
+    leaving: leavingIds.has(m.profile_id),
     role: m.role,
     fullName: (m.profiles as any)?.full_name ?? "Unknown",
   }));
@@ -295,7 +299,7 @@ export default async function BrandingPage(
             organizationName={org?.name ?? "this organization"}
             me={user.id}
             myRole={orgMembership.role}
-            members={members.map((m) => ({ profileId: m.profileId, fullName: m.fullName, role: m.role, clients: teamInfo?.clientCounts[m.profileId] ?? 0, soleClients: teamInfo?.soleCoachOfClients[m.profileId] ?? 0 }))}
+            members={members.map((m) => ({ profileId: m.profileId, fullName: m.fullName, role: m.role, clients: teamInfo?.clientCounts[m.profileId] ?? 0, soleClients: teamInfo?.soleCoachOfClients[m.profileId] ?? 0, leaving: m.leaving }))}
             invites={teamInfo?.invites ?? []}
           />
 

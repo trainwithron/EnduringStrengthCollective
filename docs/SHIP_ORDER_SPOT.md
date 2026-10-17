@@ -19,7 +19,9 @@
 | J | release-j-home-seasons | 098e151f | Release J, step 146 (0394), apply-release-j-home-seasons-all.sql, fp 210a674a3e6bdba2 | Assistant-cleared; paste BEFORE code (adds only) |
 | K2 | release-k2-mobile-fit | (see git) | none | built, awaiting Assistant |
 | K1 | release-k1-notifications | e2ce546f | Release K1, step 147 (0395), apply-release-k1-notifications-all.sql (fp in the step file) | built, awaiting Assistant; paste BEFORE code (adds only) |
+| R | release-integrated | 1493ad60 | none | K2 + resend + age-cap removal + Commander review fixes; awaiting Assistant clearance and Ron |
+| L | release-leaving-coach | (see git) | Release L, step 148 (0396), apply-release-l-leaving-coach-all.sql, fp 06cfbb404b94107a | built on R, awaiting Assistant; paste BEFORE code (adds only) |
 | D-held | (data) | - | HELD: step 138, apply-release-cn-held-all.sql, fp 8f22a2d348ee90d7, read check-intake-flag-list.sql first | Ron's word only |
 
 Fingerprint = first 16 hex of sha256 of the LF-normalized file: tr -d '\r' < supabase/apply/<file> | sha256sum | cut -c1-16.
-Apply order: CL (136), CM (137), CO (139), G (141), H (142 to 144), I (145), J (146), K1 (147); then deploy the code; then CP (140) after the code is live. Held 138 only on Ron's word.
+Apply order: CL (136), CM (137), CO (139), G (141), H (142 to 144), I (145), J (146), K1 (147), L (148); then deploy the code; then CP (140) after the code is live. Held 138 only on Ron's word.

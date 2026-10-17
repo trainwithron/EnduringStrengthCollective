@@ -27,6 +27,9 @@ import { isLowReadiness } from "@/lib/wellness";
 import { NeedsPaymentPanel } from "@/components/coach/desktop/needs-payment-panel";
 import { LateChangesPanel } from "@/components/coach/late-changes-panel";
 import { ScheduleRequestsPanel } from "@/components/coach/schedule-requests-panel";
+import { LeavingCoachBanner } from "@/components/coach/leaving-coach-banner";
+import { loadMyDepartures } from "@/lib/leaving-coach";
+import { supportEmail } from "@/lib/legal";
 import { ExpiryCheckInPanel } from "@/components/coach/expiry-checkin-panel";
 import { InactiveClientsPanel } from "@/components/coach/inactive-clients-panel";
 import { ProgressLookPanel } from "@/components/coach/progress-look-panel";
@@ -523,10 +526,16 @@ export default async function CoachHomePage() {
   // hover-peek) is deliberately not built yet — the doc's own
   // recommended order is static layout, then smart backend (both here),
   // then customization last.
+  const departures = await loadMyDepartures(supabase, user.id);
   const content = (
     <>
       <DashboardAutoRefresh />
       {stuckInDesktopModeOnRealPhone && <StuckDesktopModeBanner />}
+      <LeavingCoachBanner
+        departures={departures}
+        exportGroupId={allGroups.find((g) => g.organization_id === departures[0]?.organizationId)?.id ?? allGroups[0]?.id ?? null}
+        supportEmail={supportEmail()}
+      />
       <CoachProfileEditor
         coachId={user.id}
         coachName={viewerProfile?.full_name ?? "Coach"}

@@ -13,6 +13,8 @@ export interface TeamMember {
   clients: number;
   // Clients in groups only this member coaches: removing them needs somebody to take over.
   soleClients: number;
+  // Left the team (or the team closed) but still coaches clients who are private from it, and has not yet chosen what to do (migration 0396).
+  leaving?: boolean;
 }
 
 export interface TeamInvite {
@@ -105,8 +107,8 @@ export function TeamMembersPanel({
     }
     const takeover = members.find((x) => x.profileId === handTo)?.fullName;
     const message = needsHandOver
-      ? `Remove ${m.fullName} from ${organizationName}? They lose access to every client here right away. Their ${m.soleClients} client${m.soleClients === 1 ? "" : "s"} stay${m.soleClients === 1 ? "s" : ""} with ${organizationName} and ${takeover} takes over, with all history, programs and credits. A client who keeps their records private from the organization leaves with ${m.fullName}.`
-      : `Remove ${m.fullName} from ${organizationName}? They lose access to every client here right away. A client who keeps their records private from the organization leaves with ${m.fullName}.`;
+      ? `Remove ${m.fullName} from ${organizationName}? They lose access to every client here right away. Their ${m.soleClients} client${m.soleClients === 1 ? "" : "s"} stay${m.soleClients === 1 ? "s" : ""} with ${organizationName} and ${takeover} takes over, with all history, programs and credits. A client who keeps their records private from the organization stays with ${m.fullName}; they are then marked as leaving and choose what to do next.`
+      : `Remove ${m.fullName} from ${organizationName}? They lose access to every client here right away. A client who keeps their records private from the organization stays with ${m.fullName}; they are then marked as leaving and choose what to do next.`;
     if (!(await confirmDialog({ message, confirmLabel: "Remove", destructive: true }))) return;
     await run(`remove-${m.profileId}`, () => db().rpc("remove_org_member", { p_org: organizationId, p_profile: m.profileId, p_hand_to: needsHandOver ? handTo : null }), () => {
       setRemoving(null);
@@ -181,7 +183,7 @@ export function TeamMembersPanel({
       <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">Coaches</p>
       <div className="border border-steel/20 divide-y divide-steel/15">
         {members.map((m) => {
-          const canTouch = isOwnerOrAdmin && m.role !== "owner" && m.profileId !== me && (isOwner || m.role !== "admin");
+          const canTouch = isOwnerOrAdmin && m.role !== "owner" && m.profileId !== me && (isOwner || m.role !== "admin") && !m.leaving;
           const isRemoving = removing === m.profileId;
           const others = members.filter((x) => x.profileId !== m.profileId);
           return (
@@ -191,6 +193,7 @@ export function TeamMembersPanel({
                   {m.fullName}
                   {m.profileId === me ? <span className="text-steel"> (you)</span> : null}
                   <span className="text-steel text-xs uppercase tracking-wide ml-2">{ROLE_WORD[m.role] ?? m.role}</span>
+                  {m.leaving ? <span className="text-rust text-xs uppercase tracking-wide ml-2">Leaving</span> : null}
                 </p>
                 {isOwnerOrAdmin && (
                   <p className="font-body text-xs text-steel">
@@ -289,7 +292,7 @@ export function TeamMembersPanel({
           ) : (
             <div className="max-w-md">
               <p className="font-body text-sm text-chalk">
-                Closing {organizationName} ends the team. Every other coach leaves and takes the clients only they coach, each into an organization of their own. Groups with several coaches stay with you. Download your data first. Billing is not changed here.
+                Closing {organizationName} ends the team. Every other coach leaves. The clients you can see move to you or stay with the coach who has them; a client who keeps their records private from the team stays with their coach, who then chooses what to do next. Groups with several coaches stay with you. Download your data first. Billing is not changed here.
               </p>
               <label htmlFor="close-name" className="font-body text-xs text-steel block mt-3">
                 Type {organizationName} to confirm

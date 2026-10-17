@@ -34,18 +34,19 @@ export function LeaveOrganizationControl({
     }
     const takeover = others.find((o) => o.id === handTo)?.name;
     const message = needsHandOver
-      ? `Leave ${organizationName}? You lose coach access to its groups. Your ${soleClients} client${soleClients === 1 ? "" : "s"} stay${soleClients === 1 ? "s" : ""} with ${organizationName} and ${takeover} takes over, with all history, programs and credits. A client who keeps their records private from the organization leaves with you.`
-      : `Leave ${organizationName}? You lose coach access to its groups. A client who keeps their records private from the organization leaves with you.`;
+      ? `Leave ${organizationName}? You lose coach access to its groups. Your ${soleClients} client${soleClients === 1 ? "" : "s"} stay${soleClients === 1 ? "s" : ""} with ${organizationName} and ${takeover} takes over, with all history, programs and credits. A client who keeps their records private from the organization stays with you; you then choose whether to start your own account or export everything.`
+      : `Leave ${organizationName}? You lose coach access to its groups. A client who keeps their records private from the organization stays with you; you then choose whether to start your own account or export everything.`;
     if (!(await confirmDialog({ message, confirmLabel: "Leave" }))) return;
     setBusy(true);
     setError(null);
-    const { error: rpcError } = await createBrowserClient({ crossOrg: true }).rpc("leave_organization", { p_org: organizationId, p_hand_to: needsHandOver ? handTo : null });
+    const { data, error: rpcError } = await createBrowserClient({ crossOrg: true }).rpc("leave_organization", { p_org: organizationId, p_hand_to: needsHandOver ? handTo : null });
     setBusy(false);
     if (rpcError) {
       setError(rpcError.message);
       return;
     }
-    router.push("/choose-organization?next=/dashboard");
+    // Still coaching clients who are private from the organization: they land on their Home, where the two choices are.
+    router.push((data as { leaving?: boolean } | null)?.leaving ? "/dashboard" : "/choose-organization?next=/dashboard");
     router.refresh();
   }
 
