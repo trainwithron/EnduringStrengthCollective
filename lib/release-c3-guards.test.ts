@@ -8,10 +8,11 @@ const sess = (...reps: number[]) => ({ sets: reps.map((r) => ({ weight: 200, rep
 const rule = { weight: 205, reps: 8, reason: "rule says up" };
 
 describe("a break lowers the number", () => {
-  it("under 14 days: untouched; 14-27: 95 percent; 28-55: 90 percent, rounded down; 56 or more: no number, ask the coach", () => {
+  it("under 21 days: untouched; 21-34: 95 percent; 35-55: 90 percent, rounded down; 56 or more: no number, ask the coach", () => {
     const base = { target: rule, previousWeight: 200, missStreak: 0, protectedAge: false };
     expect(applyContractGuards({ ...base, daysSince: 5 }).weight).toBe(205);
-    expect(applyContractGuards({ ...base, daysSince: 20 })).toMatchObject({ weight: 190, status: "suggest" }); // 200 x 0.95
+    expect(applyContractGuards({ ...base, daysSince: 20 }).weight).toBe(205); // two weeks and a bit: still normal
+    expect(applyContractGuards({ ...base, daysSince: 25 })).toMatchObject({ weight: 190, status: "suggest" }); // 200 x 0.95
     expect(applyContractGuards({ ...base, daysSince: 40 })).toMatchObject({ weight: 180, status: "suggest" }); // 200 x 0.90
     const ask = applyContractGuards({ ...base, daysSince: 60 });
     expect(ask).toMatchObject({ weight: null, reps: null, status: "ask_coach" });
@@ -21,6 +22,18 @@ describe("a break lowers the number", () => {
   it("counts whole days", () => {
     expect(daysBetween("2026-10-01T00:00:00Z", new Date("2026-10-21T12:00:00Z"))).toBe(20);
     expect(daysBetween(null, new Date())).toBeNull();
+  });
+});
+
+describe("an exercise a program schedules every other week is not a break each time", () => {
+  it("a gap close to the usual gap is normal; clearly longer than usual is a break", () => {
+    const base = { target: rule, previousWeight: 200, missStreak: 0, protectedAge: false };
+    expect(applyContractGuards({ ...base, daysSince: 14, normalGapDays: 14 }).weight).toBe(205);
+    expect(applyContractGuards({ ...base, daysSince: 20, normalGapDays: 14 }).weight).toBe(205); // within a week of the usual gap
+    expect(applyContractGuards({ ...base, daysSince: 28, normalGapDays: 28 }).weight).toBe(205);
+    expect(applyContractGuards({ ...base, daysSince: 40, normalGapDays: 14 })).toMatchObject({ weight: 180, status: "suggest" });
+    expect(applyContractGuards({ ...base, daysSince: 25, normalGapDays: null }).weight).toBe(190);
+    expect(applyContractGuards({ ...base, daysSince: 25, normalGapDays: 21 }).weight).toBe(205);
   });
 });
 
@@ -65,7 +78,8 @@ describe("wired into the goal loader", () => {
     const p = src("lib/progressions.ts");
     expect(p).toContain("applyContractGuards({");
     expect(p).toContain("consecutiveMisses(recent, (r.config as DoubleProgressionConfig).repRangeLow)");
-    expect(p).toContain('(await athleteAgeStatus(supabase, athleteId)) !== "adult"');
+    expect(p).toContain('effectiveAgeStatus(await athleteAgeStatus(supabase, athleteId), viewer === athleteId) !== "adult"');
+    expect(p).toContain("normalGapDays,");
     expect(p).toContain("target.status === \"ask_coach\"");
     expect(src("components/logging/pre-start-exercise-row.tsx")).toContain("goal?.reason");
   });

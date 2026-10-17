@@ -14,7 +14,7 @@ export type ProgressionModel =
 import { roundLoad, DEFAULT_STEP } from "@/lib/load-rounding";
 import { countsForProgress } from "@/lib/set-types";
 import { applyContractGuards, consecutiveMisses, daysBetween, type GoalStatus, type PastSession } from "@/lib/progression-guards";
-import { athleteAgeStatus } from "@/lib/youth-block";
+import { athleteAgeStatus, effectiveAgeStatus } from "@/lib/youth-block";
 
 import { readLoggedSets } from "@/lib/read-logged-sets";
 
@@ -537,7 +537,9 @@ export async function getProgressionGoalsBatch(
   }
 
   // Under 18, or an age that is not known, gets the smaller step-up cap.
-  const ageIsProtected = (await athleteAgeStatus(supabase, athleteId)) !== "adult";
+  // (A coach working on their own program with no birthday on file is not treated as unknown: the same rule as the builder.)
+  const viewer = await supabase.auth.getUser().then((r: any) => r?.data?.user?.id ?? null).catch(() => null);
+  const ageIsProtected = effectiveAgeStatus(await athleteAgeStatus(supabase, athleteId), viewer === athleteId) !== "adult";
 
   for (const r of resolved) {
     const referenceLog = r.referenceWorkoutId
@@ -560,10 +562,14 @@ export async function getProgressionGoalsBatch(
       .filter((s) => s.sets.length > 0);
     const missStreak = r.model === "double_progression" ? consecutiveMisses(recent, (r.config as DoubleProgressionConfig).repRangeLow) : 0;
     const lastDone = r.previousWorkoutId ? lastDoneByKey.get(`${r.performanceName}::${r.previousWorkoutId}`) ?? null : null;
+    // The usual gap between this exercise's sessions, from its last two logged times.
+    const beforeLast = r.recentWorkoutIds[1] ? lastDoneByKey.get(`${r.performanceName}::${r.recentWorkoutIds[1]}`) ?? null : null;
+    const normalGapDays = lastDone && beforeLast ? Math.abs(Math.round((new Date(lastDone).getTime() - new Date(beforeLast).getTime()) / 86400000)) : null;
     const target = applyContractGuards({
       target: rule,
       previousWeight: previousOccurrenceLog?.weight ?? null,
       daysSince: daysBetween(lastDone, new Date()),
+      normalGapDays,
       missStreak,
       protectedAge: ageIsProtected,
     });
