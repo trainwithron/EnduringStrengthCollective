@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { SetLogSaver, SET_LOG_DELETE, writeOrDeleteSetLogRow, writeSetLogRow } from "@/lib/set-log-saver";
+import { browserOutbox, requestPersistentStorage } from "@/lib/set-outbox";
 
 interface SetSaveApi {
   // Queue a set_logs change. The value stays on screen; failures retry.
@@ -61,6 +62,7 @@ export function SetSaveProvider({ children }: { children: React.ReactNode }) {
           // The workout was finished on another device: show it as it really is instead of leaving a removal that can never save.
           if (typeof window !== "undefined") window.location.reload();
         }),
+      outbox: browserOutbox(),
       onChange: ({ unsaved, failed }) => {
         setUnsavedCount(unsaved.length);
         setUnsavedIds(new Set(unsaved));
@@ -70,11 +72,32 @@ export function SetSaveProvider({ children }: { children: React.ReactNode }) {
   }
   const saver = saverRef.current;
 
-  // The connection coming back is the best moment to retry.
+  // Sets kept on this phone from an earlier visit (closed tab, restart, dead signal) are sent again as soon as the workout opens; the browser is asked to keep the phone's copy safe.
+  useEffect(() => {
+    void requestPersistentStorage();
+    const outbox = browserOutbox();
+    if (!outbox) return;
+    let cancelled = false;
+    void outbox.all().then((kept) => {
+      if (!cancelled && kept.length > 0) saver.restore(kept);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [saver]);
+
+  // The connection coming back, or the app coming back to the front, is the best moment to retry.
   useEffect(() => {
     const onOnline = () => saver.retryAll();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") saver.retryAll();
+    };
     window.addEventListener("online", onOnline);
-    return () => window.removeEventListener("online", onOnline);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [saver]);
 
   // Leaving with unsaved sets: let the browser warn instead of silently losing them.
@@ -114,6 +137,8 @@ export function SetSaveProvider({ children }: { children: React.ReactNode }) {
 
 // A plain, persistent notice (not a toast that vanishes): nothing the athlete
 // logged is lost, but it hasn't reached the server yet.
+export const SAVED_ON_PHONE_TEXT = "Saved on this phone. It uploads when you're back online.";
+
 export function SetSaveBanner() {
   const { failedIds, retryAll } = useSetSave();
   const [busy, setBusy] = useState(false);
@@ -124,8 +149,8 @@ export function SetSaveBanner() {
       {n > 0 && (
         <div className="mx-5 mt-3 border border-amber-400/40 bg-amber-400/10 px-3 py-2.5 flex items-center justify-between gap-3">
           <p className="font-body text-sm text-chalk">
-            {n === 1 ? "1 change hasn't saved yet." : `${n} changes haven't saved yet.`}{" "}
-            <span className="text-steel">Your numbers are still here — we&apos;ll keep trying.</span>
+            {n === 1 ? "1 change hasn't uploaded yet." : `${n} changes haven't uploaded yet.`}{" "}
+            <span className="text-steel">{SAVED_ON_PHONE_TEXT}</span>
           </p>
           <button
             type="button"

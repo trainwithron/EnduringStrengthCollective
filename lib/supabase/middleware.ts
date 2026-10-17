@@ -59,6 +59,7 @@ export async function updateSession(request: NextRequest) {
     // to /login breaks "Add to Home Screen" and push registration.
     pathname === "/manifest.webmanifest" ||
     pathname === "/sw.js" ||
+    pathname === "/offline.html" ||
     pathname === "/apple-icon" ||
     pathname.startsWith("/icon") ||
     // guardian_links tokenized read-only view — a caregiver never has a

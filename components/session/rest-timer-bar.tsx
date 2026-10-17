@@ -149,6 +149,19 @@ export function RestTimerBar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
+  // The phone locks or the app goes to the background: the countdown is timestamp-based (it never drifts), so on coming back show the true time at once and take the screen wake lock again (the browser lets it go when the page is hidden).
+  useEffect(() => {
+    if (!running) return;
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      setRemaining(computeRemainingSeconds(running.startedAtMs, running.durationSeconds, Date.now()));
+      void acquireWakeLock();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [running]);
+
   useEffect(() => {
     if (!running) return;
     const interval = setInterval(() => {

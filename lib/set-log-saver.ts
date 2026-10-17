@@ -10,6 +10,8 @@
 // it survives a bad signal exactly like a logged value does. A delete wins over any update queued for the same set.
 export const SET_LOG_DELETE = "__delete";
 
+import type { OutboxEntry, OutboxStore } from "@/lib/set-outbox";
+
 export type SetLogWrite = (id: string, payload: Record<string, unknown>) => Promise<boolean>;
 
 export interface SetLogSaverOptions {
@@ -21,6 +23,8 @@ export interface SetLogSaverOptions {
   backoffMs?: number[];
   schedule?: (fn: () => void, ms: number) => unknown;
   cancel?: (handle: unknown) => void;
+  // The phone's own copy of what is still unsaved (lib/set-outbox.ts): written before the first attempt, removed only once the database confirms.
+  outbox?: OutboxStore | null;
 }
 
 interface Entry {
@@ -29,6 +33,7 @@ interface Entry {
   attempts: number; // consecutive failures since the last queue()/retry
   inflight: Promise<boolean> | null;
   timer: unknown;
+  savedAt: number; // when this change was first kept (for the phone's own copy)
 }
 
 export const DEFAULT_SET_SAVE_BACKOFF_MS = [1000, 3000, 8000, 20000];
@@ -58,12 +63,13 @@ export class SetLogSaver {
   queue(id: string, payload: Record<string, unknown>): void {
     let entry = this.entries.get(id);
     if (!entry) {
-      entry = { payload: {}, version: 0, attempts: 0, inflight: null, timer: null };
+      entry = { payload: {}, version: 0, attempts: 0, inflight: null, timer: null, savedAt: Date.now() };
       this.entries.set(id, entry);
     }
     entry.payload = { ...entry.payload, ...payload };
     entry.version += 1;
     entry.attempts = 0;
+    this.keep(id, entry);
     if (entry.timer) {
       this.cancel(entry.timer);
       entry.timer = null;
@@ -84,9 +90,29 @@ export class SetLogSaver {
         entry.timer = null;
       }
       this.entries.delete(id);
+      void this.opts.outbox?.remove(id);
       changed = true;
     }
     if (changed) this.notify();
+  }
+
+  // Changes kept on the phone from an earlier visit (the tab was closed or the phone restarted before they reached the server): sent again now. A newer change made since then wins.
+  restore(kept: OutboxEntry[]): void {
+    for (const k of kept) {
+      const existing = this.entries.get(k.id);
+      if (existing) {
+        existing.payload = { ...k.payload, ...existing.payload };
+        existing.savedAt = Math.min(existing.savedAt, k.savedAt);
+        continue;
+      }
+      this.entries.set(k.id, { payload: { ...k.payload }, version: 1, attempts: 0, inflight: null, timer: null, savedAt: k.savedAt });
+    }
+    this.notify();
+    for (const k of kept) void this.run(k.id);
+  }
+
+  private keep(id: string, entry: Entry): void {
+    void this.opts.outbox?.put({ id, payload: { ...entry.payload }, savedAt: entry.savedAt });
   }
 
   // Try everything unsaved again now (manual "Retry now", or the network is back).
@@ -137,6 +163,7 @@ export class SetLogSaver {
         if (ok) {
           if (after.version === version) {
             this.entries.delete(id);
+            void this.opts.outbox?.remove(id);
             this.notify();
             return true;
           }

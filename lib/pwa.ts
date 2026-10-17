@@ -48,8 +48,14 @@ export function writeViewOverride(mode: ViewOverride): void {
 // physical device correctly reports differently depending on how THIS
 // load was launched — from the home-screen icon (standalone) vs a normal
 // browser tab, even for the same user in the same session.
+// An installed app on a laptop or desktop monitor (a wide window with a mouse) is still the desktop experience; "phone mode" is for a phone-sized or touch-first window.
+export function isWideDesktopWindow(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.innerWidth >= 1024 && window.matchMedia("(pointer: fine)").matches;
+}
+
 export function writeStandaloneCookie(): void {
   if (typeof document === "undefined") return;
-  const value = isStandaloneDisplay() ? "1" : "0";
+  const value = isStandaloneDisplay() && !isWideDesktopWindow() ? "1" : "0";
   document.cookie = `${PWA_STANDALONE_COOKIE}=${value}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
 }

@@ -4,6 +4,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AddToHomeScreenPrompt } from "@/components/add-to-home-screen-prompt";
 import { PwaContextCookie } from "@/components/pwa-context-cookie";
+import { SetOutboxReplay } from "@/components/set-outbox-replay";
 import { LoadingWatchdog } from "@/components/ui/loading-watchdog";
 import { LegalReacceptGate } from "@/components/legal/legal-reaccept-gate";
 import { TimezoneCapture } from "@/components/timezone-capture";
@@ -83,6 +84,7 @@ export default async function RootLayout({
       </head>
       <body className="font-body bg-graphite text-chalk min-h-screen">
         <PwaContextCookie />
+        <SetOutboxReplay />
         <AddToHomeScreenPrompt />
         <LoadingWatchdog />
         {children}

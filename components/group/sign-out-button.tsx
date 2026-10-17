@@ -7,6 +7,7 @@ import { clearWorkspaceStorage } from "@/lib/workspace-layout";
 import { clearAllNoteDrafts } from "@/lib/note-draft";
 import { clearAllFunLineMemory } from "@/lib/fun-line-memory";
 import { unsubscribeFromPush } from "@/lib/push-client";
+import { purgeOfflinePages } from "@/lib/offline-pages";
 
 export function SignOutButton() {
   const [signingOut, setSigningOut] = useState(false);
@@ -23,6 +24,8 @@ export function SignOutButton() {
     clearAllNoteDrafts();
     // Nor the lines their share cards showed (they hold their workout numbers).
     clearAllFunLineMemory(window.localStorage);
+    // Nor the workout pages kept for opening with no signal.
+    purgeOfflinePages();
     router.push("/login");
     router.refresh();
   }
