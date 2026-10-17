@@ -51,9 +51,12 @@ export async function FavoriteMealsTab({ userId }: { userId: string }) {
       })),
   }));
 
-  const { data: builtinMappingRows } = await supabase
-    .from("builtin_ingredient_usda_mappings")
-    .select("ingredient_key, usda_fdc_id");
+  // The shared mapping of the built-in recipes' ingredients is a platform tool, not a coach one: only a platform admin sees it (it changes every coach's clients' estimates).
+  const { data: viewer } = await supabase.from("profiles").select("is_platform_admin").eq("id", user.id).maybeSingle();
+  const showBuiltinMappings = viewer?.is_platform_admin === true;
+  const { data: builtinMappingRows } = showBuiltinMappings
+    ? await supabase.from("builtin_ingredient_usda_mappings").select("ingredient_key, usda_fdc_id")
+    : { data: [] as { ingredient_key: string; usda_fdc_id: number | null }[] };
   const builtinMappingByKey = new Map((builtinMappingRows ?? []).map((r) => [r.ingredient_key, r.usda_fdc_id]));
   const builtinFdcIds = Array.from(new Set(Array.from(builtinMappingByKey.values()).filter((id): id is number => id != null)));
   const { data: builtinUsdaFoodRows } = builtinFdcIds.length
@@ -80,14 +83,16 @@ export async function FavoriteMealsTab({ userId }: { userId: string }) {
 
       <RecipeHubManager initialRecipes={recipes} />
 
-      <div className="pt-8 mt-8 border-t border-steel/20">
-        <h2 className="font-display font-bold text-xl uppercase leading-none mb-2">Built-in recipe ingredients</h2>
-        <p className="font-body text-sm text-steel mb-4 max-w-[70ch]">
-          Map the 24 built-in recipes&apos; shared ingredient list to real USDA foods so every client&apos;s Key nutrients grid can estimate real micronutrients, not just macros.
-          Shared across every coach on the platform.
-        </p>
-        <BuiltinIngredientMappings initialRows={builtinRows} />
-      </div>
+      {showBuiltinMappings && (
+        <div className="pt-8 mt-8 border-t border-steel/20">
+          <h2 className="font-display font-bold text-xl uppercase leading-none mb-2">Built-in recipe ingredients (platform admin)</h2>
+          <p className="font-body text-sm text-steel mb-4 max-w-[70ch]">
+            Map the 24 built-in recipes&apos; shared ingredient list to real USDA foods so every client&apos;s Key nutrients grid can estimate real micronutrients, not just macros.
+            Shared across every coach on the platform.
+          </p>
+          <BuiltinIngredientMappings initialRows={builtinRows} />
+        </div>
+      )}
     </div>
   );
 }

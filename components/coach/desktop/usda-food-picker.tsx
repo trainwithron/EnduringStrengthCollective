@@ -47,8 +47,8 @@ export function UsdaFoodPicker({
 
   if (currentFdcId && !open) {
     return (
-      <div className="flex items-center gap-2">
-        <span className="font-body text-xs text-moss truncate">{currentDescription ?? `#${currentFdcId}`}</span>
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="font-body text-xs text-moss truncate min-w-0">{currentDescription ?? `#${currentFdcId}`}</span>
         <button
           type="button"
           onClick={() => setOpen(true)}
