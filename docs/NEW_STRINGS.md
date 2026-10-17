@@ -95,3 +95,6 @@
 - Meter: "{n} of 5 AI uses left this month. Building a program, a meal plan or importing a program each takes one." / "You've used this month's 5 free AI uses. They come back on the 1st." with [See plans] / [Buy credits or subscribe]
 - Refusals: "You've used your 5 free AI uses this month. They come back on the 1st. Subscribe or buy AI credits to keep going." / "AI is not part of the free plan. You can use it 5 times a month to build a program, a meal plan or import a program; subscribe or buy AI credits for the rest." / to a client: "AI logging is paused right now. You can still search foods, scan a barcode or use your saved meals."
 - Plan & Billing: "You are on the free plan: up to 15 clients and 5 AI uses a month. Nothing was deleted, and your clients can still log workouts. Choose a plan to add more clients and use AI freely."
+
+## Release F2 (free plan client limit)
+- "Your free plan includes up to 15 clients. Subscribe to add more." (a coach adding a client) / "This coach cannot take on new clients right now." (a person joining on their own)
