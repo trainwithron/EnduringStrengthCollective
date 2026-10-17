@@ -10,9 +10,10 @@ import { useTerm } from "@/components/coach/terminology-provider";
 import { appOriginBrowser } from "@/lib/app-url";
 import { SINGLE_LINK_NOTE } from "@/lib/invite-link-plan";
 import { EmailClaimLinkButton } from "@/components/coach/email-claim-link-button";
+import { RosterImportPanel } from "@/components/coach/desktop/roster-import-panel";
 
 type Step = "choose" | "one_on_one" | "group";
-type GroupMode = "name" | "link";
+type GroupMode = "name" | "link" | "roster";
 
 interface GroupOption {
   id: string;
@@ -287,14 +288,20 @@ export function AddClientButton({
             ))}
           </select>
           <div className="flex items-center gap-1 my-3">
-            {(["name", "link"] as GroupMode[]).map((m) => (
+            {(["name", "roster", "link"] as GroupMode[]).map((m) => (
               <button key={m} type="button" onClick={() => setGroupMode(m)} className={`h-10 px-3 font-body text-xs border ${groupMode === m ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"}`}>
-                {m === "name" ? "Add by name" : "Invite link"}
+                {m === "name" ? "Add by name" : m === "roster" ? "Paste a list" : "Invite link"}
               </button>
             ))}
           </div>
           {groupMode === "name" ? (
             nameForm
+          ) : groupMode === "roster" ? (
+            selectedGroupId ? (
+              <RosterImportPanel key={selectedGroupId} groupId={selectedGroupId} groupName={groups?.find((g) => g.id === selectedGroupId)?.name ?? groupName} onAdded={onAdded} onClose={reset} />
+            ) : (
+              <p className="font-body text-xs text-steel">Pick a group first.</p>
+            )
           ) : link ? (
             <div>
               <p className="font-body text-xs text-steel mb-2">Works for 7 days.</p>

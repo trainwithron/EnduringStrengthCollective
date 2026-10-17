@@ -144,6 +144,10 @@ interface PendingImport {
   // always stop for a real look before it commits, even when every
   // exercise happened to match exactly (see prepareImport's own comment).
   isAiSourced: boolean;
+  // A spreadsheet the coach brought in: it stops on a preview of what was read before anything is created, though nothing needs deciding.
+  previewFirst: boolean;
+  // Things to tell the coach on that preview (rows that were left out, and why).
+  previewNotes: string[];
   // True only when a program-generation credit was actually charged for this import (the plain-English writer). Reading a picture, PDF or pasted text charges none, so the
   // "This was wrong" refund is offered only when this is true.
   creditCharged: boolean;
@@ -339,7 +343,12 @@ export function ImportWizard({
       return;
     }
 
-    prepareImport(parsed, fileName.replace(/\.(csv|xlsx|xls)$/i, ""), `Imported from ${fileName}`);
+    // A spreadsheet always stops on a preview of what was read (weeks, days, exercises, sets and reps as written) before anything is created.
+    // Rows that have something in them but no exercise name are left out; say which, by their row in the file (the header is row 1), so nothing disappears without a trace. A blank spacer row is not a problem.
+    const exerciseColumn = mapping.exercise as number;
+    const leftOut = body.flatMap((r, i) => (!String(r[exerciseColumn] ?? "").trim() && r.some((c) => String(c ?? "").trim()) ? [i + 2] : []));
+    const previewNotes = leftOut.length > 0 ? [`${leftOut.length} row${leftOut.length === 1 ? " has" : "s have"} no exercise name and ${leftOut.length === 1 ? "was" : "were"} left out (row${leftOut.length === 1 ? "" : "s"} ${leftOut.slice(0, 15).join(", ")}${leftOut.length > 15 ? ", …" : ""}).`] : [];
+    prepareImport(parsed, fileName.replace(/\.(csv|xlsx|xls)$/i, ""), `Imported from ${fileName}`, null, null, undefined, false, [], null, false, { previewFirst: true, previewNotes });
   }
 
   // Pure — matches every exercise against the coach's real library and
@@ -369,7 +378,7 @@ export function ImportWizard({
     libraryFlags: { exerciseName: string; flaggedReason: string }[] = [],
     adherenceCheck: PendingImport["adherenceCheck"] = null,
     creditCharged: boolean = false,
-    extras: { constraintFlags?: string[]; youth?: boolean; youthUnknownAge?: boolean; readNote?: string } = {}
+    extras: { constraintFlags?: string[]; youth?: boolean; youthUnknownAge?: boolean; readNote?: string; previewFirst?: boolean; previewNotes?: string[] } = {}
   ) {
     // The same check for every source (a spreadsheet, a photo, a PDF, pasted text, AI): a program whose exercises are called "1", "2", "3" is never created.
     if (looksLikeNumbersNotNames(parsed.map((r) => r.exerciseName))) {
@@ -457,9 +466,11 @@ export function ImportWizard({
       checkFlags,
       youth: extras.youth === true,
       youthUnknownAge: extras.youthUnknownAge === true,
+      previewFirst: extras.previewFirst === true,
+      previewNotes: extras.previewNotes ?? [],
     };
 
-    if (fuzzyMatches.length === 0 && !isAiSourced) {
+    if (fuzzyMatches.length === 0 && !isAiSourced && !extras.previewFirst) {
       finalizeImport(pendingImport);
     } else {
       // Deliberately leaves processingRef true through the review step —
@@ -990,7 +1001,8 @@ export function ImportWizard({
     // case rather than an empty "0 guessed exercises" heading. Computed
     // lazily (only when there's actually something to show) since
     // groupIntoWeeks isn't free on a long program.
-    const previewWeeks = pending.isAiSourced ? groupIntoWeeks(pending.parsed) : [];
+    const previewWeeks = pending.isAiSourced || pending.previewFirst ? groupIntoWeeks(pending.parsed) : [];
+    const readWarnings = pending.previewFirst ? [...pending.previewNotes, ...importReadWarnings(pending.parsed)] : [];
     return (
       <div className="border border-yellow-500/40 bg-surface/60 p-6 max-w-2xl">
         <label className="block mb-4">
@@ -1010,8 +1022,19 @@ export function ImportWizard({
         <p className="font-body text-sm text-steel mb-4">
           {pending.fuzzyMatches.length > 0
             ? "These weren't an exact match to anything in your library — we guessed the closest one, but a guess can be wrong (two different exercises can share a word). Nothing has been created yet."
-            : "AI-built programs are saved as a draft. Nothing reaches a client until you sign it off. Nothing has been saved yet."}
+            : pending.previewFirst
+              ? "This is what was read from your file. Nothing has been created yet."
+              : "AI-built programs are saved as a draft. Nothing reaches a client until you sign it off. Nothing has been saved yet."}
         </p>
+        {readWarnings.length > 0 && (
+          <div className="mb-4 border border-yellow-500/40 bg-yellow-500/5 p-3" role="note">
+            <ul className="font-body text-xs text-chalk space-y-1 list-disc list-inside">
+              {readWarnings.map((w, i) => (
+                <li key={i}>{w}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         {pending.isAiSourced && pending.youth && (
           <div className="mb-4 border border-rust/40 bg-rust/5 p-3" role="note">
             <p className="font-body text-xs text-chalk leading-snug">{pending.youthUnknownAge ? UNKNOWN_AGE_BANNER_TEXT : YOUTH_BANNER_TEXT}</p>

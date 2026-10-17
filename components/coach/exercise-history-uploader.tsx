@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import * as XLSX from "xlsx";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { ExerciseNameInput } from "@/components/coach/exercise-name-input";
-import { detectHistoryColumns, headerUnitOf, parseHistoryRows, type ParsedHistoryRow } from "@/lib/history-import-parser";
+import { detectHistoryColumns, headerUnitOf, parseHistoryRows, type ParsedHistoryRow, type SkippedHistoryRow } from "@/lib/history-import-parser";
+import { SET_VALUE_LIMITS } from "@/lib/set-value-limits";
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { WeightUnitChoice } from "@/components/coach/weight-unit-choice";
 import { poundsFrom, type WeightUnit } from "@/lib/weight-units";
 import {
@@ -12,6 +14,7 @@ import {
   importHistoryRows,
   listHistoricalEntries,
   deleteHistoricalSession,
+  undoImportBatch,
   type HistoricalEntryGroup,
 } from "@/lib/exercise-history-import";
 import { recomputeTrainingMaxes, settleImportedHistory } from "@/lib/unclear-points";
@@ -78,17 +81,25 @@ export function ExerciseHistoryUploader({
 
   async function handleManualSubmit() {
     if (!canSubmitManual || manualSaving) return;
-    setManualSaving(true);
     setManualError(null);
+
+    const weightLb = manualWeight.trim() && Number.isFinite(parseFloat(manualWeight)) ? poundsFrom(parseFloat(manualWeight), quickUnit) : null;
+    const repsNumber = manualReps.trim() ? parseInt(manualReps, 10) : null;
+    const rpeNumber = manualRpe.trim() ? parseFloat(manualRpe) : null;
+    // The database refuses numbers no real set can be; say so here in plain words instead of failing to save.
+    if (weightLb != null && (weightLb < 0 || weightLb > SET_VALUE_LIMITS.weightLb)) return setManualError(`A weight can be at most ${quickUnit === "kg" ? "907 kg" : "2,000 lbs"}.`);
+    if (repsNumber != null && (!Number.isFinite(repsNumber) || repsNumber < 0 || repsNumber > SET_VALUE_LIMITS.reps)) return setManualError("Reps can be a whole number from 0 to 1,000.");
+    if (rpeNumber != null && (!Number.isFinite(rpeNumber) || rpeNumber < 0 || rpeNumber > SET_VALUE_LIMITS.rpe)) return setManualError("RPE can be from 0 to 10.");
+    setManualSaving(true);
 
     const supabase = createBrowserClient();
     const { error } = await insertManualHistoryEntry(supabase, {
       athleteId,
       groupId,
       exerciseName: manualExercise.trim(),
-      weight: manualWeight.trim() && Number.isFinite(parseFloat(manualWeight)) ? poundsFrom(parseFloat(manualWeight), quickUnit) : null,
-      reps: manualReps.trim() ? parseInt(manualReps, 10) : null,
-      rpe: manualRpe.trim() ? parseFloat(manualRpe) : null,
+      weight: weightLb,
+      reps: repsNumber,
+      rpe: rpeNumber,
       date: manualDate,
     });
 
@@ -110,7 +121,10 @@ export function ExerciseHistoryUploader({
   const [csvStatus, setCsvStatus] = useState<"idle" | "reviewing" | "importing" | "error">("idle");
   const [csvError, setCsvError] = useState<string | null>(null);
   const [csvRows, setCsvRows] = useState<ParsedHistoryRow[]>([]);
-  const [csvSkippedCount, setCsvSkippedCount] = useState(0);
+  // Every row the file had that was not read, with its row number and why (the coach fixes the file and brings it in again).
+  const [csvSkipped, setCsvSkipped] = useState<SkippedHistoryRow[]>([]);
+  // One id for this import, so all of it can be taken back at once; a second try of only the unsaved rows keeps it.
+  const [csvBatchId, setCsvBatchId] = useState<string | null>(null);
   // After an import where some rows did not save: what was saved, and what is still waiting (the file stays open on only those rows).
   const [csvNotice, setCsvNotice] = useState<string | null>(null);
 
@@ -141,7 +155,10 @@ export function ExerciseHistoryUploader({
     }
 
     setCsvNotice(null);
-    const { rows: parsed, skippedCount, units } = parseHistoryRows(body, mapping, { headerUnit: headerUnitOf(header, mapping), chosenUnit: csvUnit });
+    setCsvBatchId(null);
+    setCsvSkipped([]);
+    const { rows: parsed, skipped, units } = parseHistoryRows(body, mapping, { headerUnit: headerUnitOf(header, mapping), chosenUnit: csvUnit, canFlag: viewerIsCoach });
+    setCsvSkipped(skipped);
     // A file that mixes pounds and kilograms is imported with the odd rows marked unclear, and only a coach can write that mark: an athlete's own upload of such a file is stopped.
     if (units.mixed && !viewerIsCoach) {
       setCsvStatus("error");
@@ -151,6 +168,11 @@ export function ExerciseHistoryUploader({
     if (parsed.length === 0) {
       setCsvStatus("error");
       setCsvError("No usable rows found — every row needs a date, an exercise name, and a weight or rep count.");
+      return;
+    }
+    if (parsed.some((r) => r.unclearReason) && !viewerIsCoach) {
+      setCsvStatus("error");
+      setCsvError("Some rows are marked unclear. Ask your coach to import this file.");
       return;
     }
 
@@ -163,14 +185,14 @@ export function ExerciseHistoryUploader({
     }
 
     setCsvRows(parsed);
-    setCsvSkippedCount(skippedCount);
     setCsvStatus("reviewing");
   }
 
   async function handleCsvConfirm() {
     setCsvStatus("importing");
     const supabase = createBrowserClient();
-    const result = await importHistoryRows(supabase, { athleteId, groupId, rows: csvRows });
+    const result = await importHistoryRows(supabase, { athleteId, groupId, rows: csvRows, batchId: csvBatchId ?? undefined });
+    setCsvBatchId(result.batchId);
     if (result.error) {
       setCsvStatus("error");
       setCsvError(result.error);
@@ -188,7 +210,8 @@ export function ExerciseHistoryUploader({
     }
     setCsvNotice(null);
     setCsvRows([]);
-    setCsvSkippedCount(0);
+    setCsvSkipped([]);
+    setCsvBatchId(null);
     setCsvStatus("idle");
   }
 
@@ -203,6 +226,51 @@ export function ExerciseHistoryUploader({
     setDeletingId(null);
     await refreshEntries();
   }
+
+  const [undoingBatch, setUndoingBatch] = useState<string | null>(null);
+  const [undoError, setUndoError] = useState<string | null>(null);
+
+  // The imports still in the list, newest first, each with how many workouts it made. Taking one back removes exactly those workouts.
+  const importBatches = (() => {
+    const byBatch = new Map<string, { id: string; count: number; newest: string }>();
+    for (const e of entries ?? []) {
+      if (!e.importBatchId) continue;
+      const b = byBatch.get(e.importBatchId) ?? { id: e.importBatchId, count: 0, newest: e.date };
+      b.count++;
+      byBatch.set(e.importBatchId, b);
+    }
+    return Array.from(byBatch.values());
+  })();
+
+  async function handleUndoBatch(batch: { id: string; count: number }) {
+    if (!(await confirmDialog({ message: `Undo this import? Its ${batch.count} workout${batch.count === 1 ? "" : "s"} will be removed. Anything logged live or typed in is not touched.`, confirmLabel: "Undo import", destructive: true }))) return;
+    setUndoingBatch(batch.id);
+    setUndoError(null);
+    const supabase = createBrowserClient();
+    const { error } = await undoImportBatch(supabase, athleteId, batch.id);
+    if (error) setUndoError(error);
+    else await recomputeTrainingMaxes(supabase, athleteId);
+    setUndoingBatch(null);
+    await refreshEntries();
+    window.dispatchEvent(new Event("history-entries-changed"));
+  }
+
+  // The rows of the file that were not read, with why.
+  const skippedList = csvSkipped.length > 0 && (
+    <div className="mb-3">
+      <p className="font-body text-xs text-rust mb-1">
+        {csvSkipped.length} row{csvSkipped.length === 1 ? " was" : "s were"} not read. Fix {csvSkipped.length === 1 ? "it" : "them"} in the file and import again; nothing here is lost.
+      </p>
+      <div className="max-h-40 overflow-y-auto border border-steel/20">
+        {csvSkipped.slice(0, 50).map((s) => (
+          <p key={s.rowNumber} className="font-body text-xs text-steel px-2 py-1 border-b border-steel/10 last:border-b-0">
+            Row {s.rowNumber}: {s.detail}
+          </p>
+        ))}
+        {csvSkipped.length > 50 && <p className="font-body text-xs text-steel px-2 py-1">…and {csvSkipped.length - 50} more</p>}
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-8 max-w-2xl">
@@ -298,6 +366,7 @@ export function ExerciseHistoryUploader({
             <p className="font-body text-xs text-rust mb-2" role="alert">
               {csvError}
             </p>
+            {skippedList}
             <button
               type="button"
               onClick={() => setCsvStatus("idle")}
@@ -315,9 +384,9 @@ export function ExerciseHistoryUploader({
               </p>
             )}
             <p className="font-body text-sm text-chalk mb-2">
-              Ready to import {csvRows.length} entr{csvRows.length === 1 ? "y" : "ies"}
-              {csvSkippedCount > 0 ? ` (${csvSkippedCount} row${csvSkippedCount === 1 ? "" : "s"} skipped)` : ""}.
+              Ready to import {csvRows.length} entr{csvRows.length === 1 ? "y" : "ies"}.
             </p>
+            {skippedList}
             <div className="max-h-48 overflow-y-auto border border-steel/20 mb-3">
               {csvRows.slice(0, 20).map((row, i) => (
                 <p key={i} className="font-body text-xs text-steel px-2 py-1 border-b border-steel/10 last:border-b-0">
@@ -325,6 +394,7 @@ export function ExerciseHistoryUploader({
                   {row.weight != null ? ` — ${row.weight} lbs` : ""}
                   {row.reps != null ? ` × ${row.reps}` : ""}
                   {row.rpe != null ? ` @ RPE ${row.rpe}` : ""}
+                  {row.unclearReason ? ` — kept as an unclear data point: ${row.unclearReason}` : ""}
                 </p>
               ))}
               {csvRows.length > 20 && (
@@ -343,6 +413,7 @@ export function ExerciseHistoryUploader({
                 type="button"
                 onClick={() => {
                   setCsvRows([]);
+                  setCsvSkipped([]);
                   setCsvStatus("idle");
                 }}
                 className="font-body text-xs text-steel"
@@ -361,6 +432,30 @@ export function ExerciseHistoryUploader({
         <h3 className="font-display uppercase text-sm tracking-wide mb-3">
           {viewerIsCoach ? "Entries logged so far" : "Your history so far"}
         </h3>
+        {importBatches.length > 0 && (
+          <div className="mb-4 space-y-1">
+            {importBatches.map((b) => (
+              <div key={b.id} className="flex items-center justify-between border border-steel/15 px-3 py-2">
+                <p className="font-body text-xs text-steel">
+                  A spreadsheet import: {b.count} workout{b.count === 1 ? "" : "s"}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => handleUndoBatch(b)}
+                  disabled={undoingBatch === b.id}
+                  className="font-body text-xs text-rust disabled:opacity-40"
+                >
+                  {undoingBatch === b.id ? "Undoing…" : "Undo this import"}
+                </button>
+              </div>
+            ))}
+            {undoError && (
+              <p className="font-body text-xs text-rust" role="alert">
+                {undoError}
+              </p>
+            )}
+          </div>
+        )}
         {entries === null && <p className="font-body text-xs text-steel">Loading…</p>}
         {entries !== null && entries.length === 0 && (
           <p className="font-body text-xs text-steel">Nothing entered yet.</p>

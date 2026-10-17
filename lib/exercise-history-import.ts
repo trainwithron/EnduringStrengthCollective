@@ -33,7 +33,7 @@ export interface ManualHistoryEntry {
 
 async function createHistoricalSession(
   supabase: SupabaseClient,
-  params: { athleteId: string; groupId: string; date: string }
+  params: { athleteId: string; groupId: string; date: string; importBatchId?: string }
 ): Promise<{ id: string } | null> {
   const timestamp = `${params.date}T12:00:00`; // noon, avoids any timezone date-shift at the boundary
   const { data, error } = await supabase
@@ -46,11 +46,17 @@ async function createHistoricalSession(
       is_historical: true,
       started_at: timestamp,
       completed_at: timestamp,
+      ...(params.importBatchId ? { import_batch_id: params.importBatchId } : {}),
     })
     .select("id")
     .single();
   if (error || !data) return null;
   return data;
+}
+
+// One id for everything a single import creates, so the whole import can be taken back at once.
+export function newImportBatchId(): string {
+  return crypto.randomUUID();
 }
 
 export async function insertManualHistoryEntry(
@@ -91,6 +97,8 @@ export async function insertManualHistoryEntry(
 
 export interface HistoryImportResult {
   importedCount: number;
+  // The batch this import's workouts carry (a second try of only the unsaved rows keeps the same one).
+  batchId: string;
   // How many rows there were, how many did not save, the dates they belong to, and those rows themselves (so a second try can send only these).
   totalRows: number;
   failedRows: ParsedHistoryRow[];
@@ -107,13 +115,14 @@ export interface HistoryImportResult {
 // exercise name, with one set_log per row under it.
 export async function importHistoryRows(
   supabase: SupabaseClient,
-  params: { athleteId: string; groupId: string; rows: ParsedHistoryRow[] }
+  params: { athleteId: string; groupId: string; rows: ParsedHistoryRow[]; batchId?: string }
 ): Promise<HistoryImportResult> {
   const { athleteId, groupId, rows } = params;
-  if (rows.length === 0) return { importedCount: 0, totalRows: 0, failedRows: [], failedDates: [], error: null };
+  const batchId = params.batchId ?? newImportBatchId();
+  if (rows.length === 0) return { importedCount: 0, batchId, totalRows: 0, failedRows: [], failedDates: [], error: null };
   // Nothing is written when a name is only numbers or carries sets and reps (the file's columns were probably read wrongly).
   const badRow = rows.find((r) => exerciseNameProblem(r.exerciseName));
-  if (badRow) return { importedCount: 0, totalRows: rows.length, failedRows: rows, failedDates: [], error: exerciseNameProblem(badRow.exerciseName) };
+  if (badRow) return { importedCount: 0, batchId, totalRows: rows.length, failedRows: rows, failedDates: [], error: exerciseNameProblem(badRow.exerciseName) };
 
   const rowsByDate = new Map<string, ParsedHistoryRow[]>();
   for (const row of rows) {
@@ -127,7 +136,7 @@ export async function importHistoryRows(
   const failedDates = new Set<string>();
 
   for (const [date, dateRows] of rowsByDate.entries()) {
-    const session = await createHistoricalSession(supabase, { athleteId, groupId, date });
+    const session = await createHistoricalSession(supabase, { athleteId, groupId, date, importBatchId: batchId });
     if (!session) {
       failedRows.push(...dateRows);
       failedDates.add(date);
@@ -184,12 +193,14 @@ export async function importHistoryRows(
     }
   }
 
-  return { importedCount, totalRows: rows.length, failedRows, failedDates: Array.from(failedDates).sort(), error: null };
+  return { importedCount, batchId, totalRows: rows.length, failedRows, failedDates: Array.from(failedDates).sort(), error: null };
 }
 
 export interface HistoricalEntryGroup {
   sessionId: string;
   date: string;
+  // Set when this entry came from a spreadsheet import (all entries of one import share it).
+  importBatchId: string | null;
   exercises: { exerciseName: string; sets: { weight: number | null; reps: number | null; rpe: number | null }[] }[];
 }
 
@@ -202,7 +213,7 @@ export async function listHistoricalEntries(
 ): Promise<HistoricalEntryGroup[]> {
   const { data: sessions } = await supabase
     .from("athlete_sessions")
-    .select("id, completed_at")
+    .select("id, completed_at, import_batch_id")
     .eq("athlete_id", athleteId)
     .eq("is_historical", true)
     .order("completed_at", { ascending: false });
@@ -244,8 +255,15 @@ export async function listHistoricalEntries(
   return sessions.map((s) => ({
     sessionId: s.id as string,
     date: (s.completed_at as string).slice(0, 10),
+    importBatchId: (s.import_batch_id as string | null) ?? null,
     exercises: exercisesBySessionId.get(s.id as string) ?? [],
   }));
+}
+
+// Takes back one whole import: every workout that import created for this person, and only those (never a workout they logged live: those are not historical and carry no batch). The sets go with them.
+export async function undoImportBatch(supabase: SupabaseClient, athleteId: string, batchId: string): Promise<{ error: string | null }> {
+  const { error } = await supabase.from("athlete_sessions").delete().eq("import_batch_id", batchId).eq("athlete_id", athleteId).eq("is_historical", true);
+  return { error: error ? "Couldn't undo this import — try again." : null };
 }
 
 export async function deleteHistoricalSession(supabase: SupabaseClient, sessionId: string): Promise<{ error: string | null }> {

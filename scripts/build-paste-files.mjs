@@ -2728,6 +2728,24 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "142",
+  slug: "0390",
+  title: "0390 Release H: undo a whole history import (every workout an import creates carries one batch id)",
+  migrations: ["0390"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes on screen. Imports made after the Release H code is live can be undone as one batch from the History page; imports made before have no batch and are still deleted one workout at a time. Adds one empty column and an index. Safe to run before the code is live.",
+  undo: [
+    "drop index if exists public.athlete_sessions_import_batch_idx;",
+    "alter table public.athlete_sessions drop column if exists import_batch_id;",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 142 misbehaves. Run it only while the Release H code is not live (the import and the History page read and write the column). Removes the column; the imported workouts stay, they just can no longer be removed as one batch.",
+  rows: [
+    ["0390 is not already applied (the batch column is not there yet)", "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'athlete_sessions' and column_name = 'import_batch_id')"],
+    ["the table it builds on exists", "to_regclass('public.athlete_sessions') is not null"],
+  ],
+});
+
+STEPS.push({
   n: "140",
   slug: "0388",
   title: "0388 Switch on the guard: a signed-in person's browser can no longer finish its own health form or waiver (the server does)",
@@ -2857,6 +2875,7 @@ const BUNDLES = [
   { id: "release-co", name: "Release CO (nothing about a person is public unless they chose it: personal Find a coach listing; a coach adds only their own clients to a challenge; run BEFORE the code that goes with it is live)", steps: ["139"] },
   { id: "release-cn-held", name: "HELD, Ron's word first: require the health form and waiver of every client without one (read check-intake-flag-list.sql first)", steps: ["138"] },
   { id: "release-cm", name: "Release CM (the guard function and a coach's decision on a flagged screening; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["137"] },
+  { id: "release-h-importers", name: "Release H (undo a whole history import; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["142"] },
   { id: "release-g", name: "Release G (the app at 1,500 clients; real values only in sets; a test-organization mark; pause forgotten workouts; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["141"] },
   { id: "release-cp", name: "Release CP (switch on the guard: the server finishes the health form and waiver; run AFTER the Release D code is live)", steps: ["140"] },
   { id: "release-cl", name: "Release CL (the kind of each set; records per number of reps; a warm-up or drop set never counts; run BEFORE the code that goes with it is live)", steps: ["136"] },
@@ -3132,6 +3151,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
     m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
+    m("0390", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'athlete_sessions' and column_name = 'import_batch_id')"),
     m("0389", "to_regprocedure('public.business_last_active(uuid[])') is not null"),
     m("0388", "exists (select 1 from pg_trigger where tgname = 'client_intake_guard_completion' and tgrelid = 'public.client_intake'::regclass)"),
     m("0387", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'marketplace_listed')"),

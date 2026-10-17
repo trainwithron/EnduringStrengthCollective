@@ -11,6 +11,7 @@ const REVIEWED_PERMISSION_ONLY = new Set([
   "app/api/ai/coach-conversation/route.ts",
   "app/api/ai/parse-workout/route.ts",
   "app/api/clients/delete/route.ts",
+  "app/api/clients/import-roster/undo/route.ts",
   "app/api/credits/low-balance-check/route.ts",
   "app/api/discovery-availability/[coachId]/route.ts",
   "app/api/progress-look/route.ts",

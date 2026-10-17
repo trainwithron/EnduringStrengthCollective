@@ -6,6 +6,7 @@
 // describes ACTUALLY LOGGED history — a real calendar date, a real
 // numeric rep count, one row per set actually performed.
 
+import { SET_VALUE_LIMITS } from "@/lib/set-value-limits";
 import { parseWeightCell, planUnits, unitFromText, weightInPounds, type UnitPlan, type WeightUnit } from "@/lib/weight-units";
 
 export type HistoryColumn = "date" | "exercise" | "weight" | "reps" | "rpe";
@@ -94,15 +95,25 @@ export interface ParsedHistoryRow {
   date: string; // "YYYY-MM-DD"
   exerciseName: string;
   weight: number | null; // always pounds (a kilogram weight is converted here)
-  // Set when this row's weight names a different unit than the rest of the file: it is imported flagged as an unclear data point, never silently converted by a guess.
+  // Set when this row cannot be an ordinary set: its weight names a different unit than the rest of the file, or a number is past what a real set can be (the database's own limits). It is imported flagged as an unclear data point, never silently converted or cut by a guess.
   unclearReason?: string;
   reps: number | null;
   rpe: number | null;
 }
 
+// Why a row of the file was not read. Every skipped row is listed with its row number in the file (the header is row 1), so the coach can fix the file and bring it in again.
+export type HistorySkipReason = "no_exercise" | "bad_date" | "no_data" | "weight_not_number" | "reps_not_count" | "rpe_not_number" | "too_big" | "needs_coach";
+
+export interface SkippedHistoryRow {
+  rowNumber: number;
+  reason: HistorySkipReason;
+  detail: string; // plain words for the coach, naming the cell
+}
+
 export interface HistoryParseResult {
   rows: ParsedHistoryRow[];
   skippedCount: number;
+  skipped: SkippedHistoryRow[];
   units: UnitPlan; // the unit the file was read in, and where that came from
 }
 
@@ -111,17 +122,50 @@ export function headerUnitOf(header: string[], mapping: HistoryColumnMapping): W
   return mapping.weight == null ? null : unitFromText(header[mapping.weight] ?? "");
 }
 
-// Rows missing an exercise name, a parseable date, or BOTH weight and
-// reps are skipped (a row with no real training data isn't a set worth
-// recording) — counted, never silently dropped without a trace, so the
-// upload UI can tell the coach "N rows skipped."
+// The most each column can hold at all. A value between the database's limit for a real set and this is kept only as an unclear data point (a coach's write); a value past it is never written.
+const REPS_COLUMN_MAX = 100000;
+const WEIGHT_COLUMN_MAX_LB = 9999;
+const RPE_COLUMN_MAX = 99.9;
+
+const UNIT_WORDS = /(kgs?|kilograms?|kilos?|lbs?|pounds?)/gi;
+
+// A weight cell that is a plain number, with a unit after it if at all ("225", "100 kg", "1,000"). A cell with no digits ("BW", "bodyweight") is no weight; one with digits that is not a plain number ("135-185", "60%", "BW+25") is not read.
+function weightCellState(raw: string): "empty" | "none" | "plain" | "unreadable" {
+  const t = raw.trim();
+  if (!t) return "empty";
+  if (!/\d/.test(t)) return "none";
+  return /^\d+(?:,\d{3})*(?:[.,]\d+)?$/.test(t.replace(UNIT_WORDS, "").replace(/\s+/g, "")) ? "plain" : "unreadable";
+}
+
+// Reps are a count that was performed: "5", "5.0", "5 reps". A range ("8-12"), a list ("8/8/6") or words are never turned into a number (8-12 must not become 812).
+function parseRepsCell(raw: string): { ok: true; value: number | null } | { ok: false } {
+  const t = raw.trim();
+  if (!t) return { ok: true, value: null };
+  const m = /^(\d+)(?:\.0+)?\s*(?:reps?|x)?$/i.exec(t);
+  return m ? { ok: true, value: parseInt(m[1], 10) } : { ok: false };
+}
+
+function parseRpeCell(raw: string): { ok: true; value: number | null } | { ok: false } {
+  const t = raw.trim();
+  if (!t) return { ok: true, value: null };
+  const m = /^(?:rpe\s*|@\s*)?(\d+(?:[.,]\d+)?)$/i.exec(t);
+  return m ? { ok: true, value: parseFloat(m[1].replace(",", ".")) } : { ok: false };
+}
+
+const fmt = (n: number) => n.toLocaleString("en-US");
+
+// Rows that cannot be read are skipped, each with a reason and its row number, never dropped without a trace (a blank spacer row is not a problem and is not listed): no exercise name, no readable date,
+// neither weight nor reps, a weight that is not a plain number ("135-185"), reps that are not a count ("8-12"), an RPE that is not a number, or a number no real set can be. A number past the database's limit is
+// kept as an unclear data point when the person importing is a coach (canFlag), otherwise skipped.
 export function parseHistoryRows(
   dataRows: string[][],
   mapping: HistoryColumnMapping,
-  options: { headerUnit?: WeightUnit | null; chosenUnit?: WeightUnit } = {}
+  options: { headerUnit?: WeightUnit | null; chosenUnit?: WeightUnit; canFlag?: boolean; firstRowNumber?: number } = {}
 ): HistoryParseResult {
   const rows: ParsedHistoryRow[] = [];
-  let skippedCount = 0;
+  const skipped: SkippedHistoryRow[] = [];
+  const canFlag = options.canFlag ?? true;
+  const firstRowNumber = options.firstRowNumber ?? 2;
   // Which unit the file is in: its header, else the unit written in its cells, else the coach's choice (pounds unless they picked kilograms).
   const units = planUnits({
     headerUnit: options.headerUnit ?? null,
@@ -129,34 +173,55 @@ export function parseHistoryRows(
     chosen: options.chosenUnit ?? "lb",
   });
 
-  for (const row of dataRows) {
+  dataRows.forEach((row, index) => {
+    const rowNumber = firstRowNumber + index;
+    if (row.every((c) => !(c ?? "").toString().trim())) return;
+    const skip = (reason: HistorySkipReason, detail: string) => void skipped.push({ rowNumber, reason, detail });
+
     const exerciseName = cell(row, mapping.exercise);
     const dateRaw = cell(row, mapping.date);
     const date = parseFlexibleDate(dateRaw);
+    if (!exerciseName) return skip("no_exercise", "No exercise name.");
+    if (!date) return skip("bad_date", dateRaw ? `The date "${dateRaw}" could not be read (use 2026-01-15 or 1/15/2026).` : "No date.");
 
-    const converted = weightInPounds(parseWeightCell(cell(row, mapping.weight)), units);
-    const weight = converted.pounds;
-    const repsRaw = cell(row, mapping.reps).replace(/[^0-9.]/g, "");
-    const reps = repsRaw ? parseInt(repsRaw, 10) : null;
+    const weightRaw = cell(row, mapping.weight);
+    const weightState = weightCellState(weightRaw);
+    if (weightState === "unreadable") return skip("weight_not_number", `The weight "${weightRaw}" is not a plain number (a range or a note is not a weight that was lifted).`);
+    const converted = weightState === "plain" ? weightInPounds(parseWeightCell(weightRaw), units) : { pounds: null, unclearReason: null };
+    const weight = converted.pounds != null && Number.isFinite(converted.pounds) ? converted.pounds : null;
+
+    const repsRaw = cell(row, mapping.reps);
+    const repsRead = parseRepsCell(repsRaw);
+    if (!repsRead.ok) return skip("reps_not_count", `The reps "${repsRaw}" are not a single count (a range such as 8-12 is not a number of reps performed).`);
+    const reps = repsRead.value;
+
     const rpeRaw = cell(row, mapping.rpe);
-    const rpe = rpeRaw ? parseFloat(rpeRaw) : null;
+    const rpeRead = parseRpeCell(rpeRaw);
+    if (!rpeRead.ok) return skip("rpe_not_number", `The RPE "${rpeRaw}" is not a number.`);
+    const rpe = rpeRead.value != null && Number.isFinite(rpeRead.value) ? rpeRead.value : null;
 
-    const hasRealData = (weight != null && Number.isFinite(weight)) || (reps != null && Number.isFinite(reps));
+    if (weight == null && reps == null) return skip("no_data", "No weight and no reps.");
 
-    if (!exerciseName || !date || !hasRealData) {
-      skippedCount++;
-      continue;
+    // Values no real set can be.
+    const odd: string[] = [];
+    if (weight != null && weight > SET_VALUE_LIMITS.weightLb) odd.push(`weight ${fmt(weight)} lb is over ${fmt(SET_VALUE_LIMITS.weightLb)} lb`);
+    if (reps != null && reps > SET_VALUE_LIMITS.reps) odd.push(`${fmt(reps)} reps is over ${fmt(SET_VALUE_LIMITS.reps)}`);
+    if (rpe != null && rpe > SET_VALUE_LIMITS.rpe) odd.push(`RPE ${rpe} is over ${SET_VALUE_LIMITS.rpe}`);
+    if (odd.length > 0) {
+      const pastColumn = (weight != null && weight > WEIGHT_COLUMN_MAX_LB) || (reps != null && reps > REPS_COLUMN_MAX) || (rpe != null && rpe > RPE_COLUMN_MAX);
+      if (pastColumn) return skip("too_big", `${odd.join("; ")}: not a real set.`);
+      if (!canFlag) return skip("needs_coach", `${odd.join("; ")}. Ask your coach to import this file; a coach can keep it as an unclear data point.`);
     }
 
     rows.push({
       date,
       exerciseName,
-      weight: weight != null && Number.isFinite(weight) ? weight : null,
-      ...(converted.unclearReason ? { unclearReason: converted.unclearReason } : {}),
-      reps: reps != null && Number.isFinite(reps) ? reps : null,
-      rpe: rpe != null && Number.isFinite(rpe) ? rpe : null,
+      weight,
+      ...(odd.length > 0 ? { unclearReason: `Value past what a set can be (${odd.join("; ")})` } : converted.unclearReason ? { unclearReason: converted.unclearReason } : {}),
+      reps,
+      rpe,
     });
-  }
+  });
 
-  return { rows, skippedCount, units };
+  return { rows, skippedCount: skipped.length, skipped, units };
 }

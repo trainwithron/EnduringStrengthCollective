@@ -78,3 +78,75 @@ describe("parseHistoryRows", () => {
     expect(rows).toEqual([{ date: "2026-01-05", exerciseName: "Pull-Up", weight: null, reps: 12, rpe: null }]);
   });
 });
+
+describe("parseHistoryRows: strict reading, reasons and row numbers", () => {
+  const mapping = { date: 0, exercise: 1, weight: 2, reps: 3, rpe: 4 };
+
+  it("never turns a rep range into one big number (8-12 is not 812)", () => {
+    const { rows, skipped } = parseHistoryRows([["2026-01-05", "Back Squat", "225", "8-12", ""]], mapping);
+    expect(rows).toHaveLength(0);
+    expect(skipped).toEqual([{ rowNumber: 2, reason: "reps_not_count", detail: expect.stringContaining("8-12") }]);
+  });
+
+  it("reads a count with a word after it, but not a list", () => {
+    const ok = parseHistoryRows([["2026-01-05", "Squat", "225", "5 reps", ""], ["2026-01-05", "Squat", "225", "5.0", ""]], mapping);
+    expect(ok.rows.map((r) => r.reps)).toEqual([5, 5]);
+    const list = parseHistoryRows([["2026-01-05", "Squat", "225", "8/8/6", ""]], mapping);
+    expect(list.skipped[0].reason).toBe("reps_not_count");
+  });
+
+  it("a weight that is a range or a note is not read as its first number", () => {
+    const { rows, skipped } = parseHistoryRows([["2026-01-05", "Squat", "135-185", "5", ""], ["2026-01-05", "Squat", "BW+25", "5", ""]], mapping);
+    expect(rows).toHaveLength(0);
+    expect(skipped.map((s) => s.reason)).toEqual(["weight_not_number", "weight_not_number"]);
+  });
+
+  it("a word with no number ('BW') is a bodyweight set, kept", () => {
+    const { rows } = parseHistoryRows([["2026-01-05", "Pull-Up", "BW", "10", ""]], mapping);
+    expect(rows[0]).toMatchObject({ weight: null, reps: 10 });
+  });
+
+  it("an RPE that is words is skipped; '@8' and 'RPE 8.5' are read", () => {
+    const bad = parseHistoryRows([["2026-01-05", "Squat", "225", "5", "hard"]], mapping);
+    expect(bad.skipped[0].reason).toBe("rpe_not_number");
+    const ok = parseHistoryRows([["2026-01-05", "Squat", "225", "5", "@8"], ["2026-01-05", "Squat", "225", "5", "RPE 8.5"]], mapping);
+    expect(ok.rows.map((r) => r.rpe)).toEqual([8, 8.5]);
+  });
+
+  it("lists every skipped row with its row number in the file (header is row 1), and not a blank spacer row", () => {
+    const { rows, skipped, skippedCount } = parseHistoryRows(
+      [
+        ["2026-01-05", "Squat", "225", "5", ""],
+        ["", "", "", "", ""],
+        ["whenever", "Squat", "225", "5", ""],
+        ["2026-01-06", "", "225", "5", ""],
+        ["2026-01-06", "Squat", "", "", ""],
+      ],
+      mapping
+    );
+    expect(rows).toHaveLength(1);
+    expect(skippedCount).toBe(3);
+    expect(skipped.map((s) => [s.rowNumber, s.reason])).toEqual([[4, "bad_date"], [5, "no_exercise"], [6, "no_data"]]);
+  });
+
+  it("a value past what a real set can be is kept as an unclear data point for a coach, skipped for anyone else", () => {
+    const row = [["2026-01-05", "Squat", "5280", "5", ""]];
+    const coach = parseHistoryRows(row, mapping, { canFlag: true });
+    expect(coach.rows[0].unclearReason).toContain("5,280");
+    expect(coach.rows[0].weight).toBe(5280);
+    const athlete = parseHistoryRows(row, mapping, { canFlag: false });
+    expect(athlete.rows).toHaveLength(0);
+    expect(athlete.skipped[0].reason).toBe("needs_coach");
+  });
+
+  it("a value past what the database can hold at all is skipped for everyone", () => {
+    const { rows, skipped } = parseHistoryRows([["2026-01-05", "Squat", "225", "99999999", ""], ["2026-01-05", "Squat", "52800", "5", ""]], mapping, { canFlag: true });
+    expect(rows).toHaveLength(0);
+    expect(skipped.map((s) => s.reason)).toEqual(["too_big", "too_big"]);
+  });
+
+  it("a kilogram file is checked against the limit in pounds", () => {
+    const { rows } = parseHistoryRows([["2026-01-05", "Squat", "950 kg", "1", ""]], mapping, { canFlag: true });
+    expect(rows[0].unclearReason).toBeTruthy();
+  });
+});
