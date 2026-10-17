@@ -31,7 +31,8 @@ export function ActingAsBanner({ athleteFullName, groupId, isSelf = false }: { a
     await fetch("/api/coach/act-as", { method: "DELETE" });
     // Back to the screen size the device would show by itself (the desktop coaching shell at a desktop).
     writeViewOverride(null);
-    router.push(`/groups/${groupId}`);
+    // The coaching Home: /dashboard sends a phone to the coach's usual team or social group (not the group they were standing in, which is their own space or a client's).
+    router.push("/dashboard");
     router.refresh();
   }
 

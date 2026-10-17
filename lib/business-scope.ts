@@ -13,7 +13,7 @@ export interface BusinessScope {
 }
 
 export async function loadBusinessScope(supabase: SupabaseClient, userId: string, groupId: string): Promise<BusinessScope> {
-  const coached = groupsInOrgOf(await getCoachedGroups(supabase, userId), groupId);
+  const coached = groupsInOrgOf(await getCoachedGroups(supabase, userId, true), groupId); // history: last season's records stay in scope
   const orgId = coached[0]?.orgId ?? null;
   if (!orgId) return { groupIds: coached.map((g) => g.id), organizationWide: false };
   const { data: om } = await supabase.from("organization_memberships").select("role").eq("organization_id", orgId).eq("profile_id", userId).maybeSingle();

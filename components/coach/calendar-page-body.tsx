@@ -29,7 +29,7 @@ import { coachCreditSentence } from "@/lib/credit-sentence";
 import { formatSlotTime } from "@/lib/booking-slots";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { getActivePrograms } from "@/lib/active-programs";
-import { getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
+import { getCoachedGroups, groupsInOrgOf, groupsInOrgOfOpened } from "@/lib/coach-groups";
 import { AddGroupEvent } from "@/components/coach/add-group-event";
 import { UpcomingGroupEvents } from "@/components/group/group-event-answer";
 import { computeQuietTier } from "@/lib/quiet-client-tier";
@@ -102,7 +102,7 @@ export async function CoachCalendarPageBody(
   if (!user) redirect("/login");
 
   // Only the organization this calendar is in: another organization's sessions never appear on it (Ron's rule: inside an organization, nothing from another one is visible).
-  const orgGroupIds = groupsInOrgOf(await getCoachedGroups(supabase, user.id), params.groupId).map((g) => g.id);
+  const orgGroupIds = (await groupsInOrgOfOpened(supabase, user.id, params.groupId)).map((g) => g.id);
   const bodyOrgId = await orgIdOfGroup(supabase, params.groupId);
 
   const { data: membership } = await supabase

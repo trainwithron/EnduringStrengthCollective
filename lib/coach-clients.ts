@@ -1,6 +1,6 @@
 import { readRowsByIds } from "@/lib/read-by-ids";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getCoachedGroups, groupsInOrgOf, type GroupKind } from "@/lib/coach-groups";
+import { getCoachedGroups, groupsInOrgOf, groupsInOrgOfOpened, type GroupKind } from "@/lib/coach-groups";
 
 // Every client a coach has, across ALL their groups in the organization the page is in. A one-on-one client lives in their own
 // group, so a list built from just the group the coach is standing in shows one person (or, in a team group, only the team).
@@ -27,7 +27,7 @@ export function dedupeClients(rows: CoachClient[]): CoachClient[] {
 }
 
 export async function getCoachClients(supabase: SupabaseClient, coachId: string, anchorGroupId: string): Promise<CoachClient[]> {
-  const groups = groupsInOrgOf(await getCoachedGroups(supabase, coachId), anchorGroupId);
+  const groups = (await groupsInOrgOfOpened(supabase, coachId, anchorGroupId));
   if (groups.length === 0) return [];
   const kindByGroup = new Map(groups.map((g) => [g.id, g.kind]));
   const { data } = await readRowsByIds(groups.map((g) => g.id), (ids) => (from, to) =>

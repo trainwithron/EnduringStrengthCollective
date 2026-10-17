@@ -1,7 +1,7 @@
 import { LoadFailedPage } from "@/components/ui/load-failed-page";
 import { readRowsByIds } from "@/lib/read-by-ids";
 import { isReadFailure } from "@/lib/read-failed";
-import { getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
+import { getCoachedGroups, groupsInOrgOf, groupsInOrgOfOpened } from "@/lib/coach-groups";
 import Link from "next/link";
 import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
@@ -95,7 +95,7 @@ export default async function CoachDashboardPage(
     .eq("role", "coach");
 
   // "All my groups" means all the groups of THIS organization (never another organization's).
-  const orgGroupIdSet = new Set(groupsInOrgOf(await getCoachedGroups(supabase, user.id), params.groupId).map((g) => g.id));
+  const orgGroupIdSet = new Set((await groupsInOrgOfOpened(supabase, user.id, params.groupId)).map((g) => g.id));
   const allGroupIds = (coachedGroups ?? []).map((g: any) => g.group_id).filter((id: string) => orgGroupIdSet.has(id));
   const groupIds = scopeAll ? allGroupIds : [params.groupId];
   const groupNameById = new Map<string, string>(

@@ -27,6 +27,7 @@ export default {
       await db.query(`update public.group_memberships set position_id = $1, depth_order = 1 where group_id = $2 and profile_id = $3`, [qb, team, a1]);
       await db.query(`update public.group_memberships set position_id = $1, depth_order = 2, private_from_org = true where group_id = $2 and profile_id = $3`, [wr, team, a2]);
       await db.query(`update public.group_memberships set coach_position_id = $1 where group_id = $2 and profile_id = $3`, [wr, team, assistant]);
+      await db.query(`update public.group_memberships set membership_type = 'social_only', history_import_enabled = true where group_id = $1 and profile_id = $2`, [team, a1]);
       const social = await h.group(org, coach, "social", "TS Social");
       const solo = await h.group(org, coach, "one_on_one", "TS Solo");
 
@@ -62,6 +63,8 @@ export default {
       const scope = (await db.query(`select p.name from public.group_memberships m join public.group_positions p on p.id = m.coach_position_id where m.group_id = $1 and m.profile_id = $2`, [next, assistant])).rows[0];
       h.check("the assistant coach keeps the position they were responsible for, on the new group's own position", scope?.name === "WR");
       h.check("the athletes chosen are in it in the same place on the depth chart", by[a1]?.position === "QB" && by[a1]?.depth_order === 1 && by[a2]?.position === "WR" && by[a2]?.depth_order === 2);
+      const kept = (await db.query(`select membership_type, history_import_enabled from public.group_memberships where group_id = $1 and profile_id = $2`, [next, a1])).rows[0];
+      h.check("a social-only athlete stays social-only (they do not become a training client), and the history-import setting travels", kept.membership_type === "social_only" && kept.history_import_enabled === true, JSON.stringify(kept));
       h.check("a client's private-from-the-organization setting travels with them", by[a2]?.private_from_org === true && by[a1]?.private_from_org !== true);
       h.check("the athlete left out is not in the new season", !by[a3]);
       h.check("the old season is retired and kept whole (its roster is untouched)", (await db.query(`select archived_at from public.groups where id = $1`, [team])).rows[0].archived_at != null && (await db.query(`select count(*)::int as n from public.group_memberships where group_id = $1 and role = 'athlete'`, [team])).rows[0].n === 3);
@@ -72,12 +75,19 @@ export default {
       h.check("a retired season cannot be started again", /already been retired/.test(r.error ?? ""), r.error);
 
       // ---- bring it back
+      await h.asSuper();
+      h.check("the old season records the season that followed it", (await db.query(`select next_season_id from public.groups where id = $1`, [team])).rows[0].next_season_id === next);
       await h.as(outsider);
       r = await tryQ(db, `select public.unarchive_group($1)`, [team]);
       h.check("only a coach can bring a season back", !!r.error);
       await h.as(coach);
       r = await tryQ(db, `select public.unarchive_group($1)`, [team]);
-      h.check("a coach brings a retired season back", !r.error, r.error);
+      h.check("a season with a live next season stays retired (no two live copies of one team)", /already started from this one/.test(r.error ?? ""), r.error);
+      await h.asSuper();
+      await db.query(`update public.groups set archived_at = now() where id = $1`, [next]); // the new season is retired too (it was a mistake)
+      await h.as(coach);
+      r = await tryQ(db, `select public.unarchive_group($1)`, [team]);
+      h.check("once the next season is retired too, the first can be brought back", !r.error, r.error);
       await h.asSuper();
       h.check("it is no longer retired", (await db.query(`select archived_at from public.groups where id = $1`, [team])).rows[0].archived_at === null);
     },

@@ -18,7 +18,7 @@ import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
 import { CoachRosterMobile } from "@/components/coach/mobile/coach-roster-mobile";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { groupClientsDestination } from "@/lib/coach-clients-nav";
-import { getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
+import { getCoachedGroups, groupsInOrgOf, groupsInOrgOfOpened } from "@/lib/coach-groups";
 import { mergeRosterAcrossGroups, type RosterRowAcrossGroups } from "@/lib/coach-roster";
 import type { RosterMember } from "@/lib/types";
 import {
@@ -216,7 +216,7 @@ export default async function ClientsPage(
     // Coach-level list: every client across the groups this coach coaches in this organization, not only the group the coach is
     // standing in (a one-on-one client lives in their own group, so a single group shows one person). The coach's own groups only;
     // the database refuses anything else.
-    const coachedGroups = groupsInOrgOf(await getCoachedGroups(supabase, user.id), params.groupId);
+    const coachedGroups = (await groupsInOrgOfOpened(supabase, user.id, params.groupId));
     const scopeGroups = coachedGroups.length > 0 ? coachedGroups : [{ id: params.groupId, kind: "team" as const }];
     const scopeIds = scopeGroups.map((g) => g.id);
     const kindByGroup = new Map(scopeGroups.map((g) => [g.id, g.kind]));

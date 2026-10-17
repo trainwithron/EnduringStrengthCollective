@@ -98,9 +98,9 @@ export async function loadStartInputs(
       } as StartMembership,
     };
   });
-  // Past seasons are left out unless nothing else is left (a person whose only group was retired still lands somewhere).
-  const live = all.filter((a) => !a.archived);
-  const memberships: StartMembership[] = (live.length > 0 ? live : all).map((a) => a.membership);
+  // Past seasons are left out, but only where the person has another live membership in the same role (a coach whose only coached groups were retired is still a coach, and does not become a client because of an athlete seat elsewhere).
+  const liveRoles = new Set(all.filter((a) => !a.archived).map((a) => a.membership.role === "coach" ? "coach" : "other"));
+  const memberships: StartMembership[] = all.filter((a) => !a.archived || !liveRoles.has(a.membership.role === "coach" ? "coach" : "other")).map((a) => a.membership);
   return { memberships, lastGroupId: lastGroupId ?? null, recentActivityGroupId: (recent?.group_id as string | undefined) ?? null };
 }
 

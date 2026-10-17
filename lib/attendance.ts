@@ -37,7 +37,7 @@ export function dayKeysBetween(fromDay: string, toDay: string, maxDays = 400): s
 export async function loadAttendance(supabase: any, args: { groupId: string; fromIso: string; toIso: string; fromDay: string; toDay: string; timeZone: string }): Promise<Attendance> {
   const { groupId, fromIso, toIso, timeZone } = args;
   const [members, kiosk, workouts, sessions] = await Promise.all([
-    pageAll((from, to) => supabase.from("group_memberships").select("id, profile_id, position_id, profiles ( full_name ), group_positions ( name )").eq("group_id", groupId).eq("role", "athlete").order("id").range(from, to), { maxPages: 20 }),
+    pageAll((from, to) => supabase.from("group_memberships").select("id, profile_id, position_id, profiles ( full_name ), group_positions!group_memberships_position_id_fkey ( name )").eq("group_id", groupId).eq("role", "athlete").order("id").range(from, to), { maxPages: 20 }),
     pageAll((from, to) => supabase.from("kiosk_checkins").select("id, athlete_id, checked_in_at").eq("group_id", groupId).gte("checked_in_at", fromIso).lt("checked_in_at", toIso).order("id").range(from, to), { maxPages: 100 }),
     pageAll((from, to) => supabase.from("athlete_sessions").select("id, athlete_id, completed_at").eq("group_id", groupId).eq("status", "completed").eq("is_historical", false).gte("completed_at", fromIso).lt("completed_at", toIso).order("id").range(from, to), { maxPages: 100 }),
     pageAll((from, to) => supabase.from("group_session_attendees").select("id, athlete_id, attended_at").eq("group_id", groupId).not("attended_at", "is", null).gte("attended_at", fromIso).lt("attended_at", toIso).order("id").range(from, to), { maxPages: 100 }),

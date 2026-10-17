@@ -1,6 +1,6 @@
 import { readRowsByIds } from "@/lib/read-by-ids";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getCoachedGroups, groupsInOrgOf, type GroupKind } from "@/lib/coach-groups";
+import { getCoachedGroups, groupsInOrgOf, groupsInOrgOfOpened, type GroupKind } from "@/lib/coach-groups";
 
 // Who a coach can give a program to: EVERY client of theirs, in any group they coach (a program lives in one group, but the client it is for may be in another), each once. The copy
 // is made in the CLIENT'S OWN space, never assumed to be the program's own group.
@@ -30,7 +30,7 @@ export function pickDestination(memberships: Membership[], programGroupId: strin
 
 export async function loadAssignableClients(supabase: SupabaseClient, coachId: string, programGroupId: string): Promise<AssignClient[]> {
   // Only the clients of the organization the program is in: a program is never offered to, or copied into, another organization's client.
-  const groups = groupsInOrgOf(await getCoachedGroups(supabase, coachId), programGroupId);
+  const groups = (await groupsInOrgOfOpened(supabase, coachId, programGroupId));
   if (groups.length === 0) return [];
   const byId = new Map(groups.map((g) => [g.id, g]));
   const { data } = await readRowsByIds(groups.map((g) => g.id), (ids) => (from, to) =>

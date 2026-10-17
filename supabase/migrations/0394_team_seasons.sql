@@ -7,6 +7,8 @@
 --   unarchive_group(group)       takes a retired group back.
 -- Re-runnable.
 alter table public.groups add column if not exists archived_at timestamptz;
+-- the season that took over from a retired one (so a rolled-over season cannot be brought back beside the one that replaced it)
+alter table public.groups add column if not exists next_season_id uuid references public.groups(id) on delete set null;
 
 create or replace function public.start_new_season(p_group uuid, p_name text, p_athletes uuid[])
 returns uuid
@@ -59,13 +61,13 @@ begin
   where m.group_id = p_group and m.role = 'coach';
 
   -- the athletes chosen, in the same place on the depth chart; privacy and nutrition settings travel with the person
-  insert into public.group_memberships (group_id, profile_id, role, position_id, depth_order, client_tier, private_from_org, training_level, food_tracking_enabled, coach_sets_macros)
+  insert into public.group_memberships (group_id, profile_id, role, position_id, depth_order, client_tier, private_from_org, training_level, food_tracking_enabled, coach_sets_macros, membership_type, history_import_enabled)
   select v_new, m.profile_id, 'athlete', (select np.id from public.group_positions op join public.group_positions np on np.group_id = v_new and np.name = op.name where op.id = m.position_id order by np.sort_order, np.id limit 1),
-         m.depth_order, m.client_tier, m.private_from_org, m.training_level, m.food_tracking_enabled, m.coach_sets_macros
+         m.depth_order, m.client_tier, m.private_from_org, m.training_level, m.food_tracking_enabled, m.coach_sets_macros, m.membership_type, m.history_import_enabled
   from public.group_memberships m
   where m.group_id = p_group and m.role = 'athlete' and m.profile_id = any(v_ids);
 
-  update public.groups set archived_at = now() where id = p_group;
+  update public.groups set archived_at = now(), next_season_id = v_new where id = p_group;
   perform public.audit_record('groups', p_group::text, 'update', jsonb_build_object('event', 'start_new_season', 'new_group', v_new, 'athletes', cardinality(v_ids), 'by', me));
   return v_new;
 end;
@@ -79,9 +81,20 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  v_next uuid;
+  v_next_name text;
 begin
   if auth.uid() is null or not public.is_group_coach(p_group) then
     raise exception 'Only a coach of this group can bring it back.';
+  end if;
+  -- A season that already has a live next season stays retired: bringing it back would leave two live copies of the same team. (Retire the new season first if it was a mistake.)
+  select g.next_season_id into v_next from public.groups g where g.id = p_group;
+  if v_next is not null then
+    select n.name into v_next_name from public.groups n where n.id = v_next and n.archived_at is null;
+    if found then
+      raise exception 'A new season (%) was already started from this one, so it stays retired.', v_next_name;
+    end if;
   end if;
   update public.groups set archived_at = null where id = p_group;
 end;

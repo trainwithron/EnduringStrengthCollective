@@ -37,6 +37,10 @@ export function NewSeasonPanel({ groupId, groupName, athletes }: { groupId: stri
       setError("Give the new season a name.");
       return;
     }
+    if (chosen.size === 0) {
+      setError("Tick at least one athlete to bring over.");
+      return;
+    }
     if (!(await confirmDialog({ message: `Start ${trimmed} with ${chosen.size} athlete${chosen.size === 1 ? "" : "s"}? ${groupName} is retired: it and all its records are kept in Past seasons, and nothing from it is copied into the new season.`, confirmLabel: "Start the season" }))) return;
     setBusy(true);
     setError(null);

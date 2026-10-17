@@ -76,7 +76,7 @@ export async function getPositionLeaderboardRankings(
   const [{ data: memberships }, { data: logs }] = await Promise.all([
     supabase
       .from("group_memberships")
-      .select("profile_id, position_id, profiles ( full_name, feed_broadcast_level ), group_positions ( name, sort_order )")
+      .select("profile_id, position_id, profiles ( full_name, feed_broadcast_level ), group_positions!group_memberships_position_id_fkey ( name, sort_order )")
       .eq("group_id", groupId)
       .eq("role", "athlete"),
     supabase

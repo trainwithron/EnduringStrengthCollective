@@ -15,6 +15,8 @@ export interface CoachedGroup {
   kind: GroupKind;
   orgId: string;
   orgName: string;
+  // A retired season. Left out unless asked for (includeArchived).
+  archived?: boolean;
 }
 
 // Cookie remembering the last team/social group the coach worked in. It is
@@ -29,9 +31,11 @@ function normalizeKind(kind: string | null | undefined): GroupKind {
 
 // Every group this person coaches (any org), with its org. Within one page render (where every caller shares the request's one Supabase client) the answer is read
 // once and shared, so a page and the components under it do not each ask again; anywhere else (browser, route handlers) every call reads fresh, as before.
+// Retired seasons (a team that has rolled over) are left out: they would only repeat the same people in every list and total. A reader of HISTORY (the export, the Business income) passes includeArchived so last
+// season's records stay in its scope.
 export const getCoachedGroups = cache(readCoachedGroups);
 
-async function readCoachedGroups(supabase: SupabaseClient, coachId: string): Promise<CoachedGroup[]> {
+async function readCoachedGroups(supabase: SupabaseClient, coachId: string, includeArchived: boolean = false): Promise<CoachedGroup[]> {
   // A coach with more than 1,000 one-on-one clients has more than 1,000 of these rows: a request returns at most 1,000, so they are read a page at a time (every coach-wide page starts here).
   const readWith = (columns: string) =>
     pageAll((from, to) =>
@@ -51,13 +55,15 @@ async function readCoachedGroups(supabase: SupabaseClient, coachId: string): Pro
   const out: CoachedGroup[] = [];
   for (const row of rows as any[]) {
     const g = row.groups;
-    if (!g?.id || !g.organization_id || g.archived_at) continue;
+    if (!g?.id || !g.organization_id) continue;
+    if (g.archived_at && !includeArchived) continue;
     out.push({
       id: g.id,
       name: g.name ?? "Group",
       kind: normalizeKind(g.group_kind),
       orgId: g.organization_id,
       orgName: g.organizations?.name ?? "Organization",
+      ...(g.archived_at ? { archived: true } : {}),
     });
   }
   return out.sort((a, b) => a.name.localeCompare(b.name));
@@ -70,9 +76,15 @@ export function groupsInOrgOf(groups: CoachedGroup[], groupId: string): CoachedG
   return orgId ? groups.filter((g) => g.orgId === orgId) : [];
 }
 
+// The groups a page opened on `groupId` works over: the live groups of its organization, and the opened group itself even when it is a retired season (so a retired season's own pages still have their organization).
+export async function groupsInOrgOfOpened(supabase: SupabaseClient, coachId: string, groupId: string): Promise<CoachedGroup[]> {
+  const all = await getCoachedGroups(supabase, coachId, true);
+  return groupsInOrgOf(all, groupId).filter((g) => !g.archived || g.id === groupId);
+}
+
 // The ids of the coach's groups in the same organization as `groupId` (always includes `groupId` itself). The scope for any count, list or total shown on a coach page: one organization, never all of them.
 export async function orgGroupIdsOf(supabase: SupabaseClient, coachId: string, groupId: string): Promise<string[]> {
-  const ids = groupsInOrgOf(await getCoachedGroups(supabase, coachId), groupId).map((g) => g.id);
+  const ids = (await groupsInOrgOfOpened(supabase, coachId, groupId)).map((g) => g.id);
   return ids.includes(groupId) ? ids : [groupId, ...ids];
 }
 

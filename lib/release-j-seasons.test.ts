@@ -100,7 +100,36 @@ describe("Release J: wiring", () => {
     expect(panel).toContain("nothing from it is copied into the new season");
     const sql = src("supabase/migrations/0394_team_seasons.sql");
     expect(sql).toContain("revoke execute on function public.start_new_season(uuid, text, uuid[]) from public, anon;");
-    expect(sql).toContain("update public.groups set archived_at = now() where id = p_group;");
+    expect(sql).toContain("update public.groups set archived_at = now(), next_season_id = v_new where id = p_group;");
+    expect(sql).toContain("was already started from this one, so it stays retired");
+  });
+
+  it("the roster behind the attendance grid names which position link it means (a membership has two), and the leaderboard does the same", () => {
+    expect(src("lib/attendance.ts")).toContain("group_positions!group_memberships_position_id_fkey ( name )");
+    expect(src("lib/leaderboard-data.ts")).toContain("group_positions!group_memberships_position_id_fkey ( name, sort_order )");
+  });
+
+  it("a season's athletes keep their membership type and history-import setting into the next season", () => {
+    const sql = src("supabase/migrations/0394_team_seasons.sql");
+    expect(sql).toContain("membership_type, history_import_enabled)");
+    expect(sql).toContain("m.membership_type, m.history_import_enabled");
+  });
+
+  it("Coach home goes to the coaching Home, not the group the coach is standing in", () => {
+    expect(src("components/athlete/acting-as-banner.tsx")).toContain('router.push("/dashboard")');
+  });
+
+  it("readers of history include retired seasons; lists do not; a page opened on a retired season keeps its organization", () => {
+    expect(src("lib/business-scope.ts")).toContain("getCoachedGroups(supabase, userId, true)");
+    expect(src("app/api/coach/export/route.ts")).toContain("getCoachedGroups(supabase, user.id, true)");
+    expect(src("lib/coach-groups.ts")).toContain("export async function groupsInOrgOfOpened");
+    expect(src("components/coach/calendar-page-body.tsx")).toContain("groupsInOrgOfOpened(supabase, user.id, params.groupId)");
+  });
+
+  it("a failed roster read stops Start next season instead of offering it with nobody on it", () => {
+    const page = src("app/(coach)/groups/[groupId]/team/page.tsx");
+    expect(page).toContain("rosterFailed");
+    expect(src("components/coach/desktop/new-season-panel.tsx")).toContain("Tick at least one athlete");
   });
 
   it("the attendance page and spreadsheet are for a coach of the group, use the coach's time zone, and the spreadsheet says when a read failed", () => {

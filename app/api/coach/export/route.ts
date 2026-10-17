@@ -22,7 +22,7 @@ export async function GET(request: Request) {
   const groupId = new URL(request.url).searchParams.get("groupId") ?? "";
   if (!groupId) return NextResponse.json({ error: "Missing the group." }, { status: 400 });
 
-  const coached = await getCoachedGroups(supabase, user.id);
+  const coached = await getCoachedGroups(supabase, user.id, true); // last season's records belong in the export
   const inOrg = groupsInOrgOf(coached, groupId);
   if (inOrg.length === 0) return NextResponse.json({ error: "Only a coach of this organization can export its data." }, { status: 403 });
 

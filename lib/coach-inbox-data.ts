@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
+import { getCoachedGroups, groupsInOrgOf, groupsInOrgOfOpened } from "@/lib/coach-groups";
 import { buildCoachInbox, type InboxConversation } from "@/lib/coach-inbox";
 import { readByIds, readRowsByIds } from "@/lib/read-by-ids";
 
@@ -7,7 +7,7 @@ import { readByIds, readRowsByIds } from "@/lib/read-by-ids";
 // floating panel's Messages tab, so the two always list the same conversations the same way. Reads only; nothing is marked read here.
 export async function loadCoachInbox(supabase: SupabaseClient, args: { coachId: string; groupId: string }): Promise<{ conversations: InboxConversation[]; groupName: string; incomplete: boolean }> {
   const { coachId, groupId } = args;
-  const coachedGroups = groupsInOrgOf(await getCoachedGroups(supabase, coachId), groupId);
+  const coachedGroups = (await groupsInOrgOfOpened(supabase, coachId, groupId));
   const scopeGroups = coachedGroups.length > 0 ? coachedGroups : [{ id: groupId, kind: "team" as const }];
   const scopeIds = scopeGroups.map((g) => g.id);
   const kindByGroup = new Map(scopeGroups.map((g) => [g.id, g.kind]));

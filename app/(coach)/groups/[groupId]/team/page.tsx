@@ -40,7 +40,7 @@ export default async function TeamPage(props: { params: Promise<{ groupId: strin
 
   // Group (for team_mode + name), the position list, and the roster are
   // independent lookups — one round trip instead of three.
-  const [{ data: group }, { data: positionRows }, { data: memberRows }, { data: coachRows }] = await Promise.all([
+  const [{ data: group }, { data: positionRows }, { data: memberRows, error: rosterError }, { data: coachRows }] = await Promise.all([
     supabase.from("groups").select("name, team_mode, group_kind, organization_id").eq("id", params.groupId).single(),
     supabase
       .from("group_positions")
@@ -60,8 +60,10 @@ export default async function TeamPage(props: { params: Promise<{ groupId: strin
   ]);
 
   // Whether this season has been retired (a database without the column yet reads as not retired), and the retired seasons of this organization this coach coached.
-  const archivedRead = await supabase.from("groups").select("archived_at").eq("id", params.groupId).maybeSingle();
+  const archivedRead = await supabase.from("groups").select("archived_at, next_season_id").eq("id", params.groupId).maybeSingle();
   const archivedAt = archivedRead.error ? null : ((archivedRead.data as { archived_at?: string | null } | null)?.archived_at ?? null);
+  const nextSeasonId = archivedRead.error ? null : ((archivedRead.data as { next_season_id?: string | null } | null)?.next_season_id ?? null);
+  const nextSeason = nextSeasonId ? ((await supabase.from("groups").select("id, name").eq("id", nextSeasonId).maybeSingle()).data as { id: string; name: string } | null) : null;
   let pastSeasons: { id: string; name: string }[] = [];
   if (!archivedRead.error && group?.organization_id) {
     const { data: pastRows } = await supabase
@@ -82,6 +84,8 @@ export default async function TeamPage(props: { params: Promise<{ groupId: strin
     sortOrder: p.sort_order,
   }));
 
+  // A failed (or cut-off) roster read must not look like an empty team: Start next season is then not offered.
+  const rosterFailed = !!rosterError || (memberRows ?? []).length >= 1000;
   const players: TeamPlayer[] = (memberRows ?? [])
     .map((m: any) => ({
       profileId: m.profile_id,
@@ -119,11 +123,23 @@ export default async function TeamPage(props: { params: Promise<{ groupId: strin
 
       {archivedAt && (
         <p className="font-body text-sm text-steel mb-4">
-          This season is retired. It and its records are kept here. <UnarchiveGroupButton groupId={params.groupId} />
+          This season is retired. It and its records are kept here.{" "}
+          {nextSeason ? (
+            <Link href={`/groups/${nextSeason.id}/team`} className="text-rust">
+              {nextSeason.name} took over from it.
+            </Link>
+          ) : null}{" "}
+          <UnarchiveGroupButton groupId={params.groupId} />
         </p>
       )}
 
-      {group?.group_kind === "team" && !archivedAt && (
+      {rosterFailed && (
+        <p className="font-body text-sm text-rust mb-4" role="alert">
+          The roster could not be read in full, so starting next season is not offered. Reload the page to try again.
+        </p>
+      )}
+
+      {group?.group_kind === "team" && !archivedAt && !rosterFailed && (
         <div className="mb-8">
           <NewSeasonPanel
             groupId={params.groupId}
