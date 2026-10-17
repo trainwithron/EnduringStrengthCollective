@@ -152,6 +152,8 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0383 | yes | yes | 11 | 0383 A text STOP is remembered per phone number |
 | 0384 | yes | yes | 18 | 0384 Privacy closures |
 | 0385 | yes | yes | 37 | 0385 Set types and records |
+| 0386 | yes | yes | 15 | 0386 The server finishes the health form (0386 adds, 0388 switches the guard on) |
+| 0388 | yes | yes | 15 | 0386 The server finishes the health form (0386 adds, 0388 switches the guard on) |
 | 0331 | yes | yes | 10 | 0331 a payment event and its sessions are recorded in one step |
 | 0329 | yes | yes | 12 | 0329 every session costs exactly 1 credit; the waitlist offer uses the coach's time zone |
 | 0330 | yes | yes | 9 | 0330 only a real coach can have a public page |

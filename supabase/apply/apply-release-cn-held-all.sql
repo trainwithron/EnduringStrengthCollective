@@ -41,6 +41,7 @@ where p.intake_required is not true
   and not exists (select 1 from public.group_memberships gm where gm.profile_id = p.id and gm.role = 'coach')
   and not exists (select 1 from public.client_intake ci where ci.athlete_id = p.id and ci.completed_at is not null)
   and not coalesce(p.is_platform_admin, false)
+  and not exists (select 1 from public.organization_memberships om where om.profile_id = p.id and om.role in ('owner', 'admin'))
   and not exists (select 1 from public.group_memberships gx join public.groups gg on gg.id = gx.group_id where gx.profile_id = p.id and gg.organization_id = '50000000-0000-0000-0000-000000000001'))
   returning id
 )

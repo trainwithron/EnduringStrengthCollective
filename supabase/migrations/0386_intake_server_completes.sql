@@ -1,7 +1,9 @@
 -- Release CM: a client's health form and waiver are finished by the server, never by the browser.
 --   * client_intake used to let the signed-in client write ANY of its columns (insert policy: own row; update policy: own row until completed), so a script could mark its own intake complete with any time and any
---     answers. A guard now refuses, for a signed-in person, every change to the completion columns (par_q_answers, waiver_signed_name, waiver_accepted, completed_at): the form is finished by
---     /api/intake/submit, which writes with the service role. The date of birth (and the group a row belongs to) are still written by the client as before.
+--     answers. The guard function that refuses, for a signed-in person, every change to the completion columns (par_q_answers, waiver_signed_name, waiver_accepted, completed_at) is made here; the form is
+--     finished by /api/intake/submit, which writes with the service role. The date of birth (and the group a row belongs to) are still written by the client as before.
+--     THE GUARD IS NOT SWITCHED ON HERE. This step only adds things (the function and the coach-decision columns), so it is safe to run BEFORE the new code is live: the old form keeps working. The trigger that
+--     switches the guard on is migration 0388 (Release CP), which is run AFTER the new code is live.
 --   * A coach's decision on a flagged health screening is kept with the acknowledgement: cleared, train with changes, or hold, with an optional note.
 
 create or replace function public.client_intake_guard_completion()
@@ -31,11 +33,6 @@ begin
 end;
 $$;
 revoke all on function public.client_intake_guard_completion() from public, anon, authenticated;
-
-drop trigger if exists client_intake_guard_completion on public.client_intake;
-create trigger client_intake_guard_completion
-  before insert or update on public.client_intake
-  for each row execute function public.client_intake_guard_completion();
 
 alter table public.athlete_injury_flag_acknowledgements add column if not exists decision text;
 alter table public.athlete_injury_flag_acknowledgements add column if not exists note text;

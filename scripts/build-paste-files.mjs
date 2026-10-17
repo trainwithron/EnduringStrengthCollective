@@ -2680,7 +2680,7 @@ STEPS.push({
   title: "0386 A client's health form and waiver are finished by the server, never by the browser; a coach's decision on a flagged screening is kept",
   migrations: ["0386"],
   sees: "Success. No rows returned.",
-  afterwards: "Nothing changes on screen. From now on the health form and waiver are finished only by the app's server: a signed-in person's browser can no longer mark its own form complete or write the answers and signed name (it can still change its date of birth). A coach can record a decision (cleared, train with changes, hold) and a note when acknowledging a flagged health screening.",
+  afterwards: "Nothing changes on screen, and the old health form keeps working: this step only adds the guard function (not yet switched on, see step 140) and the places where a coach's decision on a flagged health screening is kept (cleared, train with changes, hold, and a note). It is safe to run before the new code is live.",
   undo: [
     "drop trigger if exists client_intake_guard_completion on public.client_intake;",
     "drop function if exists public.client_intake_guard_completion();",
@@ -2689,10 +2689,26 @@ STEPS.push({
     "alter table public.athlete_injury_flag_acknowledgements drop column if exists decision;",
     "alter table public.athlete_injury_flag_acknowledgements drop column if exists note;",
   ].join(String.fromCharCode(10)),
-  undoWhy: "Only if step 137 misbehaves. Removes the rule that stops a browser finishing its own health form and the coach decision columns (decisions already written are lost with them).",
+  undoWhy: "Only if step 137 misbehaves. Removes the guard function (and its switch, step 140, if that was run) and the coach decision columns (decisions already written are lost with them).",
   rows: [
     ["0386 is not already applied (the guard function is not there yet)", "to_regprocedure('public.client_intake_guard_completion()') is null"],
     ["the tables it builds on exist", "to_regclass('public.client_intake') is not null and to_regclass('public.athlete_injury_flag_acknowledgements') is not null"],
+  ],
+});
+
+STEPS.push({
+  n: "140",
+  slug: "0388",
+  title: "0388 Switch on the guard: a signed-in person's browser can no longer finish its own health form or waiver (the server does)",
+  warn: "Run this only AFTER the Release D code is live (the new health form calls the server). With the old form still showing it would refuse to save.",
+  migrations: ["0388"],
+  sees: "Success. No rows returned.",
+  afterwards: "From now on the health form and waiver are finished only by the app's server: a signed-in person's browser can no longer mark its own form complete or write the answers and signed name (it can still change its date of birth).",
+  undo: "drop trigger if exists client_intake_guard_completion on public.client_intake;",
+  undoWhy: "Only if step 140 misbehaves. Switches the guard off again (the browser may then write the completion columns, as before Release D).",
+  rows: [
+    ["step 140 is not already applied (the guard trigger is not there yet)", "not exists (select 1 from pg_trigger where tgname = 'client_intake_guard_completion' and tgrelid = 'public.client_intake'::regclass)"],
+    ["step 137 is applied (the guard function exists)", "to_regprocedure('public.client_intake_guard_completion()') is not null"],
   ],
 });
 
@@ -2702,7 +2718,7 @@ STEPS.push({
   title: "HELD for Ron's word: require the health form and waiver of every client who has not finished one",
   warn: "DO NOT RUN until Ron says so. It changes what real clients see: each of them is sent to the health form the next time they open the app. Run check-intake-flag-list.sql first and read the names.",
   migrations: [],
-  bodySql: "create table if not exists public.intake_flag_log (\n  profile_id uuid primary key references public.profiles(id) on delete cascade,\n  flagged_at timestamptz not null default now()\n);\nalter table public.intake_flag_log enable row level security;\nrevoke all on public.intake_flag_log from anon, authenticated;\nwith flagged as (\n  update public.profiles set intake_required = true\n  where id in (select p.id from public.profiles p\nwhere p.intake_required is not true\n  and exists (select 1 from public.group_memberships gm where gm.profile_id = p.id and gm.role = 'athlete')\n  and not exists (select 1 from public.group_memberships gm where gm.profile_id = p.id and gm.role = 'coach')\n  and not exists (select 1 from public.client_intake ci where ci.athlete_id = p.id and ci.completed_at is not null)\n  and not coalesce(p.is_platform_admin, false)\n  and not exists (select 1 from public.group_memberships gx join public.groups gg on gg.id = gx.group_id where gx.profile_id = p.id and gg.organization_id = '50000000-0000-0000-0000-000000000001'))\n  returning id\n)\ninsert into public.intake_flag_log (profile_id) select id from flagged on conflict do nothing;",
+  bodySql: "create table if not exists public.intake_flag_log (\n  profile_id uuid primary key references public.profiles(id) on delete cascade,\n  flagged_at timestamptz not null default now()\n);\nalter table public.intake_flag_log enable row level security;\nrevoke all on public.intake_flag_log from anon, authenticated;\nwith flagged as (\n  update public.profiles set intake_required = true\n  where id in (select p.id from public.profiles p\nwhere p.intake_required is not true\n  and exists (select 1 from public.group_memberships gm where gm.profile_id = p.id and gm.role = 'athlete')\n  and not exists (select 1 from public.group_memberships gm where gm.profile_id = p.id and gm.role = 'coach')\n  and not exists (select 1 from public.client_intake ci where ci.athlete_id = p.id and ci.completed_at is not null)\n  and not coalesce(p.is_platform_admin, false)\n  and not exists (select 1 from public.organization_memberships om where om.profile_id = p.id and om.role in ('owner', 'admin'))\n  and not exists (select 1 from public.group_memberships gx join public.groups gg on gg.id = gx.group_id where gx.profile_id = p.id and gg.organization_id = '50000000-0000-0000-0000-000000000001'))\n  returning id\n)\ninsert into public.intake_flag_log (profile_id) select id from flagged on conflict do nothing;",
   sees: "Success. No rows returned.",
   afterwards: "Every client who is not a coach anywhere and has no finished health form is asked to complete it the next time they open the app (before reaching anything else). Coaches, platform admins and clients who already finished are not touched. The people it flagged are listed in intake_flag_log so the undo can put exactly them back.",
   undo: "update public.profiles set intake_required = false where id in (select profile_id from public.intake_flag_log);\ndrop table if exists public.intake_flag_log;",
@@ -2787,7 +2803,8 @@ for (const s of STEPS) {
 // The individual step files stay as the fallback (and for a release that was partly applied by hand: the bundle refuses at the first applied step).
 const BUNDLES = [
   { id: "release-cn-held", name: "HELD, Ron's word first: require the health form and waiver of every client without one (read check-intake-flag-list.sql first)", steps: ["138"] },
-  { id: "release-cm", name: "Release CM (the server finishes the health form and waiver; a coach's decision on a flagged screening; run BEFORE the code that goes with it is live)", steps: ["137"] },
+  { id: "release-cm", name: "Release CM (the guard function and a coach's decision on a flagged screening; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["137"] },
+  { id: "release-cp", name: "Release CP (switch on the guard: the server finishes the health form and waiver; run AFTER the Release D code is live)", steps: ["140"] },
   { id: "release-cl", name: "Release CL (the kind of each set; records per number of reps; a warm-up or drop set never counts; run BEFORE the code that goes with it is live)", steps: ["136"] },
   { id: "release-d", name: "Release D", steps: ["32", "33", "34"] },
   { id: "release-f", name: "Release F", steps: ["35", "36", "37"] },
@@ -3061,6 +3078,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
     m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
+    m("0388", "exists (select 1 from pg_trigger where tgname = 'client_intake_guard_completion' and tgrelid = 'public.client_intake'::regclass)"),
     m("0386", "to_regprocedure('public.client_intake_guard_completion()') is not null"),
     m("0385", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'set_logs' and column_name = 'set_type')"),
     m("0384", "to_regprocedure('public.is_group_private_from_org(uuid)') is not null"),
@@ -3212,7 +3230,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
 writeFileSync(new URL("check-function-acl.sql", outDir), functionAclCheckSql());
 writeFileSync(
   new URL("check-intake-flag-list.sql", outDir),
-  "-- READ-ONLY. Lists the clients step 138 would require a health form and waiver of, so Ron can read the names first. Changes nothing.\nselect p.full_name, (select u.email from auth.users u where u.id = p.id) as email, (select string_agg(g.name, ', ') from public.group_memberships gm join public.groups g on g.id = gm.group_id where gm.profile_id = p.id and gm.role = 'athlete') as groups,\n  exists (select 1 from public.client_intake ci where ci.athlete_id = p.id) as has_started_form\nfrom public.profiles p\nwhere p.intake_required is not true\n  and exists (select 1 from public.group_memberships gm where gm.profile_id = p.id and gm.role = 'athlete')\n  and not exists (select 1 from public.group_memberships gm where gm.profile_id = p.id and gm.role = 'coach')\n  and not exists (select 1 from public.client_intake ci where ci.athlete_id = p.id and ci.completed_at is not null)\n  and not coalesce(p.is_platform_admin, false)\n  and not exists (select 1 from public.group_memberships gx join public.groups gg on gg.id = gx.group_id where gx.profile_id = p.id and gg.organization_id = '50000000-0000-0000-0000-000000000001')\norder by p.full_name;\n"
+  "-- READ-ONLY. Lists the clients step 138 would require a health form and waiver of, so Ron can read the names first. Changes nothing.\nselect p.full_name, (select u.email from auth.users u where u.id = p.id) as email, (select string_agg(g.name, ', ') from public.group_memberships gm join public.groups g on g.id = gm.group_id where gm.profile_id = p.id and gm.role = 'athlete') as groups,\n  exists (select 1 from public.client_intake ci where ci.athlete_id = p.id) as has_started_form\nfrom public.profiles p\nwhere p.intake_required is not true\n  and exists (select 1 from public.group_memberships gm where gm.profile_id = p.id and gm.role = 'athlete')\n  and not exists (select 1 from public.group_memberships gm where gm.profile_id = p.id and gm.role = 'coach')\n  and not exists (select 1 from public.client_intake ci where ci.athlete_id = p.id and ci.completed_at is not null)\n  and not coalesce(p.is_platform_admin, false)\n  and not exists (select 1 from public.organization_memberships om where om.profile_id = p.id and om.role in ('owner', 'admin'))\n  and not exists (select 1 from public.group_memberships gx join public.groups gg on gg.id = gx.group_id where gx.profile_id = p.id and gg.organization_id = '50000000-0000-0000-0000-000000000001')\norder by p.full_name;\n"
 );
 writeFileSync(new URL("check-copy-result.sql", outDir), "-- READ-ONLY. Run after step 30 and LOOK at it before step 31: the original program and its copy, side by side. The two rows must show the same numbers.\nwith pair as (\n  select 'original (Main Group)' as which, '5b8a8a3a-344d-4192-a892-f74494fff9ab'::uuid as program_id\n  union all\n  select 'copy (The Home Team)', (select id from public.programs where group_id = '060017b5-e613-4204-a101-c6a14c3a9630' and name = 'christmas_abs_program' order by created_at desc limit 1)\n)\nselect p.which,\n  (select count(*) from public.workouts w where w.program_id = p.program_id) as workouts,\n  (select count(*) from public.group_workout_exercises x join public.workouts w on w.id = x.workout_id where w.program_id = p.program_id) as exercises,\n  (select count(*) from public.group_workout_exercise_sets s join public.group_workout_exercises x on x.id = s.group_workout_exercise_id join public.workouts w on w.id = x.workout_id where w.program_id = p.program_id) as sets,\n  (select count(*) from public.workout_notes n join public.workouts w on w.id = n.workout_id where w.program_id = p.program_id) as notes,\n  (select count(*) from public.exercise_progressions q where q.program_id = p.program_id) as progressions\nfrom pair p;\n");
 writeFileSync(new URL("check-step23-probe.sql", outDir), step23ProbeSql(migrationSql("0281")));

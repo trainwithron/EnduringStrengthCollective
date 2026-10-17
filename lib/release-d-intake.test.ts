@@ -62,9 +62,25 @@ describe("wiring", () => {
     expect(route).toContain("const completedAt = new Date().toISOString();");
     expect(route).toContain("validateIntakeSubmission(body)");
     expect(route).toContain("versions: { waiver: waiverVersionKey(snapshot) }");
-    // a signature that cannot be recorded is rolled back, never left looking complete
-    expect(route).toContain("update({ completed_at: null, waiver_accepted: false })");
+    // the signature is recorded BEFORE the form is marked complete, so there is nothing to roll back (a rollback could fail or race a second tap and leave a finished form with no signature)
+    expect(route.indexOf("recordLegalAcceptances(")).toBeLessThan(route.indexOf("const completedAt = new Date().toISOString();"));
+    expect(route).not.toContain("update({ completed_at: null, waiver_accepted: false })");
     expect(src("supabase/migrations/0386_intake_server_completes.sql")).toContain("Your health form is saved by the server.");
+  });
+  it("the guard is switched on by its own step, run after the new code is live, so the old form keeps working until then", () => {
+    const m386 = src("supabase/migrations/0386_intake_server_completes.sql");
+    const m388 = src("supabase/migrations/0388_intake_guard_trigger.sql");
+    expect(m386).not.toContain("create trigger client_intake_guard_completion");
+    expect(m388).toContain("create trigger client_intake_guard_completion");
+    const build = src("scripts/build-paste-files.mjs");
+    expect(build).toContain('id: "release-cp"');
+    expect(build).toContain("run AFTER the Release D code is live");
+  });
+  it("step 138 (held) leaves out a gym owner or admin who holds a client seat", () => {
+    const build = src("scripts/build-paste-files.mjs");
+    expect(build.split("om.role in ('owner', 'admin')").length - 1).toBeGreaterThanOrEqual(2); // the step and the read-only list
+    expect(src("supabase/apply/apply-step138-flag-clients-without-intake.sql")).toContain("om.role in ('owner', 'admin')");
+    expect(src("supabase/apply/check-intake-flag-list.sql")).toContain("om.role in ('owner', 'admin')");
   });
   it("every client page is behind the form, not just /groups, and a workout link comes back after it", () => {
     const mw = src("lib/supabase/middleware.ts");

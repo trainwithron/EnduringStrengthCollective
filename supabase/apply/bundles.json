@@ -9,11 +9,19 @@
  },
  {
   "id": "release-cm",
-  "name": "Release CM (the server finishes the health form and waiver; a coach's decision on a flagged screening; run BEFORE the code that goes with it is live)",
+  "name": "Release CM (the guard function and a coach's decision on a flagged screening; adds only, safe to run BEFORE the code that goes with it is live)",
   "steps": [
    "137"
   ],
   "file": "apply-release-cm-all.sql"
+ },
+ {
+  "id": "release-cp",
+  "name": "Release CP (switch on the guard: the server finishes the health form and waiver; run AFTER the Release D code is live)",
+  "steps": [
+   "140"
+  ],
+  "file": "apply-release-cp-all.sql"
  },
  {
   "id": "release-cl",
