@@ -51,6 +51,8 @@ export function AddClientButton({
   const [error, setError] = useState<string | null>(null);
   // Someone who already has an account: they were sent an invitation to accept instead of being added.
   const [invitedExisting, setInvitedExisting] = useState<{ email: string; already: boolean } | null>(null);
+  // The person was already this coach's client: what was sent to them again (and the link, when it is for the coach to copy or text).
+  const [resentNote, setResentNote] = useState<{ message: string; link: string | null } | null>(null);
   const [added, setAdded] = useState<{ groupId: string; profileId: string; name: string; inGroup: string | null; hasEmail: boolean; note?: string | null } | null>(null);
   const [groups, setGroups] = useState<GroupOption[] | null>(null);
   const [selectedGroupId, setSelectedGroupId] = useState("");
@@ -122,6 +124,7 @@ export function AddClientButton({
     setError(null);
     setAdded(null);
     setInvitedExisting(null);
+    setResentNote(null);
     setLink(null);
     setGroupMode("name");
     createdGroupIdRef.current = null;
@@ -168,6 +171,13 @@ export function AddClientButton({
       const res = await fetch("/api/clients/invite", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ groupId: target, fullName, email }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Couldn't add this ${t("client")}.`);
+      if (data.resent) {
+        setResentNote({ message: typeof data.message === "string" ? data.message : "Sent again.", link: typeof data.link === "string" ? data.link : null });
+        setFullName("");
+        setEmail("");
+        router.refresh();
+        return;
+      }
       if (data.invitedExisting) {
         setInvitedExisting({ email: email.trim(), already: data.already === true });
         setFullName("");
@@ -267,7 +277,27 @@ export function AddClientButton({
 
   return (
     <div className="border border-steel/30 p-4 w-full max-w-sm bg-surface">
-      {invitedExisting ? (
+      {resentNote ? (
+        <div>
+          <p className="font-body text-sm text-positive">They are already your client, so we sent it again.</p>
+          <p className="font-body text-xs text-steel mt-1.5">{resentNote.message}</p>
+          {resentNote.link && (
+            <div className="flex items-center gap-2 mt-2">
+              <input readOnly value={resentNote.link} onFocus={(e) => e.target.select()} className="flex-1 h-11 min-w-0 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none" />
+              <button
+                type="button"
+                onClick={() => void navigator.clipboard.writeText(resentNote.link!).catch(() => setError("Couldn't copy. Select the link and copy it by hand."))}
+                className="h-11 px-3 border border-rust text-rust font-body text-xs shrink-0"
+              >
+                Copy
+              </button>
+            </div>
+          )}
+          <button type="button" onClick={reset} className="mt-3 font-body text-xs text-steel">
+            Done
+          </button>
+        </div>
+      ) : invitedExisting ? (
         <div>
           <p className="font-body text-sm text-positive">{invitedExisting.already ? "They have already been invited." : "They already have an account, so we sent them an invitation."}</p>
           <p className="font-body text-xs text-steel mt-1.5">

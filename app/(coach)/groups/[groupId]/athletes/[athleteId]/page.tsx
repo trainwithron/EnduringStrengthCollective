@@ -1070,15 +1070,19 @@ export default async function AthleteProfilePage(
           </div>
           <div data-tab="settings">
           {!selfView && signInStatus !== "active" && (
-            <ClientSignInPanel
-              groupId={params.groupId}
-              athleteId={params.athleteId}
-              clientName={profile?.full_name ?? "Client"}
-              status={signInStatus}
-              linkDetail={signInDetail}
-              coachFirstName={coachFirstName}
-              emailOnFile={signInEmailOnFile}
-            />
+            <>
+              <ClientSignInPanel
+                groupId={params.groupId}
+                athleteId={params.athleteId}
+                clientName={profile?.full_name ?? "Client"}
+                status={signInStatus}
+                linkDetail={signInDetail}
+                coachFirstName={coachFirstName}
+                emailOnFile={signInEmailOnFile}
+              />
+              {/* Resend is always there, whatever state the person is in (a client who has not signed in gets a fresh sign-in link; the old one stops working). */}
+              <SendSignInLinkButton groupId={params.groupId} athleteId={params.athleteId} clientName={profile?.full_name ?? "this client"} />
+            </>
           )}
           </div>
           <div data-tab="settings">

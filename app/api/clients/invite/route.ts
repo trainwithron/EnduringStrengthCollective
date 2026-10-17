@@ -7,6 +7,7 @@ import { checkOneOnOneGroupHasRoom } from "@/lib/group-kind-guard";
 import { rateLimitResponse } from "@/lib/rate-limit";
 import { notifyAndEmail } from "@/lib/invite-notify";
 import { appOrigin } from "@/lib/app-url";
+import { resendAccess } from "@/lib/resend-access";
 
 // Creates a client BEFORE they've ever signed in: a real auth account and
 // profile, silently — no email is sent, so nothing reaches them until the
@@ -49,6 +50,21 @@ export async function POST(request: Request) {
 
   const serviceRole = createServiceRoleClient();
 
+  // Adding someone who is ALREADY this coach's client is a request to send their invitation again, never a refusal: the coach is sent through the same "resend invite / sign-in link" that the client's profile uses,
+  // whatever state the person is in (not signed in yet: their sign-in link; has signed in: an email to their own address). Looked up before anything else so a full one-on-one space cannot get in the way.
+  let existingId: string | null = null;
+  if (trimmedEmail) {
+    const { data: found } = await serviceRole.rpc("profile_id_for_email", { p_email: trimmedEmail });
+    if (typeof found === "string" && found) existingId = found;
+  }
+  if (existingId) {
+    const { data: asClient } = await serviceRole.from("group_memberships").select("role").eq("group_id", groupId).eq("profile_id", existingId).maybeSingle();
+    if (asClient?.role === "athlete") {
+      const result = await resendAccess({ supabase, serviceRole, coachId: user.id, groupId, athleteId: existingId, origin: appOrigin(request) });
+      return NextResponse.json(result.status === 200 ? { resent: true, profileId: existingId, groupId, ...result.body } : result.body, { status: result.status });
+    }
+  }
+
   // A one-on-one group that already has its client can't take another. Check BEFORE creating
   // anything, so a refusal never leaves an account behind.
   const roomError = await checkOneOnOneGroupHasRoom(serviceRole as never, groupId);
@@ -57,8 +73,7 @@ export async function POST(request: Request) {
   // Someone who already has an account cannot be made a second time. For a one-on-one space they get an INVITATION to be this coach's client, which they accept or decline (a one-on-one space has no
   // invite link). A team or group still uses its invite link.
   if (trimmedEmail) {
-    const { data: existingId } = await serviceRole.rpc("profile_id_for_email", { p_email: trimmedEmail });
-    if (typeof existingId === "string" && existingId) {
+    if (existingId) {
       const { data: spaceRow } = await serviceRole.from("groups").select("group_kind, name").eq("id", groupId).maybeSingle();
       if ((spaceRow as { group_kind?: string } | null)?.group_kind !== "one_on_one") {
         return NextResponse.json({ error: "That email already has an account. Use the group's invite link instead so they join with their own login." }, { status: 409 });

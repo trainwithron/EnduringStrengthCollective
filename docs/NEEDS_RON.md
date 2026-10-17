@@ -26,6 +26,11 @@
 - The plate picture is drawn only for pounds (it is pound plates); a kilogram client sees the number and unit.
 - QUESTION: should the coach see a kilogram client's numbers in kilograms too when logging for them? Today the coach logging for a client sees the client's unit.
 
+## Resend invite (Ron, Oct 17: a coach must always be able to resend)
+- DONE: "Resend invite / sign-in link" on every client's profile, whatever state the person is in; and adding someone who is already your client (the bug: Max Anthony, an account since Oct 10, already in the group, last sign-in Oct 12, was told "already has an account") now resends instead of refusing, even when a one-on-one space already has its client. A client who has never signed in gets a fresh sign-in link by email (the old one stops working), or the link to copy or text when there is no email on file or email is not set up. A client who has signed in gets an email to THEIR OWN address with a link to set a password and sign in; you never see that link (once a person has signed in the account is theirs). The message says what was sent and where.
+- The only waits: one send a minute per person, and one SAFETY wait: for 24 hours after the address on an account was changed no sign-in email goes out (so a changed address cannot be followed at once by a link to the new inbox). That is the only state-based refusal left; say if you want it gone.
+- Not changed: adding an existing account to a TEAM group by email still says to use the group's invite link (a team has one); a one-on-one space invites them to accept (Release I).
+
 ## Release K2 (fits a phone)
 - DONE: the Notifications page for a coach no longer puts a 240px sidebar on a phone (a slim top bar with Home, the organization name and the bell; the sidebar returns on a laptop); the exercise library's four tabs scroll sideways and its toolbar wraps; the packages table scrolls inside its own box; the small round buttons on the feed, the new-post close button, the end-of-workout effort buttons and the coach bar are 44px.
 - NOT DONE (needs a real phone to tune, and the logger's fit-to-screen layout was set on purpose): the logging card sitting behind the Complete bar, and the tablet layout stretching the phone screens. Tell me which phone and I take these with it in hand.
