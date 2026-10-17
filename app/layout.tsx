@@ -8,6 +8,8 @@ import { LoadingWatchdog } from "@/components/ui/loading-watchdog";
 import { LegalReacceptGate } from "@/components/legal/legal-reaccept-gate";
 import { TimezoneCapture } from "@/components/timezone-capture";
 import { ConfirmDialogHost } from "@/components/shared/confirm-dialog";
+import { cookies } from "next/headers";
+import { LAST_WORKSPACE_GROUP_COOKIE, decodeWorkspaceCookie } from "@/lib/workspace-header";
 import { getViewerOrgTheme } from "@/lib/org-theme-server";
 import { orgThemeToCssVars } from "@/lib/theme";
 import { baseFontFamilies, googleFontsHref } from "@/lib/google-fonts";
@@ -52,9 +54,11 @@ export default async function RootLayout({
 }) {
   const theme = await getViewerOrgTheme();
   const cssVars = orgThemeToCssVars(theme);
+  // Which remembered workspace this look was made for; the coach area compares it with the cookie after each page change (components/shared/org-theme-sync.tsx).
+  const workspaceGroup = decodeWorkspaceCookie((await cookies()).get(LAST_WORKSPACE_GROUP_COOKIE)?.value) ?? "";
 
   return (
-    <html lang="en" style={cssVars}>
+    <html lang="en" style={cssVars} data-workspace-group={workspaceGroup}>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

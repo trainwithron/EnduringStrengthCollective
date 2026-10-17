@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, CalendarDays, CreditCard, Dumbbell, MessageCircle, Sparkles, TrendingUp, Users, X } from "lucide-react";
 import { BusinessMiniDashboard } from "@/components/coach/desktop/business-mini-dashboard";
 import { CalendarMiniView } from "@/components/coach/desktop/calendar-mini-view";
@@ -61,6 +62,7 @@ export function CoachSpotHub({
   // The group every tile acts on. A coach who runs more than one organization chooses the organization in the header; the tiles then use that organization's group.
   const [activeGroupId, setActiveGroupId] = useState(groupId);
   const [orgs, setOrgs] = useState<HubOrg[]>([]);
+  const router = useRouter();
   const [orgId, setOrgId] = useState<string | null>(null);
   const orgsRequested = useRef(false);
   useEffect(() => {
@@ -112,6 +114,7 @@ export function CoachSpotHub({
     } catch {
       // not remembered; the hub still switched
     }
+    router.refresh(); // the colors, fonts and icon follow the organization chosen
   }
   const panelId = useId();
   const panelRef = useRef<HTMLDivElement>(null);

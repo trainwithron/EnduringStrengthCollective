@@ -2,6 +2,7 @@ import { isEmbeddedRequest } from "@/lib/embedded-request";
 import { createServerClient } from "@/lib/supabase/server";
 import { EmbeddedProvider } from "@/components/shared/embedded-context";
 import { WorkspaceHost } from "@/components/coach/workspace/workspace-host";
+import { OrgThemeSync } from "@/components/shared/org-theme-sync";
 
 // The coach's own areas (/groups, /clients, /dashboard) share this layout. It stays mounted while the coach moves between their pages, which is what lets the
 // workspace (the panel and floating cards, with the pages loaded in them) survive navigating the main page. (The (coach) folder is a route group: it is not in the
@@ -19,6 +20,7 @@ export default async function CoachAreaLayout({ children }: { children: React.Re
   }
   return (
     <EmbeddedProvider embedded={embedded}>
+      {!embedded && <OrgThemeSync />}
       <WorkspaceHost userId={userId}>{children}</WorkspaceHost>
     </EmbeddedProvider>
   );
