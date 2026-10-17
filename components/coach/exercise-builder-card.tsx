@@ -34,7 +34,7 @@ import { useSaveToastChannel } from "./desktop/save-toast-channel";
 import { CARDIO_PRESETS, type CardioPreset } from "@/lib/cardio-presets";
 import type { RestTempoSuggestion } from "@/lib/training-intent";
 import { loggedText, type LoggedValues } from "@/lib/day-logged";
-import { restoreExercise } from "@/lib/program-restore";
+import { restoreExercise, snapshotExerciseOverrides } from "@/lib/program-restore";
 import { firstSetFollowers } from "@/lib/first-set-fanout";
 import { showUndo } from "@/lib/undo-toast";
 
@@ -731,6 +731,8 @@ export function ExerciseBuilderCard({
     const label = exercise.exerciseName.trim() || "this exercise";
     setBusy(true);
     const supabase = createBrowserClient();
+    // A client's own change to this exercise (a swap) goes with it; it is read first so Undo can bring it back too.
+    const overrides = await snapshotExerciseOverrides(supabase, exercise.id);
     const { error } = await supabase.from("group_workout_exercises").delete().eq("id", exercise.id);
     if (error) {
       flashSaveError("Couldn't delete that exercise — try again.");
@@ -743,7 +745,7 @@ export function ExerciseBuilderCard({
     showUndo({
       message: `Deleted ${label}.`,
       onUndo: async () => {
-        const back = await restoreExercise(createBrowserClient(), { groupId, workoutId, exercise: gone });
+        const back = await restoreExercise(createBrowserClient(), { groupId, workoutId, exercise: gone, overrides });
         if (back) onRestored?.(back);
         else flashSaveError("Couldn't put that exercise back — add it again.");
       },

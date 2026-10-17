@@ -119,6 +119,44 @@ describe("undo after a delete", () => {
   });
 });
 
+describe("undo brings back what the delete also took", () => {
+  it("reads the clients' scheduled copies, session links and overrides before deleting, and puts them back with the day or exercise", () => {
+    expect(src("components/coach/desktop/day-card.tsx")).toContain("snapshotDays(supabase, [day.id])");
+    expect(src("components/coach/desktop/week-grid.tsx")).toContain("snapshotDays(supabase, days.map((d) => d.id))");
+    expect(src("components/coach/exercise-builder-card.tsx")).toContain("snapshotExerciseOverrides(supabase, exercise.id)");
+    const r = src("lib/program-restore.ts");
+    expect(r).toContain("workout_assignments");
+    expect(r).toContain("athlete_exercise_overrides");
+    expect(src("components/coach/desktop/day-card.tsx")).toContain("Workouts you scheduled on this day for clients are removed too.");
+  });
+  it("a day whose scheduled copies cannot be put back is removed again, not reported as restored", async () => {
+    const deleted: string[] = [];
+    const fake: any = {
+      from: (table: string) => ({
+        insert: () => {
+          const bad = table === "workout_assignments";
+          const res = { data: [], error: bad ? { message: "x" } : null };
+          const p: any = Promise.resolve(res);
+          p.select = () => Promise.resolve(res);
+          return p;
+        },
+        delete: () => ({
+          eq: (_c: string, id: string) => {
+            deleted.push(table + ":" + id);
+            return Promise.resolve({ error: null });
+          },
+        }),
+        update: () => ({ in: () => Promise.resolve({ error: null }) }),
+      }),
+      auth: { getUser: () => Promise.resolve({ data: { user: { id: "u" } } }) },
+    };
+    const day: BuilderDay = { id: "d2", title: "Day 2", weekNumber: 1, dayIndex: 2, scheduledDate: null, items: [] };
+    const snapshot = { note: "Day note", assignments: [{ athlete_id: "a", workout_id: "d2", scheduled_date: "2026-10-20" }], sessionIds: [], logIds: [] };
+    expect(await restoreDay(fake, { programId: "p", groupId: "g", day, snapshot })).toBeNull();
+    expect(deleted).toContain("workouts:d2");
+  });
+});
+
 describe("a workout the coach put on one day shows on the client's Home with the note", () => {
   const assigned = new Map<string, AssignedWorkout>([["2026-10-20", { workoutId: "w9", title: "Test day", note: "Warm up long" }]]);
   const day = new Date(2026, 9, 20);

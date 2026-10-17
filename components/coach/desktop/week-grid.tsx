@@ -19,7 +19,7 @@ import type { AliasEntry } from "@/lib/exercise-matching";
 import type { RestTempoSuggestion } from "@/lib/training-intent";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useSaveToastChannel } from "./save-toast-channel";
-import { restoreDays } from "@/lib/program-restore";
+import { restoreDays, snapshotDays } from "@/lib/program-restore";
 import { showUndo } from "@/lib/undo-toast";
 
 export function WeekGrid({
@@ -119,7 +119,7 @@ export function WeekGrid({
   async function handleDeleteWeek() {
     if (
       !await confirmDialog(
-        `Delete all of Week ${weekNumber} (${days.length} ${days.length === 1 ? "day" : "days"})? Any client who already logged one of these workouts keeps that history — this only removes the templates. You can undo this for a few seconds.`
+        `Delete all of Week ${weekNumber} (${days.length} ${days.length === 1 ? "day" : "days"})? Any client who already logged one of these workouts keeps that history — this only removes the templates. Workouts you scheduled on these days for clients are removed too. You can undo this for a few seconds.`
       )
     ) {
       return;
@@ -127,6 +127,8 @@ export function WeekGrid({
     setDeleting(true);
     setDeleteError(null);
     const supabase = createBrowserClient();
+    // What the delete also takes along (clients' scheduled copies, day notes) is read first so Undo can put it all back.
+    const snapshots = await snapshotDays(supabase, days.map((d) => d.id));
     const { error } = await supabase
       .from("workouts")
       .delete()
@@ -144,7 +146,7 @@ export function WeekGrid({
     showUndo({
       message: `Deleted Week ${weekNumber}.`,
       onUndo: async () => {
-        const back = await restoreDays(supabase, { programId, groupId, days: goneDays });
+        const back = await restoreDays(supabase, { programId, groupId, days: goneDays, snapshots });
         if (back) onWeekRestored?.(back);
         else flashSaveError("Couldn't put that week back — add it again.");
       },

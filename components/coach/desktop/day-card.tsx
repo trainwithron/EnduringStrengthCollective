@@ -30,7 +30,7 @@ import { useSaveToastChannel } from "./save-toast-channel";
 import { capitalizeWords } from "@/lib/exercise-name-case";
 import { useDayLogged } from "./use-day-logged";
 import { isRestDayTitle } from "@/lib/empty-sweep";
-import { restoreDay } from "@/lib/program-restore";
+import { restoreDay, snapshotDays } from "@/lib/program-restore";
 import { showUndo } from "@/lib/undo-toast";
 
 // Quick-add is typed fast, so a bare "Bench" for an existing "Bench
@@ -406,7 +406,7 @@ export function DayCard({
   async function handleDeleteDay() {
     if (
       !await confirmDialog(
-        `Delete "${day.title}"? Any client who already logged this workout keeps that history — this only removes the template. You can undo this for a few seconds.`
+        `Delete "${day.title}"? Any client who already logged this workout keeps that history — this only removes the template. Workouts you scheduled on this day for clients are removed too. You can undo this for a few seconds.`
       )
     ) {
       return;
@@ -415,6 +415,8 @@ export function DayCard({
     setBusy(true);
     setError(null);
     const supabase = createBrowserClient();
+    // What the delete also takes along (clients' scheduled copies, the day note) is read first so Undo can put it all back.
+    const snapshot = (await snapshotDays(supabase, [day.id])).get(day.id);
     const { error: deleteError } = await supabase.from("workouts").delete().eq("id", day.id);
 
     if (deleteError) {
@@ -429,7 +431,7 @@ export function DayCard({
       showUndo({
         message: `Deleted "${gone.title}".`,
         onUndo: async () => {
-          const back = await restoreDay(createBrowserClient(), { programId, groupId, day: gone });
+          const back = await restoreDay(createBrowserClient(), { programId, groupId, day: gone, snapshot });
           if (back) onRestored?.(back);
           else flashSaveError("Couldn't put that day back — add it again.");
         },

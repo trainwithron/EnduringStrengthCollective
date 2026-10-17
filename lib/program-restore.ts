@@ -7,6 +7,38 @@ import { SET_ROW_SELECT, mapSetRow } from "@/lib/exercise-fields";
 
 type Db = SupabaseClient;
 
+// What deleting a day also takes with it (database cascades): the single-day workouts the coach scheduled for clients, and the day note; it also cuts the link from clients' started sessions and logged
+// workouts. Read BEFORE the delete so "Undo" can put all of it back, not just the template.
+export interface DaySnapshot {
+  note: string | null;
+  assignments: Record<string, unknown>[];
+  sessionIds: string[];
+  logIds: string[];
+}
+
+export async function snapshotDays(supabase: Db, dayIds: string[]): Promise<Map<string, DaySnapshot>> {
+  const out = new Map<string, DaySnapshot>();
+  for (const id of dayIds) out.set(id, { note: null, assignments: [], sessionIds: [], logIds: [] });
+  if (dayIds.length === 0) return out;
+  const [days, assigned, sessions, logs] = await Promise.all([
+    supabase.from("workouts").select("id, notes").in("id", dayIds),
+    supabase.from("workout_assignments").select("*").in("workout_id", dayIds),
+    supabase.from("athlete_sessions").select("id, workout_id").in("workout_id", dayIds),
+    supabase.from("workout_logs").select("id, workout_id").in("workout_id", dayIds),
+  ]);
+  for (const d of (days.data ?? []) as Array<{ id: string; notes: string | null }>) out.get(d.id)!.note = d.notes ?? null;
+  for (const a of (assigned.data ?? []) as Array<Record<string, unknown>>) out.get(String(a.workout_id))?.assignments.push(a);
+  for (const s of (sessions.data ?? []) as Array<{ id: string; workout_id: string }>) out.get(s.workout_id)?.sessionIds.push(s.id);
+  for (const l of (logs.data ?? []) as Array<{ id: string; workout_id: string }>) out.get(l.workout_id)?.logIds.push(l.id);
+  return out;
+}
+
+// A client's own swap of an exercise goes when the exercise is deleted (cascade); read before the delete.
+export async function snapshotExerciseOverrides(supabase: Db, exerciseId: string): Promise<Record<string, unknown>[]> {
+  const { data } = await supabase.from("athlete_exercise_overrides").select("*").eq("group_workout_exercise_id", exerciseId);
+  return (data ?? []) as Record<string, unknown>[];
+}
+
 function setRows(exerciseId: string, ex: BuilderExercise) {
   return ex.sets.map((st, i) => ({
     id: st.id,
@@ -28,7 +60,7 @@ function setRows(exerciseId: string, ex: BuilderExercise) {
   }));
 }
 
-export async function restoreExercise(supabase: Db, args: { groupId: string; workoutId: string; exercise: BuilderExercise }): Promise<BuilderExercise | null> {
+export async function restoreExercise(supabase: Db, args: { groupId: string; workoutId: string; exercise: BuilderExercise; overrides?: Record<string, unknown>[] }): Promise<BuilderExercise | null> {
   const ex = args.exercise;
   const { error } = await supabase.from("group_workout_exercises").insert({
     id: ex.id,
@@ -43,10 +75,18 @@ export async function restoreExercise(supabase: Db, args: { groupId: string; wor
     ...(ex.slot ? { is_slot: true, slot_side: ex.slot.side, slot_tier: ex.slot.tier } : {}),
   });
   if (error) return null;
-  if (ex.sets.length === 0) return ex;
-  const { data, error: setsError } = await supabase.from("group_workout_exercise_sets").insert(setRows(ex.id, ex)).select(SET_ROW_SELECT);
-  if (setsError || !data) return null;
-  return { ...ex, sets: data.map(mapSetRow).sort((a, b) => a.setOrder - b.setOrder) };
+  let restored = ex;
+  if (ex.sets.length > 0) {
+    const { data, error: setsError } = await supabase.from("group_workout_exercise_sets").insert(setRows(ex.id, ex)).select(SET_ROW_SELECT);
+    if (setsError || !data) return null;
+    restored = { ...ex, sets: data.map(mapSetRow).sort((a, b) => a.setOrder - b.setOrder) };
+  }
+  // The clients' own swaps of this exercise come back with it.
+  if (args.overrides && args.overrides.length > 0) {
+    const { error: overrideError } = await supabase.from("athlete_exercise_overrides").insert(args.overrides);
+    if (overrideError) return null;
+  }
+  return restored;
 }
 
 export async function restoreNote(supabase: Db, args: { groupId: string; workoutId: string; note: BuilderNote }): Promise<BuilderNote | null> {
@@ -64,7 +104,7 @@ export async function restoreNote(supabase: Db, args: { groupId: string; workout
   return error ? null : args.note;
 }
 
-export async function restoreDay(supabase: Db, args: { programId: string; groupId: string; day: BuilderDay }): Promise<BuilderDay | null> {
+export async function restoreDay(supabase: Db, args: { programId: string; groupId: string; day: BuilderDay; snapshot?: DaySnapshot }): Promise<BuilderDay | null> {
   const d = args.day;
   const { error } = await supabase.from("workouts").insert({
     id: d.id,
@@ -74,6 +114,7 @@ export async function restoreDay(supabase: Db, args: { programId: string; groupI
     week_number: d.weekNumber,
     day_index: d.dayIndex,
     scheduled_date: d.scheduledDate,
+    ...(args.snapshot?.note ? { notes: args.snapshot.note } : {}),
   });
   if (error) return null;
   const items: typeof d.items = [];
@@ -89,13 +130,24 @@ export async function restoreDay(supabase: Db, args: { programId: string; groupI
     }
     items.push(back);
   }
+  // Single-day workouts scheduled for clients come back, and clients' started sessions and logged workouts are linked to the day again.
+  const snap = args.snapshot;
+  if (snap && snap.assignments.length > 0) {
+    const { error: assignError } = await supabase.from("workout_assignments").insert(snap.assignments);
+    if (assignError) {
+      await supabase.from("workouts").delete().eq("id", d.id);
+      return null;
+    }
+  }
+  if (snap && snap.sessionIds.length > 0) await supabase.from("athlete_sessions").update({ workout_id: d.id }).in("id", snap.sessionIds);
+  if (snap && snap.logIds.length > 0) await supabase.from("workout_logs").update({ workout_id: d.id }).in("id", snap.logIds);
   return { ...d, items };
 }
 
-export async function restoreDays(supabase: Db, args: { programId: string; groupId: string; days: BuilderDay[] }): Promise<BuilderDay[] | null> {
+export async function restoreDays(supabase: Db, args: { programId: string; groupId: string; days: BuilderDay[]; snapshots?: Map<string, DaySnapshot> }): Promise<BuilderDay[] | null> {
   const back: BuilderDay[] = [];
   for (const day of args.days.slice().sort((a, b) => a.dayIndex - b.dayIndex)) {
-    const restored = await restoreDay(supabase, { programId: args.programId, groupId: args.groupId, day });
+    const restored = await restoreDay(supabase, { programId: args.programId, groupId: args.groupId, day, snapshot: args.snapshots?.get(day.id) });
     if (!restored) {
       // Put back nothing partial: take away the days already restored in this undo.
       for (const r of back) await supabase.from("workouts").delete().eq("id", r.id);
