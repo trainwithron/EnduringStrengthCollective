@@ -144,7 +144,11 @@ export function CompleteWorkoutButton({
     setSubmitting(true);
     const supabase = createBrowserClient();
     await flushSets();
-    await saved(supabase.from("athlete_sessions").update({ status: "abandoned" }).eq("id", sessionId).eq("status", "in_progress"));
+    // A failed pause keeps the person here (the workout is still in progress), instead of leaving as if it were paused.
+    if (!(await saved(supabase.from("athlete_sessions").update({ status: "abandoned" }).eq("id", sessionId).eq("status", "in_progress")))) {
+      setSubmitting(false);
+      return;
+    }
     router.push(pauseHref);
   }
 

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { saved } from "@/lib/saved";
+import { saved, bestEffort } from "@/lib/saved";
 import { clampApplyFrom } from "@/lib/apply-from";
 import { applyStandingTarget, insertCheckinOnce, pushMessageForApply, type ApplyPlan } from "@/lib/apply-standing";
 import { notifyPush } from "@/lib/push-notify";
@@ -142,7 +142,10 @@ export function NutritionCheckinSuggestionCard({
       const ensured = await ensurePhasePlan(supabase, { athleteId, groupId, coachId: user.id, phase: suggestion.phase as NutritionPhase, todayKey });
       if (!ensured.ok) setPhaseNote("The target is applied, but the phase could not be saved. Set it under Phase.");
     }
-    await saved(supabase.from("nutrition_checkin_suggestions").update({ status: "applied" }).eq("id", suggestion.id));
+    // The targets are already applied; this only marks the suggestion done. A failure is said in its own words (a "try again" would re-apply the targets).
+    if (!(await bestEffort(supabase.from("nutrition_checkin_suggestions").update({ status: "applied" }).eq("id", suggestion.id)))) {
+      setPhaseNote("The target is applied, but this suggestion could not be marked done, so it may show again. Dismiss it if it does.");
+    }
     notifyPush(
       athleteId,
       "New macro targets",
@@ -156,9 +159,10 @@ export function NutritionCheckinSuggestionCard({
   async function handleDismiss() {
     setBusy(true);
     const supabase = createBrowserClient();
-    await saved(supabase.from("nutrition_checkin_suggestions").update({ status: "dismissed" }).eq("id", suggestion.id));
+    const dismissed = await saved(supabase.from("nutrition_checkin_suggestions").update({ status: "dismissed" }).eq("id", suggestion.id));
     setBusy(false);
-    onResolved();
+    // The card goes only when the dismissal was saved (otherwise it would come back at the next load with no explanation).
+    if (dismissed) onResolved();
   }
 
   return (

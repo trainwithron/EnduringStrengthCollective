@@ -74,9 +74,10 @@ export function AvailabilityManager({
   }
 
   async function handleDelete(id: string) {
-    setWindows((prev) => prev.filter((w) => w.id !== id));
     const supabase = createBrowserClient();
-    await saved(supabase.from("coach_availability_windows").delete().eq("id", id));
+    // The window leaves the screen only when it is really deleted: a window that failed to delete is still bookable by clients, so it must stay in the list.
+    if (!(await saved(supabase.from("coach_availability_windows").delete().eq("id", id)))) return;
+    setWindows((prev) => prev.filter((w) => w.id !== id));
   }
 
   return (

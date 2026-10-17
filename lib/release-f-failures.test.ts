@@ -172,6 +172,10 @@ describe("a screen shows the saved state only when the write saved (saved() retu
     "components/coach/desktop/recipe-vote-favorite.tsx",
     "components/share/customize-share-panel.tsx",
     "components/share/background-picker.tsx",
+    "components/coach/availability-manager.tsx",
+    "components/coach/desktop/org-notifications-panel.tsx",
+    "components/coach/nutrition-phase-control.tsx",
+    "components/session/complete-workout-button.tsx",
   ];
   for (const f of FIXED) {
     it(f + " does not ignore what saved() returns", () => {
@@ -179,4 +183,27 @@ describe("a screen shows the saved state only when the write saved (saved() retu
       expect(text.split("\n").some((line) => line.trim().startsWith("await saved(")), f).toBe(false);
     });
   }
+});
+
+describe("a write whose result is deliberately not used says why", () => {
+  function allFiles(d: string, out: string[] = []): string[] {
+    for (const f of readdirSync(join(root, d))) {
+      const rel = d + "/" + f;
+      if (statSync(join(root, rel)).isDirectory()) allFiles(rel, out);
+      else if (/\.tsx?$/.test(f) && !/\.test\.tsx?$/.test(f)) out.push(rel);
+    }
+    return out;
+  }
+  it("every 'await saved(' that stands alone has a comment line above it that starts with Deliberately", () => {
+    const offenders: string[] = [];
+    for (const f of [...allFiles("app"), ...allFiles("components"), ...allFiles("lib")]) {
+      const lines = src(f).split("\n");
+      lines.forEach((line, i) => {
+        if (!line.trim().startsWith("await saved(")) return;
+        const above = (lines[i - 1] ?? "").trim();
+        if (!(above.startsWith("//") && above.includes("Deliberately"))) offenders.push(f + ":" + (i + 1));
+      });
+    }
+    expect(offenders).toEqual([]);
+  });
 });

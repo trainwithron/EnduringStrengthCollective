@@ -31,9 +31,11 @@ export function OrgNotificationsPanel({ initialNotifications }: { initialNotific
 
   async function dismiss(id: string) {
     setDismissingId(id);
-    setRows((prev) => prev.filter((n) => n.id !== id));
     const supabase = createBrowserClient();
-    await saved(supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("id", id));
+    // The row goes only when it was really marked read (otherwise it comes back at the next load and the coach never saw why).
+    if (await saved(supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("id", id))) {
+      setRows((prev) => prev.filter((n) => n.id !== id));
+    }
     setDismissingId(null);
   }
 

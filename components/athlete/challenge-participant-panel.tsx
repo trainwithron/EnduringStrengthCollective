@@ -49,6 +49,7 @@ export function ChallengeParticipantPanel({
       setJoining(false);
       return;
     }
+    // Deliberately not checked here: nothing on this screen changes until the refresh below redraws it from what is stored, and the failure bar has already said when it did not save.
     await saved(supabase.from("challenge_participants").insert({
       challenge_id: challengeId,
       profile_id: user.id,

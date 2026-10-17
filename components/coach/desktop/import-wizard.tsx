@@ -273,9 +273,10 @@ export function ImportWizard({
     setShowInjuryBanner(false);
     if (!athleteId) return;
     const supabase = createBrowserClient();
-    await saved(supabase
+    // A failed save brings the notice back (it is still unacknowledged).
+    if (!(await saved(supabase
       .from("athlete_injury_flag_acknowledgements")
-      .upsert({ coach_id: coachId, athlete_id: athleteId }, { onConflict: "coach_id,athlete_id" }));
+      .upsert({ coach_id: coachId, athlete_id: athleteId }, { onConflict: "coach_id,athlete_id" })))) setShowInjuryBanner(true);
   }
 
   async function handleFile(file: File) {

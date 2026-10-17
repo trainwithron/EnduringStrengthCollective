@@ -39,16 +39,18 @@ export function NutritionPhaseControl({
     setSaving(true);
     const supabase = createBrowserClient();
     if (!value) {
-      await saved(supabase
+      // The select shows the new phase only when it was stored.
+      if (await saved(supabase
         .from("nutrition_phases")
         .delete()
         .eq("athlete_id", athleteId)
-        .eq("group_id", groupId));
-      setPhase(null);
-      setStartedAt(null);
+        .eq("group_id", groupId))) {
+        setPhase(null);
+        setStartedAt(null);
+      }
     } else {
       const today = new Date().toISOString().slice(0, 10);
-      await saved(supabase.from("nutrition_phases").upsert(
+      if (await saved(supabase.from("nutrition_phases").upsert(
         {
           athlete_id: athleteId,
           group_id: groupId,
@@ -57,9 +59,10 @@ export function NutritionPhaseControl({
           created_by: coachId,
         },
         { onConflict: "athlete_id,group_id" }
-      ));
-      setPhase(value as MilestonePhaseTag);
-      setStartedAt(today);
+      ))) {
+        setPhase(value as MilestonePhaseTag);
+        setStartedAt(today);
+      }
     }
     setSaving(false);
   }

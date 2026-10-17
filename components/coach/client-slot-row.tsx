@@ -43,6 +43,7 @@ export function ClientSlotRow({
       return;
     }
 
+    // Deliberately not checked here: nothing on this screen changes until the refresh below redraws it from what is stored, and the failure bar has already said when it did not save.
     await saved(supabase.from("athlete_exercise_overrides").upsert(
       {
         group_workout_exercise_id: groupWorkoutExerciseId,
@@ -61,6 +62,7 @@ export function ClientSlotRow({
   async function handleReset() {
     setBusy(true);
     const supabase = createBrowserClient();
+    // Deliberately not checked here: nothing on this screen changes until the refresh below redraws it from what is stored, and the failure bar has already said when it did not save.
     await saved(supabase
       .from("athlete_exercise_overrides")
       .delete()

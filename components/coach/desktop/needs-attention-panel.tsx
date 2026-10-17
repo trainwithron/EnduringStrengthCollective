@@ -47,6 +47,7 @@ export function NeedsAttentionPanel({
     const supabase = createBrowserClient();
     // A plain insert: the unique index on (coach_id, linked_athlete_id, trigger_key) is partial, which an upsert's ON CONFLICT cannot use (42P10). If the same suggestion was added from
     // two places at once the second insert hits the index (23505), which saved() counts as already there.
+    // Deliberately not checked here: nothing on this screen changes until the refresh below redraws it from what is stored, and the failure bar has already said when it did not save.
     await saved(supabase.from("calendar_events").insert({
       coach_id: coachId,
       title: item.title,
@@ -92,6 +93,7 @@ export function NeedsAttentionPanel({
 
   // The item that was auto-added to the calendar goes with it when it is put off or switched off (it is added again if it is still true after).
   async function removeAutoAdded(supabase: ReturnType<typeof createBrowserClient>, athleteId: string, triggerKey: string) {
+    // Deliberately quiet bookkeeping: if the auto-added item cannot be taken off the calendar, the snooze or switch-off itself still stands and the item is simply added again later if it is still true.
     await saved(supabase.from("calendar_events").delete().eq("coach_id", coachId).eq("event_type", "suggestion").eq("trigger_key", triggerKey).eq("linked_athlete_id", athleteId).eq("status", "active"));
   }
 

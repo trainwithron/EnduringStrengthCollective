@@ -28,6 +28,7 @@ export function ChallengeStatusControl({
     if (!action) return;
     setSaving(true);
     const supabase = createBrowserClient();
+    // Deliberately not checked here: nothing on this screen changes until the refresh below redraws it from what is stored, and the failure bar has already said when it did not save.
     await saved(supabase.from("challenges").update({ status: action.next }).eq("id", challengeId));
     setSaving(false);
     router.refresh();

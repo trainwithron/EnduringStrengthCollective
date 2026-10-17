@@ -20,6 +20,7 @@ export function RecurringConflictBadge({ bookingId }: { bookingId: string }) {
   async function resolve(cancel: boolean) {
     setBusy(true);
     const supabase = createBrowserClient();
+    // Deliberately not checked here: nothing on this screen changes until the refresh below redraws it from what is stored, and the failure bar has already said when it did not save.
     await saved(supabase.rpc("resolve_recurring_booking_conflict", { p_booking_id: bookingId, p_cancel: cancel }));
     setBusy(false);
     router.refresh();

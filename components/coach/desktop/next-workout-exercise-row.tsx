@@ -117,6 +117,7 @@ export function NextWorkoutExerciseRow({
     if (override === undefined && !noteTouched) return;
     if (value === (exercise.notes ?? "")) return;
     const supabase = createBrowserClient();
+    // Deliberately not checked here: the typed note stays in its box and leaving the box again saves it again (it is compared with what is stored); the failure bar has already said it did not save.
     await saved(supabase.from("group_workout_exercises").update({ notes: value }).eq("id", exercise.id));
   }
 

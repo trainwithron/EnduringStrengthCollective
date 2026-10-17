@@ -134,6 +134,7 @@ export function VideoCheckinRecorder({
     }
 
     if (actionItems.length > 0) {
+      // Deliberately not stopping here: the check-in itself is saved and sent; the bar says in its own words that only the action list did not save.
       await saved(supabase.from("coach_video_checkin_action_items").insert(
         actionItems.map((body, i) => ({
           checkin_id: checkin.id,

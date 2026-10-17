@@ -115,6 +115,7 @@ export function CalendarGrid({
 
   async function handleDeleteEvent(id: string) {
     const supabase = createBrowserClient();
+    // Deliberately not checked here: nothing on this screen changes until the refresh below redraws it from what is stored, and the failure bar has already said when it did not save.
     await saved(supabase.from("calendar_events").delete().eq("id", id));
     router.refresh();
   }

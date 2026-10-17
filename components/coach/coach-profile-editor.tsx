@@ -36,6 +36,7 @@ export function CoachProfileEditor({
 
   async function persist(patch: { bio?: string; photo_url?: string | null; completion_message?: string | null }) {
     const supabase = createBrowserClient();
+    // Deliberately not checked here: the typed text stays in its box, leaving the box again saves it again, and the failure bar has already said when it did not save.
     await saved(supabase.from("coach_profiles").upsert({ coach_id: coachId, ...patch, updated_at: new Date().toISOString() }, { onConflict: "coach_id" }));
   }
 
