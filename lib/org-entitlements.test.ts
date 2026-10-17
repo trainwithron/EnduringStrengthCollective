@@ -43,16 +43,27 @@ describe("deriveOrgEntitlements", () => {
     expect(e.trialDaysLeft).toBe(30);
   });
 
-  it("an expired trial gets GRACE_DAYS of full access, then locks (no add-on)", () => {
-    const inGrace = deriveOrgEntitlements(null, daysAgo(TRIAL_DAYS + 3), now, true);
-    expect(inGrace.state).toBe("trial_expired");
-    expect(inGrace.accessLevel).toBe("grace");
-    expect(inGrace.orgAddon).toBe(true);
-    expect(inGrace.graceDaysLeft).toBe(GRACE_DAYS - 3);
+  it("an expired trial drops straight to the free tier: full access to the coach side, no grace, no lock, no add-on", () => {
+    for (const daysPast of [1, 3, GRACE_DAYS + 1, 90]) {
+      const e = deriveOrgEntitlements(null, daysAgo(TRIAL_DAYS + daysPast), now, true);
+      expect(e.state).toBe("trial_expired");
+      expect(e.accessLevel).toBe("full");
+      expect(e.orgAddon).toBe(false);
+      expect(e.graceDaysLeft).toBeNull();
+      expect(e.freeTier).toBe(true);
+    }
+  });
 
-    const locked = deriveOrgEntitlements(null, daysAgo(TRIAL_DAYS + GRACE_DAYS + 1), now, true);
-    expect(locked.accessLevel).toBe("locked");
-    expect(locked.orgAddon).toBe(false);
+  it("the free tier applies only once billing is enforced, and never to a trial, a paying or a founding account", () => {
+    const expired = daysAgo(TRIAL_DAYS + 5);
+    const off = deriveOrgEntitlements(null, expired, now, false);
+    expect(off.rawFreeTier).toBe(true);
+    expect(off.freeTier).toBe(false);
+    expect(off.accessLevel).toBe("full");
+    expect(deriveOrgEntitlements(null, daysAgo(2), now, true).freeTier).toBe(false);
+    expect(deriveOrgEntitlements(row({ subscriptionStatus: "active" }), expired, now, true).freeTier).toBe(false);
+    expect(deriveOrgEntitlements(row({ billingExempt: true }), expired, now, true).freeTier).toBe(false);
+    expect(deriveOrgEntitlements(row({ subscriptionStatus: "past_due", pastDueSince: daysAgoIso(2) }), expired, now, true).freeTier).toBe(false);
   });
 
   it("an active subscription is full access; the add-on follows the add-on flag", () => {

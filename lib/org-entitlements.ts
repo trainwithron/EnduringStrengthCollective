@@ -52,6 +52,10 @@ export interface OrgEntitlements {
   // What the app should act on: always full/true until enforcement is on.
   accessLevel: AccessLevel;
   orgAddon: boolean;
+  // The free tier (Ron, Oct 17): up to FREE_TIER_CLIENT_LIMIT clients and FREE_TIER_AI_USES big AI uses a month, no AI crons. A coach whose trial ended without a subscription lands here (nothing is deleted;
+  // athletes are never locked). Raw = what the organization qualifies for; effective = only once billing is enforced (until then every organization behaves as it always has).
+  rawFreeTier: boolean;
+  freeTier: boolean;
   trialEndsAt: Date | null;
   trialDaysLeft: number | null;
   graceEndsAt: Date | null;
@@ -132,7 +136,7 @@ export function deriveOrgEntitlements(
       rawOrgAddon = false;
     }
   } else {
-    // No subscription yet: the free trial (everything included).
+    // No subscription yet: the free trial (everything included). When it ends the coach drops straight to the free tier: no grace period and no lock, nothing is deleted.
     const trialEnd = trialEndsAtFor(row, orgCreatedAt);
     out.trialEndsAt = trialEnd;
     out.trialDaysLeft = daysLeft(trialEnd, now);
@@ -141,19 +145,14 @@ export function deriveOrgEntitlements(
       rawAccessLevel = "full";
       rawOrgAddon = true;
     } else {
-      out.graceEndsAt = addDays(trialEnd, GRACE_DAYS);
-      out.graceDaysLeft = daysLeft(out.graceEndsAt, now);
-      if (now < out.graceEndsAt) {
-        state = "trial_expired";
-        rawAccessLevel = "grace";
-        rawOrgAddon = true;
-      } else {
-        state = "trial_expired";
-        rawAccessLevel = "locked";
-        rawOrgAddon = false;
-      }
+      state = "trial_expired";
+      rawAccessLevel = "full";
+      rawOrgAddon = false;
     }
   }
+
+  // Past the trial with no paid plan (or a plan that lapsed): the free tier.
+  const rawFreeTier = state === "trial_expired" || state === "lapsed";
 
   return {
     ...out,
@@ -161,6 +160,8 @@ export function deriveOrgEntitlements(
     exempt: state === "exempt",
     rawAccessLevel,
     rawOrgAddon,
+    rawFreeTier,
+    freeTier: enforced && rawFreeTier,
     accessLevel: enforced ? rawAccessLevel : "full",
     orgAddon: enforced ? rawOrgAddon : true,
   };

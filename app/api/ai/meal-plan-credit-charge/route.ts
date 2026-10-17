@@ -1,3 +1,4 @@
+import { freeTierUseOrRefuse } from "@/lib/free-tier-server";
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { checkAndSpendCoachCredits } from "@/lib/coach-credits";
@@ -17,6 +18,10 @@ export async function POST() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+
+  // A meal plan is one big use for a free-tier coach (this is the one place a whole plan is counted).
+  const noFreeUse = await freeTierUseOrRefuse(user.id, "meal_plan");
+  if (noFreeUse) return noFreeUse;
 
   const spend = await checkAndSpendCoachCredits(createServiceRoleClient(), user.id, "nutrition_plan");
   if (!spend.ok) {

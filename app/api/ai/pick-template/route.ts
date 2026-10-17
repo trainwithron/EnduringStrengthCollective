@@ -1,3 +1,4 @@
+import { freeTierUseOrRefuse } from "@/lib/free-tier-server";
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -123,6 +124,9 @@ export async function POST(request: Request) {
   const notes = await loadNotesBlock(supabase, user.id, clientId);
   const referenceId = typeof body.referenceClientId === "string" && /^[0-9a-f-]{36}$/i.test(body.referenceClientId) ? body.referenceClientId : null;
   const reference = await loadReferenceBlock(supabase, user.id, referenceId, program.group_id as string);
+
+  const noFreeUse = await freeTierUseOrRefuse(user!.id, "program");
+  if (noFreeUse) return noFreeUse;
 
   async function attempt(retryNote: string | null) {
     const answer = await callClaude({ retryOnTruncation: false,
