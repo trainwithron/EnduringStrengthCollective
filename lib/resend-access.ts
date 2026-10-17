@@ -28,16 +28,19 @@ export async function resendAccess(args: { supabase: any; serviceRole: any; coac
     return { status: 429, body: { error: "Something was sent to them a moment ago. Wait a minute and try again." } };
   }
 
-  const [{ data: profile }, { data: authData }, { data: coach }] = await Promise.all([
+  const [{ data: profile }, { data: authData, error: authError }, { data: coach }] = await Promise.all([
     serviceRole.from("profiles").select("full_name, claimed_at").eq("id", athleteId).maybeSingle(),
-    serviceRole.auth.admin.getUserById(athleteId),
+    serviceRole.auth.admin.getUserById(athleteId).catch((e: unknown) => ({ data: null, error: e ?? new Error("lookup failed") })),
     serviceRole.from("profiles").select("full_name").eq("id", coachId).maybeSingle(),
   ]);
   if (!profile) return { status: 404, body: { error: "Client not found." } };
+  // If the account cannot be read we cannot tell whether this person has signed in, so nothing is sent and no claim link is made: a claim link on an account that is really in use would be a way to sign in as them.
   const authUser = authData?.user ?? null;
+  if (authError || !authUser) return { status: 503, body: { error: "Couldn't check this person's account just now, so nothing was sent. Try again in a minute." } };
   const email: string | null = authUser?.email ?? null;
   const hasRealEmail = !!email && !isPlaceholderEmail(email);
-  const everSignedIn = !!profile.claimed_at || !!authUser?.last_sign_in_at;
+  // Someone who opened the claim link but never finished choosing a password has a sign-in time but no real email and was never claimed: they still need a claim link, not a password reset.
+  const everSignedIn = !!profile.claimed_at || (!!authUser?.last_sign_in_at && hasRealEmail);
 
   // ---- has not signed in: the claim link
   if (!everSignedIn) {

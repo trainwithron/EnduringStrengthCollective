@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -32,6 +32,7 @@ export function NotificationBell({
   // "above" opens the list upward from a bell at the bottom of a sidebar.
   placement?: "below" | "above";
 }) {
+  const instanceId = useId();
   const [items, setItems] = useState<NotificationEntry[]>(initial ?? []);
   // The groups of the open organization (null = not scoped; the bell shows everything the viewer has, as a client's does).
   const [scopeIds, setScopeIds] = useState<string[] | null>(null);
@@ -82,7 +83,7 @@ export function NotificationBell({
     // reflected optimistically by markRead below).
     const supabase = createBrowserClient();
     const channel = supabase
-      .channel(`notifications:${viewerId}`)
+      .channel(`notifications:${viewerId}:${instanceId}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "notifications", filter: `profile_id=eq.${viewerId}` },
@@ -108,7 +109,7 @@ export function NotificationBell({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [viewerId, scopeIds]);
+  }, [viewerId, scopeIds, instanceId]);
 
   const unreadCount = items.filter((n) => !n.readAt).length;
 

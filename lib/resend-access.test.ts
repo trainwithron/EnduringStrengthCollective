@@ -27,7 +27,7 @@ import { resendAccess } from "./resend-access";
 
 const src = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
 
-function fakes(opts: { callerRole?: string; memberRole?: string | null; claimedAt?: string | null; email?: string | null; confirmed?: boolean; lastSignIn?: string | null; recentEmailChange?: boolean }) {
+function fakes(opts: { callerRole?: string; memberRole?: string | null; claimedAt?: string | null; email?: string | null; confirmed?: boolean; lastSignIn?: string | null; recentEmailChange?: boolean; authError?: boolean }) {
   const supabase = { from: () => ({ select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { role: opts.callerRole ?? "coach" } }) }) }) }) }) };
   const serviceRole = {
     from(table: string) {
@@ -45,7 +45,7 @@ function fakes(opts: { callerRole?: string; memberRole?: string | null; claimedA
     },
     auth: {
       admin: {
-        getUserById: async () => ({ data: { user: { email: opts.email === undefined ? "max@example.com" : opts.email, email_confirmed_at: opts.confirmed === false ? null : "2026-10-10", last_sign_in_at: opts.lastSignIn ?? null } } }),
+        getUserById: async () => opts.authError ? { data: { user: null }, error: { message: "boom" } } : ({ data: { user: { email: opts.email === undefined ? "max@example.com" : opts.email, email_confirmed_at: opts.confirmed === false ? null : "2026-10-10", last_sign_in_at: opts.lastSignIn ?? null } } }),
         generateLink: async () => ({ data: { properties: { action_link: "https://supabase.test/verify?x=1" } }, error: null }),
       },
     },
@@ -130,10 +130,26 @@ describe("resend invite / sign-in link", () => {
     expect((await run({ memberRole: "coach" })).status).toBe(404);
   });
 
-  it("a signed-in person with no real email gets a plain message and no guess", async () => {
-    const r = await run({ lastSignIn: "2026-10-12T00:00:00Z", email: "client-abc@pending.invalid" });
+  it("a claimed person with no real email gets a plain message and no guess", async () => {
+    const r = await run({ claimedAt: "2026-10-12T00:00:00Z", lastSignIn: "2026-10-12T00:00:00Z", email: "client-abc@pending.invalid" });
     expect(r.status).toBe(400);
     expect((r.body as { error: string }).error).toContain("Forgot password");
+  });
+
+  it("someone who opened the claim link but never finished (a sign-in time, never claimed, no real email) is given a fresh claim link, not a dead end", async () => {
+    const r = await run({ claimedAt: null, lastSignIn: "2026-10-12T00:00:00Z", email: "client-abc@pending.invalid" });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ kind: "claim_link", link: "https://app.test/claim/abc" });
+    expect(state.minted).toBe(1);
+  });
+
+  it("if the account cannot be read, nothing is sent and no claim link is ever made (it fails closed)", async () => {
+    const r = await run({ authError: true });
+    expect(r.status).toBe(503);
+    expect((r.body as { link?: string }).link).toBeUndefined();
+    expect(state.minted).toBe(0);
+    expect(state.resetCalls).toEqual([]);
+    expect(state.sentEmails).toEqual([]);
   });
 });
 
@@ -145,6 +161,8 @@ describe("wiring", () => {
     const page = src("app/(coach)/groups/[groupId]/athletes/[athleteId]/page.tsx");
     expect((page.match(/<SendSignInLinkButton/g) ?? []).length).toBe(2);
     expect(src("components/coach/send-signin-link-button.tsx")).toContain("/api/clients/resend-access");
+    // a link handed to the coach is shown, with Copy (the old link is already dead)
+    expect(src("components/coach/send-signin-link-button.tsx")).toContain("navigator.clipboard.writeText(note.link)");
     expect(src("components/coach/desktop/add-client-button.tsx")).toContain("data.resent");
   });
 });

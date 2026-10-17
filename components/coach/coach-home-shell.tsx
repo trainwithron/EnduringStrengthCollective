@@ -12,6 +12,7 @@ import { ClientFinder } from "@/components/coach/desktop/client-finder";
 import { HeaderNotificationBell } from "@/components/notifications/header-bell";
 import { CollectiveIntelligenceChat } from "@/components/coach/desktop/collective-intelligence-chat";
 import { CoachHomeMobileMenu } from "@/components/coach/coach-home-mobile-menu";
+import { useIsDesktop } from "@/lib/use-is-desktop";
 
 // A dedicated, minimal shell for the one cross-group page in the app —
 // not a retrofit of CoachDesktopShell, which has a lot of group-keyed
@@ -20,6 +21,8 @@ import { CoachHomeMobileMenu } from "@/components/coach/coach-home-mobile-menu";
 // three sections already are the full group directory, so a dropdown
 // would be redundant.
 function CoachHomeShellFull({ orgName, children }: { orgName: string; children: React.ReactNode }) {
+  // The phone bar and the sidebar both stay in the page (CSS shows one), so the notification bell mounts in only the one in use: two bells would listen on the same live channel.
+  const desktop = useIsDesktop();
   return (
     <TerminologyProvider>
     <div className="min-h-screen bg-graphite text-chalk lg:flex">
@@ -31,7 +34,7 @@ function CoachHomeShellFull({ orgName, children }: { orgName: string; children: 
         </Link>
         <p className="font-display font-bold text-sm uppercase truncate">{orgName}</p>
         <div className="flex items-center">
-          <HeaderNotificationBell placement="below" />
+          {!desktop && <HeaderNotificationBell placement="below" />}
           <CoachHomeMobileMenu />
         </div>
       </header>
@@ -55,7 +58,7 @@ function CoachHomeShellFull({ orgName, children }: { orgName: string; children: 
         <div className="border-t border-steel/20 p-3 space-y-2">
           <div className="flex items-center justify-between">
             <Link href="/notifications" className="font-body text-sm text-steel">Notifications</Link>
-            <HeaderNotificationBell placement="above" />
+            {desktop && <HeaderNotificationBell placement="above" />}
           </div>
           <ExitDesktopModeButton />
           <DownloadAppButton />

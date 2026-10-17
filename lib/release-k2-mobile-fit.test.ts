@@ -21,6 +21,14 @@ describe("Release K2: fits a phone", () => {
     expect(menu).toContain("buttonRef.current?.focus()");
     expect(menu).toContain("[&_button]:min-h-11 [&_button]:text-sm");
   });
+  it("the notification bell is mounted once, never in the phone bar and the sidebar together, and each bell has its own live channel", () => {
+    const shell = src("components/coach/coach-home-shell.tsx");
+    expect(shell).toContain('{!desktop && <HeaderNotificationBell placement="below" />}');
+    expect(shell).toContain('{desktop && <HeaderNotificationBell placement="above" />}');
+    expect((shell.match(/<HeaderNotificationBell/g) ?? []).length).toBe(2);
+    expect(src("lib/use-is-desktop.ts")).toContain("(min-width: 1024px)");
+    expect(src("components/athlete/notification-bell.tsx")).toContain("notifications:${viewerId}:${instanceId}");
+  });
   it("the exercise library's tabs scroll sideways and its toolbar wraps instead of running off the screen", () => {
     expect(src("components/coach/exercise-library-tabs.tsx")).toContain("overflow-x-auto");
     expect(src("components/coach/exercise-library-tabs.tsx")).toContain("shrink-0 whitespace-nowrap");
