@@ -106,7 +106,14 @@ begin
       if p_hand_to is null then
         raise exception 'Choose who takes over % client% first: % has nobody else coaching.', v_clients, case when v_clients = 1 then '' else 's' end, g.name;
       end if;
+      if exists (select 1 from public.group_memberships a where a.group_id = g.group_id and a.profile_id = p_hand_to and a.role = 'athlete') then
+        raise exception 'The person chosen to take over is a client in %. Choose someone else.', g.name;
+      end if;
       insert into public.group_memberships (group_id, profile_id, role) values (g.group_id, p_hand_to, 'coach') on conflict do nothing;
+      -- never take the leaving coach's seat away unless the new coach really holds one
+      if not exists (select 1 from public.group_memberships c where c.group_id = g.group_id and c.profile_id = p_hand_to and c.role = 'coach') then
+        raise exception 'Could not make the chosen person the coach of %. Choose someone else.', g.name;
+      end if;
       -- their future confirmed bookings in this group go to the new coach where that coach is free; any that clash stay and are counted
       update public.bookings b set coach_id = p_hand_to
         where b.group_id = g.group_id and b.coach_id = p_coach and b.status = 'confirmed' and b.start_at > now()
@@ -121,6 +128,23 @@ begin
       delete from public.group_memberships where group_id = g.group_id and profile_id = p_coach and role = 'coach';
     end if;
   end loop;
+
+  -- A coach who left with clients into an organization of their own takes their own business rows along (shop links, partners, session types, challenges, calendar entries, discovery calls, briefings, and the
+  -- classes of the groups that moved), so they and their clients keep their shop, classes and calendar. A coach whose clients stayed with the gym leaves those rows with the gym.
+  if v_solo is not null then
+    perform set_config('request.jwt.claim.role', 'service_role', true);
+    update public.pro_shop_links set organization_id = v_solo where organization_id = p_org and coach_id = p_coach;
+    update public.referral_partners set organization_id = v_solo where organization_id = p_org and coach_id = p_coach;
+    update public.session_types set organization_id = v_solo where organization_id = p_org and coach_id = p_coach;
+    update public.challenges set organization_id = v_solo where organization_id = p_org and coach_id = p_coach;
+    update public.calendar_events set organization_id = v_solo where organization_id = p_org and coach_id = p_coach;
+    update public.discovery_bookings set organization_id = v_solo where organization_id = p_org and coach_id = p_coach;
+    update public.coach_briefings set organization_id = v_solo where organization_id = p_org and coach_id = p_coach;
+    -- classes belong to the coach (no group) and follow them; an event belongs to its group and follows the group only if the group moved
+    update public.group_sessions set organization_id = v_solo
+      where organization_id = p_org and coach_id = p_coach and (group_id is null or group_id in (select id from public.groups where organization_id = v_solo));
+    perform set_config('request.jwt.claim.role', coalesce(prev_role, ''), true);
+  end if;
 
   delete from public.organization_memberships where organization_id = p_org and profile_id = p_coach;
   return jsonb_build_object('handed', v_handed, 'taken', v_taken, 'bookings_moved', v_moved_bookings, 'bookings_left', v_left_bookings);

@@ -146,7 +146,8 @@ export function csvLine(values: unknown[]): string {
       .map((v) => {
         if (v == null) return "";
         let s = typeof v === "object" ? JSON.stringify(v) : String(v);
-        if (/^[=+@]/.test(s) || /^-(?!\d)/.test(s)) s = "'" + s;
+        // Anything a spreadsheet could run as a formula (starts with = + - @ or a tab or carriage return) gets a leading apostrophe, except a plain negative number.
+        if (/^[=+\-@\t\r]/.test(s) && !/^-\d+(?:\.\d+)?$/.test(s)) s = "'" + s;
         return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
       })
       .join(",") + "\r\n"

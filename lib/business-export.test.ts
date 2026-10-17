@@ -33,7 +33,7 @@ async function run(tables: Record<string, any[]>, opts: { failTable?: string; gr
     now: new Date("2026-10-17T12:00:00Z"),
   })) {
     let text = "";
-    for await (const c of e.chunks) text += new TextDecoder().decode(c);
+    for await (const c of e.chunks) text += new TextDecoder("utf-8", { ignoreBOM: true }).decode(c);
     files.set(e.name, text);
   }
   return files;
@@ -86,7 +86,7 @@ describe("exportEntries", () => {
 
   it("a coach with no clients gets headers only and a complete status", async () => {
     const files = await run({ groups: [{ id: "g1", name: "Empty" }] }, { groupIds: ["g1"] });
-    expect(files.get("clients.csv")).toBe("client_id,name,email,group,group_kind,joined,has_signed_in\r\n");
+    expect(files.get("clients.csv")).toBe("\uFEFFclient_id,name,email,group,group_kind,joined,has_signed_in\r\n");
     expect(files.get("export-status.txt")).toMatch(/^COMPLETE/);
   });
 });

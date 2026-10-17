@@ -12,11 +12,14 @@ export function LeaveOrganizationControl({
   organizationName,
   others = [],
   soleClients = 0,
+  unknown = false,
 }: {
   organizationId: string;
   organizationName: string;
   others?: { id: string; name: string }[];
   soleClients?: number;
+  // The check of which clients only this coach has could not be made: Leave waits for a reload rather than guessing.
+  unknown?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -69,7 +72,12 @@ export function LeaveOrganizationControl({
           {error}
         </p>
       )}
-      <button type="button" disabled={busy} onClick={leave} className="mt-2 min-h-11 border border-steel/40 px-4 font-body text-sm text-chalk disabled:opacity-40">
+      {unknown && (
+        <p className="font-body text-xs text-rust mt-1" role="alert">
+          We could not check which clients only you coach. Reload the page to leave.
+        </p>
+      )}
+      <button type="button" disabled={busy || unknown} onClick={leave} className="mt-2 min-h-11 border border-steel/40 px-4 font-body text-sm text-chalk disabled:opacity-40">
         {busy ? "Leaving…" : "Leave this organization"}
       </button>
     </div>

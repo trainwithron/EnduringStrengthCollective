@@ -7,7 +7,7 @@ import { useTerm } from "@/components/coach/terminology-provider";
 import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { parseRoster, splitPastedRoster, ROSTER_MAX_ROWS, type RosterParse } from "@/lib/roster-import";
 
-type Step = "enter" | "preview" | "adding" | "done";
+type Step = "enter" | "preview" | "adding" | "done" | "uncertain";
 interface Result {
   rowNumber: number;
   name: string;
@@ -59,22 +59,35 @@ export function RosterImportPanel({ groupId, groupName, onAdded, onClose }: { gr
     if (!parsed || step === "adding") return;
     setStep("adding");
     setError(null);
+    let res: Response;
     try {
-      const res = await fetch("/api/clients/import-roster", {
+      res = await fetch("/api/clients/import-roster", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ groupId, people: parsed.rows.map((r) => ({ name: r.name, email: r.email })) }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `Couldn't add these ${t("client", "plural")}.`);
-      setResults(data.results ?? []);
+    } catch {
+      // The request may have reached the server and created people even though no answer came back: never offer a blind retry (it could add everyone twice).
+      setStep("uncertain");
+      router.refresh();
+      return;
+    }
+    const data = await res.json().catch(() => null);
+    if (res.ok && data && Array.isArray(data.results)) {
+      setResults(data.results);
       setStep("done");
       router.refresh();
       onAdded?.();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : `Couldn't add these ${t("client", "plural")}.`);
-      setStep("preview");
+      return;
     }
+    if (res.status >= 400 && res.status < 500 && data?.error) {
+      // Refused before anything was made (not signed in, too many tries, a bad list): safe to fix and try again.
+      setError(data.error);
+      setStep("preview");
+      return;
+    }
+    setStep("uncertain");
+    router.refresh();
   }
 
   const addedIds = results.filter((r) => r.ok && r.profileId).map((r) => r.profileId as string);
@@ -112,6 +125,18 @@ export function RosterImportPanel({ groupId, groupName, onAdded, onClose }: { gr
       </div>
     </div>
   );
+
+  if (step === "uncertain") {
+    return (
+      <div>
+        <p className="font-body text-sm text-chalk">We could not confirm whether these {t("client", "plural")} were added.</p>
+        <p className="font-body text-xs text-steel mt-1.5">Check your {t("client", "plural")} list for the names before adding them again, so no one is added twice.</p>
+        <button type="button" onClick={onClose} className="mt-3 h-11 px-4 bg-rust text-graphite font-body text-sm font-medium">
+          Close
+        </button>
+      </div>
+    );
+  }
 
   if (step === "done") {
     const failed = results.filter((r) => !r.ok);

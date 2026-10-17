@@ -28,6 +28,12 @@ describe("parseRoster", () => {
     expect(skipped.map((s) => [s.rowNumber, s.reason])).toEqual([[3, "no_name"], [4, "bad_email"], [5, "repeated_email"], [6, "no_name"]]);
   });
 
+  it("a comma inside quotes stays in its cell and the quotes are not kept in the name", () => {
+    const { rows, skipped } = read('"Doe, Jane",jane@x.com\n"Lee, Sam"');
+    expect(skipped).toEqual([]);
+    expect(rows.map((r) => [r.name, r.email])).toEqual([["Doe, Jane", "jane@x.com"], ["Lee, Sam", null]]);
+  });
+
   it("two clients may share a name; the preview is told", () => {
     const { rows, repeatedNames } = read("Chris Lee\nChris Lee");
     expect(rows).toHaveLength(2);

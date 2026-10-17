@@ -24,7 +24,8 @@ $guard$;
 alter table public.profiles add column if not exists coach_type text check (coach_type in ('personal', 'team', 'gym'));
 
 -- 0392 also: an owner or admin adding a client chooses which coach in the organization coaches them ("Add client and assign a coach"). The coach is added to the group; the person choosing steps out unless they
--- keep it. Never for a client who keeps their records private from the organization (only their own coach can hold them). Re-runnable.
+-- keep it. A client who keeps their records private from the organization can be handed on only by a coach who already holds the group: an owner or admin who does not coach it can never give themselves (or anyone)
+-- a seat there. Re-runnable.
 create or replace function public.assign_group_coach(p_group uuid, p_coach uuid, p_drop_me boolean default true)
 returns void
 language plpgsql
@@ -48,8 +49,12 @@ begin
   if not exists (select 1 from public.organization_memberships where organization_id = v_org and profile_id = p_coach) then
     raise exception 'Choose a member of this organization.';
   end if;
-  if p_coach <> me and exists (select 1 from public.group_memberships a where a.group_id = p_group and a.role = 'athlete' and a.private_from_org) then
-    raise exception 'This client keeps their records private from the organization, so only their own coach can hold them.';
+  if exists (select 1 from public.group_memberships a where a.group_id = p_group and a.role = 'athlete' and a.private_from_org)
+     and not public.is_group_coach(p_group) then
+    raise exception 'This client keeps their records private from the organization, so only their own coach can hand them on.';
+  end if;
+  if exists (select 1 from public.group_memberships a where a.group_id = p_group and a.profile_id = p_coach and a.role = 'athlete') then
+    raise exception 'That person is a client in this group, so they cannot also coach it.';
   end if;
   insert into public.group_memberships (group_id, profile_id, role) values (p_group, p_coach, 'coach') on conflict do nothing;
   if p_drop_me and p_coach <> me then

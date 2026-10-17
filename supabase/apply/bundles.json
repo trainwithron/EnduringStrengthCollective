@@ -24,6 +24,16 @@
   "file": "apply-release-cm-all.sql"
  },
  {
+  "id": "release-h-importers",
+  "name": "Release H (undo a whole history import; getting out of an organization; what a coach coaches; adds only, safe to run BEFORE the code that goes with it is live)",
+  "steps": [
+   "142",
+   "143",
+   "144"
+  ],
+  "file": "apply-release-h-importers-all.sql"
+ },
+ {
   "id": "release-g",
   "name": "Release G (the app at 1,500 clients; real values only in sets; a test-organization mark; pause forgotten workouts; adds only, safe to run BEFORE the code that goes with it is live)",
   "steps": [

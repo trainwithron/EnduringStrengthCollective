@@ -33,11 +33,42 @@ export function isRosterEmail(value: string): boolean {
 }
 
 // Pasted text -> cells. A tab-separated paste (from a spreadsheet) or commas or semicolons split a line into cells; a plain "Jane Smith" stays one cell.
+// A comma or semicolon inside quotes stays in its cell ("Doe, Jane",jane@x.com is two cells), and the quotes themselves are not kept.
+function unquote(cell: string): string {
+  const t = cell.trim();
+  return t.length >= 2 && t.startsWith('"') && t.endsWith('"') ? t.slice(1, -1).replace(/""/g, '"').trim() : t;
+}
+
+function splitQuoted(line: string): string[] {
+  const cells: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '""';
+        i++;
+        continue;
+      }
+      inQuotes = !inQuotes;
+      current += ch;
+    } else if ((ch === "," || ch === ";") && !inQuotes) {
+      cells.push(current);
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+  cells.push(current);
+  return cells.map(unquote);
+}
+
 export function splitPastedRoster(text: string): string[][] {
   return text.split(/\r?\n/).map((line) => {
-    if (line.includes("\t")) return line.split("\t").map((c) => c.trim());
-    if (/[;,]/.test(line)) return line.split(/[;,]/).map((c) => c.trim().replace(/^"(.*)"$/, "$1"));
-    return [line.trim()];
+    if (line.includes("\t")) return line.split("\t").map(unquote);
+    if (/[;,]/.test(line)) return splitQuoted(line);
+    return [unquote(line)];
   });
 }
 

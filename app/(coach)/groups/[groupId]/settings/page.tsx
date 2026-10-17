@@ -140,7 +140,7 @@ export default async function SettingsPage(
   const isCoach = membership?.role === "coach";
 
   // A member who is not the owner can leave the organization this group is in.
-  let leaveInfo: { id: string; name: string; others: { id: string; name: string }[]; soleClients: number } | null = null;
+  let leaveInfo: { id: string; name: string; others: { id: string; name: string }[]; soleClients: number; unknown: boolean } | null = null;
   if (isCoach) {
     const orgIdForLeave = await orgIdOfGroup(supabase, params.groupId);
     if (orgIdForLeave) {
@@ -159,6 +159,8 @@ export default async function SettingsPage(
           name: orgRow.name as string,
           others: ((others ?? []) as any[]).map((o) => ({ id: o.profile_id as string, name: (o.profiles as { full_name?: string } | null)?.full_name ?? "Coach" })),
           soleClients: team.soleCoachOfClients[user.id] ?? 0,
+          // a failed read of the organization's groups must not look like "no clients to hand over"
+          unknown: team.failed,
         };
       }
     }
@@ -319,7 +321,7 @@ export default async function SettingsPage(
 
         {isCoach && leaveInfo && (
           <SettingsGroup label="Organization">
-            <LeaveOrganizationControl organizationId={leaveInfo.id} organizationName={leaveInfo.name} others={leaveInfo.others} soleClients={leaveInfo.soleClients} />
+            <LeaveOrganizationControl organizationId={leaveInfo.id} organizationName={leaveInfo.name} others={leaveInfo.others} soleClients={leaveInfo.soleClients} unknown={leaveInfo.unknown} />
           </SettingsGroup>
         )}
 

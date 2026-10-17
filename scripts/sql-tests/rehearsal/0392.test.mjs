@@ -38,8 +38,29 @@ export default {
       await h.as(owner);
       r = await tryQ(db, `select public.assign_group_coach($1, $2)`, [g, outsider]);
       h.check("the coach must be a member of the organization", /member of this organization/.test(r.error ?? ""), r.error);
-      r = await tryQ(db, `select public.assign_group_coach($1, $2)`, [pg, coach]);
-      h.check("a client private from the organization cannot be handed to another coach", /private from the organization/.test(r.error ?? ""), r.error);
+      // an owner or admin who does NOT coach the private client's group can never get a seat there, for themselves or anyone
+      const admin = await h.user("CT Admin");
+      await h.orgMember(org, admin, "admin");
+      const privOwnerless = await h.group(org, coach, "one_on_one", "CT private (coach only)");
+      const pk = await h.user("CT Private Two");
+      await h.member(privOwnerless, pk);
+      await h.asSuper();
+      await db.query(`update public.group_memberships set private_from_org = true where group_id = $1 and profile_id = $2`, [privOwnerless, pk]);
+      await h.as(admin);
+      r = await tryQ(db, `select public.assign_group_coach($1, $2)`, [privOwnerless, admin]);
+      h.check("an admin who does not coach a private client's group cannot give themselves a seat", /private from the organization/.test(r.error ?? ""), r.error);
+      r = await tryQ(db, `select public.assign_group_coach($1, $2)`, [privOwnerless, owner]);
+      h.check("nor can they give the owner one", /private from the organization/.test(r.error ?? ""), r.error);
+      await h.as(owner);
+      r = await tryQ(db, `select public.assign_group_coach($1, $2)`, [privOwnerless, owner]);
+      h.check("even the owner, who does not coach it, is refused", /private from the organization/.test(r.error ?? ""), r.error);
+      await h.as(coach);
+      r = await tryQ(db, `select public.assign_group_coach($1, $2, false)`, [privOwnerless, admin]);
+      h.check("the private client's own coach can still hand them on", !r.error, r.error);
+      await h.orgMember(org, client, "coach"); // a client of the group who is also staff in the organization
+      await h.as(owner);
+      r = await tryQ(db, `select public.assign_group_coach($1, $2)`, [g, client]);
+      h.check("a client of the group cannot be made its coach", /client in this group/.test(r.error ?? ""), r.error);
       r = await tryQ(db, `select public.assign_group_coach($1, $2)`, [g, coach]);
       h.check("an owner assigns a coach to a new client" + (r.error ? ": " + r.error : ""), !r.error);
       await h.asSuper();

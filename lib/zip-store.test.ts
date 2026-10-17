@@ -67,6 +67,8 @@ describe("zip-store", () => {
 
   it("csvLine quotes commas, quotes and line breaks, and defuses spreadsheet formulas", () => {
     expect(csvLine(["a", "b,c", 'say "hi"', "line\nbreak", null, 5])).toBe('a,"b,c","say ""hi""","line\nbreak",,5\r\n');
-    expect(csvLine(["=SUM(A1)", "+1", "@x", "-cmd", "-5"])).toBe("'=SUM(A1),'+1,'@x,'-cmd,-5\r\n");
+    expect(csvLine(["=SUM(A1)", "+1", "@x", "-cmd", "-5", "-2.5"])).toBe("'=SUM(A1),'+1,'@x,'-cmd,-5,-2.5\r\n");
+    // a minus sign and a digit is not enough to be safe: only a whole plain number is left alone
+    expect(csvLine(["-2+3", "-1+cmd|' /C calc'!A0", "\t=1", "\r=1"])).toBe("'-2+3,'-1+cmd|' /C calc'!A0,'\t=1,\"'\r=1\"\r\n");
   });
 });

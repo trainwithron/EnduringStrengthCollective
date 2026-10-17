@@ -18,9 +18,10 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-  const body = await request.json().catch(() => ({}));
+  const raw = await request.json().catch(() => null);
+  const body: { groupId?: unknown; people?: unknown } = raw && typeof raw === "object" ? raw : {};
   const groupId = typeof body.groupId === "string" ? body.groupId : "";
-  const people: { name?: unknown; email?: unknown }[] = Array.isArray(body.people) ? body.people : [];
+  const people: { name?: unknown; email?: unknown }[] = Array.isArray(body.people) ? body.people.filter((p): p is { name?: unknown; email?: unknown } => !!p && typeof p === "object") : [];
   if (!groupId || people.length === 0) return NextResponse.json({ error: "Missing the group or the people to add." }, { status: 400 });
   if (people.length > ROSTER_MAX_ROWS) return NextResponse.json({ error: `Only ${ROSTER_MAX_ROWS} people can be added at a time.` }, { status: 400 });
 

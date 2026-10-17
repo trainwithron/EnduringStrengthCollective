@@ -32,6 +32,11 @@ export default {
       await h.asSuper();
       await db.query(`update public.group_memberships set private_from_org = true where group_id = $1 and profile_id = $2`, [privG, k2]);
       const emptyG = await h.group(org, c1, "team", "OB empty");
+      await h.asSuper();
+      await db.query(`insert into public.session_types (organization_id, coach_id, name) values ($1, $2, 'OB session type')`, [org, c1]);
+      await db.query(`insert into public.pro_shop_links (organization_id, coach_id, title, url) values ($1, $2, 'OB link', 'https://example.com')`, [org, c1]);
+      await db.query(`insert into public.group_sessions (organization_id, coach_id, kind, capacity, title, start_at, end_at) values ($1, $2, 'class', 8, 'OB class', now() + interval '2 days', now() + interval '2 days 1 hour')`, [org, c1]);
+      await db.query(`insert into public.group_sessions (organization_id, coach_id, group_id, kind, title, start_at, end_at) values ($1, $2, $3, 'event', 'OB gym event', now() + interval '2 days', now() + interval '2 days 1 hour')`, [org, c1, teamG]);
       // a future confirmed booking of c1 with k1
       await db.query(`insert into public.bookings (coach_id, athlete_id, group_id, start_at, end_at, status) values ($1, $2, $3, now() + interval '3 days', now() + interval '3 days 1 hour', 'confirmed')`, [c1, k1, oneG]);
       const inv = (await db.query(`insert into public.organization_invites (organization_id, invited_profile_id, role, created_by, expires_at) values ($1, $2, 'coach', $3, now() + interval '1 day') returning id`, [org, outsider, owner])).rows[0].id;
@@ -49,6 +54,19 @@ export default {
       h.check("an admin cannot make someone an admin", /Only the owner can/.test(r.error ?? ""), r.error);
       r = await tryQ(db, `select public.remove_org_member($1, $2, $3)`, [org, c1, outsider]);
       h.check("clients can only be handed to a member of the organization", /another member/.test(r.error ?? ""), r.error);
+
+      // handing a group's clients to a person who is a client of that group would leave it with no coach: refused
+      const hostile = await h.user("OB Client Who Is Also Staff");
+      await h.orgMember(org, hostile, "coach");
+      const zTeam = await h.group(org, c1, "team", "OB zteam");
+      await h.member(zTeam, hostile);
+      await h.as(admin);
+      r = await tryQ(db, `select public.remove_org_member($1, $2, $3)`, [org, c1, hostile]);
+      h.check("the person taking over cannot be a client of the group handed to them", /is a client in/.test(r.error ?? ""), r.error);
+      await h.asSuper();
+      await db.query(`delete from public.groups where id = $1`, [zTeam]);
+      await db.query(`delete from public.organization_memberships where organization_id = $1 and profile_id = $2`, [org, hostile]);
+      await h.as(admin);
 
       // ---- remove c1: refused until someone is named, because they alone coach a client
       r = await tryQ(db, `select public.remove_org_member($1, $2, null)`, [org, c1]);
@@ -73,6 +91,9 @@ export default {
       h.check("the client who is private from the organization left with their coach, into an organization of their own", priv.organization_id !== org && seat(privG, c1));
       const solo = (await db.query(`select owner_id from public.organizations where id = $1`, [priv.organization_id])).rows[0];
       h.check("that new organization is owned by the coach", solo?.owner_id === c1);
+      const filed = async (table) => (await db.query(`select organization_id from public.${table} where coach_id = $1 limit 1`, [c1])).rows[0]?.organization_id;
+      h.check("the coach who left with a client took their session types and shop links into their own organization", (await filed("session_types")) === priv.organization_id && (await filed("pro_shop_links")) === priv.organization_id);
+      h.check("their class went with them, and the event of a group that stayed with the gym did not", (await db.query(`select title, organization_id from public.group_sessions where coach_id = $1 order by title`, [c1])).rows.map((x) => x.title + ":" + (x.organization_id === priv.organization_id ? "moved" : "stayed")).join() === "OB class:moved,OB gym event:stayed");
       const bk = (await db.query(`select coach_id from public.bookings where group_id = $1`, [oneG])).rows[0];
       h.check("their future booking moved to the new coach", bk.coach_id === c2);
       const au = (await db.query(`select count(*)::int as n from public.audit_log where table_name = 'organization_memberships' and changed ->> 'event' = 'remove_member'`)).rows[0];

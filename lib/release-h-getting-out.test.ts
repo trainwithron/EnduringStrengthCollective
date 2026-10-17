@@ -55,3 +55,39 @@ describe("Release H: what a coach coaches", () => {
     expect(src("supabase/migrations/0392_coach_type.sql")).toContain("revoke execute on function public.assign_group_coach(uuid, uuid, boolean) from public, anon;");
   });
 });
+
+describe("Release H: review fixes", () => {
+  it("the one-paste bundle really holds all three steps, and steps.json lists them (it once held only the first)", () => {
+    const bundle = src("supabase/apply/apply-release-h-importers-all.sql");
+    expect(bundle).toContain("import_batch_id");
+    expect(bundle).toContain("remove_org_member");
+    expect(bundle).toContain("assign_group_coach");
+    expect(bundle).toContain("coach_type");
+    const steps = JSON.parse(src("supabase/apply/steps.json")) as { n: string }[];
+    for (const n of ["142", "143", "144"]) expect(steps.some((s) => String(s.n) === n), n).toBe(true);
+  });
+
+  it("a private client's group can be handed on only by a coach who already holds it, and the person taking over can never be a client of that group", () => {
+    const sql = src("supabase/migrations/0392_coach_type.sql");
+    expect(sql).toContain("and not public.is_group_coach(p_group) then");
+    expect(sql).not.toContain("p_coach <> me and exists (select 1 from public.group_memberships a where a.group_id = p_group and a.role = 'athlete' and a.private_from_org)");
+    const off = src("supabase/migrations/0391_offboarding.sql");
+    expect(off).toContain("The person chosen to take over is a client in");
+    expect(off).toContain("Could not make the chosen person the coach of");
+  });
+
+  it("a coach who leaves into an organization of their own takes their shop, classes, session types and calendar with them", () => {
+    const off = src("supabase/migrations/0391_offboarding.sql");
+    for (const t of ["pro_shop_links", "referral_partners", "session_types", "challenges", "calendar_events", "discovery_bookings", "coach_briefings", "group_sessions"]) {
+      expect(off, t).toContain(`update public.${t} set organization_id = v_solo`);
+    }
+  });
+
+  it("a roster whose result could not be confirmed is never offered a blind retry", () => {
+    const panel = src("components/coach/desktop/roster-import-panel.tsx");
+    expect(panel).toContain('"uncertain"');
+    expect(panel).toContain("could not confirm whether");
+    expect(src("app/api/clients/import-roster/route.ts")).toContain('raw && typeof raw === "object"');
+    expect(src("app/api/clients/import-roster/undo/route.ts")).toContain("UNDO_WINDOW_MS");
+  });
+});

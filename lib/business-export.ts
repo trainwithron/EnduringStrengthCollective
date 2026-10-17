@@ -86,7 +86,8 @@ async function* pagedByIds(ids: string[], make: Make, failures: string[], label:
 }
 
 async function* csvOf(columns: string[], pages: AsyncIterable<Rows>, counter: { n: number }): AsyncGenerator<Uint8Array> {
-  yield utf8(csvLine(columns));
+  // A byte-order mark first, so Excel opens the file as UTF-8 (without it, names like José show as garbage).
+  yield utf8("\uFEFF" + csvLine(columns));
   for await (const rows of pages) {
     counter.n += rows.length;
     yield utf8(rows.map((r) => csvLine(columns.map((c) => r[c]))).join(""));
