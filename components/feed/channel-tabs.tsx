@@ -24,7 +24,7 @@ export function ChannelTabs({
       {CHANNELS.map((c) => (
         <Link
           key={c.key}
-          href={`${basePath}?channel=${c.key}`}
+          href={`${basePath}${basePath.includes("?") ? "&" : "?"}channel=${c.key}`}
           className={`h-11 px-4 flex items-center font-body text-sm whitespace-nowrap border-b-2 transition-colors shrink-0 ${
             active === c.key
               ? "border-rust text-chalk"

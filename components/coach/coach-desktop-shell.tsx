@@ -116,6 +116,7 @@ type Active =
   | "quick-tips"
   | "challenges"
   | "team"
+  | "attendance"
   | "team-calendar"
   | "game-detail"
   | "team-performance"
@@ -476,6 +477,7 @@ function CoachDesktopShellFull({
         ...(showsMembers(groupKind, coachLevel) ? [{ key: "members" as const, label: "Members", href: membersHref(groupId), icon: Users2 }] : []),
         { key: "dashboard", label: "Group dashboard", href: `/groups/${groupId}/dashboard`, icon: LayoutDashboard },
         { key: "team-performance", label: "Team performance", href: `/groups/${groupId}/team-performance`, icon: Activity },
+        ...(groupKind !== null && groupKind !== "one_on_one" ? [{ key: "attendance" as const, label: "Attendance", href: `/groups/${groupId}/attendance`, icon: ClipboardList }] : []),
         ...(groupKind !== null && groupKind !== "one_on_one"
           ? [{ key: "feed" as const, label: "Team feed", href: `/groups/${groupId}/feed`, icon: MessagesSquare, badge: feedUnread }]
           : []),
@@ -484,7 +486,9 @@ function CoachDesktopShellFull({
               { key: "team" as const, label: "Depth chart", href: `/groups/${groupId}/team`, icon: ClipboardList },
               { key: "team-calendar" as const, label: "Team calendar", href: `/groups/${groupId}/team/calendar`, icon: CalendarDays },
             ]
-          : []),
+          : groupKind === "team"
+            ? [{ key: "team" as const, label: "Seasons", href: `/groups/${groupId}/team`, icon: ClipboardList }]
+            : []),
         { key: "group-calendar", label: "Group calendar", href: coachLevel ? "/group-calendar" : `/groups/${groupId}/group-calendar`, icon: CalendarDays },
         { key: "group-sessions", label: "Group sessions", href: `/groups/${groupId}/group-sessions`, icon: Users2 },
         { key: "challenges", label: "Challenges", href: `/groups/${groupId}/challenges`, icon: Flag },

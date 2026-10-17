@@ -8,7 +8,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { LegalLinks } from "@/components/legal/legal-links";
 import { friendlySignInError } from "@/lib/sign-in-errors";
 import { isStandaloneDisplay, isMobileUserAgent } from "@/lib/pwa";
-import { loadStartInputs, parseLastGroupCookie, pickStartGroup } from "@/lib/start-group";
+import { loadStartInputs, parseLastGroupCookie, pickStartGroup, startPath } from "@/lib/start-group";
 
 export default function LoginPage() {
   return (
@@ -84,14 +84,8 @@ function LoginForm() {
       await loadStartInputs(supabase, data.user.id, parseLastGroupCookie(lastGroupCookie))
     );
 
-    if (membership) {
-      const wantsMobileHome =
-        membership.role !== "coach" || isStandaloneDisplay() || isMobileUserAgent();
-      const destination = wantsMobileHome ? `/groups/${membership.group_id}` : "/dashboard";
-      router.push(destination);
-    } else {
-      router.push("/");
-    }
+    // A coach on a phone lands on their own client profile (startPath); at a computer, on the desktop Home.
+    router.push(startPath(membership, isStandaloneDisplay() || isMobileUserAgent()));
     router.refresh();
   }
 

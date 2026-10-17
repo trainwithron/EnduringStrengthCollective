@@ -47,14 +47,35 @@ export function pickStartGroup({ memberships, lastGroupId, recentActivityGroupId
   return [...memberships].sort((a, b) => -byJoined(a, b))[0];
 }
 
+// Which group's feed a coach looks at from their own client app: the one the address names if it is one of their shared (team or social) groups, else the group they were last working in if it is shared, else the
+// first by name. A client's own one-on-one space has no feed, and neither has the coach's personal space, so only shared groups are offered.
+export function pickFeedGroup<T extends { id: string; name: string }>(sharedGroups: T[], requested: string | null | undefined, remembered: string | null | undefined): T | null {
+  if (sharedGroups.length === 0) return null;
+  const sorted = [...sharedGroups].sort((a, b) => a.name.localeCompare(b.name));
+  return sorted.find((g) => g.id === requested) ?? sorted.find((g) => g.id === remembered) ?? sorted[0];
+}
+
+// Where a person lands once the group is known. A coach at a computer lands on the desktop Home; a coach on a phone (or the installed app) lands on their OWN client profile, the same app a client has, with the
+// Spot button for the business side and a picker to look at any client (Ron, Oct 16: "I open my app and it's a client profile but it's my profile"). Everyone else lands in their group's page.
+export const COACH_PHONE_LANDING = "/my-space?view=client";
+export function startPath(membership: Pick<StartMembership, "group_id" | "role"> | null, onPhone: boolean): string {
+  if (!membership) return "/";
+  if (membership.role !== "coach") return `/groups/${membership.group_id}`;
+  return onPhone ? COACH_PHONE_LANDING : "/dashboard";
+}
+
 // Reads what the rule needs. Works with the browser or the server client (the person reads their own rows).
 export async function loadStartInputs(
   supabase: SupabaseClient,
   userId: string,
   lastGroupId?: string | null
 ): Promise<StartInputs> {
+  const read = (columns: string) => (supabase as any).from("group_memberships").select(`group_id, role, joined_at, groups ( ${columns} )`).eq("profile_id", userId) as PromiseLike<{ data: any[] | null; error: unknown }>;
+  // A retired group (a past season) is not where anyone lands. A database without that column yet is read as before.
+  let first = await read("group_kind, archived_at");
+  if (first.error) first = await read("group_kind");
   const [{ data: rows }, { data: recent }] = await Promise.all([
-    supabase.from("group_memberships").select("group_id, role, joined_at, groups ( group_kind )").eq("profile_id", userId),
+    Promise.resolve(first),
     supabase
       .from("workout_logs")
       .select("group_id")
@@ -63,16 +84,23 @@ export async function loadStartInputs(
       .limit(1)
       .maybeSingle(),
   ]);
-  const memberships: StartMembership[] = (rows ?? []).map((r) => {
-    const g = (r as unknown as { groups: { group_kind: string | null } | { group_kind: string | null }[] | null }).groups;
-    const kind = Array.isArray(g) ? g[0]?.group_kind ?? null : g?.group_kind ?? null;
+  type G = { group_kind: string | null; archived_at?: string | null };
+  const all = (rows ?? []).map((r) => {
+    const g = (r as unknown as { groups: G | G[] | null }).groups;
+    const one = Array.isArray(g) ? g[0] : g;
     return {
-      group_id: r.group_id as string,
-      role: r.role as string,
-      joined_at: (r.joined_at as string | null) ?? null,
-      group_kind: kind,
+      archived: !!one?.archived_at,
+      membership: {
+        group_id: r.group_id as string,
+        role: r.role as string,
+        joined_at: (r.joined_at as string | null) ?? null,
+        group_kind: one?.group_kind ?? null,
+      } as StartMembership,
     };
   });
+  // Past seasons are left out unless nothing else is left (a person whose only group was retired still lands somewhere).
+  const live = all.filter((a) => !a.archived);
+  const memberships: StartMembership[] = (live.length > 0 ? live : all).map((a) => a.membership);
   return { memberships, lastGroupId: lastGroupId ?? null, recentActivityGroupId: (recent?.group_id as string | undefined) ?? null };
 }
 

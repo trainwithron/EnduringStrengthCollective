@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
-import { loadStartInputs, parseLastGroupCookie, pickStartGroup } from "@/lib/start-group";
+import { loadStartInputs, parseLastGroupCookie, pickStartGroup, startPath } from "@/lib/start-group";
 import { Hero } from "@/components/marketing/hero";
 import { FeatureGrid } from "@/components/marketing/feature-grid";
 import { Differentiation } from "@/components/marketing/differentiation";
@@ -30,8 +30,8 @@ export default async function HomePage(props: { searchParams: Promise<{ source?:
     const membership = pickStartGroup(await loadStartInputs(supabase, user.id, lastGroupId));
 
     if (membership) {
-      const wantsMobileHome = membership.role !== "coach" || (await prefersAthleteStyleView());
-      redirect(wantsMobileHome ? `/groups/${membership.group_id}` : "/dashboard");
+      // A coach on a phone or the installed app opens on their own client profile; at a computer, the desktop Home.
+      redirect(startPath(membership, membership.role === "coach" ? await prefersAthleteStyleView() : true));
     }
 
     return (

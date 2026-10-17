@@ -14,8 +14,9 @@
 | DW | duplicate-week-no-progressions | (see git) | none | Assistant-cleared; "Copy as is" on Duplicate week |
 | G | release-g-scale | cba14678 | Release G, step 141, 0389, apply-release-g-all.sql, fp b3223e923005389e | Assistant-cleared; paste BEFORE code |
 | H | release-h-getting-in-and-out | 45aff8aa | Release H, steps 142 (0390), 143 (0391), 144 (0392), apply-release-h-importers-all.sql, fp 8cfe436c67fd2856 | Assistant-cleared; paste BEFORE code (adds only) |
-| I | release-i-gym-owner-tools | (see git) | Release I, step 145 (0393), apply-release-i-gym-all.sql (fp in the step file) | built, awaiting Assistant; paste BEFORE code (adds only) |
+| I | release-i-gym-owner-tools | 89840b70 | Release I, step 145 (0393), apply-release-i-gym-all.sql, fp 4566705a04ad5fde | Assistant-cleared; paste BEFORE code (adds only) |
+| J | release-j-home-seasons | (see git) | Release J, step 146 (0394), apply-release-j-home-seasons-all.sql (fp in the step file) | built, awaiting Assistant; paste BEFORE code (adds only) |
 | D-held | (data) | - | HELD: step 138, apply-release-cn-held-all.sql, fp 8f22a2d348ee90d7, read check-intake-flag-list.sql first | Ron's word only |
 
 Fingerprint = first 16 hex of sha256 of the LF-normalized file: tr -d '\r' < supabase/apply/<file> | sha256sum | cut -c1-16.
-Apply order: CL (136), CM (137), CO (139), G (141), H (142 to 144), I (145); then deploy the code; then CP (140) after the code is live. Held 138 only on Ron's word.
+Apply order: CL (136), CM (137), CO (139), G (141), H (142 to 144), I (145), J (146); then deploy the code; then CP (140) after the code is live. Held 138 only on Ron's word.

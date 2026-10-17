@@ -15,6 +15,10 @@ import { getGroupLeaderboardRankings, getPositionLeaderboardRankings } from "@/l
 import { loadNameProtectedIds } from "@/lib/minor-names";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { getEffectiveAthlete } from "@/lib/acting-as";
+import { cookies } from "next/headers";
+import { getCoachedGroups, LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/coach-groups";
+import { pickFeedGroup } from "@/lib/start-group";
+import { FeedGroupPicker } from "@/components/feed/feed-group-picker";
 import type { FeedChannel, FeedPost } from "@/lib/types";
 
 const VALID_CHANNELS: FeedChannel[] = ["announcements", "form_checks", "pr_board", "general", "team_chat"];
@@ -63,7 +67,7 @@ const POST_SELECT = `
 export default async function FeedPage(
   props: {
     params: Promise<{ groupId: string }>;
-    searchParams: Promise<{ channel?: string; highlight?: string }>;
+    searchParams: Promise<{ channel?: string; highlight?: string; group?: string }>;
   }
 ) {
   const searchParams = await props.searchParams;
@@ -107,7 +111,24 @@ export default async function FeedPage(
   // is a property of the group itself, so the same value applies whether
   // this page is being viewed as the real athlete or an impersonated one.
   const isOneOnOneGroup = (group?.group_kind ?? "team") === "one_on_one";
-  if (isActingAsOther) {
+
+  // A coach in their OWN client app (their personal space, which has no feed) reads the feed of one of their shared groups, one group at a time, with a dropdown at the top to switch. The page stays at
+  // their own space's address so the bar, the Spot button and the tabs stay theirs; only the feed's group changes.
+  const selfView = isActingAsOther && !!user && athleteId === user.id;
+  let feedGroupId = params.groupId;
+  let feedChoices: { id: string; name: string; orgName: string }[] = [];
+  let noSharedGroup = false;
+  if (selfView && user) {
+    const shared = (await getCoachedGroups(supabase, user.id)).filter((g) => g.kind !== "one_on_one");
+    feedChoices = shared.map((g) => ({ id: g.id, name: g.name, orgName: g.orgName }));
+    const remembered = (await cookies()).get(LAST_WORKSPACE_GROUP_COOKIE)?.value;
+    const picked = pickFeedGroup(feedChoices, searchParams.group, remembered ? decodeURIComponent(remembered) : null);
+    if (picked) feedGroupId = picked.id;
+    else noSharedGroup = true;
+  }
+  if (selfView) {
+    // handled below: the personal space is a one-on-one space, which would otherwise send the coach back to Home
+  } else if (isActingAsOther) {
     if (isOneOnOneGroup) {
       redirect(`/groups/${params.groupId}`);
     }
@@ -140,23 +161,23 @@ export default async function FeedPage(
     supabase
       .from("posts")
       .select(POST_SELECT)
-      .eq("group_id", params.groupId)
+      .eq("group_id", feedGroupId)
       .eq("channel", channel)
       .order("pinned_at", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false })
       .limit(30),
     channel === "general"
-      ? supabase.from("groups").select("team_mode").eq("id", params.groupId).maybeSingle()
+      ? supabase.from("groups").select("team_mode").eq("id", feedGroupId).maybeSingle()
       : Promise.resolve({ data: null as { team_mode: boolean } | null }),
     // Leaderboard now lives at the top of General instead of its own nav
     // tab — every post is a reminder it's there, per the ask ("every time
     // anything gets posted, everyone can see the leaderboard").
-    channel === "general" ? getGroupLeaderboardRankings(supabase, params.groupId, loadNameProtectedIds) : Promise.resolve(null),
+    channel === "general" && !noSharedGroup ? getGroupLeaderboardRankings(supabase, feedGroupId, loadNameProtectedIds) : Promise.resolve(null),
   ]);
   const feedBroadcastLevel =
     (viewerProfile?.feed_broadcast_level as "full" | "prs_only" | "checkin_only" | "private") ?? "full";
 
-  let shaped: FeedPost[] = (posts ?? []).map((p: any) => mapPostRow(p, params.groupId, athleteId));
+  let shaped: FeedPost[] = noSharedGroup ? [] : (posts ?? []).map((p: any) => mapPostRow(p, feedGroupId, athleteId));
 
   // A "Needs a reply" link deep-links straight to the stale post — but
   // that post may be older than the 30 most recent shown here (staleness
@@ -169,10 +190,10 @@ export default async function FeedPage(
       .from("posts")
       .select(POST_SELECT)
       .eq("id", highlightPostId)
-      .eq("group_id", params.groupId)
+      .eq("group_id", feedGroupId)
       .maybeSingle();
     if (highlighted) {
-      shaped = [mapPostRow(highlighted, params.groupId, athleteId), ...shaped];
+      shaped = [mapPostRow(highlighted, feedGroupId, athleteId), ...shaped];
     }
   }
 
@@ -182,13 +203,13 @@ export default async function FeedPage(
   // "general channel only" gate the leaderboard itself uses.
   let positionGroups: Awaited<ReturnType<typeof getPositionLeaderboardRankings>> | null = null;
   if (leaderboard && teamModeResult.data?.team_mode) {
-    positionGroups = await getPositionLeaderboardRankings(supabase, params.groupId, loadNameProtectedIds);
+    positionGroups = await getPositionLeaderboardRankings(supabase, feedGroupId, loadNameProtectedIds);
   }
   const leaderboardCard = leaderboard && (
     <div className="border border-steel/20 p-4 mb-4">
       <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">Leaderboard</h2>
       <LiveGroupLeaderboard
-        groupId={params.groupId}
+        groupId={feedGroupId}
         initialRankings={leaderboard}
         initialPositionGroups={positionGroups}
         viewerId={athleteId}
@@ -256,32 +277,39 @@ export default async function FeedPage(
             Team feed
           </h1>
           <div className="flex items-center">
-            <ClearChannelButton groupId={params.groupId} channel={channel} />
+            {!selfView && <ClearChannelButton groupId={params.groupId} channel={channel} />}
             {athleteId && <FeedSettingsButton initialLevel={feedBroadcastLevel} profileId={athleteId} />}
           </div>
         </div>
       </header>
 
-      <ChannelTabs basePath={`/groups/${params.groupId}/feed`} active={channel} />
+      {selfView && feedChoices.length > 0 && <FeedGroupPicker spaceId={params.groupId} choices={feedChoices} selectedId={feedGroupId} />}
+      {noSharedGroup && (
+        <p className="px-5 pt-6 font-body text-sm text-steel">Your groups&apos; feed shows here once you coach a team or a group. A client&apos;s own space has no feed.</p>
+      )}
+
+      <ChannelTabs basePath={selfView ? `/groups/${params.groupId}/feed?group=${feedGroupId}` : `/groups/${params.groupId}/feed`} active={channel} />
 
       {leaderboardCard && <div className="px-5">{leaderboardCard}</div>}
 
       <FeedList
-        key={channel}
-        groupId={params.groupId}
+        key={`${feedGroupId}-${channel}`}
+        groupId={feedGroupId}
         initialPosts={shaped}
         viewerId={athleteId}
         channel={channel}
         isCoach={renderAsCoach}
         highlightPostId={highlightPostId}
       />
+      {!noSharedGroup && (
       <NewPostComposer
-        groupId={params.groupId}
+        groupId={feedGroupId}
         raised={showMobileView}
         defaultChannel={channel}
         isCoach={renderAsCoach}
         authorId={athleteId}
       />
+      )}
 
       {showMobileView && <BottomTabBar groupId={params.groupId} activeOverride="feed" />}
     </main>

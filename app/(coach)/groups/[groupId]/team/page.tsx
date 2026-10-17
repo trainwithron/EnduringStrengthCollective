@@ -10,6 +10,9 @@ import {
   type TeamPlayer,
 } from "@/components/coach/desktop/team-depth-chart";
 import { CoachPositionScopeList, type CoachStaffRow } from "@/components/coach/desktop/coach-position-scope-list";
+import { NewSeasonPanel } from "@/components/coach/desktop/new-season-panel";
+import { UnarchiveGroupButton } from "@/components/coach/desktop/unarchive-group-button";
+import Link from "next/link";
 
 export default async function TeamPage(props: { params: Promise<{ groupId: string }> }) {
   const params = await props.params;
@@ -38,7 +41,7 @@ export default async function TeamPage(props: { params: Promise<{ groupId: strin
   // Group (for team_mode + name), the position list, and the roster are
   // independent lookups — one round trip instead of three.
   const [{ data: group }, { data: positionRows }, { data: memberRows }, { data: coachRows }] = await Promise.all([
-    supabase.from("groups").select("name, team_mode").eq("id", params.groupId).single(),
+    supabase.from("groups").select("name, team_mode, group_kind, organization_id").eq("id", params.groupId).single(),
     supabase
       .from("group_positions")
       .select("id, name, sort_order")
@@ -56,6 +59,23 @@ export default async function TeamPage(props: { params: Promise<{ groupId: strin
       .eq("role", "coach"),
   ]);
 
+  // Whether this season has been retired (a database without the column yet reads as not retired), and the retired seasons of this organization this coach coached.
+  const archivedRead = await supabase.from("groups").select("archived_at").eq("id", params.groupId).maybeSingle();
+  const archivedAt = archivedRead.error ? null : ((archivedRead.data as { archived_at?: string | null } | null)?.archived_at ?? null);
+  let pastSeasons: { id: string; name: string }[] = [];
+  if (!archivedRead.error && group?.organization_id) {
+    const { data: pastRows } = await supabase
+      .from("group_memberships")
+      .select("groups!inner ( id, name, group_kind, organization_id, archived_at )")
+      .eq("profile_id", user.id)
+      .eq("role", "coach")
+      .eq("groups.organization_id", group.organization_id)
+      .eq("groups.group_kind", "team")
+      .not("groups.archived_at", "is", null);
+    pastSeasons = ((pastRows ?? []) as any[]).map((r) => r.groups).filter(Boolean).map((g) => ({ id: g.id as string, name: g.name as string })).sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  const positionNameById = new Map((positionRows ?? []).map((p) => [p.id as string, p.name as string]));
   const positions: TeamPosition[] = (positionRows ?? []).map((p) => ({
     id: p.id,
     name: p.name,
@@ -95,6 +115,37 @@ export default async function TeamPage(props: { params: Promise<{ groupId: strin
 
       {group?.team_mode && positions.length > 0 && (
         <CoachPositionScopeList groupId={params.groupId} positions={positions} initialCoaches={coaches} />
+      )}
+
+      {archivedAt && (
+        <p className="font-body text-sm text-steel mb-4">
+          This season is retired. It and its records are kept here. <UnarchiveGroupButton groupId={params.groupId} />
+        </p>
+      )}
+
+      {group?.group_kind === "team" && !archivedAt && (
+        <div className="mb-8">
+          <NewSeasonPanel
+            groupId={params.groupId}
+            groupName={group?.name ?? "Team"}
+            athletes={players.map((p) => ({ profileId: p.profileId, fullName: p.fullName, positionName: p.positionId ? positionNameById.get(p.positionId) ?? null : null }))}
+          />
+        </div>
+      )}
+
+      {pastSeasons.length > 0 && (
+        <div className="mb-8">
+          <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">Past seasons</p>
+          <ul className="space-y-1">
+            {pastSeasons.map((s) => (
+              <li key={s.id} className="font-body text-sm">
+                <Link href={`/groups/${s.id}/team`} className="text-rust">
+                  {s.name}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       <TeamDepthChart

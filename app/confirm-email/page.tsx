@@ -6,7 +6,7 @@ import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { establishSessionFromLink } from "@/lib/auth-link-client";
 import { LinkConflictNotice } from "@/components/auth/link-conflict-notice";
-import { loadStartInputs, pickStartGroup } from "@/lib/start-group";
+import { loadStartInputs, pickStartGroup, startPath } from "@/lib/start-group";
 import { isStandaloneDisplay, isMobileUserAgent } from "@/lib/pwa";
 import { SigningInNotice } from "@/components/auth/signing-in-notice";
 
@@ -53,12 +53,7 @@ function ConfirmEmailStatus() {
       setHasSession(true);
       // Home, not a settings page: the desktop Home for a coach at a computer, the phone Home for a phone or the installed app.
       const membership = pickStartGroup(await loadStartInputs(supabase, user.id));
-      if (!membership) {
-        router.push("/");
-      } else {
-        const phone = membership.role !== "coach" || isStandaloneDisplay() || isMobileUserAgent();
-        router.push(phone ? `/groups/${membership.group_id}` : "/dashboard");
-      }
+      router.push(startPath(membership, isStandaloneDisplay() || isMobileUserAgent()));
       router.refresh();
     });
   }, [router]);

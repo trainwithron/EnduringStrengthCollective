@@ -12,17 +12,21 @@ export interface YourCoachSpace {
 }
 
 export async function loadYourCoaches(supabase: any, userId: string): Promise<{ spaces: YourCoachSpace[]; failed: boolean }> {
-  const mine = await pageAll(
-    (from, to) =>
-      supabase
-        .from("group_memberships")
-        .select("id, group_id, groups ( id, name, group_kind, organizations ( name ) )")
-        .eq("profile_id", userId)
-        .eq("role", "athlete")
-        .order("id")
-        .range(from, to),
-    { maxPages: 5 }
-  );
+  const readSpaces = (columns: string) =>
+    pageAll(
+      (from, to) =>
+        supabase
+          .from("group_memberships")
+          .select(`id, group_id, groups ( ${columns}, organizations ( name ) )`)
+          .eq("profile_id", userId)
+          .eq("role", "athlete")
+          .order("id")
+          .range(from, to),
+      { maxPages: 5 }
+    );
+  // A retired group (a past season) is left out; a database without that column yet is read as before.
+  let mine = await readSpaces("id, name, group_kind, archived_at");
+  if (mine.failed) mine = await readSpaces("id, name, group_kind");
   const groupIds = mine.rows.map((r) => r.group_id as string);
   const coaches = await readByIds(groupIds, (ids) => (from, to) => supabase.from("group_memberships").select("id, group_id, profiles ( full_name )").in("group_id", ids).eq("role", "coach").order("id").range(from, to), { maxPages: 5 });
   const namesByGroup = new Map<string, string[]>();
@@ -32,8 +36,8 @@ export async function loadYourCoaches(supabase: any, userId: string): Promise<{ 
   }
   const spaces = mine.rows
     .map((r) => {
-      const g = r.groups as { id: string; name: string; group_kind: string; organizations?: { name?: string } | null } | null;
-      return g
+      const g = r.groups as { id: string; name: string; group_kind: string; archived_at?: string | null; organizations?: { name?: string } | null } | null;
+      return g && !g.archived_at
         ? {
             groupId: g.id,
             groupName: g.name,

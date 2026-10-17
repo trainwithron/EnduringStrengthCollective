@@ -12,6 +12,8 @@ const REVIEWED_PERMISSION_ONLY = new Set([
   "app/api/ai/parse-workout/route.ts",
   "app/api/clients/delete/route.ts",
   "app/api/clients/import-roster/undo/route.ts",
+  // the team page lists this coach's retired seasons, limited to the organization of the group it is on
+  "app/(coach)/groups/[groupId]/team/page.tsx",
   "app/api/credits/low-balance-check/route.ts",
   "app/api/discovery-availability/[coachId]/route.ts",
   "app/api/progress-look/route.ts",

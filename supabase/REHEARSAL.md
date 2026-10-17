@@ -160,6 +160,7 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0391 | yes | yes | 35 | 0391 Offboarding |
 | 0392 | yes | yes | 13 | 0392 Coach type and assigning a coach |
 | 0393 | yes | yes | 24 | 0393 Space invitations |
+| 0394 | yes | yes | 20 | 0394 Team seasons |
 | 0331 | yes | yes | 10 | 0331 a payment event and its sessions are recorded in one step |
 | 0329 | yes | yes | 12 | 0329 every session costs exactly 1 credit; the waitlist offer uses the coach's time zone |
 | 0330 | yes | yes | 9 | 0330 only a real coach can have a public page |

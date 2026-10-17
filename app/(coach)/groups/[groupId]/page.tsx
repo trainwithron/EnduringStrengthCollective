@@ -777,7 +777,8 @@ export default async function GroupHubPage(
       {isActingAsOther && (
         <ActingAsBanner athleteFullName={actingAsFullName ?? "Client"} groupId={params.groupId} />
       )}
-      {isActingAsOther && (
+      {/* The client glance tiles (credits, waiver, support) are about a CLIENT; a coach looking at their own training does not get them. */}
+      {isActingAsOther && athleteId !== user?.id && (
         <TheSpotRail
           groupId={params.groupId}
           visibleWidgets={spotVisibleWidgets}

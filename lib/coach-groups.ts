@@ -33,21 +33,25 @@ export const getCoachedGroups = cache(readCoachedGroups);
 
 async function readCoachedGroups(supabase: SupabaseClient, coachId: string): Promise<CoachedGroup[]> {
   // A coach with more than 1,000 one-on-one clients has more than 1,000 of these rows: a request returns at most 1,000, so they are read a page at a time (every coach-wide page starts here).
-  const { rows, failed } = await pageAll((from, to) =>
-    supabase
-      .from("group_memberships")
-      .select("group_id, groups ( id, name, group_kind, organization_id, organizations ( name ) )")
-      .eq("profile_id", coachId)
-      .eq("role", "coach")
-      .order("id")
-      .range(from, to)
-  );
+  const readWith = (columns: string) =>
+    pageAll((from, to) =>
+      supabase
+        .from("group_memberships")
+        .select(`group_id, groups ( ${columns}, organizations ( name ) )`)
+        .eq("profile_id", coachId)
+        .eq("role", "coach")
+        .order("id")
+        .range(from, to)
+    );
+  // A retired group (a past season) is left out. If the database does not have that column yet, the read is made without it and nothing is left out, exactly as before.
+  let { rows, failed } = await readWith("id, name, group_kind, organization_id, archived_at");
+  if (failed) ({ rows, failed } = await readWith("id, name, group_kind, organization_id"));
   if (failed) console.error("getCoachedGroups: could not read all of the coach's groups");
 
   const out: CoachedGroup[] = [];
   for (const row of rows as any[]) {
     const g = row.groups;
-    if (!g?.id || !g.organization_id) continue;
+    if (!g?.id || !g.organization_id || g.archived_at) continue;
     out.push({
       id: g.id,
       name: g.name ?? "Group",

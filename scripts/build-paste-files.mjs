@@ -2728,6 +2728,26 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "146",
+  slug: "0394",
+  title: "0394 Release J: a new season for a team (the old group is retired and kept whole; the new one has the same positions, coaches and the athletes chosen)",
+  migrations: ["0394"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes on screen until the Release J code is live. Adds one empty column (when a group was retired) and two functions (start next season, bring a retired season back). Safe to run before the code is live.",
+  undo: [
+    "drop function if exists public.unarchive_group(uuid);",
+    "drop function if exists public.start_new_season(uuid, text, uuid[]);",
+    "alter table public.groups drop column if exists archived_at;",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 146 misbehaves. Run it only while the Release J code is not live (the coach's group lists, where people land and the Team page read the column). Seasons already started stay; the retired groups come back into every list.",
+  rows: [
+    ["0394 is not already applied (the retired-at column is not there yet)", "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'groups' and column_name = 'archived_at')"],
+    ["the tables it builds on exist", "to_regclass('public.groups') is not null and to_regclass('public.group_memberships') is not null and to_regclass('public.group_positions') is not null and to_regclass('public.audit_log') is not null"],
+    ["the helper functions it uses exist", "to_regprocedure('public.is_group_coach(uuid)') is not null and to_regprocedure('public.audit_record(text, text, text, jsonb)') is not null"],
+  ],
+});
+
+STEPS.push({
   n: "145",
   slug: "0393",
   title: "0393 Release I: a coach can invite someone who already has an account to be their one-on-one client (they accept or decline), and the notification types the invite code writes are accepted",
@@ -2942,6 +2962,7 @@ const BUNDLES = [
   { id: "release-co", name: "Release CO (nothing about a person is public unless they chose it: personal Find a coach listing; a coach adds only their own clients to a challenge; run BEFORE the code that goes with it is live)", steps: ["139"] },
   { id: "release-cn-held", name: "HELD, Ron's word first: require the health form and waiver of every client without one (read check-intake-flag-list.sql first)", steps: ["138"] },
   { id: "release-cm", name: "Release CM (the guard function and a coach's decision on a flagged screening; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["137"] },
+  { id: "release-j-home-seasons", name: "Release J (a new season for a team; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["146"] },
   { id: "release-i-gym", name: "Release I (invite an existing account as a one-on-one client; invite notices that were being refused; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["145"] },
   { id: "release-h-importers", name: "Release H (undo a whole history import; getting out of an organization; what a coach coaches; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["142", "143", "144"] },
   { id: "release-g", name: "Release G (the app at 1,500 clients; real values only in sets; a test-organization mark; pause forgotten workouts; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["141"] },
@@ -3219,6 +3240,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
     m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
+    m("0394", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'groups' and column_name = 'archived_at')"),
     m("0393", "to_regclass('public.space_invites') is not null"),
     m("0392", "to_regprocedure('public.assign_group_coach(uuid, uuid, boolean)') is not null"),
     m("0391", "to_regprocedure('public.remove_org_member(uuid, uuid, uuid)') is not null"),
