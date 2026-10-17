@@ -151,9 +151,43 @@ describe("undo brings back what the delete also took", () => {
       auth: { getUser: () => Promise.resolve({ data: { user: { id: "u" } } }) },
     };
     const day: BuilderDay = { id: "d2", title: "Day 2", weekNumber: 1, dayIndex: 2, scheduledDate: null, items: [] };
-    const snapshot = { note: "Day note", assignments: [{ athlete_id: "a", workout_id: "d2", scheduled_date: "2026-10-20" }], sessionIds: [], logIds: [] };
+    const snapshot = { note: "Day note", assignments: [{ athlete_id: "a", workout_id: "d2", scheduled_date: "2026-10-20" }], sessionIds: [], logIds: [], overridesByExercise: {} };
     expect(await restoreDay(fake, { programId: "p", groupId: "g", day, snapshot })).toBeNull();
     expect(deleted).toContain("workouts:d2");
+  });
+});
+
+describe("a day's undo also brings back clients' swaps of its exercises", () => {
+  it("snapshots the overrides of every exercise in the day and re-inserts them with each restored exercise", async () => {
+    const inserted: Array<[string, unknown]> = [];
+    const fake: any = {
+      from: (table: string) => ({
+        insert: (rows: any) => {
+          inserted.push([table, rows]);
+          const res = { data: Array.isArray(rows) ? rows : [rows], error: null };
+          const p: any = Promise.resolve(res);
+          p.select = () => Promise.resolve(res);
+          return p;
+        },
+        delete: () => ({ eq: () => Promise.resolve({ error: null }) }),
+        update: () => ({ in: () => Promise.resolve({ error: null }) }),
+      }),
+      auth: { getUser: () => Promise.resolve({ data: { user: { id: "u" } } }) },
+    };
+    const day: BuilderDay = {
+      id: "d3",
+      title: "Day 3",
+      weekNumber: 1,
+      dayIndex: 3,
+      scheduledDate: null,
+      items: [{ kind: "exercise", id: "e9", order: 0, exerciseName: "Row", displayName: null, movementPatternId: null, trackedFields: [], notes: null, videoPath: null, youtubeUrl: null, sets: [], tier: null }],
+    };
+    const swap = { id: "o1", group_workout_exercise_id: "e9", athlete_id: "a", group_id: "g", exercise_name: "Cable Row" };
+    const snapshot = { note: null, assignments: [], sessionIds: [], logIds: [], overridesByExercise: { e9: [swap] } };
+    const back = await restoreDay(fake, { programId: "p", groupId: "g", day, snapshot });
+    expect(back?.id).toBe("d3");
+    expect(inserted.some(([t, rows]) => t === "athlete_exercise_overrides" && JSON.stringify(rows) === JSON.stringify([swap]))).toBe(true);
+    expect(src("lib/program-restore.ts")).toContain('from("athlete_exercise_overrides").select("*").in("group_workout_exercise_id"');
   });
 });
 

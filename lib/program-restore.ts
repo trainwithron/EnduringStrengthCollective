@@ -14,18 +14,30 @@ export interface DaySnapshot {
   assignments: Record<string, unknown>[];
   sessionIds: string[];
   logIds: string[];
+  // Clients' own swaps of the exercises in this day, by exercise id (they go with the exercises).
+  overridesByExercise: Record<string, Record<string, unknown>[]>;
 }
 
 export async function snapshotDays(supabase: Db, dayIds: string[]): Promise<Map<string, DaySnapshot>> {
   const out = new Map<string, DaySnapshot>();
-  for (const id of dayIds) out.set(id, { note: null, assignments: [], sessionIds: [], logIds: [] });
+  for (const id of dayIds) out.set(id, { note: null, assignments: [], sessionIds: [], logIds: [], overridesByExercise: {} });
   if (dayIds.length === 0) return out;
-  const [days, assigned, sessions, logs] = await Promise.all([
+  const [days, assigned, sessions, logs, exercises] = await Promise.all([
     supabase.from("workouts").select("id, notes").in("id", dayIds),
     supabase.from("workout_assignments").select("*").in("workout_id", dayIds),
     supabase.from("athlete_sessions").select("id, workout_id").in("workout_id", dayIds),
     supabase.from("workout_logs").select("id, workout_id").in("workout_id", dayIds),
+    supabase.from("group_workout_exercises").select("id, workout_id").in("workout_id", dayIds),
   ]);
+  const dayOfExercise = new Map<string, string>(((exercises.data ?? []) as Array<{ id: string; workout_id: string }>).map((e) => [e.id, e.workout_id]));
+  if (dayOfExercise.size > 0) {
+    const { data: overrides } = await supabase.from("athlete_exercise_overrides").select("*").in("group_workout_exercise_id", [...dayOfExercise.keys()]);
+    for (const o of (overrides ?? []) as Array<Record<string, unknown>>) {
+      const exId = String(o.group_workout_exercise_id);
+      const snap = out.get(dayOfExercise.get(exId) ?? "");
+      if (snap) (snap.overridesByExercise[exId] ??= []).push(o);
+    }
+  }
   for (const d of (days.data ?? []) as Array<{ id: string; notes: string | null }>) out.get(d.id)!.note = d.notes ?? null;
   for (const a of (assigned.data ?? []) as Array<Record<string, unknown>>) out.get(String(a.workout_id))?.assignments.push(a);
   for (const s of (sessions.data ?? []) as Array<{ id: string; workout_id: string }>) out.get(s.workout_id)?.sessionIds.push(s.id);
@@ -121,7 +133,7 @@ export async function restoreDay(supabase: Db, args: { programId: string; groupI
   for (const item of d.items) {
     const back =
       item.kind === "exercise"
-        ? await restoreExercise(supabase, { groupId: args.groupId, workoutId: d.id, exercise: item })
+        ? await restoreExercise(supabase, { groupId: args.groupId, workoutId: d.id, exercise: item, overrides: args.snapshot?.overridesByExercise[item.id] })
         : await restoreNote(supabase, { groupId: args.groupId, workoutId: d.id, note: item });
     // A day that could not be fully put back is removed again, so half a day never sits in the program.
     if (!back) {
