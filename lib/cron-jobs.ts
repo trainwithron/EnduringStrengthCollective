@@ -41,6 +41,12 @@ export const CRON_JOBS: CronJob[] = [
 // minutes, so an oldest-row baseline never ages and a job that is never called would never be noticed.
 export const MONITORING_STARTED = new Date("2026-10-06T02:39:00Z");
 
+// A job added after monitoring began is only judged "never run" once this long has passed since it was added (it has had its chance to run). The date is when the job went in.
+export const JOB_ADDED: Record<string, Date> = {
+  "close-stale-sessions": new Date("2026-10-17T00:00:00Z"),
+};
+export const NEW_JOB_GRACE_HOURS = 48;
+
 export interface CronRunRow {
   job: string;
   last_success_at: string | null;
@@ -62,6 +68,9 @@ export function findStaleJobs(rows: CronRunRow[], now: Date, options: { since?: 
   for (const def of CRON_JOBS) {
     const row = byJob.get(def.job);
     if (!row) {
+      // A job added after monitoring began has not had its chance to run until this long after it went in.
+      const added = JOB_ADDED[def.job];
+      if (added && now.getTime() - added.getTime() < Math.max(NEW_JOB_GRACE_HOURS, def.maxAgeHours) * 3600000) continue;
       // Never reported before a job has had its full schedule to run once: a weekly job gets its whole interval, not 48 hours.
       const graceMs = Math.max((options.graceHours ?? 48), def.maxAgeHours) * 3600000;
       if (options.since && now.getTime() - options.since.getTime() < graceMs) continue;

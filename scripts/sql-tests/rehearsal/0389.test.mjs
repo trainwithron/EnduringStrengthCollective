@@ -87,11 +87,19 @@ export default {
 
       // ---- stale workouts
       const old = (await db.query(`insert into public.athlete_sessions (group_id, athlete_id, status, started_at) values ($1, $2, 'in_progress', now() - interval '5 days') returning id`, [g2, a2])).rows[0].id;
+      // started 5 days ago but resumed just now (a paused workout the client picked back up)
+      const resumed = (await db.query(`insert into public.athlete_sessions (group_id, athlete_id, status, started_at, resumed_at) values ($1, $2, 'in_progress', now() - interval '5 days', now() - interval '1 hour') returning id`, [g2, a2])).rows[0].id;
+      // started 5 days ago but a set was saved today (being logged right now)
+      const logging = (await db.query(`insert into public.athlete_sessions (group_id, athlete_id, status, started_at) values ($1, $2, 'in_progress', now() - interval '5 days') returning id`, [g2, a2])).rows[0].id;
+      const logEx = (await db.query(`insert into public.session_exercises (session_id, exercise_name, exercise_order) values ($1, 'Row', 0) returning id`, [logging])).rows[0].id;
+      await db.query(`insert into public.set_logs (session_exercise_id, set_order, weight, reps, status, completed_at) values ($1, 0, 100, 5, 'completed', now() - interval '2 hours')`, [logEx]);
       const closed = await tryQ(db, `select public.close_stale_sessions(3) as n`);
       h.check("the closer runs for the server" + (closed.error ? ": " + closed.error : ""), !closed.error && closed.rows[0].n >= 1, JSON.stringify(closed));
-      const st = await db.query(`select id, status from public.athlete_sessions where id in ($1, $2)`, [old, s1]);
+      const st = await db.query(`select id, status from public.athlete_sessions where id in ($1, $2, $3, $4)`, [old, s1, resumed, logging]);
       const statusOf = Object.fromEntries(st.rows.map((r) => [r.id, r.status]));
       h.check("the old workout is paused and today's is left alone", statusOf[old] === "abandoned" && statusOf[s1] === "in_progress", JSON.stringify(statusOf));
+      h.check("a workout resumed an hour ago is left alone, though it was started 5 days ago", statusOf[resumed] === "in_progress", JSON.stringify(statusOf));
+      h.check("a workout with a set saved today is left alone, though it was started 5 days ago", statusOf[logging] === "in_progress", JSON.stringify(statusOf));
       await h.as(coach);
       const blocked = await tryQ(db, `select public.close_stale_sessions(3)`);
       h.check("a signed-in person cannot call it", !!blocked.error);

@@ -233,6 +233,7 @@ export default async function ClientsPage(
       ),
       pageAll((from, to) => supabase.rpc("business_last_active", { p_group_ids: scopeIds }).range(from, to)),
     ]);
+    if (scopeLastResult.failed) return <LoadFailedPage />;
     const scopeLast = new Map<string, string>();
     for (const row of scopeLastResult.rows as { athlete_id: string; last_at: string }[]) {
       const prev = scopeLast.get(row.athlete_id);

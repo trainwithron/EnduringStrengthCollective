@@ -2,6 +2,7 @@
 -- WHAT YOU SHOULD SEE: "Success. No rows returned."   Then tell Spot, and do not run the step again until Spot says why it failed.
 begin;
 drop function if exists public.close_stale_sessions(integer);
+alter table public.athlete_sessions drop column if exists resumed_at;
 alter table public.organizations drop column if exists is_test;
 alter table public.set_logs drop constraint if exists set_logs_values_in_range;
 drop index if exists public.ai_usage_log_created_idx;

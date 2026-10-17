@@ -343,7 +343,11 @@ export default async function CoachHomePage() {
         supabase.from("group_memberships").select("group_id, profile_id, profiles ( full_name, avatar_url )").in("group_id", g).eq("role", "athlete").order("id").range(from, to)
       ),
       // The last workout of each client, worked out by the database (one row per client).
-      pageAll((from, to) => supabase.rpc("business_last_active", { p_group_ids: soloGroupIds }).range(from, to)).then((r) => ({ data: r.rows.map((x: any) => ({ athlete_id: x.athlete_id, created_at: x.last_at })) })),
+      pageAll((from, to) => supabase.rpc("business_last_active", { p_group_ids: soloGroupIds }).range(from, to)).then((r) => {
+        // A failed read must not look like "no client has ever worked out".
+        if (r.failed) throw new Error("Could not read the clients' last workouts.");
+        return { data: r.rows.map((x: any) => ({ athlete_id: x.athlete_id, created_at: x.last_at })) };
+      }),
       fetchInactiveKeys(supabase, soloGroupIds),
     ]);
     return { athleteRows, recentLogs, inactiveKeys };

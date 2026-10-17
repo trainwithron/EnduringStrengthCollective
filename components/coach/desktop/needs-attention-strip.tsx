@@ -36,7 +36,8 @@ export function NeedsAttentionStrip({ coachId, groupId }: { coachId: string; gro
     if (!groupIds || groupIds.length === 0) return;
     let cancelled = false;
     async function run() {
-      const res = await fetch(`/api/coach/needs-attention?groupIds=${groupIds!.join(",")}`).catch(() => null);
+      // (The group ids go in the body: a coach with 1,500 groups would send an address too long to be accepted.)
+      const res = await fetch("/api/coach/needs-attention", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ groupIds }) }).catch(() => null);
       const data = res && res.ok ? await res.json().catch(() => null) : null;
       if (cancelled) return;
       if (!data || !Array.isArray(data.items)) {

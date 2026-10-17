@@ -13,19 +13,27 @@ import { getNeedsAttentionItems } from "@/lib/needs-attention-data";
 // group's own shell, so items from an unrelated group would read as
 // confusing noise here, unlike the dashboard page's own opt-in
 // cross-group "scope=all" toggle).
+// One group goes in the address (GET ?groupId=). The coach's whole organization goes in the body of a POST ({ groupIds: [...] }): a coach with 1,500 one-on-one groups would send a 55 KB address,
+// which is refused before this code runs.
 export async function GET(request: NextRequest) {
+  const one = request.nextUrl.searchParams.get("groupId");
+  return respond(one ? [one] : []);
+}
+
+export async function POST(request: NextRequest) {
+  const body = await request.json().catch(() => null);
+  const ids = Array.isArray(body?.groupIds) ? (body.groupIds as unknown[]).filter((x): x is string => typeof x === "string" && x.length > 0 && x.length < 64) : [];
+  return respond(ids.slice(0, 5000));
+}
+
+async function respond(requested: string[]) {
   const supabase = await createServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-  // One group (?groupId=) or the coach's whole org (?groupIds=a,b,c). Only
-  // groups this person actually coaches are ever used.
-  const requested = [
-    ...(request.nextUrl.searchParams.get("groupId") ? [request.nextUrl.searchParams.get("groupId") as string] : []),
-    ...(request.nextUrl.searchParams.get("groupIds") ?? "").split(",").filter(Boolean),
-  ];
+  // Only groups this person actually coaches are ever used.
   if (requested.length === 0) return NextResponse.json({ error: "Missing groupId" }, { status: 400 });
 
   const { data: memberships } = await readRowsByIds(requested, (g) => (from, to) =>

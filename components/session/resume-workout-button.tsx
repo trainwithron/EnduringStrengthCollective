@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { resumeSession } from "@/lib/resume-session";
 
 // Exiting a workout used to be permanent: the session was marked abandoned and
 // read-only forever, so a misfire (or "I'll finish after the phone call")
@@ -17,13 +18,8 @@ export function ResumeWorkoutButton({ sessionId }: { sessionId: string }) {
     setBusy(true);
     setError(null);
     const supabase = createBrowserClient();
-    const { data, error: updateError } = await supabase
-      .from("athlete_sessions")
-      .update({ status: "in_progress" })
-      .eq("id", sessionId)
-      .eq("status", "abandoned")
-      .select("id");
-    if (updateError || !data || data.length === 0) {
+    const { resumed } = await resumeSession(supabase, sessionId);
+    if (!resumed) {
       setBusy(false);
       setError("Couldn't resume — check your connection and try again.");
       return;

@@ -2702,9 +2702,10 @@ STEPS.push({
   title: "0389 Release G: the app at 1,500 clients (last-active, unseen and digest counts done by the database, indexes), real values only in sets, a test-organization mark, and a way to pause forgotten workouts",
   migrations: ["0389"],
   sees: "Success. No rows returned.",
-  afterwards: "Nothing changes on screen. Pages and nightly jobs that read every client of a big coach can now ask the database for the answer. A set can no longer be saved with a weight over 2,000, reps over 1,000, an effort (RPE) outside 0 to 10, a time over two days or a distance over 5,000,000 (a row already flagged unclear is exempt); the few rows that break this today are flagged unclear, not changed or deleted. The sandbox organization is marked as a test. A workout left 'in progress' for three days can be paused by the nightly job (the code that calls it ships with the release). Safe to run before the code is live.",
+  afterwards: "Nothing changes on screen. Pages and nightly jobs that read every client of a big coach can now ask the database for the answer. A set can no longer be saved with a weight over 2,000, reps over 1,000, an effort (RPE) outside 0 to 10, a time over two days or a distance over 5,000,000 (a row already flagged unclear is exempt); the few rows that break this today are flagged unclear, not changed or deleted. The sandbox organization is marked as a test. A workout left 'in progress' for three days, with no set saved in that time and not resumed in it, can be paused by the nightly job (the code that calls it ships with the release); resuming a paused workout now notes when it was resumed. Safe to run before the code is live.",
   undo: [
     "drop function if exists public.close_stale_sessions(integer);",
+    "alter table public.athlete_sessions drop column if exists resumed_at;",
     "alter table public.organizations drop column if exists is_test;",
     "alter table public.set_logs drop constraint if exists set_logs_values_in_range;",
     "drop index if exists public.ai_usage_log_created_idx;",

@@ -167,7 +167,11 @@ export async function getCoachDashboardData(
     // What each client pays is coach-only (client_billing_rates, 0303).
     readRowsByIds(allGroupIds, (g) => (from, to) => supabase.from("client_billing_rates").select("membership_id, monthly_rate").in("group_id", g).order("membership_id").range(from, to)),
     // The last workout of each client, worked out by the database (one row per client) instead of reading every workout ever logged.
-    pageAll((from, to) => supabase.rpc("business_last_active", { p_group_ids: allGroupIds }).range(from, to)).then((r) => ({ data: r.rows.map((x: any) => ({ athlete_id: x.athlete_id, created_at: x.last_at })) })),
+    pageAll((from, to) => supabase.rpc("business_last_active", { p_group_ids: allGroupIds }).range(from, to)).then((r) => {
+      // A failed read must not look like "no client has ever worked out" (every client would read as quiet).
+      if (r.failed) throw new Error("Could not read the clients' last workouts.");
+      return { data: r.rows.map((x: any) => ({ athlete_id: x.athlete_id, created_at: x.last_at })) };
+    }),
     // Only the last three days of workouts carry the "new PR" shout-out.
     readRowsByIds(allGroupIds, (g) => (from, to) =>
       supabase.from("workout_logs").select("athlete_id, group_id, created_at, new_prs").in("group_id", g).gte("created_at", new Date(now.getTime() - 3 * 86400000).toISOString()).order("id").range(from, to)
@@ -213,10 +217,14 @@ export async function getCoachDashboardData(
         .not("rpe", "is", null)
         .in("session_exercises.athlete_sessions.group_id", g)
         .gte("completed_at", ninetyDaysAgoKey)
-        .order("completed_at", { ascending: true })
+        // Newest first: if a very busy group of 100 groups passes the page ceiling, it is the OLDEST sets that are left out, never the recent ones the trend is about (the points are sorted by date below).
+        .order("completed_at", { ascending: false })
         .order("id")
         .range(from, to)
-    ),
+    ).then((r) => {
+      if (r.truncated) console.error("matched-load: a set of groups passed the page ceiling; the oldest sets of the last 90 days were left out");
+      return r;
+    }),
     // Suppresses the fatigue direction for an athlete in a deliberate
     // 'fat_loss' or 'reverse_diet' phase — falling strength/rising RPE at
     // matched load is the EXPECTED result of a real caloric deficit, not

@@ -33,6 +33,7 @@ const NOT_A_SAVE = new Set([
   "/api/ai/program-chat",
   "/api/ai/explain-program",
   "/api/assistant/navigate",
+  "/api/coach/needs-attention", // a read that takes its group ids in a body (a long list does not fit in an address)
   "/api/auth/forgot-password",
   "/api/auth/resend-confirmation",
   "/api/ai/suggest-patterns",

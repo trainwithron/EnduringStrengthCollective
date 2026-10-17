@@ -78,12 +78,15 @@ export function BusinessRailWidget({ groupId }: { groupId: string }) {
       const [{ data: memberRows }, { data: rateRows }, lastActive, { data: purchaseRows }, { data: subRows }] = await Promise.all([
         readRowsByIds(groupIds, (g) => (from, to) => supabase.from("group_memberships").select("id, profile_id, joined_at").in("group_id", g).eq("role", "athlete").order("id").range(from, to)),
         readRowsByIds(groupIds, (g) => (from, to) => supabase.from("client_billing_rates").select("membership_id, monthly_rate").in("group_id", g).order("membership_id").range(from, to)),
-        groupIds.length > 0 ? pageAll((from, to) => supabase.rpc("business_last_active", { p_group_ids: groupIds }).range(from, to)) : Promise.resolve({ rows: [] as any[] }),
+        groupIds.length > 0 ? pageAll((from, to) => supabase.rpc("business_last_active", { p_group_ids: groupIds }).range(from, to)) : Promise.resolve({ rows: [] as any[], failed: false }),
         readRowsByIds(groupIds, (g) => (from, to) => supabase.from("credit_purchases").select("athlete_id, amount_cents, created_at").in("group_id", g).order("id").range(from, to)),
         readRowsByIds(groupIds, (g) => (from, to) =>
           supabase.from("membership_subscriptions").select("athlete_id, price_cents, status").in("group_id", g).order("group_id").order("athlete_id").range(from, to)
         ),
       ]);
+
+      // A failed read leaves the widget as it was (loading), never a smaller business or a quiet roster.
+      if (lastActive.failed) return;
 
       const today = new Date();
       const todayKey = dateKey(today);

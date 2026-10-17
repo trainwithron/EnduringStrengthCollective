@@ -60,7 +60,7 @@ export function BusinessMiniDashboard({ groupId, expanded = false }: { groupId: 
       const monthKey = localDateKey().slice(0, 7);
 
       // Every read goes in groups of ids and a page at a time (lib/read-by-ids.ts): at 1,500 clients a single `.in` passes the URL limit and the 1,000-row cap.
-      const [{ data: purchaseRows }, { data: quickPaymentRows }, { data: subRows }, { data: memberRows }] =
+      const [purchases, quickPayments, subs, members] =
         await Promise.all([
           readRowsByIds(groupIds!, (g) => (from, to) => supabase.from("credit_purchases").select("amount_cents, created_at, athlete_id").in("group_id", g).order("id").range(from, to)),
           // Quick Payment (mobile_more_tab_condensed_widget_hub_sept30.md)
@@ -73,6 +73,13 @@ export function BusinessMiniDashboard({ groupId, expanded = false }: { groupId: 
           ),
           readRowsByIds(groupIds!, (g) => (from, to) => supabase.from("group_memberships").select("profile_id").in("group_id", g).eq("role", "athlete").order("id").range(from, to)),
         ]);
+
+      // A read that failed leaves the card on "—" (unavailable): partial pages must never show as a smaller business.
+      if (purchases.error || quickPayments.error || subs.error || members.error) return;
+      const purchaseRows = purchases.data;
+      const quickPaymentRows = quickPayments.data;
+      const subRows = subs.data;
+      const memberRows = members.data;
 
       const incomeThisMonth = computeRealIncomeThisMonth(
         [...(purchaseRows ?? []), ...(quickPaymentRows ?? [])].map((r: any) => ({
@@ -113,13 +120,16 @@ export function BusinessMiniDashboard({ groupId, expanded = false }: { groupId: 
     async function run() {
       const supabase = createBrowserClient();
 
-      const { data: memberRows } = await readRowsByIds(groupIds!, (g) => (from, to) =>
+      const { data: memberRows, error: memberError } = await readRowsByIds(groupIds!, (g) => (from, to) =>
         supabase.from("group_memberships").select("profile_id").in("group_id", g).eq("role", "athlete").order("id").range(from, to)
       );
+      if (memberError) return;
       const athleteIds = [...new Set((memberRows ?? []).map((m: any) => m.profile_id as string))];
 
       // The last workout of each client, worked out by the database (one row per client) instead of reading every workout ever logged.
       const lastActive = await pageAll((from, to) => supabase.rpc("business_last_active", { p_group_ids: groupIds! }).range(from, to));
+      // A failed read (the database step not applied yet, a timeout) is "unavailable", never "nobody is active".
+      if (lastActive.failed) return;
       const lastByAthlete = new Map<string, string>();
       for (const row of lastActive.rows) {
         if (!lastByAthlete.has(row.athlete_id)) lastByAthlete.set(row.athlete_id, localDateKey(new Date(row.last_at)));

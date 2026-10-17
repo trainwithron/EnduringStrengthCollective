@@ -92,10 +92,10 @@ async function handler(request: Request) {
   // looking for tomorrow's. One read of every coach's zone, not one per coach.
   const coachIds = [...new Set([...groupIdsByCoachOrg.values()].map((e) => e.coachId))];
   const zoneByCoach = new Map<string, string>();
-  for (let i = 0; i < coachIds.length; i += 200) {
-    const { data: zoneRows } = await supabase.from("profiles").select("id, timezone").in("id", coachIds.slice(i, i + 200));
-    for (const row of zoneRows ?? []) zoneByCoach.set(row.id as string, isValidTimeZone(row.timezone as string | null) ? (row.timezone as string) : DEFAULT_COACH_TIMEZONE);
-  }
+  const { data: zoneRows, error: zoneError } = await readRowsByIds(coachIds, (g) => (from, to) => supabase.from("profiles").select("id, timezone").in("id", g).order("id").range(from, to));
+  // If the zones cannot be read, no briefing is made today rather than every coach being given New York's day (a coach in another zone would get a briefing the dashboard never looks for).
+  if (zoneError) return NextResponse.json({ error: "Could not read the coaches' time zones." }, { status: 500 });
+  for (const row of zoneRows) zoneByCoach.set(row.id as string, isValidTimeZone(row.timezone as string | null) ? (row.timezone as string) : DEFAULT_COACH_TIMEZONE);
 
   const results: { coachId: string; itemCount: number; skipped: string | null }[] = [];
 

@@ -21,6 +21,7 @@ import { findAthleteVisibleCoachNoteForExercise } from "@/lib/exercise-note-hist
 import { parseNumericReps } from "@/lib/program-card-visuals";
 import { computePriorBest } from "@/lib/obstacle-unlock";
 import { readLoggedSets } from "@/lib/read-logged-sets";
+import { resumeSession } from "@/lib/resume-session";
 import { countsForProgress } from "@/lib/set-types";
 import { computeVolumeHistory } from "@/lib/exercise-volume-history";
 import { ExitWorkoutButton } from "@/components/session/exit-workout-button";
@@ -70,8 +71,8 @@ export default async function SessionPage(
 
   // "Resume workout" from the workout page or Home: a paused workout goes back to in progress, exactly where it was (completed sets stay completed).
   if (query.resume === "1" && session.status === "abandoned") {
-    const { data: resumed } = await supabase.from("athlete_sessions").update({ status: "in_progress" }).eq("id", session.id).eq("status", "abandoned").select("id");
-    if (resumed && resumed.length > 0) {
+    const { resumed } = await resumeSession(supabase, session.id);
+    if (resumed) {
       (session as { status: string }).status = "in_progress";
       // The timer carries on from where the work stopped; the time it sat paused is not counted.
       const { data: lastSet } = await supabase

@@ -1,5 +1,6 @@
 "use client";
 
+import { loggableReps, loggableWeight } from "@/lib/set-value-limits";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -97,8 +98,8 @@ export function StartWorkoutButton({
       return ex.sets.length > 0
         ? ex.sets.map((target) => ({
             set_order: target.setOrder,
-            weight: target.targetWeight ?? null,
-            reps: parseRepsTarget(target.targetReps),
+            weight: loggableWeight(target.targetWeight),
+            reps: loggableReps(parseRepsTarget(target.targetReps)),
           }))
         : [{ set_order: 0, weight: null, reps: null }];
     }

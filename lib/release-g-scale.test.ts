@@ -129,18 +129,51 @@ describe("a coach's day is the coach's own day", () => {
 });
 
 describe("no page asks the database for 'all my groups' in one request", () => {
-  it("only the files listed (a person's own few groups) still use a plain list of group ids; no new one may be added", () => {
+  it("only the places listed (a person's own few groups, or a handful of quiet clients) still use a plain list of group ids; no new one may be added, in any file", () => {
     const baseline = JSON.parse(src("lib/unchunked-group-in-baseline.json")) as Record<string, number>;
     const found: Record<string, number> = {};
     for (const d of ["app", "components", "lib"]) {
       for (const f of walk(d)) {
-        const s = src(f);
-        if (s.includes("@/lib/read-by-ids") || s.includes("./read-by-ids")) continue;
-        const n = (s.match(/\.in\("group_id", /g) || []).length;
+        // Every .in on a group_id column, in any quoting; the only allowed argument is the chunk a read-by-ids callback is handed ('g' or 'ids'). A file that imports read-by-ids is checked too: a half-converted file is the case this catches.
+        let n = 0;
+        for (const m of src(f).matchAll(/\.in\(\s*["'`]group_id["'`]\s*,\s*([^)]*)\)/g)) {
+          const arg = m[1].trim();
+          if (arg !== "g" && arg !== "ids") n++;
+        }
         if (n) found[f] = n;
       }
     }
     for (const [f, n] of Object.entries(found)) expect(n, f).toBeLessThanOrEqual(baseline[f] ?? 0);
+  });
+  it("a workout paused by the nightly job is not paused again while it is being logged (counted from the latest start, resume or saved set)", () => {
+    const sql = src("supabase/migrations/0389_scale_and_data_quality.sql");
+    expect(sql).toContain("resumed_at");
+    expect(sql).toContain("not exists (");
+    expect(src("lib/resume-session.ts")).toContain('resumed_at: new Date().toISOString()');
+    expect(src("components/session/resume-workout-button.tsx")).toContain("resumeSession(");
+    expect(src("app/sessions/[sessionId]/page.tsx")).toContain("resumeSession(");
+  });
+  it("the whole-organization needs-attention call carries its group ids in a request body, not the address", () => {
+    expect(src("components/coach/desktop/needs-attention-strip.tsx")).toContain('method: "POST"');
+    expect(src("components/coach/desktop/needs-attention-strip.tsx")).not.toContain("groupIds=");
+    expect(src("app/api/coach/needs-attention/route.ts")).toContain("export async function POST");
+  });
+  it("a read of 'last workout per client' that failed is unavailable, never 'nobody has worked out'", () => {
+    for (const f of ["lib/dashboard-data.ts", "lib/coach-briefing-gather.ts", "app/(coach)/dashboard/page.tsx"]) {
+      expect(src(f), f).toContain("Could not read the clients' last workouts.");
+    }
+    for (const f of ["components/coach/desktop/business-mini-dashboard.tsx", "components/coach/desktop/rail-widgets/business-rail-widget.tsx", "components/coach/desktop/roster-mini-list.tsx"]) {
+      expect(src(f), f).toContain("lastActive.failed");
+    }
+    expect(src("app/(coach)/groups/[groupId]/clients/page.tsx")).toContain("scopeLastResult.failed");
+  });
+  it("the set history for the matched-load trend is read newest first, so a busy group loses its oldest sets, not its recent ones", () => {
+    for (const f of ["lib/dashboard-data.ts", "lib/coach-briefing-gather.ts"]) expect(src(f), f).toContain('.order("completed_at", { ascending: false })');
+  });
+  it("the briefing's coach time zones are read in the shared chunk and a failed read stops the run", () => {
+    const cron = src("app/api/cron/coach-briefing/route.ts");
+    expect(cron).toContain("readRowsByIds(coachIds");
+    expect(cron).toContain("zoneError");
   });
   it("the rest of the heavy readers use groups of ids and pages", () => {
     for (const f of [

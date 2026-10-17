@@ -49,10 +49,10 @@ export function RosterMiniList({ groupId }: { groupId: string }) {
         if (!firstGroupByAthlete.has(m.profile_id)) firstGroupByAthlete.set(m.profile_id, m.group_id);
       }
       const athleteIds = [...firstGroupByAthlete.keys()];
-      const logRows =
-        athleteIds.length > 0
-          ? (await pageAll((from, to) => supabase.rpc("business_last_active", { p_group_ids: groupIds! }).range(from, to))).rows
-          : ([] as any[]);
+      const lastActive = athleteIds.length > 0 ? await pageAll((from, to) => supabase.rpc("business_last_active", { p_group_ids: groupIds! }).range(from, to)) : { rows: [] as any[], failed: false };
+      // A failed read leaves the list as it was, never a roster where nobody has ever worked out.
+      if (lastActive.failed) return;
+      const logRows = lastActive.rows;
 
       // (One row per client from the database: the last workout, not every workout ever logged.)
       const lastByAthlete = new Map<string, string>();

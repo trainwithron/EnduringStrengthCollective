@@ -5,7 +5,7 @@
 -- failed check, and NOTHING is kept, so a second run after a refusal is safe.
 -- WHAT YOU SHOULD SEE: first "Success" for the transaction, then a result table with one row per step and in_place = true on every row.
 -- ON ERROR: run   rollback;   once, copy the red text, send it to Spot. Do not run it again.
--- AFTER STEP 141: Nothing changes on screen. Pages and nightly jobs that read every client of a big coach can now ask the database for the answer. A set can no longer be saved with a weight over 2,000, reps over 1,000, an effort (RPE) outside 0 to 10, a time over two days or a distance over 5,000,000 (a row already flagged unclear is exempt); the few rows that break this today are flagged unclear, not changed or deleted. The sandbox organization is marked as a test. A workout left 'in progress' for three days can be paused by the nightly job (the code that calls it ships with the release). Safe to run before the code is live.
+-- AFTER STEP 141: Nothing changes on screen. Pages and nightly jobs that read every client of a big coach can now ask the database for the answer. A set can no longer be saved with a weight over 2,000, reps over 1,000, an effort (RPE) outside 0 to 10, a time over two days or a distance over 5,000,000 (a row already flagged unclear is exempt); the few rows that break this today are flagged unclear, not changed or deleted. The sandbox organization is marked as a test. A workout left 'in progress' for three days, with no set saved in that time and not resumed in it, can be paused by the nightly job (the code that calls it ships with the release); resuming a paused workout now notes when it was resumed. Safe to run before the code is live.
 -- It contains no text searching, so editor re-indenting cannot break it.
 
 begin;
@@ -39,7 +39,8 @@ $g141$;
 --   * set_logs values must be real: a weight from 0 to 2000, reps from 0 to 1000, an effort (RPE) from 0 to 10, a time up to two days, a distance up to 5,000,000. A row already flagged unclear is exempt (that is the
 --     existing way to hold a value nobody trusts yet). The few rows that break this today are flagged unclear here, not changed or deleted.
 --   * organizations.is_test marks the sandbox organization so counts and checks can leave it out.
---   * close_stale_sessions(days): a workout still "in progress" long after it was started is set to paused (the same state as Pause for later, so it can still be resumed). Server only; the nightly job calls it.
+--   * close_stale_sessions(days): a workout still "in progress" with nothing done for days is set to paused (the same state as Pause for later, so it can still be resumed). "Nothing done" means: not started or resumed
+--     within the period AND no set saved within it. athlete_sessions.resumed_at notes when a paused workout was resumed. Server only; the nightly job calls it.
 
 create or replace function public.business_last_active(p_group_ids uuid[])
 returns table (athlete_id uuid, last_at timestamptz)
@@ -127,6 +128,8 @@ alter table public.set_logs add constraint set_logs_values_in_range check (
 alter table public.organizations add column if not exists is_test boolean not null default false;
 update public.organizations set is_test = true where id = '50000000-0000-0000-0000-000000000001';
 
+alter table public.athlete_sessions add column if not exists resumed_at timestamptz;
+
 create or replace function public.close_stale_sessions(p_days integer default 3)
 returns integer
 language plpgsql
@@ -139,10 +142,18 @@ begin
   if p_days is null or p_days < 1 then
     raise exception 'p_days must be at least 1';
   end if;
-  update public.athlete_sessions
+  -- Counted from the latest of: when the workout started, when it was last resumed, and the last set saved on it. A workout the client resumed days after starting it, or is logging right now, is left alone.
+  update public.athlete_sessions s
      set status = 'abandoned'
-   where status = 'in_progress'
-     and started_at < now() - make_interval(days => p_days);
+   where s.status = 'in_progress'
+     and greatest(s.started_at, coalesce(s.resumed_at, s.started_at)) < now() - make_interval(days => p_days)
+     and not exists (
+       select 1
+       from public.session_exercises se
+       join public.set_logs sl on sl.session_exercise_id = se.id
+       where se.session_id = s.id
+         and greatest(coalesce(sl.completed_at, sl.created_at), sl.created_at) >= now() - make_interval(days => p_days)
+     );
   get diagnostics v_count = row_count;
   return v_count;
 end;
