@@ -40,3 +40,8 @@
 - Note save errors: "Couldn't save that note — try again." / "Couldn't delete that note — try again."
 - Move arrows on a day: labels "Move day earlier" / "Move day later" (screen readers).
 - Client Home: a workout the coach put on one day shows under the heading "From your coach" with the coach's note.
+
+## Duplicate week without progressions
+- Button on a week: "Duplicate week →" (was "Duplicate with progression →"); panel heading "Duplicate Week N".
+- First choice in the model row: "Copy as is". Line under the choices: "Copies every exercise, set, rep target, weight, rest and note exactly as Week N has them. Nothing is progressed."
+- The action button for it reads "Copy N weeks" ("Copying…" while it works).

@@ -31,6 +31,11 @@ export interface LinearProgressionOptions {
   repCycle?: number[];
 }
 
+// "Copy as is": every new week has exactly the source set's weight and reps. Nothing is progressed.
+export function generateCopyProgression(source: ProgressionSourceSet, options: { weeks: number }): ProgressionResultWeek[] {
+  return Array.from({ length: options.weeks }, () => ({ weight: source.weight, reps: source.reps }));
+}
+
 export function generateLinearProgression(
   source: ProgressionSourceSet,
   options: LinearProgressionOptions

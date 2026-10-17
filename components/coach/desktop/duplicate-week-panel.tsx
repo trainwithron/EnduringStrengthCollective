@@ -6,6 +6,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import type { BuilderDay, BuilderExercise, BuilderItem } from "@/lib/types";
 import { SET_ROW_SELECT, mapSetRow, type TrackedField } from "@/lib/exercise-fields";
 import {
+  generateCopyProgression,
   generateLinearProgression,
   generateDoubleProgression,
   generateUndulatingProgression,
@@ -20,7 +21,7 @@ import {
 } from "@/lib/progression-models";
 import { useSaveToastChannel } from "./save-toast-channel";
 
-type Model = "linear" | "double" | "undulating" | "percent_tm";
+type Model = "copy" | "linear" | "double" | "undulating" | "percent_tm";
 type IntervalAxis = "rounds" | "rest" | "work";
 
 // An interval exercise (Time + Rest tracked) progresses at the exercise
@@ -235,7 +236,7 @@ export function DuplicateWeekPanel({
               workSeconds: firstSet?.targetTimeSeconds ?? 0,
               restSeconds: firstSet?.targetRestSeconds ?? 0,
             },
-            { weeks: weekCount, axis: intervalAxis, amountPerWeek: Number(intervalAmountPerWeek) || 0 }
+            { weeks: weekCount, axis: intervalAxis, amountPerWeek: model === "copy" ? 0 : Number(intervalAmountPerWeek) || 0 }
           );
           intervalTracks.push({
             dayIndex: day.dayIndex,
@@ -276,7 +277,10 @@ export function DuplicateWeekPanel({
               };
 
           let results: ProgressionResultWeek[];
-          if (model === "linear") {
+          if (model === "copy") {
+            // Copy as is: the same weight and reps every week.
+            results = generateCopyProgression(source, { weeks: weekCount });
+          } else if (model === "linear") {
             results = generateLinearProgression(source, {
               weeks: weekCount,
               weightPctIncreasePerWeek: Number(linearWeightPct) || 0,
@@ -308,7 +312,7 @@ export function DuplicateWeekPanel({
           // or an undulating wave. Doesn't apply to a distance/pace
           // exercise — there are no reps to override there.
           let repsOverriddenByClass = false;
-          if (!isDistancePace && classRepsEnabled && item.tier) {
+          if (model !== "copy" && !isDistancePace && classRepsEnabled && item.tier) {
             const cycleText = classRepCycles[item.tier];
             const cycle = cycleText
               .split(",")
@@ -644,7 +648,7 @@ export function DuplicateWeekPanel({
         onClick={() => setOpen(true)}
         className="font-body text-xs text-rust border border-rust px-3 h-8"
       >
-        Duplicate with progression →
+        Duplicate week →
       </button>
     );
   }
@@ -652,7 +656,7 @@ export function DuplicateWeekPanel({
   return (
     <div className="border border-rust/40 bg-surface/60 p-4 space-y-3">
       <h3 className="font-display uppercase text-sm tracking-wide">
-        Duplicate Week {sourceWeekNumber} with progression
+        Duplicate Week {sourceWeekNumber}
       </h3>
 
       <div className="flex items-center gap-2">
@@ -665,7 +669,7 @@ export function DuplicateWeekPanel({
         />
       </div>
 
-      {hasIntervalExercise && (
+      {hasIntervalExercise && model !== "copy" && (
         <div className="border border-steel/20 p-3 space-y-2">
           <p className="font-body text-xs text-steel uppercase tracking-wide">
             Interval exercises (Time + Rest) — progress:
@@ -711,8 +715,8 @@ export function DuplicateWeekPanel({
       <div className="flex gap-1">
         {(
           athleteId
-            ? (["linear", "double", "undulating", "percent_tm"] as Model[])
-            : (["linear", "double", "undulating"] as Model[])
+            ? (["copy", "linear", "double", "undulating", "percent_tm"] as Model[])
+            : (["copy", "linear", "double", "undulating"] as Model[])
         ).map((m) => (
           <button
             key={m}
@@ -722,7 +726,9 @@ export function DuplicateWeekPanel({
               model === m ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
             }`}
           >
-            {m === "linear"
+            {m === "copy"
+              ? "Copy as is"
+              : m === "linear"
               ? "Flat % / Week"
               : m === "double"
                 ? "Rep-Range Reset"
@@ -737,6 +743,11 @@ export function DuplicateWeekPanel({
           Exercise Progressions (a separate, live-adjusting rule, not
           this one-time batch precompute) uses those exact same two
           names for genuinely different math. See the note below. */}
+      {model === "copy" && (
+        <p className="font-body text-xs text-steel">
+          Copies every exercise, set, rep target, weight, rest and note exactly as Week {sourceWeekNumber} has them. Nothing is progressed.
+        </p>
+      )}
       <p className="font-body text-xs text-steel">
         This writes real weeks right now, from the numbers above — it won&apos;t keep adjusting
         after that. For an ongoing target that updates itself from logged performance instead,
@@ -817,6 +828,7 @@ export function DuplicateWeekPanel({
         </div>
       )}
 
+      {model !== "copy" && (
       <div className="pt-2 border-t border-steel/15 space-y-1.5">
         <label className="flex items-center gap-2 font-body text-xs text-steel">
           <input
@@ -847,6 +859,7 @@ export function DuplicateWeekPanel({
           </div>
         )}
       </div>
+      )}
 
       <div className="flex gap-2 pt-2">
         <button
@@ -855,7 +868,7 @@ export function DuplicateWeekPanel({
           disabled={generating}
           className="h-9 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
         >
-          {generating ? "Generating…" : `Generate ${weeks || 0} weeks`}
+          {generating ? (model === "copy" ? "Copying…" : "Generating…") : model === "copy" ? `Copy ${weeks || 0} ${Number(weeks) === 1 ? "week" : "weeks"}` : `Generate ${weeks || 0} weeks`}
         </button>
         <button
           type="button"
