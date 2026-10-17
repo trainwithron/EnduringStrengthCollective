@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { loadMinorProfileIds, shownName } from "@/lib/minor-names";
+import { shownName } from "@/lib/shown-name";
 import { onSharedBoards } from "@/lib/board-visibility";
 import { rankLeaderboard, rankByPosition, type LeaderboardEntry, type RosterAthlete, type PositionRanking } from "@/lib/leaderboard";
 
@@ -18,12 +18,11 @@ export interface GroupLeaderboardRankings {
 // same rankings.
 export async function getGroupLeaderboardRankings(
   supabase: SupabaseClient,
-  groupId: string
+  groupId: string,
+  // The members known to be under 18 (lib/minor-names.ts, looked up on the server and handed down): they are shown as first name and last initial.
+  minors: Set<string>
 ): Promise<GroupLeaderboardRankings> {
-  const [{ data: logs }, minors] = await Promise.all([
-    supabase.from("workout_logs").select("athlete_id, total_volume, new_prs, profiles ( full_name, feed_broadcast_level )").eq("group_id", groupId),
-    loadMinorProfileIds([groupId]),
-  ]);
+  const { data: logs } = await supabase.from("workout_logs").select("athlete_id, total_volume, new_prs, profiles ( full_name, feed_broadcast_level )").eq("group_id", groupId);
 
   const workoutCountByAthlete = new Map<string, number>();
   const volumeByAthlete = new Map<string, number>();
@@ -65,9 +64,10 @@ export async function getGroupLeaderboardRankings(
 // who isn't showing up in the numbers, not just quietly omit them.
 export async function getPositionLeaderboardRankings(
   supabase: SupabaseClient,
-  groupId: string
+  groupId: string,
+  minors: Set<string>
 ): Promise<PositionRanking[]> {
-  const [{ data: memberships }, { data: logs }, minors] = await Promise.all([
+  const [{ data: memberships }, { data: logs }] = await Promise.all([
     supabase
       .from("group_memberships")
       .select("profile_id, position_id, profiles ( full_name, feed_broadcast_level ), group_positions ( name, sort_order )")
@@ -77,7 +77,6 @@ export async function getPositionLeaderboardRankings(
       .from("workout_logs")
       .select("athlete_id, total_volume, new_prs")
       .eq("group_id", groupId),
-    loadMinorProfileIds([groupId]),
   ]);
 
   const roster: RosterAthlete[] = (memberships ?? []).filter((m: any) => onSharedBoards(m.profiles?.feed_broadcast_level)).map((m: any) => ({

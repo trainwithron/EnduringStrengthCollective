@@ -6,7 +6,8 @@ import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
-import { loadMinorProfileIds, shownName } from "@/lib/minor-names";
+import { loadMinorProfileIds } from "@/lib/minor-names";
+import { shownName } from "@/lib/shown-name";
 import { onSharedBoards } from "@/lib/board-visibility";
 
 interface RecordRow {

@@ -6,7 +6,8 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ChallengeStatusControl } from "@/components/coach/desktop/challenge-status-control";
 import { ChallengeParticipantPanel } from "@/components/athlete/challenge-participant-panel";
-import { loadMinorProfileIds, shownName } from "@/lib/minor-names";
+import { loadMinorProfileIds } from "@/lib/minor-names";
+import { shownName } from "@/lib/shown-name";
 import { challengePhotoLink, mayViewChallengePhotos } from "@/lib/challenge-photo";
 import {
   computeChallengeWindow,

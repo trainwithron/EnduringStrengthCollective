@@ -1,6 +1,5 @@
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { ageStatusFromDob } from "@/lib/youth-block";
-import { publicDisplayName } from "@/lib/public-name";
 
 // A member under 18 is shown to the rest of the group as a first name and a last initial ("Sam R."), never the full name, on the shared boards: the leaderboard, the records board and a challenge's
 // standings. Only a known date of birth under 18 counts here (a person with no date yet is asked for one on their next visit); an adult is shown as before. The date of birth lives where only
@@ -22,10 +21,4 @@ export async function loadMinorProfileIds(groupIds: string[]): Promise<Set<strin
     return new Set(["*"]);
   }
   return out;
-}
-
-// "*" means the lookup failed: shorten every name rather than risk showing a child's full name.
-export function shownName(fullName: string | null | undefined, profileId: string, minors: Set<string>): string {
-  const name = fullName?.trim() || "Unknown";
-  return minors.has("*") || minors.has(profileId) ? publicDisplayName(name) : name;
 }

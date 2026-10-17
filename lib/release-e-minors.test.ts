@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { shownName } from "@/lib/minor-names";
+import { shownName } from "@/lib/shown-name";
 import { onSharedBoards } from "@/lib/board-visibility";
 import { isStoredLink, mayViewChallengePhotos } from "@/lib/challenge-photo";
 import { resolveShowName } from "@/lib/share-name";
@@ -29,6 +29,15 @@ describe("a member under 18 is shown as first name and last initial on shared bo
     expect(lb).toContain(".filter((m: any) => onSharedBoards(m.profiles?.feed_broadcast_level))");
     expect(src("app/(coach)/groups/[groupId]/records/page.tsx")).toContain("shownName(row.profiles.full_name, row.athlete_id, minors)");
     expect(src("app/(coach)/groups/[groupId]/challenges/[challengeId]/page.tsx")).toContain("shownName((p.profiles as any)?.full_name, p.profile_id, minors)");
+  });
+});
+
+describe("the live leaderboard (a browser screen) never reaches for the server-only age lookup", () => {
+  it("the lookup runs on the server and its result is handed down", () => {
+    expect(src("lib/leaderboard-data.ts")).not.toContain(`from "@/lib/minor-names"`);
+    expect(src("components/leaderboard/live-group-leaderboard.tsx")).not.toContain(`from "@/lib/minor-names"`);
+    expect(src("components/leaderboard/live-group-leaderboard.tsx")).toContain("new Set(minorIds)");
+    expect(src("app/(coach)/groups/[groupId]/feed/page.tsx")).toContain("minorIds={Array.from(minors)}");
   });
 });
 

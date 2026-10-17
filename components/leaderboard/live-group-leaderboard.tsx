@@ -23,6 +23,7 @@ export function LiveGroupLeaderboard({
   initialRankings,
   initialPositionGroups,
   viewerId,
+  minorIds,
 }: {
   groupId: string;
   initialRankings: GroupLeaderboardRankings;
@@ -30,6 +31,8 @@ export function LiveGroupLeaderboard({
   // the view toggle entirely, zero extra cost for the common case.
   initialPositionGroups: PositionRanking[] | null;
   viewerId: string | null;
+  // Members known to be under 18 (shown as first name and last initial), looked up on the server.
+  minorIds: string[];
 }) {
   const [rankings, setRankings] = useState(initialRankings);
   const [positionGroups, setPositionGroups] = useState(initialPositionGroups);
@@ -44,10 +47,11 @@ export function LiveGroupLeaderboard({
         "postgres_changes",
         { event: "*", schema: "public", table: "workout_logs", filter: `group_id=eq.${groupId}` },
         async () => {
-          const fresh = await getGroupLeaderboardRankings(supabase, groupId);
+          const minors = new Set(minorIds);
+          const fresh = await getGroupLeaderboardRankings(supabase, groupId, minors);
           setRankings(fresh);
           if (initialPositionGroups !== null) {
-            setPositionGroups(await getPositionLeaderboardRankings(supabase, groupId));
+            setPositionGroups(await getPositionLeaderboardRankings(supabase, groupId, minors));
           }
         }
       )
