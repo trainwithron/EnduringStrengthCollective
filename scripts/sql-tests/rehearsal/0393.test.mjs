@@ -57,6 +57,17 @@ export default {
       r = await tryQ(db, `select public.answer_space_invite($1, true)`, [inv]);
       h.check("an answered invitation cannot be answered again", /already been answered/.test(r.error ?? ""), r.error);
 
+      // ---- the coach who invited them has left the space since: nobody is coaching it, so it cannot be accepted
+      await h.asSuper();
+      const orphan = await h.group(org, coach, "one_on_one", "SI orphan space");
+      const orphanInv = (await db.query(`insert into public.space_invites (group_id, invited_profile_id, created_by) values ($1, $2, $3) returning id`, [orphan, stranger, coach])).rows[0].id;
+      await db.query(`delete from public.group_memberships where group_id = $1 and profile_id = $2 and role = 'coach'`, [orphan, coach]);
+      await h.as(stranger);
+      r = await tryQ(db, `select public.answer_space_invite($1, true)`, [orphanInv]);
+      h.check("an invitation cannot be accepted once the inviting coach no longer coaches the space", /no longer has the coach/.test(r.error ?? ""), r.error);
+      await h.asSuper();
+      h.check("and nobody was placed in it", (await db.query(`select 1 from public.group_memberships where group_id = $1 and role = 'athlete'`, [orphan])).rows.length === 0);
+
       // ---- a space that already has its client, an expired invitation, decline, cancel
       await h.asSuper();
       const full = await h.group(org, coach, "one_on_one", "SI full space");

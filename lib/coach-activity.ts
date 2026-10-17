@@ -1,4 +1,5 @@
 import { pageAll } from "@/lib/page-all";
+import { addDaysToKey, DEFAULT_COACH_TIMEZONE, dateKeyInZone, zonedTimeToUtc } from "@/lib/timezone";
 import { readByIds } from "@/lib/read-by-ids";
 
 // What each coach in an organization has done, for the owner or an admin: clients, sessions delivered in a period, no-shows and late cancels, clients who have gone quiet, and clients low on sessions. Read
@@ -37,19 +38,39 @@ export interface CoachActivity {
 export const QUIET_DAYS = 14;
 export const LOW_BALANCE_AT = 1;
 
-// The period as two ISO instants, from a "YYYY-MM-DD" start and end (the end day included). A bad or reversed date falls back to this month so far.
-export function activityPeriod(from: string | undefined, to: string | undefined, now: Date = new Date()): { fromIso: string; toIso: string; fromDay: string; toDay: string } {
-  const day = (s: string | undefined) => (s && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s + "T00:00:00Z")) ? s : null);
-  const firstOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString().slice(0, 10);
-  const today = now.toISOString().slice(0, 10);
+// The period as two real instants, from a "YYYY-MM-DD" start and end (the end day included), cut at midnight in the viewer's time zone (a 6pm Pacific session on the last day of the month belongs to that month,
+// not the next one). A bad or reversed date falls back to this month so far.
+export function activityPeriod(
+  from: string | undefined,
+  to: string | undefined,
+  timeZone: string = DEFAULT_COACH_TIMEZONE,
+  now: Date = new Date()
+): { fromIso: string; toIso: string; fromDay: string; toDay: string; timeZone: string } {
+  const day = (s: string | undefined) => (s && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s + "T00:00:00Z")) && new Date(s + "T00:00:00Z").toISOString().slice(0, 10) === s ? s : null);
+  const today = dateKeyInZone(timeZone, now);
+  const firstOfMonth = today.slice(0, 8) + "01";
   let fromDay = day(from) ?? firstOfMonth;
   let toDay = day(to) ?? today;
   if (fromDay > toDay) {
     fromDay = firstOfMonth;
     toDay = today;
   }
-  const end = new Date(Date.parse(toDay + "T00:00:00Z") + 86400000);
-  return { fromIso: fromDay + "T00:00:00.000Z", toIso: end.toISOString(), fromDay, toDay };
+  return {
+    fromIso: zonedTimeToUtc(fromDay, "00:00", timeZone).toISOString(),
+    toIso: zonedTimeToUtc(addDaysToKey(toDay, 1), "00:00", timeZone).toISOString(),
+    fromDay,
+    toDay,
+    timeZone,
+  };
+}
+
+// A rate typed in dollars ("45" or "45.50"): whole cents, or null when it is not a plain amount. Used on screen and by the spreadsheet so they always agree.
+export const MAX_RATE_CENTS = 100_000_000;
+export function parseRateToCents(text: string): number | null {
+  const t = text.trim();
+  if (!/^\d{1,7}(\.\d{1,2})?$/.test(t)) return null;
+  const cents = Math.round(parseFloat(t) * 100);
+  return cents <= MAX_RATE_CENTS ? cents : null;
 }
 
 export async function loadCoachActivity(supabase: any, args: { orgId: string; fromIso: string; toIso: string; now?: Date }): Promise<CoachActivity> {

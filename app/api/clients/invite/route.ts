@@ -66,9 +66,27 @@ export async function POST(request: Request) {
       if (existingId === user.id) return NextResponse.json({ error: "That is your own address." }, { status: 400 });
       const { data: already } = await serviceRole.from("group_memberships").select("role").eq("group_id", groupId).eq("profile_id", existingId).maybeSingle();
       if (already) return NextResponse.json({ error: "They are already in this space." }, { status: 409 });
-      const { data: invite, error: inviteError } = await serviceRole.from("space_invites").insert({ group_id: groupId, invited_profile_id: existingId, created_by: user.id }).select("id").single();
-      if (inviteError || !invite) {
-        if (inviteError?.code === "23505") return NextResponse.json({ invitedExisting: true, groupId, already: true });
+      // An earlier invitation to the same person that nobody answered and that has run out is closed first, so it cannot block a new one.
+      await serviceRole.from("space_invites").update({ answered_at: new Date().toISOString(), accepted: false }).eq("group_id", groupId).eq("invited_profile_id", existingId).is("answered_at", null).lt("expires_at", new Date().toISOString());
+      let invite: { id: string } | null = null;
+      let alreadyInvited = false;
+      const made = await serviceRole.from("space_invites").insert({ group_id: groupId, invited_profile_id: existingId, created_by: user.id }).select("id").single();
+      if (made.data) {
+        invite = made.data as { id: string };
+      } else if (made.error?.code === "23505") {
+        // One is still open: give it fourteen more days and tell the person again (the same as Send again).
+        const { data: open } = await serviceRole
+          .from("space_invites")
+          .update({ expires_at: new Date(Date.now() + 14 * 86400000).toISOString() })
+          .eq("group_id", groupId)
+          .eq("invited_profile_id", existingId)
+          .is("answered_at", null)
+          .select("id")
+          .maybeSingle();
+        if (!open) return NextResponse.json({ error: "Couldn't send the invitation. Try again." }, { status: 502 });
+        invite = open as { id: string };
+        alreadyInvited = true;
+      } else {
         return NextResponse.json({ error: "Couldn't send the invitation. Try again." }, { status: 502 });
       }
       const { data: coachProfile } = await serviceRole.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
@@ -81,7 +99,7 @@ export async function POST(request: Request) {
         origin: appOrigin(request),
         subject: `${coachName} invited you to be their client`,
       });
-      return NextResponse.json({ invitedExisting: true, groupId, inviteId: invite.id });
+      return NextResponse.json({ invitedExisting: true, groupId, inviteId: invite.id, ...(alreadyInvited ? { already: true } : {}) });
     }
   }
 

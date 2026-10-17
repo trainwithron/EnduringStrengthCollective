@@ -89,6 +89,18 @@ drop policy if exists "space_invites_select" on public.space_invites;
 create policy "space_invites_select" on public.space_invites for select to authenticated
   using (invited_profile_id = (select auth.uid()) or public.is_group_coach(group_id));
 
+-- The same organization wall every other group table carries: a coach working in another organization's workspace does not see these invitations. Added only when the wall function exists and the policy is not there yet.
+do $$
+begin
+  if to_regprocedure('public.group_in_active_org(uuid)') is not null
+     and not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'space_invites' and policyname = 'org_wall_header') then
+    create policy "org_wall_header" on public.space_invites as restrictive for all to authenticated
+      using (public.group_in_active_org(group_id))
+      with check (public.group_in_active_org(group_id));
+  end if;
+end;
+$$;
+
 -- Accept or decline. Accepting puts the person in the space as its client, if the space is still a one-on-one space with no client yet. Nobody else can answer for the person.
 create or replace function public.answer_space_invite(p_invite uuid, p_accept boolean)
 returns uuid
@@ -110,6 +122,8 @@ begin
     raise exception 'That invitation has expired. Ask your coach for a new one.';
   end if;
   if p_accept then
+    -- two people with open invitations to the same empty space must not both get in: the space is locked before it is checked
+    perform 1 from public.groups where id = inv.group_id for update;
     if not public.is_one_on_one_group(inv.group_id) then
       raise exception 'That space is no longer a one-on-one space.';
     end if;
@@ -118,6 +132,10 @@ begin
     end if;
     if exists (select 1 from public.group_memberships where group_id = inv.group_id and profile_id = inv.invited_profile_id and role = 'coach') then
       raise exception 'You coach that space yourself.';
+    end if;
+    -- never place someone in a space with nobody coaching it (the coach may have left or been removed since the invitation was sent), and only while the coach who invited them still coaches it
+    if not exists (select 1 from public.group_memberships where group_id = inv.group_id and profile_id = inv.created_by and role = 'coach') then
+      raise exception 'That space no longer has the coach who invited you. Ask for a new invitation.';
     end if;
     insert into public.group_memberships (group_id, profile_id, role) values (inv.group_id, inv.invited_profile_id, 'athlete') on conflict do nothing;
   end if;

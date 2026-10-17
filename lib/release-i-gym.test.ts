@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { activityPeriod, estimateCents, loadCoachActivity } from "./coach-activity";
+import { activityPeriod, estimateCents, loadCoachActivity, parseRateToCents } from "./coach-activity";
 import { loadYourCoaches } from "./your-coaches";
 
 const root = join(__dirname, "..");
@@ -58,7 +58,7 @@ describe("coach activity", () => {
   const rpc = { business_last_active: [{ athlete_id: "k1", last_at: "2026-10-15T00:00:00Z" }, { athlete_id: "k3", last_at: "2026-08-01T00:00:00Z" }] };
 
   it("counts a session only when it was confirmed, has passed and was not a no-show; and traces every total to its sessions", async () => {
-    const p = activityPeriod("2026-10-01", "2026-10-31", NOW);
+    const p = activityPeriod("2026-10-01", "2026-10-31", "UTC", NOW);
     const a = await loadCoachActivity(fakeDb(tables, rpc), { orgId: "o1", fromIso: p.fromIso, toIso: p.toIso, now: NOW });
     expect(a.failed).toBe(false);
     const ann = a.rows.find((r) => r.coachId === "c1")!;
@@ -68,7 +68,7 @@ describe("coach activity", () => {
   });
 
   it("finds quiet clients (no workout in 14 days, or never) and clients low on sessions, per coach", async () => {
-    const p = activityPeriod("2026-10-01", "2026-10-31", NOW);
+    const p = activityPeriod("2026-10-01", "2026-10-31", "UTC", NOW);
     const a = await loadCoachActivity(fakeDb(tables, rpc), { orgId: "o1", fromIso: p.fromIso, toIso: p.toIso, now: NOW });
     const ann = a.rows.find((r) => r.coachId === "c1")!;
     const bo = a.rows.find((r) => r.coachId === "c2")!;
@@ -79,15 +79,33 @@ describe("coach activity", () => {
 
   it("a failed read is reported, never read as nothing", async () => {
     const bad = { ...fakeDb(tables, rpc), from: (t: string) => (t === "bookings" ? { select: () => ({ in: () => ({ gte: () => ({ lt: () => ({ order: () => ({ range: () => Promise.resolve({ data: null, error: { message: "x" } }) }) }) }) }) }) } : fakeDb(tables, rpc).from(t)) };
-    const p = activityPeriod("2026-10-01", "2026-10-31", NOW);
+    const p = activityPeriod("2026-10-01", "2026-10-31", "UTC", NOW);
     const a = await loadCoachActivity(bad, { orgId: "o1", fromIso: p.fromIso, toIso: p.toIso, now: NOW });
     expect(a.failed).toBe(true);
   });
 
   it("the period is the dates asked for, the end day included, and a bad one falls back to this month so far", () => {
-    expect(activityPeriod("2026-10-01", "2026-10-31", NOW)).toMatchObject({ fromIso: "2026-10-01T00:00:00.000Z", toIso: "2026-11-01T00:00:00.000Z" });
-    expect(activityPeriod("nonsense", undefined, NOW)).toMatchObject({ fromDay: "2026-10-01", toDay: "2026-10-17" });
-    expect(activityPeriod("2026-10-20", "2026-10-02", NOW)).toMatchObject({ fromDay: "2026-10-01", toDay: "2026-10-17" });
+    expect(activityPeriod("2026-10-01", "2026-10-31", "UTC", NOW)).toMatchObject({ fromIso: "2026-10-01T00:00:00.000Z", toIso: "2026-11-01T00:00:00.000Z" });
+    expect(activityPeriod("nonsense", undefined, "UTC", NOW)).toMatchObject({ fromDay: "2026-10-01", toDay: "2026-10-17" });
+    expect(activityPeriod("2026-10-20", "2026-10-02", "UTC", NOW)).toMatchObject({ fromDay: "2026-10-01", toDay: "2026-10-17" });
+    expect(activityPeriod("2026-02-31", "2026-03-05", "UTC", NOW).fromDay).toBe("2026-10-01"); // not a real date
+  });
+
+  it("the period is cut at midnight in the viewer's time zone: a 6pm Pacific session on October 31 is October's", () => {
+    const p = activityPeriod("2026-10-01", "2026-10-31", "America/Los_Angeles", NOW);
+    // Pacific daylight time on Oct 1 (UTC-7); on Nov 1 the clocks have not yet changed back, so the end is still UTC-7
+    expect(p.fromIso).toBe("2026-10-01T07:00:00.000Z");
+    expect(p.toIso).toBe("2026-11-01T07:00:00.000Z");
+    const sixPmOct31Pacific = "2026-11-01T01:00:00.000Z";
+    expect(sixPmOct31Pacific >= p.fromIso && sixPmOct31Pacific < p.toIso).toBe(true);
+    expect(p.timeZone).toBe("America/Los_Angeles");
+  });
+
+  it("a rate is read strictly as dollars and cents, the same on screen and in the spreadsheet", () => {
+    expect(parseRateToCents("45")).toBe(4500);
+    expect(parseRateToCents("45.50")).toBe(4550);
+    expect(parseRateToCents(" 12 ")).toBe(1200);
+    for (const bad of ["12abc", "12,50", "1e9", "-5", "", "4.555", "99999999"]) expect(parseRateToCents(bad), bad).toBeNull();
   });
 
   it("the estimate is sessions times the typed rate, and a bad rate is zero", () => {
@@ -153,5 +171,27 @@ describe("Release I: wiring", () => {
   it("a client with more than one coach gets a link to a list of them", () => {
     expect(src("app/(coach)/groups/[groupId]/settings/page.tsx")).toContain('href="/your-coaches"');
     expect(src("app/your-coaches/page.tsx")).toContain("loadYourCoaches(");
+  });
+});
+
+describe("Release I: review fixes", () => {
+  it("an expired unanswered invitation is closed before a new one is made, and a live one is given fresh days and re-sent", () => {
+    const route = src("app/api/clients/invite/route.ts");
+    expect(route).toContain('.lt("expires_at"');
+    expect(route).toContain("alreadyInvited = true");
+    expect(route).toContain("expires_at: new Date(Date.now() + 14 * 86400000)");
+  });
+
+  it("accepting locks the space before it checks that the space has no client, and needs the inviting coach still to coach it, and the organization wall covers invitations", () => {
+    const sql = src("supabase/migrations/0393_space_invites.sql");
+    expect(sql).toContain("perform 1 from public.groups where id = inv.group_id for update;");
+    expect(sql).toContain("That space no longer has the coach who invited you");
+    expect(sql).toContain('policyname = \'org_wall_header\'');
+  });
+
+  it("the payroll period and the spreadsheet dates use the viewer's time zone and say which", () => {
+    expect(src("app/api/coach/activity-csv/route.ts")).toContain("dateKeyInZone(timeZone");
+    expect(src("app/api/coach/activity-csv/route.ts")).toContain("Days run midnight to midnight in");
+    expect(src("components/org/coach-activity-table.tsx")).toContain("Days run midnight to midnight in {timeZone}");
   });
 });

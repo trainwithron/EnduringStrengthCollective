@@ -3,21 +3,21 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CoachActivityRow } from "@/lib/coach-activity";
-import { estimateCents } from "@/lib/coach-activity";
+import { estimateCents, parseRateToCents } from "@/lib/coach-activity";
 
 const money = (cents: number) => (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
 
 // The per-coach table, the period, and the payroll ESTIMATE. The rate a coach is paid per session is typed here for the estimate and for the spreadsheet only: it is not saved anywhere and nothing is paid from here.
-export function CoachActivityTable({ groupId, fromDay, toDay, rows, creditsSold }: { groupId: string; fromDay: string; toDay: string; rows: CoachActivityRow[]; creditsSold: number }) {
+export function CoachActivityTable({ groupId, fromDay, toDay, timeZone, rows, creditsSold }: { groupId: string; fromDay: string; toDay: string; timeZone: string; rows: CoachActivityRow[]; creditsSold: number }) {
   const router = useRouter();
   const [from, setFrom] = useState(fromDay);
   const [to, setTo] = useState(toDay);
   const [rates, setRates] = useState<Record<string, string>>({});
 
-  const rateCents = (coachId: string) => {
-    const n = parseFloat(rates[coachId] ?? "");
-    return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : 0;
-  };
+  const rateText = (coachId: string) => (rates[coachId] ?? "").trim();
+  // A rate is dollars and cents ("45" or "45.50"); anything else is flagged and counts as nothing (never half-read).
+  const rateCents = (coachId: string) => (rateText(coachId) === "" ? 0 : parseRateToCents(rateText(coachId)) ?? 0);
+  const rateInvalid = (coachId: string) => rateText(coachId) !== "" && parseRateToCents(rateText(coachId)) === null;
   const csvHref = () => {
     const q = new URLSearchParams({ groupId, from, to });
     for (const r of rows) if (rateCents(r.coachId) > 0) q.set(`rate_${r.coachId}`, String(rateCents(r.coachId)));
@@ -80,8 +80,10 @@ export function CoachActivityTable({ groupId, fromDay, toDay, rows, creditsSold 
                     value={rates[r.coachId] ?? ""}
                     onChange={(e) => setRates((prev) => ({ ...prev, [r.coachId]: e.target.value }))}
                     placeholder="0.00"
-                    className="w-24 h-9 bg-graphite border border-steel/30 text-chalk px-2 text-right font-body text-sm"
+                    aria-invalid={rateInvalid(r.coachId)}
+                    className={`w-24 h-9 bg-graphite border text-chalk px-2 text-right font-body text-sm ${rateInvalid(r.coachId) ? "border-rust" : "border-steel/30"}`}
                   />
+                  {rateInvalid(r.coachId) && <span className="block font-body text-xs text-rust mt-1">Use dollars and cents, like 45 or 45.50.</span>}
                 </td>
                 <td className="p-3 text-right tabular-nums">{money(estimateCents(r.sessionsDelivered, rateCents(r.coachId)))}</td>
               </tr>
@@ -99,7 +101,9 @@ export function CoachActivityTable({ groupId, fromDay, toDay, rows, creditsSold 
         </table>
       </div>
 
-      <p className="font-body text-xs text-steel mt-3">Session credits sold in this period: {creditsSold}.</p>
+      <p className="font-body text-xs text-steel mt-3">
+        Days run midnight to midnight in {timeZone}. Session credits sold in this period: {creditsSold}.
+      </p>
       <p className="font-body text-xs text-steel mt-1 max-w-[70ch]">
         The estimate is sessions delivered times the rate you type. It is an estimate to check against pay, not payroll: the rates are not saved and nothing is paid from here. The spreadsheet lists every session behind the numbers.
       </p>

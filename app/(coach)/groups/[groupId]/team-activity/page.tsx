@@ -6,6 +6,7 @@ import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { activityPeriod, loadCoachActivity } from "@/lib/coach-activity";
+import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { CoachActivityTable } from "@/components/org/coach-activity-table";
 
 // What each coach in the organization has done in a period, for the owner and admins: clients, sessions delivered, no-shows and late cancels, quiet clients, low balances, and a payroll ESTIMATE with a spreadsheet
@@ -29,7 +30,10 @@ export default async function TeamActivityPage(props: { params: Promise<{ groupI
     : { data: null };
   if (orgMembership?.role !== "owner" && orgMembership?.role !== "admin") return <NoAccess>Only the owner and admins can see what each coach has done.</NoAccess>;
 
-  const period = activityPeriod(search.from, search.to);
+  // Days are cut at midnight in the viewer's own time zone (their profile's), and the zone is shown on the page and in the spreadsheet.
+  const { data: zoneRow } = await supabase.from("profiles").select("timezone").eq("id", user.id).maybeSingle();
+  const timeZone = (zoneRow as { timezone?: string | null } | null)?.timezone || DEFAULT_COACH_TIMEZONE;
+  const period = activityPeriod(search.from, search.to, timeZone);
   const activity = await loadCoachActivity(supabase, { orgId: group!.organization_id as string, fromIso: period.fromIso, toIso: period.toIso });
 
   return (
@@ -55,7 +59,7 @@ export default async function TeamActivityPage(props: { params: Promise<{ groupI
           This period has more than the page can show. Choose a shorter period.
         </p>
       )}
-      <CoachActivityTable groupId={params.groupId} fromDay={period.fromDay} toDay={period.toDay} rows={activity.rows} creditsSold={activity.creditsSold} />
+      <CoachActivityTable groupId={params.groupId} fromDay={period.fromDay} toDay={period.toDay} timeZone={period.timeZone} rows={activity.rows} creditsSold={activity.creditsSold} />
     </CoachDesktopShell>
   );
 }
