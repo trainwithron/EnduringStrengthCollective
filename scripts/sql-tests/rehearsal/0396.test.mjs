@@ -23,7 +23,7 @@ export default {
       await h.asSuper();
       await db.query(`update public.group_memberships set private_from_org = true where group_id = $1 and profile_id = $2`, [privG, kPriv]);
       await db.query(`insert into public.session_types (organization_id, coach_id, name) values ($1, $2, 'LC type')`, [org, c1]);
-      const orgsBefore = (await db.query(`select count(*)::int as n from public.organizations`)).rows[0].n;
+      let orgsBefore = (await db.query(`select count(*)::int as n from public.organizations`)).rows[0].n;
 
       // ---- the owner removes the coach
       await h.as(owner);
@@ -70,6 +70,20 @@ export default {
       h.check("a leaving coach cannot be made the owner", /leaving/.test(r.error ?? ""), r.error);
       r = await tryQ(db, `select public.set_org_member_role($1, $2, 'admin')`, [org, c1]);
       h.check("nor made an admin", /leaving/.test(r.error ?? ""), r.error);
+      r = await tryQ(db, `select public.assign_group_coach($1, $2, false)`, [gymG, c1]);
+      h.check("nor chosen as a group's coach", /leaving/.test(r.error ?? ""), r.error);
+      // the server (or the SQL editor) can still hand an organization over
+      const ownerB = await h.user("LC Owner B");
+      const memberB = await h.user("LC Member B");
+      const orgB = await h.org(ownerB, "LC Gym B");
+      orgsBefore += 1; // this test made one more organization itself
+      await h.orgMember(orgB, memberB, "coach");
+      await h.asService();
+      r = await tryQ(db, `select public.transfer_organization_ownership($1, $2)`, [orgB, memberB]);
+      h.check("a service-role transfer of ownership still works" + (r.error ? ": " + r.error : ""), !r.error);
+      await h.asSuper();
+      h.check("and the new owner owns it", (await db.query(`select owner_id from public.organizations where id = $1`, [orgB])).rows[0].owner_id === memberB);
+      await h.as(owner);
       r = await tryQ(db, `select public.remove_org_member($1, $2, $3) as res`, [org, c5, c2]);
       h.check("the gym's own client still goes to a coach who is staying", !r.error);
 

@@ -72,8 +72,13 @@ describe("a leaving coach (migration 0396)", () => {
     // only the groups kept when they were marked leaving ever move, and the owner cannot be finished this way
     expect(sql).toContain("g.id = any (v_kept)");
     expect(sql).toContain("for update");
+    // the ownership transfer keeps the live service-role branch; the group-coach picker refuses a leaving member
+    expect(sql).toContain("if auth.role() = 'service_role' then");
+    expect(sql).toContain("profile_id = p_coach and departing_since is null");
     expect(sql).toContain("The owner of an organization cannot leave it this way.");
-    for (const f of ["lib/trainer-dispatch-gather.ts", "app/api/org/announce/route.ts", "lib/calendar-spotter-phase2-gather.ts", "lib/coach-activity.ts"]) expect(src(f), f).toContain('.is("departing_since", null)');
+    for (const f of ["lib/trainer-dispatch-gather.ts", "app/api/org/announce/route.ts", "lib/calendar-spotter-phase2-gather.ts"]) expect(src(f), f).toContain('.is("departing_since", null)');
+    // a leaving coach still has sessions and clients in the organization: they stay in the activity list, named and marked
+    expect(src("lib/coach-activity.ts")).toContain('" (leaving)"');
     expect(src("components/org/team-members-panel.tsx")).toContain("x.profileId !== m.profileId && !x.leaving");
     expect(src("app/(coach)/groups/[groupId]/branding/page.tsx")).toContain("m.profileId !== user.id && !m.leaving");
     expect(src("app/(coach)/groups/[groupId]/settings/page.tsx")).toContain('.is("departing_since", null)');

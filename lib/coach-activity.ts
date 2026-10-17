@@ -83,7 +83,7 @@ export async function loadCoachActivity(supabase: any, args: { orgId: string; fr
   };
 
   const [members, groups] = await Promise.all([
-    supabase.from("organization_memberships").select("profile_id, role, profiles ( full_name )").eq("organization_id", args.orgId).is("departing_since", null),
+    supabase.from("organization_memberships").select("profile_id, role, departing_since, profiles ( full_name )").eq("organization_id", args.orgId),
     pageAll((from: number, to: number) => supabase.from("groups").select("id").eq("organization_id", args.orgId).order("id").range(from, to), { maxPages: 100 }),
   ]);
   if (members.error) failed = true;
@@ -113,7 +113,7 @@ export async function loadCoachActivity(supabase: any, args: { orgId: string; fr
   for (const r of [seats, athletes, bookings, purchases, credits, lastActive]) mark(r);
 
   const nameOf = new Map<string, { name: string; role: string }>();
-  for (const m of (members.data ?? []) as any[]) nameOf.set(m.profile_id, { name: m.profiles?.full_name ?? "Coach", role: m.role });
+  for (const m of (members.data ?? []) as any[]) nameOf.set(m.profile_id, { name: (m.profiles?.full_name ?? "Coach") + (m.departing_since ? " (leaving)" : ""), role: m.role });
 
   const coachesByGroup = new Map<string, string[]>();
   for (const s of seats.rows) coachesByGroup.set(s.group_id, [...(coachesByGroup.get(s.group_id) ?? []), s.profile_id]);

@@ -37,7 +37,9 @@ as $function$
 declare
   v_current_owner uuid;
 begin
-  if auth.uid() is null then
+  if auth.role() = 'service_role' then
+    null;
+  elsif auth.uid() is null then
     raise exception 'Not authorized to transfer organization ownership';
   end if;
 
@@ -70,6 +72,42 @@ begin
     where organization_id = p_organization_id and profile_id = v_current_owner;
 end;
 $function$;
+create or replace function public.assign_group_coach(p_group uuid, p_coach uuid, p_drop_me boolean default true)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := auth.uid();
+  v_org uuid;
+begin
+  if me is null then
+    raise exception 'Sign in first.';
+  end if;
+  select organization_id into v_org from public.groups where id = p_group;
+  if v_org is null then
+    raise exception 'That group was not found.';
+  end if;
+  if not (public.is_org_owner_or_admin(v_org) or public.is_group_coach(p_group)) then
+    raise exception 'Only an owner, an admin or a coach of this group can choose its coach.';
+  end if;
+  if not exists (select 1 from public.organization_memberships where organization_id = v_org and profile_id = p_coach) then
+    raise exception 'Choose a member of this organization.';
+  end if;
+  if exists (select 1 from public.group_memberships a where a.group_id = p_group and a.role = 'athlete' and a.private_from_org)
+     and not public.is_group_coach(p_group) then
+    raise exception 'This client keeps their records private from the organization, so only their own coach can hand them on.';
+  end if;
+  if exists (select 1 from public.group_memberships a where a.group_id = p_group and a.profile_id = p_coach and a.role = 'athlete') then
+    raise exception 'That person is a client in this group, so they cannot also coach it.';
+  end if;
+  insert into public.group_memberships (group_id, profile_id, role) values (p_group, p_coach, 'coach') on conflict do nothing;
+  if p_drop_me and p_coach <> me then
+    delete from public.group_memberships where group_id = p_group and profile_id = me and role = 'coach';
+  end if;
+end;
+$$;
 create or replace function public.set_org_member_role(p_org uuid, p_profile uuid, p_role text)
 returns void
 language plpgsql
