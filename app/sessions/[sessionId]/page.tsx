@@ -4,6 +4,7 @@ import Link from "next/link";
 import { createCrossOrgServerClient as createServerClient } from "@/lib/supabase/server";
 import { SessionLogger } from "@/components/logging/session-logger";
 import { resumedStartedAt } from "@/lib/resume-elapsed";
+import { asSetType } from "@/lib/set-types";
 import type { PendingGateTask } from "@/components/session/rest-timer-bar";
 import { isHabitDueOn } from "@/lib/habits";
 import { DEFAULT_TRACKED_FIELDS } from "@/lib/exercise-fields";
@@ -132,6 +133,15 @@ export default async function SessionPage(
       ? supabase.from("workout_logs").select("id, posts ( id )").eq("session_id", params.sessionId).maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
+  // Which sets are warm-ups etc. Read on its own so the workout opens even if the set-type column is not there yet (every set is then a working set).
+  const setTypeById = new Map<string, string>();
+  {
+    const setIds = (sessionExercises ?? []).flatMap((se: any) => (se.set_logs ?? []).map((sl: any) => sl.id as string));
+    if (setIds.length > 0) {
+      const { data: typeRows, error: typeError } = await supabase.from("set_logs").select("id, set_type").in("id", setIds);
+      if (!typeError) for (const r of (typeRows ?? []) as Array<{ id: string; set_type: string | null }>) if (r.set_type) setTypeById.set(r.id, r.set_type);
+    }
+  }
   const gamificationEnabled = groupRow?.gamification_enabled ?? true;
   const viewerIsCoach = viewerMembership?.role === "coach";
   const canUploadVideo = isOwnSession || viewerIsCoach;
@@ -379,6 +389,7 @@ export default async function SessionPage(
             return {
               id: sl.id,
               setOrder: sl.set_order,
+              setType: asSetType(setTypeById.get(sl.id)),
               weight: sl.weight,
               reps: sl.reps,
               rpe: sl.rpe,

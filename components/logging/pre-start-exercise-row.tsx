@@ -21,7 +21,7 @@ export function PreStartExerciseRow({
   groupId: string;
   videoUrl?: string;
   lastTime?: { weight: number; reps: number };
-  goal?: { weight: number | null; reps: number | null };
+  goal?: { weight: number | null; reps: number | null; reason?: string };
 }) {
   const [swapping, setSwapping] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -80,6 +80,7 @@ export function PreStartExerciseRow({
               {goal.reps != null ? `${goal.reps} reps` : ""}
             </p>
           )}
+          {goal?.reason && <p className="font-body text-xs text-steel mt-0.5">{goal.reason}</p>}
         </div>
         <div className="flex items-center gap-3 shrink-0">
           {!demosHidden && (

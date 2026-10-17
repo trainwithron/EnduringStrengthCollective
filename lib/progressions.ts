@@ -11,6 +11,18 @@ export type ProgressionModel =
   | "double_progression"
   | "gzclp_t1"
   | "wave_from_training_max";
+import { roundLoad, DEFAULT_STEP } from "@/lib/load-rounding";
+import { countsForProgress } from "@/lib/set-types";
+
+// The set_type column arrives with its database step. Until it is there the same read is made without it (every set then counts as a working set), so goals never vanish because of the order things were released in.
+async function readLoggedSets(supabase: any, columns: string, narrow: (q: any) => any): Promise<{ data: any[] | null }> {
+  const first = await narrow(supabase.from("set_logs").select(columns));
+  if (first.error && /set_type/.test(String(first.error.message ?? ""))) {
+    return narrow(supabase.from("set_logs").select(columns.replace("set_type,", "")));
+  }
+  return first;
+}
+
 export type ProgressionUnit = "lbs" | "percent";
 
 export interface LinearConfig {
@@ -48,16 +60,24 @@ export type ProgressionConfig = LinearConfig | WaveConfig | DoubleProgressionCon
 export interface LoggedPerformance {
   weight: number;
   reps: number;
+  // Every counted (working / as-many-as-possible / back-off) set of that session. When given, double progression looks at ALL of them, not just the heaviest.
+  sets?: { weight: number; reps: number }[];
 }
 
 export interface ProgressionTarget {
   weight: number | null;
   reps: number | null;
+  // One plain sentence on why this is the number ("You hit 12 reps on every set at 135, so up to 140.").
+  reason?: string;
 }
 
+// A percent step is rounded DOWN to a weight that can be loaded (5 lb), and a step up never rounds back to where it started; an added amount stays exact (the coach chose it).
 function applyUnit(base: number, delta: number, unit: ProgressionUnit): number {
-  const result = unit === "percent" ? base * (1 + delta / 100) : base + delta;
-  return Math.round(result * 100) / 100;
+  if (unit === "percent") {
+    const rounded = roundLoad(base * (1 + delta / 100), DEFAULT_STEP.lb, "down");
+    return delta > 0 && rounded <= base ? base + DEFAULT_STEP.lb : rounded;
+  }
+  return Math.round((base + delta) * 100) / 100;
 }
 
 // The real GZCLP T1 cascade — fail the AMRAP-set minimum at a given
@@ -122,11 +142,14 @@ export function resolveGzclpT1Target({
     }
   }
 
+  const finalWeight = Math.round(weight * 100) / 100;
+  const label = GZCLP_T1_STAGES[stage].label;
   return {
-    weight: Math.round(weight * 100) / 100,
+    weight: finalWeight,
     reps: GZCLP_T1_STAGES[stage].minReps,
     stage: stage + 1,
-    stageLabel: GZCLP_T1_STAGES[stage].label,
+    stageLabel: label,
+    reason: priorOccurrences.length === 0 ? `First session: start at ${finalWeight} for ${label}.` : `${label} at ${finalWeight}, worked out from your last ${priorOccurrences.length} session${priorOccurrences.length === 1 ? "" : "s"}.`,
   };
 }
 
@@ -158,10 +181,9 @@ export function resolveProgressionTarget({
       if (!referenceLog) return { weight: null, reps: null };
       const { weightIncrement, repIncrement, unit } = config as LinearConfig;
       const steps = occurrenceIndex - 1;
-      return {
-        weight: applyUnit(referenceLog.weight, weightIncrement * steps, unit),
-        reps: referenceLog.reps + repIncrement * steps,
-      };
+      const weight = applyUnit(referenceLog.weight, weightIncrement * steps, unit);
+      const reps = referenceLog.reps + repIncrement * steps;
+      return { weight, reps, reason: `${weight} x ${reps}: ${steps} step${steps === 1 ? "" : "s"} up from your first session (${referenceLog.weight} x ${referenceLog.reps}).` };
     }
     case "wave":
     case "wave_from_training_max": {
@@ -175,20 +197,24 @@ export function resolveProgressionTarget({
         repsPattern.length > 0
           ? repsPattern[(occurrenceIndex - 1) % repsPattern.length]
           : referenceLog.reps;
-      return { weight, reps };
+      return { weight, reps, reason: `${weight} x ${reps}: this session's place in the wave, from ${referenceLog.weight}.` };
     }
     case "double_progression": {
       if (!previousOccurrenceLog) return { weight: null, reps: null };
       const { repRangeLow, repRangeHigh, weightIncrement, unit } = config as DoubleProgressionConfig;
-      if (previousOccurrenceLog.reps >= repRangeHigh) {
-        return {
-          weight: applyUnit(previousOccurrenceLog.weight, weightIncrement, unit),
-          reps: repRangeLow,
-        };
+      // EVERY counted set has to reach the top of the range before the weight goes up; the weakest set decides the next rep goal. (Without the list, the single logged set is all there is.)
+      const weights = previousOccurrenceLog.sets && previousOccurrenceLog.sets.length > 0 ? previousOccurrenceLog.sets : [previousOccurrenceLog];
+      const lowestReps = Math.min(...weights.map((s) => s.reps));
+      const w = previousOccurrenceLog.weight;
+      if (lowestReps >= repRangeHigh) {
+        const next = applyUnit(w, weightIncrement, unit);
+        return { weight: next, reps: repRangeLow, reason: `You hit ${repRangeHigh} reps on every set at ${w}, so up to ${next}.` };
       }
+      const reps = Math.min(lowestReps + 1, repRangeHigh);
       return {
-        weight: previousOccurrenceLog.weight,
-        reps: Math.min(previousOccurrenceLog.reps + 1, repRangeHigh),
+        weight: w,
+        reps,
+        reason: weights.length > 1 ? `Same weight, ${w}: your lowest set last time was ${lowestReps} reps, so aim for ${reps} on every set.` : `Same weight, ${w}: aim for ${reps} reps.`,
       };
     }
     default:
@@ -365,21 +391,22 @@ export async function getProgressionGoalsBatch(
   if (resolvedT1.length > 0) {
     const t1Query =
       t1NeededWorkoutIds.size > 0
-        ? await supabase
-            .from("set_logs")
-            .select(
-              `
-              reps, set_order,
+        ? await readLoggedSets(
+            supabase,
+            `
+              reps, set_order, set_type,
               session_exercises!inner (
                 exercise_name,
                 athlete_sessions!inner ( athlete_id, workout_id )
               )
-            `
-            )
-            .in("session_exercises.exercise_name", Array.from(t1NeededNames))
-            .eq("session_exercises.athlete_sessions.athlete_id", athleteId)
-            .in("session_exercises.athlete_sessions.workout_id", Array.from(t1NeededWorkoutIds))
-            .eq("status", "completed")
+            `,
+            (q) =>
+              q
+                .in("session_exercises.exercise_name", Array.from(t1NeededNames))
+                .eq("session_exercises.athlete_sessions.athlete_id", athleteId)
+                .in("session_exercises.athlete_sessions.workout_id", Array.from(t1NeededWorkoutIds))
+                .eq("status", "completed")
+          )
         : { data: [] };
 
     // Last (highest set_order) completed set per (exercise name, workout) —
@@ -387,6 +414,8 @@ export async function getProgressionGoalsBatch(
     const amrapByNameAndWorkout = new Map<string, number>();
     const bestOrderSeen = new Map<string, number>();
     for (const row of (t1Query.data ?? []) as any[]) {
+      // Warm-up and drop sets never count; an as-many-as-possible set is THE top set when one is marked.
+      if (!countsForProgress(row.set_type)) continue;
       const name = row.session_exercises.exercise_name as string;
       const workoutId = row.session_exercises.athlete_sessions.workout_id as string;
       const key = `${name}::${workoutId}`;
@@ -407,7 +436,7 @@ export async function getProgressionGoalsBatch(
         occurrenceIndex: r.occurrenceIndex,
         history,
       });
-      result.set(r.slotId, { weight: target.weight, reps: target.reps });
+      result.set(r.slotId, { weight: target.weight, reps: target.reps, reason: target.reason });
     }
   }
 
@@ -446,34 +475,45 @@ export async function getProgressionGoalsBatch(
 
   if (resolved.length === 0 || allNeededWorkoutIds.size === 0) return result;
 
-  const { data: priorSets } = await supabase
-    .from("set_logs")
-    .select(
-      `
-      weight, reps,
+  const { data: priorSets } = await readLoggedSets(
+    supabase,
+    `
+      weight, reps, set_type,
       session_exercises!inner (
         exercise_name,
         athlete_sessions!inner ( athlete_id, workout_id )
       )
-    `
-    )
-    .in("session_exercises.exercise_name", Array.from(allNeededNames))
-    .eq("session_exercises.athlete_sessions.athlete_id", athleteId)
-    .in("session_exercises.athlete_sessions.workout_id", Array.from(allNeededWorkoutIds))
-    .eq("status", "completed");
+    `,
+    (q) =>
+      q
+        .in("session_exercises.exercise_name", Array.from(allNeededNames))
+        .eq("session_exercises.athlete_sessions.athlete_id", athleteId)
+        .in("session_exercises.athlete_sessions.workout_id", Array.from(allNeededWorkoutIds))
+        .eq("status", "completed")
+  );
 
   // Best (highest-weight) completed log per (exercise name, workout) pair —
   // scoped by the compound key so different exercises' logs never mix.
   const bestByNameAndWorkout = new Map<string, LoggedPerformance>();
+  const setsByNameAndWorkout = new Map<string, { weight: number; reps: number }[]>();
   for (const row of (priorSets ?? []) as any[]) {
+    // Warm-up and drop sets never count toward what the next goal is.
+    if (!countsForProgress(row.set_type)) continue;
     const name = row.session_exercises.exercise_name as string;
     const workoutId = row.session_exercises.athlete_sessions.workout_id as string;
     const key = `${name}::${workoutId}`;
     const weight = row.weight ?? 0;
+    const list = setsByNameAndWorkout.get(key) ?? [];
+    list.push({ weight, reps: row.reps ?? 0 });
+    setsByNameAndWorkout.set(key, list);
     const existing = bestByNameAndWorkout.get(key);
     if (!existing || weight > existing.weight) {
       bestByNameAndWorkout.set(key, { weight, reps: row.reps ?? 0 });
     }
+  }
+  // The sets at the best weight are the ones double progression judges together.
+  for (const [key, best] of bestByNameAndWorkout) {
+    best.sets = (setsByNameAndWorkout.get(key) ?? []).filter((s) => s.weight === best.weight);
   }
 
   for (const r of resolved) {

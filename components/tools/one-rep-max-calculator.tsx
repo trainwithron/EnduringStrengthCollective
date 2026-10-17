@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { estimateOneRepMax, percentageTable } from "@/lib/one-rep-max";
 import { estimateTrainingMaxFromSet } from "@/lib/rpe-training-max";
+import { MAX_ESTIMATE_REPS, TRAINING_MAX_REPS_NOTE } from "@/lib/training-max";
 
 export function OneRepMaxCalculator() {
   const [weight, setWeight] = useState("225");
@@ -18,12 +19,8 @@ export function OneRepMaxCalculator() {
   const repsNum = Number(reps);
   const rpeNum = Number(rpe);
   const hasRpe = rpe.trim() !== "" && rpeNum >= 1 && rpeNum <= 10;
-  const valid = weightNum > 0 && repsNum >= 1 && repsNum <= 15;
-  const oneRm = valid
-    ? hasRpe
-      ? estimateTrainingMaxFromSet(weightNum, repsNum, rpeNum)
-      : estimateOneRepMax(weightNum, repsNum)
-    : null;
+  const valid = weightNum > 0 && repsNum >= 1 && repsNum <= MAX_ESTIMATE_REPS;
+  const oneRm = valid ? (hasRpe ? estimateTrainingMaxFromSet(weightNum, repsNum, rpeNum) : estimateOneRepMax(weightNum, repsNum)) : null;
   const table = oneRm ? percentageTable(oneRm) : [];
 
   return (
@@ -65,10 +62,8 @@ export function OneRepMaxCalculator() {
 
       {!valid && (
         <p className="font-body text-xs text-steel mt-3">
-          Enter a weight and 1–15 reps for an estimate (this formula gets
-          unreliable past that). Add how hard that set felt (RPE, 1-10)
-          for a more accurate estimate — leave it blank for a plain
-          reps-and-weight estimate instead.
+          Enter a weight and 1 to {MAX_ESTIMATE_REPS} reps for an estimate. {TRAINING_MAX_REPS_NOTE} Add how hard that set felt (RPE, 1-10)
+          for a more accurate estimate; leave it blank and it is treated as RPE 9, the same assumption your saved training maxes use.
         </p>
       )}
 

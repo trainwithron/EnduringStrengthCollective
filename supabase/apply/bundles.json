@@ -1,5 +1,13 @@
 [
  {
+  "id": "release-cl",
+  "name": "Release CL (the kind of each set; records per number of reps; a warm-up or drop set never counts; run BEFORE the code that goes with it is live)",
+  "steps": [
+   "136"
+  ],
+  "file": "apply-release-cl-all.sql"
+ },
+ {
   "id": "release-d",
   "name": "Release D",
   "steps": [

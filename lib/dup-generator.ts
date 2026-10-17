@@ -44,10 +44,12 @@ export interface DupLiftInput {
   trainingMax: number;
 }
 
+import { roundLoad } from "@/lib/load-rounding";
+
 export interface DupGeneratorInput {
   lifts: DupLiftInput[];
   weeksToGenerate: number;
-  // Weight rounds to the nearest multiple of this — real gyms don't
+  // Weight rounds DOWN to a multiple of this — real gyms don't
   // load fractional-pound plates. 5 for lbs, 2.5 for kg.
   roundToNearest?: number;
 }
@@ -66,7 +68,8 @@ export function generateDupProgram({
     DUP_WEEKLY_SCHEME.forEach((scheme, dayIndex) => {
       for (const lift of lifts) {
         const rawWeight = lift.trainingMax * scheme.percentOfTrainingMax;
-        const weight = Math.round(rawWeight / roundToNearest) * roundToNearest;
+        // A percent of a max rounds DOWN to a weight that can be loaded (never more than the percent says).
+        const weight = roundLoad(rawWeight, roundToNearest, "down");
         rows.push({
           week: String(week),
           day: `Day ${dayIndex + 1} — ${scheme.label}`,

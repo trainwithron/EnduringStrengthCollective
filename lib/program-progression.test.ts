@@ -85,11 +85,11 @@ describe("program-wide double progression", () => {
   it("is the rule the engine already reads: reps at the top add the weight and go back to the bottom", () => {
     const config = doubleConfig(DEFAULT_DOUBLE);
     const top = resolveProgressionTarget({ model: "double_progression", config, occurrenceIndex: 2, referenceLog: null, previousOccurrenceLog: { weight: 100, reps: 12 } });
-    expect(top).toEqual({ weight: 105, reps: 8 });
+    expect(top).toMatchObject({ weight: 105, reps: 8 });
     const mid = resolveProgressionTarget({ model: "double_progression", config, occurrenceIndex: 2, referenceLog: null, previousOccurrenceLog: { weight: 100, reps: 9 } });
-    expect(mid).toEqual({ weight: 100, reps: 10 });
+    expect(mid).toMatchObject({ weight: 100, reps: 10 });
     // the first time there is nothing to compare
-    expect(resolveProgressionTarget({ model: "double_progression", config, occurrenceIndex: 1, referenceLog: null, previousOccurrenceLog: null })).toEqual({ weight: null, reps: null });
+    expect(resolveProgressionTarget({ model: "double_progression", config, occurrenceIndex: 1, referenceLog: null, previousOccurrenceLog: null })).toMatchObject({ weight: null, reps: null });
   });
 });
 

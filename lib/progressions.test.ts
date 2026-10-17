@@ -10,7 +10,7 @@ describe("resolveProgressionTarget", () => {
       referenceLog: { weight: 200, reps: 5 },
       previousOccurrenceLog: null,
     });
-    expect(result).toEqual({ weight: null, reps: null });
+    expect(result).toMatchObject({ weight: null, reps: null });
   });
 
   describe("linear model", () => {
@@ -22,7 +22,7 @@ describe("resolveProgressionTarget", () => {
         referenceLog: { weight: 200, reps: 5 },
         previousOccurrenceLog: null,
       });
-      expect(result).toEqual({ weight: 210, reps: 5 });
+      expect(result).toMatchObject({ weight: 210, reps: 5 });
     });
 
     it("applies a percentage increment relative to the reference weight", () => {
@@ -33,7 +33,7 @@ describe("resolveProgressionTarget", () => {
         referenceLog: { weight: 200, reps: 5 },
         previousOccurrenceLog: null,
       });
-      expect(result).toEqual({ weight: 210, reps: 5 });
+      expect(result).toMatchObject({ weight: 210, reps: 5 });
     });
 
     it("also steps reps when repIncrement is set", () => {
@@ -44,7 +44,7 @@ describe("resolveProgressionTarget", () => {
         referenceLog: { weight: 100, reps: 5 },
         previousOccurrenceLog: null,
       });
-      expect(result).toEqual({ weight: 100, reps: 8 });
+      expect(result).toMatchObject({ weight: 100, reps: 8 });
     });
 
     it("returns nulls with no reference log to progress from", () => {
@@ -55,7 +55,7 @@ describe("resolveProgressionTarget", () => {
         referenceLog: null,
         previousOccurrenceLog: null,
       });
-      expect(result).toEqual({ weight: null, reps: null });
+      expect(result).toMatchObject({ weight: null, reps: null });
     });
   });
 
@@ -74,7 +74,7 @@ describe("resolveProgressionTarget", () => {
         referenceLog: { weight: 200, reps: 5 },
         previousOccurrenceLog: null,
       });
-      expect(occurrence2).toEqual({ weight: 190, reps: 8 });
+      expect(occurrence2).toMatchObject({ weight: 190, reps: 8 });
     });
 
     it("wraps back to the start of the pattern once it's exhausted", () => {
@@ -85,7 +85,7 @@ describe("resolveProgressionTarget", () => {
         referenceLog: { weight: 200, reps: 5 },
         previousOccurrenceLog: null,
       });
-      expect(occurrence4).toEqual({ weight: 200, reps: 5 });
+      expect(occurrence4).toMatchObject({ weight: 200, reps: 5 });
     });
 
     it("falls back to the reference log directly when no pattern is configured", () => {
@@ -96,7 +96,7 @@ describe("resolveProgressionTarget", () => {
         referenceLog: { weight: 200, reps: 5 },
         previousOccurrenceLog: null,
       });
-      expect(result).toEqual({ weight: 200, reps: 5 });
+      expect(result).toMatchObject({ weight: 200, reps: 5 });
     });
   });
 
@@ -111,7 +111,7 @@ describe("resolveProgressionTarget", () => {
         referenceLog: null,
         previousOccurrenceLog: { weight: 200, reps: 8 },
       });
-      expect(result).toEqual({ weight: 205, reps: 5 });
+      expect(result).toMatchObject({ weight: 205, reps: 5 });
     });
 
     it("adds one rep and holds weight while still under the ceiling", () => {
@@ -122,7 +122,7 @@ describe("resolveProgressionTarget", () => {
         referenceLog: null,
         previousOccurrenceLog: { weight: 200, reps: 6 },
       });
-      expect(result).toEqual({ weight: 200, reps: 7 });
+      expect(result).toMatchObject({ weight: 200, reps: 7 });
     });
 
     it("never proposes reps above the range ceiling", () => {
@@ -144,7 +144,7 @@ describe("resolveProgressionTarget", () => {
         referenceLog: { weight: 200, reps: 5 },
         previousOccurrenceLog: null,
       });
-      expect(result).toEqual({ weight: null, reps: null });
+      expect(result).toMatchObject({ weight: null, reps: null });
     });
   });
 
@@ -165,7 +165,7 @@ describe("resolveProgressionTarget", () => {
         referenceLog: null,
         previousOccurrenceLog: { weight: 135, reps: 10 },
       });
-      expect(result).toEqual({ weight: 140, reps: 10 });
+      expect(result).toMatchObject({ weight: 140, reps: 10 });
     });
 
     it("never targets more than 10 reps — a degenerate range can't climb", () => {
@@ -191,7 +191,7 @@ describe("resolveProgressionTarget", () => {
         referenceLog: null,
         previousOccurrenceLog: { weight: 95, reps: 18 },
       });
-      expect(result).toEqual({ weight: 95, reps: 19 });
+      expect(result).toMatchObject({ weight: 95, reps: 19 });
     });
 
     it("bumps weight and resets to 15 once the AMRAP set reaches 25", () => {
@@ -202,7 +202,7 @@ describe("resolveProgressionTarget", () => {
         referenceLog: null,
         previousOccurrenceLog: { weight: 95, reps: 25 },
       });
-      expect(result).toEqual({ weight: 105, reps: 15 });
+      expect(result).toMatchObject({ weight: 105, reps: 15 });
     });
   });
 
@@ -215,19 +215,19 @@ describe("resolveProgressionTarget", () => {
 
     it("occurrence 1 starts at Stage 1 (5x3+) with the configured starting weight", () => {
       const result = resolveGzclpT1Target({ config, occurrenceIndex: 1, history: [] });
-      expect(result).toEqual({ weight: 135, reps: 3, stage: 1, stageLabel: "5x3+" });
+      expect(result).toMatchObject({ weight: 135, reps: 3, stage: 1, stageLabel: "5x3+" });
     });
 
     it("hitting the Stage 1 AMRAP minimum adds weight and stays at Stage 1", () => {
       const history: GzclpT1Occurrence[] = [{ occurrenceIndex: 1, amrapReps: 3 }];
       const result = resolveGzclpT1Target({ config, occurrenceIndex: 2, history });
-      expect(result).toEqual({ weight: 140, reps: 3, stage: 1, stageLabel: "5x3+" });
+      expect(result).toMatchObject({ weight: 140, reps: 3, stage: 1, stageLabel: "5x3+" });
     });
 
     it("missing the Stage 1 minimum drops to Stage 2 at the SAME weight (not a deload)", () => {
       const history: GzclpT1Occurrence[] = [{ occurrenceIndex: 1, amrapReps: 2 }];
       const result = resolveGzclpT1Target({ config, occurrenceIndex: 2, history });
-      expect(result).toEqual({ weight: 135, reps: 2, stage: 2, stageLabel: "6x2+" });
+      expect(result).toMatchObject({ weight: 135, reps: 2, stage: 2, stageLabel: "6x2+" });
     });
 
     it("keeps compounding weight across consecutive Stage 1 successes", () => {
@@ -236,7 +236,7 @@ describe("resolveProgressionTarget", () => {
         { occurrenceIndex: 2, amrapReps: 4 },
       ];
       const result = resolveGzclpT1Target({ config, occurrenceIndex: 3, history });
-      expect(result).toEqual({ weight: 145, reps: 3, stage: 1, stageLabel: "5x3+" });
+      expect(result).toMatchObject({ weight: 145, reps: 3, stage: 1, stageLabel: "5x3+" });
     });
 
     it("only resets weight after failing Stage 3 specifically, not after 3 failures at one scheme", () => {
@@ -246,7 +246,7 @@ describe("resolveProgressionTarget", () => {
         { occurrenceIndex: 3, amrapReps: 0 }, // fail Stage 3 (need 1) -> deload 10%, back to Stage 1
       ];
       const result = resolveGzclpT1Target({ config, occurrenceIndex: 4, history });
-      expect(result).toEqual({ weight: 121.5, reps: 3, stage: 1, stageLabel: "5x3+" });
+      expect(result).toMatchObject({ weight: 120, reps: 3, stage: 1, stageLabel: "5x3+" });
     });
 
     it("succeeding at Stage 3 adds weight and stays at Stage 3, rather than resetting", () => {
@@ -256,7 +256,7 @@ describe("resolveProgressionTarget", () => {
         { occurrenceIndex: 3, amrapReps: 1 }, // pass Stage 3 (need 1) -> weight up, stays Stage 3
       ];
       const result = resolveGzclpT1Target({ config, occurrenceIndex: 4, history });
-      expect(result).toEqual({ weight: 140, reps: 1, stage: 3, stageLabel: "10x1+" });
+      expect(result).toMatchObject({ weight: 140, reps: 1, stage: 3, stageLabel: "10x1+" });
     });
 
     it("skips occurrences with no logged AMRAP result rather than treating them as a failure", () => {
@@ -265,7 +265,7 @@ describe("resolveProgressionTarget", () => {
         { occurrenceIndex: 2, amrapReps: null }, // never logged — ignored, not a fail
       ];
       const result = resolveGzclpT1Target({ config, occurrenceIndex: 3, history });
-      expect(result).toEqual({ weight: 140, reps: 3, stage: 1, stageLabel: "5x3+" });
+      expect(result).toMatchObject({ weight: 140, reps: 3, stage: 1, stageLabel: "5x3+" });
     });
   });
 
@@ -288,7 +288,7 @@ describe("resolveProgressionTarget", () => {
         referenceLog: { weight: 300, reps: 1 },
         previousOccurrenceLog: null,
       });
-      expect(result).toEqual({ weight: 270, reps: 10 });
+      expect(result).toMatchObject({ weight: 270, reps: 10 });
     });
 
     it("cycles the same weightDeltas/repsPattern rotation as plain wave", () => {
@@ -299,7 +299,7 @@ describe("resolveProgressionTarget", () => {
         referenceLog: { weight: 300, reps: 1 },
         previousOccurrenceLog: null,
       });
-      expect(result).toEqual({ weight: 300, reps: 5 });
+      expect(result).toMatchObject({ weight: 300, reps: 5 });
     });
 
     it("returns nulls with no training max to reference from", () => {
@@ -310,7 +310,7 @@ describe("resolveProgressionTarget", () => {
         referenceLog: null,
         previousOccurrenceLog: null,
       });
-      expect(result).toEqual({ weight: null, reps: null });
+      expect(result).toMatchObject({ weight: null, reps: null });
     });
   });
 
@@ -322,6 +322,6 @@ describe("resolveProgressionTarget", () => {
       referenceLog: { weight: 200, reps: 5 },
       previousOccurrenceLog: null,
     });
-    expect(result).toEqual({ weight: null, reps: null });
+    expect(result).toMatchObject({ weight: null, reps: null });
   });
 });

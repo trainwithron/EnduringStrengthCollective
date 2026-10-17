@@ -14,7 +14,7 @@ describe("generateDupProgram", () => {
     expect(rows).toHaveLength(2 /* weeks */ * 3 /* days */ * 2 /* lifts */);
   });
 
-  it("computes weight as training-max times the day's percentage, rounded to the nearest 5", () => {
+  it("computes weight as training-max times the day's percentage, rounded down to a loadable 5", () => {
     const rows = generateDupProgram({
       lifts: [{ exerciseName: "Back Squat", trainingMax: 303 }],
       weeksToGenerate: 1,
@@ -23,8 +23,8 @@ describe("generateDupProgram", () => {
     expect(rows[0]).toMatchObject({ weight: 210, sets: 4, reps: "10-12" });
     // Day 2 (Strength, 87.5%): 303 * 0.875 = 265.125 -> rounds to 265
     expect(rows[1]).toMatchObject({ weight: 265, sets: 4, reps: "3-5" });
-    // Day 3 (Power/Moderate, 77.5%): 303 * 0.775 = 234.825 -> rounds to 235
-    expect(rows[2]).toMatchObject({ weight: 235, sets: 3, reps: "6-8" });
+    // Day 3 (Power/Moderate, 77.5%): 303 * 0.775 = 234.825 -> rounds DOWN to 230
+    expect(rows[2]).toMatchObject({ weight: 230, sets: 3, reps: "6-8" });
   });
 
   it("rounds to a custom increment when provided (e.g. kg plates)", () => {
@@ -99,7 +99,7 @@ describe("generateDupSelfUpdatingProgram", () => {
       previousOccurrenceLog: null,
     });
     // Path A's Day 1 (Hypertrophy, 70%): 300 * 0.7 = 210
-    expect(day1).toEqual({ weight: 210, reps: 11 });
+    expect(day1).toMatchObject({ weight: 210, reps: 11 });
 
     const day2 = resolveProgressionTarget({
       model: "wave_from_training_max",
@@ -108,7 +108,7 @@ describe("generateDupSelfUpdatingProgram", () => {
       referenceLog: { weight: 300, reps: 1 },
       previousOccurrenceLog: null,
     });
-    // Path A's Day 2 (Strength, 87.5%): 300 * 0.875 = 262.5
-    expect(day2).toEqual({ weight: 262.5, reps: 4 });
+    // Path A's Day 2 (Strength, 87.5%): 300 * 0.875 = 262.5, which rounds down to the 260 that can be loaded
+    expect(day2).toMatchObject({ weight: 260, reps: 4 });
   });
 });

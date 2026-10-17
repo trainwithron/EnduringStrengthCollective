@@ -617,11 +617,34 @@ export function ExerciseSetGrid({
         <div className="flex items-center gap-1.5">
           <div className="w-12 shrink-0" />
           <div className="w-8 shrink-0" />
-          {sets.map((set, i) => (
-            <span key={set.id} className="w-12 shrink-0 text-center font-body text-xs text-steel">
-              {i + 1}
-            </span>
-          ))}
+          {sets.map((set, i) => {
+            const warmup = set.setType === "warmup";
+            // Tap the set number to mark it a warm-up (it then never counts toward goals, records or your max) and tap again to undo.
+            if (readOnly) {
+              return (
+                <span key={set.id} className="w-12 shrink-0 text-center font-body text-xs text-steel">
+                  {warmup ? "W" : i + 1}
+                </span>
+              );
+            }
+            return (
+              <button
+                key={set.id}
+                type="button"
+                aria-pressed={warmup}
+                aria-label={warmup ? `Set ${i + 1} is a warm-up. Tap to make it a working set.` : `Mark set ${i + 1} as a warm-up`}
+                title={warmup ? "Warm-up (tap to change)" : "Tap to mark as a warm-up"}
+                onClick={() => {
+                  const next = warmup ? "working" : "warmup";
+                  onSetChange(set.id, { setType: next });
+                  save(set.id, { set_type: next });
+                }}
+                className={`w-12 shrink-0 min-h-11 text-center font-body text-xs ${warmup ? "text-rust font-bold" : "text-steel"}`}
+              >
+                {warmup ? "W" : i + 1}
+              </button>
+            );
+          })}
         </div>
 
         {fields.map((field) => (

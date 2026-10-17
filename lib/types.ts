@@ -45,6 +45,8 @@ export type SetLogStatus = "pending" | "completed" | "skipped";
 export interface SetLogEntry {
   id: string;
   setOrder: number;
+  // Warm-up, working, as-many-as-possible, back-off or drop. Missing means a working set. Only counted types move progression, records and training maxes (lib/set-types.ts).
+  setType?: "warmup" | "working" | "amrap" | "backoff" | "drop";
   weight: number | null;
   reps: number | null;
   rpe: number | null;

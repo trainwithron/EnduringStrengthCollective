@@ -2646,6 +2646,32 @@ alter table public.coach_availability_windows drop column if exists session_minu
   },
 ];
 
+STEPS.push({
+  n: "136",
+  slug: "0385",
+  title: "0385 The kind of each set (warm-up, working, as-many-as-possible, back-off, drop); a warm-up or drop set never counts toward a goal, a record or a training max; records are per number of reps and a longer hold is a record; a training max comes only from a set of 1 to 8 reps",
+  migrations: ["0385"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes on screen at first. Every set already logged is a working set. From now on a client can tap a set number to mark it a warm-up; a warm-up or drop set no longer sets a record or a training max. A personal record now means no earlier set was at least as heavy for at least as many reps, and for a hold a longer time is the record. A training max is estimated only from sets of 1 to 8 reps. Marking a saved set a warm-up rebuilds that exercise's training max.",
+  undo: [
+    "drop trigger if exists set_logs_set_type_recompute on public.set_logs;",
+    "drop function if exists public.recompute_on_set_type_change();",
+    fnFromMigration("0372", "recompute_training_maxes"),
+    fnFromMigration("0372", "recompute_training_max"),
+    fnFromMigration("0372", "complete_workout_session"),
+    "alter table public.set_logs drop constraint if exists set_logs_set_type_check;",
+    "alter table public.set_logs drop column if exists set_type;",
+    "alter table public.group_workout_exercise_sets drop constraint if exists group_workout_exercise_sets_set_type_check;",
+    "alter table public.group_workout_exercise_sets drop column if exists set_type;",
+  ].join("\n"),
+  undoWhy: "Only if step 136 misbehaves. Puts back the earlier training-max, record and workout-completion functions exactly and removes the set-type columns (every set is then an ordinary set again).",
+  rows: [
+    ["0385 is not already applied (the set-type column is not there yet)", "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'set_logs' and column_name = 'set_type')"],
+    ["the functions it replaces exist", "to_regprocedure('public.recompute_training_maxes(uuid, text)') is not null and to_regprocedure('public.recompute_training_max()') is not null and to_regprocedure('public.complete_workout_session(uuid)') is not null"],
+    ["the imported-history flag it builds on exists", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'set_logs' and column_name = 'data_flag')"],
+  ],
+});
+
 const bar = "-- ".padEnd(3) + "=".repeat(100);
 const header = (s, kind) => {
   const lines = [
@@ -2718,6 +2744,7 @@ for (const s of STEPS) {
 // that names the release, the step and the failed checks, and nothing is kept. After the commit one read-only result row per step says whether it is in place.
 // The individual step files stay as the fallback (and for a release that was partly applied by hand: the bundle refuses at the first applied step).
 const BUNDLES = [
+  { id: "release-cl", name: "Release CL (the kind of each set; records per number of reps; a warm-up or drop set never counts; run BEFORE the code that goes with it is live)", steps: ["136"] },
   { id: "release-d", name: "Release D", steps: ["32", "33", "34"] },
   { id: "release-f", name: "Release F", steps: ["35", "36", "37"] },
   { id: "release-h", name: "Release H (refund fix)", steps: ["38"] },
@@ -2987,6 +3014,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
     m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
+    m("0385", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'set_logs' and column_name = 'set_type')"),
     m("0384", "to_regprocedure('public.is_group_private_from_org(uuid)') is not null"),
     m("0383", "to_regclass('public.sms_suppressed_numbers') is not null"),
     m("0382", "to_regprocedure('public.training_partner_is_protected(uuid)') is not null"),

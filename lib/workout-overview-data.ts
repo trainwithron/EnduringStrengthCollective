@@ -30,7 +30,7 @@ export interface WorkoutOverviewData {
   dayNotes: { id: string; body: string }[];
   lastTimeByExercise: Record<string, { weight: number; reps: number }>;
   videoUrlByExerciseId: Map<string, string>;
-  goalByExerciseId: Map<string, { weight: number | null; reps: number | null }>;
+  goalByExerciseId: Map<string, { weight: number | null; reps: number | null; reason?: string }>;
   // Correlating-week weight suggestion, keyed by this set's own template
   // id — a grayed-out placeholder shown in the logging UI, never
   // auto-committed as a real value (see lib/set-suggestions.ts).

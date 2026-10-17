@@ -67,6 +67,7 @@ from (
     ('2026100600331', 'purchase_grants_once', '0331_purchase_grants_once.sql', to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null),
     ('2026100600338', 'guardian_links_scoped', '0338_guardian_links_scoped.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'guardian_links' and column_name = 'expires_at')),
     ('2026100600367', 'rest_range', '0367_rest_range.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')),
+    ('2026100600385', 'set_types_and_records', '0385_set_types_and_records.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'set_logs' and column_name = 'set_type')),
     ('2026100600384', 'privacy_closures', '0384_privacy_closures.sql', to_regprocedure('public.is_group_private_from_org(uuid)') is not null),
     ('2026100600383', 'sms_number_suppression', '0383_sms_number_suppression.sql', to_regclass('public.sms_suppressed_numbers') is not null),
     ('2026100600382', 'minors_and_health_closures', '0382_minors_and_health_closures.sql', to_regprocedure('public.training_partner_is_protected(uuid)') is not null),

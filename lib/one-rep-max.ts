@@ -1,8 +1,9 @@
-// Epley formula — the most common estimated-1RM formula, accurate enough
-// for training-percentage planning without needing a max-effort test.
-export function estimateOneRepMax(weight: number, reps: number): number {
-  if (reps <= 1) return Math.round(weight);
-  return Math.round(weight * (1 + reps / 30));
+import { estimateTrainingMax } from "@/lib/training-max";
+
+// The one estimate used everywhere (lib/training-max.ts): Epley with the reps left in reserve, whole pounds. A set with no RPE counts as RPE 9. Null for a set of more than 8 reps (not reliable).
+export function estimateOneRepMax(weight: number, reps: number): number | null {
+  const t = estimateTrainingMax(weight, reps, null);
+  return t == null ? null : Math.round(t);
 }
 
 export function percentageTable(oneRepMax: number): { pct: number; weight: number }[] {

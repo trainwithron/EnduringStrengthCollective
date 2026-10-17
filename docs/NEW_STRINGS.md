@@ -4,6 +4,12 @@
 - Workout screen, when a set could not upload yet: "{n} change hasn't uploaded yet." / "{n} changes haven't uploaded yet." then "Saved on this phone. It uploads when you're back online." (replaces "haven't saved yet / Your numbers are still here, we'll keep trying.")
 - Offline page (shown with no signal for a page that was never opened): "You're offline" / "Sets you already logged on this phone are safe and upload when you're back online. A workout you opened earlier still opens from Home." / button "Try again".
 
+## Release C (progression and records)
+- Logger: tap a set's number to mark it a warm-up (shows W; tap again to undo). Screen-reader labels: "Mark set {n} as a warm-up" / "Set {n} is a warm-up. Tap to make it a working set." Hover text "Tap to mark as a warm-up".
+- Workout start screen: under "Goal: 140 lbs x 5 reps" one plain sentence of why, for example "You hit 12 reps on every set at 135, so up to 140." / "Same weight, 135: your lowest set last time was 9 reps, so aim for 10 on every set." / "5x3+ at 100, worked out from your last 6 sessions." / "140 x 5: 2 steps up from your first session (135 x 5)."
+- 1-rep-max calculator: "Enter a weight and 1 to 8 reps for an estimate. Use a set of 8 reps or fewer: an estimate from more reps is not reliable. Add how hard that set felt (RPE, 1-10) for a more accurate estimate; leave it blank and it is treated as RPE 9, the same assumption your saved training maxes use."
+- Share card "est. 1RM" line now uses the same estimate; for a set of more than 8 reps it says "new weight PR" instead.
+
 ## Release B (builder reliability, assigned workouts)
 - Undo bar after a delete in the program builder: "Deleted {exercise}." / "Deleted the note." / "Deleted \"{day}\"." / "Deleted Week {n}." with button "Undo" (while putting back: "Putting back…"). Failures: "Couldn't put that exercise back — add it again." (same for note, day, week).
 - Deleting an exercise no longer asks "are you sure" (it can be undone for 15 seconds). Day and week confirms now end "You can undo this for a few seconds." instead of "This can't be undone."

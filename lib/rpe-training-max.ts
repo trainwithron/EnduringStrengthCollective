@@ -14,9 +14,9 @@
 // extension of Epley rather than a reproduction of any single named/
 // branded RPE chart verbatim (that distinction matters given this
 // feature's own IP-grounding discipline).
+import { estimateTrainingMax } from "@/lib/training-max";
+
 export function estimateTrainingMaxFromSet(weight: number, reps: number, rpe: number): number | null {
   if (!weight || weight <= 0 || !reps || reps <= 0 || !rpe) return null;
-  const reserveReps = Math.max(0, 10 - rpe);
-  const effectiveReps = reps + reserveReps;
-  return Math.round(weight * (1 + effectiveReps / 30) * 10) / 10;
+  return estimateTrainingMax(weight, reps, Math.min(10, rpe));
 }

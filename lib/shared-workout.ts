@@ -162,7 +162,7 @@ export async function getSharedWorkout(postId: string, opts: { fullName?: boolea
         return {
           name,
           primary: `${best.weight} lbs × ${best.reps}`,
-          secondary: `est. 1RM ${estimateOneRepMax(best.weight, best.reps)} lbs`,
+          secondary: estimateOneRepMax(best.weight, best.reps) != null ? `est. 1RM ${estimateOneRepMax(best.weight, best.reps)} lbs` : "new weight PR",
         };
       }
       if (best.distance != null) {
@@ -387,6 +387,7 @@ export async function getSharedWorkout(postId: string, opts: { fullName?: boolea
         if (sessionExercise.athlete_sessions?.athlete_id !== post.author_id) continue;
         if (row.weight == null || row.reps == null) continue;
         const est = estimateOneRepMax(row.weight, row.reps);
+        if (est == null) continue;
         const name = sessionExercise.exercise_name;
         const current = priorBestEst1RmByName.get(name);
         if (current == null || est > current) priorBestEst1RmByName.set(name, est);
@@ -394,6 +395,7 @@ export async function getSharedWorkout(postId: string, opts: { fullName?: boolea
 
       for (const [name, best] of bestByExercise) {
         const currentEst1Rm = estimateOneRepMax(best.weight, best.reps);
+        if (currentEst1Rm == null) continue;
         const milestone = computeRelativeStrengthMilestone(
           currentEst1Rm,
           priorBestEst1RmByName.get(name) ?? null,
