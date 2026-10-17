@@ -283,10 +283,52 @@ begin
   return jsonb_build_object('members_left', v_members, 'groups_moved', v_taken);
 end;
 $$;
+drop function if exists public.lift_departure_block(uuid, uuid);
+drop function if exists public.end_departure_access(uuid, uuid);
+drop function if exists public._end_coach_access(uuid, uuid);
+drop function if exists public.remove_org_member(uuid, uuid, uuid, boolean);
+create or replace function public.remove_org_member(p_org uuid, p_profile uuid, p_hand_to uuid default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := auth.uid();
+  target_role public.org_member_role;
+  result jsonb;
+begin
+  if me is null then
+    raise exception 'Sign in first.';
+  end if;
+  if not public.is_org_owner_or_admin(p_org) then
+    raise exception 'Only an owner or admin can remove a member.';
+  end if;
+  select role into target_role from public.organization_memberships where organization_id = p_org and profile_id = p_profile;
+  if not found then
+    raise exception 'That person is not part of this organization.';
+  end if;
+  if p_profile = me then
+    raise exception 'To leave yourself, use Leave.';
+  end if;
+  if target_role = 'owner' then
+    raise exception 'The owner cannot be removed. Hand the organization over first.';
+  end if;
+  if target_role = 'admin' and not exists (select 1 from public.organizations where id = p_org and owner_id = me) then
+    raise exception 'Only the owner can remove an admin.';
+  end if;
+  result := public._detach_coach_from_org(p_org, p_profile, p_hand_to, false);
+  perform public.audit_record('organization_memberships', p_org::text || ':' || p_profile::text, 'update', jsonb_build_object('event', 'remove_member', 'removed_by', me, 'hand_to', p_hand_to) || result);
+  return result;
+end;
+$$;
+grant execute on function public.remove_org_member(uuid, uuid, uuid) to authenticated, service_role;
+-- the two extra notification kinds are left in the list (removing them could break rows that use them)
 drop policy if exists "push_subscriptions_select_org_owner" on public.push_subscriptions;
 create policy "push_subscriptions_select_org_owner" on public.push_subscriptions for select to authenticated using (exists (select 1 from public.organization_memberships om_owner join public.organization_memberships om_caller on om_caller.organization_id = om_owner.organization_id where om_owner.profile_id = push_subscriptions.profile_id and om_owner.role = 'owner' and om_caller.profile_id = (select auth.uid())));
 drop policy if exists "org_memberships_select_self" on public.organization_memberships;
 drop function if exists public.complete_departure(uuid, uuid);
+alter table public.organization_memberships drop column if exists closure_notified_at, drop column if exists reminded_1d_at, drop column if exists reminded_3d_at, drop column if exists departure_notified_at, drop column if exists access_ended_at, drop column if exists fired_at;
 alter table public.organization_memberships drop column if exists departing_group_ids;
 alter table public.organization_memberships drop column if exists departing_since;
 commit;

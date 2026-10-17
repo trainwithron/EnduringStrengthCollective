@@ -22,11 +22,11 @@ describe("a leaving coach (migration 0396)", () => {
   it("reads the organizations the coach is leaving, by the organization's display name when it has one", async () => {
     const rows = [
       { organization_id: "o1", departing_since: "2026-10-17T00:00:00Z", organizations: { name: "Iron Works", display_name: "Iron Works Gym" } },
-      { organization_id: "o2", departing_since: "2026-10-18T00:00:00Z", organizations: { name: "Peak", display_name: null } },
+      { organization_id: "o2", departing_since: "2026-10-18T00:00:00Z", fired_at: "2026-10-18T00:00:00Z", access_ended_at: "2026-10-18T00:00:00Z", organizations: { name: "Peak", display_name: null } },
     ];
     expect(await loadMyDepartures(fakeDb({ data: rows }), "u1")).toEqual([
-      { organizationId: "o1", organizationName: "Iron Works Gym", since: "2026-10-17T00:00:00Z" },
-      { organizationId: "o2", organizationName: "Peak", since: "2026-10-18T00:00:00Z" },
+      { organizationId: "o1", organizationName: "Iron Works Gym", since: "2026-10-17T00:00:00Z", fired: false, endedAt: null },
+      { organizationId: "o2", organizationName: "Peak", since: "2026-10-18T00:00:00Z", fired: true, endedAt: "2026-10-18T00:00:00Z" },
     ]);
   });
 
@@ -36,14 +36,14 @@ describe("a leaving coach (migration 0396)", () => {
     expect(await loadMyDepartures(fakeDb({ data: null }), "u1")).toEqual([]);
   });
 
-  it("the banner offers exactly the two choices: start my own account (coming soon, email us) and export everything", () => {
+  it("the banner offers the two choices inside the seven days, and the one export after them", () => {
     const banner = src("components/coach/leaving-coach-banner.tsx");
     expect(banner).toContain("Keep my clients and everything: start my own account");
-    expect(banner).toContain("Coming soon:");
-    expect(banner).toContain("email us");
+    expect(banner).toContain("<StartOwnAccountButton");
+    expect(banner).toContain("/api/coach/exit-export");
     expect(banner).toContain("Export everything I have");
     expect(banner).toContain("<ExportBusinessButton");
-    // nothing is bought or created from here
+    // nothing is bought from here: the new account starts on the standard free trial
     expect(banner).not.toMatch(/stripe|checkout|price/i);
   });
 
@@ -54,7 +54,8 @@ describe("a leaving coach (migration 0396)", () => {
     const panel = src("components/org/team-members-panel.tsx");
     expect(panel).toContain("m.leaving");
     expect(panel).toContain("&& !m.leaving;");
-    expect(panel).toContain(">Leaving<");
+    expect(panel).toContain('m.fired ? "Let go" : "Leaving"');
+    expect(panel).toContain("p_fired: kind === \"fired\"");
     expect(src("components/org/leave-organization-control.tsx")).toContain('?.leaving ? "/dashboard"');
   });
 

@@ -35,6 +35,7 @@ export const CRON_JOBS: CronJob[] = [
   { job: "series-top-up", path: "/api/cron/series-top-up", maxAgeHours: DAILY },
   { job: "close-stale-sessions", path: "/api/cron/close-stale-sessions", maxAgeHours: DAILY },
   { job: "notification-push", path: "/api/cron/notification-push", maxAgeHours: FREQUENT },
+  { job: "departing-coaches", path: "/api/cron/departing-coaches", maxAgeHours: 12 },
   { job: "cron-watchdog", path: "/api/cron/cron-watchdog", maxAgeHours: DAILY },
 ];
 
@@ -46,6 +47,7 @@ export const MONITORING_STARTED = new Date("2026-10-06T02:39:00Z");
 export const JOB_ADDED: Record<string, Date> = {
   "close-stale-sessions": new Date("2026-10-17T00:00:00Z"),
   "notification-push": new Date("2026-10-17T00:00:00Z"),
+  "departing-coaches": new Date("2026-10-18T00:00:00Z"),
 };
 export const NEW_JOB_GRACE_HOURS = 48;
 

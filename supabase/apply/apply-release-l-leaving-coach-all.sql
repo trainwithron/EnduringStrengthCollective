@@ -20,6 +20,7 @@ begin
       ('0396 is not already applied (the leaving mark is not there yet)', not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'organization_memberships' and column_name = 'departing_since')),
       ('the offboarding steps it replaces exist (step 143 is applied)', to_regprocedure('public.remove_org_member(uuid, uuid, uuid)') is not null and to_regprocedure('public._detach_coach_from_org(uuid, uuid, uuid, boolean)') is not null and to_regprocedure('public._solo_org_for(uuid, uuid)') is not null),
       ('the audit writer exists', to_regprocedure('public.audit_record(text, text, text, jsonb)') is not null),
+      ('the notification type rule exists to be widened', exists (select 1 from pg_constraint c where c.conname = 'notifications_type_check' and c.conrelid = 'public.notifications'::regclass)),
       ('the pieces it replaces exist (member check, seat count, ownership transfer, role change, owner push policy)', to_regprocedure('public.is_org_member(uuid)') is not null and to_regprocedure('public.org_coach_seats(uuid)') is not null and to_regprocedure('public.transfer_organization_ownership(uuid, uuid)') is not null and to_regprocedure('public.set_org_member_role(uuid, uuid, text)') is not null and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'push_subscriptions' and policyname = 'push_subscriptions_select_org_owner'))
   ) as checks(check_name, ok) where not ok;
   if failed is not null then
@@ -42,6 +43,13 @@ $g148$;
 alter table public.organization_memberships add column if not exists departing_since timestamptz;
 -- The groups the coach kept when they were marked leaving: the only groups complete_departure may ever move.
 alter table public.organization_memberships add column if not exists departing_group_ids uuid[] not null default '{}';
+-- Let go by the organization (fired), when coaching access actually ended, and which notices were sent (each sent once).
+alter table public.organization_memberships add column if not exists fired_at timestamptz;
+alter table public.organization_memberships add column if not exists access_ended_at timestamptz;
+alter table public.organization_memberships add column if not exists departure_notified_at timestamptz;
+alter table public.organization_memberships add column if not exists reminded_3d_at timestamptz;
+alter table public.organization_memberships add column if not exists reminded_1d_at timestamptz;
+alter table public.organization_memberships add column if not exists closure_notified_at timestamptz;
 
 -- A member who is leaving is NOT a member for anything organization-wide: the roster, prospects and their contact details, tags, support requests, billing and the rest that are open to "a member of this
 -- organization" are closed to them the moment they are marked. What they keep is what belongs to them or to their own clients: their seat in the groups they kept (group membership), the rows filed under
@@ -387,12 +395,20 @@ declare
   v_new uuid;
   v_groups int := 0;
   v_kept uuid[];
+  v_fired timestamptz;
+  v_ended timestamptz;
 begin
   -- the membership row is locked, so a retried or simultaneous call waits and then finds the coach already gone
-  select departing_group_ids into v_kept from public.organization_memberships
+  select departing_group_ids, fired_at, access_ended_at into v_kept, v_fired, v_ended from public.organization_memberships
     where organization_id = p_org and profile_id = p_coach and departing_since is not null for update;
   if not found then
     raise exception 'That coach is not leaving this organization.';
+  end if;
+  if v_fired is not null then
+    raise exception 'A coach who was let go cannot start their own account here.';
+  end if;
+  if v_ended is not null then
+    raise exception 'The seven days to choose have ended.';
   end if;
   if exists (select 1 from public.organizations where id = p_org and owner_id = p_coach) then
     raise exception 'The owner of an organization cannot leave it this way.';
@@ -425,6 +441,161 @@ end;
 $$;
 revoke execute on function public.complete_departure(uuid, uuid) from public, anon, authenticated;
 grant execute on function public.complete_departure(uuid, uuid) to service_role;
+
+-- Coaching access ends: the coach's seats in the groups they kept are taken away (the clients, their records and their history stay exactly where they are, private from the organization and with
+-- no coach), and the moment is recorded. Internal.
+create or replace function public._end_coach_access(p_org uuid, p_coach uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_ids uuid[];
+begin
+  select departing_group_ids into v_ids from public.organization_memberships
+    where organization_id = p_org and profile_id = p_coach and departing_since is not null and access_ended_at is null for update;
+  if not found then
+    return;
+  end if;
+  delete from public.group_memberships where profile_id = p_coach and role = 'coach' and group_id = any (v_ids);
+  update public.organization_memberships set access_ended_at = now() where organization_id = p_org and profile_id = p_coach;
+end;
+$$;
+revoke execute on function public._end_coach_access(uuid, uuid) from public, anon, authenticated;
+grant execute on function public._end_coach_access(uuid, uuid) to service_role;
+
+-- The server's daily job, seven days after a coach was marked leaving (and not let go, not already ended): coaching access ends. Returns whether it did.
+create or replace function public.end_departure_access(p_org uuid, p_coach uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (
+    select 1 from public.organization_memberships
+    where organization_id = p_org and profile_id = p_coach and departing_since is not null and fired_at is null and access_ended_at is null
+      and departing_since <= now() - interval '7 days'
+  ) then
+    return false;
+  end if;
+  perform public._end_coach_access(p_org, p_coach);
+  perform public.audit_record('organization_memberships', p_org::text || ':' || p_coach::text, 'update', jsonb_build_object('event', 'departure_window_ended'));
+  return true;
+end;
+$$;
+revoke execute on function public.end_departure_access(uuid, uuid) from public, anon, authenticated;
+grant execute on function public.end_departure_access(uuid, uuid) to service_role;
+
+-- The owner or an admin removes a coach and says which kind it is: p_fired false = they are leaving on good terms (seven days to choose), true = they are being let go (coaching access ends at once, and the
+-- coach cannot start their own account here). Replaces the three-argument version (which keeps working: p_fired defaults to false).
+drop function if exists public.remove_org_member(uuid, uuid, uuid);
+create or replace function public.remove_org_member(p_org uuid, p_profile uuid, p_hand_to uuid default null, p_fired boolean default false)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := auth.uid();
+  target_role public.org_member_role;
+  result jsonb;
+begin
+  if me is null then
+    raise exception 'Sign in first.';
+  end if;
+  if not public.is_org_owner_or_admin(p_org) then
+    raise exception 'Only an owner or admin can remove a member.';
+  end if;
+  select role into target_role from public.organization_memberships where organization_id = p_org and profile_id = p_profile;
+  if not found then
+    raise exception 'That person is not part of this organization.';
+  end if;
+  if p_profile = me then
+    raise exception 'To leave yourself, use Leave.';
+  end if;
+  if target_role = 'owner' then
+    raise exception 'The owner cannot be removed. Hand the organization over first.';
+  end if;
+  if target_role = 'admin' and not exists (select 1 from public.organizations where id = p_org and owner_id = me) then
+    raise exception 'Only the owner can remove an admin.';
+  end if;
+  result := public._detach_coach_from_org(p_org, p_profile, p_hand_to, false);
+  if p_fired and coalesce((result ->> 'leaving')::boolean, false) then
+    update public.organization_memberships set fired_at = now() where organization_id = p_org and profile_id = p_profile;
+    perform public._end_coach_access(p_org, p_profile);
+  end if;
+  perform public.audit_record('organization_memberships', p_org::text || ':' || p_profile::text, 'update', jsonb_build_object('event', 'remove_member', 'removed_by', me, 'hand_to', p_hand_to, 'fired', p_fired) || result);
+  return result;
+end;
+$$;
+revoke execute on function public.remove_org_member(uuid, uuid, uuid, boolean) from public, anon;
+grant execute on function public.remove_org_member(uuid, uuid, uuid, boolean) to authenticated, service_role;
+
+-- Only a platform administrator: lifts a "let go" (or an ended window): the coach's seats come back, and they get a fresh seven days to choose.
+create or replace function public.lift_departure_block(p_org uuid, p_coach uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_ids uuid[];
+begin
+  if auth.uid() is null or not coalesce(public.is_platform_admin(), false) then
+    raise exception 'Only a platform administrator can do that.';
+  end if;
+  select departing_group_ids into v_ids from public.organization_memberships
+    where organization_id = p_org and profile_id = p_coach and departing_since is not null for update;
+  if not found then
+    raise exception 'That coach is not leaving this organization.';
+  end if;
+  insert into public.group_memberships (group_id, profile_id, role)
+    select g.id, p_coach, 'coach' from public.groups g where g.id = any (v_ids) and g.organization_id = p_org
+    on conflict do nothing;
+  update public.organization_memberships
+    set fired_at = null, access_ended_at = null, departing_since = now(),
+        departure_notified_at = null, reminded_3d_at = null, reminded_1d_at = null, closure_notified_at = null
+    where organization_id = p_org and profile_id = p_coach;
+  perform public.audit_record('organization_memberships', p_org::text || ':' || p_coach::text, 'update', jsonb_build_object('event', 'lift_departure_block', 'by', auth.uid()));
+end;
+$$;
+revoke execute on function public.lift_departure_block(uuid, uuid) from public, anon;
+grant execute on function public.lift_departure_block(uuid, uuid) to authenticated, service_role;
+
+-- Two new kinds of notice: the reminder to a leaving coach, and the notice to a closed coach's clients.
+do $types$
+declare
+  v_def text;
+  v_have text[];
+  v_all text[];
+  v_new_def text;
+  v_after int;
+begin
+  select pg_get_constraintdef(c.oid) into v_def
+  from pg_constraint c
+  where c.conname = 'notifications_type_check' and c.conrelid = 'public.notifications'::regclass;
+  if v_def is null then
+    raise exception 'notifications_type_check was not found, so the notification types cannot be widened. NOTHING was changed.';
+  end if;
+  select coalesce(array_agg(m[1] order by m[1]), '{}') into v_have from regexp_matches(v_def, '''([^'']+)''::text', 'g') as m;
+  if coalesce(cardinality(v_have), 0) < 5 then
+    raise exception 'Could not read the existing notification types from the live constraint (%). NOTHING was changed.', v_def;
+  end if;
+  select array_agg(distinct t order by t) into v_all from unnest(v_have || array['coach_departure_reminder', 'coach_account_closed']) as t;
+  alter table public.notifications drop constraint notifications_type_check;
+  execute format(
+    'alter table public.notifications add constraint notifications_type_check check (type = any (array[%s]))',
+    (select string_agg(quote_literal(t) || '::text', ', ') from unnest(v_all) as t)
+  );
+  select pg_get_constraintdef(c.oid) into v_new_def from pg_constraint c where c.conname = 'notifications_type_check' and c.conrelid = 'public.notifications'::regclass;
+  select count(*) into v_after from regexp_matches(v_new_def, '''([^'']+)''::text', 'g');
+  if v_after <> cardinality(v_all) or cardinality(v_all) < cardinality(v_have) or exists (select 1 from unnest(v_have) t where t <> all (v_all)) then
+    raise exception 'The rebuilt notification type list does not match the live one (% before, % after). NOTHING was changed.', cardinality(v_have), v_after;
+  end if;
+end
+$types$;
 
 -- The solo-organization helper is kept (complete_departure uses it) and stays server-only; remove_org_member and leave_organization (0391) already call _detach_coach_from_org and so need no change.
 

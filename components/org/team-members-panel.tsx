@@ -15,6 +15,8 @@ export interface TeamMember {
   soleClients: number;
   // Left the team (or the team closed) but still coaches clients who are private from it, and has not yet chosen what to do (migration 0396).
   leaving?: boolean;
+  // Let go by the organization (shown as "Let go" instead of "Leaving").
+  fired?: boolean;
 }
 
 export interface TeamInvite {
@@ -50,6 +52,8 @@ export function TeamMembersPanel({
   const [error, setError] = useState<string | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
   const [handTo, setHandTo] = useState("");
+  // The one question when removing a coach: let go ("fired") or leaving on good terms ("good").
+  const [kind, setKind] = useState<"" | "fired" | "good">("");
   const [closing, setClosing] = useState(false);
   const [typedName, setTypedName] = useState("");
   const isOwner = myRole === "owner";
@@ -105,14 +109,19 @@ export function TeamMembersPanel({
       setError(`Choose who takes over ${m.fullName}'s ${m.soleClients} client${m.soleClients === 1 ? "" : "s"} first.`);
       return;
     }
+    if (!kind) {
+      setError(`Say whether ${m.fullName} is being let go or is leaving on good terms.`);
+      return;
+    }
     const takeover = members.find((x) => x.profileId === handTo && !x.leaving)?.fullName;
     const message = needsHandOver
-      ? `Remove ${m.fullName} from ${organizationName}? They lose access to every client here right away. Their ${m.soleClients} client${m.soleClients === 1 ? "" : "s"} stay${m.soleClients === 1 ? "s" : ""} with ${organizationName} and ${takeover} takes over, with all history, programs and credits. A client who keeps their records private from the organization stays with ${m.fullName}; they are then marked as leaving and choose what to do next.`
-      : `Remove ${m.fullName} from ${organizationName}? They lose access to every client here right away. A client who keeps their records private from the organization stays with ${m.fullName}; they are then marked as leaving and choose what to do next.`;
+      ? `Remove ${m.fullName} from ${organizationName}? They lose access to every client here right away. Their ${m.soleClients} client${m.soleClients === 1 ? "" : "s"} stay${m.soleClients === 1 ? "s" : ""} with ${organizationName} and ${takeover} takes over, with all history, programs and credits. A client who keeps their records private from the organization stays with ${m.fullName}; ${kind === "fired" ? "Because they are being let go, their coaching access ends right now and they cannot start their own account here." : "They get seven days to choose whether to start their own account or export everything."}`
+      : `Remove ${m.fullName} from ${organizationName}? They lose access to every client here right away. A client who keeps their records private from the organization stays with ${m.fullName}. ${kind === "fired" ? "Because they are being let go, their coaching access ends right now and they cannot start their own account here." : "They get seven days to choose whether to start their own account or export everything."}`;
     if (!(await confirmDialog({ message, confirmLabel: "Remove", destructive: true }))) return;
-    await run(`remove-${m.profileId}`, () => db().rpc("remove_org_member", { p_org: organizationId, p_profile: m.profileId, p_hand_to: needsHandOver ? handTo : null }), () => {
+    await run(`remove-${m.profileId}`, () => db().rpc("remove_org_member", { p_org: organizationId, p_profile: m.profileId, p_hand_to: needsHandOver ? handTo : null, p_fired: kind === "fired" }), () => {
       setRemoving(null);
       setHandTo("");
+      setKind("");
     });
   }
 
@@ -194,7 +203,7 @@ export function TeamMembersPanel({
                   {m.fullName}
                   {m.profileId === me ? <span className="text-steel"> (you)</span> : null}
                   <span className="text-steel text-xs uppercase tracking-wide ml-2">{ROLE_WORD[m.role] ?? m.role}</span>
-                  {m.leaving ? <span className="text-rust text-xs uppercase tracking-wide ml-2">Leaving</span> : null}
+                  {m.leaving ? <span className="text-rust text-xs uppercase tracking-wide ml-2">{m.fired ? "Let go" : "Leaving"}</span> : null}
                 </p>
                 {isOwnerOrAdmin && (
                   <p className="font-body text-xs text-steel">
@@ -209,7 +218,7 @@ export function TeamMembersPanel({
                       {m.role === "admin" ? "Make a coach" : "Make an admin"}
                     </button>
                   )}
-                  <button type="button" onClick={() => { setRemoving(m.profileId); setError(null); setHandTo(""); }} className="font-body text-xs text-rust">
+                  <button type="button" onClick={() => { setRemoving(m.profileId); setError(null); setHandTo(""); setKind(""); }} className="font-body text-xs text-rust">
                     Remove
                   </button>
                 </div>
@@ -233,6 +242,17 @@ export function TeamMembersPanel({
                   ) : (
                     <p className="font-body text-xs text-steel">{m.fullName} has no clients that need a new coach.</p>
                   )}
+                  <fieldset className="mt-3">
+                    <legend className="font-body text-xs text-steel">Why are they going?</legend>
+                    <label className="flex items-center gap-2 min-h-11 font-body text-sm">
+                      <input type="radio" name={`kind-${m.profileId}`} checked={kind === "good"} onChange={() => setKind("good")} />
+                      They are leaving on their own / on good terms
+                    </label>
+                    <label className="flex items-center gap-2 min-h-11 font-body text-sm">
+                      <input type="radio" name={`kind-${m.profileId}`} checked={kind === "fired"} onChange={() => setKind("fired")} />
+                      They are being let go
+                    </label>
+                  </fieldset>
                   <div className="flex items-center gap-3 mt-3">
                     <button type="button" onClick={() => remove(m)} disabled={busy === `remove-${m.profileId}`} className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40">
                       {busy === `remove-${m.profileId}` ? "Removing…" : "Remove"}

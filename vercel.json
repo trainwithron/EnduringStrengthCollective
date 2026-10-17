@@ -93,6 +93,10 @@
       "schedule": "*/5 * * * *"
     },
     {
+      "path": "/api/cron/departing-coaches",
+      "schedule": "0 */6 * * *"
+    },
+    {
       "path": "/api/cron/cron-watchdog",
       "schedule": "0 9 * * *"
     }

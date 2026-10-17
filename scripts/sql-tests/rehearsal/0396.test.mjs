@@ -153,6 +153,78 @@ export default {
       await h.asSuper();
       h.check("the closing coach's client is exactly where it was", (await db.query(`select organization_id from public.groups where id = $1`, [closeG])).rows[0].organization_id === org && (await seat(closeG, c4)));
       h.check("organizations created across the whole test: only the one the server made", (await db.query(`select count(*)::int as n from public.organizations`)).rows[0].n === orgsBefore + 1);
+
+      // ================= quit (seven days) and fired (at once), in an organization of their own
+      const o2 = await h.user("LD Owner");
+      const quitter = await h.user("LD Quitter");
+      const fired = await h.user("LD Fired");
+      const kQ = await h.user("LD Quitter Client");
+      const kF = await h.user("LD Fired Client");
+      const admin = await h.user("LD Platform Admin");
+      const org2 = await h.org(o2, "LD Gym");
+      await h.orgMember(org2, quitter, "coach");
+      await h.orgMember(org2, fired, "coach");
+      const gQ = await h.group(org2, quitter, "one_on_one", "LD quitter client");
+      await h.member(gQ, kQ);
+      const gF = await h.group(org2, fired, "one_on_one", "LD fired client");
+      await h.member(gF, kF);
+      await h.asSuper();
+      await db.query(`update public.group_memberships set private_from_org = true where (group_id = $1 and profile_id = $2) or (group_id = $3 and profile_id = $4)`, [gQ, kQ, gF, kF]);
+      await db.query(`update public.profiles set is_platform_admin = true where id = $1`, [admin]);
+      const orgsAfterSetup = await count(`select count(*)::int as n from public.organizations`);
+
+      // QUIT: the owner says they are leaving on good terms -> seven days
+      await h.as(o2);
+      r = await tryQ(db, `select public.remove_org_member($1, $2, null, false) as res`, [org2, quitter]);
+      h.check("the owner removes a coach who is leaving on good terms" + (r.error ? ": " + r.error : ""), !r.error);
+      await h.asSuper();
+      let qm = (await db.query(`select fired_at, access_ended_at, departing_since from public.organization_memberships where organization_id = $1 and profile_id = $2`, [org2, quitter])).rows[0];
+      h.check("the quitter is leaving, not let go, and keeps coaching", qm.departing_since != null && qm.fired_at == null && qm.access_ended_at == null && (await seat(gQ, quitter)));
+      await h.asService();
+      r = await tryQ(db, `select public.end_departure_access($1, $2) as ended`, [org2, quitter]);
+      h.check("on day zero the server does not end their access", r.rows?.[0]?.ended === false, JSON.stringify(r));
+      await h.asSuper();
+      await db.query(`update public.organization_memberships set departing_since = now() - interval '8 days' where organization_id = $1 and profile_id = $2`, [org2, quitter]);
+      await h.as(quitter);
+      r = await tryQ(db, `select public.end_departure_access($1, $2)`, [org2, quitter]);
+      h.check("the coach cannot end their own window", !!r.error);
+      await h.asService();
+      r = await tryQ(db, `select public.end_departure_access($1, $2) as ended`, [org2, quitter]);
+      h.check("after seven days the server ends their coaching access", r.rows?.[0]?.ended === true, JSON.stringify(r));
+      await h.asSuper();
+      h.check("their seat is gone, their client and the record of the group are exactly where they were", !(await seat(gQ, quitter)) && (await count(`select count(*)::int as n from public.group_memberships where group_id = $1 and profile_id = $2 and role = 'athlete'`, [gQ, kQ])) === 1 && (await db.query(`select organization_id from public.groups where id = $1`, [gQ])).rows[0].organization_id === org2);
+      await h.asService();
+      r = await tryQ(db, `select public.end_departure_access($1, $2) as ended`, [org2, quitter]);
+      h.check("a second run does nothing", r.rows?.[0]?.ended === false);
+      r = await tryQ(db, `select public.complete_departure($1, $2)`, [org2, quitter]);
+      h.check("and they can no longer start their own account here", /seven days/.test(r.error ?? ""), r.error);
+
+      // FIRED: coaching access ends at once, and they cannot start their own account
+      await h.as(o2);
+      r = await tryQ(db, `select public.remove_org_member($1, $2, null, true) as res`, [org2, fired]);
+      h.check("the owner lets a coach go" + (r.error ? ": " + r.error : ""), !r.error);
+      await h.asSuper();
+      const fm = (await db.query(`select fired_at, access_ended_at from public.organization_memberships where organization_id = $1 and profile_id = $2`, [org2, fired])).rows[0];
+      h.check("they are marked let go, and their access ended at once", fm.fired_at != null && fm.access_ended_at != null && !(await seat(gF, fired)));
+      h.check("their client is untouched", (await count(`select count(*)::int as n from public.group_memberships where group_id = $1 and profile_id = $2 and role = 'athlete'`, [gF, kF])) === 1);
+      await h.asService();
+      r = await tryQ(db, `select public.complete_departure($1, $2)`, [org2, fired]);
+      h.check("a coach who was let go cannot start their own account", /let go/.test(r.error ?? ""), r.error);
+      await h.as(o2);
+      r = await tryQ(db, `select public.lift_departure_block($1, $2)`, [org2, fired]);
+      h.check("the owner cannot lift it", !!r.error);
+      await h.as(admin);
+      r = await tryQ(db, `select public.lift_departure_block($1, $2)`, [org2, fired]);
+      h.check("a platform administrator can" + (r.error ? ": " + r.error : ""), !r.error);
+      await h.asSuper();
+      h.check("the coach's seat is back and the block is gone", (await seat(gF, fired)) && (await db.query(`select fired_at, access_ended_at from public.organization_memberships where organization_id = $1 and profile_id = $2`, [org2, fired])).rows[0].fired_at == null);
+
+      // A quitter within the window starts their own account: the organization has no billing row, so it is on the standard trial
+      await h.asService();
+      r = await tryQ(db, `select public.complete_departure($1, $2) as res`, [org2, fired]);
+      h.check("then they can start their own account" + (r.error ? ": " + r.error : ""), !r.error);
+      await h.asSuper();
+      h.check("exactly one organization was made, and it has no billing row (the standard trial from its start)", (await count(`select count(*)::int as n from public.organizations`)) === orgsAfterSetup + 1 && (await count(`select count(*)::int as n from public.organization_billing where organization_id = $1`, [r.rows[0].res.organization_id])) === 0);
     },
   },
 };
