@@ -53,7 +53,7 @@ export const remindCoach = (db: any, a: { coachId: string; orgName: string; days
     origin: a.origin,
   });
 
-export const sendCoachTheirExport = (db: any, a: { coachId: string; orgName: string; fired: boolean; origin: string; couldNotStore?: boolean; nothingToExport?: boolean }) =>
+export const sendCoachTheirExport = (db: any, a: { coachId: string; orgName: string; fired: boolean; origin: string; organizationId: string; couldNotStore?: boolean; nothingToExport?: boolean }) =>
   tell(db, {
     profileId: a.coachId,
     type: "coach_departure_reminder",
@@ -61,7 +61,8 @@ export const sendCoachTheirExport = (db: any, a: { coachId: string; orgName: str
     body: a.nothingToExport
       ? `${a.fired ? `Your coaching access with ${a.orgName} has ended.` : `Your ${WINDOW_DAYS} days with ${a.orgName} are over and your coaching access has ended.`} You had no clients to take with you, so there is nothing to export.`
       : `${a.fired ? `Your coaching access with ${a.orgName} has ended.` : `Your ${WINDOW_DAYS} days with ${a.orgName} are over and your coaching access has ended.`} Everything for the clients you kept is in one download: clients, programs, workouts, sets, bookings, credits and notes. ${a.couldNotStore ? "It is too large to prepare ahead, so it is made when you open the link, and that can take a few minutes. If it does not finish, write to support. " : ""}The link needs you to sign in, and it works for ${EXPORT_LINK_DAYS} days.`,
-    linkPath: a.nothingToExport ? "/dashboard" : "/api/coach/exit-export",
+    // the organization is named, so a coach whose access ended in two organizations gets the right export
+    linkPath: a.nothingToExport ? "/dashboard" : `/api/coach/exit-export?organizationId=${encodeURIComponent(a.organizationId)}`,
     origin: a.origin,
   });
 

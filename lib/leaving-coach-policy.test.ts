@@ -109,6 +109,10 @@ describe("wiring of the seven days", () => {
     const sql = src("supabase/migrations/0396_leaving_coach_choice.sql");
     expect(sql.split("perform public._give_orphans_to_owner(p_org, p_coach)").length - 1).toBe(2);
   });
+  it("the emailed export link names the organization, so a coach who left two gets the right one", () => {
+    expect(src("lib/leaving-coach-notify.ts")).toContain("/api/coach/exit-export?organizationId=${encodeURIComponent(a.organizationId)}");
+    expect(src("app/api/cron/departing-coaches/route.ts")).toContain("organizationId: row.organization_id, orgName");
+  });
   it("an ended coach sees why and the way to their export instead of a dead end", () => {
     const home = src("app/(coach)/dashboard/page.tsx");
     expect(home.indexOf("filter((d) => d.endedAt)")).toBeGreaterThan(-1);
