@@ -21,8 +21,17 @@ import { CollectiveIntelligenceChat } from "@/components/coach/desktop/collectiv
 function CoachHomeShellFull({ orgName, children }: { orgName: string; children: React.ReactNode }) {
   return (
     <TerminologyProvider>
-    <div className="min-h-screen bg-graphite text-chalk flex">
-      <aside className="w-60 shrink-0 border-r border-steel/20 flex flex-col">
+    <div className="min-h-screen bg-graphite text-chalk lg:flex">
+      {/* On a phone the 240px sidebar would take two thirds of the screen: it becomes a slim top bar, and the sidebar returns from the lg breakpoint. */}
+      <header className="lg:hidden flex items-center justify-between gap-3 px-4 min-h-14 border-b border-steel/20">
+        <Link href="/dashboard" className="flex items-center gap-2 min-h-11 font-body text-sm text-rust">
+          <Home className="w-4 h-4 shrink-0" strokeWidth={2.25} />
+          Home
+        </Link>
+        <p className="font-display font-bold text-sm uppercase truncate">{orgName}</p>
+        <HeaderNotificationBell placement="below" />
+      </header>
+      <aside className="hidden lg:flex w-60 shrink-0 border-r border-steel/20 flex-col">
         <div className="px-5 pt-6 pb-5 border-b border-steel/20">
           <p className="font-body text-xs text-steel uppercase tracking-wide">Coaching</p>
           <h1 className="font-display font-bold text-lg uppercase leading-tight truncate mt-1">{orgName}</h1>
@@ -49,7 +58,7 @@ function CoachHomeShellFull({ orgName, children }: { orgName: string; children: 
           <SignOutButton />
         </div>
       </aside>
-      <main className="flex-1 px-8 py-8 max-w-5xl">{children}</main>
+      <main className="flex-1 min-w-0 px-4 py-6 lg:px-8 lg:py-8 max-w-5xl">{children}</main>
       {/* Same "available everywhere" mount as CoachDesktopShell, so the
           brand-new-coach fallback branch of Home isn't missing it. */}
       {/* Desktop-only edge tab: on phones the Spotlight hub is the single entry,
