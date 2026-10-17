@@ -185,6 +185,31 @@ describe("the five free uses", () => {
     const db = fakeDb({ orgs: [org], usedUses: FREE_TIER_AI_USES });
     expect((await takeFreeTierUse(db, "c2", "program")).ok).toBe(false);
   });
+  it("a big organization's pool is read 100 ids at a time, and still counts right", async () => {
+    const members = Array.from({ length: 450 }, (_, i) => "m" + i);
+    const db = fakeDb({ orgs: [{ ...expired, members }], usedUses: 3 });
+    const calls: number[] = [];
+    const original = db.from.bind(db);
+    (db as any).from = (table: string) => {
+      const t: any = original(table);
+      if (table === "ai_usage_log" && t.select) {
+        const sel = t.select;
+        t.select = (...a: unknown[]) => {
+          const q = sel(...a);
+          const realIn = q.in;
+          q.in = (col: string, ids: string[]) => {
+            if (col === "coach_id") calls.push(ids.length);
+            return realIn(col, ids);
+          };
+          return q;
+        };
+      }
+      return t;
+    };
+    expect(await takeFreeTierUse(db, "c1", "program")).toMatchObject({ ok: true, free: true, used: 4 });
+    expect(Math.max(...calls)).toBeLessThanOrEqual(100);
+    expect(calls.length).toBeGreaterThanOrEqual(5);
+  });
   it("takes nothing and allows everything off the free tier", async () => {
     const db = fakeDb({ orgs: [{ ...expired, createdDaysAgo: 3 }] });
     expect(await takeFreeTierUse(db, "c1", "program")).toEqual({ ok: true, free: false });

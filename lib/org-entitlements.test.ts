@@ -63,8 +63,9 @@ describe("deriveOrgEntitlements", () => {
     expect(unpaid.freeTier).toBe(true);
     expect(unpaid.accessLevel).toBe("full");
     const pastDue = deriveOrgEntitlements(row({ subscriptionStatus: "past_due", pastDueSince: daysAgoIso(GRACE_DAYS + 5) }), daysAgo(400), now, true);
-    expect(pastDue.accessLevel).toBe("locked");
-    expect(pastDue.freeTier).toBe(false);
+    expect(pastDue.accessLevel).toBe("full");
+    expect(pastDue.freeTier).toBe(true);
+    expect(deriveOrgEntitlements(row({ subscriptionStatus: "past_due", pastDueSince: daysAgoIso(2) }), daysAgo(400), now, true).freeTier).toBe(false);
   });
   it("the free tier applies only once billing is enforced, and never to a trial, a paying or a founding account", () => {
     const expired = daysAgo(TRIAL_DAYS + 5);
@@ -117,7 +118,9 @@ describe("deriveOrgEntitlements", () => {
       now,
       true
     );
-    expect(locked.accessLevel).toBe("locked");
+    // unpaid past the grace: the free tier, not a lock
+    expect(locked.accessLevel).toBe("full");
+    expect(locked.freeTier).toBe(true);
     expect(locked.orgAddon).toBe(false);
   });
 
@@ -144,7 +147,8 @@ describe("deriveOrgEntitlements", () => {
 
   it("with enforcement OFF the effective access is always full, but the raw state still shows", () => {
     const e = deriveOrgEntitlements(row({ subscriptionStatus: "past_due", pastDueSince: daysAgoIso(GRACE_DAYS + 5) }), daysAgo(400), now, false);
-    expect(e.rawAccessLevel).toBe("locked");
+    expect(e.rawFreeTier).toBe(true);
+    expect(e.freeTier).toBe(false);
     expect(e.rawOrgAddon).toBe(false);
     expect(e.accessLevel).toBe("full");
     expect(e.orgAddon).toBe(true);
