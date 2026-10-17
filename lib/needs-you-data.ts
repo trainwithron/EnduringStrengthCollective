@@ -85,7 +85,7 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
       return [];
     }
   };
-  const byCreatedAt = (a: { created_at: string }, b: { created_at: string }) => a.created_at.localeCompare(b.created_at);
+  const byCreatedAt = (a: { created_at: string }, b: { created_at: string }) => String(a.created_at ?? "").localeCompare(String(b.created_at ?? ""));
   const nowMs = now.getTime();
 
   // ---- what Home already knows -------------------------------------------------------------------------------------------------
@@ -131,7 +131,7 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
     pagedIn<{ id: string; sender_id: string; group_id: string; created_at: string }>("unread messages", (g) => (from, to) =>
       supabase.from("direct_messages").select("id, sender_id, group_id, created_at").eq("recipient_id", coachId).in("group_id", g).is("read_at", null).order("created_at", { ascending: true }).order("id", { ascending: true }).range(from, to)
     ),
-    firstIn<{ id: string; athlete_id: string; group_id: string; start_at: string }>("late changes", 50, (a, b) => a.start_at.localeCompare(b.start_at), (g) => (from, to) =>
+    firstIn<{ id: string; athlete_id: string; group_id: string; start_at: string }>("late changes", 50, (a, b) => String(a.start_at ?? "").localeCompare(String(b.start_at ?? "")), (g) => (from, to) =>
       supabase.from("bookings").select("id, athlete_id, group_id, start_at").eq("coach_id", coachId).in("group_id", g).eq("late_charge_state", "flagged").order("start_at", { ascending: true }).order("id", { ascending: true }).range(from, to)
     ),
     (async () => {
@@ -175,7 +175,7 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
         return [];
       }
     })(),
-    firstIn<{ athlete_id: string; marked_at: string }>("injuries", 200, (a, b) => b.marked_at.localeCompare(a.marked_at), (g) => (from, to) =>
+    firstIn<{ athlete_id: string; marked_at: string }>("injuries", 200, (a, b) => String(b.marked_at ?? "").localeCompare(String(a.marked_at ?? "")), (g) => (from, to) =>
       supabase.from("athlete_injury_status").select("athlete_id, marked_at").in("group_id", g).eq("is_injured", true).gte("marked_at", new Date(nowMs - INJURY_RECENT_DAYS * 86_400_000).toISOString()).order("marked_at", { ascending: false }).order("athlete_id", { ascending: true }).range(from, to)
     ).then((rows) => rows.map((r) => r.athlete_id)),
     pagedIn<{ group_id: string; profile_id: string }>("roster", (g) => (from, to) =>

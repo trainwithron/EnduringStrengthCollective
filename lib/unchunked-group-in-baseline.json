@@ -1,0 +1,7 @@
+{
+  "app/api/intake/minor-consent-notice/route.ts": 1,
+  "app/scan/[exerciseId]/page.tsx": 1,
+  "lib/ai-budget-server.ts": 1,
+  "lib/my-training.ts": 1,
+  "lib/reference-context.ts": 2
+}

@@ -163,7 +163,7 @@ describe("the inbox is read in full and kept fresh (Assistant's review)", () => 
   const route = read("../app/api/messages/thread/route.ts");
   const refresh = read("../components/messages/use-inbox-refresh.ts");
   it("the messages are read a page at a time, in a fixed order, and a failed or cut-off read is reported", () => {
-    expect(data).toContain("pageAll(");
+    expect(data).toContain("readByIds(scopeIds");
     expect(data).toContain('.order("created_at", { ascending: true })');
     expect(data).toContain('.order("id", { ascending: true })');
     expect(data).toContain("incomplete: messagePages.failed || messagePages.truncated");

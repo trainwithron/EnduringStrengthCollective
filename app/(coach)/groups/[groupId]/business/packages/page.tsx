@@ -1,3 +1,4 @@
+import { readRowsByIds } from "@/lib/read-by-ids";
 import { LoadFailedPage } from "@/components/ui/load-failed-page";
 import { isReadFailure } from "@/lib/read-failed";
 import { redirect } from "next/navigation";
@@ -50,12 +51,16 @@ export default async function PackagesPage(
   const coachedGroups = await getCoachedGroups(supabase, user.id);
   const orgGroupIds = Array.from(new Set([params.groupId, ...groupsInOrgOf(coachedGroups, params.groupId).map((g) => g.id)]));
 
-  const { data: packageRows } = await supabase
-    .from("coach_packages")
-    .select("id, group_id, name, sessions_per_week, billing_type, sessions_granted, rate_cents, is_active, is_public, default_program_id, group_access_group_id, show_on_home, show_in_pro_shop, audience, audience_group_id, buyer_joins_space")
-    .eq("coach_id", user.id)
-    .in("group_id", orgGroupIds)
-    .order("sessions_per_week", { ascending: true });
+  const { data: packageRowsUnsorted } = await readRowsByIds(orgGroupIds, (g) => (from, to) =>
+    supabase
+      .from("coach_packages")
+      .select("id, group_id, name, sessions_per_week, billing_type, sessions_granted, rate_cents, is_active, is_public, default_program_id, group_access_group_id, show_on_home, show_in_pro_shop, audience, audience_group_id, buyer_joins_space")
+      .eq("coach_id", user.id)
+      .in("group_id", g)
+      .order("id")
+      .range(from, to)
+  );
+  const packageRows = packageRowsUnsorted.sort((a, b) => (a.sessions_per_week ?? 0) - (b.sessions_per_week ?? 0));
 
   // The coach's public page address, so a public package can be linked from their own website.
   const { data: sitePage } = await supabase.from("coach_booking_pages").select("slug, enabled").eq("coach_id", user.id).maybeSingle();

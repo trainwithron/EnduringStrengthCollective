@@ -1,5 +1,7 @@
 "use client";
 
+import { readRowsByIds } from "@/lib/read-by-ids";
+
 import { useEffect, useState } from "react";
 import { activeOrgGroupsFor } from "@/lib/active-org-groups";
 import { useRouter } from "next/navigation";
@@ -65,11 +67,9 @@ export function ViewAsClientPicker({ onClose }: { onClose: () => void }) {
         return;
       }
 
-      const { data } = await supabase
-        .from("group_memberships")
-        .select("group_id, profile_id, profiles ( id, full_name, avatar_url )")
-        .in("group_id", groupIds)
-        .eq("role", "athlete");
+      const { data } = await readRowsByIds(groupIds, (g) => (from, to) =>
+        supabase.from("group_memberships").select("group_id, profile_id, profiles ( id, full_name, avatar_url )").in("group_id", g).eq("role", "athlete").order("id").range(from, to)
+      );
 
       if (cancelled) return;
       const seen = new Set<string>();

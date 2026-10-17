@@ -1,3 +1,4 @@
+import { readRowsByIds } from "@/lib/read-by-ids";
 import { loadAssignableWorkouts } from "@/lib/assignable-workouts";
 import { orgGroupIdsOf } from "@/lib/coach-groups";
 import { getAthleteCurrentProgram } from "@/lib/active-programs";
@@ -188,14 +189,18 @@ export async function ClientCalendarSection({
   // The coach's own bookings this month, across every client — an overlay
   // so scheduling for this athlete doesn't happen blind to the coach's own
   // day.
-  const { data: bookingRows } = await supabase
-    .from("bookings")
-    .select("start_at")
-    .eq("coach_id", coachId)
-    .in("group_id", await orgGroupIdsOf(supabase, coachId, groupId))
-    .eq("status", "confirmed")
-    .gte("start_at", firstOfMonth.toISOString())
-    .lt("start_at", new Date(year, monthIndex + 1, 1).toISOString());
+  const { data: bookingRows } = await readRowsByIds(await orgGroupIdsOf(supabase, coachId, groupId), (g) => (from, to) =>
+    supabase
+      .from("bookings")
+      .select("start_at")
+      .eq("coach_id", coachId)
+      .in("group_id", g)
+      .eq("status", "confirmed")
+      .gte("start_at", firstOfMonth.toISOString())
+      .lt("start_at", new Date(year, monthIndex + 1, 1).toISOString())
+      .order("id")
+      .range(from, to)
+  );
   const bookingCountByDateKey = new Map<string, number>();
   for (const b of bookingRows ?? []) {
     const k = dateKey(new Date(b.start_at));

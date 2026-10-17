@@ -1,3 +1,4 @@
+import { readRowsByIds } from "@/lib/read-by-ids";
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { sendPushToProfile } from "@/lib/send-push";
@@ -53,12 +54,9 @@ export async function POST(request: Request) {
   const groupIds = [...new Set(recipients.map((r) => r.groupId))];
 
   // Caller must be a coach of every group involved.
-  const { data: coachRows } = await supabase
-    .from("group_memberships")
-    .select("group_id")
-    .eq("profile_id", user.id)
-    .eq("role", "coach")
-    .in("group_id", groupIds);
+  const { data: coachRows } = await readRowsByIds(groupIds, (g) => (from, to) =>
+    supabase.from("group_memberships").select("group_id").eq("profile_id", user.id).eq("role", "coach").in("group_id", g).order("group_id").range(from, to)
+  );
   const coachedGroupIds = new Set((coachRows ?? []).map((r) => r.group_id as string));
   if (groupIds.some((g) => !coachedGroupIds.has(g))) {
     return NextResponse.json({ error: "You can only message clients in groups you coach." }, { status: 403 });
@@ -66,12 +64,12 @@ export async function POST(request: Request) {
 
   // Every (athlete, group) pair must be a real training-membership
   // athlete in that group; names come from here, never from the browser.
-  const { data: memberRows } = await supabase
-    .from("group_memberships")
-    .select("group_id, profile_id, membership_type, profiles ( full_name )")
-    .eq("role", "athlete")
-    .in("group_id", groupIds)
-    .in("profile_id", recipients.map((r) => r.athleteId));
+  // (Read by the recipients' ids in groups of 100: a long list in one request passes the URL limit. Each pair is looked up by group AND person below, so another group's row does no harm.)
+  const { data: memberRows } = await readRowsByIds(
+    recipients.map((r) => r.athleteId),
+    (ids) => (from, to) =>
+      supabase.from("group_memberships").select("group_id, profile_id, membership_type, profiles ( full_name )").eq("role", "athlete").in("profile_id", ids).order("id").range(from, to)
+  );
   const memberByKey = new Map<string, { fullName: string | null; membershipType: string }>();
   for (const m of (memberRows ?? []) as any[]) {
     memberByKey.set(`${m.group_id}:${m.profile_id}`, {

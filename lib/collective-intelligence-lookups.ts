@@ -1,3 +1,4 @@
+import { readRowsByIds } from "@/lib/read-by-ids";
 // AI Assistant Phase 2 — Collective Intelligence conversational chat
 // (collective_intelligence_phase_2_conversational_assistant.md). The "safe-
 // query middle path": a curated, whitelisted set of narrow, deterministic
@@ -59,11 +60,9 @@ async function getCoachRoster(
   const groupIds = (coachGroups ?? []).map((g) => g.group_id).filter((id) => !scopeGroupIds || scopeGroupIds.includes(id));
   if (groupIds.length === 0) return [];
 
-  const { data: athleteRows } = await supabase
-    .from("group_memberships")
-    .select("profile_id, group_id, profiles ( full_name )")
-    .in("group_id", groupIds)
-    .eq("role", "athlete");
+  const { data: athleteRows } = await readRowsByIds(groupIds, (g) => (from, to) =>
+    supabase.from("group_memberships").select("profile_id, group_id, profiles ( full_name )").in("group_id", g).eq("role", "athlete").order("id").range(from, to)
+  );
 
   const seen = new Set<string>();
   const roster: ResolvedAthlete[] = [];

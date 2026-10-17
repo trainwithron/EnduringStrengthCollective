@@ -2697,6 +2697,36 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "141",
+  slug: "0389",
+  title: "0389 Release G: the app at 1,500 clients (last-active, unseen and digest counts done by the database, indexes), real values only in sets, a test-organization mark, and a way to pause forgotten workouts",
+  migrations: ["0389"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes on screen. Pages and nightly jobs that read every client of a big coach can now ask the database for the answer. A set can no longer be saved with a weight over 2,000, reps over 1,000, an effort (RPE) outside 0 to 10, a time over two days or a distance over 5,000,000 (a row already flagged unclear is exempt); the few rows that break this today are flagged unclear, not changed or deleted. The sandbox organization is marked as a test. A workout left 'in progress' for three days can be paused by the nightly job (the code that calls it ships with the release). Safe to run before the code is live.",
+  undo: [
+    "drop function if exists public.close_stale_sessions(integer);",
+    "alter table public.organizations drop column if exists is_test;",
+    "alter table public.set_logs drop constraint if exists set_logs_values_in_range;",
+    "drop index if exists public.ai_usage_log_created_idx;",
+    "drop index if exists public.set_logs_completed_at_idx;",
+    "drop index if exists public.nutrition_checkins_group_created_idx;",
+    "drop index if exists public.bookings_group_start_idx;",
+    "drop index if exists public.credit_purchases_group_created_idx;",
+    "drop index if exists public.workout_logs_group_created_idx;",
+    "drop index if exists public.workout_logs_group_athlete_created_idx;",
+    "drop function if exists public.coach_digest_activity(uuid, uuid[]);",
+    "drop function if exists public.coach_unseen_groups(uuid[]);",
+    "drop function if exists public.business_last_active(uuid[]);",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 141 misbehaves. Run it only while the Release G code is not live (the Business page, Home and the nightly digest call the three count functions and would show a load error without them). Removes the functions, the indexes, the value rule on sets and the test mark. Sets that step 141 flagged unclear stay flagged (a coach can accept them in Unclear data points); workouts it paused stay paused.",
+  rows: [
+    ["0389 is not already applied (the last-active function is not there yet)", "to_regprocedure('public.business_last_active(uuid[])') is null"],
+    ["the tables it builds on exist", "to_regclass('public.workout_logs') is not null and to_regclass('public.coach_view_state') is not null and to_regclass('public.set_logs') is not null and to_regclass('public.athlete_sessions') is not null and to_regclass('public.organizations') is not null and to_regclass('public.ai_usage_log') is not null"],
+    ["set_logs has the unclear flag (0371) the value rule leans on", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'set_logs' and column_name = 'data_flag')"],
+  ],
+});
+
+STEPS.push({
   n: "140",
   slug: "0388",
   title: "0388 Switch on the guard: a signed-in person's browser can no longer finish its own health form or waiver (the server does)",
@@ -2826,6 +2856,7 @@ const BUNDLES = [
   { id: "release-co", name: "Release CO (nothing about a person is public unless they chose it: personal Find a coach listing; a coach adds only their own clients to a challenge; run BEFORE the code that goes with it is live)", steps: ["139"] },
   { id: "release-cn-held", name: "HELD, Ron's word first: require the health form and waiver of every client without one (read check-intake-flag-list.sql first)", steps: ["138"] },
   { id: "release-cm", name: "Release CM (the guard function and a coach's decision on a flagged screening; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["137"] },
+  { id: "release-g", name: "Release G (the app at 1,500 clients; real values only in sets; a test-organization mark; pause forgotten workouts; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["141"] },
   { id: "release-cp", name: "Release CP (switch on the guard: the server finishes the health form and waiver; run AFTER the Release D code is live)", steps: ["140"] },
   { id: "release-cl", name: "Release CL (the kind of each set; records per number of reps; a warm-up or drop set never counts; run BEFORE the code that goes with it is live)", steps: ["136"] },
   { id: "release-d", name: "Release D", steps: ["32", "33", "34"] },
@@ -3100,6 +3131,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
     m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
+    m("0389", "to_regprocedure('public.business_last_active(uuid[])') is not null"),
     m("0388", "exists (select 1 from pg_trigger where tgname = 'client_intake_guard_completion' and tgrelid = 'public.client_intake'::regclass)"),
     m("0387", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'marketplace_listed')"),
     m("0386", "to_regprocedure('public.client_intake_guard_completion()') is not null"),

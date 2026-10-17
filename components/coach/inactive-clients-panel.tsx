@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { readRowsByIds } from "@/lib/read-by-ids";
+import { pageAll } from "@/lib/page-all";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { saved } from "@/lib/saved";
@@ -48,19 +50,19 @@ export function InactiveClientsPanel({ groupIds: scopeGroupIds }: { groupIds?: s
       if (!cancelled) setCoachId(user.id);
       const now = new Date();
 
-      const { data: coached } = await supabase.from("group_memberships").select("group_id").eq("profile_id", user.id).eq("role", "coach");
+      const { data: coached } = await pageAll((from, to) => supabase.from("group_memberships").select("group_id").eq("profile_id", user.id).eq("role", "coach").order("id").range(from, to)).then((r) => ({ data: r.rows }));
       const groupIds = (coached ?? []).map((r: any) => r.group_id as string).filter((id: string) => !scopeGroupIds || scopeGroupIds.includes(id));
       if (groupIds.length === 0) return;
 
       // Active clients only. If the column is not there yet this errors and the panel stays empty.
-      const { data: members, error: memberError } = await supabase
-        .from("group_memberships")
-        .select("group_id, profile_id, joined_at")
-        .in("group_id", groupIds)
-        .eq("role", "athlete");
+      const { data: members, error: memberError } = await readRowsByIds(groupIds, (g) => (from, to) =>
+        supabase.from("group_memberships").select("group_id, profile_id, joined_at").in("group_id", g).eq("role", "athlete").order("id").range(from, to)
+      );
       if (memberError) return;
       // Anyone already set aside is left out. If the table is not there yet (the 0281 update is not applied) the card stays hidden.
-      const { data: aside, error: asideError } = await supabase.from("client_inactive").select("group_id, athlete_id").in("group_id", groupIds);
+      const { data: aside, error: asideError } = await readRowsByIds(groupIds, (g) => (from, to) =>
+        supabase.from("client_inactive").select("group_id, athlete_id").in("group_id", g).order("group_id").order("athlete_id").range(from, to)
+      );
       if (asideError) return;
       const alreadyAside = new Set(((aside ?? []) as { group_id: string; athlete_id: string }[]).map((r) => `${r.group_id}:${r.athlete_id}`));
       const cutoff = new Date(now.getTime() - INACTIVE_AFTER_DAYS * DAY);

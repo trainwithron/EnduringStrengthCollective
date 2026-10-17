@@ -33,7 +33,8 @@ describe("View as client (desktop preview) is read only", () => {
   it("Change lists only clients in groups this coach coaches", () => {
     const page = read(PAGE);
     expect(page).toContain('.eq("profile_id", user.id).eq("role", "coach")');
-    expect(page).toContain('.in("group_id", coachedIds).eq("role", "athlete")');
+    expect(page).toContain('.in("group_id", g).eq("role", "athlete")');
+    expect(page).toContain("readRowsByIds(\n    coachedIds,");
   });
   it("has the four screens, the slim bar with Change and Exit, and Open full profile (no logging on desktop)", () => {
     const page = read(PAGE);

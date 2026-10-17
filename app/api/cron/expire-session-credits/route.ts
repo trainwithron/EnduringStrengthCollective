@@ -4,6 +4,8 @@ import { sendPushToProfile } from "@/lib/send-push";
 import { isCreditBalanceExpired, creditToExpire } from "@/lib/credit-expiration";
 import { fetchBookingCountsOrNull } from "@/lib/credit-picture";
 import { withCronRun } from "@/lib/cron-monitor";
+import { pageAll } from "@/lib/page-all";
+import { readRowsByIds } from "@/lib/read-by-ids";
 
 // acuity_replacement_gap_audit_sept16.md — credit-expiration window.
 // Triggered daily by the Vercel Cron entry in vercel.json, same
@@ -11,6 +13,8 @@ import { withCronRun } from "@/lib/cron-monitor";
 // Only ever touches a balance where the coach has set a real
 // credit_expiry_days (0 is the default for every existing coach and is
 // never treated as "already expired" — see isCreditBalanceExpired).
+// A scheduled job that loops over people needs room to finish: the function may run up to five minutes (the default is far shorter, and a long list would be cut off part way).
+export const maxDuration = 300;
 async function handler(request: Request) {
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "CRON_SECRET isn't configured." }, { status: 503 });
@@ -23,19 +27,15 @@ async function handler(request: Request) {
   const supabase = createServiceRoleClient();
 
   // A coach can hold expiry for one client (migration 0280); before that update the column does not exist and the job reads without it.
-  let creditResult = await supabase
-    .from("session_credits")
-    .select("athlete_id, group_id, balance, last_granted_at, expiry_hold_until")
-    .gt("balance", 0)
-    .not("last_granted_at", "is", null);
-  if (creditResult.error) {
-    creditResult = (await supabase
-      .from("session_credits")
-      .select("athlete_id, group_id, balance, last_granted_at")
-      .gt("balance", 0)
-      .not("last_granted_at", "is", null)) as typeof creditResult;
-  }
-  const creditRows = creditResult.data as
+  // A page at a time: a request returns at most 1,000 rows, and a balance that was never read is a balance that never expires.
+  const readCredits = async (columns: string) =>
+    pageAll((from, to) =>
+      supabase.from("session_credits").select(columns).gt("balance", 0).not("last_granted_at", "is", null).order("group_id").order("athlete_id").range(from, to)
+    , { maxPages: 100 });
+  let creditPage = await readCredits("athlete_id, group_id, balance, last_granted_at, expiry_hold_until");
+  if (creditPage.failed) creditPage = await readCredits("athlete_id, group_id, balance, last_granted_at");
+  if (creditPage.failed) return NextResponse.json({ error: "Could not read the session balances." }, { status: 500 });
+  const creditRows = creditPage.rows as
     | { athlete_id: string; group_id: string; balance: number; last_granted_at: string | null; expiry_hold_until?: string | null }[]
     | null;
 
@@ -44,21 +44,18 @@ async function handler(request: Request) {
   }
 
   const groupIds = Array.from(new Set(creditRows.map((r) => r.group_id)));
-  const { data: coachRows } = await supabase
-    .from("group_memberships")
-    .select("group_id, profile_id")
-    .eq("role", "coach")
-    .in("group_id", groupIds);
+  const { data: coachRows } = await readRowsByIds(groupIds, (g) => (from, to) =>
+    supabase.from("group_memberships").select("group_id, profile_id").eq("role", "coach").in("group_id", g).order("id").range(from, to)
+  );
   const coachIdByGroup = new Map<string, string>();
   for (const row of coachRows ?? []) {
     if (!coachIdByGroup.has(row.group_id)) coachIdByGroup.set(row.group_id, row.profile_id);
   }
 
   const coachIds = Array.from(new Set(Array.from(coachIdByGroup.values())));
-  const { data: policyRows } = await supabase
-    .from("coach_booking_policies")
-    .select("coach_id, credit_expiry_days")
-    .in("coach_id", coachIds);
+  const { data: policyRows } = await readRowsByIds(coachIds, (g) => (from, to) =>
+    supabase.from("coach_booking_policies").select("coach_id, credit_expiry_days").in("coach_id", g).order("coach_id").range(from, to)
+  );
   const expiryDaysByCoach = new Map<string, number>();
   for (const row of policyRows ?? []) {
     expiryDaysByCoach.set(row.coach_id, row.credit_expiry_days);

@@ -1,3 +1,4 @@
+import { readRowsByIds } from "@/lib/read-by-ids";
 // 3-layer Spotter framework, Tier-1 sync
 // (two_layer_spotter_framework_architecture_research_sept19.md). Pulls
 // real findings from the Spotters that already have a clean, callable
@@ -69,11 +70,9 @@ export async function syncTier1ExpertReports(
   }
 
   // --- Programming Spotter, every real active program this coach runs ---
-  const { data: programRows } = await supabase
-    .from("programs")
-    .select("id, name, group_id")
-    .in("group_id", groupIds)
-    .eq("is_active", true);
+  const { data: programRows } = await readRowsByIds(groupIds, (g) => (from, to) =>
+    supabase.from("programs").select("id, name, group_id").in("group_id", g).eq("is_active", true).order("id").range(from, to)
+  );
   for (const program of programRows ?? []) {
     const flags = await gatherProgrammingSpotterFlags(supabase, {
       programId: program.id,

@@ -1,3 +1,4 @@
+import { readRowsByIds } from "@/lib/read-by-ids";
 import { LoadFailedPage } from "@/components/ui/load-failed-page";
 import { isReadFailure } from "@/lib/read-failed";
 import { redirect } from "next/navigation";
@@ -38,15 +39,21 @@ export default async function GroupSessionsPage(props: { params: Promise<{ group
   const [{ data: group }, timezone, sessionsResult] = await Promise.all([
     supabase.from("groups").select("name").eq("id", params.groupId).single(),
     getGroupCoachTimezone(supabase, params.groupId),
-    supabase
-      .from("group_sessions")
-      .select("id, title, start_at, end_at, capacity, location_note, status")
-      .eq("kind", "class")
-      .eq("coach_id", user.id)
-      .in("group_id", orgGroupIds)
-      .gte("start_at", earliest)
-      .order("start_at", { ascending: true })
-      .limit(100),
+    readRowsByIds(
+      orgGroupIds,
+      (g) => (from, to) =>
+        supabase
+          .from("group_sessions")
+          .select("id, title, start_at, end_at, capacity, location_note, status")
+          .eq("kind", "class")
+          .eq("coach_id", user.id)
+          .in("group_id", g)
+          .gte("start_at", earliest)
+          .order("start_at", { ascending: true })
+          .order("id")
+          .range(from, to),
+      { pageSize: 100, maxPages: 1 }
+    ).then((r) => ({ data: r.data.sort((a, b) => String(a.start_at).localeCompare(String(b.start_at))).slice(0, 100), error: r.error })),
   ]);
 
   const notReady = !!sessionsResult.error;
@@ -91,15 +98,12 @@ export default async function GroupSessionsPage(props: { params: Promise<{ group
 
   // Everyone this coach can add: the clients in the groups they coach.
   const coachedIds = coached.map((g) => g.id);
-  const { data: clientRows } = coachedIds.length
-    ? await supabase
-        .from("group_memberships")
-        .select("profile_id, profiles ( full_name )")
-        .in("group_id", coachedIds)
-        .eq("role", "athlete")
-        .eq("membership_type", "training")
-        .limit(600)
-    : { data: [] as any[] };
+  const { data: clientRows } = await readRowsByIds(
+    coachedIds,
+    (g) => (from, to) =>
+      supabase.from("group_memberships").select("profile_id, profiles ( full_name )").in("group_id", g).eq("role", "athlete").eq("membership_type", "training").order("id").range(from, to),
+    { pageSize: 600, maxPages: 1 }
+  ).then((r) => ({ data: r.data.slice(0, 600) }));
   const seen = new Set<string>();
   const clients: ClientOption[] = [];
   for (const r of (clientRows ?? []) as any[]) {

@@ -1,3 +1,4 @@
+import { readRowsByIds } from "@/lib/read-by-ids";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   AI_ALLOWANCE_PER_STEP,
@@ -114,12 +115,9 @@ export async function getAiUsage(supabase: SupabaseClient, coachId: string): Pro
   const groupIds = (coachedRows ?? []).map((r) => r.group_id as string);
   let clients = 0;
   if (groupIds.length > 0) {
-    const { data: athleteRows } = await supabase
-      .from("group_memberships")
-      .select("profile_id")
-      .in("group_id", groupIds)
-      .eq("role", "athlete")
-      .eq("membership_type", "training");
+    const { data: athleteRows } = await readRowsByIds(groupIds, (g) => (from, to) =>
+      supabase.from("group_memberships").select("profile_id").in("group_id", g).eq("role", "athlete").eq("membership_type", "training").order("id").range(from, to)
+    );
     clients = new Set((athleteRows ?? []).map((r) => r.profile_id as string)).size;
   }
   return {

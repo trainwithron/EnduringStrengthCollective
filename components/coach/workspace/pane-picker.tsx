@@ -1,5 +1,7 @@
 "use client";
 
+import { readRowsByIds } from "@/lib/read-by-ids";
+
 import { activeOrgGroupsFor } from "@/lib/active-org-groups";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Search } from "lucide-react";
@@ -45,7 +47,9 @@ export function PanePicker() {
         if (!cancelled) setClients([]);
         return;
       }
-      const { data } = await supabase.from("group_memberships").select("group_id, profiles ( id, full_name ), groups ( name, group_kind )").in("group_id", groupIds).eq("role", "athlete");
+      const { data } = await readRowsByIds(groupIds, (g) => (from, to) =>
+        supabase.from("group_memberships").select("group_id, profiles ( id, full_name ), groups ( name, group_kind )").in("group_id", g).eq("role", "athlete").order("id").range(from, to)
+      );
       if (cancelled) return;
       const rows: FinderClient[] = (data ?? [])
         .map((r: any) => ({

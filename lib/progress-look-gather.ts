@@ -1,3 +1,4 @@
+import { readRowsByIds, readByIds } from "@/lib/read-by-ids";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchInactiveKeys, inactiveKey } from "./inactive-ids";
 import {
@@ -107,11 +108,9 @@ export async function gatherProgressLook(
   const hintOn = hintEnabled(events);
 
   // Clients, minus anyone the coach has set aside.
-  const { data: memberRows } = await supabase
-    .from("group_memberships")
-    .select("group_id, profile_id, profiles ( full_name )")
-    .in("group_id", groupIds)
-    .eq("role", "athlete");
+  const { data: memberRows } = await readRowsByIds(groupIds, (g) => (from, to) =>
+    supabase.from("group_memberships").select("group_id, profile_id, profiles ( full_name )").in("group_id", g).eq("role", "athlete").order("id").range(from, to)
+  );
   const inactive = await fetchInactiveKeys(supabase, groupIds);
   const clients = new Map<string, { groupId: string; name: string }>();
   for (const r of (memberRows ?? []) as any[]) {
@@ -228,16 +227,19 @@ export async function gatherProgressLook(
   // A client in a deliberate deficit phase is expected to show less.
   // Only a recent phase counts: a check-in from months ago does not silence a client for ever.
   const phaseSince = new Date(now.getTime() - PHASE_DAYS * DAY).toISOString();
-  const { rows: phaseRows } = await pageAll((a, b) =>
-    supabase.from("nutrition_checkins").select("id, athlete_id, phase, created_at").in("group_id", groupIds).gte("created_at", phaseSince).order("created_at", { ascending: false }).order("id").range(a, b)
+  const { rows: phaseRowsUnsorted } = await readByIds(groupIds, (g) => (a, b) =>
+    supabase.from("nutrition_checkins").select("id, athlete_id, phase, created_at").in("group_id", g).gte("created_at", phaseSince).order("created_at", { ascending: false }).order("id").range(a, b)
   );
+  const phaseRows = phaseRowsUnsorted.sort((x: any, y: any) => String(y.created_at).localeCompare(String(x.created_at)));
   const phaseOf = new Map<string, string>();
   for (const r of phaseRows) if (!phaseOf.has(r.athlete_id)) phaseOf.set(r.athlete_id, r.phase);
 
   // A client the coach or the client has marked as injured never gets a "time to progress?" card: injury is a coach-only decision, so suppress on doubt.
   const injuredIds = new Set<string>();
   {
-    const { data: injuryRows, error: injuryError } = await supabase.from("athlete_injury_status").select("athlete_id").in("group_id", groupIds).eq("is_injured", true);
+    const { data: injuryRows, error: injuryError } = await readRowsByIds(groupIds, (g) => (from, to) =>
+      supabase.from("athlete_injury_status").select("athlete_id, group_id").in("group_id", g).eq("is_injured", true).order("group_id").order("athlete_id").range(from, to)
+    );
     // Injury is a coach-only decision, so on doubt this stays quiet: if the status cannot be read, no card is made at all.
     if (injuryError) return { ...empty, threshold, hintOn };
     for (const r of (injuryRows ?? []) as any[]) injuredIds.add(r.athlete_id);

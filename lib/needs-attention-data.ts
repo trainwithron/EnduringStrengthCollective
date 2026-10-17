@@ -1,3 +1,4 @@
+import { readRowsByIds } from "@/lib/read-by-ids";
 import { fetchStandingHistories } from "@/lib/standing-macros";
 import { standingForDate } from "@/lib/macro-resolution";
 import { computeScheduledDates } from "@/lib/program-schedule";
@@ -63,18 +64,27 @@ export async function getNeedsAttentionItems(
   const today = new Date();
 
   // coach_sets_macros is the "No macros for [name]" switch; a database that does not have the column yet reads as on for everyone.
-  const withMacrosSwitch = await supabase
-    .from("group_memberships")
-    .select("profile_id, group_id, client_tier, joined_at, coach_sets_macros, profiles ( full_name, intake_required )")
-    .in("group_id", groupIds)
-    .eq("role", "athlete");
+  // (Read in groups of ids and pages: a coach with 1,500 clients has 1,500 groups, past a request's URL limit and its 1,000-row cap.)
+  const withMacrosSwitch = await readRowsByIds(groupIds, (g) => (from, to) =>
+    supabase
+      .from("group_memberships")
+      .select("profile_id, group_id, client_tier, joined_at, coach_sets_macros, profiles ( full_name, intake_required )")
+      .in("group_id", g)
+      .eq("role", "athlete")
+      .order("id")
+      .range(from, to)
+  );
   const allAthleteRows = withMacrosSwitch.error
     ? (
-        await supabase
-          .from("group_memberships")
-          .select("profile_id, group_id, client_tier, joined_at, profiles ( full_name, intake_required )")
-          .in("group_id", groupIds)
-          .eq("role", "athlete")
+        await readRowsByIds(groupIds, (g) => (from, to) =>
+          supabase
+            .from("group_memberships")
+            .select("profile_id, group_id, client_tier, joined_at, profiles ( full_name, intake_required )")
+            .in("group_id", g)
+            .eq("role", "athlete")
+            .order("id")
+            .range(from, to)
+        )
       ).data
     : withMacrosSwitch.data;
   // "Not now": items the coach put off for a week stay hidden until that day passes (and come back only if they are still true).

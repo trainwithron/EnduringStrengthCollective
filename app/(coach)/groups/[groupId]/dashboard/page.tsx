@@ -1,4 +1,5 @@
 import { LoadFailedPage } from "@/components/ui/load-failed-page";
+import { readRowsByIds } from "@/lib/read-by-ids";
 import { isReadFailure } from "@/lib/read-failed";
 import { getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
 import Link from "next/link";
@@ -111,10 +112,15 @@ export default async function CoachDashboardPage(
     // card (like/comment) Team Feed itself uses, not a plain text
     // summary, per the ask to be able to react/comment right from here
     // instead of sending a DM.
-    const { data: workoutPosts } = await supabase
-      .from("posts")
-      .select(
-        `
+    // (The coach's groups can pass a request's URL limit, so the ids go in groups: each group's newest, merged by time, cut to the newest few.)
+    const newest = <T extends { created_at: string }>(rows: T[]): T[] => rows.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))).slice(0, ACTIVITY_LIMIT);
+    const { data: workoutPostsAll } = await readRowsByIds(
+      groupIds,
+      (g) => (from, to) =>
+        supabase
+          .from("posts")
+          .select(
+            `
         id, post_type, channel, pinned_at, body, media_url, media_type, created_at, group_id, broadcast_level,
         author_id,
         profiles!posts_author_id_fkey ( id, full_name, avatar_url ),
@@ -122,11 +128,15 @@ export default async function CoachDashboardPage(
         reactions ( profile_id ),
         comments ( id )
       `
-      )
-      .eq("post_type", "workout_summary")
-      .in("group_id", groupIds)
-      .order("created_at", { ascending: false })
-      .limit(ACTIVITY_LIMIT);
+          )
+          .eq("post_type", "workout_summary")
+          .in("group_id", g)
+          .order("created_at", { ascending: false })
+          .order("id")
+          .range(from, to),
+      { pageSize: ACTIVITY_LIMIT, maxPages: 1 }
+    );
+    const workoutPosts = newest(workoutPostsAll);
 
     for (const p of (workoutPosts ?? []) as any[]) {
       const post: FeedPost = {
@@ -166,12 +176,13 @@ export default async function CoachDashboardPage(
       });
     }
 
-    const { data: comments } = await supabase
-      .from("comments")
-      .select("id, group_id, created_at, body, profiles ( full_name )")
-      .in("group_id", groupIds)
-      .order("created_at", { ascending: false })
-      .limit(ACTIVITY_LIMIT);
+    const { data: commentsAll } = await readRowsByIds(
+      groupIds,
+      (g) => (from, to) =>
+        supabase.from("comments").select("id, group_id, created_at, body, profiles ( full_name )").in("group_id", g).order("created_at", { ascending: false }).order("id").range(from, to),
+      { pageSize: ACTIVITY_LIMIT, maxPages: 1 }
+    );
+    const comments = newest(commentsAll);
 
     for (const c of (comments ?? []) as any[]) {
       items.push({
@@ -190,13 +201,20 @@ export default async function CoachDashboardPage(
   // else on this page — the closest thing to a "transaction" this app
   // actually has (there's no real payment system; session credits are a
   // manual coach-set counter).
-  const { data: bookings } = await supabase
-    .from("bookings")
-    .select("id, group_id, created_at, start_at, status, profiles!bookings_athlete_id_fkey ( full_name )")
-    .eq("coach_id", user.id)
-    .in("group_id", groupIds)
-    .order("created_at", { ascending: false })
-    .limit(ACTIVITY_LIMIT);
+  const { data: bookingsAll } = await readRowsByIds(
+    groupIds,
+    (g) => (from, to) =>
+      supabase
+        .from("bookings")
+        .select("id, group_id, created_at, start_at, status, profiles!bookings_athlete_id_fkey ( full_name )")
+        .eq("coach_id", user.id)
+        .in("group_id", g)
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(from, to),
+    { pageSize: ACTIVITY_LIMIT, maxPages: 1 }
+  );
+  const bookings = bookingsAll.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))).slice(0, ACTIVITY_LIMIT);
 
   for (const b of (bookings ?? []) as any[]) {
     const when = new Date(b.start_at).toLocaleDateString("en-US", { month: "short", day: "numeric" });

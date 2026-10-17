@@ -1,3 +1,4 @@
+import { readRowsByIds } from "@/lib/read-by-ids";
 import { NextResponse } from "next/server";
 import { orgGroupIdsOf } from "@/lib/coach-groups";
 import { createServerClient } from "@/lib/supabase/server";
@@ -88,15 +89,21 @@ export async function GET(request: Request) {
     // needed, unlike the roster-scoped queries above) — a coach checking
     // this glance wants to see everything coming up, not just this one
     // group's bookings.
-    supabase
-      .from("bookings")
-      .select("id, start_at, profiles!bookings_athlete_id_fkey ( full_name )")
-      .eq("coach_id", user.id)
-      .in("group_id", await orgGroupIdsOf(supabase, user.id, groupId))
-      .eq("status", "confirmed")
-      .gte("start_at", new Date().toISOString())
-      .order("start_at", { ascending: true })
-      .limit(6),
+    readRowsByIds(
+      await orgGroupIdsOf(supabase, user.id, groupId),
+      (g) => (from, to) =>
+        supabase
+          .from("bookings")
+          .select("id, start_at, profiles!bookings_athlete_id_fkey ( full_name )")
+          .eq("coach_id", user.id)
+          .in("group_id", g)
+          .eq("status", "confirmed")
+          .gte("start_at", new Date().toISOString())
+          .order("start_at", { ascending: true })
+          .order("id")
+          .range(from, to),
+      { pageSize: 6, maxPages: 1 }
+    ).then((r) => ({ data: r.data.sort((a: any, b: any) => String(a.start_at).localeCompare(String(b.start_at))).slice(0, 6), error: r.error })),
   ]);
 
   const subscribedIds = new Set((subRows ?? []).map((s) => s.athlete_id));

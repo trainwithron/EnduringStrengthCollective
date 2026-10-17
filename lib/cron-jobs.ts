@@ -33,6 +33,7 @@ export const CRON_JOBS: CronJob[] = [
   { job: "flag-recurring-booking-conflicts", path: "/api/cron/flag-recurring-booking-conflicts", maxAgeHours: DAILY },
   { job: "schedule-requests", path: "/api/cron/schedule-requests", maxAgeHours: DAILY },
   { job: "series-top-up", path: "/api/cron/series-top-up", maxAgeHours: DAILY },
+  { job: "close-stale-sessions", path: "/api/cron/close-stale-sessions", maxAgeHours: DAILY },
   { job: "cron-watchdog", path: "/api/cron/cron-watchdog", maxAgeHours: DAILY },
 ];
 

@@ -1,5 +1,7 @@
 "use client";
 
+import { readRowsByIds } from "@/lib/read-by-ids";
+
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -46,12 +48,12 @@ export function CoachRosterMobile({
         return;
       }
       const supabase = createBrowserClient();
-      const { data } = await supabase
-        .from("programs")
-        .select("athlete_id, training_days")
-        .in("group_id", groupIdsKey.split(","))
-        .eq("is_active", true)
-        .in("athlete_id", ids);
+      // By the clients' own ids in groups of 100 (a long group list passes a request's URL limit); only programs in the coach's groups count.
+      const inScope = new Set(groupIdsKey.split(","));
+      const { data: programRows } = await readRowsByIds(ids, (g) => (from, to) =>
+        supabase.from("programs").select("athlete_id, group_id, training_days").eq("is_active", true).in("athlete_id", g).order("id").range(from, to)
+      );
+      const data = programRows.filter((r: any) => inScope.has(r.group_id));
       if (cancelled) return;
       const map = new Map<string, number[] | null>();
       for (const row of data ?? []) {

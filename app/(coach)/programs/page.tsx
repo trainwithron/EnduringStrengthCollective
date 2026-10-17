@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { readRowsByIds } from "@/lib/read-by-ids";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { NoAccess } from "@/components/shared/no-access";
@@ -51,31 +52,37 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
   const groupIds = inOrg.map((g) => g.id);
   // His own programs with nothing in them (no exercise, no session, no copy), untouched for 24 hours, are removed quietly (AI builder leftovers).
   await sweepEmptyPrograms(supabase, user.id, groupIds);
-  const { data: programs, error: programsError } = await supabase
-    .from("programs")
-    .select("id, group_id, name, is_active, ai_draft, cover_image_path, athlete_id, source_program_id, training_intent, updated_at, profiles!programs_athlete_id_fkey ( full_name ), workouts(id, group_workout_exercises(count))")
-    .in("group_id", groupIds.length > 0 ? groupIds : [""])
-    .is("archived_at", null)
-    .order("updated_at", { ascending: false });
+  // (The coach's groups can pass a request's URL limit and the 1,000-row cap, so the ids go in groups and each is read a page at a time; the newest change first after they are put together.)
+  const { data: programsUnsorted, error: programsError } = await readRowsByIds(groupIds, (g) => (from, to) =>
+    supabase
+      .from("programs")
+      .select("id, group_id, name, is_active, ai_draft, cover_image_path, athlete_id, source_program_id, training_intent, updated_at, profiles!programs_athlete_id_fkey ( full_name ), workouts(id, group_workout_exercises(count))")
+      .in("group_id", g)
+      .is("archived_at", null)
+      .order("id")
+      .range(from, to)
+  );
+  const programs = programsUnsorted.sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
 
   // Every program the coach removed (kept, with every log), library or one client's: found under "Removed programs" and under its client, with Put back and Delete.
   const { data: hiddenRows } = clientId
     ? { data: [] }
-    : await supabase
-        .from("programs")
-        .select("id, name, group_id, athlete_id, profiles!programs_athlete_id_fkey ( full_name )")
-        .in("group_id", groupIds.length > 0 ? groupIds : [""])
-        .not("archived_at", "is", null)
-        .order("archived_at", { ascending: false })
-        .limit(200);
+    : await readRowsByIds(groupIds, (g) => (from, to) =>
+        supabase
+          .from("programs")
+          .select("id, name, group_id, athlete_id, archived_at, profiles!programs_athlete_id_fkey ( full_name )")
+          .in("group_id", g)
+          .not("archived_at", "is", null)
+          .order("archived_at", { ascending: false })
+          .order("id")
+          .range(from, to)
+      ).then((r) => ({ data: r.data.sort((a, b) => String(b.archived_at).localeCompare(String(a.archived_at))).slice(0, 200) }));
   const removed: RemovedProgram[] = ((hiddenRows ?? []) as any[]).map((r) => ({ id: r.id, name: r.name, groupId: r.group_id, athleteId: r.athlete_id ?? null, athleteName: r.profiles?.full_name ?? null }));
 
   // How many template slots each library program holds (the Templates filter and the card's mark).
-  const { data: slotRows } = await supabase
-    .from("group_workout_exercises")
-    .select("id, workouts!inner ( program_id )")
-    .eq("is_slot", true)
-    .in("group_id", groupIds.length > 0 ? groupIds : [""]);
+  const { data: slotRows } = await readRowsByIds(groupIds, (g) => (from, to) =>
+    supabase.from("group_workout_exercises").select("id, workouts!inner ( program_id )").eq("is_slot", true).in("group_id", g).order("id").range(from, to)
+  );
   const slotCountByProgram = new Map<string, number>();
   for (const r of (slotRows ?? []) as any[]) {
     const pid = r.workouts?.program_id as string | undefined;

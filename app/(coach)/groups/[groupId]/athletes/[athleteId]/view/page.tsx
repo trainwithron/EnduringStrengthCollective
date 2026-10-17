@@ -1,3 +1,5 @@
+import { readRowsByIds } from "@/lib/read-by-ids";
+import { pageAll } from "@/lib/page-all";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { NoAccess } from "@/components/shared/no-access";
@@ -68,11 +70,13 @@ export default async function ViewAsClientPage(props: {
   const first = name.split(/\s+/)[0] || name;
 
   // "Change": every client in every group this coach coaches (RLS limits what is visible; only groups the coach coaches are asked for).
-  const { data: coached } = await supabase.from("group_memberships").select("group_id").eq("profile_id", user.id).eq("role", "coach");
-  const coachedIds = ((coached ?? []) as { group_id: string }[]).map((g) => g.group_id);
-  const { data: others } = coachedIds.length
-    ? await supabase.from("group_memberships").select("group_id, profile_id, profiles ( full_name )").in("group_id", coachedIds).eq("role", "athlete").limit(200)
-    : { data: [] as any[] };
+  const { rows: coached } = await pageAll((from, to) => supabase.from("group_memberships").select("group_id").eq("profile_id", user.id).eq("role", "coach").order("id").range(from, to));
+  const coachedIds = (coached as { group_id: string }[]).map((g) => g.group_id);
+  const { data: others } = await readRowsByIds(
+    coachedIds,
+    (g) => (from, to) => supabase.from("group_memberships").select("group_id, profile_id, profiles ( full_name )").in("group_id", g).eq("role", "athlete").order("id").range(from, to),
+    { pageSize: 200, maxPages: 1 }
+  ).then((r) => ({ data: r.data.slice(0, 200) }));
   const choices = ((others ?? []) as any[])
     .map((r) => ({ groupId: r.group_id as string, athleteId: r.profile_id as string, name: (r.profiles?.full_name ?? "Client") as string }))
     .filter((c) => c.athleteId !== params.athleteId)

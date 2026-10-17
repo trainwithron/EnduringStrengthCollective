@@ -1,5 +1,7 @@
 "use client";
 
+import { readRowsByIds } from "@/lib/read-by-ids";
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -70,10 +72,9 @@ export function ExpiryCheckInPanel({ groupIds: scopeGroupIds }: { groupIds?: str
       const groupIds = (coached ?? []).map((r: any) => r.group_id as string).filter((id: string) => !scopeGroupIds || scopeGroupIds.includes(id));
       if (groupIds.length === 0) return;
 
-      const { data: credits, error: creditsError } = await supabase
-        .from("session_credits")
-        .select("athlete_id, group_id, balance, last_granted_at, expiry_hold_until")
-        .in("group_id", groupIds);
+      const { data: credits, error: creditsError } = await readRowsByIds(groupIds, (g) => (from, to) =>
+        supabase.from("session_credits").select("athlete_id, group_id, balance, last_granted_at, expiry_hold_until").in("group_id", g).order("group_id").order("athlete_id").range(from, to)
+      );
       if (creditsError) return;
 
       const rows = ((credits ?? []) as any[]).map((r) => ({
@@ -97,12 +98,17 @@ export function ExpiryCheckInPanel({ groupIds: scopeGroupIds }: { groupIds?: str
       for (const f of (feedback ?? []) as any[]) if (!lastDenied.has(f.dismissal_key)) lastDenied.set(f.dismissal_key, f.created_at);
 
       // Expired sessions that were not given back, with the client's last activity after that.
-      const { data: expiredRows } = await supabase
-        .from("session_credit_ledger")
-        .select("athlete_id, group_id, created_at")
-        .eq("kind", "expired")
-        .in("group_id", groupIds)
-        .order("created_at", { ascending: false });
+      const { data: expiredRowsUnsorted } = await readRowsByIds(groupIds, (g) => (from, to) =>
+        supabase
+          .from("session_credit_ledger")
+          .select("athlete_id, group_id, created_at")
+          .eq("kind", "expired")
+          .in("group_id", g)
+          .order("created_at", { ascending: false })
+          .order("id")
+          .range(from, to)
+      );
+      const expiredRows = expiredRowsUnsorted.sort((a: any, b: any) => String(b.created_at).localeCompare(String(a.created_at)));
       const expiredOn = new Map<string, Date>();
       for (const e of (expiredRows ?? []) as any[]) {
         const k = `${e.athlete_id}:${e.group_id}`;

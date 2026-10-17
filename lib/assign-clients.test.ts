@@ -38,6 +38,8 @@ function fakeSupabase() {
       const q: any = {
         select: () => q,
         eq: () => q,
+        order: () => q,
+        range: () => q,
         in: () => {
           usedIn = true;
           return q;

@@ -1,3 +1,4 @@
+import { readRowsByIds } from "@/lib/read-by-ids";
 // The real I/O layer for marketplace-coach-ranking.ts's pure scoring
 // logic — assembles actual ClientOutcomeCase[] from this platform's
 // real tables. Mirrors this codebase's established pure-logic-then-
@@ -73,12 +74,9 @@ export async function gatherOutcomeCasesForCoach(
   const groupIds = (coachedRows ?? []).map((r: { group_id: string }) => r.group_id);
   if (groupIds.length === 0) return [];
 
-  const { data: goalRows } = await supabase
-    .from("client_goals")
-    .select("athlete_id, group_id, created_at, target_date")
-    .in("group_id", groupIds)
-    .eq("goal_type", goalType)
-    .eq("status", "confirmed");
+  const { data: goalRows } = await readRowsByIds(groupIds, (g) => (from, to) =>
+    supabase.from("client_goals").select("athlete_id, group_id, created_at, target_date").in("group_id", g).eq("goal_type", goalType).eq("status", "confirmed").order("id").range(from, to)
+  );
   if (!goalRows || goalRows.length === 0) return [];
 
   const cases: ClientOutcomeCase[] = [];

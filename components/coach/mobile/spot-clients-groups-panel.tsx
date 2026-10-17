@@ -1,5 +1,7 @@
 "use client";
 
+import { readRowsByIds } from "@/lib/read-by-ids";
+
 import { useEffect, useState } from "react";
 import { createGroupWithCoach } from "@/lib/create-group";
 import { useTerm } from "@/components/coach/terminology-provider";
@@ -133,11 +135,9 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
       }
       const orgByGroup = new Map(soloGroups.map((g) => [g.id, g.orgId]));
 
-      const { data: memberRows } = await supabase
-        .from("group_memberships")
-        .select("group_id, profile_id, profiles ( id, full_name, avatar_url )")
-        .in("group_id", soloGroups.map((g) => g.id))
-        .eq("role", "athlete");
+      const { data: memberRows } = await readRowsByIds(soloGroups.map((g) => g.id), (ids) => (from, to) =>
+        supabase.from("group_memberships").select("group_id, profile_id, profiles ( id, full_name, avatar_url )").in("group_id", ids).eq("role", "athlete").order("id").range(from, to)
+      );
 
       if (cancelled) return;
       const seen = new Set<string>();

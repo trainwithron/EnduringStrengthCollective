@@ -5,6 +5,8 @@ import { getGroupCoachTimezone, dateKeyInZone, nowInZone } from "@/lib/timezone"
 import { loadProgramDayContexts, resolveSessionsForDate } from "@/lib/program-day-contexts";
 import { isHabitDueOn } from "@/lib/habits";
 import { withCronRun } from "@/lib/cron-monitor";
+import { pageAll } from "@/lib/page-all";
+import { runPool } from "@/lib/run-pool";
 import { goalLabelFor, restDayNudgeBody, restNudgeDecision } from "@/lib/rest-day-nudge";
 
 // Triggered daily by the Vercel Cron entry in vercel.json. No user
@@ -19,6 +21,11 @@ import { goalLabelFor, restDayNudgeBody, restNudgeDecision } from "@/lib/rest-da
 // group they're in, never one per group. Like coach-digest, this fires
 // at one fixed UTC time rather than per-athlete-timezone — a stated,
 // accepted limitation, not solved here.
+// Every athlete is looked at, so the run needs room: a few athletes at a time (not one after another), and no new athlete is started past the time budget.
+export const maxDuration = 300;
+const ATHLETES_AT_ONCE = 8;
+const TIME_BUDGET_MS = 270_000;
+
 async function handler(request: Request) {
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "CRON_SECRET isn't configured." }, { status: 503 });
@@ -30,20 +37,21 @@ async function handler(request: Request) {
 
   const supabase = createServiceRoleClient();
 
-  const { data: memberships } = await supabase
-    .from("group_memberships")
-    .select("profile_id, group_id")
-    .eq("role", "athlete");
+  // Every athlete seat, a page at a time (a request returns at most 1,000 rows: past that the rest were never looked at).
+  const { rows: memberships, failed: membershipsFailed } = await pageAll((from, to) =>
+    supabase.from("group_memberships").select("profile_id, group_id").eq("role", "athlete").order("id").range(from, to)
+  , { maxPages: 100 });
+  if (membershipsFailed) return NextResponse.json({ error: "Could not read the athletes." }, { status: 500 });
 
   const groupIdsByAthlete = new Map<string, string[]>();
-  for (const row of memberships ?? []) {
+  for (const row of memberships) {
     groupIdsByAthlete.set(row.profile_id, [...(groupIdsByAthlete.get(row.profile_id) ?? []), row.group_id]);
   }
 
   const results: { athleteId: string; groupId: string; sent: boolean }[] = [];
   let recordErrors = 0;
 
-  for (const [athleteId, groupIds] of groupIdsByAthlete) {
+  const processAthlete = async ([athleteId, groupIds]: [string, string[]]): Promise<void> => {
     for (const groupId of groupIds) {
       const timezone = await getGroupCoachTimezone(supabase, groupId);
       const todayKey = dateKeyInZone(timezone);
@@ -151,7 +159,10 @@ async function handler(request: Request) {
       results.push({ athleteId, groupId, sent: sent > 0 });
       break; // one push per athlete per day, even if several groups qualify
     }
-  }
+  };
+  const run = await runPool([...groupIdsByAthlete.entries()], ATHLETES_AT_ONCE, processAthlete, { deadlineMs: TIME_BUDGET_MS });
+  if (run.notStarted.length > 0) console.error(`rest-day-nudge: out of time, ${run.notStarted.length} athletes were not looked at today`);
+  if (run.failed.length > 0) console.error(`rest-day-nudge: ${run.failed.length} athletes failed`);
 
   return NextResponse.json({ athletes: groupIdsByAthlete.size, sent: results.length, recordErrors, results });
 }

@@ -1,4 +1,6 @@
 import { LoadFailedPage } from "@/components/ui/load-failed-page";
+import { readRowsByIds } from "@/lib/read-by-ids";
+import { pageAll } from "@/lib/page-all";
 import { isReadFailure } from "@/lib/read-failed";
 import Link from "next/link";
 import { NoAccess } from "@/components/shared/no-access";
@@ -77,16 +79,13 @@ export default async function RevenueSplitsPage(
   // Total estimated revenue for this org: client monthly rates across
   // every group this org owns, plus active/completed challenge entry
   // fees for coaches in this org.
-  const { data: orgGroups } = await supabase
-    .from("groups")
-    .select("id")
-    .eq("organization_id", orgMembership.organization_id);
-  const orgGroupIds = (orgGroups ?? []).map((g) => g.id);
+  // Every group of the organization a page at a time, and the rates in groups of ids and pages (a gym with 1,500 clients has 1,500 groups: past the URL limit and the 1,000-row cap of one request).
+  const { rows: orgGroups } = await pageAll((from, to) => supabase.from("groups").select("id").eq("organization_id", orgMembership.organization_id).order("id").range(from, to));
+  const orgGroupIds = orgGroups.map((g) => g.id as string);
 
-  const { data: rateRows } = await supabase
-    .from("client_billing_rates")
-    .select("monthly_rate")
-    .in("group_id", orgGroupIds.length > 0 ? orgGroupIds : ["00000000-0000-0000-0000-000000000000"]);
+  const { data: rateRows } = await readRowsByIds(orgGroupIds, (g) => (from, to) =>
+    supabase.from("client_billing_rates").select("monthly_rate").in("group_id", g).order("membership_id").range(from, to)
+  );
   const monthlyRateCents = (rateRows ?? []).reduce((sum, r) => sum + Math.round((r.monthly_rate ?? 0) * 100), 0);
 
   const coachIds = coaches.map((c) => c.profileId);
@@ -100,10 +99,9 @@ export default async function RevenueSplitsPage(
   let challengeRevenueCents = 0;
   if (challengeRows && challengeRows.length > 0) {
     const challengeIds = challengeRows.map((c) => c.id);
-    const { data: participantRows } = await supabase
-      .from("challenge_participants")
-      .select("challenge_id")
-      .in("challenge_id", challengeIds);
+    const { data: participantRows } = await readRowsByIds(challengeIds, (g) => (from, to) =>
+      supabase.from("challenge_participants").select("challenge_id, profile_id").in("challenge_id", g).order("challenge_id").order("profile_id").range(from, to)
+    );
     const countByChallenge = new Map<string, number>();
     for (const p of participantRows ?? []) {
       countByChallenge.set(p.challenge_id, (countByChallenge.get(p.challenge_id) ?? 0) + 1);

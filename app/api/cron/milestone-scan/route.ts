@@ -23,6 +23,8 @@ const RECOVERY_VOLUME_WINDOW_WEEKS = 4;
 const PHASE_ALIGNMENT_WINDOW_WEEKS = 6;
 const COOLDOWN_WEEKS = 8; // don't refire the same athlete+type again this soon
 
+// A scheduled job that loops over people needs room to finish: the function may run up to five minutes (the default is far shorter, and a long list would be cut off part way).
+export const maxDuration = 300;
 async function recordMilestone(
   supabase: SupabaseClient,
   athleteId: string,

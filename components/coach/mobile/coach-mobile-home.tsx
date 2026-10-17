@@ -1,3 +1,4 @@
+import { countByIds } from "@/lib/read-by-ids";
 import { resolveDayMacros, standingForDate } from "@/lib/macro-resolution";
 import { fetchStandingHistory } from "@/lib/standing-macros";
 import Link from "next/link";
@@ -65,7 +66,7 @@ export async function CoachMobileHome({
   if ((rosterRows ?? []).length === 0) {
     const others = orgGroupIds.filter((id) => id !== groupId);
     if (others.length > 0) {
-      const { count } = await supabase.from("group_memberships").select("profile_id", { count: "exact", head: true }).eq("role", "athlete").in("group_id", others);
+      const { count } = await countByIds(others, (g) => supabase.from("group_memberships").select("profile_id", { count: "exact", head: true }).eq("role", "athlete").in("group_id", g));
       clientsElsewhere = (count ?? 0) > 0;
     }
   }

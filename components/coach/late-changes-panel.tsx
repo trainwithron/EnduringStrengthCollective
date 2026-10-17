@@ -1,5 +1,7 @@
 "use client";
 
+import { readRowsByIds } from "@/lib/read-by-ids";
+
 import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { bookingFitsAvailability, resolveBlockedRangesForDate, type AvailabilityWindow } from "@/lib/booking-slots";
@@ -51,26 +53,31 @@ export function LateChangesPanel({ groupIds: scopeGroupIds }: { groupIds?: strin
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return;
-      let bookingsQuery: any = supabase
-        .from("bookings")
-        .select("id, start_at, late_change_kind, athlete_id, group_id, profiles!bookings_athlete_id_fkey ( full_name )")
-        .eq("coach_id", user.id)
-        .eq("late_charge_state", "flagged")
-        .order("start_at", { ascending: true })
-        .limit(20);
-      if (scopeGroupIds) bookingsQuery = bookingsQuery.in("group_id", scopeGroupIds);
-      const { data, error: loadError } = (await bookingsQuery) as { data: any[] | null; error: { message: string } | null };
+      // The first 20 by time. With a list of groups the ids go in groups of 100 (a long list passes a request's URL limit), each group's first 20, merged and cut to 20.
+      const bookingsSelect = "id, start_at, late_change_kind, athlete_id, group_id, profiles!bookings_athlete_id_fkey ( full_name )";
+      const { data, error: loadError } = (
+        scopeGroupIds
+          ? await readRowsByIds(
+              scopeGroupIds,
+              (g) => (from, to) =>
+                supabase.from("bookings").select(bookingsSelect).eq("coach_id", user.id).eq("late_charge_state", "flagged").in("group_id", g).order("start_at", { ascending: true }).order("id").range(from, to),
+              { pageSize: 20, maxPages: 1 }
+            ).then((r) => ({ data: r.data.sort((a: any, b: any) => String(a.start_at).localeCompare(String(b.start_at))).slice(0, 20), error: r.error ? { message: r.error.message } : null }))
+          : await supabase.from("bookings").select(bookingsSelect).eq("coach_id", user.id).eq("late_charge_state", "flagged").order("start_at", { ascending: true }).limit(20)
+      ) as { data: any[] | null; error: { message: string } | null };
       // Booking requests, new and move (needs the database update that adds them; until then the lookup fails quietly and nothing shows).
-      let movesQuery: any = supabase
-        .from("booking_requests")
-        .select("id, kind, from_start_at, new_start_at, new_end_at, athlete_id, group_id, profiles!booking_requests_athlete_id_fkey ( full_name )")
-        .eq("coach_id", user.id)
-        .eq("status", "pending")
-        .gt("new_start_at", new Date().toISOString())
-        .order("new_start_at", { ascending: true })
-        .limit(20);
-      if (scopeGroupIds) movesQuery = movesQuery.in("group_id", scopeGroupIds);
-      const { data: moveData, error: moveError } = (await movesQuery) as { data: any[] | null; error: { message: string } | null };
+      const movesSelect = "id, kind, from_start_at, new_start_at, new_end_at, athlete_id, group_id, profiles!booking_requests_athlete_id_fkey ( full_name )";
+      const nowIso = new Date().toISOString();
+      const { data: moveData, error: moveError } = (
+        scopeGroupIds
+          ? await readRowsByIds(
+              scopeGroupIds,
+              (g) => (from, to) =>
+                supabase.from("booking_requests").select(movesSelect).eq("coach_id", user.id).eq("status", "pending").gt("new_start_at", nowIso).in("group_id", g).order("new_start_at", { ascending: true }).order("id").range(from, to),
+              { pageSize: 20, maxPages: 1 }
+            ).then((r) => ({ data: r.data.sort((a: any, b: any) => String(a.new_start_at).localeCompare(String(b.new_start_at))).slice(0, 20), error: r.error ? { message: r.error.message } : null }))
+          : await supabase.from("booking_requests").select(movesSelect).eq("coach_id", user.id).eq("status", "pending").gt("new_start_at", nowIso).order("new_start_at", { ascending: true }).limit(20)
+      ) as { data: any[] | null; error: { message: string } | null };
       if (!cancelled && !moveError) {
         // The coach's clock and open hours, to say where a requested time sits (a session can be asked for at any minute).
         const { data: coachProfile } = await supabase.from("profiles").select("timezone").eq("id", user.id).maybeSingle();

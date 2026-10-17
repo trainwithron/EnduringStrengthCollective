@@ -96,8 +96,9 @@ describe("no count or list is every organization's rows for a coach in several",
 describe("the Business page counts one organization", () => {
   const src = readFileSync(join(ROOT, "app/(coach)/groups/[groupId]/business/page.tsx"), "utf8").replace(/\r\n/g, "\n");
   it("sessions this month and the packages check are limited to the organization's groups", () => {
-    expect(src).toMatch(/from\("bookings"\)[\s\S]{0,200}\.in\("group_id", groupIds/);
-    expect(src).toMatch(/from\("coach_packages"\)[\s\S]{0,160}\.in\("group_id", safeGroupIds\)/);
+    // (the ids go to the database in groups of 100: lib/read-by-ids.ts)
+    expect(src).toMatch(/countByIds\(groupIds, \(g\) =>\s*supabase\s*\.from\("bookings"\)[\s\S]{0,200}\.in\("group_id", g\)/);
+    expect(src).toMatch(/countByIds\(groupIds, \(g\) =>\s*supabase\s*\.from\("coach_packages"\)[\s\S]{0,160}\.in\("group_id", g\)/);
   });
   it("says it is this organization, not every group you coach", () => {
     expect(src).toContain("A snapshot of this organization.");

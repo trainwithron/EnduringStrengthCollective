@@ -1,3 +1,4 @@
+import { readRowsByIds } from "@/lib/read-by-ids";
 import { LoadFailedPage } from "@/components/ui/load-failed-page";
 import { isReadFailure } from "@/lib/read-failed";
 import { fetchSessionMinutes, sessionMinutesFor } from "@/lib/availability-windows";
@@ -294,16 +295,20 @@ export default async function DayDetailPage(
     const zonedDayStart = zonedTimeToUtc(params.date, "00:00", timezone);
     const zonedDayEnd = new Date(zonedDayStart.getTime() + 24 * 60 * 60 * 1000);
 
-    const { data: bookingRows } = await supabase
-      .from("bookings")
-      .select(
-        "id, start_at, end_at, athlete_id, needs_coach_resolution, recurring_series_id, profiles!bookings_athlete_id_fkey ( full_name )"
-      )
-      .eq("coach_id", coachMembership.profile_id)
-      .in("group_id", await orgGroupIdsOf(supabase, user.id, params.groupId))
-      .eq("status", "confirmed")
-      .gte("start_at", zonedDayStart.toISOString())
-      .lt("start_at", zonedDayEnd.toISOString());
+    const { data: bookingRows } = await readRowsByIds(await orgGroupIdsOf(supabase, user.id, params.groupId), (g) => (from, to) =>
+      supabase
+        .from("bookings")
+        .select(
+          "id, start_at, end_at, athlete_id, needs_coach_resolution, recurring_series_id, profiles!bookings_athlete_id_fkey ( full_name )"
+        )
+        .eq("coach_id", coachMembership.profile_id)
+        .in("group_id", g)
+        .eq("status", "confirmed")
+        .gte("start_at", zonedDayStart.toISOString())
+        .lt("start_at", zonedDayEnd.toISOString())
+        .order("id")
+        .range(from, to)
+    );
 
     bookingsForDay = bookingRows ?? [];
     bufferBlockingBookings = bookingsForDay.map((b) => ({

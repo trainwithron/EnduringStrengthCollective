@@ -1,3 +1,5 @@
+import { readRowsByIds } from "@/lib/read-by-ids";
+import { pageAll } from "@/lib/page-all";
 import { googleFontsHref } from "@/lib/google-fonts";
 import { ShopCard } from "@/components/shared/shop-card";
 import { isRealCoach } from "@/lib/real-coach";
@@ -46,10 +48,12 @@ async function load(slugParam: string, preview: boolean) {
     : { data: [] as any[] };
   const org = pickBrandOrg((membership ?? []) as { organization_id: string; role: string }[], (orgRows ?? []) as any[]);
   // The page belongs to that organization, so the packages and the shop on it are that organization's only.
-  const { data: orgGroupRows } = org ? await db.from("groups").select("id").eq("organization_id", org.id) : { data: [] as { id: string }[] };
-  const orgGroupIdList = (orgGroupRows ?? []).map((g) => g.id);
+  const orgGroupRows = org ? (await pageAll((from, to) => db.from("groups").select("id").eq("organization_id", org.id).order("id").range(from, to))).rows : ([] as { id: string }[]);
+  const orgGroupIdList = orgGroupRows.map((g) => g.id as string);
   const [{ data: packages }, { data: shop }] = await Promise.all([
-    db.from("coach_packages").select("id, name, sessions_per_week, billing_type, sessions_granted, rate_cents").eq("coach_id", page.coach_id).in("group_id", orgGroupIdList.length > 0 ? orgGroupIdList : ["00000000-0000-0000-0000-000000000000"]).eq("is_active", true).eq("is_public", true).order("sessions_per_week", { ascending: true }).limit(6),
+    readRowsByIds(orgGroupIdList, (g) => (from, to) =>
+      db.from("coach_packages").select("id, name, sessions_per_week, billing_type, sessions_granted, rate_cents").eq("coach_id", page.coach_id).in("group_id", g).eq("is_active", true).eq("is_public", true).order("id").range(from, to)
+    ).then((r) => ({ data: r.data.sort((a: any, b: any) => (a.sessions_per_week ?? 0) - (b.sessions_per_week ?? 0)).slice(0, 6) })),
     org
       ? db.from("pro_shop_links").select("id, title, description, url, image_url").eq("coach_id", page.coach_id).eq("organization_id", org.id).eq("show_on_public", true).eq("audience", "everyone").order("sort_order", { ascending: true }).limit(3)
       : Promise.resolve({ data: [] as { id: string; title: string; description: string | null; url: string; image_url: string | null }[] }),

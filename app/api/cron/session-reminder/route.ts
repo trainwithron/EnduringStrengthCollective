@@ -20,6 +20,8 @@ import { withCronRun } from "@/lib/cron-monitor";
 // a session moved to a new time correctly gets a fresh reminder.
 const LEAD_TIME_MINUTES = 60;
 
+// A scheduled job that loops over people needs room to finish: the function may run up to five minutes (the default is far shorter, and a long list would be cut off part way).
+export const maxDuration = 300;
 async function handler(request: Request) {
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "CRON_SECRET isn't configured." }, { status: 503 });

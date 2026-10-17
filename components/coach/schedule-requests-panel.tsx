@@ -1,5 +1,7 @@
 "use client";
 
+import { readRowsByIds } from "@/lib/read-by-ids";
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -121,16 +123,19 @@ export function ScheduleRequestsPanel({ groupIds: scopeGroupIds }: { groupIds?: 
 
   async function load() {
     const supabase = createBrowserClient();
-    let requestsQuery: any = supabase
-      .from("schedule_requests")
-      .select(
-        "id, kind, effective_on, resume_on, status, created_at, athlete_id, group_id, profiles!schedule_requests_athlete_id_fkey ( full_name ), recurring_booking_series ( weekday, start_time, duration_minutes, timezone )"
-      )
-      .in("status", ["pending", "applying"])
-      .order("created_at", { ascending: true })
-      .limit(30);
-      if (scopeGroupIds) requestsQuery = requestsQuery.in("group_id", scopeGroupIds);
-      const { data, error } = (await requestsQuery) as { data: any[] | null; error: unknown };
+    // The first 30 by time. With a list of groups the ids go in groups of 100 (a long list passes a request's URL limit), each group's first 30, merged and cut to 30.
+    const requestsSelect =
+      "id, kind, effective_on, resume_on, status, created_at, athlete_id, group_id, profiles!schedule_requests_athlete_id_fkey ( full_name ), recurring_booking_series ( weekday, start_time, duration_minutes, timezone )";
+    const { data, error } = (
+      scopeGroupIds
+        ? await readRowsByIds(
+            scopeGroupIds,
+            (g) => (from, to) =>
+              supabase.from("schedule_requests").select(requestsSelect).in("status", ["pending", "applying"]).in("group_id", g).order("created_at", { ascending: true }).order("id").range(from, to),
+            { pageSize: 30, maxPages: 1 }
+          ).then((r) => ({ data: r.data.sort((a: any, b: any) => String(a.created_at).localeCompare(String(b.created_at))).slice(0, 30), error: r.error }))
+        : await supabase.from("schedule_requests").select(requestsSelect).in("status", ["pending", "applying"]).order("created_at", { ascending: true }).limit(30)
+    ) as { data: any[] | null; error: unknown };
     if (error || !data) return;
     const rows = data as any[];
     const noteById = new Map<string, string>();

@@ -103,7 +103,8 @@ describe("the coach-level pages and pickers stand on the organization the coach 
     expect(read("lib/coach-mrr.ts")).toContain("loadBusinessScope(supabase, coachId, groupId)");
     expect(read("lib/assign-clients.ts")).toContain("groupsInOrgOf(await getCoachedGroups(supabase, coachId), programGroupId)");
     const cal = read("components/coach/calendar-page-body.tsx");
-    expect((cal.match(/\.in\("group_id", orgGroupIds\)/g) ?? []).length).toBeGreaterThanOrEqual(5);
+    // every read of the coach's bookings and sessions on the calendar goes by the organization's groups (in groups of ids: lib/read-by-ids.ts)
+    expect((cal.match(/readRowsByIds\(\s*orgGroupIds|readByIds\(\s*orgGroupIds/g) ?? []).length).toBeGreaterThanOrEqual(5);
   });
   it("visiting a team or social group remembers it as the workspace, and the theme follows the workspace", () => {
     expect(read("components/coach/coach-desktop-shell.tsx")).toContain("LAST_WORKSPACE_GROUP_COOKIE");
@@ -171,7 +172,7 @@ describe("the daily briefing is made per organization", () => {
     const cron = read3("app/api/cron/coach-briefing/route.ts");
     expect(cron).toContain("groupIdsByCoachOrg");
     expect(cron).toContain("organization_id: organizationId");
-    expect(cron).toContain("gatherCandidateSignals(supabase, { coachId, groupIds })");
+    expect(cron).toContain("gatherCandidateSignals(supabase, { coachId, groupIds, timeZone })");
   });
   it("Home shows only the open organization's briefing items", () => {
     const home = read3("app/(coach)/dashboard/page.tsx");

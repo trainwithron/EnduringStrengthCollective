@@ -24,6 +24,14 @@
   "file": "apply-release-cm-all.sql"
  },
  {
+  "id": "release-g",
+  "name": "Release G (the app at 1,500 clients; real values only in sets; a test-organization mark; pause forgotten workouts; adds only, safe to run BEFORE the code that goes with it is live)",
+  "steps": [
+   "141"
+  ],
+  "file": "apply-release-g-all.sql"
+ },
+ {
   "id": "release-cp",
   "name": "Release CP (switch on the guard: the server finishes the health form and waiver; run AFTER the Release D code is live)",
   "steps": [

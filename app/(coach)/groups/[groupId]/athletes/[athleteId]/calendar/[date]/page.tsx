@@ -1,3 +1,4 @@
+import { readRowsByIds } from "@/lib/read-by-ids";
 import { LoadFailedPage } from "@/components/ui/load-failed-page";
 import { isReadFailure } from "@/lib/read-failed";
 import { loadAssignableWorkouts } from "@/lib/assignable-workouts";
@@ -245,15 +246,20 @@ export default async function ClientCalendarDayPage(
   const displayZone = await getViewerDisplayTimezone(supabase, user.id);
   const nextDayKey = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate() + 1)).toISOString().slice(0, 10);
   const orgGroupIds = await orgGroupIdsOf(supabase, user.id, params.groupId);
-  const { data: dayBookings } = await supabase
-    .from("bookings")
-    .select("start_at, athlete_id, profiles ( full_name )")
-    .eq("coach_id", user.id)
-    .in("group_id", orgGroupIds)
-    .eq("status", "confirmed")
-    .gte("start_at", zonedTimeToUtc(params.date, "00:00", displayZone).toISOString())
-    .lt("start_at", zonedTimeToUtc(nextDayKey, "00:00", displayZone).toISOString())
-    .order("start_at", { ascending: true });
+  const { data: dayBookingsUnsorted } = await readRowsByIds(orgGroupIds, (g) => (from, to) =>
+    supabase
+      .from("bookings")
+      .select("start_at, athlete_id, profiles ( full_name )")
+      .eq("coach_id", user.id)
+      .in("group_id", g)
+      .eq("status", "confirmed")
+      .gte("start_at", zonedTimeToUtc(params.date, "00:00", displayZone).toISOString())
+      .lt("start_at", zonedTimeToUtc(nextDayKey, "00:00", displayZone).toISOString())
+      .order("start_at", { ascending: true })
+      .order("id")
+      .range(from, to)
+  );
+  const dayBookings = dayBookingsUnsorted.sort((a, b) => String(a.start_at).localeCompare(String(b.start_at)));
 
   const { data: availabilityWindows } = await supabase
     .from("coach_availability_windows")

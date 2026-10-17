@@ -29,6 +29,8 @@ const RENUDGE_COOLDOWN_DAYS = 14;
 // ATTENDANCE_NUDGE_AUTO_SEND=true (it is not set anywhere).
 const ATTENDANCE_AUTO_SEND_ENABLED = process.env.ATTENDANCE_NUDGE_AUTO_SEND === "true";
 
+// A scheduled job that loops over people needs room to finish: the function may run up to five minutes (the default is far shorter, and a long list would be cut off part way).
+export const maxDuration = 300;
 async function handler(request: Request) {
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "CRON_SECRET isn't configured." }, { status: 503 });

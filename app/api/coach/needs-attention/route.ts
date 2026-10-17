@@ -1,3 +1,4 @@
+import { readRowsByIds } from "@/lib/read-by-ids";
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { getNeedsAttentionItems } from "@/lib/needs-attention-data";
@@ -27,12 +28,9 @@ export async function GET(request: NextRequest) {
   ];
   if (requested.length === 0) return NextResponse.json({ error: "Missing groupId" }, { status: 400 });
 
-  const { data: memberships } = await supabase
-    .from("group_memberships")
-    .select("group_id")
-    .eq("profile_id", user.id)
-    .eq("role", "coach")
-    .in("group_id", requested);
+  const { data: memberships } = await readRowsByIds(requested, (g) => (from, to) =>
+    supabase.from("group_memberships").select("group_id").eq("profile_id", user.id).eq("role", "coach").in("group_id", g).order("group_id").range(from, to)
+  );
   const groupIds = (memberships ?? []).map((m) => m.group_id);
   if (groupIds.length === 0) return NextResponse.json({ items: [] });
 

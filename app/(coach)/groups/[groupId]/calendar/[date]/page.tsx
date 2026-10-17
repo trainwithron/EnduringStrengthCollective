@@ -1,3 +1,4 @@
+import { readRowsByIds } from "@/lib/read-by-ids";
 import { LoadFailedPage } from "@/components/ui/load-failed-page";
 import { isReadFailure } from "@/lib/read-failed";
 import { fetchSessionMinutes, sessionMinutesFor } from "@/lib/availability-windows";
@@ -230,16 +231,20 @@ export default async function CoachDayDetailPage(
       // Wave 2: both need timezone from wave 1, but not each other.
       const [blockedRangesFromExceptions, { data: bookingRows }] = await Promise.all([
         getBlockedRangesForDate(supabase, coachMembership.profile_id, date, timezone),
-        supabase
-          .from("bookings")
-          .select(
-            "id, start_at, end_at, athlete_id, session_type, recurring_series_id, profiles!bookings_athlete_id_fkey ( full_name )"
-          )
-          .eq("coach_id", coachMembership.profile_id)
-          .in("group_id", await orgGroupIdsOf(supabase, user.id, params.groupId))
-          .eq("status", "confirmed")
-          .gte("start_at", zonedDayStart.toISOString())
-          .lt("start_at", zonedDayEnd.toISOString()),
+        readRowsByIds(await orgGroupIdsOf(supabase, user.id, params.groupId), (g) => (from, to) =>
+          supabase
+            .from("bookings")
+            .select(
+              "id, start_at, end_at, athlete_id, session_type, recurring_series_id, profiles!bookings_athlete_id_fkey ( full_name )"
+            )
+            .eq("coach_id", coachMembership.profile_id)
+            .in("group_id", g)
+            .eq("status", "confirmed")
+            .gte("start_at", zonedDayStart.toISOString())
+            .lt("start_at", zonedDayEnd.toISOString())
+            .order("id")
+            .range(from, to)
+        ).then((r) => ({ data: r.data.sort((a, b) => String(a.start_at).localeCompare(String(b.start_at))) })),
       ]);
 
       // acuity_replacement_gap_audit_sept16.md — a too-soon slot is
@@ -579,16 +584,20 @@ export default async function CoachDayDetailPage(
   // clientMembership existing, resolved in wave 1) — all four independent.
   const [blockedRanges, { data: bookingRows }, { data: creditsForClient }, activeProgram] = await Promise.all([
     getBlockedRangesForDate(supabase, user.id, date, timezone),
-    supabase
-      .from("bookings")
-      .select(
-        "id, start_at, end_at, athlete_id, session_type, no_show, needs_coach_resolution, recurring_series_id, profiles!bookings_athlete_id_fkey ( full_name )"
-      )
-      .eq("coach_id", user.id)
-      .in("group_id", await orgGroupIdsOf(supabase, user.id, params.groupId))
-      .eq("status", "confirmed")
-      .gte("start_at", zonedDayStart.toISOString())
-      .lt("start_at", zonedDayEnd.toISOString()),
+    readRowsByIds(await orgGroupIdsOf(supabase, user.id, params.groupId), (g) => (from, to) =>
+      supabase
+        .from("bookings")
+        .select(
+          "id, start_at, end_at, athlete_id, session_type, no_show, needs_coach_resolution, recurring_series_id, profiles!bookings_athlete_id_fkey ( full_name )"
+        )
+        .eq("coach_id", user.id)
+        .in("group_id", g)
+        .eq("status", "confirmed")
+        .gte("start_at", zonedDayStart.toISOString())
+        .lt("start_at", zonedDayEnd.toISOString())
+        .order("id")
+        .range(from, to)
+    ).then((r) => ({ data: r.data.sort((a, b) => String(a.start_at).localeCompare(String(b.start_at))) })),
     clientMembership
       ? supabase.from("session_credits").select("balance").eq("athlete_id", clientId!).eq("group_id", params.groupId).maybeSingle()
       : Promise.resolve({ data: null as { balance: number } | null }),

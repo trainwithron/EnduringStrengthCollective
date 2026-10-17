@@ -1,5 +1,7 @@
 "use client";
 
+import { readRowsByIds } from "@/lib/read-by-ids";
+
 import { activeOrgGroupsFor } from "@/lib/active-org-groups";
 import { withArticle } from "@/lib/article";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -42,11 +44,9 @@ export function ClientFinder({ currentGroupId, align = "right" }: { currentGroup
         if (!cancelled) setClients([]);
         return;
       }
-      const { data, error: queryError } = await supabase
-        .from("group_memberships")
-        .select("group_id, profiles ( id, full_name ), groups ( name, group_kind )")
-        .in("group_id", groupIds)
-        .eq("role", "athlete");
+      const { data, error: queryError } = await readRowsByIds(groupIds, (g) => (from, to) =>
+        supabase.from("group_memberships").select("group_id, profiles ( id, full_name ), groups ( name, group_kind )").in("group_id", g).eq("role", "athlete").order("id").range(from, to)
+      );
       if (cancelled) return;
       if (queryError) {
         setError(true);

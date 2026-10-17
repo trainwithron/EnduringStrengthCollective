@@ -1,5 +1,5 @@
+import { readByIds } from "@/lib/read-by-ids";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { pageAll } from "@/lib/page-all";
 import { pickAnchorGroup, type CoachedGroup } from "@/lib/coach-groups";
 
 // A coach can run several organizations (separate businesses). Home, and everything counted on it, belongs to ONE of them at a time: the active one.
@@ -31,8 +31,8 @@ export async function clientCountsByOrg(supabase: SupabaseClient, groups: GroupL
   const orgOf = new Map(groups.map((g) => [g.id, g.orgId]));
   const ids = [...orgOf.keys()];
   if (ids.length === 0) return {};
-  const { rows, failed } = await pageAll((from, to) =>
-    supabase.from("group_memberships").select("group_id, profile_id").in("group_id", ids).eq("role", "athlete").order("group_id", { ascending: true }).order("profile_id", { ascending: true }).range(from, to)
+  const { rows, failed } = await readByIds(ids, (g) => (from, to) =>
+    supabase.from("group_memberships").select("group_id, profile_id").in("group_id", g).eq("role", "athlete").order("group_id", { ascending: true }).order("profile_id", { ascending: true }).range(from, to)
   );
   if (failed) return {};
   const seen = new Set<string>();

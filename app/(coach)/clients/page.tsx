@@ -49,7 +49,7 @@ export default async function CoachClientsPage() {
     fetchBookingCounts(supabase, { coachId: user.id }),
     Promise.all(chunk(clientIds, 100).map((ids) => supabase.from("session_credits").select("athlete_id, group_id, balance").in("athlete_id", ids))).then((rs) => rs.flatMap((r) => r.data ?? [])),
     Promise.all(
-      chunk(clientIds, 100).map((ids) => supabase.from("group_memberships").select("profile_id, group_id, client_tier").in("profile_id", ids).in("group_id", groupIds.length > 0 ? groupIds : [""]).eq("role", "athlete"))
+      chunk(clientIds, 100).map((ids) => supabase.from("group_memberships").select("profile_id, group_id, client_tier").in("profile_id", ids).eq("role", "athlete"))
     ).then((rs) => rs.flatMap((r) => r.data ?? [])),
   ]);
   const balance = new Map((creditRows as { athlete_id: string; group_id: string; balance: number }[]).map((r) => [`${r.athlete_id}:${r.group_id}`, r.balance]));

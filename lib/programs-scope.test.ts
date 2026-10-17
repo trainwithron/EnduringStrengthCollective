@@ -40,7 +40,8 @@ describe("where the scope can and cannot come from", () => {
     expect(shell).not.toContain("href: `/groups/${groupId}/programs`");
   });
   it("the all-programs page lists every program of the coach's groups and scopes only from ?client=", () => {
-    expect(page).toContain('.in("group_id", groupIds.length > 0 ? groupIds : [""])');
+    expect(page).toContain("readRowsByIds(groupIds, (g) => (from, to) =>");
+    expect(page).toContain('.in("group_id", g)');
     expect(page).toContain("clientFromSearch(search.client)");
     expect(page).toContain("scopePrograms(all, clientId, clientGroupId)");
   });

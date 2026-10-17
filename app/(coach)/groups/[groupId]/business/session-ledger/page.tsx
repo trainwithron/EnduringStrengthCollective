@@ -1,3 +1,5 @@
+import { readRowsByIds } from "@/lib/read-by-ids";
+import { pageAll } from "@/lib/page-all";
 import { LoadFailedPage } from "@/components/ui/load-failed-page";
 import { isReadFailure } from "@/lib/read-failed";
 import Link from "next/link";
@@ -76,12 +78,12 @@ export default async function SessionLedgerPage(
     );
   }
 
-  const { data: orgGroups } = await supabase
-    .from("groups")
-    .select("id, name")
-    .eq("organization_id", orgMembership.organization_id);
-  const orgGroupIds = (orgGroups ?? []).map((g) => g.id);
-  const groupNameById = new Map((orgGroups ?? []).map((g) => [g.id, g.name]));
+  // Every group of the organization, a page at a time (a gym with more than 1,000 one-on-one clients has more than 1,000 groups).
+  const { rows: orgGroups } = await pageAll((from, to) =>
+    supabase.from("groups").select("id, name").eq("organization_id", orgMembership.organization_id).order("id").range(from, to)
+  );
+  const orgGroupIds = orgGroups.map((g) => g.id as string);
+  const groupNameById = new Map(orgGroups.map((g) => [g.id as string, g.name as string]));
 
   if (orgGroupIds.length === 0) {
     return (
@@ -97,21 +99,17 @@ export default async function SessionLedgerPage(
   // Every athlete across every group in the org, each group's assigned
   // trainer(s), and every real session_credits balance in one batch —
   // three independent queries, not N+1 per group.
+  // (Each read goes in groups of ids and a page at a time: lib/read-by-ids.ts.)
   const [{ data: athleteRows, error: athleteError }, { data: coachRows }, { data: creditRows, error: creditError }] = await Promise.all([
-    supabase
-      .from("group_memberships")
-      .select("group_id, profile_id, profiles ( full_name )")
-      .in("group_id", orgGroupIds)
-      .eq("role", "athlete"),
-    supabase
-      .from("group_memberships")
-      .select("group_id, profile_id, profiles ( full_name )")
-      .in("group_id", orgGroupIds)
-      .eq("role", "coach"),
-    supabase
-      .from("session_credits")
-      .select("athlete_id, group_id, balance, updated_at")
-      .in("group_id", orgGroupIds),
+    readRowsByIds(orgGroupIds, (g) => (from, to) =>
+      supabase.from("group_memberships").select("group_id, profile_id, profiles ( full_name )").in("group_id", g).eq("role", "athlete").order("id").range(from, to)
+    ),
+    readRowsByIds(orgGroupIds, (g) => (from, to) =>
+      supabase.from("group_memberships").select("group_id, profile_id, profiles ( full_name )").in("group_id", g).eq("role", "coach").order("id").range(from, to)
+    ),
+    readRowsByIds(orgGroupIds, (g) => (from, to) =>
+      supabase.from("session_credits").select("athlete_id, group_id, balance, updated_at").in("group_id", g).order("group_id").order("athlete_id").range(from, to)
+    ),
   ]);
 
   const trainerNameByGroup = new Map<string, string>();

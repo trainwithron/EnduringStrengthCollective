@@ -1,5 +1,7 @@
 "use client";
 
+import { readRowsByIds } from "@/lib/read-by-ids";
+
 import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { useOrgGroupIds } from "@/lib/use-org-group-ids";
@@ -52,14 +54,21 @@ export function NeedsAttentionStrip({ coachId, groupId }: { coachId: string; gro
         // content pool when nothing real is available.
         const supabase = createBrowserClient();
         const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString();
-        const { data: prRows } = await supabase
-          .from("workout_logs")
-          .select("new_prs, created_at, profiles ( full_name )")
-          .in("group_id", groupIds!)
-          .gt("created_at", sevenDaysAgo)
-          .not("new_prs", "is", null)
-          .order("created_at", { ascending: false })
-          .limit(20);
+        const { data: prRowsAll } = await readRowsByIds(
+          groupIds!,
+          (g) => (from, to) =>
+            supabase
+              .from("workout_logs")
+              .select("new_prs, created_at, profiles ( full_name )")
+              .in("group_id", g)
+              .gt("created_at", sevenDaysAgo)
+              .not("new_prs", "is", null)
+              .order("created_at", { ascending: false })
+              .order("id")
+              .range(from, to),
+          { pageSize: 20, maxPages: 1 }
+        );
+        const prRows = prRowsAll.sort((a: any, b: any) => String(b.created_at).localeCompare(String(a.created_at))).slice(0, 20);
 
         const withPrs = (prRows ?? []).find((r: any) => (r.new_prs ?? []).length > 0);
         if (!cancelled) {

@@ -1,3 +1,5 @@
+import { readRowsByIds } from "@/lib/read-by-ids";
+import { pageAll } from "@/lib/page-all";
 import { LoadFailedPage } from "@/components/ui/load-failed-page";
 import { isReadFailure } from "@/lib/read-failed";
 import { redirect } from "next/navigation";
@@ -218,20 +220,23 @@ export default async function ClientsPage(
     const scopeGroups = coachedGroups.length > 0 ? coachedGroups : [{ id: params.groupId, kind: "team" as const }];
     const scopeIds = scopeGroups.map((g) => g.id);
     const kindByGroup = new Map(scopeGroups.map((g) => [g.id, g.kind]));
-    const [{ data: scopeMemberships }, scopeLastRows] = await Promise.all([
-      supabase
-        .from("group_memberships")
-        .select("role, profile_id, group_id, client_tier, profiles ( id, full_name, avatar_url, claimed_at )")
-        .in("group_id", scopeIds)
-        .eq("role", "athlete"),
-      Promise.all(scopeIds.map((id) => supabase.rpc("get_last_workout_per_athlete", { p_group_id: id }))),
+    // The members in groups of ids and pages, and each client's last workout from the database in ONE call (it was one call per group: 1,500 calls for 1,500 clients).
+    const [{ data: scopeMemberships }, scopeLastResult] = await Promise.all([
+      readRowsByIds(scopeIds, (g) => (from, to) =>
+        supabase
+          .from("group_memberships")
+          .select("role, profile_id, group_id, client_tier, profiles ( id, full_name, avatar_url, claimed_at )")
+          .in("group_id", g)
+          .eq("role", "athlete")
+          .order("id")
+          .range(from, to)
+      ),
+      pageAll((from, to) => supabase.rpc("business_last_active", { p_group_ids: scopeIds }).range(from, to)),
     ]);
     const scopeLast = new Map<string, string>();
-    for (const res of scopeLastRows) {
-      for (const row of (res.data ?? []) as { athlete_id: string; last_logged_at: string }[]) {
-        const prev = scopeLast.get(row.athlete_id);
-        if (!prev || row.last_logged_at > prev) scopeLast.set(row.athlete_id, row.last_logged_at);
-      }
+    for (const row of scopeLastResult.rows as { athlete_id: string; last_at: string }[]) {
+      const prev = scopeLast.get(row.athlete_id);
+      if (!prev || row.last_at > prev) scopeLast.set(row.athlete_id, row.last_at);
     }
     const scopeUnclaimed = Array.from(
       new Set(

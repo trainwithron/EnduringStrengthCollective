@@ -12,6 +12,8 @@ import { withCronRun } from "@/lib/cron-monitor";
 // Runs daily. Keeps every running "no end date" schedule booked 12 weeks ahead, and sends to Google Calendar any recurring
 // session that has come inside the next 12 weeks since the last run. A date that cannot be booked because the time is now
 // taken is told to the coach once and then left alone, so it never repeats every day.
+// A scheduled job that loops over people needs room to finish: the function may run up to five minutes (the default is far shorter, and a long list would be cut off part way).
+export const maxDuration = 300;
 async function handler(request: Request) {
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "CRON_SECRET isn't configured." }, { status: 503 });

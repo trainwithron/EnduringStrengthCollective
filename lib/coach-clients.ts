@@ -1,3 +1,4 @@
+import { readRowsByIds } from "@/lib/read-by-ids";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getCoachedGroups, groupsInOrgOf, type GroupKind } from "@/lib/coach-groups";
 
@@ -29,11 +30,9 @@ export async function getCoachClients(supabase: SupabaseClient, coachId: string,
   const groups = groupsInOrgOf(await getCoachedGroups(supabase, coachId), anchorGroupId);
   if (groups.length === 0) return [];
   const kindByGroup = new Map(groups.map((g) => [g.id, g.kind]));
-  const { data } = await supabase
-    .from("group_memberships")
-    .select("profile_id, group_id, profiles ( full_name, avatar_url )")
-    .in("group_id", groups.map((g) => g.id))
-    .eq("role", "athlete");
+  const { data } = await readRowsByIds(groups.map((g) => g.id), (ids) => (from, to) =>
+    supabase.from("group_memberships").select("profile_id, group_id, profiles ( full_name, avatar_url )").in("group_id", ids).eq("role", "athlete").order("id").range(from, to)
+  );
   const rows: CoachClient[] = ((data ?? []) as any[]).map((m) => ({
     id: m.profile_id as string,
     fullName: (m.profiles?.full_name ?? "Unknown") as string,

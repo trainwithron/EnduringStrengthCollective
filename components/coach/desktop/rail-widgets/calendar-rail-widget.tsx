@@ -1,5 +1,7 @@
 "use client";
 
+import { readRowsByIds } from "@/lib/read-by-ids";
+
 import { activeOrgGroupsFor } from "@/lib/active-org-groups";
 import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -37,15 +39,19 @@ export function CalendarRailWidget({ groupId }: { groupId: string }) {
       const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
 
-      const { data } = await supabase
-        .from("bookings")
-        .select("id, start_at, profiles!bookings_athlete_id_fkey ( full_name )")
-        .eq("coach_id", user.id)
-        .in("group_id", orgGroupIds.length > 0 ? orgGroupIds : ["00000000-0000-0000-0000-000000000000"])
-        .eq("status", "confirmed")
-        .gte("start_at", startOfDay.toISOString())
-        .lt("start_at", endOfDay.toISOString())
-        .order("start_at", { ascending: true });
+      const { data } = await readRowsByIds(orgGroupIds, (g) => (from, to) =>
+        supabase
+          .from("bookings")
+          .select("id, start_at, profiles!bookings_athlete_id_fkey ( full_name )")
+          .eq("coach_id", user.id)
+          .in("group_id", g)
+          .eq("status", "confirmed")
+          .gte("start_at", startOfDay.toISOString())
+          .lt("start_at", endOfDay.toISOString())
+          .order("start_at", { ascending: true })
+          .order("id")
+          .range(from, to)
+      ).then((r) => ({ data: r.data.sort((a: any, b: any) => String(a.start_at).localeCompare(String(b.start_at))) }));
 
       if (!cancelled) {
         setBookings(

@@ -1,4 +1,5 @@
 import { fetchSessionMinutes, sessionMinutesFor } from "@/lib/availability-windows";
+import { readByIds, readRowsByIds } from "@/lib/read-by-ids";
 import { inOrg, orgIdOfGroup } from "@/lib/org-of-group";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -12,7 +13,6 @@ import { CalendarSchedulingProvider } from "@/components/coach/desktop/calendar-
 import { buildAttentionItems } from "@/lib/calendar-attention";
 import { dateFromKey, monthCellKeys, weekKeys } from "@/lib/date-key";
 import { chunk } from "@/lib/chunk";
-import { pageAll } from "@/lib/page-all";
 import { fetchInactiveKeys, inactiveKey } from "@/lib/inactive-ids";
 import { defaultSessionTypeId, lastTypeByClient, type ClientTierLite } from "@/lib/session-type-default";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
@@ -183,16 +183,24 @@ export async function CoachCalendarPageBody(
       // gated — so the coach sees their real upcoming schedule across
       // every client while deciding who to book, instead of a void.
       const upcomingRangeEnd = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
-      const { data: upcomingBookingRows } = await supabase
-        .from("bookings")
-        .select("id, start_at, profiles!bookings_athlete_id_fkey ( full_name )")
-        .eq("coach_id", user.id)
-        .in("group_id", orgGroupIds)
-        .eq("status", "confirmed")
-        .gte("start_at", new Date().toISOString())
-        .lt("start_at", upcomingRangeEnd.toISOString())
-        .order("start_at", { ascending: true })
-        .limit(10);
+      // (The coach's groups can be more than a request's URL holds, so the ids go in groups; each group's first 10, merged by time, cut to 10.)
+      const { data: upcomingAll } = await readRowsByIds(
+        orgGroupIds,
+        (g) => (from, to) =>
+          supabase
+            .from("bookings")
+            .select("id, start_at, profiles!bookings_athlete_id_fkey ( full_name )")
+            .eq("coach_id", user.id)
+            .in("group_id", g)
+            .eq("status", "confirmed")
+            .gte("start_at", new Date().toISOString())
+            .lt("start_at", upcomingRangeEnd.toISOString())
+            .order("start_at", { ascending: true })
+            .order("id", { ascending: true })
+            .range(from, to),
+        { pageSize: 10, maxPages: 1 }
+      );
+      const upcomingBookingRows = upcomingAll.sort((a, b) => String(a.start_at).localeCompare(String(b.start_at))).slice(0, 10);
       const upcomingBookings = (upcomingBookingRows ?? []).map((b: any) => ({
         id: b.id,
         startAt: b.start_at as string,
@@ -210,15 +218,20 @@ export async function CoachCalendarPageBody(
       const gKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
       const gMonthStart = new Date(gYear, gMonthIndex, 1, 0, 0, 0);
       const gMonthEnd = new Date(gYear, gMonthIndex + 1, 1, 0, 0, 0);
-      const { data: monthBookingRows } = await supabase
-        .from("bookings")
-        .select("id, start_at, profiles!bookings_athlete_id_fkey ( full_name )")
-        .eq("coach_id", user.id)
-        .in("group_id", orgGroupIds)
-        .eq("status", "confirmed")
-        .gte("start_at", new Date(gMonthStart.getTime() - 86400000).toISOString())
-        .lt("start_at", new Date(gMonthEnd.getTime() + 86400000).toISOString())
-        .order("start_at", { ascending: true });
+      const { data: monthBookingRowsUnsorted } = await readRowsByIds(orgGroupIds, (g) => (from, to) =>
+        supabase
+          .from("bookings")
+          .select("id, start_at, profiles!bookings_athlete_id_fkey ( full_name )")
+          .eq("coach_id", user.id)
+          .in("group_id", g)
+          .eq("status", "confirmed")
+          .gte("start_at", new Date(gMonthStart.getTime() - 86400000).toISOString())
+          .lt("start_at", new Date(gMonthEnd.getTime() + 86400000).toISOString())
+          .order("start_at", { ascending: true })
+          .order("id", { ascending: true })
+          .range(from, to)
+      );
+      const monthBookingRows = monthBookingRowsUnsorted.sort((a, b) => String(a.start_at).localeCompare(String(b.start_at)));
       const sessionsByGeneralDay = new Map<string, { time: string; name: string }[]>();
       for (const b of (monthBookingRows ?? []) as any[]) {
         const k = dateKeyInZone(coachTz, new Date(b.start_at));
@@ -347,7 +360,6 @@ export async function CoachCalendarPageBody(
       .from("bookings")
       .select("id, start_at")
       .eq("coach_id", user.id)
-      .in("group_id", orgGroupIds)
       .eq("athlete_id", selected.id)
       .eq("group_id", params.groupId)
       .eq("status", "confirmed")
@@ -805,17 +817,21 @@ export async function CoachCalendarPageBody(
     // across every client — the actual "what does my schedule look
     // like" view, distinct from Availability (which just configures
     // the recurring hours).
-    supabase
-      .from("bookings")
-      .select("id, start_at, end_at, athlete_id, recurring_series_id, profiles!bookings_athlete_id_fkey ( full_name )")
-      .eq("coach_id", user.id)
-      .in("group_id", orgGroupIds)
-      .eq("status", "confirmed")
-      // Padded by a day and a half each side: the grid's cells are the coach's days, the server's midnights are UTC, and a Pacific evening session on the
-      // last day of a month would otherwise fall past the end of the range and appear on no month at all. The cell keys decide where each one shows.
-      .gte("start_at", new Date(rangeStart.getTime() - 36 * 3600000).toISOString())
-      .lt("start_at", new Date(rangeEnd.getTime() + 36 * 3600000).toISOString())
-      .order("start_at", { ascending: true }),
+    readRowsByIds(orgGroupIds, (g) => (from, to) =>
+      supabase
+        .from("bookings")
+        .select("id, start_at, end_at, athlete_id, recurring_series_id, profiles!bookings_athlete_id_fkey ( full_name )")
+        .eq("coach_id", user.id)
+        .in("group_id", g)
+        .eq("status", "confirmed")
+        // Padded by a day and a half each side: the grid's cells are the coach's days, the server's midnights are UTC, and a Pacific evening session on the
+        // last day of a month would otherwise fall past the end of the range and appear on no month at all. The cell keys decide where each one shows.
+        .gte("start_at", new Date(rangeStart.getTime() - 36 * 3600000).toISOString())
+        .lt("start_at", new Date(rangeEnd.getTime() + 36 * 3600000).toISOString())
+        .order("start_at", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to)
+    ).then((r) => ({ data: r.data.sort((a, b) => String(a.start_at).localeCompare(String(b.start_at))) })),
     // Custom events + acted-on suggestions this coach has on the
     // calendar in the visible range — same coach-wide-not-group-scoped
     // model as bookings above.
@@ -851,14 +867,18 @@ export async function CoachCalendarPageBody(
       .eq("group_id", params.groupId)
       .order("created_at", { ascending: false }),
     // Group items on the coach's calendar: every group event and every small-group class in the visible range.
-    supabase
-      .from("group_sessions")
-      .select("id, title, start_at, end_at, kind, group_id, anchor_booking_id")
-      .eq("coach_id", user.id)
-      .in("group_id", orgGroupIds)
-      .eq("status", "scheduled")
-      .gte("start_at", new Date(rangeStart.getTime() - 36 * 3600000).toISOString())
-      .lt("start_at", new Date(rangeEnd.getTime() + 36 * 3600000).toISOString()),
+    readRowsByIds(orgGroupIds, (g) => (from, to) =>
+      supabase
+        .from("group_sessions")
+        .select("id, title, start_at, end_at, kind, group_id, anchor_booking_id")
+        .eq("coach_id", user.id)
+        .in("group_id", g)
+        .eq("status", "scheduled")
+        .gte("start_at", new Date(rangeStart.getTime() - 36 * 3600000).toISOString())
+        .lt("start_at", new Date(rangeEnd.getTime() + 36 * 3600000).toISOString())
+        .order("id")
+        .range(from, to)
+    ),
     supabase
       .from("coach_availability_windows")
       .select("id, weekday, start_time, end_time, slot_duration_minutes")
@@ -905,19 +925,20 @@ export async function CoachCalendarPageBody(
     // "2 left, 1 pending". A client's own workouts never appear here: they cost nothing.
     fetchBookingCounts(supabase, { coachId: user.id }),
     // A session the coach marked attended counts as activity too: a client trained in person with the coach is not "quiet" just because nothing was logged in the app.
-    pageAll(
-      (from, to) =>
+    readByIds(
+      orgGroupIds,
+      (g) => (from, to) =>
         supabase
           .from("bookings")
           .select("id, athlete_id, start_at")
           .eq("coach_id", user.id)
-          .in("group_id", orgGroupIds)
+          .in("group_id", g)
           .not("attended_at", "is", null)
           .order("start_at", { ascending: false })
           .order("id", { ascending: true })
           .range(from, to),
       { maxPages: 3 }
-    ),
+    ).then((r) => ({ ...r, rows: r.rows.sort((a, b) => String(b.start_at).localeCompare(String(a.start_at))) })),
     getCoachedGroups(supabase, user.id),
     gatherCalendarSpotterFindings(supabase, { groupId: params.groupId, coachId: user.id }),
     gatherSchedulingSpotterFlags(supabase, {
@@ -931,20 +952,21 @@ export async function CoachCalendarPageBody(
     // Session types (Online, In person...) and each client's usual one: the type of their latest typed session, else the one type that fits their tier.
     inOrg(supabase.from("session_types").select("id, name, location_kind").eq("coach_id", user.id), bodyOrgId).order("name", { ascending: true }),
     // Past sessions only (future ones would fill the list), newest first, a page at a time past the 1000-row cap.
-    pageAll(
-      (from, to) =>
+    readByIds(
+      orgGroupIds,
+      (g) => (from, to) =>
         supabase
           .from("bookings")
           .select("id, athlete_id, session_type_id, start_at")
           .eq("coach_id", user.id)
-          .in("group_id", orgGroupIds)
+          .in("group_id", g)
           .not("session_type_id", "is", null)
           .lt("start_at", nowIsoForTypes)
           .order("start_at", { ascending: false })
           .order("id", { ascending: true })
           .range(from, to),
       { maxPages: 4 }
-    ),
+    ).then((r) => ({ ...r, rows: r.rows.sort((a, b) => String(b.start_at).localeCompare(String(a.start_at))) })),
     // Which of the coach's types each window of hours is set aside for (a guide, never a block).
     supabase.from("coach_availability_windows").select("id, session_type_id").eq("coach_id", user.id),
     // One batched query covers every active program's workouts at once.
@@ -1001,11 +1023,11 @@ export async function CoachCalendarPageBody(
     fetchInactiveKeys(supabase, clientGroupIds),
     Promise.all(
       chunk(clientIds, 100).map((ids) =>
+        // Each client with their own group: the group list is not sent (a long list passes the URL limit), the clients' own ids already narrow it, and the next lines keep only the pairs that exist.
         supabase
           .from("group_memberships")
           .select("profile_id, group_id, joined_at, client_tier, profiles ( claimed_at )")
           .in("profile_id", ids)
-          .in("group_id", clientGroupIds.length > 0 ? clientGroupIds : [""])
           .eq("role", "athlete")
       )
     ),

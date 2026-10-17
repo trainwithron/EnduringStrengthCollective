@@ -43,7 +43,25 @@ async function handler(request: Request) {
   } catch {
     // the AI check never stops the job check
   }
-  return NextResponse.json({ ok: true, checked: CRON_JOBS.length, stale, aiAlerts });
+  // Data health, nightly: a workout left "in progress" for a week means the stale-workout job is not doing its work (it closes them after three days).
+  let staleOpenSessions = 0;
+  try {
+    const cutoff = new Date(Date.now() - 7 * 86400000).toISOString();
+    const { count, error: healthError } = await db
+      .from("athlete_sessions")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "in_progress")
+      .lt("started_at", cutoff);
+    if (!healthError) {
+      staleOpenSessions = count ?? 0;
+      if (staleOpenSessions > 0) {
+        await alertPlatformAdmins("Workouts are being left open", `${staleOpenSessions} workouts have been "in progress" for more than a week. The nightly close-stale-sessions job should have paused them.`);
+      }
+    }
+  } catch {
+    // the data check never stops the job check
+  }
+  return NextResponse.json({ ok: true, checked: CRON_JOBS.length, stale, aiAlerts, staleOpenSessions });
 }
 
 export const GET = withCronRun("cron-watchdog", handler);

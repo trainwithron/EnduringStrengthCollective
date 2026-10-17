@@ -1,3 +1,4 @@
+import { readRowsByIds } from "@/lib/read-by-ids";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 // Empty things are not worth keeping (Ron): a day with no exercises and no name saying it is a rest day, and a program with nothing in it. Both are removed quietly, with safety: nothing that has a
@@ -84,12 +85,16 @@ export async function sweepEmptyPrograms(supabase: SupabaseClient, viewerId: str
   try {
     if (groupIds.length === 0) return 0;
     const cutoff = new Date(now.getTime() - PROGRAM_IDLE_MS).toISOString();
-    const { data } = await supabase
-      .from("programs")
-      .select("id, created_by, updated_at, workouts(id, group_workout_exercises(count), athlete_sessions(count))")
-      .in("group_id", groupIds)
-      .eq("created_by", viewerId)
-      .lt("updated_at", cutoff);
+    const { data } = await readRowsByIds(groupIds, (g) => (from, to) =>
+      supabase
+        .from("programs")
+        .select("id, created_by, updated_at, workouts(id, group_workout_exercises(count), athlete_sessions(count))")
+        .in("group_id", g)
+        .eq("created_by", viewerId)
+        .lt("updated_at", cutoff)
+        .order("id")
+        .range(from, to)
+    );
     const candidates = ((data ?? []) as any[]).filter((p) => {
       const workouts = (p.workouts ?? []) as any[];
       return !workouts.some((w) => count(w.group_workout_exercises) > 0 || count(w.athlete_sessions) > 0);

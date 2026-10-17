@@ -1,5 +1,8 @@
 "use client";
 
+import { readRowsByIds } from "@/lib/read-by-ids";
+import { pageAll } from "@/lib/page-all";
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -36,11 +39,9 @@ export function RosterMiniList({ groupId }: { groupId: string }) {
     let cancelled = false;
     async function run() {
       const supabase = createBrowserClient();
-      const { data: memberRows } = await supabase
-        .from("group_memberships")
-        .select("group_id, profile_id, profiles ( full_name )")
-        .in("group_id", groupIds!)
-        .eq("role", "athlete");
+      const { data: memberRows } = await readRowsByIds(groupIds!, (g) => (from, to) =>
+        supabase.from("group_memberships").select("group_id, profile_id, profiles ( full_name )").in("group_id", g).eq("role", "athlete").order("id").range(from, to)
+      );
 
       // One row per person (a client can sit in a team and their own group).
       const firstGroupByAthlete = new Map<string, string>();
@@ -48,19 +49,15 @@ export function RosterMiniList({ groupId }: { groupId: string }) {
         if (!firstGroupByAthlete.has(m.profile_id)) firstGroupByAthlete.set(m.profile_id, m.group_id);
       }
       const athleteIds = [...firstGroupByAthlete.keys()];
-      const { data: logRows } =
+      const logRows =
         athleteIds.length > 0
-          ? await supabase
-              .from("workout_logs")
-              .select("athlete_id, created_at")
-              .in("athlete_id", athleteIds)
-              .in("group_id", groupIds!)
-              .order("created_at", { ascending: false })
-          : { data: [] };
+          ? (await pageAll((from, to) => supabase.rpc("business_last_active", { p_group_ids: groupIds! }).range(from, to))).rows
+          : ([] as any[]);
 
+      // (One row per client from the database: the last workout, not every workout ever logged.)
       const lastByAthlete = new Map<string, string>();
-      for (const row of logRows ?? []) {
-        if (!lastByAthlete.has(row.athlete_id)) lastByAthlete.set(row.athlete_id, row.created_at);
+      for (const row of logRows) {
+        if (!lastByAthlete.has(row.athlete_id)) lastByAthlete.set(row.athlete_id, row.last_at);
       }
 
       const seenPeople = new Set<string>();

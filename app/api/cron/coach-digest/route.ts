@@ -4,6 +4,14 @@ import { sendPushToProfile } from "@/lib/send-push";
 import { findThreadsNeedingReply } from "@/lib/notification-priority";
 import { DEFAULT_COACH_TIMEZONE, nowInZone } from "@/lib/timezone";
 import { withCronRun } from "@/lib/cron-monitor";
+import { pageAll } from "@/lib/page-all";
+import { readRowsByIds } from "@/lib/read-by-ids";
+import { runPool } from "@/lib/run-pool";
+
+// One digest per coach and organization: a few at a time (not one after another), and no new coach is started past the time budget.
+export const maxDuration = 300;
+const COACHES_AT_ONCE = 8;
+const TIME_BUDGET_MS = 270_000;
 
 // Triggered daily by the Vercel Cron entry in vercel.json. No user
 // session involved — auth is the CRON_SECRET header, same pattern as
@@ -21,17 +29,18 @@ async function handler(request: Request) {
 
   const supabase = createServiceRoleClient();
 
-  const { data: coachRows } = await supabase
-    .from("group_memberships")
-    .select("profile_id, group_id, groups ( group_kind, organization_id, organizations ( name ) )")
-    .eq("role", "coach");
+  // Every coach seat, a page at a time (a request returns at most 1,000 rows).
+  const { rows: coachRows, failed: coachRowsFailed } = await pageAll((from, to) =>
+    supabase.from("group_memberships").select("profile_id, group_id, groups ( group_kind, organization_id, organizations ( name ) )").eq("role", "coach").order("id").range(from, to)
+  );
+  if (coachRowsFailed) return NextResponse.json({ error: "Could not read the coaches." }, { status: 500 });
 
   // One entry per (coach, organization).
   const groupIdsByCoach = new Map<string, string[]>();
   const teamSocialGroupIdsByCoach = new Map<string, string[]>();
   const entryInfo = new Map<string, { coachId: string; orgName: string | null }>();
   const orgCountByCoach = new Map<string, Set<string>>();
-  for (const row of coachRows ?? []) {
+  for (const row of coachRows) {
     const g = (row as any).groups;
     // A personal space belongs to no organization and has no clients: it is not part of the digest.
     if (!g?.organization_id) continue;
@@ -49,57 +58,34 @@ async function handler(request: Request) {
   // day the cron's UTC clock happens to read — otherwise the weekly recap
   // fires a day early or late for anyone not in the UTC zone (same class
   // of bug as the workout-visibility lock — see lib/timezone.ts).
-  const { data: timezoneRows } = await supabase
-    .from("profiles")
-    .select("id, timezone")
-    .in("id", [...new Set([...entryInfo.values()].map((e) => e.coachId))]);
+  const { data: timezoneRows } = await readRowsByIds([...new Set([...entryInfo.values()].map((e) => e.coachId))], (g) => (from, to) =>
+    supabase.from("profiles").select("id, timezone").in("id", g).order("id").range(from, to)
+  );
   const timezoneByCoach = new Map(
     (timezoneRows ?? []).map((r) => [r.id, r.timezone ?? DEFAULT_COACH_TIMEZONE])
   );
 
   const results: { coachId: string; sent: boolean; summary?: string }[] = [];
 
-  for (const [entryKey, groupIds] of groupIdsByCoach) {
+  const processEntry = async ([entryKey, groupIds]: [string, string[]]): Promise<void> => {
     const { coachId, orgName } = entryInfo.get(entryKey)!;
     const parts: string[] = [];
 
     // "What's New" — the same coach_view_state comparison the desktop
     // sidebar badges already compute, run headlessly and WITHOUT marking
     // anything seen (the desktop badge still does that itself).
-    const { data: viewStateRows } = await supabase
-      .from("coach_view_state")
-      .select("group_id, feed_seen_at, clients_seen_at")
-      .eq("coach_id", coachId)
-      .in("group_id", groupIds);
-
-    const seenByGroup = new Map(
-      (viewStateRows ?? []).map((r) => [r.group_id, { feed: r.feed_seen_at, clients: r.clients_seen_at }])
-    );
-    const visitedGroupIds = [...seenByGroup.keys()];
-
+    // The database counts the new posts and the distinct active clients since this coach last looked, in the groups they have visited (no read of every post and workout ever logged).
     let newPostCount = 0;
-    const activeAthletes = new Set<string>();
-    if (visitedGroupIds.length > 0) {
-      const [{ data: recentPosts }, { data: recentLogs }] = await Promise.all([
-        supabase.from("posts").select("group_id, created_at").in("group_id", visitedGroupIds),
-        supabase.from("workout_logs").select("group_id, athlete_id, created_at").in("group_id", visitedGroupIds),
-      ]);
-      for (const groupId of visitedGroupIds) {
-        const seen = seenByGroup.get(groupId)!;
-        newPostCount += (recentPosts ?? []).filter(
-          (p) => p.group_id === groupId && (!seen.feed || p.created_at > seen.feed)
-        ).length;
-        for (const log of recentLogs ?? []) {
-          if (log.group_id === groupId && log.athlete_id && (!seen.clients || log.created_at > seen.clients)) {
-            activeAthletes.add(log.athlete_id);
-          }
-        }
-      }
-    }
-    if (newPostCount > 0 || activeAthletes.size > 0) {
+    let activeAthleteCount = 0;
+    const { data: activityRows, error: activityError } = await supabase.rpc("coach_digest_activity", { p_coach: coachId, p_group_ids: groupIds });
+    if (activityError) console.error("coach-digest: could not count new activity:", activityError.message);
+    const activity = Array.isArray(activityRows) ? activityRows[0] : activityRows;
+    newPostCount = Number(activity?.new_posts ?? 0);
+    activeAthleteCount = Number(activity?.active_athletes ?? 0);
+    if (newPostCount > 0 || activeAthleteCount > 0) {
       const bits: string[] = [];
       if (newPostCount > 0) bits.push(`${newPostCount} new post${newPostCount === 1 ? "" : "s"}`);
-      if (activeAthletes.size > 0) bits.push(`${activeAthletes.size} client${activeAthletes.size === 1 ? "" : "s"} active`);
+      if (activeAthleteCount > 0) bits.push(`${activeAthleteCount} client${activeAthleteCount === 1 ? "" : "s"} active`);
       parts.push(bits.join(", "));
     }
 
@@ -108,7 +94,7 @@ async function handler(request: Request) {
     const teamSocialIds = teamSocialGroupIdsByCoach.get(entryKey) ?? [];
     if (teamSocialIds.length > 0) {
       const [{ data: commentRows }, { data: dismissedRows }] = await Promise.all([
-        supabase.from("comments").select("post_id, group_id, author_id, created_at").in("group_id", teamSocialIds),
+        readRowsByIds(teamSocialIds, (g) => (from, to) => supabase.from("comments").select("post_id, group_id, author_id, created_at").in("group_id", g).order("id").range(from, to)),
         supabase.from("coach_dismissed_reply_alerts").select("post_id, dismissed_at").eq("coach_id", coachId),
       ]);
       const dismissedAt = new Map((dismissedRows ?? []).map((d) => [d.post_id, d.dismissed_at]));
@@ -134,11 +120,9 @@ async function handler(request: Request) {
     const isMonday = nowInZone(timezoneByCoach.get(coachId) ?? DEFAULT_COACH_TIMEZONE).getUTCDay() === 1;
     if (isMonday) {
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-      const { data: purchases } = await supabase
-        .from("credit_purchases")
-        .select("amount_cents")
-        .in("group_id", groupIds)
-        .gte("created_at", sevenDaysAgo);
+      const { data: purchases } = await readRowsByIds(groupIds, (g) => (from, to) =>
+        supabase.from("credit_purchases").select("amount_cents").in("group_id", g).gte("created_at", sevenDaysAgo).order("id").range(from, to)
+      );
       const incomeCents = (purchases ?? []).reduce((sum, p) => sum + (p.amount_cents ?? 0), 0);
       if (incomeCents > 0) {
         parts.push(`$${(incomeCents / 100).toFixed(0)} income this week`);
@@ -147,7 +131,7 @@ async function handler(request: Request) {
 
     if (parts.length === 0) {
       results.push({ coachId, sent: false });
-      continue;
+      return;
     }
 
     const summary = parts.join(" · ");
@@ -155,7 +139,10 @@ async function handler(request: Request) {
     const title = (orgCountByCoach.get(coachId)?.size ?? 1) > 1 && orgName ? `${orgName}: since you last checked` : "Your business, since you last checked";
     const sent = await sendPushToProfile(supabase, coachId, title, summary, "/dashboard");
     results.push({ coachId, sent: sent > 0, summary });
-  }
+  };
+  const run = await runPool([...groupIdsByCoach.entries()], COACHES_AT_ONCE, processEntry, { deadlineMs: TIME_BUDGET_MS });
+  if (run.notStarted.length > 0) console.error(`coach-digest: out of time, ${run.notStarted.length} digests were not made today`);
+  if (run.failed.length > 0) console.error(`coach-digest: ${run.failed.length} digests failed`);
 
   return NextResponse.json({ coaches: results.length, results });
 }

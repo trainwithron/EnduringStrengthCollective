@@ -108,8 +108,9 @@ describe("Home is scoped to the active organization everywhere", () => {
     }
   });
   it("each of those panels stays inside the groups it is given (and still works unscoped elsewhere)", () => {
-    expect(read("components/coach/late-changes-panel.tsx")).toContain('.in("group_id", scopeGroupIds)');
-    expect(read("components/coach/schedule-requests-panel.tsx")).toContain('.in("group_id", scopeGroupIds)');
+    // (the ids go to the database in groups of 100: lib/read-by-ids.ts)
+    expect(read("components/coach/late-changes-panel.tsx")).toContain("readRowsByIds(\n              scopeGroupIds,");
+    expect(read("components/coach/schedule-requests-panel.tsx")).toContain("readRowsByIds(\n            scopeGroupIds,");
     expect(read("components/coach/expiry-checkin-panel.tsx")).toContain("scopeGroupIds.includes(id)");
     expect(read("components/coach/inactive-clients-panel.tsx")).toContain("scopeGroupIds.includes(id)");
     expect(read("components/coach/progress-look-panel.tsx")).toContain("scopeGroupIds.includes(c.groupId)");

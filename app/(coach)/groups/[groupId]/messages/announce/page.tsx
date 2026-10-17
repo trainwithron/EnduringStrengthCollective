@@ -1,3 +1,4 @@
+import { readRowsByIds } from "@/lib/read-by-ids";
 import { LoadFailedPage } from "@/components/ui/load-failed-page";
 import { isReadFailure } from "@/lib/read-failed";
 import { redirect } from "next/navigation";
@@ -60,22 +61,22 @@ export default async function AnnouncePage(props: { params: Promise<{ groupId: s
   }));
 
   const groupIds = groups.map((g) => g.id);
-  const { data: memberRows } = groupIds.length
-    ? await supabase
-        .from("group_memberships")
-        .select("group_id, profile_id, profiles ( full_name )")
-        .eq("role", "athlete")
-        .eq("membership_type", "training")
-        .in("group_id", groupIds)
-    : { data: [] };
+  const { data: memberRows } = await readRowsByIds(groupIds, (g) => (from, to) =>
+    supabase
+      .from("group_memberships")
+      .select("group_id, profile_id, profiles ( full_name )")
+      .eq("role", "athlete")
+      .eq("membership_type", "training")
+      .in("group_id", g)
+      .order("id")
+      .range(from, to)
+  );
 
   const athleteIds = [...new Set((memberRows ?? []).map((m: any) => m.profile_id as string))];
-  const [{ data: intakeRows }, { data: consentRows }] = athleteIds.length
-    ? await Promise.all([
-        supabase.from("client_intake").select("athlete_id, date_of_birth").in("athlete_id", athleteIds),
-        supabase.from("minor_consent").select("athlete_id, verified").in("athlete_id", athleteIds),
-      ])
-    : [{ data: [] }, { data: [] }];
+  const [{ data: intakeRows }, { data: consentRows }] = await Promise.all([
+    readRowsByIds(athleteIds, (g) => (from, to) => supabase.from("client_intake").select("athlete_id, date_of_birth").in("athlete_id", g).order("athlete_id").range(from, to)),
+    readRowsByIds(athleteIds, (g) => (from, to) => supabase.from("minor_consent").select("athlete_id, verified").in("athlete_id", g).order("athlete_id").range(from, to)),
+  ]);
   const dobById = new Map((intakeRows ?? []).map((r: any) => [r.athlete_id, r.date_of_birth as string | null]));
   const consentVerified = new Set((consentRows ?? []).filter((r: any) => r.verified).map((r: any) => r.athlete_id));
   const now = new Date();

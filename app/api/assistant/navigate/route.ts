@@ -1,3 +1,4 @@
+import { readRowsByIds } from "@/lib/read-by-ids";
 import { describeScheduleRequests, matchScheduleRequestQuestion, namedClients } from "@/lib/schedule-requests-chat";
 import { NextResponse } from "next/server";
 import { getActiveAnchor } from "@/lib/active-anchor";
@@ -52,12 +53,12 @@ export async function POST(request: Request) {
 
   let roster: RosterClient[] = [];
   if (role === "coach") {
-    const { data: rows } = await supabase
-      .from("group_memberships")
-      .select("group_id, profile_id, role, profiles ( full_name )")
-      .in("group_id", coachGroupIds)
-      .eq("role", "athlete")
-      .limit(600);
+    const { data: rows } = await readRowsByIds(
+      coachGroupIds,
+      (g) => (from, to) =>
+        supabase.from("group_memberships").select("group_id, profile_id, role, profiles ( full_name )").in("group_id", g).eq("role", "athlete").order("id").range(from, to),
+      { pageSize: 600, maxPages: 1 }
+    ).then((r) => ({ data: r.data.slice(0, 600) }));
     roster = (rows ?? [])
       .map((r: any) => ({ id: r.profile_id as string, fullName: (r.profiles?.full_name as string | undefined) ?? "", groupId: r.group_id as string }))
       .filter((r) => r.fullName);
@@ -105,8 +106,8 @@ export async function POST(request: Request) {
   const clientPrograms: Record<string, { programId: string; groupId: string }> = {};
   if (role === "coach" && roster.length > 0) {
     const [{ data: programRows }, { data: kindRows }] = await Promise.all([
-      supabase.from("programs").select("id, group_id, athlete_id").in("group_id", coachGroupIds).eq("is_active", true).limit(1000),
-      supabase.from("groups").select("id, group_kind").in("id", coachGroupIds),
+      readRowsByIds(coachGroupIds, (g) => (from, to) => supabase.from("programs").select("id, group_id, athlete_id").in("group_id", g).eq("is_active", true).order("id").range(from, to)),
+      readRowsByIds(coachGroupIds, (g) => (from, to) => supabase.from("groups").select("id, group_kind").in("id", g).order("id").range(from, to)),
     ]);
     const oneOnOneIds = new Set<string>((kindRows ?? []).filter((g: any) => g.group_kind === "one_on_one").map((g: any) => g.id as string));
     // A one-on-one space has no shared program: a program with no client on it is the coach's template.

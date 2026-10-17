@@ -14,6 +14,8 @@ import { withCronRun } from "@/lib/cron-monitor";
 // actual push (needs the web-push library, not available in plpgsql)
 // and expiring a stale offer to cascade to the next person in line.
 // Runs every 5 minutes, same cadence as webhook-retry/session-reminder.
+// A scheduled job that loops over people needs room to finish: the function may run up to five minutes (the default is far shorter, and a long list would be cut off part way).
+export const maxDuration = 300;
 async function handler(request: Request) {
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "CRON_SECRET isn't configured." }, { status: 503 });

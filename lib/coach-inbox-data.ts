@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
 import { buildCoachInbox, type InboxConversation } from "@/lib/coach-inbox";
-import { pageAll } from "@/lib/page-all";
+import { readByIds, readRowsByIds } from "@/lib/read-by-ids";
 
 // The coach's one inbox as data: every client across the groups the coach coaches in the organization, with the newest message and the unread count. Shared by the All messages page and the
 // floating panel's Messages tab, so the two always list the same conversations the same way. Reads only; nothing is marked read here.
@@ -12,20 +12,23 @@ export async function loadCoachInbox(supabase: SupabaseClient, args: { coachId: 
   const scopeIds = scopeGroups.map((g) => g.id);
   const kindByGroup = new Map(scopeGroups.map((g) => [g.id, g.kind]));
   // The messages are read a page at a time (PostgREST stops at 1,000 rows), in a fixed order, so the newest message and the unread count of every conversation are right however many there are.
+  // (The group ids go in groups of 100: a long list in one request passes the URL limit. The groups' messages are put together oldest first.)
   const readMessages = (columns: string) =>
-    pageAll((from, to) =>
+    readByIds(scopeIds, (g) => (from, to) =>
       supabase
         .from("direct_messages")
         .select(columns)
-        .in("group_id", scopeIds)
+        .in("group_id", g)
         .or(`sender_id.eq.${coachId},recipient_id.eq.${coachId}`)
         .order("created_at", { ascending: true })
         .order("id", { ascending: true })
         .range(from, to)
-    );
+    ).then((r) => ({ ...r, rows: r.rows.sort((a: any, b: any) => String(a.created_at).localeCompare(String(b.created_at)) || String(a.id).localeCompare(String(b.id))) }));
   const [{ data: group }, { data: roster }, firstPages] = await Promise.all([
     supabase.from("groups").select("name").eq("id", groupId).single(),
-    supabase.from("group_memberships").select("profile_id, group_id, profiles ( full_name, avatar_url )").in("group_id", scopeIds).eq("role", "athlete"),
+    readRowsByIds(scopeIds, (g) => (from, to) =>
+      supabase.from("group_memberships").select("profile_id, group_id, profiles ( full_name, avatar_url )").in("group_id", g).eq("role", "athlete").order("id").range(from, to)
+    ),
     readMessages("id, group_id, sender_id, recipient_id, body, created_at, read_at, auto_reply"),
   ]);
   // Before the 0315 database update there is no auto_reply column and that read fails: read again with the old column list so the inbox is never empty.
