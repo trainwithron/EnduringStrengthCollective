@@ -114,10 +114,12 @@ export async function POST(request: Request) {
       recurring: billingType === "subscription" ? { interval: "month" } : undefined,
     });
 
-    await serviceRole
+    // The ids must be saved: a package without them cannot be bought. A failed save takes the catch below (the row is deactivated and the coach is told), not a success answer.
+    const { error: priceSaveError } = await serviceRole
       .from("coach_packages")
       .update({ stripe_product_id: product.id, stripe_price_id: price.id })
       .eq("id", pkg.id);
+    if (priceSaveError) throw priceSaveError;
 
     return NextResponse.json({ packageId: pkg.id });
   } catch (err) {

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { orgIdOfGroup } from "@/lib/org-of-group";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { saved } from "@/lib/saved";
+import { saved, bestEffort } from "@/lib/saved";
 
 export function ChallengeCreator({
   groupId,
@@ -79,9 +79,15 @@ export function ChallengeCreator({
       return;
     }
 
-    await saved(supabase.from("challenge_habits").insert(
+    const habitsSaved = await saved(supabase.from("challenge_habits").insert(
       cleanHabits.map((title, i) => ({ challenge_id: challenge.id, title, sort_order: i }))
     ));
+    if (!habitsSaved) {
+      // A challenge with no habits cannot be repaired from the app, so it is taken back and the form stays open with what was typed (Create tries again).
+      await bestEffort(supabase.from("challenges").delete().eq("id", challenge.id));
+      setSaving(false);
+      return;
+    }
 
     setSaving(false);
     setOpen(false);

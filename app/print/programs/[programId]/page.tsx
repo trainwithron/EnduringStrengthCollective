@@ -1,4 +1,5 @@
 import { LoadFailedPage } from "@/components/ui/load-failed-page";
+import { isReadFailure } from "@/lib/read-failed";
 import { redirect } from "next/navigation";
 import { createCrossOrgServerClient as createServerClient } from "@/lib/supabase/server";
 import { NoAccess } from "@/components/shared/no-access";
@@ -29,7 +30,7 @@ export default async function PrintProgramPage(props: { params: Promise<{ progra
 
   const { data: membership, error: membershipError } = await supabase.from("group_memberships").select("role").eq("group_id", program.group_id).eq("profile_id", user.id).maybeSingle();
 
-  if (membershipError) return <LoadFailedPage />;
+  if (isReadFailure(membershipError)) return <LoadFailedPage />;
 
   if (!membership) return <NoAccess>This program isn&apos;t available, or you don&apos;t have access to it.</NoAccess>;
   const isCoach = membership.role === "coach";

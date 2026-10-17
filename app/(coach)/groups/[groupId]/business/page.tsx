@@ -1,4 +1,5 @@
 import { LoadFailedPage } from "@/components/ui/load-failed-page";
+import { isReadFailure } from "@/lib/read-failed";
 import Link from "next/link";
 import { inOrg, orgIdOfGroup } from "@/lib/org-of-group";
 import { getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
@@ -52,7 +53,7 @@ export default async function BusinessDashboardPage(
     .eq("profile_id", user.id)
     .maybeSingle();
 
-  if (membershipError) return <LoadFailedPage />;
+  if (isReadFailure(membershipError)) return <LoadFailedPage />;
 
   if (membership?.role !== "coach") {
     return (
@@ -70,15 +71,16 @@ export default async function BusinessDashboardPage(
   // A coach: their own groups. The owner or an admin of the organization: every group in it (all coaches, all clients).
   const scope = await loadBusinessScope(supabase, user.id, params.groupId);
   const groupIds = scope.groupIds;
+  if (scope.failed) return <LoadFailedPage />;
 
-  const { data: memberRows } = await supabase
+  const { data: memberRows, error: memberError } = await supabase
     .from("group_memberships")
     .select("id, group_id, profile_id, joined_at, client_tier, profiles ( full_name )")
     .in("group_id", groupIds.length > 0 ? groupIds : ["00000000-0000-0000-0000-000000000000"])
     .eq("role", "athlete")
     .order("joined_at", { ascending: false });
   // What each client pays is coach-only (client_billing_rates, 0303).
-  const { data: rateRows } = await supabase
+  const { data: rateRows, error: rateError } = await supabase
     .from("client_billing_rates")
     .select("membership_id, monthly_rate")
     .in("group_id", groupIds.length > 0 ? groupIds : ["00000000-0000-0000-0000-000000000000"]);
@@ -96,7 +98,7 @@ export default async function BusinessDashboardPage(
 
   const uniqueAthleteIds = new Set(clients.map((c) => c.athleteId));
 
-  const { data: creditRows } = await supabase
+  const { data: creditRows, error: creditError } = await supabase
     .from("session_credits")
     .select("athlete_id, group_id, balance")
     .in("group_id", groupIds.length > 0 ? groupIds : ["00000000-0000-0000-0000-000000000000"]);
@@ -106,7 +108,7 @@ export default async function BusinessDashboardPage(
   const displayZone = await getViewerDisplayTimezone(supabase, user.id);
   const dateKey = (d: Date): string => dateKeyInZone(displayZone, d);
 
-  const { data: logRows } = await supabase
+  const { data: logRows, error: logError } = await supabase
     .from("workout_logs")
     .select("athlete_id, created_at")
     .in("group_id", groupIds.length > 0 ? groupIds : ["00000000-0000-0000-0000-000000000000"])
@@ -121,7 +123,7 @@ export default async function BusinessDashboardPage(
   const todayKey = dateKey(new Date());
   const { monthKey, startIso: monthStartIso } = monthBoundsInZone(displayZone);
 
-  const { count: bookingsThisMonthCount } = await supabase
+  const { count: bookingsThisMonthCount, error: bookingsError } = await supabase
     .from("bookings")
     .select("id", { count: "exact", head: true })
     .in("group_id", groupIds.length > 0 ? groupIds : ["00000000-0000-0000-0000-000000000000"])
@@ -147,22 +149,25 @@ export default async function BusinessDashboardPage(
   // read differently from a real "$0 this period" (packages exist, just
   // no purchases yet). Package existence, not the period's totals, is
   // the real "has billing even been set up" signal.
-  const { count: packageCount } = await supabase
+  const { count: packageCount, error: packageError } = await supabase
     .from("coach_packages")
     .select("id", { count: "exact", head: true })
     .in("group_id", safeGroupIds)
     .match(scope.organizationWide ? {} : { coach_id: user.id });
   const hasBillingSetUp = (packageCount ?? 0) > 0;
 
-  const { data: purchaseRows } = await supabase
+  const { data: purchaseRows, error: purchaseError } = await supabase
     .from("credit_purchases")
     .select("athlete_id, amount_cents, created_at")
     .in("group_id", safeGroupIds);
 
-  const { data: subscriptionRows } = await supabase
+  const { data: subscriptionRows, error: subscriptionError } = await supabase
     .from("membership_subscriptions")
     .select("athlete_id, price_cents, status")
     .in("group_id", safeGroupIds);
+
+  // A failed read must never look like "no billing yet / $0 / no clients": the page says it could not load.
+  if (memberError || rateError || creditError || logError || bookingsError || packageError || purchaseError || subscriptionError) return <LoadFailedPage />;
 
   const realIncomeThisMonth = computeRealIncomeThisMonth(
     (purchaseRows ?? []).map((p) => ({

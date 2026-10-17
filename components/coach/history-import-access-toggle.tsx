@@ -30,11 +30,13 @@ export function HistoryImportAccessToggle({
     const next = !enabled;
     setEnabled(next);
     const supabase = createBrowserClient();
-    await saved(supabase
+    const ok = await saved(supabase
       .from("group_memberships")
       .update({ history_import_enabled: next })
       .eq("group_id", groupId)
       .eq("profile_id", athleteId));
+    // A failed save puts the box back: this decides whether the client can write history.
+    if (!ok) setEnabled(!next);
     setSaving(false);
   }
 

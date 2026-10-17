@@ -173,13 +173,15 @@ export function ExpiryCheckInPanel({ groupIds: scopeGroupIds }: { groupIds?: str
   async function notNow(athleteId: string, groupId: string, kind: "soon" | "returning", summary: string) {
     if (!coachId) return;
     const supabase = createBrowserClient();
-    await saved(supabase.from("spotter_recommendation_feedback").insert({
+    // The card goes only when the answer was saved, so a failed "Not now" leaves the card to tap again.
+    const ok = await saved(supabase.from("spotter_recommendation_feedback").insert({
       coach_id: coachId,
       spotter_kind: "expiry",
       dismissal_key: expiryDismissalKey(athleteId, groupId, kind),
       option_summary: summary,
       action: "denied",
     }));
+    if (!ok) return;
     if (kind === "soon") setSoon((p) => p.filter((i) => !(i.athleteId === athleteId && i.groupId === groupId)));
     else setReturning((p) => p.filter((i) => !(i.athleteId === athleteId && i.groupId === groupId)));
   }
@@ -188,13 +190,14 @@ export function ExpiryCheckInPanel({ groupIds: scopeGroupIds }: { groupIds?: str
   async function leaveExpired(item: ReturnItem) {
     if (!coachId) return;
     const supabase = createBrowserClient();
-    await saved(supabase.from("spotter_recommendation_feedback").insert({
+    const ok = await saved(supabase.from("spotter_recommendation_feedback").insert({
       coach_id: coachId,
       spotter_kind: "expiry",
       dismissal_key: expiryFinalKey(item.athleteId, item.groupId, item.expiredOn),
       option_summary: `${item.name} returned; ${item.reinstatable} expired sessions left expired`,
       action: "denied",
     }));
+    if (!ok) return;
     setReturning((p) => p.filter((i) => !(i.athleteId === item.athleteId && i.groupId === item.groupId)));
   }
 

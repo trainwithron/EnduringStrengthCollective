@@ -91,7 +91,10 @@ export function OrgImageUpload({
     setUploading(true);
     setError(null);
     const supabase = createBrowserClient();
-    await saved(supabase.from("organizations").update({ [column]: null }).eq("id", organizationId));
+    if (!(await saved(supabase.from("organizations").update({ [column]: null }).eq("id", organizationId)))) {
+      setUploading(false);
+      return;
+    }
     setUrl(null);
     setUploading(false);
   }

@@ -79,7 +79,7 @@ export function SessionTypeManager({ initialTypes, teamMode = false , organizati
   async function handleDelete(id: string) {
     if (!await confirmDialog("Delete this session type? Existing logged sessions keep their history either way.")) return;
     const supabase = createBrowserClient();
-    await saved(supabase.from("session_types").delete().eq("id", id));
+    if (!(await saved(supabase.from("session_types").delete().eq("id", id)))) return;
     setTypes((prev) => prev.filter((t) => t.id !== id));
     router.refresh();
   }

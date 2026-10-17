@@ -1,4 +1,5 @@
 import { LoadFailedPage } from "@/components/ui/load-failed-page";
+import { isReadFailure } from "@/lib/read-failed";
 import Link from "next/link";
 import { inOrg, orgIdOfGroup } from "@/lib/org-of-group";
 import { redirectOneOnOneToAnchor } from "@/lib/coach-wide-redirect";
@@ -28,7 +29,7 @@ export default async function BookingPageSettingsPage(props: { params: Promise<{
     .eq("profile_id", user.id)
     .maybeSingle();
 
-  if (membershipError) return <LoadFailedPage />;
+  if (isReadFailure(membershipError)) return <LoadFailedPage />;
 
   if (membership?.role !== "coach") {
     return (

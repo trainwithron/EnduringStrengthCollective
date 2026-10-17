@@ -1,4 +1,5 @@
 import { LoadFailedPage } from "@/components/ui/load-failed-page";
+import { isReadFailure } from "@/lib/read-failed";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
@@ -81,7 +82,7 @@ export default async function MessagesPage(props: { params: Promise<{ groupId: s
     .eq("profile_id", user.id)
     .maybeSingle();
 
-  if (membershipError) return <LoadFailedPage />;
+  if (isReadFailure(membershipError)) return <LoadFailedPage />;
 
   const isCoach = membership?.role === "coach";
 

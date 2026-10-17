@@ -1,4 +1,5 @@
 import { LoadFailedPage } from "@/components/ui/load-failed-page";
+import { isReadFailure } from "@/lib/read-failed";
 import { redirect } from "next/navigation";
 import { NoAccess } from "@/components/shared/no-access";
 import { claimStatus } from "@/lib/client-claim";
@@ -49,7 +50,7 @@ export default async function ClientsPage(
     .eq("profile_id", user.id)
     .maybeSingle();
 
-  if (membershipError) return <LoadFailedPage />;
+  if (isReadFailure(membershipError)) return <LoadFailedPage />;
 
   if (membership?.role !== "coach") {
     return (

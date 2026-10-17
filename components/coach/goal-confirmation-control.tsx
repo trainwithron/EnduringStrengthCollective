@@ -28,7 +28,7 @@ export function GoalConfirmationControl({ goal }: { goal: PendingGoal }) {
     setBusy(true);
     const supabase = createBrowserClient();
     const { data: userData } = await supabase.auth.getUser();
-    await saved(supabase
+    const ok = await saved(supabase
       .from("client_goals")
       .update({
         status,
@@ -37,6 +37,8 @@ export function GoalConfirmationControl({ goal }: { goal: PendingGoal }) {
       })
       .eq("id", goal.id));
     setBusy(false);
+    // The buttons stay when the answer did not save, so the coach can try again.
+    if (!ok) return;
     setResolved(status);
     router.refresh();
   }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { saved } from "@/lib/saved";
+import { showSaveFailed } from "@/lib/save-failed";
 import { Trash2 } from "lucide-react";
 
 export interface PinnableLink {
@@ -58,12 +59,14 @@ export function ProShopDayPin({
       setPins((prev) => [...prev, { id: data.id, linkId: link.id, linkTitle: link.title }]);
       setSelectedLinkId("");
       router.refresh();
+    } else if (error) {
+      showSaveFailed("That pin didn't save. Try again.");
     }
   }
 
   async function handleUnpin(pinId: string) {
     const supabase = createBrowserClient();
-    await saved(supabase.from("pro_shop_link_day_pins").delete().eq("id", pinId));
+    if (!(await saved(supabase.from("pro_shop_link_day_pins").delete().eq("id", pinId)))) return;
     setPins((prev) => prev.filter((p) => p.id !== pinId));
     router.refresh();
   }

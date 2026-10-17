@@ -101,10 +101,11 @@ export function NextWorkoutExerciseRow({
     const supabase = createBrowserClient();
     const kind = fieldDef(field).kind;
     const value = raw.trim() === "" ? null : kind === "number" ? Number(raw) : raw.trim();
-    await saved(supabase
+    // The grid shows the new target only once it is stored; after a failed save the typed value stays in the box and leaving it again tries again.
+    if (!(await saved(supabase
       .from("group_workout_exercise_sets")
       .update({ [TARGET_COLUMN[field]]: value })
-      .eq("id", setId));
+      .eq("id", setId)))) return;
     setSets((prev) =>
       prev.map((s) => (s.id === setId ? { ...s, [TARGET_PROP[field]]: value } : s))
     );

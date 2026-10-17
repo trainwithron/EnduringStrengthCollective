@@ -24,10 +24,12 @@ export function SwipeDirectionSetting({
 
   async function choose(next: SwipeDirection) {
     if (next === direction || saving) return;
+    const previous = direction;
     setDirection(next);
     setSaving(true);
     const supabase = createBrowserClient();
-    await saved(supabase.from("profiles").update({ exercise_swipe_direction: next }).eq("id", athleteId));
+    // A failed save puts the old choice back (the logger keeps using what is stored).
+    if (!(await saved(supabase.from("profiles").update({ exercise_swipe_direction: next }).eq("id", athleteId)))) setDirection(previous);
     setSaving(false);
   }
 

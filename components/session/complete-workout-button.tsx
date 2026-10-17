@@ -120,7 +120,7 @@ export function CompleteWorkoutButton({
     }
     setWeightSubmitting(true);
     const supabase = createBrowserClient();
-    await saved(supabase.from("body_weight_logs").upsert(
+    const weightSaved = await saved(supabase.from("body_weight_logs").upsert(
       {
         athlete_id: weightNudge.athleteId,
         group_id: weightNudge.groupId,
@@ -130,6 +130,8 @@ export function CompleteWorkoutButton({
       { onConflict: "athlete_id,logged_date" }
     ));
     setWeightSubmitting(false);
+    // A failed save keeps the person on this prompt with the number they typed (Save to try again, Skip to move on); only a saved weight moves on.
+    if (!weightSaved) return;
     finishNavigation(weightNudge.navHref);
   }
 
@@ -342,8 +344,10 @@ export function CompleteWorkoutButton({
     if (!rpeNudge) return;
     setRpeSubmitting(true);
     const supabase = createBrowserClient();
-    await saved(supabase.from("athlete_sessions").update({ session_rpe: value }).eq("id", sessionId));
+    const rpeSaved = await saved(supabase.from("athlete_sessions").update({ session_rpe: value }).eq("id", sessionId));
     setRpeSubmitting(false);
+    // A failed save keeps the person on the rating prompt (tap again to try again, Skip to move on).
+    if (!rpeSaved) return;
     const { athleteId, groupId, navHref } = rpeNudge;
     setRpeNudge(null);
     await checkWeightThenNavigate(athleteId, groupId, navHref);

@@ -16,12 +16,14 @@ export function AcknowledgeSessionPatternNoteButton({ checkId }: { checkId: stri
   async function handleAcknowledge() {
     setAcknowledging(true);
     const supabase = createBrowserClient();
-    await saved(supabase
+    const ok = await saved(supabase
       .from("session_pattern_checks")
       .update({ acknowledged_at: new Date().toISOString() })
       .eq("id", checkId));
-    setAcknowledged(true);
     setAcknowledging(false);
+    // "Acknowledged" shows only once it is stored (a failed save leaves the button to try again).
+    if (!ok) return;
+    setAcknowledged(true);
     router.refresh();
   }
 

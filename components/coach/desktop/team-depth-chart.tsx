@@ -95,11 +95,13 @@ export function TeamDepthChart({
       prev.map((p) => (p.profileId === profileId ? { ...p, positionId, depthOrder } : p))
     );
     const supabase = createBrowserClient();
-    await saved(supabase
+    const ok = await saved(supabase
       .from("group_memberships")
       .update({ position_id: positionId, depth_order: depthOrder })
       .eq("group_id", groupId)
       .eq("profile_id", profileId));
+    // A failed save puts the player back where the database has them.
+    if (!ok) setPlayers((prev) => prev.map((p) => (p.profileId === profileId ? { ...p, positionId: player.positionId, depthOrder: player.depthOrder } : p)));
   }
 
   function nextDepthOrder(positionId: string): number {
@@ -108,15 +110,17 @@ export function TeamDepthChart({
   }
 
   async function handleRankChange(profileId: string, depthOrder: number) {
+    const previousOrder = players.find((p) => p.profileId === profileId)?.depthOrder ?? null;
     setPlayers((prev) =>
       prev.map((p) => (p.profileId === profileId ? { ...p, depthOrder } : p))
     );
     const supabase = createBrowserClient();
-    await saved(supabase
+    const ok = await saved(supabase
       .from("group_memberships")
       .update({ depth_order: depthOrder })
       .eq("group_id", groupId)
       .eq("profile_id", profileId));
+    if (!ok) setPlayers((prev) => prev.map((p) => (p.profileId === profileId ? { ...p, depthOrder: previousOrder } : p)));
   }
 
   if (!enabled) {

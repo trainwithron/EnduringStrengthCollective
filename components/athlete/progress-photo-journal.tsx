@@ -111,17 +111,23 @@ export function ProgressPhotoJournal({ athleteId, groupId }: { athleteId: string
       prev.map((p) => (p.id === photo.id ? { ...p, sharedWithCoach: !p.sharedWithCoach } : p))
     );
     const supabase = createBrowserClient();
-    await saved(supabase
+    const ok = await saved(supabase
       .from("progress_photos")
       .update({ shared_with_coach: !photo.sharedWithCoach })
       .eq("id", photo.id));
+    // A failed save puts the box back: this setting is privacy, and the screen must show what is really stored.
+    if (!ok) setPhotos((prev) => prev.map((p) => (p.id === photo.id ? { ...p, sharedWithCoach: photo.sharedWithCoach } : p)));
   }
 
   async function handleDelete(photo: PhotoRow) {
     if (!await confirmDialog("Delete this photo? This can't be undone.")) return;
     setPhotos((prev) => prev.filter((p) => p.id !== photo.id));
     const supabase = createBrowserClient();
-    await saved(supabase.from("progress_photos").delete().eq("id", photo.id));
+    // The file goes only after the row is gone: a failed row delete leaves the photo and its file both in place (and the card comes back).
+    if (!(await saved(supabase.from("progress_photos").delete().eq("id", photo.id)))) {
+      await loadPhotos();
+      return;
+    }
     await supabase.storage.from("progress-photos").remove([photo.storagePath]);
   }
 

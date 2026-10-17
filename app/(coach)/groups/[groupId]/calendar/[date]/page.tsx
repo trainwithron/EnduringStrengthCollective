@@ -1,4 +1,5 @@
 import { LoadFailedPage } from "@/components/ui/load-failed-page";
+import { isReadFailure } from "@/lib/read-failed";
 import { fetchSessionMinutes, sessionMinutesFor } from "@/lib/availability-windows";
 import { inOrg, orgIdOfGroup } from "@/lib/org-of-group";
 import { orgGroupIdsOf } from "@/lib/coach-groups";
@@ -72,7 +73,7 @@ export default async function CoachDayDetailPage(
     .eq("profile_id", user.id)
     .maybeSingle();
 
-  if (membershipError) return <LoadFailedPage />;
+  if (isReadFailure(membershipError)) return <LoadFailedPage />;
 
   if (!membership) {
     return (

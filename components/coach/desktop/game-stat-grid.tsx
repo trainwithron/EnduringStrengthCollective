@@ -38,15 +38,25 @@ export function GameStatGrid({
   async function handleChange(athleteId: string, fieldId: string, raw: string) {
     const value = Number(raw) || 0;
     const key = `${athleteId}:${fieldId}`;
+    const previous = values.get(key);
     setValues((prev) => new Map(prev).set(key, value));
     setSavingKey(key);
     const supabase = createBrowserClient();
-    await saved(supabase
+    const ok = await saved(supabase
       .from("game_stat_entries")
       .upsert(
         { game_id: gameId, athlete_id: athleteId, field_id: fieldId, value },
         { onConflict: "game_id,athlete_id,field_id" }
       ));
+    // A failed save shows the number that is really stored.
+    if (!ok) {
+      setValues((prev) => {
+        const next = new Map(prev);
+        if (previous === undefined) next.delete(key);
+        else next.set(key, previous);
+        return next;
+      });
+    }
     setSavingKey((k) => (k === key ? null : k));
   }
 

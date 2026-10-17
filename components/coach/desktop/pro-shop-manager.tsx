@@ -171,7 +171,7 @@ export function ProShopManager({ initialLinks, organizationId, groups = [] }: { 
 
   async function handleDelete(id: string) {
     const supabase = createBrowserClient();
-    await saved(supabase.from("pro_shop_links").delete().eq("id", id));
+    if (!(await saved(supabase.from("pro_shop_links").delete().eq("id", id)))) return;
     setLinks((prev) => prev.filter((l) => l.id !== id));
     router.refresh();
   }

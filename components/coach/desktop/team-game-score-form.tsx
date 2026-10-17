@@ -22,7 +22,7 @@ export function TeamGameScoreForm({
 
   async function handleBlur() {
     const supabase = createBrowserClient();
-    await saveWrite(supabase
+    const ok = await saveWrite(supabase
       .from("team_games")
       .update({
         our_score: ourScore === "" ? null : Number(ourScore),
@@ -30,7 +30,8 @@ export function TeamGameScoreForm({
         notes: notes.trim() || null,
       })
       .eq("id", gameId));
-    setSaved(true);
+    // "Saved." shows only for a save that happened.
+    setSaved(ok);
   }
 
   return (

@@ -29,13 +29,16 @@ export function CoachPositionScopeList({
   const [coaches, setCoaches] = useState(initialCoaches);
 
   async function handleChange(profileId: string, positionId: string | null) {
+    const previous = coaches.find((c) => c.profileId === profileId)?.coachPositionId ?? null;
     setCoaches((prev) => prev.map((c) => (c.profileId === profileId ? { ...c, coachPositionId: positionId } : c)));
     const supabase = createBrowserClient();
-    await saved(supabase
+    // A failed save puts the old scope back: this select decides who may enter which game stats.
+    const ok = await saved(supabase
       .from("group_memberships")
       .update({ coach_position_id: positionId })
       .eq("group_id", groupId)
       .eq("profile_id", profileId));
+    if (!ok) setCoaches((prev) => prev.map((c) => (c.profileId === profileId ? { ...c, coachPositionId: previous } : c)));
   }
 
   if (positions.length === 0) return null;

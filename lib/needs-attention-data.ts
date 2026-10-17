@@ -13,6 +13,16 @@ import { isStillOnboarding } from "@/lib/client-onboarding";
 import { firstNameOf, isSnoozed } from "@/lib/attention-snooze";
 import type { NeedsAttentionItem } from "@/components/coach/desktop/needs-attention-panel";
 
+// Puts one reminder on the calendar. True when it is there afterwards: just written, or already there (a unique-key conflict, 23505). False when the write failed, so the item is not labelled "On your calendar".
+async function addSuggestion(supabase: any, row: Record<string, unknown>): Promise<boolean> {
+  const { error } = await supabase.from("calendar_events").insert(row);
+  if (error && error.code !== "23505") {
+    console.error("needs-attention: could not add the reminder to the calendar:", error.message);
+    return false;
+  }
+  return true;
+}
+
 function dateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
     d.getDate()
@@ -208,21 +218,17 @@ export async function getNeedsAttentionItems(
     const suggestedDate = computeSuggestedReminderDate(s.programEndDate, reminderRule, today);
     const suggestedDateKey = dateKey(suggestedDate);
 
-    if (suggestionMode === "auto_add") {
-      await supabase.from("calendar_events").upsert(
-        {
-          coach_id: coachId,
-          title: s.title,
-          event_date: suggestedDateKey,
-          event_type: "suggestion",
-          trigger_key: "program_ending",
-          linked_athlete_id: s.athleteId,
-          linked_group_id: s.groupId,
-          status: "active",
-        },
-        { onConflict: "coach_id,linked_athlete_id,trigger_key", ignoreDuplicates: true }
-      );
-    }
+    // A plain insert, not an upsert: the unique index on these rows is partial (only where trigger_key is set), which an ON CONFLICT clause cannot use (42P10). An already-there row (23505) is the point.
+    const onCalendar = suggestionMode === "auto_add" && (await addSuggestion(supabase, {
+      coach_id: coachId,
+      title: s.title,
+      event_date: suggestedDateKey,
+      event_type: "suggestion",
+      trigger_key: "program_ending",
+      linked_athlete_id: s.athleteId,
+      linked_group_id: s.groupId,
+      status: "active",
+    }));
 
     needsAttentionItems.push({
       athleteId: s.athleteId,
@@ -231,28 +237,23 @@ export async function getNeedsAttentionItems(
       triggerKey: "program_ending",
       firstName: firstNames.get(s.athleteId) ?? "this client",
       suggestedDateKey,
-      alreadyOnCalendar: suggestionMode === "auto_add",
+      alreadyOnCalendar: onCalendar,
     });
   }
 
   for (const s of activeMacroSuggestions) {
     const suggestedDateKey = dateKey(today);
 
-    if (suggestionMode === "auto_add") {
-      await supabase.from("calendar_events").upsert(
-        {
-          coach_id: coachId,
-          title: s.title,
-          event_date: suggestedDateKey,
-          event_type: "suggestion",
-          trigger_key: "macros_missing",
-          linked_athlete_id: s.athleteId,
-          linked_group_id: s.groupId,
-          status: "active",
-        },
-        { onConflict: "coach_id,linked_athlete_id,trigger_key", ignoreDuplicates: true }
-      );
-    }
+    const onCalendar = suggestionMode === "auto_add" && (await addSuggestion(supabase, {
+      coach_id: coachId,
+      title: s.title,
+      event_date: suggestedDateKey,
+      event_type: "suggestion",
+      trigger_key: "macros_missing",
+      linked_athlete_id: s.athleteId,
+      linked_group_id: s.groupId,
+      status: "active",
+    }));
 
     needsAttentionItems.push({
       athleteId: s.athleteId,
@@ -261,7 +262,7 @@ export async function getNeedsAttentionItems(
       triggerKey: "macros_missing",
       firstName: firstNames.get(s.athleteId) ?? "this client",
       suggestedDateKey,
-      alreadyOnCalendar: suggestionMode === "auto_add",
+      alreadyOnCalendar: onCalendar,
     });
   }
 

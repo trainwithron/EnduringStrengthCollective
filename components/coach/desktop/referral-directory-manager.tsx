@@ -89,7 +89,7 @@ export function ReferralDirectoryManager({ initialPartners, organizationId }: { 
 
   async function handleDelete(id: string) {
     const supabase = createBrowserClient();
-    await saved(supabase.from("referral_partners").delete().eq("id", id));
+    if (!(await saved(supabase.from("referral_partners").delete().eq("id", id)))) return;
     setPartners((prev) => prev.filter((p) => p.id !== id));
     router.refresh();
   }

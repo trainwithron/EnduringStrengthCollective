@@ -53,17 +53,12 @@ export function RecipeVoteFavorite({ recipeId }: { recipeId: string }) {
     if (!userId) return;
     const supabase = createBrowserClient();
     const next = viewerVote === value ? 0 : value;
-    if (next === 0) {
-      await saved(supabase
-        .from("recipe_votes")
-        .delete()
-        .eq("profile_id", userId)
-        .eq("recipe_id", recipeId));
-    } else {
-      await saved(supabase
-        .from("recipe_votes")
-        .upsert({ profile_id: userId, recipe_id: recipeId, vote: next }, { onConflict: "profile_id,recipe_id" }));
-    }
+    const ok =
+      next === 0
+        ? await saved(supabase.from("recipe_votes").delete().eq("profile_id", userId).eq("recipe_id", recipeId))
+        : await saved(supabase.from("recipe_votes").upsert({ profile_id: userId, recipe_id: recipeId, vote: next }, { onConflict: "profile_id,recipe_id" }));
+    // The score and the arrow change only for a vote that was stored.
+    if (!ok) return;
     setNetScore((s) => s - viewerVote + next);
     setViewerVote(next);
   }
@@ -73,11 +68,10 @@ export function RecipeVoteFavorite({ recipeId }: { recipeId: string }) {
     e.preventDefault();
     if (!userId) return;
     const supabase = createBrowserClient();
-    if (isFavorited) {
-      await saved(supabase.from("recipe_favorites").delete().eq("profile_id", userId).eq("recipe_id", recipeId));
-    } else {
-      await saved(supabase.from("recipe_favorites").insert({ profile_id: userId, recipe_id: recipeId }));
-    }
+    const ok = isFavorited
+      ? await saved(supabase.from("recipe_favorites").delete().eq("profile_id", userId).eq("recipe_id", recipeId))
+      : await saved(supabase.from("recipe_favorites").insert({ profile_id: userId, recipe_id: recipeId }));
+    if (!ok) return;
     setIsFavorited((v) => !v);
   }
 

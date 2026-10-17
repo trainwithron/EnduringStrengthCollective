@@ -36,12 +36,18 @@ export function ClientTagAssignmentControl({
       isAssigned ? next.delete(tagId) : next.add(tagId);
       return next;
     });
-    if (isAssigned) {
-      await saved(supabase.from("client_tag_assignments").delete().eq("tag_id", tagId).eq("athlete_id", athleteId));
-    } else {
-      await saved(supabase
-        .from("client_tag_assignments")
-        .upsert({ tag_id: tagId, athlete_id: athleteId }, { onConflict: "tag_id,athlete_id", ignoreDuplicates: true }));
+    const ok = isAssigned
+      ? await saved(supabase.from("client_tag_assignments").delete().eq("tag_id", tagId).eq("athlete_id", athleteId))
+      : await saved(supabase
+          .from("client_tag_assignments")
+          .upsert({ tag_id: tagId, athlete_id: athleteId }, { onConflict: "tag_id,athlete_id", ignoreDuplicates: true }));
+    // A failed save puts the tag back the way it was stored.
+    if (!ok) {
+      setAssigned((prev) => {
+        const next = new Set(prev);
+        isAssigned ? next.add(tagId) : next.delete(tagId);
+        return next;
+      });
     }
   }
 

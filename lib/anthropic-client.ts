@@ -5,7 +5,7 @@
 // worth adding for that. Never import this from a "use client" component —
 // it reads the secret key from process.env.
 
-import type { AiCallMeta } from "@/lib/ai-usage";
+import { AiRateLimitedError, type AiCallMeta } from "@/lib/ai-usage";
 import { reserveAiCall } from "@/lib/ai-usage-server";
 import { classifyAiHttpError, classifyAiThrown } from "@/lib/ai-error-class";
 import { noteAiAttempt } from "@/lib/ai-run-stats";
@@ -195,7 +195,13 @@ export async function callClaude({
   });
   if (data.stop_reason === "max_tokens") {
     if (retryOnTruncation && maxTokens < MAX_OUTPUT_TOKENS) {
-      return callClaude({ system, userText, image, document, maxTokens: Math.min(maxTokens * 2, MAX_OUTPUT_TOKENS), timeoutMs, retryOnTruncation: false, meta });
+      try {
+        return await callClaude({ system, userText, image, document, maxTokens: Math.min(maxTokens * 2, MAX_OUTPUT_TOKENS), timeoutMs, retryOnTruncation: false, meta });
+      } catch (retryError) {
+        // The retry is a second use against the burst limit and the monthly ceiling: when it is refused, the person is told what really happened (the answer was cut off), not that they are out of uses.
+        if (retryError instanceof AiRateLimitedError) throw new AiTruncatedError();
+        throw retryError;
+      }
     }
     throw new AiTruncatedError();
   }

@@ -1,4 +1,5 @@
 import { LoadFailedPage } from "@/components/ui/load-failed-page";
+import { isReadFailure } from "@/lib/read-failed";
 import { redirect } from "next/navigation";
 import { safePushPath } from "@/lib/push-url";
 import { createServerClient } from "@/lib/supabase/server";
@@ -24,7 +25,7 @@ export default async function IntakePage(
     .limit(1)
     .maybeSingle();
 
-  if (membershipError) return <LoadFailedPage />;
+  if (isReadFailure(membershipError)) return <LoadFailedPage />;
 
   if (!membership) {
     // Nothing to gate — a coach or an account with no athlete membership

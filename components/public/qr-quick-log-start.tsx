@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { saved } from "@/lib/saved";
+import { bestEffort } from "@/lib/saved";
 import type { TrackedField } from "@/lib/exercise-fields";
 
 // equipment_qr_decal_scoping_sept19.md — the "logged-in existing client"
@@ -53,6 +53,12 @@ export function QrQuickLogStart({
       return;
     }
 
+    // Either step failing takes the half-made session back and keeps the person here with a message (an empty logger with nothing to retry is worse than an error).
+    const startFailed = async () => {
+      await bestEffort(supabase.from("athlete_sessions").delete().eq("id", session.id));
+      setStarting(false);
+      setError("Couldn't start logging — check your connection and try again.");
+    };
     const { data: insertedExercise } = await supabase
       .from("session_exercises")
       .insert({
@@ -66,15 +72,21 @@ export function QrQuickLogStart({
       .select("id")
       .single();
 
-    if (insertedExercise) {
-      await saved(supabase.from("set_logs").insert(
-        [0, 1, 2].map((setOrder) => ({
-          session_exercise_id: insertedExercise.id,
-          set_order: setOrder,
-          weight: null,
-          reps: null,
-        }))
-      ));
+    if (!insertedExercise) {
+      await startFailed();
+      return;
+    }
+    const { error: setsError } = await supabase.from("set_logs").insert(
+      [0, 1, 2].map((setOrder) => ({
+        session_exercise_id: insertedExercise.id,
+        set_order: setOrder,
+        weight: null,
+        reps: null,
+      }))
+    );
+    if (setsError) {
+      await startFailed();
+      return;
     }
 
     router.push(`/sessions/${session.id}`);

@@ -73,9 +73,16 @@ export function TeamPracticeScheduleForm({
   }
 
   async function handleDelete(id: string) {
+    const removedRow = schedules.find((s) => s.id === id);
     setSchedules((prev) => prev.filter((s) => s.id !== id));
     const supabase = createBrowserClient();
-    await saved(supabase.from("team_practice_schedules").delete().eq("id", id));
+    // A failed delete puts the practice back in the list (it is still on the calendar).
+    if (!(await saved(supabase.from("team_practice_schedules").delete().eq("id", id)))) {
+      if (removedRow) {
+        setSchedules((prev) => [...prev, removedRow].sort((a, b) => a.weekday - b.weekday || a.startTime.localeCompare(b.startTime)));
+      }
+      return;
+    }
     router.refresh();
   }
 

@@ -141,7 +141,10 @@ export function GroupSwitcher({
 
   async function persistTag(targetGroupId: string, tag: string) {
     const supabase = createBrowserClient();
-    await saved(supabase.from("groups").update({ focus_tag: tag.trim() || null }).eq("id", targetGroupId));
+    if (!(await saved(supabase.from("groups").update({ focus_tag: tag.trim() || null }).eq("id", targetGroupId)))) {
+      setEditingTagFor(null);
+      return;
+    }
     setGroups((prev) => prev.map((g) => (g.id === targetGroupId ? { ...g, focusTag: tag.trim() || null } : g)));
     setEditingTagFor(null);
   }

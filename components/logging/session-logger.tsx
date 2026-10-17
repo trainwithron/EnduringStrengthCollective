@@ -195,8 +195,10 @@ export function SessionLogger({
     setDeletingId(exerciseId);
     try {
       const supabase = createBrowserClient();
-      await saved(supabase.from("session_exercises").delete().eq("id", exerciseId));
-      setExercises((prev) => prev.filter((e) => e.id !== exerciseId));
+      // The card goes only when the exercise is really gone (otherwise it stays, and the workout cannot be finished without it).
+      if (await saved(supabase.from("session_exercises").delete().eq("id", exerciseId))) {
+        setExercises((prev) => prev.filter((e) => e.id !== exerciseId));
+      }
     } finally {
       setDeletingId(null);
     }

@@ -9,7 +9,7 @@ import { addLibraryExercise } from "@/lib/library-write";
 import * as XLSX from "xlsx";
 import * as cptable from "xlsx/dist/cpexcel.full.mjs";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { saved } from "@/lib/saved";
+import { saved, bestEffort } from "@/lib/saved";
 
 // xlsx's own auto-load for its optional codepage-table module only fires
 // in a plain Node `require` context, not in a bundled browser build — so
@@ -661,7 +661,8 @@ export function ImportWizard({
       }
     }
     if (importData.isAiSourced && aiSnapshot.length > 0) {
-      await saved(supabase.from("programs").update({ ai_snapshot: aiSnapshot }).eq("id", programRow.id));
+      // Bookkeeping for the sign-off view: a failure here is not something the coach can retry (importing again would make a second program), so it is not announced over the finished import.
+      await bestEffort(supabase.from("programs").update({ ai_snapshot: aiSnapshot }).eq("id", programRow.id));
     }
 
     setSummary({

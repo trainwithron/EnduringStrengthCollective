@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { saved, bestEffort } from "@/lib/saved";
 import { showSaveFailed, subscribeSaveFailed, clearSaveFailed } from "@/lib/save-failed";
 import { aiFeatureHealth, aiFeaturesToAlert } from "@/lib/ai-health";
+import { isReadFailure } from "@/lib/read-failed";
 
 const root = join(__dirname, "..");
 const src = (p: string) => readFileSync(join(root, p), "utf8").replace(/\r\n/g, "\n");
@@ -66,7 +67,7 @@ describe("a page whose data could not be read says so instead of looking empty",
   });
   it("the workout page tells a failed read from a missing workout and from an empty one", () => {
     const p = src("app/sessions/[sessionId]/page.tsx");
-    expect(p).toContain('(sessionError as { code?: string }).code !== "PGRST116"');
+    expect(p).toContain("isReadFailure(sessionError)");
     expect(p).toContain("if (sessionExercisesError) {");
   });
 });
@@ -100,4 +101,82 @@ describe("AI calls that are cut off", () => {
     expect(aiFeaturesToAlert(health).map((h) => h.feature)).toEqual(["program_day"]);
     expect(src("app/api/cron/cron-watchdog/route.ts")).toContain("aiFeaturesToAlert(");
   });
+});
+
+describe("review follow-ups: the check that watches the AI, and a bar that restarts", () => {
+  it("a cut-off call whose retry finished is not counted as a failure the person saw", () => {
+    const at = (s: number) => new Date(Date.UTC(2026, 9, 16, 12, 0, s)).toISOString();
+    const rows = [
+      { feature: "inbody_scan_parse", status: "truncated", created_at: at(0), user_id: "u1", coach_id: null },
+      { feature: "inbody_scan_parse", status: "ok", created_at: at(5), user_id: "u1", coach_id: null },
+      // a cut-off call with no finished retry, and one by someone else, still count
+      { feature: "inbody_scan_parse", status: "truncated", created_at: at(60), user_id: "u2", coach_id: null },
+      { feature: "inbody_scan_parse", status: "ok", created_at: at(65), user_id: "u3", coach_id: null },
+    ];
+    expect(aiFeatureHealth(rows).find((h) => h.feature === "inbody_scan_parse")).toMatchObject({ calls: 3, notOk: 1 });
+  });
+  it("the daily check reads the last 24 hours a page at a time, oldest first (a request returns at most 1,000 rows)", () => {
+    const w = src("app/api/cron/cron-watchdog/route.ts");
+    expect(w).toContain("86400000");
+    expect(w).toContain("pageAll(");
+    expect(w).not.toContain(".limit(20000)");
+  });
+  it("a retry the usage rules refuse gives back the cut-off answer, not an out-of-uses message", () => {
+    const c = src("lib/anthropic-client.ts");
+    expect(c).toContain("retryError instanceof AiRateLimitedError");
+  });
+  it("a second failure with the same words restarts the bar's timer", () => {
+    expect(src("components/ui/save-failed-toast.tsx")).toContain("[message, shownCount]");
+  });
+  it("the Add button and auto-add mode insert reminders instead of upserting onto a partial unique index", () => {
+    for (const f of ["components/coach/desktop/needs-attention-panel.tsx", "lib/needs-attention-data.ts"]) {
+      expect(src(f), f).not.toContain('onConflict: "coach_id,linked_athlete_id,trigger_key"');
+    }
+  });
+  it("the Stripe routes stop when the ids they just created could not be saved", () => {
+    expect(src("app/api/coach/packages/route.ts")).toContain("if (priceSaveError) throw priceSaveError;");
+    expect(src("app/api/stripe/connect/onboard/route.ts")).toContain("if (saveError) {");
+  });
+});
+
+describe("a malformed id in the address is 'not found', not 'couldn't load'", () => {
+  it("isReadFailure treats an invalid uuid (22P02) and a no-row answer (PGRST116) as not a failure", () => {
+    expect(isReadFailure(null)).toBe(false);
+    expect(isReadFailure({ code: "22P02" })).toBe(false);
+    expect(isReadFailure({ code: "PGRST116" })).toBe(false);
+    expect(isReadFailure({ code: "57014" })).toBe(true);
+    expect(isReadFailure({})).toBe(true);
+  });
+  it("no page returns the load-failed page on a bare membership error", () => {
+    const offenders = pages("app").filter((p) => src(p).includes("if (membershipError) return <LoadFailedPage />"));
+    expect(offenders).toEqual([]);
+  });
+});
+
+describe("a screen shows the saved state only when the write saved (saved() returned true)", () => {
+  // The files fixed in the Release F review: each keeps the result of saved() and acts on it. A bare 'await saved(' statement followed by a state change would bring the old behaviour back.
+  const FIXED = [
+    "components/athlete/progress-photo-journal.tsx",
+    "components/coach/guardian-share-button.tsx",
+    "components/coach/desktop/program-card-grid.tsx",
+    "components/coach/desktop/habit-manager.tsx",
+    "components/coach/desktop/pro-shop-manager.tsx",
+    "components/coach/desktop/referral-directory-manager.tsx",
+    "components/coach/desktop/session-type-manager.tsx",
+    "components/coach/desktop/stat-field-manager.tsx",
+    "components/coach/goal-confirmation-control.tsx",
+    "components/coach/history-import-access-toggle.tsx",
+    "components/coach/main-lift-picker.tsx",
+    "components/coach/desktop/team-depth-chart.tsx",
+    "components/coach/desktop/coach-position-scope-list.tsx",
+    "components/coach/desktop/recipe-vote-favorite.tsx",
+    "components/share/customize-share-panel.tsx",
+    "components/share/background-picker.tsx",
+  ];
+  for (const f of FIXED) {
+    it(f + " does not ignore what saved() returns", () => {
+      const text = src(f);
+      expect(text.split("\n").some((line) => line.trim().startsWith("await saved(")), f).toBe(false);
+    });
+  }
 });

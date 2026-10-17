@@ -64,9 +64,11 @@ export function RecapAndUpNext({
     setShowTrainingMaxOnPr(next);
     setSavingTmPref(true);
     const supabase = createBrowserClient();
-    await saved(supabase
+    const ok = await saved(supabase
       .from("coach_preferences")
       .upsert({ coach_id: coachId, show_training_max_on_pr: next }, { onConflict: "coach_id" }));
+    // A failed save puts the toggle back to what is stored.
+    if (!ok) setShowTrainingMaxOnPr(!next);
     setSavingTmPref(false);
   }
   const [sessionNoteOpen, setSessionNoteOpen] = useState(false);

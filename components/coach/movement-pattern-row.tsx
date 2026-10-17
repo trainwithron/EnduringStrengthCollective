@@ -42,8 +42,9 @@ export function MovementPatternRow({
     const value = plane === next ? null : next;
     setPlaneSaving(true);
     const supabase = createBrowserClient();
-    await saved(supabase.from("movement_patterns").update({ plane: value }).eq("id", pattern.id));
-    onPlaneChange(value);
+    const planeSaved = await saved(supabase.from("movement_patterns").update({ plane: value }).eq("id", pattern.id));
+    // The list shows the plane only once it is really stored.
+    if (planeSaved) onPlaneChange(value);
     setPlaneSaving(false);
   }
   const [ladder, setLadder] = useState<LadderItem[]>(
@@ -136,7 +137,11 @@ export function MovementPatternRow({
     if (!await confirmDialog(`Delete the "${pattern.name}" pattern? This can't be undone.`)) return;
     setSubmitting(true);
     const supabase = createBrowserClient();
-    await saved(supabase.from("movement_patterns").delete().eq("id", pattern.id));
+    if (!(await saved(supabase.from("movement_patterns").delete().eq("id", pattern.id)))) {
+      // The editor must not stay locked on "Saving…" after a failed delete.
+      setSubmitting(false);
+      return;
+    }
     router.refresh();
   }
 

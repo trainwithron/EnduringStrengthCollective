@@ -1,4 +1,5 @@
 import { LoadFailedPage } from "@/components/ui/load-failed-page";
+import { isReadFailure } from "@/lib/read-failed";
 import Link from "next/link";
 import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
@@ -68,7 +69,7 @@ export default async function ProgramCalendarPage(
     .eq("profile_id", user.id)
     .maybeSingle();
 
-  if (membershipError) return <LoadFailedPage />;
+  if (isReadFailure(membershipError)) return <LoadFailedPage />;
 
   if (!membership) {
     return (
@@ -107,7 +108,7 @@ export default async function ProgramCalendarPage(
     .single();
 
   // "No such row" (PGRST116) is a real "not found"; any other error is a read that failed and must not look like one.
-  if (programError && (programError as { code?: string }).code !== "PGRST116") return <LoadFailedPage />;
+  if (isReadFailure(programError)) return <LoadFailedPage />;
   if (!program) {
     return (
       <NoAccess>This program isn&apos;t available, or you don&apos;t have access to it.</NoAccess>

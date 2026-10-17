@@ -4,7 +4,8 @@ import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { saved } from "@/lib/saved";
+import { saved, bestEffort } from "@/lib/saved";
+import { showSaveFailed } from "@/lib/save-failed";
 import { ChevronDown, ChevronUp, Trash2, Plus } from "lucide-react";
 import type { IngredientRole } from "@/lib/recipe-scaling";
 import { UsdaFoodPicker } from "./usda-food-picker";
@@ -101,7 +102,7 @@ export function RecipeHubManager({
         return;
       }
 
-      const { data: insertedIngredients } = await supabase
+      const { data: insertedIngredients, error: ingredientsError } = await supabase
         .from("recipe_ingredients")
         .insert(
           data.ingredients.map((ing: any, i: number) => ({
@@ -116,6 +117,14 @@ export function RecipeHubManager({
           }))
         )
         .select("id, sort_order, label, role, protein_per_100g, carbs_per_100g, fat_per_100g, fixed_display_text");
+
+      if (ingredientsError) {
+        // A recipe with no ingredients is not what was asked for: take it back and say so.
+        await bestEffort(supabase.from("recipes").delete().eq("id", newRecipe.id));
+        setGenError("Couldn't save that recipe's ingredients — try again.");
+        setGenerating(false);
+        return;
+      }
 
       setRecipes((prev) => [
         {
@@ -151,7 +160,7 @@ export function RecipeHubManager({
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) return;
 
-    const { data: newRecipe } = await supabase
+    const { data: newRecipe, error: newRecipeError } = await supabase
       .from("recipes")
       .insert({
         created_by: userData.user.id,
@@ -163,7 +172,10 @@ export function RecipeHubManager({
       .select("id, name, slot, archetypes, keywords")
       .single();
 
-    if (!newRecipe) return;
+    if (!newRecipe) {
+      if (newRecipeError) showSaveFailed("Couldn't add that recipe. Try again.");
+      return;
+    }
 
     setRecipes((prev) => [
       { ...newRecipe, ingredients: [] },
@@ -175,7 +187,8 @@ export function RecipeHubManager({
   async function handleDeleteRecipe(id: string, name: string) {
     if (!await confirmDialog(`Delete "${name}"? This can't be undone.`)) return;
     const supabase = createBrowserClient();
-    await saved(supabase.from("recipes").delete().eq("id", id));
+    // The recipe leaves the list only when it is really deleted.
+    if (!(await saved(supabase.from("recipes").delete().eq("id", id)))) return;
     setRecipes((prev) => prev.filter((r) => r.id !== id));
     router.refresh();
   }
@@ -272,13 +285,17 @@ function RecipeCard({
     setNameDraft(trimmed);
     if (trimmed === recipe.name) return;
     const supabase = createBrowserClient();
-    await saved(supabase.from("recipes").update({ name: trimmed }).eq("id", recipe.id));
+    // A failed save puts the stored name back in the box (so leaving it again is not skipped as "unchanged").
+    if (!(await saved(supabase.from("recipes").update({ name: trimmed }).eq("id", recipe.id)))) {
+      setNameDraft(recipe.name);
+      return;
+    }
     onUpdated({ name: trimmed });
   }
 
   async function persistSlot(slot: RecipeRow["slot"]) {
     const supabase = createBrowserClient();
-    await saved(supabase.from("recipes").update({ slot }).eq("id", recipe.id));
+    if (!(await saved(supabase.from("recipes").update({ slot }).eq("id", recipe.id)))) return;
     onUpdated({ slot });
   }
 
@@ -288,7 +305,7 @@ function RecipeCard({
       : [...recipe.archetypes, archetype];
     if (next.length === 0) return; // must keep at least one — otherwise it can never match a plan
     const supabase = createBrowserClient();
-    await saved(supabase.from("recipes").update({ archetypes: next }).eq("id", recipe.id));
+    if (!(await saved(supabase.from("recipes").update({ archetypes: next }).eq("id", recipe.id)))) return;
     onUpdated({ archetypes: next });
   }
 
@@ -298,7 +315,10 @@ function RecipeCard({
       .map((k) => k.trim().toLowerCase())
       .filter(Boolean);
     const supabase = createBrowserClient();
-    await saved(supabase.from("recipes").update({ keywords: next }).eq("id", recipe.id));
+    if (!(await saved(supabase.from("recipes").update({ keywords: next }).eq("id", recipe.id)))) {
+      setKeywordsDraft(recipe.keywords.join(", "));
+      return;
+    }
     onUpdated({ keywords: next });
   }
 
@@ -311,7 +331,7 @@ function RecipeCard({
           ? Math.max(...recipe.ingredients.map((i) => i.sortOrder)) + 1
           : 0;
       const supabase = createBrowserClient();
-      const { data: newRow } = await supabase
+      const { data: newRow, error: newRowError } = await supabase
         .from("recipe_ingredients")
         .insert({
           recipe_id: recipe.id,
@@ -326,7 +346,10 @@ function RecipeCard({
         .select("id, sort_order, label, role, protein_per_100g, carbs_per_100g, fat_per_100g, fixed_display_text, usda_fdc_id")
         .single();
 
-      if (!newRow) return;
+      if (!newRow) {
+        if (newRowError) showSaveFailed("Couldn't add that ingredient. Try again.");
+        return;
+      }
 
       onUpdated({
         ingredients: [
@@ -357,7 +380,7 @@ function RecipeCard({
 
   async function handleDeleteIngredient(id: string) {
     const supabase = createBrowserClient();
-    await saved(supabase.from("recipe_ingredients").delete().eq("id", id));
+    if (!(await saved(supabase.from("recipe_ingredients").delete().eq("id", id)))) return;
     onUpdated({ ingredients: recipe.ingredients.filter((i) => i.id !== id) });
   }
 
@@ -508,7 +531,15 @@ function IngredientEditor({
 
   async function persist(patch: Record<string, unknown>, localPatch: Partial<RecipeIngredientRow>) {
     const supabase = createBrowserClient();
-    await saved(supabase.from("recipe_ingredients").update(patch).eq("id", ingredient.id));
+    if (!(await saved(supabase.from("recipe_ingredients").update(patch).eq("id", ingredient.id)))) {
+      // Every box goes back to what is stored (the database refuses some changes, for example a measured role on an AI recipe line with no food id).
+      setLabelDraft(ingredient.label);
+      setProteinDraft(ingredient.proteinPer100g.toString());
+      setCarbsDraft(ingredient.carbsPer100g.toString());
+      setFatDraft(ingredient.fatPer100g.toString());
+      setFixedTextDraft(ingredient.fixedDisplayText ?? "");
+      return;
+    }
     onUpdated(localPatch);
   }
 

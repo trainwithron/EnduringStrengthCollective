@@ -45,22 +45,18 @@ export function NeedsAttentionPanel({
   async function handleAdd(item: NeedsAttentionItem) {
     setBusyKey(keyOf(item));
     const supabase = createBrowserClient();
-    // Upsert with ignoreDuplicates — the unique index on (coach_id,
-    // linked_athlete_id, trigger_key) makes this safe even if the same
-    // suggestion somehow got added from two places at once.
-    await saved(supabase.from("calendar_events").upsert(
-      {
-        coach_id: coachId,
-        title: item.title,
-        event_date: item.suggestedDateKey,
-        event_type: "suggestion",
-        trigger_key: item.triggerKey,
-        linked_athlete_id: item.athleteId,
-        linked_group_id: item.groupId,
-        status: "active",
-      },
-      { onConflict: "coach_id,linked_athlete_id,trigger_key", ignoreDuplicates: true }
-    ));
+    // A plain insert: the unique index on (coach_id, linked_athlete_id, trigger_key) is partial, which an upsert's ON CONFLICT cannot use (42P10). If the same suggestion was added from
+    // two places at once the second insert hits the index (23505), which saved() counts as already there.
+    await saved(supabase.from("calendar_events").insert({
+      coach_id: coachId,
+      title: item.title,
+      event_date: item.suggestedDateKey,
+      event_type: "suggestion",
+      trigger_key: item.triggerKey,
+      linked_athlete_id: item.athleteId,
+      linked_group_id: item.groupId,
+      status: "active",
+    }));
     setBusyKey(null);
     router.refresh();
   }

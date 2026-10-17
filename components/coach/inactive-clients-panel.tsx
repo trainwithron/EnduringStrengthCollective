@@ -157,14 +157,15 @@ export function InactiveClientsPanel({ groupIds: scopeGroupIds }: { groupIds?: s
   async function answer(i: Item, kind: "not-now" | "keep") {
     if (!coachId) return;
     const supabase = createBrowserClient();
-    await saved(supabase.from("spotter_recommendation_feedback").insert({
+    const ok = await saved(supabase.from("spotter_recommendation_feedback").insert({
       coach_id: coachId,
       spotter_kind: "inactive",
       dismissal_key: kind === "keep" ? inactiveKeepActiveKey(i.athleteId, i.groupId) : inactiveDismissalKey(i.athleteId, i.groupId),
       option_summary: `${i.name}: ${i.reasons.join(", ")}`,
       action: "denied",
     }));
-    remove(i);
+    // The card goes only when the answer was saved.
+    if (ok) remove(i);
   }
 
   async function setAside(i: Item) {

@@ -22,8 +22,10 @@ export function TriviaReviewPanel({ initialQuestions }: { initialQuestions: Triv
 
   async function setStatus(id: string, status: "approved" | "rejected") {
     const supabase = createBrowserClient();
-    await saved(supabase.from("trivia_questions").update({ status }).eq("id", id));
-    setQuestions((prev) => prev.filter((q) => q.id !== id));
+    // The question leaves the list only when its review was really saved.
+    if (await saved(supabase.from("trivia_questions").update({ status }).eq("id", id))) {
+      setQuestions((prev) => prev.filter((q) => q.id !== id));
+    }
   }
 
   async function handleGenerate() {

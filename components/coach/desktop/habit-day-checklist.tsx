@@ -17,12 +17,14 @@ export function HabitDayChecklist({ date, habits }: { date: string; habits: DueH
   async function toggle(habitId: string, current: boolean) {
     setState((prev) => prev.map((h) => (h.id === habitId ? { ...h, completed: !current } : h)));
     const supabase = createBrowserClient();
-    await saved(supabase
+    const ok = await saved(supabase
       .from("habit_logs")
       .upsert(
         { habit_id: habitId, log_date: date, completed_at: !current ? new Date().toISOString() : null },
         { onConflict: "habit_id,log_date" }
       ));
+    // A failed save puts the box back to what is stored.
+    if (!ok) setState((prev) => prev.map((h) => (h.id === habitId ? { ...h, completed: current } : h)));
   }
 
   if (state.length === 0) {

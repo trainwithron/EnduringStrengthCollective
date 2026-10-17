@@ -142,7 +142,7 @@ export function VideoCheckinRecorder({
           body,
           sort_order: i,
         }))
-      ));
+      ), "The check-in was sent, but its action list didn't save.");
     }
 
     notifyPush(athleteId, "New video check-in", "Your coach just sent you a video check-in.", `/groups/${groupId}/video-checkins`);

@@ -7,6 +7,8 @@ export interface BusinessScope {
   groupIds: string[];
   // True for an owner or admin: totals cover all coaches, so sessions are not limited to the viewer's own.
   organizationWide: boolean;
+  // True when the owner's list of the organization's groups could not be read: the page shows "couldn't load", not a smaller business.
+  failed?: boolean;
 }
 
 export async function loadBusinessScope(supabase: SupabaseClient, userId: string, groupId: string): Promise<BusinessScope> {
@@ -16,7 +18,7 @@ export async function loadBusinessScope(supabase: SupabaseClient, userId: string
   const { data: om } = await supabase.from("organization_memberships").select("role").eq("organization_id", orgId).eq("profile_id", userId).maybeSingle();
   const role = (om as { role?: string } | null)?.role;
   if (role !== "owner" && role !== "admin") return { groupIds: coached.map((g) => g.id), organizationWide: false };
-  const { data: all } = await supabase.from("groups").select("id").eq("organization_id", orgId);
+  const { data: all, error: allError } = await supabase.from("groups").select("id").eq("organization_id", orgId);
   const ids = ((all ?? []) as { id: string }[]).map((g) => g.id);
-  return { groupIds: ids.length > 0 ? ids : coached.map((g) => g.id), organizationWide: true };
+  return { groupIds: ids.length > 0 ? ids : coached.map((g) => g.id), organizationWide: true, failed: !!allError };
 }

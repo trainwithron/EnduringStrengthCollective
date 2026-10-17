@@ -32,12 +32,14 @@ export function WorkoutCardBackgroundSettings({
   const [copied, setCopied] = useState(false);
 
   async function persistMode(next: "default_rotation" | "custom") {
+    const previous = mode;
     setMode(next);
     const supabase = createBrowserClient();
-    await saved(supabase
+    // A failed save puts the old mode back (athletes keep seeing what is stored).
+    if (!(await saved(supabase
       .from("organizations")
       .update({ workout_card_background_mode: next })
-      .eq("id", organizationId));
+      .eq("id", organizationId)))) setMode(previous);
   }
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {

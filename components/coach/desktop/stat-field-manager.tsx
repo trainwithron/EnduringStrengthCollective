@@ -47,7 +47,7 @@ export function StatFieldManager({
   async function handleDelete(id: string) {
     if (!await confirmDialog("Delete this stat category? Any entered values for it are lost.")) return;
     const supabase = createBrowserClient();
-    await saved(supabase.from("group_stat_fields").delete().eq("id", id));
+    if (!(await saved(supabase.from("group_stat_fields").delete().eq("id", id)))) return;
     setFields((prev) => prev.filter((f) => f.id !== id));
     router.refresh();
   }

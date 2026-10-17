@@ -42,7 +42,7 @@ async function ensureProfile(
   email: string | null | undefined,
   code: string,
   metadataName?: string | null
-) {
+): Promise<boolean> {
   const { data: profile } = await supabase
     .from("profiles")
     .select("id")
@@ -51,9 +51,11 @@ async function ensureProfile(
 
   if (!profile) {
     const name = metadataName || readPendingName(code, email) || email?.split("@")[0] || "New member";
-    await saved(supabase.from("profiles").insert({ id: userId, full_name: name, intake_required: true }));
+    // The saved name is kept until the profile really exists (joining needs it, and the name is the fallback for the next try).
+    if (!(await saved(supabase.from("profiles").insert({ id: userId, full_name: name, intake_required: true })))) return false;
     window.localStorage.removeItem(`invite_pending_signup_${code}`);
   }
+  return true;
 }
 
 export function InviteJoinFlow({
@@ -108,7 +110,11 @@ export function InviteJoinFlow({
         return;
       }
 
-      await ensureProfile(supabase, user.id, user.email, code, user.user_metadata?.full_name ?? null);
+      if (!(await ensureProfile(supabase, user.id, user.email, code, user.user_metadata?.full_name ?? null))) {
+        setError("We couldn't set up your account. Refresh the page to try again.");
+        setPhase("guest");
+        return;
+      }
       setPhase("authed");
     }
 
@@ -226,9 +232,13 @@ export function InviteJoinFlow({
       }
 
       if (data.session && data.user) {
-        await saved(supabase
+        if (!(await saved(supabase
           .from("profiles")
-          .insert({ id: data.user.id, full_name: trimmedName, intake_required: true }));
+          .insert({ id: data.user.id, full_name: trimmedName, intake_required: true })))) {
+          setError("Your account was made, but your profile didn't save. Tap 'I have an account' and sign in to finish.");
+          setSubmitting(false);
+          return;
+        }
         window.localStorage.removeItem(`invite_pending_signup_${code}`);
         await flushLegalConsent();
         setAuthedEmail(data.user.email ?? null);
@@ -267,7 +277,11 @@ export function InviteJoinFlow({
       return;
     }
 
-    await ensureProfile(supabase, data.user.id, data.user.email, code, data.user.user_metadata?.full_name ?? null);
+    if (!(await ensureProfile(supabase, data.user.id, data.user.email, code, data.user.user_metadata?.full_name ?? null))) {
+      setError("We couldn't set up your account. Try again.");
+      setSubmitting(false);
+      return;
+    }
     setAuthedEmail(data.user.email ?? null);
     setPhase("authed");
     setSubmitting(false);

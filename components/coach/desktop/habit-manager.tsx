@@ -29,7 +29,7 @@ export function HabitManager({
 
   async function handleDelete(id: string) {
     const supabase = createBrowserClient();
-    await saved(supabase.from("client_habits").delete().eq("id", id));
+    if (!(await saved(supabase.from("client_habits").delete().eq("id", id)))) return;
     setHabits((prev) => prev.filter((h) => h.id !== id));
     router.refresh();
   }

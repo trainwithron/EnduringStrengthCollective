@@ -24,13 +24,14 @@ export function MainLiftPicker({
   const [saving, setSaving] = useState(false);
 
   async function handleChange(next: string) {
+    const previous = value;
     setValue(next);
     setSaving(true);
     const supabase = createBrowserClient();
-    await saved(supabase
+    if (!(await saved(supabase
       .from("client_goals")
       .update({ main_lift_movement_pattern_id: next || null })
-      .eq("id", goalId));
+      .eq("id", goalId)))) setValue(previous);
     setSaving(false);
   }
 

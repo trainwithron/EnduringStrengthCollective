@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { isReadFailure } from "@/lib/read-failed";
 import { NoAccess } from "@/components/shared/no-access";
 import Link from "next/link";
 import { createCrossOrgServerClient as createServerClient } from "@/lib/supabase/server";
@@ -54,7 +55,7 @@ export default async function SessionPage(
     .single();
 
   // "No such row" (PGRST116) really is "not available"; any other error is a read that failed and must not look like a missing workout.
-  if (sessionError && (sessionError as { code?: string }).code !== "PGRST116") {
+  if (isReadFailure(sessionError)) {
     return (
       <main className="min-h-screen bg-graphite text-chalk p-5">
         <LoadFailed />

@@ -38,11 +38,13 @@ export function CustomizeSharePanel({
   async function handleSave() {
     setSaving(true);
     const supabase = createBrowserClient();
-    await saved(supabase
+    const ok = await saved(supabase
       .from("posts")
       .update({ shared_exercise_names: Array.from(selected) })
       .eq("id", postId));
     setSaving(false);
+    // A failed save keeps the panel open with the picks, so saving again is one tap.
+    if (!ok) return;
     setOpen(false);
     router.refresh();
   }

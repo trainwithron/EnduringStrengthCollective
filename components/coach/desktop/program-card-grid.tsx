@@ -6,6 +6,7 @@ import Link from "next/link";
 import { LayoutGrid, ImagePlus } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { saved } from "@/lib/saved";
+import { showSaveFailed } from "@/lib/save-failed";
 import { ProgramActiveToggle } from "@/components/coach/program-active-toggle";
 import { CardSizeToggle } from "@/components/coach/desktop/card-size-toggle";
 import { ProgramCardMenu } from "@/components/coach/desktop/program-card-menu";
@@ -146,13 +147,19 @@ function ProgramCard({
       .from("program-covers")
       .upload(path, file, { upsert: true });
 
-    if (!uploadError) {
+    if (uploadError) {
+      showSaveFailed("Couldn't upload that picture. Try again.");
+    } else {
       const oldPath = coverPath;
-      await saved(supabase.from("programs").update({ cover_image_path: path }).eq("id", program.id));
-      if (oldPath && oldPath !== path) {
-        await supabase.storage.from("program-covers").remove([oldPath]);
+      if (await saved(supabase.from("programs").update({ cover_image_path: path }).eq("id", program.id))) {
+        if (oldPath && oldPath !== path) {
+          await supabase.storage.from("program-covers").remove([oldPath]);
+        }
+        setCoverPath(path);
+      } else {
+        // The program still points at the old cover: keep it, and take back the file that was just uploaded.
+        await supabase.storage.from("program-covers").remove([path]);
       }
-      setCoverPath(path);
     }
     setUploading(false);
   }

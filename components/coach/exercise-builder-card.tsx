@@ -641,10 +641,16 @@ export function ExerciseBuilderCard({
 
       const setIds = sets.map((s) => s.id);
       if (setIds.length > 0) {
-        await saved(supabase
+        const targetsSaved = await saved(supabase
           .from("group_workout_exercise_sets")
           .update({ target_time_seconds: preset.workSeconds, target_rest_seconds: preset.restSeconds, target_rest_max_seconds: null })
           .in("id", setIds));
+        if (!targetsSaved) {
+          // The fields did change; the work and rest times did not. The screen keeps the times that are really stored, and says so.
+          onFieldsAndSetsChange(nextFields, sets);
+          flashSaveError("Preset's fields applied, but couldn't set the work/rest times — try again.");
+          return;
+        }
         sets = sets.map((s) => ({ ...s, targetTimeSeconds: preset.workSeconds, targetRestSeconds: preset.restSeconds, targetRestMaxSeconds: null }));
       }
 

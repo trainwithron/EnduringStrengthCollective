@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { CRON_JOBS, MONITORING_STARTED, findStaleJobs, type CronRunRow } from "@/lib/cron-jobs";
 import { alertPlatformAdmins, withCronRun } from "@/lib/cron-monitor";
+import { pageAll } from "@/lib/page-all";
 import { aiFeatureHealth, aiFeaturesToAlert, AI_ALERT_SHARE } from "@/lib/ai-health";
 
 // Runs daily. Looks at every scheduled job's last run and tells the platform admin about any that is failing or has stopped
@@ -26,16 +27,17 @@ async function handler(request: Request) {
     const lines = stale.map((s) => `- ${s.job}: ${s.reason.replace(/_/g, " ")}${s.hoursSinceSuccess !== null ? ` (last success ${Math.round(s.hoursSinceSuccess)}h ago)` : ""}`);
     await alertPlatformAdmins(`${stale.length} scheduled ${stale.length === 1 ? "job needs" : "jobs need"} attention`, `These scheduled jobs are failing or have stopped running:\n${lines.join("\n")}`);
   }
-  // AI calls over the last 7 days: a feature whose calls end cut off or failing more than 10 percent of the time (with at least 10 calls) is reported.
+  // AI calls over the last 24 hours (the job runs daily, so one bad afternoon is reported once, not every day for a week): a feature whose calls end cut off or failing more than 10 percent of the time (with at
+  // least 10 calls) is reported. The read goes a page at a time, oldest first, because a request returns at most 1,000 rows.
   let aiAlerts: ReturnType<typeof aiFeaturesToAlert> = [];
   try {
-    const since = new Date(Date.now() - 7 * 86400000).toISOString();
-    const { data: usage, error: usageError } = await db.from("ai_usage_log").select("feature, status").gte("created_at", since).limit(20000);
-    if (!usageError) {
-      aiAlerts = aiFeaturesToAlert(aiFeatureHealth((usage ?? []) as { feature: string; status: string }[]));
+    const since = new Date(Date.now() - 86400000).toISOString();
+    const usage = await pageAll((from, to) => db.from("ai_usage_log").select("feature, status, created_at, user_id, coach_id").gte("created_at", since).order("created_at", { ascending: true }).order("id").range(from, to), { maxPages: 40 });
+    if (!usage.failed) {
+      aiAlerts = aiFeaturesToAlert(aiFeatureHealth(usage.rows as { feature: string; status: string; created_at: string; user_id: string | null; coach_id: string | null }[]));
       if (aiAlerts.length > 0) {
         const lines = aiAlerts.map((h) => `- ${h.feature}: ${h.notOk} of ${h.calls} calls did not finish (${Math.round(h.share * 100)} percent)`);
-        await alertPlatformAdmins(`${aiAlerts.length} AI ${aiAlerts.length === 1 ? "feature is" : "features are"} failing more than ${Math.round(AI_ALERT_SHARE * 100)} percent of the time`, `In the last 7 days:\n${lines.join("\n")}`);
+        await alertPlatformAdmins(`${aiAlerts.length} AI ${aiAlerts.length === 1 ? "feature is" : "features are"} failing more than ${Math.round(AI_ALERT_SHARE * 100)} percent of the time`, `In the last 24 hours:\n${lines.join("\n")}`);
       }
     }
   } catch {

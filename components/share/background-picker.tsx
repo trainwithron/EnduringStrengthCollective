@@ -27,12 +27,14 @@ export function BackgroundPicker({
   async function choose(key: ScenicBackgroundKey | null) {
     setSaving(key ?? "auto");
     const supabase = createBrowserClient();
-    await saved(supabase
+    const ok = await saved(supabase
       .from("profiles")
       .update({ preferred_share_background: key })
       .eq("id", athleteId));
-    setSelected(key);
     setSaving(null);
+    // The checkmark moves only when the pick was stored.
+    if (!ok) return;
+    setSelected(key);
     router.refresh();
   }
 

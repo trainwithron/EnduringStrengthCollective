@@ -54,11 +54,20 @@ export async function POST(request: Request) {
         capabilities: { transfers: { requested: true } },
       });
       accountId = account.id;
-      await serviceRole
+      const { error: saveError } = await serviceRole
         .from("organization_memberships")
         .update({ stripe_connect_account_id: accountId, stripe_connect_status: "pending" })
         .eq("organization_id", organizationId)
         .eq("profile_id", user.id);
+      if (saveError) {
+        // The account must be recorded before the coach is sent to Stripe, or they finish onboarding an account the app does not know and every retry makes another. Take the new account back and say so.
+        try {
+          await stripe.accounts.del(accountId);
+        } catch {
+          // an account that cannot be removed stays unused; the coach is still told
+        }
+        throw saveError;
+      }
     }
 
     const origin = appOrigin(request);

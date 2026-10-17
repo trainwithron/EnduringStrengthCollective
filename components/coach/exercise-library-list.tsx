@@ -119,7 +119,8 @@ export function ExerciseLibraryList({
     setNewTags((prev) => prev.map((t) => (t.tagId === tagId ? { ...t, role } : t)));
   }
 
-  async function toggleExistingTag(exerciseName: string, tagId: string) {
+  // True when the tag change was saved, so a caller that builds on it (accepting a suggestion) knows whether to go on.
+  async function toggleExistingTag(exerciseName: string, tagId: string): Promise<boolean> {
     const current = tagsByExercise[exerciseName] ?? [];
     const already = current.some((t) => t.tagId === tagId);
     const supabase = createBrowserClient();
@@ -133,18 +134,23 @@ export function ExerciseLibraryList({
         // put the tag back on screen: another coach added it, and only they can remove it
         setTagsByExercise((prev) => ({ ...prev, [exerciseName]: current }));
         setNameProblem(removed.error);
+        return false;
       }
+      return true;
     } else {
       setTagsByExercise((prev) => ({
         ...prev,
         [exerciseName]: [...(prev[exerciseName] ?? []), { tagId, role: "prime_mover" }],
       }));
-      await saved(supabase
+      const ok = await saved(supabase
         .from("exercise_biomech_tags")
         .upsert(
           { exercise_name: exerciseName, tag_id: tagId, role: "prime_mover", created_by: coachId },
           { onConflict: "exercise_name,tag_id", ignoreDuplicates: true }
         ));
+      // A failed save takes the chip back off the screen.
+      if (!ok) setTagsByExercise((prev) => ({ ...prev, [exerciseName]: current }));
+      return ok;
     }
   }
 
@@ -196,7 +202,7 @@ export function ExerciseLibraryList({
   }
 
   async function acceptSuggestedTag(exerciseName: string, tagId: string, role: BiomechTagSelection["role"]) {
-    await toggleExistingTag(exerciseName, tagId);
+    if (!(await toggleExistingTag(exerciseName, tagId))) return;
     if (role !== "prime_mover") await setExistingTagRole(exerciseName, tagId, role);
     setPendingSuggestions((prev) => ({
       ...prev,
@@ -286,7 +292,7 @@ export function ExerciseLibraryList({
       // Upsert with ignoreDuplicates rather than a plain insert, so that
       // coincidence (two coaches independently creating the same new
       // exercise name) can't surface as a write error here.
-      await saved(supabase.from("exercise_biomech_tags").upsert(
+      const tagsSaved = await saved(supabase.from("exercise_biomech_tags").upsert(
         newTags.map((t) => ({
           exercise_name: trimmed,
           tag_id: t.tagId,
@@ -294,7 +300,8 @@ export function ExerciseLibraryList({
           created_by: coachId,
         })),
         { onConflict: "exercise_name,tag_id", ignoreDuplicates: true }
-      ));
+      ), "The exercise was added, but its tags didn't save. Tag it from the list.");
+      if (!tagsSaved) setNameProblem("The exercise was added, but its tags didn't save. Tag it from the list.");
 
       setExercises((prev) => [
         ...prev,
@@ -309,7 +316,8 @@ export function ExerciseLibraryList({
           description: data.description,
         },
       ]);
-      setTagsByExercise((prev) => ({ ...prev, [data.name]: newTags }));
+      // Chips show only what was written: a failed tag save leaves the exercise untagged on screen, as it is in the database, so it can be tagged from the list.
+      if (tagsSaved) setTagsByExercise((prev) => ({ ...prev, [data.name]: newTags }));
       setNewName("");
       setNewCategory("");
       setNewEquipmentType("");
@@ -349,9 +357,13 @@ export function ExerciseLibraryList({
 
   async function handleDelete(id: string) {
     if (!await confirmDialog("Remove this exercise from your library?")) return;
+    const removedRow = exercises.find((e) => e.id === id);
     setExercises((prev) => prev.filter((e) => e.id !== id));
     const supabase = createBrowserClient();
-    await saved(supabase.from("exercise_library").delete().eq("id", id));
+    // A failed delete puts the row back (it is still in the library).
+    if (!(await saved(supabase.from("exercise_library").delete().eq("id", id))) && removedRow) {
+      setExercises((prev) => (prev.some((e) => e.id === id) ? prev : [...prev, removedRow]));
+    }
   }
 
   const patternOptions = patternFilterOptions(

@@ -129,9 +129,10 @@ export function BrandingForm({
     setSaving(true);
     setSaved(false);
     const supabase = createBrowserClient();
-    await saveWrite(supabase.from("organizations").update(patch).eq("id", organizationId));
+    const ok = await saveWrite(supabase.from("organizations").update(patch).eq("id", organizationId));
     setSaving(false);
-    setSaved(true);
+    // "Saved" shows only for a save that happened (never beside the failure bar).
+    setSaved(ok);
   }
 
   function handleShapeChange(shape: ButtonShape) {

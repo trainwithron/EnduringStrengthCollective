@@ -22,7 +22,7 @@ export function AddDayEventForm({ coachId, dateKey, organizationId }: { coachId:
     if (!title.trim()) return;
     setSaving(true);
     const supabase = createBrowserClient();
-    await saved(supabase.from("calendar_events").insert({
+    const ok = await saved(supabase.from("calendar_events").insert({
       coach_id: coachId,
       organization_id: organizationId,
       title: title.trim(),
@@ -31,6 +31,8 @@ export function AddDayEventForm({ coachId, dateKey, organizationId }: { coachId:
       event_type: "custom",
     }));
     setSaving(false);
+    // What was typed is kept when the save failed, so trying again is one tap.
+    if (!ok) return;
     setTitle("");
     setTime("");
     router.refresh();

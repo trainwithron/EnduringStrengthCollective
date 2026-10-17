@@ -1,4 +1,5 @@
 import { LoadFailedPage } from "@/components/ui/load-failed-page";
+import { isReadFailure } from "@/lib/read-failed";
 import { redirect } from "next/navigation";
 import { inOrg, orgIdOfGroup } from "@/lib/org-of-group";
 import { redirectOneOnOneToAnchor } from "@/lib/coach-wide-redirect";
@@ -37,7 +38,7 @@ export default async function AvailabilityPage(
     .eq("profile_id", user.id)
     .maybeSingle();
 
-  if (membershipError) return <LoadFailedPage />;
+  if (isReadFailure(membershipError)) return <LoadFailedPage />;
 
   if (membership?.role !== "coach") {
     return (
@@ -51,13 +52,13 @@ export default async function AvailabilityPage(
     .eq("id", params.groupId)
     .single();
 
-  const { data: coachProfile } = await supabase
+  const { data: coachProfile, error: profileError } = await supabase
     .from("profiles")
     .select("timezone")
     .eq("id", user.id)
     .maybeSingle();
 
-  const { data: windowRows } = await supabase
+  const { data: windowRows, error: windowsError } = await supabase
     .from("coach_availability_windows")
     .select("id, weekday, start_time, end_time, slot_duration_minutes")
     .eq("coach_id", user.id)
@@ -85,7 +86,7 @@ export default async function AvailabilityPage(
     sessionTypeId: typeById.get(w.id) ?? null,
   }));
 
-  const { data: policyRow } = await supabase
+  const { data: policyRow, error: policyError } = await supabase
     .from("coach_booking_policies")
     .select("cancellation_window_hours, buffer_minutes, minimum_notice_hours, credit_expiry_days")
     .eq("coach_id", user.id)
@@ -103,11 +104,14 @@ export default async function AvailabilityPage(
   const bookingModeResult = await supabase.from("coach_booking_policies").select("booking_mode").eq("coach_id", user.id).maybeSingle();
   const bookingMode: BookingMode | null = bookingModeResult.error ? null : ((bookingModeResult.data?.booking_mode as BookingMode | null) ?? "coach_schedules");
 
-  const { data: exceptionRows } = await supabase
+  const { data: exceptionRows, error: exceptionsError } = await supabase
     .from("coach_availability_exceptions")
     .select("id, kind, label, start_at, end_at, weekday, start_time, end_time")
     .eq("coach_id", user.id)
     .order("created_at", { ascending: false });
+
+  // A failed read must not show default settings as if they were the coach's own (the next edit would save those defaults over the real ones).
+  if (profileError || windowsError || policyError || exceptionsError) return <LoadFailedPage />;
 
   const exceptions = (exceptionRows ?? []).map((e) => ({
     id: e.id,

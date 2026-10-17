@@ -70,11 +70,15 @@ export function GuardianShareButton({
     if (!await confirmDialog("Revoke this parent link? The page will stop working immediately.")) return;
     setBusy(true);
     const supabase = createBrowserClient();
-    await saved(supabase
+    // Only a revoke that was really saved clears the link from the screen: the coach must never believe a live parent link is dead.
+    if (!(await saved(supabase
       .from("guardian_links")
       .update({ revoked_at: new Date().toISOString() })
       .eq("athlete_id", athleteId)
-      .eq("access_token", token));
+      .eq("access_token", token)))) {
+      setBusy(false);
+      return;
+    }
     setToken(null);
     setExpiresAt(null);
     setBusy(false);

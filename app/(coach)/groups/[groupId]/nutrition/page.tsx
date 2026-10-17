@@ -1,4 +1,5 @@
 import { LoadFailedPage } from "@/components/ui/load-failed-page";
+import { isReadFailure } from "@/lib/read-failed";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
@@ -58,7 +59,7 @@ export default async function NutritionPage(
     .eq("group_id", params.groupId)
     .eq("profile_id", user.id)
     .maybeSingle();
-  if (membershipError) return <LoadFailedPage />;
+  if (isReadFailure(membershipError)) return <LoadFailedPage />;
 
   // A coach "acting as" a client sees that client's own athlete-facing
   // Nutrition tab below, not their own Meal Plans builder — same

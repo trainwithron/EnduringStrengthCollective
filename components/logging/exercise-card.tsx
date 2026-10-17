@@ -241,9 +241,11 @@ export function ExerciseCard({
     try {
       const nextFields = [...exercise.trackedFields, field];
       const supabase = createBrowserClient();
-      await saved(supabase.from("session_exercises").update({ tracked_fields: nextFields }).eq("id", exercise.id));
-      onTrackedFieldsChange(nextFields);
-      setFieldsOpen(false);
+      // The column appears only when it was really saved (a failed save would show a column that is gone after a reload).
+      if (await saved(supabase.from("session_exercises").update({ tracked_fields: nextFields }).eq("id", exercise.id))) {
+        onTrackedFieldsChange(nextFields);
+        setFieldsOpen(false);
+      }
     } finally {
       setFieldsBusy(false);
     }
@@ -267,15 +269,13 @@ export function ExerciseCard({
     try {
       const nextFields = exercise.trackedFields.filter((f) => f !== field);
       const supabase = createBrowserClient();
-      await saved(supabase.from("session_exercises").update({ tracked_fields: nextFields }).eq("id", exercise.id));
+      // Step by step, each step only after the one before it was saved: the logged values are cleared only once the metric is really dropped, and the screen clears them only once they are really cleared.
+      if (!(await saved(supabase.from("session_exercises").update({ tracked_fields: nextFields }).eq("id", exercise.id)))) return;
+      onTrackedFieldsChange(nextFields);
       const setIds = exercise.sets.map((s) => s.id);
       if (setIds.length > 0) {
-        await saved(supabase
-          .from("set_logs")
-          .update({ [ACTUAL_COLUMN[field]]: null })
-          .in("id", setIds));
+        if (!(await saved(supabase.from("set_logs").update({ [ACTUAL_COLUMN[field]]: null }).in("id", setIds)))) return;
       }
-      onTrackedFieldsChange(nextFields);
       for (const set of exercise.sets) {
         onSetChange(set.id, { [prop]: null } as Partial<SetLogEntry>);
       }
