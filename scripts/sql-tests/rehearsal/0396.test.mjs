@@ -149,10 +149,14 @@ export default {
       r = await tryQ(db, `select public.close_organization($1) as res`, [org]);
       h.check("the owner closes the team" + (r.error ? ": " + r.error : ""), !r.error);
       const closed = r.rows?.[0]?.res ?? {};
-      h.check("each coach with clients is left to choose, and no organization was created", closed.still_to_choose >= 2, JSON.stringify(closed));
+      h.check("only coaches who keep clients private from the team are left to choose (the rest go to the owner), and no organization was created", closed.still_to_choose >= 1 && closed.still_to_choose < closed.members_left, JSON.stringify(closed));
       await h.asSuper();
-      h.check("the closing coach's client is exactly where it was", (await db.query(`select organization_id from public.groups where id = $1`, [closeG])).rows[0].organization_id === org && (await seat(closeG, c4)));
+      h.check("a closing coach's gym-visible client stays in the gym and goes to the owner, not left with the coach", (await db.query(`select organization_id from public.groups where id = $1`, [closeG])).rows[0].organization_id === org && (await seat(closeG, owner)) && !(await seat(closeG, c4)));
       h.check("organizations created across the whole test: only the one the server made", (await db.query(`select count(*)::int as n from public.organizations`)).rows[0].n === orgsBefore + 1);
+
+      // the stored exports bucket is private and has no storage policy at all (only the server key reaches it)
+      h.check("the exports bucket exists and is private", (await count(`select count(*)::int as n from storage.buckets where id = 'coach-exit-exports' and public = false`)) === 1);
+      h.check("and no storage policy mentions it", (await count(`select count(*)::int as n from pg_policies where schemaname = 'storage' and tablename = 'objects' and (coalesce(qual, '') || coalesce(with_check, '')) like '%coach-exit-exports%'`)) === 0);
 
       // ================= quit (seven days) and fired (at once), in an organization of their own
       const o2 = await h.user("LD Owner");

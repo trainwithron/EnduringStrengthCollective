@@ -26,6 +26,11 @@ export interface TeamInvite {
   expiresAt: string;
 }
 
+// What happens to a coach who still has clients that are private from the organization (a coach without any is simply removed).
+const LEAVING_NOTE = {
+  fired: (name: string) => `${name} then loses coaching access to those clients right away and cannot start their own account here.`,
+  good: (name: string) => `${name} then gets seven days to choose whether to start their own account or export everything.`,
+};
 const ROLE_WORD: Record<string, string> = { owner: "Owner", admin: "Admin", coach: "Coach" };
 
 // The people in the organization (owner and admins can change roles, remove a member and hand over their clients, cancel or extend an invitation), and for the owner, ending the team. Every rule is in the
@@ -115,8 +120,8 @@ export function TeamMembersPanel({
     }
     const takeover = members.find((x) => x.profileId === handTo && !x.leaving)?.fullName;
     const message = needsHandOver
-      ? `Remove ${m.fullName} from ${organizationName}? They lose access to every client here right away. Their ${m.soleClients} client${m.soleClients === 1 ? "" : "s"} stay${m.soleClients === 1 ? "s" : ""} with ${organizationName} and ${takeover} takes over, with all history, programs and credits. A client who keeps their records private from the organization stays with ${m.fullName}; ${kind === "fired" ? "Because they are being let go, their coaching access ends right now and they cannot start their own account here." : "They get seven days to choose whether to start their own account or export everything."}`
-      : `Remove ${m.fullName} from ${organizationName}? They lose access to every client here right away. A client who keeps their records private from the organization stays with ${m.fullName}. ${kind === "fired" ? "Because they are being let go, their coaching access ends right now and they cannot start their own account here." : "They get seven days to choose whether to start their own account or export everything."}`;
+      ? `Remove ${m.fullName} from ${organizationName}? They lose access to every client here right away. Their ${m.soleClients} client${m.soleClients === 1 ? "" : "s"} stay${m.soleClients === 1 ? "s" : ""} with ${organizationName} and ${takeover} takes over, with all history, programs and credits. If a client keeps their records private from the organization, that client stays with ${m.fullName}. ${LEAVING_NOTE[kind || "good"](m.fullName)}`
+      : `Remove ${m.fullName} from ${organizationName}? They lose access to every client here right away. If a client keeps their records private from the organization, that client stays with ${m.fullName}. ${LEAVING_NOTE[kind || "good"](m.fullName)}`;
     if (!(await confirmDialog({ message, confirmLabel: "Remove", destructive: true }))) return;
     await run(`remove-${m.profileId}`, () => db().rpc("remove_org_member", { p_org: organizationId, p_profile: m.profileId, p_hand_to: needsHandOver ? handTo : null, p_fired: kind === "fired" }), () => {
       setRemoving(null);

@@ -2872,7 +2872,7 @@ STEPS.push({
     "create policy \"push_subscriptions_select_org_owner\" on public.push_subscriptions for select to authenticated using (exists (select 1 from public.organization_memberships om_owner join public.organization_memberships om_caller on om_caller.organization_id = om_owner.organization_id where om_owner.profile_id = push_subscriptions.profile_id and om_owner.role = 'owner' and om_caller.profile_id = (select auth.uid())));",
     "drop policy if exists \"org_memberships_select_self\" on public.organization_memberships;",
     "drop function if exists public.complete_departure(uuid, uuid);",
-    "alter table public.organization_memberships drop column if exists departing_org_name;",
+    "alter table public.organization_memberships drop column if exists export_failed_at, drop column if exists export_attempts, drop column if exists departing_org_name;",
     "-- the stored exports: their rows are removed here, but the files themselves can only be removed in the Storage section of the dashboard (bucket coach-exit-exports)",
     "delete from storage.objects where bucket_id = 'coach-exit-exports';",
     "delete from storage.buckets where id = 'coach-exit-exports';",

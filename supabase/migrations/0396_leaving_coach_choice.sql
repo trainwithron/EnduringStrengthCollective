@@ -21,6 +21,9 @@ alter table public.organization_memberships add column if not exists export_path
 alter table public.organization_memberships add column if not exists export_created_at timestamptz;
 -- The organization's name as it was when they were marked leaving: once their seats are gone they can no longer read the organization, and their Home still has to say which one it was.
 alter table public.organization_memberships add column if not exists departing_org_name text;
+-- Making the stored export is tried a few times, then given up on (the coach is told, and the live link still works).
+alter table public.organization_memberships add column if not exists export_attempts int not null default 0;
+alter table public.organization_memberships add column if not exists export_failed_at timestamptz;
 insert into storage.buckets (id, name, public, file_size_limit)
 values ('coach-exit-exports', 'coach-exit-exports', false, 524288000)
 on conflict (id) do nothing;
@@ -86,6 +89,7 @@ begin
       and not exists (
         select 1 from public.organization_memberships om
         where om.organization_id = p_org_id and g.id = any (om.departing_group_ids)
+          and exists (select 1 from public.group_memberships a where a.group_id = g.id and a.role = 'athlete' and a.private_from_org)
           and not exists (select 1 from public.group_memberships c where c.group_id = g.id and c.role = 'coach' and c.profile_id <> om.profile_id)
       )
   );
@@ -240,7 +244,8 @@ $$;
 
 -- Takes a coach out of an organization. For each group of the organization that they coach:
 --   - another coach is there too: they just lose their seat;
---   - they are the only coach and p_take is set (closing the organization), or a client in it is private from the organization: they KEEP the group and its clients, untouched (they are marked leaving, below);
+--   - they are the only coach and a client in it is private from the organization: they KEEP the group and its clients, untouched (they are marked leaving, below); closing the organization changes nothing about this,
+--     the clients the organization can see go to whoever is named (the owner, when closing), as in any other removal;
 --   - they are the only coach of a group with clients: p_hand_to becomes its coach and they lose their seat (refused with a plain message when nobody was named);
 --   - they are the only coach of an empty group: they lose their seat and the empty group stays.
 -- Then, if they kept any group, their membership stays, marked leaving and set back to coach (an admin who is leaving no longer has admin powers); otherwise the membership goes. Internal: the callers check who is allowed.
@@ -281,7 +286,7 @@ begin
     select count(*) into v_clients from public.group_memberships a where a.group_id = g.group_id and a.role = 'athlete';
     v_private := exists (select 1 from public.group_memberships a where a.group_id = g.group_id and a.role = 'athlete' and a.private_from_org);
 
-    if v_sole and (p_take or v_private) then
+    if v_sole and v_private then
       -- the coach keeps this group and its clients exactly as they are, until they choose what to do
       v_kept := v_kept + 1;
       v_kept_ids := v_kept_ids || g.group_id;
@@ -328,7 +333,8 @@ $$;
 revoke execute on function public._detach_coach_from_org(uuid, uuid, uuid, boolean) from public, anon, authenticated;
 grant execute on function public._detach_coach_from_org(uuid, uuid, uuid, boolean) to service_role;
 
--- The owner ends the team: every other member goes through the same step with p_take set, so each coach keeps the clients only they coach (marked leaving, choosing in their own time) and the owner keeps the rest.
+-- The owner ends the team: every other member goes through the same step with the owner as the one who takes over, so each coach keeps only the clients who are private from the team (marked leaving, choosing in their own time)
+-- and the owner keeps the rest.
 -- Open invitations are cancelled. Billing is not touched.
 create or replace function public.close_organization(p_org uuid)
 returns jsonb
@@ -349,7 +355,7 @@ begin
     raise exception 'Only the owner can close the organization.';
   end if;
   for m in select profile_id from public.organization_memberships where organization_id = p_org and profile_id <> me order by created_at, profile_id loop
-    if coalesce((public._detach_coach_from_org(p_org, m.profile_id, null, true) ->> 'leaving')::boolean, false) then
+    if coalesce((public._detach_coach_from_org(p_org, m.profile_id, me, true) ->> 'leaving')::boolean, false) then
       v_leaving := v_leaving + 1;
     end if;
     v_members := v_members + 1;
@@ -552,7 +558,7 @@ begin
   update public.organization_memberships
     set fired_at = null, access_ended_at = null, departing_since = now(),
         departure_notified_at = null, reminded_3d_at = null, reminded_1d_at = null, closure_notified_at = null,
-        clients_notified_at = null, export_path = null, export_created_at = null
+        clients_notified_at = null, export_path = null, export_created_at = null, export_attempts = 0, export_failed_at = null
     where organization_id = p_org and profile_id = p_coach;
   perform public.audit_record('organization_memberships', p_org::text || ':' || p_coach::text, 'update', jsonb_build_object('event', 'lift_departure_block', 'by', auth.uid()));
 end;

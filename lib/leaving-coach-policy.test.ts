@@ -81,7 +81,14 @@ describe("wiring of the seven days", () => {
     expect(job).toContain("emailToo: adult");
     const route = src("app/api/coach/exit-export/route.ts");
     expect(route).toContain("createSignedUrl(row.export_path");
-    expect(route).toContain('.eq("organization_id", row.organization_id)');
+    expect(route).toContain("groupsStillTheirs(");
+    expect(job).toContain("groupsStillTheirs(");
+    expect(src("lib/leaving-coach-groups.ts")).toContain('.eq("organization_id", organizationId)');
+    // one stored export per run, a few tries, then given up on; the notices never wait for it
+    expect(job).toContain("let exportBudget = 1;");
+    expect(job).toContain("MAX_EXPORT_ATTEMPTS");
+    expect(job.indexOf("// 3. Tell the clients")).toBeGreaterThan(job.indexOf("// 1. The coach"));
+    expect(job).not.toContain("if (!exportPath) return;");
     const sql = src("supabase/migrations/0396_leaving_coach_choice.sql");
     expect(sql).toContain("insert into storage.buckets");
     expect(sql).toContain("coach-exit-exports");

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { rateLimitResponse } from "@/lib/rate-limit";
-import { readByIds } from "@/lib/read-by-ids";
+import { groupsStillTheirs } from "@/lib/leaving-coach-groups";
 import { exportEntries } from "@/lib/business-export";
 import { zipStream } from "@/lib/zip-store";
 import { exportLinkStillWorks, EXPORT_LINK_DAYS } from "@/lib/leaving-coach-policy";
@@ -50,13 +50,9 @@ export async function GET(request: Request) {
   // Not made yet (the job retries every few hours): the groups they kept that are still without any other coach and still in that organization.
   const kept: string[] = row.departing_group_ids ?? [];
   if (kept.length === 0) return NextResponse.json({ error: "There is nothing to export." }, { status: 404 });
-  const [groups, coaches] = await Promise.all([
-    readByIds(kept, (ids) => (from, to) => db.from("groups").select("id").in("id", ids).eq("organization_id", row.organization_id).order("id").range(from, to), { maxPages: 100 }),
-    readByIds(kept, (ids) => (from, to) => db.from("group_memberships").select("id, group_id").in("group_id", ids).eq("role", "coach").order("id").range(from, to), { maxPages: 100 }),
-  ]);
-  if (groups.failed || coaches.failed) return NextResponse.json({ error: "Couldn't prepare your export. Try again in a few minutes." }, { status: 502 });
-  const hasCoach = new Set(coaches.rows.map((c: { group_id: string }) => c.group_id));
-  const groupIds = groups.rows.map((g: { id: string }) => g.id).filter((id: string) => !hasCoach.has(id));
+  const still = await groupsStillTheirs(db, row.organization_id, kept);
+  if (still.failed) return NextResponse.json({ error: "Couldn't prepare your export. Try again in a few minutes." }, { status: 502 });
+  const groupIds = still.ids;
   if (groupIds.length === 0) return NextResponse.json({ error: "Your export is still being prepared. Try again in a few hours." }, { status: 404 });
 
   const stream = zipStream(exportEntries({ supabase: db, groupIds, orgName, emailsFor: emailsForExport(db) }));
