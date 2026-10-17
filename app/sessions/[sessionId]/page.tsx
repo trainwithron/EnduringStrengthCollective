@@ -5,6 +5,8 @@ import { createCrossOrgServerClient as createServerClient } from "@/lib/supabase
 import { SessionLogger } from "@/components/logging/session-logger";
 import { resumedStartedAt } from "@/lib/resume-elapsed";
 import { asSetType } from "@/lib/set-types";
+import { loadLiftUnit } from "@/lib/lift-unit-server";
+import { LiftUnitProvider } from "@/components/logging/lift-unit-context";
 import type { PendingGateTask } from "@/components/session/rest-timer-bar";
 import { isHabitDueOn } from "@/lib/habits";
 import { DEFAULT_TRACKED_FIELDS } from "@/lib/exercise-fields";
@@ -638,6 +640,7 @@ export default async function SessionPage(
         )}
       </header>
 
+      <LiftUnitProvider unit={await loadLiftUnit(supabase, session.athlete_id)}>
       <SessionLogger
         sessionId={session.id}
         isCompleted={session.status !== "in_progress"}
@@ -661,6 +664,7 @@ export default async function SessionPage(
         demoLibrary={demoLibrary}
         read={read}
       />
+      </LiftUnitProvider>
 
       {isOwnSession && (
         <BottomTabBar groupId={session.group_id} activeOverride="home" />

@@ -7,6 +7,8 @@ import { formatCondensedSets } from "@/lib/exercise-fields";
 import type { WorkoutOverviewExercise } from "@/lib/workout-overview-data";
 import { ExerciseDemoButton } from "./exercise-demo-button";
 import { useDemosHidden } from "./demo-preference";
+import { useLiftUnit } from "./lift-unit-context";
+import { formatLift } from "@/lib/lift-weight";
 
 export function PreStartExerciseRow({
   exercise,
@@ -23,6 +25,7 @@ export function PreStartExerciseRow({
   lastTime?: { weight: number; reps: number };
   goal?: { weight: number | null; reps: number | null; reason?: string };
 }) {
+  const unit = useLiftUnit();
   const [swapping, setSwapping] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,12 +73,12 @@ export function PreStartExerciseRow({
           )}
           {lastTime && (
             <p className="font-body text-xs text-steel mt-0.5">
-              Last: {lastTime.weight}&times;{lastTime.reps}
+              Last: {formatLift(lastTime.weight, unit)} &times; {lastTime.reps}
             </p>
           )}
           {goal && (goal.weight != null || goal.reps != null) && (
             <p className="font-body text-xs text-rust mt-0.5">
-              Goal: {goal.weight != null ? `${goal.weight} lbs` : ""}
+              Goal: {goal.weight != null ? formatLift(goal.weight, unit) : ""}
               {goal.weight != null && goal.reps != null ? " × " : ""}
               {goal.reps != null ? `${goal.reps} reps` : ""}
             </p>

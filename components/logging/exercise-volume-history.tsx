@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { buildSparklinePath } from "@/lib/program-card-visuals";
+import { useLiftUnit } from "./lift-unit-context";
+import { formatVolume } from "@/lib/lift-weight";
 import { MIN_SESSIONS_FOR_HISTORY, type VolumeHistoryPoint } from "@/lib/exercise-volume-history";
 
 const SPARK_W = 200;
@@ -18,6 +20,7 @@ const RUST = "#D2703B";
 // below MIN_SESSIONS_FOR_HISTORY, matching TrendChart's own "needs more
 // data" convention elsewhere in this app.
 export function ExerciseVolumeHistory({ history }: { history: VolumeHistoryPoint[] }) {
+  const unit = useLiftUnit();
   const [open, setOpen] = useState(false);
 
   if (history.length < MIN_SESSIONS_FOR_HISTORY) return null;
@@ -59,8 +62,7 @@ export function ExerciseVolumeHistory({ history }: { history: VolumeHistoryPoint
             />
           </svg>
           <p className="font-body text-xs text-steel mt-1">
-            {Math.round(first.totalVolume).toLocaleString()} lbs &rarr;{" "}
-            {Math.round(latest.totalVolume).toLocaleString()} lbs
+            {formatVolume(first.totalVolume, unit)} &rarr; {formatVolume(latest.totalVolume, unit)}
           </p>
         </div>
       )}

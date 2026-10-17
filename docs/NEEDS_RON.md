@@ -5,6 +5,12 @@
 - ASSUMED: an installed app in a window 1024px wide or more with a mouse opens the desktop experience (a phone or touch tablet keeps phone mode; the existing view toggle still overrides).
 - Needs Ron: name an iPhone tester (offline and wake-lock behaviour differ on iOS).
 
+## Release C2 (kilograms, no paste)
+- Design: pounds stay the one stored unit. A client who picked kilograms in About you (the same setting body weight already uses) sees and types kilograms in the workout screens; nothing stored is ever rewritten, and a cell left alone keeps its stored pounds exactly (checked in a test with before/after numbers: 135 lb shows 61.2 kg).
+- NOT DONE (smaller follow-ups): the public share picture and card, the progress graphs and records for the client's own view, and the coach's views of that client still show pounds. Goals for a kilogram client are still computed on 5 lb steps (so 140 lb shows as 63.5 kg); a kilogram step of 2.5 kg would be cleaner. Say go and I add them as C2b.
+- The plate picture is drawn only for pounds (it is pound plates); a kilogram client sees the number and unit.
+- QUESTION: should the coach see a kilogram client's numbers in kilograms too when logging for them? Today the coach logging for a client sees the client's unit.
+
 ## Release E (minors off public surfaces)
 - ASSUMED (reverses an earlier Ron decision, one-line change back in lib/share-name.ts): a client with NO date of birth on file now has their name AND photo hidden on shared workout pictures until they choose (Ron's earlier rule showed an unknown-age client's name). Reason: an unknown age is treated as protected everywhere else. Only affects the 26 clients with no birthday until they are asked for it.
 - CHANGED after review (the stated rule): in-app boards (leaderboard, records board, challenge standings) shorten the name of every member who is not a confirmed adult: under 18 AND no date of birth on file (or no health form yet). Today none of the five real clients has a health form, so they show as first name and last initial there until they finish it. The check is made for the people actually on the board or page (a member who left, a participant from another group) and a failed lookup shortens everyone.

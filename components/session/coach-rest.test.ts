@@ -49,7 +49,8 @@ describe("a coach-prescribed rest is the only option for that set", () => {
     const fields = src("../../lib/exercise-fields.ts");
     expect(fields).toContain('{ key: "rest", label: "Rest", kind: "number" }');
     const grid = src("../logging/exercise-set-grid.tsx");
-    expect(grid).toContain('field === "rest" && typeof v === "number" ? formatRest(v)');
+    expect(grid).toContain('field === "rest" && typeof v === "number"');
+    expect(grid).toContain("? formatRest(v)");
     expect(grid).toContain("parseRestInput(draft, MAX_REST_SECONDS)");
   });
   it("the interval generator writes no rest (null), never 0, when a generated week has none", () => {

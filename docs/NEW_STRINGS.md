@@ -4,6 +4,9 @@
 - Workout screen, when a set could not upload yet: "{n} change hasn't uploaded yet." / "{n} changes haven't uploaded yet." then "Saved on this phone. It uploads when you're back online." (replaces "haven't saved yet / Your numbers are still here, we'll keep trying.")
 - Offline page (shown with no signal for a page that was never opened): "You're offline" / "Sets you already logged on this phone are safe and upload when you're back online. A workout you opened earlier still opens from Home." / button "Try again".
 
+## Release C2 (kilograms)
+- No new words: a client who chose kilograms in About you sees "kg" where "lb"/"lbs" showed in the workout screens (set cells, goal and last-time lines, equipment badge, volume history) and the after-workout body-weight box reads "Weight (kg)".
+
 ## Release E (minors off public surfaces)
 - Branding > Team: "Show me in "Find a coach"" / "Off by default. You appear only if your organization is listed and this is on." / "Name to show" / "Leave empty to show first name and last initial" / "That didn't save. Nothing was changed."
 - Challenge photo save error: "Couldn't save that photo. Try again."

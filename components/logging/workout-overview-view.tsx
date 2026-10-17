@@ -5,6 +5,9 @@ import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { RefreshOnBfcacheRestore } from "@/components/logging/refresh-on-bfcache-restore";
 import { renderNoteBody } from "@/lib/text-note-format";
+import { createServerClient } from "@/lib/supabase/server";
+import { loadLiftUnit } from "@/lib/lift-unit-server";
+import { LiftUnitProvider } from "@/components/logging/lift-unit-context";
 import type { WorkoutOverviewData } from "@/lib/workout-overview-data";
 
 // Shared between the athlete's own workout overview and the coach's
@@ -12,7 +15,7 @@ import type { WorkoutOverviewData } from "@/lib/workout-overview-data";
 // only things that differ between the two contexts. `actingAs` is a third,
 // distinct context — a coach viewing this as part of "View as Client" —
 // separate from `loggingForName`'s in-person coach-logs-a-session flow.
-export function WorkoutOverviewView({
+export async function WorkoutOverviewView({
   data,
   groupId,
   workoutId,
@@ -39,8 +42,11 @@ export function WorkoutOverviewView({
   // Coach logging a session on a client's behalf sees no tab bar (they
   // aren't navigating their own athlete experience).
   const showTabBar = !loggingForName;
+  // Goals and last-time numbers are stored in pounds and shown in the unit this person lifts in.
+  const liftUnit = await loadLiftUnit(await createServerClient(), athleteId);
 
   return (
+    <LiftUnitProvider unit={liftUnit}>
     <main className="min-h-screen bg-graphite text-chalk font-body pb-28">
       <RefreshOnBfcacheRestore />
       {actingAs && <ActingAsBanner athleteFullName={actingAs.fullName} groupId={actingAs.groupId} />}
@@ -122,5 +128,6 @@ export function WorkoutOverviewView({
 
       {showTabBar && <BottomTabBar groupId={groupId} activeOverride="home" />}
     </main>
+    </LiftUnitProvider>
   );
 }

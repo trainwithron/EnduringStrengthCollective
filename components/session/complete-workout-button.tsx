@@ -12,6 +12,9 @@ import { checkAndNotifyLowSessionBalance } from "@/lib/notify-low-session-balanc
 import { notifyWebhookEvent } from "@/lib/notify-webhook-event";
 import { refreshEquipmentLoadRatios } from "@/lib/equipment-load-ratio-gather";
 import { announceWorkoutLog } from "@/lib/announce-workout-log";
+import { useLiftUnit } from "@/components/logging/lift-unit-context";
+import { liftUnitLabel } from "@/lib/lift-weight";
+import { parseWeightInput } from "@/lib/units";
 
 // This project has no generated Supabase Database type, so a fresh RPC's
 // result falls back to an untyped shape — spelled out explicitly here
@@ -54,6 +57,7 @@ export function CompleteWorkoutButton({
   // no feed post is made in the name of a client under 18.
   coachMode?: { homeHref: string; clientIsMinor: boolean };
 }) {
+  const liftUnit = useLiftUnit();
   const [submitting, setSubmitting] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -107,7 +111,8 @@ export function CompleteWorkoutButton({
 
   async function handleLogWeight() {
     if (!weightNudge) return;
-    const value = Number(weightValue);
+    // Typed in the unit this person uses; saved as pounds (the stored unit), so a kilogram client is not saved as a much lighter body weight.
+    const value = parseWeightInput(weightValue, liftUnit);
     if (!value || value <= 0) {
       finishNavigation(weightNudge.navHref);
       return;
@@ -406,7 +411,7 @@ export function CompleteWorkoutButton({
             autoFocus
             value={weightValue}
             onChange={(e) => setWeightValue(e.target.value)}
-            placeholder="Weight (lbs)"
+            placeholder={`Weight (${liftUnitLabel(liftUnit)})`}
             className="flex-1 h-11 bg-surface border border-steel/30 text-chalk px-3 font-body focus:outline-none focus:border-rust"
           />
           <button

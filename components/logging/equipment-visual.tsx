@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { SetLogEntry } from "@/lib/types";
 import type { EquipmentType } from "@/lib/equipment-classifier";
+import { useLiftUnit } from "./lift-unit-context";
+import { liftDisplayValue, liftUnitLabel } from "@/lib/lift-weight";
 import { computePlateBreakdown, isPlateMathMilestone, STANDARD_BAR_WEIGHT_LBS } from "@/lib/plate-math";
 
 // Phase 3 of the gamified-logging thread (custom_shape_theming_idea.md)
@@ -120,6 +122,7 @@ function BarbellVisual({
   popping: boolean;
   finale: boolean;
 }) {
+  const unit = useLiftUnit();
   if (weight == null) return <BarbellIcon perSide={[]} className="text-steel" />;
   const breakdown = computePlateBreakdown(weight);
   const isMilestone = isPlateMathMilestone(weight);
@@ -131,10 +134,10 @@ function BarbellVisual({
     >
       <BarbellIcon perSide={breakdown.perSide} className={isMilestone ? "text-rust" : "text-chalk"} />
       <span className="font-display text-sm">
-        {weight}
-        <span className="font-body text-xs text-steel ml-0.5">lbs</span>
+        {liftDisplayValue(weight, unit)}
+        <span className="font-body text-xs text-steel ml-0.5">{liftUnitLabel(unit)}</span>
       </span>
-      {breakdown.exact && breakdown.perSide.length > 0 && (
+      {unit === "lb" && breakdown.exact && breakdown.perSide.length > 0 && (
         <span className="font-body text-xs text-steel">
           ({breakdown.perSide.join("/")} per side)
         </span>
@@ -173,6 +176,7 @@ function KettlebellVisual({
   popping: boolean;
   finale: boolean;
 }) {
+  const unit = useLiftUnit();
   // "One object gets bigger" mental model — scaled by sqrt so the visual
   // area (not just linear size) tracks weight, clamped to a sane range so
   // a 100 lb kettlebell doesn't blow out the layout.
@@ -191,8 +195,8 @@ function KettlebellVisual({
       </div>
       {weight != null && (
         <span className="font-display text-sm">
-          {weight}
-          <span className="font-body text-xs text-steel ml-0.5">lbs</span>
+          {liftDisplayValue(weight, unit)}
+          <span className="font-body text-xs text-steel ml-0.5">{liftUnitLabel(unit)}</span>
         </span>
       )}
     </div>
@@ -208,6 +212,7 @@ function DumbbellVisual({
   popping: boolean;
   finale: boolean;
 }) {
+  const unit = useLiftUnit();
   return (
     <div
       className={`flex items-center gap-1.5 ${
@@ -222,8 +227,8 @@ function DumbbellVisual({
       {/* The number "on the side of the head" — matches a real dumbbell's
           own printed-weight convention. */}
       <span className="font-display text-sm">
-        {weight ?? "—"}
-        <span className="font-body text-xs text-steel ml-0.5">lbs</span>
+        {weight != null ? liftDisplayValue(weight, unit) : "—"}
+        <span className="font-body text-xs text-steel ml-0.5">{liftUnitLabel(unit)}</span>
       </span>
     </div>
   );

@@ -3,6 +3,8 @@
 import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useEffect, useRef, useState } from "react";
 import { useSetSave } from "./set-save-context";
+import { useLiftUnit } from "./lift-unit-context";
+import { liftCellText, liftDisplayValue, liftStoredFromInput } from "@/lib/lift-weight";
 import { validateSetFieldInput, type SetFieldValidation } from "@/lib/set-field-validation";
 import type { SetLogEntry } from "@/lib/types";
 import {
@@ -121,8 +123,17 @@ function GridCell({
   const value = set[prop];
   const { save, failedIds } = useSetSave();
   const unsaved = failedIds.has(set.id);
+  // Weights are stored in pounds; a client who chose kilograms sees and types kilograms (lib/lift-weight.ts).
+  const unit = useLiftUnit();
   // A rest is typed and shown as m:ss (90 shows as 1:30), the same as the rest the coach sets; every other field is the plain number.
-  const shown = (v: unknown) => (v === null || v === undefined ? "" : field === "rest" && typeof v === "number" ? formatRest(v) : String(v));
+  const shown = (v: unknown) =>
+    v === null || v === undefined
+      ? ""
+      : field === "rest" && typeof v === "number"
+        ? formatRest(v)
+        : field === "weight" && typeof v === "number"
+          ? liftCellText(v, unit)
+          : String(v);
   const [draft, setDraft] = useState(shown(value));
   // A value that can't be saved (RPE 89, 5.5 reps) stays on screen with the
   // reason, instead of silently reverting or being saved as nonsense.
@@ -146,7 +157,9 @@ function GridCell({
       : (set[TARGET_PROP[field] as keyof SetLogEntry] as number | string | null | undefined) ?? null;
 
   // Just the number: the row's label already says what it is, and a longer hint does not fit in the cell.
-  const placeholder = field === "rest" ? "m:ss" : suggestion !== null && suggestion !== undefined ? String(suggestion) : "—";
+  // The suggestion as text in the person's unit (a stored pound value shows as kilograms for a kilogram client).
+  const suggestionText = suggestion === null || suggestion === undefined ? null : field === "weight" && typeof suggestion === "number" ? liftCellText(suggestion, unit) : String(suggestion);
+  const placeholder = field === "rest" ? "m:ss" : suggestionText ?? "—";
 
   // What the obstacle-unlock mechanic protects — NOT the same thing as
   // `suggestion` above, which the server deliberately nulls out the
@@ -203,12 +216,18 @@ function GridCell({
     }
     setInvalid(null);
     onTouched();
+    // A weight typed in kilograms is saved once as pounds. A cell the person only looked at keeps its stored pounds exactly (the shown kilograms are rounded, so converting them back would drift).
+    if (field === "weight" && unit === "kg" && typeof checked.value === "number") {
+      const same = typeof value === "number" && liftDisplayValue(value, unit) === checked.value;
+      commit(same ? (value as number) : liftStoredFromInput(checked.value, unit));
+      return;
+    }
     commit(checked.value);
   }
 
   const swipe = useSwipeGesture(() => {
     if (draft.trim() !== "" || suggestion == null) return;
-    setDraft(String(suggestion));
+    setDraft(suggestionText ?? String(suggestion));
     vibrateConfirm();
     onTouched();
     commit(suggestion);
@@ -242,7 +261,7 @@ function GridCell({
         type={isNumeric ? "number" : "text"}
         inputMode={isNumeric ? (field === "reps" ? "numeric" : "decimal") : undefined}
         aria-label={`${def.label} for set ${setNumber}${
-          suggestion != null && draft.trim() === "" ? `, suggested ${suggestion}` : ""
+          suggestion != null && draft.trim() === "" ? `, suggested ${suggestionText ?? suggestion}` : ""
         }${showLock ? " — locked, beat this to unlock it" : ""}`}
         placeholder={placeholder}
         value={draft}
@@ -264,7 +283,7 @@ function GridCell({
         onClick={() => {
           if (!touchTap.current || !tapAccepts || suggestion == null) return;
           touchTap.current = false;
-          setDraft(String(suggestion));
+          setDraft(suggestionText ?? String(suggestion));
           vibrateConfirm();
           onTouched();
           commit(suggestion);

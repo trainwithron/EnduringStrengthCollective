@@ -7,6 +7,7 @@
 | C | release-c-progression | ff415403 | Release CL, step 136, 0385, apply-release-cl-all.sql, fp eab4e0c37c77376e | Assistant-cleared; paste BEFORE code |
 | D | release-d-intake | (see git) | Release CM, step 137, 0386, apply-release-cm-all.sql, fp dca3959f76fe0fe7 | built, awaiting Assistant; paste BEFORE code |
 | E | release-e-minors | (see git) | Release CO, step 139, 0387, apply-release-co-all.sql, fp 89dfba2466affd00 | built, awaiting Assistant; paste BEFORE code |
+| C2 | release-c2-units | (see git) | none | built, awaiting Assistant (stacked on E) |
 | D-held | (data) | - | HELD: step 138, apply-release-cn-held-all.sql, fp 1dd698bbed81ce1d, read check-intake-flag-list.sql first | Ron's word only |
 
 Fingerprint = first 16 hex of sha256 of the LF-normalized file: tr -d '\r' < supabase/apply/<file> | sha256sum | cut -c1-16.
