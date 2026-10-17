@@ -105,7 +105,7 @@ export function TeamMembersPanel({
       setError(`Choose who takes over ${m.fullName}'s ${m.soleClients} client${m.soleClients === 1 ? "" : "s"} first.`);
       return;
     }
-    const takeover = members.find((x) => x.profileId === handTo)?.fullName;
+    const takeover = members.find((x) => x.profileId === handTo && !x.leaving)?.fullName;
     const message = needsHandOver
       ? `Remove ${m.fullName} from ${organizationName}? They lose access to every client here right away. Their ${m.soleClients} client${m.soleClients === 1 ? "" : "s"} stay${m.soleClients === 1 ? "s" : ""} with ${organizationName} and ${takeover} takes over, with all history, programs and credits. A client who keeps their records private from the organization stays with ${m.fullName}; they are then marked as leaving and choose what to do next.`
       : `Remove ${m.fullName} from ${organizationName}? They lose access to every client here right away. A client who keeps their records private from the organization stays with ${m.fullName}; they are then marked as leaving and choose what to do next.`;
@@ -185,7 +185,8 @@ export function TeamMembersPanel({
         {members.map((m) => {
           const canTouch = isOwnerOrAdmin && m.role !== "owner" && m.profileId !== me && (isOwner || m.role !== "admin") && !m.leaving;
           const isRemoving = removing === m.profileId;
-          const others = members.filter((x) => x.profileId !== m.profileId);
+          // someone who is leaving cannot take over a gym's clients
+          const others = members.filter((x) => x.profileId !== m.profileId && !x.leaving);
           return (
             <div key={m.profileId} className="p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">

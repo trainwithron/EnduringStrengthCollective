@@ -40,6 +40,39 @@ export default {
       h.check("the coach's membership is kept, marked leaving, and an admin is back to coach", mem?.departing_since != null && mem.role === "coach", JSON.stringify(mem));
       h.check("their session type is still where it was", (await db.query(`select organization_id from public.session_types where coach_id = $1`, [c1])).rows[0].organization_id === org);
 
+      // ---- a leaving coach is NOT a member for anything organization-wide (prospects' contact details, the roster, seats, tags), but still sees their own row and their own kept client
+      await h.asSuper();
+      await db.query(`insert into public.org_trainer_dispatch_requests (organization_id, prospect_name, prospect_email, prospect_timezone, requested_start_at, goal_type) values ($1, 'Pat Prospect', 'pat@example.com', 'UTC', now(), 'weight_loss')`, [org]);
+      const count = async (sql, params) => (await db.query(sql, params)).rows[0].n;
+      await h.as(c2);
+      h.check("an ordinary coach of the gym reads the prospects", (await count(`select count(*)::int as n from public.org_trainer_dispatch_requests where organization_id = $1`, [org])) === 1);
+      h.check("an ordinary coach is a member", (await count(`select public.is_org_member($1)::int as n`, [org])) === 1);
+      await h.as(c1);
+      h.check("the leaving coach reads NO prospects", (await count(`select count(*)::int as n from public.org_trainer_dispatch_requests where organization_id = $1`, [org])) === 0);
+      h.check("the leaving coach is not a member of the organization", (await count(`select public.is_org_member($1)::int as n`, [org])) === 0);
+      h.check("the leaving coach cannot read the roster, only their own row", (await count(`select count(*)::int as n from public.organization_memberships where organization_id = $1`, [org])) === 1);
+      r = await tryQ(db, `select public.org_coach_seats($1)`, [org]);
+      h.check("nor the seat count", !!r.error);
+      h.check("their own kept client is still theirs to see", (await count(`select count(*)::int as n from public.group_memberships where group_id = $1 and profile_id = $2`, [privG, kPriv])) === 1);
+      await h.as(owner);
+      h.check("the gym's seat count no longer includes the leaving coach", (await count(`select public.org_coach_seats($1)::int as n`, [org])) === 2);
+
+      // ---- nobody can hand clients to, make owner, or promote a leaving coach
+      const c5 = await h.user("LC Sole Coach");
+      const kSole = await h.user("LC Sole Client");
+      await h.orgMember(org, c5, "coach");
+      const soleG = await h.group(org, c5, "one_on_one", "LC gym-owned client");
+      await h.member(soleG, kSole);
+      await h.as(owner);
+      r = await tryQ(db, `select public.remove_org_member($1, $2, $3)`, [org, c5, c1]);
+      h.check("a leaving coach is refused as the one who takes over", /leaving/.test(r.error ?? ""), r.error);
+      r = await tryQ(db, `select public.transfer_organization_ownership($1, $2)`, [org, c1]);
+      h.check("a leaving coach cannot be made the owner", /leaving/.test(r.error ?? ""), r.error);
+      r = await tryQ(db, `select public.set_org_member_role($1, $2, 'admin')`, [org, c1]);
+      h.check("nor made an admin", /leaving/.test(r.error ?? ""), r.error);
+      r = await tryQ(db, `select public.remove_org_member($1, $2, $3) as res`, [org, c5, c2]);
+      h.check("the gym's own client still goes to a coach who is staying", !r.error);
+
       // ---- nothing happens by itself; only the server can finish it
       await h.as(c1);
       r = await tryQ(db, `select public.complete_departure($1, $2)`, [org, c1]);
@@ -47,7 +80,13 @@ export default {
       await h.as(owner);
       r = await tryQ(db, `select public.complete_departure($1, $2)`, [org, c1]);
       h.check("nor can the owner", !!r.error);
+      await h.asSuper();
+      const gymG2 = await h.group(org, c2, "one_on_one", "LC gym-owned group the leaving coach ended up alone in");
+      await db.query(`insert into public.group_memberships (group_id, profile_id, role) values ($1, $2, 'coach')`, [gymG2, c1]);
+      await db.query(`delete from public.group_memberships where group_id = $1 and profile_id = $2`, [gymG2, c2]);
       await h.asService();
+      r = await tryQ(db, `select public.complete_departure($1, $2) as res`, [org, owner]);
+      h.check("it refuses the organization's owner", !!r.error);
       r = await tryQ(db, `select public.complete_departure($1, $2) as res`, [org, c2]);
       h.check("it refuses a coach who is not leaving", /not leaving/.test(r.error ?? ""), r.error);
       r = await tryQ(db, `select public.complete_departure($1, $2) as res`, [org, c1]);
@@ -58,6 +97,13 @@ export default {
       h.check("the coach now owns an organization", newOrg?.owner_id === c1);
       h.check("their private client's space moved into it, with the coach still in it", (await db.query(`select organization_id from public.groups where id = $1`, [privG])).rows[0].organization_id === done.organization_id && (await seat(privG, c1)));
       h.check("the gym's client did NOT move", (await db.query(`select organization_id from public.groups where id = $1`, [gymG])).rows[0].organization_id === org);
+      h.check("nor did a gym group the leaving coach was alone in (only the groups they kept move)", (await db.query(`select organization_id from public.groups where id = $1`, [gymG2])).rows[0].organization_id === org);
+      h.check("a second call finds nothing to do and makes no second organization", await (async () => {
+        await h.asService();
+        const again = await tryQ(db, `select public.complete_departure($1, $2)`, [org, c1]);
+        await h.asSuper();
+        return !!again.error;
+      })());
       h.check("their session type moved with them", (await db.query(`select organization_id from public.session_types where coach_id = $1`, [c1])).rows[0].organization_id === done.organization_id);
       h.check("they are no longer in the old organization", (await db.query(`select 1 from public.organization_memberships where organization_id = $1 and profile_id = $2`, [org, c1])).rows.length === 0);
 

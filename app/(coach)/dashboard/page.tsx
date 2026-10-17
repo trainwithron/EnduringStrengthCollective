@@ -526,16 +526,15 @@ export default async function CoachHomePage() {
   // hover-peek) is deliberately not built yet — the doc's own
   // recommended order is static layout, then smart backend (both here),
   // then customization last.
+  // One section per organization they are leaving, each exporting THAT organization (from their own coached groups, which are read before the page is narrowed to the active organization).
   const departures = await loadMyDepartures(supabase, user.id);
+  const myCoachedGroups = (coachedRows ?? []).map((row) => (row as any).groups as GroupRow | null).filter((g): g is GroupRow => !!g);
+  const departuresWithExport = departures.map((d) => ({ ...d, exportGroupId: myCoachedGroups.find((g) => g.organization_id === d.organizationId)?.id ?? null }));
   const content = (
     <>
       <DashboardAutoRefresh />
       {stuckInDesktopModeOnRealPhone && <StuckDesktopModeBanner />}
-      <LeavingCoachBanner
-        departures={departures}
-        exportGroupId={allGroups.find((g) => g.organization_id === departures[0]?.organizationId)?.id ?? allGroups[0]?.id ?? null}
-        supportEmail={supportEmail()}
-      />
+      <LeavingCoachBanner departures={departuresWithExport} supportEmail={supportEmail()} />
       <CoachProfileEditor
         coachId={user.id}
         coachName={viewerProfile?.full_name ?? "Coach"}

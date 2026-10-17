@@ -63,4 +63,26 @@ describe("a leaving coach (migration 0396)", () => {
     expect(page).toContain('.not("departing_since", "is", null)');
     expect(page).toContain("leaving: leavingIds.has(m.profile_id)");
   });
+
+  it("a leaving coach is not a member for anything organization-wide, and the lists that offer people skip them", () => {
+    const sql = src("supabase/migrations/0396_leaving_coach_choice.sql");
+    expect(sql).toContain("profile_id = auth.uid() and departing_since is null");
+    expect(sql).toContain("org_memberships_select_self");
+    expect(sql).toContain("om_caller.departing_since is null");
+    // only the groups kept when they were marked leaving ever move, and the owner cannot be finished this way
+    expect(sql).toContain("g.id = any (v_kept)");
+    expect(sql).toContain("for update");
+    expect(sql).toContain("The owner of an organization cannot leave it this way.");
+    for (const f of ["lib/trainer-dispatch-gather.ts", "app/api/org/announce/route.ts", "lib/calendar-spotter-phase2-gather.ts", "lib/coach-activity.ts"]) expect(src(f), f).toContain('.is("departing_since", null)');
+    expect(src("components/org/team-members-panel.tsx")).toContain("x.profileId !== m.profileId && !x.leaving");
+    expect(src("app/(coach)/groups/[groupId]/branding/page.tsx")).toContain("m.profileId !== user.id && !m.leaving");
+    expect(src("app/(coach)/groups/[groupId]/settings/page.tsx")).toContain('.is("departing_since", null)');
+  });
+
+  it("each organization being left gets its own section, exporting that organization from the coach's own coached groups", () => {
+    const home = src("app/(coach)/dashboard/page.tsx");
+    expect(home).toContain("departuresWithExport");
+    expect(home).toContain("g.organization_id === d.organizationId");
+    expect(src("components/coach/leaving-coach-banner.tsx")).toContain("departures.map((d) => (");
+  });
 });

@@ -147,12 +147,13 @@ export default async function SettingsPage(
     if (orgIdForLeave) {
       const [{ data: orgRow }, { data: memberRow }] = await Promise.all([
         supabase.from("organizations").select("name, owner_id").eq("id", orgIdForLeave).maybeSingle(),
-        supabase.from("organization_memberships").select("id").eq("organization_id", orgIdForLeave).eq("profile_id", user.id).maybeSingle(),
+        supabase.from("organization_memberships").select("id, departing_since").eq("organization_id", orgIdForLeave).eq("profile_id", user.id).maybeSingle(),
       ]);
-      if (orgRow && memberRow && orgRow.owner_id !== user.id) {
+      // A coach who is already leaving has no "Leave" to press: their Home offers the two choices.
+      if (orgRow && memberRow && !(memberRow as { departing_since?: string | null }).departing_since && orgRow.owner_id !== user.id) {
         // Who could take over my clients, and how many clients only I coach (so Leave can ask first).
         const [{ data: others }, team] = await Promise.all([
-          supabase.from("organization_memberships").select("profile_id, profiles ( full_name )").eq("organization_id", orgIdForLeave).neq("profile_id", user.id),
+          supabase.from("organization_memberships").select("profile_id, profiles ( full_name )").eq("organization_id", orgIdForLeave).neq("profile_id", user.id).is("departing_since", null),
           loadTeamInfo(supabase, orgIdForLeave),
         ]);
         leaveInfo = {

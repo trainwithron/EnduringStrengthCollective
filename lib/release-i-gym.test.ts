@@ -17,6 +17,7 @@ function fakeDb(tables: Record<string, any[]>, rpc: Record<string, any[]> = {}) 
         select: () => q,
         in: (col: string, ids: string[]) => ((rows = rows.filter((r) => ids.includes(r[col]))), q),
         eq: (col: string, v: unknown) => ((rows = rows.filter((r) => r[col] === v)), q),
+        is: (col: string, v: unknown) => ((rows = rows.filter((r) => (r[col] ?? null) === v)), q),
         gte: (col: string, v: string) => ((rows = rows.filter((r) => r[col] >= v)), q),
         lt: (col: string, v: string) => ((rows = rows.filter((r) => r[col] < v)), q),
         lte: (col: string, v: number) => ((rows = rows.filter((r) => r[col] <= v)), q),

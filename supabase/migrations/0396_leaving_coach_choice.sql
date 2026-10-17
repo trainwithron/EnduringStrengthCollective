@@ -6,6 +6,151 @@
 --   (b) "Export everything I have": the Export my business zip.
 -- Clients the gym owns still go to the member the owner or the coach names. Re-runnable (replaces the 0391 functions).
 alter table public.organization_memberships add column if not exists departing_since timestamptz;
+-- The groups the coach kept when they were marked leaving: the only groups complete_departure may ever move.
+alter table public.organization_memberships add column if not exists departing_group_ids uuid[] not null default '{}';
+
+-- A member who is leaving is NOT a member for anything organization-wide: the roster, prospects and their contact details, tags, support requests, billing and the rest that are open to "a member of this
+-- organization" are closed to them the moment they are marked. What they keep is what belongs to them or to their own clients: their seat in the groups they kept (group membership), the rows filed under
+-- their own name (coach_in_org, which reads the membership row directly and is left as it is), and the organization's name and look (can_view_org_branding, through those groups).
+create or replace function public.is_org_member(target_org_id uuid)
+returns boolean language sql security definer stable set search_path = public as $$
+  select exists (
+    select 1 from public.organization_memberships
+    where organization_id = target_org_id and profile_id = auth.uid() and departing_since is null
+  );
+$$;
+
+-- They can always read their OWN membership row (so the app knows they are leaving), never the roster.
+drop policy if exists "org_memberships_select_self" on public.organization_memberships;
+create policy "org_memberships_select_self" on public.organization_memberships for select
+  to authenticated using (profile_id = (select auth.uid()));
+
+-- Coach seats for the organization's billing: a leaving coach is not a seat.
+create or replace function public.org_coach_seats(p_org_id uuid)
+returns int
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if auth.role() is distinct from 'service_role'
+     and not (coalesce(public.is_org_member(p_org_id), false) or coalesce(public.is_platform_admin(), false)) then
+    raise exception 'Not authorized';
+  end if;
+
+  return (
+    select count(distinct profile_id)::int
+    from public.organization_memberships
+    where organization_id = p_org_id and departing_since is null
+  );
+end;
+$$;
+
+-- The owner's push address is open to the coaches of the organization (so a coach can alert the owner); not to a coach who is leaving.
+drop policy if exists "push_subscriptions_select_org_owner" on public.push_subscriptions;
+create policy "push_subscriptions_select_org_owner" on public.push_subscriptions for select
+  to authenticated using (
+    exists (
+      select 1
+      from public.organization_memberships om_owner
+      join public.organization_memberships om_caller on om_caller.organization_id = om_owner.organization_id
+      where om_owner.profile_id = push_subscriptions.profile_id
+        and om_owner.role = 'owner'
+        and om_caller.profile_id = (select auth.uid())
+        and om_caller.departing_since is null
+    )
+  );
+
+-- A coach who is leaving cannot be made the organization's owner (they are on their way out; ownership would be left with someone who has no membership).
+create or replace function public.transfer_organization_ownership(p_organization_id uuid, p_new_owner_id uuid)
+ returns void
+ language plpgsql
+ security definer
+ set search_path to 'public'
+as $function$
+declare
+  v_current_owner uuid;
+begin
+  if auth.uid() is null then
+    raise exception 'Not authorized to transfer organization ownership';
+  end if;
+
+  select owner_id into v_current_owner from public.organizations where id = p_organization_id;
+  if v_current_owner is null then
+    raise exception 'Organization not found';
+  end if;
+
+  if v_current_owner <> auth.uid()
+     and not exists (select 1 from public.profiles where id = auth.uid() and is_platform_admin)
+  then
+    raise exception 'Only the current owner or a platform admin can transfer ownership';
+  end if;
+
+  if p_new_owner_id = v_current_owner then
+    raise exception 'That person already owns this organization';
+  end if;
+
+  if not exists (
+    select 1 from public.organization_memberships
+    where organization_id = p_organization_id and profile_id = p_new_owner_id
+  ) then
+    raise exception 'The new owner must already be a member of this organization';
+  end if;
+  if exists (
+    select 1 from public.organization_memberships
+    where organization_id = p_organization_id and profile_id = p_new_owner_id and departing_since is not null
+  ) then
+    raise exception 'That coach is leaving this organization and cannot be made its owner.';
+  end if;
+
+  update public.organizations set owner_id = p_new_owner_id where id = p_organization_id;
+  update public.organization_memberships set role = 'owner'
+    where organization_id = p_organization_id and profile_id = p_new_owner_id;
+  update public.organization_memberships set role = 'admin'
+    where organization_id = p_organization_id and profile_id = v_current_owner;
+end;
+$function$;
+
+-- Same for a role change: a coach who is leaving cannot be made an admin.
+create or replace function public.set_org_member_role(p_org uuid, p_profile uuid, p_role text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := auth.uid();
+  caller_is_owner boolean;
+  target_role public.org_member_role;
+  target_departing timestamptz;
+begin
+  if me is null then
+    raise exception 'Sign in first.';
+  end if;
+  if not public.is_org_owner_or_admin(p_org) then
+    raise exception 'Only an owner or admin can change a role.';
+  end if;
+  if p_role not in ('admin', 'coach') then
+    raise exception 'A role is admin or coach. Ownership is handed over, not assigned.';
+  end if;
+  caller_is_owner := exists (select 1 from public.organizations where id = p_org and owner_id = me);
+  select role, departing_since into target_role, target_departing from public.organization_memberships where organization_id = p_org and profile_id = p_profile;
+  if not found then
+    raise exception 'That person is not part of this organization.';
+  end if;
+  if target_role = 'owner' then
+    raise exception 'The owner''s role cannot be changed. Hand the organization over instead.';
+  end if;
+  if target_departing is not null then
+    raise exception 'That coach is leaving this organization, so their role cannot be changed.';
+  end if;
+  if not caller_is_owner then
+    raise exception 'Only the owner can make someone an admin or change an admin.';
+  end if;
+  update public.organization_memberships set role = p_role::public.org_member_role where organization_id = p_org and profile_id = p_profile;
+end;
+$$;
 
 -- Takes a coach out of an organization. For each group of the organization that they coach:
 --   - another coach is there too: they just lose their seat;
@@ -25,13 +170,14 @@ declare
   v_kept int := 0;
   v_moved_bookings int := 0;
   v_left_bookings int := 0;
+  v_kept_ids uuid[] := '{}';
   v_clients int;
   v_sole boolean;
   v_private boolean;
   n int;
 begin
-  if p_hand_to is not null and (p_hand_to = p_coach or not exists (select 1 from public.organization_memberships where organization_id = p_org and profile_id = p_hand_to)) then
-    raise exception 'Choose another member of this organization to take over.';
+  if p_hand_to is not null and (p_hand_to = p_coach or not exists (select 1 from public.organization_memberships where organization_id = p_org and profile_id = p_hand_to and departing_since is null)) then
+    raise exception 'Choose another member of this organization to take over (not someone who is leaving).';
   end if;
 
   for g in
@@ -48,6 +194,7 @@ begin
     if v_sole and (p_take or v_private) then
       -- the coach keeps this group and its clients exactly as they are, until they choose what to do
       v_kept := v_kept + 1;
+      v_kept_ids := v_kept_ids || g.group_id;
     elsif v_sole and v_clients > 0 then
       if p_hand_to is null then
         raise exception 'Choose who takes over % client% first: % has nobody else coaching.', v_clients, case when v_clients = 1 then '' else 's' end, g.name;
@@ -76,7 +223,11 @@ begin
   end loop;
 
   if v_kept > 0 then
-    update public.organization_memberships set departing_since = coalesce(departing_since, now()), role = 'coach' where organization_id = p_org and profile_id = p_coach;
+    update public.organization_memberships
+      set departing_since = coalesce(departing_since, now()),
+          role = 'coach',
+          departing_group_ids = (select coalesce(array_agg(distinct x), '{}') from unnest(departing_group_ids || v_kept_ids) as x)
+      where organization_id = p_org and profile_id = p_coach;
   else
     delete from public.organization_memberships where organization_id = p_org and profile_id = p_coach;
   end if;
@@ -132,18 +283,25 @@ declare
   prev_role text := current_setting('request.jwt.claim.role', true);
   v_new uuid;
   v_groups int := 0;
+  v_kept uuid[];
 begin
-  if not exists (select 1 from public.organization_memberships where organization_id = p_org and profile_id = p_coach and departing_since is not null) then
+  -- the membership row is locked, so a retried or simultaneous call waits and then finds the coach already gone
+  select departing_group_ids into v_kept from public.organization_memberships
+    where organization_id = p_org and profile_id = p_coach and departing_since is not null for update;
+  if not found then
     raise exception 'That coach is not leaving this organization.';
+  end if;
+  if exists (select 1 from public.organizations where id = p_org and owner_id = p_coach) then
+    raise exception 'The owner of an organization cannot leave it this way.';
   end if;
   v_new := public._solo_org_for(p_coach, p_org);
 
   perform set_config('request.jwt.claim.role', 'service_role', true);
-  -- the groups only they coach (their clients), which they kept
+  -- only the groups they kept when they were marked leaving (never a group the organization owns)
   update public.groups g set organization_id = v_new
     where g.organization_id = p_org
-      and exists (select 1 from public.group_memberships c where c.group_id = g.id and c.profile_id = p_coach and c.role = 'coach')
-      and not exists (select 1 from public.group_memberships o where o.group_id = g.id and o.role = 'coach' and o.profile_id <> p_coach);
+      and g.id = any (v_kept)
+      and exists (select 1 from public.group_memberships c where c.group_id = g.id and c.profile_id = p_coach and c.role = 'coach');
   get diagnostics v_groups = row_count;
   update public.pro_shop_links set organization_id = v_new where organization_id = p_org and coach_id = p_coach;
   update public.referral_partners set organization_id = v_new where organization_id = p_org and coach_id = p_coach;

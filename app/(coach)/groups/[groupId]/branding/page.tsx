@@ -310,7 +310,7 @@ export default async function BrandingPage(
                 <TransferOwnershipButton
                   organizationId={orgMembership.organization_id}
                   candidates={members
-                    .filter((m) => m.profileId !== user.id)
+                    .filter((m) => m.profileId !== user.id && !m.leaving)
                     .map((m) => ({ profileId: m.profileId, fullName: m.fullName }))}
                 />
               )}

@@ -88,7 +88,8 @@ export async function gatherSchedulingSpotterFlags(
     const { data: orgCoachRows } = await supabase
       .from("organization_memberships")
       .select("profile_id, profiles ( full_name )")
-      .eq("organization_id", organizationId);
+      .eq("organization_id", organizationId)
+      .is("departing_since", null);
     const coachIds = (orgCoachRows ?? []).map((r) => r.profile_id);
     if (coachIds.length >= 2) {
       const since = new Date(now.getTime() - LOOKBACK_DAYS_FOR_LOAD * 86400000).toISOString();

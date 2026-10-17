@@ -2,15 +2,24 @@ import { ExportBusinessButton } from "@/components/coach/desktop/export-business
 import type { MyDeparture } from "@/lib/leaving-coach";
 
 // Shown at the top of a leaving coach's Home. Nothing has moved: they still coach their clients as before, and they choose between starting their own account (not open yet) and taking a copy of everything.
-export function LeavingCoachBanner({ departures, exportGroupId, supportEmail }: { departures: MyDeparture[]; exportGroupId: string | null; supportEmail: string | null }) {
+export function LeavingCoachBanner({ departures, supportEmail }: { departures: (MyDeparture & { exportGroupId: string | null })[]; supportEmail: string | null }) {
   if (departures.length === 0) return null;
   return (
-    <section className="mb-6 border border-rust/50 p-4" aria-labelledby="leaving-heading">
+    <>
       {departures.map((d) => (
-        <h2 key={d.organizationId} id={departures.length === 1 ? "leaving-heading" : undefined} className="font-display font-bold text-lg uppercase">
-          You are leaving {d.organizationName}
-        </h2>
+        <DepartureSection key={d.organizationId} departure={d} supportEmail={supportEmail} />
       ))}
+    </>
+  );
+}
+
+function DepartureSection({ departure: d, supportEmail }: { departure: MyDeparture & { exportGroupId: string | null }; supportEmail: string | null }) {
+  const exportGroupId = d.exportGroupId;
+  return (
+    <section className="mb-6 border border-rust/50 p-4" aria-labelledby={`leaving-${d.organizationId}`}>
+      <h2 id={`leaving-${d.organizationId}`} className="font-display font-bold text-lg uppercase">
+        You are leaving {d.organizationName}
+      </h2>
       <p className="font-body text-sm text-chalk mt-2">
         Your clients are still with you and nothing has moved. You keep coaching them as you do today. When you are ready, choose what happens next.
       </p>

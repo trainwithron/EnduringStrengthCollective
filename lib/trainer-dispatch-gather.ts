@@ -25,7 +25,8 @@ export async function findAndRankAvailableTrainers(
   const { data: members } = await supabase
     .from("organization_memberships")
     .select("profile_id, profiles ( full_name, timezone )")
-    .eq("organization_id", organizationId);
+    .eq("organization_id", organizationId)
+    .is("departing_since", null); // a coach who is leaving is not offered the gym's new prospects
   if (!members || members.length === 0) return [];
 
   const candidates: {

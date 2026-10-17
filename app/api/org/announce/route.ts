@@ -32,7 +32,7 @@ export async function POST(request: Request) {
 
   const db = createServiceRoleClient();
   const { data: org } = await db.from("organizations").select("name").eq("id", organizationId).maybeSingle();
-  const { data: members, error: memberError } = await db.from("organization_memberships").select("profile_id").eq("organization_id", organizationId).neq("profile_id", user.id);
+  const { data: members, error: memberError } = await db.from("organization_memberships").select("profile_id").eq("organization_id", organizationId).neq("profile_id", user.id).is("departing_since", null);
   if (memberError) return NextResponse.json({ error: "Couldn't find your team. Try again." }, { status: 502 });
   const ids = ((members ?? []) as { profile_id: string }[]).map((m) => m.profile_id);
   if (ids.length === 0) return NextResponse.json({ error: "There is nobody else on the team yet." }, { status: 400 });

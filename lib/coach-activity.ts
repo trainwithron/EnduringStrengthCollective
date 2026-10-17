@@ -83,7 +83,7 @@ export async function loadCoachActivity(supabase: any, args: { orgId: string; fr
   };
 
   const [members, groups] = await Promise.all([
-    supabase.from("organization_memberships").select("profile_id, role, profiles ( full_name )").eq("organization_id", args.orgId),
+    supabase.from("organization_memberships").select("profile_id, role, profiles ( full_name )").eq("organization_id", args.orgId).is("departing_since", null),
     pageAll((from: number, to: number) => supabase.from("groups").select("id").eq("organization_id", args.orgId).order("id").range(from, to), { maxPages: 100 }),
   ]);
   if (members.error) failed = true;
