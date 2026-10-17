@@ -1,5 +1,6 @@
 import { toFriendlyAuthEmailError } from "@/lib/auth-email-error";
 import { placeholderEmailFor } from "@/lib/client-claim";
+import { clientLimitMessage, isClientLimitError } from "@/lib/free-tier-clients";
 
 export type CreateUnclaimedClientResult = { ok: true; profileId: string } | { ok: false; error: string; status: number };
 
@@ -34,6 +35,8 @@ export async function createUnclaimedClient(serviceRole: any, args: { groupId: s
   if (membershipError) {
     // Don't leave a half-made client behind (an account with a placeholder email and no group). Deleting the auth user removes its profile with it.
     await serviceRole.auth.admin.deleteUser(newUserId).catch(() => {});
+    // The free plan's client limit is a plain answer, not a failure: nothing was made, and the coach is told what to do.
+    if (isClientLimitError(membershipError.message)) return { ok: false, status: 403, error: clientLimitMessage() };
     return { ok: false, status: 502, error: `Couldn't add them to the group: ${membershipError.message}` };
   }
 
