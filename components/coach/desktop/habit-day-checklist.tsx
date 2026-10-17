@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import { Check } from "lucide-react";
 
 export interface DueHabit {
@@ -16,12 +17,12 @@ export function HabitDayChecklist({ date, habits }: { date: string; habits: DueH
   async function toggle(habitId: string, current: boolean) {
     setState((prev) => prev.map((h) => (h.id === habitId ? { ...h, completed: !current } : h)));
     const supabase = createBrowserClient();
-    await supabase
+    await saved(supabase
       .from("habit_logs")
       .upsert(
         { habit_id: habitId, log_date: date, completed_at: !current ? new Date().toISOString() : null },
         { onConflict: "habit_id,log_date" }
-      );
+      ));
   }
 
   if (state.length === 0) {

@@ -5,6 +5,7 @@ import { createCrossOrgServerClient as createServerClient } from "@/lib/supabase
 import { SessionLogger } from "@/components/logging/session-logger";
 import { resumedStartedAt } from "@/lib/resume-elapsed";
 import { asSetType } from "@/lib/set-types";
+import { LoadFailed } from "@/components/ui/load-failed";
 import { loadLiftUnit } from "@/lib/lift-unit-server";
 import { LiftUnitProvider } from "@/components/logging/lift-unit-context";
 import type { PendingGateTask } from "@/components/session/rest-timer-bar";
@@ -46,12 +47,20 @@ export default async function SessionPage(
     redirect("/login");
   }
 
-  const { data: session } = await supabase
+  const { data: session, error: sessionError } = await supabase
     .from("athlete_sessions")
     .select("id, status, athlete_id, group_id, logged_by_coach, workout_id, started_at, workouts ( title )")
     .eq("id", params.sessionId)
     .single();
 
+  // "No such row" (PGRST116) really is "not available"; any other error is a read that failed and must not look like a missing workout.
+  if (sessionError && (sessionError as { code?: string }).code !== "PGRST116") {
+    return (
+      <main className="min-h-screen bg-graphite text-chalk p-5">
+        <LoadFailed />
+      </main>
+    );
+  }
   if (!session) {
     return (
       <NoAccess>This session isn&apos;t available, or you don&apos;t have access to it.</NoAccess>
@@ -87,7 +96,7 @@ export default async function SessionPage(
   // the exercises fetch itself, instead of each paying its own sequential
   // round trip later in the file where they used to live.
   const [
-    { data: sessionExercises },
+    { data: sessionExercises, error: sessionExercisesError },
     { data: coachMembership },
     { data: groupRow },
     { data: viewerMembership },
@@ -145,6 +154,14 @@ export default async function SessionPage(
       const { data: typeRows, error: typeError } = await supabase.from("set_logs").select("id, set_type").in("id", setIds);
       if (!typeError) for (const r of (typeRows ?? []) as Array<{ id: string; set_type: string | null }>) if (r.set_type) setTypeById.set(r.id, r.set_type);
     }
+  }
+  // A workout whose exercises could not be read is not an empty workout.
+  if (sessionExercisesError) {
+    return (
+      <main className="min-h-screen bg-graphite text-chalk p-5">
+        <LoadFailed />
+      </main>
+    );
   }
   const gamificationEnabled = groupRow?.gamification_enabled ?? true;
   const viewerIsCoach = viewerMembership?.role === "coach";

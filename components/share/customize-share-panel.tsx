@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import { Check } from "lucide-react";
 
 export interface ShareCandidateLift {
@@ -37,10 +38,10 @@ export function CustomizeSharePanel({
   async function handleSave() {
     setSaving(true);
     const supabase = createBrowserClient();
-    await supabase
+    await saved(supabase
       .from("posts")
       .update({ shared_exercise_names: Array.from(selected) })
-      .eq("id", postId);
+      .eq("id", postId));
     setSaving(false);
     setOpen(false);
     router.refresh();

@@ -3,6 +3,7 @@
 import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import { localDateKey } from "@/lib/timezone";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic"];
@@ -110,17 +111,17 @@ export function ProgressPhotoJournal({ athleteId, groupId }: { athleteId: string
       prev.map((p) => (p.id === photo.id ? { ...p, sharedWithCoach: !p.sharedWithCoach } : p))
     );
     const supabase = createBrowserClient();
-    await supabase
+    await saved(supabase
       .from("progress_photos")
       .update({ shared_with_coach: !photo.sharedWithCoach })
-      .eq("id", photo.id);
+      .eq("id", photo.id));
   }
 
   async function handleDelete(photo: PhotoRow) {
     if (!await confirmDialog("Delete this photo? This can't be undone.")) return;
     setPhotos((prev) => prev.filter((p) => p.id !== photo.id));
     const supabase = createBrowserClient();
-    await supabase.from("progress_photos").delete().eq("id", photo.id);
+    await saved(supabase.from("progress_photos").delete().eq("id", photo.id));
     await supabase.storage.from("progress-photos").remove([photo.storagePath]);
   }
 

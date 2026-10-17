@@ -5,6 +5,7 @@ import { useState } from "react";
 import { existingLibraryName } from "@/lib/exercise-search";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import { ExerciseMediaPicker } from "./exercise-media-picker";
 import { AutoCategorizeButton } from "./auto-categorize-button";
 import { classifyExerciseCategory } from "@/lib/exercise-category-classifier";
@@ -138,12 +139,12 @@ export function ExerciseLibraryList({
         ...prev,
         [exerciseName]: [...(prev[exerciseName] ?? []), { tagId, role: "prime_mover" }],
       }));
-      await supabase
+      await saved(supabase
         .from("exercise_biomech_tags")
         .upsert(
           { exercise_name: exerciseName, tag_id: tagId, role: "prime_mover", created_by: coachId },
           { onConflict: "exercise_name,tag_id", ignoreDuplicates: true }
-        );
+        ));
     }
   }
 
@@ -285,7 +286,7 @@ export function ExerciseLibraryList({
       // Upsert with ignoreDuplicates rather than a plain insert, so that
       // coincidence (two coaches independently creating the same new
       // exercise name) can't surface as a write error here.
-      await supabase.from("exercise_biomech_tags").upsert(
+      await saved(supabase.from("exercise_biomech_tags").upsert(
         newTags.map((t) => ({
           exercise_name: trimmed,
           tag_id: t.tagId,
@@ -293,7 +294,7 @@ export function ExerciseLibraryList({
           created_by: coachId,
         })),
         { onConflict: "exercise_name,tag_id", ignoreDuplicates: true }
-      );
+      ));
 
       setExercises((prev) => [
         ...prev,
@@ -350,7 +351,7 @@ export function ExerciseLibraryList({
     if (!await confirmDialog("Remove this exercise from your library?")) return;
     setExercises((prev) => prev.filter((e) => e.id !== id));
     const supabase = createBrowserClient();
-    await supabase.from("exercise_library").delete().eq("id", id);
+    await saved(supabase.from("exercise_library").delete().eq("id", id));
   }
 
   const patternOptions = patternFilterOptions(

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 
 const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -90,7 +91,7 @@ export function OrgImageUpload({
     setUploading(true);
     setError(null);
     const supabase = createBrowserClient();
-    await supabase.from("organizations").update({ [column]: null }).eq("id", organizationId);
+    await saved(supabase.from("organizations").update({ [column]: null }).eq("id", organizationId));
     setUrl(null);
     setUploading(false);
   }

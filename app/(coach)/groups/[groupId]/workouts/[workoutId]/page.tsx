@@ -1,3 +1,4 @@
+import { LoadFailedPage } from "@/components/ui/load-failed-page";
 import { redirect } from "next/navigation";
 import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
@@ -56,12 +57,14 @@ export default async function WorkoutOverviewPage(
   // matching the "coach is never locked out" rule used elsewhere in this
   // app), and never once a session already exists for it (started early
   // in person, say).
-  const { data: membership } = await supabase
+  const { data: membership, error: membershipError } = await supabase
     .from("group_memberships")
     .select("role")
     .eq("group_id", params.groupId)
     .eq("profile_id", user.id)
     .maybeSingle();
+
+  if (membershipError) return <LoadFailedPage />;
 
   if (membership?.role === "athlete" && !data.existingSession) {
     // A coach-assigned override for this exact workout, on a date that's

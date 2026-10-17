@@ -4,6 +4,7 @@ import { useState } from "react";
 import { orgIdOfGroup } from "@/lib/org-of-group";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 
 export function ChallengeCreator({
   groupId,
@@ -78,9 +79,9 @@ export function ChallengeCreator({
       return;
     }
 
-    await supabase.from("challenge_habits").insert(
+    await saved(supabase.from("challenge_habits").insert(
       cleanHabits.map((title, i) => ({ challenge_id: challenge.id, title, sort_order: i }))
-    );
+    ));
 
     setSaving(false);
     setOpen(false);

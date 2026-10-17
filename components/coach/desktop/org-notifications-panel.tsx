@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { X } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 
 export interface OrgNotification {
   id: string;
@@ -32,7 +33,7 @@ export function OrgNotificationsPanel({ initialNotifications }: { initialNotific
     setDismissingId(id);
     setRows((prev) => prev.filter((n) => n.id !== id));
     const supabase = createBrowserClient();
-    await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("id", id);
+    await saved(supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("id", id));
     setDismissingId(null);
   }
 

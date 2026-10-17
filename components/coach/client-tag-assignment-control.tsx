@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 
 export interface AssignableClientTag {
   id: string;
@@ -36,11 +37,11 @@ export function ClientTagAssignmentControl({
       return next;
     });
     if (isAssigned) {
-      await supabase.from("client_tag_assignments").delete().eq("tag_id", tagId).eq("athlete_id", athleteId);
+      await saved(supabase.from("client_tag_assignments").delete().eq("tag_id", tagId).eq("athlete_id", athleteId));
     } else {
-      await supabase
+      await saved(supabase
         .from("client_tag_assignments")
-        .upsert({ tag_id: tagId, athlete_id: athleteId }, { onConflict: "tag_id,athlete_id", ignoreDuplicates: true });
+        .upsert({ tag_id: tagId, athlete_id: athleteId }, { onConflict: "tag_id,athlete_id", ignoreDuplicates: true }));
     }
   }
 

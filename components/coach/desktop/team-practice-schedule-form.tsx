@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import { Trash2 } from "lucide-react";
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -74,7 +75,7 @@ export function TeamPracticeScheduleForm({
   async function handleDelete(id: string) {
     setSchedules((prev) => prev.filter((s) => s.id !== id));
     const supabase = createBrowserClient();
-    await supabase.from("team_practice_schedules").delete().eq("id", id);
+    await saved(supabase.from("team_practice_schedules").delete().eq("id", id));
     router.refresh();
   }
 

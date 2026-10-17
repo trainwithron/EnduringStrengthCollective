@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import { Trash2 } from "lucide-react";
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -75,7 +76,7 @@ export function AvailabilityManager({
   async function handleDelete(id: string) {
     setWindows((prev) => prev.filter((w) => w.id !== id));
     const supabase = createBrowserClient();
-    await supabase.from("coach_availability_windows").delete().eq("id", id);
+    await saved(supabase.from("coach_availability_windows").delete().eq("id", id));
   }
 
   return (

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 
 export interface GameStatAthlete {
   profileId: string;
@@ -40,12 +41,12 @@ export function GameStatGrid({
     setValues((prev) => new Map(prev).set(key, value));
     setSavingKey(key);
     const supabase = createBrowserClient();
-    await supabase
+    await saved(supabase
       .from("game_stat_entries")
       .upsert(
         { game_id: gameId, athlete_id: athleteId, field_id: fieldId, value },
         { onConflict: "game_id,athlete_id,field_id" }
-      );
+      ));
     setSavingKey((k) => (k === key ? null : k));
   }
 

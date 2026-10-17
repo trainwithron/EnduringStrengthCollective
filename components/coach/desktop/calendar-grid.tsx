@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import { X } from "lucide-react";
 import type { AvailabilityWindow } from "@/lib/booking-slots";
 import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
@@ -114,7 +115,7 @@ export function CalendarGrid({
 
   async function handleDeleteEvent(id: string) {
     const supabase = createBrowserClient();
-    await supabase.from("calendar_events").delete().eq("id", id);
+    await saved(supabase.from("calendar_events").delete().eq("id", id));
     router.refresh();
   }
 

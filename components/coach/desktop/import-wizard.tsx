@@ -9,6 +9,7 @@ import { addLibraryExercise } from "@/lib/library-write";
 import * as XLSX from "xlsx";
 import * as cptable from "xlsx/dist/cpexcel.full.mjs";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 
 // xlsx's own auto-load for its optional codepage-table module only fires
 // in a plain Node `require` context, not in a bundled browser build — so
@@ -272,9 +273,9 @@ export function ImportWizard({
     setShowInjuryBanner(false);
     if (!athleteId) return;
     const supabase = createBrowserClient();
-    await supabase
+    await saved(supabase
       .from("athlete_injury_flag_acknowledgements")
-      .upsert({ coach_id: coachId, athlete_id: athleteId }, { onConflict: "coach_id,athlete_id" });
+      .upsert({ coach_id: coachId, athlete_id: athleteId }, { onConflict: "coach_id,athlete_id" }));
   }
 
   async function handleFile(file: File) {
@@ -660,7 +661,7 @@ export function ImportWizard({
       }
     }
     if (importData.isAiSourced && aiSnapshot.length > 0) {
-      await supabase.from("programs").update({ ai_snapshot: aiSnapshot }).eq("id", programRow.id);
+      await saved(supabase.from("programs").update({ ai_snapshot: aiSnapshot }).eq("id", programRow.id));
     }
 
     setSummary({

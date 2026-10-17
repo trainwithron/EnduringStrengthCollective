@@ -5,6 +5,7 @@ import { ShopCard, ShopGrid } from "@/components/shared/shop-card";
 import { safeWebUrl } from "@/lib/coach-site";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import { Trash2 } from "lucide-react";
 import { ShelfPlacementControls } from "@/components/coach/desktop/shelf-placement-controls";
 import { isAudience, type Audience } from "@/lib/shelf";
@@ -170,7 +171,7 @@ export function ProShopManager({ initialLinks, organizationId, groups = [] }: { 
 
   async function handleDelete(id: string) {
     const supabase = createBrowserClient();
-    await supabase.from("pro_shop_links").delete().eq("id", id);
+    await saved(supabase.from("pro_shop_links").delete().eq("id", id));
     setLinks((prev) => prev.filter((l) => l.id !== id));
     router.refresh();
   }

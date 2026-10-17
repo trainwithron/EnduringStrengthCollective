@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { WORKOUT_CHOICE_EVENT } from "@/lib/workout-choice";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import { localDateKey } from "@/lib/timezone";
 import { useSetSave } from "@/components/logging/set-save-context";
 import { useRouter } from "next/navigation";
@@ -119,7 +120,7 @@ export function CompleteWorkoutButton({
     }
     setWeightSubmitting(true);
     const supabase = createBrowserClient();
-    await supabase.from("body_weight_logs").upsert(
+    await saved(supabase.from("body_weight_logs").upsert(
       {
         athlete_id: weightNudge.athleteId,
         group_id: weightNudge.groupId,
@@ -127,7 +128,7 @@ export function CompleteWorkoutButton({
         weight: value,
       },
       { onConflict: "athlete_id,logged_date" }
-    );
+    ));
     setWeightSubmitting(false);
     finishNavigation(weightNudge.navHref);
   }
@@ -141,7 +142,7 @@ export function CompleteWorkoutButton({
     setSubmitting(true);
     const supabase = createBrowserClient();
     await flushSets();
-    await supabase.from("athlete_sessions").update({ status: "abandoned" }).eq("id", sessionId).eq("status", "in_progress");
+    await saved(supabase.from("athlete_sessions").update({ status: "abandoned" }).eq("id", sessionId).eq("status", "in_progress"));
     router.push(pauseHref);
   }
 
@@ -341,7 +342,7 @@ export function CompleteWorkoutButton({
     if (!rpeNudge) return;
     setRpeSubmitting(true);
     const supabase = createBrowserClient();
-    await supabase.from("athlete_sessions").update({ session_rpe: value }).eq("id", sessionId);
+    await saved(supabase.from("athlete_sessions").update({ session_rpe: value }).eq("id", sessionId));
     setRpeSubmitting(false);
     const { athleteId, groupId, navHref } = rpeNudge;
     setRpeNudge(null);

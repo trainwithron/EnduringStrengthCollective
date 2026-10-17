@@ -1,3 +1,4 @@
+import { LoadFailedPage } from "@/components/ui/load-failed-page";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { getEffectiveAthlete } from "@/lib/acting-as";
@@ -15,7 +16,10 @@ export default async function GroupCalendarPage(props: { params: Promise<{ group
     data: { user },
   } = await supabase.auth.getUser();
   if (user) {
-    const { data: membership } = await supabase.from("group_memberships").select("role").eq("group_id", params.groupId).eq("profile_id", user.id).maybeSingle();
+    const { data: membership, error: membershipError } = await supabase.from("group_memberships").select("role").eq("group_id", params.groupId).eq("profile_id", user.id).maybeSingle();
+
+    if (membershipError) return <LoadFailedPage />;
+
     if (membership?.role === "coach" && !(await getEffectiveAthlete(params.groupId, user.id)).isActingAsOther && !(await prefersAthleteStyleView())) {
       const qs = new URLSearchParams();
       for (const [k, v] of Object.entries(searchParams)) if (typeof v === "string") qs.set(k, v);

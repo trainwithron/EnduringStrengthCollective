@@ -4,6 +4,7 @@ import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { ExerciseNameInput } from "./exercise-name-input";
 
@@ -41,7 +42,7 @@ export function MovementPatternRow({
     const value = plane === next ? null : next;
     setPlaneSaving(true);
     const supabase = createBrowserClient();
-    await supabase.from("movement_patterns").update({ plane: value }).eq("id", pattern.id);
+    await saved(supabase.from("movement_patterns").update({ plane: value }).eq("id", pattern.id));
     onPlaneChange(value);
     setPlaneSaving(false);
   }
@@ -135,7 +136,7 @@ export function MovementPatternRow({
     if (!await confirmDialog(`Delete the "${pattern.name}" pattern? This can't be undone.`)) return;
     setSubmitting(true);
     const supabase = createBrowserClient();
-    await supabase.from("movement_patterns").delete().eq("id", pattern.id);
+    await saved(supabase.from("movement_patterns").delete().eq("id", pattern.id));
     router.refresh();
   }
 

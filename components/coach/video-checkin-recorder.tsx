@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import { notifyPush } from "@/lib/push-notify";
 
 // Coach video check-ins (coach_video_checkin_idea memory) — the mirror
@@ -133,7 +134,7 @@ export function VideoCheckinRecorder({
     }
 
     if (actionItems.length > 0) {
-      await supabase.from("coach_video_checkin_action_items").insert(
+      await saved(supabase.from("coach_video_checkin_action_items").insert(
         actionItems.map((body, i) => ({
           checkin_id: checkin.id,
           group_id: groupId,
@@ -141,7 +142,7 @@ export function VideoCheckinRecorder({
           body,
           sort_order: i,
         }))
-      );
+      ));
     }
 
     notifyPush(athleteId, "New video check-in", "Your coach just sent you a video check-in.", `/groups/${groupId}/video-checkins`);

@@ -1,3 +1,4 @@
+import { LoadFailedPage } from "@/components/ui/load-failed-page";
 import { fetchSessionMinutes, sessionMinutesFor } from "@/lib/availability-windows";
 import { orgGroupIdsOf } from "@/lib/coach-groups";
 import Link from "next/link";
@@ -59,12 +60,14 @@ export default async function DayDetailPage(
     );
   }
 
-  const { data: membership } = await supabase
+  const { data: membership, error: membershipError } = await supabase
     .from("group_memberships")
     .select("role")
     .eq("group_id", params.groupId)
     .eq("profile_id", user.id)
     .maybeSingle();
+
+  if (membershipError) return <LoadFailedPage />;
 
   if (!membership) {
     return (

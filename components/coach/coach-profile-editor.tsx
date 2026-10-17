@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import { initialsOf } from "@/lib/initials";
 
 // coach_identity_bio_social_link_pinning_scoping_sept19.md — the coach-
@@ -35,7 +36,7 @@ export function CoachProfileEditor({
 
   async function persist(patch: { bio?: string; photo_url?: string | null; completion_message?: string | null }) {
     const supabase = createBrowserClient();
-    await supabase.from("coach_profiles").upsert({ coach_id: coachId, ...patch, updated_at: new Date().toISOString() }, { onConflict: "coach_id" });
+    await saved(supabase.from("coach_profiles").upsert({ coach_id: coachId, ...patch, updated_at: new Date().toISOString() }, { onConflict: "coach_id" }));
   }
 
   async function handleBioBlur() {

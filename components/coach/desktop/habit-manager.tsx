@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import { Trash2 } from "lucide-react";
 import { AddHabitForm } from "./add-habit-form";
 import { habitFrequencyLabel } from "@/lib/habits";
@@ -28,7 +29,7 @@ export function HabitManager({
 
   async function handleDelete(id: string) {
     const supabase = createBrowserClient();
-    await supabase.from("client_habits").delete().eq("id", id);
+    await saved(supabase.from("client_habits").delete().eq("id", id));
     setHabits((prev) => prev.filter((h) => h.id !== id));
     router.refresh();
   }

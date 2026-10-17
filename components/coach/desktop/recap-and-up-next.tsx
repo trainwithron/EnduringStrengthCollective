@@ -4,6 +4,7 @@ import { useState } from "react";
 import { renameProgramExercise } from "@/lib/rename-program-exercise";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import type { SessionRecap } from "@/lib/session-recap-data";
 import type { WorkoutOverviewExercise } from "@/lib/workout-overview-data";
 import { RecapExerciseRow } from "./recap-exercise-row";
@@ -63,9 +64,9 @@ export function RecapAndUpNext({
     setShowTrainingMaxOnPr(next);
     setSavingTmPref(true);
     const supabase = createBrowserClient();
-    await supabase
+    await saved(supabase
       .from("coach_preferences")
-      .upsert({ coach_id: coachId, show_training_max_on_pr: next }, { onConflict: "coach_id" });
+      .upsert({ coach_id: coachId, show_training_max_on_pr: next }, { onConflict: "coach_id" }));
     setSavingTmPref(false);
   }
   const [sessionNoteOpen, setSessionNoteOpen] = useState(false);

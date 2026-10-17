@@ -48,6 +48,7 @@ import { HeaderNotificationBell } from "@/components/notifications/header-bell";
 import { WorkspaceMenu } from "@/components/coach/desktop/workspace-menu";
 import { LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/coach-groups";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { bestEffort } from "@/lib/saved";
 import { TerminologyProvider } from "@/components/coach/terminology-provider";
 import { SwappableTerm } from "@/components/coach/swappable-term";
 import { ShellRail, type RailIcon } from "@/components/coach/desktop/shell-rail";
@@ -326,10 +327,10 @@ function CoachDesktopShellFull({
         // First time this coach has ever loaded any desktop page for this
         // group — seed both to "now" so nothing pre-existing floods in as
         // "unread." A real badge only starts accumulating from here.
-        await supabase.from("coach_view_state").upsert(
+        await bestEffort(supabase.from("coach_view_state").upsert(
           { coach_id: user.id, group_id: groupId, feed_seen_at: nowIso, clients_seen_at: nowIso },
           { onConflict: "coach_id,group_id" }
-        );
+        ));
         state = { feed_seen_at: nowIso, clients_seen_at: nowIso };
       } else if (active === "feed" || active === "clients" || active === "dashboard") {
         // Visiting the group's own Dashboard (which already surfaces a
@@ -343,11 +344,11 @@ function CoachDesktopShellFull({
             : active === "clients"
             ? { clients_seen_at: nowIso }
             : { feed_seen_at: nowIso, clients_seen_at: nowIso };
-        await supabase
+        await bestEffort(supabase
           .from("coach_view_state")
           .update(patch)
           .eq("coach_id", user.id)
-          .eq("group_id", groupId);
+          .eq("group_id", groupId));
         state = { ...state, ...patch };
       }
 
@@ -437,7 +438,7 @@ function CoachDesktopShellFull({
       icon: Dumbbell,
       items: [
         { key: "programs", label: "Programs", href: ALL_PROGRAMS_HREF, icon: Dumbbell, termKey: "program", termForm: "plural" },
-        { key: "exercise-library", label: "Exercise Library", href: `/groups/${groupId}/exercise-library`, icon: Library },
+        { key: "exercise-library", label: "Exercise library", href: `/groups/${groupId}/exercise-library`, icon: Library },
         // One Nutrition area. Targets, meal plans, favorite meals and the calculator are tabs and sections inside it, not separate places in the rail.
         { key: "nutrition", label: "Nutrition", href: `/groups/${groupId}/nutrition`, icon: Salad },
       ],
@@ -448,14 +449,14 @@ function CoachDesktopShellFull({
       items: [
         { key: "business", label: "Overview", href: `/groups/${groupId}/business`, icon: TrendingUp },
         { key: "packages", label: "Packages", href: `/groups/${groupId}/business/packages`, icon: Layers },
-        { key: "resources", label: "Pro Shop and Referrals", href: `/groups/${groupId}/resources`, icon: HeartHandshake },
+        { key: "resources", label: "Pro shop and referrals", href: `/groups/${groupId}/resources`, icon: HeartHandshake },
         { key: "website", label: "My website", href: `/groups/${groupId}/business/website`, icon: Globe },
         { key: "availability", label: "Availability", href: `/groups/${groupId}/availability`, icon: CalendarClock },
-        { key: "session-types", label: "Session Types", href: `/groups/${groupId}/business/session-types`, icon: Tag },
-        { key: "booking-page", label: "Booking Page", href: `/groups/${groupId}/business/booking-page`, icon: Link2 },
+        { key: "session-types", label: "Session types", href: `/groups/${groupId}/business/session-types`, icon: Tag },
+        { key: "booking-page", label: "Booking page", href: `/groups/${groupId}/business/booking-page`, icon: Link2 },
         { key: "waiver", label: "Waiver", href: `/groups/${groupId}/business/waiver`, icon: ClipboardList },
         { key: "leads", label: "Leads", href: `/groups/${groupId}/business/leads`, icon: UserPlus },
-        { key: "session-ledger", label: "Session Ledger", href: `/groups/${groupId}/business/session-ledger`, icon: Wallet },
+        { key: "session-ledger", label: "Session ledger", href: `/groups/${groupId}/business/session-ledger`, icon: Wallet },
         { key: "branding", label: "Organization", href: `/groups/${groupId}/branding`, icon: Palette },
         { key: "zapier", label: "Zapier", href: `/groups/${groupId}/business/zapier`, icon: Zap },
         // Platform administration: only the platform admin sees these (their pages refuse everyone else on the server too).
@@ -474,20 +475,20 @@ function CoachDesktopShellFull({
       items: [
         ...(showsMembers(groupKind, coachLevel) ? [{ key: "members" as const, label: "Members", href: membersHref(groupId), icon: Users2 }] : []),
         { key: "dashboard", label: "Group dashboard", href: `/groups/${groupId}/dashboard`, icon: LayoutDashboard },
-        { key: "team-performance", label: "Team Performance", href: `/groups/${groupId}/team-performance`, icon: Activity },
+        { key: "team-performance", label: "Team performance", href: `/groups/${groupId}/team-performance`, icon: Activity },
         ...(groupKind !== null && groupKind !== "one_on_one"
-          ? [{ key: "feed" as const, label: "Team Feed", href: `/groups/${groupId}/feed`, icon: MessagesSquare, badge: feedUnread }]
+          ? [{ key: "feed" as const, label: "Team feed", href: `/groups/${groupId}/feed`, icon: MessagesSquare, badge: feedUnread }]
           : []),
         ...(teamMode
           ? [
-              { key: "team" as const, label: "Depth Chart", href: `/groups/${groupId}/team`, icon: ClipboardList },
-              { key: "team-calendar" as const, label: "Team Calendar", href: `/groups/${groupId}/team/calendar`, icon: CalendarDays },
+              { key: "team" as const, label: "Depth chart", href: `/groups/${groupId}/team`, icon: ClipboardList },
+              { key: "team-calendar" as const, label: "Team calendar", href: `/groups/${groupId}/team/calendar`, icon: CalendarDays },
             ]
           : []),
         { key: "group-calendar", label: "Group calendar", href: coachLevel ? "/group-calendar" : `/groups/${groupId}/group-calendar`, icon: CalendarDays },
-        { key: "group-sessions", label: "Group Sessions", href: `/groups/${groupId}/group-sessions`, icon: Users2 },
+        { key: "group-sessions", label: "Group sessions", href: `/groups/${groupId}/group-sessions`, icon: Users2 },
         { key: "challenges", label: "Challenges", href: `/groups/${groupId}/challenges`, icon: Flag },
-        { key: "records", label: "Hall of Fame", href: `/groups/${groupId}/records`, icon: Trophy },
+        { key: "records", label: "Hall of fame", href: `/groups/${groupId}/records`, icon: Trophy },
       ],
     },
     {
@@ -495,12 +496,12 @@ function CoachDesktopShellFull({
       icon: Settings,
       items: [
         { key: "settings", label: "Account", href: `/groups/${groupId}/settings`, icon: Settings },
-        { key: "display", label: "Display Mode", href: `/groups/${groupId}/display`, icon: MonitorPlay, newTab: true },
-        { key: "kiosk", label: "Kiosk Check-In", href: `/groups/${groupId}/kiosk/settings`, icon: UserCheck },
+        { key: "display", label: "Display mode", href: `/groups/${groupId}/display`, icon: MonitorPlay, newTab: true },
+        { key: "kiosk", label: "Kiosk check-in", href: `/groups/${groupId}/kiosk/settings`, icon: UserCheck },
         { key: "sms-settings", label: "Text messages", href: `/groups/${groupId}/business/sms-settings`, icon: MessageCircle },
         { key: "support", label: "Support", href: `/groups/${groupId}/business/support`, icon: HeartHandshake },
-        { key: "quick-tips", label: "Quick Tips", href: `/groups/${groupId}/quick-tips`, icon: Lightbulb },
-        ...(isPlatformAdmin ? [{ key: "admin-support" as const, label: "Support Inbox", href: "/admin/support", icon: HeartHandshake, badge: openSupportCount }] : []),
+        { key: "quick-tips", label: "Quick tips", href: `/groups/${groupId}/quick-tips`, icon: Lightbulb },
+        ...(isPlatformAdmin ? [{ key: "admin-support" as const, label: "Support inbox", href: "/admin/support", icon: HeartHandshake, badge: openSupportCount }] : []),
       ],
     },
   ];

@@ -50,7 +50,7 @@ export async function POST(request: Request) {
 
   // Reads one piece of text with the AI. The program is only ever read from text the coach gave: nothing is guessed.
   const readOne = async (sourceText: string, opts: { big: boolean }): Promise<ParsedImportRow[] | "not_a_list"> => {
-    const text = await callClaude({
+    const text = await callClaude({ retryOnTruncation: false,
       meta: { feature: plan.ok ? plan.feature : "program_import_text", userId: user!.id },
       system: PROGRAM_IMPORT_SYSTEM_PROMPT,
       userText: userTextForProgramText(sourceText),
@@ -80,7 +80,7 @@ export async function POST(request: Request) {
       if (read.stoppedEarly && rows.length > 0) note = partialMessage(rows);
     } else {
       // A picture or a scanned PDF is looked at as it is. It cannot be cut in half here, so a very long one gets a plain message instead of a made-up one.
-      const text = await callClaude({
+      const text = await callClaude({ retryOnTruncation: false,
         meta: { feature: plan.feature, userId: user.id },
         system: PROGRAM_IMPORT_SYSTEM_PROMPT,
         userText: plan.userText,

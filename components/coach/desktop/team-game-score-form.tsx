@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved as saveWrite } from "@/lib/saved";
 
 export function TeamGameScoreForm({
   gameId,
@@ -21,14 +22,14 @@ export function TeamGameScoreForm({
 
   async function handleBlur() {
     const supabase = createBrowserClient();
-    await supabase
+    await saveWrite(supabase
       .from("team_games")
       .update({
         our_score: ourScore === "" ? null : Number(ourScore),
         opponent_score: opponentScore === "" ? null : Number(opponentScore),
         notes: notes.trim() || null,
       })
-      .eq("id", gameId);
+      .eq("id", gameId));
     setSaved(true);
   }
 

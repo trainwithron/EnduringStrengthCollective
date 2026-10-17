@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 
 // Real relocation, not new scope: this exact insert used to live as a
 // cramped inline popup on the month-grid calendar cell
@@ -21,14 +22,14 @@ export function AddDayEventForm({ coachId, dateKey, organizationId }: { coachId:
     if (!title.trim()) return;
     setSaving(true);
     const supabase = createBrowserClient();
-    await supabase.from("calendar_events").insert({
+    await saved(supabase.from("calendar_events").insert({
       coach_id: coachId,
       organization_id: organizationId,
       title: title.trim(),
       event_date: dateKey,
       event_time: time || null,
       event_type: "custom",
-    });
+    }));
     setSaving(false);
     setTitle("");
     setTime("");

@@ -125,7 +125,7 @@ export async function POST(request: Request) {
   const reference = await loadReferenceBlock(supabase, user.id, referenceId, program.group_id as string);
 
   async function attempt(retryNote: string | null) {
-    const answer = await callClaude({
+    const answer = await callClaude({ retryOnTruncation: false,
       meta: { feature: "program_template", userId: user!.id },
       system: TEMPLATE_PICK_SYSTEM,
       userText: buildTemplatePickUserText({ slots: slotCandidates, level, text, injuryContext, youthBlock, retryNote, learnedBlock: taught, notesBlock: notes, referenceBlock: reference }),

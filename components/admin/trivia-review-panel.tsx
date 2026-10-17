@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 
 export interface TriviaQuestionRow {
   id: string;
@@ -21,7 +22,7 @@ export function TriviaReviewPanel({ initialQuestions }: { initialQuestions: Triv
 
   async function setStatus(id: string, status: "approved" | "rejected") {
     const supabase = createBrowserClient();
-    await supabase.from("trivia_questions").update({ status }).eq("id", id);
+    await saved(supabase.from("trivia_questions").update({ status }).eq("id", id));
     setQuestions((prev) => prev.filter((q) => q.id !== id));
   }
 

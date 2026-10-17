@@ -1,3 +1,4 @@
+import { safeErrorDetail } from "@/lib/safe-error";
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -125,7 +126,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ url: session.url });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
+    const message = safeErrorDetail(err);
     return NextResponse.json({ error: `Couldn't start checkout: ${message}` }, { status: 502 });
   }
 }

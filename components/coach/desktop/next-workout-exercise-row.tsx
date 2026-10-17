@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import {
   TARGET_COLUMN,
   TARGET_PROP,
@@ -100,10 +101,10 @@ export function NextWorkoutExerciseRow({
     const supabase = createBrowserClient();
     const kind = fieldDef(field).kind;
     const value = raw.trim() === "" ? null : kind === "number" ? Number(raw) : raw.trim();
-    await supabase
+    await saved(supabase
       .from("group_workout_exercise_sets")
       .update({ [TARGET_COLUMN[field]]: value })
-      .eq("id", setId);
+      .eq("id", setId));
     setSets((prev) =>
       prev.map((s) => (s.id === setId ? { ...s, [TARGET_PROP[field]]: value } : s))
     );
@@ -115,7 +116,7 @@ export function NextWorkoutExerciseRow({
     if (override === undefined && !noteTouched) return;
     if (value === (exercise.notes ?? "")) return;
     const supabase = createBrowserClient();
-    await supabase.from("group_workout_exercises").update({ notes: value }).eq("id", exercise.id);
+    await saved(supabase.from("group_workout_exercises").update({ notes: value }).eq("id", exercise.id));
   }
 
   return (

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import type { TeamPosition } from "./team-depth-chart";
 
 export interface CoachStaffRow {
@@ -30,11 +31,11 @@ export function CoachPositionScopeList({
   async function handleChange(profileId: string, positionId: string | null) {
     setCoaches((prev) => prev.map((c) => (c.profileId === profileId ? { ...c, coachPositionId: positionId } : c)));
     const supabase = createBrowserClient();
-    await supabase
+    await saved(supabase
       .from("group_memberships")
       .update({ coach_position_id: positionId })
       .eq("group_id", groupId)
-      .eq("profile_id", profileId);
+      .eq("profile_id", profileId));
   }
 
   if (positions.length === 0) return null;

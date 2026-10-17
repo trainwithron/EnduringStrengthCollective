@@ -3,6 +3,7 @@
 import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { bestEffort } from "@/lib/saved";
 import type { FoodLogEntry } from "./meal-checkoff-list";
 import { FavoriteStar } from "./favorite-star";
 import {
@@ -78,7 +79,7 @@ export function FoodLogEntries({
     const { error: itemsError } = await supabase.from("saved_meal_items").insert(items.map((i) => itemInsertRow(meal.id as string, i)));
     if (itemsError) {
       // Do not leave an empty meal behind.
-      await supabase.from("saved_meals").delete().eq("id", meal.id);
+      await bestEffort(supabase.from("saved_meals").delete().eq("id", meal.id));
       setBusy(false);
       setNotice("That didn't save. Try again.");
       return;

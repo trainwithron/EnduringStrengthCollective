@@ -4,6 +4,7 @@ import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import { Trash2, Plus } from "lucide-react";
 
 export interface TeamPosition {
@@ -94,11 +95,11 @@ export function TeamDepthChart({
       prev.map((p) => (p.profileId === profileId ? { ...p, positionId, depthOrder } : p))
     );
     const supabase = createBrowserClient();
-    await supabase
+    await saved(supabase
       .from("group_memberships")
       .update({ position_id: positionId, depth_order: depthOrder })
       .eq("group_id", groupId)
-      .eq("profile_id", profileId);
+      .eq("profile_id", profileId));
   }
 
   function nextDepthOrder(positionId: string): number {
@@ -111,11 +112,11 @@ export function TeamDepthChart({
       prev.map((p) => (p.profileId === profileId ? { ...p, depthOrder } : p))
     );
     const supabase = createBrowserClient();
-    await supabase
+    await saved(supabase
       .from("group_memberships")
       .update({ depth_order: depthOrder })
       .eq("group_id", groupId)
-      .eq("profile_id", profileId);
+      .eq("profile_id", profileId));
   }
 
   if (!enabled) {

@@ -1,3 +1,4 @@
+import { LoadFailedPage } from "@/components/ui/load-failed-page";
 import Link from "next/link";
 import { LoadFailed } from "@/components/ui/load-failed";
 import { redirectOneOnOneToAnchor } from "@/lib/coach-wide-redirect";
@@ -29,12 +30,14 @@ export default async function SessionLedgerPage(
 
   if (!user) redirect("/login");
 
-  const { data: membership } = await supabase
+  const { data: membership, error: membershipError } = await supabase
     .from("group_memberships")
     .select("role")
     .eq("group_id", params.groupId)
     .eq("profile_id", user.id)
     .maybeSingle();
+
+  if (membershipError) return <LoadFailedPage />;
 
   if (membership?.role !== "coach") {
     return (

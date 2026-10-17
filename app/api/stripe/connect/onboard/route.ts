@@ -1,3 +1,4 @@
+import { safeErrorDetail } from "@/lib/safe-error";
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -70,7 +71,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ url: accountLink.url });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Couldn't start Stripe onboarding.";
+    const message = safeErrorDetail(err, "Couldn't start Stripe onboarding.");
     return NextResponse.json({ error: message }, { status: 502 });
   }
 }

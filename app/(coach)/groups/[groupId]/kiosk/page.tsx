@@ -1,3 +1,4 @@
+import { LoadFailedPage } from "@/components/ui/load-failed-page";
 import { redirect } from "next/navigation";
 import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
@@ -28,12 +29,14 @@ export default async function KioskPage(
     redirect("/login");
   }
 
-  const { data: membership } = await supabase
+  const { data: membership, error: membershipError } = await supabase
     .from("group_memberships")
     .select("role")
     .eq("group_id", params.groupId)
     .eq("profile_id", user.id)
     .maybeSingle();
+
+  if (membershipError) return <LoadFailedPage />;
 
   if (membership?.role !== "coach") {
     return (

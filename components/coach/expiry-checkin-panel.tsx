@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import {
   DEFAULT_HEADS_UP_DAYS,
   buildCheckInDraft,
@@ -172,13 +173,13 @@ export function ExpiryCheckInPanel({ groupIds: scopeGroupIds }: { groupIds?: str
   async function notNow(athleteId: string, groupId: string, kind: "soon" | "returning", summary: string) {
     if (!coachId) return;
     const supabase = createBrowserClient();
-    await supabase.from("spotter_recommendation_feedback").insert({
+    await saved(supabase.from("spotter_recommendation_feedback").insert({
       coach_id: coachId,
       spotter_kind: "expiry",
       dismissal_key: expiryDismissalKey(athleteId, groupId, kind),
       option_summary: summary,
       action: "denied",
-    });
+    }));
     if (kind === "soon") setSoon((p) => p.filter((i) => !(i.athleteId === athleteId && i.groupId === groupId)));
     else setReturning((p) => p.filter((i) => !(i.athleteId === athleteId && i.groupId === groupId)));
   }
@@ -187,13 +188,13 @@ export function ExpiryCheckInPanel({ groupIds: scopeGroupIds }: { groupIds?: str
   async function leaveExpired(item: ReturnItem) {
     if (!coachId) return;
     const supabase = createBrowserClient();
-    await supabase.from("spotter_recommendation_feedback").insert({
+    await saved(supabase.from("spotter_recommendation_feedback").insert({
       coach_id: coachId,
       spotter_kind: "expiry",
       dismissal_key: expiryFinalKey(item.athleteId, item.groupId, item.expiredOn),
       option_summary: `${item.name} returned; ${item.reinstatable} expired sessions left expired`,
       action: "denied",
-    });
+    }));
     setReturning((p) => p.filter((i) => !(i.athleteId === item.athleteId && i.groupId === item.groupId)));
   }
 

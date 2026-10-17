@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { bestEffort } from "@/lib/saved";
 import { legalGateAppliesTo } from "@/lib/legal-status";
 import { isValidTimeZone } from "@/lib/format-in-timezone";
 import { DEVICE_TZ_COOKIE, readDeviceZoneCookie, zoneLabel } from "@/lib/display-timezone";
@@ -36,7 +37,7 @@ export function TimezoneCapture() {
       if (cancelled || !profile) return;
       checkedThisLoad = true;
       if (!profile.timezone) {
-        await supabase.from("profiles").update({ timezone: detected }).eq("id", user.id);
+        await bestEffort(supabase.from("profiles").update({ timezone: detected }).eq("id", user.id));
       }
       const saved: string | null = profile.timezone ?? detected;
 

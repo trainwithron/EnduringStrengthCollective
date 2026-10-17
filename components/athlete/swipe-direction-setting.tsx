@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 
 export type SwipeDirection = "vertical" | "horizontal";
 
@@ -26,7 +27,7 @@ export function SwipeDirectionSetting({
     setDirection(next);
     setSaving(true);
     const supabase = createBrowserClient();
-    await supabase.from("profiles").update({ exercise_swipe_direction: next }).eq("id", athleteId);
+    await saved(supabase.from("profiles").update({ exercise_swipe_direction: next }).eq("id", athleteId));
     setSaving(false);
   }
 

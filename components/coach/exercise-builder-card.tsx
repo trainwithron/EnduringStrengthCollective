@@ -5,6 +5,7 @@ import { badExerciseNameMessage, isBadExerciseName, splitPrescriptionName, PRESC
 import type { DemoRow } from "@/lib/exercise-demo";
 import { useEffect, useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import { MAX_TIME_SECONDS, formatRest, parseRestInput, parseRestSpan } from "@/lib/rest-time";
 import { cellWrite } from "@/lib/cell-write";
 import { ExerciseNameInput } from "./exercise-name-input";
@@ -640,10 +641,10 @@ export function ExerciseBuilderCard({
 
       const setIds = sets.map((s) => s.id);
       if (setIds.length > 0) {
-        await supabase
+        await saved(supabase
           .from("group_workout_exercise_sets")
           .update({ target_time_seconds: preset.workSeconds, target_rest_seconds: preset.restSeconds, target_rest_max_seconds: null })
-          .in("id", setIds);
+          .in("id", setIds));
         sets = sets.map((s) => ({ ...s, targetTimeSeconds: preset.workSeconds, targetRestSeconds: preset.restSeconds, targetRestMaxSeconds: null }));
       }
 

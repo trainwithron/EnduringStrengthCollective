@@ -162,7 +162,7 @@ export async function POST(request: Request) {
   const allowRepeat = allowsRepeats(sayings);
 
   async function attempt(retryNote: string | null, timeoutMs: number) {
-    const text = await callClaude({
+    const text = await callClaude({ retryOnTruncation: false,
       meta: { feature: "program_day", userId: user!.id },
       system: buildDaySystemPrompt({ youthBlock, hasInjury: injuryContext !== null }),
       userText: buildDayUserText({ slot: { week, day }, instruction, corrections, built, fixing: mode === "fix" ? targetBuilt : null, youthBlock, injuryContext, libraryText, mobilityNote, retryNote, learnedBlock: taught, notesBlock: notes, referenceBlock: reference }),

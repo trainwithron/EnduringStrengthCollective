@@ -1,3 +1,4 @@
+import { LoadFailedPage } from "@/components/ui/load-failed-page";
 import { loadAssignableWorkouts } from "@/lib/assignable-workouts";
 import { inOrg, orgIdOfGroup } from "@/lib/org-of-group";
 import { orgGroupIdsOf } from "@/lib/coach-groups";
@@ -38,12 +39,14 @@ export default async function ClientCalendarDayPage(
 
   if (!user) redirect("/login");
 
-  const { data: membership } = await supabase
+  const { data: membership, error: membershipError } = await supabase
     .from("group_memberships")
     .select("role")
     .eq("group_id", params.groupId)
     .eq("profile_id", user.id)
     .maybeSingle();
+
+  if (membershipError) return <LoadFailedPage />;
 
   if (membership?.role !== "coach") {
     return (

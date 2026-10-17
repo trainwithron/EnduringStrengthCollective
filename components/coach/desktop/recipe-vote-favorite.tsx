@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import { Heart, ChevronUp, ChevronDown } from "lucide-react";
 
 // Recipe Hub v1 — voting + favoriting on top of the existing recipe
@@ -53,15 +54,15 @@ export function RecipeVoteFavorite({ recipeId }: { recipeId: string }) {
     const supabase = createBrowserClient();
     const next = viewerVote === value ? 0 : value;
     if (next === 0) {
-      await supabase
+      await saved(supabase
         .from("recipe_votes")
         .delete()
         .eq("profile_id", userId)
-        .eq("recipe_id", recipeId);
+        .eq("recipe_id", recipeId));
     } else {
-      await supabase
+      await saved(supabase
         .from("recipe_votes")
-        .upsert({ profile_id: userId, recipe_id: recipeId, vote: next }, { onConflict: "profile_id,recipe_id" });
+        .upsert({ profile_id: userId, recipe_id: recipeId, vote: next }, { onConflict: "profile_id,recipe_id" }));
     }
     setNetScore((s) => s - viewerVote + next);
     setViewerVote(next);
@@ -73,9 +74,9 @@ export function RecipeVoteFavorite({ recipeId }: { recipeId: string }) {
     if (!userId) return;
     const supabase = createBrowserClient();
     if (isFavorited) {
-      await supabase.from("recipe_favorites").delete().eq("profile_id", userId).eq("recipe_id", recipeId);
+      await saved(supabase.from("recipe_favorites").delete().eq("profile_id", userId).eq("recipe_id", recipeId));
     } else {
-      await supabase.from("recipe_favorites").insert({ profile_id: userId, recipe_id: recipeId });
+      await saved(supabase.from("recipe_favorites").insert({ profile_id: userId, recipe_id: recipeId }));
     }
     setIsFavorited((v) => !v);
   }

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 
 // The plain "seen it" action from habit_spotter_and_post_workout_coach_
 // page_research_sept19.md — same shape as every other Spotter's
@@ -15,10 +16,10 @@ export function AcknowledgeSessionPatternNoteButton({ checkId }: { checkId: stri
   async function handleAcknowledge() {
     setAcknowledging(true);
     const supabase = createBrowserClient();
-    await supabase
+    await saved(supabase
       .from("session_pattern_checks")
       .update({ acknowledged_at: new Date().toISOString() })
-      .eq("id", checkId);
+      .eq("id", checkId));
     setAcknowledged(true);
     setAcknowledging(false);
     router.refresh();

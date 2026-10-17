@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import {
   INACTIVE_AFTER_DAYS,
   KEEP_ACTIVE_SNOOZE_DAYS,
@@ -156,13 +157,13 @@ export function InactiveClientsPanel({ groupIds: scopeGroupIds }: { groupIds?: s
   async function answer(i: Item, kind: "not-now" | "keep") {
     if (!coachId) return;
     const supabase = createBrowserClient();
-    await supabase.from("spotter_recommendation_feedback").insert({
+    await saved(supabase.from("spotter_recommendation_feedback").insert({
       coach_id: coachId,
       spotter_kind: "inactive",
       dismissal_key: kind === "keep" ? inactiveKeepActiveKey(i.athleteId, i.groupId) : inactiveDismissalKey(i.athleteId, i.groupId),
       option_summary: `${i.name}: ${i.reasons.join(", ")}`,
       action: "denied",
-    });
+    }));
     remove(i);
   }
 

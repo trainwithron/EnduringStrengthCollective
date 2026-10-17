@@ -1,3 +1,4 @@
+import { LoadFailedPage } from "@/components/ui/load-failed-page";
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
@@ -21,12 +22,15 @@ export default async function MessageThreadPage(
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: membership } = await supabase
+  const { data: membership, error: membershipError } = await supabase
     .from("group_memberships")
     .select("role")
     .eq("group_id", params.groupId)
     .eq("profile_id", user.id)
     .maybeSingle();
+
+  if (membershipError) return <LoadFailedPage />;
+
   const isCoach = membership?.role === "coach";
 
   const effective = await getEffectiveAthlete(params.groupId, user.id);

@@ -44,6 +44,9 @@ export interface ClaudeCallOptions {
   maxTokens?: number;
   // Give up after this many milliseconds and throw AiTimeoutError, so a long generation ends with our own message before the platform cuts the request off with a plain-text page.
   timeoutMs?: number;
+  // A call cut off at its token limit is asked once more with twice the room (up to the ceiling) before giving up, so a slightly-too-small limit is not a failure. The retry is logged as its own call. A
+  // route that already retries in its own way passes false.
+  retryOnTruncation?: boolean;
   // Who/what this call is for — drives usage logging (model + tokens per
   // call, for per-coach cost) and the burst limit (lib/ai-usage.ts).
   // Required so a new call site can't silently skip the cost log.
@@ -94,6 +97,7 @@ export async function callClaude({
   document,
   maxTokens = 4096,
   timeoutMs,
+  retryOnTruncation = true,
   meta,
 }: ClaudeCallOptions): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -190,6 +194,9 @@ export async function callClaude({
     status: data.stop_reason === "max_tokens" ? "truncated" : "ok",
   });
   if (data.stop_reason === "max_tokens") {
+    if (retryOnTruncation && maxTokens < MAX_OUTPUT_TOKENS) {
+      return callClaude({ system, userText, image, document, maxTokens: Math.min(maxTokens * 2, MAX_OUTPUT_TOKENS), timeoutMs, retryOnTruncation: false, meta });
+    }
     throw new AiTruncatedError();
   }
   const textBlock = (data.content ?? []).find((b: any) => b.type === "text");

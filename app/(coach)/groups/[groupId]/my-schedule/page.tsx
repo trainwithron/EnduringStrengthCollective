@@ -1,3 +1,4 @@
+import { LoadFailedPage } from "@/components/ui/load-failed-page";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
@@ -20,7 +21,10 @@ export default async function MySchedulePage(props: { params: Promise<{ groupId:
 
   const effective = await getEffectiveAthlete(params.groupId, user.id);
   const athleteId = effective.athleteId;
-  const { data: membership } = await supabase.from("group_memberships").select("role").eq("group_id", params.groupId).eq("profile_id", athleteId).maybeSingle();
+  const { data: membership, error: membershipError } = await supabase.from("group_memberships").select("role").eq("group_id", params.groupId).eq("profile_id", athleteId).maybeSingle();
+
+  if (membershipError) return <LoadFailedPage />;
+
   if (membership?.role !== "athlete") {
     return <NoAccess>My schedule is for clients. Coaches change a client&apos;s schedule from the client&apos;s profile.</NoAccess>;
   }

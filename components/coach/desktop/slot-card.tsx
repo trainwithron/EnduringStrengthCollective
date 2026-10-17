@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { bestEffort } from "@/lib/saved";
 import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { SET_ROW_SELECT, mapSetRow } from "@/lib/exercise-fields";
 import { slotLabel, slotPlaceholderName, type Side, type SlotSpec, type SlotTier } from "@/lib/slot-templates";
@@ -92,7 +93,7 @@ export function AddSlotForm({
       .select(SET_ROW_SELECT);
     if (setError) {
       // A slot with no sets is half-made: take it back out.
-      await supabase.from("group_workout_exercises").delete().eq("id", row.id);
+      await bestEffort(supabase.from("group_workout_exercises").delete().eq("id", row.id));
       setBusy(false);
       onError("Couldn't add that slot. Try again.");
       return;

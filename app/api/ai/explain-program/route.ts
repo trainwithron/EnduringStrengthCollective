@@ -59,7 +59,7 @@ export async function POST(request: Request) {
   try {
     const answer = await answerConcisely((strict) => {
       const settings = explainSettings(thread, strict);
-      return callClaude({
+      return callClaude({ retryOnTruncation: false,
       meta: { feature: "program_chat", userId: user.id },
       system: settings.system,
       userText:

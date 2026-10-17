@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, Share } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { bestEffort } from "@/lib/saved";
 import { isStandaloneDisplay } from "@/lib/pwa";
 import {
   computeGuideSteps,
@@ -95,7 +96,7 @@ export function FirstRunGuideCard({
     // and the device-level flag above does the job.
     try {
       const supabase = createBrowserClient();
-      await supabase.from("profiles").update({ guide_dismissed_at: new Date().toISOString() }).eq("id", profileId);
+      await bestEffort(supabase.from("profiles").update({ guide_dismissed_at: new Date().toISOString() }).eq("id", profileId));
     } catch {
       // ignore
     }

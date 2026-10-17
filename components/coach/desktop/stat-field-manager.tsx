@@ -4,6 +4,7 @@ import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import { Trash2, Plus } from "lucide-react";
 
 export interface StatFieldRow {
@@ -46,7 +47,7 @@ export function StatFieldManager({
   async function handleDelete(id: string) {
     if (!await confirmDialog("Delete this stat category? Any entered values for it are lost.")) return;
     const supabase = createBrowserClient();
-    await supabase.from("group_stat_fields").delete().eq("id", id);
+    await saved(supabase.from("group_stat_fields").delete().eq("id", id));
     setFields((prev) => prev.filter((f) => f.id !== id));
     router.refresh();
   }

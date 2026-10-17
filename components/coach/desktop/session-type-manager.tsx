@@ -4,6 +4,7 @@ import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import { Trash2, Plus } from "lucide-react";
 import { PRESET_SETS, missingPresets, type PresetSetKey } from "@/lib/session-type-presets";
 
@@ -78,7 +79,7 @@ export function SessionTypeManager({ initialTypes, teamMode = false , organizati
   async function handleDelete(id: string) {
     if (!await confirmDialog("Delete this session type? Existing logged sessions keep their history either way.")) return;
     const supabase = createBrowserClient();
-    await supabase.from("session_types").delete().eq("id", id);
+    await saved(supabase.from("session_types").delete().eq("id", id));
     setTypes((prev) => prev.filter((t) => t.id !== id));
     router.refresh();
   }

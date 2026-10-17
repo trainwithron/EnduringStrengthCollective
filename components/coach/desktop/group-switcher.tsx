@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createGroupWithCoach } from "@/lib/create-group";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import { ChevronDown, Plus, Search, Pencil } from "lucide-react";
 
 type GroupKind = "one_on_one" | "social" | "team";
@@ -140,7 +141,7 @@ export function GroupSwitcher({
 
   async function persistTag(targetGroupId: string, tag: string) {
     const supabase = createBrowserClient();
-    await supabase.from("groups").update({ focus_tag: tag.trim() || null }).eq("id", targetGroupId);
+    await saved(supabase.from("groups").update({ focus_tag: tag.trim() || null }).eq("id", targetGroupId));
     setGroups((prev) => prev.map((g) => (g.id === targetGroupId ? { ...g, focusTag: tag.trim() || null } : g)));
     setEditingTagFor(null);
   }

@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import { cleanExerciseName, exerciseNameProblem } from "@/lib/exercise-name-guard";
 import { existingLibraryName } from "@/lib/exercise-search";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import { SetSaveBanner, SetSaveProvider } from "./set-save-context";
 import type { SessionExerciseEntry, SetLogEntry } from "@/lib/types";
 import { ExerciseSwipeCarousel } from "./exercise-swipe-carousel";
@@ -194,7 +195,7 @@ export function SessionLogger({
     setDeletingId(exerciseId);
     try {
       const supabase = createBrowserClient();
-      await supabase.from("session_exercises").delete().eq("id", exerciseId);
+      await saved(supabase.from("session_exercises").delete().eq("id", exerciseId));
       setExercises((prev) => prev.filter((e) => e.id !== exerciseId));
     } finally {
       setDeletingId(null);

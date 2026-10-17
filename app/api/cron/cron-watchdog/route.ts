@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { CRON_JOBS, MONITORING_STARTED, findStaleJobs, type CronRunRow } from "@/lib/cron-jobs";
 import { alertPlatformAdmins, withCronRun } from "@/lib/cron-monitor";
+import { aiFeatureHealth, aiFeaturesToAlert, AI_ALERT_SHARE } from "@/lib/ai-health";
 
 // Runs daily. Looks at every scheduled job's last run and tells the platform admin about any that is failing or has stopped
 // running. A job that throws already alerts on its own; this catches the quiet failure, a job that is not being called at all.
@@ -25,7 +26,22 @@ async function handler(request: Request) {
     const lines = stale.map((s) => `- ${s.job}: ${s.reason.replace(/_/g, " ")}${s.hoursSinceSuccess !== null ? ` (last success ${Math.round(s.hoursSinceSuccess)}h ago)` : ""}`);
     await alertPlatformAdmins(`${stale.length} scheduled ${stale.length === 1 ? "job needs" : "jobs need"} attention`, `These scheduled jobs are failing or have stopped running:\n${lines.join("\n")}`);
   }
-  return NextResponse.json({ ok: true, checked: CRON_JOBS.length, stale });
+  // AI calls over the last 7 days: a feature whose calls end cut off or failing more than 10 percent of the time (with at least 10 calls) is reported.
+  let aiAlerts: ReturnType<typeof aiFeaturesToAlert> = [];
+  try {
+    const since = new Date(Date.now() - 7 * 86400000).toISOString();
+    const { data: usage, error: usageError } = await db.from("ai_usage_log").select("feature, status").gte("created_at", since).limit(20000);
+    if (!usageError) {
+      aiAlerts = aiFeaturesToAlert(aiFeatureHealth((usage ?? []) as { feature: string; status: string }[]));
+      if (aiAlerts.length > 0) {
+        const lines = aiAlerts.map((h) => `- ${h.feature}: ${h.notOk} of ${h.calls} calls did not finish (${Math.round(h.share * 100)} percent)`);
+        await alertPlatformAdmins(`${aiAlerts.length} AI ${aiAlerts.length === 1 ? "feature is" : "features are"} failing more than ${Math.round(AI_ALERT_SHARE * 100)} percent of the time`, `In the last 7 days:\n${lines.join("\n")}`);
+      }
+    }
+  } catch {
+    // the AI check never stops the job check
+  }
+  return NextResponse.json({ ok: true, checked: CRON_JOBS.length, stale, aiAlerts });
 }
 
 export const GET = withCronRun("cron-watchdog", handler);

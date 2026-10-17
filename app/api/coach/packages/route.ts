@@ -1,3 +1,4 @@
+import { safeErrorDetail } from "@/lib/safe-error";
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -123,7 +124,7 @@ export async function POST(request: Request) {
     // The DB row exists but Stripe setup failed — deactivate it rather
     // than leave a package with no price that could otherwise be bought.
     await serviceRole.from("coach_packages").update({ is_active: false }).eq("id", pkg.id);
-    const message = err instanceof Error ? err.message : "Unknown error";
+    const message = safeErrorDetail(err);
     return NextResponse.json({ error: `Couldn't set up billing for this package: ${message}` }, { status: 502 });
   }
 }
@@ -224,7 +225,7 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ ok: true });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
+    const message = safeErrorDetail(err);
     return NextResponse.json({ error: `Couldn't update this package: ${message}` }, { status: 502 });
   }
 }

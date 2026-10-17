@@ -1,3 +1,4 @@
+import { safeErrorDetail } from "@/lib/safe-error";
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError } from "@/lib/anthropic-client";
@@ -216,7 +217,7 @@ Favorite foods / requests: ${favoriteFoods || "none given"}${rulesText ? `\n${ru
     if (err instanceof AiNotConfiguredError) {
       return NextResponse.json({ error: err.message }, { status: 503 });
     }
-    const message = err instanceof Error ? err.message : "Unknown error";
+    const message = safeErrorDetail(err);
     return NextResponse.json({ error: `Couldn't generate a suggestion: ${message}` }, { status: 502 });
   }
 }

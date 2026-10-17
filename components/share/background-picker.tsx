@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import { Check } from "lucide-react";
 import { SCENIC_BACKGROUNDS, type ScenicBackgroundKey } from "@/lib/scenic-backgrounds";
 import { ScenicBackground } from "@/components/share/scenic-background";
@@ -26,10 +27,10 @@ export function BackgroundPicker({
   async function choose(key: ScenicBackgroundKey | null) {
     setSaving(key ?? "auto");
     const supabase = createBrowserClient();
-    await supabase
+    await saved(supabase
       .from("profiles")
       .update({ preferred_share_background: key })
-      .eq("id", athleteId);
+      .eq("id", athleteId));
     setSelected(key);
     setSaving(null);
     router.refresh();

@@ -1,3 +1,4 @@
+import { LoadFailedPage } from "@/components/ui/load-failed-page";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { NoAccess } from "@/components/shared/no-access";
@@ -15,7 +16,10 @@ export default async function AboutYouPage(props: { params: Promise<{ groupId: s
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: membership } = await supabase.from("group_memberships").select("role").eq("group_id", params.groupId).eq("profile_id", user.id).maybeSingle();
+  const { data: membership, error: membershipError } = await supabase.from("group_memberships").select("role").eq("group_id", params.groupId).eq("profile_id", user.id).maybeSingle();
+
+  if (membershipError) return <LoadFailedPage />;
+
   if (membership?.role !== "athlete") {
     return <NoAccess>This page is for clients. A coach edits these in the client&apos;s Nutrition area.</NoAccess>;
   }

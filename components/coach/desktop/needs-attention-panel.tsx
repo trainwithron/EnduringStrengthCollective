@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import { firstNameOf, snoozeUntil } from "@/lib/attention-snooze";
 
 export interface NeedsAttentionItem {
@@ -47,7 +48,7 @@ export function NeedsAttentionPanel({
     // Upsert with ignoreDuplicates — the unique index on (coach_id,
     // linked_athlete_id, trigger_key) makes this safe even if the same
     // suggestion somehow got added from two places at once.
-    await supabase.from("calendar_events").upsert(
+    await saved(supabase.from("calendar_events").upsert(
       {
         coach_id: coachId,
         title: item.title,
@@ -59,7 +60,7 @@ export function NeedsAttentionPanel({
         status: "active",
       },
       { onConflict: "coach_id,linked_athlete_id,trigger_key", ignoreDuplicates: true }
-    );
+    ));
     setBusyKey(null);
     router.refresh();
   }
@@ -95,7 +96,7 @@ export function NeedsAttentionPanel({
 
   // The item that was auto-added to the calendar goes with it when it is put off or switched off (it is added again if it is still true after).
   async function removeAutoAdded(supabase: ReturnType<typeof createBrowserClient>, athleteId: string, triggerKey: string) {
-    await supabase.from("calendar_events").delete().eq("coach_id", coachId).eq("event_type", "suggestion").eq("trigger_key", triggerKey).eq("linked_athlete_id", athleteId).eq("status", "active");
+    await saved(supabase.from("calendar_events").delete().eq("coach_id", coachId).eq("event_type", "suggestion").eq("trigger_key", triggerKey).eq("linked_athlete_id", athleteId).eq("status", "active"));
   }
 
   // "Not now": hidden for this client for a week; it comes back only if it is still true after.

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 
 type Status = "draft" | "active" | "completed";
 
@@ -27,7 +28,7 @@ export function ChallengeStatusControl({
     if (!action) return;
     setSaving(true);
     const supabase = createBrowserClient();
-    await supabase.from("challenges").update({ status: action.next }).eq("id", challengeId);
+    await saved(supabase.from("challenges").update({ status: action.next }).eq("id", challengeId));
     setSaving(false);
     router.refresh();
   }

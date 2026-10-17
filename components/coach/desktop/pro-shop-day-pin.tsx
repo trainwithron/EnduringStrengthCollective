@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import { Trash2 } from "lucide-react";
 
 export interface PinnableLink {
@@ -62,7 +63,7 @@ export function ProShopDayPin({
 
   async function handleUnpin(pinId: string) {
     const supabase = createBrowserClient();
-    await supabase.from("pro_shop_link_day_pins").delete().eq("id", pinId);
+    await saved(supabase.from("pro_shop_link_day_pins").delete().eq("id", pinId));
     setPins((prev) => prev.filter((p) => p.id !== pinId));
     router.refresh();
   }

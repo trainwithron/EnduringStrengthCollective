@@ -1,3 +1,4 @@
+import { LoadFailedPage } from "@/components/ui/load-failed-page";
 import Link from "next/link";
 import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
@@ -60,12 +61,14 @@ export default async function ProgramCalendarPage(
     redirect("/login");
   }
 
-  const { data: membership } = await supabase
+  const { data: membership, error: membershipError } = await supabase
     .from("group_memberships")
     .select("role")
     .eq("group_id", params.groupId)
     .eq("profile_id", user.id)
     .maybeSingle();
+
+  if (membershipError) return <LoadFailedPage />;
 
   if (!membership) {
     return (
@@ -96,13 +99,15 @@ export default async function ProgramCalendarPage(
   // stays athlete-only below, that part genuinely doesn't apply to them.
   const showMobileView = viewingAsAthlete || await prefersAthleteStyleView();
 
-  const { data: program } = await supabase
+  const { data: program, error: programError } = await supabase
     .from("programs")
     .select("id, name, start_date, training_days, visibility_window")
     .eq("id", params.programId)
     .eq("group_id", params.groupId)
     .single();
 
+  // "No such row" (PGRST116) is a real "not found"; any other error is a read that failed and must not look like one.
+  if (programError && (programError as { code?: string }).code !== "PGRST116") return <LoadFailedPage />;
   if (!program) {
     return (
       <NoAccess>This program isn&apos;t available, or you don&apos;t have access to it.</NoAccess>

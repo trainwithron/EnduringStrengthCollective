@@ -1,3 +1,4 @@
+import { safeErrorDetail } from "@/lib/safe-error";
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError, AiTruncatedError, AiTimeoutError } from "@/lib/anthropic-client";
@@ -554,7 +555,7 @@ export async function POST(request: Request) {
         { status: 502 }
       );
     }
-    const message = err instanceof Error ? err.message : "Unknown error";
+    const message = safeErrorDetail(err);
     return NextResponse.json({ error: `Couldn't generate a program: ${message}` }, { status: 502 });
   }
 }

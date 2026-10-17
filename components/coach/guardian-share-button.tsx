@@ -4,6 +4,7 @@ import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import { appOriginBrowser } from "@/lib/app-url";
 
 // calorie_tracking_ux_research_and_plan.md — hard-gated on
@@ -69,11 +70,11 @@ export function GuardianShareButton({
     if (!await confirmDialog("Revoke this parent link? The page will stop working immediately.")) return;
     setBusy(true);
     const supabase = createBrowserClient();
-    await supabase
+    await saved(supabase
       .from("guardian_links")
       .update({ revoked_at: new Date().toISOString() })
       .eq("athlete_id", athleteId)
-      .eq("access_token", token);
+      .eq("access_token", token));
     setToken(null);
     setExpiresAt(null);
     setBusy(false);

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import { localDateKey } from "@/lib/date-key";
 import { ACTIVITY_LABELS, ACTIVITY_LEVELS, type ActivityKey } from "@/lib/client-body-profile";
 import { ONBOARDING_GOALS, type GoalType } from "@/lib/goal-to-nutrition-phase";
@@ -102,7 +103,7 @@ export function AboutYouForm({ athleteId, groupId, initial }: { athleteId: strin
     }
     if (goal && !initial.hasGoal) {
       // The same row the My Goal page makes: the client proposes, the coach confirms.
-      await supabase.from("client_goals").insert({ athlete_id: athleteId, group_id: groupId, goal_type: goal, created_by: athleteId });
+      await saved(supabase.from("client_goals").insert({ athlete_id: athleteId, group_id: groupId, goal_type: goal, created_by: athleteId }));
     }
     setBusy(false);
     router.push(`/groups/${groupId}`);

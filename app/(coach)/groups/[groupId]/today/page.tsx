@@ -1,3 +1,4 @@
+import { LoadFailedPage } from "@/components/ui/load-failed-page";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { getTodaysSessions, workoutResultFromSessions } from "@/lib/todays-workout";
@@ -23,12 +24,15 @@ export default async function TodayPage(
     redirect("/login");
   }
 
-  const { data: membership } = await supabase
+  const { data: membership, error: membershipError } = await supabase
     .from("group_memberships")
     .select("role")
     .eq("group_id", params.groupId)
     .eq("profile_id", user.id)
     .maybeSingle();
+
+  if (membershipError) return <LoadFailedPage />;
+
   const isCoach = membership?.role === "coach";
 
   const effective = await getEffectiveAthlete(params.groupId, user.id);

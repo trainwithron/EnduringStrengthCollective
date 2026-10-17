@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 
 export interface ChallengeHabitRow {
   id: string;
@@ -48,10 +49,10 @@ export function ChallengeParticipantPanel({
       setJoining(false);
       return;
     }
-    await supabase.from("challenge_participants").insert({
+    await saved(supabase.from("challenge_participants").insert({
       challenge_id: challengeId,
       profile_id: user.id,
-    });
+    }));
     setJoining(false);
     router.refresh();
   }

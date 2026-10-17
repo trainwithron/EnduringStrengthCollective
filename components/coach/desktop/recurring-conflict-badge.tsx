@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import { AlertTriangle } from "lucide-react";
 
 // acuity_replacement_gap_audit_sept16.md — recurring bookings, Q4's
@@ -19,7 +20,7 @@ export function RecurringConflictBadge({ bookingId }: { bookingId: string }) {
   async function resolve(cancel: boolean) {
     setBusy(true);
     const supabase = createBrowserClient();
-    await supabase.rpc("resolve_recurring_booking_conflict", { p_booking_id: bookingId, p_cancel: cancel });
+    await saved(supabase.rpc("resolve_recurring_booking_conflict", { p_booking_id: bookingId, p_cancel: cancel }));
     setBusy(false);
     router.refresh();
   }

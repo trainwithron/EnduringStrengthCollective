@@ -5,6 +5,15 @@
 - ASSUMED: an installed app in a window 1024px wide or more with a mouse opens the desktop experience (a phone or touch tablet keeps phone mode; the existing view toggle still overrides).
 - Needs Ron: name an iPhone tester (offline and wake-lock behaviour differ on iOS).
 
+## Release F (silent failures, wording; no paste)
+- Done: every write the screens used to ignore (93) now looks at its result: a failed save says so in one shared bar, or (for 8 deliberately quiet ones: remembering a dismissed hint, the time zone, cleanup of a half-made row after the real error was shown) is checked and stays quiet. The list that could only shrink is empty; a test stops new ones.
+- Done: about 60 server pages now tell "couldn't read" from "no access / nothing here" for the member check, and the workout page does too for the workout and its exercises. Not done: the OTHER reads on those pages (lists, counts) still treat a failed read as empty; that is a page-by-page job (95 pages), listed as the next sweep.
+- Done: cut-off AI calls (truncated) are retried once with twice the room before failing, and a nightly check reports a feature whose calls fail more than 10 percent over 7 days (at least 10 calls). Credits were already taken only after a usable answer (tested).
+- Done: server errors from Stripe, the AI provider and the database no longer reach the screen as raw text on 13 customer-facing routes; our own plain errors still do.
+- ASSUMED (Ron's standing sentence-case rule): the coach navigation labels listed in NEW_STRINGS are now sentence case.
+- NOT DONE: the word-swap (your own terms) across busy screens, empty-state wording, and sentence case in the rest of the app (buttons, headings): too many strings to change without you reading them; say which screens first.
+- Deploy note: no database change; safe to ship any time.
+
 ## Release C3 (progression safety rules, no paste) - the report's RECOMMENDED defaults, all ASSUMED, each a constant in lib/progression-guards.ts
 - Break: 21-34 days since the exercise was last done = start at 95 percent; 35-55 days = 90 percent; 56+ days = no number, "check with your coach" (nothing is applied automatically). (The research report said 14 and 28; raised on review so an exercise a program schedules every other week is not cut every time. A gap close to that exercise's own usual gap, from its last two logged times, is never a break either.)
 - Miss ladder (double progression only): hold the weight after the 1st and 2nd consecutive miss at one weight; the 3rd miss makes the next goal 90 percent (rounded down). A miss = any set at the heaviest weight under the bottom of the rep range. Only that exercise moves. A scheduled session that was not done is never a miss.

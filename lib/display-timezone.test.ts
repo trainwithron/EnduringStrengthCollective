@@ -96,7 +96,7 @@ describe("the device zone is display only", () => {
   it("never overwrites a saved zone: the only write is the first fill when none is saved", () => {
     const src = read("components/timezone-capture.tsx");
     expect(src.match(/update\(\{ timezone/g)?.length).toBe(1);
-    expect(src).toContain("if (!profile.timezone) {\n        await supabase.from(\"profiles\").update({ timezone: detected })");
+    expect(src).toContain("if (!profile.timezone) {\n        await bestEffort(supabase.from(\"profiles\").update({ timezone: detected })");
     expect(src).toContain("document.cookie = `${DEVICE_TZ_COOKIE}=");
   });
   it("the note appears only for a coach whose device zone differs, and can be dismissed", () => {

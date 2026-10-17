@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import type { SessionExerciseEntry, SetLogEntry } from "@/lib/types";
 import { TRACKED_FIELD_DEFS, ACTUAL_COLUMN, ACTUAL_PROP, fieldDef, type TrackedField } from "@/lib/exercise-fields";
 import { UnclearPointsNote } from "@/components/logging/unclear-points-note";
@@ -240,7 +241,7 @@ export function ExerciseCard({
     try {
       const nextFields = [...exercise.trackedFields, field];
       const supabase = createBrowserClient();
-      await supabase.from("session_exercises").update({ tracked_fields: nextFields }).eq("id", exercise.id);
+      await saved(supabase.from("session_exercises").update({ tracked_fields: nextFields }).eq("id", exercise.id));
       onTrackedFieldsChange(nextFields);
       setFieldsOpen(false);
     } finally {
@@ -266,13 +267,13 @@ export function ExerciseCard({
     try {
       const nextFields = exercise.trackedFields.filter((f) => f !== field);
       const supabase = createBrowserClient();
-      await supabase.from("session_exercises").update({ tracked_fields: nextFields }).eq("id", exercise.id);
+      await saved(supabase.from("session_exercises").update({ tracked_fields: nextFields }).eq("id", exercise.id));
       const setIds = exercise.sets.map((s) => s.id);
       if (setIds.length > 0) {
-        await supabase
+        await saved(supabase
           .from("set_logs")
           .update({ [ACTUAL_COLUMN[field]]: null })
-          .in("id", setIds);
+          .in("id", setIds));
       }
       onTrackedFieldsChange(nextFields);
       for (const set of exercise.sets) {

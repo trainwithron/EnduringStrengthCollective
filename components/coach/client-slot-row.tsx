@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 
 export function ClientSlotRow({
   groupWorkoutExerciseId,
@@ -42,7 +43,7 @@ export function ClientSlotRow({
       return;
     }
 
-    await supabase.from("athlete_exercise_overrides").upsert(
+    await saved(supabase.from("athlete_exercise_overrides").upsert(
       {
         group_workout_exercise_id: groupWorkoutExerciseId,
         athlete_id: athleteId,
@@ -51,7 +52,7 @@ export function ClientSlotRow({
         created_by: userData.user.id,
       },
       { onConflict: "group_workout_exercise_id,athlete_id" }
-    );
+    ));
 
     setBusy(false);
     router.refresh();
@@ -60,11 +61,11 @@ export function ClientSlotRow({
   async function handleReset() {
     setBusy(true);
     const supabase = createBrowserClient();
-    await supabase
+    await saved(supabase
       .from("athlete_exercise_overrides")
       .delete()
       .eq("group_workout_exercise_id", groupWorkoutExerciseId)
-      .eq("athlete_id", athleteId);
+      .eq("athlete_id", athleteId));
     setBusy(false);
     router.refresh();
   }

@@ -4,6 +4,12 @@
 - Workout screen, when a set could not upload yet: "{n} change hasn't uploaded yet." / "{n} changes haven't uploaded yet." then "Saved on this phone. It uploads when you're back online." (replaces "haven't saved yet / Your numbers are still here, we'll keep trying.")
 - Offline page (shown with no signal for a page that was never opened): "You're offline" / "Sets you already logged on this phone are safe and upload when you're back online. A workout you opened earlier still opens from Home." / button "Try again".
 
+## Release F (silent failures, wording)
+- A bar at the bottom of any screen when a save did not go through: "That didn't save. Try again." with "Dismiss". (Shown for the 85 saves that used to fail silently: calendar events, habits, recipes, tags, notes, rest and sets edits, and so on.)
+- A whole page in place of one whose data could not be read: "Couldn't load this. Try again." with "Try again" (about 60 coach pages, and the workout page, which used to say "This session isn't available" or show an empty workout).
+- Failures from the server no longer show technical text: "Couldn't start checkout: Try again in a moment." (was the provider's own message).
+- Menu labels in sentence case: Team feed, Session ledger, Quick tips, Display mode, Kiosk check-in, Exercise library, Pro shop and referrals, Support inbox, Depth chart, Booking page, Session types, Team performance, Team calendar, Group sessions, Hall of fame.
+
 ## Release C3 (progression safety rules)
 - Goal sentences: "It has been {n} days since you last did this, so start back lighter: {w} ({95|90} percent of {prev})." / "It has been {n} weeks since you last did this. Check with your coach before you load it." / "You missed the reps at {w} last time. Stay at {w} and try again." / "You missed the reps at {w} {n} times in a row, so drop to {w2} and build back up." / "...Held to a 5 lb step up for your age: {w}."
 

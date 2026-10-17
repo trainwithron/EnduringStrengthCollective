@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import { GOAL_TYPE_LABELS } from "@/lib/goal-types";
 import type { GoalType } from "@/lib/goal-reversal";
 
@@ -27,14 +28,14 @@ export function GoalConfirmationControl({ goal }: { goal: PendingGoal }) {
     setBusy(true);
     const supabase = createBrowserClient();
     const { data: userData } = await supabase.auth.getUser();
-    await supabase
+    await saved(supabase
       .from("client_goals")
       .update({
         status,
         confirmed_at: new Date().toISOString(),
         confirmed_by: userData.user?.id,
       })
-      .eq("id", goal.id);
+      .eq("id", goal.id));
     setBusy(false);
     setResolved(status);
     router.refresh();

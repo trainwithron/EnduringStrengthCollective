@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 
 // Strength Meet Week Taper — a coach's own movement-pattern taxonomy
 // isn't something the client who proposed the goal would know, so this
@@ -26,10 +27,10 @@ export function MainLiftPicker({
     setValue(next);
     setSaving(true);
     const supabase = createBrowserClient();
-    await supabase
+    await saved(supabase
       .from("client_goals")
       .update({ main_lift_movement_pattern_id: next || null })
-      .eq("id", goalId);
+      .eq("id", goalId));
     setSaving(false);
   }
 

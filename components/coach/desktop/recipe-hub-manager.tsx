@@ -4,6 +4,7 @@ import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import { ChevronDown, ChevronUp, Trash2, Plus } from "lucide-react";
 import type { IngredientRole } from "@/lib/recipe-scaling";
 import { UsdaFoodPicker } from "./usda-food-picker";
@@ -174,7 +175,7 @@ export function RecipeHubManager({
   async function handleDeleteRecipe(id: string, name: string) {
     if (!await confirmDialog(`Delete "${name}"? This can't be undone.`)) return;
     const supabase = createBrowserClient();
-    await supabase.from("recipes").delete().eq("id", id);
+    await saved(supabase.from("recipes").delete().eq("id", id));
     setRecipes((prev) => prev.filter((r) => r.id !== id));
     router.refresh();
   }
@@ -271,13 +272,13 @@ function RecipeCard({
     setNameDraft(trimmed);
     if (trimmed === recipe.name) return;
     const supabase = createBrowserClient();
-    await supabase.from("recipes").update({ name: trimmed }).eq("id", recipe.id);
+    await saved(supabase.from("recipes").update({ name: trimmed }).eq("id", recipe.id));
     onUpdated({ name: trimmed });
   }
 
   async function persistSlot(slot: RecipeRow["slot"]) {
     const supabase = createBrowserClient();
-    await supabase.from("recipes").update({ slot }).eq("id", recipe.id);
+    await saved(supabase.from("recipes").update({ slot }).eq("id", recipe.id));
     onUpdated({ slot });
   }
 
@@ -287,7 +288,7 @@ function RecipeCard({
       : [...recipe.archetypes, archetype];
     if (next.length === 0) return; // must keep at least one — otherwise it can never match a plan
     const supabase = createBrowserClient();
-    await supabase.from("recipes").update({ archetypes: next }).eq("id", recipe.id);
+    await saved(supabase.from("recipes").update({ archetypes: next }).eq("id", recipe.id));
     onUpdated({ archetypes: next });
   }
 
@@ -297,7 +298,7 @@ function RecipeCard({
       .map((k) => k.trim().toLowerCase())
       .filter(Boolean);
     const supabase = createBrowserClient();
-    await supabase.from("recipes").update({ keywords: next }).eq("id", recipe.id);
+    await saved(supabase.from("recipes").update({ keywords: next }).eq("id", recipe.id));
     onUpdated({ keywords: next });
   }
 
@@ -356,7 +357,7 @@ function RecipeCard({
 
   async function handleDeleteIngredient(id: string) {
     const supabase = createBrowserClient();
-    await supabase.from("recipe_ingredients").delete().eq("id", id);
+    await saved(supabase.from("recipe_ingredients").delete().eq("id", id));
     onUpdated({ ingredients: recipe.ingredients.filter((i) => i.id !== id) });
   }
 
@@ -507,7 +508,7 @@ function IngredientEditor({
 
   async function persist(patch: Record<string, unknown>, localPatch: Partial<RecipeIngredientRow>) {
     const supabase = createBrowserClient();
-    await supabase.from("recipe_ingredients").update(patch).eq("id", ingredient.id);
+    await saved(supabase.from("recipe_ingredients").update(patch).eq("id", ingredient.id));
     onUpdated(localPatch);
   }
 

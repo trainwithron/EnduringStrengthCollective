@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import type { TrackedField } from "@/lib/exercise-fields";
 
 // equipment_qr_decal_scoping_sept19.md — the "logged-in existing client"
@@ -66,14 +67,14 @@ export function QrQuickLogStart({
       .single();
 
     if (insertedExercise) {
-      await supabase.from("set_logs").insert(
+      await saved(supabase.from("set_logs").insert(
         [0, 1, 2].map((setOrder) => ({
           session_exercise_id: insertedExercise.id,
           set_order: setOrder,
           weight: null,
           reps: null,
         }))
-      );
+      ));
     }
 
     router.push(`/sessions/${session.id}`);

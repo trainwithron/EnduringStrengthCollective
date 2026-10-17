@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import type { MilestonePhaseTag } from "@/lib/nutrition-trend-classifier";
 
 const PHASE_LABELS: Record<MilestonePhaseTag, string> = {
@@ -38,16 +39,16 @@ export function NutritionPhaseControl({
     setSaving(true);
     const supabase = createBrowserClient();
     if (!value) {
-      await supabase
+      await saved(supabase
         .from("nutrition_phases")
         .delete()
         .eq("athlete_id", athleteId)
-        .eq("group_id", groupId);
+        .eq("group_id", groupId));
       setPhase(null);
       setStartedAt(null);
     } else {
       const today = new Date().toISOString().slice(0, 10);
-      await supabase.from("nutrition_phases").upsert(
+      await saved(supabase.from("nutrition_phases").upsert(
         {
           athlete_id: athleteId,
           group_id: groupId,
@@ -56,7 +57,7 @@ export function NutritionPhaseControl({
           created_by: coachId,
         },
         { onConflict: "athlete_id,group_id" }
-      );
+      ));
       setPhase(value as MilestonePhaseTag);
       setStartedAt(today);
     }

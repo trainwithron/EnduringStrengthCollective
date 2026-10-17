@@ -1,3 +1,4 @@
+import { safeErrorDetail } from "@/lib/safe-error";
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { parseOpenFoodFactsResponse, type OpenFoodFactsProduct } from "@/lib/open-food-facts";
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
     }
     return NextResponse.json(result);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
+    const message = safeErrorDetail(err);
     return NextResponse.json({ error: `Couldn't look that up: ${message}` }, { status: 502 });
   }
 }

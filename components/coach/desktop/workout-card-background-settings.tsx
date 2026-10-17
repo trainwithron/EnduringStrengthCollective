@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 
 const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/webp"];
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -33,10 +34,10 @@ export function WorkoutCardBackgroundSettings({
   async function persistMode(next: "default_rotation" | "custom") {
     setMode(next);
     const supabase = createBrowserClient();
-    await supabase
+    await saved(supabase
       .from("organizations")
       .update({ workout_card_background_mode: next })
-      .eq("id", organizationId);
+      .eq("id", organizationId));
   }
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {

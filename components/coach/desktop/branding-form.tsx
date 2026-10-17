@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved as saveWrite } from "@/lib/saved";
 import {
   BUTTON_SHAPE_RADIUS,
   BUTTON_SHAPE_LABELS,
@@ -128,7 +129,7 @@ export function BrandingForm({
     setSaving(true);
     setSaved(false);
     const supabase = createBrowserClient();
-    await supabase.from("organizations").update(patch).eq("id", organizationId);
+    await saveWrite(supabase.from("organizations").update(patch).eq("id", organizationId));
     setSaving(false);
     setSaved(true);
   }

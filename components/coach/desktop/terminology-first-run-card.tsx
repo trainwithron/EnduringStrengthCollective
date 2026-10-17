@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { TerminologyChooser } from "@/components/coach/desktop/terminology-chooser";
 import { useTerminology } from "@/components/coach/terminology-provider";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { bestEffort } from "@/lib/saved";
 
 const DISMISSED_KEY = "terminology-first-run-dismissed";
 
@@ -22,7 +23,7 @@ export async function markTerminologyAsked(): Promise<void> {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return;
-    await supabase.from("profiles").update({ terminology_asked_at: new Date().toISOString() }).eq("id", user.id);
+    await bestEffort(supabase.from("profiles").update({ terminology_asked_at: new Date().toISOString() }).eq("id", user.id));
   } catch {
     // The browser's memory still holds it on this device; the next answer tries the server again.
   }

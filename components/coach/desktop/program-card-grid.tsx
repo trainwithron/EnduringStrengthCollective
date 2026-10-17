@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { LayoutGrid, ImagePlus } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import { ProgramActiveToggle } from "@/components/coach/program-active-toggle";
 import { CardSizeToggle } from "@/components/coach/desktop/card-size-toggle";
 import { ProgramCardMenu } from "@/components/coach/desktop/program-card-menu";
@@ -147,7 +148,7 @@ function ProgramCard({
 
     if (!uploadError) {
       const oldPath = coverPath;
-      await supabase.from("programs").update({ cover_image_path: path }).eq("id", program.id);
+      await saved(supabase.from("programs").update({ cover_image_path: path }).eq("id", program.id));
       if (oldPath && oldPath !== path) {
         await supabase.storage.from("program-covers").remove([oldPath]);
       }

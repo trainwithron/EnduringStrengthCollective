@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 
 // Locked design #2 (coach_onboarding_history_ingestion_scoping_sept19.md):
 // a coach can grant a client a one-time link into the same uploader UI,
@@ -29,11 +30,11 @@ export function HistoryImportAccessToggle({
     const next = !enabled;
     setEnabled(next);
     const supabase = createBrowserClient();
-    await supabase
+    await saved(supabase
       .from("group_memberships")
       .update({ history_import_enabled: next })
       .eq("group_id", groupId)
-      .eq("profile_id", athleteId);
+      .eq("profile_id", athleteId));
     setSaving(false);
   }
 

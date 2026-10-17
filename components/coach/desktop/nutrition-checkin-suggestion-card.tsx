@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import { clampApplyFrom } from "@/lib/apply-from";
 import { applyStandingTarget, insertCheckinOnce, pushMessageForApply, type ApplyPlan } from "@/lib/apply-standing";
 import { notifyPush } from "@/lib/push-notify";
@@ -141,7 +142,7 @@ export function NutritionCheckinSuggestionCard({
       const ensured = await ensurePhasePlan(supabase, { athleteId, groupId, coachId: user.id, phase: suggestion.phase as NutritionPhase, todayKey });
       if (!ensured.ok) setPhaseNote("The target is applied, but the phase could not be saved. Set it under Phase.");
     }
-    await supabase.from("nutrition_checkin_suggestions").update({ status: "applied" }).eq("id", suggestion.id);
+    await saved(supabase.from("nutrition_checkin_suggestions").update({ status: "applied" }).eq("id", suggestion.id));
     notifyPush(
       athleteId,
       "New macro targets",
@@ -155,7 +156,7 @@ export function NutritionCheckinSuggestionCard({
   async function handleDismiss() {
     setBusy(true);
     const supabase = createBrowserClient();
-    await supabase.from("nutrition_checkin_suggestions").update({ status: "dismissed" }).eq("id", suggestion.id);
+    await saved(supabase.from("nutrition_checkin_suggestions").update({ status: "dismissed" }).eq("id", suggestion.id));
     setBusy(false);
     onResolved();
   }

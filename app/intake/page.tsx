@@ -1,3 +1,4 @@
+import { LoadFailedPage } from "@/components/ui/load-failed-page";
 import { redirect } from "next/navigation";
 import { safePushPath } from "@/lib/push-url";
 import { createServerClient } from "@/lib/supabase/server";
@@ -15,13 +16,15 @@ export default async function IntakePage(
 
   if (!user) redirect("/login");
 
-  const { data: membership } = await supabase
+  const { data: membership, error: membershipError } = await supabase
     .from("group_memberships")
     .select("group_id")
     .eq("profile_id", user.id)
     .eq("role", "athlete")
     .limit(1)
     .maybeSingle();
+
+  if (membershipError) return <LoadFailedPage />;
 
   if (!membership) {
     // Nothing to gate — a coach or an account with no athlete membership

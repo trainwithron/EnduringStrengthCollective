@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import { Trash2 } from "lucide-react";
 
 export interface ReferralPartner {
@@ -88,7 +89,7 @@ export function ReferralDirectoryManager({ initialPartners, organizationId }: { 
 
   async function handleDelete(id: string) {
     const supabase = createBrowserClient();
-    await supabase.from("referral_partners").delete().eq("id", id);
+    await saved(supabase.from("referral_partners").delete().eq("id", id));
     setPartners((prev) => prev.filter((p) => p.id !== id));
     router.refresh();
   }

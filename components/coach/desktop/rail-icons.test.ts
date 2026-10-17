@@ -26,7 +26,7 @@ describe("the three look-alike rail icons are now different", () => {
 
 describe("Exercise Library does not look like Programs", () => {
   it("is a library icon, so the dumbbell is only Programs inside the Coaching panel", () => {
-    expect(nav).toContain('label: "Exercise Library", href: `/groups/${groupId}/exercise-library`, icon: Library }');
+    expect(nav).toContain('label: "Exercise library", href: `/groups/${groupId}/exercise-library`, icon: Library }');
     expect(nav.match(/icon: Dumbbell/g)?.length).toBe(2); // the Coaching rail icon and its Programs tab
   });
 });

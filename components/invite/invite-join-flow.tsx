@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saved } from "@/lib/saved";
 import { LegalAcceptance } from "@/components/legal/legal-acceptance";
 import { LegalLinks } from "@/components/legal/legal-links";
 import { flushLegalConsent, rememberLegalConsent } from "@/lib/legal-client";
@@ -50,7 +51,7 @@ async function ensureProfile(
 
   if (!profile) {
     const name = metadataName || readPendingName(code, email) || email?.split("@")[0] || "New member";
-    await supabase.from("profiles").insert({ id: userId, full_name: name, intake_required: true });
+    await saved(supabase.from("profiles").insert({ id: userId, full_name: name, intake_required: true }));
     window.localStorage.removeItem(`invite_pending_signup_${code}`);
   }
 }
@@ -225,9 +226,9 @@ export function InviteJoinFlow({
       }
 
       if (data.session && data.user) {
-        await supabase
+        await saved(supabase
           .from("profiles")
-          .insert({ id: data.user.id, full_name: trimmedName, intake_required: true });
+          .insert({ id: data.user.id, full_name: trimmedName, intake_required: true }));
         window.localStorage.removeItem(`invite_pending_signup_${code}`);
         await flushLegalConsent();
         setAuthedEmail(data.user.email ?? null);

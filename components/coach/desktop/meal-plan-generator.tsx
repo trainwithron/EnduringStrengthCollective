@@ -5,6 +5,7 @@ import { IngredientLine } from "@/components/shared/ingredient-line";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { bestEffort } from "@/lib/saved";
 import {
   computeCarbCyclingTargets,
   matchFlexTreat,
@@ -693,7 +694,7 @@ export function MealPlanGenerator({
     if (error || !recipe) return { result: error?.code === "23505" ? "exists" : "failed" };
     const { error: linesError } = await supabase.from("recipe_ingredients").insert(built.rows.ingredients.map((i) => ({ recipe_id: recipe.id, ...i })));
     if (linesError) {
-      await supabase.from("recipes").delete().eq("id", recipe.id);
+      await bestEffort(supabase.from("recipes").delete().eq("id", recipe.id));
       return { result: "failed" };
     }
     return { result: "saved" };
