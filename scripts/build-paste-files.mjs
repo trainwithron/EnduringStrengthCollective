@@ -2891,6 +2891,27 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "149",
+  slug: "0397",
+  title: "0397 Release F2: the free plan's client limit (15 training clients), installed SWITCHED OFF",
+  migrations: ["0397"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes at all: the limit is installed switched off (free_tier_clients_enforced returns false), so every organization behaves exactly as before. It is switched on later, together with billing, by one more short step. Safe to run before or after the code.",
+  undo: [
+    "drop trigger if exists group_memberships_free_tier_limit on public.group_memberships;",
+    "drop function if exists public.enforce_free_tier_client_limit();",
+    "drop function if exists public._org_training_clients(uuid);",
+    "drop function if exists public.org_is_free_tier(uuid);",
+    "drop function if exists public.free_tier_clients_enforced();",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 149 misbehaves. Nothing else depends on it.",
+  rows: [
+    ["0397 is not already applied (the limit trigger is not there yet)", "not exists (select 1 from pg_trigger where tgname = 'group_memberships_free_tier_limit' and not tgisinternal)"],
+    ["the tables it reads exist", "to_regclass('public.group_memberships') is not null and to_regclass('public.groups') is not null and to_regclass('public.organizations') is not null and to_regclass('public.organization_billing') is not null"],
+  ],
+});
+
+STEPS.push({
   n: "142",
   slug: "0390",
   title: "0390 Release H: undo a whole history import (every workout an import creates carries one batch id)",
@@ -3038,6 +3059,7 @@ const BUNDLES = [
   { id: "release-co", name: "Release CO (nothing about a person is public unless they chose it: personal Find a coach listing; a coach adds only their own clients to a challenge; run BEFORE the code that goes with it is live)", steps: ["139"] },
   { id: "release-cn-held", name: "HELD, Ron's word first: require the health form and waiver of every client without one (read check-intake-flag-list.sql first)", steps: ["138"] },
   { id: "release-cm", name: "Release CM (the guard function and a coach's decision on a flagged screening; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["137"] },
+  { id: "release-f2-client-cap", name: "Release F2 (the free plan's client limit, installed switched off; adds only)", steps: ["149"] },
   { id: "release-l-leaving-coach", name: "Release L (a leaving coach is never given an organization; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["148"] },
   { id: "release-k1-notifications", name: "Release K1 (quiet hours, private lock screen, payment and invite pushes; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["147"] },
   { id: "release-j-home-seasons", name: "Release J (a new season for a team; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["146"] },
@@ -3318,6 +3340,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
     m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
+    m("0397", "exists (select 1 from pg_trigger where tgname = 'group_memberships_free_tier_limit' and not tgisinternal)"),
     m("0396", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'organization_memberships' and column_name = 'departing_since')"),
     m("0395", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'notifications' and column_name = 'pushed_at')"),
     m("0394", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'groups' and column_name = 'archived_at')"),

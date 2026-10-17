@@ -24,6 +24,14 @@
   "file": "apply-release-cm-all.sql"
  },
  {
+  "id": "release-f2-client-cap",
+  "name": "Release F2 (the free plan's client limit, installed switched off; adds only)",
+  "steps": [
+   "149"
+  ],
+  "file": "apply-release-f2-client-cap-all.sql"
+ },
+ {
   "id": "release-l-leaving-coach",
   "name": "Release L (a leaving coach is never given an organization; adds only, safe to run BEFORE the code that goes with it is live)",
   "steps": [
