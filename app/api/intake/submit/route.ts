@@ -6,6 +6,7 @@ import { validateIntakeSubmission } from "@/lib/intake-submit";
 import { loadDobGate } from "@/lib/dob-gate";
 import { buildServerWaiverSnapshot, waiverVersionKey } from "@/lib/waiver-server";
 import { recordLegalAcceptances } from "@/lib/legal-record";
+import { finishIntake } from "@/lib/intake-finish";
 import { screeningStatus, CLIENT_ALL_CLEAR_LINE, CLIENT_TALK_FIRST_LINE } from "@/lib/par-q-outcome";
 
 // The health form and waiver are finished by this ONE server call. The browser can no longer mark its own intake complete: the time is the server's, the questions are ours, the address and device come from
@@ -38,35 +39,39 @@ export async function POST(request: Request) {
   const line = status === "clear" ? CLIENT_ALL_CLEAR_LINE : CLIENT_TALK_FIRST_LINE;
   if (existing?.completed_at) return NextResponse.json({ ok: true, status, message: line, alreadyDone: true });
 
-  // The record of what was signed comes FIRST, and the form is marked complete only once that record exists. If the record cannot be saved nothing was marked complete, so there is nothing to undo (a
-  // rollback could itself fail, or race a second tap, and leave a finished form with no signature behind it). If the record is saved and the completion write then fails, the client signs once more: a second
-  // record of the same signature is harmless.
-  const snapshot = await buildServerWaiverSnapshot(db, user.id);
+  // The record of what was signed comes FIRST, and the form is marked complete only once that record exists (lib/intake-finish.ts). The record is built from the name, time and group being signed right now:
+  // the intake row does not hold them yet. If the record cannot be saved nothing was marked complete, so there is nothing to undo.
   const ip = clientIp(request);
-  const recorded = snapshot
-    ? await recordLegalAcceptances(db, {
-        profileId: user.id,
-        documents: ["waiver"],
-        ip: ip === "unknown" ? null : ip,
-        userAgent: request.headers.get("user-agent"),
-        snapshots: { waiver: snapshot },
-        versions: { waiver: waiverVersionKey(snapshot) },
-      })
-    : false;
-  if (!recorded) {
-    return NextResponse.json({ error: "We couldn't save your signature. Please try again." }, { status: 500 });
-  }
-
-  const completedAt = new Date().toISOString();
-  const written = await db
-    .from("client_intake")
-    .upsert(
-      { athlete_id: user.id, group_id: groupId, par_q_answers: checked.answers, waiver_signed_name: checked.signedName, waiver_accepted: true, completed_at: completedAt },
-      { onConflict: "athlete_id" }
-    )
-    .select("athlete_id");
-  if (written.error || !written.data || written.data.length === 0) {
-    return NextResponse.json({ error: "We couldn't save that. Check your connection and try again." }, { status: 500 });
+  const finished = await finishIntake(
+    { groupId, signedName: checked.signedName, now: new Date() },
+    {
+      buildSnapshot: (signing) => buildServerWaiverSnapshot(db, user.id, signing),
+      record: (snapshot) =>
+        recordLegalAcceptances(db, {
+          profileId: user.id,
+          documents: ["waiver"],
+          ip: ip === "unknown" ? null : ip,
+          userAgent: request.headers.get("user-agent"),
+          snapshots: { waiver: snapshot },
+          versions: { waiver: waiverVersionKey(snapshot) },
+        }),
+      writeComplete: async (completedAtIso) => {
+        const written = await db
+          .from("client_intake")
+          .upsert(
+            { athlete_id: user.id, group_id: groupId, par_q_answers: checked.answers, waiver_signed_name: checked.signedName, waiver_accepted: true, completed_at: completedAtIso },
+            { onConflict: "athlete_id" }
+          )
+          .select("athlete_id");
+        return !written.error && !!written.data && written.data.length > 0;
+      },
+    }
+  );
+  if (!finished.ok) {
+    return NextResponse.json(
+      { error: finished.step === "record" ? "We couldn't save your signature. Please try again." : "We couldn't save that. Check your connection and try again." },
+      { status: 500 }
+    );
   }
   return NextResponse.json({ ok: true, status, message: line });
 }

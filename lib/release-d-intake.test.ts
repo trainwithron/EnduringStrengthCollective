@@ -59,11 +59,11 @@ describe("wiring", () => {
     expect(form).not.toContain("completed_at: new Date().toISOString()");
     expect(form).not.toContain("/api/legal/accept");
     const route = src("app/api/intake/submit/route.ts");
-    expect(route).toContain("const completedAt = new Date().toISOString();");
     expect(route).toContain("validateIntakeSubmission(body)");
     expect(route).toContain("versions: { waiver: waiverVersionKey(snapshot) }");
     // the signature is recorded BEFORE the form is marked complete, so there is nothing to roll back (a rollback could fail or race a second tap and leave a finished form with no signature)
-    expect(route.indexOf("recordLegalAcceptances(")).toBeLessThan(route.indexOf("const completedAt = new Date().toISOString();"));
+    expect(route).toContain("finishIntake(");
+    expect(route).toContain("buildServerWaiverSnapshot(db, user.id, signing)");
     expect(route).not.toContain("update({ completed_at: null, waiver_accepted: false })");
     expect(src("supabase/migrations/0386_intake_server_completes.sql")).toContain("Your health form is saved by the server.");
   });
@@ -91,5 +91,79 @@ describe("wiring", () => {
   it("the coach decides on a flagged screening with three buttons and the decision shows on the profile", () => {
     expect(src("components/coach/desktop/parq-flag-notice.tsx")).toContain("COACH_DECISIONS.map(");
     expect(src("app/(coach)/groups/[groupId]/athletes/[athleteId]/page.tsx")).toContain("reviewLine={decisionLine(");
+  });
+});
+
+import { finishIntake } from "@/lib/intake-finish";
+import { buildServerWaiverSnapshot } from "@/lib/waiver-server";
+
+// A database that knows nothing: a brand-new client has no intake row at all. Every read answers "nothing here".
+const emptyDb: any = {
+  from: () => {
+    const chain: any = {
+      select: () => chain,
+      eq: () => chain,
+      maybeSingle: async () => ({ data: null }),
+    };
+    return chain;
+  },
+  storage: { from: () => ({ download: async () => ({ data: null }), upload: async () => ({ error: null }) }) },
+};
+
+describe("a brand-new client can finish the health form (the signature record is made before the form is marked complete)", () => {
+  it("the record can be built for a client with NO intake row yet, from the name, time and group being signed now", async () => {
+    const withSigning = await buildServerWaiverSnapshot(emptyDb, "u1", { groupId: "g1", signedName: "Sam Rivera", signedAtIso: "2026-10-17T12:00:00.000Z" });
+    expect(withSigning).toContain("Sam Rivera");
+    // the old reading form (the 'accept again' route) still needs a finished intake
+    expect(await buildServerWaiverSnapshot(emptyDb, "u1")).toBeNull();
+    // and nothing to sign means no record
+    expect(await buildServerWaiverSnapshot(emptyDb, "u1", { groupId: "g1", signedName: "", signedAtIso: "2026-10-17T12:00:00.000Z" })).toBeNull();
+  });
+  it("the real submit order on a new client: record saved, then the intake marked complete", async () => {
+    const calls: string[] = [];
+    let intakeComplete = false;
+    const result = await finishIntake(
+      { groupId: "g1", signedName: "Sam Rivera", now: new Date("2026-10-17T12:00:00.000Z") },
+      {
+        buildSnapshot: (signing) => buildServerWaiverSnapshot(emptyDb, "u1", signing),
+        record: async (snapshot) => {
+          calls.push("record");
+          expect(intakeComplete).toBe(false); // nothing is marked complete before the record exists
+          return snapshot.includes("Sam Rivera");
+        },
+        writeComplete: async (at) => {
+          calls.push("write");
+          intakeComplete = at === "2026-10-17T12:00:00.000Z";
+          return true;
+        },
+      }
+    );
+    expect(result).toEqual({ ok: true });
+    expect(calls).toEqual(["record", "write"]);
+    expect(intakeComplete).toBe(true);
+  });
+  it("when the record cannot be saved, nothing is marked complete", async () => {
+    let wrote = false;
+    const result = await finishIntake(
+      { groupId: "g1", signedName: "Sam Rivera", now: new Date() },
+      {
+        buildSnapshot: (signing) => buildServerWaiverSnapshot(emptyDb, "u1", signing),
+        record: async () => false,
+        writeComplete: async () => {
+          wrote = true;
+          return true;
+        },
+      }
+    );
+    expect(result).toEqual({ ok: false, step: "record" });
+    expect(wrote).toBe(false);
+  });
+  it("when the record cannot even be built, nothing is marked complete; when the completion write fails the client is told to try again", async () => {
+    let wrote = false;
+    const none = await finishIntake({ groupId: "", signedName: "Sam", now: new Date() }, { buildSnapshot: (s) => buildServerWaiverSnapshot(emptyDb, "u1", s), record: async () => true, writeComplete: async () => ((wrote = true), true) });
+    expect(none).toEqual({ ok: false, step: "record" });
+    expect(wrote).toBe(false);
+    const failedWrite = await finishIntake({ groupId: "g1", signedName: "Sam", now: new Date() }, { buildSnapshot: async () => "text", record: async () => true, writeComplete: async () => false });
+    expect(failedWrite).toEqual({ ok: false, step: "write" });
   });
 });
