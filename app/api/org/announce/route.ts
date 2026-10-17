@@ -43,6 +43,7 @@ export async function POST(request: Request) {
 
   let sent = 0;
   let failed = 0;
+  const delivered: string[] = []; // only members whose notice was written get the push too
   for (const group of chunk(ids, 100)) {
     const { error } = await db.from("notifications").insert(group.map((profile_id) => ({ profile_id, type: "org_announcement", body: text, link_path: "/dashboard" })));
     if (error) {
@@ -50,11 +51,12 @@ export async function POST(request: Request) {
       failed += group.length;
     } else {
       sent += group.length;
+      delivered.push(...group);
     }
   }
   if (sent === 0) return NextResponse.json({ error: "Couldn't send it. Try again." }, { status: 502 });
   // The same message to their phones (best effort, a few at a time; quiet hours and private lock screens apply).
-  await runPool(ids, 8, async (id) => {
+  await runPool(delivered, 8, async (id) => {
     await sendPushToProfile(db, id, `${(org as { name?: string } | null)?.name ?? "Your organization"}`, `${from}: ${message}`.slice(0, 140), "/dashboard").catch(() => 0);
   }, { deadlineMs: 20_000 });
   return NextResponse.json({ ok: true, sent, failed });
