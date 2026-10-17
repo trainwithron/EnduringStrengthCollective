@@ -54,6 +54,18 @@ describe("deriveOrgEntitlements", () => {
     }
   });
 
+  it("a lapsed or canceled plan is the free tier, never a lock; only an unpaid payment past its grace locks", () => {
+    const lapsed = deriveOrgEntitlements(row({ subscriptionStatus: "canceled", currentPeriodEnd: daysAgoIso(10) }), daysAgo(400), now, true);
+    expect(lapsed.state).toBe("lapsed");
+    expect(lapsed.accessLevel).toBe("full");
+    expect(lapsed.freeTier).toBe(true);
+    const unpaid = deriveOrgEntitlements(row({ subscriptionStatus: "unpaid" }), daysAgo(400), now, true);
+    expect(unpaid.freeTier).toBe(true);
+    expect(unpaid.accessLevel).toBe("full");
+    const pastDue = deriveOrgEntitlements(row({ subscriptionStatus: "past_due", pastDueSince: daysAgoIso(GRACE_DAYS + 5) }), daysAgo(400), now, true);
+    expect(pastDue.accessLevel).toBe("locked");
+    expect(pastDue.freeTier).toBe(false);
+  });
   it("the free tier applies only once billing is enforced, and never to a trial, a paying or a founding account", () => {
     const expired = daysAgo(TRIAL_DAYS + 5);
     const off = deriveOrgEntitlements(null, expired, now, false);
@@ -121,7 +133,8 @@ describe("deriveOrgEntitlements", () => {
       true
     );
     expect(over.state).toBe("lapsed");
-    expect(over.accessLevel).toBe("locked");
+    expect(over.accessLevel).toBe("full");
+    expect(over.freeTier).toBe(true);
   });
 
   it("an incomplete subscription is treated as no subscription (still on the trial)", () => {
@@ -130,7 +143,7 @@ describe("deriveOrgEntitlements", () => {
   });
 
   it("with enforcement OFF the effective access is always full, but the raw state still shows", () => {
-    const e = deriveOrgEntitlements(row({ subscriptionStatus: "canceled", currentPeriodEnd: daysAgoIso(10) }), daysAgo(400), now, false);
+    const e = deriveOrgEntitlements(row({ subscriptionStatus: "past_due", pastDueSince: daysAgoIso(GRACE_DAYS + 5) }), daysAgo(400), now, false);
     expect(e.rawAccessLevel).toBe("locked");
     expect(e.rawOrgAddon).toBe(false);
     expect(e.accessLevel).toBe("full");

@@ -10,7 +10,7 @@ import {
   type AiCallMeta,
 } from "@/lib/ai-usage";
 import { budgetOutMessage } from "@/lib/ai-budget";
-import { FREE_TIER_CLIENT_MESSAGE, FREE_TIER_INNER_FEATURES, FREE_TIER_SLOT_CEILING, FREE_TIER_SLOT_WINDOW_HOURS, freeTierBlockedMessage } from "@/lib/ai-usage";
+import { FREE_TIER_CLIENT_MESSAGE, FREE_TIER_INNER_FEATURES, FREE_TIER_SLOT_CEILING, FREE_TIER_SLOT_WINDOW_HOURS, freeTierBlockedMessage, freeTierPlanWindowMessage, freeTierSlotLimitMessage } from "@/lib/ai-usage";
 import { hasPaidAiBalance, isFreeTierCoach } from "@/lib/free-tier-server";
 import { getCoachBudgetStatus, noteBudgetLevel, resolveBillingCoach, topUpInfo } from "@/lib/ai-budget-server";
 
@@ -54,10 +54,11 @@ export async function reserveAiCall(meta: AiCallMeta): Promise<UsageHandle> {
         const since = new Date(Date.now() - FREE_TIER_SLOT_WINDOW_HOURS * 3600000).toISOString();
         const [{ count: planStarts, error: startError }, { count: slots, error: slotError }] = await Promise.all([
           supabase.from("ai_usage_log").select("id", { count: "exact", head: true }).eq("coach_id", billingCoach).eq("feature", "free_use_meal_plan").gte("created_at", since),
-          supabase.from("ai_usage_log").select("id", { count: "exact", head: true }).eq("coach_id", billingCoach).eq("feature", "meal_plan_slot").gte("created_at", `${currentAllowancePeriod()}T00:00:00Z`),
+          supabase.from("ai_usage_log").select("id", { count: "exact", head: true }).eq("coach_id", billingCoach).eq("feature", "meal_plan_slot").neq("status", "error").gte("created_at", `${currentAllowancePeriod()}T00:00:00Z`),
         ]);
         if (startError || slotError) throw new AiRateLimitedError("unavailable");
-        if ((planStarts ?? 0) === 0 || (slots ?? 0) >= FREE_TIER_SLOT_CEILING) throw new AiRateLimitedError("free_tier", meta.feature, freeTierBlockedMessage());
+        if ((planStarts ?? 0) === 0) throw new AiRateLimitedError("free_tier", meta.feature, freeTierPlanWindowMessage());
+        if ((slots ?? 0) >= FREE_TIER_SLOT_CEILING) throw new AiRateLimitedError("free_tier", meta.feature, freeTierSlotLimitMessage());
       }
     }
     if (billingCoach) {

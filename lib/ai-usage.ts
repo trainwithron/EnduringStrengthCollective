@@ -179,6 +179,10 @@ export const freeTierOutMessage = (): string =>
   `You've used your ${FREE_TIER_AI_USES} free AI uses this month. They come back on the 1st. Subscribe or buy AI credits to keep going.`;
 export const freeTierBlockedMessage = (): string =>
   "AI is not part of the free plan. You can use it ${FREE_TIER_AI_USES} times a month to build a program, a meal plan or import a program; subscribe or buy AI credits for the rest.".replace("${FREE_TIER_AI_USES}", String(FREE_TIER_AI_USES));
+export const freeTierPlanWindowMessage = (): string =>
+  `The free plan covers a meal plan right after you start it (${FREE_TIER_SLOT_WINDOW_HOURS} hours). Start a new meal plan with one of your ${FREE_TIER_AI_USES} free AI uses, or subscribe or buy AI credits.`;
+export const freeTierSlotLimitMessage = (): string =>
+  `You've reached this month's limit of ${FREE_TIER_SLOT_CEILING} meal suggestions on the free plan. Subscribe or buy AI credits to keep going.`;
 export const FREE_TIER_CLIENT_MESSAGE = "AI logging is paused right now. You can still search foods, scan a barcode or use your saved meals.";
 
 export interface AiCallMeta {

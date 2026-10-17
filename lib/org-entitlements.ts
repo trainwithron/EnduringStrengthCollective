@@ -30,7 +30,7 @@ export interface OrgBillingRow {
 
 // full   = everything works
 // grace  = everything works, with a "fix your plan" banner (GRACE_DAYS)
-// locked = coach side goes to the billing page; athletes are never locked
+// locked = coach side goes to the billing page; athletes are never locked (now only a payment that stays unpaid past its grace; an ended trial or a lapsed plan is the free tier, not a lock)
 export type AccessLevel = "full" | "grace" | "locked";
 
 export type PlanState =
@@ -131,8 +131,9 @@ export function deriveOrgEntitlements(
       rawAccessLevel = "full";
       rawOrgAddon = addonStillOn(row!, now);
     } else {
+      // A lapsed plan drops to the free tier, like an ended trial: nothing is locked and nothing is deleted.
       state = "lapsed";
-      rawAccessLevel = "locked";
+      rawAccessLevel = "full";
       rawOrgAddon = false;
     }
   } else {

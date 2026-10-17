@@ -81,6 +81,8 @@ export async function POST(request: Request) {
     .maybeSingle();
   if (existing) return NextResponse.json({ ok: true, alreadyChecked: true });
 
+  const { data: groupRow } = await admin.from("groups").select("organization_id").eq("id", groupId).maybeSingle();
+  const groupOrgId = (groupRow?.organization_id as string | null | undefined) ?? null;
   const findings = await gatherSessionPatternFindings(admin, { athleteId, groupId });
 
   if (findings.length === 0) {
@@ -96,7 +98,7 @@ export async function POST(request: Request) {
 
   let synthesisText = findings.map((f) => f.description).join(" ");
   // The free plan gets the plain sentence, never a model call.
-  if (isAiConfigured() && !(await isZeroAiCoach(admin, coachId))) {
+  if (isAiConfigured() && !(await isZeroAiCoach(admin, coachId, { organizationId: groupOrgId }))) {
     try {
       const allowedValues = findings.flatMap((f) => f.numericValues);
       const userText = `Real findings for this client's recent session pattern:\n${findings.map((f) => `- ${f.description}`).join("\n")}\n\nWrite the note now.`;
