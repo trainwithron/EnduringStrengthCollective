@@ -27,10 +27,35 @@ export const exportFileName = (orgName: string, on: Date = new Date()): string =
   return `${safe}-export-${on.toISOString().slice(0, 10)}.zip`;
 };
 
+// Removes stored files that no membership row points at any more (a platform administrator lifted the block and the coach started their own account, or a run died between storing and recording). A file made in the
+// last hour is left alone: it may be mid-way through being recorded. Returns how many were removed.
+export async function sweepOrphanExports(db: any): Promise<number> {
+  try {
+    const { data: rows } = await db.from("organization_memberships").select("export_path").not("export_path", "is", null);
+    const known = new Set(((rows ?? []) as { export_path: string }[]).map((r) => r.export_path));
+    const { data: folders } = await db.storage.from(EXIT_EXPORT_BUCKET).list("", { limit: 200 });
+    const cutoff = Date.now() - 3600_000;
+    let removed = 0;
+    for (const folder of (folders ?? []) as { name: string; id: string | null }[]) {
+      if (folder.id) continue; // a file at the top, not a folder
+      const { data: files } = await db.storage.from(EXIT_EXPORT_BUCKET).list(folder.name, { limit: 200 });
+      const orphans = ((files ?? []) as { name: string; created_at?: string }[]).filter((f) => !known.has(`${folder.name}/${f.name}`) && (!f.created_at || new Date(f.created_at).getTime() < cutoff)).map((f) => `${folder.name}/${f.name}`);
+      if (orphans.length > 0) {
+        const { error } = await db.storage.from(EXIT_EXPORT_BUCKET).remove(orphans);
+        if (!error) removed += orphans.length;
+      }
+    }
+    return removed;
+  } catch {
+    return 0;
+  }
+}
+
 // Builds the zip for the groups the coach kept and stores it. Returns the stored path, or null when it could not be made (the caller tries again on its next run).
 export async function storeExitExport(db: any, args: { coachId: string; organizationId: string; groupIds: string[]; orgName: string }): Promise<string | null> {
   try {
-    const reader = zipStream(exportEntries({ supabase: db, groupIds: args.groupIds, orgName: args.orgName, emailsFor: emailsForExport(db) })).getReader();
+    const report = { failed: [] as string[] };
+    const reader = zipStream(exportEntries({ supabase: db, groupIds: args.groupIds, orgName: args.orgName, emailsFor: emailsForExport(db), report })).getReader();
     const chunks: Uint8Array[] = [];
     let size = 0;
     for (;;) {
@@ -41,6 +66,11 @@ export async function storeExitExport(db: any, args: { coachId: string; organiza
         if (size > MAX_EXPORT_BYTES) throw new Error("export is too large to store");
         chunks.push(value);
       }
+    }
+    // Only a COMPLETE export is kept as the coach's final one: a part that could not be read counts as a failed try (the next run tries again).
+    if (report.failed.length > 0) {
+      console.error("[leaving-coach] the export was incomplete (" + report.failed.join(", ") + "), so it was not stored");
+      return null;
     }
     const path = `${args.coachId}/${args.organizationId}.zip`;
     const { error } = await db.storage.from(EXIT_EXPORT_BUCKET).upload(path, new Blob(chunks as BlobPart[], { type: "application/zip" }), { contentType: "application/zip", upsert: true });

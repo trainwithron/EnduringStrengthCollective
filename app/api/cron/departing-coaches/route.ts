@@ -7,7 +7,7 @@ import { runPool } from "@/lib/run-pool";
 import { athleteAgeStatus } from "@/lib/youth-block";
 import { departurePlan, daysLeftToChoose, windowEndsAt, exportLinkStillWorks, EXPORT_LINK_DAYS, type DepartureRow } from "@/lib/leaving-coach-policy";
 import { remindCoach, sendCoachTheirExport, tellClientCoachClosed, tellCoachTheyAreLeaving } from "@/lib/leaving-coach-notify";
-import { storeExitExport, EXIT_EXPORT_BUCKET } from "@/lib/leaving-coach-export";
+import { storeExitExport, sweepOrphanExports, EXIT_EXPORT_BUCKET } from "@/lib/leaving-coach-export";
 import { groupsStillTheirs } from "@/lib/leaving-coach-groups";
 
 // Every six hours: walks the coaches who are leaving (migration 0396). For each, once only: the notice that they are leaving, the reminders with three days and one day left, ending coaching access when the
@@ -85,6 +85,8 @@ async function handler(request: Request) {
     expired++;
   }
 
+  const orphansRemoved = await sweepOrphanExports(db);
+
   const stats = { told: 0, reminded: 0, ended: 0, exports: 0, exportsFailed: 0, coachesTold: 0, clientsTold: 0 };
   // One stored export is built per run: each is held in memory, so the rest wait for the next run.
   let exportBudget = 1;
@@ -133,6 +135,12 @@ async function handler(request: Request) {
         }
       }
       if (!ended || !plan.closure) return;
+      // Past the 30 days nothing more is sent or made: the row is retired.
+      if (!exportLinkStillWorks(endedAt, now)) {
+        await mark(row, "closure_notified_at");
+        await mark(row, "clients_notified_at");
+        return;
+      }
       // Only the kept groups that are still the situation the notices assume: still in that organization, and with no coach now.
       const still = await groupsStillTheirs(db, row.organization_id, row.departing_group_ids ?? []);
       if (still.failed) return;
@@ -186,7 +194,7 @@ async function handler(request: Request) {
     { deadlineMs: 270_000 }
   );
 
-  return NextResponse.json({ looked: (data ?? []).length, expiredExports: expired, ...stats });
+  return NextResponse.json({ looked: (data ?? []).length, expiredExports: expired, orphansRemoved, ...stats });
 }
 
 export const GET = withCronRun("departing-coaches", handler);

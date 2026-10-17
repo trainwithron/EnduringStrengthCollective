@@ -13,6 +13,8 @@ export interface ExportDeps {
   // The sign-in email of each client id (not placeholders), looked up by the caller with the server key; may be empty.
   emailsFor: (profileIds: string[]) => Promise<Map<string, string>>;
   now?: Date;
+  // Filled in as the export finishes: the parts that could not be read completely (the same list export-status.txt names). A caller that must not keep an incomplete export reads it.
+  report?: { failed: string[] };
 }
 
 const PAGE = 1000;
@@ -217,6 +219,7 @@ export async function* exportEntries(deps: ExportDeps): AsyncGenerator<ZipEntry>
     name: "export-status.txt",
     chunks: (async function* () {
       const failed = [...new Set(failures)];
+      if (deps.report) deps.report.failed = failed;
       yield utf8(
         [
           failed.length === 0 ? "COMPLETE: every part was read." : `INCOMPLETE: these parts could not be read completely: ${failed.join(", ")}. Run the export again.`,
