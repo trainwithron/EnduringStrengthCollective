@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { computeEstimatedMRR, computeRealMRR } from "@/lib/business-metrics";
 import { ratesByMembership } from "@/lib/client-rates";
 import { loadBusinessScope } from "@/lib/business-scope";
+import { readByIds } from "@/lib/read-by-ids";
 
 // The one number a coach is shown as "MRR": real subscriptions when there are any, otherwise the estimate from the monthly rates set by hand. The Business page and the phone Home
 // both read it through here, so the two can never disagree.
@@ -16,11 +17,15 @@ export async function loadCoachMrr(supabase: SupabaseClient, coachId: string, gr
   // Only the organization the page is in (never another organization's income): the coach's own groups, or every group of the organization for its owner or an admin.
   const ids = (await loadBusinessScope(supabase, coachId, groupId)).groupIds;
   const groupIds = ids.length > 0 ? ids : [NO_GROUP];
-  const [{ data: subRows }, { data: memberRows }, { data: rateRows }] = await Promise.all([
-    supabase.from("membership_subscriptions").select("price_cents, status").in("group_id", groupIds),
-    supabase.from("group_memberships").select("id").in("group_id", groupIds).eq("role", "athlete"),
-    supabase.from("client_billing_rates").select("membership_id, monthly_rate").in("group_id", groupIds),
+  // Read in groups of ids and a page at a time (1,500 clients is 1,500 groups: a single `.in` would pass the URL limit and the 1,000-row cap, and the MRR would read as $0 or low without any error).
+  const [subs, members, rateRead] = await Promise.all([
+    readByIds(groupIds, (g) => (from, to) => supabase.from("membership_subscriptions").select("price_cents, status").in("group_id", g).order("group_id").order("athlete_id").range(from, to)),
+    readByIds(groupIds, (g) => (from, to) => supabase.from("group_memberships").select("id").in("group_id", g).eq("role", "athlete").order("id").range(from, to)),
+    readByIds(groupIds, (g) => (from, to) => supabase.from("client_billing_rates").select("membership_id, monthly_rate").in("group_id", g).order("membership_id").range(from, to)),
   ]);
+  const subRows = subs.rows;
+  const memberRows = members.rows;
+  const rateRows = rateRead.rows;
   const real = computeRealMRR(
     (subRows ?? []).map((s) => ({
       priceCents: s.price_cents,

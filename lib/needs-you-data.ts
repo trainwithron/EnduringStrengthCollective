@@ -3,7 +3,8 @@
 // is soft: one that fails just leaves its kind out, never the strip and never the page. The ranking and the sentences are lib/needs-you.ts.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { formatInTimezone } from "@/lib/format-in-timezone";
-import { pageAll } from "@/lib/page-all";
+import type { PageQuery } from "@/lib/page-all";
+import { readByIds, readRowsByIds } from "@/lib/read-by-ids";
 import { DEFAULT_HEADS_UP_DAYS, expiringSoon, expiryDismissalKey, isSnoozed } from "@/lib/expiry-checkin";
 import { BUTTON, sentences, type NeedsYouItem } from "@/lib/needs-you";
 import type { QuietTier } from "@/lib/quiet-client-tier";
@@ -59,10 +60,11 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
       return fallback;
     }
   };
-  // A read that can pass 1000 rows is read a page at a time; a failed or cut-short read counts as failed.
-  const paged = async <T,>(label: string, make: (from: number, to: number) => PromiseLike<{ data: any[] | null; error: unknown }>): Promise<T[]> => {
+  // A read over the coach's groups that can pass 1000 rows: the ids go in groups of 100 and each group is read a page at a time (1,500 clients is 1,500 groups, past the URL limit of one request, and a
+  // request returns at most 1,000 rows). A failed or cut-short read counts as failed.
+  const pagedIn = async <T,>(label: string, make: (groupChunk: string[]) => PageQuery): Promise<T[]> => {
     try {
-      const r = await pageAll(make);
+      const r = await readByIds(groupIds, make);
       if (r.failed || r.truncated) failed.push(label);
       return r.rows as T[];
     } catch (e) {
@@ -71,6 +73,19 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
       return [];
     }
   };
+  // The first N rows (by the caller's order) over the coach's groups: the first N of each group of ids, merged and cut to N.
+  const firstIn = async <T,>(label: string, n: number, byOrder: (a: T, b: T) => number, make: (groupChunk: string[]) => PageQuery): Promise<T[]> => {
+    try {
+      const r = await readByIds(groupIds, make, { pageSize: n, maxPages: 1 });
+      if (r.failed) failed.push(label);
+      return (r.rows as T[]).sort(byOrder).slice(0, n);
+    } catch (e) {
+      failed.push(label);
+      console.error(`[needs-you] ${label} failed:`, e instanceof Error ? e.message : e);
+      return [];
+    }
+  };
+  const byCreatedAt = (a: { created_at: string }, b: { created_at: string }) => a.created_at.localeCompare(b.created_at);
   const nowMs = now.getTime();
 
   // ---- what Home already knows -------------------------------------------------------------------------------------------------
@@ -107,23 +122,17 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
 
   // ---- the small extra reads, all in parallel and all soft ------------------------------------------------------------------------
   const [scheduleRequests, bookingRequests, unreadMessages, lateChanges, expiring, injured, athleteRows] = await Promise.all([
-    soft(
-      "schedule requests",
-      () => supabase.from("schedule_requests").select("id, athlete_id, group_id, kind, created_at").eq("coach_id", coachId).in("group_id", groupIds).in("status", ["pending", "applying"]).order("created_at", { ascending: true }).limit(50) as never,
-      [] as { id: string; athlete_id: string; group_id: string; kind: string; created_at: string }[]
+    firstIn<{ id: string; athlete_id: string; group_id: string; kind: string; created_at: string }>("schedule requests", 50, byCreatedAt, (g) => (from, to) =>
+      supabase.from("schedule_requests").select("id, athlete_id, group_id, kind, created_at").eq("coach_id", coachId).in("group_id", g).in("status", ["pending", "applying"]).order("created_at", { ascending: true }).order("id", { ascending: true }).range(from, to)
     ),
-    soft(
-      "booking requests",
-      () => supabase.from("booking_requests").select("id, athlete_id, group_id, created_at").eq("coach_id", coachId).in("group_id", groupIds).eq("status", "pending").order("created_at", { ascending: true }).limit(50) as never,
-      [] as { id: string; athlete_id: string; group_id: string; created_at: string }[]
+    firstIn<{ id: string; athlete_id: string; group_id: string; created_at: string }>("booking requests", 50, byCreatedAt, (g) => (from, to) =>
+      supabase.from("booking_requests").select("id, athlete_id, group_id, created_at").eq("coach_id", coachId).in("group_id", g).eq("status", "pending").order("created_at", { ascending: true }).order("id", { ascending: true }).range(from, to)
     ),
-    paged<{ id: string; sender_id: string; group_id: string; created_at: string }>("unread messages", (from, to) =>
-      supabase.from("direct_messages").select("id, sender_id, group_id, created_at").eq("recipient_id", coachId).in("group_id", groupIds).is("read_at", null).order("created_at", { ascending: true }).order("id", { ascending: true }).range(from, to)
+    pagedIn<{ id: string; sender_id: string; group_id: string; created_at: string }>("unread messages", (g) => (from, to) =>
+      supabase.from("direct_messages").select("id, sender_id, group_id, created_at").eq("recipient_id", coachId).in("group_id", g).is("read_at", null).order("created_at", { ascending: true }).order("id", { ascending: true }).range(from, to)
     ),
-    soft(
-      "late changes",
-      () => supabase.from("bookings").select("id, athlete_id, group_id, start_at").eq("coach_id", coachId).in("group_id", groupIds).eq("late_charge_state", "flagged").order("start_at", { ascending: true }).limit(50) as never,
-      [] as { id: string; athlete_id: string; group_id: string; start_at: string }[]
+    firstIn<{ id: string; athlete_id: string; group_id: string; start_at: string }>("late changes", 50, (a, b) => a.start_at.localeCompare(b.start_at), (g) => (from, to) =>
+      supabase.from("bookings").select("id, athlete_id, group_id, start_at").eq("coach_id", coachId).in("group_id", g).eq("late_charge_state", "flagged").order("start_at", { ascending: true }).order("id", { ascending: true }).range(from, to)
     ),
     (async () => {
       try {
@@ -132,8 +141,8 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
         const expiryDays = (policy?.credit_expiry_days as number | undefined) ?? 0;
         if (expiryDays <= 0) return [];
         const headsUp = (policy?.expiry_heads_up_days as number | undefined) ?? DEFAULT_HEADS_UP_DAYS;
-        const credits = await paged<{ athlete_id: string; group_id: string; balance: number; last_granted_at: string | null; expiry_hold_until: string | null }>("expiring sessions", (from, to) =>
-          supabase.from("session_credits").select("athlete_id, group_id, balance, last_granted_at, expiry_hold_until").in("group_id", groupIds).order("athlete_id", { ascending: true }).order("group_id", { ascending: true }).range(from, to)
+        const credits = await pagedIn<{ athlete_id: string; group_id: string; balance: number; last_granted_at: string | null; expiry_hold_until: string | null }>("expiring sessions", (g) => (from, to) =>
+          supabase.from("session_credits").select("athlete_id, group_id, balance, last_granted_at, expiry_hold_until").in("group_id", g).order("athlete_id", { ascending: true }).order("group_id", { ascending: true }).range(from, to)
         );
         const soon = expiringSoon(
           credits.map((r) => ({
@@ -166,13 +175,11 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
         return [];
       }
     })(),
-    soft(
-      "injuries",
-      () => supabase.from("athlete_injury_status").select("athlete_id, marked_at").in("group_id", groupIds).eq("is_injured", true).gte("marked_at", new Date(nowMs - INJURY_RECENT_DAYS * 86_400_000).toISOString()).limit(200) as never,
-      [] as { athlete_id: string; marked_at: string }[]
+    firstIn<{ athlete_id: string; marked_at: string }>("injuries", 200, (a, b) => b.marked_at.localeCompare(a.marked_at), (g) => (from, to) =>
+      supabase.from("athlete_injury_status").select("athlete_id, marked_at").in("group_id", g).eq("is_injured", true).gte("marked_at", new Date(nowMs - INJURY_RECENT_DAYS * 86_400_000).toISOString()).order("marked_at", { ascending: false }).order("athlete_id", { ascending: true }).range(from, to)
     ).then((rows) => rows.map((r) => r.athlete_id)),
-    paged<{ group_id: string; profile_id: string }>("roster", (from, to) =>
-      supabase.from("group_memberships").select("group_id, profile_id").in("group_id", groupIds).eq("role", "athlete").order("group_id", { ascending: true }).order("profile_id", { ascending: true }).range(from, to)
+    pagedIn<{ group_id: string; profile_id: string }>("roster", (g) => (from, to) =>
+      supabase.from("group_memberships").select("group_id, profile_id").in("group_id", g).eq("role", "athlete").order("group_id", { ascending: true }).order("profile_id", { ascending: true }).range(from, to)
     ),
   ]);
 
@@ -195,7 +202,7 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
   const claimedById = new Map<string, boolean>();
   if (needNames.size > 0) {
     // A name that cannot be read just says "A client": the item itself is still shown.
-    const names = await soft("names", () => supabase.from("profiles").select("id, full_name, claimed_at").in("id", [...needNames]) as never, [] as { id: string; full_name: string | null; claimed_at: string | null }[]);
+    const names = await soft("names", () => readRowsByIds([...needNames], (g) => (from, to) => supabase.from("profiles").select("id, full_name, claimed_at").in("id", g).order("id").range(from, to)) as never, [] as { id: string; full_name: string | null; claimed_at: string | null }[]);
     for (const n of names) {
       nameById.set(n.id, n.full_name?.trim() || "A client");
       claimedById.set(n.id, !!n.claimed_at);

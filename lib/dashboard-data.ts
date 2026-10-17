@@ -1,6 +1,6 @@
 // Server-only data orchestration behind the coach Home dashboard redesign
 import { needsPayment } from "@/lib/reup";
-import { localDayBounds } from "@/lib/timezone";
+import { daysAgoKeyInZone, localDayBounds } from "@/lib/timezone";
 // (coach_dashboard_redesign_scoping.md). Pairs with the tested pure libs
 // (team-pulse.ts, quiet-client-tier.ts, coach-hero-priority.ts) the same
 // way lib/leaderboard-data.ts pairs with lib/leaderboard.ts — this file
@@ -16,6 +16,8 @@ import { computeHabitCompliance, computeCompliancePct } from "./habits";
 import { formatInTimezone, timezoneForProfiles } from "@/lib/format-in-timezone";
 import { fetchInactiveKeys, inactiveKey } from "@/lib/inactive-ids";
 import { ratesByMembership } from "@/lib/client-rates";
+import { readRowsByIds } from "@/lib/read-by-ids";
+import { pageAll } from "@/lib/page-all";
 
 export interface DashboardGroupInfo {
   id: string;
@@ -97,11 +99,6 @@ function todayKeyOf(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-function daysAgoKey(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return todayKeyOf(d);
-}
 
 export async function getCoachDashboardData(
   supabase: SupabaseClient,
@@ -126,6 +123,8 @@ export async function getCoachDashboardData(
   const now = new Date();
   const dayBounds = timezone ? localDayBounds(timezone, now) : null;
   const todayKey = dayBounds?.dateKey ?? todayKeyOf(now);
+  // "N days ago" is counted from the coach's own today, so the windows line up with the day shown above.
+  const daysAgoKey = (days: number) => (timezone ? daysAgoKeyInZone(timezone, days, now) : todayKeyOf(new Date(now.getTime() - days * 86400000)));
   const sevenDaysAgoKey = daysAgoKey(7);
   const monthKey = todayKey.slice(0, 7);
 
@@ -147,7 +146,8 @@ export async function getCoachDashboardData(
   const [
     { data: athleteRows },
     { data: rateRows },
-    { data: logRows },
+    { data: lastActiveRows },
+    { data: recentLogRows },
     { data: programRows },
     { data: wellnessTodayRows },
     { data: habitRows },
@@ -160,69 +160,63 @@ export async function getCoachDashboardData(
     { data: habitLogRows },
     { data: groupKindRows },
   ] = await Promise.all([
-    supabase
-      .from("group_memberships")
-      .select("id, group_id, profile_id, joined_at, profiles ( full_name, claimed_at )")
-      .in("group_id", allGroupIds)
-      .eq("role", "athlete"),
+    // Every read over the coach's groups goes in groups of ids and a page at a time (lib/read-by-ids.ts): at 1,500 clients a single `.in` passes the URL limit and the 1,000-row cap.
+    readRowsByIds(allGroupIds, (g) => (from, to) =>
+      supabase.from("group_memberships").select("id, group_id, profile_id, joined_at, profiles ( full_name, claimed_at )").in("group_id", g).eq("role", "athlete").order("id").range(from, to)
+    ),
     // What each client pays is coach-only (client_billing_rates, 0303).
-    supabase.from("client_billing_rates").select("membership_id, monthly_rate").in("group_id", allGroupIds),
-    supabase
-      .from("workout_logs")
-      .select("athlete_id, group_id, created_at, new_prs")
-      .in("group_id", allGroupIds)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("programs")
-      .select("group_id, athlete_id, training_days")
-      .in("group_id", allGroupIds)
-      .eq("is_active", true),
-    supabase
-      .from("wellness_checkins")
-      .select("athlete_id, group_id, sleep_quality, soreness, energy")
-      .in("group_id", allGroupIds)
-      .eq("log_date", todayKey),
-    supabase
-      .from("client_habits")
-      .select("id, athlete_id, group_id, weekdays")
-      .in("group_id", allGroupIds)
-      .eq("active", true),
-    supabase
-      .from("bookings")
-      .select("id, athlete_id, group_id, start_at, status, profiles!bookings_athlete_id_fkey ( full_name )")
-      .eq("coach_id", coachId)
-      .in("group_id", allGroupIds)
-      .eq("status", "confirmed")
-      .gte("start_at", dayBounds?.startIso ?? `${todayKey}T00:00:00Z`)
-      .lt("start_at", dayBounds?.endIso ?? `${todayKey}T23:59:59Z`)
-      .order("start_at", { ascending: true }),
-    supabase
-      .from("credit_purchases")
-      .select("amount_cents, created_at")
-      .in("group_id", allGroupIds)
-      .gte("created_at", daysAgoKey(30)),
+    readRowsByIds(allGroupIds, (g) => (from, to) => supabase.from("client_billing_rates").select("membership_id, monthly_rate").in("group_id", g).order("membership_id").range(from, to)),
+    // The last workout of each client, worked out by the database (one row per client) instead of reading every workout ever logged.
+    pageAll((from, to) => supabase.rpc("business_last_active", { p_group_ids: allGroupIds }).range(from, to)).then((r) => ({ data: r.rows.map((x: any) => ({ athlete_id: x.athlete_id, created_at: x.last_at })) })),
+    // Only the last three days of workouts carry the "new PR" shout-out.
+    readRowsByIds(allGroupIds, (g) => (from, to) =>
+      supabase.from("workout_logs").select("athlete_id, group_id, created_at, new_prs").in("group_id", g).gte("created_at", new Date(now.getTime() - 3 * 86400000).toISOString()).order("id").range(from, to)
+    ).then((r) => ({ data: r.data.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))) })),
+    readRowsByIds(allGroupIds, (g) => (from, to) => supabase.from("programs").select("group_id, athlete_id, training_days").in("group_id", g).eq("is_active", true).order("id").range(from, to)),
+    readRowsByIds(allGroupIds, (g) => (from, to) =>
+      supabase.from("wellness_checkins").select("athlete_id, group_id, sleep_quality, soreness, energy").in("group_id", g).eq("log_date", todayKey).order("id").range(from, to)
+    ),
+    readRowsByIds(allGroupIds, (g) => (from, to) => supabase.from("client_habits").select("id, athlete_id, group_id, weekdays").in("group_id", g).eq("active", true).order("id").range(from, to)),
+    readRowsByIds(allGroupIds, (g) => (from, to) =>
+      supabase
+        .from("bookings")
+        .select("id, athlete_id, group_id, start_at, status, profiles!bookings_athlete_id_fkey ( full_name )")
+        .eq("coach_id", coachId)
+        .in("group_id", g)
+        .eq("status", "confirmed")
+        .gte("start_at", dayBounds?.startIso ?? `${todayKey}T00:00:00Z`)
+        .lt("start_at", dayBounds?.endIso ?? `${todayKey}T23:59:59Z`)
+        .order("start_at", { ascending: true })
+        .order("id")
+        .range(from, to)
+    ).then((r) => ({ data: r.data.sort((a, b) => String(a.start_at).localeCompare(String(b.start_at))) })),
+    readRowsByIds(allGroupIds, (g) => (from, to) => supabase.from("credit_purchases").select("amount_cents, created_at").in("group_id", g).gte("created_at", daysAgoKey(30)).order("id").range(from, to)),
     // AI Assistant Slice 1 (lib/matched-load-trend.ts) — every completed
     // set with a real weight+RPE, bounded to the last 90 days (enough
     // real session history for a 3+ session trend without scanning an
     // athlete's whole career). Grouped client-side into one top-set-per-
     // session point per (athlete, exercise) below.
-    supabase
-      .from("set_logs")
-      .select(
-        `
-        weight, rpe, completed_at,
+    readRowsByIds(allGroupIds, (g) => (from, to) =>
+      supabase
+        .from("set_logs")
+        .select(
+          `
+        id, weight, rpe, completed_at,
         session_exercises!inner (
           exercise_name, session_id,
           athlete_sessions!inner ( athlete_id, group_id )
         )
       `
-      )
-      .eq("status", "completed")
-      .not("weight", "is", null)
-      .not("rpe", "is", null)
-      .in("session_exercises.athlete_sessions.group_id", allGroupIds)
-      .gte("completed_at", ninetyDaysAgoKey)
-      .order("completed_at", { ascending: true }),
+        )
+        .eq("status", "completed")
+        .not("weight", "is", null)
+        .not("rpe", "is", null)
+        .in("session_exercises.athlete_sessions.group_id", g)
+        .gte("completed_at", ninetyDaysAgoKey)
+        .order("completed_at", { ascending: true })
+        .order("id")
+        .range(from, to)
+    ),
     // Suppresses the fatigue direction for an athlete in a deliberate
     // 'fat_loss' or 'reverse_diet' phase — falling strength/rising RPE at
     // matched load is the EXPECTED result of a real caloric deficit, not
@@ -232,30 +226,34 @@ export async function getCoachDashboardData(
     // caloric-deficit reasoning so it gets the same treatment). Never
     // suppresses the celebration direction. First-seen (most recent) row
     // per athlete wins.
-    supabase
-      .from("nutrition_checkins")
-      .select("athlete_id, phase, created_at")
-      .in("group_id", allGroupIds)
-      .order("created_at", { ascending: false }),
+    readRowsByIds(allGroupIds, (g) => (from, to) =>
+      supabase.from("nutrition_checkins").select("athlete_id, phase, created_at").in("group_id", g).order("created_at", { ascending: false }).order("id").range(from, to)
+    ).then((r) => ({ data: r.data.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))) })),
     // A client the coach has set aside as inactive (0281) is left out of every count and flag below; their data is untouched.
     fetchInactiveKeys(supabase, allGroupIds),
     // Clients who have run out of sessions (migration 0260 adds the hold flag; without it the select errors and is retried below without it).
-    supabase.from("session_credits").select("athlete_id, group_id, balance, payment_hold").in("group_id", allGroupIds).lte("balance", 0),
+    readRowsByIds(allGroupIds, (g) => (from, to) =>
+      supabase.from("session_credits").select("athlete_id, group_id, balance, payment_hold").in("group_id", g).lte("balance", 0).order("group_id").order("athlete_id").range(from, to)
+    ),
     // The last seven days of check-offs for these groups' active habits, joined to the habit so it needs no wait for the habit list.
-    supabase
-      .from("habit_logs")
-      .select("habit_id, log_date, completed_at, client_habits!inner ( group_id, active )")
-      .in("client_habits.group_id", allGroupIds)
-      .eq("client_habits.active", true)
-      .gte("log_date", sevenDaysAgoKey),
-    supabase.from("groups").select("id, group_kind").in("id", allGroupIds),
+    readRowsByIds(allGroupIds, (g) => (from, to) =>
+      supabase
+        .from("habit_logs")
+        .select("id, habit_id, log_date, completed_at, client_habits!inner ( group_id, active )")
+        .in("client_habits.group_id", g)
+        .eq("client_habits.active", true)
+        .gte("log_date", sevenDaysAgoKey)
+        .order("id")
+        .range(from, to)
+    ),
+    readRowsByIds(allGroupIds, (g) => (from, to) => supabase.from("groups").select("id, group_kind").in("id", g).order("id").range(from, to)),
   ]);
   const oneOnOneGroupIds = new Set<string>((groupKindRows ?? []).filter((g: any) => g.group_kind === "one_on_one").map((g: any) => g.id as string));
 
   // Most recent completed-workout date per athlete — first occurrence
-  // wins since logRows is already ordered newest-first.
+  // wins since the rows are one per client (the latest workout).
   const lastLoggedAtByAthlete = new Map<string, string>();
-  for (const log of logRows ?? []) {
+  for (const log of lastActiveRows ?? []) {
     if (!lastLoggedAtByAthlete.has(log.athlete_id)) {
       lastLoggedAtByAthlete.set(log.athlete_id, log.created_at);
     }
@@ -375,7 +373,9 @@ export async function getCoachDashboardData(
   // Clients who have run out of sessions (migration 0260 adds the hold flag; without it nobody is on hold).
   let owedResult: any = owedFirst;
   if (owedResult.error) {
-    owedResult = await supabase.from("session_credits").select("athlete_id, group_id, balance").in("group_id", allGroupIds).lte("balance", 0);
+    owedResult = await readRowsByIds(allGroupIds, (g) => (from, to) =>
+      supabase.from("session_credits").select("athlete_id, group_id, balance").in("group_id", g).lte("balance", 0).order("group_id").order("athlete_id").range(from, to)
+    );
   }
   const needsPaymentRows: NeedsPaymentRow[] = ((owedResult.data ?? []) as { athlete_id: string; group_id: string; balance: number; payment_hold?: boolean | null }[])
     .filter((r) => needsPayment(r.balance, r.payment_hold) && athleteByProfileId.has(r.athlete_id))
@@ -527,7 +527,7 @@ export async function getCoachDashboardData(
   // doesn't exist yet; a real follow-up, not silently dropped.)
   let heroEmptyState: HeroEmptyState | null = null;
   if (!heroFlag) {
-    const recentPrLog = (logRows ?? []).find(
+    const recentPrLog = (recentLogRows ?? []).find(
       (l) => (l.new_prs?.length ?? 0) > 0 && Date.now() - new Date(l.created_at).getTime() < 3 * 24 * 60 * 60 * 1000
     );
     if (recentPrLog) {

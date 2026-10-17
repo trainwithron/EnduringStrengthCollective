@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { useOrgGroupIds } from "@/lib/use-org-group-ids";
+import { readRowsByIds } from "@/lib/read-by-ids";
+import { pageAll } from "@/lib/page-all";
+import { localDateKey } from "@/lib/timezone";
 import {
   computeRealIncomeThisMonth,
   computeRealMRR,
@@ -53,33 +56,28 @@ export function BusinessMiniDashboard({ groupId, expanded = false }: { groupId: 
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      const monthKey = new Date().toISOString().slice(0, 7);
+      // This month and each payment's day are the coach's own (their device's zone), not UTC's.
+      const monthKey = localDateKey().slice(0, 7);
 
+      // Every read goes in groups of ids and a page at a time (lib/read-by-ids.ts): at 1,500 clients a single `.in` passes the URL limit and the 1,000-row cap.
       const [{ data: purchaseRows }, { data: quickPaymentRows }, { data: subRows }, { data: memberRows }] =
         await Promise.all([
-          supabase
-            .from("credit_purchases")
-            .select("amount_cents, created_at, athlete_id")
-            .in("group_id", groupIds!),
+          readRowsByIds(groupIds!, (g) => (from, to) => supabase.from("credit_purchases").select("amount_cents, created_at, athlete_id").in("group_id", g).order("id").range(from, to)),
           // Quick Payment (mobile_more_tab_condensed_widget_hub_sept30.md)
           // — real money received, a separate table from credit_purchases
           // (no session credits granted), but it still belongs in "income
           // this month" alongside everything else.
-          supabase
-            .from("coach_quick_payments")
-            .select("amount_cents, created_at, athlete_id")
-            .in("group_id", groupIds!),
-          supabase
-            .from("membership_subscriptions")
-            .select("price_cents, status, athlete_id")
-            .in("group_id", groupIds!),
-          supabase.from("group_memberships").select("profile_id").in("group_id", groupIds!).eq("role", "athlete"),
+          readRowsByIds(groupIds!, (g) => (from, to) => supabase.from("coach_quick_payments").select("amount_cents, created_at, athlete_id").in("group_id", g).order("id").range(from, to)),
+          readRowsByIds(groupIds!, (g) => (from, to) =>
+            supabase.from("membership_subscriptions").select("price_cents, status, athlete_id").in("group_id", g).order("group_id").order("athlete_id").range(from, to)
+          ),
+          readRowsByIds(groupIds!, (g) => (from, to) => supabase.from("group_memberships").select("profile_id").in("group_id", g).eq("role", "athlete").order("id").range(from, to)),
         ]);
 
       const incomeThisMonth = computeRealIncomeThisMonth(
         [...(purchaseRows ?? []), ...(quickPaymentRows ?? [])].map((r: any) => ({
           amountCents: r.amount_cents,
-          createdAtDateKey: (r.created_at as string).slice(0, 10),
+          createdAtDateKey: localDateKey(new Date(r.created_at as string)),
         })),
         monthKey
       );
@@ -115,30 +113,20 @@ export function BusinessMiniDashboard({ groupId, expanded = false }: { groupId: 
     async function run() {
       const supabase = createBrowserClient();
 
-      const { data: memberRows } = await supabase
-        .from("group_memberships")
-        .select("profile_id")
-        .in("group_id", groupIds!)
-        .eq("role", "athlete");
+      const { data: memberRows } = await readRowsByIds(groupIds!, (g) => (from, to) =>
+        supabase.from("group_memberships").select("profile_id").in("group_id", g).eq("role", "athlete").order("id").range(from, to)
+      );
       const athleteIds = [...new Set((memberRows ?? []).map((m: any) => m.profile_id as string))];
 
-      const { data: logRows } =
-        athleteIds.length > 0
-          ? await supabase
-              .from("workout_logs")
-              .select("athlete_id, created_at")
-              .in("athlete_id", athleteIds)
-              .in("group_id", groupIds!)
-              .order("created_at", { ascending: false })
-          : { data: [] };
-
+      // The last workout of each client, worked out by the database (one row per client) instead of reading every workout ever logged.
+      const lastActive = await pageAll((from, to) => supabase.rpc("business_last_active", { p_group_ids: groupIds! }).range(from, to));
       const lastByAthlete = new Map<string, string>();
-      for (const row of logRows ?? []) {
-        if (!lastByAthlete.has(row.athlete_id)) lastByAthlete.set(row.athlete_id, row.created_at.slice(0, 10));
+      for (const row of lastActive.rows) {
+        if (!lastByAthlete.has(row.athlete_id)) lastByAthlete.set(row.athlete_id, localDateKey(new Date(row.last_at)));
       }
       const engagement = computeEngagement(
         athleteIds.map((id: string) => ({ lastActiveDateKey: lastByAthlete.get(id) ?? null })),
-        new Date().toISOString().slice(0, 10),
+        localDateKey(),
         7
       );
 

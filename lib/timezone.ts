@@ -102,6 +102,17 @@ export function dateKeyInZone(timeZone: string, now: Date = new Date()): string 
   return nowInZone(timeZone, now).toISOString().slice(0, 10);
 }
 
+// A date key moved by whole days ("2026-10-31" + 1 = "2026-11-01"). Pure calendar arithmetic on the key, so it never depends on the machine clock or zone.
+export function addDaysToKey(key: string, days: number): string {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
+
+// The date key `days` calendar days before today as seen in `timeZone` (the zone-correct form of a UTC "N days ago").
+export function daysAgoKeyInZone(timeZone: string, days: number, now: Date = new Date()): string {
+  return addDaysToKey(dateKeyInZone(timeZone, now), -days);
+}
+
 // The real start and end instants of the calendar day it is right now in `timeZone`, plus that day's key. The end is the next local
 // midnight, so a day with a daylight-saving change is 23 or 25 hours long rather than a fixed 24. Use these for "today" queries instead of
 // the UTC date, which for a US coach is already tomorrow in the evening.

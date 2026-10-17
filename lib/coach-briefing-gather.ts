@@ -19,6 +19,9 @@ import { shortDateLabel } from "./apply-from";
 import { isSustainedHrvSuppression, SUSTAINED_SUPPRESSION_DAYS } from "./hrv-suppression";
 import { isGoalReversal, type GoalType } from "./goal-reversal";
 import { GOAL_TYPE_LABELS } from "./goal-types";
+import { DEFAULT_COACH_TIMEZONE, dateKeyInZone, daysAgoKeyInZone } from "./timezone";
+import { readRowsByIds } from "./read-by-ids";
+import { pageAll } from "./page-all";
 
 export type SignalKind =
   | "low_readiness"
@@ -40,21 +43,19 @@ export interface CandidateSignal {
   isStrongQuietTier: boolean;
 }
 
-function daysAgoKey(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return d.toISOString().slice(0, 10);
-}
 
 export async function gatherCandidateSignals(
   supabase: SupabaseClient,
-  params: { coachId: string; groupIds: string[] }
+  params: { coachId: string; groupIds: string[]; timeZone?: string }
 ): Promise<CandidateSignal[]> {
   const { coachId, groupIds } = params;
   if (groupIds.length === 0) return [];
 
   const now = new Date();
-  const todayKey = now.toISOString().slice(0, 10);
+  // "Today" and "N days ago" are the coach's own days (their time zone), not the server's UTC ones.
+  const timeZone = params.timeZone ?? DEFAULT_COACH_TIMEZONE;
+  const todayKey = dateKeyInZone(timeZone, now);
+  const daysAgoKey = (days: number) => daysAgoKeyInZone(timeZone, days, now);
   const sevenDaysAgoKey = daysAgoKey(7);
   const ninetyDaysAgoKey = daysAgoKey(90);
   const cooldownWindowKey = daysAgoKey(COOLDOWN_DAYS);
@@ -69,53 +70,41 @@ export async function gatherCandidateSignals(
     { data: nutritionPhaseRows },
     { data: recentBriefingItemRows },
   ] = await Promise.all([
-    supabase
-      .from("group_memberships")
-      .select("group_id, profile_id, joined_at, profiles ( full_name )")
-      .in("group_id", groupIds)
-      .eq("role", "athlete"),
-    supabase
-      .from("workout_logs")
-      .select("athlete_id, created_at")
-      .in("group_id", groupIds)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("programs")
-      .select("group_id, athlete_id, training_days")
-      .in("group_id", groupIds)
-      .eq("is_active", true),
-    supabase
-      .from("wellness_checkins")
-      .select("athlete_id, sleep_quality, soreness, energy")
-      .in("group_id", groupIds)
-      .eq("log_date", todayKey),
-    supabase
-      .from("client_habits")
-      .select("id, athlete_id, group_id, weekdays")
-      .in("group_id", groupIds)
-      .eq("active", true),
-    supabase
-      .from("set_logs")
-      .select(
-        `
-        weight, rpe, completed_at,
+    // Every read over the coach's groups goes in groups of ids and a page at a time (lib/read-by-ids.ts): at 1,500 clients a single `.in` passes the URL limit and the 1,000-row cap.
+    readRowsByIds(groupIds, (g) => (from, to) =>
+      supabase.from("group_memberships").select("group_id, profile_id, joined_at, profiles ( full_name )").in("group_id", g).eq("role", "athlete").order("id").range(from, to)
+    ),
+    // The last workout of each client, worked out by the database (one row per client) instead of reading every workout ever logged.
+    pageAll((from, to) => supabase.rpc("business_last_active", { p_group_ids: groupIds }).range(from, to)).then((r) => ({ data: r.rows.map((x: any) => ({ athlete_id: x.athlete_id, created_at: x.last_at })) })),
+    readRowsByIds(groupIds, (g) => (from, to) => supabase.from("programs").select("group_id, athlete_id, training_days").in("group_id", g).eq("is_active", true).order("id").range(from, to)),
+    readRowsByIds(groupIds, (g) => (from, to) =>
+      supabase.from("wellness_checkins").select("athlete_id, sleep_quality, soreness, energy").in("group_id", g).eq("log_date", todayKey).order("id").range(from, to)
+    ),
+    readRowsByIds(groupIds, (g) => (from, to) => supabase.from("client_habits").select("id, athlete_id, group_id, weekdays").in("group_id", g).eq("active", true).order("id").range(from, to)),
+    readRowsByIds(groupIds, (g) => (from, to) =>
+      supabase
+        .from("set_logs")
+        .select(
+          `
+        id, weight, rpe, completed_at,
         session_exercises!inner (
           exercise_name, session_id,
           athlete_sessions!inner ( athlete_id, group_id )
         )
       `
-      )
-      .eq("status", "completed")
-      .not("weight", "is", null)
-      .not("rpe", "is", null)
-      .in("session_exercises.athlete_sessions.group_id", groupIds)
-      .gte("completed_at", ninetyDaysAgoKey)
-      .order("completed_at", { ascending: true }),
-    supabase
-      .from("nutrition_checkins")
-      .select("athlete_id, phase, created_at")
-      .in("group_id", groupIds)
-      .order("created_at", { ascending: false }),
+        )
+        .eq("status", "completed")
+        .not("weight", "is", null)
+        .not("rpe", "is", null)
+        .in("session_exercises.athlete_sessions.group_id", g)
+        .gte("completed_at", ninetyDaysAgoKey)
+        .order("completed_at", { ascending: true })
+        .order("id")
+        .range(from, to)
+    ),
+    readRowsByIds(groupIds, (g) => (from, to) =>
+      supabase.from("nutrition_checkins").select("athlete_id, phase, created_at").in("group_id", g).order("created_at", { ascending: false }).order("id").range(from, to)
+    ).then((r) => ({ data: r.data.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))) })),
     supabase
       .from("coach_briefing_items")
       .select("signal_ids, coach_briefings!inner ( coach_id, briefing_date )")
@@ -147,14 +136,9 @@ export async function gatherCandidateSignals(
     habitsByAthlete.set(h.athlete_id, list);
   }
   const habitIds = (habitRows ?? []).map((h) => h.id);
-  const { data: habitLogRows } =
-    habitIds.length > 0
-      ? await supabase
-          .from("habit_logs")
-          .select("habit_id, log_date, completed_at")
-          .in("habit_id", habitIds)
-          .gte("log_date", sevenDaysAgoKey)
-      : { data: [] as { habit_id: string; log_date: string; completed_at: string | null }[] };
+  const { data: habitLogRows } = await readRowsByIds(habitIds, (g) => (from, to) =>
+    supabase.from("habit_logs").select("habit_id, log_date, completed_at").in("habit_id", g).gte("log_date", sevenDaysAgoKey).order("id").range(from, to)
+  );
   const windowDates: Date[] = [];
   for (let i = 0; i < 7; i++) {
     const d = new Date(now);
@@ -225,28 +209,23 @@ export async function gatherCandidateSignals(
   // above) scoped to just the athletes on this coach's roster who have
   // an active Oura connection.
   const athleteIds = [...athleteByProfileId.keys()];
-  const { data: wearableConnectionRows } =
-    athleteIds.length > 0
-      ? await supabase
-          .from("wearable_connections")
-          .select("id, profile_id, created_at")
-          .in("profile_id", athleteIds)
-          .eq("provider", "oura")
-          .eq("status", "active")
-      : { data: [] as { id: string; profile_id: string; created_at: string }[] };
+  const { data: wearableConnectionRows } = await readRowsByIds(athleteIds, (g) => (from, to) =>
+    supabase.from("wearable_connections").select("id, profile_id, created_at").in("profile_id", g).eq("provider", "oura").eq("status", "active").order("id").range(from, to)
+  );
   const connectionByAthlete = new Map((wearableConnectionRows ?? []).map((c) => [c.profile_id, c]));
   const connectionIds = (wearableConnectionRows ?? []).map((c) => c.id);
   const hrvCutoffKey = daysAgoKey(SUSTAINED_SUPPRESSION_DAYS);
-  const { data: hrvMetricRows } =
-    connectionIds.length > 0
-      ? await supabase
-          .from("wearable_daily_metrics")
-          .select("connection_id, metric_date, value")
-          .in("connection_id", connectionIds)
-          .eq("metric_type", "hrv_balance")
-          .gte("metric_date", hrvCutoffKey)
-          .order("metric_date", { ascending: true })
-      : { data: [] as { connection_id: string; metric_date: string; value: number }[] };
+  const { data: hrvMetricRows } = await readRowsByIds(connectionIds, (g) => (from, to) =>
+    supabase
+      .from("wearable_daily_metrics")
+      .select("connection_id, metric_date, value")
+      .in("connection_id", g)
+      .eq("metric_type", "hrv_balance")
+      .gte("metric_date", hrvCutoffKey)
+      .order("metric_date", { ascending: true })
+      .order("id")
+      .range(from, to)
+  ).then((r) => ({ data: r.data.sort((a, b) => String(a.metric_date).localeCompare(String(b.metric_date))) }));
   const hrvPointsByConnection = new Map<string, { date: string; value: number }[]>();
   for (const row of hrvMetricRows ?? []) {
     const list = hrvPointsByConnection.get(row.connection_id) ?? [];
@@ -260,15 +239,16 @@ export async function gatherCandidateSignals(
   // direction flip between what the coach most recently signed off on
   // and the one before that, never compared against a still-'proposed'
   // goal (which hasn't taken effect yet).
-  const { data: confirmedGoalRows } =
-    athleteIds.length > 0
-      ? await supabase
-          .from("client_goals")
-          .select("athlete_id, group_id, goal_type, confirmed_at, created_at")
-          .in("athlete_id", athleteIds)
-          .eq("status", "confirmed")
-          .order("confirmed_at", { ascending: false })
-      : { data: [] as { athlete_id: string; group_id: string; goal_type: string; confirmed_at: string; created_at: string }[] };
+  const { data: confirmedGoalRows } = await readRowsByIds(athleteIds, (g) => (from, to) =>
+    supabase
+      .from("client_goals")
+      .select("athlete_id, group_id, goal_type, confirmed_at, created_at")
+      .in("athlete_id", g)
+      .eq("status", "confirmed")
+      .order("confirmed_at", { ascending: false })
+      .order("id")
+      .range(from, to)
+  ).then((r) => ({ data: r.data.sort((a, b) => String(b.confirmed_at).localeCompare(String(a.confirmed_at))) }));
   const confirmedGoalsByAthlete = new Map<string, { goalType: string; confirmedAt: string }[]>();
   for (const row of confirmedGoalRows ?? []) {
     const list = confirmedGoalsByAthlete.get(row.athlete_id) ?? [];

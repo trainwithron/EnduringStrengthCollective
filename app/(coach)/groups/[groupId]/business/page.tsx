@@ -7,6 +7,8 @@ import { redirectOneOnOneToAnchor } from "@/lib/coach-wide-redirect";
 import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { loadBusinessScope } from "@/lib/business-scope";
+import { countByIds, readByIds } from "@/lib/read-by-ids";
+import { pageAll } from "@/lib/page-all";
 import { createServerClient } from "@/lib/supabase/server";
 import { getViewerDisplayTimezone } from "@/lib/display-timezone-server";
 import { dateKeyInZone, monthBoundsInZone } from "@/lib/timezone";
@@ -73,20 +75,22 @@ export default async function BusinessDashboardPage(
   const groupIds = scope.groupIds;
   if (scope.failed) return <LoadFailedPage />;
 
-  const { data: memberRows, error: memberError } = await supabase
-    .from("group_memberships")
-    .select("id, group_id, profile_id, joined_at, client_tier, profiles ( full_name )")
-    .in("group_id", groupIds.length > 0 ? groupIds : ["00000000-0000-0000-0000-000000000000"])
-    .eq("role", "athlete")
-    .order("joined_at", { ascending: false });
-  // What each client pays is coach-only (client_billing_rates, 0303).
-  const { data: rateRows, error: rateError } = await supabase
-    .from("client_billing_rates")
-    .select("membership_id, monthly_rate")
-    .in("group_id", groupIds.length > 0 ? groupIds : ["00000000-0000-0000-0000-000000000000"]);
-  const rateByMembership = ratesByMembership(rateRows);
+  // Every read below goes in groups of ids and a page at a time (readByIds): with 1,500 clients there are 1,500 groups, past the URL limit of one request and the 1,000-row cap, and either
+  // used to drop rows without a word. A read that fails shows "couldn't load", never a smaller business.
+  const [members, rates, credits] = await Promise.all([
+    readByIds(groupIds, (g) => (from, to) =>
+      supabase.from("group_memberships").select("id, group_id, profile_id, joined_at, client_tier, profiles ( full_name )").in("group_id", g).eq("role", "athlete").order("id").range(from, to)
+    ),
+    // What each client pays is coach-only (client_billing_rates, 0303).
+    readByIds(groupIds, (g) => (from, to) => supabase.from("client_billing_rates").select("membership_id, monthly_rate").in("group_id", g).order("membership_id").range(from, to)),
+    readByIds(groupIds, (g) => (from, to) => supabase.from("session_credits").select("athlete_id, group_id, balance").in("group_id", g).order("group_id").order("athlete_id").range(from, to)),
+  ]);
+  if (members.failed || rates.failed || credits.failed) return <LoadFailedPage />;
+  const memberRows = members.rows.sort((a, b) => String(b.joined_at).localeCompare(String(a.joined_at)));
+  const rateByMembership = ratesByMembership(rates.rows);
+  const creditRows = credits.rows;
 
-  const clients = (memberRows ?? []).map((m) => ({
+  const clients = memberRows.map((m) => ({
     membershipId: m.id,
     groupId: m.group_id,
     athleteId: m.profile_id,
@@ -98,39 +102,36 @@ export default async function BusinessDashboardPage(
 
   const uniqueAthleteIds = new Set(clients.map((c) => c.athleteId));
 
-  const { data: creditRows, error: creditError } = await supabase
-    .from("session_credits")
-    .select("athlete_id, group_id, balance")
-    .in("group_id", groupIds.length > 0 ? groupIds : ["00000000-0000-0000-0000-000000000000"]);
-  const totalOutstandingCredits = (creditRows ?? []).reduce((sum, r) => sum + (r.balance ?? 0), 0);
+  const totalOutstandingCredits = creditRows.reduce((sum, r) => sum + (r.balance ?? 0), 0);
 
   // Every day and month on this page is the coach's own (the zone their device is in), not the server's UTC.
   const displayZone = await getViewerDisplayTimezone(supabase, user.id);
   const dateKey = (d: Date): string => dateKeyInZone(displayZone, d);
 
-  const { data: logRows, error: logError } = await supabase
-    .from("workout_logs")
-    .select("athlete_id, created_at")
-    .in("group_id", groupIds.length > 0 ? groupIds : ["00000000-0000-0000-0000-000000000000"])
-    .order("created_at", { ascending: false });
+  // The last workout of each client, worked out by the database (one row per client) instead of reading every workout ever logged.
+  const lastActive = await pageAll((from, to) => supabase.rpc("business_last_active", { p_group_ids: groupIds }).range(from, to));
+  if (lastActive.failed) return <LoadFailedPage />;
   const lastActiveByAthlete = new Map<string, string>();
-  for (const log of logRows ?? []) {
-    if (!lastActiveByAthlete.has(log.athlete_id)) {
-      lastActiveByAthlete.set(log.athlete_id, dateKey(new Date(log.created_at)));
+  for (const row of lastActive.rows) {
+    if (!lastActiveByAthlete.has(row.athlete_id)) {
+      lastActiveByAthlete.set(row.athlete_id, dateKey(new Date(row.last_at)));
     }
   }
 
   const todayKey = dateKey(new Date());
   const { monthKey, startIso: monthStartIso } = monthBoundsInZone(displayZone);
 
-  const { count: bookingsThisMonthCount, error: bookingsError } = await supabase
-    .from("bookings")
-    .select("id", { count: "exact", head: true })
-    .in("group_id", groupIds.length > 0 ? groupIds : ["00000000-0000-0000-0000-000000000000"])
-    .eq("status", "confirmed")
-    // a coach counts their own sessions; the owner or an admin counts every coach's
-    .match(scope.organizationWide ? {} : { coach_id: user.id })
-    .gte("start_at", monthStartIso);
+  const { count: bookingsThisMonthCount, failed: bookingsCountFailed } = await countByIds(groupIds, (g) =>
+    supabase
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .in("group_id", g)
+      .eq("status", "confirmed")
+      // a coach counts their own sessions; the owner or an admin counts every coach's
+      .match(scope.organizationWide ? {} : { coach_id: user.id })
+      .gte("start_at", monthStartIso)
+  );
+  if (bookingsCountFailed) return <LoadFailedPage />;
 
   const organizationId = await orgIdOfGroup(supabase, params.groupId);
   const { data: referralRows } = await inOrg(supabase.from("referral_partners").select("click_count").eq("coach_id", user.id), organizationId);
@@ -142,32 +143,27 @@ export default async function BusinessDashboardPage(
   // Real, Stripe-sourced figures — additive to the manual-rate estimate
   // below, not a replacement. A coach with no packages configured yet
   // simply gets 0 here and keeps seeing the estimate as their only signal.
-  const safeGroupIds = groupIds.length > 0 ? groupIds : ["00000000-0000-0000-0000-000000000000"];
 
   // v3_visual_polish_mockup_sept15.md's "Dashboard Empty State & Business
   // Tiles" mockup — a true zero (no packages ever configured) needs to
   // read differently from a real "$0 this period" (packages exist, just
   // no purchases yet). Package existence, not the period's totals, is
   // the real "has billing even been set up" signal.
-  const { count: packageCount, error: packageError } = await supabase
-    .from("coach_packages")
-    .select("id", { count: "exact", head: true })
-    .in("group_id", safeGroupIds)
-    .match(scope.organizationWide ? {} : { coach_id: user.id });
-  const hasBillingSetUp = (packageCount ?? 0) > 0;
-
-  const { data: purchaseRows, error: purchaseError } = await supabase
-    .from("credit_purchases")
-    .select("athlete_id, amount_cents, created_at")
-    .in("group_id", safeGroupIds);
-
-  const { data: subscriptionRows, error: subscriptionError } = await supabase
-    .from("membership_subscriptions")
-    .select("athlete_id, price_cents, status")
-    .in("group_id", safeGroupIds);
-
-  // A failed read must never look like "no billing yet / $0 / no clients": the page says it could not load.
-  if (memberError || rateError || creditError || logError || bookingsError || packageError || purchaseError || subscriptionError) return <LoadFailedPage />;
+  const [packages, purchases, subscriptions] = await Promise.all([
+    countByIds(groupIds, (g) =>
+      supabase
+        .from("coach_packages")
+        .select("id", { count: "exact", head: true })
+        .in("group_id", g)
+        .match(scope.organizationWide ? {} : { coach_id: user.id })
+    ),
+    readByIds(groupIds, (g) => (from, to) => supabase.from("credit_purchases").select("athlete_id, amount_cents, created_at").in("group_id", g).order("id").range(from, to)),
+    readByIds(groupIds, (g) => (from, to) => supabase.from("membership_subscriptions").select("athlete_id, price_cents, status").in("group_id", g).order("group_id").order("athlete_id").range(from, to)),
+  ]);
+  if (packages.failed || purchases.failed || subscriptions.failed) return <LoadFailedPage />;
+  const hasBillingSetUp = packages.count > 0;
+  const purchaseRows = purchases.rows;
+  const subscriptionRows = subscriptions.rows;
 
   const realIncomeThisMonth = computeRealIncomeThisMonth(
     (purchaseRows ?? []).map((p) => ({

@@ -20,6 +20,8 @@ import {
 } from "@/lib/business-rail-metrics";
 import { RailWidgetHeader, RailWidgetDeeperLink, RailWidgetLoading } from "./rail-widget-shell";
 import { ratesByMembership } from "@/lib/client-rates";
+import { readRowsByIds } from "@/lib/read-by-ids";
+import { pageAll } from "@/lib/page-all";
 
 function dateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -69,19 +71,18 @@ export function BusinessRailWidget({ groupId }: { groupId: string }) {
       ]);
       // Only the organization the coach is in: never another organization's clients or income.
       const groupIds = (coachedGroups ?? []).map((g) => g.id);
-      const safeGroupIds = groupIds.length > 0 ? groupIds : ["00000000-0000-0000-0000-000000000000"];
       const resolvedPicks = resolveTopBusinessMetrics(layoutRow?.business_widget_metrics ?? []);
 
-      const [{ data: memberRows }, { data: rateRows }, { data: logRows }, { data: purchaseRows }, { data: subRows }] = await Promise.all([
-        supabase
-          .from("group_memberships")
-          .select("id, profile_id, joined_at")
-          .in("group_id", safeGroupIds)
-          .eq("role", "athlete"),
-        supabase.from("client_billing_rates").select("membership_id, monthly_rate").in("group_id", safeGroupIds),
-        supabase.from("workout_logs").select("athlete_id, created_at").in("group_id", safeGroupIds),
-        supabase.from("credit_purchases").select("athlete_id, amount_cents, created_at").in("group_id", safeGroupIds),
-        supabase.from("membership_subscriptions").select("athlete_id, price_cents, status").in("group_id", safeGroupIds),
+      // Every read goes in groups of ids and a page at a time (lib/read-by-ids.ts): at 1,500 clients a single `.in` passes the URL limit and the 1,000-row cap. The last workout of each client is worked
+      // out by the database (one row per client) instead of reading every workout ever logged.
+      const [{ data: memberRows }, { data: rateRows }, lastActive, { data: purchaseRows }, { data: subRows }] = await Promise.all([
+        readRowsByIds(groupIds, (g) => (from, to) => supabase.from("group_memberships").select("id, profile_id, joined_at").in("group_id", g).eq("role", "athlete").order("id").range(from, to)),
+        readRowsByIds(groupIds, (g) => (from, to) => supabase.from("client_billing_rates").select("membership_id, monthly_rate").in("group_id", g).order("membership_id").range(from, to)),
+        groupIds.length > 0 ? pageAll((from, to) => supabase.rpc("business_last_active", { p_group_ids: groupIds }).range(from, to)) : Promise.resolve({ rows: [] as any[] }),
+        readRowsByIds(groupIds, (g) => (from, to) => supabase.from("credit_purchases").select("athlete_id, amount_cents, created_at").in("group_id", g).order("id").range(from, to)),
+        readRowsByIds(groupIds, (g) => (from, to) =>
+          supabase.from("membership_subscriptions").select("athlete_id, price_cents, status").in("group_id", g).order("group_id").order("athlete_id").range(from, to)
+        ),
       ]);
 
       const today = new Date();
@@ -90,8 +91,8 @@ export function BusinessRailWidget({ groupId }: { groupId: string }) {
       const uniqueAthleteIds = new Set((memberRows ?? []).map((m) => m.profile_id));
 
       const lastActiveByAthlete = new Map<string, string>();
-      for (const log of logRows ?? []) {
-        const key = dateKey(new Date(log.created_at));
+      for (const log of lastActive.rows) {
+        const key = dateKey(new Date(log.last_at));
         const existing = lastActiveByAthlete.get(log.athlete_id);
         if (!existing || key > existing) lastActiveByAthlete.set(log.athlete_id, key);
       }

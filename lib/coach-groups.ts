@@ -1,5 +1,6 @@
 import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { pageAll } from "@/lib/page-all";
 
 // The coach's own world, scoped to ONE organization. Organizations are
 // separate businesses (their own groups and one-on-one clients), so every
@@ -31,14 +32,20 @@ function normalizeKind(kind: string | null | undefined): GroupKind {
 export const getCoachedGroups = cache(readCoachedGroups);
 
 async function readCoachedGroups(supabase: SupabaseClient, coachId: string): Promise<CoachedGroup[]> {
-  const { data } = await supabase
-    .from("group_memberships")
-    .select("group_id, groups ( id, name, group_kind, organization_id, organizations ( name ) )")
-    .eq("profile_id", coachId)
-    .eq("role", "coach");
+  // A coach with more than 1,000 one-on-one clients has more than 1,000 of these rows: a request returns at most 1,000, so they are read a page at a time (every coach-wide page starts here).
+  const { rows, failed } = await pageAll((from, to) =>
+    supabase
+      .from("group_memberships")
+      .select("group_id, groups ( id, name, group_kind, organization_id, organizations ( name ) )")
+      .eq("profile_id", coachId)
+      .eq("role", "coach")
+      .order("id")
+      .range(from, to)
+  );
+  if (failed) console.error("getCoachedGroups: could not read all of the coach's groups");
 
   const out: CoachedGroup[] = [];
-  for (const row of (data ?? []) as any[]) {
+  for (const row of rows as any[]) {
     const g = row.groups;
     if (!g?.id || !g.organization_id) continue;
     out.push({

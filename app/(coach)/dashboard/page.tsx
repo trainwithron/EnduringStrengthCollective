@@ -21,7 +21,7 @@ import { PulseTabs } from "@/components/coach/desktop/pulse-tabs";
 import { DashboardStatTiles } from "@/components/coach/desktop/dashboard-stat-tiles";
 import { YourDayPanel } from "@/components/coach/desktop/your-day-panel";
 import { attentionFromSources, buildSchedule, type ClassSource } from "@/lib/your-day";
-import { DEFAULT_COACH_TIMEZONE, localDayBounds } from "@/lib/timezone";
+import { DEFAULT_COACH_TIMEZONE, addDaysToKey, dateKeyInZone, localDayBounds } from "@/lib/timezone";
 import { isValidTimeZone } from "@/lib/format-in-timezone";
 import { isLowReadiness } from "@/lib/wellness";
 import { NeedsPaymentPanel } from "@/components/coach/desktop/needs-payment-panel";
@@ -38,6 +38,8 @@ import {
 } from "@/components/coach/desktop/collective-intelligence-panel";
 import { StuckDesktopModeBanner } from "@/components/coach/desktop/stuck-desktop-mode-banner";
 import { fetchInactiveKeys, inactiveKey } from "@/lib/inactive-ids";
+import { readRowsByIds } from "@/lib/read-by-ids";
+import { pageAll } from "@/lib/page-all";
 import { TerminologyFirstRunCard } from "@/components/coach/desktop/terminology-first-run-card";
 import { GettingStartedCard } from "@/components/coach/desktop/getting-started-card";
 import { NeedsYouLoader, NeedsYouLoading } from "@/components/coach/desktop/needs-you-loader";
@@ -125,7 +127,8 @@ export default async function CoachHomePage() {
   // organization's; another one appears only after switching to it.
   // The organization they last used (the switcher remembers it); with none remembered, the one with the most clients.
   const rememberedWorkspace = (await cookies()).get(LAST_WORKSPACE_GROUP_COOKIE)?.value ?? null;
-  const todayKey = new Date().toISOString().slice(0, 10);
+  // The briefing is filed under the coach's own day (their time zone, set below), which is the UTC day or a day either side of it: read that window, keep the right one once the zone is known.
+  const utcTodayKey = new Date().toISOString().slice(0, 10);
   // Round 1: everything that needs only who the coach is, as one batch.
   const [
     // A coach can own/admin more than one organization (e.g. running several client orgs at once) — fetching every row here, not just
@@ -146,7 +149,7 @@ export default async function CoachHomePage() {
     { data: layoutRow },
     // AI Assistant Slice 2 ("Collective Intelligence") — today's briefing, if the cron has already run. RLS already scopes this to athletes this
     // coach actually staffs, so a plain select needs no extra group filtering.
-    { data: todaysBriefing },
+    { data: briefingWindowRows },
     // Real org-level notifications (trainer-dispatch admin alerts, cascade offers, question replies) are inserted with group_id: null since they're
     // inherently org-wide, not tied to one specific group. This is the one page in the app that's already cross-group by design.
     { data: orgNotificationRows },
@@ -159,7 +162,7 @@ export default async function CoachHomePage() {
     supabase.from("coach_profiles").select("completion_message").eq("coach_id", user.id).maybeSingle(),
     supabase.from("group_memberships").select("groups ( id, name, focus_tag, group_kind, organization_id )").eq("profile_id", user.id).eq("role", "coach"),
     supabase.from("coach_dashboard_layout").select("hidden_tiles, tile_order, tile_metric_overrides").eq("coach_id", user.id).maybeSingle(),
-    supabase.from("coach_briefings").select("id").eq("coach_id", user.id).eq("briefing_date", todayKey),
+    supabase.from("coach_briefings").select("id, briefing_date").eq("coach_id", user.id).gte("briefing_date", addDaysToKey(utcTodayKey, -1)).lte("briefing_date", addDaysToKey(utcTodayKey, 1)),
     supabase
       .from("notifications")
       .select("id, type, body, link_path, created_at")
@@ -177,6 +180,7 @@ export default async function CoachHomePage() {
   const primaryOrgMembership = (homeOrgId ? orgMemberships?.find((m) => m.organization_id === homeOrgId) : null) ?? orgMemberships?.[0] ?? null;
   // The coach's own time zone: "today" on this page is their day, not the server's.
   const coachTimezone = isValidTimeZone(viewerProfile?.timezone) ? (viewerProfile!.timezone as string) : DEFAULT_COACH_TIMEZONE;
+  const todaysBriefing = (briefingWindowRows ?? []).filter((b) => b.briefing_date === dateKeyInZone(coachTimezone));
 
   const byId = new Map<string, GroupRow>();
   for (const row of coachedRows ?? []) {
@@ -193,8 +197,11 @@ export default async function CoachHomePage() {
     primaryOrgMembership
       ? supabase.from("organizations").select("name, display_name").eq("id", primaryOrgMembership.organization_id).maybeSingle()
       : Promise.resolve({ data: null }),
+    // Every group of the organizations they administer (more than 1,000 for a gym with that many one-on-one clients, so a page at a time), by name.
     adminOrgIds.length > 0
-      ? supabase.from("groups").select("id, name, focus_tag, group_kind, organization_id").in("organization_id", adminOrgIds).order("name")
+      ? pageAll((from, to) => supabase.from("groups").select("id, name, focus_tag, group_kind, organization_id").in("organization_id", adminOrgIds).order("id").range(from, to)).then((r) => ({
+          data: r.rows.sort((a, b) => String(a.name ?? "").localeCompare(String(b.name ?? ""))),
+        }))
       : Promise.resolve({ data: null }),
     todaysBriefing && todaysBriefing.length > 0
       ? supabase
@@ -260,31 +267,9 @@ export default async function CoachHomePage() {
   async function loadUnseenByGroup(): Promise<Map<string, boolean>> {
     const unseen = new Map<string, boolean>();
     if (allGroupIds.length === 0) return unseen;
-    const { data: viewStateRows } = await supabase
-      .from("coach_view_state")
-      .select("group_id, feed_seen_at, clients_seen_at")
-      .eq("coach_id", user!.id)
-      .in("group_id", allGroupIds);
-
-    const seenByGroup = new Map<string, { feed: string | null; clients: string | null }>();
-    for (const row of viewStateRows ?? []) {
-      seenByGroup.set(row.group_id, { feed: row.feed_seen_at, clients: row.clients_seen_at });
-    }
-
-    if (seenByGroup.size > 0) {
-      const visitedGroupIds = [...seenByGroup.keys()];
-      const [{ data: recentPosts }, { data: recentGroupLogs }] = await Promise.all([
-        supabase.from("posts").select("group_id, created_at").in("group_id", visitedGroupIds),
-        supabase.from("workout_logs").select("group_id, created_at").in("group_id", visitedGroupIds),
-      ]);
-
-      for (const groupId of visitedGroupIds) {
-        const seen = seenByGroup.get(groupId)!;
-        const hasNewPost = (recentPosts ?? []).some((p) => p.group_id === groupId && (!seen.feed || p.created_at > seen.feed));
-        const hasNewLog = (recentGroupLogs ?? []).some((l) => l.group_id === groupId && (!seen.clients || l.created_at > seen.clients));
-        unseen.set(groupId, hasNewPost || hasNewLog);
-      }
-    }
+    // The database answers "is there anything newer than I last looked" for each visited group (one row per group), instead of this page reading every post and workout ever logged.
+    const { rows } = await pageAll((from, to) => supabase.rpc("coach_unseen_groups", { p_group_ids: allGroupIds }).range(from, to));
+    for (const row of rows) unseen.set(row.group_id as string, !!row.unseen);
     return unseen;
   }
 
@@ -292,7 +277,7 @@ export default async function CoachHomePage() {
   async function loadMemberCounts(): Promise<Map<string, number>> {
     const counts = new Map<string, number>();
     if (teamAndSocialIds.length === 0) return counts;
-    const { data: memberRows } = await supabase.from("group_memberships").select("group_id").in("group_id", teamAndSocialIds);
+    const { data: memberRows } = await readRowsByIds(teamAndSocialIds, (g) => (from, to) => supabase.from("group_memberships").select("group_id").in("group_id", g).order("id").range(from, to));
     for (const row of memberRows ?? []) {
       counts.set(row.group_id, (counts.get(row.group_id) ?? 0) + 1);
     }
@@ -305,10 +290,9 @@ export default async function CoachHomePage() {
   async function loadNeedsReplyThreads(): Promise<NeedsReplyThread[]> {
     if (teamAndSocialIds.length === 0) return [];
     const [{ data: commentRows }, { data: dismissedRows }] = await Promise.all([
-      supabase
-        .from("comments")
-        .select("post_id, group_id, author_id, created_at, body, profiles ( full_name )")
-        .in("group_id", teamAndSocialIds),
+      readRowsByIds(teamAndSocialIds, (g) => (from, to) =>
+        supabase.from("comments").select("post_id, group_id, author_id, created_at, body, profiles ( full_name )").in("group_id", g).order("id").range(from, to)
+      ),
       supabase.from("coach_dismissed_reply_alerts").select("post_id, dismissed_at").eq("coach_id", user!.id),
     ]);
 
@@ -355,12 +339,11 @@ export default async function CoachHomePage() {
   async function loadSoloClientRows() {
     if (soloGroupIds.length === 0) return null;
     const [{ data: athleteRows }, { data: recentLogs }, inactiveKeys] = await Promise.all([
-      supabase
-        .from("group_memberships")
-        .select("group_id, profile_id, profiles ( full_name, avatar_url )")
-        .in("group_id", soloGroupIds)
-        .eq("role", "athlete"),
-      supabase.from("workout_logs").select("athlete_id, created_at").in("group_id", soloGroupIds).order("created_at", { ascending: false }),
+      readRowsByIds(soloGroupIds, (g) => (from, to) =>
+        supabase.from("group_memberships").select("group_id, profile_id, profiles ( full_name, avatar_url )").in("group_id", g).eq("role", "athlete").order("id").range(from, to)
+      ),
+      // The last workout of each client, worked out by the database (one row per client).
+      pageAll((from, to) => supabase.rpc("business_last_active", { p_group_ids: soloGroupIds }).range(from, to)).then((r) => ({ data: r.rows.map((x: any) => ({ athlete_id: x.athlete_id, created_at: x.last_at })) })),
       fetchInactiveKeys(supabase, soloGroupIds),
     ]);
     return { athleteRows, recentLogs, inactiveKeys };
@@ -370,16 +353,20 @@ export default async function CoachHomePage() {
   // just leaves that part out.
   async function loadTodaysClasses(): Promise<ClassSource[]> {
     try {
-      const { data: classRows } = await supabase
-        .from("group_sessions")
-        .select("id, title, start_at, end_at, capacity")
-        .eq("kind", "class")
-        .eq("coach_id", user!.id)
-        .in("group_id", allGroupIdList.length > 0 ? allGroupIdList : ["00000000-0000-0000-0000-000000000000"])
-        .eq("status", "scheduled")
-        .gte("start_at", day.startIso)
-        .lt("start_at", day.endIso)
-        .order("start_at", { ascending: true });
+      const { data: classData } = await readRowsByIds(allGroupIdList, (g) => (from, to) =>
+        supabase
+          .from("group_sessions")
+          .select("id, title, start_at, end_at, capacity")
+          .eq("kind", "class")
+          .eq("coach_id", user!.id)
+          .in("group_id", g)
+          .eq("status", "scheduled")
+          .gte("start_at", day.startIso)
+          .lt("start_at", day.endIso)
+          .order("id")
+          .range(from, to)
+      );
+      const classRows = classData.sort((a, b) => String(a.start_at).localeCompare(String(b.start_at)));
       const ids = (classRows ?? []).map((c: any) => c.id as string);
       const counts = new Map<string, { joined: number; waitlisted: number }>();
       if (ids.length > 0) {
@@ -408,14 +395,12 @@ export default async function CoachHomePage() {
   async function loadLowReadiness(): Promise<{ athleteId: string; groupId: string; name: string }[]> {
     try {
       if (allGroupIdList.length === 0) return [];
-      const { data: wellnessRows } = await supabase
-        .from("wellness_checkins")
-        .select("athlete_id, group_id, sleep_quality, soreness, energy")
-        .in("group_id", allGroupIdList)
-        .eq("log_date", day.dateKey);
+      const { data: wellnessRows } = await readRowsByIds(allGroupIdList, (g) => (from, to) =>
+        supabase.from("wellness_checkins").select("athlete_id, group_id, sleep_quality, soreness, energy").in("group_id", g).eq("log_date", day.dateKey).order("id").range(from, to)
+      );
       const low = (wellnessRows ?? []).filter((w: any) => isLowReadiness({ sleepQuality: w.sleep_quality, soreness: w.soreness, energy: w.energy }));
       if (low.length === 0) return [];
-      const { data: nameRows } = await supabase.from("profiles").select("id, full_name").in("id", low.map((w: any) => w.athlete_id));
+      const { data: nameRows } = await readRowsByIds(low.map((w: any) => w.athlete_id as string), (g) => (from, to) => supabase.from("profiles").select("id, full_name").in("id", g).order("id").range(from, to));
       const nameById = new Map((nameRows ?? []).map((p: any) => [p.id, p.full_name as string]));
       return low.map((w: any) => ({ athleteId: w.athlete_id, groupId: w.group_id, name: nameById.get(w.athlete_id) ?? "A client" }));
     } catch {

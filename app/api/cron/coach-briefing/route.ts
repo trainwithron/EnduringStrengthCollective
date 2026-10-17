@@ -5,7 +5,12 @@ import { gatherCandidateSignals, type CandidateSignal } from "@/lib/coach-briefi
 import { validateNoHallucinatedNumbers, validateNoNumbers } from "@/lib/coach-briefing-numeral-guard";
 import { enforceReservedQuietSlot } from "@/lib/coach-briefing-reserved-slot";
 import { withCronRun } from "@/lib/cron-monitor";
+import { runPool } from "@/lib/run-pool";
+import { pageAll } from "@/lib/page-all";
+import { readRowsByIds } from "@/lib/read-by-ids";
 import { AiRateLimitedError } from "@/lib/ai-usage";
+import { DEFAULT_COACH_TIMEZONE, dateKeyInZone } from "@/lib/timezone";
+import { isValidTimeZone } from "@/lib/format-in-timezone";
 
 // AI Assistant Slice 2 ("Collective Intelligence" — The Briefing). Same
 // CRON_SECRET/service-role shape as every other cron in this app. One
@@ -16,6 +21,12 @@ import { AiRateLimitedError } from "@/lib/ai-usage";
 // "an empty day is zero items, never manufactured content" is to never
 // hand the model an empty canvas to fill in the first place.
 const MAX_ITEMS_PER_DAY = 3;
+
+// One AI call per coach: the coaches run a few at a time (not one after another) and no new coach is started past the time budget, so a long list finishes inside the function's time and a manual re-run
+// (idempotent per day) picks up whoever was left.
+export const maxDuration = 300;
+const COACHES_AT_ONCE = 5;
+const TIME_BUDGET_MS = 270_000;
 
 interface RawModelItem {
   item_type: "observation" | "reflective_question" | "celebration";
@@ -52,19 +63,22 @@ async function handler(request: Request) {
   }
 
   const supabase = createServiceRoleClient();
-  const todayKey = new Date().toISOString().slice(0, 10);
 
-  const { data: coachMemberships } = await supabase
-    .from("group_memberships")
-    .select("profile_id, group_id")
-    .eq("role", "coach");
+  // Every coach membership, a page at a time (a request returns at most 1,000 rows).
+  const { rows: coachMemberships, failed: membershipsFailed } = await pageAll((from, to) =>
+    supabase.from("group_memberships").select("profile_id, group_id").eq("role", "coach").order("id").range(from, to)
+  );
+  if (membershipsFailed) return NextResponse.json({ error: "Could not read the coaches." }, { status: 500 });
 
   // One briefing per coach PER ORGANIZATION: a coach who runs two organizations gets a separate briefing for each, built only from that organization's clients (the request to the AI never
   // names clients from two organizations, and each organization has its own limit of items).
-  const { data: groupOrgRows } = await supabase.from("groups").select("id, organization_id").in("id", [...new Set((coachMemberships ?? []).map((r) => r.group_id))]);
+  const { data: groupOrgRows } = await readRowsByIds(
+    [...new Set(coachMemberships.map((r) => r.group_id as string))],
+    (g) => (from, to) => supabase.from("groups").select("id, organization_id").in("id", g).order("id").range(from, to)
+  );
   const orgOfGroup = new Map((groupOrgRows ?? []).map((g) => [g.id as string, (g.organization_id as string | null) ?? null]));
   const groupIdsByCoachOrg = new Map<string, { coachId: string; organizationId: string | null; groupIds: string[] }>();
-  for (const row of coachMemberships ?? []) {
+  for (const row of coachMemberships) {
     const organizationId = orgOfGroup.get(row.group_id) ?? null;
     // A personal space belongs to no organization and has no clients: it is not briefed.
     if (!organizationId) continue;
@@ -74,25 +88,36 @@ async function handler(request: Request) {
     groupIdsByCoachOrg.set(key, entry);
   }
 
+  // The briefing's date is the coach's own day (their profile time zone), the same day the dashboard looks for, so a coach in the evening still sees this morning's briefing instead of
+  // looking for tomorrow's. One read of every coach's zone, not one per coach.
+  const coachIds = [...new Set([...groupIdsByCoachOrg.values()].map((e) => e.coachId))];
+  const zoneByCoach = new Map<string, string>();
+  for (let i = 0; i < coachIds.length; i += 200) {
+    const { data: zoneRows } = await supabase.from("profiles").select("id, timezone").in("id", coachIds.slice(i, i + 200));
+    for (const row of zoneRows ?? []) zoneByCoach.set(row.id as string, isValidTimeZone(row.timezone as string | null) ? (row.timezone as string) : DEFAULT_COACH_TIMEZONE);
+  }
+
   const results: { coachId: string; itemCount: number; skipped: string | null }[] = [];
 
-  for (const { coachId, organizationId, groupIds } of groupIdsByCoachOrg.values()) {
+  const processOne = async ({ coachId, organizationId, groupIds }: { coachId: string; organizationId: string | null; groupIds: string[] }): Promise<void> => {
+    const timeZone = zoneByCoach.get(coachId) ?? DEFAULT_COACH_TIMEZONE;
+    const todayKey = dateKeyInZone(timeZone);
     // Idempotent per day and organization — a re-run (retry, manual trigger) never double-generates.
     let existingQuery = supabase.from("coach_briefings").select("id").eq("coach_id", coachId).eq("briefing_date", todayKey);
     existingQuery = organizationId ? existingQuery.eq("organization_id", organizationId) : existingQuery.is("organization_id", null);
     const { data: existing } = await existingQuery.maybeSingle();
     if (existing) {
       results.push({ coachId, itemCount: 0, skipped: "already generated today" });
-      continue;
+      return;
     }
 
     // AI off (no key, or AI_DISABLED): leave no row behind, so switching it back on the same day still generates.
     if (!isAiConfigured()) {
       results.push({ coachId, itemCount: 0, skipped: "AI not configured" });
-      continue;
+      return;
     }
 
-    const candidates = await gatherCandidateSignals(supabase, { coachId, groupIds });
+    const candidates = await gatherCandidateSignals(supabase, { coachId, groupIds, timeZone });
 
     const { data: briefing } = await supabase
       .from("coach_briefings")
@@ -101,17 +126,17 @@ async function handler(request: Request) {
       .single();
     if (!briefing) {
       results.push({ coachId, itemCount: 0, skipped: "failed to create briefing row" });
-      continue;
+      return;
     }
 
     if (candidates.length === 0) {
       results.push({ coachId, itemCount: 0, skipped: "no eligible signals today" });
-      continue;
+      return;
     }
 
     if (!isAiConfigured()) {
       results.push({ coachId, itemCount: 0, skipped: "AI not configured" });
-      continue;
+      return;
     }
 
     let rawItems: RawModelItem[] = [];
@@ -131,7 +156,7 @@ async function handler(request: Request) {
       // A coach whose AI budget for the month is used up is skipped, not failed (the coach was told once when it ran out), and the run resumes by itself on the 1st.
       const budgetOut = err instanceof AiRateLimitedError && err.reason === "budget_out";
       results.push({ coachId, itemCount: 0, skipped: budgetOut ? "AI budget used up this month" : "generation or parse failure" });
-      continue;
+      return;
     }
 
     const candidatesById = new Map(candidates.map((c) => [c.id, c]));
@@ -178,7 +203,13 @@ async function handler(request: Request) {
     }
 
     results.push({ coachId, itemCount: finalItems.length, skipped: null });
-  }
+  };
+
+  const run = await runPool([...groupIdsByCoachOrg.values()], COACHES_AT_ONCE, processOne, { deadlineMs: TIME_BUDGET_MS });
+  for (const entry of run.notStarted) results.push({ coachId: entry.coachId, itemCount: 0, skipped: "out of time before this one was reached" });
+  for (const failure of run.failed) results.push({ coachId: failure.item.coachId, itemCount: 0, skipped: "generation or parse failure" });
+
+
 
   return NextResponse.json({ coaches: results.length, results });
 }
