@@ -130,7 +130,7 @@ describe("deriveOrgEntitlements", () => {
   });
 
   it("with enforcement OFF the effective access is always full, but the raw state still shows", () => {
-    const e = deriveOrgEntitlements(null, daysAgo(TRIAL_DAYS + GRACE_DAYS + 30), now, false);
+    const e = deriveOrgEntitlements(row({ subscriptionStatus: "canceled", currentPeriodEnd: daysAgoIso(10) }), daysAgo(400), now, false);
     expect(e.rawAccessLevel).toBe("locked");
     expect(e.rawOrgAddon).toBe(false);
     expect(e.accessLevel).toBe("full");
