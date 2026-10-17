@@ -8,6 +8,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { BrandingForm } from "@/components/coach/desktop/branding-form";
 import { InviteCoachForm } from "@/components/coach/desktop/invite-coach-form";
+import { ExportBusinessButton } from "@/components/coach/desktop/export-business-button";
 import { TransferOwnershipButton } from "@/components/coach/desktop/transfer-ownership-button";
 import { WorkoutCardBackgroundSettings } from "@/components/coach/desktop/workout-card-background-settings";
 import { DispatchSettings } from "@/components/coach/desktop/dispatch-settings";
@@ -305,6 +306,10 @@ export default async function BrandingPage(
               )}
             </div>
           )}
+
+          <div className="mb-8">
+            <ExportBusinessButton groupId={params.groupId} />
+          </div>
 
           <p className="font-body text-xs text-steel">
             <Link href={`/groups/${params.groupId}/revenue-splits`} className="text-rust">
