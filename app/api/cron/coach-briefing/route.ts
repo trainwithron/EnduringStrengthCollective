@@ -4,6 +4,7 @@ import { callClaude, extractJson, isAiConfigured } from "@/lib/anthropic-client"
 import { gatherCandidateSignals, type CandidateSignal } from "@/lib/coach-briefing-gather";
 import { validateNoHallucinatedNumbers, validateNoNumbers } from "@/lib/coach-briefing-numeral-guard";
 import { enforceReservedQuietSlot } from "@/lib/coach-briefing-reserved-slot";
+import { isZeroAiCoach } from "@/lib/free-tier-server";
 import { withCronRun } from "@/lib/cron-monitor";
 import { runPool } from "@/lib/run-pool";
 import { pageAll } from "@/lib/page-all";
@@ -108,6 +109,12 @@ async function handler(request: Request) {
     const { data: existing } = await existingQuery.maybeSingle();
     if (existing) {
       results.push({ coachId, itemCount: 0, skipped: "already generated today" });
+      return;
+    }
+
+    // The free plan has no nightly briefing (and nothing is left behind to retry).
+    if (await isZeroAiCoach(supabase, coachId)) {
+      results.push({ coachId, itemCount: 0, skipped: "free plan" });
       return;
     }
 

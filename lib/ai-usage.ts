@@ -76,7 +76,11 @@ export type AiFeature =
   | "coach_briefing"
   | "spotter_cornerstone"
   | "spotter_overarching"
-  | "trivia_generate";
+  | "trivia_generate"
+  // a free-tier coach's use of one of their monthly free AI uses (a row only, never a model call; lib/free-tier-server.ts)
+  | "free_use_program"
+  | "free_use_meal_plan"
+  | "free_use_import";
 
 // The longest text a person may hand each AI feature. The model is paid for by the length of what is sent, and a pasted wall of text is never what
 // these features are for; the limit also stops one request from costing far more than the allowance assumes.
@@ -141,7 +145,41 @@ const POLICY: Record<AiFeature, FeaturePolicy> = {
   spotter_cornerstone: { enforce: false },
   spotter_overarching: { enforce: false },
   trivia_generate: { enforce: false },
+  free_use_program: { enforce: false },
+  free_use_meal_plan: { enforce: false },
+  free_use_import: { enforce: false },
 };
+
+// ---- the free tier (Ron, Oct 17; behind COACH_BILLING_ENFORCED, see lib/free-tier-server.ts) ----------------------------------------------------------------------------------
+// Up to FREE_TIER_CLIENT_LIMIT clients and FREE_TIER_AI_USES big AI uses a month. A "use" is a program built, a meal plan, or a program import (photo, PDF or text); a failed or cut-off attempt counts too, so
+// retrying cannot spend money for free. Every other AI call is refused for a free-tier coach and their clients, the nightly briefing and the spotters included, unless the coach has bought AI credits.
+export const FREE_TIER_CLIENT_LIMIT = 15;
+export const FREE_TIER_AI_USES = 5;
+export type FreeTierUseKind = "program" | "meal_plan" | "import";
+export const FREE_TIER_USE_FEATURE: Record<FreeTierUseKind, AiFeature> = {
+  program: "free_use_program",
+  meal_plan: "free_use_meal_plan",
+  import: "free_use_import",
+};
+// The calls that make up a big use once it has been taken: they pass the free-tier gate (the use itself was counted when it began).
+export const FREE_TIER_INNER_FEATURES: ReadonlySet<AiFeature> = new Set<AiFeature>([
+  "program_generation",
+  "program_day",
+  "program_template",
+  "program_import_photo",
+  "program_import_text",
+  "program_import_pdf",
+  "meal_plan_slot",
+]);
+// The per-meal calls of a meal plan are only allowed within this many hours of taking a meal-plan use, and no more than this many in a month.
+export const FREE_TIER_SLOT_WINDOW_HOURS = 6;
+export const FREE_TIER_SLOT_CEILING = 60;
+
+export const freeTierOutMessage = (): string =>
+  `You've used your ${FREE_TIER_AI_USES} free AI uses this month. They come back on the 1st. Subscribe or buy AI credits to keep going.`;
+export const freeTierBlockedMessage = (): string =>
+  "AI is not part of the free plan. You can use it ${FREE_TIER_AI_USES} times a month to build a program, a meal plan or import a program; subscribe or buy AI credits for the rest.".replace("${FREE_TIER_AI_USES}", String(FREE_TIER_AI_USES));
+export const FREE_TIER_CLIENT_MESSAGE = "AI logging is paused right now. You can still search foods, scan a barcode or use your saved meals.";
 
 export interface AiCallMeta {
   feature: AiFeature;
@@ -168,9 +206,9 @@ const USER_MONTHLY_MESSAGE: Partial<Record<AiFeature, string>> = {
 };
 
 export class AiRateLimitedError extends Error {
-  reason: "burst" | "monthly_ceiling" | "user_monthly" | "budget_out" | "unavailable";
+  reason: "burst" | "monthly_ceiling" | "user_monthly" | "budget_out" | "free_tier" | "unavailable";
   // `message` replaces the standard wording (the AI budget words differ for a coach and for a client).
-  constructor(reason: "burst" | "monthly_ceiling" | "user_monthly" | "budget_out" | "unavailable", feature?: AiFeature, message?: string) {
+  constructor(reason: "burst" | "monthly_ceiling" | "user_monthly" | "budget_out" | "free_tier" | "unavailable", feature?: AiFeature, message?: string) {
     super(
       message
         ? message

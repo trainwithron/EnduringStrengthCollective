@@ -6,6 +6,7 @@ import { gatherSessionPatternFindings } from "@/lib/session-pattern-spotter-gath
 import { sendPushToProfile } from "@/lib/send-push";
 import { getCallerGroupRole } from "@/lib/group-access";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { isZeroAiCoach } from "@/lib/free-tier-server";
 
 // Session Pattern Spotter
 // (habit_spotter_and_post_workout_coach_page_research_sept19.md) — runs
@@ -94,7 +95,8 @@ export async function POST(request: Request) {
   }
 
   let synthesisText = findings.map((f) => f.description).join(" ");
-  if (isAiConfigured()) {
+  // The free plan gets the plain sentence, never a model call.
+  if (isAiConfigured() && !(await isZeroAiCoach(admin, coachId))) {
     try {
       const allowedValues = findings.flatMap((f) => f.numericValues);
       const userText = `Real findings for this client's recent session pattern:\n${findings.map((f) => `- ${f.description}`).join("\n")}\n\nWrite the note now.`;

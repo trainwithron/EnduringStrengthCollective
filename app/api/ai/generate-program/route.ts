@@ -1,3 +1,4 @@
+import { freeTierUseOrRefuse } from "@/lib/free-tier-server";
 import { safeErrorDetail } from "@/lib/safe-error";
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
@@ -371,6 +372,10 @@ export async function POST(request: Request) {
     maxesByAthlete.size > 0
       ? [...maxesByAthlete.entries()].map(([name, lifts]) => `- ${name} — ${lifts.join(", ")}`).join("\n")
       : "(no logged sets yet for anyone on this roster)";
+
+  // A free-tier coach has FREE_TIER_AI_USES of these a month (nothing happens while billing is not enforced).
+  const noFreeUse = await freeTierUseOrRefuse(user.id, "program");
+  if (noFreeUse) return noFreeUse;
 
   try {
     const text = await callClaude({

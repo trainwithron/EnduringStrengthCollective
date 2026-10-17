@@ -90,3 +90,8 @@
 - After: "Your coaching access with {organization} has ended" / "You were let go by the organization." | "Your seven days are over." / "Your clients keep their records and can keep logging; nothing was deleted. We emailed you a link to one export of everything for the clients you kept. It works for 30 days." / [Download my export] / "Your export link has expired."
 - Remove dialog: "Why are they going?" / "They are leaving on their own / on good terms" / "They are being let go"; "Say whether {name} is being let go or is leaving on good terms."; tags "Leaving" / "Let go".
 - Emails and notices: "You are leaving {organization}" ... ; "{n} day(s) left to choose"; "Your export is ready"; to clients: "Your coach's account has closed" / "You can keep logging your workouts, and nothing of yours was deleted. You can download all of your own data any time."
+
+## Release F1 (free tier AI)
+- Meter: "{n} of 5 AI uses left this month. Building a program, a meal plan or importing a program each takes one." / "You've used this month's 5 free AI uses. They come back on the 1st." with [See plans] / [Buy credits or subscribe]
+- Refusals: "You've used your 5 free AI uses this month. They come back on the 1st. Subscribe or buy AI credits to keep going." / "AI is not part of the free plan. You can use it 5 times a month to build a program, a meal plan or import a program; subscribe or buy AI credits for the rest." / to a client: "AI logging is paused right now. You can still search foods, scan a barcode or use your saved meals."
+- Plan & Billing: "You are on the free plan: up to 15 clients and 5 AI uses a month. Nothing was deleted, and your clients can still log workouts. Choose a plan to add more clients and use AI freely."

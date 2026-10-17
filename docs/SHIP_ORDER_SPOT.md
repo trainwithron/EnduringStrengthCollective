@@ -21,6 +21,8 @@
 | K1 | release-k1-notifications | e2ce546f | Release K1, step 147 (0395), apply-release-k1-notifications-all.sql (fp in the step file) | built, awaiting Assistant; paste BEFORE code (adds only) |
 | R | release-integrated | 1493ad60 | none | K2 + resend + age-cap removal + Commander review fixes; awaiting Assistant clearance and Ron |
 | L | release-leaving-coach | (see git) | Release L, step 148 (0396), apply-release-l-leaving-coach-all.sql, fp 86ffbb87846409c3 | built on R, awaiting Assistant; paste BEFORE code (adds only) |
+
+| F1 | release-f1-free-tier-ai | (see git) | none | free tier AI gate behind COACH_BILLING_ENFORCED (off); built on master 1493ad60, independent of L |
 | D-held | (data) | - | HELD: step 138, apply-release-cn-held-all.sql, fp 8f22a2d348ee90d7, read check-intake-flag-list.sql first | Ron's word only |
 
 Fingerprint = first 16 hex of sha256 of the LF-normalized file: tr -d '\r' < supabase/apply/<file> | sha256sum | cut -c1-16.

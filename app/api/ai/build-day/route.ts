@@ -1,3 +1,4 @@
+import { freeTierUseOrRefuse } from "@/lib/free-tier-server";
 import { NextResponse } from "next/server";
 import { isBadExerciseName, cleanExerciseName, exerciseNameProblem } from "@/lib/exercise-name-guard";
 import { existingLibraryName } from "@/lib/exercise-search";
@@ -70,6 +71,9 @@ export async function POST(request: Request) {
   if (!run.ok) {
     const canRun = await canRunAiAction(supabase, user.id, "program_generation");
     if (!canRun.ok) return NextResponse.json({ error: canRun.error }, { status: 402 });
+    // A new run is one big use for a free-tier coach (later days of the same run carry the token and are not counted again).
+    const noFreeUse = await freeTierUseOrRefuse(user.id, "program");
+    if (noFreeUse) return noFreeUse;
   }
 
   // The days already in the program (so a new day knows them and does not repeat them).

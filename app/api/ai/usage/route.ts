@@ -4,6 +4,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getAiUsage } from "@/lib/coach-credits";
 import { balanceLine, coachBudgetMessage, meterLine, type BudgetStatus, type TopUpPack } from "@/lib/ai-budget";
 import { getCoachBudgetStatus, topUpInfo } from "@/lib/ai-budget-server";
+import { freeTierMeter, type FreeTierMeter } from "@/lib/free-tier-server";
 
 // Feeds the coach-facing usage meter: how much of this month's included
 // AI generations (per 100-client step) a coach has used, and the one simple
@@ -53,5 +54,12 @@ export async function GET() {
   } catch {
     budget = null;
   }
-  return NextResponse.json({ ...usage, budget });
+  // The free plan's own meter ("3 of 5 AI uses left this month"); freeTier false everywhere billing is not enforced or the coach pays.
+  let freeTier: FreeTierMeter | null = null;
+  try {
+    freeTier = await freeTierMeter(createServiceRoleClient(), user.id);
+  } catch {
+    freeTier = null;
+  }
+  return NextResponse.json({ ...usage, budget, freeTier });
 }

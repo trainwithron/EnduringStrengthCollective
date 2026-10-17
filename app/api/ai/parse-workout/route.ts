@@ -1,3 +1,4 @@
+import { freeTierUseOrRefuse } from "@/lib/free-tier-server";
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError, AiTruncatedError } from "@/lib/anthropic-client";
@@ -47,6 +48,10 @@ export async function POST(request: Request) {
 
   const plan = await planImportRequest(body);
   if (!plan.ok) return NextResponse.json({ error: plan.error }, { status: plan.status });
+
+  // A program import (photo, PDF or text) is one big use for a free-tier coach.
+  const noFreeUse = await freeTierUseOrRefuse(user.id, "import");
+  if (noFreeUse) return noFreeUse;
 
   // Reads one piece of text with the AI. The program is only ever read from text the coach gave: nothing is guessed.
   const readOne = async (sourceText: string, opts: { big: boolean }): Promise<ParsedImportRow[] | "not_a_list"> => {

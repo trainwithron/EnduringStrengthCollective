@@ -28,7 +28,7 @@ export function AiUsageMeter({
   compact?: boolean;
   refreshKey?: string | number | null;
 }) {
-  const [usage, setUsage] = useState<AiUsageSummary | null>(null);
+  const [usage, setUsage] = useState<(AiUsageSummary & { freeTier?: { freeTier: boolean; used: number; limit: number; left: number } | null }) | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -44,6 +44,20 @@ export function AiUsageMeter({
   }, [refreshKey]);
 
   if (!usage || usage.unlimited) return null;
+
+  // The free plan: one plain count of the big uses left this month, in place of the per-feature meters.
+  if (usage.freeTier?.freeTier) {
+    const { left, limit } = usage.freeTier;
+    const text = left > 0 ? `${left} of ${limit} AI uses left this month. Building a program, a meal plan or importing a program each takes one.` : `You've used this month's ${limit} free AI uses. They come back on the 1st.`;
+    return (
+      <p className="font-body text-xs text-steel" data-testid="free-tier-ai-meter">
+        {text}{" "}
+        <Link href={`/groups/${groupId}/branding?tab=credits`} className="text-rust underline underline-offset-2">
+          {left > 0 ? "See plans" : "Buy credits or subscribe"}
+        </Link>
+      </p>
+    );
+  }
 
   const showProgram = focus !== "mealplan";
   const showMeal = focus !== "program";

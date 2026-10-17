@@ -36,11 +36,7 @@ export function PlanBillingPanel({
       break;
     case "trial_expired":
       statusLine = "Free trial ended";
-      statusDetail = `Ended ${formatDate(e.trialEndsAt)}. ${
-        e.rawAccessLevel === "grace"
-          ? `Everything keeps working for ${plural(e.graceDaysLeft ?? 0, "more day")} while you choose a plan.`
-          : "Choose a plan to keep using the coach tools. Your clients can still log workouts."
-      }`;
+      statusDetail = `Ended ${formatDate(e.trialEndsAt)}. You are on the free plan: up to 15 clients and 5 AI uses a month. Nothing was deleted, and your clients can still log workouts. Choose a plan to add more clients and use AI freely.`;
       break;
     case "active":
       statusLine = "Plan active";

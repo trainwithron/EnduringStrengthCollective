@@ -40,7 +40,8 @@ export function AiBudgetMeter({ variant = "meter", groupId }: { variant?: "meter
     fetch("/api/ai/usage")
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        if (!cancelled) setView((data?.budget as AiBudgetView | null | undefined) ?? null);
+        // On the free plan the free-uses line (AiUsageMeter) replaces this meter.
+        if (!cancelled) setView(data?.freeTier?.freeTier ? null : ((data?.budget as AiBudgetView | null | undefined) ?? null));
       })
       .catch(() => {
         if (!cancelled) setView(null);
