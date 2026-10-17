@@ -11,8 +11,11 @@ import { AlertTriangle } from "lucide-react";
 // exist and read true," not a separate clinical judgment call.
 export function ParQAnswersPanel({
   answers,
+  reviewLine,
 }: {
   answers: { question: string; answer: boolean }[];
+  // "Reviewed by you: Train with changes (Oct 12)", once the coach has decided.
+  reviewLine?: string | null;
 }) {
   // No answers is said out loud, never silent: a coach reading nothing could take it for "no concerns".
   if (answers.length === 0) {
@@ -31,6 +34,7 @@ export function ParQAnswersPanel({
       <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">
         Health screening (PAR-Q+)
       </p>
+      {reviewLine && <p className="font-body text-sm text-chalk mb-2">{reviewLine}</p>}
       {flagged.length > 0 && (
         <div className="flex items-start gap-2 border border-rust/40 bg-rust/5 p-3 mb-2">
           <AlertTriangle className="w-4 h-4 shrink-0 text-rust mt-0.5" />

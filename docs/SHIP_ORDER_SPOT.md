@@ -4,7 +4,9 @@
 |---|--------|-----|-------|--------|
 | A | release-a-pwa | 90f13a8d | none | SHIPPED (master 85a2699b) |
 | B | release-b-builder | 85a2699b | none | SHIPPED (master 85a2699b) |
-| C | release-c-progression | (see git) | Release CL, step 136, migration 0385, file supabase/apply/apply-release-cl-all.sql, fingerprint eab4e0c37c77376e | built, awaiting Assistant; paste BEFORE the code |
+| C | release-c-progression | ff415403 | Release CL, step 136, 0385, apply-release-cl-all.sql, fp eab4e0c37c77376e | Assistant-cleared; paste BEFORE code |
+| D | release-d-intake | (see git) | Release CM, step 137, 0386, apply-release-cm-all.sql, fp dca3959f76fe0fe7 | built, awaiting Assistant; paste BEFORE code |
+| D-held | (data) | - | HELD: step 138, apply-release-cn-held-all.sql, fp 22257e3a80047753, read check-intake-flag-list.sql first | Ron's word only |
 
-Fingerprint = first 16 hex of sha256 of the LF-normalized file: `tr -d '\r' < supabase/apply/apply-release-cl-all.sql | sha256sum | cut -c1-16`.
-Release C's code reads the new set_type column defensively (the workout opens and goals still work if the column is not there yet), but the set-type toggle, warm-up exclusion and the new records only work after the paste.
+Fingerprint = first 16 hex of sha256 of the LF-normalized file: tr -d '\r' < supabase/apply/<file> | sha256sum | cut -c1-16.
+Apply order: CL (136), then CM (137). Code order: paste first, then the branch.

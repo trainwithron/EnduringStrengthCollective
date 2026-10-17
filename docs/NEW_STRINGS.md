@@ -4,6 +4,12 @@
 - Workout screen, when a set could not upload yet: "{n} change hasn't uploaded yet." / "{n} changes haven't uploaded yet." then "Saved on this phone. It uploads when you're back online." (replaces "haven't saved yet / Your numbers are still here, we'll keep trying.")
 - Offline page (shown with no signal for a page that was never opened): "You're offline" / "Sets you already logged on this phone are safe and upload when you're back online. A workout you opened earlier still opens from Home." / button "Try again".
 
+## Release D (intake and consent)
+- After the form: "You're all set." (no yes answers) or "Thanks. Because you answered yes to something, your coach will check in with you about it before you start hard training."
+- Form errors: "Tick the box to accept the waiver." / "Type your full name to sign." / "That name is too long." / "Answer every health question." / "Add your date of birth first." / "We couldn't save your signature. Please try again."
+- Coach, flagged screening on a client's Overview: "Health screening: {n} flagged. What do you decide?" with buttons "Cleared to train" / "Train with changes" / "Hold until cleared" and a box "Note for yourself (optional)". After deciding, in the client's settings: "Reviewed by you: Train with changes (Oct 12)".
+- Assign screen: "{names} is on hold after their health screening. Check with them before you assign."
+
 ## Release C (progression and records)
 - Logger: tap a set's number to mark it a warm-up (shows W; tap again to undo). Screen-reader labels: "Mark set {n} as a warm-up" / "Set {n} is a warm-up. Tap to make it a working set." Hover text "Tap to mark as a warm-up".
 - Workout start screen: under "Goal: 140 lbs x 5 reps" one plain sentence of why, for example "You hit 12 reps on every set at 135, so up to 140." / "Same weight, 135: your lowest set last time was 9 reps, so aim for 10 on every set." / "5x3+ at 100, worked out from your last 6 sessions." / "140 x 5: 2 steps up from your first session (135 x 5)."

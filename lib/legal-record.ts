@@ -13,12 +13,14 @@ export async function recordLegalAcceptances(
     userAgent: string | null;
     // The exact text signed, kept with the acceptance (the waiver). Left out, the current text of the beta notice, terms or privacy policy is stored.
     snapshots?: Partial<Record<LegalDocument, string>>;
+    // A version key of its own for a document (the waiver: the platform's version plus a fingerprint of the words signed), so a changed waiver is a NEW record instead of a repeat of the old one.
+    versions?: Partial<Record<LegalDocument, string>>;
   }
 ): Promise<boolean> {
   const rows = args.documents.map((document) => ({
     profile_id: args.profileId,
     document,
-    version: LEGAL_VERSIONS[document],
+    version: args.versions?.[document] ?? LEGAL_VERSIONS[document],
     ip: args.ip,
     user_agent: args.userAgent ? args.userAgent.slice(0, 400) : null,
     // The text actually shown is stored with every acceptance (the waiver passes its own); a record can then always say what was agreed to.

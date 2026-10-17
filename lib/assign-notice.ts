@@ -6,16 +6,20 @@ export interface AssignClientFacts {
   name: string;
   dateOfBirth: string | null;
   parqFlagged: boolean;
+  // The coach decided "hold until cleared" after the client's health screening.
+  onHold?: boolean;
 }
 
 export function assignNotices(clients: AssignClientFacts[], asOf: Date = new Date()): string[] {
   const minors = clients.filter((c) => ageStatusFromDob(c.dateOfBirth, asOf) === "minor").map((c) => c.name);
   const unknown = clients.filter((c) => ageStatusFromDob(c.dateOfBirth, asOf) === "unknown").map((c) => c.name);
   const health = clients.filter((c) => c.parqFlagged).map((c) => c.name);
+  const hold = clients.filter((c) => c.onHold).map((c) => c.name);
   const list = (names: string[]) => (names.length <= 3 ? names.join(", ") : names.slice(0, 3).join(", ") + " and " + (names.length - 3) + " more");
   const out: string[] = [];
   if (minors.length > 0) out.push(list(minors) + (minors.length === 1 ? " is" : " are") + " under 18. Check the program is technique first, with no max testing and no maximal loads.");
   if (unknown.length > 0) out.push(list(unknown) + (unknown.length === 1 ? " has" : " have") + " no birthdate on file. Check their age before you assign.");
   if (health.length > 0) out.push(list(health) + (health.length === 1 ? " has" : " have") + " a flagged health concern on their screening. Check the program works around it.");
+  if (hold.length > 0) out.push(list(hold) + (hold.length === 1 ? " is" : " are") + " on hold after their health screening. Check with them before you assign.");
   return out;
 }

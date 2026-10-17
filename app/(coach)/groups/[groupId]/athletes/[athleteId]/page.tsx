@@ -57,6 +57,7 @@ import { AddSocialOnlyMembershipControl } from "@/components/coach/add-social-on
 import { ClientProgramActions } from "@/components/coach/client-program-actions";
 import { OverviewMessageBox } from "@/components/coach/desktop/overview-message-box";
 import { ParqFlagNotice } from "@/components/coach/desktop/parq-flag-notice";
+import { asDecision, decisionLine } from "@/lib/par-q-outcome";
 import { parqNoticeNeeded } from "@/lib/parq-notice";
 import { ClientCalendarSection } from "@/components/coach/desktop/client-calendar-section";
 import { MinorConsentControl } from "@/components/coach/minor-consent-control";
@@ -431,7 +432,7 @@ export default async function AthleteProfilePage(
     // The records this coach asked the client to count as real ones (private to the coach who asked).
     supabase.from("pr_promotions").select("session_id, exercise_name, status, answered_at").eq("athlete_id", params.athleteId).eq("group_id", params.groupId).eq("requested_by", user.id),
     // What this coach has acknowledged of the client's health screening: the number of flagged answers they had seen (athlete_injury_flag_acknowledgements.flagged_count).
-    supabase.from("athlete_injury_flag_acknowledgements").select("flagged_count").eq("coach_id", user.id).eq("athlete_id", params.athleteId).maybeSingle(),
+    supabase.from("athlete_injury_flag_acknowledgements").select("flagged_count, decision, acknowledged_at").eq("coach_id", user.id).eq("athlete_id", params.athleteId).maybeSingle(),
   ]);
 
   if (membership?.role !== "coach") {
@@ -1147,7 +1148,7 @@ export default async function AthleteProfilePage(
                           .filter(Boolean)
                           .join(" + ")}
                 </p>
-                <ParQAnswersPanel answers={parQAnswers} />
+                <ParQAnswersPanel answers={parQAnswers} reviewLine={decisionLine(asDecision((parqAckRow as { decision?: string | null } | null)?.decision), (parqAckRow as { acknowledged_at?: string | null } | null)?.acknowledged_at ?? null)} />
                 {intake && (
                   <WaiverStatusLine
                     waiverAccepted={!!intake.waiver_accepted}

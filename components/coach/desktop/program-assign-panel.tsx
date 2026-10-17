@@ -144,6 +144,10 @@ export function ProgramAssignPanel({ programId, programName, groupId, aiDraft, o
         return;
       }
       const byId = new Map(((data ?? []) as { athlete_id: string; date_of_birth: string | null; par_q_answers: unknown }[]).map((r) => [r.athlete_id, r]));
+      // The coach's own decisions on flagged screenings (best effort: without them the other notes still show).
+      const { data: ackRows } = await createBrowserClient().from("athlete_injury_flag_acknowledgements").select("athlete_id, decision").in("athlete_id", ids);
+      if (cancelled) return;
+      const holdIds = new Set(((ackRows ?? []) as { athlete_id: string; decision: string | null }[]).filter((r) => r.decision === "hold").map((r) => r.athlete_id));
       const names = new Map((clients ?? []).map((c) => [c.id, c.fullName]));
       setNotices(
         assignNotices(
@@ -151,6 +155,7 @@ export function ProgramAssignPanel({ programId, programName, groupId, aiDraft, o
             name: names.get(id) ?? "A client",
             dateOfBirth: byId.get(id)?.date_of_birth ?? null,
             parqFlagged: hasFlaggedMusculoskeletalConcern((byId.get(id)?.par_q_answers as ParQAnswer[]) ?? []),
+            onHold: holdIds.has(id),
           }))
         )
       );

@@ -7,6 +7,10 @@ import { MY_TRAINING_COOKIES, shouldLeaveMyTraining } from "@/lib/my-training-ex
 import { DOB_OK_COOKIE, dobOkCookieValid, loadDobGate, signDobOk } from "@/lib/dob-gate";
 import { SIGNED_OUT_FRAME_HTML } from "@/lib/signed-out-frame";
 
+// Every page a client can use. A client who has not finished the health form and waiver (profiles.intake_required) reaches none of them, not just /groups: a workout link, a notification or a typed address
+// all land on the form first.
+export const INTAKE_GATED_PREFIXES = ["/groups", "/sessions", "/my-training", "/partners"];
+
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -168,7 +172,7 @@ export async function updateSession(request: NextRequest) {
   // post-signup redirect in app/set-password/page.tsx. Scoped to /groups
   // only so /intake itself, /login, /set-password, etc. never loop.
   // Existing accounts (intake_required defaults false) are never touched.
-  if (user && pathname.startsWith("/groups")) {
+  if (user && INTAKE_GATED_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("intake_required")
@@ -184,6 +188,8 @@ export async function updateSession(request: NextRequest) {
 
       if (!intake?.completed_at) {
         const redirectUrl = new URL("/intake", request.url);
+        // Come back to where they were going (a workout link, a notification) once the form is done.
+        if (pathname !== "/groups") redirectUrl.searchParams.set("next", pathname + request.nextUrl.search);
         const redirectResponse = NextResponse.redirect(redirectUrl);
         response.cookies.getAll().forEach((cookie) => {
           redirectResponse.cookies.set(cookie);

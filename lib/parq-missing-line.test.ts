@@ -14,7 +14,7 @@ describe("a missing health screening is said out loud", () => {
   });
   it("the client profile always renders the panel, with or without an intake form", () => {
     const page = read("app/(coach)/groups/[groupId]/athletes/[athleteId]/page.tsx");
-    expect(page).toContain("<ParQAnswersPanel answers={parQAnswers} />");
+    expect(page).toContain("<ParQAnswersPanel answers={parQAnswers} reviewLine=");
     expect(page).not.toContain("parQAnswers.length > 0 && <ParQAnswersPanel");
   });
 });

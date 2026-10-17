@@ -54,6 +54,7 @@ export function IntakeForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(alreadyCompleted);
+  const [doneMessage, setDoneMessage] = useState<string | null>(null);
   const [step, setStep] = useState<Step>(
     alreadyCompleted ? "form" : computeInitialStep(initialDateOfBirth, parentalConsentVerified)
   );
@@ -110,51 +111,27 @@ export function IntakeForm({
     setSubmitting(true);
     setError(null);
 
-    const supabase = createBrowserClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      setError("Your session expired — please sign in again.");
-      setSubmitting(false);
-      return;
-    }
-
     const parQAnswers = PAR_Q_QUESTIONS.map((q) => ({ question: q, answer: answers[q] as boolean }));
 
-    const { error: upsertError } = await supabase.from("client_intake").upsert(
-      {
-        athlete_id: user.id,
-        group_id: groupId,
-        par_q_answers: parQAnswers,
-        waiver_signed_name: signedName.trim(),
-        waiver_accepted: true,
-        completed_at: new Date().toISOString(),
-      },
-      { onConflict: "athlete_id" }
-    );
-
-    if (upsertError) {
-      setError("We couldn't save that. Check your connection and try again.");
+    // ONE server call finishes the form: the server sets the time, checks the questions, and keeps the record of exactly what was signed (with the address and device). The browser cannot mark itself complete.
+    let outcome: { ok: boolean; message?: string; error?: string } | null = null;
+    try {
+      const res = await fetch("/api/intake/submit", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ groupId, answers: parQAnswers, signedName: signedName.trim(), accepted: waiverAccepted }),
+      });
+      outcome = (await res.json().catch(() => ({}))) as { ok: boolean; message?: string; error?: string };
+      if (!res.ok) outcome = { ok: false, error: outcome?.error };
+    } catch {
+      outcome = null;
+    }
+    if (!outcome?.ok) {
+      setError(outcome?.error ?? "We couldn't save that. Check your connection and try again.");
       setSubmitting(false);
       return;
     }
-
-    // Keep the exact text that was signed, with the version, time, address and device. Best effort: the signature
-    // itself is already saved above, and a missing table never blocks the client.
-    // Waited for, with one retry, so a dropped request does not leave a signed waiver with no record of its text.
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const ok = await fetch("/api/legal/accept", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        // No text is sent: the server builds the record of what was signed from the coach's waiver and this saved intake.
-        body: JSON.stringify({ documents: ["waiver"] }),
-      })
-        .then((r) => r.ok)
-        .catch(() => false);
-      if (ok) break;
-    }
-
+    setDoneMessage(outcome.message ?? null);
     setDone(true);
     router.push(nextUrl);
     router.refresh();
@@ -163,9 +140,7 @@ export function IntakeForm({
   if (done) {
     return (
       <div className="border border-steel/20 p-6">
-        <p className="font-body text-sm">
-          You&apos;re all set — thanks for completing your intake. Taking you in…
-        </p>
+        <p className="font-body text-sm">{doneMessage ?? "You're all set."} Taking you in…</p>
       </div>
     );
   }

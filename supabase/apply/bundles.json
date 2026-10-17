@@ -1,5 +1,21 @@
 [
  {
+  "id": "release-cn-held",
+  "name": "HELD, Ron's word first: require the health form and waiver of every client without one (read check-intake-flag-list.sql first)",
+  "steps": [
+   "138"
+  ],
+  "file": "apply-release-cn-held-all.sql"
+ },
+ {
+  "id": "release-cm",
+  "name": "Release CM (the server finishes the health form and waiver; a coach's decision on a flagged screening; run BEFORE the code that goes with it is live)",
+  "steps": [
+   "137"
+  ],
+  "file": "apply-release-cm-all.sql"
+ },
+ {
   "id": "release-cl",
   "name": "Release CL (the kind of each set; records per number of reps; a warm-up or drop set never counts; run BEFORE the code that goes with it is live)",
   "steps": [
