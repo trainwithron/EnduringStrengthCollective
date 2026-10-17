@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { createUnclaimedClient } from "@/lib/create-unclaimed-client";
+import { clientLimitMessage } from "@/lib/free-tier-clients";
 import { dispatchWebhookEvent } from "@/lib/webhook-dispatch";
 import { rateLimitResponse } from "@/lib/rate-limit";
 import { parseRoster, ROSTER_MAX_ROWS } from "@/lib/roster-import";
@@ -45,7 +46,13 @@ export async function POST(request: Request) {
   );
   const results: { rowNumber: number; name: string; ok: boolean; profileId?: string; reason?: string }[] = checked.skipped.map((s) => ({ rowNumber: s.rowNumber, name: "", ok: false, reason: s.detail }));
 
-  const pool = await runPool(checked.rows, 4, async (row) => {
+  // On the free plan only so many people fit: count the room once, make accounts for those who fit, and report the rest as not added (never make an account and take it back).
+  const { data: headroomRaw } = await serviceRole.rpc("free_tier_client_headroom", { p_group: groupId });
+  const headroom = typeof headroomRaw === "number" ? headroomRaw : null;
+  const fits = headroom == null ? checked.rows : checked.rows.slice(0, headroom);
+  for (const row of headroom == null ? [] : checked.rows.slice(headroom)) results.push({ rowNumber: row.rowNumber, name: row.name, ok: false, reason: clientLimitMessage() });
+
+  const pool = await runPool(fits, 4, async (row) => {
     const made = await createUnclaimedClient(serviceRole, { groupId, fullName: row.name, email: row.email ?? "" });
     if (!made.ok) {
       results.push({ rowNumber: row.rowNumber, name: row.name, ok: false, reason: made.error });

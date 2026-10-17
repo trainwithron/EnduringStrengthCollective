@@ -3,7 +3,7 @@
 --
 -- INSTALLED SWITCHED OFF. free_tier_clients_enforced() returns false, so every organization behaves exactly as before. It is switched on, together with the COACH_BILLING_ENFORCED setting, by replacing that one
 -- function with "select true" (and back by putting "select false" again). org_is_free_tier() mirrors lib/org-entitlements.ts: not a founding (billing_exempt) organization, no active or trialing subscription,
--- not past due, and either the trial has ended or the plan lapsed (a canceled plan is free tier only after the period paid for).
+-- not past due inside its 7-day grace (after it, free tier), and either the trial has ended or the plan lapsed (a canceled plan is free tier only after the period paid for).
 
 create or replace function public.free_tier_clients_enforced()
 returns boolean
@@ -26,7 +26,8 @@ as $$
     not coalesce(b.billing_exempt, false)
     and case
       when b.subscription_status in ('active', 'trialing') then false
-      when b.subscription_status = 'past_due' then false
+      -- a payment left unpaid past its 7-day grace is the free plan too (GRACE_DAYS in lib/coach-plan-pricing.ts)
+      when b.subscription_status = 'past_due' then coalesce(b.past_due_since, now()) + interval '7 days' <= now()
       when b.subscription_status = 'canceled' then coalesce(b.current_period_end, '-infinity'::timestamptz) <= now()
       when b.subscription_status in ('unpaid', 'paused', 'incomplete_expired') then true
       else coalesce(b.trial_ends_at, o.created_at + interval '42 days') <= now()
@@ -38,7 +39,8 @@ $$;
 revoke execute on function public.org_is_free_tier(uuid) from public, anon, authenticated;
 grant execute on function public.org_is_free_tier(uuid) to service_role;
 
--- How many different training clients the organization has (the same count the bill uses). Internal.
+-- How many different training clients the organization has: the SAME people the bill counts. A retired past-season group (groups.archived_at) and a group a leaving coach keeps that holds a client private from the
+-- organization (organization_memberships.departing_group_ids, migration 0396) are left out, so graduated players and a leaving coach's clients never block a gym. org_billable_clients below uses this too. Internal.
 create or replace function public._org_training_clients(p_org uuid)
 returns int
 language sql
@@ -49,10 +51,51 @@ as $$
   select count(distinct m.profile_id)::int
   from public.groups g
   join public.group_memberships m on m.group_id = g.id
-  where g.organization_id = p_org and m.role = 'athlete' and m.membership_type = 'training'
+  where g.organization_id = p_org and g.archived_at is null and m.role = 'athlete' and m.membership_type = 'training'
+    and not exists (
+      select 1 from public.organization_memberships om
+      where om.organization_id = p_org and g.id = any (om.departing_group_ids)
+        and exists (select 1 from public.group_memberships a where a.group_id = g.id and a.role = 'athlete' and a.private_from_org)
+        and not exists (select 1 from public.group_memberships c where c.group_id = g.id and c.role = 'coach' and c.profile_id <> om.profile_id)
+    )
 $$;
 revoke execute on function public._org_training_clients(uuid) from public, anon, authenticated;
 grant execute on function public._org_training_clients(uuid) to service_role;
+
+-- The bill's client count is the same number (same authorization as before).
+create or replace function public.org_billable_clients(p_org_id uuid)
+returns integer
+language plpgsql
+stable security definer
+set search_path to 'public'
+as $function$
+begin
+  if auth.role() is distinct from 'service_role'
+     and not (coalesce(public.is_org_member(p_org_id), false) or coalesce(public.is_platform_admin(), false)) then
+    raise exception 'Not authorized';
+  end if;
+  return public._org_training_clients(p_org_id);
+end;
+$function$;
+
+-- How many more training clients this group's organization can add on the free plan: null when there is no limit (switched off, or not the free plan). Server only; the roster import reads it once so it never
+-- makes accounts it cannot place.
+create or replace function public.free_tier_client_headroom(p_group uuid)
+returns int
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select case
+    when not public.free_tier_clients_enforced() then null
+    when g.organization_id is null or not public.org_is_free_tier(g.organization_id) then null
+    else greatest(0, 15 - public._org_training_clients(g.organization_id))
+  end
+  from public.groups g where g.id = p_group
+$$;
+revoke execute on function public.free_tier_client_headroom(uuid) from public, anon, authenticated;
+grant execute on function public.free_tier_client_headroom(uuid) to service_role;
 
 create or replace function public.enforce_free_tier_client_limit()
 returns trigger
@@ -62,6 +105,7 @@ set search_path = public
 as $$
 declare
   v_org uuid;
+  v_old_org uuid;
 begin
   if not public.free_tier_clients_enforced() then
     return new;
@@ -70,13 +114,22 @@ begin
   if new.role is distinct from 'athlete' or new.membership_type is distinct from 'training' then
     return new;
   end if;
-  if tg_op = 'UPDATE' and old.role = 'athlete' and old.membership_type = 'training' then
-    return new;
-  end if;
   select organization_id into v_org from public.groups where id = new.group_id;
-  if v_org is null or not public.org_is_free_tier(v_org) then
+  if v_org is null then
     return new;
   end if;
+  if tg_op = 'UPDATE' and old.role = 'athlete' and old.membership_type = 'training' then
+    -- a client moved to another group of the SAME organization is not new there; moved into another organization they are
+    select organization_id into v_old_org from public.groups where id = old.group_id;
+    if v_old_org is not distinct from v_org then
+      return new;
+    end if;
+  end if;
+  if not public.org_is_free_tier(v_org) then
+    return new;
+  end if;
+  -- two people adding clients at the same moment are taken one after the other, so neither can slip past the 15th
+  perform pg_advisory_xact_lock(hashtextextended(v_org::text, 0));
   if exists (
     select 1 from public.group_memberships m join public.groups g on g.id = m.group_id
     where g.organization_id = v_org and m.profile_id = new.profile_id and m.role = 'athlete' and m.membership_type = 'training' and m.id is distinct from new.id
@@ -94,5 +147,5 @@ revoke execute on function public.enforce_free_tier_client_limit() from public, 
 
 drop trigger if exists group_memberships_free_tier_limit on public.group_memberships;
 create trigger group_memberships_free_tier_limit
-  before insert or update of role, membership_type on public.group_memberships
+  before insert or update of role, membership_type, group_id on public.group_memberships
   for each row execute function public.enforce_free_tier_client_limit();

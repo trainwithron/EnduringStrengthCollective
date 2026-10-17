@@ -2899,6 +2899,8 @@ STEPS.push({
   afterwards: "Nothing changes at all: the limit is installed switched off (free_tier_clients_enforced returns false), so every organization behaves exactly as before. It is switched on later, together with billing, by one more short step. Safe to run before or after the code.",
   undo: [
     "drop trigger if exists group_memberships_free_tier_limit on public.group_memberships;",
+    "drop function if exists public.free_tier_client_headroom(uuid);",
+    fnFromMigration("0396", "org_billable_clients"),
     "drop function if exists public.enforce_free_tier_client_limit();",
     "drop function if exists public._org_training_clients(uuid);",
     "drop function if exists public.org_is_free_tier(uuid);",
@@ -2908,6 +2910,7 @@ STEPS.push({
   rows: [
     ["0397 is not already applied (the limit trigger is not there yet)", "not exists (select 1 from pg_trigger where tgname = 'group_memberships_free_tier_limit' and not tgisinternal)"],
     ["the tables it reads exist", "to_regclass('public.group_memberships') is not null and to_regclass('public.groups') is not null and to_regclass('public.organizations') is not null and to_regclass('public.organization_billing') is not null"],
+    ["the columns it counts with exist (step 146: archived groups, step 148: kept groups)", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'groups' and column_name = 'archived_at') and exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'organization_memberships' and column_name = 'departing_group_ids')"],
   ],
 });
 
