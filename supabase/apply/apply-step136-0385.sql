@@ -22,7 +22,7 @@ $guard$;
 
 -- Release CL, part 1: the kind of each set, and records that count only real work.
 --   * set_logs.set_type (and group_workout_exercise_sets.set_type): warmup, working, amrap, backoff or drop. Every existing row is a working set.
---   * A warm-up or drop set never raises a training max, never makes a record, and never counts toward a goal. A training max is estimated only from a set of 1 to 8 reps (it was 1 to 12).
+--   * A warm-up or drop set never raises a training max, never makes a record, and never counts toward a goal. A NEW training max comes only from a set of 1 to 8 reps (it was 1 to 12), but no stored max is wiped or lowered by that change: a max resting on sets of 9 to 12 reps is kept (down to what those sets still support). No rebuild runs when this is applied.
 --   * A personal record is now per number of reps: a working set is a record when no earlier set was at least as heavy for at least as many reps. A longer hold is a record (it was the shorter one).
 --   * Marking a set a warm-up (or back) after it was saved rebuilds that exercise's training max.
 -- Everything below is the earlier definition (0372) with only the lines named above changed.
@@ -56,14 +56,40 @@ begin
     where s.athlete_id = p_athlete
       and sl.status = 'completed'
       and sl.weight > 0
-      and sl.reps between 1 and 8
+      and sl.reps between 1 and 12
       and sl.set_type in ('working', 'amrap', 'backoff')
       and (sl.data_flag is null or sl.data_flag = 'accepted')
       and (p_exercise is null or se.exercise_name = p_exercise)
   ),
+  best_low as (
+    select distinct on (exercise_name) exercise_name, weight, reps, rpe, rpe_assumed, completed_at, estimate
+    from counted
+    where reps <= 8
+    order by exercise_name, estimate desc, completed_at desc nulls last
+  ),
+  best_high as (
+    select distinct on (exercise_name) exercise_name, weight, reps, rpe, rpe_assumed, completed_at, estimate
+    from counted
+    where reps > 8
+    order by exercise_name, estimate desc, completed_at desc nulls last
+  ),
+  candidates as (
+    select exercise_name, estimate, weight, reps, rpe, rpe_assumed, completed_at from best_low
+    union all
+    -- a stored max that rests on sets of 9 to 12 reps is kept, down to what those sets still support
+    select bh.exercise_name,
+           least(bh.estimate, m.estimated_max),
+           case when m.estimated_max <= bh.estimate then m.source_weight else bh.weight end,
+           case when m.estimated_max <= bh.estimate then m.source_reps else bh.reps end,
+           case when m.estimated_max <= bh.estimate then m.source_rpe else bh.rpe end,
+           case when m.estimated_max <= bh.estimate then m.source_rpe_assumed else bh.rpe_assumed end,
+           bh.completed_at
+    from best_high bh
+    join public.athlete_training_maxes m on m.athlete_id = p_athlete and m.exercise_name = bh.exercise_name
+  ),
   best as (
     select distinct on (exercise_name) exercise_name, weight, reps, rpe, rpe_assumed, estimate
-    from counted
+    from candidates
     order by exercise_name, estimate desc, completed_at desc nulls last
   ),
   gone as (

@@ -26,10 +26,13 @@ describe("one estimate of a training max", () => {
     expect(estimateOneRepMax(225, 5)).toBe(Math.round(estimateTrainingMax(225, 5)!));
     expect(estimateTrainingMaxFromSet(225, 5, 8)).toBe(estimateTrainingMax(225, 5, 8));
   });
-  it("the database keeps the same limit (8 reps) and ignores warm-up and drop sets", () => {
+  it("the database makes new maxes only from 1 to 8 reps, never wipes or lowers a stored one by that change, and ignores warm-up and drop sets", () => {
     const sql = src("supabase/migrations/0385_set_types_and_records.sql");
-    expect(sql).toContain("sl.reps between 1 and 8");
+    expect(sql).toContain("best_high as (");
+    expect(sql).toContain("least(bh.estimate, m.estimated_max)");
     expect(sql).toContain("new.reps > 8");
+    // no rebuild runs when the step is applied
+    expect(sql).not.toContain("recompute_training_maxes(r.athlete_id");
     expect(sql).toContain("sl.set_type in ('working', 'amrap', 'backoff')");
   });
 });

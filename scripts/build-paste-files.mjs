@@ -2898,8 +2898,11 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     ["programming_spotter_dismissals", "programming_spotter_dismissals"],
   ];
   // programs.ai_draft (0324) is NOT NULL, and an older backup does not have it: a missing value is a signed-off program (false).
+  // group_workout_exercise_sets.set_type (0385) is NOT NULL too: an older backup has none, which means an ordinary working set.
   const lines = order.map(([k, tbl]) =>
-    tbl === "programs"
+    tbl === "group_workout_exercise_sets"
+      ? `  insert into public.${tbl} select * from jsonb_populate_recordset(null::public.${tbl}, (select coalesce(jsonb_agg(x || jsonb_build_object('set_type', coalesce(x ->> 'set_type', 'working'))), '[]'::jsonb) from jsonb_array_elements(b.payload -> '${k}') x));`
+      : tbl === "programs"
       ? `  insert into public.programs select * from jsonb_populate_recordset(null::public.programs, (select coalesce(jsonb_agg(x || jsonb_build_object('ai_draft', coalesce((x ->> 'ai_draft')::boolean, false))), '[]'::jsonb) from jsonb_array_elements(b.payload -> 'programs') x));`
       : `  insert into public.${tbl} select * from jsonb_populate_recordset(null::public.${tbl}, b.payload -> '${k}');`
   );

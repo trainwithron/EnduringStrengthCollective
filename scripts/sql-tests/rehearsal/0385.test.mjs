@@ -19,7 +19,7 @@ export default {
       const session = async (day, status) =>
         (await db.query(
           `insert into public.athlete_sessions (group_id, athlete_id, status, started_at, completed_at) values ($1, $2, $3, $4, $5) returning id`,
-          [group, client, status, `2026-09-${String(day).padStart(2, "0")}T12:00:00Z`, status === "completed" ? `2026-09-${String(day).padStart(2, "0")}T13:00:00Z` : null]
+          [group, client, status, new Date(Date.UTC(2026, 8, day, 12)).toISOString(), status === "completed" ? new Date(Date.UTC(2026, 8, day, 13)).toISOString() : null]
         )).rows[0].id;
       const exercise = async (sid, name) =>
         (await db.query(`insert into public.session_exercises (session_id, exercise_name, exercise_order) values ($1, $2, 0) returning id`, [sid, name])).rows[0].id;
@@ -118,6 +118,49 @@ export default {
       await db.query(`update public.set_logs set set_type = 'working' where id = $1`, [rowSet]);
       await h.asSuper();
       h.check("...and back to a working set it counts again", (await maxOf("Row")) === 170);
+
+      // ---- stored maxes are never wiped or lowered by the new 1-to-8-rep window (the shape of the live data: maxes resting only on sets of 9 or more reps)
+      const putMax = (name, est, w, r) =>
+        db.query(
+          `insert into public.athlete_training_maxes (athlete_id, exercise_name, estimated_max, source_weight, source_reps, source_rpe, source_rpe_assumed, updated_at) values ($1, $2, $3, $4, $5, 9, true, now())
+           on conflict (athlete_id, exercise_name) do update set estimated_max = excluded.estimated_max, source_weight = excluded.source_weight, source_reps = excluded.source_reps`,
+          [client, name, est, w, r]
+        );
+      const sOld = await session(30, "completed");
+      // A: rests only on a 10-rep set (150 x 10 -> 205)
+      await set(await exercise(sOld, "Legacy A"), 0, { weight: 150, reps: 10 });
+      await putMax("Legacy A", 205, 150, 10);
+      // B: a 10-rep set (205) and a lower 5-rep set (180): the 5-rep estimate must not shrink it
+      const eB = await exercise(await session(31, "completed"), "Legacy B");
+      await set(eB, 0, { weight: 150, reps: 10 });
+      await set(eB, 1, { weight: 150, reps: 5 });
+      await putMax("Legacy B", 205, 150, 10);
+      // C: a 400 stored from a typo set that is now marked unclear: it still can come down
+      const eC = await exercise(await session(32, "completed"), "Legacy C");
+      const typo = await set(eC, 0, { weight: 300, reps: 10 });
+      await set(eC, 1, { weight: 100, reps: 5 });
+      await putMax("Legacy C", 410, 300, 10);
+      await db.query(`update public.set_logs set data_flag = 'unclear' where id = $1`, [typo]);
+      // D: no counted set of 1 to 12 reps left (only a 15-rep set): nothing supports the row
+      await set(await exercise(await session(33, "completed"), "Legacy D"), 0, { weight: 100, reps: 15 });
+      await putMax("Legacy D", 150, 100, 15);
+      // E: a 12-rep set and a heavier 3-rep set: the new estimate (higher) replaces the stored one
+      const eE = await exercise(await session(34, "completed"), "Legacy E");
+      await set(eE, 0, { weight: 100, reps: 12 });
+      await set(eE, 1, { weight: 200, reps: 3 });
+      await putMax("Legacy E", 100, 100, 12);
+      await h.as(client);
+      const rebuilt = await tryQ(db, `select public.recompute_training_maxes($1, null) as n`, [client]);
+      await h.asSuper();
+      h.check("a recompute runs for the client" + (rebuilt.error ? ": " + rebuilt.error : ""), !rebuilt.error);
+      h.check("a max that rests only on a 10-rep set is kept, not wiped", (await maxOf("Legacy A")) === 205);
+      h.check("a lower 5-rep estimate does not shrink a stored max (205 stays, not 180)", (await maxOf("Legacy B")) === 205);
+      h.check("a max from a set marked unclear can still come down (to the 100 x 5 = 120)", (await maxOf("Legacy C")) === 120);
+      h.check("a max with no counted set of 1 to 12 reps behind it is dropped", (await maxOf("Legacy D")) === null);
+      h.check("a higher 1-to-8-rep estimate replaces a stored max (200 x 3 = 226.7)", (await maxOf("Legacy E")) === 226.7);
+      h.check("the earlier maxes in this test are unchanged by the recompute", (await maxOf("Bench")) === 130 && (await maxOf("Row")) === 170);
+      const nineUp = await set(await exercise(await session(35, "completed"), "Legacy F"), 0, { weight: 100, reps: 9 });
+      h.check("a NEW set of 9 reps makes no max going forward", nineUp && (await maxOf("Legacy F")) === null);
 
       // ---- permissions did not change
       const acl = await h.one(`select has_function_privilege('authenticated', 'public.recompute_on_set_type_change()', 'execute') as a, has_function_privilege('anon', 'public.recompute_on_set_type_change()', 'execute') as b, has_function_privilege('anon', 'public.complete_workout_session(uuid)', 'execute') as c`);
