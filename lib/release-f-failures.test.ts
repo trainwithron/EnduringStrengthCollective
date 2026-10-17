@@ -34,6 +34,11 @@ describe("a write whose result nobody looked at now says when it did not save", 
     clearSaveFailed();
     expect(seen.filter(Boolean)).toEqual(["Couldn't rename that.", "That didn't save. Try again."]);
   });
+  it("saved() counts 'already there' (a unique-key conflict) as saved", async () => {
+    expect(await saved(Promise.resolve({ error: { message: "duplicate key value", code: "23505" } }))).toBe(true);
+    expect(await saved(Promise.resolve({ error: { message: "other", code: "42501" } }))).toBe(false);
+    clearSaveFailed();
+  });
   it("bestEffort() looks at the result, never throws, and stays quiet", async () => {
     const spy = vi.fn();
     const off = subscribeSaveFailed(spy);
