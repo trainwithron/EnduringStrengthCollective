@@ -50,6 +50,11 @@ export async function hasPaidAiBalance(db: any, coachId: string): Promise<boolea
   }
 }
 
+// True when this coach gets NO AI at all outside their monthly free uses (free tier, nothing bought). The scheduled AI jobs skip such a coach before doing any work.
+export async function isZeroAiCoach(db: any, coachId: string): Promise<boolean> {
+  return (await isFreeTierCoach(db, coachId)) && !(await hasPaidAiBalance(db, coachId));
+}
+
 const monthStart = (): string => `${currentAllowancePeriod()}T00:00:00Z`;
 
 const USE_FEATURES = Object.values(FREE_TIER_USE_FEATURE);

@@ -5,6 +5,7 @@ import { synthesizeCornerstone } from "@/lib/spotter-cornerstone-synthesis";
 import { synthesizeOverarching } from "@/lib/spotter-overarching-synthesis";
 import type { Cornerstone, SpotterExpertReport } from "@/lib/spotter-expert-report";
 import { withCronRun } from "@/lib/cron-monitor";
+import { isZeroAiCoach } from "@/lib/free-tier-server";
 
 // 3-layer Spotter framework
 // (two_layer_spotter_framework_architecture_research_sept19.md) — once
@@ -65,8 +66,10 @@ async function handler(request: Request) {
       tier1ByCornerstone.set(r.cornerstone, list);
     }
 
+    // The free plan has no AI synthesis: the data reports above are kept, the model is never called.
+    const zeroAi = await isZeroAiCoach(supabase, coachId);
     const allTier2: SpotterExpertReport[] = [];
-    for (const cornerstone of CORNERSTONES) {
+    for (const cornerstone of zeroAi ? [] : CORNERSTONES) {
       const cornerstoneReports = tier1ByCornerstone.get(cornerstone) ?? [];
       const tier2 = await synthesizeCornerstone(supabase, { coachId, cornerstone, tier1Reports: cornerstoneReports });
       allTier2.push(...tier2);
@@ -101,7 +104,7 @@ async function handler(request: Request) {
     }
 
     const tier2WithIds = tier2Inserted.filter((r): r is SpotterExpertReport & { id: string } => !!r.id);
-    const tier3 = await synthesizeOverarching(supabase, { coachId, tier2Reports: tier2WithIds });
+    const tier3 = zeroAi ? [] : await synthesizeOverarching(supabase, { coachId, tier2Reports: tier2WithIds });
     if (tier3.length > 0) {
       await supabase.from("spotter_expert_reports").upsert(
         tier3.map((r) => ({
