@@ -28,6 +28,29 @@ begin
   );
 end;
 $$;
+create or replace function public.org_billable_clients(p_org_id uuid)
+returns int
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if auth.role() is distinct from 'service_role'
+     and not (coalesce(public.is_org_member(p_org_id), false) or coalesce(public.is_platform_admin(), false)) then
+    raise exception 'Not authorized';
+  end if;
+
+  return (
+    select count(distinct m.profile_id)::int
+    from public.groups g
+    join public.group_memberships m on m.group_id = g.id
+    where g.organization_id = p_org_id
+      and m.role = 'athlete'
+      and m.membership_type = 'training'
+  );
+end;
+$$;
 create or replace function public.transfer_organization_ownership(p_organization_id uuid, p_new_owner_id uuid)
  returns void
  language plpgsql

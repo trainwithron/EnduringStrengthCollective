@@ -9,6 +9,7 @@ import {
   detectBookedVsActualMismatch,
   type AvailabilityWindow,
 } from "./calendar-spotter-phase2";
+import { readStayingMembers } from "./org-members";
 import { ASK_HEADLINE, FOLLOWUP_HEADLINE, scheduleGapsStage, type GapAnswerEvent } from "./schedule-gaps-question";
 
 export interface SchedulingSpotterFlag {
@@ -85,11 +86,10 @@ export async function gatherSchedulingSpotterFlags(
 
   // --- Pattern 2: uneven load across a multi-trainer org ---
   if (organizationId) {
-    const { data: orgCoachRows } = await supabase
-      .from("organization_memberships")
-      .select("profile_id, profiles ( full_name )")
-      .eq("organization_id", organizationId)
-      .is("departing_since", null);
+    const { data: orgCoachRows } = await readStayingMembers<{ profile_id: string; profiles: unknown }>((x) => {
+      const q = supabase.from("organization_memberships").select("profile_id, profiles ( full_name )").eq("organization_id", organizationId);
+      return x ? q.is("departing_since", null) : q;
+    });
     const coachIds = (orgCoachRows ?? []).map((r) => r.profile_id);
     if (coachIds.length >= 2) {
       const since = new Date(now.getTime() - LOOKBACK_DAYS_FOR_LOAD * 86400000).toISOString();

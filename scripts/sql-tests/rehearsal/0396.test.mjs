@@ -56,6 +56,11 @@ export default {
       h.check("their own kept client is still theirs to see", (await count(`select count(*)::int as n from public.group_memberships where group_id = $1 and profile_id = $2`, [privG, kPriv])) === 1);
       await h.as(owner);
       h.check("the gym's seat count no longer includes the leaving coach", (await count(`select public.org_coach_seats($1)::int as n`, [org])) === 2);
+      const billable = await count(`select public.org_billable_clients($1)::int as n`, [org]);
+      await h.asSuper();
+      const everyone = await count(`select count(distinct m.profile_id)::int as n from public.groups g join public.group_memberships m on m.group_id = g.id where g.organization_id = $1 and m.role = 'athlete' and m.membership_type = 'training'`, [org]);
+      h.check("the gym is not billed for the clients of the groups the leaving coach kept", billable === everyone - 1, billable + " vs " + everyone);
+      await h.as(owner);
 
       // ---- nobody can hand clients to, make owner, or promote a leaving coach
       const c5 = await h.user("LC Sole Coach");

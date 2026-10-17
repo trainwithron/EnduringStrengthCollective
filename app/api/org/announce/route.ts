@@ -5,6 +5,7 @@ import { rateLimitResponse } from "@/lib/rate-limit";
 import { chunk } from "@/lib/chunk";
 import { sendPushToProfile } from "@/lib/send-push";
 import { runPool } from "@/lib/run-pool";
+import { readStayingMembers } from "@/lib/org-members";
 
 const ANNOUNCEMENT_MAX = 500;
 
@@ -32,7 +33,10 @@ export async function POST(request: Request) {
 
   const db = createServiceRoleClient();
   const { data: org } = await db.from("organizations").select("name").eq("id", organizationId).maybeSingle();
-  const { data: members, error: memberError } = await db.from("organization_memberships").select("profile_id").eq("organization_id", organizationId).neq("profile_id", user.id).is("departing_since", null);
+  const { data: members, error: memberError } = await readStayingMembers<{ profile_id: string }>((x) => {
+    const q = db.from("organization_memberships").select("profile_id").eq("organization_id", organizationId).neq("profile_id", user.id);
+    return x ? q.is("departing_since", null) : q;
+  });
   if (memberError) return NextResponse.json({ error: "Couldn't find your team. Try again." }, { status: 502 });
   const ids = ((members ?? []) as { profile_id: string }[]).map((m) => m.profile_id);
   if (ids.length === 0) return NextResponse.json({ error: "There is nobody else on the team yet." }, { status: 400 });

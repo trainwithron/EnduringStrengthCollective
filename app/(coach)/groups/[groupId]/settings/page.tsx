@@ -2,6 +2,7 @@ import { ChangeMyEmail } from "@/components/athlete/change-my-email";
 import { LeaveOrganizationControl } from "@/components/org/leave-organization-control";
 import { orgIdOfGroup } from "@/lib/org-of-group";
 import { loadTeamInfo } from "@/lib/org-team";
+import { readStayingMembers } from "@/lib/org-members";
 import { CoachTypeSetting } from "@/components/coach/coach-type-setting";
 import { PushPreferences } from "@/components/athlete/push-preferences";
 import { isCoachType, type CoachType } from "@/lib/coach-type";
@@ -147,13 +148,17 @@ export default async function SettingsPage(
     if (orgIdForLeave) {
       const [{ data: orgRow }, { data: memberRow }] = await Promise.all([
         supabase.from("organizations").select("name, owner_id").eq("id", orgIdForLeave).maybeSingle(),
-        supabase.from("organization_memberships").select("id, departing_since").eq("organization_id", orgIdForLeave).eq("profile_id", user.id).maybeSingle(),
+        supabase.from("organization_memberships").select("id").eq("organization_id", orgIdForLeave).eq("profile_id", user.id).maybeSingle(),
       ]);
-      // A coach who is already leaving has no "Leave" to press: their Home offers the two choices.
-      if (orgRow && memberRow && !(memberRow as { departing_since?: string | null }).departing_since && orgRow.owner_id !== user.id) {
+      // A coach who is already leaving has no "Leave" to press: their Home offers the two choices. (A separate read: a database without the column yet just shows nobody as leaving.)
+      const { data: leavingRow } = await supabase.from("organization_memberships").select("departing_since").eq("organization_id", orgIdForLeave).eq("profile_id", user.id).not("departing_since", "is", null).maybeSingle();
+      if (orgRow && memberRow && !leavingRow && orgRow.owner_id !== user.id) {
         // Who could take over my clients, and how many clients only I coach (so Leave can ask first).
         const [{ data: others }, team] = await Promise.all([
-          supabase.from("organization_memberships").select("profile_id, profiles ( full_name )").eq("organization_id", orgIdForLeave).neq("profile_id", user.id).is("departing_since", null),
+          readStayingMembers((x) => {
+            const q = supabase.from("organization_memberships").select("profile_id, profiles ( full_name )").eq("organization_id", orgIdForLeave).neq("profile_id", user.id);
+            return x ? q.is("departing_since", null) : q;
+          }),
           loadTeamInfo(supabase, orgIdForLeave),
         ]);
         leaveInfo = {

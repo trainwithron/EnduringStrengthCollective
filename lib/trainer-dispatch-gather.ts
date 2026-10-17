@@ -1,5 +1,6 @@
 import { fetchSessionMinutes, sessionMinutesFor } from "@/lib/availability-windows";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { readStayingMembers } from "@/lib/org-members";
 import {
   findMatchingSlotForTrainer,
   rankTrainersByFit,
@@ -22,11 +23,11 @@ export async function findAndRankAvailableTrainers(
   requestedStartAt: Date,
   goalType: GoalType
 ): Promise<RankedTrainer[]> {
-  const { data: members } = await supabase
-    .from("organization_memberships")
-    .select("profile_id, profiles ( full_name, timezone )")
-    .eq("organization_id", organizationId)
-    .is("departing_since", null); // a coach who is leaving is not offered the gym's new prospects
+  // a coach who is leaving is not offered the gym's new prospects
+  const { data: members } = await readStayingMembers((x) => {
+    const q = supabase.from("organization_memberships").select("profile_id, profiles ( full_name, timezone )").eq("organization_id", organizationId);
+    return x ? q.is("departing_since", null) : q;
+  });
   if (!members || members.length === 0) return [];
 
   const candidates: {

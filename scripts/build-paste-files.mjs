@@ -2849,6 +2849,7 @@ STEPS.push({
   undo: [
     fnFromMigration("0049", "is_org_member"),
     fnFromMigration("0228", "org_coach_seats"),
+    fnFromMigration("0228", "org_billable_clients"),
     LIVE_TRANSFER_ORGANIZATION_OWNERSHIP,
     fnFromMigration("0392", "assign_group_coach"),
     fnFromMigration("0391", "set_org_member_role"),

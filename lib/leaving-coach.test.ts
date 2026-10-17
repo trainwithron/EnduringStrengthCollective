@@ -76,7 +76,12 @@ describe("a leaving coach (migration 0396)", () => {
     expect(sql).toContain("if auth.role() = 'service_role' then");
     expect(sql).toContain("profile_id = p_coach and departing_since is null");
     expect(sql).toContain("The owner of an organization cannot leave it this way.");
-    for (const f of ["lib/trainer-dispatch-gather.ts", "app/api/org/announce/route.ts", "lib/calendar-spotter-phase2-gather.ts"]) expect(src(f), f).toContain('.is("departing_since", null)');
+    // each of these reads falls back to the same read without the filter when the column is not there yet (code deployed before the paste)
+    for (const f of ["lib/trainer-dispatch-gather.ts", "app/api/org/announce/route.ts", "lib/calendar-spotter-phase2-gather.ts", "app/(coach)/groups/[groupId]/settings/page.tsx"]) {
+      expect(src(f), f).toContain('.is("departing_since", null)');
+      expect(src(f), f).toMatch(/readStayingMembers(<[^>]*>)?\(/);
+    }
+    expect(src("supabase/migrations/0396_leaving_coach_choice.sql")).toContain("g.id = any (om.departing_group_ids)");
     // a leaving coach still has sessions and clients in the organization: they stay in the activity list, named and marked
     expect(src("lib/coach-activity.ts")).toContain('" (leaving)"');
     expect(src("components/org/team-members-panel.tsx")).toContain("x.profileId !== m.profileId && !x.leaving");
