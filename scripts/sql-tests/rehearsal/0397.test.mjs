@@ -78,6 +78,13 @@ export default {
       h.check("a payment 9 days past due is the free plan", /up to 15 clients/.test(r.error ?? ""), r.error);
       await db.query(`update public.organization_billing set subscription_status = null, past_due_since = null where organization_id = $1`, [org]);
 
+      // an organization with no retired or kept groups sees exactly the number it always did
+      await h.asService();
+      const plainBilled = (await tryQ(db, `select public.org_billable_clients($1) as n`, [org])).rows?.[0]?.n;
+      await h.asSuper();
+      const plainRaw = (await db.query(`select count(distinct m.profile_id)::int as n from public.group_memberships m join public.groups g on g.id = m.group_id where g.organization_id = $1 and m.role = 'athlete' and m.membership_type = 'training'`, [org])).rows[0].n;
+      h.check("with no retired or kept groups the bill count is unchanged (" + plainBilled + ")", plainBilled === plainRaw && plainBilled === 15, plainBilled + " vs " + plainRaw);
+
       // ---- a retired past-season group does not count; the headroom reads the same number; the bill follows it
       await db.query(`update public.groups set archived_at = now() where id = $1`, [group2]);
       await h.asService();
@@ -94,6 +101,9 @@ export default {
       await setSwitch(true);
       await db.query(`update public.groups set archived_at = now() where id = $1`, [oldSeason]);
       h.check("a player who only sits in a retired season is not counted", (await (async () => { await h.asService(); const n = (await tryQ(db, `select public.org_billable_clients($1) as n`, [org])).rows?.[0]?.n; await h.asSuper(); return n; })()) === 15);
+      // a returning player from a retired season is a NEW client when the organization is full: being in an archived group is not being a current client
+      r = await addAthlete(group, gone);
+      h.check("a player returning from a retired season does not slip past the limit", /up to 15 clients/.test(r.error ?? ""), r.error);
       await db.query(`update public.groups set archived_at = null where id = $1`, [group2]);
 
       // ---- moving a client into another organization's group is a new client there

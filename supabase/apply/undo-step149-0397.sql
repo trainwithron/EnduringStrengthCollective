@@ -33,6 +33,7 @@ end;
 $function$;
 drop function if exists public.enforce_free_tier_client_limit();
 drop function if exists public._org_training_clients(uuid);
+drop function if exists public._org_training_client_ids(uuid);
 drop function if exists public.org_is_free_tier(uuid);
 drop function if exists public.free_tier_clients_enforced();
 commit;

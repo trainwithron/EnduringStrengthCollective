@@ -25,6 +25,9 @@ describe("the free plan's client limit", () => {
   });
   it("counts the people the bill counts, takes a lock per organization, and also watches a client moved between organizations", () => {
     expect(sql).toContain("g.archived_at is null");
+    // the "already one of your clients" shortcut ignores retired seasons too
+    expect(sql).toContain("from public._org_training_client_ids(v_org) c where c.profile_id = new.profile_id");
+    expect(sql).toContain("select count(*)::int from public._org_training_client_ids(p_org)");
     expect(sql).toContain("om.departing_group_ids");
     expect(sql).toContain("pg_advisory_xact_lock(hashtextextended(v_org::text, 0))");
     expect(sql.indexOf("pg_advisory_xact_lock")).toBeGreaterThan(sql.indexOf("if not public.org_is_free_tier(v_org) then"));

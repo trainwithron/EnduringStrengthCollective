@@ -5,7 +5,7 @@
 -- failed check, and NOTHING is kept, so a second run after a refusal is safe.
 -- WHAT YOU SHOULD SEE: first "Success" for the transaction, then a result table with one row per step and in_place = true on every row.
 -- ON ERROR: run   rollback;   once, copy the red text, send it to Spot. Do not run it again.
--- AFTER STEP 149: Nothing changes at all: the limit is installed switched off (free_tier_clients_enforced returns false), so every organization behaves exactly as before. It is switched on later, together with billing, by one more short step. Safe to run before or after the code.
+-- AFTER STEP 149: Apply it after steps 146, 147 and 148 (it reads columns they add; the check above stops you otherwise). ONE thing changes at once: the client count in Plan and Billing (and so the bill) no longer counts a player who only sits in a retired past-season group, nor the clients of a group a leaving coach kept; an organization with neither sees the same number as before. Otherwise nothing changes: the limit is installed switched off (free_tier_clients_enforced returns false), so every organization behaves exactly as before. It is switched on later, together with billing, by one more short step. Safe to run before or after the code.
 -- It contains no text searching, so editor re-indenting cannot break it.
 
 begin;
@@ -33,6 +33,9 @@ $g149$;
 
 -- 0397: the free plan's client limit (Ron, Oct 17): a coach whose trial ended with no paid plan can keep every client they have, but cannot ADD more than 15 training clients. Nothing is deleted and nobody is
 -- locked out; only a new training client beyond the 15th is refused, by the database, so no screen or route can slip past it.
+--
+-- ONE THING CHANGES AT ONCE, even switched off: the bill's client count (org_billable_clients, shown in Plan & Billing) becomes the same number the limit uses, so it no longer counts a player who only sits in a
+-- retired past-season group, nor the clients of a group a leaving coach kept. An organization with no retired or kept groups sees exactly the same number as before.
 --
 -- INSTALLED SWITCHED OFF. free_tier_clients_enforced() returns false, so every organization behaves exactly as before. It is switched on, together with the COACH_BILLING_ENFORCED setting, by replacing that one
 -- function with "select true" (and back by putting "select false" again). org_is_free_tier() mirrors lib/org-entitlements.ts: not a founding (billing_exempt) organization, no active or trialing subscription,
@@ -74,14 +77,14 @@ grant execute on function public.org_is_free_tier(uuid) to service_role;
 
 -- How many different training clients the organization has: the SAME people the bill counts. A retired past-season group (groups.archived_at) and a group a leaving coach keeps that holds a client private from the
 -- organization (organization_memberships.departing_group_ids, migration 0396) are left out, so graduated players and a leaving coach's clients never block a gym. org_billable_clients below uses this too. Internal.
-create or replace function public._org_training_clients(p_org uuid)
-returns int
+create or replace function public._org_training_client_ids(p_org uuid)
+returns table (profile_id uuid)
 language sql
 stable
 security definer
 set search_path = public
 as $$
-  select count(distinct m.profile_id)::int
+  select distinct m.profile_id
   from public.groups g
   join public.group_memberships m on m.group_id = g.id
   where g.organization_id = p_org and g.archived_at is null and m.role = 'athlete' and m.membership_type = 'training'
@@ -92,6 +95,17 @@ as $$
         and not exists (select 1 from public.group_memberships c where c.group_id = g.id and c.role = 'coach' and c.profile_id <> om.profile_id)
     )
 $$;
+revoke execute on function public._org_training_client_ids(uuid) from public, anon, authenticated;
+grant execute on function public._org_training_client_ids(uuid) to service_role;
+
+-- The number of them. The count, the bill and the "already one of their clients" shortcut in the trigger all read the one list above, so they cannot drift apart.
+create or replace function public._org_training_clients(p_org uuid)
+returns int
+language sql
+stable
+security definer
+set search_path = public
+as $$ select count(*)::int from public._org_training_client_ids(p_org) $$;
 revoke execute on function public._org_training_clients(uuid) from public, anon, authenticated;
 grant execute on function public._org_training_clients(uuid) to service_role;
 
@@ -163,10 +177,7 @@ begin
   end if;
   -- two people adding clients at the same moment are taken one after the other, so neither can slip past the 15th
   perform pg_advisory_xact_lock(hashtextextended(v_org::text, 0));
-  if exists (
-    select 1 from public.group_memberships m join public.groups g on g.id = m.group_id
-    where g.organization_id = v_org and m.profile_id = new.profile_id and m.role = 'athlete' and m.membership_type = 'training' and m.id is distinct from new.id
-  ) then
+  if exists (select 1 from public._org_training_client_ids(v_org) c where c.profile_id = new.profile_id) then
     return new;
   end if;
   if public._org_training_clients(v_org) >= 15 then
