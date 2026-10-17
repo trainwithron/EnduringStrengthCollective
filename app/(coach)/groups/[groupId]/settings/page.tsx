@@ -2,6 +2,8 @@ import { ChangeMyEmail } from "@/components/athlete/change-my-email";
 import { LeaveOrganizationControl } from "@/components/org/leave-organization-control";
 import { orgIdOfGroup } from "@/lib/org-of-group";
 import { loadTeamInfo } from "@/lib/org-team";
+import { CoachTypeSetting } from "@/components/coach/coach-type-setting";
+import { isCoachType, type CoachType } from "@/lib/coach-type";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
@@ -161,6 +163,13 @@ export default async function SettingsPage(
       }
     }
   }
+  // What this coach coaches (0392). Read on its own so a database that does not have the column yet still shows the whole page.
+  let coachTypeNow: CoachType | null = null;
+  if (isCoach) {
+    const typeRead = await supabase.from("profiles").select("coach_type").eq("id", user.id).maybeSingle();
+    const value = (typeRead.data as { coach_type?: string | null } | null)?.coach_type;
+    coachTypeNow = !typeRead.error && isCoachType(value) ? value : null;
+  }
   // The first-name-on-shared-pictures switch (0334). Read on its own so a database that does not have the column yet still shows the whole page (the switch is just left out).
   const shareNameRead = await supabase.from("profiles").select("show_name_on_share").eq("id", athleteId).maybeSingle();
   const showNameAvailable = !shareNameRead.error;
@@ -301,6 +310,12 @@ export default async function SettingsPage(
 
       <section className="px-5 pt-8 space-y-6">
         {isCoach ? <>{coachingGroup}{terminologyGroup}{notificationsGroup}</> : notificationsGroup}
+
+        {isCoach && !effective.isActingAsOther && (
+          <SettingsGroup label="What you coach">
+            <CoachTypeSetting profileId={user.id} initial={coachTypeNow} />
+          </SettingsGroup>
+        )}
 
         {isCoach && leaveInfo && (
           <SettingsGroup label="Organization">

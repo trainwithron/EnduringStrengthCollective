@@ -7,6 +7,7 @@ import { rateLimitResponse, rateLimitAllows, clientIp } from "@/lib/rate-limit";
 import { SIGNUP_DOCUMENTS } from "@/lib/legal";
 import { recordLegalAcceptances } from "@/lib/legal-record";
 import { appOrigin } from "@/lib/app-url";
+import { isCoachType, starterGroupName } from "@/lib/coach-type";
 
 // Self-service coach signup — a brand-new person, no pre-existing
 // invite/relationship, creating their own account AND their own
@@ -37,6 +38,8 @@ export async function POST(request: Request) {
   const trimmedOrgName = typeof orgName === "string" ? orgName.trim() : "";
   const trimmedEmail = typeof email === "string" ? email.trim() : "";
   const pw = typeof password === "string" ? password : "";
+  // What they coach (optional here so an older page still works); anything else is ignored.
+  const coachType = isCoachType(body.coachType) ? body.coachType : null;
 
   if (!trimmedName || !trimmedOrgName || !trimmedEmail) {
     return NextResponse.json({ error: "Missing name, organization name, or email." }, { status: 400 });
@@ -107,9 +110,15 @@ export async function POST(request: Request) {
   try {
     const { groupId } = await createOrganization(serviceRole, {
       name: trimmedOrgName,
-      starterGroupName: "Main Group",
+      starterGroupName: starterGroupName(coachType),
       ownerId: newUserId,
     });
+
+    // What they coach. Best-effort and on its own, so a database that does not have the column yet still signs people up.
+    if (coachType) {
+      const { error: typeError } = await serviceRole.from("profiles").update({ coach_type: coachType }).eq("id", newUserId);
+      if (typeError) console.error("signup: couldn't save what they coach:", typeError.message);
+    }
 
     // A brand-new coach starts in "request" booking (a client asks, the coach approves); they can change it any time in their availability settings. Coaches who signed up before this
     // keep what they have. Best-effort: with no row, booking behaves as it always did.

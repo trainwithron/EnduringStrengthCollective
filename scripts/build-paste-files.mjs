@@ -2728,6 +2728,25 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "144",
+  slug: "0392",
+  title: "0392 Release H: what a coach coaches (asked at signup) and an owner or admin choosing which coach holds a new client",
+  migrations: ["0392"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes on screen until the Release H code is live. Adds one empty column (what a coach coaches: one-on-one clients, a team or class, or a gym) and one function (the owner or admin choosing the coach of a new client). Safe to run before the code is live.",
+  undo: [
+    "drop function if exists public.assign_group_coach(uuid, uuid, boolean);",
+    "alter table public.profiles drop column if exists coach_type;",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 144 misbehaves. Run it only while the Release H code is not live (signup, Settings and Add client read the column and call the function). Removes the column and the function.",
+  rows: [
+    ["0392 is not already applied (the coach type column is not there yet)", "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'coach_type')"],
+    ["the tables it builds on exist", "to_regclass('public.profiles') is not null and to_regclass('public.group_memberships') is not null and to_regclass('public.organization_memberships') is not null"],
+    ["the helper functions it uses exist", "to_regprocedure('public.is_org_owner_or_admin(uuid)') is not null and to_regprocedure('public.is_group_coach(uuid)') is not null"],
+  ],
+});
+
+STEPS.push({
   n: "143",
   slug: "0391",
   title: "0391 Release H: getting out of an organization (remove a member and hand over their clients, leave, change a role, cancel or extend an invitation, close the organization)",
@@ -2901,7 +2920,7 @@ const BUNDLES = [
   { id: "release-co", name: "Release CO (nothing about a person is public unless they chose it: personal Find a coach listing; a coach adds only their own clients to a challenge; run BEFORE the code that goes with it is live)", steps: ["139"] },
   { id: "release-cn-held", name: "HELD, Ron's word first: require the health form and waiver of every client without one (read check-intake-flag-list.sql first)", steps: ["138"] },
   { id: "release-cm", name: "Release CM (the guard function and a coach's decision on a flagged screening; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["137"] },
-  { id: "release-h-importers", name: "Release H (undo a whole history import; getting out of an organization; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["142", "143"] },
+  { id: "release-h-importers", name: "Release H (undo a whole history import; getting out of an organization; what a coach coaches; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["142", "143", "144"] },
   { id: "release-g", name: "Release G (the app at 1,500 clients; real values only in sets; a test-organization mark; pause forgotten workouts; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["141"] },
   { id: "release-cp", name: "Release CP (switch on the guard: the server finishes the health form and waiver; run AFTER the Release D code is live)", steps: ["140"] },
   { id: "release-cl", name: "Release CL (the kind of each set; records per number of reps; a warm-up or drop set never counts; run BEFORE the code that goes with it is live)", steps: ["136"] },
@@ -3177,6 +3196,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
     m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
+    m("0392", "to_regprocedure('public.assign_group_coach(uuid, uuid, boolean)') is not null"),
     m("0391", "to_regprocedure('public.remove_org_member(uuid, uuid, uuid)') is not null"),
     m("0390", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'athlete_sessions' and column_name = 'import_batch_id')"),
     m("0389", "to_regprocedure('public.business_last_active(uuid[])') is not null"),

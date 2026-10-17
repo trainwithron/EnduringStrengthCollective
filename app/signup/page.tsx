@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { COACH_TYPES, type CoachType } from "@/lib/coach-type";
 import Link from "next/link";
 import { LegalAcceptance } from "@/components/legal/legal-acceptance";
 import { LegalLinks } from "@/components/legal/legal-links";
@@ -8,6 +9,7 @@ import { LegalLinks } from "@/components/legal/legal-links";
 export default function SignupPage() {
   const [fullName, setFullName] = useState("");
   const [orgName, setOrgName] = useState("");
+  const [coachType, setCoachType] = useState<CoachType | "">("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [legalAccepted, setLegalAccepted] = useState(false);
@@ -26,6 +28,10 @@ export default function SignupPage() {
       setError("Please tick the box to agree before continuing.");
       return;
     }
+    if (!coachType) {
+      setError("Tell us what you coach.");
+      return;
+    }
     setSubmitting(true);
     setError(null);
 
@@ -33,7 +39,7 @@ export default function SignupPage() {
       const res = await fetch("/api/coaches/signup", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ fullName, orgName, email, password, acceptedLegal: true }),
+        body: JSON.stringify({ fullName, orgName, email, password, coachType, acceptedLegal: true }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Couldn't create your account.");
@@ -128,6 +134,21 @@ export default function SignupPage() {
               className="w-full h-11 mt-1 bg-surface border border-steel/30 text-chalk px-3 font-body focus:outline-none focus:border-rust"
             />
           </div>
+
+          <fieldset>
+            <legend className="font-body text-xs text-steel uppercase tracking-wide">What do you coach?</legend>
+            <div className="mt-1 space-y-2">
+              {COACH_TYPES.map((t) => (
+                <label key={t.value} className={`flex items-start gap-3 border px-3 py-2.5 cursor-pointer ${coachType === t.value ? "border-rust" : "border-steel/30"}`}>
+                  <input type="radio" name="coach-type" value={t.value} checked={coachType === t.value} onChange={() => setCoachType(t.value)} className="mt-1" />
+                  <span>
+                    <span className="block font-body text-sm text-chalk">{t.label}</span>
+                    <span className="block font-body text-xs text-steel">{t.hint}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
 
           <div>
             <label htmlFor="email" className="font-body text-xs text-steel uppercase tracking-wide">

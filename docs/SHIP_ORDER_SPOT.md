@@ -12,8 +12,9 @@
 | F | release-f-silent-failures | (see git) | none | Assistant-cleared |
 | CP | (after the code is live) | - | Release CP, step 140, 0388, apply-release-cp-all.sql, fp e01025b329dbd888 | run AFTER the Release D code is live: switches on the guard that stops a browser finishing its own health form |
 | DW | duplicate-week-no-progressions | (see git) | none | Assistant-cleared; "Copy as is" on Duplicate week |
-| G | release-g-scale | (see git) | Release G, step 141, 0389, apply-release-g-all.sql (fp in the step file) | built, awaiting Assistant; paste BEFORE code |
+| G | release-g-scale | cba14678 | Release G, step 141, 0389, apply-release-g-all.sql, fp b3223e923005389e | Assistant-cleared; paste BEFORE code |
+| H | release-h-getting-in-and-out | (see git) | Release H, steps 142 (0390), 143 (0391), 144 (0392), apply-release-h-importers-all.sql (fp below) | built, awaiting Assistant; paste BEFORE code (adds only) |
 | D-held | (data) | - | HELD: step 138, apply-release-cn-held-all.sql, fp 8f22a2d348ee90d7, read check-intake-flag-list.sql first | Ron's word only |
 
 Fingerprint = first 16 hex of sha256 of the LF-normalized file: tr -d '\r' < supabase/apply/<file> | sha256sum | cut -c1-16.
-Apply order: CL (136), CM (137), CO (139), G (141); then deploy the code; then CP (140) after the code is live. Held 138 only on Ron's word.
+Apply order: CL (136), CM (137), CO (139), G (141), H (142 to 144); then deploy the code; then CP (140) after the code is live. Held 138 only on Ron's word.

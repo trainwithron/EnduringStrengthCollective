@@ -1,4 +1,6 @@
-# Offboarding and handoff (design, not built)
+# Offboarding and handoff (BUILT in Release H, migration 0391, paste step 143; the design below is kept for the reasoning)
+
+What was built differs from section 3 in two ways: (1) handing a coach's clients over does NOT call move_client_to_group; it adds the new coach to the same group and removes the old one, so a one-on-one space (with its history, programs, credits, packages) is never rebuilt or merged; (2) a client who is private from the organization is not handed over at all: the group moves WITH its coach into an organization of the coach's own. Closing the organization is the same thing for every other member (they take the clients they alone coach). reassign_client was not needed. Billing is not touched. See docs/NEEDS_RON.md, Release H.
 
 Ron: "easy to leave is a big promise; the owner must be able to do everything."
 

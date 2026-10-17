@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createGroupWithCoach } from "@/lib/create-group";
 import { discardEmptyGroup } from "@/lib/discard-empty-group";
 import { useRouter } from "next/navigation";
@@ -49,12 +49,40 @@ export function AddClientButton({
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [added, setAdded] = useState<{ groupId: string; profileId: string; name: string; inGroup: string | null; hasEmail: boolean } | null>(null);
+  const [added, setAdded] = useState<{ groupId: string; profileId: string; name: string; inGroup: string | null; hasEmail: boolean; note?: string | null } | null>(null);
   const [groups, setGroups] = useState<GroupOption[] | null>(null);
   const [selectedGroupId, setSelectedGroupId] = useState("");
   const [groupMode, setGroupMode] = useState<GroupMode>("name");
   const [link, setLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  // What this coach coaches (asked at signup): a team or gym coach is shown "Add to a group" first, everyone else "Add a one-on-one client" first.
+  const [groupsFirst, setGroupsFirst] = useState(false);
+  // An owner or admin adding a one-on-one client can choose which coach in the organization holds them (default: themselves).
+  const [orgCoaches, setOrgCoaches] = useState<{ id: string; name: string }[]>([]);
+  const [assignTo, setAssignTo] = useState("");
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    void (async () => {
+      const supabase = createBrowserClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase.from("profiles").select("coach_type").eq("id", user.id).maybeSingle();
+      const type = (data as { coach_type?: string | null } | null)?.coach_type;
+      if (!cancelled) setGroupsFirst(type === "team" || type === "gym");
+      const { data: current } = await supabase.from("groups").select("organization_id").eq("id", groupId).maybeSingle();
+      if (!current?.organization_id) return;
+      const { data: mine } = await supabase.from("organization_memberships").select("role").eq("organization_id", current.organization_id).eq("profile_id", user.id).maybeSingle();
+      if (mine?.role !== "owner" && mine?.role !== "admin") return;
+      const { data: members } = await supabase.from("organization_memberships").select("profile_id, profiles ( full_name )").eq("organization_id", current.organization_id).neq("profile_id", user.id);
+      if (!cancelled) setOrgCoaches(((members ?? []) as any[]).map((m) => ({ id: m.profile_id as string, name: (m.profiles as { full_name?: string } | null)?.full_name ?? "Coach" })).sort((a, b) => a.name.localeCompare(b.name)));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
   // A group made for a new one-on-one client: kept so a retry after a failure reuses it instead of leaving an empty space behind each time.
   const createdGroupIdRef = useRef<string | null>(null);
 
@@ -137,7 +165,14 @@ export function AddClientButton({
       const res = await fetch("/api/clients/invite", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ groupId: target, fullName, email }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Couldn't add this ${t("client")}.`);
-      setAdded({ groupId: target, profileId: data.profileId, name: fullName, inGroup: step === "group" ? groups?.find((g) => g.id === target)?.name ?? null : null, hasEmail: email.trim().length > 0 });
+      // The person adding chose another coach to hold this client: add them to the client's space (and step out of it).
+      let note: string | null = null;
+      if (step === "one_on_one" && assignTo) {
+        const coachName = orgCoaches.find((c) => c.id === assignTo)?.name ?? "that coach";
+        const { error: assignError } = await createBrowserClient().rpc("assign_group_coach", { p_group: target, p_coach: assignTo });
+        note = assignError ? `Added, but ${coachName} could not be given them: ${assignError.message}. You still coach them; you can hand them over from the Team page.` : `${coachName} is their coach now.`;
+      }
+      setAdded({ groupId: target, profileId: data.profileId, name: fullName, inGroup: step === "group" ? groups?.find((g) => g.id === target)?.name ?? null : null, hasEmail: email.trim().length > 0, note });
       setFullName("");
       setEmail("");
       router.refresh();
@@ -226,6 +261,7 @@ export function AddClientButton({
           <p className="font-body text-sm text-positive">
             {added.name} added{added.inGroup ? ` to ${added.inGroup}` : ""}. Nothing was sent to them.
           </p>
+          {added.note && <p className="font-body text-xs text-steel mt-1.5">{added.note}</p>}
           <p className="font-body text-xs text-steel mt-1.5">Build their program and schedule now. When you&apos;re ready, send their sign-in link from their profile.</p>
           {added.hasEmail && (
             <div className="mt-3">
@@ -242,11 +278,11 @@ export function AddClientButton({
           </div>
         </div>
       ) : step === "choose" ? (
-        <div className="space-y-2">
+        <div className="flex flex-col gap-2">
           <button
             type="button"
             onClick={() => setStep("one_on_one")}
-            className="w-full text-left border border-steel/40 hover:border-rust px-3 py-3"
+            className={`w-full text-left border border-steel/40 hover:border-rust px-3 py-3 ${groupsFirst ? "order-last" : ""}`}
           >
             <span className="block font-body text-sm text-chalk">Add a one-on-one {t("client")}</span>
             <span className="block font-body text-xs text-steel mt-0.5">Their own private space with you.</span>
@@ -262,7 +298,7 @@ export function AddClientButton({
             <span className="block font-body text-sm text-chalk">Add to a group</span>
             <span className="block font-body text-xs text-steel mt-0.5">Pick one of your groups, then add someone or share its link.</span>
           </button>
-          <button type="button" onClick={reset} className="font-body text-xs text-steel pt-1">
+          <button type="button" onClick={reset} className="order-last font-body text-xs text-steel pt-1 text-left">
             Cancel
           </button>
         </div>
@@ -271,6 +307,21 @@ export function AddClientButton({
           <p className="font-body text-xs text-steel mb-3">
             Add a one-on-one {t("client")}. A real account is made right away, with no email sent, so you can build their program before they ever sign in.
           </p>
+          {orgCoaches.length > 0 && (
+            <div className="mb-3">
+              <label htmlFor="assign-coach" className="font-body text-xs text-steel">
+                Who coaches them
+              </label>
+              <select id="assign-coach" value={assignTo} onChange={(e) => setAssignTo(e.target.value)} className={inputClass}>
+                <option value="">Me</option>
+                {orgCoaches.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           {nameForm}
         </div>
       ) : (

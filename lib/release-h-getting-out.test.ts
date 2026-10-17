@@ -34,3 +34,24 @@ describe("Release H: getting out", () => {
     expect(src("lib/business-export.ts")).toContain("INCOMPLETE");
   });
 });
+
+describe("Release H: what a coach coaches", () => {
+  it("signup asks it, saves it on its own after the organization exists, and settings can change it", () => {
+    expect(src("app/signup/page.tsx")).toContain("What do you coach?");
+    expect(src("app/signup/page.tsx")).toContain("coachType");
+    const route = src("app/api/coaches/signup/route.ts");
+    expect(route).toContain("isCoachType(body.coachType)");
+    // a separate update, never part of the profile insert: a database without the column still signs people up
+    expect(route).not.toMatch(/from\("profiles"\)\s*\.insert\([^)]*coach_type/);
+    expect(src("components/coach/coach-type-setting.tsx")).toContain("coach_type");
+    expect(src("app/(coach)/groups/[groupId]/settings/page.tsx")).toContain("CoachTypeSetting");
+    expect(src("supabase/migrations/0392_coach_type.sql")).toContain("check (coach_type in ('personal', 'team', 'gym'))");
+  });
+
+  it("an owner or admin adding a one-on-one client can choose the coach, through the database function that checks they may", () => {
+    const ui = src("components/coach/desktop/add-client-button.tsx");
+    expect(ui).toContain('rpc("assign_group_coach"');
+    expect(ui).toContain("Who coaches them");
+    expect(src("supabase/migrations/0392_coach_type.sql")).toContain("revoke execute on function public.assign_group_coach(uuid, uuid, boolean) from public, anon;");
+  });
+});
