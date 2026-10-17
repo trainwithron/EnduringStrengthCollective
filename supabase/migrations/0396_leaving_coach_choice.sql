@@ -15,6 +15,13 @@ alter table public.organization_memberships add column if not exists departure_n
 alter table public.organization_memberships add column if not exists reminded_3d_at timestamptz;
 alter table public.organization_memberships add column if not exists reminded_1d_at timestamptz;
 alter table public.organization_memberships add column if not exists closure_notified_at timestamptz;
+alter table public.organization_memberships add column if not exists clients_notified_at timestamptz;
+-- The coach's one export, made once when coaching access ended and kept in a private bucket (no policies: only the server key reaches it), so it never changes after that moment.
+alter table public.organization_memberships add column if not exists export_path text;
+alter table public.organization_memberships add column if not exists export_created_at timestamptz;
+insert into storage.buckets (id, name, public, file_size_limit)
+values ('coach-exit-exports', 'coach-exit-exports', false, 524288000)
+on conflict (id) do nothing;
 
 -- A member who is leaving is NOT a member for anything organization-wide: the roster, prospects and their contact details, tags, support requests, billing and the rest that are open to "a member of this
 -- organization" are closed to them the moment they are marked. What they keep is what belongs to them or to their own clients: their seat in the groups they kept (group membership), the rows filed under
@@ -77,6 +84,7 @@ begin
       and not exists (
         select 1 from public.organization_memberships om
         where om.organization_id = p_org_id and g.id = any (om.departing_group_ids)
+          and not exists (select 1 from public.group_memberships c where c.group_id = g.id and c.role = 'coach' and c.profile_id <> om.profile_id)
       )
   );
 end;
@@ -252,6 +260,10 @@ declare
   v_private boolean;
   n int;
 begin
+  -- A coach who is already leaving (or was let go, or whose days ran out) is not touched again: removing them a second time, or closing the organization, must not wipe what records their departure.
+  if exists (select 1 from public.organization_memberships where organization_id = p_org and profile_id = p_coach and departing_since is not null) then
+    return jsonb_build_object('handed', 0, 'kept', 0, 'leaving', true, 'already', true, 'bookings_moved', 0, 'bookings_left', 0);
+  end if;
   if p_hand_to is not null and (p_hand_to = p_coach or not exists (select 1 from public.organization_memberships where organization_id = p_org and profile_id = p_hand_to and departing_since is null)) then
     raise exception 'Choose another member of this organization to take over (not someone who is leaving).';
   end if;
@@ -362,9 +374,10 @@ declare
   v_kept uuid[];
   v_fired timestamptz;
   v_ended timestamptz;
+  v_since timestamptz;
 begin
   -- the membership row is locked, so a retried or simultaneous call waits and then finds the coach already gone
-  select departing_group_ids, fired_at, access_ended_at into v_kept, v_fired, v_ended from public.organization_memberships
+  select departing_group_ids, fired_at, access_ended_at, departing_since into v_kept, v_fired, v_ended, v_since from public.organization_memberships
     where organization_id = p_org and profile_id = p_coach and departing_since is not null for update;
   if not found then
     raise exception 'That coach is not leaving this organization.';
@@ -372,7 +385,7 @@ begin
   if v_fired is not null then
     raise exception 'A coach who was let go cannot start their own account here.';
   end if;
-  if v_ended is not null then
+  if v_ended is not null or v_since <= now() - interval '7 days' then
     raise exception 'The seven days to choose have ended.';
   end if;
   if exists (select 1 from public.organizations where id = p_org and owner_id = p_coach) then
@@ -406,6 +419,20 @@ end;
 $$;
 revoke execute on function public.complete_departure(uuid, uuid) from public, anon, authenticated;
 grant execute on function public.complete_departure(uuid, uuid) to service_role;
+
+-- The rows a coach files under their own name (shop links, classes, session types, calendar...) are theirs only while they still have coaching access: not once they were let go or their days ended.
+create or replace function public.coach_in_org(p_org uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select p_org is null or exists (
+    select 1 from public.organization_memberships om
+    where om.organization_id = p_org and om.profile_id = auth.uid() and om.fired_at is null and om.access_ended_at is null
+  )
+$$;
 
 -- Coaching access ends: the coach's seats in the groups they kept are taken away (the clients, their records and their history stay exactly where they are, private from the organization and with
 -- no coach), and the moment is recorded. Internal.
@@ -488,7 +515,7 @@ begin
   end if;
   result := public._detach_coach_from_org(p_org, p_profile, p_hand_to, false);
   if p_fired and coalesce((result ->> 'leaving')::boolean, false) then
-    update public.organization_memberships set fired_at = now() where organization_id = p_org and profile_id = p_profile;
+    update public.organization_memberships set fired_at = coalesce(fired_at, now()) where organization_id = p_org and profile_id = p_profile;
     perform public._end_coach_access(p_org, p_profile);
   end if;
   perform public.audit_record('organization_memberships', p_org::text || ':' || p_profile::text, 'update', jsonb_build_object('event', 'remove_member', 'removed_by', me, 'hand_to', p_hand_to, 'fired', p_fired) || result);
@@ -521,7 +548,8 @@ begin
     on conflict do nothing;
   update public.organization_memberships
     set fired_at = null, access_ended_at = null, departing_since = now(),
-        departure_notified_at = null, reminded_3d_at = null, reminded_1d_at = null, closure_notified_at = null
+        departure_notified_at = null, reminded_3d_at = null, reminded_1d_at = null, closure_notified_at = null,
+        clients_notified_at = null, export_path = null, export_created_at = null
     where organization_id = p_org and profile_id = p_coach;
   perform public.audit_record('organization_memberships', p_org::text || ':' || p_coach::text, 'update', jsonb_build_object('event', 'lift_departure_block', 'by', auth.uid()));
 end;

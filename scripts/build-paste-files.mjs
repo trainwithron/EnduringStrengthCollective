@@ -2847,6 +2847,11 @@ STEPS.push({
   afterwards: "Nothing changes on screen until the Release L code is live. Adds one empty column (when a coach was marked leaving) and replaces the remove / leave / close organization steps so none of them creates an organization. A coach marked leaving keeps their clients exactly where they are. Safe to run before the code is live.",
   // Puts every function back exactly as it was before (the 0049, 0174, 0217, 0228 and 0391 versions), then removes what 0396 added, so nothing is left reading the new columns.
   undo: [
+    // Coaches whose access already ended or who were let go are put back the way they were before the step: their seats in the groups they kept come back, and anyone let go is removed from the organization
+    // (as the earlier step did), so nobody becomes an ordinary member by the undo.
+    "insert into public.group_memberships (group_id, profile_id, role) select g.id, om.profile_id, 'coach' from public.organization_memberships om join public.groups g on g.id = any (om.departing_group_ids) and g.organization_id = om.organization_id where om.access_ended_at is not null on conflict do nothing;",
+    "delete from public.organization_memberships where fired_at is not null;",
+    fnFromMigration("0350", "coach_in_org"),
     fnFromMigration("0049", "is_org_member"),
     fnFromMigration("0228", "org_coach_seats"),
     fnFromMigration("0228", "org_billable_clients"),
@@ -2860,12 +2865,14 @@ STEPS.push({
     "drop function if exists public._end_coach_access(uuid, uuid);",
     "drop function if exists public.remove_org_member(uuid, uuid, uuid, boolean);",
     fnFromMigration("0391", "remove_org_member"),
+    "revoke execute on function public.remove_org_member(uuid, uuid, uuid) from public, anon;",
     "grant execute on function public.remove_org_member(uuid, uuid, uuid) to authenticated, service_role;",
     "-- the two extra notification kinds are left in the list (removing them could break rows that use them)",
     "drop policy if exists \"push_subscriptions_select_org_owner\" on public.push_subscriptions;",
     "create policy \"push_subscriptions_select_org_owner\" on public.push_subscriptions for select to authenticated using (exists (select 1 from public.organization_memberships om_owner join public.organization_memberships om_caller on om_caller.organization_id = om_owner.organization_id where om_owner.profile_id = push_subscriptions.profile_id and om_owner.role = 'owner' and om_caller.profile_id = (select auth.uid())));",
     "drop policy if exists \"org_memberships_select_self\" on public.organization_memberships;",
     "drop function if exists public.complete_departure(uuid, uuid);",
+    "alter table public.organization_memberships drop column if exists export_created_at, drop column if exists export_path, drop column if exists clients_notified_at;",
     "alter table public.organization_memberships drop column if exists closure_notified_at, drop column if exists reminded_1d_at, drop column if exists reminded_3d_at, drop column if exists departure_notified_at, drop column if exists access_ended_at, drop column if exists fired_at;",
     "alter table public.organization_memberships drop column if exists departing_group_ids;",
     "alter table public.organization_memberships drop column if exists departing_since;",
@@ -2876,7 +2883,7 @@ STEPS.push({
     ["the offboarding steps it replaces exist (step 143 is applied)", "to_regprocedure('public.remove_org_member(uuid, uuid, uuid)') is not null and to_regprocedure('public._detach_coach_from_org(uuid, uuid, uuid, boolean)') is not null and to_regprocedure('public._solo_org_for(uuid, uuid)') is not null"],
     ["the audit writer exists", "to_regprocedure('public.audit_record(text, text, text, jsonb)') is not null"],
     ["the notification type rule exists to be widened", "exists (select 1 from pg_constraint c where c.conname = 'notifications_type_check' and c.conrelid = 'public.notifications'::regclass)"],
-    ["the pieces it replaces exist (member check, seat count, ownership transfer, role change, owner push policy)", "to_regprocedure('public.is_org_member(uuid)') is not null and to_regprocedure('public.org_coach_seats(uuid)') is not null and to_regprocedure('public.transfer_organization_ownership(uuid, uuid)') is not null and to_regprocedure('public.set_org_member_role(uuid, uuid, text)') is not null and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'push_subscriptions' and policyname = 'push_subscriptions_select_org_owner')"],
+    ["the pieces it replaces exist (member check, seat count, ownership transfer, role change, owner push policy)", "to_regprocedure('public.is_org_member(uuid)') is not null and to_regprocedure('public.coach_in_org(uuid)') is not null and to_regprocedure('public.org_coach_seats(uuid)') is not null and to_regprocedure('public.transfer_organization_ownership(uuid, uuid)') is not null and to_regprocedure('public.set_org_member_role(uuid, uuid, text)') is not null and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'push_subscriptions' and policyname = 'push_subscriptions_select_org_owner')"],
   ],
 });
 

@@ -14,5 +14,5 @@ from (
     ('the notification type rule exists to be widened',
       exists (select 1 from pg_constraint c where c.conname = 'notifications_type_check' and c.conrelid = 'public.notifications'::regclass)),
     ('the pieces it replaces exist (member check, seat count, ownership transfer, role change, owner push policy)',
-      to_regprocedure('public.is_org_member(uuid)') is not null and to_regprocedure('public.org_coach_seats(uuid)') is not null and to_regprocedure('public.transfer_organization_ownership(uuid, uuid)') is not null and to_regprocedure('public.set_org_member_role(uuid, uuid, text)') is not null and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'push_subscriptions' and policyname = 'push_subscriptions_select_org_owner'))
+      to_regprocedure('public.is_org_member(uuid)') is not null and to_regprocedure('public.coach_in_org(uuid)') is not null and to_regprocedure('public.org_coach_seats(uuid)') is not null and to_regprocedure('public.transfer_organization_ownership(uuid, uuid)') is not null and to_regprocedure('public.set_org_member_role(uuid, uuid, text)') is not null and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'push_subscriptions' and policyname = 'push_subscriptions_select_org_owner'))
 ) as checks(check_name, ok);

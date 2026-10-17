@@ -23,7 +23,9 @@ export interface DepartureRow {
   departureNotifiedAt: string | null;
   reminded3dAt: string | null;
   reminded1dAt: string | null;
+  // The coach's export notice (sent once the export is stored), and the notice to the clients they kept (sent once every one has it).
   closureNotifiedAt: string | null;
+  clientsNotifiedAt: string | null;
 }
 
 export const windowEndsAt = (departingSince: string): Date => new Date(new Date(departingSince).getTime() + WINDOW_DAYS * DAY_MS);
@@ -38,21 +40,26 @@ export interface DeparturePlan {
   remind3: boolean;
   remind1: boolean;
   endAccess: boolean;
-  closure: boolean; // the export link to the coach, and the notice to their clients
+  closure: boolean; // the stored export and its notice to the coach, and the notice to the clients they kept
 }
 
-// What the job should do for one coach right now. Each step is sent once (its own timestamp), and a step never repeats.
+// What the job should do for one coach right now. The steps are exclusive, so a job that ran late never sends two contradictory messages in one pass: once the days are over only ending access and the closing
+// notices happen; inside the last day only the one-day reminder; inside the last three only the three-day reminder; the "you are leaving" notice only while there is still more than that to say. Each step is
+// sent once (its own timestamp).
 export function departurePlan(row: DepartureRow, now: Date): DeparturePlan {
   const left = windowEndsAt(row.departingSince).getTime() - now.getTime();
   const ended = !!row.accessEndedAt;
   const windowOver = left <= 0;
   const quitting = !row.firedAt && !ended;
+  const live = quitting && !windowOver;
+  const lastDay = left <= REMINDER_DAYS_LEFT[1] * DAY_MS;
+  const lastThree = left <= REMINDER_DAYS_LEFT[0] * DAY_MS;
   return {
-    tellThemTheyAreLeaving: quitting && !row.departureNotifiedAt,
-    remind3: quitting && !windowOver && !row.reminded3dAt && left <= REMINDER_DAYS_LEFT[0] * DAY_MS,
-    remind1: quitting && !windowOver && !row.reminded1dAt && left <= REMINDER_DAYS_LEFT[1] * DAY_MS,
+    tellThemTheyAreLeaving: live && !lastThree && !row.departureNotifiedAt,
+    remind3: live && lastThree && !lastDay && !row.reminded3dAt,
+    remind1: live && lastDay && !row.reminded1dAt,
     endAccess: quitting && windowOver,
-    closure: (ended || (quitting && windowOver)) && !row.closureNotifiedAt,
+    closure: (ended || (quitting && windowOver)) && (!row.closureNotifiedAt || !row.clientsNotifiedAt),
   };
 }
 

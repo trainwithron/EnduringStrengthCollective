@@ -1,6 +1,17 @@
 -- UNDO for step 148 (0396). Only if step 148 misbehaves. Run it only while the Release L code is not live (the Team page, Home and the announcement read the column). Coaches already marked leaving lose the mark and become ordinary members of that organization again, still coaching the clients they kept.
 -- WHAT YOU SHOULD SEE: "Success. No rows returned."   Then tell Spot, and do not run the step again until Spot says why it failed.
 begin;
+insert into public.group_memberships (group_id, profile_id, role) select g.id, om.profile_id, 'coach' from public.organization_memberships om join public.groups g on g.id = any (om.departing_group_ids) and g.organization_id = om.organization_id where om.access_ended_at is not null on conflict do nothing;
+delete from public.organization_memberships where fired_at is not null;
+create or replace function public.coach_in_org(p_org uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select p_org is null or exists (select 1 from public.organization_memberships om where om.organization_id = p_org and om.profile_id = auth.uid())
+$$;
 create or replace function public.is_org_member(target_org_id uuid)
 returns boolean language sql security definer stable set search_path = public as $$
   select exists (
@@ -322,12 +333,14 @@ begin
   return result;
 end;
 $$;
+revoke execute on function public.remove_org_member(uuid, uuid, uuid) from public, anon;
 grant execute on function public.remove_org_member(uuid, uuid, uuid) to authenticated, service_role;
 -- the two extra notification kinds are left in the list (removing them could break rows that use them)
 drop policy if exists "push_subscriptions_select_org_owner" on public.push_subscriptions;
 create policy "push_subscriptions_select_org_owner" on public.push_subscriptions for select to authenticated using (exists (select 1 from public.organization_memberships om_owner join public.organization_memberships om_caller on om_caller.organization_id = om_owner.organization_id where om_owner.profile_id = push_subscriptions.profile_id and om_owner.role = 'owner' and om_caller.profile_id = (select auth.uid())));
 drop policy if exists "org_memberships_select_self" on public.organization_memberships;
 drop function if exists public.complete_departure(uuid, uuid);
+alter table public.organization_memberships drop column if exists export_created_at, drop column if exists export_path, drop column if exists clients_notified_at;
 alter table public.organization_memberships drop column if exists closure_notified_at, drop column if exists reminded_1d_at, drop column if exists reminded_3d_at, drop column if exists departure_notified_at, drop column if exists access_ended_at, drop column if exists fired_at;
 alter table public.organization_memberships drop column if exists departing_group_ids;
 alter table public.organization_memberships drop column if exists departing_since;

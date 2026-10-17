@@ -15,13 +15,13 @@ async function emailOf(db: any, profileId: string): Promise<string | null> {
   }
 }
 
-async function tell(db: any, args: { profileId: string; type: "coach_departure_reminder" | "coach_account_closed"; subject: string; body: string; linkPath: string; origin: string }): Promise<boolean> {
+async function tell(db: any, args: { profileId: string; type: "coach_departure_reminder" | "coach_account_closed"; subject: string; body: string; linkPath: string; origin: string; emailToo?: boolean }): Promise<boolean> {
   let delivered = false;
   const { error } = await db.from("notifications").insert({ profile_id: args.profileId, type: args.type, body: args.body, link_path: args.linkPath });
   if (error) console.error(`[leaving-coach] notice (${args.type}) was refused:`, error.message);
   else delivered = true;
   await sendPushToProfile(db, args.profileId, args.subject, args.body, args.linkPath).catch(() => 0);
-  if (isEmailConfigured()) {
+  if (args.emailToo !== false && isEmailConfigured()) {
     const to = await emailOf(db, args.profileId);
     if (to) {
       const ok = await sendEmail(to, args.subject, `${args.body}\n\n${args.origin}${args.linkPath}\n\nYou are getting this because it is about your account on Spotlight Coaching.`).catch(() => false);
@@ -63,8 +63,10 @@ export const sendCoachTheirExport = (db: any, a: { coachId: string; orgName: str
     origin: a.origin,
   });
 
-export const tellClientCoachClosed = (db: any, a: { clientId: string; origin: string }) =>
+// The clients are told in the app (and by push); an email goes only to someone known to be an adult (a minor's or unknown-age login address is never written to).
+export const tellClientCoachClosed = (db: any, a: { clientId: string; origin: string; emailToo: boolean }) =>
   tell(db, {
+    emailToo: a.emailToo,
     profileId: a.clientId,
     type: "coach_account_closed",
     subject: "Your coach's account has closed",

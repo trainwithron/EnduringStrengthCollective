@@ -72,6 +72,15 @@ export default async function CoachHomePage() {
     .eq("role", "coach");
 
   if (!coachedGroupRows || coachedGroupRows.length === 0) {
+    // A coach whose coaching access has ended (their seven days ran out, or they were let go) has no seats left but still needs to see why, and the one export they are owed.
+    const ended = (await loadMyDepartures(supabase, user.id)).filter((d) => d.endedAt);
+    if (ended.length > 0) {
+      return (
+        <CoachHomeShell orgName={ended[0].organizationName}>
+          <LeavingCoachBanner departures={ended.map((d) => ({ ...d, exportGroupId: null }))} supportEmail={supportEmail()} />
+        </CoachHomeShell>
+      );
+    }
     return (
       <NoAccess>Only coaches have a home dashboard.</NoAccess>
     );

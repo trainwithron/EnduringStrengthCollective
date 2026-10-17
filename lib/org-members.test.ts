@@ -12,6 +12,12 @@ describe("readStayingMembers", () => {
     expect(retried.data).toEqual([{ id: 2 }]);
     expect(calls).toEqual([true, false]);
   });
+  it("any other failure is reported, never read as everyone (no second read without the filter)", async () => {
+    const calls: boolean[] = [];
+    const r = await readStayingMembers(async (x) => (calls.push(x), { data: null, error: { message: "timeout" } }));
+    expect(r.error?.message).toBe("timeout");
+    expect(calls).toEqual([true]);
+  });
   it("a read that fails both ways still reports the error", async () => {
     const r = await readStayingMembers(async () => ({ data: null, error: { message: "down" } }));
     expect(r.error?.message).toBe("down");

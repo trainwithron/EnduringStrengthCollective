@@ -3,5 +3,7 @@
 export async function readStayingMembers<T = any>(run: (excludeLeaving: boolean) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<{ data: T[] | null; error: { message: string } | null }> {
   const first = await run(true);
   if (!first.error) return first;
-  return run(false);
+  // Only a database that does not have the column yet is answered without the filter; any other failure is reported, never read as "everyone".
+  const missingColumn = (first.error as { code?: string }).code === "42703" || /departing_since/i.test(first.error.message) || /column .* does not exist/i.test(first.error.message);
+  return missingColumn ? run(false) : first;
 }

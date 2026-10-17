@@ -6,7 +6,7 @@ import { daysLeftToChoose, departurePlan, exportLinkStillWorks, retentionDays, w
 const src = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
 const T0 = "2026-10-17T12:00:00Z";
 const at = (days: number) => new Date(new Date(T0).getTime() + days * 86_400_000);
-const row = (over: Partial<DepartureRow> = {}): DepartureRow => ({ departingSince: T0, firedAt: null, accessEndedAt: null, departureNotifiedAt: null, reminded3dAt: null, reminded1dAt: null, closureNotifiedAt: null, ...over });
+const row = (over: Partial<DepartureRow> = {}): DepartureRow => ({ departingSince: T0, firedAt: null, accessEndedAt: null, departureNotifiedAt: null, reminded3dAt: null, reminded1dAt: null, closureNotifiedAt: null, clientsNotifiedAt: null, ...over });
 
 describe("a coach who is leaving: the seven days", () => {
   it("day 0: told they are leaving, nothing else", () => {
@@ -25,8 +25,18 @@ describe("a coach who is leaving: the seven days", () => {
     expect(p.endAccess).toBe(true);
     expect(p.closure).toBe(true);
     expect(p.remind3 || p.remind1 || p.tellThemTheyAreLeaving).toBe(false);
-    const done = departurePlan(row({ departureNotifiedAt: T0, accessEndedAt: at(7).toISOString(), closureNotifiedAt: at(7).toISOString() }), at(8));
+    const done = departurePlan(row({ departureNotifiedAt: T0, accessEndedAt: at(7).toISOString(), closureNotifiedAt: at(7).toISOString(), clientsNotifiedAt: at(7).toISOString() }), at(8));
     expect(done).toEqual({ tellThemTheyAreLeaving: false, remind3: false, remind1: false, endAccess: false, closure: false });
+  });
+  it("a job that ran late sends one message, the latest that applies, never two contradictory ones", () => {
+    const fresh = row();
+    // first seen with 12 hours left: only the one-day reminder, not the "you are leaving" notice or the three-day one
+    expect(departurePlan(fresh, at(6.5))).toEqual({ tellThemTheyAreLeaving: false, remind3: false, remind1: true, endAccess: false, closure: false });
+    // first seen after the seven days: access ends and the closing steps follow; no reminders and no "you have seven days"
+    expect(departurePlan(fresh, at(8))).toEqual({ tellThemTheyAreLeaving: false, remind3: false, remind1: false, endAccess: true, closure: true });
+    // closing is not done until the coach AND every client have been told
+    const half = row({ accessEndedAt: at(7).toISOString(), closureNotifiedAt: at(7).toISOString() });
+    expect(departurePlan(half, at(8)).closure).toBe(true);
   });
   it("a coach who was let go is never told they have days; they get only the closing step", () => {
     const p = departurePlan(row({ firedAt: T0, accessEndedAt: T0 }), at(0));
@@ -62,6 +72,24 @@ describe("wiring of the seven days", () => {
     for (const col of ["departure_notified_at", "reminded_3d_at", "reminded_1d_at", "closure_notified_at"]) expect(job, col).toContain(col);
     expect(job).toContain('rpc("end_departure_access"');
     expect(job).toContain("giveBack(");
+  });
+  it("the export is made once when access ends and stored privately, and the route only hands out that file", () => {
+    const job = src("app/api/cron/departing-coaches/route.ts");
+    expect(job).toContain("storeExitExport(");
+    expect(job).toContain("clients_notified_at");
+    expect(job).toContain('.eq("membership_type", "training")');
+    expect(job).toContain("emailToo: adult");
+    const route = src("app/api/coach/exit-export/route.ts");
+    expect(route).toContain("createSignedUrl(row.export_path");
+    expect(route).toContain('.eq("organization_id", row.organization_id)');
+    const sql = src("supabase/migrations/0396_leaving_coach_choice.sql");
+    expect(sql).toContain("insert into storage.buckets");
+    expect(sql).toContain("coach-exit-exports");
+  });
+  it("an ended coach sees why and the way to their export instead of a dead end", () => {
+    const home = src("app/(coach)/dashboard/page.tsx");
+    expect(home.indexOf("filter((d) => d.endedAt)")).toBeGreaterThan(-1);
+    expect(home.indexOf("filter((d) => d.endedAt)")).toBeLessThan(home.indexOf("Only coaches have a home dashboard."));
   });
   it("the export is the coach's own, from the groups they kept, only while the link works", () => {
     const route = src("app/api/coach/exit-export/route.ts");

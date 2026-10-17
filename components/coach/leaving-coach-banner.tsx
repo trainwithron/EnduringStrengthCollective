@@ -28,7 +28,7 @@ function DepartureSection({ departure: d, supportEmail }: { departure: MyDepartu
         </h2>
         <p className="font-body text-sm text-chalk mt-2">
           {d.fired ? "You were let go by the organization. " : "Your seven days are over. "}
-          Your clients keep their records and can keep logging; nothing was deleted. {works ? `We emailed you a link to one export of everything for the clients you kept. It works for ${EXPORT_LINK_DAYS} days.` : "Your export link has expired."}
+          Your clients keep their records and can keep logging; nothing was deleted. {works ? `One export of everything for the clients you kept is ready to download for ${EXPORT_LINK_DAYS} days. We also send you the link by email.` : "Your export link has expired."}
         </p>
         {works && (
           <p className="mt-3">

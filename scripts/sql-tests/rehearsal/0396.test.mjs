@@ -225,6 +225,51 @@ export default {
       h.check("then they can start their own account" + (r.error ? ": " + r.error : ""), !r.error);
       await h.asSuper();
       h.check("exactly one organization was made, and it has no billing row (the standard trial from its start)", (await count(`select count(*)::int as n from public.organizations`)) === orgsAfterSetup + 1 && (await count(`select count(*)::int as n from public.organization_billing where organization_id = $1`, [r.rows[0].res.organization_id])) === 0);
+
+      // ================= third-round rules: a let-go coach stays recorded, loses the rows filed under their name, and the gym is billed fairly
+      const fired2 = await h.user("LD Fired Two");
+      const kF2 = await h.user("LD Fired Two Client");
+      const late = await h.user("LD Late Quitter");
+      const kLate = await h.user("LD Late Client");
+      await h.orgMember(org2, fired2, "coach");
+      await h.orgMember(org2, late, "coach");
+      const gF2 = await h.group(org2, fired2, "one_on_one", "LD fired two client");
+      await h.member(gF2, kF2);
+      const gLate = await h.group(org2, late, "one_on_one", "LD late client");
+      await h.member(gLate, kLate);
+      await h.asSuper();
+      await db.query(`update public.group_memberships set private_from_org = true where (group_id = $1 and profile_id = $2) or (group_id = $3 and profile_id = $4)`, [gF2, kF2, gLate, kLate]);
+      await h.as(o2);
+      r = await tryQ(db, `select public.remove_org_member($1, $2, null, true)`, [org2, fired2]);
+      h.check("another coach is let go", !r.error, r.error);
+      r = await tryQ(db, `select public.remove_org_member($1, $2, null, true)`, [org2, fired2]);
+      h.check("removing them a second time changes nothing and is not an error", !r.error, r.error);
+      r = await tryQ(db, `select public.close_organization($1)`, [org2]);
+      h.check("closing the organization does not wipe them either", !r.error, r.error);
+      await h.asSuper();
+      const keep = (await db.query(`select fired_at, access_ended_at, departing_group_ids from public.organization_memberships where organization_id = $1 and profile_id = $2`, [org2, fired2])).rows[0];
+      h.check("they are still recorded as let go, with their kept group", keep && keep.fired_at != null && keep.access_ended_at != null && keep.departing_group_ids.includes(gF2), JSON.stringify(keep));
+      await h.as(fired2);
+      h.check("what they filed under their own name is no longer theirs to write (coach_in_org is false)", (await count(`select public.coach_in_org($1)::int as n`, [org2])) === 0);
+      await h.as(late);
+      h.check("a coach still inside their days keeps it (coach_in_org true)", (await count(`select public.coach_in_org($1)::int as n`, [org2])) === 1);
+
+      // the gym is not billed for a group with no coach; it is billed again once a different coach holds it
+      await h.asService();
+      const before = await count(`select public.org_billable_clients($1)::int as n`, [org2]);
+      await h.asSuper();
+      await db.query(`insert into public.group_memberships (group_id, profile_id, role) values ($1, $2, 'coach')`, [gF2, o2]);
+      await h.asService();
+      const after = await count(`select public.org_billable_clients($1)::int as n`, [org2]);
+      await h.asSuper();
+      h.check("a kept group is billable to the gym again once a different coach holds it", after === before + 1, before + " -> " + after);
+
+      // the seven days are enforced by the clock when starting an account, not only by the daily job
+      await db.query(`update public.organization_memberships set departing_since = now() - interval '8 days' where organization_id = $1 and profile_id = $2`, [org2, late]);
+      await h.as(late);
+      await h.asService();
+      r = await tryQ(db, `select public.complete_departure($1, $2)`, [org2, late]);
+      h.check("past seven days a coach cannot start an account even if the job has not run yet", /seven days/.test(r.error ?? ""), r.error);
     },
   },
 };
