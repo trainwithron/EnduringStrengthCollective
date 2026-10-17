@@ -165,7 +165,7 @@ async function handler(request: Request) {
 
       // 2. Tell the coach (marked only after it was delivered): the export is ready, or it could not be stored ahead and is made when the link is opened. Nothing is sent while a try is still to come.
       if (!row.closure_notified_at && (exportPath || exportFailed || groupIds.length === 0)) {
-        if (await sendCoachTheirExport(db, { coachId: row.profile_id, orgName, fired: !!row.fired_at, origin, couldNotStore: !exportPath && groupIds.length > 0, nothingToExport: groupIds.length === 0 })) {
+        if (await sendCoachTheirExport(db, { coachId: row.profile_id, organizationId: row.organization_id, orgName, fired: !!row.fired_at, origin, couldNotStore: !exportPath && groupIds.length > 0, nothingToExport: groupIds.length === 0 })) {
           await mark(row, "closure_notified_at");
           stats.coachesTold++;
         }
