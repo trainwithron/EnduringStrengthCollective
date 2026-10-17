@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { deriveOrgEntitlements, isBillingEnforced, type OrgBillingRow, type SubscriptionStatus } from "@/lib/org-entitlements";
+import { chunk } from "@/lib/chunk";
 import { getCoachBudgetStatus } from "@/lib/ai-budget-server";
 import { currentAllowancePeriod, FREE_TIER_AI_USES, FREE_TIER_USE_FEATURE, freeTierOutMessage, type FreeTierUseKind } from "@/lib/ai-usage";
 
@@ -97,9 +98,15 @@ async function pool(db: any, coachId: string, ctx?: FreeTierContext): Promise<st
 }
 
 // This month's big uses (every attempt counts: a failed or cut-off one too), oldest first. Null when it could not be read.
+// The ids go to the database 100 at a time (a long list in one request can be too long to send), and the answers are put back in order.
 async function usesThisMonth(db: any, ids: string[]): Promise<{ id: string; created_at: string }[] | null> {
-  const { data, error } = await db.from("ai_usage_log").select("id, created_at").in("coach_id", ids).in("feature", USE_FEATURES).gte("created_at", monthStart()).order("created_at", { ascending: true }).order("id", { ascending: true }).limit(200);
-  return error ? null : (data ?? []);
+  const byId = new Map<string, { id: string; created_at: string }>();
+  for (const part of chunk(ids, 100)) {
+    const { data, error } = await db.from("ai_usage_log").select("id, created_at").in("coach_id", part).in("feature", USE_FEATURES).gte("created_at", monthStart()).order("created_at", { ascending: true }).order("id", { ascending: true }).limit(200);
+    if (error) return null;
+    for (const r of (data ?? []) as { id: string; created_at: string }[]) byId.set(r.id, r);
+  }
+  return [...byId.values()].sort((a, b) => (a.created_at === b.created_at ? a.id.localeCompare(b.id) : a.created_at.localeCompare(b.created_at)));
 }
 
 export async function freeTierUsesThisMonth(db: any, coachId: string, ctx?: FreeTierContext): Promise<number | null> {
