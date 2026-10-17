@@ -21,7 +21,7 @@ vi.mock("@/lib/zip-store", () => ({
     }),
 }));
 
-import { storeExitExport, sweepOrphanExports } from "./leaving-coach-export";
+import { emailsForExport, storeExitExport, sweepOrphanExports } from "./leaving-coach-export";
 
 const db = (extra: Record<string, unknown> = {}) => ({
   auth: { admin: { getUserById: async () => ({ data: { user: { email: "x@example.com" } } }) } },
@@ -42,7 +42,7 @@ beforeEach(() => {
   state.uploadError = null;
 });
 
-describe("storing the coach's one export", () => {
+describe("storing the coach export", () => {
   it("stores a complete export and returns where", async () => {
     const path = await storeExitExport(db(), { coachId: "c1", organizationId: "o1", groupIds: ["g1"], orgName: "Gym" });
     expect(path).toBe("c1/o1.zip");
@@ -59,26 +59,55 @@ describe("storing the coach's one export", () => {
   });
 });
 
+const recordedRead = (rows: unknown[] | null, error: unknown = null) => ({
+  select: () => ({ not: () => ({ order: () => ({ range: async () => ({ data: rows, error }) }) }) }),
+});
+const storageOf = (removed: string[][], files: Record<string, unknown[]>) => ({
+  from: () => ({
+    list: async (folder: string) => (folder === "" ? { data: Object.keys(files).map((name) => ({ name, id: null })) } : { data: files[folder] ?? [] }),
+    remove: async (paths: string[]) => (removed.push(paths), { error: null }),
+  }),
+});
+const old = new Date(Date.now() - 5 * 3600_000).toISOString();
+const fresh = new Date(Date.now() - 60_000).toISOString();
+
 describe("sweeping files nothing points at", () => {
-  it("removes an old file with no membership row, keeps a recorded one and a brand-new one", async () => {
+  it("removes an old file with no membership row, keeps a recorded one, a brand-new one and one with no age", async () => {
     const removed: string[][] = [];
-    const old = new Date(Date.now() - 5 * 3600_000).toISOString();
-    const fresh = new Date(Date.now() - 60_000).toISOString();
     const fake = {
-      from: () => ({ select: () => ({ not: async () => ({ data: [{ export_path: "c1/o1.zip" }] }) }) }),
-      storage: {
-        from: () => ({
-          list: async (folder: string) =>
-            folder === ""
-              ? { data: [{ name: "c1", id: null }, { name: "c2", id: null }] }
-              : folder === "c1"
-              ? { data: [{ name: "o1.zip", created_at: old }, { name: "o9.zip", created_at: old }] }
-              : { data: [{ name: "new.zip", created_at: fresh }] },
-          remove: async (paths: string[]) => (removed.push(paths), { error: null }),
-        }),
-      },
+      from: () => recordedRead([{ export_path: "c1/o1.zip", profile_id: "c1" }]),
+      storage: storageOf(removed, { c1: [{ name: "o1.zip", created_at: old }, { name: "o9.zip", created_at: old }, { name: "undated.zip" }], c2: [{ name: "new.zip", created_at: fresh }] }),
     };
     expect(await sweepOrphanExports(fake)).toBe(1);
     expect(removed).toEqual([["c1/o9.zip"]]);
+  });
+  it("deletes nothing when the list of recorded files could not be read", async () => {
+    const removed: string[][] = [];
+    const fake = { from: () => recordedRead(null, { message: "down" }), storage: storageOf(removed, { c1: [{ name: "o9.zip", created_at: old }] }) };
+    expect(await sweepOrphanExports(fake)).toBe(0);
+    expect(removed).toEqual([]);
+  });
+  it("deletes nothing when the read may have been cut short", async () => {
+    const removed: string[][] = [];
+    const full = Array.from({ length: 1000 }, (_, i) => ({ export_path: `x/${i}.zip`, profile_id: "p" + i }));
+    // every page comes back full, so the read hit its cap
+    const fake = { from: () => recordedRead(full), storage: storageOf(removed, { c1: [{ name: "o9.zip", created_at: old }] }) };
+    expect(await sweepOrphanExports(fake)).toBe(0);
+    expect(removed).toEqual([]);
+  });
+});
+
+describe("the client emails in the export", () => {
+  const dbWith = (getUserById: (id: string) => Promise<unknown>) => ({ auth: { admin: { getUserById } } }) as any;
+  it("finds the real ones and skips placeholders", async () => {
+    const found = await emailsForExport(dbWith(async (id) => ({ data: { user: { email: id === "a" ? "a@example.com" : "client-1@pending.invalid" } } })))(["a", "b"]);
+    expect([...found.entries()]).toEqual([["a", "a@example.com"]]);
+  });
+  it("a lookup that fails makes the export fail (it is never kept with a blank email cell)", async () => {
+    await expect(emailsForExport(dbWith(async () => ({ data: null, error: { status: 500, message: "boom" } })))(["a"])).rejects.toThrow();
+  });
+  it("a client whose account is gone just has no email", async () => {
+    const found = await emailsForExport(dbWith(async () => ({ data: null, error: { status: 404, message: "User not found" } })))(["a"]);
+    expect(found.size).toBe(0);
   });
 });

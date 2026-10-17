@@ -2,6 +2,7 @@ import { exportEntries } from "@/lib/business-export";
 import { zipStream } from "@/lib/zip-store";
 import { isPlaceholderEmail } from "@/lib/placeholder-email";
 import { runPool } from "@/lib/run-pool";
+import { pageAll } from "@/lib/page-all";
 
 // The one export a coach is owed when their coaching access ends. It is made ONCE, at that moment, and kept in a private bucket (migration 0396: no policies, only the server key reaches it), so what the coach
 // can download never changes afterwards: not with the gym's new notes, not with clients who joined later. The coach reaches it through app/api/coach/exit-export, which checks who they are and that the 30 days
@@ -12,13 +13,17 @@ export const EXIT_EXPORT_BUCKET = "coach-exit-exports";
 export const MAX_EXPORT_BYTES = 150 * 1024 * 1024;
 
 // The clients' sign-in emails for the export, looked up with the server key for clients already read.
+// A lookup that fails is reported (it throws, which the export records as "clients (emails)" and the store counts as a failed try): the contact emails are the main thing a coach takes with them, so a blank cell
+// from a failed lookup must never be kept as the final export. A client whose account no longer exists simply has no email.
 export const emailsForExport = (db: any) => async (ids: string[]) => {
   const found = new Map<string, string>();
-  await runPool(ids, 8, async (id) => {
-    const { data } = await db.auth.admin.getUserById(id);
+  const run = await runPool(ids, 8, async (id) => {
+    const { data, error } = await db.auth.admin.getUserById(id);
+    if (error && !(error.status === 404 || /not found/i.test(String(error.message ?? "")))) throw new Error("lookup failed");
     const email = data?.user?.email;
     if (email && !isPlaceholderEmail(email)) found.set(id, email);
   });
+  if (run.failed.length > 0 || run.notStarted.length > 0) throw new Error("some emails could not be looked up");
   return found;
 };
 
@@ -31,15 +36,17 @@ export const exportFileName = (orgName: string, on: Date = new Date()): string =
 // last hour is left alone: it may be mid-way through being recorded. Returns how many were removed.
 export async function sweepOrphanExports(db: any): Promise<number> {
   try {
-    const { data: rows } = await db.from("organization_memberships").select("export_path").not("export_path", "is", null);
-    const known = new Set(((rows ?? []) as { export_path: string }[]).map((r) => r.export_path));
+    // Which files are recorded: read in pages, and if that read failed or may be cut short nothing at all is deleted (a file that looks unrecorded might simply be one we did not see).
+    const recorded = await pageAll((from, to) => db.from("organization_memberships").select("export_path, profile_id").not("export_path", "is", null).order("profile_id").range(from, to), { maxPages: 100 });
+    if (recorded.failed || recorded.truncated) return 0;
+    const known = new Set((recorded.rows as { export_path: string }[]).map((r) => r.export_path));
     const { data: folders } = await db.storage.from(EXIT_EXPORT_BUCKET).list("", { limit: 200 });
     const cutoff = Date.now() - 3600_000;
     let removed = 0;
     for (const folder of (folders ?? []) as { name: string; id: string | null }[]) {
       if (folder.id) continue; // a file at the top, not a folder
       const { data: files } = await db.storage.from(EXIT_EXPORT_BUCKET).list(folder.name, { limit: 200 });
-      const orphans = ((files ?? []) as { name: string; created_at?: string }[]).filter((f) => !known.has(`${folder.name}/${f.name}`) && (!f.created_at || new Date(f.created_at).getTime() < cutoff)).map((f) => `${folder.name}/${f.name}`);
+      const orphans = ((files ?? []) as { name: string; created_at?: string }[]).filter((f) => !known.has(`${folder.name}/${f.name}`) && (!!f.created_at && new Date(f.created_at).getTime() < cutoff)).map((f) => `${folder.name}/${f.name}`);
       if (orphans.length > 0) {
         const { error } = await db.storage.from(EXIT_EXPORT_BUCKET).remove(orphans);
         if (!error) removed += orphans.length;

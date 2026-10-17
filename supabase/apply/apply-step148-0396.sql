@@ -319,8 +319,8 @@ begin
       if exists (select 1 from public.group_memberships a where a.group_id = g.group_id and a.profile_id = p_hand_to and a.role = 'athlete') then
         -- closing the team must not fail because the owner is a client here: the coach keeps this group until the owner picks someone else
         if p_take then
+          -- the coach stays in it for now (marked leaving), but it is a group the organization can see, so it is NOT one they take with them (it is not recorded in departing_group_ids)
           v_kept := v_kept + 1;
-          v_kept_ids := v_kept_ids || g.group_id;
           continue;
         end if;
         raise exception 'The person chosen to take over is a client in %. Choose someone else.', g.name;
@@ -435,7 +435,9 @@ begin
   update public.groups g set organization_id = v_new
     where g.organization_id = p_org
       and g.id = any (v_kept)
-      and exists (select 1 from public.group_memberships c where c.group_id = g.id and c.profile_id = p_coach and c.role = 'coach');
+      and exists (select 1 from public.group_memberships c where c.group_id = g.id and c.profile_id = p_coach and c.role = 'coach')
+      -- only a group that really holds a client private from the organization goes with them
+      and exists (select 1 from public.group_memberships a where a.group_id = g.id and a.role = 'athlete' and a.private_from_org);
   get diagnostics v_groups = row_count;
   update public.pro_shop_links set organization_id = v_new where organization_id = p_org and coach_id = p_coach;
   update public.referral_partners set organization_id = v_new where organization_id = p_org and coach_id = p_coach;
@@ -447,6 +449,8 @@ begin
   -- classes belong to the coach (no group) and follow them; an event belongs to its group and follows the group only if the group moved
   update public.group_sessions set organization_id = v_new
     where organization_id = p_org and coach_id = p_coach and (group_id is null or group_id in (select id from public.groups where organization_id = v_new));
+  -- any coach seat they still hold in a group that stayed behind ends with their membership
+  delete from public.group_memberships gm using public.groups g where gm.group_id = g.id and g.organization_id = p_org and gm.profile_id = p_coach and gm.role = 'coach';
   perform set_config('request.jwt.claim.role', coalesce(prev_role, ''), true);
 
   delete from public.organization_memberships where organization_id = p_org and profile_id = p_coach;
@@ -487,7 +491,8 @@ begin
   if not found then
     return;
   end if;
-  delete from public.group_memberships where profile_id = p_coach and role = 'coach' and group_id = any (v_ids);
+  -- every coach seat they hold in this organization's groups ends (the kept ones, and any group they were left in that the organization can see)
+  delete from public.group_memberships gm using public.groups g where gm.group_id = g.id and g.organization_id = p_org and gm.profile_id = p_coach and gm.role = 'coach';
   update public.organization_memberships set access_ended_at = now() where organization_id = p_org and profile_id = p_coach;
 end;
 $$;

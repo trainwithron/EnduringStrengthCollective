@@ -288,6 +288,12 @@ export default {
       h.check("closing a team whose owner is a client in the coach's group does not fail" + (r.error ? ": " + r.error : ""), !r.error);
       await h.asSuper();
       h.check("the coach keeps that group until the owner picks someone", await seat(g3, e3));
+      h.check("it is not recorded as a group they take with them", (await count(`select cardinality(departing_group_ids)::int as n from public.organization_memberships where organization_id = $1 and profile_id = $2`, [org3, e3])) === 0);
+      await h.asService();
+      r = await tryQ(db, `select public.complete_departure($1, $2) as res`, [org3, e3]);
+      h.check("starting their own account works" + (r.error ? ": " + r.error : ""), !r.error);
+      await h.asSuper();
+      h.check("the gym-visible group (the owner is a client in it) stays with the gym and the coach loses the seat", (await db.query(`select organization_id from public.groups where id = $1`, [g3])).rows[0].organization_id === org3 && !(await seat(g3, e3)));
     },
   },
 };
