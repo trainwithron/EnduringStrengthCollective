@@ -34,27 +34,35 @@ export function LiveGroupLeaderboard({
   useEffect(() => {
     const supabase = createBrowserClient();
 
+    // Several changes close together (a class finishing) cause ONE refresh a couple of seconds later, not one each.
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
     const realtimeChannel = supabase
       .channel(`leaderboard:${groupId}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "workout_logs", filter: `group_id=eq.${groupId}` },
-        async () => {
-          // The server makes the rankings, looking up who is not a confirmed adult fresh each time (a screen left open for days must not keep an old list).
-          try {
-            const res = await fetch(`/api/groups/${groupId}/leaderboard?positions=${initialPositionGroups !== null ? 1 : 0}`, { cache: "no-store" });
-            if (!res.ok) return;
-            const fresh = (await res.json()) as { rankings: GroupLeaderboardRankings; positionGroups: PositionRanking[] | null };
-            setRankings(fresh.rankings);
-            if (initialPositionGroups !== null && fresh.positionGroups) setPositionGroups(fresh.positionGroups);
-          } catch {
-            // the next change tries again; the board on screen stays as it was
-          }
+        () => {
+          if (refreshTimer) clearTimeout(refreshTimer);
+          refreshTimer = setTimeout(refresh, 2000);
         }
       )
       .subscribe();
 
+    async function refresh() {
+      // The server makes the rankings, looking up who is not a confirmed adult fresh each time (a screen left open for days must not keep an old list).
+      try {
+        const res = await fetch(`/api/groups/${groupId}/leaderboard?positions=${initialPositionGroups !== null ? 1 : 0}`, { cache: "no-store" });
+        if (!res.ok) return;
+        const fresh = (await res.json()) as { rankings: GroupLeaderboardRankings; positionGroups: PositionRanking[] | null };
+        setRankings(fresh.rankings);
+        if (initialPositionGroups !== null && fresh.positionGroups) setPositionGroups(fresh.positionGroups);
+      } catch {
+        // the next change tries again; the board on screen stays as it was
+      }
+    }
+
     return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
       supabase.removeChannel(realtimeChannel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

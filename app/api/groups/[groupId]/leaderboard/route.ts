@@ -14,7 +14,7 @@ export async function GET(request: Request, context: { params: Promise<{ groupId
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Your session expired. Please sign in again." }, { status: 401 });
 
-  const limited = await rateLimitResponse("group-leaderboard", user.id, 120, 3600);
+  const limited = await rateLimitResponse("group-leaderboard", user.id, 1200, 3600);
   if (limited) return limited;
 
   const { data: seat, error: seatError } = await supabase.from("group_memberships").select("role").eq("group_id", groupId).eq("profile_id", user.id).maybeSingle();
