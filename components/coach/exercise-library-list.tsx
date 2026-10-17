@@ -410,15 +410,16 @@ export function ExerciseLibraryList({
           </button>
         )}
       </div>
-      <div className="flex items-center gap-3 mb-4">
+      {/* The toolbar wraps on a narrow screen (a fixed-width search box plus the category and add controls ran off the right edge of a phone). */}
+      <div className="flex flex-wrap items-center gap-3 mb-4">
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search exercises…"
-          className="h-10 w-64 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
+          className="h-11 w-full sm:h-10 sm:w-64 bg-surface border border-steel/30 text-chalk px-3 font-body text-base sm:text-sm focus:outline-none focus:border-rust"
         />
-        <div className="flex-1" />
+        <div className="hidden sm:block flex-1" />
         <AutoCategorizeButton exercises={exercises} onApplied={(id, category) => {
           setExercises((prev) => prev.map((e) => (e.id === id ? { ...e, category } : e)));
         }} />

@@ -26,6 +26,10 @@
 - The plate picture is drawn only for pounds (it is pound plates); a kilogram client sees the number and unit.
 - QUESTION: should the coach see a kilogram client's numbers in kilograms too when logging for them? Today the coach logging for a client sees the client's unit.
 
+## Release K2 (fits a phone)
+- DONE: the Notifications page for a coach no longer puts a 240px sidebar on a phone (a slim top bar with Home, the organization name and the bell; the sidebar returns on a laptop); the exercise library's four tabs scroll sideways and its toolbar wraps; the packages table scrolls inside its own box; the small round buttons on the feed, the new-post close button, the end-of-workout effort buttons and the coach bar are 44px.
+- NOT DONE (needs a real phone to tune, and the logger's fit-to-screen layout was set on purpose): the logging card sitting behind the Complete bar, and the tablet layout stretching the phone screens. Tell me which phone and I take these with it in hand.
+
 ## Release K1 (notifications)
 - DONE: quiet hours (an hour range in the person's own time zone, no push during it; the notice is still in the app) and a private lock screen (the phone shows only "You have a new notification") in Settings > Notifications, for coaches and clients. The platform's own alerts to you (a failing job, new feedback) ignore quiet hours.
 - DONE: pushes that did not exist: an invitation (to an organization or to be a coach's client), a team announcement, a payment received (a package, a renewal or a quick payment, once per payment, to every coach of the group; the phone says only "Open the app to see who paid", the client and amount are in the notice), and the notices the database writes itself: a client's booking request, a late change to a session, a schedule request, and the answer to a request. A five-minute job sends those once each and skips any older than six hours.

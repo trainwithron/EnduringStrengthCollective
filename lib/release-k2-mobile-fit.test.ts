@@ -1,0 +1,32 @@
+import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+const root = join(__dirname, "..");
+const src = (p: string) => readFileSync(join(root, p), "utf8").replace(/\r\n/g, "\n");
+
+describe("Release K2: fits a phone", () => {
+  it("the notifications page's coach shell is a slim top bar on a phone and the 240px sidebar returns from the lg breakpoint", () => {
+    const shell = src("components/coach/coach-home-shell.tsx");
+    expect(shell).toContain('<aside className="hidden lg:flex w-60');
+    expect(shell).toContain('<header className="lg:hidden');
+    expect(shell).toContain("px-4 py-6 lg:px-8 lg:py-8");
+    expect(shell).toContain("min-w-0");
+  });
+  it("the exercise library's tabs scroll sideways and its toolbar wraps instead of running off the screen", () => {
+    expect(src("components/coach/exercise-library-tabs.tsx")).toContain("overflow-x-auto");
+    expect(src("components/coach/exercise-library-tabs.tsx")).toContain("shrink-0 whitespace-nowrap");
+    const list = src("components/coach/exercise-library-list.tsx");
+    expect(list).toContain('className="flex flex-wrap items-center gap-3 mb-4"');
+    expect(list).toContain("w-full sm:h-10 sm:w-64");
+  });
+  it("the packages table scrolls inside its own box", () => {
+    expect(src("components/coach/desktop/package-manager.tsx")).toContain('<div className="overflow-x-auto">');
+  });
+  it("the small buttons a thumb has to hit are at least 44px", () => {
+    for (const f of ["components/feed/clear-channel-button.tsx", "components/feed/feed-settings-button.tsx"]) expect(src(f), f).toContain("w-11 h-11");
+    expect(src("components/feed/new-post-composer.tsx")).toContain('aria-label="Close" className="w-11 h-11');
+    expect(src("components/athlete/acting-as-banner.tsx")).toContain("min-h-11");
+    expect(src("components/session/complete-workout-button.tsx")).toContain('className="h-11 border border-steel/30');
+  });
+});

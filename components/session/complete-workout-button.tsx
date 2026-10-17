@@ -381,7 +381,7 @@ export function CompleteWorkoutButton({
               aria-label={`Session RPE: ${n} of 10${n === 1 ? " (Easy)" : n === 10 ? " (All-out)" : ""}`}
               onClick={() => handleSubmitRpe(n)}
               disabled={rpeSubmitting}
-              className="h-9 border border-steel/30 text-chalk font-body text-sm active:bg-rust active:border-rust active:text-graphite disabled:opacity-40"
+              className="h-11 border border-steel/30 text-chalk font-body text-sm active:bg-rust active:border-rust active:text-graphite disabled:opacity-40"
             >
               {n}
             </button>
@@ -395,7 +395,7 @@ export function CompleteWorkoutButton({
           type="button"
           onClick={handleSkipRpe}
           disabled={rpeSubmitting}
-          className="w-full h-9 mt-2 border border-steel/30 text-steel font-body text-xs disabled:opacity-40"
+          className="w-full h-11 mt-2 border border-steel/30 text-steel font-body text-xs disabled:opacity-40"
         >
           {rpeSubmitting ? "Saving…" : "Skip"}
         </button>

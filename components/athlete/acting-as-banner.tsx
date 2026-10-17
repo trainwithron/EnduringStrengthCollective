@@ -43,12 +43,12 @@ export function ActingAsBanner({ athleteFullName, groupId, isSelf = false }: { a
           type="button"
           onClick={() => setPickerOpen(true)}
           aria-label={self ? "Viewing yourself. Pick a client to look at instead" : `Viewing ${athleteFullName}. Pick someone else`}
-          className="flex items-center gap-1 min-h-8 max-w-[34%] font-body text-xs font-medium"
+          className="flex items-center gap-1 min-h-11 max-w-[34%] font-body text-xs font-medium"
         >
           <span className="truncate">{self ? "Me" : athleteFullName}</span>
           <ChevronDown className="w-4 h-4 shrink-0" strokeWidth={2.5} />
         </button>
-        <button type="button" onClick={exit} disabled={exiting} className="shrink-0 min-h-8 font-body text-xs uppercase tracking-wide underline underline-offset-2 disabled:opacity-50">
+        <button type="button" onClick={exit} disabled={exiting} className="shrink-0 min-h-11 font-body text-xs uppercase tracking-wide underline underline-offset-2 disabled:opacity-50">
           {exiting ? "Going…" : "Coach home"}
         </button>
       </div>

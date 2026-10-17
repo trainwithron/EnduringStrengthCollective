@@ -40,11 +40,12 @@ export function ExerciseLibraryTabs({
 
   return (
     <div>
-      <div className="flex items-center gap-1 border-b border-steel/20 mb-6">
+      {/* Four tabs do not fit a phone's width: the row scrolls sideways instead of pushing the page wider. */}
+      <div className="flex items-center gap-1 border-b border-steel/20 mb-6 overflow-x-auto" role="tablist">
         <button
           type="button"
           onClick={() => setTab("exercises")}
-          className={`h-10 px-4 font-body text-sm border-b-2 transition-colors ${
+          className={`h-11 px-4 shrink-0 whitespace-nowrap font-body text-sm border-b-2 transition-colors ${
             tab === "exercises"
               ? "border-rust text-chalk"
               : "border-transparent text-steel active:text-chalk"
@@ -55,7 +56,7 @@ export function ExerciseLibraryTabs({
         <button
           type="button"
           onClick={() => setTab("patterns")}
-          className={`h-10 px-4 font-body text-sm border-b-2 transition-colors ${
+          className={`h-11 px-4 shrink-0 whitespace-nowrap font-body text-sm border-b-2 transition-colors ${
             tab === "patterns"
               ? "border-rust text-chalk"
               : "border-transparent text-steel active:text-chalk"
@@ -66,7 +67,7 @@ export function ExerciseLibraryTabs({
         <button
           type="button"
           onClick={() => setTab("sort")}
-          className={`h-10 px-4 font-body text-sm border-b-2 transition-colors ${
+          className={`h-11 px-4 shrink-0 whitespace-nowrap font-body text-sm border-b-2 transition-colors ${
             tab === "sort"
               ? "border-rust text-chalk"
               : "border-transparent text-steel active:text-chalk"
@@ -77,7 +78,7 @@ export function ExerciseLibraryTabs({
         <button
           type="button"
           onClick={() => setTab("one-rep-max")}
-          className={`h-10 px-4 font-body text-sm border-b-2 transition-colors ${
+          className={`h-11 px-4 shrink-0 whitespace-nowrap font-body text-sm border-b-2 transition-colors ${
             tab === "one-rep-max"
               ? "border-rust text-chalk"
               : "border-transparent text-steel active:text-chalk"

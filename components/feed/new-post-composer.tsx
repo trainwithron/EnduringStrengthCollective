@@ -161,7 +161,7 @@ export function NewPostComposer({
       <div className="w-full bg-surface p-5 pb-8">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-display uppercase text-lg">New post</h2>
-          <button onClick={() => setOpen(false)} aria-label="Close" className="w-9 h-9 flex items-center justify-center text-steel">
+          <button onClick={() => setOpen(false)} aria-label="Close" className="w-11 h-11 flex items-center justify-center text-steel">
             <X className="w-5 h-5" />
           </button>
         </div>

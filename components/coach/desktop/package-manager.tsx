@@ -194,7 +194,8 @@ export function PackageManager({
             No packages yet — add your first tier on the right.
           </p>
         ) : (
-          <table className="w-full border-collapse">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] border-collapse">
             <thead>
               <tr className="border-b border-steel/20">
                 <th className="text-left font-body text-xs text-steel uppercase tracking-wide font-medium py-2">Package</th>
@@ -291,6 +292,7 @@ export function PackageManager({
               ))}
             </tbody>
           </table>
+          </div>
         )}
 
         {inactive.length > 0 && (

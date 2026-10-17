@@ -93,7 +93,7 @@ export function ClearChannelButton({ groupId, channel }: { groupId: string; chan
         onClick={() => setConfirming(true)}
         aria-label={`Clear ${CHANNEL_LABELS[channel]}`}
         title={`Clear ${CHANNEL_LABELS[channel]}`}
-        className="w-8 h-8 flex items-center justify-center text-steel active:text-rust transition-colors"
+        className="w-11 h-11 flex items-center justify-center text-steel active:text-rust transition-colors"
       >
         <Trash2 className="w-4 h-4" />
       </button>
