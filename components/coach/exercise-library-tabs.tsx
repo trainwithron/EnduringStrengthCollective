@@ -44,6 +44,8 @@ export function ExerciseLibraryTabs({
       <div className="flex items-center gap-1 border-b border-steel/20 mb-6 overflow-x-auto" role="tablist">
         <button
           type="button"
+          role="tab"
+          aria-selected={tab === "exercises"}
           onClick={() => setTab("exercises")}
           className={`h-11 px-4 shrink-0 whitespace-nowrap font-body text-sm border-b-2 transition-colors ${
             tab === "exercises"
@@ -55,6 +57,8 @@ export function ExerciseLibraryTabs({
         </button>
         <button
           type="button"
+          role="tab"
+          aria-selected={tab === "patterns"}
           onClick={() => setTab("patterns")}
           className={`h-11 px-4 shrink-0 whitespace-nowrap font-body text-sm border-b-2 transition-colors ${
             tab === "patterns"
@@ -66,6 +70,8 @@ export function ExerciseLibraryTabs({
         </button>
         <button
           type="button"
+          role="tab"
+          aria-selected={tab === "sort"}
           onClick={() => setTab("sort")}
           className={`h-11 px-4 shrink-0 whitespace-nowrap font-body text-sm border-b-2 transition-colors ${
             tab === "sort"
@@ -77,6 +83,8 @@ export function ExerciseLibraryTabs({
         </button>
         <button
           type="button"
+          role="tab"
+          aria-selected={tab === "one-rep-max"}
           onClick={() => setTab("one-rep-max")}
           className={`h-11 px-4 shrink-0 whitespace-nowrap font-body text-sm border-b-2 transition-colors ${
             tab === "one-rep-max"

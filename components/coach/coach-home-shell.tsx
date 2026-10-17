@@ -11,6 +11,7 @@ import { ExitDesktopModeButton } from "@/components/coach/exit-desktop-mode-butt
 import { ClientFinder } from "@/components/coach/desktop/client-finder";
 import { HeaderNotificationBell } from "@/components/notifications/header-bell";
 import { CollectiveIntelligenceChat } from "@/components/coach/desktop/collective-intelligence-chat";
+import { CoachHomeMobileMenu } from "@/components/coach/coach-home-mobile-menu";
 
 // A dedicated, minimal shell for the one cross-group page in the app —
 // not a retrofit of CoachDesktopShell, which has a lot of group-keyed
@@ -29,7 +30,10 @@ function CoachHomeShellFull({ orgName, children }: { orgName: string; children: 
           Home
         </Link>
         <p className="font-display font-bold text-sm uppercase truncate">{orgName}</p>
-        <HeaderNotificationBell placement="below" />
+        <div className="flex items-center">
+          <HeaderNotificationBell placement="below" />
+          <CoachHomeMobileMenu />
+        </div>
       </header>
       <aside className="hidden lg:flex w-60 shrink-0 border-r border-steel/20 flex-col">
         <div className="px-5 pt-6 pb-5 border-b border-steel/20">

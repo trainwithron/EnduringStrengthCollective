@@ -12,10 +12,15 @@ describe("Release K2: fits a phone", () => {
     expect(shell).toContain('<header className="lg:hidden');
     expect(shell).toContain("px-4 py-6 lg:px-8 lg:py-8");
     expect(shell).toContain("min-w-0");
+    // nothing the sidebar holds is lost on a phone: it all sits behind the menu button in the top bar
+    expect(shell).toContain("<CoachHomeMobileMenu />");
+    const menu = src("components/coach/coach-home-mobile-menu.tsx");
+    for (const part of ["<ClientFinder", 'href="/notifications"', "<ExitDesktopModeButton", "<DownloadAppButton", "<SignOutButton", "w-11 h-11"]) expect(menu, part).toContain(part);
   });
   it("the exercise library's tabs scroll sideways and its toolbar wraps instead of running off the screen", () => {
     expect(src("components/coach/exercise-library-tabs.tsx")).toContain("overflow-x-auto");
     expect(src("components/coach/exercise-library-tabs.tsx")).toContain("shrink-0 whitespace-nowrap");
+    expect((src("components/coach/exercise-library-tabs.tsx").match(/role="tab"/g) ?? []).length).toBe(4);
     const list = src("components/coach/exercise-library-list.tsx");
     expect(list).toContain('className="flex flex-wrap items-center gap-3 mb-4"');
     expect(list).toContain("w-full sm:h-10 sm:w-64");
