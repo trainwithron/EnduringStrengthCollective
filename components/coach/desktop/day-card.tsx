@@ -24,12 +24,14 @@ import { TextNoteCard } from "../text-note-card";
 import { BulkEditDayPanel } from "./bulk-edit-day-panel";
 import { AddSlotForm, SlotCard } from "./slot-card";
 import { formatShortDate } from "@/lib/program-schedule";
-import { GripVertical, ChevronDown, ChevronUp, StickyNote, Video } from "lucide-react";
+import { GripVertical, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, StickyNote, Video } from "lucide-react";
 import { formatCompactLine } from "@/lib/compact-line";
 import { useSaveToastChannel } from "./save-toast-channel";
 import { capitalizeWords } from "@/lib/exercise-name-case";
 import { useDayLogged } from "./use-day-logged";
 import { isRestDayTitle } from "@/lib/empty-sweep";
+import { restoreDay } from "@/lib/program-restore";
+import { showUndo } from "@/lib/undo-toast";
 
 // Quick-add is typed fast, so a bare "Bench" for an existing "Bench
 // Press" is common — matchExercise's fuzzy threshold is deliberately
@@ -75,6 +77,10 @@ export function DayCard({
   onUpdate,
   onItemsChange,
   onDeleted,
+  onMoveEarlier,
+  onMoveLater,
+  onRestored,
+  programId,
 }: {
   day: BuilderDay;
   scheduledDate?: Date;
@@ -100,8 +106,15 @@ export function DayCard({
   collapsed: boolean;
   onToggleCollapse: () => void;
   onUpdate: (patch: Partial<Pick<BuilderDay, "title">>) => void;
-  onItemsChange: (items: BuilderItem[]) => void;
+  // A function is given the CURRENT items, so two edits made close together both land (building from the list the screen last drew made the second one undo the first).
+  onItemsChange: (items: BuilderItem[] | ((prev: BuilderItem[]) => BuilderItem[])) => void;
   onDeleted: () => void;
+  // Move this day one place earlier or later in its week (buttons that work at every screen width, as an alternative to dragging). Not given at the edge of the week.
+  onMoveEarlier?: () => void;
+  onMoveLater?: () => void;
+  // The day put back by "Undo" (with all its exercises, sets and notes).
+  onRestored?: (day: BuilderDay) => void;
+  programId?: string;
 }) {
   const { flashSaved, flashSaveError } = useSaveToastChannel();
   const dayLogged = useDayLogged(day.id, !!athleteId && !collapsed);
@@ -174,7 +187,8 @@ export function DayCard({
       setDraggedItemId(null);
       return;
     }
-    const items = day.items;
+    // Positions are taken in the order shown (by order), not in the order the list happens to be stored.
+    const items = day.items.slice().sort((a, b) => a.order - b.order);
     const fromIndex = items.findIndex((i) => i.id === draggedItemId);
     const toIndex = items.findIndex((i) => i.id === targetId);
     if (fromIndex === -1 || toIndex === -1) {
@@ -260,7 +274,7 @@ export function DayCard({
         sets: setRow ? [mapSetRow(setRow)] : [],
       };
 
-      onItemsChange([...day.items, newExercise]);
+      onItemsChange((prev) => [...prev, newExercise]);
       if (!setInsertError) flashSaved();
     } finally {
       setAddItemBusy(false);
@@ -294,7 +308,7 @@ export function DayCard({
       }
 
       const newNote: BuilderNote = { kind: "note", id: newRow.id, order: nextOrder, body: "" };
-      onItemsChange([...day.items, newNote]);
+      onItemsChange((prev) => [...prev, newNote]);
       flashSaved();
     } finally {
       setAddItemBusy(false);
@@ -378,7 +392,7 @@ export function DayCard({
         sets: (setsData ?? []).map(mapSetRow),
       };
 
-      onItemsChange([...day.items, newExercise]);
+      onItemsChange((prev) => [...prev, newExercise]);
       setQuickEntryDraft("");
       if (!setsError) flashSaved();
     } finally {
@@ -392,7 +406,7 @@ export function DayCard({
   async function handleDeleteDay() {
     if (
       !await confirmDialog(
-        `Delete "${day.title}"? This can't be undone. Any client who already logged this workout keeps that history — this only removes the template.`
+        `Delete "${day.title}"? Any client who already logged this workout keeps that history — this only removes the template. You can undo this for a few seconds.`
       )
     ) {
       return;
@@ -410,6 +424,17 @@ export function DayCard({
     }
 
     onDeleted();
+    const gone = day;
+    if (programId) {
+      showUndo({
+        message: `Deleted "${gone.title}".`,
+        onUndo: async () => {
+          const back = await restoreDay(createBrowserClient(), { programId, groupId, day: gone });
+          if (back) onRestored?.(back);
+          else flashSaveError("Couldn't put that day back — add it again.");
+        },
+      });
+    }
   }
 
   const itemCount = day.items.filter((i) => i.kind === "exercise").length;
@@ -420,8 +445,7 @@ export function DayCard({
     updates: { exerciseId: string; field: TrackedField; value: string | number | null; highValue?: number | null; addedField?: boolean }[]
   ) {
     const byExercise = new Map(updates.map((u) => [u.exerciseId, u]));
-    onItemsChange(
-      day.items.map((item) => {
+    onItemsChange((prev) => prev.map((item) => {
         if (item.kind !== "exercise") return item;
         const update = byExercise.get(item.id);
         if (!update) return item;
@@ -447,8 +471,8 @@ export function DayCard({
           canMoveDown={index < sortedItems.length - 1}
           onMoveUp={() => moveItem(sortedItems, index, -1)}
           onMoveDown={() => moveItem(sortedItems, index, 1)}
-          onChange={(patch) => onItemsChange(day.items.map((i) => (i.id === item.id && i.kind === "exercise" ? { ...i, ...patch } : i)))}
-          onDeleted={() => onItemsChange(day.items.filter((i) => i.id !== item.id))}
+          onChange={(patch) => onItemsChange((prev) => prev.map((i) => (i.id === item.id && i.kind === "exercise" ? { ...i, ...patch } : i)))}
+          onDeleted={() => onItemsChange((prev) => prev.filter((i) => i.id !== item.id))}
           onError={flashSaveError}
         />
       );
@@ -474,13 +498,11 @@ export function DayCard({
                       onMoveUp={() => moveItem(sortedItems, index, -1)}
                       onMoveDown={() => moveItem(sortedItems, index, 1)}
                       onUpdate={(patch) =>
-                        onItemsChange(day.items.map((i) => (i.id === item.id ? { ...i, ...patch } : i)))
+                        onItemsChange((prev) => prev.map((i) => (i.id === item.id ? { ...i, ...patch } : i)))
                       }
                       onSetsChange={(sets) =>
-                        onItemsChange(
-                          day.items.map((i) =>
-                            i.id === item.id && i.kind === "exercise" ? { ...i, sets } : i
-                          )
+                        onItemsChange((prev) =>
+                          prev.map((i) => (i.id === item.id && i.kind === "exercise" ? { ...i, sets: typeof sets === "function" ? sets(i.sets) : sets } : i))
                         )
                       }
                       // A patch and a full sets replacement made back-to-back in
@@ -494,13 +516,13 @@ export function DayCard({
                       // This single combined callback computes both fields in
                       // one map pass instead of two sequential ones.
                       onFieldsAndSetsChange={(trackedFields, sets) =>
-                        onItemsChange(
-                          day.items.map((i) =>
+                        onItemsChange((prev) => prev.map((i) =>
                             i.id === item.id && i.kind === "exercise" ? { ...i, trackedFields, sets } : i
                           )
                         )
                       }
-                      onDeleted={() => onItemsChange(day.items.filter((i) => i.id !== item.id))}
+                      onDeleted={() => onItemsChange((prev) => prev.filter((i) => i.id !== item.id))}
+                      onRestored={(back) => onItemsChange((prev) => (prev.some((i) => i.id === back.id) ? prev : [...prev, back]))}
                       onDuplicated={(newExercise) => insertAfter(item.id, newExercise)}
                     />
     );
@@ -510,6 +532,16 @@ export function DayCard({
     <div className="border border-steel/20 bg-surface/40 rounded-token-lg flex flex-col">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 py-3 border-b border-steel/20 bg-surface">
         <GripVertical className="w-4 h-4 text-steel shrink-0 cursor-grab" aria-hidden="true" />
+        {(onMoveEarlier || onMoveLater) && (
+          <div className="flex items-center shrink-0" role="group" aria-label="Move this day">
+            <button type="button" onClick={onMoveEarlier} disabled={!onMoveEarlier} aria-label="Move day earlier" className="w-8 h-8 flex items-center justify-center text-steel disabled:opacity-30">
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button type="button" onClick={onMoveLater} disabled={!onMoveLater} aria-label="Move day later" className="w-8 h-8 flex items-center justify-center text-steel disabled:opacity-30">
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
         <div className="flex-1 min-w-[6rem] flex flex-col">
           <input
             type="text"
@@ -693,10 +725,26 @@ export function DayCard({
                 <div
                   key={item.id}
                   draggable
-                  onDragStart={() => setDraggedItemId(item.id)}
-                  onDragEnd={() => setDraggedItemId(null)}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={() => handleDrop(item.id)}
+                  onDragStart={(e) => {
+                    // The day around it is draggable too: dragging an exercise must not also start dragging the day.
+                    e.stopPropagation();
+                    e.dataTransfer.setData("text/plain", item.id);
+                    setDraggedItemId(item.id);
+                  }}
+                  onDragEnd={(e) => {
+                    e.stopPropagation();
+                    setDraggedItemId(null);
+                  }}
+                  onDragOver={(e) => {
+                    if (!draggedItemId) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  onDrop={(e) => {
+                    if (!draggedItemId) return;
+                    e.stopPropagation();
+                    handleDrop(item.id);
+                  }}
                   className={`w-full ${draggedItemId === item.id ? "opacity-50" : ""}`}
                 >
                   {sortedItems.length > 1 && (
@@ -714,7 +762,12 @@ export function DayCard({
                       canMoveDown={index < sortedItems.length - 1}
                       onMoveUp={() => moveItem(sortedItems, index, -1)}
                       onMoveDown={() => moveItem(sortedItems, index, 1)}
-                      onDeleted={() => onItemsChange(day.items.filter((i) => i.id !== item.id))}
+                      workoutId={day.id}
+                      groupId={groupId}
+                      order={item.order}
+                      onDeleted={() => onItemsChange((prev) => prev.filter((i) => i.id !== item.id))}
+                      onRestored={(note) => onItemsChange((prev) => (prev.some((i) => i.id === note.id) ? prev : [...prev, note]))}
+                      onBodyChange={(next) => onItemsChange((prev) => prev.map((i) => (i.id === item.id && i.kind === "note" ? { ...i, body: next } : i)))}
                     />
                   )}
                 </div>
@@ -735,7 +788,7 @@ export function DayCard({
                 nextOrder={day.items.length > 0 ? Math.max(...day.items.map((i) => i.order)) + 1 : 0}
                 patterns={movementPatterns}
                 onAdded={(item) => {
-                  onItemsChange([...day.items, item]);
+                  onItemsChange((prev) => [...prev, item]);
                   setShowSlotForm(false);
                   flashSaved();
                 }}

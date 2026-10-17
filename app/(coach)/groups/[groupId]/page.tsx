@@ -51,6 +51,8 @@ import {
   nextWorkoutLabel,
   emptyDayInfo,
   loadProgramDayContexts,
+  loadAssignedWorkouts,
+  type AssignedWorkout,
   resolveSessionsForDate,
   summarizeSessions,
   type DaySession,
@@ -373,7 +375,13 @@ export default async function GroupHubPage(
     const programContexts = await loadProgramDayContexts(supabase, params.groupId, athleteId);
     // Week and Month need dates to plot; they are only unavailable when NO active program has a schedule.
     isUnscheduledProgram = programContexts.length > 0 && programContexts.every((c) => c.unscheduled);
-    const workoutIdsForLogCheck = contextWorkoutIds(programContexts);
+    // Workouts the coach put on single days (shown on Home with the coach's note): looked at from a month before to two months after the day being viewed.
+    const assignedFrom = new Date(targetDate);
+    assignedFrom.setDate(assignedFrom.getDate() - 35);
+    const assignedTo = new Date(targetDate);
+    assignedTo.setDate(assignedTo.getDate() + 70);
+    const assignedByDate = await loadAssignedWorkouts(supabase, athleteId, params.groupId, dateKeyOf(assignedFrom), dateKeyOf(assignedTo));
+    const workoutIdsForLogCheck = [...contextWorkoutIds(programContexts), ...[...assignedByDate.values()].map((a) => a.workoutId)];
 
     const [{ data: logRows }, { data: habitRows }] = await Promise.all([
       workoutIdsForLogCheck.length > 0
@@ -421,7 +429,7 @@ export default async function GroupHubPage(
     }
 
     if (view === "day") {
-      daySessions = resolveSessionsForDate(programContexts, loggedIds, targetDate, today, isToday);
+      daySessions = resolveSessionsForDate(programContexts, loggedIds, targetDate, today, isToday, assignedByDate);
       dayWorkout = summarizeSessions(daySessions, emptyDayInfo(programContexts, isToday));
       if (isToday) {
         const { count: priorWorkoutCount } = await supabase
@@ -613,6 +621,7 @@ export default async function GroupHubPage(
             loggedIds,
             today,
             habitDefs: habitRows ?? [],
+            assignedByDate,
           });
     } else if (!isUnscheduledProgram) {
       const rangeDates = Array.from(
@@ -627,6 +636,7 @@ export default async function GroupHubPage(
         loggedIds,
         today,
         habitDefs: habitRows ?? [],
+            assignedByDate,
       });
       monthSummaryByDateKey = new Map(summaries.map((s) => [s.dateKey, s]));
     }
@@ -980,6 +990,7 @@ async function computeRangeSummaries(
     loggedIds,
     today,
     habitDefs,
+    assignedByDate,
   }: {
     athleteId: string;
     macrosEnabled: boolean;
@@ -988,6 +999,7 @@ async function computeRangeSummaries(
     loggedIds: Set<string>;
     today: Date;
     habitDefs: { id: string; title: string; weekdays: number[] }[];
+    assignedByDate?: Map<string, AssignedWorkout>;
   }
 ): Promise<HomeDaySummary[]> {
   const dateKeys = dates.map(dateKeyOf);
@@ -1038,7 +1050,7 @@ async function computeRangeSummaries(
 
   return dates.map((date) => {
     const dateKey = dateKeyOf(date);
-    const sessions = resolveSessionsForDate(programContexts, loggedIds, date, today, false);
+    const sessions = resolveSessionsForDate(programContexts, loggedIds, date, today, false, assignedByDate);
     const workout = summarizeSessions(sessions, emptyDayInfo(programContexts, false));
     const dueHabits = habitDefs.filter((h) => isHabitDueOn(h.weekdays, date));
     const habitsCompleted = dueHabits.filter((h) => completedByHabitAndDate.has(`${h.id}|${dateKey}`)).length;

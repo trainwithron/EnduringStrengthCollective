@@ -19,6 +19,8 @@ import type { AliasEntry } from "@/lib/exercise-matching";
 import type { RestTempoSuggestion } from "@/lib/training-intent";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useSaveToastChannel } from "./save-toast-channel";
+import { restoreDays } from "@/lib/program-restore";
+import { showUndo } from "@/lib/undo-toast";
 
 export function WeekGrid({
   weekNumber,
@@ -41,6 +43,7 @@ export function WeekGrid({
   onDaysChange,
   onWeeksGenerated,
   onWeekDeleted,
+  onWeekRestored,
 }: {
   weekNumber: number;
   days: BuilderDay[];
@@ -59,9 +62,11 @@ export function WeekGrid({
   scheduledDateByDayId?: Map<string, Date>;
   existingWeekNumbers: number[];
   onToggle: () => void;
-  onDaysChange: (days: BuilderDay[]) => void;
+  onDaysChange: (days: BuilderDay[] | ((prev: BuilderDay[]) => BuilderDay[])) => void;
   onWeeksGenerated: (newDays: BuilderDay[]) => void;
   onWeekDeleted: () => void;
+  // The week's days put back by "Undo".
+  onWeekRestored?: (days: BuilderDay[]) => void;
 }) {
   const { flashSaved, flashSaveError } = useSaveToastChannel();
   const [draggedDayId, setDraggedDayId] = useState<string | null>(null);
@@ -114,7 +119,7 @@ export function WeekGrid({
   async function handleDeleteWeek() {
     if (
       !await confirmDialog(
-        `Delete all of Week ${weekNumber} (${days.length} ${days.length === 1 ? "day" : "days"})? This can't be undone. Any client who already logged one of these workouts keeps that history — this only removes the templates.`
+        `Delete all of Week ${weekNumber} (${days.length} ${days.length === 1 ? "day" : "days"})? Any client who already logged one of these workouts keeps that history — this only removes the templates. You can undo this for a few seconds.`
       )
     ) {
       return;
@@ -134,7 +139,16 @@ export function WeekGrid({
       return;
     }
 
+    const goneDays = days;
     onWeekDeleted();
+    showUndo({
+      message: `Deleted Week ${weekNumber}.`,
+      onUndo: async () => {
+        const back = await restoreDays(supabase, { programId, groupId, days: goneDays });
+        if (back) onWeekRestored?.(back);
+        else flashSaveError("Couldn't put that week back — add it again.");
+      },
+    });
   }
 
   async function persistDayOrder(nextDays: BuilderDay[]) {
@@ -146,18 +160,33 @@ export function WeekGrid({
     flashSaved();
   }
 
+  // The arrows on a day: swap it with its neighbour in the order shown.
+  function moveDay(dayId: string, direction: -1 | 1) {
+    const shown = days.slice().sort((a, b) => a.dayIndex - b.dayIndex);
+    const from = shown.findIndex((d) => d.id === dayId);
+    const to = from + direction;
+    if (from === -1 || to < 0 || to >= shown.length) return;
+    const next = shown.slice();
+    [next[from], next[to]] = [next[to], next[from]];
+    const reindexed = next.map((d, i) => ({ ...d, dayIndex: i + 1 }));
+    onDaysChange(reindexed);
+    persistDayOrder(reindexed);
+  }
+
   function handleDrop(targetId: string) {
     if (!draggedDayId || draggedDayId === targetId) {
       setDraggedDayId(null);
       return;
     }
-    const fromIndex = days.findIndex((d) => d.id === draggedDayId);
-    const toIndex = days.findIndex((d) => d.id === targetId);
+    // Positions are taken in the order the days are shown (by day number), not in the order the list happens to be stored.
+    const shown = days.slice().sort((a, b) => a.dayIndex - b.dayIndex);
+    const fromIndex = shown.findIndex((d) => d.id === draggedDayId);
+    const toIndex = shown.findIndex((d) => d.id === targetId);
     if (fromIndex === -1 || toIndex === -1) {
       setDraggedDayId(null);
       return;
     }
-    const next = days.slice();
+    const next = shown;
     const [moved] = next.splice(fromIndex, 1);
     next.splice(toIndex, 0, moved);
     const reindexed = next.map((d, i) => ({ ...d, dayIndex: i + 1 }));
@@ -179,8 +208,8 @@ export function WeekGrid({
         return;
       }
 
-      onDaysChange([
-        ...days,
+      onDaysChange((prev) => [
+        ...prev,
         {
           id: newRow.id,
           title: newRow.title,
@@ -205,8 +234,8 @@ export function WeekGrid({
     updates: { exerciseId: string; field: TrackedField; value: string | number | null; highValue?: number | null; addedField?: boolean }[]
   ) {
     const byExercise = new Map(updates.map((u) => [u.exerciseId, u]));
-    onDaysChange(
-      days.map((day) => ({
+    onDaysChange((prev) =>
+      prev.map((day) => ({
         ...day,
         items: day.items.map((item) => {
           if (item.kind !== "exercise") return item;
@@ -299,10 +328,19 @@ export function WeekGrid({
               <div
                 key={day.id}
                 draggable
-                onDragStart={() => setDraggedDayId(day.id)}
+                onDragStart={(e) => {
+                  // Only the day itself starts a day drag (an exercise dragged inside it is not a day).
+                  if (e.target !== e.currentTarget) return;
+                  e.dataTransfer.setData("text/plain", day.id);
+                  setDraggedDayId(day.id);
+                }}
                 onDragEnd={() => setDraggedDayId(null)}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={() => handleDrop(day.id)}
+                onDragOver={(e) => {
+                  if (draggedDayId) e.preventDefault();
+                }}
+                onDrop={() => {
+                  if (draggedDayId) handleDrop(day.id);
+                }}
                 className={`flex-[1_1_0%] ${compactIds.has(day.id) && !editingCompactIds.has(day.id) ? "min-w-[220px] max-w-[300px]" : "min-w-[300px] max-w-[420px]"} ${draggedDayId === day.id ? "opacity-50" : ""}`}
               >
                 <DayCard
@@ -324,12 +362,16 @@ export function WeekGrid({
                   collapsed={collapsedDayIds.has(day.id)}
                   onToggleCollapse={() => handleToggleDayCollapse(day.id)}
                   onUpdate={(patch) =>
-                    onDaysChange(days.map((d) => (d.id === day.id ? { ...d, ...patch } : d)))
+                    onDaysChange((prev) => prev.map((d) => (d.id === day.id ? { ...d, ...patch } : d)))
                   }
                   onItemsChange={(items) =>
-                    onDaysChange(days.map((d) => (d.id === day.id ? { ...d, items } : d)))
+                    onDaysChange((prev) => prev.map((d) => (d.id === day.id ? { ...d, items: typeof items === "function" ? items(d.items) : items } : d)))
                   }
-                  onDeleted={() => onDaysChange(days.filter((d) => d.id !== day.id))}
+                  onDeleted={() => onDaysChange((prev) => prev.filter((d) => d.id !== day.id))}
+                  programId={programId}
+                  onRestored={(back) => onDaysChange((prev) => (prev.some((d) => d.id === back.id) ? prev : [...prev, back]))}
+                  onMoveEarlier={sortedDays[0]?.id === day.id ? undefined : () => moveDay(day.id, -1)}
+                  onMoveLater={sortedDays[sortedDays.length - 1]?.id === day.id ? undefined : () => moveDay(day.id, 1)}
                 />
               </div>
             ))}

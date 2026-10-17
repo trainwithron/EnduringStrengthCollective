@@ -1,6 +1,6 @@
 import { getProgressionGoalsBatch } from "@/lib/progressions";
 import { findDemo, type DemoRow } from "@/lib/exercise-demo";
-import { DEFAULT_TRACKED_FIELDS, mapSetRow, type TrackedField } from "@/lib/exercise-fields";
+import { DEFAULT_TRACKED_FIELDS, mapSetRow, SET_ROW_SELECT, type TrackedField } from "@/lib/exercise-fields";
 import { PRIOR_SETS_SELECT, suggestedWeightsFromHistory } from "@/lib/suggested-weights";
 import type { ExerciseSetTarget } from "@/lib/types";
 
@@ -60,7 +60,7 @@ export async function getWorkoutOverviewData(
       id, title, notes, program_id, athlete_id,
       group_workout_exercises (
         id, exercise_name, display_name, exercise_order, movement_pattern_id, tracked_fields, notes,
-        group_workout_exercise_sets ( id, set_order, target_reps, target_weight, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance )
+        group_workout_exercise_sets ( ${SET_ROW_SELECT} )
       ),
       workout_notes ( id, body, position )
     `

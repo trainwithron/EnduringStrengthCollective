@@ -2,7 +2,7 @@ import { sortByUsage } from "@/lib/exercise-search";
 import { usableExerciseNames } from "@/lib/exercise-name-guard";
 import { mergeAliases } from "@/lib/exercise-alias-seed";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { DEFAULT_TRACKED_FIELDS, mapSetRow } from "./exercise-fields";
+import { DEFAULT_TRACKED_FIELDS, mapSetRow, SET_ROW_SELECT } from "./exercise-fields";
 import { findDemo, type DemoRow } from "./exercise-demo";
 import { computeScheduledDates, type VisibilityWindow } from "./program-schedule";
 import { getGroupCoachTimezone, nowInZone } from "./timezone";
@@ -97,7 +97,7 @@ export async function getProgramBuilderData(
       id, title, week_number, day_index, scheduled_date,
       group_workout_exercises (
         id, exercise_name, display_name, exercise_order, movement_pattern_id, tracked_fields, notes, is_slot, slot_side, slot_tier,
-        group_workout_exercise_sets ( id, set_order, target_reps, target_weight, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance, rep_min, rep_max )
+        group_workout_exercise_sets ( ${SET_ROW_SELECT} )
       ),
       workout_notes ( id, body, position )
     `
@@ -247,7 +247,7 @@ export const BUILDER_ONE_WORKOUT_SELECT = `
       id, title, week_number, day_index, scheduled_date,
       group_workout_exercises (
         id, exercise_name, display_name, exercise_order, movement_pattern_id, tracked_fields, notes, is_slot, slot_side, slot_tier,
-        group_workout_exercise_sets ( id, set_order, target_reps, target_weight, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance )
+        group_workout_exercise_sets ( ${SET_ROW_SELECT} )
       ),
       workout_notes ( id, body, position )
     `;

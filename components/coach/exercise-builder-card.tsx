@@ -34,6 +34,9 @@ import { useSaveToastChannel } from "./desktop/save-toast-channel";
 import { CARDIO_PRESETS, type CardioPreset } from "@/lib/cardio-presets";
 import type { RestTempoSuggestion } from "@/lib/training-intent";
 import { loggedText, type LoggedValues } from "@/lib/day-logged";
+import { restoreExercise } from "@/lib/program-restore";
+import { firstSetFollowers } from "@/lib/first-set-fanout";
+import { showUndo } from "@/lib/undo-toast";
 
 export interface MovementPatternOption {
   id: string;
@@ -164,6 +167,7 @@ export function ExerciseBuilderCard({
   onSetsChange,
   onFieldsAndSetsChange,
   onDeleted,
+  onRestored,
   onDuplicated,
 }: {
   exercise: BuilderExercise;
@@ -197,7 +201,8 @@ export function ExerciseBuilderCard({
   onMoveUp: () => void;
   onMoveDown: () => void;
   onUpdate: (patch: Partial<Omit<BuilderExercise, "kind" | "id" | "order" | "sets">>) => void;
-  onSetsChange: (sets: ExerciseSetTarget[]) => void;
+  // A function is given the CURRENT sets, so quick successive edits (a cell, then another cell, then an added set) all land instead of each being built from the list the screen last drew.
+  onSetsChange: (sets: ExerciseSetTarget[] | ((prev: ExerciseSetTarget[]) => ExerciseSetTarget[])) => void;
   // Updates trackedFields and sets atomically in one call — required
   // whenever both change together in the same handler (e.g. switching to
   // an Energy System preset, or clearing a removed field's values).
@@ -207,6 +212,8 @@ export function ExerciseBuilderCard({
   // with it.
   onFieldsAndSetsChange: (trackedFields: TrackedField[], sets: ExerciseSetTarget[]) => void;
   onDeleted: () => void;
+  // Called with the exercise put back by "Undo", so the day draws it again.
+  onRestored?: (exercise: BuilderExercise) => void;
   onDuplicated: (newExercise: BuilderExercise) => void;
 }) {
   const { flashSaved, flashSaveError } = useSaveToastChannel();
@@ -421,7 +428,7 @@ export function ExerciseBuilderCard({
       flashSaveError("Couldn't save the rep range — try again.");
       return;
     }
-    onSetsChange(exercise.sets.map((s) => ({ ...s, repMin, repMax })));
+    onSetsChange((prev) => prev.map((s) => ({ ...s, repMin, repMax })));
     flashSaved();
   }
 
@@ -457,7 +464,8 @@ export function ExerciseBuilderCard({
         flashSaveError("Couldn't add that set — try again.");
         return;
       }
-      onSetsChange([...exercise.sets, mapSetRow(data)]);
+      const added = mapSetRow(data);
+      onSetsChange((prev) => [...prev, added]);
       flashSaved();
     } finally {
       setSetsBusy(false);
@@ -475,7 +483,7 @@ export function ExerciseBuilderCard({
         flashSaveError("Couldn't remove that set — try again.");
         return;
       }
-      onSetsChange(exercise.sets.slice(0, -1));
+      onSetsChange((prev) => prev.filter((s) => s.id !== last.id));
       flashSaved();
     } finally {
       setSetsBusy(false);
@@ -493,28 +501,28 @@ export function ExerciseBuilderCard({
       flashSaveError("Couldn't save that value — try again.");
       return;
     }
-    onSetsChange(
-      exercise.sets.map((s) => (s.id === setId ? { ...s, ...write.local } : s))
-    );
+    onSetsChange((prev) => prev.map((s) => (s.id === setId ? { ...s, ...write.local } : s)));
     flashSaved();
   }
 
   // Filling in the first set's value for a field and moving on (Tab/Enter)
   // fills every other set in that same row too — 3 sets of 5 shouldn't
   // need typing "5" three times.
+  // Only the sets that were still empty, or still had the first set's old value, follow it; a set the coach already gave its own number (a heavier top set) is never overwritten.
   async function handleFirstSetCommit(setId: string, field: TrackedField, raw: string) {
     const write = cellWrite(field, raw);
-    const otherSetIds = exercise.sets.filter((s) => s.id !== setId).map((s) => s.id);
+    const followers = firstSetFollowers(exercise.sets, setId, Object.keys(write.local) as Array<keyof ExerciseSetTarget>);
+    const followerIds = new Set(followers);
     const supabase = createBrowserClient();
     const { error } = await supabase
       .from("group_workout_exercise_sets")
       .update(write.patch)
-      .in("id", [setId, ...otherSetIds]);
+      .in("id", [setId, ...followers]);
     if (error) {
       flashSaveError("Couldn't save that value across all sets — try again.");
       return;
     }
-    onSetsChange(exercise.sets.map((s) => ({ ...s, ...write.local })));
+    onSetsChange((prev) => prev.map((s) => (s.id === setId || followerIds.has(s.id) ? { ...s, ...write.local } : s)));
     flashSaved();
   }
 
@@ -530,7 +538,7 @@ export function ExerciseBuilderCard({
       flashSaveError("Couldn't save the suggested weights — try again.");
       return;
     }
-    onSetsChange(exercise.sets.map((s) => (openSuggestions.some((o) => o.id === s.id) ? { ...s, targetWeight: suggestedWeights![s.id] } : s)));
+    onSetsChange((prev) => prev.map((s) => (openSuggestions.some((o) => o.id === s.id) ? { ...s, targetWeight: suggestedWeights![s.id] } : s)));
     flashSaved();
   }
 
@@ -721,9 +729,6 @@ export function ExerciseBuilderCard({
 
   async function handleDelete() {
     const label = exercise.exerciseName.trim() || "this exercise";
-    if (!await confirmDialog(`Delete ${label}? This removes its sets, notes, and video. Can't be undone.`)) {
-      return;
-    }
     setBusy(true);
     const supabase = createBrowserClient();
     const { error } = await supabase.from("group_workout_exercises").delete().eq("id", exercise.id);
@@ -733,6 +738,16 @@ export function ExerciseBuilderCard({
       return;
     }
     onDeleted();
+    // Deleting needs no "are you sure": it can be put back, with its sets, for a few seconds.
+    const gone = exercise;
+    showUndo({
+      message: `Deleted ${label}.`,
+      onUndo: async () => {
+        const back = await restoreExercise(createBrowserClient(), { groupId, workoutId, exercise: gone });
+        if (back) onRestored?.(back);
+        else flashSaveError("Couldn't put that exercise back — add it again.");
+      },
+    });
   }
 
   async function handleDuplicate() {
@@ -815,13 +830,13 @@ export function ExerciseBuilderCard({
     <div className="border border-steel/20 p-3 bg-surface/40">
       <div className="flex items-center gap-1 mb-1">
         <GripVertical className="w-4 h-4 text-steel shrink-0 hidden sm:block" aria-hidden="true" />
-        <div className="flex items-center gap-0.5 shrink-0 sm:hidden" aria-label="Reorder exercise">
+        <div className="flex items-center gap-0.5 shrink-0" aria-label="Reorder exercise">
           <button
             type="button"
             onClick={onMoveUp}
             disabled={!canMoveUp}
             aria-label="Move exercise up"
-            className="w-11 h-11 flex items-center justify-center text-steel disabled:opacity-30"
+            className="w-11 h-11 sm:w-8 sm:h-8 flex items-center justify-center text-steel disabled:opacity-30"
           >
             <ChevronUp className="w-3.5 h-3.5" />
           </button>
@@ -830,7 +845,7 @@ export function ExerciseBuilderCard({
             onClick={onMoveDown}
             disabled={!canMoveDown}
             aria-label="Move exercise down"
-            className="w-11 h-11 flex items-center justify-center text-steel disabled:opacity-30"
+            className="w-11 h-11 sm:w-8 sm:h-8 flex items-center justify-center text-steel disabled:opacity-30"
           >
             <ChevronDown className="w-3.5 h-3.5" />
           </button>
@@ -1199,7 +1214,7 @@ export function ExerciseBuilderCard({
                   onSaved={(lo, hi) => {
                     setRepMinDraft(lo == null ? "" : String(lo));
                     setRepMaxDraft(hi == null ? "" : String(hi));
-                    onSetsChange(exercise.sets.map((s) => ({ ...s, repMin: lo, repMax: hi })));
+                    onSetsChange((prev) => prev.map((s) => ({ ...s, repMin: lo, repMax: hi })));
                   }}
                   onFlashSaved={flashSaved}
                   onFlashError={flashSaveError}

@@ -11,6 +11,7 @@ import {
 } from "./athlete-day-schedule";
 import { getActivePrograms, type ActiveProgram } from "./active-programs";
 import { programHeading } from "./session-stack";
+import { dateKeyOf } from "./athlete-day-schedule";
 
 // Several programs can be active for one client at once: a main program, a
 // mobility program on off days, a warm-up flow. Each has its own schedule.
@@ -58,6 +59,33 @@ export function contextWorkoutIds(contexts: ProgramDayContext[]): string[] {
 export interface DaySession extends DayWorkoutInfo {
   programId: string;
   heading: string;
+  // The coach's note for a workout assigned to this one day.
+  note?: string | null;
+}
+
+// A workout the coach put on ONE day for this client (workout_assignments). It replaces what the programs would give that day, the same rule "Today" already follows.
+export interface AssignedWorkout {
+  workoutId: string;
+  title: string;
+  note: string | null;
+}
+export const ASSIGNED_HEADING = "From your coach";
+
+export async function loadAssignedWorkouts(supabase: SupabaseClient, athleteId: string, groupId: string, fromKey: string, toKey: string): Promise<Map<string, AssignedWorkout>> {
+  const out = new Map<string, AssignedWorkout>();
+  const { data } = await supabase
+    .from("workout_assignments")
+    .select("scheduled_date, workout_id, note, workouts ( title )")
+    .eq("athlete_id", athleteId)
+    .eq("group_id", groupId)
+    .gte("scheduled_date", fromKey)
+    .lte("scheduled_date", toKey);
+  for (const row of (data ?? []) as unknown as Array<{ scheduled_date: string; workout_id: string | null; note: string | null; workouts: { title: string } | { title: string }[] | null }>) {
+    if (!row.workout_id) continue;
+    const w = Array.isArray(row.workouts) ? row.workouts[0] : row.workouts;
+    out.set(row.scheduled_date, { workoutId: row.workout_id, title: w?.title ?? "Workout", note: row.note?.trim() || null });
+  }
+  return out;
 }
 
 // Every program that has something on `targetDate`: a workout to do, one that
@@ -69,8 +97,18 @@ export function resolveSessionsForDate(
   loggedIds: Set<string>,
   targetDate: Date,
   today: Date,
-  isToday: boolean
+  isToday: boolean,
+  assignedByDate?: Map<string, AssignedWorkout>
 ): DaySession[] {
+  const assigned = assignedByDate?.get(dateKeyOf(targetDate));
+  if (assigned) {
+    const todayStart = new Date(today);
+    todayStart.setHours(0, 0, 0, 0);
+    const dayStart = new Date(targetDate);
+    dayStart.setHours(0, 0, 0, 0);
+    const status: DayWorkoutStatus = loggedIds.has(assigned.workoutId) ? "done" : dayStart.getTime() < todayStart.getTime() ? "missed" : "planned";
+    return [{ status, workoutId: assigned.workoutId, title: assigned.title, programId: "assigned", heading: ASSIGNED_HEADING, note: assigned.note }];
+  }
   const out: DaySession[] = [];
   for (const c of contexts) {
     let info: DayWorkoutInfo;

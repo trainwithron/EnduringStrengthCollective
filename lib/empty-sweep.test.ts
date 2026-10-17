@@ -53,12 +53,13 @@ describe("an empty program is removed quietly, only his own, only when nothing i
 });
 
 describe("wiring", () => {
-  it("the builder sweeps its own program's empty days when opened, and Programs sweeps the owner's empty programs", () => {
+  it("the builder offers to remove empty days with a button (never behind the coach's back), and Programs sweeps the owner's empty programs", () => {
     expect(read("app/(coach)/groups/[groupId]/programs/[programId]/page.tsx")).not.toContain("sweepEmptyDays");
     const builder = read("components/coach/desktop/program-builder-desktop.tsx");
     expect(builder).toContain("/api/programs/sweep-empty-days");
-    expect(builder).toContain("}, []);");
-    expect(builder).toContain("initialDays.filter((d) => d.items.length === 0 && !isRestDayTitle(d.title))");
+    expect(builder).toContain("explicit: true");
+    expect(builder).toContain("const emptyDayIds = days.filter((d) => d.items.length === 0 && !isRestDayTitle(d.title))");
+    expect(builder).not.toContain("initialDays.filter((d) => d.items.length === 0");
     const api = read("app/api/programs/sweep-empty-days/route.ts");
     expect(api).toContain("isBrandNewProgram");
     expect(api).toContain("sweepEmptyDays(supabase, programId, dayIds)");

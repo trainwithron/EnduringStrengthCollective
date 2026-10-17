@@ -55,7 +55,6 @@
  "components/coach/main-lift-picker.tsx": 1,
  "components/coach/movement-pattern-row.tsx": 2,
  "components/coach/nutrition-phase-control.tsx": 2,
- "components/coach/text-note-card.tsx": 2,
  "components/coach/video-checkin-recorder.tsx": 1,
  "components/invite/invite-join-flow.tsx": 2,
  "components/logging/exercise-card.tsx": 3,

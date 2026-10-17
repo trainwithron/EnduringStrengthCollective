@@ -17,6 +17,8 @@ import type { MovementPatternOption } from "../exercise-builder-card";
 import { ProgramAssignedClients } from "@/components/coach/desktop/program-assigned-clients";
 import { ProgramCardMenu } from "./program-card-menu";
 import { SaveToast } from "./save-toast";
+import { UndoToast } from "./undo-toast";
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { SaveStatusBar } from "./save-status-bar";
 import { ProgramProgressionPanel } from "./program-progression-panel";
 import type { Rule } from "@/lib/program-progression";
@@ -153,25 +155,30 @@ export function ProgramBuilderDesktop({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  // A day with no exercises and no "Rest day" name (and no log, session, note, date or assignment) is not worth keeping: the ones the program is opened with go as it opens, once. Days added while
-  // building are never in that list, so nothing is swept under the coach. The server checks each day again and a brand-new program is left alone.
-  useEffect(() => {
-    const ids = initialDays.filter((d) => d.items.length === 0 && !isRestDayTitle(d.title)).map((d) => d.id);
-    if (ids.length === 0) return;
-    let cancelled = false;
-    fetch("/api/programs/sweep-empty-days", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ programId, dayIds: ids }) })
-      .then((r) => (r.ok ? r.json() : { removed: [] }))
-      .then((res: { removed?: string[] }) => {
-        const gone = new Set(res.removed ?? []);
-        if (!cancelled && gone.size > 0) setDays((prev) => prev.filter((d) => !gone.has(d.id)));
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-    // once, as the builder opens
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Empty days are never removed behind the coach's back; a button below offers to remove them (see removeEmptyDays).
+  const emptyDayIds = days.filter((d) => d.items.length === 0 && !isRestDayTitle(d.title)).map((d) => d.id);
+  const [sweepBusy, setSweepBusy] = useState(false);
+  async function removeEmptyDays() {
+    if (sweepBusy || emptyDayIds.length === 0) return;
+    const n = emptyDayIds.length;
+    if (!(await confirmDialog({ message: `Remove ${n} empty ${n === 1 ? "day" : "days"}? They have no exercises, notes or logged work.`, confirmLabel: "Remove" }))) return;
+    setSweepBusy(true);
+    try {
+      const res = await fetch("/api/programs/sweep-empty-days", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ programId, dayIds: emptyDayIds, explicit: true }) });
+      if (!res.ok) {
+        flashSaveError("Couldn't remove the empty days — try again.");
+        return;
+      }
+      const out = (await res.json()) as { removed?: string[] };
+      const gone = new Set(out.removed ?? []);
+      if (gone.size > 0) setDays((prev) => prev.filter((d) => !gone.has(d.id)));
+      flashSaved();
+    } catch {
+      flashSaveError("Couldn't remove the empty days — try again.");
+    } finally {
+      setSweepBusy(false);
+    }
+  }
   const [startDate, setStartDate] = useState(initialStartDate);
   const [trainingDays, setTrainingDays] = useState(initialTrainingDays);
   const [trainingIntent, setTrainingIntent] = useState(initialTrainingIntent);
@@ -280,6 +287,7 @@ export function ProgramBuilderDesktop({
     <SaveToastChannelContext.Provider value={saveToastChannel}>
     <div ref={rootRef}>
       <SaveToast />
+      <UndoToast />
       <div className="pb-6 border-b border-steel/20 mb-6">
         <div className="flex items-start justify-between gap-3">
           <input
@@ -409,8 +417,12 @@ export function ProgramBuilderDesktop({
             scheduledDateByDayId={scheduledDateByDayId}
             existingWeekNumbers={weekNumbers}
             onToggle={() => toggleWeek(wn)}
-            onDaysChange={(weekDays) =>
-              setDays((prev) => [...prev.filter((d) => d.weekNumber !== wn), ...weekDays])
+            onDaysChange={(change) =>
+              setDays((prev) => {
+                const week = prev.filter((d) => d.weekNumber === wn);
+                const weekDays = typeof change === "function" ? change(week) : change;
+                return [...prev.filter((d) => d.weekNumber !== wn), ...weekDays];
+              })
             }
             onWeeksGenerated={(newDays) => {
               setDays((prev) => [...prev, ...newDays]);
@@ -419,6 +431,10 @@ export function ProgramBuilderDesktop({
                 newDays.forEach((d) => next.add(d.weekNumber));
                 return next;
               });
+            }}
+            onWeekRestored={(back) => {
+              setDays((prev) => [...prev.filter((d) => !back.some((b) => b.id === d.id)), ...back]);
+              setExpandedWeeks((prev) => new Set(prev).add(wn));
             }}
             onWeekDeleted={() => {
               setDays((prev) => prev.filter((d) => d.weekNumber !== wn));
@@ -432,6 +448,18 @@ export function ProgramBuilderDesktop({
         ))}
       </div>
 
+      {emptyDayIds.length > 0 && (
+        <div className="pt-4">
+          <button
+            type="button"
+            onClick={removeEmptyDays}
+            disabled={sweepBusy}
+            className="w-full min-h-11 border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors disabled:opacity-40"
+          >
+            {sweepBusy ? "Removing…" : `Remove ${emptyDayIds.length} empty ${emptyDayIds.length === 1 ? "day" : "days"}`}
+          </button>
+        </div>
+      )}
       <div className="pt-4">
         <button
           type="button"

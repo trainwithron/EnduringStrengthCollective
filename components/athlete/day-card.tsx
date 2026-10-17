@@ -180,6 +180,7 @@ function WorkoutSection({
               <>
                 <p className="font-body text-xs text-rust uppercase tracking-wide">{x.heading}</p>
                 <p className="font-display font-bold text-xl uppercase leading-none mt-1">{x.title}</p>
+                {x.note && <p className="font-body text-sm text-chalk mt-2 whitespace-pre-line">{x.note}</p>}
                 <div className="mt-3">
                   {x.status === "planned" && (
                     <Link
