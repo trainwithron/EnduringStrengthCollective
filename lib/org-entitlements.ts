@@ -30,7 +30,7 @@ export interface OrgBillingRow {
 
 // full   = everything works
 // grace  = everything works, with a "fix your plan" banner (GRACE_DAYS)
-// locked = coach side goes to the billing page; athletes are never locked (now only a payment that stays unpaid past its grace; an ended trial or a lapsed plan is the free tier, not a lock)
+// locked = coach side goes to the billing page; athletes are never locked (nothing locks any more: an ended trial, a lapsed plan and a payment unpaid past its grace are all the free tier)
 export type AccessLevel = "full" | "grace" | "locked";
 
 export type PlanState =
@@ -102,6 +102,7 @@ export function deriveOrgEntitlements(
   let state: PlanState;
   let rawAccessLevel: AccessLevel;
   let rawOrgAddon: boolean;
+  let pastDueFree = false;
   const out = { ...base };
 
   const status = row?.subscriptionStatus ?? null;
@@ -121,8 +122,10 @@ export function deriveOrgEntitlements(
     out.graceEndsAt = addDays(since, GRACE_DAYS);
     out.graceDaysLeft = daysLeft(out.graceEndsAt, now);
     const inGrace = now < out.graceEndsAt;
-    rawAccessLevel = inGrace ? "grace" : "locked";
+    // A payment that stays unpaid past its grace drops to the free tier like everything else that is not paid: nothing is locked.
+    rawAccessLevel = inGrace ? "grace" : "full";
     rawOrgAddon = inGrace ? addonStillOn(row!, now) : false;
+    pastDueFree = !inGrace;
   } else if (hasSubscription) {
     // canceled / unpaid / paused / incomplete_expired
     const paidThrough = row!.currentPeriodEnd ? new Date(row!.currentPeriodEnd) : null;
@@ -153,7 +156,7 @@ export function deriveOrgEntitlements(
   }
 
   // Past the trial with no paid plan (or a plan that lapsed): the free tier.
-  const rawFreeTier = state === "trial_expired" || state === "lapsed";
+  const rawFreeTier = state === "trial_expired" || state === "lapsed" || pastDueFree;
 
   return {
     ...out,
