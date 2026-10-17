@@ -123,6 +123,7 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0353 | yes | yes | 3 | 0353 a coach can ask for notice before a schedule is paused or ended |
 | 0354 | yes | yes | 15 | 0354 the money settings on a membership are the server's |
 | 0355 | yes | yes | 6 | 0355 coach assessments are private to the coaches of the group |
+| 0356 | yes | yes | 13 | 0356 review request and client quotes |
 | 0358 | yes | yes | 38 | 0358 personal space: one set of personal data, owned by the person, in no organization; 0360 the creator of a new group can seat themselves as its coach |
 | 0359 | yes | yes | 5 | 0359 imported FitPros sets do not set training maxes |
 | 0360 | yes | yes | 9 | 0360 the creator of a new group can seat themselves as its coach |
@@ -130,8 +131,29 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0362 | yes | yes | 21 | 0362 storage buckets accept only the file types their screens upload |
 | 0363 | yes | yes | 15 | 0363 smaller goals: add and read by the client and their coach only, no direct change |
 | 0364 | yes | yes | 8 | 0364 group sessions belong to one organization |
-| 0365 | yes | yes | 14 | 0365 pattern and class template columns; 0366 template slots survive duplicate; a client is never given a slot |
-| 0366 | yes | yes | 7 | 0366 template slots survive duplicate; a client is never given a slot |
+| 0365 | yes | yes | 23 | 0365 pattern and class template columns; 0366 template slots survive duplicate; a client is never given a slot; 0367 a rest can be a range (60-90) |
+| 0366 | yes | yes | 16 | 0366 template slots survive duplicate; a client is never given a slot; 0367 a rest can be a range (60-90) |
+| 0367 | yes | yes | 5 | 0367 a rest can be a range (60-90) |
+| 0368 | yes | yes | 8 | 0368 shelf placement and audience |
+| 0369 | yes | yes | 15 | 0369 Past AI build notes and taught rules |
+| 0370 | yes | yes | 12 | 0370 Not now and No macros for a client |
+| 0371 | yes | yes | 25 | 0371 Unclear data points |
+| 0372 | yes | yes | 22 | 0372 Imported history counts |
+| 0373 | yes | yes | 16 | 0373 Progress tab tables |
+| 0374 | yes | yes | 27 | 0374 Promote an imported record |
+| 0375 | yes | yes | 23 | 0375 InBody scans |
+| 0376 | yes | yes | 6 | 0376 Health screening acknowledged count |
+| 0377 | yes | yes | 33 | 0377 Library names are never only numbers or sets and reps |
+| 0378 | yes | yes | 6 | 0378 Moving a client moves every record of theirs |
+| 0379 | yes | yes | 25 | 0379 Program and session exercise names are never only numbers or sets and reps |
+| 0380 | yes | yes | 5 | 0380 A day number is unique inside a week of a program |
+| 0381 | yes | yes | 4 | 0381 A one-on-one space's name follows its client's name |
+| 0382 | yes | yes | 25 | 0382 Minors and health closures |
+| 0383 | yes | yes | 11 | 0383 A text STOP is remembered per phone number |
+| 0384 | yes | yes | 18 | 0384 Privacy closures |
+| 0385 | yes | yes | 26 | 0385 Set types and records |
+| 0386 | yes | yes | 13 | 0386 The server finishes the health form |
+| 0387 | yes | yes | 7 | 0387 Minors off public surfaces |
 | 0331 | yes | yes | 10 | 0331 a payment event and its sessions are recorded in one step |
 | 0329 | yes | yes | 12 | 0329 every session costs exactly 1 credit; the waitlist offer uses the coach's time zone |
 | 0330 | yes | yes | 9 | 0330 only a real coach can have a public page |
