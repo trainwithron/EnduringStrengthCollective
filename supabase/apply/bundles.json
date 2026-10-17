@@ -24,6 +24,14 @@
   "file": "apply-release-cm-all.sql"
  },
  {
+  "id": "release-k1-notifications",
+  "name": "Release K1 (quiet hours, private lock screen, payment and invite pushes; adds only, safe to run BEFORE the code that goes with it is live)",
+  "steps": [
+   "147"
+  ],
+  "file": "apply-release-k1-notifications-all.sql"
+ },
+ {
   "id": "release-j-home-seasons",
   "name": "Release J (a new season for a team; adds only, safe to run BEFORE the code that goes with it is live)",
   "steps": [

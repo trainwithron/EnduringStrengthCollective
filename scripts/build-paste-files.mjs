@@ -2728,6 +2728,29 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "147",
+  slug: "0395",
+  title: "0395 Release K1: push notifications that respect the person (quiet hours, private lock screen), a mark on each notice for the five-minute push job, and a payment notice type",
+  migrations: ["0395"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes on screen until the Release K1 code is live. Adds three small settings on each person (quiet hours start and end, private lock screen), a pushed-at mark on notices (every existing notice is marked as already handled, so nothing old is sent), and one more notice type for payments. Safe to run before the code is live.",
+  undo: [
+    "drop index if exists public.notifications_unpushed_idx;",
+    "alter table public.notifications drop column if exists pushed_at;",
+    "alter table public.profiles drop column if exists generic_push_text;",
+    "alter table public.profiles drop column if exists quiet_hours_end;",
+    "alter table public.profiles drop column if exists quiet_hours_start;",
+    "-- the extra notification type is left in the list (removing it could break rows that use it)",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 147 misbehaves. Run it only while the Release K1 code is not live (Settings, the push sender and the push job use the columns). Quiet hours people set are lost.",
+  rows: [
+    ["0395 is not already applied (the pushed-at mark is not there yet)", "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'notifications' and column_name = 'pushed_at')"],
+    ["the tables it builds on exist", "to_regclass('public.profiles') is not null and to_regclass('public.notifications') is not null"],
+    ["the notification type rule exists to be widened", "exists (select 1 from pg_constraint c where c.conname = 'notifications_type_check' and c.conrelid = 'public.notifications'::regclass)"],
+  ],
+});
+
+STEPS.push({
   n: "146",
   slug: "0394",
   title: "0394 Release J: a new season for a team (the old group is retired and kept whole; the new one has the same positions, coaches and the athletes chosen)",
@@ -2962,6 +2985,7 @@ const BUNDLES = [
   { id: "release-co", name: "Release CO (nothing about a person is public unless they chose it: personal Find a coach listing; a coach adds only their own clients to a challenge; run BEFORE the code that goes with it is live)", steps: ["139"] },
   { id: "release-cn-held", name: "HELD, Ron's word first: require the health form and waiver of every client without one (read check-intake-flag-list.sql first)", steps: ["138"] },
   { id: "release-cm", name: "Release CM (the guard function and a coach's decision on a flagged screening; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["137"] },
+  { id: "release-k1-notifications", name: "Release K1 (quiet hours, private lock screen, payment and invite pushes; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["147"] },
   { id: "release-j-home-seasons", name: "Release J (a new season for a team; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["146"] },
   { id: "release-i-gym", name: "Release I (invite an existing account as a one-on-one client; invite notices that were being refused; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["145"] },
   { id: "release-h-importers", name: "Release H (undo a whole history import; getting out of an organization; what a coach coaches; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["142", "143", "144"] },
@@ -3240,6 +3264,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
     m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
+    m("0395", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'notifications' and column_name = 'pushed_at')"),
     m("0394", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'groups' and column_name = 'archived_at')"),
     m("0393", "to_regclass('public.space_invites') is not null"),
     m("0392", "to_regprocedure('public.assign_group_coach(uuid, uuid, boolean)') is not null"),
