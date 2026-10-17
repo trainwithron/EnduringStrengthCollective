@@ -40,6 +40,8 @@ import { retryState as retryStateFor, type RetryState } from "@/lib/meal-plan-re
 import { ClientGroceryList } from "@/components/athlete/client-grocery-list";
 import { WeeklyNutritionSection } from "@/components/coach/nutrition/weekly-nutrition-section";
 
+export const metadata = { title: "Nutrition" };
+
 export default async function NutritionPage(
   props: {
     params: Promise<{ groupId: string }>;

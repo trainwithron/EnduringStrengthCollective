@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { createCrossOrgServerClient as createServerClient } from "@/lib/supabase/server";
 import { loadYourCoaches } from "@/lib/your-coaches";
 
+export const metadata = { title: "Your coaches" };
+
 // Every coach a client trains with, one row each, with a link into that space. For a client with more than one coach this is where they switch.
 export default async function YourCoachesPage() {
   const supabase = await createServerClient();

@@ -40,6 +40,8 @@ import { ReadDuringRestSettings } from "@/components/coach/read-during-rest-sett
 import { FAITH_PACK } from "@/lib/read-content";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 
+export const metadata = { title: "Settings" };
+
 export default async function SettingsPage(
   props: {
     params: Promise<{ groupId: string }>;

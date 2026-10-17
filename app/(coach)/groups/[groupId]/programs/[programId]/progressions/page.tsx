@@ -7,6 +7,8 @@ import { createServerClient } from "@/lib/supabase/server";
 import { ProgressionRow } from "@/components/coach/progression-row";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 
+export const metadata = { title: "Progressions" };
+
 export const dynamic = "force-dynamic";
 
 export default async function ProgressionsPage(

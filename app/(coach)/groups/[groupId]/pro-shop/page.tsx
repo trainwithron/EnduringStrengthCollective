@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 
+export const metadata = { title: "Pro shop" };
+
 // Merged into Resources (Referrals + Pro Shop combined) — kept as a
 // redirect so any old bookmarked/shared link still lands somewhere real.
 export default async function ProShopRedirect(

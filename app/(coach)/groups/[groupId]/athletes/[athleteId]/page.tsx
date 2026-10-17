@@ -84,6 +84,8 @@ import { currentTaperMultiplier } from "@/lib/endurance-taper";
 import { computeStrengthTaperWeek, computeHeavySingleWeight } from "@/lib/strength-meet-taper";
 import { MainLiftPicker } from "@/components/coach/main-lift-picker";
 
+export const metadata = { title: "Client profile" };
+
 // Every date key from `startKey` through `endKey`, inclusive.
 function last7DatesForTargets(startKey: string, endKey: string): string[] {
   const out: string[] = [];

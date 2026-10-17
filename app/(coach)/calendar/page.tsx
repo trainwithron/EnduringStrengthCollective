@@ -7,6 +7,8 @@ import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { loadStartInputs, parseLastGroupCookie, pickStartGroup } from "@/lib/start-group";
 import { CoachCalendarPageBody } from "@/components/coach/calendar-page-body";
 
+export const metadata = { title: "Calendar" };
+
 type SearchParams = Record<string, string | undefined>;
 
 // The coach's Calendar: the whole schedule (every one-on-one session and every group item), with no group in the address, like /clients and /programs. The page

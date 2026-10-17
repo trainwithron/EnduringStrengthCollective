@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 
+export const metadata = { title: "Canceled" };
+
 export default async function BillingCanceledPage(props: { params: Promise<{ groupId: string }> }) {
   const params = await props.params;
   return (
