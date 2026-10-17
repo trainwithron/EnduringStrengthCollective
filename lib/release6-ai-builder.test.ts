@@ -39,17 +39,6 @@ describe("a coach building their own program is not capped for want of a birthda
   });
 });
 
-describe("a coach can add a missing birthday from the client profile", () => {
-  it("the profile shows the prompt only for a client with no birthday; the route checks the coach, the seat and never overwrites", () => {
-    expect(src("app/(coach)/groups/[groupId]/athletes/[athleteId]/page.tsx")).toContain("!selfView && !intake?.date_of_birth && <AddBirthdayPrompt");
-    const route = src("app/api/clients/birthday/route.ts");
-    expect(route).toContain("validDateOfBirth(dateOfBirth)");
-    expect(route).toContain('caller?.role !== "coach"');
-    expect(route).toContain("They already have a birthday on file.");
-    expect(route).toContain("write.data.length === 0");
-  });
-});
-
 describe("a young client's program is clamped on the server", () => {
   it("effort above RPE 8 is lowered, reps outside 6 to 15 are flagged, AMRAP and in-range reps are left", () => {
     const rows = [

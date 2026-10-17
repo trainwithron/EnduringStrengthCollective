@@ -57,7 +57,6 @@ import { AddSocialOnlyMembershipControl } from "@/components/coach/add-social-on
 import { ClientProgramActions } from "@/components/coach/client-program-actions";
 import { OverviewMessageBox } from "@/components/coach/desktop/overview-message-box";
 import { ParqFlagNotice } from "@/components/coach/desktop/parq-flag-notice";
-import { AddBirthdayPrompt } from "@/components/coach/add-birthday-prompt";
 import { parqNoticeNeeded } from "@/lib/parq-notice";
 import { ClientCalendarSection } from "@/components/coach/desktop/client-calendar-section";
 import { MinorConsentControl } from "@/components/coach/minor-consent-control";
@@ -1067,7 +1066,6 @@ export default async function AthleteProfilePage(
             </p>
           )}
           {parqNotice && <ParqFlagNotice athleteId={params.athleteId} coachId={user.id} flagged={parQFlaggedCount} />}
-          {!selfView && !intake?.date_of_birth && <AddBirthdayPrompt groupId={params.groupId} athleteId={params.athleteId} suggestion={null} />}
           </div>
           <div data-tab="settings">
           {!selfView && signInStatus !== "active" && (
