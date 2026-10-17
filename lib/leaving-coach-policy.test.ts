@@ -96,7 +96,9 @@ describe("wiring of the seven days", () => {
   it("the undo puts back only the seats of coaches who were NOT let go, and clears the stored exports", () => {
     const undo = src("supabase/apply/undo-step148-0396.sql");
     expect(undo).toContain("where om.access_ended_at is not null and om.fired_at is null");
-    expect(undo).toContain("delete from storage.objects where bucket_id = 'coach-exit-exports'");
+    // the database refuses direct deletes in storage, so the undo only says where to remove the files
+    expect(undo).not.toContain("delete from storage.");
+    expect(undo).toContain("Storage section of the dashboard");
     expect(src("app/api/cron/departing-coaches/route.ts")).toContain(".remove([s.export_path])");
     expect(src("lib/leaving-coach.ts")).toContain("departing_org_name");
   });

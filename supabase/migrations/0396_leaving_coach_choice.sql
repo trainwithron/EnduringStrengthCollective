@@ -295,6 +295,12 @@ begin
         raise exception 'Choose who takes over % client% first: % has nobody else coaching.', v_clients, case when v_clients = 1 then '' else 's' end, g.name;
       end if;
       if exists (select 1 from public.group_memberships a where a.group_id = g.group_id and a.profile_id = p_hand_to and a.role = 'athlete') then
+        -- closing the team must not fail because the owner is a client here: the coach keeps this group until the owner picks someone else
+        if p_take then
+          v_kept := v_kept + 1;
+          v_kept_ids := v_kept_ids || g.group_id;
+          continue;
+        end if;
         raise exception 'The person chosen to take over is a client in %. Choose someone else.', g.name;
       end if;
       insert into public.group_memberships (group_id, profile_id, role) values (g.group_id, p_hand_to, 'coach') on conflict do nothing;

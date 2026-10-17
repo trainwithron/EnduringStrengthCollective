@@ -275,6 +275,19 @@ export default {
       await h.asService();
       r = await tryQ(db, `select public.complete_departure($1, $2)`, [org2, late]);
       h.check("past seven days a coach cannot start an account even if the job has not run yet", /seven days/.test(r.error ?? ""), r.error);
+
+      // closing a team whose owner is a client in a group a coach solely coaches does not fail: the coach keeps that group
+      const o3 = await h.user("LE Owner");
+      const e3 = await h.user("LE Coach");
+      const org3 = await h.org(o3, "LE Gym");
+      await h.orgMember(org3, e3, "coach");
+      const g3 = await h.group(org3, e3, "one_on_one", "LE owner is a client");
+      await h.member(g3, o3);
+      await h.as(o3);
+      r = await tryQ(db, `select public.close_organization($1) as res`, [org3]);
+      h.check("closing a team whose owner is a client in the coach's group does not fail" + (r.error ? ": " + r.error : ""), !r.error);
+      await h.asSuper();
+      h.check("the coach keeps that group until the owner picks someone", await seat(g3, e3));
     },
   },
 };
