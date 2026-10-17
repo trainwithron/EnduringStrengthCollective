@@ -2838,6 +2838,26 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "148",
+  slug: "0396",
+  title: "0396 Release L: a leaving coach is never given an organization (their clients stay where they are, they are marked leaving and choose); the finishing step is server-only",
+  migrations: ["0396"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes on screen until the Release L code is live. Adds one empty column (when a coach was marked leaving) and replaces the remove / leave / close organization steps so none of them creates an organization. A coach marked leaving keeps their clients exactly where they are. Safe to run before the code is live.",
+  undo: [
+    "drop function if exists public.complete_departure(uuid, uuid);",
+    "alter table public.organization_memberships drop column if exists departing_since;",
+    "-- then run step 143 (0391) again to bring back the earlier remove / leave / close behavior",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 148 misbehaves. Run it only while the Release L code is not live (the Team page and Settings read the column). Coaches already marked leaving lose the mark but keep everything they kept.",
+  rows: [
+    ["0396 is not already applied (the leaving mark is not there yet)", "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'organization_memberships' and column_name = 'departing_since')"],
+    ["the offboarding steps it replaces exist (step 143 is applied)", "to_regprocedure('public.remove_org_member(uuid, uuid, uuid)') is not null and to_regprocedure('public._detach_coach_from_org(uuid, uuid, uuid, boolean)') is not null and to_regprocedure('public._solo_org_for(uuid, uuid)') is not null"],
+    ["the audit writer exists", "to_regprocedure('public.audit_record(text, text, text, jsonb)') is not null"],
+  ],
+});
+
+STEPS.push({
   n: "142",
   slug: "0390",
   title: "0390 Release H: undo a whole history import (every workout an import creates carries one batch id)",
@@ -2985,6 +3005,7 @@ const BUNDLES = [
   { id: "release-co", name: "Release CO (nothing about a person is public unless they chose it: personal Find a coach listing; a coach adds only their own clients to a challenge; run BEFORE the code that goes with it is live)", steps: ["139"] },
   { id: "release-cn-held", name: "HELD, Ron's word first: require the health form and waiver of every client without one (read check-intake-flag-list.sql first)", steps: ["138"] },
   { id: "release-cm", name: "Release CM (the guard function and a coach's decision on a flagged screening; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["137"] },
+  { id: "release-l-leaving-coach", name: "Release L (a leaving coach is never given an organization; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["148"] },
   { id: "release-k1-notifications", name: "Release K1 (quiet hours, private lock screen, payment and invite pushes; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["147"] },
   { id: "release-j-home-seasons", name: "Release J (a new season for a team; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["146"] },
   { id: "release-i-gym", name: "Release I (invite an existing account as a one-on-one client; invite notices that were being refused; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["145"] },
@@ -3264,6 +3285,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
     m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
+    m("0396", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'organization_memberships' and column_name = 'departing_since')"),
     m("0395", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'notifications' and column_name = 'pushed_at')"),
     m("0394", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'groups' and column_name = 'archived_at')"),
     m("0393", "to_regclass('public.space_invites') is not null"),

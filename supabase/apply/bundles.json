@@ -24,6 +24,14 @@
   "file": "apply-release-cm-all.sql"
  },
  {
+  "id": "release-l-leaving-coach",
+  "name": "Release L (a leaving coach is never given an organization; adds only, safe to run BEFORE the code that goes with it is live)",
+  "steps": [
+   "148"
+  ],
+  "file": "apply-release-l-leaving-coach-all.sql"
+ },
+ {
   "id": "release-k1-notifications",
   "name": "Release K1 (quiet hours, private lock screen, payment and invite pushes; adds only, safe to run BEFORE the code that goes with it is live)",
   "steps": [
