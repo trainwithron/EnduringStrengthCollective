@@ -5,6 +5,12 @@
 - ASSUMED: an installed app in a window 1024px wide or more with a mouse opens the desktop experience (a phone or touch tablet keeps phone mode; the existing view toggle still overrides).
 - Needs Ron: name an iPhone tester (offline and wake-lock behaviour differ on iOS).
 
+## Release C3 (progression safety rules, no paste) - the report's RECOMMENDED defaults, all ASSUMED, each a constant in lib/progression-guards.ts
+- Break: 14-27 days since the exercise was last done = start at 95 percent; 28-55 days = 90 percent; 56+ days = no number, "check with your coach" (nothing is applied automatically).
+- Miss ladder (double progression only): hold the weight after the 1st and 2nd consecutive miss at one weight; the 3rd miss makes the next goal 90 percent (rounded down). A miss = any set at the heaviest weight under the bottom of the rep range. Only that exercise moves. A scheduled session that was not done is never a miss.
+- Under 18 or age not known: a goal is never more than 5 lb above last time.
+- NOT DONE: deloads (reactive-only per the report, nothing automatic exists to turn off), the coach "ask me" notices (a long-break exercise just says so on the athlete's screen; there is no coach alert), the +5 lb cap is lb-based (kg clients get the same number converted).
+
 ## Release C2 (kilograms, no paste)
 - Design: pounds stay the one stored unit. A client who picked kilograms in About you (the same setting body weight already uses) sees and types kilograms in the workout screens; nothing stored is ever rewritten, and a cell left alone keeps its stored pounds exactly (checked in a test with before/after numbers: 135 lb shows 61.2 kg).
 - NOT DONE (smaller follow-ups): the public share picture and card, the progress graphs and records for the client's own view, and the coach's views of that client still show pounds. Goals for a kilogram client are still computed on 5 lb steps (so 140 lb shows as 63.5 kg); a kilogram step of 2.5 kg would be cleaner. Say go and I add them as C2b.

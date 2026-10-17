@@ -13,6 +13,8 @@ export type ProgressionModel =
   | "wave_from_training_max";
 import { roundLoad, DEFAULT_STEP } from "@/lib/load-rounding";
 import { countsForProgress } from "@/lib/set-types";
+import { applyContractGuards, consecutiveMisses, daysBetween, type GoalStatus, type PastSession } from "@/lib/progression-guards";
+import { athleteAgeStatus } from "@/lib/youth-block";
 
 import { readLoggedSets } from "@/lib/read-logged-sets";
 
@@ -62,6 +64,8 @@ export interface ProgressionTarget {
   reps: number | null;
   // One plain sentence on why this is the number ("You hit 12 reps on every set at 135, so up to 140.").
   reason?: string;
+  // suggest = the rule's number; hold / reset = the miss ladder; ask_coach = no number, the coach is asked (a long break).
+  status?: GoalStatus;
 }
 
 // A percent step is rounded DOWN to a weight that can be loaded (5 lb), and a step up never rounds back to where it started; an added amount stays exact (the coach chose it).
@@ -291,6 +295,8 @@ export async function getProgressionGoalsBatch(
     occurrenceIndex: number;
     referenceWorkoutId?: string;
     previousWorkoutId?: string;
+    // The up-to-three sessions before this one, most recent first (for the miss ladder).
+    recentWorkoutIds: string[];
   }
   const resolved: Resolved[] = [];
   const allNeededWorkoutIds = new Set<string>();
@@ -367,6 +373,11 @@ export async function getProgressionGoalsBatch(
 
     if (referenceWorkoutId) allNeededWorkoutIds.add(referenceWorkoutId);
     if (previousWorkoutId) allNeededWorkoutIds.add(previousWorkoutId);
+    const recentWorkoutIds = occurrences
+      .slice(Math.max(0, occurrenceIndex - 4), occurrenceIndex - 1)
+      .map((o) => o.workoutId)
+      .reverse();
+    for (const id of recentWorkoutIds) allNeededWorkoutIds.add(id);
     allNeededNames.add(performanceName);
 
     resolved.push({
@@ -377,6 +388,7 @@ export async function getProgressionGoalsBatch(
       occurrenceIndex,
       referenceWorkoutId,
       previousWorkoutId,
+      recentWorkoutIds,
     });
   }
 
@@ -484,7 +496,7 @@ export async function getProgressionGoalsBatch(
   const { data: priorSets } = await readLoggedSets(
     supabase,
     `
-      weight, reps, set_type,
+      weight, reps, set_type, completed_at,
       session_exercises!inner (
         exercise_name,
         athlete_sessions!inner ( athlete_id, workout_id )
@@ -502,6 +514,7 @@ export async function getProgressionGoalsBatch(
   // scoped by the compound key so different exercises' logs never mix.
   const bestByNameAndWorkout = new Map<string, LoggedPerformance>();
   const setsByNameAndWorkout = new Map<string, { weight: number; reps: number }[]>();
+  const lastDoneByKey = new Map<string, string>();
   for (const row of (priorSets ?? []) as any[]) {
     // Warm-up and drop sets never count toward what the next goal is.
     if (!countsForProgress(row.set_type)) continue;
@@ -512,6 +525,7 @@ export async function getProgressionGoalsBatch(
     const list = setsByNameAndWorkout.get(key) ?? [];
     list.push({ weight, reps: row.reps ?? 0 });
     setsByNameAndWorkout.set(key, list);
+    if (row.completed_at && (!lastDoneByKey.has(key) || row.completed_at > lastDoneByKey.get(key)!)) lastDoneByKey.set(key, row.completed_at);
     const existing = bestByNameAndWorkout.get(key);
     if (!existing || weight > existing.weight) {
       bestByNameAndWorkout.set(key, { weight, reps: row.reps ?? 0 });
@@ -522,6 +536,9 @@ export async function getProgressionGoalsBatch(
     best.sets = (setsByNameAndWorkout.get(key) ?? []).filter((s) => s.weight === best.weight);
   }
 
+  // Under 18, or an age that is not known, gets the smaller step-up cap.
+  const ageIsProtected = (await athleteAgeStatus(supabase, athleteId)) !== "adult";
+
   for (const r of resolved) {
     const referenceLog = r.referenceWorkoutId
       ? bestByNameAndWorkout.get(`${r.performanceName}::${r.referenceWorkoutId}`) ?? null
@@ -530,14 +547,27 @@ export async function getProgressionGoalsBatch(
       ? bestByNameAndWorkout.get(`${r.performanceName}::${r.previousWorkoutId}`) ?? null
       : null;
 
-    const target = resolveProgressionTarget({
+    const rule = resolveProgressionTarget({
       model: r.model,
       config: r.config,
       occurrenceIndex: r.occurrenceIndex,
       referenceLog,
       previousOccurrenceLog,
     });
-    if (target.weight != null || target.reps != null) {
+    // The contract's safety rules on top of the rule's number: a break, the miss ladder, a step-up cap for someone under 18 or of unknown age.
+    const recent: PastSession[] = r.recentWorkoutIds
+      .map((id) => ({ sets: (setsByNameAndWorkout.get(`${r.performanceName}::${id}`) ?? []).slice() }))
+      .filter((s) => s.sets.length > 0);
+    const missStreak = r.model === "double_progression" ? consecutiveMisses(recent, (r.config as DoubleProgressionConfig).repRangeLow) : 0;
+    const lastDone = r.previousWorkoutId ? lastDoneByKey.get(`${r.performanceName}::${r.previousWorkoutId}`) ?? null : null;
+    const target = applyContractGuards({
+      target: rule,
+      previousWeight: previousOccurrenceLog?.weight ?? null,
+      daysSince: daysBetween(lastDone, new Date()),
+      missStreak,
+      protectedAge: ageIsProtected,
+    });
+    if (target.weight != null || target.reps != null || target.status === "ask_coach") {
       result.set(r.slotId, target);
     }
   }
