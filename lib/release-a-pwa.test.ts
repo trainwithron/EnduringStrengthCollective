@@ -80,7 +80,8 @@ describe("the app keeps working with a bad or no signal", () => {
     expect(replay).toContain("saver.restore(kept)");
     // follow-ups from review: no storage prompt for a first-time visitor, kept pages purged on sign-in, kept sets tagged with their owner, a replaced icon is never stale
     expect(replay.indexOf("requestPersistentStorage();")).toBeGreaterThan(replay.indexOf("if (kept.length > 0)"));
-    expect(replay).toContain('event === "SIGNED_IN"');
+    expect(replay).toContain('event !== "SIGNED_IN"');
+    expect(replay).toContain("getItem(LAST_USER_KEY) !== session.user.id");
     expect(src("lib/set-outbox.ts")).toContain("r.userId === uid");
     expect(src("public/sw.js")).not.toContain("startsWith(\"/brand/\")");
   });
