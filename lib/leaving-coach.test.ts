@@ -25,8 +25,8 @@ describe("a leaving coach (migration 0396)", () => {
       { organization_id: "o2", departing_since: "2026-10-18T00:00:00Z", fired_at: "2026-10-18T00:00:00Z", access_ended_at: "2026-10-18T00:00:00Z", organizations: { name: "Peak", display_name: null } },
     ];
     expect(await loadMyDepartures(fakeDb({ data: rows }), "u1")).toEqual([
-      { organizationId: "o1", organizationName: "Iron Works Gym", since: "2026-10-17T00:00:00Z", fired: false, endedAt: null },
-      { organizationId: "o2", organizationName: "Peak", since: "2026-10-18T00:00:00Z", fired: true, endedAt: "2026-10-18T00:00:00Z" },
+      { organizationId: "o1", organizationName: "Iron Works Gym", since: "2026-10-17T00:00:00Z", fired: false, endedAt: null, hasExport: false },
+      { organizationId: "o2", organizationName: "Peak", since: "2026-10-18T00:00:00Z", fired: true, endedAt: "2026-10-18T00:00:00Z", hasExport: false },
     ]);
   });
 

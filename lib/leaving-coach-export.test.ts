@@ -60,11 +60,16 @@ describe("storing the coach export", () => {
 });
 
 const recordedRead = (rows: unknown[] | null, error: unknown = null) => ({
-  select: () => ({ not: () => ({ order: () => ({ range: async () => ({ data: rows, error }) }) }) }),
+  select: () => ({ not: () => ({ order: () => ({ order: () => ({ range: async () => ({ data: rows, error }) }) }) }) }),
 });
-const storageOf = (removed: string[][], files: Record<string, unknown[]>) => ({
+// A storage mock that honours limit and offset, like the real listing.
+const storageOf = (removed: string[][], files: Record<string, unknown[]>, listError = false) => ({
   from: () => ({
-    list: async (folder: string) => (folder === "" ? { data: Object.keys(files).map((name) => ({ name, id: null })) } : { data: files[folder] ?? [] }),
+    list: async (folder: string, opts: { limit: number; offset: number } = { limit: 100, offset: 0 }) => {
+      if (listError) return { data: null, error: { message: "down" } };
+      const all = folder === "" ? Object.keys(files).map((name) => ({ name, id: null })) : files[folder] ?? [];
+      return { data: all.slice(opts.offset, opts.offset + opts.limit), error: null };
+    },
     remove: async (paths: string[]) => (removed.push(paths), { error: null }),
   }),
 });
@@ -80,6 +85,21 @@ describe("sweeping files nothing points at", () => {
     };
     expect(await sweepOrphanExports(fake)).toBe(1);
     expect(removed).toEqual([["c1/o9.zip"]]);
+  });
+  it("looks at every folder, not just the first hundred", async () => {
+    const removed: string[][] = [];
+    const files: Record<string, unknown[]> = {};
+    for (let i = 0; i < 250; i++) files["c" + String(i).padStart(3, "0")] = [];
+    files["c249"] = [{ name: "lost.zip", created_at: old }];
+    const fake = { from: () => recordedRead([]), storage: storageOf(removed, files) };
+    expect(await sweepOrphanExports(fake)).toBe(1);
+    expect(removed).toEqual([["c249/lost.zip"]]);
+  });
+  it("deletes nothing when a listing failed", async () => {
+    const removed: string[][] = [];
+    const fake = { from: () => recordedRead([]), storage: storageOf(removed, { c1: [{ name: "o9.zip", created_at: old }] }, true) };
+    expect(await sweepOrphanExports(fake)).toBe(0);
+    expect(removed).toEqual([]);
   });
   it("deletes nothing when the list of recorded files could not be read", async () => {
     const removed: string[][] = [];

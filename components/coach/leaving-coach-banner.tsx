@@ -20,7 +20,7 @@ export function LeavingCoachBanner({ departures, supportEmail }: { departures: (
 function DepartureSection({ departure: d, supportEmail }: { departure: MyDeparture & { exportGroupId: string | null }; supportEmail: string | null }) {
   const now = new Date();
   if (d.endedAt) {
-    const works = exportLinkStillWorks(d.endedAt, now);
+    const works = d.hasExport && exportLinkStillWorks(d.endedAt, now);
     return (
       <section className="mb-6 border border-rust/50 p-4" aria-labelledby={`leaving-${d.organizationId}`}>
         <h2 id={`leaving-${d.organizationId}`} className="font-display font-bold text-lg uppercase">
@@ -28,7 +28,7 @@ function DepartureSection({ departure: d, supportEmail }: { departure: MyDepartu
         </h2>
         <p className="font-body text-sm text-chalk mt-2">
           {d.fired ? "You were let go by the organization. " : "Your seven days are over. "}
-          Your clients keep their records and can keep logging; nothing was deleted. {works ? `One export of everything for the clients you kept is ready to download for ${EXPORT_LINK_DAYS} days. We also send you the link by email.` : "Your export link has expired."}
+          Your clients keep their records and can keep logging; nothing was deleted. {!d.hasExport ? "You had no clients to take with you, so there is nothing to export." : works ? `One export of everything for the clients you kept is ready to download for ${EXPORT_LINK_DAYS} days. We also send you the link by email.` : "Your export link has expired."}
         </p>
         {works && (
           <p className="mt-3">

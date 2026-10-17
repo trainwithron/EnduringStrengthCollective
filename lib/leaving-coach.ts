@@ -8,13 +8,15 @@ export interface MyDeparture {
   fired: boolean;
   // When coaching access ended (null while they still have their days).
   endedAt: string | null;
+  // Whether there are kept clients to export at all.
+  hasExport: boolean;
 }
 
 export async function loadMyDepartures(supabase: any, userId: string): Promise<MyDeparture[]> {
   try {
     const { data, error } = await supabase
       .from("organization_memberships")
-      .select("organization_id, departing_since, fired_at, access_ended_at, departing_org_name, organizations ( name, display_name )")
+      .select("organization_id, departing_since, fired_at, access_ended_at, departing_org_name, departing_group_ids, organizations ( name, display_name )")
       .eq("profile_id", userId)
       .not("departing_since", "is", null);
     if (error || !Array.isArray(data)) return [];
@@ -24,6 +26,7 @@ export async function loadMyDepartures(supabase: any, userId: string): Promise<M
       since: r.departing_since as string,
       fired: !!r.fired_at,
       endedAt: (r.access_ended_at as string | null) ?? null,
+      hasExport: Array.isArray(r.departing_group_ids) && r.departing_group_ids.length > 0,
     }));
   } catch {
     return [];

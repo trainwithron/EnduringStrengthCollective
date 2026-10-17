@@ -427,7 +427,8 @@ begin
   -- classes belong to the coach (no group) and follow them; an event belongs to its group and follows the group only if the group moved
   update public.group_sessions set organization_id = v_new
     where organization_id = p_org and coach_id = p_coach and (group_id is null or group_id in (select id from public.groups where organization_id = v_new));
-  -- any coach seat they still hold in a group that stayed behind ends with their membership
+  -- any coach seat they still hold in a group that stayed behind ends with their membership (a group the organization can see is never left without a coach: the owner takes it)
+  perform public._give_orphans_to_owner(p_org, p_coach);
   delete from public.group_memberships gm using public.groups g where gm.group_id = g.id and g.organization_id = p_org and gm.profile_id = p_coach and gm.role = 'coach';
   perform set_config('request.jwt.claim.role', coalesce(prev_role, ''), true);
 
@@ -453,6 +454,35 @@ as $$
   )
 $$;
 
+-- When a coach's seats end, a group the organization can see that would be left with no coach at all goes to the owner, or to an admin when the owner is a client in that group. A group that holds a client private
+-- from the organization is never given away: that client's records stay private and the group stays as it is. Internal.
+create or replace function public._give_orphans_to_owner(p_org uuid, p_coach uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.group_memberships (group_id, profile_id, role)
+  select gm.group_id, cand.profile_id, 'coach'
+  from public.group_memberships gm
+  join public.groups g on g.id = gm.group_id and g.organization_id = p_org
+  cross join lateral (
+    select om.profile_id from public.organization_memberships om
+    where om.organization_id = p_org and om.role in ('owner', 'admin') and om.departing_since is null
+      and not exists (select 1 from public.group_memberships a where a.group_id = gm.group_id and a.role = 'athlete' and a.profile_id = om.profile_id)
+    order by (om.role = 'owner') desc, om.created_at, om.profile_id
+    limit 1
+  ) cand
+  where gm.profile_id = p_coach and gm.role = 'coach'
+    and not exists (select 1 from public.group_memberships c where c.group_id = gm.group_id and c.role = 'coach' and c.profile_id <> p_coach)
+    and not exists (select 1 from public.group_memberships a where a.group_id = gm.group_id and a.role = 'athlete' and a.private_from_org)
+  on conflict do nothing;
+end;
+$$;
+revoke execute on function public._give_orphans_to_owner(uuid, uuid) from public, anon, authenticated;
+grant execute on function public._give_orphans_to_owner(uuid, uuid) to service_role;
+
 -- Coaching access ends: the coach's seats in the groups they kept are taken away (the clients, their records and their history stay exactly where they are, private from the organization and with
 -- no coach), and the moment is recorded. Internal.
 create or replace function public._end_coach_access(p_org uuid, p_coach uuid)
@@ -469,7 +499,8 @@ begin
   if not found then
     return;
   end if;
-  -- every coach seat they hold in this organization's groups ends (the kept ones, and any group they were left in that the organization can see)
+  -- every coach seat they hold in this organization's groups ends (the kept ones, and any group they were left in that the organization can see, which goes to the owner)
+  perform public._give_orphans_to_owner(p_org, p_coach);
   delete from public.group_memberships gm using public.groups g where gm.group_id = g.id and g.organization_id = p_org and gm.profile_id = p_coach and gm.role = 'coach';
   update public.organization_memberships set access_ended_at = now() where organization_id = p_org and profile_id = p_coach;
 end;

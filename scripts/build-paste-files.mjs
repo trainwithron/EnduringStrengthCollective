@@ -2861,6 +2861,7 @@ STEPS.push({
     fnFromMigration("0391", "_detach_coach_from_org"),
     fnFromMigration("0391", "close_organization"),
     "drop function if exists public.lift_departure_block(uuid, uuid);",
+    "drop function if exists public._give_orphans_to_owner(uuid, uuid);",
     "drop function if exists public.end_departure_access(uuid, uuid);",
     "drop function if exists public._end_coach_access(uuid, uuid);",
     "drop function if exists public.remove_org_member(uuid, uuid, uuid, boolean);",

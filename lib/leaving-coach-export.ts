@@ -10,7 +10,8 @@ import { pageAll } from "@/lib/page-all";
 export const EXIT_EXPORT_BUCKET = "coach-exit-exports";
 // The zip is held in memory twice while it is stored (the pieces, then the file), inside a function with about a gigabyte: 150 MB keeps that well inside it. A bigger export is not stored; the link then falls
 // back to the live read in app/api/coach/exit-export (a download that is streamed and never held in memory).
-export const MAX_EXPORT_BYTES = 150 * 1024 * 1024;
+const LIST_PAGE = 100;
+const MAX_EXPORT_BYTES = 150 * 1024 * 1024;
 
 // The clients' sign-in emails for the export, looked up with the server key for clients already read.
 // A lookup that fails is reported (it throws, which the export records as "clients (emails)" and the store counts as a failed try): the contact emails are the main thing a coach takes with them, so a blank cell
@@ -37,18 +38,32 @@ export const exportFileName = (orgName: string, on: Date = new Date()): string =
 export async function sweepOrphanExports(db: any): Promise<number> {
   try {
     // Which files are recorded: read in pages, and if that read failed or may be cut short nothing at all is deleted (a file that looks unrecorded might simply be one we did not see).
-    const recorded = await pageAll((from, to) => db.from("organization_memberships").select("export_path, profile_id").not("export_path", "is", null).order("profile_id").range(from, to), { maxPages: 100 });
+    const recorded = await pageAll((from, to) => db.from("organization_memberships").select("export_path, organization_id, profile_id").not("export_path", "is", null).order("organization_id").order("profile_id").range(from, to), { maxPages: 100 });
     if (recorded.failed || recorded.truncated) return 0;
     const known = new Set((recorded.rows as { export_path: string }[]).map((r) => r.export_path));
-    const { data: folders } = await db.storage.from(EXIT_EXPORT_BUCKET).list("", { limit: 200 });
+    const bucket = db.storage.from(EXIT_EXPORT_BUCKET);
+    // A listing is read to its end, a page at a time; one that fails stops the sweep (nothing is deleted on a doubtful listing).
+    const listAll = async (folder: string): Promise<{ name: string; id?: string | null; created_at?: string }[] | null> => {
+      const all: { name: string; id?: string | null; created_at?: string }[] = [];
+      for (let page = 0; page < 100; page++) {
+        const { data, error } = await bucket.list(folder, { limit: LIST_PAGE, offset: page * LIST_PAGE, sortBy: { column: "name", order: "asc" } });
+        if (error) return null;
+        all.push(...((data ?? []) as { name: string; id?: string | null; created_at?: string }[]));
+        if ((data ?? []).length < LIST_PAGE) return all;
+      }
+      return null;
+    };
+    const folders = await listAll("");
+    if (!folders) return 0;
     const cutoff = Date.now() - 3600_000;
     let removed = 0;
-    for (const folder of (folders ?? []) as { name: string; id: string | null }[]) {
+    for (const folder of folders) {
       if (folder.id) continue; // a file at the top, not a folder
-      const { data: files } = await db.storage.from(EXIT_EXPORT_BUCKET).list(folder.name, { limit: 200 });
-      const orphans = ((files ?? []) as { name: string; created_at?: string }[]).filter((f) => !known.has(`${folder.name}/${f.name}`) && (!!f.created_at && new Date(f.created_at).getTime() < cutoff)).map((f) => `${folder.name}/${f.name}`);
+      const files = await listAll(folder.name);
+      if (!files) return removed;
+      const orphans = files.filter((f) => !known.has(`${folder.name}/${f.name}`) && !!f.created_at && new Date(f.created_at).getTime() < cutoff).map((f) => `${folder.name}/${f.name}`);
       if (orphans.length > 0) {
-        const { error } = await db.storage.from(EXIT_EXPORT_BUCKET).remove(orphans);
+        const { error } = await bucket.remove(orphans);
         if (!error) removed += orphans.length;
       }
     }

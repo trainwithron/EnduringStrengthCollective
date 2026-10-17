@@ -276,11 +276,32 @@ export default {
       r = await tryQ(db, `select public.complete_departure($1, $2)`, [org2, late]);
       h.check("past seven days a coach cannot start an account even if the job has not run yet", /seven days/.test(r.error ?? ""), r.error);
 
+      // a kept group whose private client left before the move is not left without a coach: the owner takes it when the seat ends
+      const qx = await h.user("LD Quitter X");
+      const kX = await h.user("LD Client X");
+      await h.orgMember(org2, qx, "coach");
+      const gX = await h.group(org2, qx, "one_on_one", "LD group whose private client left");
+      await h.member(gX, kX);
+      await h.asSuper();
+      await db.query(`update public.group_memberships set private_from_org = true where group_id = $1 and profile_id = $2`, [gX, kX]);
+      await h.as(o2);
+      r = await tryQ(db, `select public.remove_org_member($1, $2, null, false)`, [org2, qx]);
+      h.check("another quitter is marked leaving", !r.error, r.error);
+      await h.asSuper();
+      await db.query(`update public.group_memberships set private_from_org = false where group_id = $1 and profile_id = $2`, [gX, kX]);
+      await db.query(`update public.organization_memberships set departing_since = now() - interval '8 days' where organization_id = $1 and profile_id = $2`, [org2, qx]);
+      await h.asService();
+      r = await tryQ(db, `select public.end_departure_access($1, $2) as ended`, [org2, qx]);
+      h.check("their days run out" + (r.error ? ": " + r.error : ""), r.rows?.[0]?.ended === true, r.error);
+      await h.asSuper();
+      h.check("the group the gym can now see goes to the owner instead of being left without a coach", (await seat(gX, o2)) && !(await seat(gX, qx)));
+
       // closing a team whose owner is a client in a group a coach solely coaches does not fail: the coach keeps that group
       const o3 = await h.user("LE Owner");
       const e3 = await h.user("LE Coach");
       const org3 = await h.org(o3, "LE Gym");
       await h.orgMember(org3, e3, "coach");
+      const adm3 = await h.user("LE Admin");
       const g3 = await h.group(org3, e3, "one_on_one", "LE owner is a client");
       await h.member(g3, o3);
       await h.as(o3);
@@ -289,11 +310,12 @@ export default {
       await h.asSuper();
       h.check("the coach keeps that group until the owner picks someone", await seat(g3, e3));
       h.check("it is not recorded as a group they take with them", (await count(`select cardinality(departing_group_ids)::int as n from public.organization_memberships where organization_id = $1 and profile_id = $2`, [org3, e3])) === 0);
+      await h.orgMember(org3, adm3, "admin"); // an admin joins before the coach starts their own account
       await h.asService();
       r = await tryQ(db, `select public.complete_departure($1, $2) as res`, [org3, e3]);
       h.check("starting their own account works" + (r.error ? ": " + r.error : ""), !r.error);
       await h.asSuper();
-      h.check("the gym-visible group (the owner is a client in it) stays with the gym and the coach loses the seat", (await db.query(`select organization_id from public.groups where id = $1`, [g3])).rows[0].organization_id === org3 && !(await seat(g3, e3)));
+      h.check("the gym-visible group (the owner is a client in it) stays with the gym, the coach loses the seat, and an admin takes it so it is never left without a coach", (await db.query(`select organization_id from public.groups where id = $1`, [g3])).rows[0].organization_id === org3 && !(await seat(g3, e3)) && (await seat(g3, adm3)));
     },
   },
 };

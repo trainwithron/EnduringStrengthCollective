@@ -102,6 +102,13 @@ describe("wiring of the seven days", () => {
     expect(src("app/api/cron/departing-coaches/route.ts")).toContain(".remove([s.export_path])");
     expect(src("lib/leaving-coach.ts")).toContain("departing_org_name");
   });
+  it("a coach with nothing to export is told so, with no link, and no visible group is left without a coach", () => {
+    expect(src("components/coach/leaving-coach-banner.tsx")).toContain("nothing to export");
+    expect(src("lib/leaving-coach-notify.ts")).toContain("nothingToExport");
+    expect(src("app/api/cron/departing-coaches/route.ts")).toContain("nothingToExport: groupIds.length === 0");
+    const sql = src("supabase/migrations/0396_leaving_coach_choice.sql");
+    expect(sql.split("perform public._give_orphans_to_owner(p_org, p_coach)").length - 1).toBe(2);
+  });
   it("an ended coach sees why and the way to their export instead of a dead end", () => {
     const home = src("app/(coach)/dashboard/page.tsx");
     expect(home.indexOf("filter((d) => d.endedAt)")).toBeGreaterThan(-1);
