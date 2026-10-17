@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { shownName } from "@/lib/shown-name";
+import type { ProtectIds } from "@/lib/minor-names";
 import { onSharedBoards } from "@/lib/board-visibility";
 import { rankLeaderboard, rankByPosition, type LeaderboardEntry, type RosterAthlete, type PositionRanking } from "@/lib/leaderboard";
 
@@ -19,8 +20,8 @@ export interface GroupLeaderboardRankings {
 export async function getGroupLeaderboardRankings(
   supabase: SupabaseClient,
   groupId: string,
-  // The members known to be under 18 (lib/minor-names.ts, looked up on the server and handed down): they are shown as first name and last initial.
-  minors: Set<string>
+  // Says which of the members on the board are not confirmed adults (lib/minor-names.ts, looked up on the server for the ids actually shown): they are shown as first name and last initial.
+  protect: ProtectIds
 ): Promise<GroupLeaderboardRankings> {
   const { data: logs } = await supabase.from("workout_logs").select("athlete_id, total_volume, new_prs, profiles ( full_name, feed_broadcast_level )").eq("group_id", groupId);
 
@@ -28,16 +29,21 @@ export async function getGroupLeaderboardRankings(
   const volumeByAthlete = new Map<string, number>();
   const prCountByAthlete = new Map<string, number>();
   const nameByAthlete = new Map<string, string>();
+  const rawNameByAthlete = new Map<string, string | null>();
 
   for (const log of logs ?? []) {
     const id = log.athlete_id;
     // A client who keeps their activity private, or shares only that they checked in, is not ranked (their numbers are not for the board).
     if (!onSharedBoards((log.profiles as any)?.feed_broadcast_level)) continue;
-    nameByAthlete.set(id, shownName((log.profiles as any)?.full_name, id, minors));
+    rawNameByAthlete.set(id, (log.profiles as any)?.full_name ?? null);
     workoutCountByAthlete.set(id, (workoutCountByAthlete.get(id) ?? 0) + 1);
     volumeByAthlete.set(id, (volumeByAthlete.get(id) ?? 0) + (log.total_volume ?? 0));
     prCountByAthlete.set(id, (prCountByAthlete.get(id) ?? 0) + (log.new_prs?.length ?? 0));
   }
+
+  // The names are shortened for everyone on the board who is not a confirmed adult, whether or not they are still a member.
+  const protectedIds = await protect([...rawNameByAthlete.keys()]);
+  for (const [id, raw] of rawNameByAthlete) nameByAthlete.set(id, shownName(raw, id, protectedIds));
 
   function buildEntries(scoreByAthlete: Map<string, number>): LeaderboardEntry[] {
     return [...nameByAthlete.entries()].map(([profileId, fullName]) => ({
@@ -65,7 +71,7 @@ export async function getGroupLeaderboardRankings(
 export async function getPositionLeaderboardRankings(
   supabase: SupabaseClient,
   groupId: string,
-  minors: Set<string>
+  protect: ProtectIds
 ): Promise<PositionRanking[]> {
   const [{ data: memberships }, { data: logs }] = await Promise.all([
     supabase
@@ -79,9 +85,11 @@ export async function getPositionLeaderboardRankings(
       .eq("group_id", groupId),
   ]);
 
-  const roster: RosterAthlete[] = (memberships ?? []).filter((m: any) => onSharedBoards(m.profiles?.feed_broadcast_level)).map((m: any) => ({
+  const shownMembers = (memberships ?? []).filter((m: any) => onSharedBoards(m.profiles?.feed_broadcast_level));
+  const protectedIds = await protect(shownMembers.map((m: any) => m.profile_id as string));
+  const roster: RosterAthlete[] = shownMembers.map((m: any) => ({
     profileId: m.profile_id,
-    fullName: shownName(m.profiles?.full_name, m.profile_id, minors),
+    fullName: shownName(m.profiles?.full_name, m.profile_id, protectedIds),
     positionId: m.position_id ?? null,
     positionName: m.group_positions?.name ?? null,
     positionSortOrder: m.group_positions?.sort_order ?? null,

@@ -6,7 +6,7 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ChallengeStatusControl } from "@/components/coach/desktop/challenge-status-control";
 import { ChallengeParticipantPanel } from "@/components/athlete/challenge-participant-panel";
-import { loadMinorProfileIds } from "@/lib/minor-names";
+import { loadNameProtectedIds } from "@/lib/minor-names";
 import { shownName } from "@/lib/shown-name";
 import { challengePhotoLink, mayViewChallengePhotos } from "@/lib/challenge-photo";
 import {
@@ -72,7 +72,8 @@ export default async function ChallengeDetailPage(
     .select("profile_id, before_photo_url, after_photo_url, profiles ( full_name )")
     .eq("challenge_id", params.challengeId);
   // A member under 18 is shown as first name and last initial. A photo is opened (with a short-lived link) only for the person it belongs to and the coach who runs the challenge.
-  const minors = await loadMinorProfileIds([params.groupId]);
+  // The participants themselves (they can come from any of the coach's groups), not this group's seats.
+  const minors = await loadNameProtectedIds((participantRows ?? []).map((p) => p.profile_id as string));
   const participants = await Promise.all(
     (participantRows ?? []).map(async (p) => {
       const may = mayViewChallengePhotos(user.id, p.profile_id, challenge.coach_id);

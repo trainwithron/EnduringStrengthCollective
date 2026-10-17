@@ -6,7 +6,7 @@ import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
-import { loadMinorProfileIds } from "@/lib/minor-names";
+import { loadNameProtectedIds } from "@/lib/minor-names";
 import { shownName } from "@/lib/shown-name";
 import { onSharedBoards } from "@/lib/board-visibility";
 
@@ -29,7 +29,7 @@ interface RecordRow {
 // by default rather than treated as an optional extra.
 async function loadRecords(groupId: string): Promise<RecordRow[]> {
   const supabase = await createServerClient();
-  const [{ data: rows }, minors] = await Promise.all([
+  const [{ data: rows }] = await Promise.all([
     supabase
       .from("exercise_records")
       .select("id, exercise_name, value, achieved_at, superseded_at, athlete_id, profiles ( full_name, feed_broadcast_level )")
@@ -37,8 +37,9 @@ async function loadRecords(groupId: string): Promise<RecordRow[]> {
       .eq("tracked_field", "weight")
       .order("exercise_name", { ascending: true })
       .order("achieved_at", { ascending: false }),
-    loadMinorProfileIds([groupId]),
   ]);
+  // The people on this page, whether or not they are still in the group: anyone who is not a confirmed adult is shown shortened.
+  const minors = await loadNameProtectedIds(((rows ?? []) as any[]).map((r) => r.athlete_id as string));
 
   const byExercise = new Map<string, RecordRow>();
   for (const row of (rows ?? []) as any[]) {

@@ -3,7 +3,7 @@ import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
 import { computeScheduledDates } from "@/lib/program-schedule";
 import { SET_ROW_SELECT, mapSetRow, DEFAULT_TRACKED_FIELDS, type TrackedField } from "@/lib/exercise-fields";
-import { loadMinorProfileIds } from "@/lib/minor-names";
+import { loadNameProtectedIds } from "@/lib/minor-names";
 import { getGroupLeaderboardRankings, getPositionLeaderboardRankings } from "@/lib/leaderboard-data";
 import { LiveGroupLeaderboard } from "@/components/leaderboard/live-group-leaderboard";
 import { DisplayWorkoutPanel, type DisplayExercise } from "@/components/coach/desktop/display-workout-panel";
@@ -99,10 +99,9 @@ export default async function DisplayModePage(
     }
   }
 
-  const minors = await loadMinorProfileIds([params.groupId]);
-  const leaderboard = await getGroupLeaderboardRankings(supabase, params.groupId, minors);
+  const leaderboard = await getGroupLeaderboardRankings(supabase, params.groupId, loadNameProtectedIds);
   const positionGroups = group?.team_mode
-    ? await getPositionLeaderboardRankings(supabase, params.groupId, minors)
+    ? await getPositionLeaderboardRankings(supabase, params.groupId, loadNameProtectedIds)
     : null;
 
   return (
@@ -135,7 +134,6 @@ export default async function DisplayModePage(
             initialRankings={leaderboard}
             initialPositionGroups={positionGroups}
             viewerId={null}
-            minorIds={Array.from(minors)}
           />
         </div>
       </div>

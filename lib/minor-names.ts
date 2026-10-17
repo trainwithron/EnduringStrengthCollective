@@ -1,24 +1,32 @@
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { ageStatusFromDob } from "@/lib/youth-block";
+import { chunk } from "@/lib/chunk";
 
-// A member under 18 is shown to the rest of the group as a first name and a last initial ("Sam R."), never the full name, on the shared boards: the leaderboard, the records board and a challenge's
-// standings. Only a known date of birth under 18 counts here (a person with no date yet is asked for one on their next visit); an adult is shown as before. The date of birth lives where only
-// coaches can read it, so the check is made on the server with the service role and only the ids of the under-18s come back.
-export async function loadMinorProfileIds(groupIds: string[]): Promise<Set<string>> {
+// A member who is not a confirmed adult is shown to the rest of the group as a first name and a last initial ("Sam R."), never the full name, on the shared boards: the leaderboard, the records board and a
+// challenge's standings. That is a member under 18 AND a member whose age is not known (no date of birth on file, or no health form yet): a child who has not filled in the form must not be the one shown in
+// full. Only someone whose date of birth says 18 or over is shown as before. The date of birth lives where only coaches can read it, so the check is made on the server with the service role.
+//
+// The check is made for the profile ids that are actually ON the board or page being shown (not the group's current seats): a member who has left the group, or a challenge participant from another group,
+// is still on the page and still protected. If the lookup cannot be made (an error answer or a thrown error), everyone is shortened ("*"), never the other way round.
+export type ProtectIds = (profileIds: string[]) => Promise<Set<string>>;
+
+export const loadNameProtectedIds: ProtectIds = async (profileIds) => {
+  const ids = Array.from(new Set(profileIds.filter(Boolean)));
   const out = new Set<string>();
-  if (groupIds.length === 0) return out;
+  if (ids.length === 0) return out;
   try {
     const db = createServiceRoleClient();
-    const { data: seats } = await db.from("group_memberships").select("profile_id").in("group_id", groupIds).eq("role", "athlete");
-    const ids = Array.from(new Set((seats ?? []).map((s: { profile_id: string }) => s.profile_id)));
-    if (ids.length === 0) return out;
-    const { data: intakes } = await db.from("client_intake").select("athlete_id, date_of_birth").in("athlete_id", ids);
-    for (const row of (intakes ?? []) as Array<{ athlete_id: string; date_of_birth: string | null }>) {
-      if (ageStatusFromDob(row.date_of_birth) === "minor") out.add(row.athlete_id);
+    const adults = new Set<string>();
+    for (const group of chunk(ids, 100)) {
+      const { data, error } = await db.from("client_intake").select("athlete_id, date_of_birth").in("athlete_id", group);
+      if (error) return new Set(["*"]);
+      for (const row of (data ?? []) as Array<{ athlete_id: string; date_of_birth: string | null }>) {
+        if (ageStatusFromDob(row.date_of_birth) === "adult") adults.add(row.athlete_id);
+      }
     }
+    for (const id of ids) if (!adults.has(id)) out.add(id);
   } catch {
-    // If the check cannot be made, nobody is shown by full name that might be a minor: callers treat a failed lookup as "everyone shortened" (see shownName).
     return new Set(["*"]);
   }
   return out;
-}
+};

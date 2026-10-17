@@ -12,7 +12,7 @@ import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { LiveGroupLeaderboard } from "@/components/leaderboard/live-group-leaderboard";
 import { getGroupLeaderboardRankings, getPositionLeaderboardRankings } from "@/lib/leaderboard-data";
-import { loadMinorProfileIds } from "@/lib/minor-names";
+import { loadNameProtectedIds } from "@/lib/minor-names";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import type { FeedChannel, FeedPost } from "@/lib/types";
@@ -132,8 +132,7 @@ export default async function FeedPage(
   // sequentially after everything else. `group` (name/group_kind) was
   // already fetched above, before the redirect check — no need to fetch
   // it a second time here.
-  // Members known to be under 18 are shown on the leaderboard as first name and last initial (looked up here on the server and handed to the live board).
-  const minors = channel === "general" ? await loadMinorProfileIds([params.groupId]) : new Set<string>();
+  // Members who are not confirmed adults are shown on the leaderboard as first name and last initial (looked up on the server for the people actually on the board).
   const [{ data: viewerProfile }, { data: posts }, teamModeResult, leaderboard] = await Promise.all([
     athleteId
       ? supabase.from("profiles").select("full_name, feed_broadcast_level").eq("id", athleteId).maybeSingle()
@@ -152,7 +151,7 @@ export default async function FeedPage(
     // Leaderboard now lives at the top of General instead of its own nav
     // tab — every post is a reminder it's there, per the ask ("every time
     // anything gets posted, everyone can see the leaderboard").
-    channel === "general" ? getGroupLeaderboardRankings(supabase, params.groupId, minors) : Promise.resolve(null),
+    channel === "general" ? getGroupLeaderboardRankings(supabase, params.groupId, loadNameProtectedIds) : Promise.resolve(null),
   ]);
   const feedBroadcastLevel =
     (viewerProfile?.feed_broadcast_level as "full" | "prs_only" | "checkin_only" | "private") ?? "full";
@@ -183,7 +182,7 @@ export default async function FeedPage(
   // "general channel only" gate the leaderboard itself uses.
   let positionGroups: Awaited<ReturnType<typeof getPositionLeaderboardRankings>> | null = null;
   if (leaderboard && teamModeResult.data?.team_mode) {
-    positionGroups = await getPositionLeaderboardRankings(supabase, params.groupId, minors);
+    positionGroups = await getPositionLeaderboardRankings(supabase, params.groupId, loadNameProtectedIds);
   }
   const leaderboardCard = leaderboard && (
     <div className="border border-steel/20 p-4 mb-4">
@@ -193,7 +192,6 @@ export default async function FeedPage(
         initialRankings={leaderboard}
         initialPositionGroups={positionGroups}
         viewerId={athleteId}
-        minorIds={Array.from(minors)}
       />
     </div>
   );

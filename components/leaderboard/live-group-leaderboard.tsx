@@ -2,11 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
-import {
-  getGroupLeaderboardRankings,
-  getPositionLeaderboardRankings,
-  type GroupLeaderboardRankings,
-} from "@/lib/leaderboard-data";
+import type { GroupLeaderboardRankings } from "@/lib/leaderboard-data";
 import type { PositionRanking } from "@/lib/leaderboard";
 import { GroupLeaderboardTabs } from "./group-leaderboard-tabs";
 import { PositionLeaderboard } from "./position-leaderboard";
@@ -23,7 +19,6 @@ export function LiveGroupLeaderboard({
   initialRankings,
   initialPositionGroups,
   viewerId,
-  minorIds,
 }: {
   groupId: string;
   initialRankings: GroupLeaderboardRankings;
@@ -31,8 +26,6 @@ export function LiveGroupLeaderboard({
   // the view toggle entirely, zero extra cost for the common case.
   initialPositionGroups: PositionRanking[] | null;
   viewerId: string | null;
-  // Members known to be under 18 (shown as first name and last initial), looked up on the server.
-  minorIds: string[];
 }) {
   const [rankings, setRankings] = useState(initialRankings);
   const [positionGroups, setPositionGroups] = useState(initialPositionGroups);
@@ -47,11 +40,15 @@ export function LiveGroupLeaderboard({
         "postgres_changes",
         { event: "*", schema: "public", table: "workout_logs", filter: `group_id=eq.${groupId}` },
         async () => {
-          const minors = new Set(minorIds);
-          const fresh = await getGroupLeaderboardRankings(supabase, groupId, minors);
-          setRankings(fresh);
-          if (initialPositionGroups !== null) {
-            setPositionGroups(await getPositionLeaderboardRankings(supabase, groupId, minors));
+          // The server makes the rankings, looking up who is not a confirmed adult fresh each time (a screen left open for days must not keep an old list).
+          try {
+            const res = await fetch(`/api/groups/${groupId}/leaderboard?positions=${initialPositionGroups !== null ? 1 : 0}`, { cache: "no-store" });
+            if (!res.ok) return;
+            const fresh = (await res.json()) as { rankings: GroupLeaderboardRankings; positionGroups: PositionRanking[] | null };
+            setRankings(fresh.rankings);
+            if (initialPositionGroups !== null && fresh.positionGroups) setPositionGroups(fresh.positionGroups);
+          } catch {
+            // the next change tries again; the board on screen stays as it was
           }
         }
       )

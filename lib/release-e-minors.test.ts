@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { shownName } from "@/lib/shown-name";
@@ -29,15 +29,69 @@ describe("a member under 18 is shown as first name and last initial on shared bo
     expect(lb).toContain(".filter((m: any) => onSharedBoards(m.profiles?.feed_broadcast_level))");
     expect(src("app/(coach)/groups/[groupId]/records/page.tsx")).toContain("shownName(row.profiles.full_name, row.athlete_id, minors)");
     expect(src("app/(coach)/groups/[groupId]/challenges/[challengeId]/page.tsx")).toContain("shownName((p.profiles as any)?.full_name, p.profile_id, minors)");
+    // the check is made for the people ON the page (a member who left, a participant from another group), not the group's current seats
+    expect(src("app/(coach)/groups/[groupId]/records/page.tsx")).toContain("loadNameProtectedIds(((rows ?? []) as any[]).map((r) => r.athlete_id as string))");
+    expect(src("app/(coach)/groups/[groupId]/challenges/[challengeId]/page.tsx")).toContain("loadNameProtectedIds((participantRows ?? []).map((p) => p.profile_id as string))");
   });
 });
 
 describe("the live leaderboard (a browser screen) never reaches for the server-only age lookup", () => {
   it("the lookup runs on the server and its result is handed down", () => {
-    expect(src("lib/leaderboard-data.ts")).not.toContain(`from "@/lib/minor-names"`);
+    // only the TYPE comes from the server-only file (erased at build); no value is imported
+    expect(src("lib/leaderboard-data.ts")).toContain(`import type { ProtectIds } from "@/lib/minor-names"`);
     expect(src("components/leaderboard/live-group-leaderboard.tsx")).not.toContain(`from "@/lib/minor-names"`);
-    expect(src("components/leaderboard/live-group-leaderboard.tsx")).toContain("new Set(minorIds)");
-    expect(src("app/(coach)/groups/[groupId]/feed/page.tsx")).toContain("minorIds={Array.from(minors)}");
+    // the board refreshes through the server, which looks the list up fresh each time (no list is kept in the browser for days)
+    const live = src("components/leaderboard/live-group-leaderboard.tsx");
+    expect(live).toContain("/api/groups/");
+    expect(live).not.toContain("minorIds");
+    expect(src("app/(coach)/groups/[groupId]/feed/page.tsx")).not.toContain("minorIds=");
+    expect(src("app/api/groups/[groupId]/leaderboard/route.ts")).toContain("loadNameProtectedIds");
+  });
+});
+
+// The age lookup, with the database replaced by a fake.
+const intakeRows: { rows: Array<{ athlete_id: string; date_of_birth: string | null }>; error: unknown } = { rows: [], error: null };
+let thrown = false;
+vi.mock("@/lib/supabase/service-role", () => ({
+  createServiceRoleClient: () => {
+    if (thrown) throw new Error("no key");
+    return {
+      from: () => ({
+        select: () => ({
+          in: async (_col: string, ids: string[]) => ({ data: intakeRows.error ? null : intakeRows.rows.filter((r) => ids.includes(r.athlete_id)), error: intakeRows.error }),
+        }),
+      }),
+    };
+  },
+}));
+
+describe("who is shown by a shortened name", () => {
+  beforeEach(() => {
+    intakeRows.rows = [];
+    intakeRows.error = null;
+    thrown = false;
+  });
+  it("a member under 18 AND a member whose age is not known are shortened; only a confirmed adult is shown in full", async () => {
+    const { loadNameProtectedIds } = await import("@/lib/minor-names");
+    intakeRows.rows = [
+      { athlete_id: "adult", date_of_birth: "1985-03-03" },
+      { athlete_id: "minor", date_of_birth: "2012-05-05" },
+      { athlete_id: "nodob", date_of_birth: null },
+    ];
+    const protectedIds = await loadNameProtectedIds(["adult", "minor", "nodob", "nointake"]);
+    expect([...protectedIds].sort()).toEqual(["minor", "nodob", "nointake"]);
+  });
+  it("a failed lookup (an error answer or a thrown error) shortens everyone, never nobody", async () => {
+    const { loadNameProtectedIds } = await import("@/lib/minor-names");
+    intakeRows.error = { message: "boom" };
+    expect([...(await loadNameProtectedIds(["a"]))]).toEqual(["*"]);
+    intakeRows.error = null;
+    thrown = true;
+    expect([...(await loadNameProtectedIds(["a"]))]).toEqual(["*"]);
+  });
+  it("nobody on the page means nothing to look up", async () => {
+    const { loadNameProtectedIds } = await import("@/lib/minor-names");
+    expect((await loadNameProtectedIds([])).size).toBe(0);
   });
 });
 

@@ -153,6 +153,7 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0384 | yes | yes | 18 | 0384 Privacy closures |
 | 0385 | yes | yes | 37 | 0385 Set types and records |
 | 0386 | yes | yes | 15 | 0386 The server finishes the health form (0386 adds, 0388 switches the guard on) |
+| 0387 | yes | yes | 7 | 0387 Minors off public surfaces |
 | 0388 | yes | yes | 15 | 0386 The server finishes the health form (0386 adds, 0388 switches the guard on) |
 | 0331 | yes | yes | 10 | 0331 a payment event and its sessions are recorded in one step |
 | 0329 | yes | yes | 12 | 0329 every session costs exactly 1 credit; the waitlist offer uses the coach's time zone |
