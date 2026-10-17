@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { applyContractGuards, consecutiveMisses, sessionMissed, daysBetween, RESET_AFTER_MISSES } from "@/lib/progression-guards";
+import { applyContractGuards, consecutiveMisses, sessionMissed, daysBetween, usualGapDays, RESET_AFTER_MISSES } from "@/lib/progression-guards";
 
 const src = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
 const sess = (...reps: number[]) => ({ sets: reps.map((r) => ({ weight: 200, reps: r })) });
@@ -78,9 +78,50 @@ describe("wired into the goal loader", () => {
     const p = src("lib/progressions.ts");
     expect(p).toContain("applyContractGuards({");
     expect(p).toContain("consecutiveMisses(recent, (r.config as DoubleProgressionConfig).repRangeLow)");
-    expect(p).toContain('effectiveAgeStatus(await athleteAgeStatus(supabase, athleteId), viewer === athleteId) !== "adult"');
+    expect(p).toContain('effectiveAgeStatus(status, coachOnOwnProgram) !== "adult"');
     expect(p).toContain("normalGapDays,");
     expect(p).toContain("target.status === \"ask_coach\"");
     expect(src("components/logging/pre-start-exercise-row.tsx")).toContain("goal?.reason");
+  });
+});
+
+describe("review fixes for Release C3", () => {
+  it("a client with no birthday viewing their own workout is still capped; only a coach on their own program is exempt", () => {
+    const p = src("lib/progressions.ts");
+    // not 'the viewer is the athlete' alone: that was every client logging their own workout
+    expect(p).not.toContain("viewer === athleteId) !== \"adult\"");
+    expect(p).toContain('viewer === athleteId && status === "unknown" ? await isCoachSomewhere(supabase, athleteId) : false');
+  });
+  it("the safety rules never raise a number above what the rule itself prescribed", () => {
+    // a wave week that deliberately prescribes 100 after 200 last time: a 25-day break must not push it up to 190
+    const light = applyContractGuards({ target: { weight: 100, reps: 5, reason: "light week" }, previousWeight: 200, daysSince: 25, missStreak: 0, protectedAge: false });
+    expect(light.weight).toBe(100);
+    expect(light.reason).toBe("light week");
+    // the usual case still comes down
+    const normal = applyContractGuards({ target: { weight: 205, reps: 5, reason: "up" }, previousWeight: 200, daysSince: 25, missStreak: 0, protectedAge: false });
+    expect(normal.weight).toBe(190);
+    // a miss hold or a reset also never goes above the rule's number
+    expect(applyContractGuards({ target: { weight: 150, reps: 5 }, previousWeight: 200, daysSince: 3, missStreak: 1, protectedAge: false }).weight).toBe(150);
+    expect(applyContractGuards({ target: { weight: 150, reps: 5 }, previousWeight: 200, daysSince: 3, missStreak: 3, protectedAge: false }).weight).toBe(150);
+  });
+  it("the usual gap is the middle of several gaps; one earlier break does not set it; it never silences the ask-the-coach rule", () => {
+    // sessions a week apart, with one 60-day layoff in the middle: the rhythm is still about a week
+    expect(usualGapDays([7, 60, 7, 8])).toBe(7);
+    // a layoff that repeats is the rhythm (an exercise done every fourth week), capped below the 90 percent line
+    expect(usualGapDays([28, 28])).toBe(28);
+    expect(usualGapDays([60, 70])).toBe(34);
+    // one long gap alone says nothing
+    expect(usualGapDays([60])).toBeNull();
+    expect(usualGapDays([])).toBeNull();
+    // 66 days after the last session, with a usual gap of 60 taken from one layoff, used to read as normal. It does not now.
+    const ask = applyContractGuards({ target: { weight: 205, reps: 5 }, previousWeight: 200, daysSince: 66, normalGapDays: usualGapDays([60]), missStreak: 0, protectedAge: false });
+    expect(ask.status).toBe("ask_coach");
+    // and a 70-day gap is ask-the-coach even when the usual rhythm is long
+    expect(applyContractGuards({ target: { weight: 205, reps: 5 }, previousWeight: 200, daysSince: 70, normalGapDays: 34, missStreak: 0, protectedAge: false }).status).toBe("ask_coach");
+  });
+  it("GZCLP T1 and waves from a training max go through the same safety rules", () => {
+    const p = src("lib/progressions.ts");
+    expect(p).toContain("await guardedFromHistory(r.performanceName, { weight: target.weight, reps: target.reps, reason: target.reason })");
+    expect(p).toContain("await guardedFromHistory(r.performanceName, target)");
   });
 });

@@ -46,6 +46,13 @@ export function effectiveAgeStatus(status: AgeStatus, buildingForSelf: boolean):
   return buildingForSelf && status === "unknown" ? "adult" : status;
 }
 
+// Whether the person looking at an athlete's goals is that athlete AS A COACH working on their own program (a coach is an adult by definition; a client logging their own workout is not).
+// A client viewing their own workout with no birthday on file is still "unknown" and still gets the protections.
+export async function isCoachSomewhere(supabase: SupabaseClient, profileId: string): Promise<boolean> {
+  const { data, error } = await supabase.from("group_memberships").select("group_id").eq("profile_id", profileId).eq("role", "coach").limit(1);
+  return !error && Array.isArray(data) && data.length > 0;
+}
+
 export const UNKNOWN_AGE_BANNER_TEXT = "This client has no birthdate on file, so the program was built with the youth protections (technique first, no max testing, effort at RPE 8 or lower). Add their birthdate to remove them, and review the program with that in mind.";
 
 export const YOUTH_RPE_CAP = 8;

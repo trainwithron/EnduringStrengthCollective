@@ -13,10 +13,79 @@ export type ProgressionModel =
   | "wave_from_training_max";
 import { roundLoad, DEFAULT_STEP } from "@/lib/load-rounding";
 import { countsForProgress } from "@/lib/set-types";
-import { applyContractGuards, consecutiveMisses, daysBetween, type GoalStatus, type PastSession } from "@/lib/progression-guards";
-import { athleteAgeStatus, effectiveAgeStatus } from "@/lib/youth-block";
+import { applyContractGuards, consecutiveMisses, daysBetween, usualGapDays, type GoalStatus, type PastSession } from "@/lib/progression-guards";
+import { athleteAgeStatus, effectiveAgeStatus, isCoachSomewhere } from "@/lib/youth-block";
 
 import { readLoggedSets } from "@/lib/read-logged-sets";
+
+// Under 18, or an age that is not known, gets the smaller step-up cap. The one exception to "unknown": a coach looking at their OWN program (they are an adult by definition, the same rule as the builder).
+// A client with no birthday on file who opens their own workout is still unknown and still capped.
+async function isAgeProtected(supabase: any, athleteId: string): Promise<boolean> {
+  const viewer = await supabase.auth.getUser().then((r: any) => r?.data?.user?.id ?? null).catch(() => null);
+  const status = await athleteAgeStatus(supabase, athleteId);
+  const coachOnOwnProgram = viewer === athleteId && status === "unknown" ? await isCoachSomewhere(supabase, athleteId) : false;
+  return effectiveAgeStatus(status, coachOnOwnProgram) !== "adult";
+}
+
+// The recent sessions of each named exercise, most recent first, with the heaviest counted weight of each and when it was done: what the safety rules need for the models that do not read the last session
+// themselves (GZCLP T1 and waves from a training max).
+interface RecentSession {
+  sessionId: string;
+  lastDone: string | null;
+  maxWeight: number;
+}
+async function loadRecentHistory(supabase: any, athleteId: string, names: string[]): Promise<Map<string, RecentSession[]>> {
+  const out = new Map<string, RecentSession[]>();
+  if (names.length === 0) return out;
+  const { data } = await readLoggedSets(
+    supabase,
+    `
+      weight, set_type, completed_at,
+      session_exercises!inner (
+        exercise_name, session_id,
+        athlete_sessions!inner ( athlete_id )
+      )
+    `,
+    (q) =>
+      q
+        .in("session_exercises.exercise_name", names)
+        .eq("session_exercises.athlete_sessions.athlete_id", athleteId)
+        .eq("status", "completed")
+        .order("completed_at", { ascending: false })
+        .limit(400)
+  );
+  const bySession = new Map<string, RecentSession & { name: string }>();
+  for (const row of (data ?? []) as any[]) {
+    if (!countsForProgress(row.set_type) || !(row.weight > 0)) continue;
+    const name = row.session_exercises.exercise_name as string;
+    const sessionId = row.session_exercises.session_id as string;
+    const key = `${name}::${sessionId}`;
+    const existing = bySession.get(key);
+    if (!existing) bySession.set(key, { name, sessionId, lastDone: row.completed_at ?? null, maxWeight: row.weight });
+    else {
+      if (row.weight > existing.maxWeight) existing.maxWeight = row.weight;
+      if (row.completed_at && (!existing.lastDone || row.completed_at > existing.lastDone)) existing.lastDone = row.completed_at;
+    }
+  }
+  for (const s of bySession.values()) {
+    const list = out.get(s.name) ?? [];
+    list.push({ sessionId: s.sessionId, lastDone: s.lastDone, maxWeight: s.maxWeight });
+    out.set(s.name, list);
+  }
+  for (const list of out.values()) list.sort((a, b) => String(b.lastDone ?? "").localeCompare(String(a.lastDone ?? "")));
+  return out;
+}
+
+// The days between consecutive sessions in a most-recent-first list of dates (the last few only).
+function intervalsOf(datesRecentFirst: (string | null)[]): number[] {
+  const out: number[] = [];
+  for (let i = 0; i + 1 < datesRecentFirst.length && out.length < 4; i++) {
+    const a = datesRecentFirst[i];
+    const b = datesRecentFirst[i + 1];
+    if (a && b) out.push(Math.abs(Math.round((new Date(a).getTime() - new Date(b).getTime()) / 86400000)));
+  }
+  return out;
+}
 
 export type ProgressionUnit = "lbs" | "percent";
 
@@ -373,8 +442,9 @@ export async function getProgressionGoalsBatch(
 
     if (referenceWorkoutId) allNeededWorkoutIds.add(referenceWorkoutId);
     if (previousWorkoutId) allNeededWorkoutIds.add(previousWorkoutId);
+    // The last few sessions, most recent first (the miss ladder reads the latest ones; the exercise's usual rhythm is worked out from the gaps between them).
     const recentWorkoutIds = occurrences
-      .slice(Math.max(0, occurrenceIndex - 4), occurrenceIndex - 1)
+      .slice(Math.max(0, occurrenceIndex - 6), occurrenceIndex - 1)
       .map((o) => o.workoutId)
       .reverse();
     for (const id of recentWorkoutIds) allNeededWorkoutIds.add(id);
@@ -396,6 +466,27 @@ export async function getProgressionGoalsBatch(
   // set is the LAST set in the occurrence, not the highest-weight one;
   // every T1 set is prescribed at the same weight, so "highest weight"
   // is meaningless here).
+  // The safety rules (a break, the step-up cap for someone under 18 or of unknown age) also apply to the models that do not use the generic loop below: GZCLP T1 and waves from a training max.
+  let ageProtectedMemo: boolean | null = null;
+  const ageProtected = async () => (ageProtectedMemo ??= await isAgeProtected(supabase, athleteId));
+  const recentHistory = await loadRecentHistory(
+    supabase,
+    athleteId,
+    Array.from(new Set([...resolvedT1.map((r) => r.performanceName), ...resolvedWaveFromTM.map((r) => r.performanceName)]))
+  );
+  const guardedFromHistory = async (name: string, rule: ProgressionTarget): Promise<ProgressionTarget> => {
+    const sessions = recentHistory.get(name) ?? [];
+    if (sessions.length === 0) return rule;
+    return applyContractGuards({
+      target: rule,
+      previousWeight: sessions[0].maxWeight,
+      daysSince: daysBetween(sessions[0].lastDone, new Date()),
+      normalGapDays: usualGapDays(intervalsOf(sessions.map((s) => s.lastDone))),
+      missStreak: 0,
+      protectedAge: await ageProtected(),
+    });
+  };
+
   if (resolvedT1.length > 0) {
     const t1Query =
       t1NeededWorkoutIds.size > 0
@@ -454,7 +545,7 @@ export async function getProgressionGoalsBatch(
         occurrenceIndex: r.occurrenceIndex,
         history,
       });
-      result.set(r.slotId, { weight: target.weight, reps: target.reps, reason: target.reason });
+      result.set(r.slotId, await guardedFromHistory(r.performanceName, { weight: target.weight, reps: target.reps, reason: target.reason }));
     }
   }
 
@@ -486,7 +577,7 @@ export async function getProgressionGoalsBatch(
         previousOccurrenceLog: null,
       });
       if (target.weight != null || target.reps != null) {
-        result.set(r.slotId, target);
+        result.set(r.slotId, await guardedFromHistory(r.performanceName, target));
       }
     }
   }
@@ -536,10 +627,8 @@ export async function getProgressionGoalsBatch(
     best.sets = (setsByNameAndWorkout.get(key) ?? []).filter((s) => s.weight === best.weight);
   }
 
-  // Under 18, or an age that is not known, gets the smaller step-up cap.
-  // (A coach working on their own program with no birthday on file is not treated as unknown: the same rule as the builder.)
-  const viewer = await supabase.auth.getUser().then((r: any) => r?.data?.user?.id ?? null).catch(() => null);
-  const ageIsProtected = effectiveAgeStatus(await athleteAgeStatus(supabase, athleteId), viewer === athleteId) !== "adult";
+  // Under 18, or an age that is not known, gets the smaller step-up cap (a coach on their own program is the only unknown-age exception).
+  const ageIsProtected = await ageProtected();
 
   for (const r of resolved) {
     const referenceLog = r.referenceWorkoutId
@@ -562,9 +651,8 @@ export async function getProgressionGoalsBatch(
       .filter((s) => s.sets.length > 0);
     const missStreak = r.model === "double_progression" ? consecutiveMisses(recent, (r.config as DoubleProgressionConfig).repRangeLow) : 0;
     const lastDone = r.previousWorkoutId ? lastDoneByKey.get(`${r.performanceName}::${r.previousWorkoutId}`) ?? null : null;
-    // The usual gap between this exercise's sessions, from its last two logged times.
-    const beforeLast = r.recentWorkoutIds[1] ? lastDoneByKey.get(`${r.performanceName}::${r.recentWorkoutIds[1]}`) ?? null : null;
-    const normalGapDays = lastDone && beforeLast ? Math.abs(Math.round((new Date(lastDone).getTime() - new Date(beforeLast).getTime()) / 86400000)) : null;
+    // The usual gap between this exercise's sessions: the middle value of the gaps between its last few sessions (one earlier break does not set the rhythm).
+    const normalGapDays = usualGapDays(intervalsOf(r.recentWorkoutIds.map((id) => lastDoneByKey.get(`${r.performanceName}::${id}`) ?? null)));
     const target = applyContractGuards({
       target: rule,
       previousWeight: previousOccurrenceLog?.weight ?? null,

@@ -15,6 +15,10 @@ export const RESET_AFTER_MISSES = 3;
 export const RESET_FACTOR = 0.9;
 export const MINOR_MAX_JUMP_LBS = 5;
 export const USUAL_GAP_SLACK_DAYS = 7;
+// An interval this long between two sessions is itself a break, not the exercise's rhythm, unless it keeps repeating (an exercise a program schedules every fourth week).
+export const BREAK_INTERVAL_DAYS = 21;
+// The usual gap is never taken as longer than this: an exercise that really is done every 5 weeks still gets the lighter restart.
+export const USUAL_GAP_CAP_DAYS = 34;
 
 export type GoalStatus = "suggest" | "hold" | "reset" | "ask_coach";
 
@@ -57,6 +61,23 @@ export function consecutiveMisses(recentFirst: PastSession[], repRangeLow: numbe
   return n;
 }
 
+// How many days there usually are between this exercise's sessions, from the gaps between its last few sessions (each in days). A single earlier break does not set the rhythm: gaps of 21 days or more are
+// ignored unless at least two of them show up (then they are the rhythm). The middle value of the gaps that count, never more than USUAL_GAP_CAP_DAYS. Null when there is nothing to go on.
+export function usualGapDays(intervals: number[]): number | null {
+  const clean = intervals.filter((n) => Number.isFinite(n) && n >= 0);
+  if (clean.length === 0) return null;
+  const median = (xs: number[]) => {
+    const s = xs.slice().sort((a, b) => a - b);
+    const mid = Math.floor(s.length / 2);
+    return s.length % 2 ? s[mid] : Math.round((s[mid - 1] + s[mid]) / 2);
+  };
+  const short = clean.filter((n) => n < BREAK_INTERVAL_DAYS);
+  const long = clean.filter((n) => n >= BREAK_INTERVAL_DAYS);
+  const basis = short.length > 0 ? short : long.length >= 2 ? long : [];
+  if (basis.length === 0) return null;
+  return Math.min(median(basis), USUAL_GAP_CAP_DAYS);
+}
+
 export function daysBetween(fromIso: string | null | undefined, now: Date): number | null {
   if (!fromIso) return null;
   const t = new Date(fromIso).getTime();
@@ -80,15 +101,20 @@ export function applyContractGuards(args: {
   const { target, previousWeight, missStreak, protectedAge } = args;
   if (previousWeight == null || previousWeight <= 0) return target;
   const usual = args.normalGapDays;
-  const daysSince = args.daysSince != null && usual != null && args.daysSince <= usual + USUAL_GAP_SLACK_DAYS ? null : args.daysSince;
+  // The exercise's usual rhythm only keeps the 95 and 90 percent restarts away; it never silences the ask-the-coach rule (a long layoff is a long layoff).
+  const rhythmGap = args.daysSince != null && usual != null && args.daysSince <= usual + USUAL_GAP_SLACK_DAYS;
+  const daysSince = rhythmGap ? null : args.daysSince;
 
-  if (daysSince != null && daysSince >= GAP_ASK_COACH_FROM_DAYS) {
-    const weeks = Math.floor(daysSince / 7);
+  if (args.daysSince != null && args.daysSince >= GAP_ASK_COACH_FROM_DAYS) {
+    const weeks = Math.floor(args.daysSince / 7);
     return { weight: null, reps: null, status: "ask_coach", reason: `It has been ${weeks} weeks since you last did this. Check with your coach before you load it.` };
   }
+  // The safety rules only ever make a goal lighter. A rule that deliberately prescribes less than the guarded number (a light week in a wave) keeps its own number and its own reason.
+  const keepsRule = (guardedWeight: number) => target.weight != null && target.weight <= guardedWeight;
   if (daysSince != null && daysSince >= GAP_5_PCT_FROM_DAYS) {
     const factor = daysSince >= GAP_10_PCT_FROM_DAYS ? 0.9 : 0.95;
     const weight = roundLoad(previousWeight * factor, DEFAULT_STEP.lb, "down");
+    if (keepsRule(weight)) return { ...target, status: target.status ?? "suggest" };
     return {
       weight,
       reps: target.reps,
@@ -98,9 +124,11 @@ export function applyContractGuards(args: {
   }
   if (missStreak >= RESET_AFTER_MISSES) {
     const weight = roundLoad(previousWeight * RESET_FACTOR, DEFAULT_STEP.lb, "down");
+    if (keepsRule(weight)) return { ...target, status: target.status ?? "suggest" };
     return { weight, reps: target.reps, status: "reset", reason: `You missed the reps at ${previousWeight} ${missStreak} times in a row, so drop to ${weight} and build back up.` };
   }
   if (missStreak >= 1) {
+    if (keepsRule(previousWeight)) return { ...target, status: target.status ?? "suggest" };
     return { weight: previousWeight, reps: target.reps, status: "hold", reason: `You missed the reps at ${previousWeight} last time. Stay at ${previousWeight} and try again.` };
   }
   if (protectedAge && target.weight != null && target.weight - previousWeight > MINOR_MAX_JUMP_LBS) {
