@@ -6,6 +6,8 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ChallengeStatusControl } from "@/components/coach/desktop/challenge-status-control";
 import { ChallengeParticipantPanel } from "@/components/athlete/challenge-participant-panel";
+import { loadMinorProfileIds, shownName } from "@/lib/minor-names";
+import { challengePhotoLink, mayViewChallengePhotos } from "@/lib/challenge-photo";
 import {
   computeChallengeWindow,
   computeConsistencyPct,
@@ -68,12 +70,19 @@ export default async function ChallengeDetailPage(
     .from("challenge_participants")
     .select("profile_id, before_photo_url, after_photo_url, profiles ( full_name )")
     .eq("challenge_id", params.challengeId);
-  const participants = (participantRows ?? []).map((p) => ({
-    profileId: p.profile_id,
-    fullName: (p.profiles as any)?.full_name ?? "Unknown",
-    beforePhotoUrl: p.before_photo_url,
-    afterPhotoUrl: p.after_photo_url,
-  }));
+  // A member under 18 is shown as first name and last initial. A photo is opened (with a short-lived link) only for the person it belongs to and the coach who runs the challenge.
+  const minors = await loadMinorProfileIds([params.groupId]);
+  const participants = await Promise.all(
+    (participantRows ?? []).map(async (p) => {
+      const may = mayViewChallengePhotos(user.id, p.profile_id, challenge.coach_id);
+      return {
+        profileId: p.profile_id as string,
+        fullName: shownName((p.profiles as any)?.full_name, p.profile_id, minors),
+        beforePhotoUrl: may ? await challengePhotoLink(supabase, p.before_photo_url) : null,
+        afterPhotoUrl: may ? await challengePhotoLink(supabase, p.after_photo_url) : null,
+      };
+    })
+  );
 
   const habitIds = habits.map((h) => h.id);
   const { data: logRows } = await supabase

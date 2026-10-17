@@ -10,6 +10,7 @@ import { TransferOwnershipButton } from "@/components/coach/desktop/transfer-own
 import { WorkoutCardBackgroundSettings } from "@/components/coach/desktop/workout-card-background-settings";
 import { DispatchSettings } from "@/components/coach/desktop/dispatch-settings";
 import { MarketplaceListingToggle } from "@/components/coach/desktop/marketplace-listing-toggle";
+import { MarketplacePersonControl } from "@/components/coach/desktop/marketplace-person-control";
 import { ClientTagManager } from "@/components/coach/desktop/client-tag-manager";
 import { TerminologySettingsPanel } from "@/components/coach/desktop/terminology-settings-panel";
 import { CoachCreditsPanel } from "@/components/coach/desktop/coach-credits-panel";
@@ -107,6 +108,9 @@ export default async function BrandingPage(
     .select("listed_in_marketplace")
     .eq("id", orgMembership.organization_id)
     .maybeSingle();
+
+  // The coach's own listing choice (separate read: a database without the columns yet just hides the control).
+  const { data: personRow, error: personError } = await supabase.from("profiles").select("marketplace_listed, marketplace_display_name").eq("id", user.id).maybeSingle();
 
   const { data: memberRows } = await supabase
     .from("organization_memberships")
@@ -251,6 +255,12 @@ export default async function BrandingPage(
             initialListed={!!listingRow?.listed_in_marketplace}
             canEdit={isOwnerOrAdmin}
             available={!listingError && !!listingRow}
+          />
+          <MarketplacePersonControl
+            profileId={user.id}
+            initialListed={!!(personRow as { marketplace_listed?: boolean } | null)?.marketplace_listed}
+            initialName={(personRow as { marketplace_display_name?: string | null } | null)?.marketplace_display_name ?? ""}
+            available={!personError && !!personRow}
           />
           <div className="border border-steel/20 p-4 mb-8 grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div>

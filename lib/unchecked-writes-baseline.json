@@ -1,7 +1,7 @@
 {
  "components/admin/trivia-review-panel.tsx": 1,
  "components/athlete/about-you-form.tsx": 1,
- "components/athlete/challenge-participant-panel.tsx": 2,
+ "components/athlete/challenge-participant-panel.tsx": 1,
  "components/athlete/first-run-guide-card.tsx": 1,
  "components/athlete/food-log-entries.tsx": 1,
  "components/athlete/progress-photo-journal.tsx": 2,

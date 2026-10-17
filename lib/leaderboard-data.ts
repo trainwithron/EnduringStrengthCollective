@@ -1,4 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { loadMinorProfileIds, shownName } from "@/lib/minor-names";
+import { onSharedBoards } from "@/lib/board-visibility";
 import { rankLeaderboard, rankByPosition, type LeaderboardEntry, type RosterAthlete, type PositionRanking } from "@/lib/leaderboard";
 
 type RankedEntry = LeaderboardEntry & { rank: number };
@@ -18,10 +20,10 @@ export async function getGroupLeaderboardRankings(
   supabase: SupabaseClient,
   groupId: string
 ): Promise<GroupLeaderboardRankings> {
-  const { data: logs } = await supabase
-    .from("workout_logs")
-    .select("athlete_id, total_volume, new_prs, profiles ( full_name )")
-    .eq("group_id", groupId);
+  const [{ data: logs }, minors] = await Promise.all([
+    supabase.from("workout_logs").select("athlete_id, total_volume, new_prs, profiles ( full_name, feed_broadcast_level )").eq("group_id", groupId),
+    loadMinorProfileIds([groupId]),
+  ]);
 
   const workoutCountByAthlete = new Map<string, number>();
   const volumeByAthlete = new Map<string, number>();
@@ -30,7 +32,9 @@ export async function getGroupLeaderboardRankings(
 
   for (const log of logs ?? []) {
     const id = log.athlete_id;
-    nameByAthlete.set(id, (log.profiles as any)?.full_name ?? "Unknown");
+    // A client who keeps their activity private, or shares only that they checked in, is not ranked (their numbers are not for the board).
+    if (!onSharedBoards((log.profiles as any)?.feed_broadcast_level)) continue;
+    nameByAthlete.set(id, shownName((log.profiles as any)?.full_name, id, minors));
     workoutCountByAthlete.set(id, (workoutCountByAthlete.get(id) ?? 0) + 1);
     volumeByAthlete.set(id, (volumeByAthlete.get(id) ?? 0) + (log.total_volume ?? 0));
     prCountByAthlete.set(id, (prCountByAthlete.get(id) ?? 0) + (log.new_prs?.length ?? 0));
@@ -63,21 +67,22 @@ export async function getPositionLeaderboardRankings(
   supabase: SupabaseClient,
   groupId: string
 ): Promise<PositionRanking[]> {
-  const [{ data: memberships }, { data: logs }] = await Promise.all([
+  const [{ data: memberships }, { data: logs }, minors] = await Promise.all([
     supabase
       .from("group_memberships")
-      .select("profile_id, position_id, profiles ( full_name ), group_positions ( name, sort_order )")
+      .select("profile_id, position_id, profiles ( full_name, feed_broadcast_level ), group_positions ( name, sort_order )")
       .eq("group_id", groupId)
       .eq("role", "athlete"),
     supabase
       .from("workout_logs")
       .select("athlete_id, total_volume, new_prs")
       .eq("group_id", groupId),
+    loadMinorProfileIds([groupId]),
   ]);
 
-  const roster: RosterAthlete[] = (memberships ?? []).map((m: any) => ({
+  const roster: RosterAthlete[] = (memberships ?? []).filter((m: any) => onSharedBoards(m.profiles?.feed_broadcast_level)).map((m: any) => ({
     profileId: m.profile_id,
-    fullName: m.profiles?.full_name ?? "Unknown",
+    fullName: shownName(m.profiles?.full_name, m.profile_id, minors),
     positionId: m.position_id ?? null,
     positionName: m.group_positions?.name ?? null,
     positionSortOrder: m.group_positions?.sort_order ?? null,

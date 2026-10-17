@@ -116,15 +116,14 @@ export function ChallengeParticipantPanel({
     const path = `${groupId}/challenges/${challengeId}/${user.id}-${kind}-${crypto.randomUUID()}-${file.name}`;
     const { error: uploadError } = await supabase.storage.from("post-media").upload(path, file);
     if (!uploadError) {
-      const { data: signed } = await supabase.storage
-        .from("post-media")
-        .createSignedUrl(path, 60 * 60 * 24 * 365);
+      // The PATH is saved, not a link that works for a year: the screen makes a short-lived link for the person and their coach only (lib/challenge-photo.ts).
       const column = kind === "before" ? "before_photo_url" : "after_photo_url";
-      await supabase
+      const { error: saveError } = await supabase
         .from("challenge_participants")
-        .update({ [column]: signed?.signedUrl ?? null })
+        .update({ [column]: path })
         .eq("challenge_id", challengeId)
         .eq("profile_id", user.id);
+      if (saveError) setHabitError("Couldn't save that photo. Try again.");
     }
     setUploading(null);
     router.refresh();

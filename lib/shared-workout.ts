@@ -498,7 +498,8 @@ export async function getSharedWorkout(postId: string, opts: { fullName?: boolea
       : opts.fullName
         ? (post.profiles as any)?.full_name ?? "An athlete"
         : publicDisplayName((post.profiles as any)?.full_name),
-    athleteAvatarUrl: (post.profiles as any)?.avatar_url ?? null,
+    // A person whose name is hidden does not have their photo shown either (the photo identifies them as surely as the name).
+    athleteAvatarUrl: nameHidden ? null : (post.profiles as any)?.avatar_url ?? null,
     // A one-on-one space is named after the client (their full name), so on the PUBLIC card, picture and link preview the business name stands in for it, always.
     groupName: !opts.fullName && (group as { group_kind?: string } | null)?.group_kind === "one_on_one" ? ((org as { name?: string } | null)?.name ?? "Spotlight Coaching") : group?.name ?? "Spotlight Coaching",
     workoutCardBackgroundMode: (org?.workout_card_background_mode as "default_rotation" | "custom" | null) ?? "default_rotation",

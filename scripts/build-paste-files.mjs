@@ -2730,6 +2730,27 @@ STEPS.push({
   ],
 });
 
+STEPS.push({
+  n: "139",
+  slug: "0387",
+  title: "0387 Nothing about a person is public unless they chose it: a coach appears in Find a coach only after turning it on for themselves; a coach can add only their own clients to a challenge",
+  migrations: ["0387"],
+  sees: "Success. No rows returned.",
+  afterwards: "No coach appears in Find a coach until each one turns on 'Show me in Find a coach' in Branding (every coach starts off, including coaches whose organization is already listed). A coach can no longer add a person who is not their client to a challenge.",
+  undo: [
+    "drop policy if exists \"challenge_participants_insert_self_or_coach\" on public.challenge_participants;",
+    "create policy \"challenge_participants_insert_self_or_coach\" on public.challenge_participants for insert to authenticated with check (((profile_id = (select auth.uid())) and exists (select 1 from public.challenges c where c.id = challenge_participants.challenge_id and c.status = 'active' and is_client_of_coach(c.coach_id))) or exists (select 1 from public.challenges c where c.id = challenge_participants.challenge_id and c.coach_id = (select auth.uid())));",
+    "alter table public.profiles drop constraint if exists profiles_marketplace_display_name_length;",
+    "alter table public.profiles drop column if exists marketplace_display_name;",
+    "alter table public.profiles drop column if exists marketplace_listed;",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 139 misbehaves. Puts back the earlier challenge rule and removes the personal listing columns (coaches in listed organizations are then shown as before).",
+  rows: [
+    ["0387 is not already applied (the personal listing column is not there yet)", "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'marketplace_listed')"],
+    ["the tables it builds on exist", "to_regclass('public.challenge_participants') is not null and to_regclass('public.challenges') is not null"],
+  ],
+});
+
 const bar = "-- ".padEnd(3) + "=".repeat(100);
 const header = (s, kind) => {
   const lines = [
@@ -2802,6 +2823,7 @@ for (const s of STEPS) {
 // that names the release, the step and the failed checks, and nothing is kept. After the commit one read-only result row per step says whether it is in place.
 // The individual step files stay as the fallback (and for a release that was partly applied by hand: the bundle refuses at the first applied step).
 const BUNDLES = [
+  { id: "release-co", name: "Release CO (nothing about a person is public unless they chose it: personal Find a coach listing; a coach adds only their own clients to a challenge; run BEFORE the code that goes with it is live)", steps: ["139"] },
   { id: "release-cn-held", name: "HELD, Ron's word first: require the health form and waiver of every client without one (read check-intake-flag-list.sql first)", steps: ["138"] },
   { id: "release-cm", name: "Release CM (the guard function and a coach's decision on a flagged screening; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["137"] },
   { id: "release-cp", name: "Release CP (switch on the guard: the server finishes the health form and waiver; run AFTER the Release D code is live)", steps: ["140"] },
@@ -3079,6 +3101,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0338", has.col("guardian_links", "expires_at")),
     m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
     m("0388", "exists (select 1 from pg_trigger where tgname = 'client_intake_guard_completion' and tgrelid = 'public.client_intake'::regclass)"),
+    m("0387", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'marketplace_listed')"),
     m("0386", "to_regprocedure('public.client_intake_guard_completion()') is not null"),
     m("0385", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'set_logs' and column_name = 'set_type')"),
     m("0384", "to_regprocedure('public.is_group_private_from_org(uuid)') is not null"),

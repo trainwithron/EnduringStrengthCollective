@@ -10,6 +10,7 @@
 // not a gap in this file.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { mapGoalTypeToTrainingIntents } from "./trainer-dispatch";
+import { publicDisplayName } from "./public-name";
 import type { TrainingIntent } from "./training-intent";
 import {
   computeCoachRankingScore,
@@ -46,7 +47,7 @@ export async function findRankedCoaches(
   // org for its real zip_code and to profiles for a display name.
   const { data: memberRows } = await supabase
     .from("organization_memberships")
-    .select("profile_id, organization_id, profiles ( full_name ), organizations ( name, zip_code, listed_in_marketplace )")
+    .select("profile_id, organization_id, profiles ( full_name, marketplace_listed, marketplace_display_name ), organizations ( name, zip_code, listed_in_marketplace )")
     .in("role", ["owner", "admin", "coach"]);
   if (!memberRows || memberRows.length === 0) return [];
 
@@ -66,6 +67,8 @@ export async function findRankedCoaches(
     const orgZip: string | null = row.organizations?.zip_code ?? null;
     // Opt-in: an organization is listed only after its owner or admin turns it on (migration 0256).
     if (!row.organizations?.listed_in_marketplace) continue;
+    // ...and only a coach who has turned on "Show me in Find a coach" for themselves (release E): nothing about a person is public unless they chose it.
+    if (!row.profiles?.marketplace_listed) continue;
 
     // Real per-coach program library — same "created_by" scoping
     // lib/trainer-dispatch-gather.ts's own findAndRankAvailableTrainers
@@ -103,7 +106,8 @@ export async function findRankedCoaches(
 
     results.push({
       coachId,
-      coachName: row.profiles?.full_name ?? "Coach",
+      // The name the coach chose to show; with none, first name and last initial only.
+      coachName: (row.profiles?.marketplace_display_name as string | null)?.trim() || publicDisplayName(row.profiles?.full_name) || "Coach",
       orgName: row.organizations?.name ?? "",
       orgZipCode: orgZip,
       distanceMiles,

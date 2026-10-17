@@ -4,6 +4,11 @@
 - Workout screen, when a set could not upload yet: "{n} change hasn't uploaded yet." / "{n} changes haven't uploaded yet." then "Saved on this phone. It uploads when you're back online." (replaces "haven't saved yet / Your numbers are still here, we'll keep trying.")
 - Offline page (shown with no signal for a page that was never opened): "You're offline" / "Sets you already logged on this phone are safe and upload when you're back online. A workout you opened earlier still opens from Home." / button "Try again".
 
+## Release E (minors off public surfaces)
+- Branding > Team: "Show me in "Find a coach"" / "Off by default. You appear only if your organization is listed and this is on." / "Name to show" / "Leave empty to show first name and last initial" / "That didn't save. Nothing was changed."
+- Challenge photo save error: "Couldn't save that photo. Try again."
+- Names of members under 18 on the leaderboard, records board and challenge standings are shown as first name and last initial ("Sam R."); a member who keeps their numbers private is not ranked and a private record holder shows as "An athlete".
+
 ## Release D (intake and consent)
 - After the form: "You're all set." (no yes answers) or "Thanks. Because you answered yes to something, your coach will check in with you about it before you start hard training."
 - Form errors: "Tick the box to accept the waiver." / "Type your full name to sign." / "That name is too long." / "Answer every health question." / "Add your date of birth first." / "We couldn't save your signature. Please try again."

@@ -68,6 +68,7 @@ from (
     ('2026100600338', 'guardian_links_scoped', '0338_guardian_links_scoped.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'guardian_links' and column_name = 'expires_at')),
     ('2026100600367', 'rest_range', '0367_rest_range.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')),
     ('2026100600388', 'intake_guard_trigger', '0388_intake_guard_trigger.sql', exists (select 1 from pg_trigger where tgname = 'client_intake_guard_completion' and tgrelid = 'public.client_intake'::regclass)),
+    ('2026100600387', 'minors_off_public_surfaces', '0387_minors_off_public_surfaces.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'marketplace_listed')),
     ('2026100600386', 'intake_server_completes', '0386_intake_server_completes.sql', to_regprocedure('public.client_intake_guard_completion()') is not null),
     ('2026100600385', 'set_types_and_records', '0385_set_types_and_records.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'set_logs' and column_name = 'set_type')),
     ('2026100600384', 'privacy_closures', '0384_privacy_closures.sql', to_regprocedure('public.is_group_private_from_org(uuid)') is not null),

@@ -6,6 +6,8 @@ import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
+import { loadMinorProfileIds, shownName } from "@/lib/minor-names";
+import { onSharedBoards } from "@/lib/board-visibility";
 
 interface RecordRow {
   id: string;
@@ -26,18 +28,22 @@ interface RecordRow {
 // by default rather than treated as an optional extra.
 async function loadRecords(groupId: string): Promise<RecordRow[]> {
   const supabase = await createServerClient();
-  const { data: rows } = await supabase
-    .from("exercise_records")
-    .select("id, exercise_name, value, achieved_at, superseded_at, profiles ( full_name )")
-    .eq("group_id", groupId)
-    .eq("tracked_field", "weight")
-    .order("exercise_name", { ascending: true })
-    .order("achieved_at", { ascending: false });
+  const [{ data: rows }, minors] = await Promise.all([
+    supabase
+      .from("exercise_records")
+      .select("id, exercise_name, value, achieved_at, superseded_at, athlete_id, profiles ( full_name, feed_broadcast_level )")
+      .eq("group_id", groupId)
+      .eq("tracked_field", "weight")
+      .order("exercise_name", { ascending: true })
+      .order("achieved_at", { ascending: false }),
+    loadMinorProfileIds([groupId]),
+  ]);
 
   const byExercise = new Map<string, RecordRow>();
   for (const row of (rows ?? []) as any[]) {
     const name = row.exercise_name;
-    const athleteName = row.profiles?.full_name ?? "An athlete";
+    // A member under 18 is shown as first name and last initial; one who keeps their numbers off the shared boards is "An athlete".
+    const athleteName = onSharedBoards(row.profiles?.feed_broadcast_level) ? (row.profiles?.full_name ? shownName(row.profiles.full_name, row.athlete_id, minors) : "An athlete") : "An athlete";
     if (row.superseded_at === null) {
       byExercise.set(name, {
         id: row.id,

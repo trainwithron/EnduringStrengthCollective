@@ -5,6 +5,14 @@
 - ASSUMED: an installed app in a window 1024px wide or more with a mouse opens the desktop experience (a phone or touch tablet keeps phone mode; the existing view toggle still overrides).
 - Needs Ron: name an iPhone tester (offline and wake-lock behaviour differ on iOS).
 
+## Release E (minors off public surfaces)
+- ASSUMED (reverses an earlier Ron decision, one-line change back in lib/share-name.ts): a client with NO date of birth on file now has their name AND photo hidden on shared workout pictures until they choose (Ron's earlier rule showed an unknown-age client's name). Reason: an unknown age is treated as protected everywhere else. Only affects the 26 clients with no birthday until they are asked for it.
+- ASSUMED: in-app boards (leaderboard, records board, challenge standings) shorten the names of members KNOWN to be under 18 only. Someone with no birthday yet is shown by full name there (everyone in the group already knows them); if the age lookup fails, everyone is shortened.
+- ASSUMED: a member whose broadcast setting is "private" or "only that I checked in" is left off the leaderboard and shown as "An athlete" on records.
+- AFTER THE PASTE, every coach starts hidden in Find a coach (each must tick "Show me in Find a coach" in Branding), including coaches whose organization is already listed. Ron: tick yours after the paste.
+- NOT DONE (needs the storage rules read first): the post-media bucket's own read rule. Challenge photos are now stored as a path and shown (with a one-hour link) only to the person and their coach, but the bucket may still let any signed-in user who guesses a path open the file. Recommended: a storage rule limiting challenge folders to the owner and the coach; a separate small paste.
+- NOT DONE: share-card photo for adults who never chose (still shown when the name is shown); public Hall of Fame pages for minors (no such public page exists today; the records board is inside the group).
+
 ## Release D (intake and consent)
 - HELD for Ron's word, data paste ready: require the health form of every client without one (step 138 / bundle release-cn-held; run check-intake-flag-list.sql first and read the names). Not run by me.
 - ASSUMED: any "yes" on the 7-question form means "talk first" (our form is the first page of the PAR-Q+ only; there are no follow-up pages, so "clearance recommended" cannot be told apart yet). The coach's decision (cleared / train with changes / hold) is kept per coach; "hold" shows as a note on the Assign screen. It does NOT block starting a workout (the gate stays: form not finished).

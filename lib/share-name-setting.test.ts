@@ -53,13 +53,13 @@ describe("the default depends on age until the client chooses (Ron's decision)",
     expect(resolveShowName(true, "2015-01-01", asOf)).toBe(true);
     expect(resolveShowName(false, "1990-01-01", asOf)).toBe(false);
   });
-  it("no choice yet: off under 18, on for an adult, on when there is no date of birth", () => {
+  it("no choice yet: off under 18, on for an adult, OFF when there is no date of birth (release E)", () => {
     expect(resolveShowName(null, "2012-05-05", asOf)).toBe(false);
     expect(resolveShowName(undefined, "2009-10-12", asOf)).toBe(false); // turns 18 tomorrow
     expect(resolveShowName(null, "2008-10-11", asOf)).toBe(true); // turns 18 today
     expect(resolveShowName(null, "1985-03-03", asOf)).toBe(true);
-    expect(resolveShowName(null, null, asOf)).toBe(true);
-    expect(resolveShowName(null, "not a date", asOf)).toBe(true);
+    expect(resolveShowName(null, null, asOf)).toBe(false);
+    expect(resolveShowName(null, "not a date", asOf)).toBe(false);
   });
   it("the settings page shows the same default the card uses", () => {
     expect(read("app/(coach)/groups/[groupId]/settings/page.tsx")).toContain("resolveShowName(");
