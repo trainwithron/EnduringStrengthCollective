@@ -24,6 +24,14 @@
   "file": "apply-release-cm-all.sql"
  },
  {
+  "id": "release-i-gym",
+  "name": "Release I (invite an existing account as a one-on-one client; invite notices that were being refused; adds only, safe to run BEFORE the code that goes with it is live)",
+  "steps": [
+   "145"
+  ],
+  "file": "apply-release-i-gym-all.sql"
+ },
+ {
   "id": "release-h-importers",
   "name": "Release H (undo a whole history import; getting out of an organization; what a coach coaches; adds only, safe to run BEFORE the code that goes with it is live)",
   "steps": [

@@ -2728,6 +2728,28 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "145",
+  slug: "0393",
+  title: "0393 Release I: a coach can invite someone who already has an account to be their one-on-one client (they accept or decline), and the notification types the invite code writes are accepted",
+  migrations: ["0393"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes on screen until the Release I code is live. Adds one small table (invitations to a one-on-one space) and two functions (accept or decline, and the coach cancelling). It also adds three notification types to the list the database accepts: 'organization_invite' (the invite-a-coach code has written it since Release BD but the database refused it, so an existing account invited to an organization never got a notice), 'space_invite' and 'org_announcement'. Safe to run before the code is live.",
+  undo: [
+    "drop function if exists public.cancel_space_invite(uuid);",
+    "drop function if exists public.answer_space_invite(uuid, boolean);",
+    "drop table if exists public.space_invites;",
+    "-- the three extra notification types are left in the list (removing them could break rows that use them)",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 145 misbehaves. Run it only while the Release I code is not live (Add client and the invitation page use the table and functions). Pending invitations are lost.",
+  rows: [
+    ["0393 is not already applied (the invitations table is not there yet)", "to_regclass('public.space_invites') is null"],
+    ["the tables it builds on exist", "to_regclass('public.groups') is not null and to_regclass('public.group_memberships') is not null and to_regclass('public.notifications') is not null"],
+    ["the notification type rule exists to be widened", "exists (select 1 from pg_constraint c where c.conname = 'notifications_type_check' and c.conrelid = 'public.notifications'::regclass)"],
+    ["the helper functions it uses exist", "to_regprocedure('public.is_group_coach(uuid)') is not null and to_regprocedure('public.is_one_on_one_group(uuid)') is not null"],
+  ],
+});
+
+STEPS.push({
   n: "144",
   slug: "0392",
   title: "0392 Release H: what a coach coaches (asked at signup) and an owner or admin choosing which coach holds a new client",
@@ -2920,6 +2942,7 @@ const BUNDLES = [
   { id: "release-co", name: "Release CO (nothing about a person is public unless they chose it: personal Find a coach listing; a coach adds only their own clients to a challenge; run BEFORE the code that goes with it is live)", steps: ["139"] },
   { id: "release-cn-held", name: "HELD, Ron's word first: require the health form and waiver of every client without one (read check-intake-flag-list.sql first)", steps: ["138"] },
   { id: "release-cm", name: "Release CM (the guard function and a coach's decision on a flagged screening; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["137"] },
+  { id: "release-i-gym", name: "Release I (invite an existing account as a one-on-one client; invite notices that were being refused; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["145"] },
   { id: "release-h-importers", name: "Release H (undo a whole history import; getting out of an organization; what a coach coaches; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["142", "143", "144"] },
   { id: "release-g", name: "Release G (the app at 1,500 clients; real values only in sets; a test-organization mark; pause forgotten workouts; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["141"] },
   { id: "release-cp", name: "Release CP (switch on the guard: the server finishes the health form and waiver; run AFTER the Release D code is live)", steps: ["140"] },
@@ -3196,6 +3219,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
     m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
+    m("0393", "to_regclass('public.space_invites') is not null"),
     m("0392", "to_regprocedure('public.assign_group_coach(uuid, uuid, boolean)') is not null"),
     m("0391", "to_regprocedure('public.remove_org_member(uuid, uuid, uuid)') is not null"),
     m("0390", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'athlete_sessions' and column_name = 'import_batch_id')"),

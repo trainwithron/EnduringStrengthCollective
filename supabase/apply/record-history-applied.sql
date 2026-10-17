@@ -67,6 +67,7 @@ from (
     ('2026100600331', 'purchase_grants_once', '0331_purchase_grants_once.sql', to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null),
     ('2026100600338', 'guardian_links_scoped', '0338_guardian_links_scoped.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'guardian_links' and column_name = 'expires_at')),
     ('2026100600367', 'rest_range', '0367_rest_range.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')),
+    ('2026100600393', 'space_invites', '0393_space_invites.sql', to_regclass('public.space_invites') is not null),
     ('2026100600392', 'coach_type', '0392_coach_type.sql', to_regprocedure('public.assign_group_coach(uuid, uuid, boolean)') is not null),
     ('2026100600391', 'offboarding', '0391_offboarding.sql', to_regprocedure('public.remove_org_member(uuid, uuid, uuid)') is not null),
     ('2026100600390', 'import_batch_undo', '0390_import_batch_undo.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'athlete_sessions' and column_name = 'import_batch_id')),

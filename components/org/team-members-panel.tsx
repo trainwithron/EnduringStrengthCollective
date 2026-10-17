@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { confirmDialog } from "@/components/shared/confirm-dialog";
@@ -26,6 +27,7 @@ const ROLE_WORD: Record<string, string> = { owner: "Owner", admin: "Admin", coac
 // The people in the organization (owner and admins can change roles, remove a member and hand over their clients, cancel or extend an invitation), and for the owner, ending the team. Every rule is in the
 // database functions (migration 0391); this only asks and shows their plain-word refusals.
 export function TeamMembersPanel({
+  groupId,
   organizationId,
   organizationName,
   me,
@@ -33,6 +35,7 @@ export function TeamMembersPanel({
   members,
   invites,
 }: {
+  groupId: string;
   organizationId: string;
   organizationName: string;
   me: string;
@@ -49,6 +52,29 @@ export function TeamMembersPanel({
   const [typedName, setTypedName] = useState("");
   const isOwner = myRole === "owner";
   const isOwnerOrAdmin = isOwner || myRole === "admin";
+  const [announcement, setAnnouncement] = useState("");
+  const [announceNote, setAnnounceNote] = useState<string | null>(null);
+
+  async function announce() {
+    const text = announcement.trim();
+    if (!text) return;
+    setBusy("announce");
+    setAnnounceNote(null);
+    try {
+      const res = await fetch("/api/org/announce", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ organizationId, message: text }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAnnounceNote(data.error || "Couldn't send it. Try again.");
+      } else {
+        setAnnouncement("");
+        setAnnounceNote(data.failed > 0 ? `Sent to ${data.sent}; ${data.failed} could not be reached.` : `Sent to ${data.sent} coach${data.sent === 1 ? "" : "es"}.`);
+      }
+    } catch {
+      setAnnounceNote("Couldn't send it. Check your connection and try again.");
+    } finally {
+      setBusy(null);
+    }
+  }
 
   const db = () => createBrowserClient({ crossOrg: true });
 
@@ -88,8 +114,20 @@ export function TeamMembersPanel({
     });
   }
 
-  async function extend(i: TeamInvite) {
-    await run(`ext-${i.id}`, () => db().rpc("extend_org_invite", { p_invite: i.id }));
+  // Sends it again: fourteen more days, and the person is told again (a notice and an email).
+  async function resend(i: TeamInvite) {
+    setBusy(`ext-${i.id}`);
+    setError(null);
+    try {
+      const res = await fetch("/api/org-invites/resend", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ inviteId: i.id }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) setError(data.error || "Couldn't send it again. Try again.");
+      else router.refresh();
+    } catch {
+      setError("Couldn't send it again. Check your connection and try again.");
+    } finally {
+      setBusy(null);
+    }
   }
   async function cancel(i: TeamInvite) {
     if (!(await confirmDialog({ message: `Cancel the invitation to ${i.name}?`, confirmLabel: "Cancel invitation", cancelLabel: "Keep it", destructive: true }))) return;
@@ -109,6 +147,37 @@ export function TeamMembersPanel({
 
   return (
     <div className="mb-8">
+      {isOwnerOrAdmin && (
+        <div className="mb-6 max-w-xl">
+          <label htmlFor="announce" className="font-body text-xs text-steel uppercase tracking-wide">
+            Message your coaches
+          </label>
+          <textarea
+            id="announce"
+            rows={3}
+            maxLength={500}
+            value={announcement}
+            onChange={(e) => setAnnouncement(e.target.value)}
+            placeholder="A short note every coach on the team will see in their notifications."
+            className="w-full mt-1 bg-graphite border border-steel/30 text-chalk px-2.5 py-2 font-body text-base sm:text-sm focus:outline-none focus:border-rust"
+          />
+          <div className="flex items-center gap-3 mt-2">
+            <button type="button" onClick={announce} disabled={busy === "announce" || !announcement.trim()} className="h-11 px-4 border border-rust text-rust font-body text-sm font-medium disabled:opacity-40">
+              {busy === "announce" ? "Sending…" : "Send to the team"}
+            </button>
+            {announceNote && (
+              <p className="font-body text-xs text-steel" role="status">
+                {announceNote}
+              </p>
+            )}
+          </div>
+          <p className="font-body text-xs mt-3">
+            <Link href={`/groups/${groupId}/team-activity`} className="text-rust">
+              Coach activity and payroll estimate &rarr;
+            </Link>
+          </p>
+        </div>
+      )}
       <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">Coaches</p>
       <div className="border border-steel/20 divide-y divide-steel/15">
         {members.map((m) => {
@@ -190,8 +259,8 @@ export function TeamMembersPanel({
                   </p>
                   {isOwnerOrAdmin && (
                     <div className="flex items-center gap-4">
-                      <button type="button" onClick={() => extend(i)} disabled={busy === `ext-${i.id}`} className="font-body text-xs text-steel underline disabled:opacity-40">
-                        Give 14 more days
+                      <button type="button" onClick={() => resend(i)} disabled={busy === `ext-${i.id}`} className="font-body text-xs text-steel underline disabled:opacity-40">
+                        Send again
                       </button>
                       <button type="button" onClick={() => cancel(i)} disabled={busy === `cancel-${i.id}`} className="font-body text-xs text-rust disabled:opacity-40">
                         Cancel

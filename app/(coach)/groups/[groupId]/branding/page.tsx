@@ -290,6 +290,7 @@ export default async function BrandingPage(
             </p>
           )}
           <TeamMembersPanel
+            groupId={params.groupId}
             organizationId={orgMembership.organization_id}
             organizationName={org?.name ?? "this organization"}
             me={user.id}

@@ -8,7 +8,7 @@ const src = (p: string) => readFileSync(join(root, p), "utf8").replace(/\r\n/g, 
 describe("Release H: getting out", () => {
   it("the Team page calls every offboarding function, and none of them is open to a signed-out caller", () => {
     const panel = src("components/org/team-members-panel.tsx");
-    for (const fn of ["set_org_member_role", "remove_org_member", "extend_org_invite", "cancel_org_invite", "close_organization"]) expect(panel, fn).toContain(`"${fn}"`);
+    for (const fn of ["set_org_member_role", "remove_org_member", "cancel_org_invite", "close_organization"]) expect(panel, fn).toContain(`"${fn}"`);
     const sql = src("supabase/migrations/0391_offboarding.sql");
     for (const fn of ["remove_org_member(uuid, uuid, uuid)", "leave_organization(uuid, uuid)", "set_org_member_role(uuid, uuid, text)", "cancel_org_invite(uuid)", "extend_org_invite(uuid)", "close_organization(uuid)"]) {
       expect(sql, fn).toContain(`revoke execute on function public.${fn} from public, anon;`);

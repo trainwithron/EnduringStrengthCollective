@@ -242,7 +242,7 @@ describe("M11 and M12 creating a group", () => {
   });
   it("closing the add-client box before anyone was added removes the empty space (never one that has a client)", () => {
     const add = src("components/coach/desktop/add-client-button.tsx");
-    expect(add).toContain("if (createdGroupIdRef.current && !added) void removeEmptySpace(createdGroupIdRef.current);");
+    expect(add).toContain("if (createdGroupIdRef.current && !added && !invitedExisting) void removeEmptySpace(createdGroupIdRef.current);");
     expect(add).toContain("await discardEmptyGroup(groupIdToCheck)");
     expect(add).not.toContain('.from("groups").delete()');
   });

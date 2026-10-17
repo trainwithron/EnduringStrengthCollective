@@ -6,7 +6,7 @@ import { CoachTypeSetting } from "@/components/coach/coach-type-setting";
 import { isCoachType, type CoachType } from "@/lib/coach-type";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createServerClient } from "@/lib/supabase/server";
+import { createCrossOrgServerClient, createServerClient } from "@/lib/supabase/server";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
@@ -165,6 +165,12 @@ export default async function SettingsPage(
       }
     }
   }
+  // A client who trains in more than one space (two coaches) gets a link to pick between them.
+  let trainsWithSeveralCoaches = false;
+  if (!isCoach && !effective.isActingAsOther) {
+    const { count: spaceCount } = await (await createCrossOrgServerClient()).from("group_memberships").select("id", { count: "exact", head: true }).eq("profile_id", user.id).eq("role", "athlete");
+    trainsWithSeveralCoaches = (spaceCount ?? 0) > 1;
+  }
   // What this coach coaches (0392). Read on its own so a database that does not have the column yet still shows the whole page.
   let coachTypeNow: CoachType | null = null;
   if (isCoach) {
@@ -322,6 +328,14 @@ export default async function SettingsPage(
         {isCoach && leaveInfo && (
           <SettingsGroup label="Organization">
             <LeaveOrganizationControl organizationId={leaveInfo.id} organizationName={leaveInfo.name} others={leaveInfo.others} soleClients={leaveInfo.soleClients} unknown={leaveInfo.unknown} />
+          </SettingsGroup>
+        )}
+
+        {trainsWithSeveralCoaches && (
+          <SettingsGroup label="Your coaches">
+            <Link href="/your-coaches" className="block py-3 font-body text-sm text-chalk">
+              You train with more than one coach. Switch between them &rarr;
+            </Link>
           </SettingsGroup>
         )}
 

@@ -49,6 +49,8 @@ export function AddClientButton({
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Someone who already has an account: they were sent an invitation to accept instead of being added.
+  const [invitedExisting, setInvitedExisting] = useState<{ email: string; already: boolean } | null>(null);
   const [added, setAdded] = useState<{ groupId: string; profileId: string; name: string; inGroup: string | null; hasEmail: boolean; note?: string | null } | null>(null);
   const [groups, setGroups] = useState<GroupOption[] | null>(null);
   const [selectedGroupId, setSelectedGroupId] = useState("");
@@ -112,13 +114,14 @@ export function AddClientButton({
   }
 
   function reset() {
-    if (createdGroupIdRef.current && !added) void removeEmptySpace(createdGroupIdRef.current);
+    if (createdGroupIdRef.current && !added && !invitedExisting) void removeEmptySpace(createdGroupIdRef.current);
     setOpen(false);
     setStep("choose");
     setFullName("");
     setEmail("");
     setError(null);
     setAdded(null);
+    setInvitedExisting(null);
     setLink(null);
     setGroupMode("name");
     createdGroupIdRef.current = null;
@@ -165,6 +168,14 @@ export function AddClientButton({
       const res = await fetch("/api/clients/invite", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ groupId: target, fullName, email }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Couldn't add this ${t("client")}.`);
+      if (data.invitedExisting) {
+        setInvitedExisting({ email: email.trim(), already: data.already === true });
+        setFullName("");
+        setEmail("");
+        router.refresh();
+        onAdded?.();
+        return;
+      }
       // The person adding chose another coach to hold this client: add them to the client's space (and step out of it).
       let note: string | null = null;
       if (step === "one_on_one" && assignTo) {
@@ -256,7 +267,18 @@ export function AddClientButton({
 
   return (
     <div className="border border-steel/30 p-4 w-full max-w-sm bg-surface">
-      {added ? (
+      {invitedExisting ? (
+        <div>
+          <p className="font-body text-sm text-positive">{invitedExisting.already ? "They have already been invited." : "They already have an account, so we sent them an invitation."}</p>
+          <p className="font-body text-xs text-steel mt-1.5">
+            {invitedExisting.email} sees it in the app{" "}
+            and by email, and joins your space only if they accept. Nothing else is shared with you until they do.
+          </p>
+          <button type="button" onClick={reset} className="mt-3 font-body text-xs text-steel">
+            Done
+          </button>
+        </div>
+      ) : added ? (
         <div>
           <p className="font-body text-sm text-positive">
             {added.name} added{added.inGroup ? ` to ${added.inGroup}` : ""}. Nothing was sent to them.

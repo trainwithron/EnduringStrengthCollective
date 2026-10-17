@@ -4,6 +4,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { toFriendlyAuthEmailError } from "@/lib/auth-email-error";
 import { appOrigin } from "@/lib/app-url";
 import { rateLimitResponse } from "@/lib/rate-limit";
+import { notifyAndEmail } from "@/lib/invite-notify";
 
 // Which org-level role an invite can grant. "owner" is set once at
 // org creation and never assigned through this flow.
@@ -85,11 +86,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Couldn't send the invitation. Try again." }, { status: 502 });
     }
     const { data: orgRow } = await serviceRole.from("organizations").select("name").eq("id", group.organization_id).maybeSingle();
-    await serviceRole.from("notifications").insert({
-      profile_id: existingId,
+    // An in-app notice and an email to the address on the account. The answer to the caller is the same either way.
+    await notifyAndEmail(serviceRole, {
+      profileId: existingId,
       type: "organization_invite",
       body: `${orgRow?.name ?? "An organization"} invited you to join as ${role === "admin" ? "an admin" : "a coach"}.`,
-      link_path: `/org-invite/${invite.id}`,
+      linkPath: `/org-invite/${invite.id}`,
+      origin: appOrigin(request),
+      subject: `${orgRow?.name ?? "An organization"} invited you to join`,
     });
     return NextResponse.json({ invited: true });
   }
