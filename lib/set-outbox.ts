@@ -6,6 +6,7 @@ export interface OutboxEntry {
   id: string; // the set_logs row id
   payload: Record<string, unknown>; // the merged change still to send
   savedAt: number; // when it was first kept on this phone
+  userId?: string | null; // whose phone session kept it (only that person's are sent again)
 }
 
 export interface OutboxStore {
@@ -86,8 +87,25 @@ export class IndexedDbOutbox implements OutboxStore {
   }
 }
 
-export function browserOutbox(): OutboxStore | null {
-  return typeof indexedDB === "undefined" ? null : new IndexedDbOutbox();
+// Entries are tagged with the signed-in person, and only that person's are read back: after an account switch on a shared phone the other person's kept sets are left alone, not retried for nothing.
+export function scopedOutbox(store: OutboxStore, getUserId: () => Promise<string | null>): OutboxStore {
+  return {
+    async put(entry) {
+      await store.put({ ...entry, userId: await getUserId() });
+    },
+    remove: (id) => store.remove(id),
+    async all() {
+      const uid = await getUserId();
+      const rows = await store.all();
+      return rows.filter((r) => !r.userId || r.userId === uid);
+    },
+  };
+}
+
+export function browserOutbox(getUserId?: () => Promise<string | null>): OutboxStore | null {
+  if (typeof indexedDB === "undefined") return null;
+  const store = new IndexedDbOutbox();
+  return getUserId ? scopedOutbox(store, getUserId) : store;
 }
 
 // Ask the browser not to clear what the app keeps on the phone when storage runs low. Harmless when refused or unsupported.

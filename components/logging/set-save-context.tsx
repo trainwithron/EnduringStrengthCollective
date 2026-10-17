@@ -62,7 +62,7 @@ export function SetSaveProvider({ children }: { children: React.ReactNode }) {
           // The workout was finished on another device: show it as it really is instead of leaving a removal that can never save.
           if (typeof window !== "undefined") window.location.reload();
         }),
-      outbox: browserOutbox(),
+      outbox: browserOutbox(async () => (await supabase.auth.getSession()).data.session?.user.id ?? null),
       onChange: ({ unsaved, failed }) => {
         setUnsavedCount(unsaved.length);
         setUnsavedIds(new Set(unsaved));
@@ -75,7 +75,8 @@ export function SetSaveProvider({ children }: { children: React.ReactNode }) {
   // Sets kept on this phone from an earlier visit (closed tab, restart, dead signal) are sent again as soon as the workout opens; the browser is asked to keep the phone's copy safe.
   useEffect(() => {
     void requestPersistentStorage();
-    const outbox = browserOutbox();
+    const supabase = createBrowserClient();
+    const outbox = browserOutbox(async () => (await supabase.auth.getSession()).data.session?.user.id ?? null);
     if (!outbox) return;
     let cancelled = false;
     void outbox.all().then((kept) => {

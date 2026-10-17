@@ -25,7 +25,8 @@ self.addEventListener("message", (event) => {
 });
 
 function isStaticAsset(url) {
-  return url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/brand/") || /^\/(icon|apple-touch-icon)/.test(url.pathname);
+  // Only the hashed, never-changing build files: a replaced icon or logo is always fetched fresh.
+  return url.pathname.startsWith("/_next/static/");
 }
 
 async function trimPages(cache) {
