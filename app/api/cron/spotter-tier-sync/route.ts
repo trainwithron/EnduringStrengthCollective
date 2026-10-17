@@ -67,7 +67,7 @@ async function handler(request: Request) {
     }
 
     // The free plan has no AI synthesis: the data reports above are kept, the model is never called.
-    const zeroAi = await isZeroAiCoach(supabase, coachId);
+    const zeroAi = await isZeroAiCoach(supabase, coachId, { organizationId: orgMembership?.organization_id ?? null });
     const allTier2: SpotterExpertReport[] = [];
     for (const cornerstone of zeroAi ? [] : CORNERSTONES) {
       const cornerstoneReports = tier1ByCornerstone.get(cornerstone) ?? [];

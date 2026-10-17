@@ -1,5 +1,9 @@
 import { TRIAL_DAYS, formatPlanCents, MAX_AUTO_CLIENTS } from "@/lib/coach-plan-pricing";
 import type { OrgBillingSummary } from "@/lib/org-billing-server";
+import { FREE_TIER_AI_USES, FREE_TIER_CLIENT_LIMIT } from "@/lib/ai-usage";
+
+// Shown only once billing is enforced; until then the plan page words everything as it always did.
+const FREE_PLAN_SENTENCE = `You are on the free plan: up to ${FREE_TIER_CLIENT_LIMIT} clients and ${FREE_TIER_AI_USES} AI uses a month. Nothing was deleted, and your clients can still log workouts. Choose a plan to add more clients and use AI freely.`;
 
 function formatDate(d: Date | null): string {
   return d ? d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—";
@@ -36,7 +40,9 @@ export function PlanBillingPanel({
       break;
     case "trial_expired":
       statusLine = "Free trial ended";
-      statusDetail = `Ended ${formatDate(e.trialEndsAt)}. You are on the free plan: up to 15 clients and 5 AI uses a month. Nothing was deleted, and your clients can still log workouts. Choose a plan to add more clients and use AI freely.`;
+      statusDetail = `Ended ${formatDate(e.trialEndsAt)}. ${
+        e.enforced ? FREE_PLAN_SENTENCE : "Choose a plan to keep using the coach tools. Your clients can still log workouts."
+      }`;
       break;
     case "active":
       statusLine = "Plan active";
@@ -54,7 +60,7 @@ export function PlanBillingPanel({
       break;
     default:
       statusLine = "Plan inactive";
-      statusDetail = "Choose a plan to keep using the coach tools. Your clients can still log workouts.";
+      statusDetail = e.enforced ? FREE_PLAN_SENTENCE : "Choose a plan to keep using the coach tools. Your clients can still log workouts.";
   }
 
   const showQuote = !e.exempt;

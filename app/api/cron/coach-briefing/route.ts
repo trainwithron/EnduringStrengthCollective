@@ -113,7 +113,7 @@ async function handler(request: Request) {
     }
 
     // The free plan has no nightly briefing (and nothing is left behind to retry).
-    if (await isZeroAiCoach(supabase, coachId)) {
+    if (await isZeroAiCoach(supabase, coachId, { organizationId })) {
       results.push({ coachId, itemCount: 0, skipped: "free plan" });
       return;
     }
