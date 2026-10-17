@@ -21,6 +21,7 @@ describe("duplicate a week without progressions", () => {
     const panel = src("components/coach/desktop/duplicate-week-panel.tsx");
     expect(panel).toContain('type Model = "copy" | "linear" | "double" | "undulating" | "percent_tm";');
     expect(panel).toContain('(["copy", "linear", "double", "undulating", "percent_tm"] as Model[])');
+    expect(panel).toContain('useState<Model>("copy")'); // a plain copy is the starting choice
     expect(panel).toContain('results = generateCopyProgression(source, { weeks: weekCount });');
     expect(panel).toContain('amountPerWeek: model === "copy" ? 0 :');
     expect(panel).toContain('model !== "copy" && !isDistancePace && classRepsEnabled');

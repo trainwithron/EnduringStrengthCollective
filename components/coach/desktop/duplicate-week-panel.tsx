@@ -80,7 +80,7 @@ export function DuplicateWeekPanel({
 }) {
   const { flashSaved, flashSaveError } = useSaveToastChannel();
   const [open, setOpen] = useState(false);
-  const [model, setModel] = useState<Model>("linear");
+  const [model, setModel] = useState<Model>("copy");
   const [weeks, setWeeks] = useState("3");
   const [linearWeightPct, setLinearWeightPct] = useState("2.5");
   const [doubleWeightBumpPct, setDoubleWeightBumpPct] = useState("5");
