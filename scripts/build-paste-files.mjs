@@ -2728,6 +2728,32 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "143",
+  slug: "0391",
+  title: "0391 Release H: getting out of an organization (remove a member and hand over their clients, leave, change a role, cancel or extend an invitation, close the organization)",
+  migrations: ["0391"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes on screen until the Release H code is live (the Team page calls these). Adds functions only; it replaces leave_organization with a version that can hand clients over (the old one-argument call still works). Safe to run before the code is live.",
+  undo: [
+    "drop function if exists public.close_organization(uuid);",
+    "drop function if exists public.extend_org_invite(uuid);",
+    "drop function if exists public.cancel_org_invite(uuid);",
+    "drop function if exists public.set_org_member_role(uuid, uuid, text);",
+    "drop function if exists public.remove_org_member(uuid, uuid, uuid);",
+    "drop function if exists public.leave_organization(uuid, uuid);",
+    "drop function if exists public._detach_coach_from_org(uuid, uuid, uuid, boolean);",
+    "drop function if exists public._solo_org_for(uuid, uuid);",
+    "-- then put the old one-argument leave_organization back by running step 0352 again (apply-step*-0352.sql)",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 143 misbehaves. Run it only while the Release H code is not live (the Team page and the Leave button call these). Removes the new functions; run the 0352 step again to bring the old Leave back. Organizations and groups already moved stay where they are.",
+  rows: [
+    ["0391 is not already applied (the remove function is not there yet)", "to_regprocedure('public.remove_org_member(uuid, uuid, uuid)') is null"],
+    ["the tables it builds on exist", "to_regclass('public.organization_memberships') is not null and to_regclass('public.organization_invites') is not null and to_regclass('public.audit_log') is not null and to_regclass('public.bookings') is not null"],
+    ["the helper functions it uses exist", "to_regprocedure('public.is_org_owner_or_admin(uuid)') is not null and to_regprocedure('public.audit_record(text, text, text, jsonb)') is not null"],
+  ],
+});
+
+STEPS.push({
   n: "142",
   slug: "0390",
   title: "0390 Release H: undo a whole history import (every workout an import creates carries one batch id)",
@@ -2875,7 +2901,7 @@ const BUNDLES = [
   { id: "release-co", name: "Release CO (nothing about a person is public unless they chose it: personal Find a coach listing; a coach adds only their own clients to a challenge; run BEFORE the code that goes with it is live)", steps: ["139"] },
   { id: "release-cn-held", name: "HELD, Ron's word first: require the health form and waiver of every client without one (read check-intake-flag-list.sql first)", steps: ["138"] },
   { id: "release-cm", name: "Release CM (the guard function and a coach's decision on a flagged screening; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["137"] },
-  { id: "release-h-importers", name: "Release H (undo a whole history import; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["142"] },
+  { id: "release-h-importers", name: "Release H (undo a whole history import; getting out of an organization; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["142", "143"] },
   { id: "release-g", name: "Release G (the app at 1,500 clients; real values only in sets; a test-organization mark; pause forgotten workouts; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["141"] },
   { id: "release-cp", name: "Release CP (switch on the guard: the server finishes the health form and waiver; run AFTER the Release D code is live)", steps: ["140"] },
   { id: "release-cl", name: "Release CL (the kind of each set; records per number of reps; a warm-up or drop set never counts; run BEFORE the code that goes with it is live)", steps: ["136"] },
@@ -3151,6 +3177,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
     m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
+    m("0391", "to_regprocedure('public.remove_org_member(uuid, uuid, uuid)') is not null"),
     m("0390", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'athlete_sessions' and column_name = 'import_batch_id')"),
     m("0389", "to_regprocedure('public.business_last_active(uuid[])') is not null"),
     m("0388", "exists (select 1 from pg_trigger where tgname = 'client_intake_guard_completion' and tgrelid = 'public.client_intake'::regclass)"),

@@ -9,6 +9,8 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { BrandingForm } from "@/components/coach/desktop/branding-form";
 import { InviteCoachForm } from "@/components/coach/desktop/invite-coach-form";
 import { ExportBusinessButton } from "@/components/coach/desktop/export-business-button";
+import { TeamMembersPanel } from "@/components/org/team-members-panel";
+import { loadTeamInfo } from "@/lib/org-team";
 import { TransferOwnershipButton } from "@/components/coach/desktop/transfer-ownership-button";
 import { WorkoutCardBackgroundSettings } from "@/components/coach/desktop/workout-card-background-settings";
 import { DispatchSettings } from "@/components/coach/desktop/dispatch-settings";
@@ -128,6 +130,8 @@ export default async function BrandingPage(
     role: m.role,
     fullName: (m.profiles as any)?.full_name ?? "Unknown",
   }));
+
+  const teamInfo = tab === "team" ? await loadTeamInfo(supabase, orgMembership.organization_id) : null;
 
   const { data: tagRows } = await supabase
     .from("client_tags")
@@ -278,20 +282,21 @@ export default async function BrandingPage(
                 Created {org?.created_at ? new Date(org.created_at).toLocaleDateString() : "—"}
               </p>
             </div>
-            <div>
-              <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">
-                Coaches
-              </p>
-              <div className="space-y-1">
-                {members.map((m) => (
-                  <p key={m.profileId} className="font-body text-sm flex items-center justify-between">
-                    <span>{m.fullName}</span>
-                    <span className="text-steel text-xs uppercase tracking-wide">{m.role}</span>
-                  </p>
-                ))}
-              </div>
-            </div>
           </div>
+
+          {teamInfo?.failed && (
+            <p className="font-body text-xs text-rust mb-4" role="alert">
+              Some of this list could not be read, so the client counts may be low. Reload to try again.
+            </p>
+          )}
+          <TeamMembersPanel
+            organizationId={orgMembership.organization_id}
+            organizationName={org?.name ?? "this organization"}
+            me={user.id}
+            myRole={orgMembership.role}
+            members={members.map((m) => ({ profileId: m.profileId, fullName: m.fullName, role: m.role, clients: teamInfo?.clientCounts[m.profileId] ?? 0, soleClients: teamInfo?.soleCoachOfClients[m.profileId] ?? 0 }))}
+            invites={teamInfo?.invites ?? []}
+          />
 
           {isOwnerOrAdmin && (
             <div className="mb-8 flex flex-wrap items-start gap-4">

@@ -157,6 +157,7 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0388 | yes | yes | 15 | 0386 The server finishes the health form (0386 adds, 0388 switches the guard on) |
 | 0389 | yes | yes | 23 | 0389 Scale and data quality |
 | 0390 | yes | yes | 2 | 0390 Import batch undo |
+| 0391 | yes | yes | 32 | 0391 Offboarding |
 | 0331 | yes | yes | 10 | 0331 a payment event and its sessions are recorded in one step |
 | 0329 | yes | yes | 12 | 0329 every session costs exactly 1 credit; the waitlist offer uses the coach's time zone |
 | 0330 | yes | yes | 9 | 0330 only a real coach can have a public page |

@@ -1,6 +1,7 @@
 import { ChangeMyEmail } from "@/components/athlete/change-my-email";
 import { LeaveOrganizationControl } from "@/components/org/leave-organization-control";
 import { orgIdOfGroup } from "@/lib/org-of-group";
+import { loadTeamInfo } from "@/lib/org-team";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
@@ -137,7 +138,7 @@ export default async function SettingsPage(
   const isCoach = membership?.role === "coach";
 
   // A member who is not the owner can leave the organization this group is in.
-  let leaveInfo: { id: string; name: string } | null = null;
+  let leaveInfo: { id: string; name: string; others: { id: string; name: string }[]; soleClients: number } | null = null;
   if (isCoach) {
     const orgIdForLeave = await orgIdOfGroup(supabase, params.groupId);
     if (orgIdForLeave) {
@@ -145,7 +146,19 @@ export default async function SettingsPage(
         supabase.from("organizations").select("name, owner_id").eq("id", orgIdForLeave).maybeSingle(),
         supabase.from("organization_memberships").select("id").eq("organization_id", orgIdForLeave).eq("profile_id", user.id).maybeSingle(),
       ]);
-      if (orgRow && memberRow && orgRow.owner_id !== user.id) leaveInfo = { id: orgIdForLeave, name: orgRow.name as string };
+      if (orgRow && memberRow && orgRow.owner_id !== user.id) {
+        // Who could take over my clients, and how many clients only I coach (so Leave can ask first).
+        const [{ data: others }, team] = await Promise.all([
+          supabase.from("organization_memberships").select("profile_id, profiles ( full_name )").eq("organization_id", orgIdForLeave).neq("profile_id", user.id),
+          loadTeamInfo(supabase, orgIdForLeave),
+        ]);
+        leaveInfo = {
+          id: orgIdForLeave,
+          name: orgRow.name as string,
+          others: ((others ?? []) as any[]).map((o) => ({ id: o.profile_id as string, name: (o.profiles as { full_name?: string } | null)?.full_name ?? "Coach" })),
+          soleClients: team.soleCoachOfClients[user.id] ?? 0,
+        };
+      }
     }
   }
   // The first-name-on-shared-pictures switch (0334). Read on its own so a database that does not have the column yet still shows the whole page (the switch is just left out).
@@ -291,7 +304,7 @@ export default async function SettingsPage(
 
         {isCoach && leaveInfo && (
           <SettingsGroup label="Organization">
-            <LeaveOrganizationControl organizationId={leaveInfo.id} organizationName={leaveInfo.name} />
+            <LeaveOrganizationControl organizationId={leaveInfo.id} organizationName={leaveInfo.name} others={leaveInfo.others} soleClients={leaveInfo.soleClients} />
           </SettingsGroup>
         )}
 
