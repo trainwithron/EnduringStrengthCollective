@@ -3,6 +3,7 @@ import { LeaveOrganizationControl } from "@/components/org/leave-organization-co
 import { orgIdOfGroup } from "@/lib/org-of-group";
 import { loadTeamInfo } from "@/lib/org-team";
 import { CoachTypeSetting } from "@/components/coach/coach-type-setting";
+import { PushPreferences } from "@/components/athlete/push-preferences";
 import { isCoachType, type CoachType } from "@/lib/coach-type";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -171,6 +172,9 @@ export default async function SettingsPage(
     const { count: spaceCount } = await (await createCrossOrgServerClient()).from("group_memberships").select("id", { count: "exact", head: true }).eq("profile_id", user.id).eq("role", "athlete");
     trainsWithSeveralCoaches = (spaceCount ?? 0) > 1;
   }
+  // Quiet hours and private lock screens (0395). Read on its own so a database without the columns yet shows the whole page (the two choices are then left out).
+  const pushPrefsRead = await supabase.from("profiles").select("quiet_hours_start, quiet_hours_end, generic_push_text").eq("id", user.id).maybeSingle();
+  const pushPrefs = pushPrefsRead.error ? null : (pushPrefsRead.data as { quiet_hours_start: number | null; quiet_hours_end: number | null; generic_push_text: boolean | null } | null);
   // What this coach coaches (0392). Read on its own so a database that does not have the column yet still shows the whole page.
   let coachTypeNow: CoachType | null = null;
   if (isCoach) {
@@ -279,6 +283,7 @@ export default async function SettingsPage(
   const notificationsGroup = (
     <SettingsGroup label="Notifications">
           <PushNotificationToggle variant="settings" profileId={user.id} audience={isCoach ? "coach" : "client"} />
+          <PushPreferences profileId={user.id} initialStart={pushPrefs?.quiet_hours_start ?? null} initialEnd={pushPrefs?.quiet_hours_end ?? null} initialGeneric={pushPrefs?.generic_push_text === true} available={!!pushPrefs} />
         </SettingsGroup>
   );
 

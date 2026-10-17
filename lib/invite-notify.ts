@@ -1,5 +1,6 @@
 import { isEmailConfigured, sendEmail } from "@/lib/email";
 import { isPlaceholderEmail } from "@/lib/placeholder-email";
+import { sendPushToProfile } from "@/lib/send-push";
 
 // Tells one existing account about an invitation (or an announcement): an in-app notification, and a plain transactional email to the address on the account when email is set up. Both are best effort and
 // reported separately: the caller's answer to the person who made the invitation must not change with them (it never says whether an address has an account). A refused notification is logged, never ignored.
@@ -10,6 +11,9 @@ export async function notifyAndEmail(
   const { error } = await serviceRole.from("notifications").insert({ profile_id: args.profileId, type: args.type, body: args.body, link_path: args.linkPath });
   const notified = !error;
   if (error) console.error(`[invite-notify] notification (${args.type}) was refused:`, error.message);
+
+  // A push to the phone (a failure, a missing subscription or the person's quiet hours change nothing else: the notice and the email are the reliable ones).
+  await sendPushToProfile(serviceRole, args.profileId, args.subject, args.body, args.linkPath).catch(() => 0);
 
   let emailed = false;
   if (isEmailConfigured()) {

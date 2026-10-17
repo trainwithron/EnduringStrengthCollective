@@ -89,6 +89,10 @@
       "schedule": "45 7 * * *"
     },
     {
+      "path": "/api/cron/notification-push",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/cron/cron-watchdog",
       "schedule": "0 9 * * *"
     }

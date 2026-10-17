@@ -14,7 +14,7 @@ export async function alertPlatformAdmins(subject: string, body: string): Promis
     const db = createServiceRoleClient();
     const { data: admins } = await db.from("profiles").select("id").eq("is_platform_admin", true);
     for (const admin of admins ?? []) {
-      await sendPushToProfile(db, admin.id as string, subject, body.slice(0, 160), "/admin/health").catch(() => 0);
+      await sendPushToProfile(db, admin.id as string, subject, body.slice(0, 160), "/admin/health", { ignoreQuiet: true }).catch(() => 0);
       if (isEmailConfigured()) {
         const { data: authUser } = await db.auth.admin.getUserById(admin.id as string);
         const to = authUser?.user?.email;

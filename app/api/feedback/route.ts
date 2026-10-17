@@ -49,7 +49,7 @@ export async function POST(request: Request) {
   const headline = `${kind === "idea" ? "Idea" : "Problem"} from ${who}`;
   const preview = message.length > 140 ? `${message.slice(0, 140)}...` : message;
   for (const admin of admins ?? []) {
-    await sendPushToProfile(serviceRole, admin.id as string, headline, preview, "/admin/feedback").catch(() => 0);
+    await sendPushToProfile(serviceRole, admin.id as string, headline, preview, "/admin/feedback", { ignoreQuiet: true }).catch(() => 0);
     if (isEmailConfigured()) {
       const { data: authUser } = await serviceRole.auth.admin.getUserById(admin.id as string);
       const to = authUser?.user?.email;

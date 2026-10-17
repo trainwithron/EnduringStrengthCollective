@@ -1,3 +1,4 @@
+import { notifyPaymentReceived } from "@/lib/notify-payment";
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getStripeClient, isStripeConfigured } from "@/lib/stripe";
@@ -440,6 +441,8 @@ export async function POST(request: Request) {
             if (insertError.code === "23505") break; // already processed this event
             throw insertError;
           }
+          // The coach is told (best effort; only the first time this event is handled).
+          await notifyPaymentReceived(supabase, { groupId: quickGroupId, athleteId: quickAthleteId, amountCents: session.amount_total ?? 0, what: session.metadata?.description || "a quick payment" });
           break;
         }
 
@@ -481,6 +484,8 @@ export async function POST(request: Request) {
             p_note: "Package purchased",
           });
           if (grantOnceError) throw grantOnceError;
+          // The coach is told, once: a repeat of an event that was already handled returns false and tells nobody again.
+          if (granted === true) await notifyPaymentReceived(supabase, { groupId, athleteId, amountCents: session.amount_total ?? 0, what: `${credits} session${credits === 1 ? "" : "s"}` });
           // Everything below is safe to run again on a retry (the transfers, the program copy, the group access and the outside notice each check themselves).
 
           const stripeFeeCents = await getRealStripeFeeCents(stripe, session.payment_intent);
@@ -620,6 +625,7 @@ export async function POST(request: Request) {
           p_note: "Membership renewed",
         });
         if (renewalError) throw renewalError;
+        if (renewalGranted === true) await notifyPaymentReceived(supabase, { groupId, athleteId, amountCents: invoice.amount_paid ?? 0, what: "a membership renewal" });
 
         // A paid invoice gives back the group access a lapse took away (a no-op for someone who already has it).
         await grantGroupAccessLogged(supabase, coachPackageId, athleteId);

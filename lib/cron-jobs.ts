@@ -34,6 +34,7 @@ export const CRON_JOBS: CronJob[] = [
   { job: "schedule-requests", path: "/api/cron/schedule-requests", maxAgeHours: DAILY },
   { job: "series-top-up", path: "/api/cron/series-top-up", maxAgeHours: DAILY },
   { job: "close-stale-sessions", path: "/api/cron/close-stale-sessions", maxAgeHours: DAILY },
+  { job: "notification-push", path: "/api/cron/notification-push", maxAgeHours: FREQUENT },
   { job: "cron-watchdog", path: "/api/cron/cron-watchdog", maxAgeHours: DAILY },
 ];
 
@@ -44,6 +45,7 @@ export const MONITORING_STARTED = new Date("2026-10-06T02:39:00Z");
 // A job added after monitoring began is only judged "never run" once this long has passed since it was added (it has had its chance to run). The date is when the job went in.
 export const JOB_ADDED: Record<string, Date> = {
   "close-stale-sessions": new Date("2026-10-17T00:00:00Z"),
+  "notification-push": new Date("2026-10-17T00:00:00Z"),
 };
 export const NEW_JOB_GRACE_HOURS = 48;
 

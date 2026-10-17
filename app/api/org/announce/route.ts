@@ -3,6 +3,8 @@ import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { rateLimitResponse } from "@/lib/rate-limit";
 import { chunk } from "@/lib/chunk";
+import { sendPushToProfile } from "@/lib/send-push";
+import { runPool } from "@/lib/run-pool";
 
 const ANNOUNCEMENT_MAX = 500;
 
@@ -51,5 +53,9 @@ export async function POST(request: Request) {
     }
   }
   if (sent === 0) return NextResponse.json({ error: "Couldn't send it. Try again." }, { status: 502 });
+  // The same message to their phones (best effort, a few at a time; quiet hours and private lock screens apply).
+  await runPool(ids, 8, async (id) => {
+    await sendPushToProfile(db, id, `${(org as { name?: string } | null)?.name ?? "Your organization"}`, `${from}: ${message}`.slice(0, 140), "/dashboard").catch(() => 0);
+  }, { deadlineMs: 20_000 });
   return NextResponse.json({ ok: true, sent, failed });
 }
