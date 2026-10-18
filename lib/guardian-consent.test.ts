@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
-import { GUARDIAN_PACKET_VERSION, ageBand, checkGuardianEmail, checkSignature, guardianPacketText, isUsState, majorityAgeFor, US_STATES } from "./guardian-consent";
+import { GUARDIAN_PACKET_VERSION, ageBand, canonicalMailbox, checkGuardianEmail, checkSignature, guardianPacketText, isUsState, majorityAgeFor, US_STATES } from "./guardian-consent";
 import { hashToken, newToken } from "./guardian-consent-server";
 
 const src = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
@@ -35,6 +35,19 @@ describe("the guardian's address and signature", () => {
     expect(checkGuardianEmail(" Pat@Example.com ", "kid@example.com")).toEqual({ ok: true, email: "pat@example.com" });
     expect(checkGuardianEmail("kid@example.com", "KID@example.com")).toEqual({ ok: false, reason: "same_as_child" });
     for (const bad of ["", "nope", "a@b", "a b@c.com"]) expect(checkGuardianEmail(bad, null).ok, bad).toBe(false);
+  });
+
+  it("an address that reaches the child's own inbox by an alias is refused: plus tags, Gmail dots, googlemail, capitals", () => {
+    const kid = "kid@gmail.com";
+    for (const alias of ["kid+parent@gmail.com", "k.i.d@gmail.com", "KID@GMAIL.COM", "kid@googlemail.com", "k.id+x@googlemail.com"]) {
+      expect(checkGuardianEmail(alias, kid), alias).toEqual({ ok: false, reason: "same_as_child" });
+    }
+    // a different person, or a different domain where dots and tags count, is allowed
+    expect(checkGuardianEmail("kid.parent@gmail.com", kid).ok).toBe(true);
+    expect(checkGuardianEmail("kid@example.com", kid).ok).toBe(true);
+    expect(checkGuardianEmail("k.id@example.com", "kid@example.com").ok).toBe(true);
+    expect(checkGuardianEmail("kid+x@example.com", "kid@example.com")).toEqual({ ok: false, reason: "same_as_child" });
+    expect(canonicalMailbox(" Sam.Lee+tag@GoogleMail.com ")).toBe("samlee@gmail.com");
   });
 
   it("needs a name, a relationship from the list, a state and both boxes", () => {
@@ -135,7 +148,8 @@ vi.mock("@/lib/supabase/service-role", () => ({
 import { POST as sign } from "@/app/api/guardian-consent/sign/route";
 
 const token = "t".repeat(43);
-const body = { token, name: "Pat Parent", relationship: "Parent", state: "AL", understood: true, mayRefuse: true };
+const shownWords = guardianPacketText({ athleteName: "Sam Rivera", coachName: "Coach Dee", state: "AL" });
+const body = { token, name: "Pat Parent", relationship: "Parent", state: "AL", understood: true, mayRefuse: true, shown: createHash("sha256").update(shownWords).digest("hex") };
 const post = (b: unknown, headers: Record<string, string> = {}) => sign(new Request("http://x/api/guardian-consent/sign", { method: "POST", headers, body: JSON.stringify(b) }));
 
 beforeEach(() => {
@@ -184,6 +198,13 @@ describe("signing", () => {
     expect(db.mails.length).toBe(0);
   });
 
+  it("signs only what was read: if the words on the page are not the words the server would show, nothing is signed", async () => {
+    expect((await post({ ...body, shown: "0".repeat(64) })).status).toBe(409);
+    expect((await post({ ...body, shown: undefined })).status).toBe(409);
+    expect(db.updates.find((u) => u.status === "signed")).toBeUndefined();
+    expect(db.mails.length).toBe(0);
+  });
+
   it("the child's own session plays no part: the route has no sign-in and takes nothing but the link and the guardian's answers", () => {
     const route = src("app/api/guardian-consent/sign/route.ts");
     expect(route).not.toContain("createServerClient");
@@ -195,7 +216,8 @@ describe("how the gate is wired", () => {
   it("sends a client under 18 without permission back to the permission screen, covers the health form, and never remembers a minor's pass", () => {
     const mw = src("lib/supabase/middleware.ts");
     expect(mw).toContain('onIntake && facts.gate === "need_dob"');
-    expect(mw).toContain('facts.ageBand === "teen" || facts.ageBand === "under13" ? null');
+    // only an adult with a date on file (or someone who is not a client) is remembered; the old cookie name no longer opens anything
+    expect(mw).toContain("facts.cacheable ? await signDobOk(user.id, process.env.CRON_SECRET) : null");
     for (const open of ['pathname.startsWith("/guardian-consent/")', 'pathname === "/api/guardian-consent/sign"', 'pathname === "/api/guardian-consent/withdraw"']) expect(mw).toContain(open);
     // the request and resend routes are NOT public: they need a signed-in child or coach
     expect(mw).not.toContain('"/api/guardian-consent/request"');
@@ -217,10 +239,32 @@ describe("how the gate is wired", () => {
     expect(src("app/api/guardian-consent/resend/route.ts")).toContain("Only the client's coach can do that.");
   });
 
-  it("the migration is a server-only table and one new function", () => {
+  it("the migration is a server-only table, the state function, and a guard on the birthday", () => {
     const sql = src("supabase/migrations/0402_guardian_consent.sql");
     expect(sql).toContain("revoke all on public.guardian_consents from anon, authenticated;");
     expect(sql).toContain("create unique index if not exists guardian_consents_one_signed");
-    expect(sql).not.toMatch(/create or replace function public\.(?!guardian_consent_state)/);
+    expect(sql).not.toMatch(/create or replace function public\.(?!guardian_consent_state|guard_client_birthday)/);
+    expect(sql).toContain("before update of date_of_birth on public.client_intake");
+    expect(sql).toContain("if old.date_of_birth is not null and new.date_of_birth is distinct from old.date_of_birth then");
+  });
+
+  it("two requests at once cannot cancel each other, the child's own address is looked up for real, and the coach named is always the same one", () => {
+    const server = src("lib/guardian-consent-server.ts");
+    expect(server).toContain('.lt("created_at", row.created_at)');
+    expect(server).not.toContain('.neq("id", row.id)');
+    expect(server).toContain("if (auth.error || !auth.data?.user?.email) return");
+    expect(server).toContain('.order("joined_at", { ascending: true }).order("profile_id")');
+  });
+
+  it("the coach sees who signed and at which address, is told to phone the parent, and can cancel a permission; expired and taken-back requests can be sent again", () => {
+    const ui = src("components/coach/guardian-consent-status.tsx");
+    expect(ui).toContain("{info?.guardian_name} ({info?.relationship}), {info?.guardian_email}");
+    expect(ui).toContain("Phone the parent to confirm it was really them who signed.");
+    expect(ui).toContain("Cancel this permission");
+    expect(ui).toContain('(state === "pending" || state === "expired" || state === "withdrawn")');
+    const route = src("app/api/guardian-consent/void/route.ts");
+    expect(route).toContain('.eq("status", "signed")');
+    expect(route).toContain('status: "withdrawn"');
+    expect(route).toContain("Only the client's coach can do that.");
   });
 });

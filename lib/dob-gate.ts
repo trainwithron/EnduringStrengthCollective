@@ -6,7 +6,8 @@ import { ageBand, type AgeBand, type GuardianConsentState } from "@/lib/guardian
 // ("need_guardian"). A coach, or anyone who is not a client, is never asked.
 export type DobGate = "ok" | "need_dob" | "blocked" | "need_guardian";
 
-export const DOB_OK_COOKIE = "dob_ok";
+// "_v2": passes issued before the rule that a minor is never remembered stopped being honored at that deploy (the name changed and so did the signed text).
+export const DOB_OK_COOKIE = "dob_ok_v2";
 
 // The "already checked" cookie is signed (HMAC with a server secret) so a child cannot write it by hand to skip the check. With no secret configured nothing is cached and the check runs every time.
 async function hmacHex(message: string, secret: string): Promise<string> {
@@ -15,7 +16,7 @@ async function hmacHex(message: string, secret: string): Promise<string> {
   return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 export async function signDobOk(userId: string, secret: string | undefined): Promise<string | null> {
-  return secret ? `${userId}.${await hmacHex(`dob_ok:${userId}`, secret)}` : null;
+  return secret ? `${userId}.${await hmacHex(`dob_ok_v2:${userId}`, secret)}` : null;
 }
 export async function dobOkCookieValid(value: string | undefined, userId: string, secret: string | undefined): Promise<boolean> {
   if (!value || !secret) return false;
@@ -57,6 +58,8 @@ export interface DobGateFacts {
   dateOfBirth: string | null;
   profileBirthday: string | null;
   ageBand: AgeBand;
+  // May this pass be remembered for a week? Only an adult whose date of birth is on file, or someone who is not a client. A client with no date, a teen and a child are checked on every page.
+  cacheable: boolean;
   // Only read for a client aged 13 to 17.
   guardian: GuardianFacts | null;
 }
@@ -67,7 +70,7 @@ export async function loadDobGate(supabase: SupabaseClient, userId: string): Pro
   const rows = (memberships ?? []) as { group_id: string; role: string }[];
   const isClientOnly = rows.some((m) => m.role === "athlete") && !rows.some((m) => m.role === "coach");
   const groupId = rows.find((m) => m.role === "athlete")?.group_id ?? null;
-  if (!isClientOnly) return { gate: "ok", groupId, dateOfBirth: null, profileBirthday: null, ageBand: "unknown", guardian: null };
+  if (!isClientOnly) return { gate: "ok", groupId, dateOfBirth: null, profileBirthday: null, ageBand: "unknown", cacheable: true, guardian: null };
 
   const [{ data: intake }, { data: details }] = await Promise.all([
     supabase.from("client_intake").select("date_of_birth").eq("athlete_id", userId).maybeSingle(),
@@ -81,8 +84,9 @@ export async function loadDobGate(supabase: SupabaseClient, userId: string): Pro
   if (band === "teen") {
     const { data, error } = await supabase.rpc("guardian_consent_state", { p_athlete: userId });
     const row = !error && data && typeof data === "object" ? (data as { state?: string; guardian_email?: string | null; requested_at?: string | null }) : null;
-    const state = row?.state === "signed" || row?.state === "pending" || row?.state === "withdrawn" ? row.state : "none";
+    const state = row?.state === "signed" || row?.state === "pending" || row?.state === "withdrawn" || row?.state === "expired" ? row.state : "none";
     guardian = { state, guardianEmail: row?.guardian_email ?? null, requestedAt: row?.requested_at ?? null };
   }
-  return { gate: dobGateState({ isClientOnly, dateOfBirth, guardianSigned: guardian?.state === "signed" }), groupId, dateOfBirth, profileBirthday, ageBand: band, guardian };
+  const gate = dobGateState({ isClientOnly, dateOfBirth, guardianSigned: guardian?.state === "signed" });
+  return { gate, groupId, dateOfBirth, profileBirthday, ageBand: band, cacheable: gate === "ok" && band === "adult", guardian };
 }

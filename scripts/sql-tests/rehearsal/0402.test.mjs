@@ -49,7 +49,7 @@ export default {
 
       // ---- an expired request is not waiting
       await db.query(`update public.guardian_consents set expires_at = now() - interval '1 day' where token_hash = 'hash-pending'`);
-      h.check("an expired request is no longer 'pending'", (await state(teen, teen)).state === "none");
+      h.check("an expired request shows as 'expired' (with its address, so the coach can resend)", (await state(coach, teen)).state === "expired" && (await state(coach, teen)).guardian_email === "parent@example.com");
 
       // ---- signed
       await db.query(`update public.guardian_consents set status = 'signed', guardian_name = 'Pat Parent', relationship = 'Parent', residence_state = 'AL', majority_age = 19, doc_version = 'v1', doc_sha256 = 'abc', doc_text = 'words', signed_at = now(), signed_ip = '203.0.113.9', signed_user_agent = 'UA' where token_hash = 'hash-pending'`);
@@ -67,6 +67,22 @@ export default {
       h.check("after a withdrawal a newer waiting request is what the child sees", s.state === "pending" && s.guardian_email === "new@example.com", JSON.stringify(s));
       await db.query(`update public.guardian_consents set status = 'replaced' where token_hash = 'hash-new'`);
       h.check("with nothing waiting a withdrawal shows as 'withdrawn'", (await state(teen, teen)).state === "withdrawn");
+
+      // ---- a client cannot rewrite their own date of birth once it is on file
+      await db.query(`insert into public.client_intake (athlete_id, group_id) values ($1, $2) on conflict do nothing`, [teen, g]);
+      await h.as(teen);
+      let u = await tryQ(db, `update public.client_intake set date_of_birth = '2012-05-01' where athlete_id = $1 returning 1`, [teen]);
+      h.check("the first date of birth is the client's to give", !u.error && u.rows.length === 1, JSON.stringify(u));
+      u = await tryQ(db, `update public.client_intake set date_of_birth = '1990-01-01' where athlete_id = $1`, [teen]);
+      h.check("but once on file they cannot change it to an adult's", !!u.error && /corrected by your coach/.test(u.error), JSON.stringify(u));
+      u = await tryQ(db, `update public.client_intake set date_of_birth = '2012-05-01' where athlete_id = $1 returning 1`, [teen]);
+      h.check("writing the same date again is harmless", !u.error, JSON.stringify(u));
+      await h.as(coach);
+      u = await tryQ(db, `update public.client_intake set date_of_birth = '1990-01-01' where athlete_id = $1 returning 1`, [teen]);
+      h.check("a coach has no write on the table either", !u.error && u.rows.length === 0, JSON.stringify(u));
+      await h.asSuper();
+      u = await tryQ(db, `update public.client_intake set date_of_birth = '2011-05-01' where athlete_id = $1`, [teen]);
+      h.check("a correction made by the server (support) goes through", !u.error, JSON.stringify(u));
 
       // ---- the server's own view
       await h.asService();

@@ -14,7 +14,7 @@ export function ageBand(dateOfBirth: string | null | undefined, now: Date = new 
   return isMinorDob(dob, now) ? "teen" : "adult";
 }
 
-export type GuardianConsentState = "none" | "pending" | "signed" | "withdrawn";
+export type GuardianConsentState = "none" | "pending" | "expired" | "signed" | "withdrawn";
 
 export const US_STATES: { code: string; name: string }[] = [
   ["AL", "Alabama"], ["AK", "Alaska"], ["AZ", "Arizona"], ["AR", "Arkansas"], ["CA", "California"], ["CO", "Colorado"], ["CT", "Connecticut"], ["DE", "Delaware"], ["DC", "District of Columbia"],
@@ -77,11 +77,25 @@ export function guardianPacketText(args: { athleteName: string; coachName: strin
 
 export type EmailCheck = { ok: true; email: string } | { ok: false; reason: "invalid" | "same_as_child" };
 
-// The guardian's address must look like an address and must not be the child's own sign-in address (the whole point is a different person's inbox).
+// The mailbox an address reaches, so tricks that point at the same inbox compare equal: lowercase, anything after a "+" in the name dropped, and for Gmail (gmail.com and googlemail.com) the dots in the name dropped.
+export function canonicalMailbox(address: string): string {
+  const email = address.trim().toLowerCase();
+  const at = email.lastIndexOf("@");
+  if (at < 1) return email;
+  let local = email.slice(0, at);
+  let domain = email.slice(at + 1);
+  const plus = local.indexOf("+");
+  if (plus > 0) local = local.slice(0, plus);
+  if (domain === "googlemail.com") domain = "gmail.com";
+  if (domain === "gmail.com") local = local.replace(/\./g, "");
+  return `${local}@${domain}`;
+}
+
+// The guardian's address must look like an address and must not reach the child's own inbox (the whole point is a different person's mailbox): kid+g@gmail.com and k.id@gmail.com are the child's.
 export function checkGuardianEmail(raw: string, childEmail: string | null | undefined): EmailCheck {
   const email = raw.trim().toLowerCase();
   if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return { ok: false, reason: "invalid" };
-  if (childEmail && email === childEmail.trim().toLowerCase()) return { ok: false, reason: "same_as_child" };
+  if (childEmail && canonicalMailbox(email) === canonicalMailbox(childEmail)) return { ok: false, reason: "same_as_child" };
   return { ok: true, email };
 }
 

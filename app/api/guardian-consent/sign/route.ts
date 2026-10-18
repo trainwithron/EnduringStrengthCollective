@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   const byIp = await rateLimitResponse("guardian-sign-ip", ip, 30, 3600);
   if (byIp) return byIp;
 
-  const body = (await request.json().catch(() => ({}))) as { token?: unknown; name?: unknown; relationship?: unknown; state?: unknown; understood?: unknown; mayRefuse?: unknown };
+  const body = (await request.json().catch(() => ({}))) as { token?: unknown; name?: unknown; relationship?: unknown; state?: unknown; understood?: unknown; mayRefuse?: unknown; shown?: unknown };
   const token = typeof body.token === "string" ? body.token : "";
   if (token.length < 20 || token.length > 100) return NextResponse.json({ error: "This link isn't valid." }, { status: 404 });
   const byToken = await rateLimitResponse("guardian-sign-token", hashToken(token).slice(0, 16), 15, 3600);
@@ -45,6 +45,10 @@ export async function POST(request: Request) {
   const childName = (profile as { full_name?: string | null } | null)?.full_name?.trim() || "your child";
   const text = guardianPacketText({ athleteName: childName, coachName: coach, state: fields.state });
   const sha = createHash("sha256").update(text).digest("hex");
+  // What was signed must be what was read: the page sends the fingerprint of the words it showed. If the words built here differ (the coach's name changed between opening the page and signing), nothing is signed.
+  if (typeof body.shown !== "string" || body.shown !== sha) {
+    return NextResponse.json({ error: "The words on this page changed since you opened it. Reload the page and read them again before you sign." }, { status: 409 });
+  }
   const signedAt = new Date().toISOString();
 
   // Signed only if it is STILL waiting (two taps at once sign once).

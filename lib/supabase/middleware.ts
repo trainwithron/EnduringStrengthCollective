@@ -221,8 +221,8 @@ export async function updateSession(request: NextRequest) {
       });
       return redirectResponse;
     }
-    // A client under 18 is checked every time (a guardian can withdraw permission at any moment); only an adult, or someone who is not a client, is remembered for a week.
-    const signed = facts.ageBand === "teen" || facts.ageBand === "under13" ? null : await signDobOk(user.id, process.env.CRON_SECRET);
+    // Only an adult whose date of birth is on file, or someone who is not a client, is remembered for a week (facts.cacheable). A client with no date yet, a teen (a guardian can withdraw at any moment) and a child are checked every time.
+    const signed = facts.cacheable ? await signDobOk(user.id, process.env.CRON_SECRET) : null;
     if (signed) response.cookies.set(DOB_OK_COOKIE, signed, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 24 * 7 });
   }
 

@@ -1,6 +1,7 @@
 {
   "app/api/guardian-consent/resend/route.ts": 1,
   "app/api/guardian-consent/sign/route.ts": 1,
+  "app/api/guardian-consent/void/route.ts": 1,
   "app/api/guardian-consent/withdraw/route.ts": 1,
   "app/api/intake/minor-consent-notice/route.ts": 1,
   "app/scan/[exerciseId]/page.tsx": 1,

@@ -5,7 +5,7 @@
 -- failed check, and NOTHING is kept, so a second run after a refusal is safe.
 -- WHAT YOU SHOULD SEE: first "Success" for the transaction, then a result table with one row per step and in_place = true on every row.
 -- ON ERROR: run   rollback;   once, copy the red text, send it to Spot. Do not run it again.
--- AFTER STEP 154: Nothing changes on screen until the Release V1 code is live. Adds one empty server-only table and one function (guardian_consent_state). Apply this BEFORE the Release V1 code is deployed: with the code live, every client aged 13 to 17 is stopped at a permission screen until a parent or guardian signs.
+-- AFTER STEP 154: Nothing changes on screen until the Release V1 code is live. Adds one empty server-only table, one function (guardian_consent_state) and a guard on client_intake: once a date of birth is on file, a signed-in client can no longer change it from their browser (a correction goes through support). Apply this BEFORE the Release V1 code is deployed: with the code live, every client aged 13 to 17 is stopped at a permission screen until a parent or guardian signs.
 -- It contains no text searching, so editor re-indenting cannot break it.
 
 begin;
@@ -18,7 +18,7 @@ begin
   select string_agg(check_name, '; ') into failed from (
     values
       ('0402 is not already applied (the consent table is not there yet)', to_regclass('public.guardian_consents') is null),
-      ('the tables and helper it uses exist', to_regclass('public.profiles') is not null and to_regclass('public.group_memberships') is not null and to_regprocedure('public.is_group_coach(uuid)') is not null)
+      ('the tables and helper it uses exist', to_regclass('public.profiles') is not null and to_regclass('public.group_memberships') is not null and to_regclass('public.client_intake') is not null and to_regprocedure('public.is_group_coach(uuid)') is not null)
   ) as checks(check_name, ok) where not ok;
   if failed is not null then
     raise exception 'Release V1 (a parent or guardian''s consent for clients aged 13 to 17; adds only, but apply BEFORE the code that goes with it is live), step 154 (0402) cannot run: this step looks already applied, or the database is not in the state it expects. Failed checks: %. NOTHING was changed (the whole bundle is all or nothing). If an earlier step was applied by hand, use the single-step files for the rest, and send Spot this message.', failed;
@@ -58,7 +58,8 @@ create table if not exists public.guardian_consents (
   signed_ip text,
   signed_user_agent text,
   copy_emailed_at timestamptz,
-  withdrawn_at timestamptz
+  withdrawn_at timestamptz,
+  voided_by uuid references public.profiles(id) on delete set null
 );
 create index if not exists guardian_consents_athlete_idx on public.guardian_consents (athlete_id, created_at desc);
 -- a child has at most one live signature at a time
@@ -88,19 +89,16 @@ begin
   ) then
     return null;
   end if;
-  -- a signature that stands wins; then a request still waiting; then the latest withdrawal
+  -- a signature that stands wins; otherwise the latest request that was not replaced: waiting, run out of time ('expired'), or taken back
   select * into r from public.guardian_consents where athlete_id = p_athlete and status = 'signed' limit 1;
   if not found then
-    select * into r from public.guardian_consents where athlete_id = p_athlete and status = 'pending' and expires_at > now() order by created_at desc limit 1;
-  end if;
-  if not found then
-    select * into r from public.guardian_consents where athlete_id = p_athlete and status = 'withdrawn' order by withdrawn_at desc nulls last limit 1;
+    select * into r from public.guardian_consents where athlete_id = p_athlete and status in ('pending', 'withdrawn') order by created_at desc limit 1;
   end if;
   if not found then
     return jsonb_build_object('state', 'none');
   end if;
   return jsonb_build_object(
-    'state', case r.status when 'signed' then 'signed' when 'pending' then 'pending' else 'withdrawn' end,
+    'state', case when r.status = 'signed' then 'signed' when r.status = 'withdrawn' then 'withdrawn' when r.expires_at > now() then 'pending' else 'expired' end,
     'guardian_email', r.guardian_email,
     'guardian_name', r.guardian_name,
     'relationship', r.relationship,
@@ -113,6 +111,29 @@ end;
 $$;
 revoke execute on function public.guardian_consent_state(uuid) from public, anon;
 grant execute on function public.guardian_consent_state(uuid) to authenticated, service_role;
+
+-- A client cannot rewrite their own date of birth once it is on file. Without this, a client stopped as under 13 (or without a guardian's permission) could change it to an adult's in their own browser and pass the gate.
+-- The first date is the client's own to give; a correction goes through support or the server (the service role has no signed-in person and passes). A coach has no write on this table.
+create or replace function public.guard_client_birthday()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if auth.uid() is null or auth.role() = 'service_role' then
+    return new;
+  end if;
+  if old.date_of_birth is not null and new.date_of_birth is distinct from old.date_of_birth then
+    raise exception 'A date of birth that is on file can only be corrected by your coach through support.' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+revoke execute on function public.guard_client_birthday() from public, anon, authenticated;
+drop trigger if exists client_intake_guard_birthday on public.client_intake;
+create trigger client_intake_guard_birthday
+  before update of date_of_birth on public.client_intake
+  for each row execute function public.guard_client_birthday();
 
 commit;
 

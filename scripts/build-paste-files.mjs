@@ -2921,15 +2921,17 @@ STEPS.push({
   title: "0402 Release V1: a parent or guardian's consent for a client aged 13 to 17 (a server-only table of requests and signatures, and one function that says where a client's consent stands)",
   migrations: ["0402"],
   sees: "Success. No rows returned.",
-  afterwards: "Nothing changes on screen until the Release V1 code is live. Adds one empty server-only table and one function (guardian_consent_state). Apply this BEFORE the Release V1 code is deployed: with the code live, every client aged 13 to 17 is stopped at a permission screen until a parent or guardian signs.",
+  afterwards: "Nothing changes on screen until the Release V1 code is live. Adds one empty server-only table, one function (guardian_consent_state) and a guard on client_intake: once a date of birth is on file, a signed-in client can no longer change it from their browser (a correction goes through support). Apply this BEFORE the Release V1 code is deployed: with the code live, every client aged 13 to 17 is stopped at a permission screen until a parent or guardian signs.",
   undo: [
+    "drop trigger if exists client_intake_guard_birthday on public.client_intake;",
+    "drop function if exists public.guard_client_birthday();",
     "drop function if exists public.guardian_consent_state(uuid);",
     "drop table if exists public.guardian_consents;",
   ].join(String.fromCharCode(10)),
   undoWhy: "Only if step 154 misbehaves. Run it only while the Release V1 code is not live. Removes every request and every signed permission (the signed words and fingerprints go with them).",
   rows: [
     ["0402 is not already applied (the consent table is not there yet)", "to_regclass('public.guardian_consents') is null"],
-    ["the tables and helper it uses exist", "to_regclass('public.profiles') is not null and to_regclass('public.group_memberships') is not null and to_regprocedure('public.is_group_coach(uuid)') is not null"],
+    ["the tables and helper it uses exist", "to_regclass('public.profiles') is not null and to_regclass('public.group_memberships') is not null and to_regclass('public.client_intake') is not null and to_regprocedure('public.is_group_coach(uuid)') is not null"],
   ],
 });
 

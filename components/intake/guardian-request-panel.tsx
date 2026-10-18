@@ -8,6 +8,7 @@ import type { GuardianConsentState } from "@/lib/guardian-consent";
 export function GuardianRequestPanel({ state, guardianEmail, requestedAt, coachName }: { state: GuardianConsentState; guardianEmail: string | null; requestedAt: string | null; coachName: string | null }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
+  // A request still waiting shows where it stands; none yet, one that ran out of time, or one taken back asks for an address.
   const [asking, setAsking] = useState(state !== "pending");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +38,11 @@ export function GuardianRequestPanel({ state, guardianEmail, requestedAt, coachN
 
   return (
     <div className="border border-steel/20 p-6 space-y-4">
+      {state === "expired" && (
+        <p className="font-body text-sm text-rust" role="status">
+          The last request ran out of time. Send a new one.
+        </p>
+      )}
       {state === "withdrawn" && (
         <p className="font-body text-sm text-rust" role="status">
           A parent or guardian took back their permission, so training is paused until they give it again.

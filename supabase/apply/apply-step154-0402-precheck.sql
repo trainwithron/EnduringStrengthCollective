@@ -8,5 +8,5 @@ from (
     ('0402 is not already applied (the consent table is not there yet)',
       to_regclass('public.guardian_consents') is null),
     ('the tables and helper it uses exist',
-      to_regclass('public.profiles') is not null and to_regclass('public.group_memberships') is not null and to_regprocedure('public.is_group_coach(uuid)') is not null)
+      to_regclass('public.profiles') is not null and to_regclass('public.group_memberships') is not null and to_regclass('public.client_intake') is not null and to_regprocedure('public.is_group_coach(uuid)') is not null)
 ) as checks(check_name, ok);

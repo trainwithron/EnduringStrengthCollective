@@ -26,7 +26,10 @@ export function GuardianConsentForm({ token, childName, coachName, signed }: { t
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/guardian-consent/sign", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token, name, relationship, state, understood, mayRefuse }) });
+      // The fingerprint of the exact words on the screen: the server signs only if it would show the same words.
+      const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+      const shown = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+      const res = await fetch("/api/guardian-consent/sign", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token, name, relationship, state, understood, mayRefuse, shown }) });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(d.error ?? "Couldn't record that. Try again.");

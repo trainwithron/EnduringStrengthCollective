@@ -12,10 +12,11 @@ export type RequestResult = { ok: true } | { ok: false; status: number; error: s
 
 // Who the child's coach is (the first coach of the first group they train in), for the words the guardian reads. Best effort: "their coach" when unknown.
 export async function coachNameFor(db: SupabaseClient, athleteId: string): Promise<string | null> {
-  const { data: seats } = await db.from("group_memberships").select("group_id").eq("profile_id", athleteId).eq("role", "athlete").limit(5);
+  const { data: seats } = await db.from("group_memberships").select("group_id").eq("profile_id", athleteId).eq("role", "athlete").order("group_id").limit(5);
   const groupIds = (seats ?? []).map((s: { group_id: string }) => s.group_id);
   if (groupIds.length === 0) return null;
-  const { data } = await db.from("group_memberships").select("profiles ( full_name )").in("group_id", groupIds).eq("role", "coach").limit(1);
+  // The same coach every time (earliest seat, then id), so the words recorded, the words shown and the words emailed always name the same person.
+  const { data } = await db.from("group_memberships").select("profiles ( full_name )").in("group_id", groupIds).eq("role", "coach").order("joined_at", { ascending: true }).order("profile_id").limit(1);
   const p = (data as unknown as { profiles: { full_name: string | null } | { full_name: string | null }[] | null }[] | null)?.[0]?.profiles;
   return (Array.isArray(p) ? p[0]?.full_name : p?.full_name) ?? null;
 }
@@ -34,7 +35,9 @@ export async function requestGuardianConsent(db: SupabaseClient, args: { athlete
   if (band === "under13") return { ok: false, status: 400, error: "Spotlight Coaching is for people 13 and older." };
   if (band !== "teen") return { ok: false, status: 400, error: "A guardian's permission is only needed for someone aged 13 to 17." };
 
-  const checked = checkGuardianEmail(args.guardianEmail, auth.data?.user?.email);
+  // If the child's own address cannot be read the check against it cannot be made: that is an error, not a pass.
+  if (auth.error || !auth.data?.user?.email) return { ok: false, status: 502, error: "Couldn't check that address just now. Try again in a moment." };
+  const checked = checkGuardianEmail(args.guardianEmail, auth.data.user.email);
   if (!checked.ok) {
     return { ok: false, status: 400, error: checked.reason === "same_as_child" ? "That is your own email address. Use your parent's or guardian's." : "Enter a real email address." };
   }
@@ -53,7 +56,7 @@ export async function requestGuardianConsent(db: SupabaseClient, args: { athlete
       requested_by: args.requestedBy,
       expires_at: new Date(Date.now() + GUARDIAN_LINK_DAYS * 86400000).toISOString(),
     })
-    .select("id")
+    .select("id, created_at")
     .single();
   if (insertError || !row) return { ok: false, status: 502, error: "Couldn't make the request. Try again." };
 
@@ -78,7 +81,7 @@ Spotlight Coaching`
     await db.from("guardian_consents").delete().eq("id", row.id);
     return { ok: false, status: 502, error: "The email could not be sent just now. Try again in a moment." };
   }
-  // The request is out: older waiting requests stop working.
-  await db.from("guardian_consents").update({ status: "replaced" }).eq("athlete_id", args.athleteId).eq("status", "pending").neq("id", row.id);
+  // The request is out: waiting requests OLDER than this one stop working. Only older ones, so two requests made at the same moment (the child's and the coach's) cannot cancel each other: the newest survives.
+  await db.from("guardian_consents").update({ status: "replaced" }).eq("athlete_id", args.athleteId).eq("status", "pending").lt("created_at", row.created_at);
   return { ok: true };
 }

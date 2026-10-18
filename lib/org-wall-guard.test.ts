@@ -49,6 +49,7 @@ const REVIEWED_PERMISSION_ONLY = new Set([
   "components/timezone-capture.tsx",
   // checks that the caller coaches a group the client trains in before re-sending that client's guardian request
   "app/api/guardian-consent/resend/route.ts",
+  "app/api/guardian-consent/void/route.ts",
   // only decides whether the menus show the selling tools: it asks if the coach has any client of their own in their one-on-one spaces (one row), nothing is listed or shown
   "components/coach/use-coach-type.ts",
   "lib/collective-intelligence-lookups.ts",
