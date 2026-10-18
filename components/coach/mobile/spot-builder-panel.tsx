@@ -150,7 +150,7 @@ export function SpotBuilderPanel({
         </p>
 
         {!initialAthleteId && (
-          <select
+          <select aria-label="Client"
             value={athleteId ?? ""}
             onChange={(e) => {
               const c = (clients ?? []).find((c) => c.id === e.target.value);
@@ -168,7 +168,7 @@ export function SpotBuilderPanel({
           </select>
         )}
 
-        <input
+        <input aria-label="Describe the program"
           type="text"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
@@ -226,7 +226,7 @@ export function SpotBuilderPanel({
         ) : (
           <div className="mb-3">
             <label className="font-body text-xs text-steel uppercase tracking-wide">{term("client", "singular", { cap: true })}</label>
-            <select
+            <select aria-label="Client"
               value={athleteId ?? ""}
               onChange={(e) => {
                 const c = (clients ?? []).find((c) => c.id === e.target.value);
@@ -245,7 +245,7 @@ export function SpotBuilderPanel({
           </div>
         )}
 
-        <textarea
+        <textarea aria-label="Describe the program"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           rows={2}
@@ -256,7 +256,7 @@ export function SpotBuilderPanel({
         <div className="grid grid-cols-3 gap-2 mt-3">
           <div>
             <label className="font-body text-xs text-steel uppercase tracking-wide">Progression</label>
-            <select
+            <select aria-label="Progression"
               value={progressionRule}
               onChange={(e) => setProgressionRule(e.target.value as ProgressionRule)}
               className="w-full h-9 mt-1 bg-graphite border border-steel/30 text-chalk px-1 font-body text-xs"
@@ -270,7 +270,7 @@ export function SpotBuilderPanel({
           </div>
           <div>
             <label className="font-body text-xs text-steel uppercase tracking-wide">Weeks</label>
-            <input
+            <input aria-label="Weeks"
               type="number"
               min={1}
               max={16}

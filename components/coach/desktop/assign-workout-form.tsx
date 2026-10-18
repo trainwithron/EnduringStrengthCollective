@@ -93,7 +93,7 @@ export function AssignWorkoutForm({
 
   return (
     <div className="space-y-2">
-      <select
+      <select aria-label="Workout to assign"
         value={workoutId}
         onChange={(e) => setWorkoutId(e.target.value)}
         className="w-full h-10 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"

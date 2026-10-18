@@ -262,7 +262,7 @@ export function ProShopManager({ initialLinks, organizationId, groups = [] }: { 
           placeholder="Title (e.g. Team Merch Store)"
           className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm"
         />
-        <select
+        <select aria-label="Category"
           value={category}
           onChange={(e) => setCategory(e.target.value)}
           className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm"

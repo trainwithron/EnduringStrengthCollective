@@ -939,7 +939,7 @@ export function ExerciseBuilderCard({
       {!collapsed && (
         <>
           {movementPatterns.length > 0 && (
-            <select
+            <select aria-label="Movement pattern"
               value={exercise.movementPatternId ?? ""}
               onChange={(e) => handleMovementPatternChange(e.target.value)}
               className="w-full h-9 mb-2 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust"

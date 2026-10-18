@@ -558,7 +558,7 @@ function IngredientEditor({
           placeholder="Chicken Breast"
           className="h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust"
         />
-        <select
+        <select aria-label="Ingredient role"
           value={ingredient.role}
           onChange={(e) => {
             const role = e.target.value as IngredientRole;

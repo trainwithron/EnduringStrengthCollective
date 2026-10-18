@@ -168,7 +168,7 @@ export function NewPostComposer({
           </button>
         </div>
 
-        <textarea
+        <textarea aria-label={placeholderForChannel(defaultChannel)}
           value={body}
           onChange={(e) => {
             setBody(e.target.value);

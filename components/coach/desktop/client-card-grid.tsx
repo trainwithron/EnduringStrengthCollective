@@ -652,7 +652,7 @@ export function ClientCardGrid({
           {selectedIds.size > 0 && (
             <div className="flex items-center gap-2">
               <span className="font-body text-xs text-steel">{selectedIds.size} selected</span>
-              <select
+              <select aria-label="Client type for everyone selected"
                 value={bulkTier ?? ""}
                 onChange={(e) => setBulkTier((e.target.value || null) as ClientTier)}
                 className="h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs"
@@ -786,7 +786,7 @@ export function ClientCardGrid({
                 )}
 
                 <div className="flex items-center gap-2 w-full justify-center mt-1">
-                  <select
+                  <select aria-label="Client type"
                     value={member.clientTier ?? ""}
                     onChange={(e) => handleTierChange(member, (e.target.value || null) as ClientTier)}
                     className="h-7 bg-graphite border border-steel/30 rounded-token-sm text-chalk px-1.5 font-body text-xs"

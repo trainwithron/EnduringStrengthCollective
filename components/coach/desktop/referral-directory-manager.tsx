@@ -138,7 +138,7 @@ export function ReferralDirectoryManager({ initialPartners, organizationId }: { 
           placeholder="Name"
           className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm"
         />
-        <select
+        <select aria-label="Specialty"
           value={specialty}
           onChange={(e) => setSpecialty(e.target.value)}
           className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm"

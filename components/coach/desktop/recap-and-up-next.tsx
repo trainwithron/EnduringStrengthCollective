@@ -288,7 +288,7 @@ export function RecapAndUpNext({
         <div ref={swapDialogRef} role="dialog" aria-modal="true" aria-label="Swap exercise" className="fixed inset-0 z-40 bg-graphite flex items-center justify-center p-6">
           <div className="bg-surface border border-steel/30 w-full max-w-sm p-5">
             <h3 className="font-display uppercase text-sm tracking-wide mb-3">Swap exercise</h3>
-            <input
+            <input aria-label="New exercise name"
               type="text"
               autoFocus
               value={swapDraft}

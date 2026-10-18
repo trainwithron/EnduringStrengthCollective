@@ -205,7 +205,7 @@ export function StartWorkoutButton({
       {loggedByCoach && sessionTypes && sessionTypes.length > 0 && (
         <div className="mb-2 flex items-center gap-2 justify-center">
           <label className="font-body text-xs text-steel uppercase tracking-wide">Session type</label>
-          <select
+          <select aria-label="Session type"
             value={sessionTypeId}
             onChange={(e) => setSessionTypeId(e.target.value)}
             className="h-11 bg-surface border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust"

@@ -298,7 +298,7 @@ export function InlineCommentSection({
         </div>
       )}
       <div className="flex items-center gap-2">
-        <input
+        <input aria-label="Add a comment"
           ref={inputRef}
           type="text"
           value={body}

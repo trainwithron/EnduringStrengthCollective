@@ -50,7 +50,7 @@ export function WaiverSettings({
         <span className="font-body text-xs text-steel uppercase tracking-wide">
           Waiver text (used only when no PDF is uploaded above)
         </span>
-        <textarea
+        <textarea aria-label="Waiver text"
           value={text}
           onChange={(e) => setText(e.target.value)}
           onBlur={handleBlur}

@@ -181,7 +181,7 @@ export function ClientSignInPanel({
             One-time link — works once and expires in 48 hours. Creating a new one cancels this one.
           </p>
           <div className="flex items-center gap-2">
-            <input
+            <input aria-label="Sign-in link"
               readOnly
               value={link}
               onFocus={(e) => e.target.select()}

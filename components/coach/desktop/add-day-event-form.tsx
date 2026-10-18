@@ -52,7 +52,7 @@ export function AddDayEventForm({ coachId, dateKey, organizationId }: { coachId:
           className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2.5 font-body text-sm"
         />
       </div>
-      <input
+      <input aria-label="Time (optional)"
         type="time"
         value={time}
         onChange={(e) => setTime(e.target.value)}

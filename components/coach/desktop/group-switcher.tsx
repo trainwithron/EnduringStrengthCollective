@@ -390,7 +390,7 @@ export function GroupSwitcher({
     <div className="px-5 pt-6 pb-5 border-b border-steel/20 relative group" ref={containerRef}>
       <p className="font-body text-xs text-steel uppercase tracking-wide">Coaching</p>
       {editingName ? (
-        <input
+        <input aria-label="Group name"
           type="text"
           autoFocus
           value={nameDraft}

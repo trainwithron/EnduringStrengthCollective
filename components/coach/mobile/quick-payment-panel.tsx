@@ -88,7 +88,7 @@ export function QuickPaymentPanel({ groupId }: { groupId: string }) {
           </div>
         ) : (
           <>
-            <input
+            <input aria-label={`Search ${term("client", "plural")}`}
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}

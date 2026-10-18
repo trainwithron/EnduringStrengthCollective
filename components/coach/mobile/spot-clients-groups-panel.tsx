@@ -365,7 +365,7 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
 
       <div>
         <p className="font-body text-xs text-steel uppercase tracking-wide mb-1.5">{term("client", "plural", { cap: true })}</p>
-        <input
+        <input aria-label={`Search ${term("client", "plural")}`}
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}

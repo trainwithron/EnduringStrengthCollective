@@ -193,7 +193,7 @@ export function DailyMacrosForm({
         <label className="font-body text-xs text-steel uppercase tracking-wide">
           Calories
         </label>
-        <input
+        <input aria-label="Calories"
           type="number"
           min="0"
           value={calories}
@@ -206,7 +206,7 @@ export function DailyMacrosForm({
         <label className="font-body text-xs text-steel uppercase tracking-wide">
           Body weight (lbs) — sets protein at {PROTEIN_G_PER_LB}g/lb
         </label>
-        <input
+        <input aria-label="Body weight (lbs)"
           type="number"
           min="0"
           value={bodyWeight}
@@ -232,7 +232,7 @@ export function DailyMacrosForm({
           <label className="font-body text-xs text-steel uppercase tracking-wide">
             Protein (g)
           </label>
-          <input
+          <input aria-label="Protein (g)"
             type="number"
             min="0"
             value={protein}
@@ -244,7 +244,7 @@ export function DailyMacrosForm({
           <label className="font-body text-xs text-steel uppercase tracking-wide">
             Carbs (g)
           </label>
-          <input
+          <input aria-label="Carbs (g)"
             type="number"
             min="0"
             value={carbs}
@@ -256,7 +256,7 @@ export function DailyMacrosForm({
           <label className="font-body text-xs text-steel uppercase tracking-wide">
             Fat (g)
           </label>
-          <input
+          <input aria-label="Fat (g)"
             type="number"
             min="0"
             value={fat}

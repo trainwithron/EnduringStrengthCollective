@@ -586,7 +586,7 @@ export function ExerciseLibraryList({
                         // above the list.
                         <span className="font-body text-xs text-amber-400">⚠ No video</span>
                       )}
-                      <select
+                      <select aria-label="Category"
                         value={ex.category ?? ""}
                         onChange={(e) => handleCategoryChange(ex.id, e.target.value)}
                         className="h-8 bg-surface border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust"

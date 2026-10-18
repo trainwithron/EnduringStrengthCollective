@@ -122,14 +122,14 @@ export function OrgTrainerRequestForm({ organizationId, orgName }: { organizatio
         />
 
         <div className="flex gap-2">
-          <input
+          <input aria-label="Preferred date"
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
             required
             className="flex-1 h-11 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
           />
-          <input
+          <input aria-label="Preferred time"
             type="time"
             value={time}
             onChange={(e) => setTime(e.target.value)}
@@ -137,7 +137,7 @@ export function OrgTrainerRequestForm({ organizationId, orgName }: { organizatio
             className="flex-1 h-11 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
           />
         </div>
-        <select
+        <select aria-label="Time zone"
           value={timezone}
           onChange={(e) => setTimezone(e.target.value)}
           className="w-full h-11 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
@@ -150,7 +150,7 @@ export function OrgTrainerRequestForm({ organizationId, orgName }: { organizatio
           ))}
         </select>
 
-        <select
+        <select aria-label="Goal"
           value={goalType}
           onChange={(e) => setGoalType(e.target.value)}
           required

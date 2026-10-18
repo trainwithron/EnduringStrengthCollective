@@ -104,7 +104,7 @@ export function GoalAnswerControl({ goal, groupId, coachIds }: { goal: Suggested
         <div className="space-y-3">
           <div>
             <label className="font-body text-xs text-steel uppercase tracking-wide">Goal</label>
-            <select value={goalType} onChange={(e) => setGoalType(e.target.value as GoalType)} className="w-full h-11 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm mt-1">
+            <select aria-label="Goal" value={goalType} onChange={(e) => setGoalType(e.target.value as GoalType)} className="w-full h-11 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm mt-1">
               {GOAL_TYPE_ORDER.map((t) => (
                 <option key={t} value={t}>
                   {GOAL_TYPE_LABELS[t]}
@@ -117,11 +117,11 @@ export function GoalAnswerControl({ goal, groupId, coachIds }: { goal: Suggested
           )}
           <div>
             <label className="font-body text-xs text-steel uppercase tracking-wide">Target date (optional)</label>
-            <input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} className="w-full h-11 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm mt-1" />
+            <input aria-label="Target date (optional)" type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} className="w-full h-11 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm mt-1" />
           </div>
           <div>
             <label className="font-body text-xs text-steel uppercase tracking-wide">Anything to add? (optional)</label>
-            <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} className="w-full bg-surface border border-steel/30 text-chalk px-2 py-1.5 font-body text-sm mt-1" />
+            <textarea aria-label="Anything to add? (optional)" value={note} onChange={(e) => setNote(e.target.value)} rows={2} className="w-full bg-surface border border-steel/30 text-chalk px-2 py-1.5 font-body text-sm mt-1" />
           </div>
           <div className="flex items-center gap-2">
             <button type="button" disabled={busy} onClick={saveChange} className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40">

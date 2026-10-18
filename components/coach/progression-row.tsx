@@ -236,7 +236,7 @@ export function ProgressionRow({
                 <label className="font-body text-xs text-steel uppercase tracking-wide">
                   Weight increment / occurrence
                 </label>
-                <input
+                <input aria-label="Weight increment per occurrence"
                   type="number"
                   value={weightIncrement}
                   onChange={(e) => setWeightIncrement(e.target.value)}
@@ -247,7 +247,7 @@ export function ProgressionRow({
                 <label className="font-body text-xs text-steel uppercase tracking-wide">
                   Rep increment / occurrence
                 </label>
-                <input
+                <input aria-label="Rep increment per occurrence"
                   type="number"
                   value={repIncrement}
                   onChange={(e) => setRepIncrement(e.target.value)}
@@ -263,7 +263,7 @@ export function ProgressionRow({
                 <label className="font-body text-xs text-steel uppercase tracking-wide">
                   Rep scheme (repeats, e.g. 5,3,5,3)
                 </label>
-                <input
+                <input aria-label="Rep scheme"
                   type="text"
                   value={repsPattern}
                   onChange={(e) => setRepsPattern(e.target.value)}
@@ -274,7 +274,7 @@ export function ProgressionRow({
                 <label className="font-body text-xs text-steel uppercase tracking-wide">
                   Weight deltas from occurrence 1 (repeats, e.g. 0,10,-5,15)
                 </label>
-                <input
+                <input aria-label="Weight changes from the first occurrence"
                   type="text"
                   value={weightDeltas}
                   onChange={(e) => setWeightDeltas(e.target.value)}
@@ -288,7 +288,7 @@ export function ProgressionRow({
             <div className="flex gap-2">
               <div className="w-20">
                 <label className="font-body text-xs text-steel uppercase tracking-wide">Low</label>
-                <input
+                <input aria-label="Low reps"
                   type="number"
                   value={repRangeLow}
                   onChange={(e) => setRepRangeLow(e.target.value)}
@@ -297,7 +297,7 @@ export function ProgressionRow({
               </div>
               <div className="w-20">
                 <label className="font-body text-xs text-steel uppercase tracking-wide">High</label>
-                <input
+                <input aria-label="High reps"
                   type="number"
                   value={repRangeHigh}
                   onChange={(e) => setRepRangeHigh(e.target.value)}
@@ -308,7 +308,7 @@ export function ProgressionRow({
                 <label className="font-body text-xs text-steel uppercase tracking-wide">
                   Weight increment on success
                 </label>
-                <input
+                <input aria-label="Weight increment on success"
                   type="number"
                   value={dpWeightIncrement}
                   onChange={(e) => setDpWeightIncrement(e.target.value)}

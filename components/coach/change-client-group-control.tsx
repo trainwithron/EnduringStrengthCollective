@@ -218,7 +218,7 @@ export function ChangeClientGroupControl({
         ))}
       </div>
       {destination === "existing" ? (
-        <select
+        <select aria-label="Group to move them to"
           value={selectedGroupId}
           onChange={(e) => setSelectedGroupId(e.target.value)}
           disabled={loadingOrgGroups}
