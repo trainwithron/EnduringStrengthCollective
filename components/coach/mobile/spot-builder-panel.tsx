@@ -281,7 +281,7 @@ export function SpotBuilderPanel({
           </div>
           <div>
             <label className="font-body text-xs text-steel uppercase tracking-wide">Style</label>
-            <input
+            <input aria-label="Conjugate"
               type="text"
               value={programType}
               onChange={(e) => setProgramType(e.target.value)}

@@ -49,7 +49,7 @@ export function AthleteNotesEditor({
 
   return (
     <div>
-      <textarea
+      <textarea aria-label="Private notes for this client — injuries, goals, anything to remember. Only you can see this."
         value={body}
         onChange={(e) => setBody(e.target.value)}
         onBlur={handleBlur}

@@ -88,7 +88,7 @@ export function GoalProposalForm({ athleteId, groupId, suggestedBy, fromWords }:
       </div>
 
       {goalType === "custom" && (
-        <input
+        <input aria-label="Describe your goal"
           value={customLabel}
           onChange={(e) => setCustomLabel(e.target.value)}
           placeholder="Describe your goal"
@@ -98,7 +98,7 @@ export function GoalProposalForm({ athleteId, groupId, suggestedBy, fromWords }:
 
       {goalTypeHasEventFields(goalType) && (
         <div className="grid grid-cols-2 gap-2">
-          <input
+          <input aria-label="Sport / event"
             value={eventType}
             onChange={(e) => setEventType(e.target.value)}
             placeholder="Sport / event"
@@ -145,7 +145,7 @@ export function GoalProposalForm({ athleteId, groupId, suggestedBy, fromWords }:
         <label className="font-body text-xs text-steel uppercase tracking-wide">
           {suggestedBy ? "Anything specific to add? (optional)" : "Anything specific your coach should know? (optional)"}
         </label>
-        <textarea
+        <textarea aria-label="e.g. rear delts, an event I'm prepping for"
           value={priorityNote}
           onChange={(e) => setPriorityNote(e.target.value)}
           rows={2}

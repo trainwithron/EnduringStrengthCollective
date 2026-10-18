@@ -113,7 +113,7 @@ export function GoalAnswerControl({ goal, groupId, coachIds }: { goal: Suggested
             </select>
           </div>
           {goalType === "custom" && (
-            <input value={customLabel} onChange={(e) => setCustomLabel(e.target.value)} placeholder="Describe your goal" className="w-full h-11 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm" />
+            <input aria-label="Describe your goal" value={customLabel} onChange={(e) => setCustomLabel(e.target.value)} placeholder="Describe your goal" className="w-full h-11 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm" />
           )}
           <div>
             <label className="font-body text-xs text-steel uppercase tracking-wide">Target date (optional)</label>

@@ -195,7 +195,7 @@ export function NextWorkoutExerciseRow({
             <label className="font-body text-xs text-steel uppercase tracking-wide block mb-1">
               Note for this exercise (the athlete sees it)
             </label>
-            <input
+            <input aria-label="Shown to the athlete on this exercise"
               type="text"
               value={noteDraft}
               onFocus={() => setNoteTouched(true)}

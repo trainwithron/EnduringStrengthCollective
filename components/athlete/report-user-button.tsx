@@ -58,7 +58,7 @@ export function ReportUserButton({ reportedId }: { reportedId: string }) {
 
   return (
     <div className="flex items-center gap-2">
-      <input
+      <input aria-label="What's wrong?"
         type="text"
         value={reason}
         onChange={(e) => setReason(e.target.value)}

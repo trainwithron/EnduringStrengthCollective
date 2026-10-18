@@ -473,7 +473,7 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
           ))}
         </div>
         <div className="flex items-center gap-1.5">
-          <input
+          <input aria-label="New group name"
             type="text"
             value={newGroupName}
             onChange={(e) => setNewGroupName(e.target.value)}

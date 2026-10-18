@@ -66,7 +66,7 @@ export function StatFieldManager({
         ))}
       </div>
       <div className="flex items-center gap-2">
-        <input
+        <input aria-label="e.g. Tackles"
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}

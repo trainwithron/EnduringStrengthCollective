@@ -222,7 +222,7 @@ export function RecapAndUpNext({
                   {sessionNoteOpen ? "Hide session note" : "Session note"}
                 </button>
                 {sessionNoteOpen && (
-                  <textarea
+                  <textarea aria-label="Coach-only note about this whole session — never visible to the athlete"
                     value={sessionNote}
                     onChange={(e) => setSessionNote(e.target.value)}
                     onBlur={handleSessionNoteBlur}

@@ -233,7 +233,7 @@ export function ChangeClientGroupControl({
           ))}
         </select>
       ) : (
-        <input
+        <input aria-label="Group name"
           type="text"
           value={newGroupName}
           onChange={(e) => setNewGroupName(e.target.value)}

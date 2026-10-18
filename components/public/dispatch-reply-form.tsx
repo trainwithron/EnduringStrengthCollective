@@ -42,7 +42,7 @@ export function DispatchReplyForm({ replyToken }: { replyToken: string }) {
 
   return (
     <form onSubmit={handleSubmit} className="mt-6 space-y-3">
-      <textarea
+      <textarea aria-label="Your answer"
         value={answer}
         onChange={(e) => setAnswer(e.target.value)}
         placeholder="Your answer"

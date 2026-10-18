@@ -119,7 +119,7 @@ export function QuickPaymentPanel({ groupId }: { groupId: string }) {
 
       <div>
         <label className="font-body text-xs text-steel uppercase tracking-wide">Amount ($)</label>
-        <input
+        <input aria-label="0.00"
           type="number"
           inputMode="decimal"
           min="1"
@@ -133,7 +133,7 @@ export function QuickPaymentPanel({ groupId }: { groupId: string }) {
 
       <div>
         <label className="font-body text-xs text-steel uppercase tracking-wide">What for? (optional)</label>
-        <input
+        <input aria-label="e.g. Extra session, late fee"
           type="text"
           value={description}
           onChange={(e) => setDescription(e.target.value)}

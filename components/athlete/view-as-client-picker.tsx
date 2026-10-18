@@ -230,7 +230,7 @@ export function ViewAsClientPicker({ onClose }: { onClose: () => void }) {
 
       <div className="px-5 py-3 border-b border-steel/20 flex items-center gap-2">
         <Search className="w-4 h-4 text-steel shrink-0" />
-        <input
+        <input aria-label="Search clients"
           type="text"
           autoFocus
           value={query}

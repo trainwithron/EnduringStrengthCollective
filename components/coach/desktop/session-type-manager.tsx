@@ -145,7 +145,7 @@ export function SessionTypeManager({ initialTypes, teamMode = false , organizati
       <div className="flex items-end gap-3">
         <div className="flex flex-col gap-1">
           <label className="font-body text-xs text-steel uppercase tracking-wide">Name</label>
-          <input
+          <input aria-label="e.g. Check-in"
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}

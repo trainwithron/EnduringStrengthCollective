@@ -54,7 +54,7 @@ export function RecipeLibraryRail({ coachId }: { coachId: string }) {
       <p className="font-body text-xs text-steel mb-2">
         Drag a recipe onto a meal slot in an expanded day.
       </p>
-      <input
+      <input aria-label="Search recipes"
         type="search"
         value={query}
         onChange={(e) => setQuery(e.target.value)}

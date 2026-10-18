@@ -105,7 +105,7 @@ export function AssignWorkoutForm({
           </option>
         ))}
       </select>
-      <input
+      <input aria-label="Note (optional)"
         type="text"
         value={note}
         onChange={(e) => setNote(e.target.value)}

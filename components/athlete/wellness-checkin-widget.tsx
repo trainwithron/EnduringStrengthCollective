@@ -189,7 +189,7 @@ export function WellnessCheckinWidget({
           {lifeImpactPrompt && !lifeImpactDismissed && (
             <div className="pt-2 border-t border-steel/15">
               <p className="font-body text-sm mb-1.5">{lifeImpactPrompt}</p>
-              <textarea
+              <textarea aria-label="Totally optional — only if something comes to mind."
                 value={lifeImpactNote}
                 onChange={(e) => setLifeImpactNote(e.target.value)}
                 placeholder="Totally optional — only if something comes to mind."

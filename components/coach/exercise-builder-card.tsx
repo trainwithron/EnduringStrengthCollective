@@ -1196,7 +1196,7 @@ export function ExerciseBuilderCard({
                     ? "Distance range (for Double Progression)"
                     : "Rep range (for Double Progression)"}
                 </span>
-                <input
+                <input aria-label="Min"
                   type="number"
                   value={repMinDraft}
                   onChange={(e) => setRepMinDraft(e.target.value)}
@@ -1205,7 +1205,7 @@ export function ExerciseBuilderCard({
                   className="w-14 h-8 bg-graphite border border-steel/30 text-chalk px-1 font-body text-xs text-center focus:outline-none focus:border-rust"
                 />
                 <span className="font-body text-xs text-steel">–</span>
-                <input
+                <input aria-label="Max"
                   type="number"
                   value={repMaxDraft}
                   onChange={(e) => setRepMaxDraft(e.target.value)}

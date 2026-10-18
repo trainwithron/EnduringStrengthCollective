@@ -298,7 +298,7 @@ export function GroupSwitcher({
           <div className="absolute left-full top-0 ml-1 w-64 bg-surface border border-steel/30 z-20 shadow-lg">
             {groups.length > 3 && (
               <div className="p-2 border-b border-steel/20">
-                <input
+                <input aria-label="Filter groups"
                   type="text"
                   value={filterQuery}
                   onChange={(e) => setFilterQuery(e.target.value)}
@@ -358,7 +358,7 @@ export function GroupSwitcher({
                 ))}
               </div>
               <div className="flex items-center gap-1.5">
-                <input
+                <input aria-label="New group name"
                   type="text"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
@@ -430,7 +430,7 @@ export function GroupSwitcher({
           {groups.length > 3 && (
             <div className="p-2 border-b border-steel/20 flex items-center gap-2">
               <Search className="w-3.5 h-3.5 text-steel shrink-0" />
-              <input
+              <input aria-label="Filter groups"
                 type="text"
                 value={filterQuery}
                 onChange={(e) => setFilterQuery(e.target.value)}
@@ -464,7 +464,7 @@ export function GroupSwitcher({
                           }`}
                         >
                           {editingTagFor === g.id ? (
-                            <input
+                            <input aria-label="e.g. Bodybuilding"
                               type="text"
                               autoFocus
                               value={tagDraft}
@@ -543,7 +543,7 @@ export function GroupSwitcher({
               ))}
             </div>
             <div className="flex items-center gap-1.5">
-              <input
+              <input aria-label="New group name"
                 type="text"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}

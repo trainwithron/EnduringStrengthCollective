@@ -175,7 +175,7 @@ export function TeamDepthChart({
           )}
         </div>
         <div className="flex items-center gap-2">
-          <input
+          <input aria-label="Position name"
             type="text"
             value={newPositionName}
             onChange={(e) => setNewPositionName(e.target.value)}

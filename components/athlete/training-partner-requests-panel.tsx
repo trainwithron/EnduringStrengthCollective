@@ -82,7 +82,7 @@ export function TrainingPartnerRequestsPanel({
                 <p className="font-body text-sm text-chalk mt-1">{r.message}</p>
                 {acceptingId === r.id ? (
                   <div className="mt-3 space-y-2">
-                    <textarea
+                    <textarea aria-label="Share how they can reach you — a number, Instagram, or where to find you."
                       value={responseDraft}
                       onChange={(e) => setResponseDraft(e.target.value)}
                       rows={2}

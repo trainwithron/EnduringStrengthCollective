@@ -168,7 +168,7 @@ export function SwappableTerm({
             ))}
             {customOpen ? (
               <div className="px-2 py-1 flex items-center gap-1">
-                <input
+                <input aria-label="Custom"
                   autoFocus
                   value={customText}
                   onChange={(e) => setCustomText(e.target.value)}

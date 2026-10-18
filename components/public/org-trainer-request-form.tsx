@@ -97,7 +97,7 @@ export function OrgTrainerRequestForm({ organizationId, orgName }: { organizatio
       </p>
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-3">
-        <input
+        <input aria-label="Your name"
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -105,7 +105,7 @@ export function OrgTrainerRequestForm({ organizationId, orgName }: { organizatio
           required
           className="w-full h-11 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
         />
-        <input
+        <input aria-label="Email"
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -113,7 +113,7 @@ export function OrgTrainerRequestForm({ organizationId, orgName }: { organizatio
           required
           className="w-full h-11 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
         />
-        <input
+        <input aria-label="Phone (optional)"
           type="tel"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
@@ -166,7 +166,7 @@ export function OrgTrainerRequestForm({ organizationId, orgName }: { organizatio
           ))}
         </select>
         {goalType === "custom" && (
-          <input
+          <input aria-label="Tell us more"
             type="text"
             value={goalCustomLabel}
             onChange={(e) => setGoalCustomLabel(e.target.value)}
@@ -175,7 +175,7 @@ export function OrgTrainerRequestForm({ organizationId, orgName }: { organizatio
           />
         )}
 
-        <textarea
+        <textarea aria-label="Anything else we should know? (optional)"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           placeholder="Anything else we should know? (optional)"

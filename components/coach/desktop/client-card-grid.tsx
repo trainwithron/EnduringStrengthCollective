@@ -528,7 +528,7 @@ export function ClientCardGrid({
       {error && <p className="font-body text-sm text-rust mb-3">{error}</p>}
 
       <div className="mb-3">
-        <input
+        <input aria-label="Search by name"
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}

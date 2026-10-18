@@ -412,7 +412,7 @@ export function ExerciseLibraryList({
       </div>
       {/* The toolbar wraps on a narrow screen (a fixed-width search box plus the category and add controls ran off the right edge of a phone). */}
       <div className="flex flex-wrap items-center gap-3 mb-4">
-        <input
+        <input aria-label="Search exercises"
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -461,7 +461,7 @@ export function ExerciseLibraryList({
             </option>
           ))}
         </select>
-        <input
+        <input aria-label="New exercise name"
           type="text"
           value={newName}
           onChange={(e) => handleNewNameChange(e.target.value)}
@@ -642,7 +642,7 @@ export function ExerciseLibraryList({
                           <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">
                             Description / instructions
                           </p>
-                          <textarea
+                          <textarea aria-label="How it's done, rules, setup — shown to any coach browsing this exercise."
                             defaultValue={ex.description ?? ""}
                             onBlur={(e) => handleDescriptionChange(ex.id, e.target.value)}
                             placeholder="How it's done, rules, setup — shown to any coach browsing this exercise."

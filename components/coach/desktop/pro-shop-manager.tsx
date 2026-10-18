@@ -255,7 +255,7 @@ export function ProShopManager({ initialLinks, organizationId, groups = [] }: { 
 
       <div className="border border-steel/20 p-4 space-y-2.5">
         <h3 className="font-body text-xs text-steel uppercase tracking-wide mb-1">Add Pro Shop link</h3>
-        <input
+        <input aria-label="Title (e.g. Team Merch Store)"
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -273,28 +273,28 @@ export function ProShopManager({ initialLinks, organizationId, groups = [] }: { 
             </option>
           ))}
         </select>
-        <input
+        <input aria-label="Short description (optional)"
           type="text"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Short description (optional)"
           className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm"
         />
-        <input
+        <input aria-label="Link URL"
           type="url"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="Link URL"
           className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm"
         />
-        <input
+        <input aria-label="Discount code (optional)"
           type="text"
           value={discountCode}
           onChange={(e) => setDiscountCode(e.target.value)}
           placeholder="Discount code (optional)"
           className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm"
         />
-        <input
+        <input aria-label="e.g. 10% off with code TEAM10"
           type="text"
           value={discountDescription}
           onChange={(e) => setDiscountDescription(e.target.value)}

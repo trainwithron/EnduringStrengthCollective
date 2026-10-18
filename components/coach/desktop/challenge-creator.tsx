@@ -109,14 +109,14 @@ export function ChallengeCreator({
   return (
     <div className="border border-steel/20 p-5 space-y-3 max-w-lg">
       <h3 className="font-body text-xs text-steel uppercase tracking-wide">New challenge</h3>
-      <input
+      <input aria-label="Challenge name, e.g. Summer Shred"
         type="text"
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder="Challenge name, e.g. Summer Shred"
         className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm"
       />
-      <input
+      <input aria-label="Short description (optional)"
         type="text"
         value={description}
         onChange={(e) => setDescription(e.target.value)}
@@ -162,7 +162,7 @@ export function ChallengeCreator({
         <div className="space-y-1.5 mt-1">
           {habits.map((h, i) => (
             <div key={i} className="flex gap-1.5">
-              <input
+              <input aria-label="e.g. Track calories"
                 type="text"
                 value={h}
                 onChange={(e) => updateHabit(i, e.target.value)}

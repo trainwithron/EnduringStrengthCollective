@@ -176,7 +176,7 @@ export function WorkspaceMenu({ groupId, orgName, large = false }: { groupId: st
               </button>
             ) : (
               <div className="p-3 space-y-2">
-                <input
+                <input aria-label="Group name"
                   autoFocus
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
