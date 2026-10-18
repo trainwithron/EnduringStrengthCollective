@@ -57,11 +57,36 @@ export interface Recorded {
   first: boolean;
   // The coach has already been told about it.
   notified: boolean;
+  // What was actually stored (the owner is dropped when it no longer exists).
+  stored: PaymentEventInput;
 }
 
 // Records the event once (one row per Stripe event, and one per Stripe refund). A repeat finds the row that is already there and says whether the coach was told.
-export async function recordPaymentEvent(db: any, e: PaymentEventInput): Promise<Recorded> {
-  const { data, error } = await db
+// A Stripe event can name a group or account that has since been erased (a refund or dispute arrives months after the payment): the insert is refused as 'owner not valid' (a missing row, a malformed id, a failed check). That is
+// not a passing fault, so retrying the webhook would never help: the event is stored once more with no owner and a note, and logged. Anything else wrong with the database is thrown (Stripe sends the event again).
+const OWNER_NOT_VALID = new Set(["23503", "22P02", "23514"]);
+
+export async function recordPaymentEvent(db: any, input: PaymentEventInput): Promise<Recorded> {
+  let e = input;
+  let result = await insertEvent(db, e);
+  if (result.error && OWNER_NOT_VALID.has(result.error.code ?? "") && (e.groupId || e.athleteId || e.coachId)) {
+    console.error("[payment events] the owner no longer exists, recording the event without one:", e.eventId, result.error.code);
+    e = { ...e, groupId: null, athleteId: null, coachId: null, detail: [e.detail, "owner no longer exists"].filter(Boolean).join("; ") };
+    result = await insertEvent(db, e);
+  }
+  const { data, error } = result;
+  if (!error) return { id: (data as { id: string } | null)?.id ?? null, first: true, notified: false, stored: e };
+  if (error.code !== "23505") throw error;
+  // Already recorded: by this event, or (a refund) by another event that carried the same refund.
+  let existing = await db.from("payment_events").select("id, notified_at").eq("stripe_event_id", e.eventId).maybeSingle();
+  if (!existing.error && !existing.data && e.refundId) existing = await db.from("payment_events").select("id, notified_at").eq("refund_id", e.refundId).maybeSingle();
+  if (existing.error) throw existing.error;
+  const row = existing.data as { id: string; notified_at: string | null } | null;
+  return { id: row?.id ?? null, first: false, notified: !!row?.notified_at, stored: e };
+}
+
+async function insertEvent(db: any, e: PaymentEventInput): Promise<{ data: unknown; error: { code?: string; message?: string } | null }> {
+  return db
     .from("payment_events")
     .insert({
       stripe_event_id: e.eventId,
@@ -79,14 +104,6 @@ export async function recordPaymentEvent(db: any, e: PaymentEventInput): Promise
     })
     .select("id")
     .single();
-  if (!error) return { id: (data as { id: string } | null)?.id ?? null, first: true, notified: false };
-  if (error.code !== "23505") throw error;
-  // Already recorded: by this event, or (a refund) by another event that carried the same refund.
-  let existing = await db.from("payment_events").select("id, notified_at").eq("stripe_event_id", e.eventId).maybeSingle();
-  if (!existing.error && !existing.data && e.refundId) existing = await db.from("payment_events").select("id, notified_at").eq("refund_id", e.refundId).maybeSingle();
-  if (existing.error) throw existing.error;
-  const row = existing.data as { id: string; notified_at: string | null } | null;
-  return { id: row?.id ?? null, first: false, notified: !!row?.notified_at };
 }
 
 // Remembers that the coach was told, so a redelivery that finds the row but no memory of a notice still tells them once.
@@ -96,7 +113,7 @@ async function markNotified(db: any, id: string | null): Promise<void> {
   if (error) console.error("[payment events] could not mark the notice as sent:", error.message);
 }
 
-// Tells the coach seat(s) of the group (or the one coach whose own plan it is). Best effort.
+// Tells the coach seat(s) of the group (or the one coach whose own plan it is). Best effort. Returns how many notices were actually written (0 when there is no coach seat, or the notice was refused).
 export async function notifyPaymentProblem(db: any, e: PaymentEventInput): Promise<number> {
   try {
     let coachIds: string[] = [];
@@ -114,12 +131,17 @@ export async function notifyPaymentProblem(db: any, e: PaymentEventInput): Promi
     }
     const body = e.coachId && !e.groupId ? ownPlanText(e) : problemText(e.kind, name, e.amountCents, e.currency, e.detail, e.totalCents);
     const link = e.groupId ? `/groups/${e.groupId}/business` : "/dashboard";
+    let delivered = 0;
     for (const coachId of coachIds) {
       const { error } = await db.from("notifications").insert({ profile_id: coachId, group_id: e.groupId, type: "payment_problem", body, link_path: link, pushed_at: new Date().toISOString() });
-      if (error) console.error("[payment problem notice] the notification was refused:", error.message);
+      if (error) {
+        console.error("[payment problem notice] the notification was refused:", error.message);
+        continue;
+      }
+      delivered++;
       await sendPushToProfile(db, coachId, TITLE[e.kind], LOCK_SCREEN_TEXT, link).catch(() => 0);
     }
-    return coachIds.length;
+    return delivered;
   } catch (err) {
     console.error("[payment problem notice] failed:", err instanceof Error ? err.message : err);
     return 0;
@@ -298,12 +320,26 @@ export async function handlePaymentProblemEvent(event: Stripe.Event, deps: { db:
     });
   }
 
+  let upgradedFallback = false;
   for (const input of inputs) {
-    const recorded = await recordPaymentEvent(db, input);
-    // The coach is told the first time, and also on a redelivery of an event whose notice never went out.
+    let recorded: Recorded | null = null;
+    // A refund first recorded through the fallback row (the list of refunds could not be read, so it holds the charge total) becomes the first real refund when the event is delivered again and the list works: one row, one notice.
+    if (input.kind === "refund" && input.refundId && !upgradedFallback) {
+      const { data: fallback, error: fallbackError } = await db.from("payment_events").select("id, notified_at").eq("stripe_event_id", event.id).eq("kind", "refund").is("refund_id", null).maybeSingle();
+      if (fallbackError) throw fallbackError;
+      const row = fallback as { id: string; notified_at: string | null } | null;
+      if (row) {
+        upgradedFallback = true;
+        const { error: upgradeError } = await db.from("payment_events").update({ refund_id: input.refundId, amount_cents: input.amountCents, total_cents: input.totalCents, detail: input.detail }).eq("id", row.id);
+        if (upgradeError && upgradeError.code !== "23505") throw upgradeError;
+        recorded = { id: row.id, first: false, notified: !!row.notified_at, stored: input };
+      }
+    }
+    if (!recorded) recorded = await recordPaymentEvent(db, input);
+    // The coach is told the first time, and also on a redelivery of an event whose notice never went out. The mark is only made when a notice was really written (no coach seat, or a refused notice, leaves it open for a later delivery).
     if (announce && (recorded.first || !recorded.notified)) {
-      await notifyPaymentProblem(db, input);
-      await markNotified(db, recorded.id);
+      const delivered = await notifyPaymentProblem(db, recorded.stored);
+      if (delivered > 0) await markNotified(db, recorded.id);
     }
   }
 }

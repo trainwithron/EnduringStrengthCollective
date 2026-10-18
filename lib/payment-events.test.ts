@@ -10,7 +10,7 @@ const src = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replac
 
 type Row = Record<string, any>;
 // A stand-in database that remembers what is written, gives rows ids, refuses a repeated Stripe event id or refund id, and can be told to fail.
-function world(opts: { seats?: Row[]; profiles?: Row[]; failInsert?: boolean; failSelect?: boolean } = {}) {
+function world(opts: { seats?: Row[]; profiles?: Row[]; failInsert?: boolean; failSelect?: boolean; goneIds?: string[]; failNotifications?: boolean; failInsertCode?: string } = {}) {
   const tables: Record<string, Row[]> = { payment_events: [], notifications: [] };
   let n = 0;
   const db = {
@@ -22,6 +22,7 @@ function world(opts: { seats?: Row[]; profiles?: Row[]; failInsert?: boolean; fa
       const q: any = {
         select: () => q,
         eq: (c: string, v: unknown) => (filters.push((r) => r[c] === v), q),
+        is: (c: string, v: unknown) => (filters.push((r) => (r[c] ?? null) === v), q),
         insert: (v: Row) => ((op = "insert"), (values = v), q),
         update: (v: Row) => ((op = "update"), (values = v), q),
         single: async () => run().then((r: any) => ({ data: r.data?.[0] ?? null, error: r.error })),
@@ -31,6 +32,8 @@ function world(opts: { seats?: Row[]; profiles?: Row[]; failInsert?: boolean; fa
       async function run(): Promise<any> {
         if (op === "insert") {
           if (opts.failInsert && table === "payment_events") return { data: null, error: { code: "XX000", message: "down" } };
+          if (table === "payment_events" && (opts.goneIds ?? []).some((id) => [values.group_id, values.athlete_id, values.coach_id].includes(id))) return { data: null, error: { code: opts.failInsertCode ?? "23503", message: "foreign key" } };
+          if (table === "notifications" && opts.failNotifications) return { data: null, error: { code: "42501", message: "refused" } };
           if (table === "payment_events") {
             const dup = tables.payment_events.some((r) => r.stripe_event_id === values.stripe_event_id || (values.refund_id && r.refund_id === values.refund_id));
             if (dup) return { data: null, error: { code: "23505", message: "dup" } };
@@ -342,6 +345,59 @@ describe("a lookup that FAILS is retried while it can help; only one that succee
     expect(db.tables.notifications).toHaveLength(0);
   });
 
+  it("an owner that no longer exists (the account was erased, the group deleted, or the id is malformed) records the event with no owner, never a 500", async () => {
+    for (const code of ["23503", "22P02", "23514"]) {
+      const db = world({ seats, profiles, goneIds: ["ath"], failInsertCode: code });
+      await handlePaymentProblemEvent(evt("charge.refunded", { id: "ch_1", payment_intent: "pi_1", amount_refunded: 900, currency: "usd" }, "evt_gone"), { db, stripe: fakeStripe({ sessionMeta: { athlete_id: "ath", group_id: "grp" }, refunds: [{ id: "re_1", amount: 900 }] }) });
+      expect(db.tables.payment_events, code).toHaveLength(1);
+      expect(db.tables.payment_events[0], code).toMatchObject({ group_id: null, athlete_id: null, coach_id: null, amount_cents: 900 });
+      expect(db.tables.payment_events[0].detail, code).toContain("owner no longer exists");
+      expect(db.tables.notifications, code).toHaveLength(0);
+    }
+  });
+
+  it("any other database failure is still thrown, so Stripe sends the event again", async () => {
+    const db = world({ seats, profiles, goneIds: ["ath"], failInsertCode: "57014" });
+    await expect(handlePaymentProblemEvent(evt("invoice.payment_failed", failedInvoice()), { db, stripe: fakeStripe() })).rejects.toBeTruthy();
+  });
+
+  it("a refund first recorded through the fallback row becomes the real refund on redelivery: one row, one notice", async () => {
+    const db = world({ seats, profiles });
+    const meta = { athlete_id: "ath", group_id: "grp" };
+    const charge = { id: "ch_1", payment_intent: "pi_1", amount_refunded: 900, currency: "usd" };
+    // first delivery: the list of refunds is empty (cannot be read), so the charge total is recorded
+    await handlePaymentProblemEvent(evt("charge.refunded", charge, "evt_f"), { db, stripe: fakeStripe({ sessionMeta: meta, refunds: [] }) });
+    expect(db.tables.payment_events).toHaveLength(1);
+    expect(db.tables.payment_events[0].refund_id ?? null).toBeNull();
+    expect(db.tables.notifications).toHaveLength(1);
+    // redelivery: the list works now
+    await handlePaymentProblemEvent(evt("charge.refunded", charge, "evt_f"), { db, stripe: fakeStripe({ sessionMeta: meta, refunds: [{ id: "re_1", amount: 900 }] }) });
+    expect(db.tables.payment_events).toHaveLength(1);
+    expect(db.tables.payment_events[0]).toMatchObject({ refund_id: "re_1", amount_cents: 900 });
+    expect(db.tables.notifications).toHaveLength(1);
+    // with two refunds the first takes the fallback row and the second is a new row (told once)
+    const db2 = world({ seats, profiles });
+    await handlePaymentProblemEvent(evt("charge.refunded", { ...charge, amount_refunded: 1900 }, "evt_g"), { db: db2, stripe: fakeStripe({ sessionMeta: meta, refunds: [] }) });
+    await handlePaymentProblemEvent(evt("charge.refunded", { ...charge, amount_refunded: 1900 }, "evt_g"), { db: db2, stripe: fakeStripe({ sessionMeta: meta, refunds: [{ id: "re_1", amount: 900 }, { id: "re_2", amount: 1000 }] }) });
+    expect(db2.tables.payment_events.map((r) => [r.refund_id, r.amount_cents])).toEqual([["re_1", 900], ["re_2", 1000]]);
+    expect(db2.tables.notifications).toHaveLength(2);
+  });
+
+  it("the 'coach was told' mark is made only when a notice was really written: no coach seat or a refused notice leaves it open", async () => {
+    const noSeat = world({ seats: [], profiles });
+    await handlePaymentProblemEvent(evt("invoice.payment_failed", failedInvoice()), { db: noSeat, stripe: fakeStripe() });
+    expect(noSeat.tables.payment_events[0].notified_at).toBeNull();
+    const refused = world({ seats, profiles, failNotifications: true });
+    await handlePaymentProblemEvent(evt("invoice.payment_failed", failedInvoice()), { db: refused, stripe: fakeStripe() });
+    expect(refused.tables.payment_events[0].notified_at).toBeNull();
+    const ok = world({ seats, profiles });
+    await handlePaymentProblemEvent(evt("invoice.payment_failed", failedInvoice()), { db: ok, stripe: fakeStripe() });
+    expect(ok.tables.payment_events[0].notified_at).toBeTruthy();
+    // with no seat nothing was written either
+    expect(noSeat.tables.notifications).toHaveLength(0);
+    expect(refused.tables.notifications).toHaveLength(0);
+  });
+
   it("any other event does nothing", async () => {
     const db = world();
     await handlePaymentProblemEvent(evt("customer.created", {}), { db, stripe: fakeStripe() });
@@ -358,7 +414,8 @@ describe("how it is wired", () => {
     // it records and notifies: it never touches balances, sessions, subscriptions or Stripe objects
     expect(lib).not.toMatch(/session_credits|credit_purchases|apply_session_credit|membership_subscriptions|transfers\.|refunds\.create|subscriptions\.(update|cancel)|\.delete\(/);
     // the only thing it ever changes is the 'coach was told' mark on its own record
-    expect((lib.match(/\.update\(/g) ?? []).length).toBe(1);
+    expect((lib.match(/\.update\(/g) ?? []).length).toBe(2);
+    expect((lib.match(/from\("payment_events"\)\.update\(/g) ?? []).length).toBe(2);
     expect(lib).toContain('update({ notified_at:');
   });
 
