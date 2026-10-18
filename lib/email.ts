@@ -35,7 +35,13 @@ export async function describeBrevoFailure(res: { status: number; text(): Promis
   return line.slice(0, 300);
 }
 
-export async function sendEmail(to: string, subject: string, text: string): Promise<boolean> {
+// One file sent along with a message (Brevo takes it as base64). Used for a graduating player's own training history.
+export interface EmailAttachment {
+  name: string;
+  bytes: Uint8Array;
+}
+
+export async function sendEmail(to: string, subject: string, text: string, attachment?: EmailAttachment): Promise<boolean> {
   const apiKey = process.env.BREVO_API_KEY;
   const from = process.env.BREVO_FROM_EMAIL;
   if (!apiKey || !from) return false;
@@ -53,6 +59,7 @@ export async function sendEmail(to: string, subject: string, text: string): Prom
         to: [{ email: to }],
         subject,
         textContent: text,
+        ...(attachment ? { attachment: [{ name: attachment.name, content: Buffer.from(attachment.bytes).toString("base64") }] } : {}),
       }),
     });
     if (!res.ok) {

@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { shownName } from "@/lib/shown-name";
 import type { ProtectIds } from "@/lib/minor-names";
 import { onSharedBoards } from "@/lib/board-visibility";
+import { readPositionRoster } from "@/lib/group-roster-reads";
 import { rankLeaderboard, rankByPosition, type LeaderboardEntry, type RosterAthlete, type PositionRanking } from "@/lib/leaderboard";
 
 type RankedEntry = LeaderboardEntry & { rank: number };
@@ -73,26 +74,23 @@ export async function getPositionLeaderboardRankings(
   groupId: string,
   protect: ProtectIds
 ): Promise<PositionRanking[]> {
-  const [{ data: memberships }, { data: logs }] = await Promise.all([
-    supabase
-      .from("group_memberships")
-      .select("profile_id, position_id, profiles ( full_name, feed_broadcast_level ), group_positions!group_memberships_position_id_fkey ( name, sort_order )")
-      .eq("group_id", groupId)
-      .eq("role", "athlete"),
+  // The athletes with their position, through the narrow read (migration 0404): a name, a position and how they share their activity, nothing else about anyone.
+  const [memberships, { data: logs }] = await Promise.all([
+    readPositionRoster(supabase, groupId),
     supabase
       .from("workout_logs")
       .select("athlete_id, total_volume, new_prs")
       .eq("group_id", groupId),
   ]);
 
-  const shownMembers = (memberships ?? []).filter((m: any) => onSharedBoards(m.profiles?.feed_broadcast_level));
-  const protectedIds = await protect(shownMembers.map((m: any) => m.profile_id as string));
-  const roster: RosterAthlete[] = shownMembers.map((m: any) => ({
-    profileId: m.profile_id,
-    fullName: shownName(m.profiles?.full_name, m.profile_id, protectedIds),
-    positionId: m.position_id ?? null,
-    positionName: m.group_positions?.name ?? null,
-    positionSortOrder: m.group_positions?.sort_order ?? null,
+  const shownMembers = (memberships ?? []).filter((m) => onSharedBoards(m.feedBroadcastLevel));
+  const protectedIds = await protect(shownMembers.map((m) => m.profileId));
+  const roster: RosterAthlete[] = shownMembers.map((m) => ({
+    profileId: m.profileId,
+    fullName: shownName(m.fullName, m.profileId, protectedIds),
+    positionId: m.positionId,
+    positionName: m.positionName,
+    positionSortOrder: m.positionSortOrder,
   }));
 
   const workouts = new Map<string, number>();

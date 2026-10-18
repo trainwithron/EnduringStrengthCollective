@@ -3,12 +3,15 @@
 //   node scripts/build-paste-files.mjs
 // scripts/sql-tests/paste-files.test.mjs applies every step in order on the live-equivalent schema and checks each precheck is true first.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { checkSql as functionAclCheckSql, undoSql as functionAclUndoSql, TRIGGER_SWEEP, triggerSweepUndoSql } from "./function-acl.mjs";
 import { probeSql as step23ProbeSql } from "./step23-probe.mjs";
 import { LIVE_TRANSFER_ORGANIZATION_OWNERSHIP } from "./live-bodies-0396.mjs";
 
 const root = new URL("../supabase/", import.meta.url);
-const outDir = new URL("apply/", root);
+// PASTE_OUT_DIR lets a test build everything into a scratch folder and compare it with what is committed.
+const outDir = process.env.PASTE_OUT_DIR ? pathToFileURL(resolve(process.env.PASTE_OUT_DIR) + "/") : new URL("apply/", root);
 mkdirSync(outDir, { recursive: true });
 
 import { readdirSync } from "node:fs";
@@ -2648,6 +2651,171 @@ alter table public.coach_availability_windows drop column if exists session_minu
 ];
 
 STEPS.push({
+  n: "164",
+  slug: "0412",
+  title: "0412 Release T1: Download my data gives a person everything the app holds about them (two small functions and a private bucket)",
+  migrations: ["0412"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes on screen until the Release T1 code is live. Adds two functions, export_my_data_tables and export_my_data_table, that a signed-in person runs as themselves to collect, a page at a time, every row they can read that names them, and an empty private bucket (account-exports) for a download too large to send directly. Safe to run before the code.",
+  undo: [
+    "drop function if exists public.export_my_data_table(text, text, integer, integer);",
+    "drop function if exists public.export_my_data_tables();",
+    "-- the empty account-exports bucket is left in place (removing a bucket that holds files fails)",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 164 misbehaves. Run it only while the Release T1 code is not live. Download my data then falls back to its short list.",
+  rows: [
+    ["0412 is not already applied (the functions are not there yet)", "to_regprocedure('public.export_my_data_tables()') is null"],
+    ["the table it reads from exists", "to_regclass('public.profiles') is not null"],
+    ["the storage bucket table exists", "to_regclass('storage.buckets') is not null"],
+  ],
+});
+
+STEPS.push({
+  n: "163",
+  slug: "0411",
+  title: "0411 Release CM1: report a post or comment, and block a member (two small tables, two functions, one new kind of notice)",
+  warn: "This REBUILDS the list of allowed notice kinds (adds one: content_reported). It refuses to run if the live list cannot be read or would lose a kind, and changes nothing in that case.",
+  migrations: ["0411"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes on screen until the Release CM1 code is live. Adds user_blocks (a member's own list of people they have stopped seeing), content_reports (reports of posts and comments, read by the group's coaches) and the functions report_content and handle_content_report. Safe to run before the code.",
+  undo: [
+    "drop function if exists public.handle_content_report(uuid);",
+    "drop function if exists public.report_content(uuid, uuid, text);",
+    "drop table if exists public.content_reports;",
+    "drop table if exists public.user_blocks;",
+    "-- the extra notification kind is left in the list (removing it could break rows that use it)",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 163 misbehaves. Run it only while the Release CM1 code is not live. Blocks and reports are forgotten.",
+  rows: [
+    ["0411 is not already applied (the reports table is not there yet)", "to_regclass('public.content_reports') is null"],
+    ["the tables and helpers it uses exist", "to_regclass('public.posts') is not null and to_regclass('public.comments') is not null and to_regclass('public.groups') is not null and to_regclass('public.group_memberships') is not null and to_regprocedure('public.is_group_coach(uuid)') is not null"],
+    ["the notification type rule exists to be widened", "exists (select 1 from pg_constraint c where c.conname = 'notifications_type_check' and c.conrelid = 'public.notifications'::regclass)"],
+  ],
+});
+
+STEPS.push({
+  n: "162",
+  slug: "0410",
+  title: "0410 Release SP1: a reply in a support thread tells the other side (a bell notice and a push)",
+  warn: "This REBUILDS the list of allowed notice kinds (adds one: support_reply). It refuses to run if the live list cannot be read or would lose a kind, and changes nothing in that case.",
+  migrations: ["0410"],
+  sees: "Success. No rows returned.",
+  afterwards: "From now on a coach's new support message tells every platform admin, and an admin's reply tells the coach who opened the request. Nothing changes on screen except the bell. Safe to run before the code (the push needs the Release SP1 code).",
+  undo: [
+    "drop trigger if exists support_messages_notify on public.support_messages;",
+    "drop function if exists public.notify_on_support_message();",
+    "-- the extra notification kind is left in the list (removing it could break rows that use it)",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 162 misbehaves. Stops the support notices; threads work as before.",
+  rows: [
+    ["0410 is not already applied (the support notice trigger is not there yet)", "not exists (select 1 from pg_trigger where tgname = 'support_messages_notify' and not tgisinternal)"],
+    ["the support tables exist", "to_regclass('public.support_requests') is not null and to_regclass('public.support_messages') is not null and to_regclass('public.notifications') is not null"],
+    ["the notification type rule exists to be widened", "exists (select 1 from pg_constraint c where c.conname = 'notifications_type_check' and c.conrelid = 'public.notifications'::regclass)"],
+  ],
+});
+
+STEPS.push({
+  n: "161",
+  slug: "0409",
+  title: "0409 Release M1: failed payments, refunds and disputes are recorded and the coach is told (a ledger of money events, one new kind of notice, a platform report); no money moves",
+  warn: "This REBUILDS the list of allowed notice kinds (adds one: payment_problem). It refuses to run if the live list cannot be read or would lose a kind, and changes nothing in that case.",
+  migrations: ["0409"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes on screen until the Release M1 code is live. Adds one table (payment_events: a record of each failed payment, refund and dispute Stripe reports, a coach reads their own groups') and a read-only report for the platform admin. It moves no money and changes no balance. After the code is live, switch on four more event types for the webhook in the Stripe dashboard (invoice.payment_failed, charge.refunded, charge.dispute.created, charge.dispute.closed).",
+  undo: [
+    "drop function if exists public.payment_reconciliation_report();",
+    "drop table if exists public.payment_events;",
+    "-- the extra notification kind is left in the list (removing it could break rows that use it)",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 161 misbehaves. Run it only while the Release M1 code is not live. The record of failed payments, refunds and disputes is dropped with the table.",
+  rows: [
+    ["0409 is not already applied (the money events table is not there yet)", "to_regclass('public.payment_events') is null"],
+    ["the tables and helpers it uses exist", "to_regclass('public.groups') is not null and to_regclass('public.profiles') is not null and to_regclass('public.membership_subscriptions') is not null and to_regclass('public.group_memberships') is not null and to_regprocedure('public.is_group_coach(uuid)') is not null and to_regprocedure('public.is_org_admin_of_group(uuid)') is not null and to_regprocedure('public.is_client_private_from_org(uuid, uuid)') is not null"],
+    ["the notification type rule exists to be widened", "exists (select 1 from pg_constraint c where c.conname = 'notifications_type_check' and c.conrelid = 'public.notifications'::regclass)"],
+  ],
+});
+
+STEPS.push({
+  n: "160",
+  slug: "0408",
+  title: "0408 Release B1: a coach can switch off automatic nutrition suggestions for one client (a coach-only note per client)",
+  migrations: ["0408"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes on screen until the Release B1 code is live. Adds one empty table (client_nutrition_flags) that only the group's coaches can read or write, and one small read function (nutrition_auto_off_state) that tells a coach only whether suggestions are off for their client. Until the code is live the weekly nutrition job behaves as before. Safe to run before the code.",
+  undo: [
+    "drop function if exists public.nutrition_auto_off_state(uuid, uuid);",
+    "drop table if exists public.client_nutrition_flags;",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 160 misbehaves. Run it only while the Release B1 code is not live, and be aware that dropping it forgets which clients had suggestions switched off (the weekly job would suggest for them again).",
+  rows: [
+    ["0408 is not already applied (the flags table is not there yet)", "to_regclass('public.client_nutrition_flags') is null"],
+    ["the tables and helper it uses exist", "to_regclass('public.groups') is not null and to_regclass('public.profiles') is not null and to_regprocedure('public.is_group_coach(uuid)') is not null and to_regclass('public.group_memberships') is not null"],
+  ],
+});
+
+STEPS.push({
+  n: "159",
+  slug: "0407",
+  title: "0407 Release Z1: take a client out of a group without destroying them (Remove from my clients, Delete permanently with 30 days to undo)",
+  migrations: ["0407"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes on screen until the Release Z1 code is live. Adds two tables (client_removals: who was taken out of which group, with their name, email, membership and rate as they were; client_removal_log: a person-free note of each permanent erase) and two functions (remove_client, restore_removed_client), plus a small trigger that un-hides a one-on-one space when a client joins it again. Safe to run before the code.",
+  undo: [
+    "drop trigger if exists group_memberships_unarchive_one_on_one on public.group_memberships;",
+    "drop function if exists public.unarchive_one_on_one_on_client_join();",
+    "drop function if exists public.restore_removed_client(uuid);",
+    "drop function if exists public.remove_client(uuid, uuid, boolean, boolean);",
+    "drop table if exists public.client_removal_log;",
+    "drop table if exists public.client_removals;",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 159 misbehaves. Run it only while the Release Z1 code is not live, and only if no client has been removed yet: dropping the table forgets how removed clients were (their memberships are not restored).",
+  rows: [
+    ["0407 is not already applied (the removals table is not there yet)", "to_regclass('public.client_removals') is null"],
+    ["the tables and helpers it uses exist", "to_regclass('public.group_memberships') is not null and to_regclass('public.profiles') is not null and to_regclass('public.client_billing_rates') is not null and to_regclass('public.membership_subscriptions') is not null and to_regclass('public.recurring_booking_series') is not null and to_regclass('public.booking_waitlist_entries') is not null and to_regprocedure('public.is_group_coach(uuid)') is not null and to_regprocedure('public.cancel_booking_and_refund_credit(uuid)') is not null and to_regprocedure('public.cancel_recurring_booking_series(uuid)') is not null and to_regprocedure('public.audit_record(text, text, text, jsonb)') is not null"],
+  ],
+});
+
+STEPS.push({
+  n: "157",
+  slug: "0405",
+  title: "0405 Release W2b: the bell notices that name a person ('X commented on your post', 'X mentioned you') show a member under 18, or of unknown age, as a first name and last initial",
+  warn: "This REPLACES three existing notice functions (notify_on_comment, notify_on_mention, notify_on_post_mention). It is not an additions-only step. They behave as before except for the name in the notice.",
+  migrations: ["0405"],
+  sees: "Success. No rows returned.",
+  afterwards: "From now on, a notice that names the person who commented or mentioned someone shows 'Sam R.' for a member under 18 or whose age is not known; coaches and adults are named in full. Notices already written keep the name they have.",
+  undo: [
+    functionFromMigration("0073_notify_on_comment_reply.sql", "notify_on_comment"),
+    functionFromMigration("0093_structured_mentions.sql", "notify_on_mention"),
+    functionFromMigration("0093_structured_mentions.sql", "notify_on_post_mention"),
+    "drop function if exists public.notice_display_name(uuid);",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 157 misbehaves. Puts the three notice functions back to the text migrations 0073 and 0093 gave them (full names in notices).",
+  rows: [
+    ["0405 is not already applied (the notice-name function is not there yet)", "to_regprocedure('public.notice_display_name(uuid)') is null"],
+    ["the notice functions it replaces exist", "to_regprocedure('public.notify_on_comment()') is not null and to_regprocedure('public.notify_on_mention()') is not null and to_regprocedure('public.notify_on_post_mention()') is not null"],
+    ["the tables it reads exist", "to_regclass('public.profiles') is not null and to_regclass('public.client_intake') is not null and to_regclass('public.organization_memberships') is not null"],
+  ],
+});
+
+STEPS.push({
+  n: "156",
+  slug: "0404",
+  title: "0404 Release X1: the narrow reads athletes' screens use to see who else is in their group (a name, a photo, a role and a position, nothing else)",
+  migrations: ["0404"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes on screen. Adds two read-only functions (group_member_names, group_position_roster) that only a member of the group can use; the athlete screens that list the group's members (the @mention lists, the position leaderboard, the game stat grid) use them once the Release X1 code is live and fall back to the older read until then.",
+  undo: [
+    "drop function if exists public.group_position_roster(uuid);",
+    "drop function if exists public.group_member_names(uuid);",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 156 misbehaves. Run it only while the Release X1 code is not live (the code then falls back to the older read on its own).",
+  rows: [
+    ["0404 is not already applied (the member-names function is not there yet)", "to_regprocedure('public.group_member_names(uuid)') is null"],
+    ["the tables and helper it uses exist", "to_regclass('public.group_memberships') is not null and to_regclass('public.profiles') is not null and to_regclass('public.group_positions') is not null and to_regprocedure('public.is_group_member(uuid)') is not null"],
+  ],
+});
+
+STEPS.push({
   n: "136",
   slug: "0385",
   title: "0385 The kind of each set (warm-up, working, as-many-as-possible, back-off, drop); a warm-up or drop set never counts toward a goal, a record or a training max; records are per number of reps and a longer hold is a record; a training max comes only from a set of 1 to 8 reps",
@@ -2915,23 +3083,88 @@ STEPS.push({
   ],
 });
 
+// The text of one function exactly as an earlier migration made it (from its "create or replace" line to the closing $$;), so an undo can put it back.
+function functionFromMigration(file, name) {
+  const text = readFileSync(new URL("../supabase/migrations/" + file, import.meta.url), "utf8").replace(/\r\n/g, String.fromCharCode(10));
+  const start = text.indexOf("create or replace function public." + name + "(");
+  const end = text.indexOf(String.fromCharCode(36, 36) + ";", start);
+  if (start < 0 || end < 0) throw new Error("cannot find " + name + " in " + file);
+  return text.slice(start, end + 3).replace(/—/g, "-");
+}
+
 STEPS.push({
-  n: "164",
-  slug: "0412",
-  title: "0412 Release T1: Download my data gives a person everything the app holds about them (two small functions and a private bucket)",
-  migrations: ["0412"],
+  n: "152",
+  slug: "0400",
+  title: "0400 Release T1: the front desk (a person an owner or admin invites to check clients in on an organization-wide screen, and nothing else)",
+  migrations: ["0400"],
   sees: "Success. No rows returned.",
-  afterwards: "Nothing changes on screen until the Release T1 code is live. Adds two functions, export_my_data_tables and export_my_data_table, that a signed-in person runs as themselves to collect, a page at a time, every row they can read that names them, and an empty private bucket (account-exports) for a download too large to send directly. Safe to run before the code.",
+  afterwards: "Nothing changes on screen until the Release T1 code is live. Adds one small table of front-desk people, five functions (find a client by name, check a client in, list my organizations, remove a front-desk person, and the shared check-in code test), lets an invitation name the front-desk role, and makes the existing check-in code test (verify_kiosk_pin) call the shared one with the same answers and the same coach-only guard.",
   undo: [
-    "drop function if exists public.export_my_data_table(text, text, integer, integer);",
-    "drop function if exists public.export_my_data_tables();",
-    "-- the empty account-exports bucket is left in place (removing a bucket that holds files fails)",
+    "drop function if exists public.remove_front_desk(uuid, uuid);",
+    "drop function if exists public.front_desk_check_in(uuid, uuid, text);",
+    "drop function if exists public.front_desk_find(uuid, text);",
+    "drop function if exists public.front_desk_orgs();",
+    "drop function if exists public._front_desk_display_name(text, date);",
+    "drop function if exists public._front_desk_scope(uuid);",
+    "drop table if exists public.front_desk_pin_misses;",
+    "drop table if exists public.org_front_desk;",
+    "drop function if exists public.is_org_active_owner_or_admin(uuid);",
+    "delete from public.organization_invites where role = 'front_desk';",
+    "alter table public.organization_invites drop constraint if exists organization_invites_role_check;",
+    "alter table public.organization_invites add constraint organization_invites_role_check check (role in ('admin', 'coach'));",
+    // the check-in code test and the invitation answer go back to their earlier text, copied from the migrations that made them
+    functionFromMigration("0251_kiosk_pins_hashed.sql", "verify_kiosk_pin"),
+    "drop function if exists public._check_kiosk_pin(uuid, uuid, text);",
+    functionFromMigration("0352_organization_invites_accept_and_leave.sql", "answer_organization_invite"),
+    functionFromMigration("0396_leaving_coach_choice.sql", "close_organization"),
   ].join(String.fromCharCode(10)),
-  undoWhy: "Only if step 164 misbehaves. Run it only while the Release T1 code is not live. Download my data then falls back to its short list.",
+  undoWhy: "Only if step 152 misbehaves. Run it only while the Release T1 code is not live. Removes the front-desk table (every front-desk person is dropped; they can be invited again) and the functions. The two older functions it replaced (verify_kiosk_pin, answer_organization_invite) keep working for every other role either way.",
   rows: [
-    ["0412 is not already applied (the functions are not there yet)", "to_regprocedure('public.export_my_data_tables()') is null"],
-    ["the table it reads from exists", "to_regclass('public.profiles') is not null"],
-    ["the storage bucket table exists", "to_regclass('storage.buckets') is not null"],
+    ["0400 is not already applied (the front-desk table is not there yet)", "to_regclass('public.org_front_desk') is null"],
+    ["the tables and helpers it uses exist", "to_regclass('public.organizations') is not null and to_regclass('public.kiosk_pins') is not null and to_regclass('public.kiosk_checkins') is not null and to_regclass('public.organization_invites') is not null and to_regprocedure('public.is_org_owner_or_admin(uuid)') is not null and to_regprocedure('public.is_group_coach(uuid)') is not null"],
+    ["the leaving-coach columns it reads exist", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'organization_memberships' and column_name = 'access_ended_at')"],
+    ["retired groups can be recognised", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'groups' and column_name = 'archived_at')"],
+  ],
+});
+
+STEPS.push({
+  n: "153",
+  slug: "0401",
+  title: "0401 Release U1: graduation (a class year for each team player, and a record of who has been emailed their training history)",
+  migrations: ["0401"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes on screen until the Release U1 code is live. Adds two empty columns (the player's graduation year, and the year a season's graduates were decided by) and one empty server-only table (who has been sent their history), and one new function, start_next_season, that calls the existing start_new_season (unchanged) and then copies the graduation year to the players brought into the new season. Nothing existing is replaced.",
+  undo: [
+    "drop function if exists public.start_next_season(uuid, text, uuid[], int);",
+    "drop trigger if exists groups_guard_graduates_through on public.groups;",
+    "drop function if exists public.guard_graduates_through();",
+    "alter table public.groups drop column if exists graduates_through;",
+    "drop table if exists public.graduation_exports;",
+    "alter table public.group_memberships drop constraint if exists group_memberships_graduation_year_range;",
+    "alter table public.group_memberships drop column if exists graduation_year;",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 153 misbehaves. Run it only while the Release U1 code is not live. Removes the graduation years that were entered, the record of who was emailed and the new function; the app goes back to calling start_new_season directly (the old code still does).",
+  rows: [
+    ["0401 is not already applied (the graduation year column is not there yet)", "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_memberships' and column_name = 'graduation_year')"],
+    ["the seasons migration is applied (groups can be retired)", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'groups' and column_name = 'archived_at') and to_regprocedure('public.start_new_season(uuid, text, uuid[])') is not null"],
+  ],
+});
+
+STEPS.push({
+  n: "155",
+  slug: "0403",
+  title: "0403 Release W3: every client goes through the health form and waiver, whichever door they came in by (a trigger flags someone who joins as a client without a finished form)",
+  migrations: ["0403"],
+  sees: "Success. No rows returned.",
+  afterwards: "From now on, a person who already had an account and joins a group as a client (by an invite link, or by accepting a coach's invitation) is sent to the health form and waiver on their next page, if they have not finished one. Coaches, social-only members and people who already finished the form are left alone. Nobody who is already in a group is touched.",
+  undo: [
+    "drop trigger if exists group_memberships_require_intake on public.group_memberships;",
+    "drop function if exists public.require_intake_for_new_client();",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 155 misbehaves. Removes the trigger; people it already flagged stay flagged (they still finish the form once).",
+  rows: [
+    ["0403 is not already applied (the trigger is not there yet)", "not exists (select 1 from pg_trigger where tgname = 'group_memberships_require_intake' and not tgisinternal)"],
+    ["the tables it reads exist", "to_regclass('public.group_memberships') is not null and to_regclass('public.client_intake') is not null and to_regclass('public.profiles') is not null"],
   ],
 });
 
@@ -2951,6 +3184,38 @@ STEPS.push({
     ["0398 is not already applied (the waiting-requests table is not there yet)", "to_regclass('public.pending_email_changes') is null"],
     ["the tables it builds on exist", "to_regclass('public.profiles') is not null and to_regclass('public.groups') is not null and to_regclass('public.notifications') is not null"],
     ["the notification type rule exists to be widened", "exists (select 1 from pg_constraint c where c.conname = 'notifications_type_check' and c.conrelid = 'public.notifications'::regclass)"],
+  ],
+});
+
+STEPS.push({
+  n: "151",
+  slug: "0399",
+  title: "0399 Release S2: a client's health answers are read only by the client, their coach, and an owner or admin the owner has granted; the address and device of an acceptance only by the audit path",
+  migrations: ["0399"],
+  sees: "Success. No rows returned.",
+  afterwards: "Takes effect at once and the Release S2 code must be live with it: the health answers can no longer be read straight from the table (the app reads them through new functions), and an organization's owner and admins stop seeing the answers (they still see whether the form is done) unless the owner grants it. Apply this step and deploy the code together; the code is written to keep working on either side of the paste only for the pages that do not read the answers.",
+  undo: [
+    "drop trigger if exists organization_memberships_drop_health_grant_role on public.organization_memberships;",
+    "drop function if exists public.drop_health_grant_on_role_change();",
+    "drop trigger if exists organization_memberships_drop_health_grant on public.organization_memberships;",
+    "drop function if exists public.drop_health_grant_on_leaving();",
+    "-- signed-out visitors get back exactly what they held before",
+    "grant delete, insert, references, select, trigger, truncate, update on public.client_intake to anon;",
+    "grant insert, select on public.legal_acceptances to anon;",
+    "drop function if exists public.legal_acceptance_audit(uuid);",
+    "grant select on public.legal_acceptances to authenticated;",
+    "grant select on public.client_intake to authenticated;",
+    "drop function if exists public.set_health_access(uuid, uuid, boolean);",
+    "drop function if exists public.health_answers_many(uuid[]);",
+    "drop function if exists public.health_answers(uuid);",
+    "drop function if exists public._can_read_health_answers(uuid);",
+    "drop table if exists public.health_access_grants;",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 151 misbehaves. It gives the owner and admins their old read of the answers back (and a coach their old read of an acceptance's address and device); run it only if you accept that.",
+  rows: [
+    ["0399 is not already applied (the grants table is not there yet)", "to_regclass('public.health_access_grants') is null"],
+    ["the tables it protects exist", "to_regclass('public.client_intake') is not null and to_regclass('public.legal_acceptances') is not null"],
+    ["the helpers it uses exist", "to_regprocedure('public.is_group_coach(uuid)') is not null and to_regprocedure('public.is_client_private_from_org(uuid, uuid)') is not null and to_regprocedure('public.is_org_owner_or_admin(uuid)') is not null and to_regprocedure('public.audit_record(text, text, text, jsonb)') is not null"],
   ],
 });
 
@@ -3100,9 +3365,20 @@ for (const s of STEPS) {
 // The individual step files stay as the fallback (and for a release that was partly applied by hand: the bundle refuses at the first applied step).
 const BUNDLES = [
   { id: "release-t1-export-my-data", name: "Release T1 (Download my data gives a person everything the app holds about them; adds two functions and a private bucket, safe before the code)", steps: ["164"] },
+  { id: "release-cm1-report-and-block", name: "Release CM1 (report a post or comment, block a member; adds two small tables, two functions and one notice kind, safe before the code)", steps: ["163"] },
+  { id: "release-sp1-support-notices", name: "Release SP1 (a support reply tells the other side; adds one notice kind and a trigger, safe before the code)", steps: ["162"] },
+  { id: "release-m1-payment-events", name: "Release M1 (failed payments, refunds and disputes recorded and the coach told; adds one table and one notice kind, moves no money, safe before the code)", steps: ["161"] },
+  { id: "release-b1-nutrition-flag", name: "Release B1 (switch off automatic nutrition suggestions for one client; adds one coach-only table, safe before the code)", steps: ["160"] },
+  { id: "release-z1-client-removals", name: "Release Z1 (remove a client without destroying them, and a 30-day undo for a permanent delete; adds only, safe before the code)", steps: ["159"] },
+  { id: "release-w2b-notice-names", name: "Release W2b (notices name a member under 18 as a first name and last initial; REPLACES three notice functions, so it is not additions-only)", steps: ["157"] },
+  { id: "release-x1-athlete-narrow-reads", name: "Release X1 (two narrow read functions for athletes' screens; adds only, safe before or with the code)", steps: ["156"] },
   { id: "release-co", name: "Release CO (nothing about a person is public unless they chose it: personal Find a coach listing; a coach adds only their own clients to a challenge; run BEFORE the code that goes with it is live)", steps: ["139"] },
   { id: "release-cn-held", name: "HELD, Ron's word first: require the health form and waiver of every client without one (read check-intake-flag-list.sql first)", steps: ["138"] },
   { id: "release-cm", name: "Release CM (the guard function and a coach's decision on a flagged screening; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["137"] },
+  { id: "release-w3-intake-every-client", name: "Release W3 (every client reaches the health form, whichever door they came in by; adds a trigger only, safe before or with the code)", steps: ["155"] },
+  { id: "release-u1-graduation", name: "Release U1 (graduation years and the graduating player's training history; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["153"] },
+  { id: "release-t1-front-desk", name: "Release T1 (the front desk; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["152"] },
+  { id: "release-s2-health-answers", name: "Release S2 (health answers private to the client and their coach; apply together with the code)", steps: ["151"] },
   { id: "release-s1-signin-hardening", name: "Release S1 (a changed sign-in email is confirmed by the new address; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["150"] },
   { id: "release-f2-client-cap", name: "Release F2 (the free plan's client limit, installed switched off; adds only)", steps: ["149"] },
   { id: "release-l-leaving-coach", name: "Release L (a leaving coach is never given an organization; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["148"] },
@@ -3326,6 +3602,14 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
 {
   const m = (n, marker) => ({ n, file: index[n], marker });
   const items = [
+    m("0412", "to_regprocedure('public.export_my_data_table(text, text, integer, integer)') is not null"),
+    m("0411", "to_regclass('public.content_reports') is not null"),
+    m("0410", "exists (select 1 from pg_trigger where tgname = 'support_messages_notify' and not tgisinternal)"),
+    m("0409", "to_regclass('public.payment_events') is not null"),
+    m("0408", "to_regclass('public.client_nutrition_flags') is not null"),
+    m("0407", "to_regclass('public.client_removals') is not null"),
+    m("0405", "to_regprocedure('public.notice_display_name(uuid)') is not null"),
+    m("0404", "to_regprocedure('public.group_member_names(uuid)') is not null"),
     m("0236", "exists (select 1 from pg_indexes where schemaname = 'public' and indexname = 'workout_logs_session_id_key')"),
     m("0237", has.fnName("join_group_with_invite")),
     m("0238", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'group_memberships' and policyname = 'memberships_insert_coach_or_self' and with_check not like '%has_valid_group_invite%')"),
@@ -3385,7 +3669,10 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
     m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
-    m("0412", "to_regprocedure('public.export_my_data_table(text, text, integer, integer)') is not null"),
+    m("0403", "exists (select 1 from pg_trigger where tgname = 'group_memberships_require_intake' and not tgisinternal)"),
+    m("0401", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_memberships' and column_name = 'graduation_year')"),
+    m("0400", "to_regclass('public.org_front_desk') is not null"),
+    m("0399", "to_regclass('public.health_access_grants') is not null"),
     m("0398", "to_regclass('public.pending_email_changes') is not null"),
     m("0397", "exists (select 1 from pg_trigger where tgname = 'group_memberships_free_tier_limit' and not tgisinternal)"),
     m("0396", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'organization_memberships' and column_name = 'departing_since')"),
@@ -3553,5 +3840,7 @@ writeFileSync(
 );
 writeFileSync(new URL("check-copy-result.sql", outDir), "-- READ-ONLY. Run after step 30 and LOOK at it before step 31: the original program and its copy, side by side. The two rows must show the same numbers.\nwith pair as (\n  select 'original (Main Group)' as which, '5b8a8a3a-344d-4192-a892-f74494fff9ab'::uuid as program_id\n  union all\n  select 'copy (The Home Team)', (select id from public.programs where group_id = '060017b5-e613-4204-a101-c6a14c3a9630' and name = 'christmas_abs_program' order by created_at desc limit 1)\n)\nselect p.which,\n  (select count(*) from public.workouts w where w.program_id = p.program_id) as workouts,\n  (select count(*) from public.group_workout_exercises x join public.workouts w on w.id = x.workout_id where w.program_id = p.program_id) as exercises,\n  (select count(*) from public.group_workout_exercise_sets s join public.group_workout_exercises x on x.id = s.group_workout_exercise_id join public.workouts w on w.id = x.workout_id where w.program_id = p.program_id) as sets,\n  (select count(*) from public.workout_notes n join public.workouts w on w.id = n.workout_id where w.program_id = p.program_id) as notes,\n  (select count(*) from public.exercise_progressions q where q.program_id = p.program_id) as progressions\nfrom pair p;\n");
 writeFileSync(new URL("check-step23-probe.sql", outDir), step23ProbeSql(migrationSql("0281")));
+// The step list for scripts/state-report.mjs: each step with the check that says it is NOT yet applied (every row labelled "... is not already applied"; older steps have none and are reported as no check), so a read-only report can tell which pastes are in the database.
+writeFileSync(new URL("state-probes.json", outDir), JSON.stringify(STEPS.map((s) => ({ n: s.n, slug: s.slug, title: s.title, migrations: s.migrations, notApplied: s.rows.filter((r) => /not already applied/i.test(r[0])).map((r) => r[1]) })), null, 1));
 writeFileSync(new URL("steps.json", outDir), JSON.stringify(STEPS.map((s) => ({ n: s.n, slug: s.slug, migrations: s.migrations, rows: s.rows.length })), null, 1));
 console.log(`wrote ${STEPS.length} steps to supabase/apply/`);

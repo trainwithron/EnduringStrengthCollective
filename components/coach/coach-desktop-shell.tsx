@@ -46,6 +46,7 @@ import { FeedbackButton } from "@/components/feedback/feedback-button";
 import { ClientFinder } from "@/components/coach/desktop/client-finder";
 import { HeaderNotificationBell } from "@/components/notifications/header-bell";
 import { useCoachNavFacts } from "@/components/coach/use-coach-type";
+import { useOnFrontDesk } from "@/components/front-desk/use-on-front-desk";
 import { hiddenForCoach } from "@/lib/team-coach";
 import { WorkspaceMenu } from "@/components/coach/desktop/workspace-menu";
 import { LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/coach-groups";
@@ -90,6 +91,7 @@ function NavBadge({ count, collapsed }: { count: number; collapsed?: boolean }) 
 
 type Active =
   | "home"
+  | "front-desk"
   | "dashboard"
   | "programs"
   | "exercise-library"
@@ -424,6 +426,7 @@ function CoachDesktopShellFull({
   // GroupSwitcher below) — it's already the flattest, first-reached
   // item, which is exactly what "Run my day" wants for it.
   const navFacts = useCoachNavFacts();
+  const onFrontDesk = useOnFrontDesk();
   const nav: NavEntry[] = [
     // Run my day — the highest-frequency items, flat, no group/extra
     // click to reach any of them. Team Performance sits right next to
@@ -505,6 +508,7 @@ function CoachDesktopShellFull({
         { key: "settings", label: "Account", href: `/groups/${groupId}/settings`, icon: Settings },
         { key: "display", label: "Display mode", href: `/groups/${groupId}/display`, icon: MonitorPlay, newTab: true },
         { key: "kiosk", label: "Kiosk check-in", href: `/groups/${groupId}/kiosk/settings`, icon: UserCheck },
+        ...(onFrontDesk ? [{ key: "front-desk" as const, label: "Front desk", href: "/front-desk", icon: UserCheck, newTab: true }] : []),
         { key: "sms-settings", label: "Text messages", href: `/groups/${groupId}/business/sms-settings`, icon: MessageCircle },
         { key: "support", label: "Support", href: `/groups/${groupId}/business/support`, icon: HeartHandshake },
         { key: "quick-tips", label: "Quick tips", href: `/groups/${groupId}/quick-tips`, icon: Lightbulb },
