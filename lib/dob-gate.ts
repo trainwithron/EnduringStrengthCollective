@@ -19,6 +19,23 @@ async function hmacHex(message: string, secret: string): Promise<string> {
 export async function signDobOk(userId: string, secret: string | undefined): Promise<string | null> {
   return secret ? `${userId}.${await hmacHex(`dob_ok_v2:${userId}`, secret)}` : null;
 }
+// A person with NO seat at all (a platform administrator, an organization admin, front desk staff) is not asked anything, but nothing about them is known to last: they may become a client at any moment. Their pass is a separate
+// cookie that carries its own expiry INSIDE the signed text (ten minutes), so it cannot be kept past that by anyone who holds the cookie, and it saves them one lookup per page.
+export const NOSEAT_OK_COOKIE = "dob_noseat_v1";
+export const NOSEAT_OK_SECONDS = 600;
+export async function signNoSeatOk(userId: string, secret: string | undefined, nowMs: number = Date.now()): Promise<string | null> {
+  if (!secret) return null;
+  const exp = Math.floor(nowMs / 1000) + NOSEAT_OK_SECONDS;
+  return `${userId}.${exp}.${await hmacHex(`dob_noseat_v1:${userId}:${exp}`, secret)}`;
+}
+export async function noSeatOkValid(value: string | undefined, userId: string, secret: string | undefined, nowMs: number = Date.now()): Promise<boolean> {
+  if (!value || !secret) return false;
+  const [id, expText, sig] = value.split(".");
+  const exp = Number(expText);
+  if (id !== userId || !Number.isFinite(exp) || exp * 1000 <= nowMs || exp * 1000 > nowMs + (NOSEAT_OK_SECONDS + 5) * 1000) return false;
+  return sig === (await hmacHex(`dob_noseat_v1:${userId}:${exp}`, secret));
+}
+
 export async function dobOkCookieValid(value: string | undefined, userId: string, secret: string | undefined): Promise<boolean> {
   if (!value || !secret) return false;
   const expected = await signDobOk(userId, secret);
@@ -62,6 +79,8 @@ export interface DobGateFacts {
   // May this pass be remembered for a week? Only an adult client whose date of birth is on file, or a coach (a coach seat is what makes someone "not a client only" for a lasting reason). Never when the person has no seat at all
   // (they may become a client any minute: a removed client who is put back, a new account that joins by invite), and never after a failed lookup. A client with no date, a teen and a child are checked on every page.
   cacheable: boolean;
+  // The person has no seat at all (so the ten-minute no-seat pass may be used, never the week-long one).
+  noSeat: boolean;
   // Only read for a client aged 13 to 17.
   guardian: GuardianFacts | null;
 }
@@ -70,19 +89,19 @@ export interface DobGateFacts {
 export async function loadDobGate(supabase: SupabaseClient, userId: string): Promise<DobGateFacts> {
   const { data: memberships, error: membershipError } = await supabase.from("group_memberships").select("group_id, role").eq("profile_id", userId);
   // A lookup that failed says nothing about who this person is: not ok, not remembered.
-  if (membershipError) return { gate: "check_failed", groupId: null, dateOfBirth: null, profileBirthday: null, ageBand: "unknown", cacheable: false, guardian: null };
+  if (membershipError) return { gate: "check_failed", groupId: null, dateOfBirth: null, profileBirthday: null, ageBand: "unknown", cacheable: false, noSeat: false, guardian: null };
   const rows = (memberships ?? []) as { group_id: string; role: string }[];
   const hasCoachSeat = rows.some((m) => m.role === "coach");
   const isClientOnly = rows.some((m) => m.role === "athlete") && !hasCoachSeat;
   const groupId = rows.find((m) => m.role === "athlete")?.group_id ?? null;
-  if (!isClientOnly) return { gate: "ok", groupId, dateOfBirth: null, profileBirthday: null, ageBand: "unknown", cacheable: hasCoachSeat, guardian: null };
+  if (!isClientOnly) return { gate: "ok", groupId, dateOfBirth: null, profileBirthday: null, ageBand: "unknown", cacheable: hasCoachSeat, noSeat: rows.length === 0, guardian: null };
 
   const [{ data: intake, error: intakeError }, { data: details, error: detailsError }] = await Promise.all([
     supabase.from("client_intake").select("date_of_birth").eq("athlete_id", userId).maybeSingle(),
     supabase.from("athlete_profile_details").select("birthday").eq("athlete_id", userId).maybeSingle(),
   ]);
   // A failed read of the date is not "no date": asking an adult for their birthday again because a lookup failed would be wrong, and so would letting anyone through. Not ok, not remembered.
-  if (intakeError || detailsError) return { gate: "check_failed", groupId, dateOfBirth: null, profileBirthday: null, ageBand: "unknown", cacheable: false, guardian: null };
+  if (intakeError || detailsError) return { gate: "check_failed", groupId, dateOfBirth: null, profileBirthday: null, ageBand: "unknown", cacheable: false, noSeat: false, guardian: null };
   const dateOfBirth = ((intake as { date_of_birth?: string | null } | null)?.date_of_birth ?? null) as string | null;
   const profileBirthday = ((details as { birthday?: string | null } | null)?.birthday ?? null) as string | null;
   const band = ageBand(dateOfBirth);
@@ -95,5 +114,5 @@ export async function loadDobGate(supabase: SupabaseClient, userId: string): Pro
     guardian = { state, guardianEmail: row?.guardian_email ?? null, requestedAt: row?.requested_at ?? null };
   }
   const gate = dobGateState({ isClientOnly, dateOfBirth, guardianSigned: guardian?.state === "signed" });
-  return { gate, groupId, dateOfBirth, profileBirthday, ageBand: band, cacheable: gate === "ok" && band === "adult", guardian };
+  return { gate, groupId, dateOfBirth, profileBirthday, ageBand: band, cacheable: gate === "ok" && band === "adult", noSeat: false, guardian };
 }

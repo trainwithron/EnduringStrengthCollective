@@ -4,8 +4,8 @@ import { shouldResumeClaim } from "@/lib/claim-resume";
 import { LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/workspace-header";
 import { decodeWorkspaceCookie, groupIdFromPath } from "@/lib/workspace-header";
 import { MY_TRAINING_COOKIES, shouldLeaveMyTraining } from "@/lib/my-training-exit";
-import { DOB_OK_COOKIE, dobOkCookieValid, loadDobGate, signDobOk } from "@/lib/dob-gate";
-import { apiGateApplies, dobGatedPage, intakeGateApplies } from "@/lib/gate-paths";
+import { DOB_OK_COOKIE, NOSEAT_OK_COOKIE, NOSEAT_OK_SECONDS, dobOkCookieValid, loadDobGate, noSeatOkValid, signDobOk, signNoSeatOk } from "@/lib/dob-gate";
+import { apiGateApplies, dobGatedPage, gateAction, intakeGateApplies } from "@/lib/gate-paths";
 import { SIGNED_OUT_FRAME_HTML } from "@/lib/signed-out-frame";
 
 // Every page a client can use. A client who has not finished the health form and waiver (profiles.intake_required) reaches none of them, not just /groups: a workout link, a notification or a typed address
@@ -221,12 +221,18 @@ export async function updateSession(request: NextRequest) {
   // The same check closes the API to a blocked child: ONE shared guard here, so every route a client session can reach (AI, uploads, messages, push, wearables, payments ...) is covered, and a route added later is too.
   // The few routes a child must still reach (their own data download and deletion, the guardian's signing, the birthday and health steps, legal, sign-in help, feedback, turning push off) are listed in lib/gate-paths.ts.
   const gatedApi = apiGateApplies(pathname);
-  if (user && (dobGatedPage(pathname) || onIntake || gatedApi) && !(await dobOkCookieValid(request.cookies.get(DOB_OK_COOKIE)?.value, user.id, process.env.CRON_SECRET))) {
+  if (
+    user &&
+    (dobGatedPage(pathname) || onIntake || gatedApi) &&
+    !(await dobOkCookieValid(request.cookies.get(DOB_OK_COOKIE)?.value, user.id, process.env.CRON_SECRET)) &&
+    !(await noSeatOkValid(request.cookies.get(NOSEAT_OK_COOKIE)?.value, user.id, process.env.CRON_SECRET))
+  ) {
     const facts = await loadDobGate(supabase, user.id);
-    if (facts.gate !== "ok" && !(onIntake && facts.gate === "need_dob")) {
+    const action = gateAction({ kind: gatedApi ? "api" : "page", gate: facts.gate, onIntake });
+    if (action !== "pass") {
       if (gatedApi) {
         const message = facts.gate === "check_failed" ? "We couldn't check your account just now. Try again in a moment." : "This account isn't set up to use this yet. Finish the steps on your birthday screen first.";
-        const blocked = NextResponse.json({ error: message, gate: facts.gate }, { status: facts.gate === "check_failed" ? 503 : 403, headers: { "cache-control": "no-store" } });
+        const blocked = NextResponse.json({ error: message, gate: facts.gate }, { status: action === "unavailable" ? 503 : 403, headers: { "cache-control": "no-store" } });
         response.cookies.getAll().forEach((cookie) => {
           blocked.cookies.set(cookie);
         });
@@ -243,6 +249,9 @@ export async function updateSession(request: NextRequest) {
     // Only an adult client whose date of birth is on file, or a coach, is remembered for a week (facts.cacheable). A client with no date yet, a teen (a guardian can withdraw at any moment), a child, a person with no seat at all and a failed lookup are checked every time.
     const signed = facts.cacheable ? await signDobOk(user.id, process.env.CRON_SECRET) : null;
     if (signed) response.cookies.set(DOB_OK_COOKIE, signed, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 24 * 7 });
+    // A person with no seat at all gets a ten-minute pass instead (their expiry is inside the signed text).
+    const noSeatSigned = !signed && facts.gate === "ok" && facts.noSeat ? await signNoSeatOk(user.id, process.env.CRON_SECRET) : null;
+    if (noSeatSigned) response.cookies.set(NOSEAT_OK_COOKIE, noSeatSigned, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: NOSEAT_OK_SECONDS });
   }
 
   // "My training" is a deliberate visit (lib/my-training-exit.ts): landing on a coach page ends it. The cookies are cleared for THIS request too, so the coach screen renders instead of a redirect

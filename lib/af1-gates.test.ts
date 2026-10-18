@@ -109,7 +109,7 @@ describe("one shared guard closes the API to a blocked child, and the page list 
   it("the middleware answers a blocked child's API call with 403 (or 503 when the check failed) and remembers nothing", () => {
     const mw = src("lib/supabase/middleware.ts");
     expect(mw).toContain("const gatedApi = apiGateApplies(pathname);");
-    expect(mw).toContain('status: facts.gate === "check_failed" ? 503 : 403');
+    expect(mw).toContain('status: action === "unavailable" ? 503 : 403');
     expect(mw).toContain("facts.cacheable ? await signDobOk");
   });
 });
@@ -124,5 +124,52 @@ describe("the blocked and guardian screens say what to do about a wrong birthday
     const page = src("app/birthday/page.tsx");
     expect(page.indexOf('facts.gate === "check_failed"')).toBeLessThan(page.indexOf("redirect(next)"));
     expect(src("app/api/intake/submit/route.ts")).toContain('facts.gate === "check_failed"');
+  });
+});
+
+import { NOSEAT_OK_SECONDS, noSeatOkValid, signNoSeatOk } from "./dob-gate";
+import { gateAction } from "./gate-paths";
+
+describe("what the middleware does at a gate (the one decision function it calls)", () => {
+  it("a page sends everyone who is not ok to the birthday screen, except a client still giving a date on the health form", () => {
+    for (const gate of ["need_dob", "blocked", "need_guardian", "check_failed"] as const) expect(gateAction({ kind: "page", gate }), gate).toBe("redirect_birthday");
+    expect(gateAction({ kind: "page", gate: "need_dob", onIntake: true })).toBe("pass");
+    expect(gateAction({ kind: "page", gate: "blocked", onIntake: true })).toBe("redirect_birthday");
+    expect(gateAction({ kind: "page", gate: "ok" })).toBe("pass");
+  });
+
+  it("the API stops a known minor (403) and a failed check (503), and lets a person with no birthday yet through (the page gate sends them to the birthday screen)", () => {
+    expect(gateAction({ kind: "api", gate: "blocked" })).toBe("forbidden");
+    expect(gateAction({ kind: "api", gate: "need_guardian" })).toBe("forbidden");
+    expect(gateAction({ kind: "api", gate: "check_failed" })).toBe("unavailable");
+    expect(gateAction({ kind: "api", gate: "need_dob" })).toBe("pass");
+    expect(gateAction({ kind: "api", gate: "ok" })).toBe("pass");
+  });
+
+  it("the claim step works for a client with a seat and no birthday: it is on the exempt list and need_dob passes the API anyway", () => {
+    expect(apiGateApplies("/api/clients/complete-claim")).toBe(false);
+    expect(apiGateApplies("/api/clients/complete-claimx")).toBe(true);
+    expect(gateAction({ kind: "api", gate: "need_dob" })).toBe("pass");
+    expect(src("lib/supabase/middleware.ts")).toContain("gateAction({ kind: gatedApi ? \"api\" : \"page\", gate: facts.gate, onIntake })");
+  });
+});
+
+describe("the ten-minute pass for a person with no seat", () => {
+  it("is signed with its own expiry, bound to the person, and refused after ten minutes or when altered", async () => {
+    const now = Date.UTC(2026, 9, 18, 12, 0, 0);
+    const pass = (await signNoSeatOk("u1", "secret", now))!;
+    expect(await noSeatOkValid(pass, "u1", "secret", now + 1000)).toBe(true);
+    expect(await noSeatOkValid(pass, "u2", "secret", now + 1000)).toBe(false);
+    expect(await noSeatOkValid(pass, "u1", "other-secret", now + 1000)).toBe(false);
+    expect(await noSeatOkValid(pass, "u1", "secret", now + (NOSEAT_OK_SECONDS + 1) * 1000)).toBe(false);
+    const [id, exp, sig] = pass.split(".");
+    expect(await noSeatOkValid(`${id}.${Number(exp) + 86400}.${sig}`, "u1", "secret", now)).toBe(false);
+    expect(await signNoSeatOk("u1", undefined, now)).toBeNull();
+  });
+
+  it("is given only to a person with no seat whose check was ok, never as the week-long pass", () => {
+    const mw = src("lib/supabase/middleware.ts");
+    expect(mw).toContain('facts.gate === "ok" && facts.noSeat');
+    expect(mw).toContain("maxAge: NOSEAT_OK_SECONDS");
   });
 });
