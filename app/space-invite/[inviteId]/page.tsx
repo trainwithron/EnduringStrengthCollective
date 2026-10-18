@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { createCrossOrgServerClient as createServerClient } from "@/lib/supabase/server";
 import { SpaceInviteAnswer } from "@/components/org/space-invite-answer";
 
+export const metadata = { title: "Space invite" };
+
 // A coach's invitation to be their one-on-one client, for someone who already has an account. They see who invited them and choose; nothing is joined until they accept.
 export default async function SpaceInvitePage(props: { params: Promise<{ inviteId: string }> }) {
   const { inviteId } = await props.params;

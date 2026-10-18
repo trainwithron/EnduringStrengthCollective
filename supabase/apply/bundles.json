@@ -1,5 +1,29 @@
 [
  {
+  "id": "release-z1-client-removals",
+  "name": "Release Z1 (remove a client without destroying them, and a 30-day undo for a permanent delete; adds only, safe before the code)",
+  "steps": [
+   "159"
+  ],
+  "file": "apply-release-z1-client-removals-all.sql"
+ },
+ {
+  "id": "release-w2b-notice-names",
+  "name": "Release W2b (notices name a member under 18 as a first name and last initial; REPLACES three notice functions, so it is not additions-only)",
+  "steps": [
+   "157"
+  ],
+  "file": "apply-release-w2b-notice-names-all.sql"
+ },
+ {
+  "id": "release-x1-athlete-narrow-reads",
+  "name": "Release X1 (two narrow read functions for athletes' screens; adds only, safe before or with the code)",
+  "steps": [
+   "156"
+  ],
+  "file": "apply-release-x1-athlete-narrow-reads-all.sql"
+ },
+ {
   "id": "release-co",
   "name": "Release CO (nothing about a person is public unless they chose it: personal Find a coach listing; a coach adds only their own clients to a challenge; run BEFORE the code that goes with it is live)",
   "steps": [
@@ -24,12 +48,36 @@
   "file": "apply-release-cm-all.sql"
  },
  {
-  "id": "release-z1-client-removals",
-  "name": "Release Z1 (remove a client without destroying them, and a 30-day undo for a permanent delete; adds only, safe before the code)",
+  "id": "release-w3-intake-every-client",
+  "name": "Release W3 (every client reaches the health form, whichever door they came in by; adds a trigger only, safe before or with the code)",
   "steps": [
-   "159"
+   "155"
   ],
-  "file": "apply-release-z1-client-removals-all.sql"
+  "file": "apply-release-w3-intake-every-client-all.sql"
+ },
+ {
+  "id": "release-u1-graduation",
+  "name": "Release U1 (graduation years and the graduating player's training history; adds only, safe to run BEFORE the code that goes with it is live)",
+  "steps": [
+   "153"
+  ],
+  "file": "apply-release-u1-graduation-all.sql"
+ },
+ {
+  "id": "release-t1-front-desk",
+  "name": "Release T1 (the front desk; adds only, safe to run BEFORE the code that goes with it is live)",
+  "steps": [
+   "152"
+  ],
+  "file": "apply-release-t1-front-desk-all.sql"
+ },
+ {
+  "id": "release-s2-health-answers",
+  "name": "Release S2 (health answers private to the client and their coach; apply together with the code)",
+  "steps": [
+   "151"
+  ],
+  "file": "apply-release-s2-health-answers-all.sql"
  },
  {
   "id": "release-s1-signin-hardening",

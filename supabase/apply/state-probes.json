@@ -1,0 +1,1719 @@
+[
+ {
+  "n": "01",
+  "slug": "0249-0250-0254-0240-0241",
+  "title": "0249 coach completion message, 0250 AI allowance scaling, 0254 client tag write rules, 0240 guide dismissal, 0241 program label and order",
+  "migrations": [
+   "0249",
+   "0250",
+   "0254",
+   "0240",
+   "0241"
+  ],
+  "notApplied": [
+   "not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'client_tags' and policyname = 'client_tags_insert_owner_admin')"
+  ]
+ },
+ {
+  "n": "02",
+  "slug": "0244-0255-0256-0257-0258",
+  "title": "0244 macro target history and row security, 0255 legal acceptances and locked waiver, 0256 marketplace listing opt-in, 0257 feedback reports, 0258 help-search log",
+  "migrations": [
+   "0244",
+   "0255",
+   "0256",
+   "0257",
+   "0258"
+  ],
+  "notApplied": [
+   "to_regclass('public.client_macro_target_history') is null",
+   "to_regclass('public.legal_acceptances') is null",
+   "to_regclass('public.feedback_reports') is null and to_regclass('public.nav_query_log') is null"
+  ]
+ },
+ {
+  "n": "03",
+  "slug": "0259-0260-0261-0262",
+  "title": "0259 ongoing weekly series, 0260 payment holds and re-up reminders, 0261 public booking page tables, 0262 job monitoring",
+  "migrations": [
+   "0259",
+   "0260",
+   "0261",
+   "0262"
+  ],
+  "notApplied": [
+   "to_regclass('public.coach_booking_pages') is null and to_regclass('public.cron_runs') is null"
+  ]
+ },
+ {
+  "n": "04",
+  "slug": "0263",
+  "title": "0263 small-group sessions with spots, waiting list and charges",
+  "migrations": [
+   "0263"
+  ],
+  "notApplied": [
+   "to_regclass('public.group_sessions') is null"
+  ]
+ },
+ {
+  "n": "05",
+  "slug": "0236",
+  "title": "0236 workout session integrity: one log per workout however many times Finish is tapped, no edits to a completed workout, atomic resumable start",
+  "migrations": [
+   "0236"
+  ],
+  "notApplied": [
+   "not exists (select 1 from pg_indexes where schemaname = 'public' and indexname = 'workout_logs_session_id_key')"
+  ]
+ },
+ {
+  "n": "06",
+  "slug": "0251",
+  "title": "0251 kiosk PINs stored hashed with a five-wrong-tries lockout",
+  "migrations": [
+   "0251"
+  ],
+  "notApplied": [
+   "to_regclass('public.kiosk_pins') is null"
+  ]
+ },
+ {
+  "n": "07",
+  "slug": "0252",
+  "title": "0252 remove the plain-text kiosk PIN column (ONLY after the kiosk test passed)",
+  "migrations": [
+   "0252"
+  ],
+  "notApplied": []
+ },
+ {
+  "n": "08",
+  "slug": "0237-0242",
+  "title": "0237 join a group with an invite code (checked in the database), 0242 cancelling invite links",
+  "migrations": [
+   "0237",
+   "0242"
+  ],
+  "notApplied": [
+   "not exists (select 1 from pg_proc where proname = 'join_group_with_invite' and pronamespace = 'public'::regnamespace)",
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_invites' and column_name = 'revoked_at')"
+  ]
+ },
+ {
+  "n": "09",
+  "slug": "0238",
+  "title": "0238 close the old self-join (LAST, after the invite-join test passed)",
+  "migrations": [
+   "0238"
+  ],
+  "notApplied": [
+   "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'group_memberships' and policyname = 'memberships_insert_coach_or_self')"
+  ]
+ },
+ {
+  "n": "10",
+  "slug": "0268",
+  "title": "0268 guard fixes: a client's new session cannot start pre-flagged, workout totals recompute correctly, audit rows stop copying message text",
+  "migrations": [
+   "0268"
+  ],
+  "notApplied": [
+   "not exists (select 1 from pg_proc where proname = 'guard_athlete_session_insert' and pronamespace = 'public'::regnamespace)"
+  ]
+ },
+ {
+  "n": "11",
+  "slug": "0269",
+  "title": "0269 group session fixes: owed on promotion, not after start, credits in the right group, held time cannot be cancelled or double-booked",
+  "migrations": [
+   "0269"
+  ],
+  "notApplied": [
+   "not exists (select 1 from pg_proc where proname = 'guard_group_session_bookings' and pronamespace = 'public'::regnamespace)"
+  ]
+ },
+ {
+  "n": "12",
+  "slug": "0270",
+  "title": "0270 a coach can only add their own clients to a group (closes the hole that lets any coach add any user)",
+  "migrations": [
+   "0270"
+  ],
+  "notApplied": [
+   "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'group_memberships' and policyname = 'memberships_insert_coach_or_self' and with_check not like '%is_coach_of_athlete%')"
+  ]
+ },
+ {
+  "n": "13",
+  "slug": "0271",
+  "title": "0271 database functions are runnable by signed-in users and the server only (not by the public internet), except the three the public pages call",
+  "migrations": [
+   "0271"
+  ],
+  "notApplied": [
+   "(select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.prokind = 'f' and has_function_privilege('anon', p.oid, 'execute')) > 10"
+  ]
+ },
+ {
+  "n": "14",
+  "slug": "0273",
+  "title": "0273 guards on groups and organizations: ownership, the platform fee, moving a group, the one-on-one rule",
+  "migrations": [
+   "0273"
+  ],
+  "notApplied": [
+   "not exists (select 1 from pg_trigger where tgname in ('organizations_guard_columns', 'groups_guard_columns'))"
+  ]
+ },
+ {
+  "n": "15",
+  "slug": "0274",
+  "title": "0274 a completed workout is locked against added or deleted sets and against being reopened by the client",
+  "migrations": [
+   "0274"
+  ],
+  "notApplied": [
+   "coalesce((select position('tg_op' in pg_get_functiondef(p.oid)) = 0 from pg_proc p where p.proname = 'block_athlete_edits_to_completed_session' and p.pronamespace = 'public'::regnamespace), false)"
+  ]
+ },
+ {
+  "n": "16",
+  "slug": "0275",
+  "title": "0275 a client's cancel or move of one week of an ongoing weekly schedule stays skipped (so the nightly top-up does not book it back)",
+  "migrations": [
+   "0275"
+  ],
+  "notApplied": [
+   "not exists (select 1 from pg_trigger where tgname = 'bookings_note_series_skip')"
+  ]
+ },
+ {
+  "n": "17",
+  "slug": "0272",
+  "title": "0272 the discovery-call and gym QR functions are server-only (ONLY after the release with the two new server routes is deployed)",
+  "migrations": [
+   "0272"
+  ],
+  "notApplied": [
+   "has_function_privilege('anon', 'public.book_discovery_call(uuid, timestamptz, timestamptz, text, text, text, text)', 'execute')"
+  ]
+ },
+ {
+  "n": "18",
+  "slug": "0276",
+  "title": "0276 a new direct message gives the recipient an in-app notice (one line per sender while unread, no message text)",
+  "migrations": [
+   "0276"
+  ],
+  "notApplied": [
+   "not exists (select 1 from pg_trigger where tgname = 'direct_messages_notify')"
+  ]
+ },
+ {
+  "n": "19",
+  "slug": "0277",
+  "title": "0277 a client's late cancel or late move is flagged for the coach to Charge or Waive (nothing is taken automatically)",
+  "migrations": [
+   "0277"
+  ],
+  "notApplied": [
+   "coalesce((select md5(replace(pg_get_functiondef(p.oid), chr(13), '')) = 'b0485b9332f337b725669193b19f0887' from pg_proc p where p.oid = to_regprocedure('public.cancel_booking_and_refund_credit(uuid)')), false) and coalesce((select md5(replace(pg_get_functiondef(p.oid), chr(13), '')) = 'f45d1a198654ec4150e6ec958de3b1d1' from pg_proc p where p.oid = to_regprocedure('public.reschedule_booking(uuid, timestamptz, timestamptz)')), false)"
+  ]
+ },
+ {
+  "n": "20",
+  "slug": "0278",
+  "title": "0278 each coach picks how clients book: on their own, request and the coach confirms, or the coach schedules everyone (existing coaches start as 'coach schedules')",
+  "migrations": [
+   "0278"
+  ],
+  "notApplied": [
+   "coalesce((select md5(replace(pg_get_functiondef(p.oid), chr(13), '')) = 'da934a4629a0f09580619b7c908ab42a' from pg_proc p where p.oid = to_regprocedure('public.book_session(uuid, uuid, uuid, timestamptz, timestamptz)')), false) and coalesce((select md5(replace(pg_get_functiondef(p.oid), chr(13), '')) = 'a14562f9889b8094e99a5403e5423835' from pg_proc p where p.oid = to_regprocedure('public.create_recurring_booking_series(uuid, uuid, uuid, timestamptz, integer, integer)')), false) and coalesce((select md5(replace(pg_get_functiondef(p.oid), chr(13), '')) = 'f2d3243ac4fcf1876d894178e8a937f7' from pg_proc p where p.oid = to_regprocedure('public.join_booking_waitlist(uuid, uuid, uuid, timestamptz, timestamptz)')), false)"
+  ]
+ },
+ {
+  "n": "21",
+  "slug": "0279",
+  "title": "0279 booking requests: in 'request' mode a client asks for a new session or to move one, and the coach confirms (nothing is booked or held until then)",
+  "migrations": [
+   "0279"
+  ],
+  "notApplied": [
+   "coalesce((select md5(replace(pg_get_functiondef(p.oid), chr(13), '')) = '1283df1e48a57927374db97199ad00eb' from pg_proc p where p.oid = to_regprocedure('public.reschedule_booking(uuid, timestamptz, timestamptz)')), false) and to_regclass('public.booking_requests') is null"
+  ]
+ },
+ {
+  "n": "22",
+  "slug": "0280",
+  "title": "0280 credit expiry kept human: a coach can hold expiry for one client, give back sessions that expired (up to what expired, logged, undoable), and sets how early they are prompted",
+  "migrations": [
+   "0280"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'session_credits' and column_name = 'expiry_hold_until')"
+  ]
+ },
+ {
+  "n": "23",
+  "slug": "0281",
+  "title": "0281 inactive clients: a coach can set a client aside as inactive (reversible, nothing deleted, coach-only), and a workout, session or message from the client brings them back",
+  "migrations": [
+   "0281"
+  ],
+  "notApplied": [
+   "to_regclass('public.client_inactive') is null"
+  ]
+ },
+ {
+  "n": "24",
+  "slug": "0282",
+  "title": "0282 URGENT: close again the internal server-only functions that step 13 (0271) opened to every signed-in account (credit changes, booking settlement, audit writers, SMS and rate-limit bookkeeping, AI metering)",
+  "migrations": [
+   "0282"
+  ],
+  "notApplied": [
+   "has_function_privilege('authenticated', 'public.apply_session_credit_change(uuid, uuid, integer, text, text, uuid, uuid)', 'execute')"
+  ]
+ },
+ {
+  "n": "25",
+  "slug": "0283",
+  "title": "0283 session length separate from the slot step: a window can keep 60-minute slots with 55-minute sessions (a 5-minute gap), or any length up to the step",
+  "migrations": [
+   "0283"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_availability_windows' and column_name = 'session_minutes')"
+  ]
+ },
+ {
+  "n": "26",
+  "slug": "move-home-team",
+  "title": "move the group The Home Team from Ron's own organization (Enduring Strength Co.) into Coast2Coast Fitness, keeping its programs, history and Ron's coach access",
+  "migrations": [],
+  "notApplied": [
+   "exists (select 1 from public.groups where id = '060017b5-e613-4204-a101-c6a14c3a9630' and organization_id = 'b7318b19-a17e-4412-88f1-51d68fcf026f')"
+  ]
+ },
+ {
+  "n": "27",
+  "slug": "0284",
+  "title": "0284 a coach can propose a goal to a client, and the client confirms it, changes it or declines it (a coach cannot confirm it for them)",
+  "migrations": [
+   "0284"
+  ],
+  "notApplied": [
+   "not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'client_goals' and policyname = 'client_goals_insert_coach')"
+  ]
+ },
+ {
+  "n": "28",
+  "slug": "0285",
+  "title": "0285 a record of the rest-day nudges sent, so they can be limited to 2 in any 7 days and stopped after 3 with no response",
+  "migrations": [
+   "0285"
+  ],
+  "notApplied": [
+   "to_regclass('public.rest_day_nudges') is null"
+  ]
+ },
+ {
+  "n": "29",
+  "slug": "0286",
+  "title": "0286 favorite foods: a client can star a food they logged and log it again in one tap (extends recipe_favorites; private to the client; macros frozen as starred)",
+  "migrations": [
+   "0286"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'recipe_favorites' and column_name = 'kind')"
+  ]
+ },
+ {
+  "n": "30",
+  "slug": "copy-main-group-program",
+  "title": "copy the program christmas_abs_program from Main Group into The Home Team (nothing is deleted; run check-copy-result.sql afterwards and look at it before step 31)",
+  "migrations": [],
+  "notApplied": [
+   "not exists (select 1 from public.programs where group_id = '060017b5-e613-4204-a101-c6a14c3a9630' and name = 'christmas_abs_program')"
+  ]
+ },
+ {
+  "n": "31",
+  "slug": "delete-two-groups",
+  "title": "delete Main Group and the stray Coast to Coast group (only after the copy is checked); everything in them is first saved in cleanup_backups",
+  "migrations": [],
+  "notApplied": [
+   "(select count(*) from public.groups where id in ('b292055b-edc6-4171-ad2b-a89d65dcd8db', 'c368ab0b-ccab-442e-a42e-38fb22293182')) = 2"
+  ]
+ },
+ {
+  "n": "32",
+  "slug": "0287",
+  "title": "0287 a session can be longer than the time between slot starts (a start every 15 minutes with a 55-minute session); the session still has to fit inside its window",
+  "migrations": [
+   "0287"
+  ],
+  "notApplied": [
+   "exists (select 1 from pg_constraint where conname = 'coach_availability_windows_session_minutes_range' and pg_get_constraintdef(oid) like '%slot_duration_minutes%')"
+  ]
+ },
+ {
+  "n": "33",
+  "slug": "0288",
+  "title": "0288 two bookings that overlap at different minutes can no longer both be saved at the same instant (a lock per coach, then a second overlap check before a confirmed future booking is saved or moved)",
+  "migrations": [
+   "0288"
+  ],
+  "notApplied": [
+   "not exists (select 1 from pg_trigger where tgname = 'bookings_guard_overlap')"
+  ]
+ },
+ {
+  "n": "34",
+  "slug": "0289",
+  "title": "0289 a window of hours can be tagged with one of your session types (Online, In person, Weight room, Practice, Game...), and a booking made inside it is tagged the same",
+  "migrations": [
+   "0289"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_availability_windows' and column_name = 'session_type_id')"
+  ]
+ },
+ {
+  "n": "35",
+  "slug": "0290",
+  "title": "0290 four database closures: a membership can no longer be handed to another person, the two AI-credit spending functions are server-only and refuse negative amounts, two private video buckets are readable only by the person they belong to and the coaches, and a client who joined by invite link is marked as signed in",
+  "migrations": [
+   "0290"
+  ],
+  "notApplied": [
+   "not exists (select 1 from pg_trigger where tgname = 'group_memberships_guard_identity')"
+  ]
+ },
+ {
+  "n": "36",
+  "slug": "0291",
+  "title": "0291 booking and credit closures: a booking, a waiting-list place or a weekly schedule must name a coach who coaches that group, a client cannot cancel or move a session that has already started or been marked attended, and the nightly credit expiry becomes one locked step that takes only an amount",
+  "migrations": [
+   "0291"
+  ],
+  "notApplied": [
+   "coalesce((select position('that coach does not coach this group' in pg_get_functiondef(p.oid)) = 0 from pg_proc p where p.proname = 'book_session' and p.pronamespace = 'public'::regnamespace), false)"
+  ]
+ },
+ {
+  "n": "37",
+  "slug": "0292",
+  "title": "0292 the AI call log records why a call failed (a short error class), so an AI outage can be diagnosed",
+  "migrations": [
+   "0292"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'ai_usage_log' and column_name = 'error_class')"
+  ]
+ },
+ {
+  "n": "38",
+  "slug": "0293",
+  "title": "0293 a signed-in coach can no longer refund their own meal-plan or program charge by claiming the generation failed: that refund becomes server-only, and the coach's own 'This was wrong' button keeps working",
+  "migrations": [
+   "0293"
+  ],
+  "notApplied": [
+   "not exists (select 1 from pg_proc where proname = 'refund_coach_credit_for' and pronamespace = 'public'::regnamespace)"
+  ]
+ },
+ {
+  "n": "39",
+  "slug": "0294",
+  "title": "0294 food preferences and allergy safety: one preferences row per client (allergies, dislikes, diet type, protein target and floor) that the client edits for their tastes and a coach edits for the rules, a fixed-wording notice to the coaches when allergies or dislikes change, the client's answer to 'are you happy with your meal plan', and three new notification types added to the list the database already has",
+  "migrations": [
+   "0294"
+  ],
+  "notApplied": [
+   "to_regclass('public.client_nutrition_preferences') is null",
+   "to_regclass('public.client_nutrition_feedback') is null"
+  ]
+ },
+ {
+  "n": "40",
+  "slug": "0295",
+  "title": "0295 about you, a starting target for a new client, and the phase a client is in: activity level and units on the client's own details (a coach writes the calculator inputs only through one function), a baseline kind of check-in suggestion with a fixed-wording notice to the coaches, the phase of record (coach-only, filled in from existing check-ins and milestone tags), and a coach-proposed goal that can carry a phase which becomes the phase of record only when the client confirms it, plus one new notification type added to the list the database already has",
+  "migrations": [
+   "0295"
+  ],
+  "notApplied": [
+   "to_regclass('public.client_phase_plans') is null",
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'athlete_profile_details' and column_name = 'activity_level')",
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'client_goals' and column_name = 'nutrition_phase')"
+  ]
+ },
+ {
+  "n": "41",
+  "slug": "0296",
+  "title": "0296 recipe library columns: where a recipe came from (the coach or an approved AI option), tags computed when it is saved (allergens, intolerances, diets), its main protein, its reference macros, a fingerprint so the same option saved twice is one recipe, and the line amounts the meal builder scales; a line of an AI recipe must be matched to a real food",
+  "migrations": [
+   "0296"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'recipes' and column_name = 'content_hash')",
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'recipe_ingredients' and column_name = 'grams_ref')"
+  ]
+ },
+ {
+  "n": "42",
+  "slug": "0297",
+  "title": "0297 pause, freeze or cancel a client's weekly schedule: a client asks (their own schedule only) and the change takes effect on the date they chose unless the coach handles it first; the request table, a coach-only table for the client's private note, the freeze dates on the schedule, the functions the app uses to apply a request and to restart a freeze on its day, a freeze that adds its length to the expiry of the client's unused sessions through the expiry hold that already exists, and three new notification types added to the list the database already has",
+  "migrations": [
+   "0297"
+  ],
+  "notApplied": [
+   "to_regclass('public.schedule_requests') is null",
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'recurring_booking_series' and column_name = 'frozen_from')"
+  ]
+ },
+ {
+  "n": "43",
+  "slug": "0298",
+  "title": "0298 Read during rest: the client's own on/off switch (a table only that client can read or write), the coach's switch for all their clients, the coach's choice of passage for a day, and one function the client's screen asks (is Read on for me here, is there a coach's passage today, have I seen the note); the passages themselves are in the app",
+  "migrations": [
+   "0298"
+  ],
+  "notApplied": [
+   "to_regclass('public.read_settings') is null",
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_preferences' and column_name = 'faith_track_default')"
+  ]
+ },
+ {
+  "n": "45",
+  "slug": "0300",
+  "title": "0300 Food search and logging: USDA household portions (public reference table), a record of which USDA batches were loaded, and the optional detail of a searched food on a food log entry (source, USDA food, grams, serving, nutrient snapshot), with sanity limits on what can be logged from now on",
+  "migrations": [
+   "0300"
+  ],
+  "notApplied": [
+   "to_regclass('public.usda_food_portions') is null",
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'food_log_entries' and column_name = 'fdc_id')",
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_memberships' and column_name = 'food_tracking_enabled')"
+  ]
+ },
+ {
+  "n": "46",
+  "slug": "0301",
+  "title": "0301 AI budget: one pool per organization (its size, and this month's AI use summed by model, both server-only), paid top-up packs (a balance that carries over from month to month; the small step 50 record after the deploy keeps what each month used), and a record that the owner and coach were told the AI is running low or used up, once per month",
+  "migrations": [
+   "0301"
+  ],
+  "notApplied": [
+   "not exists (select 1 from pg_proc where proname = 'ai_org_summary' and pronamespace = 'public'::regnamespace)",
+   "to_regclass('public.ai_budget_notices') is null"
+  ]
+ },
+ {
+  "n": "47",
+  "slug": "0302",
+  "title": "0302 Custom foods and saved meals: a client's own foods (with the numbers from a label, an optional full label and a barcode) and meals saved from several foods, private to the client and readable by their coaches, with limits on how many",
+  "migrations": [
+   "0302"
+  ],
+  "notApplied": [
+   "to_regclass('public.custom_foods') is null",
+   "to_regclass('public.saved_meals') is null"
+  ]
+ },
+ {
+  "n": "48",
+  "slug": "0303",
+  "title": "0303 What a client pays becomes coach-only (part one): the coach's manual monthly rate moves off the roster table (which every member of a group could read) into its own table that only the group's coaches can read or write (the organization's owner and admins can read it); the existing rates are copied across and the old column is emptied, so the leak is closed at once",
+  "migrations": [
+   "0303"
+  ],
+  "notApplied": [
+   "to_regclass('public.client_billing_rates') is null"
+  ]
+ },
+ {
+  "n": "49",
+  "slug": "0304",
+  "title": "0304 What a client pays (part two): drops the old, now empty, rate column from the roster table (anything the old code wrote there since step 48 is copied across first)",
+  "migrations": [
+   "0304"
+  ],
+  "notApplied": [
+   "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_memberships' and column_name = 'monthly_rate')"
+  ]
+ },
+ {
+  "n": "51",
+  "slug": "0306",
+  "title": "0306 Target-change notice: when a coach applies a new daily calorie target the client is told, with fixed wording and a link to their Nutrition page, so they can answer 'are you happy with your meal plan?' (adds one notification type to the list the database already has)",
+  "migrations": [
+   "0306"
+  ],
+  "notApplied": [
+   "not exists (select 1 from pg_proc where proname = 'notify_on_target_change' and pronamespace = 'public'::regnamespace)"
+  ]
+ },
+ {
+  "n": "52",
+  "slug": "0307",
+  "title": "0307 Release O fix: the target-change notice function is closed to the public and signed-in users like the other internal functions (it was left open by default; it is a trigger function so nobody could call it, but internal functions are server-only on purpose)",
+  "migrations": [
+   "0307"
+  ],
+  "notApplied": [
+   "coalesce((select has_function_privilege('authenticated', p.oid, 'execute') from pg_proc p where p.proname = 'notify_on_target_change' and p.pronamespace = 'public'::regnamespace), false)"
+  ]
+ },
+ {
+  "n": "53",
+  "slug": "0308",
+  "title": "0308 Release O fix: every trigger function that signed-in users could run by default is closed to the public and signed-in users, like the other internal functions (46 functions; they can only ever run as triggers, and no trigger stops firing)",
+  "migrations": [
+   "0308"
+  ],
+  "notApplied": [
+   "exists (select 1 from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prorettype = 'trigger'::regtype and p.proname = any (array['audit_log_refuse_changes', 'audit_watch', 'backfill_placeholder_group_name', 'block_athlete_edits_to_completed_session', 'clear_client_goal_phase_on_insert', 'default_client_tier_for_one_on_one', 'enforce_one_on_one_athlete_limit', 'guard_ai_recipe_ingredient', 'guard_athlete_session_columns', 'guard_athlete_session_insert', 'guard_client_goal_update', 'guard_client_nutrition_feedback', 'guard_client_nutrition_preferences', 'guard_direct_message_columns', 'guard_group_columns', 'guard_group_session_bookings', 'guard_membership_identity', 'guard_organization_columns', 'guard_partner_request_columns', 'guard_post_columns', 'guard_profile_sensitive_columns', 'guard_workout_log_columns', 'limit_food_favorites', 'note_series_session_skipped', 'notify_on_client_goal', 'notify_on_comment', 'notify_on_direct_message', 'notify_on_gym_visitor_lead', 'notify_on_macros_assigned', 'notify_on_mention', 'notify_on_nutrition_baseline', 'notify_on_nutrition_feedback', 'notify_on_nutrition_preferences', 'notify_on_partner_request', 'notify_on_post_mention', 'notify_on_program_assigned', 'notify_on_video_comment', 'notify_on_video_upload', 'phase_follows_confirmed_goal', 'prevent_platform_admin_self_escalation', 'recompute_training_max', 'recompute_workout_log', 'resurface_inactive_client', 'set_gwe_athlete_id', 'set_workout_athlete_id', 'set_workout_notes_athlete_id']) and has_function_privilege('authenticated', p.oid, 'execute'))"
+  ]
+ },
+ {
+  "n": "62",
+  "slug": "0317",
+  "title": "0317 A package can include access to a group: one optional column on packages (the group it opens) and one server-only record of the access a package gave, so it can end cleanly when a subscription lapses",
+  "migrations": [
+   "0317"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_packages' and column_name = 'group_access_group_id')"
+  ]
+ },
+ {
+  "n": "61",
+  "slug": "0316",
+  "title": "0316 A program copy remembers which program it was copied from: one optional column (programs.source_program_id) and the copy function now stores it, so the builder can list the clients who hold a copy of a program",
+  "migrations": [
+   "0316"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'source_program_id')"
+  ]
+ },
+ {
+  "n": "68",
+  "slug": "0322",
+  "title": "0322 Deleting a client no longer fails because of a record they once created (an invite, for example): one server-only function clears everything that still points at the person, from the database's own list, and refuses only for shared records (a group or organization they own, billing, team records)",
+  "migrations": [
+   "0322"
+  ],
+  "notApplied": [
+   "to_regprocedure('public.detach_profile_references(uuid)') is null"
+  ]
+ },
+ {
+  "n": "67",
+  "slug": "0321",
+  "title": "0321 A coach's one short public website (My website): a private table for what the coach types, and a featured flag on Pro Shop cards (nothing is public until the coach publishes)",
+  "migrations": [
+   "0321"
+  ],
+  "notApplied": [
+   "to_regclass('public.coach_sites') is null"
+  ]
+ },
+ {
+  "n": "66",
+  "slug": "0320",
+  "title": "0320 Image uploads work: the organization logo and app icon, the coach profile photo and the pro shop pictures were refused for everyone because their storage buckets had no rule for looking at a file's row (adds one rule per bucket, the same people who can already write)",
+  "migrations": [
+   "0320"
+  ],
+  "notApplied": [
+   "not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'org_branding_select_owner_admin')"
+  ]
+ },
+ {
+  "n": "65",
+  "slug": "0319",
+  "title": "0319 Three database functions are hardened: the two audit helpers get a fixed search path, and the database's own row-security helper (rls_auto_enable) is closed to signed-out visitors and signed-in users",
+  "migrations": [
+   "0319"
+  ],
+  "notApplied": [
+   "exists (select 1 from pg_proc where oid = 'public.audit_diff(jsonb, jsonb, text[])'::regprocedure and proconfig is null)"
+  ]
+ },
+ {
+  "n": "64",
+  "slug": "merge-duplicate-exercises",
+  "title": "merge Coach Ron's duplicate exercises into one entry each (13 duplicates into 12 survivors, Ron's library only; every set and log row is kept; undoable)",
+  "migrations": [],
+  "notApplied": [
+   "to_regclass('public.exercise_merge_log') is null"
+  ]
+ },
+ {
+  "n": "63",
+  "slug": "0318",
+  "title": "0318 A program copy is named \"Program - Client\" without stacking: assigning a client's copy to someone else drops the old client's tail, and a name that already ends with this client gets nothing added (the copy function only; existing programs are not renamed)",
+  "migrations": [
+   "0318"
+  ],
+  "notApplied": [
+   "not exists (select 1 from pg_proc where proname = 'duplicate_program' and pronamespace = 'public'::regnamespace and position('v_tail' in prosrc) > 0)"
+  ]
+ },
+ {
+  "n": "60",
+  "slug": "0315",
+  "title": "0315 The \"I'm away\" preset reply: a coach writes one reply, turns it on (optionally with a last day), and every message a client sends them gets that reply back in the thread (marked as an auto-reply). One tiny private table, one marker column, two trigger functions",
+  "migrations": [
+   "0315"
+  ],
+  "notApplied": [
+   "to_regclass('public.coach_away_replies') is null"
+  ]
+ },
+ {
+  "n": "59",
+  "slug": "0314",
+  "title": "0314 \"Hide exercise demos\" follows the person, not the device: one tiny private table (client_ui_settings, one row per client, only that client can read or change it)",
+  "migrations": [
+   "0314"
+  ],
+  "notApplied": [
+   "to_regclass('public.client_ui_settings') is null"
+  ]
+ },
+ {
+  "n": "58",
+  "slug": "0313",
+  "title": "0313 Session counts worked out in the database for large rosters: one function (booking_counts) returns booked, to mark and prepaid-ahead per client and group, with a small index, so the pages that show \"8 left · 4 booked · 2 to mark\" stay fast and complete with 500+ clients",
+  "migrations": [
+   "0313"
+  ],
+  "notApplied": [
+   "not exists (select 1 from pg_proc where proname = 'booking_counts' and pronamespace = 'public'::regnamespace)"
+  ]
+ },
+ {
+  "n": "57",
+  "slug": "0312",
+  "title": "0312 A client booking or moving their own session must stay inside the coach's open hours and clear of time off: book_session and reschedule_booking now refuse any other time (a coach booking for a client is never refused)",
+  "migrations": [
+   "0312"
+  ],
+  "notApplied": [
+   "coalesce((select position('coach_time_is_open' in pg_get_functiondef(p.oid)) = 0 from pg_proc p where p.proname = 'book_session' and p.pronamespace = 'public'::regnamespace limit 1), false)"
+  ]
+ },
+ {
+  "n": "56",
+  "slug": "0311",
+  "title": "0311 A client can ask for a different meal plan (up to 3 times per plan): a table of the tries with a copy of the plan from before each one, the server-only function that applies a try (counts the tries, refuses a 4th, never touches a day the coach built by hand, tells the coach in fixed wording), the coach's one-tap put-back function, and one notification type added to the list the database already has",
+  "migrations": [
+   "0311"
+  ],
+  "notApplied": [
+   "to_regclass('public.meal_plan_tries') is null"
+  ]
+ },
+ {
+  "n": "55",
+  "slug": "0310",
+  "title": "0310 The coach's own name for an exercise: one new optional column on the program's exercises (display_name), set only when a coach picks an exercise through their own alias, and the program copy (Assign to client, Duplicate) carries it across. The real exercise name is untouched, so history, personal records and progression keep matching; only what is shown uses the coach's name",
+  "migrations": [
+   "0310"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercises' and column_name = 'display_name')"
+  ]
+ },
+ {
+  "n": "54",
+  "slug": "0309",
+  "title": "0309 New training block notice: when a coach moves a client to a new phase the client sees one plain line in their bell, with no phase words (adds one notification type to the list the database already has)",
+  "migrations": [
+   "0309"
+  ],
+  "notApplied": [
+   "not exists (select 1 from pg_proc where proname = 'notify_on_new_training_block' and pronamespace = 'public'::regnamespace)"
+  ]
+ },
+ {
+  "n": "50",
+  "slug": "0305",
+  "title": "0305 AI top-up balance that carries over: a small server-only record of how much of the top-up balance each month used, so a paid top-up is spent after the month's included AI and the rest carries into the next month",
+  "migrations": [
+   "0305"
+  ],
+  "notApplied": [
+   "to_regclass('public.ai_topup_draws') is null"
+  ]
+ },
+ {
+  "n": "44",
+  "slug": "0299",
+  "title": "0299 The record of what people agreed to (beta notice, terms, privacy, waiver) can only be added to: a trigger refuses any change to a row and any truncate, and the app's roles lose update, delete and truncate on it",
+  "migrations": [
+   "0299"
+  ],
+  "notApplied": [
+   "not exists (select 1 from pg_trigger where tgname = 'legal_acceptances_append_only' and tgrelid = 'public.legal_acceptances'::regclass)"
+  ]
+ },
+ {
+  "n": "69",
+  "slug": "0323",
+  "title": "0323 Group events: a coach can add an event for one group (a monthly gym workout then lunch); members answer In or Out; it costs no session credit on any path, and the class functions now refuse an event",
+  "migrations": [
+   "0323"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_sessions' and column_name = 'kind')"
+  ]
+ },
+ {
+  "n": "70",
+  "slug": "0324",
+  "title": "0324 AI builder safety: a program the AI builds is a draft (not active, and hidden from clients at the database level) until the coach signs it off; no path can make an unsigned draft live, and a copy of a draft is a draft",
+  "migrations": [
+   "0324"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'ai_draft')"
+  ]
+ },
+ {
+  "n": "71",
+  "slug": "0325",
+  "title": "0325 AI builder learning: the changes a coach makes to an AI draft are noted privately, one quiet question can be asked per pattern, and what the coach said Yes to is kept in one list they can undo",
+  "migrations": [
+   "0325"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'ai_snapshot')"
+  ]
+ },
+ {
+  "n": "72",
+  "slug": "0326",
+  "title": "0326 AI builder conversation: an optional chapter-by-chapter conversation where the app asks the coach how they program; the invitation's state and the conversation are private to the coach",
+  "migrations": [
+   "0326"
+  ],
+  "notApplied": [
+   "to_regclass('public.coach_conversations') is null"
+  ]
+ },
+ {
+  "n": "73",
+  "slug": "0327",
+  "title": "0327 Coach message templates: a coach's own wording for the email that carries a client's sign-in link; private to the coach",
+  "migrations": [
+   "0327"
+  ],
+  "notApplied": [
+   "to_regclass('public.coach_message_templates') is null"
+  ]
+ },
+ {
+  "n": "74",
+  "slug": "0328",
+  "title": "0328 Remove a program from a client's profile without deleting it: programs.archived_at; a removed program is inactive and hidden from the client like an unsigned AI draft",
+  "migrations": [
+   "0328"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'archived_at')"
+  ]
+ },
+ {
+  "n": "75",
+  "slug": "0329",
+  "title": "0329 Release AA: every session costs exactly 1 credit (the session type's own cost is no longer read) and the waitlist offer shows the coach's time zone",
+  "migrations": [
+   "0329"
+  ],
+  "notApplied": [
+   "not exists (select 1 from pg_constraint where conname = 'session_types_credit_cost_is_one')"
+  ]
+ },
+ {
+  "n": "76",
+  "slug": "0330",
+  "title": "0330 Only a real coach can have a public booking page or a public website (the row-security rule for changing them now also requires coaching a group)",
+  "migrations": [
+   "0330"
+  ],
+  "notApplied": [
+   "not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_booking_pages' and policyname = 'coach_booking_pages_coach_manage' and with_check like '%group_memberships%')"
+  ]
+ },
+ {
+  "n": "77",
+  "slug": "0331",
+  "title": "0331 A paid session pack or membership renewal records its payment event and grants the sessions in ONE database step (a failed grant can no longer leave a handled-looking event with no sessions)",
+  "migrations": [
+   "0331"
+  ],
+  "notApplied": [
+   "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is null"
+  ]
+ },
+ {
+  "n": "78",
+  "slug": "0332",
+  "title": "0332 In a one-on-one space a program with no client on it is the coach's template: the client can no longer read it (nor its workouts, exercises or sets)",
+  "migrations": [
+   "0332"
+  ],
+  "notApplied": [
+   "to_regprocedure('public.is_one_on_one_group(uuid)') is null"
+  ]
+ },
+ {
+  "n": "79",
+  "slug": "0333",
+  "title": "0333 A one-on-one space keeps being one: its programs must be for its client, group-only features are refused there, and it cannot be turned into another kind of space",
+  "migrations": [
+   "0333"
+  ],
+  "notApplied": [
+   "to_regprocedure('public.one_on_one_athlete(uuid)') is null"
+  ]
+ },
+ {
+  "n": "80",
+  "slug": "0334",
+  "title": "0334 A client can choose whether their first name is shown on their shared workout pictures (on for everyone until they switch it off)",
+  "migrations": [
+   "0334"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'show_name_on_share')"
+  ]
+ },
+ {
+  "n": "81",
+  "slug": "0335",
+  "title": "0335 Assigning a program that belongs to no client to ONE client attaches it to that client (no copy is left behind)",
+  "migrations": [
+   "0335"
+  ],
+  "notApplied": [
+   "to_regprocedure('public.assign_program_to_client(uuid, uuid, uuid, text, date)') is null"
+  ]
+ },
+ {
+  "n": "82",
+  "slug": "0336",
+  "title": "0336 The 'What do you call your people?' card is asked once, for good (remembered on the coach's profile; every coach already here counts as answered)",
+  "migrations": [
+   "0336"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'terminology_asked_at')"
+  ]
+ },
+ {
+  "n": "83",
+  "slug": "0337",
+  "title": "0337 Assigning a program attaches it only inside one organization (across organizations it makes a copy)",
+  "migrations": [
+   "0337"
+  ],
+  "notApplied": [
+   "to_regprocedure('public.assign_program_to_client(uuid, uuid, uuid, text, date)') is not null and position('v_src_org' in pg_get_functiondef(to_regprocedure('public.assign_program_to_client(uuid, uuid, uuid, text, date)'))) = 0"
+  ]
+ },
+ {
+  "n": "84",
+  "slug": "0338",
+  "title": "0338 A parent-view link can only be made for a client under 13 in a group the coach coaches, and it expires; three internal training-partner functions are closed to the browser",
+  "migrations": [
+   "0338"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'guardian_links' and column_name = 'expires_at')"
+  ]
+ },
+ {
+  "n": "85",
+  "slug": "0339",
+  "title": "0339 A transformation card can only use the athlete's own photos and milestone, in a group they are a client of, and is never made for a client under 18",
+  "migrations": [
+   "0339"
+  ],
+  "notApplied": [
+   "not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'transformation_cards' and policyname = 'transformation_cards_insert_own')"
+  ]
+ },
+ {
+  "n": "86",
+  "slug": "0340",
+  "title": "0340 A coach can only file a row about a person who belongs to that group (one rule on 28 tables); a client can only be moved inside one organization; an organization admin can't add themselves to a private client's space; a comment stays in its post's group",
+  "migrations": [
+   "0340"
+  ],
+  "notApplied": [
+   "to_regprocedure('public.enforce_athlete_in_group()') is null"
+  ]
+ },
+ {
+  "n": "87",
+  "slug": "0341",
+  "title": "0341 A coach package can only be created, changed or removed by the server (a client could file their own package with thousands of sessions and pay for a cheap one)",
+  "migrations": [
+   "0341"
+  ],
+  "notApplied": [
+   "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_packages' and policyname = 'coach_packages_insert_coach')"
+  ]
+ },
+ {
+  "n": "88",
+  "slug": "0342",
+  "title": "0342 Private lookups the row rules use can't be asked about other people by any signed-in account (who shares an organization, who blocked whom, who is a client of a group, who is hidden from the organization, a coach's client count)",
+  "migrations": [
+   "0342"
+  ],
+  "notApplied": [
+   "has_function_privilege('authenticated', 'public.coach_ai_multiplier(uuid)', 'execute')"
+  ]
+ },
+ {
+  "n": "89",
+  "slug": "0343",
+  "title": "0343 A coach's credit pack or Lift Off grant is recorded and added in one step (a failed add is retried instead of lost)",
+  "migrations": [
+   "0343"
+  ],
+  "notApplied": [
+   "to_regprocedure('public.grant_coach_credit_pack_once(text, text, uuid, integer, integer)') is null"
+  ]
+ },
+ {
+  "n": "90",
+  "slug": "0344",
+  "title": "0344 The 'person must belong to the group' rule still lets a coach tidy up an existing row of someone who has since left (refunds and settlements)",
+  "migrations": [
+   "0344"
+  ],
+  "notApplied": [
+   "to_regprocedure('public.enforce_athlete_in_group()') is not null and position('v_had_row' in pg_get_functiondef(to_regprocedure('public.enforce_athlete_in_group()'))) = 0"
+  ]
+ },
+ {
+  "n": "91",
+  "slug": "0345",
+  "title": "0345 The organization walls: a person can only see names of people they share a group with (or, for an owner or admin, everyone in their organization); a platform administrator can no longer read client content; who has which tag is limited to the owner, admins and that client's coach",
+  "migrations": [
+   "0345"
+  ],
+  "notApplied": [
+   "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'profiles' and policyname = 'profiles_select_authenticated')"
+  ]
+ },
+ {
+  "n": "92",
+  "slug": "0346",
+  "title": "0346 A coach using the app as their own client can do everything a client can: nutrition phase plans, macro-target feedback and transformation cards no longer require the athlete role; 'Assign to Myself' attaches the program",
+  "migrations": [
+   "0346"
+  ],
+  "notApplied": [
+   "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'client_phase_plans' and policyname = 'client_phase_plans_coach_manage' and position('''athlete''::member_role' in with_check) > 0)"
+  ]
+ },
+ {
+  "n": "93",
+  "slug": "0347",
+  "title": "0347 The daily briefing is made once per coach, per day, per organization (a coach who runs two organizations no longer gets one briefing built from both)",
+  "migrations": [
+   "0347"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_briefings' and column_name = 'organization_id')"
+  ]
+ },
+ {
+  "n": "94",
+  "slug": "0348",
+  "title": "0348 Defense in depth for the organization walls, installed switched OFF: the database learns to refuse a row of a different organization than the workspace a request names (nothing changes until step 95)",
+  "migrations": [
+   "0348"
+  ],
+  "notApplied": [
+   "to_regprocedure('public.request_workspace_org()') is null"
+  ]
+ },
+ {
+  "n": "95",
+  "slug": "0349",
+  "title": "0349 Switch the organization-wall request header rule ON",
+  "migrations": [
+   "0349"
+  ],
+  "notApplied": [
+   "position('select true' in pg_get_functiondef(to_regprocedure('public.org_wall_header_enabled()'))) = 0"
+  ]
+ },
+ {
+  "n": "96",
+  "slug": "0350",
+  "title": "0350 A coach's Pro Shop links, referral partners, challenges, calendar entries, session types and discovery-call prospects belong to an organization, and a client sees only the organization they are a client in",
+  "migrations": [
+   "0350"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'pro_shop_links' and column_name = 'organization_id')"
+  ]
+ },
+ {
+  "n": "97",
+  "slug": "0351",
+  "title": "0351 Duplicate makes an unassigned library program: a copy that is not for a client comes out not active, so no team or client sees it until the coach assigns it or sets it active",
+  "migrations": [
+   "0351"
+  ],
+  "notApplied": [
+   "position('p_athlete_id is null then false' in pg_get_functiondef(to_regprocedure('public.duplicate_program(uuid, uuid, uuid, uuid, text, date)'))) = 0"
+  ]
+ },
+ {
+  "n": "98",
+  "slug": "0352",
+  "title": "0352 Joining an organization needs the person's OK: an owner can no longer put an existing account into their organization; an invitation is accepted or declined by the person, and any member can leave",
+  "migrations": [
+   "0352"
+  ],
+  "notApplied": [
+   "to_regclass('public.organization_invites') is null"
+  ]
+ },
+ {
+  "n": "99",
+  "slug": "0353",
+  "title": "0353 A coach can ask for notice before a client pauses, freezes or ends a weekly schedule, and can add their own wording",
+  "migrations": [
+   "0353"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_booking_policies' and column_name = 'schedule_change_notice_days')"
+  ]
+ },
+ {
+  "n": "100",
+  "slug": "0354",
+  "title": "0354 The money settings on an organization membership are the server's: the connected Stripe account can no longer be written by an owner or anyone signed in, and the shares in an organization can never add up to more than 100 percent",
+  "migrations": [
+   "0354"
+  ],
+  "notApplied": [
+   "to_regprocedure('public.guard_organization_share_total()') is null"
+  ]
+ },
+ {
+  "n": "101",
+  "slug": "0355",
+  "title": "0355 A coach can attach their own assessments (notes, numbers and a PDF, photo or video) to a client's profile; only the coaches of that client's group can see them",
+  "migrations": [
+   "0355"
+  ],
+  "notApplied": [
+   "to_regclass('public.client_assessments') is null"
+  ]
+ },
+ {
+  "n": "102",
+  "slug": "0356",
+  "title": "0356 Asking a happy client for a review, once and quietly: a one-time card after 12 sessions with a box for a short review and a tick to agree the coach may share it publicly, and quotes the coach approves",
+  "migrations": [
+   "0356"
+  ],
+  "notApplied": [
+   "to_regclass('public.client_quotes') is null"
+  ]
+ },
+ {
+  "n": "104",
+  "slug": "0358",
+  "title": "0358 A personal space: every person can have one space of their own that belongs to no organization, so a coach's own training is one set that follows them into every organization",
+  "migrations": [
+   "0358"
+  ],
+  "notApplied": [
+   "to_regprocedure('public.ensure_personal_space()') is null"
+  ]
+ },
+ {
+  "n": "105",
+  "slug": "move-ron-personal-training",
+  "title": "move Coach Ron's own training (his programs not yet removed, their workouts, his sessions, workout log and wellness check-ins in The Enduring Strength Collective) into his personal space; undoable",
+  "migrations": [],
+  "notApplied": [
+   "to_regclass('public.personal_space_move_log') is null"
+  ]
+ },
+ {
+  "n": "106",
+  "slug": "add-fitpros-exercises",
+  "title": "add four exercises to Coach Ron's library (Sissy Squat, Thoracic Extension (Quadruped), Handcuff W Rotation, Incline Iso Lateral Chest Press) so the FitPros history links to real rows; undoable",
+  "migrations": [],
+  "notApplied": []
+ },
+ {
+  "n": "107",
+  "slug": "0359",
+  "title": "0359 Weights from a history import (the FitPros import) no longer set training maxes, so an old number from another app cannot steer what a client, above all a minor, is prescribed",
+  "migrations": [
+   "0359"
+  ],
+  "notApplied": [
+   "position('12:00:17' in pg_get_functiondef(to_regprocedure('public.recompute_training_max()'))) = 0"
+  ]
+ },
+ {
+  "n": "109",
+  "slug": "remove-empty-rob-derrick-groups",
+  "title": "remove the two empty one-on-one groups named Rob Derrick left behind by the failed add-client attempts (both have no members, programs, sessions, posts or invites); undoable",
+  "migrations": [],
+  "notApplied": [
+   "to_regclass('public.orphan_group_cleanup_log') is null"
+  ]
+ },
+ {
+  "n": "108",
+  "slug": "0360",
+  "title": "0360 Adding a client works again: the person who has just created a group can seat themselves in it as its coach (a new one-on-one space was refusing its very first membership)",
+  "migrations": [
+   "0360"
+  ],
+  "notApplied": [
+   "to_regprocedure('public.group_is_new_and_mine(uuid)') is null"
+  ]
+ },
+ {
+  "n": "110",
+  "slug": "0361",
+  "title": "0361 The shared exercise catalog (empty): one list of real movements everyone can read and only the platform admin can write, and a link from each coach's library entry to its movement",
+  "migrations": [
+   "0361"
+  ],
+  "notApplied": [
+   "to_regclass('public.exercise_catalog') is null"
+  ]
+ },
+ {
+  "n": "111",
+  "slug": "catalog-merge-ron",
+  "title": "Coach Ron's exercise names: 9 merges and 9 renames (the implement stated), his four FitPros exercises, and the shared catalog filled from his library; undoable",
+  "migrations": [],
+  "notApplied": [
+   "to_regclass('public.exercise_catalog_merge_log') is null"
+  ]
+ },
+ {
+  "n": "112",
+  "slug": "0362",
+  "title": "0362 Each storage bucket accepts only the file types its screen uploads (the three public buckets included), post-media gets a 100 MB size limit, and the signed-out role has no rights on the coach website table",
+  "migrations": [
+   "0362"
+  ],
+  "notApplied": [
+   "coalesce((select allowed_mime_types is null from storage.buckets where id = 'coach-profile-photos'), true)"
+  ]
+ },
+ {
+  "n": "113",
+  "slug": "0363",
+  "title": "0363 Smaller goals under a client's goal: either side adds one, the other side agrees or says not now, an agreed one can be marked done (nothing changes a program or a nutrition target)",
+  "migrations": [
+   "0363"
+  ],
+  "notApplied": [
+   "to_regclass('public.client_sub_goals') is null"
+  ]
+ },
+ {
+  "n": "114",
+  "slug": "0364",
+  "title": "0364 A group session (class) belongs to one organization: members see, join and are counted in only the classes of an organization in which they are that coach's client (no class exists yet)",
+  "migrations": [
+   "0364"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_sessions' and column_name = 'organization_id')"
+  ]
+ },
+ {
+  "n": "115",
+  "slug": "0365",
+  "title": "0365 Pattern and class templates: a ladder exercise can be marked one-sided (unilateral); the slot columns on a workout exercise and a client's training level are added (all empty, nothing reads them yet)",
+  "migrations": [
+   "0365"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'movement_pattern_exercises' and column_name = 'is_unilateral')"
+  ]
+ },
+ {
+  "n": "116",
+  "slug": "0366",
+  "title": "0366 Template slots survive Duplicate, and a program that still has a slot cannot be given to a client (the duplicate-program function is replaced; the two flags added by step 115 may be empty so the old restore scripts still work)",
+  "migrations": [
+   "0366"
+  ],
+  "notApplied": [
+   "position('is_slot' in pg_get_functiondef(to_regprocedure('public.duplicate_program(uuid, uuid, uuid, uuid, text, date)'))) = 0"
+  ]
+ },
+ {
+  "n": "117",
+  "slug": "0367",
+  "title": "0367 A rest can be a range: a new empty column holds the high end (the low end stays where it is), and Duplicate copies it",
+  "migrations": [
+   "0367"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"
+  ]
+ },
+ {
+  "n": "118",
+  "slug": "0368",
+  "title": "0368 The one product shelf: where each package and Pro Shop card shows (public page, Client Home, Pro Shop) and who in the app sees it (everyone, not the one-on-one clients, only the one-on-one clients, one group); a program buyer can join the coach's client space",
+  "migrations": [
+   "0368"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_packages' and column_name = 'audience')"
+  ]
+ },
+ {
+  "n": "119",
+  "slug": "0369",
+  "title": "0369 The AI you can train: rules the coach teaches that apply only to the clients they fit, a short list of Past AI build notes for each client, corrections recorded with their reason, and the one-time note about how the AI learns",
+  "migrations": [
+   "0369"
+  ],
+  "notApplied": [
+   "to_regclass('public.client_ai_notes') is null"
+  ]
+ },
+ {
+  "n": "120",
+  "slug": "0370",
+  "title": "0370 The Needs attention list can be quieted: Not now (a week) and No macros for a client",
+  "migrations": [
+   "0370"
+  ],
+  "notApplied": [
+   "to_regclass('public.attention_snoozes') is null"
+  ]
+ },
+ {
+  "n": "121",
+  "slug": "0371",
+  "title": "0371 Unclear data points in imported history are marked, kept, and left out of the numbers",
+  "migrations": [
+   "0371"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'set_logs' and column_name = 'data_flag')"
+  ]
+ },
+ {
+  "n": "122",
+  "slug": "0372",
+  "title": "0372 Imported history counts: totals, graphs, estimated maxes and records are read from the sets, and training maxes are rebuilt",
+  "migrations": [
+   "0372"
+  ],
+  "notApplied": [
+   "to_regprocedure('public.client_exercise_rollup(uuid, uuid)') is null"
+  ]
+ },
+ {
+  "n": "123",
+  "slug": "0373",
+  "title": "0373 The Progress tab: your card and graph choices, pinned exercises, and the daily calories a client logged",
+  "migrations": [
+   "0373"
+  ],
+  "notApplied": [
+   "to_regclass('public.client_progress_pins') is null"
+  ]
+ },
+ {
+  "n": "124",
+  "slug": "0374",
+  "title": "0374 A coach can ask a client to count a record from imported history as a real one",
+  "migrations": [
+   "0374"
+  ],
+  "notApplied": [
+   "to_regclass('public.pr_promotions') is null"
+  ]
+ },
+ {
+  "n": "125",
+  "slug": "0375",
+  "title": "0375 InBody scans from a photo of the result sheet: the scans, a private place for the photos, and the one function that saves a scan",
+  "migrations": [
+   "0375"
+  ],
+  "notApplied": [
+   "to_regclass('public.body_scans') is null"
+  ]
+ },
+ {
+  "n": "126",
+  "slug": "0376",
+  "title": "0376 The health screening line on a client's Overview stays gone once acknowledged, until a new flagged answer",
+  "migrations": [
+   "0376"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'athlete_injury_flag_acknowledgements' and column_name = 'flagged_count')"
+  ]
+ },
+ {
+  "n": "127",
+  "slug": "0377",
+  "title": "0377 A library exercise can never be named with only numbers or with its sets and reps",
+  "migrations": [
+   "0377"
+  ],
+  "notApplied": [
+   "not exists (select 1 from pg_constraint where conname = 'exercise_library_name_not_digits' and conrelid = 'public.exercise_library'::regclass)"
+  ]
+ },
+ {
+  "n": "128",
+  "slug": "0378",
+  "title": "0378 Moving a client to another group moves all of their records",
+  "migrations": [
+   "0378"
+  ],
+  "notApplied": [
+   "to_regprocedure('public.move_client_to_group(uuid, uuid, uuid)') is not null and pg_get_functiondef(to_regprocedure('public.move_client_to_group(uuid, uuid, uuid)')) not like '%information_schema.columns%'"
+  ]
+ },
+ {
+  "n": "129",
+  "slug": "0379",
+  "title": "0379 A program day or logged session exercise can never be named with only numbers or with its sets and reps",
+  "migrations": [
+   "0379"
+  ],
+  "notApplied": [
+   "not exists (select 1 from pg_constraint where conname in ('group_workout_exercises_name_not_digits', 'session_exercises_name_not_digits'))"
+  ]
+ },
+ {
+  "n": "130",
+  "slug": "renumber-johann-program-days",
+  "title": "give each day of the program 'Dont mess with the Johann' its own day number (its Day 1 and Day 2 both carry the number 1), keeping the order you see today; undoable",
+  "migrations": [],
+  "notApplied": [
+   "exists (select 1 from public.workouts where program_id = 'a7b5f600-3b62-4ec0-a016-d518f3f39a3e' and day_index = 1 group by week_number having count(*) = 2)"
+  ]
+ },
+ {
+  "n": "131",
+  "slug": "0380",
+  "title": "0380 A day number is unique inside a week of a program",
+  "migrations": [
+   "0380"
+  ],
+  "notApplied": [
+   "not exists (select 1 from pg_constraint where conname = 'workouts_program_week_day_key' and conrelid = 'public.workouts'::regclass)"
+  ]
+ },
+ {
+  "n": "132",
+  "slug": "0381",
+  "title": "0381 A one-on-one space's name follows its client's name when the client's name is corrected",
+  "migrations": [
+   "0381"
+  ],
+  "notApplied": [
+   "to_regprocedure('public.sync_one_on_one_group_name()') is null"
+  ]
+ },
+ {
+  "n": "133",
+  "slug": "0382",
+  "title": "0382 Minors and health closures: children are never shown to or matched with other members, parent-link secrets are made by the database and need verified consent, believable weigh-ins, images-only scan photos, bounded scan saves",
+  "migrations": [
+   "0382"
+  ],
+  "notApplied": [
+   "to_regprocedure('public.training_partner_is_protected(uuid)') is null"
+  ]
+ },
+ {
+  "n": "134",
+  "slug": "0383",
+  "title": "0383 A text STOP is remembered for the phone number: nobody can opt in with it, and no text goes to it, until it texts START",
+  "migrations": [
+   "0383"
+  ],
+  "notApplied": [
+   "to_regclass('public.sms_suppressed_numbers') is null"
+  ]
+ },
+ {
+  "n": "135",
+  "slug": "0384",
+  "title": "0384 Privacy closures: shared lists changed only by their owner, private clients stay private from organization admins, ten more client tables refuse a row about a non-member, progress photos in the owner's folder, an audit trail for access-changing rows",
+  "migrations": [
+   "0384"
+  ],
+  "notApplied": [
+   "to_regprocedure('public.is_group_private_from_org(uuid)') is null"
+  ]
+ },
+ {
+  "n": "159",
+  "slug": "0407",
+  "title": "0407 Release Z1: take a client out of a group without destroying them (Remove from my clients, Delete permanently with 30 days to undo)",
+  "migrations": [
+   "0407"
+  ],
+  "notApplied": [
+   "to_regclass('public.client_removals') is null"
+  ]
+ },
+ {
+  "n": "157",
+  "slug": "0405",
+  "title": "0405 Release W2b: the bell notices that name a person ('X commented on your post', 'X mentioned you') show a member under 18, or of unknown age, as a first name and last initial",
+  "migrations": [
+   "0405"
+  ],
+  "notApplied": [
+   "to_regprocedure('public.notice_display_name(uuid)') is null"
+  ]
+ },
+ {
+  "n": "156",
+  "slug": "0404",
+  "title": "0404 Release X1: the narrow reads athletes' screens use to see who else is in their group (a name, a photo, a role and a position, nothing else)",
+  "migrations": [
+   "0404"
+  ],
+  "notApplied": [
+   "to_regprocedure('public.group_member_names(uuid)') is null"
+  ]
+ },
+ {
+  "n": "136",
+  "slug": "0385",
+  "title": "0385 The kind of each set (warm-up, working, as-many-as-possible, back-off, drop); a warm-up or drop set never counts toward a goal, a record or a training max; records are per number of reps and a longer hold is a record; a training max comes only from a set of 1 to 8 reps",
+  "migrations": [
+   "0385"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'set_logs' and column_name = 'set_type')"
+  ]
+ },
+ {
+  "n": "137",
+  "slug": "0386",
+  "title": "0386 A client's health form and waiver are finished by the server, never by the browser; a coach's decision on a flagged screening is kept",
+  "migrations": [
+   "0386"
+  ],
+  "notApplied": [
+   "to_regprocedure('public.client_intake_guard_completion()') is null"
+  ]
+ },
+ {
+  "n": "141",
+  "slug": "0389",
+  "title": "0389 Release G: the app at 1,500 clients (last-active, unseen and digest counts done by the database, indexes), real values only in sets, a test-organization mark, and a way to pause forgotten workouts",
+  "migrations": [
+   "0389"
+  ],
+  "notApplied": [
+   "to_regprocedure('public.business_last_active(uuid[])') is null"
+  ]
+ },
+ {
+  "n": "147",
+  "slug": "0395",
+  "title": "0395 Release K1: push notifications that respect the person (quiet hours, private lock screen), a mark on each notice for the five-minute push job, and a payment notice type",
+  "migrations": [
+   "0395"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'notifications' and column_name = 'pushed_at')"
+  ]
+ },
+ {
+  "n": "146",
+  "slug": "0394",
+  "title": "0394 Release J: a new season for a team (the old group is retired and kept whole; the new one has the same positions, coaches and the athletes chosen)",
+  "migrations": [
+   "0394"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'groups' and column_name = 'archived_at')"
+  ]
+ },
+ {
+  "n": "145",
+  "slug": "0393",
+  "title": "0393 Release I: a coach can invite someone who already has an account to be their one-on-one client (they accept or decline), and the notification types the invite code writes are accepted",
+  "migrations": [
+   "0393"
+  ],
+  "notApplied": [
+   "to_regclass('public.space_invites') is null"
+  ]
+ },
+ {
+  "n": "144",
+  "slug": "0392",
+  "title": "0392 Release H: what a coach coaches (asked at signup) and an owner or admin choosing which coach holds a new client",
+  "migrations": [
+   "0392"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'coach_type')"
+  ]
+ },
+ {
+  "n": "143",
+  "slug": "0391",
+  "title": "0391 Release H: getting out of an organization (remove a member and hand over their clients, leave, change a role, cancel or extend an invitation, close the organization)",
+  "migrations": [
+   "0391"
+  ],
+  "notApplied": [
+   "to_regprocedure('public.remove_org_member(uuid, uuid, uuid)') is null"
+  ]
+ },
+ {
+  "n": "148",
+  "slug": "0396",
+  "title": "0396 Release L: a leaving coach is never given an organization (their clients stay where they are, they are marked leaving and choose); the finishing step is server-only",
+  "migrations": [
+   "0396"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'organization_memberships' and column_name = 'departing_since')"
+  ]
+ },
+ {
+  "n": "149",
+  "slug": "0397",
+  "title": "0397 Release F2: the free plan's client limit (15 training clients), installed SWITCHED OFF",
+  "migrations": [
+   "0397"
+  ],
+  "notApplied": [
+   "not exists (select 1 from pg_trigger where tgname = 'group_memberships_free_tier_limit' and not tgisinternal)"
+  ]
+ },
+ {
+  "n": "152",
+  "slug": "0400",
+  "title": "0400 Release T1: the front desk (a person an owner or admin invites to check clients in on an organization-wide screen, and nothing else)",
+  "migrations": [
+   "0400"
+  ],
+  "notApplied": [
+   "to_regclass('public.org_front_desk') is null"
+  ]
+ },
+ {
+  "n": "153",
+  "slug": "0401",
+  "title": "0401 Release U1: graduation (a class year for each team player, and a record of who has been emailed their training history)",
+  "migrations": [
+   "0401"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_memberships' and column_name = 'graduation_year')"
+  ]
+ },
+ {
+  "n": "155",
+  "slug": "0403",
+  "title": "0403 Release W3: every client goes through the health form and waiver, whichever door they came in by (a trigger flags someone who joins as a client without a finished form)",
+  "migrations": [
+   "0403"
+  ],
+  "notApplied": [
+   "not exists (select 1 from pg_trigger where tgname = 'group_memberships_require_intake' and not tgisinternal)"
+  ]
+ },
+ {
+  "n": "150",
+  "slug": "0398",
+  "title": "0398 Release S1: a changed sign-in email must be confirmed by the new address first (waiting requests table)",
+  "migrations": [
+   "0398"
+  ],
+  "notApplied": [
+   "to_regclass('public.pending_email_changes') is null"
+  ]
+ },
+ {
+  "n": "151",
+  "slug": "0399",
+  "title": "0399 Release S2: a client's health answers are read only by the client, their coach, and an owner or admin the owner has granted; the address and device of an acceptance only by the audit path",
+  "migrations": [
+   "0399"
+  ],
+  "notApplied": [
+   "to_regclass('public.health_access_grants') is null"
+  ]
+ },
+ {
+  "n": "142",
+  "slug": "0390",
+  "title": "0390 Release H: undo a whole history import (every workout an import creates carries one batch id)",
+  "migrations": [
+   "0390"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'athlete_sessions' and column_name = 'import_batch_id')"
+  ]
+ },
+ {
+  "n": "140",
+  "slug": "0388",
+  "title": "0388 Switch on the guard: a signed-in person's browser can no longer finish its own health form or waiver (the server does)",
+  "migrations": [
+   "0388"
+  ],
+  "notApplied": [
+   "not exists (select 1 from pg_trigger where tgname = 'client_intake_guard_completion' and tgrelid = 'public.client_intake'::regclass)"
+  ]
+ },
+ {
+  "n": "138",
+  "slug": "flag-clients-without-intake",
+  "title": "HELD for Ron's word: require the health form and waiver of every client who has not finished one",
+  "migrations": [],
+  "notApplied": [
+   "to_regclass('public.intake_flag_log') is null"
+  ]
+ },
+ {
+  "n": "139",
+  "slug": "0387",
+  "title": "0387 Nothing about a person is public unless they chose it: a coach appears in Find a coach only after turning it on for themselves; a coach can add only their own clients to a challenge",
+  "migrations": [
+   "0387"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'marketplace_listed')"
+  ]
+ }
+]

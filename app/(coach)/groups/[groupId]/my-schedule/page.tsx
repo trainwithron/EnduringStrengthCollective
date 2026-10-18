@@ -10,6 +10,8 @@ import { MySchedule } from "@/components/athlete/my-schedule";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { loadMySchedule } from "@/lib/my-schedule-data";
 
+export const metadata = { title: "My schedule" };
+
 // "My schedule": a client's weekly schedule and three plain buttons to ask for a pause, a freeze or to cancel (migration 0297). Only the client sees it; a coach looking
 // in as the client sees the schedule but cannot send requests for them.
 export default async function MySchedulePage(props: { params: Promise<{ groupId: string }> }) {

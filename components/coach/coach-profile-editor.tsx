@@ -109,7 +109,7 @@ export function CoachProfileEditor({
             </span>
             <input type="file" accept={ALLOWED_IMAGE_TYPES.join(",")} onChange={handlePhotoChange} disabled={uploading} className="hidden" />
           </label>
-          <textarea
+          <textarea aria-label="Short bio"
             value={bio}
             onChange={(e) => setBio(e.target.value)}
             onBlur={handleBioBlur}

@@ -8,6 +8,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { BrandingForm } from "@/components/coach/desktop/branding-form";
 import { InviteCoachForm } from "@/components/coach/desktop/invite-coach-form";
+import { FrontDeskList } from "@/components/org/front-desk-list";
 import { ExportBusinessButton } from "@/components/coach/desktop/export-business-button";
 import { TeamMembersPanel } from "@/components/org/team-members-panel";
 import { loadTeamInfo } from "@/lib/org-team";
@@ -25,6 +26,8 @@ import { isBillingEnforced } from "@/lib/org-entitlements";
 import type { ButtonShape, DisplayFont, BodyFont } from "@/lib/theme";
 import { isStripeConfigured } from "@/lib/stripe";
 import { ALL_BRAND_FONTS, googleFontsHref } from "@/lib/google-fonts";
+
+export const metadata = { title: "Branding" };
 
 type OrgTab = "team" | "branding" | "workout-card" | "tags" | "dispatch" | "terminology" | "credits" | "plan";
 
@@ -129,6 +132,10 @@ export default async function BrandingPage(
   const leavingIds = new Set((leavingRows ?? []).map((r: { profile_id: string }) => r.profile_id));
   const firedIds = new Set(((leavingRows ?? []) as { profile_id: string; fired_at: string | null }[]).filter((r) => r.fired_at).map((r) => r.profile_id));
 
+  // Who the owner has let read the clients' health answers (a separate read: a database without the table yet just shows nobody).
+  const { data: grantRows } = await supabase.from("health_access_grants").select("profile_id").eq("organization_id", orgMembership.organization_id);
+  const healthAccessIds = new Set(((grantRows ?? []) as { profile_id: string }[]).map((r) => r.profile_id));
+
   const members = (memberRows ?? []).map((m) => ({
     profileId: m.profile_id,
     leaving: leavingIds.has(m.profile_id),
@@ -138,6 +145,16 @@ export default async function BrandingPage(
   }));
 
   const teamInfo = tab === "team" ? await loadTeamInfo(supabase, orgMembership.organization_id) : null;
+
+  // The front desk (Release T1): the people invited only to check clients in. Not organization members, so listed apart. Two links point at profiles, so the one that names the person is spelled out.
+  const { data: frontDeskRows, error: frontDeskError } =
+    tab === "team"
+      ? await supabase.from("org_front_desk").select("profile_id, profiles!org_front_desk_profile_id_fkey ( full_name )").eq("organization_id", orgMembership.organization_id)
+      : { data: null, error: null };
+  const frontDesk = ((frontDeskRows ?? []) as unknown as { profile_id: string; profiles: { full_name: string | null } | { full_name: string | null }[] | null }[]).map((r) => ({
+    profileId: r.profile_id,
+    fullName: (Array.isArray(r.profiles) ? r.profiles[0]?.full_name : r.profiles?.full_name) ?? "Unknown",
+  }));
 
   const { data: tagRows } = await supabase
     .from("client_tags")
@@ -301,9 +318,17 @@ export default async function BrandingPage(
             organizationName={org?.name ?? "this organization"}
             me={user.id}
             myRole={orgMembership.role}
-            members={members.map((m) => ({ profileId: m.profileId, fullName: m.fullName, role: m.role, clients: teamInfo?.clientCounts[m.profileId] ?? 0, soleClients: teamInfo?.soleCoachOfClients[m.profileId] ?? 0, leaving: m.leaving, fired: m.fired }))}
+            members={members.map((m) => ({ profileId: m.profileId, fullName: m.fullName, role: m.role, clients: teamInfo?.clientCounts[m.profileId] ?? 0, soleClients: teamInfo?.soleCoachOfClients[m.profileId] ?? 0, leaving: m.leaving, fired: m.fired, healthAccess: healthAccessIds.has(m.profileId) }))}
             invites={teamInfo?.invites ?? []}
           />
+
+          {frontDeskError ? (
+            <p className="font-body text-xs text-rust mb-4" role="alert">
+              The front desk list could not be read. Reload to try again.
+            </p>
+          ) : (
+            <FrontDeskList organizationId={orgMembership.organization_id} organizationName={org?.name ?? "this organization"} people={frontDesk} canManage={isOwnerOrAdmin} />
+          )}
 
           {isOwnerOrAdmin && (
             <div className="mb-8 flex flex-wrap items-start gap-4">

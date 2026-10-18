@@ -300,7 +300,7 @@ export function ExerciseCard({
         {swapping ? (
           <div className="flex-1">
             <div className="flex items-center gap-2">
-              <input
+              <input aria-label="Exercise name"
                 type="text"
                 autoFocus
                 value={nameDraft}

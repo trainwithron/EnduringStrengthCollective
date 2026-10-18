@@ -11,6 +11,8 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { isStripeConfigured } from "@/lib/stripe";
 import { PackageManager, type CoachPackageRow, type LinkableProgramOption } from "@/components/coach/desktop/package-manager";
 
+export const metadata = { title: "Packages" };
+
 export default async function PackagesPage(
   props: {
     params: Promise<{ groupId: string }>;

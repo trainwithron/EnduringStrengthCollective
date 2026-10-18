@@ -88,7 +88,7 @@ export function QuickPaymentPanel({ groupId }: { groupId: string }) {
           </div>
         ) : (
           <>
-            <input
+            <input aria-label={`Search ${term("client", "plural")}`}
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -119,7 +119,7 @@ export function QuickPaymentPanel({ groupId }: { groupId: string }) {
 
       <div>
         <label className="font-body text-xs text-steel uppercase tracking-wide">Amount ($)</label>
-        <input
+        <input aria-label="Amount in dollars"
           type="number"
           inputMode="decimal"
           min="1"
@@ -133,7 +133,7 @@ export function QuickPaymentPanel({ groupId }: { groupId: string }) {
 
       <div>
         <label className="font-body text-xs text-steel uppercase tracking-wide">What for? (optional)</label>
-        <input
+        <input aria-label="What the payment is for"
           type="text"
           value={description}
           onChange={(e) => setDescription(e.target.value)}

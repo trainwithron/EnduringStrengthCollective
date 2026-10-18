@@ -8,6 +8,8 @@ import { getWorkoutOverviewData, type WorkoutOverviewExercise } from "@/lib/work
 import { findMostRecentCoachNoteForExercise } from "@/lib/exercise-note-history";
 import { RecapAndUpNext } from "@/components/coach/desktop/recap-and-up-next";
 
+export const metadata = { title: "Recap" };
+
 // Coach-only. The athlete's own completed-session view
 // (app/sessions/[sessionId]/page.tsx) is a separate, unchanged route —
 // this is purely additive, reached from the client profile's logged-

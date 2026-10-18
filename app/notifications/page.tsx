@@ -9,6 +9,8 @@ import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { isValidTimeZone } from "@/lib/format-in-timezone";
 import { CHOOSE_ORGANIZATION_PATH, getActiveAnchor } from "@/lib/active-anchor";
 
+export const metadata = { title: "Notifications" };
+
 // Every notification the signed-in person has received, in one place, whatever their role: replies, programs and macros assigned, class
 // changes, partner requests, notices from their organization. The bell in the header shows the latest few and links here.
 export default async function NotificationsPage() {

@@ -833,9 +833,13 @@ export function MealPlanGenerator({
         setAiError((prev) => ({
           ...prev,
           [meal.spec.id]:
-            (data.droppedForPreferences ?? 0) > 0
-              ? "Every suggestion broke this client's food preferences, so none is shown. Try again."
-              : "Couldn't verify any of this suggestion's ingredients against real food data — try again.",
+            (data.droppedForPreferences ?? 0) > 0 && (data.droppedForMacros ?? 0) > 0
+              ? "Some suggestions broke this client's food preferences and the rest didn't land close enough to this meal's macros, so none is shown. Try again."
+              : (data.droppedForPreferences ?? 0) > 0
+                ? "Every suggestion broke this client's food preferences, so none is shown. Try again."
+                : (data.droppedForMacros ?? 0) > 0
+                  ? "None of the suggestions landed close enough to this meal's macros, so none is shown. Try again."
+                  : "Couldn't verify any of this suggestion's ingredients against real food data — try again.",
         }));
         return false;
       }
@@ -1123,7 +1127,7 @@ export function MealPlanGenerator({
           High carb training / low carb rest days
         </label>
         {carbCycling && (
-          <select
+          <select aria-label="Training days per week"
             value={trainingDays}
             onChange={(e) => setTrainingDays(e.target.value)}
             className="h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs"

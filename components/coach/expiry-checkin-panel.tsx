@@ -293,7 +293,7 @@ export function ExpiryCheckInPanel({ groupIds: scopeGroupIds }: { groupIds?: str
               </div>
               {openExtend === key && (
                 <div className="mt-2 space-y-2">
-                  <input
+                  <input aria-label="Note (optional)"
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
                     placeholder="Note (optional), for example: away until winter"
@@ -345,7 +345,7 @@ export function ExpiryCheckInPanel({ groupIds: scopeGroupIds }: { groupIds?: str
                     aria-label="How many sessions"
                     className="w-20 h-11 bg-graphite border border-steel/30 text-chalk px-2 font-body text-base sm:text-sm"
                   />
-                  <input
+                  <input aria-label="Note (optional)"
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
                     placeholder="Note (optional)"

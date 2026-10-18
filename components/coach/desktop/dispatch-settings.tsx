@@ -67,7 +67,7 @@ export function DispatchSettings({
         we cascade the request to whichever of your coaches is actually available, best fit first.
       </p>
       <div className="flex items-center gap-2">
-        <input
+        <input aria-label="Coach request page link"
           type="text"
           readOnly
           value={intakeUrl}

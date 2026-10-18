@@ -5,6 +5,9 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { Trash2 } from "lucide-react";
 import { renderWithMentions } from "./mention-text";
 import { notifyPush } from "@/lib/push-notify";
+import { fetchProtectedIds, nameForOthers } from "@/lib/name-protection-client";
+import { shownName } from "@/lib/shown-name";
+import { readGroupMemberNames } from "@/lib/group-roster-reads";
 
 interface CommentRow {
   id: string;
@@ -49,31 +52,31 @@ export function InlineCommentSection({
   useEffect(() => {
     const supabase = createBrowserClient();
 
+    // The post's group: needed to ask which commenters must be shown as a first name and last initial.
+    const groupPromise = supabase.from("posts").select("group_id").eq("id", postId).single().then(({ data }) => (data?.group_id as string | undefined) ?? null);
+    const protect = async (rows: any[]) => {
+      const gid = await groupPromise;
+      const ids = rows.map((r) => r.author_id as string).filter(Boolean);
+      if (ids.length === 0) return rows;
+      // If the post's group cannot be found nobody can be checked, so everyone is shown shortened.
+      const protectedIds = gid ? await fetchProtectedIds(gid, ids) : new Set(["*"]);
+      return rows.map((r) => (r.profiles && r.author_id ? { ...r, profiles: { ...r.profiles, full_name: shownName(r.profiles.full_name, r.author_id, protectedIds) } } : r));
+    };
+
     supabase
       .from("comments")
       .select("id, body, author_id, parent_comment_id, created_at, profiles ( full_name )")
       .eq("post_id", postId)
       .order("created_at", { ascending: true })
-      .then(({ data }) => setComments((data as any) ?? []));
+      .then(async ({ data }) => setComments((await protect((data as any) ?? [])) as any));
 
     // Mention candidates — every member of this post's group, fetched
     // once so typing "@" doesn't need a round trip per keystroke.
-    supabase
-      .from("posts")
-      .select("group_id")
-      .eq("id", postId)
-      .single()
-      .then(async ({ data: post }) => {
-        if (!post) return;
-        const { data: rows } = await supabase
-          .from("group_memberships")
-          .select("profile_id, profiles ( full_name )")
-          .eq("group_id", post.group_id);
-        setMembers(
-          (rows ?? [])
-            .map((r: any) => ({ id: r.profile_id, fullName: r.profiles?.full_name ?? "" }))
-            .filter((m) => m.fullName)
-        );
+    groupPromise.then(async (gid) => {
+        if (!gid) return;
+        const people = await readGroupMemberNames(supabase, gid);
+        const protectedIds = await fetchProtectedIds(gid, people.map((m) => m.id));
+        setMembers(people.map((m) => ({ id: m.id, fullName: shownName(m.fullName, m.id, protectedIds) })));
       });
 
     const channel = supabase
@@ -87,7 +90,10 @@ export function InlineCommentSection({
             .select("id, body, author_id, parent_comment_id, created_at, profiles ( full_name )")
             .eq("id", payload.new.id)
             .single();
-          if (data) setComments((prev) => [...prev, data as any]);
+          if (data) {
+            const [shaped] = await protect([data as any]);
+            setComments((prev) => [...prev, shaped as any]);
+          }
         }
       )
       .on(
@@ -192,7 +198,8 @@ export function InlineCommentSection({
         .select("full_name")
         .eq("id", viewerId)
         .maybeSingle();
-      const commenterName = viewerProfile?.full_name ?? "Someone";
+      // Other people are told who commented: a member who is not a confirmed adult is named as a first name and last initial.
+      const commenterName = viewerProfile?.full_name ? await nameForOthers(post.group_id, viewerId, viewerProfile.full_name) : "Someone";
       const feedUrl = `/groups/${post.group_id}/feed`;
       const notified = new Set<string>([viewerId]);
       if (post.author_id && !notified.has(post.author_id)) {
@@ -298,7 +305,7 @@ export function InlineCommentSection({
         </div>
       )}
       <div className="flex items-center gap-2">
-        <input
+        <input aria-label="Add a comment"
           ref={inputRef}
           type="text"
           value={body}

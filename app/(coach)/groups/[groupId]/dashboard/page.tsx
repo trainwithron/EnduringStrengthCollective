@@ -15,6 +15,8 @@ import { AddClientButton } from "@/components/coach/desktop/add-client-button";
 import { WorkoutSummaryCard } from "@/components/feed/workout-summary-card";
 import type { FeedPost } from "@/lib/types";
 
+export const metadata = { title: "Dashboard" };
+
 function dateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
     d.getDate()

@@ -3,6 +3,8 @@ import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 
+export const metadata = { title: "Feedback" };
+
 // The platform admin's list of what testers wrote, newest first, with the page and device each came from.
 export default async function AdminFeedbackPage() {
   const supabase = await createServerClient();

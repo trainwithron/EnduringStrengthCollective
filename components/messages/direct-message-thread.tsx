@@ -155,7 +155,7 @@ export function DirectMessageThread({
             : "flex items-center gap-2 px-5 py-3 border-t border-steel/20 shrink-0"
         }
       >
-        <input
+        <input aria-label={`Message ${otherName}`}
           type="text"
           value={body}
           onChange={(e) => setBody(e.target.value)}

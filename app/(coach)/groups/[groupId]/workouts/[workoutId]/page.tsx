@@ -11,6 +11,8 @@ import { computeScheduledDates, formatShortDate, isLocked, unlockDate } from "@/
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { dateKeyInZone, getGroupCoachTimezone, nowInZone } from "@/lib/timezone";
 
+export const metadata = { title: "Workouts" };
+
 export default async function WorkoutOverviewPage(
   props: {
     params: Promise<{ groupId: string; workoutId: string }>;

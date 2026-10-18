@@ -12,6 +12,8 @@ import { HistoryImportPicker } from "@/components/coach/history-import-picker";
 import { UnclearPointsReview } from "@/components/coach/unclear-points-review";
 import { IMPORT_BASELINE_NOTE, IMPORT_UNITS_NOTE, listUnclearPoints } from "@/lib/unclear-points";
 
+export const metadata = { title: "History" };
+
 export default async function ClientHistoryPage(
   props: {
     params: Promise<{ groupId: string; athleteId: string }>;

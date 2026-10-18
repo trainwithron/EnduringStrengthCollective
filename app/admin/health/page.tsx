@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { formatInTimezone } from "@/lib/format-in-timezone";
 
+export const metadata = { title: "Health" };
+
 // Scheduled jobs at a glance for the platform admin: when each last ran, whether it worked, and how many runs in a row have failed. The alert
 // push and email for a failing job link here. (/api/health is the same information for an uptime monitor.)
 export default async function AdminHealthPage() {

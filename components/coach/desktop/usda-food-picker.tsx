@@ -64,7 +64,7 @@ export function UsdaFoodPicker({
     <div className="relative">
       <div className="flex items-center gap-1.5 border border-steel/30 h-8 px-2">
         <Search className="w-3 h-3 text-steel shrink-0" />
-        <input
+        <input aria-label="Search real USDA foods"
           type="text"
           value={query}
           onChange={(e) => handleSearch(e.target.value)}

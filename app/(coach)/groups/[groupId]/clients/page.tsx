@@ -28,6 +28,8 @@ import {
   type MilestonePhaseTag,
 } from "@/lib/nutrition-trend-classifier";
 
+export const metadata = { title: "Clients" };
+
 export default async function ClientsPage(
   props: {
     params: Promise<{ groupId: string }>;

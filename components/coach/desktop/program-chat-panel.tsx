@@ -169,7 +169,7 @@ export function ProgramChatPanel({
             and I&apos;ll build it your way.
           </p>
           <div className="p-3 border-t border-steel/20 flex gap-2">
-            <input
+            <input aria-label={`Ask about ${programName}`}
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}

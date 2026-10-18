@@ -141,7 +141,7 @@ export function FeedbackButton({ variant = "link" }: { variant?: "icon" | "link"
                     </button>
                   ))}
                 </div>
-                <textarea
+                <textarea aria-label={kind === "problem" ? "What happened" : "Your idea"}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   rows={5}
