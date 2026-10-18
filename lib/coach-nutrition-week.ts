@@ -146,7 +146,12 @@ export interface LoadedWeek {
   rows: WeekRow[];
   total: number;
   failed: boolean;
+  // The coach-only "no automatic suggestions" note could not be read, so no one is judged this time (everyone is shown neutrally and the page says so).
+  flagsUnreadable?: boolean;
 }
+
+// Only a database that does not have the flags table yet (the paste is pending) may be read as "nobody has switched it off"; any other failure to read it must not leave a flagged client judged.
+const TABLE_MISSING = new Set(["42P01", "PGRST205"]);
 
 interface HistoryDbRow {
   athlete_id: string;
@@ -165,13 +170,20 @@ export async function loadNutritionWeek(supabase: SupabaseClient, clients: WeekC
   const ids = [...new Set(clients.map((c) => c.id))];
   const from = addDaysToKey(todayKey, -(WEEK_DAYS - 1));
 
+  // The safety switch first: is the table there, and can it be read at all? (The probe is asked directly because the paged reads hide the error code.)
+  const probe = await supabase.from("client_nutrition_flags").select("profile_id").limit(1);
+  const flagsMissing = !!probe.error && TABLE_MISSING.has((probe.error as { code?: string }).code ?? "");
+  let flagsUnreadable = !!probe.error && !flagsMissing;
+
   const [food, weights, memberships, units, flags, histories, legacy, protectedIds] = await Promise.all([
     readByIds(ids, (g) => (a, b) => supabase.from("food_log_entries").select("id, athlete_id, log_date, status, calories, protein_g").in("athlete_id", g).gte("log_date", from).lte("log_date", todayKey).order("id").range(a, b)),
     readByIds(ids, (g) => (a, b) => supabase.from("body_weight_logs").select("id, athlete_id, logged_date, weight").in("athlete_id", g).gte("logged_date", from).lte("logged_date", todayKey).order("id").range(a, b)),
     readByIds(ids, (g) => (a, b) => supabase.from("group_memberships").select("id, profile_id, group_id, food_tracking_enabled, coach_sets_macros").in("profile_id", g).eq("role", "athlete").order("id").range(a, b)),
     readByIds(ids, (g) => (a, b) => supabase.from("athlete_profile_details").select("athlete_id, weight_unit").in("athlete_id", g).order("athlete_id").range(a, b)),
     // The coach-only "no automatic suggestions" note. A database without the table yet reads as none switched on.
-    readByIds(ids, (g) => (a, b) => supabase.from("client_nutrition_flags").select("profile_id, group_id").eq("auto_off", true).in("profile_id", g).order("profile_id").order("group_id").range(a, b)),
+    flagsMissing || flagsUnreadable
+      ? Promise.resolve({ rows: [], failed: false, truncated: false })
+      : readByIds(ids, (g) => (a, b) => supabase.from("client_nutrition_flags").select("profile_id, group_id").eq("auto_off", true).in("profile_id", g).order("profile_id").order("group_id").range(a, b)),
     readByIds(ids, (g) => (a, b) => supabase.from("client_macro_target_history").select("athlete_id, group_id, effective_from, calories, protein_g, carbs_g, fat_g").in("athlete_id", g).order("athlete_id").order("group_id").order("effective_from").range(a, b)),
     // The single row that stood in before the history existed: used only for a client with no history row.
     readByIds(ids, (g) => (a, b) => supabase.from("client_macro_targets").select("athlete_id, group_id, calories, protein_g, carbs_g, fat_g, updated_at").in("athlete_id", g).order("athlete_id").order("group_id").range(a, b)),
@@ -179,7 +191,9 @@ export async function loadNutritionWeek(supabase: SupabaseClient, clients: WeekC
   ]);
   const unreadable = [food, weights, memberships, units, histories, legacy].some((r) => r.failed || r.truncated);
   if (unreadable) return { rows: [], total: clients.length, failed: true };
-  const flagRows = flags.failed ? [] : flags.rows;
+  // A failed or cut-short read of the switch is never read as "nobody flagged": everyone is shown neutrally instead.
+  if (flags.failed || flags.truncated) flagsUnreadable = true;
+  const flagRows = flagsUnreadable ? [] : flags.rows;
 
   // Standing targets per client AND group, as of today.
   const byKey = new Map<string, StandingHistory>();
@@ -210,6 +224,6 @@ export async function loadNutritionWeek(supabase: SupabaseClient, clients: WeekC
   const weightUnits = new Map<string, "lb" | "kg">();
   for (const u of units.rows as { athlete_id: string; weight_unit: string | null }[]) weightUnits.set(u.athlete_id, u.weight_unit === "kg" ? "kg" : "lb");
 
-  const all = summarizeWeek({ clients, food: food.rows as FoodRow[], weights: weights.rows as WeightRow[], targets, trackingOff, suggestionsOff, weightUnits, protectedIds });
-  return { rows: all.slice(0, MAX_ROWS), total: all.length, failed: false };
+  const all = summarizeWeek({ clients, food: food.rows as FoodRow[], weights: weights.rows as WeightRow[], targets, trackingOff, suggestionsOff, weightUnits, protectedIds: flagsUnreadable ? new Set(["*"]) : protectedIds });
+  return { rows: all.slice(0, MAX_ROWS), total: all.length, failed: false, ...(flagsUnreadable ? { flagsUnreadable: true } : {}) };
 }

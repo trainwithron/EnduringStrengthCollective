@@ -54,6 +54,11 @@ export async function WeeklyNutritionSection({ groupId, clients }: { groupId: st
       <p className="font-body text-sm text-steel mb-4 max-w-[70ch]">
         The last seven days for each client: what they logged, on the days they logged, against their target. The ones who need you come first. Open a client to see the detail.
       </p>
+      {week.flagsUnreadable && (
+        <p className="font-body text-xs text-steel mb-3" role="status">
+          Couldn&apos;t check which clients have automatic suggestions switched off, so no one is marked under or over this time. Reload to try again.
+        </p>
+      )}
       <p className="font-body text-xs text-steel mb-3">
         {(["nothing_logged", "under", "over", "no_target", "tracking_off", "on_track", "logged"] as WeekStatus[])
           .filter((s) => (counts.get(s) ?? 0) > 0)

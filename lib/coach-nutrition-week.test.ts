@@ -106,7 +106,8 @@ describe("the week's table", () => {
 });
 
 // A stand-in database that pages like the real one: each table answers with its rows, cut to the requested range, whatever the filters.
-function fakeDb(tables: Record<string, unknown[]>, failing: string[] = []) {
+function fakeDb(tables: Record<string, unknown[]>, failing: string[] | Record<string, { code?: string }> = []) {
+  const errors: Record<string, { code?: string }> = Array.isArray(failing) ? Object.fromEntries(failing.map((t) => [t, {}])) : failing;
   return {
     from(table: string) {
       let range: [number, number] | null = null;
@@ -117,9 +118,10 @@ function fakeDb(tables: Record<string, unknown[]>, failing: string[] = []) {
         gte: () => q,
         lte: () => q,
         order: () => q,
+        limit: () => q,
         range: (a: number, b: number) => ((range = [a, b]), q),
         then(resolve: (v: unknown) => void) {
-          if (failing.includes(table)) return resolve({ data: null, error: { message: "x" } });
+          if (errors[table]) return resolve({ data: null, error: { message: "x", ...errors[table] } });
           const rows = tables[table] ?? [];
           return resolve({ data: range ? rows.slice(range[0], range[1] + 1) : rows, error: null });
         },
@@ -147,6 +149,46 @@ describe("loading the week", () => {
     const w = await loadNutritionWeek(db, [client("a", "Ann")], "2026-10-17", adults);
     expect(w.failed).toBe(false);
     expect(w.rows[0]).toMatchObject({ fullName: "Ann", status: "on_track", daysLogged: 1, avgCalories: 1800, targetCalories: 2000, suggestionsOff: false });
+  });
+
+  it("if the safety switch cannot be read, nobody is judged: a flagged client is never shown as under or over, and the page is told", async () => {
+    const tables = {
+      food_log_entries: [{ id: "1", athlete_id: "a", log_date: "2026-10-16", status: null, calories: 900, protein_g: 50 }],
+      client_macro_target_history: [{ athlete_id: "a", group_id: "g", effective_from: "2026-01-01", calories: 2000, protein_g: 150, carbs_g: 0, fat_g: 0 }],
+    };
+    const w = await loadNutritionWeek(fakeDb(tables, { client_nutrition_flags: {} }), [client("a", "Ann")], "2026-10-17", adults);
+    expect(w.failed).toBe(false);
+    expect(w.flagsUnreadable).toBe(true);
+    expect(w.rows[0]).toMatchObject({ status: "logged", calorieGapPct: null, neutral: true });
+  });
+
+  it("a cut-short read of the switch (more rows than a read returns) also makes everyone neutral", async () => {
+    const flags = Array.from({ length: 26_000 }, (_, i) => ({ profile_id: `p${i}`, group_id: "x" }));
+    const tables = {
+      food_log_entries: [{ id: "1", athlete_id: "a", log_date: "2026-10-16", status: null, calories: 900, protein_g: 50 }],
+      client_macro_target_history: [{ athlete_id: "a", group_id: "g", effective_from: "2026-01-01", calories: 2000, protein_g: 150, carbs_g: 0, fat_g: 0 }],
+      client_nutrition_flags: flags,
+    };
+    const w = await loadNutritionWeek(fakeDb(tables), [client("a", "Ann")], "2026-10-17", adults);
+    expect(w.flagsUnreadable).toBe(true);
+    expect(w.rows[0]).toMatchObject({ status: "logged", neutral: true });
+  });
+
+  it("only a MISSING flags table (the paste is pending) reads as nobody flagged: not neutral, unless No macros for that client is on", async () => {
+    const tables = {
+      food_log_entries: [{ id: "1", athlete_id: "a", log_date: "2026-10-16", status: null, calories: 900, protein_g: 50 }, { id: "2", athlete_id: "b", log_date: "2026-10-16", status: null, calories: 900, protein_g: 50 }],
+      client_macro_target_history: [
+        { athlete_id: "a", group_id: "g", effective_from: "2026-01-01", calories: 2000, protein_g: 150, carbs_g: 0, fat_g: 0 },
+        { athlete_id: "b", group_id: "g", effective_from: "2026-01-01", calories: 2000, protein_g: 150, carbs_g: 0, fat_g: 0 },
+      ],
+      group_memberships: [{ id: "m1", profile_id: "b", group_id: "g", food_tracking_enabled: true, coach_sets_macros: false }],
+    };
+    for (const code of ["42P01", "PGRST205"]) {
+      const w = await loadNutritionWeek(fakeDb(tables, { client_nutrition_flags: { code } }), [client("a", "Ann"), client("b", "Bo")], "2026-10-17", adults);
+      expect(w.flagsUnreadable, code).toBeUndefined();
+      expect(w.rows.find((r) => r.id === "a"), code).toMatchObject({ status: "under", neutral: false });
+      expect(w.rows.find((r) => r.id === "b"), code).toMatchObject({ status: "logged", neutral: true });
+    }
   });
 
   it("a client with the safety switch on is shown neutrally (the flag read feeds the table)", async () => {
