@@ -44,4 +44,35 @@ create policy "group_memberships_select_narrow" on public.group_memberships as r
     or public.is_org_admin_of_group(group_id)
   );
 
+-- How many people are in a group, for the "N members" line on the group's home page. The page used to count the rows it could read, which for an athlete is now only themselves and the coaches, so the count is asked of the
+-- database instead: the same rows as before for a member of the group, and, for an owner or admin of the organization with no seat in it, the rows their existing policy lets them read (a client who is private from the
+-- organization is not counted). Anyone else gets nothing. Additions only.
+create or replace function public.group_member_count(p_group uuid)
+returns integer
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_member boolean;
+begin
+  if auth.uid() is null then
+    return null;
+  end if;
+  v_member := public.is_group_member(p_group);
+  if not v_member and not public.is_org_admin_of_group(p_group) then
+    return null;
+  end if;
+  return (
+    select count(*)::int
+    from public.group_memberships m
+    where m.group_id = p_group
+      and (v_member or m.role <> 'athlete' or not public.is_client_private_from_org(m.group_id, m.profile_id))
+  );
+end;
+$$;
+revoke execute on function public.group_member_count(uuid) from public, anon;
+grant execute on function public.group_member_count(uuid) to authenticated, service_role;
+
 commit;

@@ -26,6 +26,21 @@ describe("Release X2: athletes stop reading other athletes' membership rows", ()
     expect(build).toContain("to_regprocedure('public.group_member_names(uuid)') is not null and to_regprocedure('public.group_position_roster(uuid)') is not null");
   });
 
+  it("the paste that Ron runs (the bundle, not just the build script) refuses to run without step 156", () => {
+    const bundle = src("supabase/apply/apply-release-x2-athlete-narrow-memberships-all.sql");
+    expect(bundle).toContain("to_regprocedure('public.group_member_names(uuid)') is not null and to_regprocedure('public.group_position_roster(uuid)') is not null");
+    expect(bundle).toContain("RIGHT AFTER APPLYING, CHECK AS AN ATHLETE");
+  });
+
+  it("the group's 'N members' line is counted by the database, with the old count as the fallback", () => {
+    expect(sql).toContain("create or replace function public.group_member_count(p_group uuid)");
+    const page = src("app/(coach)/groups/[groupId]/page.tsx");
+    expect(page).toContain("memberCount={memberCount}");
+    expect(page).toContain("readGroupMemberCount(supabase, params.groupId, (memberships ?? []).length)");
+    expect(page).not.toContain("memberCount={roster.length}");
+    expect(src("lib/group-roster-reads.ts")).toContain("if (error || typeof data !== \"number\") return fallback;");
+  });
+
   it("the athlete screens that list the group's people are already on the narrow reads (Release X1), not on the table", () => {
     // These are the athlete-facing places that read other athletes' membership rows; each now asks the narrow functions.
     for (const [file, call] of [

@@ -63,3 +63,11 @@ export async function readPositionRoster(supabase: SupabaseClient, groupId: stri
     positionSortOrder: (m.group_positions?.sort_order ?? null) as number | null,
   }));
 }
+
+// How many people are in the group, for the "N members" line: asked of the database (migration 0406) because an athlete can no longer read the other athletes' rows to count them. Until that function exists, or if it
+// cannot be read, the number of rows the page itself could read is used (which is the whole group wherever the old open read still applies).
+export async function readGroupMemberCount(supabase: SupabaseClient, groupId: string, fallback: number): Promise<number> {
+  const { data, error } = await supabase.rpc("group_member_count", { p_group: groupId });
+  if (error || typeof data !== "number") return fallback;
+  return data;
+}

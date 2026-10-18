@@ -3484,7 +3484,10 @@ STEPS.push({
   migrations: ["0406"],
   sees: "Success. No rows returned.",
   afterwards: "From now on an athlete reads their own membership row and their coaches' rows, and no other athlete's (their tier, level, privacy setting and membership type). Coaches, and an organization's owner or admin, read exactly what they did before. Everything the athlete screens list about the group's people comes through the two narrow functions from step 156. RIGHT AFTER APPLYING, CHECK AS AN ATHLETE (and keep the one-line undo ready): the group Home, the feed with its leaderboard, a post's comments with an @ mention, the games page and messages. If anything shows fewer people than before, run the undo below (it takes effect at once).",
-  undo: "drop policy if exists \"group_memberships_select_narrow\" on public.group_memberships;",
+  undo: [
+    "drop policy if exists \"group_memberships_select_narrow\" on public.group_memberships;",
+    "drop function if exists public.group_member_count(uuid);",
+  ].join(String.fromCharCode(10)),
   undoWhy: "Only if step 158 misbehaves. Takes the restriction off again; athletes can then read teammates' membership rows as before.",
   rows: [
     ["0406 is not already applied (the restrictive read rule is not there yet)", "not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'group_memberships' and policyname = 'group_memberships_select_narrow')"],

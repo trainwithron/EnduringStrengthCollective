@@ -76,6 +76,7 @@ import { OtherProgramsCard } from "@/components/athlete/other-programs-card";
 import { ReviewPromptSection } from "@/components/athlete/review-prompt-section";
 import type { TodayMacros, TodayHabit } from "@/components/athlete/today-widget";
 import type { WeightLogEntry } from "@/components/athlete/weight-log-widget";
+import { readGroupMemberCount } from "@/lib/group-roster-reads";
 
 export const metadata = { title: "Home" };
 
@@ -211,6 +212,8 @@ export default async function GroupHubPage(
     }
   }
 
+  // The people in the group, asked of the database: an athlete reads only their own row and the coaches' now, so the rows on this page are not the group.
+  const memberCount = await readGroupMemberCount(supabase, params.groupId, (memberships ?? []).length);
   const roster: RosterMember[] = (memberships ?? []).map((m: any) => ({
     profileId: m.profile_id,
     fullName: (m.profiles as any)?.full_name ?? "Unknown",
@@ -825,7 +828,7 @@ export default async function GroupHubPage(
       <GroupHubHeader
         name={group.name}
         description={group.description}
-        memberCount={roster.length}
+        memberCount={memberCount}
         hideMemberCount={(group as { group_kind?: string }).group_kind === "one_on_one"}
         isCoach={renderAsCoach}
         groupId={params.groupId}

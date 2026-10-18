@@ -87,6 +87,21 @@ export default {
       h.check("and the coach can message the client", !dmBack.error && dmBack.rows.length === 1, JSON.stringify(dmBack));
       h.check("the group-member test the other rules use still says yes for an athlete", (await (async () => { await h.as(ann); const x = await tryQ(db, `select public.is_group_member($1) as m`, [g]); await h.asSuper(); return x.rows?.[0]?.m === true; })()));
       h.check("the second group is untouched", other !== null);
+
+      // ---- "N members" is counted by the database, not by the rows the page can read
+      const countAs = async (who, groupId) => { await h.as(who); const x = await tryQ(db, `select public.group_member_count($1) as n`, [groupId]); await h.asSuper(); return x; };
+      let n = await countAs(ann, g);
+      h.check("a client is told the whole group's size (the leaver has gone, so 4 are left)", n.rows?.[0]?.n === 4, JSON.stringify(n));
+      n = await countAs(coach, g);
+      h.check("so is the coach", n.rows?.[0]?.n === 4, JSON.stringify(n));
+      n = await countAs(admin, g);
+      h.check("an organization admin with no seat gets the count they could read before, without the client who is private from the organization", n.rows?.[0]?.n === 3, JSON.stringify(n));
+      n = await countAs(outsider, g);
+      h.check("someone from another group gets nothing", !n.error && n.rows?.[0]?.n === null, JSON.stringify(n));
+      await h.as(null);
+      n = await tryQ(db, `select public.group_member_count($1) as n`, [g]);
+      await h.asSuper();
+      h.check("a signed-out caller gets nothing or is refused", !!n.error || n.rows?.[0]?.n === null, JSON.stringify(n));
     },
   },
 };
