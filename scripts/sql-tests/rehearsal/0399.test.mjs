@@ -113,6 +113,34 @@ export default {
       h.check("and the former coach no longer does", (await answersFor(coach, client)) === null);
       await db.query(`update public.group_memberships set group_id = $1 where group_id = $2 and profile_id = $3`, [g1, g3, client]);
 
+      // ---- only a TRAINING membership in a live group counts
+      const socialCoach = await h.user("HA Social Coach");
+      const retiredCoach = await h.user("HA Retired Coach");
+      const outsideSocialCoach = await h.user("HA Outside Social Coach");
+      const secondCoach = await h.user("HA Second Coach");
+      await h.orgMember(org, socialCoach, "coach");
+      await h.orgMember(org, retiredCoach, "coach");
+      const org2 = await h.org(outsideSocialCoach, "HA Other Gym");
+      const org3 = await h.org(secondCoach, "HA Third Gym");
+      const gSocial = await h.group(org, socialCoach, "team", "HA social group");
+      await h.member(gSocial, client);
+      const gRetired = await h.group(org, retiredCoach, "team", "HA retired season");
+      await h.member(gRetired, client);
+      const gOutsideSocial = await h.group(org2, outsideSocialCoach, "team", "HA other org social group");
+      await h.member(gOutsideSocial, client);
+      const gSecond = await h.group(org3, secondCoach, "team", "HA second coach group");
+      await h.member(gSecond, client);
+      await db.query("update public.group_memberships set membership_type = 'social_only' where profile_id = $1 and group_id = any ($2::uuid[])", [client, [gSocial, gOutsideSocial]]);
+      await db.query("update public.groups set archived_at = now() where id = $1", [gRetired]);
+      h.check("a coach of a group the client is only in socially (same organization) cannot read the answers", (await answersFor(socialCoach, client)) === null);
+      h.check("nor a coach of a social group in another organization", (await answersFor(outsideSocialCoach, client)) === null);
+      h.check("nor the coach of a retired season", (await answersFor(retiredCoach, client)) === null);
+      h.check("but a second real coach of the same client (a training membership in another organization) reads them", Array.isArray(await answersFor(secondCoach, client)));
+      h.check("and the client's own coach still does", Array.isArray(await answersFor(coach, client)));
+      await db.query("update public.group_memberships set membership_type = 'training' where profile_id = $1 and group_id = $2", [client, gSocial]);
+      h.check("the same coach reads them once the membership is a training one", Array.isArray(await answersFor(socialCoach, client)));
+      await db.query("delete from public.group_memberships where profile_id = $1 and group_id = any ($2::uuid[])", [client, [gSocial, gRetired, gOutsideSocial, gSecond]]);
+
       // ---- signed-out visitors hold nothing on these tables
       h.check("signed-out visitors have no access to the intake table", (await db.query(`select has_table_privilege('anon', 'public.client_intake', 'select') or has_table_privilege('anon', 'public.client_intake', 'insert') or has_table_privilege('anon', 'public.client_intake', 'update') as p`)).rows[0].p === false);
       h.check("nor the acceptances table", (await db.query(`select has_table_privilege('anon', 'public.legal_acceptances', 'select') or has_table_privilege('anon', 'public.legal_acceptances', 'insert') as p`)).rows[0].p === false);

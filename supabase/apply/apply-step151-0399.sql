@@ -44,7 +44,8 @@ create policy "health_access_grants_select_org_admin" on public.health_access_gr
 revoke insert, update, delete on public.health_access_grants from authenticated, anon;
 
 -- Who may read a client's answers. Internal. Decided by the groups the client is in NOW (a client moved to another group is readable by the coach of the new group and no longer by the coach of the old one),
--- never by the group recorded when the form was filled in.
+-- never by the group recorded when the form was filled in. Only a TRAINING membership in a group that is not retired counts: a coach of a group the client is merely in socially (their own organization's or another's), or of a retired
+-- season, cannot read the answers; a second real coach of the same client (a training membership in another organization) can.
 create or replace function public._can_read_health_answers(p_athlete uuid)
 returns boolean
 language sql
@@ -59,8 +60,13 @@ as $$
       and (
         p_athlete = auth.uid()
         or exists (
-          select 1 from public.group_memberships m
-          where m.profile_id = p_athlete and m.role = 'athlete' and public.is_group_coach(m.group_id)
+          select 1
+          from public.group_memberships m
+          join public.groups g on g.id = m.group_id
+          where m.profile_id = p_athlete and m.role = 'athlete'
+            and m.membership_type = 'training'
+            and g.archived_at is null
+            and public.is_group_coach(m.group_id)
         )
         or exists (
           select 1
@@ -68,6 +74,8 @@ as $$
           join public.groups g on g.id = m.group_id
           join public.health_access_grants h on h.organization_id = g.organization_id and h.profile_id = auth.uid()
           where m.profile_id = p_athlete and m.role = 'athlete'
+            and m.membership_type = 'training'
+            and g.archived_at is null
             and public.is_org_owner_or_admin(g.organization_id)
             and not public.is_client_private_from_org(m.group_id, p_athlete)
         )
