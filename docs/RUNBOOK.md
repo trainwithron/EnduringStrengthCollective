@@ -152,3 +152,6 @@ Section 4 is for a leaked secret. This is for the harder case: you have reason t
 7. **Write it down and learn from it** within a week: the timeline, the cause, what was exposed, who was told and when, what changed so it cannot happen again. Keep it with the evidence. If it was a code bug, say which review step should have caught it and add that check.
 
 Who does what: when Ron is the only person, the order above is the order of the day. If someone else (a developer or an assistant) is helping, Ron decides about telling people; the helper's job is steps 1 to 4.
+## Which pastes are applied
+
+Run `node scripts/state-report.mjs` to see, in one screen, which paste bundles are already in the database and which are still waiting. It sends one read-only query (the script refuses anything else). With `SUPABASE_ACCESS_TOKEN` set (a personal access token from the Supabase dashboard) it asks the live database itself; without it, it writes the query to `supabase/apply/state-report.sql` to paste into the SQL editor, and `node scripts/state-report.mjs --from <result.json>` reads the saved result. `--all` also lists the ones already applied. The list comes from the checks each paste file already uses ("... is not already applied"), refreshed whenever `scripts/build-paste-files.mjs` runs.

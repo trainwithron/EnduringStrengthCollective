@@ -101,6 +101,10 @@
       "schedule": "20 8 * * *"
     },
     {
+      "path": "/api/cron/purge-removed-clients",
+      "schedule": "30 7 * * *"
+    },
+    {
       "path": "/api/cron/cron-watchdog",
       "schedule": "0 9 * * *"
     }

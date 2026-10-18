@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readHealthAnswers } from "@/lib/health-answers";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { rateLimitResponse } from "@/lib/rate-limit";
@@ -47,7 +48,8 @@ export async function GET(request: Request) {
   ] = await Promise.all([
     supabase.from("profiles").select("full_name, avatar_url").eq("id", userId).maybeSingle(),
     supabase.from("athlete_profile_details").select("*").eq("athlete_id", userId).maybeSingle(),
-    supabase.from("client_intake").select("*").eq("athlete_id", userId).maybeSingle(),
+    // The answers come through health_answers (the table no longer hands them out); everything else on the row as before.
+    supabase.from("client_intake").select("athlete_id, group_id, waiver_signed_name, waiver_accepted, completed_at, created_at, updated_at, date_of_birth").eq("athlete_id", userId).maybeSingle(),
     supabase.from("body_weight_logs").select("*").eq("athlete_id", userId),
     supabase.from("wellness_checkins").select("*").eq("athlete_id", userId),
     supabase.from("athlete_sessions").select("*").eq("athlete_id", userId),
@@ -69,6 +71,9 @@ export async function GET(request: Request) {
     supabase.from("read_settings").select("faith_track, note_seen_at, updated_at").eq("athlete_id", userId).maybeSingle(),
   ]);
 
+  // Their own screening answers, read through the same door as everyone's.
+  const ownAnswers = intake ? await readHealthAnswers(supabase, userId) : null;
+  if (ownAnswers?.kind === "error") return NextResponse.json({ error: "Couldn't read your health screening, so the export wasn't made. Try again in a moment." }, { status: 503 });
   // Everything else the app holds about this person as a member and client that their own sign-in can read, found by the database itself from every table that names them (so a table added
   // later is included without anyone remembering to list it). Null until the database has the functions; the list below still downloads then.
   const everything = await collectEverything(supabase as unknown as ExportClient);
@@ -82,7 +87,7 @@ export async function GET(request: Request) {
       : "The complete collection was not available this time; the sections below are still complete for the main parts of your account. Try again later or contact support.",
     profile,
     profileDetails,
-    intake,
+    intake: intake ? { ...intake, par_q_answers: ownAnswers?.kind === "ok" ? ownAnswers.answers : [] } : intake,
     bodyWeightLogs,
     wellnessCheckins,
     athleteSessions,
