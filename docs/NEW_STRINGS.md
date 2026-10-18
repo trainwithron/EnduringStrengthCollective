@@ -112,3 +112,11 @@
 
 - Settings > What you coach: "A team coach's menus leave out booking pages, availability, session types, the website, the pro shop and referrals, leads and the session ledger. They come back if you choose another option here, and they always stay if you have a one-on-one client or run an organization with other coaches or staff."
 - Home tiles: "Roster" / "Your players, their positions and seasons."; "Depth chart" / "Who plays where, by position."; "Practices and games" / "The team calendar."; "Attendance" / "Who was there, day by day."; "Weight room" / "Check players in at the kiosk."; "TV display" / "Put the board on the weight-room screen."
+
+## Release T1 (front desk)
+
+- Invite form, permission level: "Front desk (check-in only)"; note: "Front desk staff check clients in on the front-desk screen and can see nothing else: no health answers, programs, messages or reports."
+- Invitation page / notice: "invited you to join as front desk staff, to check clients in."; Team page role word "Front desk".
+- Team page: "Front desk"; "Nobody yet. Invite someone below and choose Front desk."; "Open the check-in screen →"; confirm "Remove {name} from the front desk of {organization}? They can no longer check clients in."; error "Couldn't remove them. Try again."; "The front desk list could not be read. Reload to try again."
+- Front-desk screen: "Type your name to check in"; placeholder "Your name…"; "Keep typing…"; "No match. Check the spelling, or ask the front desk."; "Couldn't look that up. Try again."; "Enter your check-in code"; "Not {first name}? Go back"; "Checked in!"; "No front desk here" / "You are not on an organization's front desk. Ask the owner to invite you, then open this page again."; "Which front desk?"
+- Check-in answers: "That code is not right. Try again."; "Too many wrong tries. Try again later, or ask the client's coach."; "No check-in code is set for this client yet. Ask their coach to set one."; "Couldn't check in. Try again."

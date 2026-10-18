@@ -8,7 +8,8 @@ import { notifyAndEmail } from "@/lib/invite-notify";
 
 // Which org-level role an invite can grant. "owner" is set once at
 // org creation and never assigned through this flow.
-const INVITABLE_ORG_ROLES = new Set(["admin", "coach"]);
+// "front_desk" (Release T1) is not an organization role: it makes a row in org_front_desk (check-in only), never a membership or a group seat.
+const INVITABLE_ORG_ROLES = new Set(["admin", "coach", "front_desk"]);
 
 export async function POST(request: Request) {
   const supabase = await createServerClient();
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "This group isn't part of an organization." }, { status: 400 });
   }
   // A one-on-one space belongs to its client and their coach: an organization admin can't add another coach to it.
-  if (group.group_kind === "one_on_one") {
+  if (group.group_kind === "one_on_one" && role !== "front_desk") {
     return NextResponse.json({ error: "You can't add a coach to a one-on-one space." }, { status: 400 });
   }
 
@@ -59,12 +60,14 @@ export async function POST(request: Request) {
 
   const serviceRole = createServiceRoleClient();
   // ...or to a group that holds a client who is private from the organization.
-  const { count: privateClients } = await serviceRole
-    .from("group_memberships")
-    .select("profile_id", { count: "exact", head: true })
-    .eq("group_id", groupId)
-    .eq("role", "athlete")
-    .eq("private_from_org", true);
+  const { count: privateClients } = role === "front_desk"
+    ? { count: 0 }
+    : await serviceRole
+        .from("group_memberships")
+        .select("profile_id", { count: "exact", head: true })
+        .eq("group_id", groupId)
+        .eq("role", "athlete")
+        .eq("private_from_org", true);
   if ((privateClients ?? 0) > 0) {
     return NextResponse.json({ error: "This group has a client who is private from the organization, so a coach can't be added to it." }, { status: 400 });
   }
@@ -72,12 +75,15 @@ export async function POST(request: Request) {
   // and that person joins by setting their own password.
   const { data: existingId } = await serviceRole.rpc("profile_id_for_email", { p_email: trimmedEmail });
   if (typeof existingId === "string" && existingId) {
-    const { data: already } = await serviceRole.from("organization_memberships").select("id").eq("organization_id", group.organization_id).eq("profile_id", existingId).maybeSingle();
+    const { data: already } =
+      role === "front_desk"
+        ? await serviceRole.from("org_front_desk").select("profile_id").eq("organization_id", group.organization_id).eq("profile_id", existingId).maybeSingle()
+        : await serviceRole.from("organization_memberships").select("id").eq("organization_id", group.organization_id).eq("profile_id", existingId).maybeSingle();
     // The answer is the same whether or not the address has an account (or is already a member), so an organization cannot be used to find out who has an account.
     if (already) return NextResponse.json({ invited: true });
     const { data: invite, error: inviteRowError } = await serviceRole
       .from("organization_invites")
-      .insert({ organization_id: group.organization_id, invited_profile_id: existingId, role, group_id: groupId, created_by: user.id })
+      .insert({ organization_id: group.organization_id, invited_profile_id: existingId, role, group_id: role === "front_desk" ? null : groupId, created_by: user.id })
       .select("id")
       .single();
     if (inviteRowError || !invite) {
@@ -90,7 +96,7 @@ export async function POST(request: Request) {
     await notifyAndEmail(serviceRole, {
       profileId: existingId,
       type: "organization_invite",
-      body: `${orgRow?.name ?? "An organization"} invited you to join as ${role === "admin" ? "an admin" : "a coach"}.`,
+      body: `${orgRow?.name ?? "An organization"} invited you to join as ${role === "admin" ? "an admin" : role === "front_desk" ? "front desk staff" : "a coach"}.`,
       linkPath: `/org-invite/${invite.id}`,
       origin: appOrigin(request),
       subject: `${orgRow?.name ?? "An organization"} invited you to join`,
@@ -119,6 +125,14 @@ export async function POST(request: Request) {
     .insert({ id: newUserId, full_name: trimmedName });
   if (profileError) {
     return NextResponse.json({ error: `Couldn't create their profile: ${profileError.message}` }, { status: 502 });
+  }
+
+  if (role === "front_desk") {
+    const { error: frontDeskError } = await serviceRole.from("org_front_desk").insert({ organization_id: group.organization_id, profile_id: newUserId, added_by: user.id });
+    if (frontDeskError) {
+      return NextResponse.json({ error: `Couldn't add them to the front desk: ${frontDeskError.message}` }, { status: 502 });
+    }
+    return NextResponse.json({ invited: true });
   }
 
   const { error: groupMembershipError } = await serviceRole

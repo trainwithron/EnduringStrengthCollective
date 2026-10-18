@@ -31,7 +31,7 @@ const LEAVING_NOTE = {
   fired: (name: string) => `${name} then loses coaching access to those clients right away and cannot start their own account here.`,
   good: (name: string) => `${name} then gets seven days to choose whether to start their own account or export everything.`,
 };
-const ROLE_WORD: Record<string, string> = { owner: "Owner", admin: "Admin", coach: "Coach" };
+const ROLE_WORD: Record<string, string> = { owner: "Owner", admin: "Admin", coach: "Coach", front_desk: "Front desk" };
 
 // The people in the organization (owner and admins can change roles, remove a member and hand over their clients, cancel or extend an invitation), and for the owner, ending the team. Every rule is in the
 // database functions (migration 0391); this only asks and shows their plain-word refusals.

@@ -2915,6 +2915,46 @@ STEPS.push({
   ],
 });
 
+// The text of one function exactly as an earlier migration made it (from its "create or replace" line to the closing $$;), so an undo can put it back.
+function functionFromMigration(file, name) {
+  const text = readFileSync(new URL("../supabase/migrations/" + file, import.meta.url), "utf8").replace(/\r\n/g, String.fromCharCode(10));
+  const start = text.indexOf("create or replace function public." + name + "(");
+  const end = text.indexOf(String.fromCharCode(36, 36) + ";", start);
+  if (start < 0 || end < 0) throw new Error("cannot find " + name + " in " + file);
+  return text.slice(start, end + 3);
+}
+
+STEPS.push({
+  n: "152",
+  slug: "0400",
+  title: "0400 Release T1: the front desk (a person an owner or admin invites to check clients in on an organization-wide screen, and nothing else)",
+  migrations: ["0400"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes on screen until the Release T1 code is live. Adds one small table of front-desk people, five functions (find a client by name, check a client in, list my organizations, remove a front-desk person, and the shared check-in code test), lets an invitation name the front-desk role, and makes the existing check-in code test (verify_kiosk_pin) call the shared one with the same answers and the same coach-only guard.",
+  undo: [
+    "drop function if exists public.remove_front_desk(uuid, uuid);",
+    "drop function if exists public.front_desk_check_in(uuid, uuid, text);",
+    "drop function if exists public.front_desk_find(uuid, text);",
+    "drop function if exists public.front_desk_orgs();",
+    "drop function if exists public._front_desk_may_act(uuid);",
+    "drop table if exists public.org_front_desk;",
+    "delete from public.organization_invites where role = 'front_desk';",
+    "alter table public.organization_invites drop constraint if exists organization_invites_role_check;",
+    "alter table public.organization_invites add constraint organization_invites_role_check check (role in ('admin', 'coach'));",
+    // the check-in code test and the invitation answer go back to their earlier text, copied from the migrations that made them
+    functionFromMigration("0251_kiosk_pins_hashed.sql", "verify_kiosk_pin"),
+    "drop function if exists public._check_kiosk_pin(uuid, uuid, text);",
+    functionFromMigration("0352_organization_invites_accept_and_leave.sql", "answer_organization_invite"),
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 152 misbehaves. Run it only while the Release T1 code is not live. Removes the front-desk table (every front-desk person is dropped; they can be invited again) and the functions. The two older functions it replaced (verify_kiosk_pin, answer_organization_invite) keep working for every other role either way.",
+  rows: [
+    ["0400 is not already applied (the front-desk table is not there yet)", "to_regclass('public.org_front_desk') is null"],
+    ["the tables and helpers it uses exist", "to_regclass('public.organizations') is not null and to_regclass('public.kiosk_pins') is not null and to_regclass('public.kiosk_checkins') is not null and to_regclass('public.organization_invites') is not null and to_regprocedure('public.is_org_owner_or_admin(uuid)') is not null and to_regprocedure('public.is_group_coach(uuid)') is not null"],
+    ["the leaving-coach columns it reads exist", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'organization_memberships' and column_name = 'access_ended_at')"],
+    ["retired groups can be recognised", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'groups' and column_name = 'archived_at')"],
+  ],
+});
+
 STEPS.push({
   n: "150",
   slug: "0398",
@@ -3082,6 +3122,7 @@ const BUNDLES = [
   { id: "release-co", name: "Release CO (nothing about a person is public unless they chose it: personal Find a coach listing; a coach adds only their own clients to a challenge; run BEFORE the code that goes with it is live)", steps: ["139"] },
   { id: "release-cn-held", name: "HELD, Ron's word first: require the health form and waiver of every client without one (read check-intake-flag-list.sql first)", steps: ["138"] },
   { id: "release-cm", name: "Release CM (the guard function and a coach's decision on a flagged screening; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["137"] },
+  { id: "release-t1-front-desk", name: "Release T1 (the front desk; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["152"] },
   { id: "release-s1-signin-hardening", name: "Release S1 (a changed sign-in email is confirmed by the new address; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["150"] },
   { id: "release-f2-client-cap", name: "Release F2 (the free plan's client limit, installed switched off; adds only)", steps: ["149"] },
   { id: "release-l-leaving-coach", name: "Release L (a leaving coach is never given an organization; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["148"] },
@@ -3364,6 +3405,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
     m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
+    m("0400", "to_regclass('public.org_front_desk') is not null"),
     m("0398", "to_regclass('public.pending_email_changes') is not null"),
     m("0397", "exists (select 1 from pg_trigger where tgname = 'group_memberships_free_tier_limit' and not tgisinternal)"),
     m("0396", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'organization_memberships' and column_name = 'departing_since')"),
