@@ -208,9 +208,9 @@ export const HELP_ARTICLES: HelpArticle[] = [
     title: "Remove or delete a client",
     summary: "Take someone off your list, and what happens to their information.",
     body: [
-      "On a client's row menu or profile, choose Remove from my clients. They leave your lists and counts and lose their place in the group. Their account and everything about them stay, filed under the group and linked to their email, so nothing is lost.",
+      "On a client's profile, under Remove or delete client, choose Remove [name] from my clients. They leave your lists and counts and lose their place in the group. Their account and everything about them stay, filed under the group and linked to their email, so nothing is lost.",
       "Open Members and look under Removed clients to see who you removed. Choose Put back and they return exactly as they were, with their level, position and history. If you invite the same email again, the existing account reconnects with its history.",
-      "Delete permanently is the same removal with 30 days to change your mind. After 30 days the account is erased. Their logged workouts and notes are erased only if you tick that box. Someone who still belongs to another group keeps their account.",
+      "Delete [name] permanently is the same removal with 30 days to change your mind. After 30 days the account is erased. Their logged workouts and your notes about them are erased too only if you tick Also erase their logged workouts and my notes about them. Someone who still belongs to another group keeps their account.",
       "A client with a subscription that can still bill cannot be removed until it is canceled. Their upcoming sessions with you are cancelled and the credits go back to them, and they get a notice saying so.",
     ],
   },
