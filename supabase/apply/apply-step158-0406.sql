@@ -4,7 +4,7 @@
 --
 -- Run apply-precheck first (every row ok = true). Then paste THIS file and run it once.
 -- WHAT YOU SHOULD SEE: "Success. No rows returned."
--- AFTERWARDS: From now on an athlete reads their own membership row and their coaches' rows, and no other athlete's (their tier, level, privacy setting and membership type). Coaches, and an organization's owner or admin, read exactly what they did before. Everything the athlete screens list about the group's people comes through the two narrow functions from step 156.
+-- AFTERWARDS: From now on an athlete reads their own membership row and their coaches' rows, and no other athlete's (their tier, level, privacy setting and membership type). Coaches, and an organization's owner or admin, read exactly what they did before. Everything the athlete screens list about the group's people comes through the two narrow functions from step 156. RIGHT AFTER APPLYING, CHECK AS AN ATHLETE (and keep the one-line undo ready): the group Home, the feed with its leaderboard, a post's comments with an @ mention, the games page and messages. If anything shows fewer people than before, run the undo below (it takes effect at once).
 -- ON ERROR: it is all or nothing, so nothing was applied. Run   rollback;   once, copy the red error text, and send it back. Do not run the file again.
 -- It contains no text searching, so editor re-indenting cannot break it.
 

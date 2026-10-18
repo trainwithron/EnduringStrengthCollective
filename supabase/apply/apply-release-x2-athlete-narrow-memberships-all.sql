@@ -5,7 +5,7 @@
 -- failed check, and NOTHING is kept, so a second run after a refusal is safe.
 -- WHAT YOU SHOULD SEE: first "Success" for the transaction, then a result table with one row per step and in_place = true on every row.
 -- ON ERROR: run   rollback;   once, copy the red text, send it to Spot. Do not run it again.
--- AFTER STEP 158: From now on an athlete reads their own membership row and their coaches' rows, and no other athlete's (their tier, level, privacy setting and membership type). Coaches, and an organization's owner or admin, read exactly what they did before. Everything the athlete screens list about the group's people comes through the two narrow functions from step 156.
+-- AFTER STEP 158: From now on an athlete reads their own membership row and their coaches' rows, and no other athlete's (their tier, level, privacy setting and membership type). Coaches, and an organization's owner or admin, read exactly what they did before. Everything the athlete screens list about the group's people comes through the two narrow functions from step 156. RIGHT AFTER APPLYING, CHECK AS AN ATHLETE (and keep the one-line undo ready): the group Home, the feed with its leaderboard, a post's comments with an @ mention, the games page and messages. If anything shows fewer people than before, run the undo below (it takes effect at once).
 -- It contains no text searching, so editor re-indenting cannot break it.
 
 begin;

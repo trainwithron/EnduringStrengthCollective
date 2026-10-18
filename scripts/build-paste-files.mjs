@@ -3483,7 +3483,7 @@ STEPS.push({
   warn: "This CHANGES what athletes can read. Apply it ONLY AFTER step 156 is applied AND the Release X1 code is live (the athlete screens that list the group's people must already be using the narrow functions). Applying it earlier makes the @mention lists and the position leaderboard show only the coaches.",
   migrations: ["0406"],
   sees: "Success. No rows returned.",
-  afterwards: "From now on an athlete reads their own membership row and their coaches' rows, and no other athlete's (their tier, level, privacy setting and membership type). Coaches, and an organization's owner or admin, read exactly what they did before. Everything the athlete screens list about the group's people comes through the two narrow functions from step 156.",
+  afterwards: "From now on an athlete reads their own membership row and their coaches' rows, and no other athlete's (their tier, level, privacy setting and membership type). Coaches, and an organization's owner or admin, read exactly what they did before. Everything the athlete screens list about the group's people comes through the two narrow functions from step 156. RIGHT AFTER APPLYING, CHECK AS AN ATHLETE (and keep the one-line undo ready): the group Home, the feed with its leaderboard, a post's comments with an @ mention, the games page and messages. If anything shows fewer people than before, run the undo below (it takes effect at once).",
   undo: "drop policy if exists \"group_memberships_select_narrow\" on public.group_memberships;",
   undoWhy: "Only if step 158 misbehaves. Takes the restriction off again; athletes can then read teammates' membership rows as before.",
   rows: [
