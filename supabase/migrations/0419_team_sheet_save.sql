@@ -229,10 +229,11 @@ begin
         || case when v_records > 0 then ', ' || v_records::text || ' new record' || case when v_records = 1 then '' else 's' end else '' end || '. You can undo it from the Team sheet page.',
       '/groups/' || p_group::text || '/team-sheet');
   else
-    delete from public.team_sheet_batches where id = v_batch and sessions_saved = 0 and kept_count = 0;
+    -- an upload that saved nothing (everyone already had a session, or every row was refused) leaves no record to undo
+    delete from public.team_sheet_batches where id = v_batch;
   end if;
 
-  return jsonb_build_object('batch', case when v_saved > 0 or v_kept > 0 then v_batch else null end, 'saved', v_saved, 'kept', v_kept, 'replaced', v_replaced, 'records', v_records, 'skipped', v_skipped);
+  return jsonb_build_object('batch', case when v_saved > 0 then v_batch else null end, 'saved', v_saved, 'kept', v_kept, 'replaced', v_replaced, 'records', v_records, 'skipped', v_skipped);
 end;
 $$;
 revoke execute on function public.team_sheet_save(uuid, text, jsonb, boolean) from public, anon;
