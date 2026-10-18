@@ -154,6 +154,52 @@ export default {
         await db.query(`alter table public.group_memberships drop column if exists z_later`);
       }
 
+      // ---- an archived one-on-one space comes back when a client joins it again (re-invite), and across remove, re-add, remove, put back
+      const hal = await h.user("RM Hal");
+      const g4 = await h.group(org, coach, "one_on_one", "RM Solo Two");
+      await h.member(g4, hal);
+      r = await callAs(coach, `select public.remove_client($1, $2) as id`, [g4, hal]);
+      h.check("the space is archived after its only client leaves", (await db.query(`select archived_at is not null as a from public.groups where id = $1`, [g4])).rows[0].a === true);
+      await h.member(g4, hal);
+      h.check("a re-invited client brings the space back at once", (await db.query(`select archived_at is null as a from public.groups where id = $1`, [g4])).rows[0].a === true);
+      r = await callAs(coach, `select public.remove_client($1, $2) as id`, [g4, hal]);
+      const halSecond = r.rows?.[0]?.id;
+      h.check("removed again: archived again and the new record says so", !r.error && (await db.query(`select c.archived_space, g.archived_at is not null as a from public.client_removals c join public.groups g on g.id = c.group_id where c.id = $1`, [halSecond])).rows[0].archived_space === true);
+      await callAs(coach, `select public.restore_removed_client($1)`, [halSecond]);
+      h.check("put back: the space is visible", (await db.query(`select archived_at is null as a from public.groups where id = $1`, [g4])).rows[0].a === true);
+      // the carry-forward when the space was left archived by an older record
+      const ida = await h.user("RM Ida");
+      const g5 = await h.group(org, coach, "one_on_one", "RM Solo Three");
+      await h.member(g5, ida);
+      r = await callAs(coach, `select public.remove_client($1, $2) as id`, [g5, ida]);
+      await db.query(`alter table public.group_memberships disable trigger group_memberships_unarchive_one_on_one`);
+      await h.member(g5, ida);
+      await db.query(`alter table public.group_memberships enable trigger group_memberships_unarchive_one_on_one`);
+      r = await callAs(coach, `select public.remove_client($1, $2) as id`, [g5, ida]);
+      h.check("a space still archived by an earlier record is carried forward to the new one", (await db.query(`select archived_space from public.client_removals where id = $1`, [r.rows?.[0]?.id])).rows[0].archived_space === true, JSON.stringify(r));
+
+      // ---- the count includes a repeating series, and the client is told in the bell
+      const jo = await h.user("RM Jo");
+      await h.member(g, jo);
+      const series = (await db.query(`insert into public.recurring_booking_series (coach_id, athlete_id, group_id, weekday, start_time, duration_minutes, occurrences_total) values ($1, $2, $3, 2, '10:00', 60, 3) returning id`, [coach, jo, g])).rows[0].id;
+      await db.query(`insert into public.bookings (coach_id, athlete_id, group_id, start_at, end_at, recurring_series_id) values ($1, $2, $3, now() + interval '3 days', now() + interval '3 days 1 hour', $4), ($1, $2, $3, now() + interval '10 days', now() + interval '10 days 1 hour', $4)`, [coach, jo, g, series]);
+      await db.query(`insert into public.bookings (coach_id, athlete_id, group_id, start_at, end_at) values ($1, $2, $3, now() + interval '5 days', now() + interval '5 days 1 hour')`, [coach, jo, g]);
+      r = await callAs(coach, `select public.remove_client($1, $2) as id`, [g, jo]);
+      h.check("removing a client with a repeating series works" + (r.error ? ": " + r.error : ""), !r.error);
+      h.check("the count includes the series' sessions (2) and the single one (1)", (await db.query(`select cancelled_bookings from public.client_removals where id = $1`, [r.rows?.[0]?.id])).rows[0].cancelled_bookings === 3);
+      h.check("no session of theirs is left confirmed", (await db.query(`select count(*)::int as n from public.bookings where athlete_id = $1 and status = 'confirmed'`, [jo])).rows[0].n === 0);
+      const notice = (await db.query(`select type, body from public.notifications where profile_id = $1 order by created_at desc limit 1`, [jo])).rows[0];
+      h.check("the client gets one notice saying how many were cancelled", notice && notice.type === "request_decision" && /cancelled 3 of your upcoming sessions/.test(notice.body), JSON.stringify(notice));
+
+      // ---- the time of a scheduled group session is not cancelled behind its back
+      const kit = await h.user("RM Kit");
+      await h.member(g, kit);
+      const anchor = (await db.query(`insert into public.bookings (coach_id, athlete_id, group_id, start_at, end_at) values ($1, $2, $3, now() + interval '4 days', now() + interval '4 days 1 hour') returning id`, [coach, kit, g])).rows[0].id;
+      await db.query(`insert into public.group_sessions (coach_id, title, start_at, end_at, capacity, anchor_booking_id) values ($1, 'RM class', now() + interval '4 days', now() + interval '4 days 1 hour', 8, $2)`, [coach, anchor]);
+      r = await callAs(coach, `select public.remove_client($1, $2)`, [g, kit]);
+      h.check("a client who holds the time of a scheduled group session is told to change the session first, in plain words", !!r.error && /Change the group session first/.test(r.error), JSON.stringify(r));
+      h.check("and nothing was removed", (await db.query(`select count(*)::int as n from public.group_memberships where group_id = $1 and profile_id = $2`, [g, kit])).rows[0].n === 1);
+
       // ---- someone else's group is unaffected
       h.check("the other coach's group is untouched", g2 !== null);
     },

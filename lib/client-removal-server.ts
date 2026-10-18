@@ -5,7 +5,8 @@ import { deletionBlocker, eraseAccount, loadDeletionFacts } from "@/lib/account-
 //   - the account can't be deleted here (a platform administrator, someone who coaches or owns groups, a live subscription): the record says why and the job tries again in a week;
 //   - otherwise the account is erased (logged workouts and the coach's notes too only if the coach chose that), and a one-on-one space that held only this client is dealt with the way the delete always did.
 // The erase is built to be repeated safely. The record is marked "erasing" first (so Put back is refused while it is under way and two runs never overlap), a person-free note goes to client_removal_log BEFORE anything is
-// erased (the record itself goes when the account does), the steps that can fail and be retried come first, and the account itself is deleted last. A step that fails leaves the record marked, with the reason, and the next run finishes the job.
+// erased (the record itself goes when the account does), and the account itself is deleted before the clean-up of a one-on-one space (so a failed delete leaves the person, their space and their record exactly as they were). A step that fails leaves the
+// record marked, with the reason, and the next run finishes the job; a clean-up step that fails after the account is gone is written to the note.
 // Each removal is its own step, so one that fails never stops the others.
 export interface DueRemoval {
   id: string;
@@ -73,32 +74,31 @@ export async function purgeOneRemoval(db: any, r: DueRemoval, now: Date = new Da
   }
 
   // The note that outlives the person: written before anything is erased, finished afterwards. No name and no email.
-  const { data: logRow, error: logError } = await db
-    .from("client_removal_log")
-    .insert({ removal_id: r.id, group_id: r.group_id, outcome: "erasing", note: "The 30 days were up; the account is being erased." })
-    .select("id")
-    .single();
-  if (logError || !logRow) {
+  // One row per removal: a retry updates it rather than adding another.
+  const writeLog = (outcome: string, text: string) =>
+    db.from("client_removal_log").upsert({ removal_id: r.id, group_id: r.group_id, outcome, note: text }, { onConflict: "removal_id" });
+  const { error: logError } = await writeLog("erasing", "The 30 days were up; the account is being erased.");
+  if (logError) {
     await note("Couldn't write the note that is kept after the erase; will try again in a week.", { ...retryLater, ...release });
     return "failed";
   }
 
-  const result = await eraseAccount(db, r.athlete_id, { eraseHistory: r.erase_history, deleteEmptyOneOnOneGroups: emptyOneOnOne, spacesBeforeDelete: true });
+  const result = await eraseAccount(db, r.athlete_id, { eraseHistory: r.erase_history, deleteEmptyOneOnOneGroups: emptyOneOnOne });
   if (!result.ok) {
     // Left marked "erasing" (Put back is refused until the erase is finished) with the reason; the next run picks it up.
     await note(result.error + " Will try again in a week.", retryLater);
-    await db.from("client_removal_log").update({ note: result.error + " Will try again in a week." }).eq("id", logRow.id);
+    await writeLog("failed", result.error + " Will try again in a week.");
     return "failed";
   }
   // The removal record went with the account (it is tied to the person); the log is what remains.
-  await db.from("client_removal_log").update({ outcome: "erased", note: result.leftover ?? "The account was erased." }).eq("id", logRow.id);
+  await writeLog("erased", result.leftover ?? "The account was erased.");
   return "erased";
 }
 
 export async function purgeDueRemovals(
   db: any,
   now: Date = new Date()
-): Promise<{ checked: number; erased: number; kept: number; blocked: number; failed: number; skipped: number }> {
+): Promise<{ checked: number; erased: number; kept: number; blocked: number; failed: number; skipped: number; discarded: number }> {
   const { data: due, error } = await db
     .from("client_removals")
     .select("id, group_id, athlete_id, erase_history")
@@ -109,7 +109,7 @@ export async function purgeDueRemovals(
     .order("delete_after", { ascending: true })
     .limit(200);
   if (error) throw new Error("Couldn't read the removals that are due.");
-  const tally = { checked: 0, erased: 0, kept: 0, blocked: 0, failed: 0, skipped: 0 };
+  const tally = { checked: 0, erased: 0, kept: 0, blocked: 0, failed: 0, skipped: 0, discarded: 0 };
   for (const r of (due ?? []) as DueRemoval[]) {
     tally.checked++;
     try {
@@ -124,5 +124,29 @@ export async function purgeDueRemovals(
       tally.failed++;
     }
   }
+  tally.discarded = await discardOrphanedRemovals(db, now);
   return tally;
+}
+
+// A plain "Remove from my clients" whose group has since been deleted can never be put back and is no longer listed anywhere, yet still holds the person's name and email. After 30 days it is discarded, with a person-free note.
+export async function discardOrphanedRemovals(db: any, now: Date = new Date()): Promise<number> {
+  const cutoff = new Date(now.getTime() - 30 * 86400000).toISOString();
+  const { data, error } = await db
+    .from("client_removals")
+    .select("id")
+    .is("group_id", null)
+    .is("delete_after", null)
+    .is("restored_at", null)
+    .is("purged_at", null)
+    .lte("removed_at", cutoff)
+    .limit(200);
+  if (error) return 0;
+  let discarded = 0;
+  for (const row of (data ?? []) as { id: string }[]) {
+    const { error: logError } = await db.from("client_removal_log").upsert({ removal_id: row.id, group_id: null, outcome: "record_discarded", note: "The group was deleted, so this removal could no longer be put back; its record was discarded after 30 days." }, { onConflict: "removal_id" });
+    if (logError) continue;
+    const { error: deleteError } = await db.from("client_removals").delete().eq("id", row.id);
+    if (!deleteError) discarded++;
+  }
+  return discarded;
 }

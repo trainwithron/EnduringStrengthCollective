@@ -28,6 +28,9 @@ export async function POST(request: Request) {
     // Only for someone who coaches this group (row security decides), so nothing about other accounts is revealed to anyone else.
     const { data: coachRow } = await supabase.from("group_memberships").select("role").eq("group_id", groupId).eq("profile_id", user.id).maybeSingle();
     if (coachRow?.role !== "coach") return NextResponse.json({ error: "Only a coach of this group can remove a client." }, { status: 403 });
+    // Only about someone who is a client of THIS group (read as the caller, so row security decides): the reason an account cannot be erased is never shown for an id that is not.
+    const { data: target } = await supabase.from("group_memberships").select("role").eq("group_id", groupId).eq("profile_id", athleteId).maybeSingle();
+    if (target?.role !== "athlete") return NextResponse.json({ error: "That person isn't a client in this group." }, { status: 404 });
     const blocker = deletionBlocker(await loadDeletionFacts(createServiceRoleClient(), athleteId));
     if (blocker) return NextResponse.json({ error: blocker }, { status: 409 });
   }
@@ -40,7 +43,7 @@ export async function POST(request: Request) {
   });
   if (error) {
     const message = error.message ?? "";
-    if (/live subscription/i.test(message)) return NextResponse.json({ error: message }, { status: 409 });
+    if (/live subscription|Change the group session first/i.test(message)) return NextResponse.json({ error: message }, { status: 409 });
     const known = /Only a coach|can't remove yourself|isn't a client/i.test(message);
     return NextResponse.json({ error: known ? message : "Couldn't remove this client. Nothing was changed." }, { status: known ? 403 : 500 });
   }

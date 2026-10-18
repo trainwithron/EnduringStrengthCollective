@@ -14,7 +14,7 @@ vi.mock("@/lib/account-deletion", () => ({
   deletionBlocker: () => acct.blocker,
   eraseAccount: (...args: unknown[]) => (acct.erase as any)(...args),
 }));
-import { purgeDueRemovals, purgeOneRemoval } from "./client-removal-server";
+import { discardOrphanedRemovals, purgeDueRemovals, purgeOneRemoval } from "./client-removal-server";
 
 // A stand-in database that remembers: the removal rows, the memberships people still have, the groups and the note that outlives a person. It understands just the calls the job makes.
 type Row = Record<string, any>;
@@ -29,7 +29,8 @@ function world(opts: { memberships?: Row[]; removals?: Row[]; groups?: Row[]; fa
     tables,
     from(table: string) {
       const filters: ((r: Row) => boolean)[] = [];
-      let op: "select" | "update" | "insert" = "select";
+      let op: "select" | "update" | "insert" | "upsert" | "delete" = "select";
+      let conflict = "";
       let values: Row = {};
       let head = false;
       let lim = Infinity;
@@ -49,13 +50,27 @@ function world(opts: { memberships?: Row[]; removals?: Row[]; groups?: Row[]; fa
         limit: (n: number) => ((lim = n), q),
         update: (v: Row) => ((op = "update"), (values = v), q),
         insert: (v: Row) => ((op = "insert"), (values = v), q),
+        upsert: (v: Row, o?: { onConflict?: string }) => ((op = "upsert"), (values = v), (conflict = o?.onConflict ?? ""), q),
+        delete: () => ((op = "delete"), q),
         single: async () => run().then((r: any) => ({ data: Array.isArray(r.data) ? r.data[0] ?? null : r.data, error: r.error })),
         maybeSingle: async () => run().then((r: any) => ({ data: Array.isArray(r.data) ? r.data[0] ?? null : r.data, error: r.error })),
         then: (resolve: (v: unknown) => void) => run().then(resolve),
       };
       async function run(): Promise<any> {
-        if (table === "client_removal_log" && op === "insert" && opts.failLog) return { data: null, error: { message: "x" } };
+        if (table === "client_removal_log" && (op === "insert" || op === "upsert") && opts.failLog) return { data: null, error: { message: "x" } };
         if (table === "group_memberships" && op === "select" && opts.failMemberships) return { data: null, error: { message: "x" } };
+        if (op === "upsert") {
+          const existing = tables[table].find((r) => r[conflict] === values[conflict]);
+          if (existing) Object.assign(existing, values);
+          else tables[table].push({ id: "log" + (tables[table].length + 1), ...values });
+          return { data: null, error: null };
+        }
+        if (op === "delete") {
+          const gone = tables[table].filter((r) => filters.every((f) => f(r)));
+          tables[table] = tables[table].filter((r) => !gone.includes(r));
+          (tables as any)[table] = tables[table];
+          return { data: null, error: null };
+        }
         if (op === "insert") {
           const row = { id: "log" + (tables[table].length + 1), ...values };
           tables[table].push(row);
@@ -113,7 +128,7 @@ describe("the scheduled erase after 30 days", () => {
   it("erases the account when nothing stands in the way, with the coach's choice about history, leaving a person-free note", async () => {
     const w = world({});
     expect(await purgeOneRemoval(w.db, { ...removal, erase_history: true }, NOW)).toBe("erased");
-    expect(acct.erase).toHaveBeenCalledWith(w.db, "a", { eraseHistory: true, deleteEmptyOneOnOneGroups: [], spacesBeforeDelete: true });
+    expect(acct.erase).toHaveBeenCalledWith(w.db, "a", { eraseHistory: true, deleteEmptyOneOnOneGroups: [] });
     expect(w.log()).toHaveLength(1);
     expect(w.log()[0]).toMatchObject({ removal_id: "r1", group_id: "g", outcome: "erased" });
     expect(Object.keys(w.log()[0]).join()).not.toMatch(/name|email/);
@@ -133,10 +148,10 @@ describe("the scheduled erase after 30 days", () => {
   it("a one-on-one space that held only this client goes with them; one that still has a client does not", async () => {
     let w = world({ groups: [{ id: "g", group_kind: "one_on_one" }] });
     await purgeOneRemoval(w.db, removal, NOW);
-    expect(acct.erase).toHaveBeenLastCalledWith(w.db, "a", { eraseHistory: false, deleteEmptyOneOnOneGroups: ["g"], spacesBeforeDelete: true });
+    expect(acct.erase).toHaveBeenLastCalledWith(w.db, "a", { eraseHistory: false, deleteEmptyOneOnOneGroups: ["g"] });
     w = world({ groups: [{ id: "g", group_kind: "one_on_one" }], memberships: [{ group_id: "g", profile_id: "someone", role: "athlete" }] });
     await purgeOneRemoval(w.db, removal, NOW);
-    expect(acct.erase).toHaveBeenLastCalledWith(w.db, "a", { eraseHistory: false, deleteEmptyOneOnOneGroups: [], spacesBeforeDelete: true });
+    expect(acct.erase).toHaveBeenLastCalledWith(w.db, "a", { eraseHistory: false, deleteEmptyOneOnOneGroups: [] });
   });
 
   it("someone who still belongs to another group is NOT erased: only the removal stands, and the record says so", async () => {
@@ -185,11 +200,12 @@ describe("the scheduled erase after 30 days", () => {
     expect(await purgeOneRemoval(w.db, removal, NOW)).toBe("failed");
     expect(w.row()).toMatchObject({ erasing_since: NOW.toISOString(), delete_after: WEEK });
     expect(String(w.row().purge_note)).toContain("not deleted");
-    expect(w.log()[0].outcome).toBe("erasing");
+    expect(w.log()).toHaveLength(1);
+    expect(w.log()[0].outcome).toBe("failed");
     const later = new Date(NOW.getTime() + 8 * 86400000);
     expect(await purgeOneRemoval(w.db, removal, later)).toBe("erased");
-    expect(w.log()).toHaveLength(2);
-    expect(w.log()[1].outcome).toBe("erased");
+    expect(w.log()).toHaveLength(1);
+    expect(w.log()[0].outcome).toBe("erased");
   });
 
   it("two runs at once never overlap, and a Put back that got in first means nothing is done", async () => {
@@ -209,11 +225,48 @@ describe("the scheduled erase after 30 days", () => {
     acct.erase.mockRejectedValueOnce(new Error("boom"));
     const w = world({ removals });
     const tally = await purgeDueRemovals(w.db, NOW);
-    expect(tally).toEqual({ checked: 2, erased: 1, kept: 0, blocked: 0, failed: 1, skipped: 0 });
+    expect(tally).toEqual({ checked: 2, erased: 1, kept: 0, blocked: 0, failed: 1, skipped: 0, discarded: 0 });
+  });
+});
+
+describe("a plain removal whose group was deleted", () => {
+  it("is discarded after 30 days with a person-free note; a recent one, one that can still be put back, and a scheduled delete are left alone", async () => {
+    const old = "2026-10-01T00:00:00Z";
+    const w = world({
+      removals: [
+        { id: "orphan", group_id: null, athlete_id: "a", removed_at: old },
+        { id: "recent", group_id: null, athlete_id: "b", removed_at: "2026-11-15T00:00:00Z" },
+        { id: "listed", group_id: "g", athlete_id: "c", removed_at: old },
+        { id: "scheduled", group_id: null, athlete_id: "d", removed_at: old, delete_after: "2026-12-01T00:00:00Z" },
+      ],
+    });
+    expect(await discardOrphanedRemovals(w.db, NOW)).toBe(1);
+    expect((w.db as any).tables.client_removals.map((r: Row) => r.id).sort()).toEqual(["listed", "recent", "scheduled"]);
+    expect(w.log()).toHaveLength(1);
+    expect(w.log()[0]).toMatchObject({ removal_id: "orphan", outcome: "record_discarded" });
+    expect(Object.keys(w.log()[0]).join()).not.toMatch(/name|email/);
   });
 });
 
 describe("how it is wired", () => {
+  it("the one-on-one space comes back by itself when a client joins it, the client is told, a group session's time is not cancelled behind its back, and the count includes a series", () => {
+    const sql = src("supabase/migrations/0407_client_removals.sql");
+    expect(sql).toContain("create trigger group_memberships_unarchive_one_on_one\n  after insert on public.group_memberships");
+    expect(sql).toContain("update public.groups set archived_at = null where id = new.group_id and group_kind = 'one_on_one' and archived_at is not null;");
+    expect(sql).toContain("v_prev_archived");
+    expect(sql).toContain("'request_decision'");
+    expect(sql).toContain("Change the group session first.");
+    expect(sql).toContain("v_cancelled := v_cancelled + coalesce(public.cancel_recurring_booking_series(b.id), 0);");
+    expect(sql).toContain("create unique index if not exists client_removal_log_one_per_removal");
+  });
+
+  it("a permanent delete says nothing about an account unless the person is a client of THIS group, and the group-session sentence is passed through", () => {
+    const route = src("app/api/clients/remove/route.ts");
+    expect(route.indexOf('That person isn\'t a client in this group.')).toBeGreaterThan(-1);
+    expect(route.indexOf('That person isn\'t a client in this group.')).toBeLessThan(route.indexOf("deletionBlocker(await"));
+    expect(route).toContain("Change the group session first");
+  });
+
   it("the migration only adds: one table the browser cannot write, and two functions for the coach", () => {
     const sql = src("supabase/migrations/0407_client_removals.sql");
     expect(sql).toContain("revoke all on public.client_removals from anon, authenticated;\ngrant select on public.client_removals to authenticated;");
@@ -226,7 +279,7 @@ describe("how it is wired", () => {
     // a live subscription in the group refuses the removal; upcoming sessions end with the app's own cancel
     expect(sql).toContain("They have a live subscription. Cancel it first");
     expect(sql).toContain("perform public.cancel_booking_and_refund_credit(b.id);");
-    expect(sql).toContain("perform public.cancel_recurring_booking_series(b.id);");
+    expect(sql).toContain("cancel_recurring_booking_series(b.id)");
     // an emptied one-on-one space leaves the lists the way a retired team does; a stale open record is closed rather than failing
     expect(sql).toContain("update public.groups set archived_at = now() where id = p_group;");
     expect(sql).toContain("Closed: they became a client of this group again.");

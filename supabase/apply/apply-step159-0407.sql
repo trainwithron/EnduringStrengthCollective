@@ -2,7 +2,7 @@
 --
 -- Run apply-precheck first (every row ok = true). Then paste THIS file and run it once.
 -- WHAT YOU SHOULD SEE: "Success. No rows returned."
--- AFTERWARDS: Nothing changes on screen until the Release Z1 code is live. Adds two tables (client_removals: who was taken out of which group, with their name, email, membership and rate as they were; client_removal_log: a person-free note of each permanent erase) and two functions (remove_client, restore_removed_client). Safe to run before the code.
+-- AFTERWARDS: Nothing changes on screen until the Release Z1 code is live. Adds two tables (client_removals: who was taken out of which group, with their name, email, membership and rate as they were; client_removal_log: a person-free note of each permanent erase) and two functions (remove_client, restore_removed_client), plus a small trigger that un-hides a one-on-one space when a client joins it again. Safe to run before the code.
 -- ON ERROR: it is all or nothing, so nothing was applied. Run   rollback;   once, copy the red error text, and send it back. Do not run the file again.
 -- It contains no text searching, so editor re-indenting cannot break it.
 
@@ -73,6 +73,8 @@ create table if not exists public.client_removal_log (
   note text,
   created_at timestamptz not null default now()
 );
+-- one row per removal: a retried erase updates it rather than adding another
+create unique index if not exists client_removal_log_one_per_removal on public.client_removal_log (removal_id);
 alter table public.client_removal_log enable row level security;
 revoke all on public.client_removal_log from anon, authenticated;
 
@@ -93,6 +95,8 @@ declare
   v_cancelled int := 0;
   v_kind text;
   v_archived boolean := false;
+  v_prev_archived boolean := false;
+  v_name_me text;
   b record;
 begin
   if me is null or not public.is_group_coach(p_group) then
@@ -110,6 +114,8 @@ begin
   end if;
 
   -- A record left open from an earlier removal (they were invited back in) is out of date: close it so there is only ever one.
+  -- (If that record had archived the space, the new one carries it forward so Put back still brings the space back.)
+  select coalesce(bool_or(archived_space), false) into v_prev_archived from public.client_removals where group_id = p_group and athlete_id = p_athlete and restored_at is null and purged_at is null;
   update public.client_removals
     set restored_at = now(), delete_after = null, erasing_since = null, purge_note = 'Closed: they became a client of this group again.'
     where group_id = p_group and athlete_id = p_athlete and restored_at is null and purged_at is null;
@@ -120,9 +126,13 @@ begin
 
   -- Their upcoming sessions with this group's coaches end here. Each goes through the same cancel the app uses (a coach cancelling always gives the credit back and offers the slot to the waitlist).
   for b in select id from public.recurring_booking_series where athlete_id = p_athlete and group_id = p_group and status = 'active' loop
-    perform public.cancel_recurring_booking_series(b.id);
+    v_cancelled := v_cancelled + coalesce(public.cancel_recurring_booking_series(b.id), 0);
   end loop;
   for b in select id from public.bookings where athlete_id = p_athlete and group_id = p_group and status = 'confirmed' and start_at > now() order by start_at loop
+    -- the hidden booking that holds the time of a scheduled group session is not an ordinary booking and cannot be cancelled here
+    if exists (select 1 from public.group_sessions gs where gs.anchor_booking_id = b.id and gs.status = 'scheduled') then
+      raise exception 'Change the group session first. This client holds the time of a scheduled group session.';
+    end if;
     perform public.cancel_booking_and_refund_credit(b.id);
     v_cancelled := v_cancelled + 1;
   end loop;
@@ -141,6 +151,16 @@ begin
     update public.groups set archived_at = now() where id = p_group;
     update public.client_removals set archived_space = true where id = v_id;
     v_archived := true;
+  elsif v_kind = 'one_on_one' and v_prev_archived and not exists (select 1 from public.group_memberships where group_id = p_group and role = 'athlete') then
+    update public.client_removals set archived_space = true where id = v_id;
+    v_archived := true;
+  end if;
+
+  -- The client is told, in the bell, that their upcoming sessions were cancelled and the credits are back (an existing kind of notice).
+  if v_cancelled > 0 then
+    select nullif(btrim(full_name), '') into v_name_me from public.profiles where id = me;
+    insert into public.notifications (profile_id, group_id, type, body, link_path)
+    values (p_athlete, p_group, 'request_decision', coalesce(v_name_me, 'Your coach') || ' cancelled ' || v_cancelled::text || ' of your upcoming session' || case when v_cancelled = 1 then '' else 's' end || '. The credits were returned to you.', '/dashboard');
   end if;
 
   perform public.audit_record('group_memberships', m.id::text, 'update', jsonb_build_object('event', case when p_permanent then 'client_deleted_30_day_undo' else 'client_removed' end, 'group', p_group, 'client', p_athlete, 'by', me, 'removal', v_id, 'cancelled_bookings', v_cancelled, 'space_archived', v_archived));
@@ -208,5 +228,25 @@ end;
 $$;
 revoke execute on function public.restore_removed_client(uuid) from public, anon;
 grant execute on function public.restore_removed_client(uuid) to authenticated, service_role;
+
+-- A one-on-one space that was archived because its only client left comes back the moment a client joins it again (re-invited, added, or put back), so it is never left hidden with a client in it.
+create or replace function public.unarchive_one_on_one_on_client_join()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.role = 'athlete' then
+    update public.groups set archived_at = null where id = new.group_id and group_kind = 'one_on_one' and archived_at is not null;
+  end if;
+  return new;
+end;
+$$;
+revoke execute on function public.unarchive_one_on_one_on_client_join() from public, anon, authenticated;
+drop trigger if exists group_memberships_unarchive_one_on_one on public.group_memberships;
+create trigger group_memberships_unarchive_one_on_one
+  after insert on public.group_memberships
+  for each row execute function public.unarchive_one_on_one_on_client_join();
 
 commit;

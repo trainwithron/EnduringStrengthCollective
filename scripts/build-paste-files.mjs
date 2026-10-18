@@ -2921,8 +2921,10 @@ STEPS.push({
   title: "0407 Release Z1: take a client out of a group without destroying them (Remove from my clients, Delete permanently with 30 days to undo)",
   migrations: ["0407"],
   sees: "Success. No rows returned.",
-  afterwards: "Nothing changes on screen until the Release Z1 code is live. Adds two tables (client_removals: who was taken out of which group, with their name, email, membership and rate as they were; client_removal_log: a person-free note of each permanent erase) and two functions (remove_client, restore_removed_client). Safe to run before the code.",
+  afterwards: "Nothing changes on screen until the Release Z1 code is live. Adds two tables (client_removals: who was taken out of which group, with their name, email, membership and rate as they were; client_removal_log: a person-free note of each permanent erase) and two functions (remove_client, restore_removed_client), plus a small trigger that un-hides a one-on-one space when a client joins it again. Safe to run before the code.",
   undo: [
+    "drop trigger if exists group_memberships_unarchive_one_on_one on public.group_memberships;",
+    "drop function if exists public.unarchive_one_on_one_on_client_join();",
     "drop function if exists public.restore_removed_client(uuid);",
     "drop function if exists public.remove_client(uuid, uuid, boolean, boolean);",
     "drop table if exists public.client_removal_log;",
