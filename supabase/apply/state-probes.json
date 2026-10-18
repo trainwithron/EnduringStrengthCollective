@@ -1488,6 +1488,17 @@
   ]
  },
  {
+  "n": "172",
+  "slug": "0420",
+  "title": "0420 Release OWN1: ownership of an organization cannot be handed to someone who has not accepted their invitation",
+  "migrations": [
+   "0420"
+  ],
+  "notApplied": [
+   "not exists (select 1 from pg_proc where proname = 'transfer_organization_ownership' and pronamespace = 'public'::regnamespace and prosrc like '%has not accepted their invitation%')"
+  ]
+ },
+ {
   "n": "170",
   "slug": "0418",
   "title": "0418 Release AF3: database policies from the post-ship audit (a private client stays private in posts and tags; two undecided account-deletion links decided; the guardian-consent answer limited for a coach; the health-form flag cleared when the last client seat goes)",

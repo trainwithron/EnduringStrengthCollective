@@ -17,9 +17,12 @@ interface MemberOption {
 export function TransferOwnershipButton({
   organizationId,
   candidates,
+  waitingOnInvitation = 0,
 }: {
   organizationId: string;
   candidates: MemberOption[];
+  // coaches who have been invited and have not accepted yet: they cannot be made owner, so they are not in the list
+  waitingOnInvitation?: number;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -47,7 +50,10 @@ export function TransferOwnershipButton({
     router.refresh();
   }
 
-  if (candidates.length === 0) return null;
+  if (candidates.length === 0) {
+    if (waitingOnInvitation === 0) return null;
+    return <p className="font-body text-sm text-steel max-w-sm">You can transfer ownership once a coach has accepted their invitation.</p>;
+  }
 
   if (!open) {
     return (

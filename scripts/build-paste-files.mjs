@@ -2671,6 +2671,23 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "172",
+  slug: "0420",
+  title: "0420 Release OWN1: ownership of an organization cannot be handed to someone who has not accepted their invitation",
+  warn: "This REPLACES one function, transfer_organization_ownership. It adds one refusal and changes nothing else; the replaced text was compared with the live database by hash and matches.",
+  migrations: ["0420"],
+  sees: "Success. No rows returned.",
+  afterwards: "An owner (or a platform admin) who tries to transfer ownership to someone who has never accepted their invitation and signed in is told so in plain words and nothing changes. Everything else about transferring ownership is as before.",
+  undo: fnFromMigration("0396", "transfer_organization_ownership"),
+  undoWhy: "Only if step 172 misbehaves. Puts the function back to the text it had (it then allows an unaccepted invitee to be made owner again).",
+  rows: [
+    ["0420 is not already applied (the function does not mention an unaccepted invitation yet)", "not exists (select 1 from pg_proc where proname = 'transfer_organization_ownership' and pronamespace = 'public'::regnamespace and prosrc like '%has not accepted their invitation%')"],
+    ["the function it replaces exists", "to_regprocedure('public.transfer_organization_ownership(uuid, uuid)') is not null"],
+    ["the account columns it reads exist", "(select count(*) from information_schema.columns where table_schema = 'auth' and table_name = 'users' and column_name in ('invited_at', 'email_confirmed_at', 'last_sign_in_at')) = 3"],
+  ],
+});
+
+STEPS.push({
   n: "170",
   slug: "0418",
   title: "0418 Release AF3: database policies from the post-ship audit (a private client stays private in posts and tags; two undecided account-deletion links decided; the guardian-consent answer limited for a coach; the health-form flag cleared when the last client seat goes)",
@@ -3501,6 +3518,7 @@ for (const s of STEPS) {
 // that names the release, the step and the failed checks, and nothing is kept. After the commit one read-only result row per step says whether it is in place.
 // The individual step files stay as the fallback (and for a release that was partly applied by hand: the bundle refuses at the first applied step).
 const BUNDLES = [
+  { id: "release-own1-owner-accepted-only", name: "Release OWN1 (ownership cannot be handed to someone who has not accepted their invitation; replaces one function)", steps: ["172"] },
   { id: "release-af3-database-policies", name: "Release AF3 (database policies from the post-ship audit; replaces two posts policies, one tag policy and two functions, adds two functions and two triggers)", steps: ["170"] },
   { id: "release-af3e-c-write-guard-rest", name: "Release AF3e paste C (the restrictive write guard on the rest of the covered tables; apply only after paste B has run clean for a few days)", steps: ["169"] },
   { id: "release-af3e-b-write-guard-posts", name: "Release AF3e paste B (the restrictive write guard on posts only)", steps: ["168"] },
@@ -3747,6 +3765,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
   const m = (n, marker) => ({ n, file: index[n], marker });
   const items = [
     m("0402", "to_regclass('public.guardian_consents') is not null"),
+    m("0420", "exists (select 1 from pg_proc where proname = 'transfer_organization_ownership' and pronamespace = 'public'::regnamespace and prosrc like '%has not accepted their invitation%')"),
     m("0418", "exists (select 1 from pg_trigger where tgname = 'group_memberships_clear_intake' and not tgisinternal)"),
     m("0417", "(exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'comments' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'reactions' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'direct_messages' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'exercise_video_comments' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'training_partner_profiles' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'training_partner_requests' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'challenge_participants' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'progress_photos' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'session_exercise_videos' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'body_weight_logs' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'body_scans' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'transformation_cards' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'transformation_milestones' and policyname = 'minor_write_guard_insert'))"),
     m("0416", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'posts' and policyname = 'minor_write_guard_insert')"),

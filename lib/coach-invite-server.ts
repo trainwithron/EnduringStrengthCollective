@@ -48,6 +48,23 @@ export async function loadPendingInvitees(serviceRole: any, organizationId: stri
   return found.sort((a, b) => (b.sentAt ?? "").localeCompare(a.sentAt ?? ""));
 }
 
+/**
+ * Which of these people have not accepted an invitation, by the plain rule alone (isUnaccepted), the same one the database applies when ownership is handed over. A person whose account cannot be read is counted as
+ * NOT accepted: for a decision about who may own the organization, an unreadable account is never assumed fine. (loadPendingInvitees, for the Invitations list, is the other way round and leaves such a person out.)
+ */
+export async function unacceptedIds(serviceRole: any, profileIds: string[]): Promise<Set<string>> {
+  const out = new Set<string>();
+  await runPool(profileIds, 8, async (id) => {
+    try {
+      const { data, error } = await serviceRole.auth.admin.getUserById(id);
+      if (error || !data?.user || isUnaccepted(data.user)) out.add(id);
+    } catch {
+      out.add(id);
+    }
+  });
+  return out;
+}
+
 export const RESEND_COOLDOWN_SECONDS = 600;
 
 /** Was a send of this kind made for this account in the last ten minutes? Read from the account itself, written only AFTER a send succeeded, so a failed attempt never locks anybody out. */
