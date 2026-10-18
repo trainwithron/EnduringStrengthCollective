@@ -10,7 +10,9 @@
    "0240",
    "0241"
   ],
-  "notApplied": "not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'client_tags' and policyname = 'client_tags_insert_owner_admin')"
+  "notApplied": [
+   "not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'client_tags' and policyname = 'client_tags_insert_owner_admin')"
+  ]
  },
  {
   "n": "02",
@@ -23,7 +25,11 @@
    "0257",
    "0258"
   ],
-  "notApplied": "to_regclass('public.client_macro_target_history') is null"
+  "notApplied": [
+   "to_regclass('public.client_macro_target_history') is null",
+   "to_regclass('public.legal_acceptances') is null",
+   "to_regclass('public.feedback_reports') is null and to_regclass('public.nav_query_log') is null"
+  ]
  },
  {
   "n": "03",
@@ -35,7 +41,9 @@
    "0261",
    "0262"
   ],
-  "notApplied": "to_regclass('public.coach_booking_pages') is null and to_regclass('public.cron_runs') is null"
+  "notApplied": [
+   "to_regclass('public.coach_booking_pages') is null and to_regclass('public.cron_runs') is null"
+  ]
  },
  {
   "n": "04",
@@ -44,7 +52,9 @@
   "migrations": [
    "0263"
   ],
-  "notApplied": "to_regclass('public.group_sessions') is null"
+  "notApplied": [
+   "to_regclass('public.group_sessions') is null"
+  ]
  },
  {
   "n": "05",
@@ -53,7 +63,9 @@
   "migrations": [
    "0236"
   ],
-  "notApplied": "not exists (select 1 from pg_indexes where schemaname = 'public' and indexname = 'workout_logs_session_id_key')"
+  "notApplied": [
+   "not exists (select 1 from pg_indexes where schemaname = 'public' and indexname = 'workout_logs_session_id_key')"
+  ]
  },
  {
   "n": "06",
@@ -62,7 +74,9 @@
   "migrations": [
    "0251"
   ],
-  "notApplied": "to_regclass('public.kiosk_pins') is null"
+  "notApplied": [
+   "to_regclass('public.kiosk_pins') is null"
+  ]
  },
  {
   "n": "07",
@@ -71,7 +85,7 @@
   "migrations": [
    "0252"
   ],
-  "notApplied": null
+  "notApplied": []
  },
  {
   "n": "08",
@@ -81,7 +95,10 @@
    "0237",
    "0242"
   ],
-  "notApplied": "not exists (select 1 from pg_proc where proname = 'join_group_with_invite' and pronamespace = 'public'::regnamespace)"
+  "notApplied": [
+   "not exists (select 1 from pg_proc where proname = 'join_group_with_invite' and pronamespace = 'public'::regnamespace)",
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_invites' and column_name = 'revoked_at')"
+  ]
  },
  {
   "n": "09",
@@ -90,7 +107,9 @@
   "migrations": [
    "0238"
   ],
-  "notApplied": "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'group_memberships' and policyname = 'memberships_insert_coach_or_self')"
+  "notApplied": [
+   "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'group_memberships' and policyname = 'memberships_insert_coach_or_self')"
+  ]
  },
  {
   "n": "10",
@@ -99,7 +118,9 @@
   "migrations": [
    "0268"
   ],
-  "notApplied": "not exists (select 1 from pg_proc where proname = 'guard_athlete_session_insert' and pronamespace = 'public'::regnamespace)"
+  "notApplied": [
+   "not exists (select 1 from pg_proc where proname = 'guard_athlete_session_insert' and pronamespace = 'public'::regnamespace)"
+  ]
  },
  {
   "n": "11",
@@ -108,7 +129,9 @@
   "migrations": [
    "0269"
   ],
-  "notApplied": "not exists (select 1 from pg_proc where proname = 'guard_group_session_bookings' and pronamespace = 'public'::regnamespace)"
+  "notApplied": [
+   "not exists (select 1 from pg_proc where proname = 'guard_group_session_bookings' and pronamespace = 'public'::regnamespace)"
+  ]
  },
  {
   "n": "12",
@@ -117,7 +140,9 @@
   "migrations": [
    "0270"
   ],
-  "notApplied": "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'group_memberships' and policyname = 'memberships_insert_coach_or_self' and with_check not like '%is_coach_of_athlete%')"
+  "notApplied": [
+   "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'group_memberships' and policyname = 'memberships_insert_coach_or_self' and with_check not like '%is_coach_of_athlete%')"
+  ]
  },
  {
   "n": "13",
@@ -126,7 +151,9 @@
   "migrations": [
    "0271"
   ],
-  "notApplied": "(select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.prokind = 'f' and has_function_privilege('anon', p.oid, 'execute')) > 10"
+  "notApplied": [
+   "(select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.prokind = 'f' and has_function_privilege('anon', p.oid, 'execute')) > 10"
+  ]
  },
  {
   "n": "14",
@@ -135,7 +162,9 @@
   "migrations": [
    "0273"
   ],
-  "notApplied": "not exists (select 1 from pg_trigger where tgname in ('organizations_guard_columns', 'groups_guard_columns'))"
+  "notApplied": [
+   "not exists (select 1 from pg_trigger where tgname in ('organizations_guard_columns', 'groups_guard_columns'))"
+  ]
  },
  {
   "n": "15",
@@ -144,7 +173,9 @@
   "migrations": [
    "0274"
   ],
-  "notApplied": "coalesce((select position('tg_op' in pg_get_functiondef(p.oid)) = 0 from pg_proc p where p.proname = 'block_athlete_edits_to_completed_session' and p.pronamespace = 'public'::regnamespace), false)"
+  "notApplied": [
+   "coalesce((select position('tg_op' in pg_get_functiondef(p.oid)) = 0 from pg_proc p where p.proname = 'block_athlete_edits_to_completed_session' and p.pronamespace = 'public'::regnamespace), false)"
+  ]
  },
  {
   "n": "16",
@@ -153,7 +184,9 @@
   "migrations": [
    "0275"
   ],
-  "notApplied": "not exists (select 1 from pg_trigger where tgname = 'bookings_note_series_skip')"
+  "notApplied": [
+   "not exists (select 1 from pg_trigger where tgname = 'bookings_note_series_skip')"
+  ]
  },
  {
   "n": "17",
@@ -162,7 +195,9 @@
   "migrations": [
    "0272"
   ],
-  "notApplied": "has_function_privilege('anon', 'public.book_discovery_call(uuid, timestamptz, timestamptz, text, text, text, text)', 'execute')"
+  "notApplied": [
+   "has_function_privilege('anon', 'public.book_discovery_call(uuid, timestamptz, timestamptz, text, text, text, text)', 'execute')"
+  ]
  },
  {
   "n": "18",
@@ -171,7 +206,9 @@
   "migrations": [
    "0276"
   ],
-  "notApplied": "not exists (select 1 from pg_trigger where tgname = 'direct_messages_notify')"
+  "notApplied": [
+   "not exists (select 1 from pg_trigger where tgname = 'direct_messages_notify')"
+  ]
  },
  {
   "n": "19",
@@ -180,7 +217,9 @@
   "migrations": [
    "0277"
   ],
-  "notApplied": "coalesce((select md5(replace(pg_get_functiondef(p.oid), chr(13), '')) = 'b0485b9332f337b725669193b19f0887' from pg_proc p where p.oid = to_regprocedure('public.cancel_booking_and_refund_credit(uuid)')), false) and coalesce((select md5(replace(pg_get_functiondef(p.oid), chr(13), '')) = 'f45d1a198654ec4150e6ec958de3b1d1' from pg_proc p where p.oid = to_regprocedure('public.reschedule_booking(uuid, timestamptz, timestamptz)')), false)"
+  "notApplied": [
+   "coalesce((select md5(replace(pg_get_functiondef(p.oid), chr(13), '')) = 'b0485b9332f337b725669193b19f0887' from pg_proc p where p.oid = to_regprocedure('public.cancel_booking_and_refund_credit(uuid)')), false) and coalesce((select md5(replace(pg_get_functiondef(p.oid), chr(13), '')) = 'f45d1a198654ec4150e6ec958de3b1d1' from pg_proc p where p.oid = to_regprocedure('public.reschedule_booking(uuid, timestamptz, timestamptz)')), false)"
+  ]
  },
  {
   "n": "20",
@@ -189,7 +228,9 @@
   "migrations": [
    "0278"
   ],
-  "notApplied": "coalesce((select md5(replace(pg_get_functiondef(p.oid), chr(13), '')) = 'da934a4629a0f09580619b7c908ab42a' from pg_proc p where p.oid = to_regprocedure('public.book_session(uuid, uuid, uuid, timestamptz, timestamptz)')), false) and coalesce((select md5(replace(pg_get_functiondef(p.oid), chr(13), '')) = 'a14562f9889b8094e99a5403e5423835' from pg_proc p where p.oid = to_regprocedure('public.create_recurring_booking_series(uuid, uuid, uuid, timestamptz, integer, integer)')), false) and coalesce((select md5(replace(pg_get_functiondef(p.oid), chr(13), '')) = 'f2d3243ac4fcf1876d894178e8a937f7' from pg_proc p where p.oid = to_regprocedure('public.join_booking_waitlist(uuid, uuid, uuid, timestamptz, timestamptz)')), false)"
+  "notApplied": [
+   "coalesce((select md5(replace(pg_get_functiondef(p.oid), chr(13), '')) = 'da934a4629a0f09580619b7c908ab42a' from pg_proc p where p.oid = to_regprocedure('public.book_session(uuid, uuid, uuid, timestamptz, timestamptz)')), false) and coalesce((select md5(replace(pg_get_functiondef(p.oid), chr(13), '')) = 'a14562f9889b8094e99a5403e5423835' from pg_proc p where p.oid = to_regprocedure('public.create_recurring_booking_series(uuid, uuid, uuid, timestamptz, integer, integer)')), false) and coalesce((select md5(replace(pg_get_functiondef(p.oid), chr(13), '')) = 'f2d3243ac4fcf1876d894178e8a937f7' from pg_proc p where p.oid = to_regprocedure('public.join_booking_waitlist(uuid, uuid, uuid, timestamptz, timestamptz)')), false)"
+  ]
  },
  {
   "n": "21",
@@ -198,7 +239,9 @@
   "migrations": [
    "0279"
   ],
-  "notApplied": "coalesce((select md5(replace(pg_get_functiondef(p.oid), chr(13), '')) = '1283df1e48a57927374db97199ad00eb' from pg_proc p where p.oid = to_regprocedure('public.reschedule_booking(uuid, timestamptz, timestamptz)')), false) and to_regclass('public.booking_requests') is null"
+  "notApplied": [
+   "coalesce((select md5(replace(pg_get_functiondef(p.oid), chr(13), '')) = '1283df1e48a57927374db97199ad00eb' from pg_proc p where p.oid = to_regprocedure('public.reschedule_booking(uuid, timestamptz, timestamptz)')), false) and to_regclass('public.booking_requests') is null"
+  ]
  },
  {
   "n": "22",
@@ -207,7 +250,9 @@
   "migrations": [
    "0280"
   ],
-  "notApplied": "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'session_credits' and column_name = 'expiry_hold_until')"
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'session_credits' and column_name = 'expiry_hold_until')"
+  ]
  },
  {
   "n": "23",
@@ -216,7 +261,9 @@
   "migrations": [
    "0281"
   ],
-  "notApplied": "to_regclass('public.client_inactive') is null"
+  "notApplied": [
+   "to_regclass('public.client_inactive') is null"
+  ]
  },
  {
   "n": "24",
@@ -225,7 +272,9 @@
   "migrations": [
    "0282"
   ],
-  "notApplied": "has_function_privilege('authenticated', 'public.apply_session_credit_change(uuid, uuid, integer, text, text, uuid, uuid)', 'execute')"
+  "notApplied": [
+   "has_function_privilege('authenticated', 'public.apply_session_credit_change(uuid, uuid, integer, text, text, uuid, uuid)', 'execute')"
+  ]
  },
  {
   "n": "25",
@@ -234,14 +283,18 @@
   "migrations": [
    "0283"
   ],
-  "notApplied": "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_availability_windows' and column_name = 'session_minutes')"
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_availability_windows' and column_name = 'session_minutes')"
+  ]
  },
  {
   "n": "26",
   "slug": "move-home-team",
   "title": "move the group The Home Team from Ron's own organization (Enduring Strength Co.) into Coast2Coast Fitness, keeping its programs, history and Ron's coach access",
   "migrations": [],
-  "notApplied": "exists (select 1 from public.groups where id = '060017b5-e613-4204-a101-c6a14c3a9630' and organization_id = 'b7318b19-a17e-4412-88f1-51d68fcf026f')"
+  "notApplied": [
+   "exists (select 1 from public.groups where id = '060017b5-e613-4204-a101-c6a14c3a9630' and organization_id = 'b7318b19-a17e-4412-88f1-51d68fcf026f')"
+  ]
  },
  {
   "n": "27",
@@ -250,7 +303,9 @@
   "migrations": [
    "0284"
   ],
-  "notApplied": "not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'client_goals' and policyname = 'client_goals_insert_coach')"
+  "notApplied": [
+   "not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'client_goals' and policyname = 'client_goals_insert_coach')"
+  ]
  },
  {
   "n": "28",
@@ -259,7 +314,9 @@
   "migrations": [
    "0285"
   ],
-  "notApplied": "to_regclass('public.rest_day_nudges') is null"
+  "notApplied": [
+   "to_regclass('public.rest_day_nudges') is null"
+  ]
  },
  {
   "n": "29",
@@ -268,21 +325,27 @@
   "migrations": [
    "0286"
   ],
-  "notApplied": "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'recipe_favorites' and column_name = 'kind')"
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'recipe_favorites' and column_name = 'kind')"
+  ]
  },
  {
   "n": "30",
   "slug": "copy-main-group-program",
   "title": "copy the program christmas_abs_program from Main Group into The Home Team (nothing is deleted; run check-copy-result.sql afterwards and look at it before step 31)",
   "migrations": [],
-  "notApplied": "not exists (select 1 from public.programs where group_id = '060017b5-e613-4204-a101-c6a14c3a9630' and name = 'christmas_abs_program')"
+  "notApplied": [
+   "not exists (select 1 from public.programs where group_id = '060017b5-e613-4204-a101-c6a14c3a9630' and name = 'christmas_abs_program')"
+  ]
  },
  {
   "n": "31",
   "slug": "delete-two-groups",
   "title": "delete Main Group and the stray Coast to Coast group (only after the copy is checked); everything in them is first saved in cleanup_backups",
   "migrations": [],
-  "notApplied": "(select count(*) from public.groups where id in ('b292055b-edc6-4171-ad2b-a89d65dcd8db', 'c368ab0b-ccab-442e-a42e-38fb22293182')) = 2"
+  "notApplied": [
+   "(select count(*) from public.groups where id in ('b292055b-edc6-4171-ad2b-a89d65dcd8db', 'c368ab0b-ccab-442e-a42e-38fb22293182')) = 2"
+  ]
  },
  {
   "n": "32",
@@ -291,7 +354,9 @@
   "migrations": [
    "0287"
   ],
-  "notApplied": "exists (select 1 from pg_constraint where conname = 'coach_availability_windows_session_minutes_range' and pg_get_constraintdef(oid) like '%slot_duration_minutes%')"
+  "notApplied": [
+   "exists (select 1 from pg_constraint where conname = 'coach_availability_windows_session_minutes_range' and pg_get_constraintdef(oid) like '%slot_duration_minutes%')"
+  ]
  },
  {
   "n": "33",
@@ -300,7 +365,9 @@
   "migrations": [
    "0288"
   ],
-  "notApplied": "not exists (select 1 from pg_trigger where tgname = 'bookings_guard_overlap')"
+  "notApplied": [
+   "not exists (select 1 from pg_trigger where tgname = 'bookings_guard_overlap')"
+  ]
  },
  {
   "n": "34",
@@ -309,7 +376,9 @@
   "migrations": [
    "0289"
   ],
-  "notApplied": "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_availability_windows' and column_name = 'session_type_id')"
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_availability_windows' and column_name = 'session_type_id')"
+  ]
  },
  {
   "n": "35",
@@ -318,7 +387,9 @@
   "migrations": [
    "0290"
   ],
-  "notApplied": "not exists (select 1 from pg_trigger where tgname = 'group_memberships_guard_identity')"
+  "notApplied": [
+   "not exists (select 1 from pg_trigger where tgname = 'group_memberships_guard_identity')"
+  ]
  },
  {
   "n": "36",
@@ -327,7 +398,9 @@
   "migrations": [
    "0291"
   ],
-  "notApplied": "coalesce((select position('that coach does not coach this group' in pg_get_functiondef(p.oid)) = 0 from pg_proc p where p.proname = 'book_session' and p.pronamespace = 'public'::regnamespace), false)"
+  "notApplied": [
+   "coalesce((select position('that coach does not coach this group' in pg_get_functiondef(p.oid)) = 0 from pg_proc p where p.proname = 'book_session' and p.pronamespace = 'public'::regnamespace), false)"
+  ]
  },
  {
   "n": "37",
@@ -336,7 +409,9 @@
   "migrations": [
    "0292"
   ],
-  "notApplied": "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'ai_usage_log' and column_name = 'error_class')"
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'ai_usage_log' and column_name = 'error_class')"
+  ]
  },
  {
   "n": "38",
@@ -345,7 +420,9 @@
   "migrations": [
    "0293"
   ],
-  "notApplied": "not exists (select 1 from pg_proc where proname = 'refund_coach_credit_for' and pronamespace = 'public'::regnamespace)"
+  "notApplied": [
+   "not exists (select 1 from pg_proc where proname = 'refund_coach_credit_for' and pronamespace = 'public'::regnamespace)"
+  ]
  },
  {
   "n": "39",
@@ -354,7 +431,10 @@
   "migrations": [
    "0294"
   ],
-  "notApplied": "to_regclass('public.client_nutrition_preferences') is null"
+  "notApplied": [
+   "to_regclass('public.client_nutrition_preferences') is null",
+   "to_regclass('public.client_nutrition_feedback') is null"
+  ]
  },
  {
   "n": "40",
@@ -363,7 +443,11 @@
   "migrations": [
    "0295"
   ],
-  "notApplied": "to_regclass('public.client_phase_plans') is null"
+  "notApplied": [
+   "to_regclass('public.client_phase_plans') is null",
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'athlete_profile_details' and column_name = 'activity_level')",
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'client_goals' and column_name = 'nutrition_phase')"
+  ]
  },
  {
   "n": "41",
@@ -372,7 +456,10 @@
   "migrations": [
    "0296"
   ],
-  "notApplied": "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'recipes' and column_name = 'content_hash')"
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'recipes' and column_name = 'content_hash')",
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'recipe_ingredients' and column_name = 'grams_ref')"
+  ]
  },
  {
   "n": "42",
@@ -381,7 +468,10 @@
   "migrations": [
    "0297"
   ],
-  "notApplied": "to_regclass('public.schedule_requests') is null"
+  "notApplied": [
+   "to_regclass('public.schedule_requests') is null",
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'recurring_booking_series' and column_name = 'frozen_from')"
+  ]
  },
  {
   "n": "43",
@@ -390,7 +480,10 @@
   "migrations": [
    "0298"
   ],
-  "notApplied": "to_regclass('public.read_settings') is null"
+  "notApplied": [
+   "to_regclass('public.read_settings') is null",
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_preferences' and column_name = 'faith_track_default')"
+  ]
  },
  {
   "n": "45",
@@ -399,7 +492,11 @@
   "migrations": [
    "0300"
   ],
-  "notApplied": "to_regclass('public.usda_food_portions') is null"
+  "notApplied": [
+   "to_regclass('public.usda_food_portions') is null",
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'food_log_entries' and column_name = 'fdc_id')",
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_memberships' and column_name = 'food_tracking_enabled')"
+  ]
  },
  {
   "n": "46",
@@ -408,7 +505,10 @@
   "migrations": [
    "0301"
   ],
-  "notApplied": "not exists (select 1 from pg_proc where proname = 'ai_org_summary' and pronamespace = 'public'::regnamespace)"
+  "notApplied": [
+   "not exists (select 1 from pg_proc where proname = 'ai_org_summary' and pronamespace = 'public'::regnamespace)",
+   "to_regclass('public.ai_budget_notices') is null"
+  ]
  },
  {
   "n": "47",
@@ -417,7 +517,10 @@
   "migrations": [
    "0302"
   ],
-  "notApplied": "to_regclass('public.custom_foods') is null"
+  "notApplied": [
+   "to_regclass('public.custom_foods') is null",
+   "to_regclass('public.saved_meals') is null"
+  ]
  },
  {
   "n": "48",
@@ -426,7 +529,9 @@
   "migrations": [
    "0303"
   ],
-  "notApplied": "to_regclass('public.client_billing_rates') is null"
+  "notApplied": [
+   "to_regclass('public.client_billing_rates') is null"
+  ]
  },
  {
   "n": "49",
@@ -435,7 +540,9 @@
   "migrations": [
    "0304"
   ],
-  "notApplied": "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_memberships' and column_name = 'monthly_rate')"
+  "notApplied": [
+   "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_memberships' and column_name = 'monthly_rate')"
+  ]
  },
  {
   "n": "51",
@@ -444,7 +551,9 @@
   "migrations": [
    "0306"
   ],
-  "notApplied": "not exists (select 1 from pg_proc where proname = 'notify_on_target_change' and pronamespace = 'public'::regnamespace)"
+  "notApplied": [
+   "not exists (select 1 from pg_proc where proname = 'notify_on_target_change' and pronamespace = 'public'::regnamespace)"
+  ]
  },
  {
   "n": "52",
@@ -453,7 +562,9 @@
   "migrations": [
    "0307"
   ],
-  "notApplied": "coalesce((select has_function_privilege('authenticated', p.oid, 'execute') from pg_proc p where p.proname = 'notify_on_target_change' and p.pronamespace = 'public'::regnamespace), false)"
+  "notApplied": [
+   "coalesce((select has_function_privilege('authenticated', p.oid, 'execute') from pg_proc p where p.proname = 'notify_on_target_change' and p.pronamespace = 'public'::regnamespace), false)"
+  ]
  },
  {
   "n": "53",
@@ -462,7 +573,9 @@
   "migrations": [
    "0308"
   ],
-  "notApplied": "exists (select 1 from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prorettype = 'trigger'::regtype and p.proname = any (array['audit_log_refuse_changes', 'audit_watch', 'backfill_placeholder_group_name', 'block_athlete_edits_to_completed_session', 'clear_client_goal_phase_on_insert', 'default_client_tier_for_one_on_one', 'enforce_one_on_one_athlete_limit', 'guard_ai_recipe_ingredient', 'guard_athlete_session_columns', 'guard_athlete_session_insert', 'guard_client_goal_update', 'guard_client_nutrition_feedback', 'guard_client_nutrition_preferences', 'guard_direct_message_columns', 'guard_group_columns', 'guard_group_session_bookings', 'guard_membership_identity', 'guard_organization_columns', 'guard_partner_request_columns', 'guard_post_columns', 'guard_profile_sensitive_columns', 'guard_workout_log_columns', 'limit_food_favorites', 'note_series_session_skipped', 'notify_on_client_goal', 'notify_on_comment', 'notify_on_direct_message', 'notify_on_gym_visitor_lead', 'notify_on_macros_assigned', 'notify_on_mention', 'notify_on_nutrition_baseline', 'notify_on_nutrition_feedback', 'notify_on_nutrition_preferences', 'notify_on_partner_request', 'notify_on_post_mention', 'notify_on_program_assigned', 'notify_on_video_comment', 'notify_on_video_upload', 'phase_follows_confirmed_goal', 'prevent_platform_admin_self_escalation', 'recompute_training_max', 'recompute_workout_log', 'resurface_inactive_client', 'set_gwe_athlete_id', 'set_workout_athlete_id', 'set_workout_notes_athlete_id']) and has_function_privilege('authenticated', p.oid, 'execute'))"
+  "notApplied": [
+   "exists (select 1 from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prorettype = 'trigger'::regtype and p.proname = any (array['audit_log_refuse_changes', 'audit_watch', 'backfill_placeholder_group_name', 'block_athlete_edits_to_completed_session', 'clear_client_goal_phase_on_insert', 'default_client_tier_for_one_on_one', 'enforce_one_on_one_athlete_limit', 'guard_ai_recipe_ingredient', 'guard_athlete_session_columns', 'guard_athlete_session_insert', 'guard_client_goal_update', 'guard_client_nutrition_feedback', 'guard_client_nutrition_preferences', 'guard_direct_message_columns', 'guard_group_columns', 'guard_group_session_bookings', 'guard_membership_identity', 'guard_organization_columns', 'guard_partner_request_columns', 'guard_post_columns', 'guard_profile_sensitive_columns', 'guard_workout_log_columns', 'limit_food_favorites', 'note_series_session_skipped', 'notify_on_client_goal', 'notify_on_comment', 'notify_on_direct_message', 'notify_on_gym_visitor_lead', 'notify_on_macros_assigned', 'notify_on_mention', 'notify_on_nutrition_baseline', 'notify_on_nutrition_feedback', 'notify_on_nutrition_preferences', 'notify_on_partner_request', 'notify_on_post_mention', 'notify_on_program_assigned', 'notify_on_video_comment', 'notify_on_video_upload', 'phase_follows_confirmed_goal', 'prevent_platform_admin_self_escalation', 'recompute_training_max', 'recompute_workout_log', 'resurface_inactive_client', 'set_gwe_athlete_id', 'set_workout_athlete_id', 'set_workout_notes_athlete_id']) and has_function_privilege('authenticated', p.oid, 'execute'))"
+  ]
  },
  {
   "n": "62",
@@ -471,7 +584,9 @@
   "migrations": [
    "0317"
   ],
-  "notApplied": "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_packages' and column_name = 'group_access_group_id')"
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_packages' and column_name = 'group_access_group_id')"
+  ]
  },
  {
   "n": "61",
@@ -480,7 +595,9 @@
   "migrations": [
    "0316"
   ],
-  "notApplied": "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'source_program_id')"
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'source_program_id')"
+  ]
  },
  {
   "n": "68",
@@ -489,7 +606,9 @@
   "migrations": [
    "0322"
   ],
-  "notApplied": "to_regprocedure('public.detach_profile_references(uuid)') is null"
+  "notApplied": [
+   "to_regprocedure('public.detach_profile_references(uuid)') is null"
+  ]
  },
  {
   "n": "67",
@@ -498,7 +617,9 @@
   "migrations": [
    "0321"
   ],
-  "notApplied": "to_regclass('public.coach_sites') is null"
+  "notApplied": [
+   "to_regclass('public.coach_sites') is null"
+  ]
  },
  {
   "n": "66",
@@ -507,7 +628,9 @@
   "migrations": [
    "0320"
   ],
-  "notApplied": "not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'org_branding_select_owner_admin')"
+  "notApplied": [
+   "not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'org_branding_select_owner_admin')"
+  ]
  },
  {
   "n": "65",
@@ -516,14 +639,18 @@
   "migrations": [
    "0319"
   ],
-  "notApplied": "exists (select 1 from pg_proc where oid = 'public.audit_diff(jsonb, jsonb, text[])'::regprocedure and proconfig is null)"
+  "notApplied": [
+   "exists (select 1 from pg_proc where oid = 'public.audit_diff(jsonb, jsonb, text[])'::regprocedure and proconfig is null)"
+  ]
  },
  {
   "n": "64",
   "slug": "merge-duplicate-exercises",
   "title": "merge Coach Ron's duplicate exercises into one entry each (13 duplicates into 12 survivors, Ron's library only; every set and log row is kept; undoable)",
   "migrations": [],
-  "notApplied": "to_regclass('public.exercise_merge_log') is null"
+  "notApplied": [
+   "to_regclass('public.exercise_merge_log') is null"
+  ]
  },
  {
   "n": "63",
@@ -532,7 +659,9 @@
   "migrations": [
    "0318"
   ],
-  "notApplied": "not exists (select 1 from pg_proc where proname = 'duplicate_program' and pronamespace = 'public'::regnamespace and position('v_tail' in prosrc) > 0)"
+  "notApplied": [
+   "not exists (select 1 from pg_proc where proname = 'duplicate_program' and pronamespace = 'public'::regnamespace and position('v_tail' in prosrc) > 0)"
+  ]
  },
  {
   "n": "60",
@@ -541,7 +670,9 @@
   "migrations": [
    "0315"
   ],
-  "notApplied": "to_regclass('public.coach_away_replies') is null"
+  "notApplied": [
+   "to_regclass('public.coach_away_replies') is null"
+  ]
  },
  {
   "n": "59",
@@ -550,7 +681,9 @@
   "migrations": [
    "0314"
   ],
-  "notApplied": "to_regclass('public.client_ui_settings') is null"
+  "notApplied": [
+   "to_regclass('public.client_ui_settings') is null"
+  ]
  },
  {
   "n": "58",
@@ -559,7 +692,9 @@
   "migrations": [
    "0313"
   ],
-  "notApplied": "not exists (select 1 from pg_proc where proname = 'booking_counts' and pronamespace = 'public'::regnamespace)"
+  "notApplied": [
+   "not exists (select 1 from pg_proc where proname = 'booking_counts' and pronamespace = 'public'::regnamespace)"
+  ]
  },
  {
   "n": "57",
@@ -568,7 +703,9 @@
   "migrations": [
    "0312"
   ],
-  "notApplied": "coalesce((select position('coach_time_is_open' in pg_get_functiondef(p.oid)) = 0 from pg_proc p where p.proname = 'book_session' and p.pronamespace = 'public'::regnamespace limit 1), false)"
+  "notApplied": [
+   "coalesce((select position('coach_time_is_open' in pg_get_functiondef(p.oid)) = 0 from pg_proc p where p.proname = 'book_session' and p.pronamespace = 'public'::regnamespace limit 1), false)"
+  ]
  },
  {
   "n": "56",
@@ -577,7 +714,9 @@
   "migrations": [
    "0311"
   ],
-  "notApplied": "to_regclass('public.meal_plan_tries') is null"
+  "notApplied": [
+   "to_regclass('public.meal_plan_tries') is null"
+  ]
  },
  {
   "n": "55",
@@ -586,7 +725,9 @@
   "migrations": [
    "0310"
   ],
-  "notApplied": "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercises' and column_name = 'display_name')"
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercises' and column_name = 'display_name')"
+  ]
  },
  {
   "n": "54",
@@ -595,7 +736,9 @@
   "migrations": [
    "0309"
   ],
-  "notApplied": "not exists (select 1 from pg_proc where proname = 'notify_on_new_training_block' and pronamespace = 'public'::regnamespace)"
+  "notApplied": [
+   "not exists (select 1 from pg_proc where proname = 'notify_on_new_training_block' and pronamespace = 'public'::regnamespace)"
+  ]
  },
  {
   "n": "50",
@@ -604,7 +747,9 @@
   "migrations": [
    "0305"
   ],
-  "notApplied": "to_regclass('public.ai_topup_draws') is null"
+  "notApplied": [
+   "to_regclass('public.ai_topup_draws') is null"
+  ]
  },
  {
   "n": "44",
@@ -613,7 +758,9 @@
   "migrations": [
    "0299"
   ],
-  "notApplied": "not exists (select 1 from pg_trigger where tgname = 'legal_acceptances_append_only' and tgrelid = 'public.legal_acceptances'::regclass)"
+  "notApplied": [
+   "not exists (select 1 from pg_trigger where tgname = 'legal_acceptances_append_only' and tgrelid = 'public.legal_acceptances'::regclass)"
+  ]
  },
  {
   "n": "69",
@@ -622,7 +769,9 @@
   "migrations": [
    "0323"
   ],
-  "notApplied": "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_sessions' and column_name = 'kind')"
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_sessions' and column_name = 'kind')"
+  ]
  },
  {
   "n": "70",
@@ -631,7 +780,9 @@
   "migrations": [
    "0324"
   ],
-  "notApplied": "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'ai_draft')"
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'ai_draft')"
+  ]
  },
  {
   "n": "71",
@@ -640,7 +791,9 @@
   "migrations": [
    "0325"
   ],
-  "notApplied": "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'ai_snapshot')"
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'ai_snapshot')"
+  ]
  },
  {
   "n": "72",
@@ -649,7 +802,9 @@
   "migrations": [
    "0326"
   ],
-  "notApplied": "to_regclass('public.coach_conversations') is null"
+  "notApplied": [
+   "to_regclass('public.coach_conversations') is null"
+  ]
  },
  {
   "n": "73",
@@ -658,7 +813,9 @@
   "migrations": [
    "0327"
   ],
-  "notApplied": "to_regclass('public.coach_message_templates') is null"
+  "notApplied": [
+   "to_regclass('public.coach_message_templates') is null"
+  ]
  },
  {
   "n": "74",
@@ -667,7 +824,9 @@
   "migrations": [
    "0328"
   ],
-  "notApplied": "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'archived_at')"
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'archived_at')"
+  ]
  },
  {
   "n": "75",
@@ -676,7 +835,9 @@
   "migrations": [
    "0329"
   ],
-  "notApplied": "not exists (select 1 from pg_constraint where conname = 'session_types_credit_cost_is_one')"
+  "notApplied": [
+   "not exists (select 1 from pg_constraint where conname = 'session_types_credit_cost_is_one')"
+  ]
  },
  {
   "n": "76",
@@ -685,7 +846,9 @@
   "migrations": [
    "0330"
   ],
-  "notApplied": "not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_booking_pages' and policyname = 'coach_booking_pages_coach_manage' and with_check like '%group_memberships%')"
+  "notApplied": [
+   "not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_booking_pages' and policyname = 'coach_booking_pages_coach_manage' and with_check like '%group_memberships%')"
+  ]
  },
  {
   "n": "77",
@@ -694,7 +857,9 @@
   "migrations": [
    "0331"
   ],
-  "notApplied": "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is null"
+  "notApplied": [
+   "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is null"
+  ]
  },
  {
   "n": "78",
@@ -703,7 +868,9 @@
   "migrations": [
    "0332"
   ],
-  "notApplied": "to_regprocedure('public.is_one_on_one_group(uuid)') is null"
+  "notApplied": [
+   "to_regprocedure('public.is_one_on_one_group(uuid)') is null"
+  ]
  },
  {
   "n": "79",
@@ -712,7 +879,9 @@
   "migrations": [
    "0333"
   ],
-  "notApplied": "to_regprocedure('public.one_on_one_athlete(uuid)') is null"
+  "notApplied": [
+   "to_regprocedure('public.one_on_one_athlete(uuid)') is null"
+  ]
  },
  {
   "n": "80",
@@ -721,7 +890,9 @@
   "migrations": [
    "0334"
   ],
-  "notApplied": "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'show_name_on_share')"
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'show_name_on_share')"
+  ]
  },
  {
   "n": "81",
@@ -730,7 +901,9 @@
   "migrations": [
    "0335"
   ],
-  "notApplied": "to_regprocedure('public.assign_program_to_client(uuid, uuid, uuid, text, date)') is null"
+  "notApplied": [
+   "to_regprocedure('public.assign_program_to_client(uuid, uuid, uuid, text, date)') is null"
+  ]
  },
  {
   "n": "82",
@@ -739,7 +912,9 @@
   "migrations": [
    "0336"
   ],
-  "notApplied": "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'terminology_asked_at')"
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'terminology_asked_at')"
+  ]
  },
  {
   "n": "83",
@@ -748,7 +923,9 @@
   "migrations": [
    "0337"
   ],
-  "notApplied": "to_regprocedure('public.assign_program_to_client(uuid, uuid, uuid, text, date)') is not null and position('v_src_org' in pg_get_functiondef(to_regprocedure('public.assign_program_to_client(uuid, uuid, uuid, text, date)'))) = 0"
+  "notApplied": [
+   "to_regprocedure('public.assign_program_to_client(uuid, uuid, uuid, text, date)') is not null and position('v_src_org' in pg_get_functiondef(to_regprocedure('public.assign_program_to_client(uuid, uuid, uuid, text, date)'))) = 0"
+  ]
  },
  {
   "n": "84",
@@ -757,7 +934,9 @@
   "migrations": [
    "0338"
   ],
-  "notApplied": "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'guardian_links' and column_name = 'expires_at')"
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'guardian_links' and column_name = 'expires_at')"
+  ]
  },
  {
   "n": "85",
@@ -766,7 +945,9 @@
   "migrations": [
    "0339"
   ],
-  "notApplied": "not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'transformation_cards' and policyname = 'transformation_cards_insert_own')"
+  "notApplied": [
+   "not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'transformation_cards' and policyname = 'transformation_cards_insert_own')"
+  ]
  },
  {
   "n": "86",
@@ -775,7 +956,9 @@
   "migrations": [
    "0340"
   ],
-  "notApplied": "to_regprocedure('public.enforce_athlete_in_group()') is null"
+  "notApplied": [
+   "to_regprocedure('public.enforce_athlete_in_group()') is null"
+  ]
  },
  {
   "n": "87",
@@ -784,7 +967,9 @@
   "migrations": [
    "0341"
   ],
-  "notApplied": "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_packages' and policyname = 'coach_packages_insert_coach')"
+  "notApplied": [
+   "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_packages' and policyname = 'coach_packages_insert_coach')"
+  ]
  },
  {
   "n": "88",
@@ -793,7 +978,9 @@
   "migrations": [
    "0342"
   ],
-  "notApplied": "has_function_privilege('authenticated', 'public.coach_ai_multiplier(uuid)', 'execute')"
+  "notApplied": [
+   "has_function_privilege('authenticated', 'public.coach_ai_multiplier(uuid)', 'execute')"
+  ]
  },
  {
   "n": "89",
@@ -802,7 +989,9 @@
   "migrations": [
    "0343"
   ],
-  "notApplied": "to_regprocedure('public.grant_coach_credit_pack_once(text, text, uuid, integer, integer)') is null"
+  "notApplied": [
+   "to_regprocedure('public.grant_coach_credit_pack_once(text, text, uuid, integer, integer)') is null"
+  ]
  },
  {
   "n": "90",
@@ -811,7 +1000,9 @@
   "migrations": [
    "0344"
   ],
-  "notApplied": "to_regprocedure('public.enforce_athlete_in_group()') is not null and position('v_had_row' in pg_get_functiondef(to_regprocedure('public.enforce_athlete_in_group()'))) = 0"
+  "notApplied": [
+   "to_regprocedure('public.enforce_athlete_in_group()') is not null and position('v_had_row' in pg_get_functiondef(to_regprocedure('public.enforce_athlete_in_group()'))) = 0"
+  ]
  },
  {
   "n": "91",
@@ -820,7 +1011,9 @@
   "migrations": [
    "0345"
   ],
-  "notApplied": "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'profiles' and policyname = 'profiles_select_authenticated')"
+  "notApplied": [
+   "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'profiles' and policyname = 'profiles_select_authenticated')"
+  ]
  },
  {
   "n": "92",
@@ -829,7 +1022,9 @@
   "migrations": [
    "0346"
   ],
-  "notApplied": "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'client_phase_plans' and policyname = 'client_phase_plans_coach_manage' and position('''athlete''::member_role' in with_check) > 0)"
+  "notApplied": [
+   "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'client_phase_plans' and policyname = 'client_phase_plans_coach_manage' and position('''athlete''::member_role' in with_check) > 0)"
+  ]
  },
  {
   "n": "93",
@@ -838,7 +1033,9 @@
   "migrations": [
    "0347"
   ],
-  "notApplied": "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_briefings' and column_name = 'organization_id')"
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_briefings' and column_name = 'organization_id')"
+  ]
  },
  {
   "n": "94",
@@ -847,7 +1044,9 @@
   "migrations": [
    "0348"
   ],
-  "notApplied": "to_regprocedure('public.request_workspace_org()') is null"
+  "notApplied": [
+   "to_regprocedure('public.request_workspace_org()') is null"
+  ]
  },
  {
   "n": "95",
@@ -856,7 +1055,9 @@
   "migrations": [
    "0349"
   ],
-  "notApplied": "position('select true' in pg_get_functiondef(to_regprocedure('public.org_wall_header_enabled()'))) = 0"
+  "notApplied": [
+   "position('select true' in pg_get_functiondef(to_regprocedure('public.org_wall_header_enabled()'))) = 0"
+  ]
  },
  {
   "n": "96",
@@ -865,7 +1066,9 @@
   "migrations": [
    "0350"
   ],
-  "notApplied": "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'pro_shop_links' and column_name = 'organization_id')"
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'pro_shop_links' and column_name = 'organization_id')"
+  ]
  },
  {
   "n": "97",
@@ -874,7 +1077,9 @@
   "migrations": [
    "0351"
   ],
-  "notApplied": "position('p_athlete_id is null then false' in pg_get_functiondef(to_regprocedure('public.duplicate_program(uuid, uuid, uuid, uuid, text, date)'))) = 0"
+  "notApplied": [
+   "position('p_athlete_id is null then false' in pg_get_functiondef(to_regprocedure('public.duplicate_program(uuid, uuid, uuid, uuid, text, date)'))) = 0"
+  ]
  },
  {
   "n": "98",
@@ -883,7 +1088,9 @@
   "migrations": [
    "0352"
   ],
-  "notApplied": "to_regclass('public.organization_invites') is null"
+  "notApplied": [
+   "to_regclass('public.organization_invites') is null"
+  ]
  },
  {
   "n": "99",
@@ -892,7 +1099,9 @@
   "migrations": [
    "0353"
   ],
-  "notApplied": "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_booking_policies' and column_name = 'schedule_change_notice_days')"
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_booking_policies' and column_name = 'schedule_change_notice_days')"
+  ]
  },
  {
   "n": "100",
@@ -901,7 +1110,9 @@
   "migrations": [
    "0354"
   ],
-  "notApplied": "to_regprocedure('public.guard_organization_share_total()') is null"
+  "notApplied": [
+   "to_regprocedure('public.guard_organization_share_total()') is null"
+  ]
  },
  {
   "n": "101",
@@ -910,7 +1121,9 @@
   "migrations": [
    "0355"
   ],
-  "notApplied": "to_regclass('public.client_assessments') is null"
+  "notApplied": [
+   "to_regclass('public.client_assessments') is null"
+  ]
  },
  {
   "n": "102",
@@ -919,7 +1132,9 @@
   "migrations": [
    "0356"
   ],
-  "notApplied": "to_regclass('public.client_quotes') is null"
+  "notApplied": [
+   "to_regclass('public.client_quotes') is null"
+  ]
  },
  {
   "n": "104",
@@ -928,21 +1143,25 @@
   "migrations": [
    "0358"
   ],
-  "notApplied": "to_regprocedure('public.ensure_personal_space()') is null"
+  "notApplied": [
+   "to_regprocedure('public.ensure_personal_space()') is null"
+  ]
  },
  {
   "n": "105",
   "slug": "move-ron-personal-training",
   "title": "move Coach Ron's own training (his programs not yet removed, their workouts, his sessions, workout log and wellness check-ins in The Enduring Strength Collective) into his personal space; undoable",
   "migrations": [],
-  "notApplied": "to_regclass('public.personal_space_move_log') is null"
+  "notApplied": [
+   "to_regclass('public.personal_space_move_log') is null"
+  ]
  },
  {
   "n": "106",
   "slug": "add-fitpros-exercises",
   "title": "add four exercises to Coach Ron's library (Sissy Squat, Thoracic Extension (Quadruped), Handcuff W Rotation, Incline Iso Lateral Chest Press) so the FitPros history links to real rows; undoable",
   "migrations": [],
-  "notApplied": null
+  "notApplied": []
  },
  {
   "n": "107",
@@ -951,14 +1170,18 @@
   "migrations": [
    "0359"
   ],
-  "notApplied": "position('12:00:17' in pg_get_functiondef(to_regprocedure('public.recompute_training_max()'))) = 0"
+  "notApplied": [
+   "position('12:00:17' in pg_get_functiondef(to_regprocedure('public.recompute_training_max()'))) = 0"
+  ]
  },
  {
   "n": "109",
   "slug": "remove-empty-rob-derrick-groups",
   "title": "remove the two empty one-on-one groups named Rob Derrick left behind by the failed add-client attempts (both have no members, programs, sessions, posts or invites); undoable",
   "migrations": [],
-  "notApplied": "to_regclass('public.orphan_group_cleanup_log') is null"
+  "notApplied": [
+   "to_regclass('public.orphan_group_cleanup_log') is null"
+  ]
  },
  {
   "n": "108",
@@ -967,7 +1190,9 @@
   "migrations": [
    "0360"
   ],
-  "notApplied": "to_regprocedure('public.group_is_new_and_mine(uuid)') is null"
+  "notApplied": [
+   "to_regprocedure('public.group_is_new_and_mine(uuid)') is null"
+  ]
  },
  {
   "n": "110",
@@ -976,14 +1201,18 @@
   "migrations": [
    "0361"
   ],
-  "notApplied": "to_regclass('public.exercise_catalog') is null"
+  "notApplied": [
+   "to_regclass('public.exercise_catalog') is null"
+  ]
  },
  {
   "n": "111",
   "slug": "catalog-merge-ron",
   "title": "Coach Ron's exercise names: 9 merges and 9 renames (the implement stated), his four FitPros exercises, and the shared catalog filled from his library; undoable",
   "migrations": [],
-  "notApplied": "to_regclass('public.exercise_catalog_merge_log') is null"
+  "notApplied": [
+   "to_regclass('public.exercise_catalog_merge_log') is null"
+  ]
  },
  {
   "n": "112",
@@ -992,7 +1221,9 @@
   "migrations": [
    "0362"
   ],
-  "notApplied": "coalesce((select allowed_mime_types is null from storage.buckets where id = 'coach-profile-photos'), true)"
+  "notApplied": [
+   "coalesce((select allowed_mime_types is null from storage.buckets where id = 'coach-profile-photos'), true)"
+  ]
  },
  {
   "n": "113",
@@ -1001,7 +1232,9 @@
   "migrations": [
    "0363"
   ],
-  "notApplied": "to_regclass('public.client_sub_goals') is null"
+  "notApplied": [
+   "to_regclass('public.client_sub_goals') is null"
+  ]
  },
  {
   "n": "114",
@@ -1010,7 +1243,9 @@
   "migrations": [
    "0364"
   ],
-  "notApplied": "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_sessions' and column_name = 'organization_id')"
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_sessions' and column_name = 'organization_id')"
+  ]
  },
  {
   "n": "115",
@@ -1019,7 +1254,9 @@
   "migrations": [
    "0365"
   ],
-  "notApplied": "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'movement_pattern_exercises' and column_name = 'is_unilateral')"
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'movement_pattern_exercises' and column_name = 'is_unilateral')"
+  ]
  },
  {
   "n": "116",
@@ -1028,7 +1265,9 @@
   "migrations": [
    "0366"
   ],
-  "notApplied": "position('is_slot' in pg_get_functiondef(to_regprocedure('public.duplicate_program(uuid, uuid, uuid, uuid, text, date)'))) = 0"
+  "notApplied": [
+   "position('is_slot' in pg_get_functiondef(to_regprocedure('public.duplicate_program(uuid, uuid, uuid, uuid, text, date)'))) = 0"
+  ]
  },
  {
   "n": "117",
@@ -1037,7 +1276,9 @@
   "migrations": [
    "0367"
   ],
-  "notApplied": "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"
+  ]
  },
  {
   "n": "118",
@@ -1046,7 +1287,9 @@
   "migrations": [
    "0368"
   ],
-  "notApplied": "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_packages' and column_name = 'audience')"
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_packages' and column_name = 'audience')"
+  ]
  },
  {
   "n": "119",
@@ -1055,7 +1298,9 @@
   "migrations": [
    "0369"
   ],
-  "notApplied": "to_regclass('public.client_ai_notes') is null"
+  "notApplied": [
+   "to_regclass('public.client_ai_notes') is null"
+  ]
  },
  {
   "n": "120",
@@ -1064,7 +1309,9 @@
   "migrations": [
    "0370"
   ],
-  "notApplied": "to_regclass('public.attention_snoozes') is null"
+  "notApplied": [
+   "to_regclass('public.attention_snoozes') is null"
+  ]
  },
  {
   "n": "121",
@@ -1073,7 +1320,9 @@
   "migrations": [
    "0371"
   ],
-  "notApplied": "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'set_logs' and column_name = 'data_flag')"
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'set_logs' and column_name = 'data_flag')"
+  ]
  },
  {
   "n": "122",
@@ -1082,7 +1331,9 @@
   "migrations": [
    "0372"
   ],
-  "notApplied": "to_regprocedure('public.client_exercise_rollup(uuid, uuid)') is null"
+  "notApplied": [
+   "to_regprocedure('public.client_exercise_rollup(uuid, uuid)') is null"
+  ]
  },
  {
   "n": "123",
@@ -1091,7 +1342,9 @@
   "migrations": [
    "0373"
   ],
-  "notApplied": "to_regclass('public.client_progress_pins') is null"
+  "notApplied": [
+   "to_regclass('public.client_progress_pins') is null"
+  ]
  },
  {
   "n": "124",
@@ -1100,7 +1353,9 @@
   "migrations": [
    "0374"
   ],
-  "notApplied": "to_regclass('public.pr_promotions') is null"
+  "notApplied": [
+   "to_regclass('public.pr_promotions') is null"
+  ]
  },
  {
   "n": "125",
@@ -1109,7 +1364,9 @@
   "migrations": [
    "0375"
   ],
-  "notApplied": "to_regclass('public.body_scans') is null"
+  "notApplied": [
+   "to_regclass('public.body_scans') is null"
+  ]
  },
  {
   "n": "126",
@@ -1118,7 +1375,9 @@
   "migrations": [
    "0376"
   ],
-  "notApplied": "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'athlete_injury_flag_acknowledgements' and column_name = 'flagged_count')"
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'athlete_injury_flag_acknowledgements' and column_name = 'flagged_count')"
+  ]
  },
  {
   "n": "127",
@@ -1127,7 +1386,9 @@
   "migrations": [
    "0377"
   ],
-  "notApplied": "not exists (select 1 from pg_constraint where conname = 'exercise_library_name_not_digits' and conrelid = 'public.exercise_library'::regclass)"
+  "notApplied": [
+   "not exists (select 1 from pg_constraint where conname = 'exercise_library_name_not_digits' and conrelid = 'public.exercise_library'::regclass)"
+  ]
  },
  {
   "n": "128",
@@ -1136,7 +1397,9 @@
   "migrations": [
    "0378"
   ],
-  "notApplied": "to_regprocedure('public.move_client_to_group(uuid, uuid, uuid)') is not null and pg_get_functiondef(to_regprocedure('public.move_client_to_group(uuid, uuid, uuid)')) not like '%information_schema.columns%'"
+  "notApplied": [
+   "to_regprocedure('public.move_client_to_group(uuid, uuid, uuid)') is not null and pg_get_functiondef(to_regprocedure('public.move_client_to_group(uuid, uuid, uuid)')) not like '%information_schema.columns%'"
+  ]
  },
  {
   "n": "129",
@@ -1145,14 +1408,18 @@
   "migrations": [
    "0379"
   ],
-  "notApplied": "not exists (select 1 from pg_constraint where conname in ('group_workout_exercises_name_not_digits', 'session_exercises_name_not_digits'))"
+  "notApplied": [
+   "not exists (select 1 from pg_constraint where conname in ('group_workout_exercises_name_not_digits', 'session_exercises_name_not_digits'))"
+  ]
  },
  {
   "n": "130",
   "slug": "renumber-johann-program-days",
   "title": "give each day of the program 'Dont mess with the Johann' its own day number (its Day 1 and Day 2 both carry the number 1), keeping the order you see today; undoable",
   "migrations": [],
-  "notApplied": "exists (select 1 from public.workouts where program_id = 'a7b5f600-3b62-4ec0-a016-d518f3f39a3e' and day_index = 1 group by week_number having count(*) = 2)"
+  "notApplied": [
+   "exists (select 1 from public.workouts where program_id = 'a7b5f600-3b62-4ec0-a016-d518f3f39a3e' and day_index = 1 group by week_number having count(*) = 2)"
+  ]
  },
  {
   "n": "131",
@@ -1161,7 +1428,9 @@
   "migrations": [
    "0380"
   ],
-  "notApplied": "not exists (select 1 from pg_constraint where conname = 'workouts_program_week_day_key' and conrelid = 'public.workouts'::regclass)"
+  "notApplied": [
+   "not exists (select 1 from pg_constraint where conname = 'workouts_program_week_day_key' and conrelid = 'public.workouts'::regclass)"
+  ]
  },
  {
   "n": "132",
@@ -1170,7 +1439,9 @@
   "migrations": [
    "0381"
   ],
-  "notApplied": "to_regprocedure('public.sync_one_on_one_group_name()') is null"
+  "notApplied": [
+   "to_regprocedure('public.sync_one_on_one_group_name()') is null"
+  ]
  },
  {
   "n": "133",
@@ -1179,7 +1450,9 @@
   "migrations": [
    "0382"
   ],
-  "notApplied": "to_regprocedure('public.training_partner_is_protected(uuid)') is null"
+  "notApplied": [
+   "to_regprocedure('public.training_partner_is_protected(uuid)') is null"
+  ]
  },
  {
   "n": "134",
@@ -1188,7 +1461,9 @@
   "migrations": [
    "0383"
   ],
-  "notApplied": "to_regclass('public.sms_suppressed_numbers') is null"
+  "notApplied": [
+   "to_regclass('public.sms_suppressed_numbers') is null"
+  ]
  },
  {
   "n": "135",
@@ -1197,7 +1472,9 @@
   "migrations": [
    "0384"
   ],
-  "notApplied": "to_regprocedure('public.is_group_private_from_org(uuid)') is null"
+  "notApplied": [
+   "to_regprocedure('public.is_group_private_from_org(uuid)') is null"
+  ]
  },
  {
   "n": "136",
@@ -1206,7 +1483,9 @@
   "migrations": [
    "0385"
   ],
-  "notApplied": "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'set_logs' and column_name = 'set_type')"
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'set_logs' and column_name = 'set_type')"
+  ]
  },
  {
   "n": "137",
@@ -1215,7 +1494,9 @@
   "migrations": [
    "0386"
   ],
-  "notApplied": "to_regprocedure('public.client_intake_guard_completion()') is null"
+  "notApplied": [
+   "to_regprocedure('public.client_intake_guard_completion()') is null"
+  ]
  },
  {
   "n": "141",
@@ -1224,7 +1505,9 @@
   "migrations": [
    "0389"
   ],
-  "notApplied": "to_regprocedure('public.business_last_active(uuid[])') is null"
+  "notApplied": [
+   "to_regprocedure('public.business_last_active(uuid[])') is null"
+  ]
  },
  {
   "n": "147",
@@ -1233,7 +1516,9 @@
   "migrations": [
    "0395"
   ],
-  "notApplied": "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'notifications' and column_name = 'pushed_at')"
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'notifications' and column_name = 'pushed_at')"
+  ]
  },
  {
   "n": "146",
@@ -1242,7 +1527,9 @@
   "migrations": [
    "0394"
   ],
-  "notApplied": "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'groups' and column_name = 'archived_at')"
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'groups' and column_name = 'archived_at')"
+  ]
  },
  {
   "n": "145",
@@ -1251,7 +1538,9 @@
   "migrations": [
    "0393"
   ],
-  "notApplied": "to_regclass('public.space_invites') is null"
+  "notApplied": [
+   "to_regclass('public.space_invites') is null"
+  ]
  },
  {
   "n": "144",
@@ -1260,7 +1549,9 @@
   "migrations": [
    "0392"
   ],
-  "notApplied": "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'coach_type')"
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'coach_type')"
+  ]
  },
  {
   "n": "143",
@@ -1269,7 +1560,9 @@
   "migrations": [
    "0391"
   ],
-  "notApplied": "to_regprocedure('public.remove_org_member(uuid, uuid, uuid)') is null"
+  "notApplied": [
+   "to_regprocedure('public.remove_org_member(uuid, uuid, uuid)') is null"
+  ]
  },
  {
   "n": "148",
@@ -1278,7 +1571,9 @@
   "migrations": [
    "0396"
   ],
-  "notApplied": "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'organization_memberships' and column_name = 'departing_since')"
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'organization_memberships' and column_name = 'departing_since')"
+  ]
  },
  {
   "n": "149",
@@ -1287,7 +1582,9 @@
   "migrations": [
    "0397"
   ],
-  "notApplied": "not exists (select 1 from pg_trigger where tgname = 'group_memberships_free_tier_limit' and not tgisinternal)"
+  "notApplied": [
+   "not exists (select 1 from pg_trigger where tgname = 'group_memberships_free_tier_limit' and not tgisinternal)"
+  ]
  },
  {
   "n": "150",
@@ -1296,7 +1593,9 @@
   "migrations": [
    "0398"
   ],
-  "notApplied": "to_regclass('public.pending_email_changes') is null"
+  "notApplied": [
+   "to_regclass('public.pending_email_changes') is null"
+  ]
  },
  {
   "n": "142",
@@ -1305,7 +1604,9 @@
   "migrations": [
    "0390"
   ],
-  "notApplied": "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'athlete_sessions' and column_name = 'import_batch_id')"
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'athlete_sessions' and column_name = 'import_batch_id')"
+  ]
  },
  {
   "n": "140",
@@ -1314,14 +1615,18 @@
   "migrations": [
    "0388"
   ],
-  "notApplied": "not exists (select 1 from pg_trigger where tgname = 'client_intake_guard_completion' and tgrelid = 'public.client_intake'::regclass)"
+  "notApplied": [
+   "not exists (select 1 from pg_trigger where tgname = 'client_intake_guard_completion' and tgrelid = 'public.client_intake'::regclass)"
+  ]
  },
  {
   "n": "138",
   "slug": "flag-clients-without-intake",
   "title": "HELD for Ron's word: require the health form and waiver of every client who has not finished one",
   "migrations": [],
-  "notApplied": "to_regclass('public.intake_flag_log') is null"
+  "notApplied": [
+   "to_regclass('public.intake_flag_log') is null"
+  ]
  },
  {
   "n": "139",
@@ -1330,6 +1635,8 @@
   "migrations": [
    "0387"
   ],
-  "notApplied": "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'marketplace_listed')"
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'marketplace_listed')"
+  ]
  }
 ]
