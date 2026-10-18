@@ -90,7 +90,7 @@ export default async function IntakePage(
           waiverText={org?.waiver_text ?? null}
           waiverPdfUrl={waiverPdfUrl}
           nextUrl={searchParams.next && safePushPath(searchParams.next) !== "/" ? safePushPath(searchParams.next) : `/groups/${membership.group_id}`}
-          initialParQAnswers={ownAnswers ?? []}
+          initialParQAnswers={ownAnswers.kind === "ok" ? ownAnswers.answers : []}
           initialWaiverAccepted={existing?.waiver_accepted ?? false}
           initialWaiverSignedName={existing?.waiver_signed_name ?? ""}
           alreadyCompleted={!!existing?.completed_at}

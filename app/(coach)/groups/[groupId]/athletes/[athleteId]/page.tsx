@@ -1,4 +1,4 @@
-import { readHealthAnswers } from "@/lib/health-answers";
+import { readHealthAnswers, type HealthRead } from "@/lib/health-answers";
 import { isEmailConfigured } from "@/lib/email";
 import { mergeLoggedList } from "@/lib/logged-list";
 import { hindsightPrs, importedWorkouts, parseRollup } from "@/lib/imported-prs";
@@ -267,7 +267,7 @@ export default async function AthleteProfilePage(
       const answersRequest = readHealthAnswers(supabase, params.athleteId);
       const row = await rowRequest;
       const answers = await answersRequest;
-      return { data: row.data ? { ...row.data, par_q_answers: answers } : row.data, error: row.error };
+      return { data: row.data ? { ...row.data, health: answers } : row.data, error: row.error };
     })(),
     // Self-reported by the athlete in their own Settings — RLS already
     // scopes this to "self or a coach who actually coaches them."
@@ -637,9 +637,12 @@ export default async function AthleteProfilePage(
   const subGoals: SubGoalView[] = ((subGoalRows ?? []) as any[]).map((r: any) => ({ id: r.id as string, title: r.title as string, targetDate: (r.target_date as string | null) ?? null, proposedBy: r.proposed_by as string, status: r.status as SubGoalStatus }));
   // The answers are read through the database's health_answers door (migration 0399): the client, their coach and an owner or admin the owner has granted get them; anyone else gets null and sees only whether
   // the form is done.
-  const parQRead = ((intake as { par_q_answers?: { question: string; answer: boolean }[] | null } | null)?.par_q_answers ?? null) as { question: string; answer: boolean }[] | null;
-  const parQAnswers = parQRead ?? [];
-  const answersHidden = !!intake && parQRead === null;
+  const health: HealthRead = (intake as { health?: HealthRead } | null)?.health ?? { kind: "none" };
+  const parQAnswers = health.kind === "ok" ? health.answers : [];
+  // The form exists but this viewer may not read the answers (an owner or admin without the owner's say-so): they see only whether it is done.
+  const answersHidden = !!intake && health.kind === "none";
+  // A failed read is said out loud, never shown as "no health screening answers on file".
+  const answersFailed = health.kind === "error";
   const parQFlaggedCount = parQAnswers.filter((a) => a.answer).length;
   // The health screening line on Overview: only while there are more flagged answers than this coach has acknowledged.
   const parqNotice = !selfView && parqNoticeNeeded(parQFlaggedCount, (parqAckRow as { flagged_count?: number | null } | null)?.flagged_count);
@@ -1160,8 +1163,15 @@ export default async function AthleteProfilePage(
                           .filter(Boolean)
                           .join(" + ")}
                 </p>
-                {answersHidden && <ParQHiddenNotice done={!!intake?.completed_at} />}
+                {answersFailed ? (
+                  <p className="font-body text-sm text-rust" role="alert">
+                    Couldn&apos;t load this client&apos;s health screening. Reload the page to try again.
+                  </p>
+                ) : answersHidden ? (
+                  <ParQHiddenNotice done={!!intake?.completed_at} />
+                ) : (
                 <ParQAnswersPanel answers={parQAnswers} reviewLine={decisionLine(asDecision((parqAckRow as { decision?: string | null } | null)?.decision), (parqAckRow as { acknowledged_at?: string | null } | null)?.acknowledged_at ?? null)} />
+                )}
                 {intake && (
                   <WaiverStatusLine
                     waiverAccepted={!!intake.waiver_accepted}

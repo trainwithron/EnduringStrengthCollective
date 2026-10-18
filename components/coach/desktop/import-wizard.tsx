@@ -265,7 +265,7 @@ export function ImportWizard({
           .eq("athlete_id", athleteId)
           .maybeSingle(),
       ]);
-      const flagged = hasFlaggedMusculoskeletalConcern(parQ ?? []);
+      const flagged = parQ.kind === "error" || hasFlaggedMusculoskeletalConcern(parQ.kind === "ok" ? parQ.answers : []);
       if (!cancelled) setShowInjuryBanner(flagged && !ackRow);
     }
     run();

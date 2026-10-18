@@ -43,8 +43,9 @@ create policy "health_access_grants_select_org_admin" on public.health_access_gr
   to authenticated using (public.is_org_owner_or_admin(organization_id));
 revoke insert, update, delete on public.health_access_grants from authenticated, anon;
 
--- Who may read a client's answers. Internal.
-create or replace function public._can_read_health_answers(p_group uuid, p_athlete uuid)
+-- Who may read a client's answers. Internal. Decided by the groups the client is in NOW (a client moved to another group is readable by the coach of the new group and no longer by the coach of the old one),
+-- never by the group recorded when the form was filled in.
+create or replace function public._can_read_health_answers(p_athlete uuid)
 returns boolean
 language sql
 stable
@@ -57,20 +58,24 @@ as $$
       auth.uid() is not null
       and (
         p_athlete = auth.uid()
-        or public.is_group_coach(p_group)
+        or exists (
+          select 1 from public.group_memberships m
+          where m.profile_id = p_athlete and m.role = 'athlete' and public.is_group_coach(m.group_id)
+        )
         or exists (
           select 1
-          from public.groups g
+          from public.group_memberships m
+          join public.groups g on g.id = m.group_id
           join public.health_access_grants h on h.organization_id = g.organization_id and h.profile_id = auth.uid()
-          where g.id = p_group
+          where m.profile_id = p_athlete and m.role = 'athlete'
             and public.is_org_owner_or_admin(g.organization_id)
-            and not public.is_client_private_from_org(p_group, p_athlete)
+            and not public.is_client_private_from_org(m.group_id, p_athlete)
         )
       )
     )
 $$;
-revoke execute on function public._can_read_health_answers(uuid, uuid) from public, anon;
-grant execute on function public._can_read_health_answers(uuid, uuid) to authenticated, service_role;
+revoke execute on function public._can_read_health_answers(uuid) from public, anon;
+grant execute on function public._can_read_health_answers(uuid) to authenticated, service_role;
 
 create or replace function public.health_answers(p_athlete uuid)
 returns jsonb
@@ -81,7 +86,7 @@ set search_path = public
 as $$
   select ci.par_q_answers
   from public.client_intake ci
-  where ci.athlete_id = p_athlete and public._can_read_health_answers(ci.group_id, ci.athlete_id)
+  where ci.athlete_id = p_athlete and public._can_read_health_answers(ci.athlete_id)
 $$;
 revoke execute on function public.health_answers(uuid) from public, anon;
 grant execute on function public.health_answers(uuid) to authenticated, service_role;
@@ -95,7 +100,7 @@ set search_path = public
 as $$
   select ci.athlete_id, ci.par_q_answers
   from public.client_intake ci
-  where ci.athlete_id = any (p_athletes) and public._can_read_health_answers(ci.group_id, ci.athlete_id)
+  where ci.athlete_id = any (p_athletes) and public._can_read_health_answers(ci.athlete_id)
 $$;
 revoke execute on function public.health_answers_many(uuid[]) from public, anon;
 grant execute on function public.health_answers_many(uuid[]) to authenticated, service_role;
@@ -143,9 +148,33 @@ create trigger organization_memberships_drop_health_grant
   after delete on public.organization_memberships
   for each row execute function public.drop_health_grant_on_leaving();
 
+-- A grant also ends when the person's ROLE changes away from owner/admin, and when an owner steps down to admin (the ownership was handed over): it would otherwise come back if they were promoted again.
+create or replace function public.drop_health_grant_on_role_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.role not in ('owner', 'admin') or (old.role = 'owner' and new.role <> 'owner') then
+    delete from public.health_access_grants where organization_id = old.organization_id and profile_id = old.profile_id;
+  end if;
+  return new;
+end;
+$$;
+revoke execute on function public.drop_health_grant_on_role_change() from public, anon, authenticated;
+drop trigger if exists organization_memberships_drop_health_grant_role on public.organization_memberships;
+create trigger organization_memberships_drop_health_grant_role
+  after update of role on public.organization_memberships
+  for each row execute function public.drop_health_grant_on_role_change();
+
 -- 1. the answers column is no longer readable from the table
 revoke select on public.client_intake from authenticated;
 grant select (athlete_id, group_id, waiver_signed_name, waiver_accepted, completed_at, created_at, updated_at, date_of_birth) on public.client_intake to authenticated;
+
+-- Signed-out visitors never needed these tables (their policies are for signed-in people only); the broad grants they held are taken away too.
+revoke all on public.client_intake from anon;
+revoke all on public.legal_acceptances from anon;
 
 -- 2. the address and device of an acceptance are no longer readable from the table
 revoke select on public.legal_acceptances from authenticated;

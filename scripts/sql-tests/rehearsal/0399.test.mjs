@@ -91,6 +91,32 @@ export default {
       await db.query(`delete from public.organization_memberships where organization_id = $1 and profile_id = $2`, [org, admin]);
       h.check("a person who leaves the organization loses a grant they held", (await db.query(`select count(*)::int as n from public.health_access_grants where organization_id = $1 and profile_id = $2`, [org, admin])).rows[0].n === 0);
 
+      // ---- a grant ends with the ROLE, not only with the membership
+      await db.query(`insert into public.organization_memberships (organization_id, profile_id, role) values ($1, $2, 'admin')`, [org, admin]);
+      await h.as(owner);
+      await tryQ(db, `select public.set_health_access($1, $2, true)`, [org, admin]);
+      await h.asSuper();
+      h.check("the admin has it again", Array.isArray(await answersFor(admin, client)));
+      await db.query(`update public.organization_memberships set role = 'coach' where organization_id = $1 and profile_id = $2`, [org, admin]);
+      await db.query(`update public.organization_memberships set role = 'admin' where organization_id = $1 and profile_id = $2`, [org, admin]);
+      h.check("demoted and promoted again, they do NOT get the old grant back", (await answersFor(admin, client)) === null);
+      await h.as(owner);
+      await tryQ(db, `select public.set_health_access($1, $2, true)`, [org, owner]);
+      await h.asSuper();
+      await db.query(`update public.organization_memberships set role = 'admin' where organization_id = $1 and profile_id = $2`, [org, owner]);
+      h.check("an owner who hands the organization over (steps down to admin) loses the grant they held", (await db.query(`select count(*)::int as n from public.health_access_grants where organization_id = $1 and profile_id = $2`, [org, owner])).rows[0].n === 0);
+      await db.query(`update public.organization_memberships set role = 'owner' where organization_id = $1 and profile_id = $2`, [org, owner]);
+
+      // ---- access follows the client's CURRENT groups
+      await db.query(`update public.group_memberships set group_id = $1 where group_id = $2 and profile_id = $3`, [g3, g1, client]);
+      h.check("after the client moved to another coach's group, that coach reads the answers", Array.isArray(await answersFor(otherCoach, client)));
+      h.check("and the former coach no longer does", (await answersFor(coach, client)) === null);
+      await db.query(`update public.group_memberships set group_id = $1 where group_id = $2 and profile_id = $3`, [g1, g3, client]);
+
+      // ---- signed-out visitors hold nothing on these tables
+      h.check("signed-out visitors have no access to the intake table", (await db.query(`select has_table_privilege('anon', 'public.client_intake', 'select') or has_table_privilege('anon', 'public.client_intake', 'insert') or has_table_privilege('anon', 'public.client_intake', 'update') as p`)).rows[0].p === false);
+      h.check("nor the acceptances table", (await db.query(`select has_table_privilege('anon', 'public.legal_acceptances', 'select') or has_table_privilege('anon', 'public.legal_acceptances', 'insert') as p`)).rows[0].p === false);
+
       // ---- the batch door used by the program assignment
       await h.as(coach);
       r = await tryQ(db, `select athlete_id from public.health_answers_many($1::uuid[])`, [[client, privateClient, otherCoach]]);

@@ -17,11 +17,43 @@ function walk(dir: string, out: string[] = []): string[] {
 }
 
 describe("health answers are read through the database's door", () => {
-  it("returns the answers when allowed, null when not (or when the call fails)", async () => {
+  it("says which of three things happened: the answers, nothing to read, or a failed read (never 'no concerns')", async () => {
     const answers = [{ question: "Heart condition?", answer: true }];
-    expect(await readHealthAnswers({ rpc: async () => ({ data: answers, error: null }) }, "a1")).toEqual(answers);
-    expect(await readHealthAnswers({ rpc: async () => ({ data: null, error: null }) }, "a1")).toBeNull();
-    expect(await readHealthAnswers({ rpc: async () => ({ data: null, error: { message: "x" } }) }, "a1")).toBeNull();
+    expect(await readHealthAnswers({ rpc: async () => ({ data: answers, error: null }) }, "a1")).toEqual({ kind: "ok", answers });
+    expect(await readHealthAnswers({ rpc: async () => ({ data: [], error: null }) }, "a1")).toEqual({ kind: "ok", answers: [] });
+    expect(await readHealthAnswers({ rpc: async () => ({ data: null, error: null }) }, "a1")).toEqual({ kind: "none" });
+    expect(await readHealthAnswers({ rpc: async () => ({ data: null, error: { message: "x" } }) }, "a1")).toEqual({ kind: "error" });
+    expect(await readHealthAnswers({ rpc: async () => { throw new Error("network"); } }, "a1")).toEqual({ kind: "error" });
+  });
+
+  it("a failed read stops the AI, the export and the assignment check instead of passing as 'no concern'", () => {
+    for (const f of ["app/api/ai/build-day/route.ts", "app/api/ai/generate-program/route.ts", "app/api/ai/pick-template/route.ts"]) {
+      const code = src(f);
+      expect(code, f).toContain('if (parQ.kind === "error") return NextResponse.json({ error: HEALTH_READ_FAILED_MESSAGE }, { status: 503 });');
+      // the refusal comes before anything is generated
+      expect(code.indexOf('parQ.kind === "error"'), f).toBeLessThan(code.indexOf("callClaude("));
+    }
+    expect(src("app/api/account/export/route.ts")).toContain('ownAnswers?.kind === "error"');
+    expect(src("components/coach/desktop/program-assign-panel.tsx")).toContain("screening.failed");
+    expect(src("components/coach/desktop/import-wizard.tsx")).toContain('parQ.kind === "error" ||');
+    const page = src("app/(coach)/groups/[groupId]/athletes/[athleteId]/page.tsx");
+    expect(page).toContain('const answersFailed = health.kind === "error";');
+    // an owner/admin without access sees the status note and never the "no answers on file" panel
+    expect(page.indexOf("answersFailed ? (")).toBeLessThan(page.indexOf("answersHidden ? ("));
+    expect(page.indexOf("answersHidden ? (")).toBeLessThan(page.indexOf("<ParQAnswersPanel answers={parQAnswers}"));
+  });
+
+  it("access follows the client's current groups, a grant ends with the role, and signed-out visitors hold nothing", () => {
+    const sql = src("supabase/migrations/0399_health_answers_private.sql");
+    expect(sql).toContain("function public._can_read_health_answers(p_athlete uuid)");
+    expect(sql).not.toContain("ci.group_id");
+    expect(sql).toContain("after update of role on public.organization_memberships");
+    expect(sql).toContain("(old.role = 'owner' and new.role <> 'owner')");
+    expect(sql).toContain("revoke all on public.client_intake from anon;");
+    expect(sql).toContain("revoke all on public.legal_acceptances from anon;");
+    const steps = src("scripts/build-paste-files.mjs");
+    expect(steps).toContain("grant delete, insert, references, select, trigger, truncate, update on public.client_intake to anon;");
+    expect(steps).not.toContain("step 199");
   });
 
   it("the batch read gives a list per client, and says when it failed instead of reading it as 'no concerns'", async () => {
@@ -48,9 +80,9 @@ describe("health answers are read through the database's door", () => {
     expect(sql).toContain("revoke select on public.client_intake from authenticated");
     expect(sql).toContain("grant select (athlete_id, group_id, waiver_signed_name, waiver_accepted, completed_at, created_at, updated_at, date_of_birth) on public.client_intake to authenticated");
     expect(sql).not.toMatch(/grant select \([^)]*par_q_answers/);
-    expect(sql).toContain("not public.is_client_private_from_org(p_group, p_athlete)");
+    expect(sql).toContain("not public.is_client_private_from_org(m.group_id, p_athlete)");
     const page = src("app/(coach)/groups/[groupId]/athletes/[athleteId]/page.tsx");
-    expect(page).toContain("const answersHidden = !!intake && parQRead === null;");
+    expect(page).toContain('const answersHidden = !!intake && health.kind === "none";');
     expect(src("components/coach/par-q-answers-panel.tsx")).toContain("Needs attention: the form is not finished.");
   });
 

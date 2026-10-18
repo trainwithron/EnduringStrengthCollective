@@ -1,4 +1,4 @@
-import { readHealthAnswers } from "@/lib/health-answers";
+import { readHealthAnswers, HEALTH_READ_FAILED_MESSAGE } from "@/lib/health-answers";
 import { freeTierUseOrRefuse } from "@/lib/free-tier-server";
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
@@ -114,7 +114,9 @@ export async function POST(request: Request) {
       readHealthAnswers(supabase, clientId),
       supabase.from("athlete_notes").select("body").eq("athlete_id", clientId).eq("group_id", program.group_id as string).maybeSingle(),
     ]);
-    const flagged = hasFlaggedMusculoskeletalConcern(parQ ?? []);
+    // A screening that could not be read is not "no concern": nothing is generated.
+    if (parQ.kind === "error") return NextResponse.json({ error: HEALTH_READ_FAILED_MESSAGE }, { status: 503 });
+    const flagged = hasFlaggedMusculoskeletalConcern(parQ.kind === "ok" ? parQ.answers : []);
     const noteText = noteRow?.body?.trim() || null;
     if (flagged || noteText) injuryContext = `This client has flagged a musculoskeletal or health concern${flagged ? " on their intake screening" : ""}.${noteText ? ` The coach's own note: "${noteText}"` : ""}`;
     // Under 18, or no birthdate on file: the youth protections apply (an unknown age is never treated as an adult).

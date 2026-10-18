@@ -145,6 +145,11 @@ export function ProgramAssignPanel({ programId, programName, groupId, aiDraft, o
         setNotices([]);
         return;
       }
+      // The screening could not be read: say so, never read it as "nobody has a concern".
+      if (screening.failed) {
+        setNotices(["The health screening could not be checked just now. Look at each client's screening before assigning."]);
+        return;
+      }
       const byId = new Map(((data ?? []) as { athlete_id: string; date_of_birth: string | null }[]).map((r) => [r.athlete_id, r]));
       // The coach's own decisions on flagged screenings (best effort: without them the other notes still show).
       const { data: ackRows } = await createBrowserClient().from("athlete_injury_flag_acknowledgements").select("athlete_id, decision").in("athlete_id", ids);

@@ -66,11 +66,12 @@ export async function GET() {
 
   // Their own screening answers, read through the same door as everyone's.
   const ownAnswers = intake ? await readHealthAnswers(supabase, userId) : null;
+  if (ownAnswers?.kind === "error") return NextResponse.json({ error: "Couldn't read your health screening, so the export wasn't made. Try again in a moment." }, { status: 503 });
   const exportData = {
     exportedAt: new Date().toISOString(),
     profile,
     profileDetails,
-    intake: intake ? { ...intake, par_q_answers: ownAnswers ?? [] } : intake,
+    intake: intake ? { ...intake, par_q_answers: ownAnswers?.kind === "ok" ? ownAnswers.answers : [] } : intake,
     bodyWeightLogs,
     wellnessCheckins,
     athleteSessions,
