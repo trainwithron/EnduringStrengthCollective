@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { exchangeGarminCode } from "@/lib/garmin";
-import { sealedTokenColumns } from "@/lib/token-crypto";
+import { sealedTokenColumns, tokenOwner } from "@/lib/token-crypto";
 
 // Garmin redirects back here after the user approves (or denies) access.
 // Mirrors app/api/oura/callback/route.ts's shape (state/CSRF check,
@@ -79,10 +79,11 @@ export async function GET(request: Request) {
     // access token stored below instead. Re-verify this assumption
     // directly once real partner API access exists (see lib/garmin.ts's
     // header comment).
+    // Garmin pushes are found by the token's fingerprint, so anything that ever writes a Garmin token (including a future refresh) must pass { withHash: true }.
     const { error: tokenError } = await serviceRole.from("wearable_oauth_tokens").upsert(
       {
         connection_id: connection.id,
-        ...sealedTokenColumns(tokens, { withHash: true }),
+        ...sealedTokenColumns(tokens, tokenOwner("wearable", "garmin", user.id), { withHash: true }),
         expires_at: tokens.expiresAt,
         updated_at: new Date().toISOString(),
       },

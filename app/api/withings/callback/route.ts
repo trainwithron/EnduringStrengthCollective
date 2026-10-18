@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { exchangeWithingsCode, fetchWithingsWeight } from "@/lib/withings";
-import { sealedTokenColumns } from "@/lib/token-crypto";
+import { sealedTokenColumns, tokenOwner } from "@/lib/token-crypto";
 
 const BACKFILL_WINDOW_DAYS = 90;
 
@@ -107,7 +107,7 @@ export async function GET(request: Request) {
     const { error: tokenError } = await serviceRole.from("wearable_oauth_tokens").upsert(
       {
         connection_id: connection.id,
-        ...sealedTokenColumns(tokens),
+        ...sealedTokenColumns(tokens, tokenOwner("wearable", "withings", user.id), { withHash: true }),
         expires_at: tokens.expiresAt,
         updated_at: new Date().toISOString(),
       },

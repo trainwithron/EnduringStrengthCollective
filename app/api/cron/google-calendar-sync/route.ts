@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { listPersonalCalendarEvents, refreshGoogleCalendarTokens } from "@/lib/google-calendar";
 import { withCronRun } from "@/lib/cron-monitor";
-import { sealedTokenColumns, openToken } from "@/lib/token-crypto";
+import { sealedTokenColumns, openToken, tokenOwner } from "@/lib/token-crypto";
 
 // Daily sync of each connected coach's personal Google Calendar events
 // into google_calendar_personal_events, for rendering inside the in-app
@@ -29,7 +29,7 @@ async function handler(request: Request) {
   const supabase = createServiceRoleClient();
   const { data: connections, error: connectionsError } = await supabase
     .from("google_calendar_connections")
-    .select("id, google_calendar_oauth_tokens ( access_token, refresh_token, expires_at )")
+    .select("id, coach_id, google_calendar_oauth_tokens ( access_token, refresh_token, expires_at )")
     .eq("status", "active");
 
   if (connectionsError) {
@@ -50,20 +50,22 @@ async function handler(request: Request) {
       continue;
     }
 
+    const owner = tokenOwner("calendar", "google", connection.coach_id);
     try {
-      let accessToken = openToken(tokenRow.access_token);
+      let accessToken = openToken(tokenRow.access_token, owner, "access");
       const expiresSoon = new Date(tokenRow.expires_at).getTime() - Date.now() < 5 * 60 * 1000;
       if (expiresSoon) {
-        const refreshed = await refreshGoogleCalendarTokens(openToken(tokenRow.refresh_token));
+        const refreshed = await refreshGoogleCalendarTokens(openToken(tokenRow.refresh_token, owner, "refresh"));
         accessToken = refreshed.accessToken;
-        await supabase
+        const { error: saveError } = await supabase
           .from("google_calendar_oauth_tokens")
           .update({
-            ...sealedTokenColumns(refreshed),
+            ...sealedTokenColumns(refreshed, owner),
             expires_at: refreshed.expiresAt,
             updated_at: new Date().toISOString(),
           })
           .eq("connection_id", connection.id);
+        if (saveError) throw new Error("Couldn't save the new connection tokens.");
       }
 
       const events = await listPersonalCalendarEvents(accessToken, timeMin, timeMax);

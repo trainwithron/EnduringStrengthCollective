@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { exchangeGoogleHealthCode, fetchGoogleHealthDailyMetrics } from "@/lib/google-health";
-import { sealedTokenColumns } from "@/lib/token-crypto";
+import { sealedTokenColumns, tokenOwner } from "@/lib/token-crypto";
 
 // Mirrors app/api/oura/callback/route.ts exactly, including the one-time
 // historical backfill on a brand-new connection (Google Health is a
@@ -106,7 +106,7 @@ export async function GET(request: Request) {
     const { error: tokenError } = await serviceRole.from("wearable_oauth_tokens").upsert(
       {
         connection_id: connection.id,
-        ...sealedTokenColumns(tokens),
+        ...sealedTokenColumns(tokens, tokenOwner("wearable", "google_health", user.id), { withHash: true }),
         expires_at: tokens.expiresAt,
         updated_at: new Date().toISOString(),
       },

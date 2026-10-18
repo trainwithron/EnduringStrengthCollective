@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { sealedTokenColumns } from "@/lib/token-crypto";
+import { sealedTokenColumns, tokenOwner } from "@/lib/token-crypto";
 import {
   createWorkCalendar,
   exchangeGoogleCalendarCode,
@@ -90,7 +90,7 @@ export async function GET(request: Request) {
     const { error: tokenError } = await serviceRole.from("google_calendar_oauth_tokens").upsert(
       {
         connection_id: connection.id,
-        ...sealedTokenColumns(tokens),
+        ...sealedTokenColumns(tokens, tokenOwner("calendar", "google", user.id)),
         expires_at: tokens.expiresAt,
         updated_at: new Date().toISOString(),
       },

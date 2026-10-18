@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { fetchGoogleHealthDailyMetrics, refreshGoogleHealthTokens } from "@/lib/google-health";
 import { withCronRun } from "@/lib/cron-monitor";
-import { sealedTokenColumns, openToken } from "@/lib/token-crypto";
+import { sealedTokenColumns, openToken, tokenOwner } from "@/lib/token-crypto";
 
 // Mirrors app/api/oura/sync/route.ts exactly — triggered daily by the
 // Vercel Cron entry in vercel.json, CRON_SECRET-gated, polls the
@@ -32,7 +32,7 @@ async function handler(request: Request) {
   const supabase = createServiceRoleClient();
   const { data: connections, error: connectionsError } = await supabase
     .from("wearable_connections")
-    .select("id, wearable_oauth_tokens ( access_token, refresh_token, expires_at )")
+    .select("id, profile_id, wearable_oauth_tokens ( access_token, refresh_token, expires_at )")
     .eq("provider", "google_health")
     .eq("status", "active");
 
@@ -54,21 +54,23 @@ async function handler(request: Request) {
       continue;
     }
 
+    const owner = tokenOwner("wearable", "google_health", connection.profile_id);
     try {
-      let accessToken = openToken(tokenRow.access_token);
+      let accessToken = openToken(tokenRow.access_token, owner, "access");
 
       const expiresSoon = new Date(tokenRow.expires_at).getTime() - Date.now() < 5 * 60 * 1000;
       if (expiresSoon) {
-        const refreshed = await refreshGoogleHealthTokens(openToken(tokenRow.refresh_token));
+        const refreshed = await refreshGoogleHealthTokens(openToken(tokenRow.refresh_token, owner, "refresh"));
         accessToken = refreshed.accessToken;
-        await supabase
+        const { error: saveError } = await supabase
           .from("wearable_oauth_tokens")
           .update({
-            ...sealedTokenColumns(refreshed),
+            ...sealedTokenColumns(refreshed, owner, { withHash: true }),
             expires_at: refreshed.expiresAt,
             updated_at: new Date().toISOString(),
           })
           .eq("connection_id", connection.id);
+        if (saveError) throw new Error("Couldn't save the new connection tokens.");
       }
 
       const { steps, sleepScore, restingHeartRate, weight } = await fetchGoogleHealthDailyMetrics(

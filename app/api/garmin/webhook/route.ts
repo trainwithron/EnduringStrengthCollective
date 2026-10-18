@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { parseGarminWebhookPayload } from "@/lib/garmin";
 import { secretsMatch } from "@/lib/webhook-secret";
-import { tokenHash } from "@/lib/token-crypto";
+import { isSealedToken, tokenHash } from "@/lib/token-crypto";
 
 // The receiving side of Garmin's push architecture — registered as this
 // app's callback URL with Garmin at partner-approval time. No user
@@ -60,7 +60,9 @@ export async function POST(request: Request) {
   // privacy design.
   // The stored token may be scrambled (see lib/token-crypto.ts), so a push is matched by the token's one-way fingerprint; a connection saved before the
   // fingerprint existed is still matched by the token itself until the protect-wearable-tokens job has filled it in.
-  const uniqueTokens = Array.from(new Set(rows.map((r) => r.externalUserId)));
+  // A presented value that looks like a scrambled stored token is never a real token: someone holding a copy of the database must not be able to push data by sending the stored text back.
+  const uniqueTokens = Array.from(new Set(rows.map((r) => r.externalUserId))).filter((token) => !isSealedToken(token));
+  if (uniqueTokens.length === 0) return NextResponse.json({ synced: 0 });
   const tokenByHash = new Map(uniqueTokens.map((token) => [tokenHash(token), token]));
   const [byHash, byToken] = await Promise.all([
     supabase.from("wearable_oauth_tokens").select("connection_id, access_token_hash").in("access_token_hash", Array.from(tokenByHash.keys())),
