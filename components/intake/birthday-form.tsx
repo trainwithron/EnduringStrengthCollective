@@ -71,7 +71,7 @@ export function BirthdayForm({
     return (
       <div className="border border-steel/20 p-6 space-y-4">
         <p className="font-body text-sm">
-          Spotlight Coaching is for people 13 and older, so we can&apos;t set up an account for you yet, and we haven&apos;t asked you for anything else. A parent or guardian can talk to {coachName ?? "your coach"} about other options.
+          Spotlight Coaching is for people 13 and older, so we can&apos;t set up an account for you yet, and we haven&apos;t asked you for anything else. A parent or guardian can talk to {coachName ?? "your coach"} about other options. If the date you entered is wrong, ask {coachName ?? "your coach"} to contact support.
         </p>
       </div>
     );

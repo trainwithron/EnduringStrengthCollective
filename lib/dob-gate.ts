@@ -4,7 +4,8 @@ import { ageBand, type AgeBand, type GuardianConsentState } from "@/lib/guardian
 // Every client has a date of birth on file (client_intake.date_of_birth, the one place the age rules read). A client who has none is asked once, on a one-field screen (/birthday), before they
 // reach their group. A client under 13 is not accepted at all ("blocked": no consent of any kind lets them in). A client aged 13 to 17 stops at the same screen until a parent or guardian has signed
 // ("need_guardian"). A coach, or anyone who is not a client, is never asked.
-export type DobGate = "ok" | "need_dob" | "blocked" | "need_guardian";
+// "check_failed": the gate could not be read (a failed lookup). It is never "ok" and never remembered: the careful side, and the person is asked to try again.
+export type DobGate = "ok" | "need_dob" | "blocked" | "need_guardian" | "check_failed";
 
 // "_v2": passes issued before the rule that a minor is never remembered stopped being honored at that deploy (the name changed and so did the signed text).
 export const DOB_OK_COOKIE = "dob_ok_v2";
@@ -58,7 +59,8 @@ export interface DobGateFacts {
   dateOfBirth: string | null;
   profileBirthday: string | null;
   ageBand: AgeBand;
-  // May this pass be remembered for a week? Only an adult whose date of birth is on file, or someone who is not a client. A client with no date, a teen and a child are checked on every page.
+  // May this pass be remembered for a week? Only an adult client whose date of birth is on file, or a coach (a coach seat is what makes someone "not a client only" for a lasting reason). Never when the person has no seat at all
+  // (they may become a client any minute: a removed client who is put back, a new account that joins by invite), and never after a failed lookup. A client with no date, a teen and a child are checked on every page.
   cacheable: boolean;
   // Only read for a client aged 13 to 17.
   guardian: GuardianFacts | null;
@@ -66,11 +68,14 @@ export interface DobGateFacts {
 
 // Reads what the gate needs for one person. "Client only" = at least one client membership and no coach membership (a coach using the app as their own client is a coach).
 export async function loadDobGate(supabase: SupabaseClient, userId: string): Promise<DobGateFacts> {
-  const { data: memberships } = await supabase.from("group_memberships").select("group_id, role").eq("profile_id", userId);
+  const { data: memberships, error: membershipError } = await supabase.from("group_memberships").select("group_id, role").eq("profile_id", userId);
+  // A lookup that failed says nothing about who this person is: not ok, not remembered.
+  if (membershipError) return { gate: "check_failed", groupId: null, dateOfBirth: null, profileBirthday: null, ageBand: "unknown", cacheable: false, guardian: null };
   const rows = (memberships ?? []) as { group_id: string; role: string }[];
-  const isClientOnly = rows.some((m) => m.role === "athlete") && !rows.some((m) => m.role === "coach");
+  const hasCoachSeat = rows.some((m) => m.role === "coach");
+  const isClientOnly = rows.some((m) => m.role === "athlete") && !hasCoachSeat;
   const groupId = rows.find((m) => m.role === "athlete")?.group_id ?? null;
-  if (!isClientOnly) return { gate: "ok", groupId, dateOfBirth: null, profileBirthday: null, ageBand: "unknown", cacheable: true, guardian: null };
+  if (!isClientOnly) return { gate: "ok", groupId, dateOfBirth: null, profileBirthday: null, ageBand: "unknown", cacheable: hasCoachSeat, guardian: null };
 
   const [{ data: intake }, { data: details }] = await Promise.all([
     supabase.from("client_intake").select("date_of_birth").eq("athlete_id", userId).maybeSingle(),

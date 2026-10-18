@@ -32,6 +32,7 @@ export async function POST(request: Request) {
   // A birthday first; a child under 13 is not accepted; a client aged 13 to 17 needs a guardian's permission first (the same rule as everywhere else).
   const facts = await loadDobGate(supabase, user.id);
   if (facts.gate !== "ok") {
+    if (facts.gate === "check_failed") return NextResponse.json({ error: "We couldn't check your account just now. Try again in a moment." }, { status: 503 });
     const error = facts.gate === "need_guardian" ? "A parent or guardian needs to give permission first." : facts.gate === "blocked" ? "Spotlight Coaching is for people 13 and older." : "Add your date of birth first.";
     return NextResponse.json({ error }, { status: 409 });
   }

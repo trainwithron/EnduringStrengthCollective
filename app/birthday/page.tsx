@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { safePushPath } from "@/lib/push-url";
 import { createServerClient } from "@/lib/supabase/server";
@@ -18,6 +19,23 @@ export default async function BirthdayPage(props: { searchParams: Promise<{ next
   if (!user) redirect("/login");
 
   const facts = await loadDobGate(supabase, user.id);
+  // The check could not be made (a failed lookup): say so plainly and let the person try again. Never let them through, never show them a form that does not apply.
+  if (facts.gate === "check_failed") {
+    return (
+      <main className="min-h-screen bg-graphite text-chalk font-body px-5 py-10">
+        <div className="max-w-lg mx-auto">
+          <div className="flex justify-end mb-4">
+            <SignOutButton />
+          </div>
+          <h1 className="font-display font-bold text-3xl uppercase leading-none mb-2">One moment</h1>
+          <p className="font-body text-sm text-steel mb-6">We couldn&apos;t check your account just now. Nothing is wrong with it. Try again in a moment.</p>
+          <Link href={safePushPath(search.next ?? "/")} className="inline-block h-12 leading-[3rem] px-6 bg-rust text-graphite font-display uppercase text-lg font-bold">
+            Try again
+          </Link>
+        </div>
+      </main>
+    );
+  }
   const next = search.next && safePushPath(search.next) !== "/" ? safePushPath(search.next) : facts.groupId ? `/groups/${facts.groupId}` : "/";
   if (facts.gate === "ok" || !facts.groupId) redirect(next);
 
@@ -35,6 +53,7 @@ export default async function BirthdayPage(props: { searchParams: Promise<{ next
             <h1 className="font-display font-bold text-3xl uppercase leading-none mb-2">One more thing</h1>
             <p className="font-body text-sm text-steel mb-8">We need a parent or guardian&apos;s OK before you start.</p>
             <GuardianRequestPanel state={facts.guardian?.state ?? "none"} guardianEmail={facts.guardian?.guardianEmail ?? null} requestedAt={facts.guardian?.requestedAt ?? null} coachName={coachName} />
+            <p className="font-body text-xs text-steel mt-6">If the date of birth on your account is wrong, ask {coachName ?? "your coach"} to contact support.</p>
           </>
         ) : (
           <>

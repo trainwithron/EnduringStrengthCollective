@@ -5,6 +5,7 @@ import { LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/workspace-header";
 import { decodeWorkspaceCookie, groupIdFromPath } from "@/lib/workspace-header";
 import { MY_TRAINING_COOKIES, shouldLeaveMyTraining } from "@/lib/my-training-exit";
 import { DOB_OK_COOKIE, dobOkCookieValid, loadDobGate, signDobOk } from "@/lib/dob-gate";
+import { apiGateApplies, dobGatedPage, intakeGateApplies } from "@/lib/gate-paths";
 import { SIGNED_OUT_FRAME_HTML } from "@/lib/signed-out-frame";
 
 // Every page a client can use. A client who has not finished the health form and waiver (profiles.intake_required) reaches none of them, not just /groups: a workout link, a notification or a typed address
@@ -198,7 +199,9 @@ export async function updateSession(request: NextRequest) {
         .eq("athlete_id", user.id)
         .maybeSingle();
 
-      if (!intake?.completed_at) {
+      // Only for a person who is a client and nothing else (an athlete seat, no coach seat). A coach flagged by someone else's Add Client, or a person with no seat at all, would otherwise bounce between /intake and / for ever.
+      const { data: seats } = !intake?.completed_at ? await supabase.from("group_memberships").select("role").eq("profile_id", user.id) : { data: null };
+      if (!intake?.completed_at && intakeGateApplies((seats ?? []) as { role: string }[])) {
         const redirectUrl = new URL("/intake", request.url);
         // Come back to where they were going (a workout link, a notification) once the form is done.
         if (pathname !== "/groups") redirectUrl.searchParams.set("next", pathname + request.nextUrl.search);
@@ -215,9 +218,20 @@ export async function updateSession(request: NextRequest) {
   // The check is cached per person in a cookie once it passes (a client who still needs a date, or a child waiting on consent, is checked every time).
   // The health form (/intake) is reached before a date of birth is on file (it asks for one), so it is only closed to a client who is under 13 (not accepted) or aged 13 to 17 with no guardian's permission yet.
   const onIntake = pathname === "/intake" || pathname.startsWith("/intake/");
-  if (user && (pathname.startsWith("/groups") || pathname.startsWith("/sessions") || onIntake) && !(await dobOkCookieValid(request.cookies.get(DOB_OK_COOKIE)?.value, user.id, process.env.CRON_SECRET))) {
+  // The same check closes the API to a blocked child: ONE shared guard here, so every route a client session can reach (AI, uploads, messages, push, wearables, payments ...) is covered, and a route added later is too.
+  // The few routes a child must still reach (their own data download and deletion, the guardian's signing, the birthday and health steps, legal, sign-in help, feedback, turning push off) are listed in lib/gate-paths.ts.
+  const gatedApi = apiGateApplies(pathname);
+  if (user && (dobGatedPage(pathname) || onIntake || gatedApi) && !(await dobOkCookieValid(request.cookies.get(DOB_OK_COOKIE)?.value, user.id, process.env.CRON_SECRET))) {
     const facts = await loadDobGate(supabase, user.id);
     if (facts.gate !== "ok" && !(onIntake && facts.gate === "need_dob")) {
+      if (gatedApi) {
+        const message = facts.gate === "check_failed" ? "We couldn't check your account just now. Try again in a moment." : "This account isn't set up to use this yet. Finish the steps on your birthday screen first.";
+        const blocked = NextResponse.json({ error: message, gate: facts.gate }, { status: facts.gate === "check_failed" ? 503 : 403, headers: { "cache-control": "no-store" } });
+        response.cookies.getAll().forEach((cookie) => {
+          blocked.cookies.set(cookie);
+        });
+        return blocked;
+      }
       const redirectUrl = new URL("/birthday", request.url);
       redirectUrl.searchParams.set("next", pathname + request.nextUrl.search);
       const redirectResponse = NextResponse.redirect(redirectUrl);
@@ -226,7 +240,7 @@ export async function updateSession(request: NextRequest) {
       });
       return redirectResponse;
     }
-    // Only an adult whose date of birth is on file, or someone who is not a client, is remembered for a week (facts.cacheable). A client with no date yet, a teen (a guardian can withdraw at any moment) and a child are checked every time.
+    // Only an adult client whose date of birth is on file, or a coach, is remembered for a week (facts.cacheable). A client with no date yet, a teen (a guardian can withdraw at any moment), a child, a person with no seat at all and a failed lookup are checked every time.
     const signed = facts.cacheable ? await signDobOk(user.id, process.env.CRON_SECRET) : null;
     if (signed) response.cookies.set(DOB_OK_COOKIE, signed, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 24 * 7 });
   }
