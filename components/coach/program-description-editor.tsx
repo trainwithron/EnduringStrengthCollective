@@ -2,11 +2,10 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { saved } from "@/lib/saved";
-import { PROGRAM_DESCRIPTION_MAX, descriptionCounter, tidyProgramDescription } from "@/lib/program-description";
+import { PROGRAM_DESCRIPTION_MAX, descriptionCounter, saveProgramDescription } from "@/lib/program-description";
 
 // The program's description, editable after the fact for any program (one the AI wrote or one the coach built). It shows the text with an "Edit description" link; editing opens a box with a counter and a plain Save.
-// "Saved" is shown only when the write really saved (lib/saved.ts); a failed save keeps the box open with what was typed.
+// "Saved" is shown only when the write really saved a row (saveProgramDescription); a failed save keeps the box open with what was typed.
 export function ProgramDescriptionEditor({ programId, initialDescription }: { programId: string; initialDescription: string | null }) {
   const [current, setCurrent] = useState<string | null>(initialDescription);
   const [editing, setEditing] = useState(false);
@@ -18,16 +17,14 @@ export function ProgramDescriptionEditor({ programId, initialDescription }: { pr
     if (busy) return;
     setBusy(true);
     setMessage(null);
-    const next = tidyProgramDescription(text);
-    const supabase = createBrowserClient();
-    const ok = await saved(supabase.from("programs").update({ description: next }).eq("id", programId), "Couldn't save the description.");
+    const result = await saveProgramDescription(createBrowserClient() as never, programId, text);
     setBusy(false);
-    if (!ok) {
+    if (!result.ok) {
       setMessage({ kind: "failed", text: "Didn't save. What you typed is still here; try again." });
       return;
     }
-    setCurrent(next);
-    setText(next ?? "");
+    setCurrent(result.description);
+    setText(result.description ?? "");
     setEditing(false);
     setMessage({ kind: "saved", text: "Saved." });
   }

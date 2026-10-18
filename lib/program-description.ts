@@ -12,3 +12,12 @@ export function descriptionCounter(text: string): { label: string; nearLimit: bo
   const used = text.length;
   return { label: `${used} / ${PROGRAM_DESCRIPTION_MAX}`, nearLimit: used >= PROGRAM_DESCRIPTION_MAX - 100 };
 }
+
+// Saves the description and tells the truth: the update must come back with the row (row security turns a refused update into "no error, no rows", which would otherwise look saved).
+type UpdateClient = { from: (table: "programs") => { update: (values: { description: string | null }) => { eq: (column: string, value: string) => PromiseLike<{ data?: unknown; error?: { message?: string } | null }> & { select: (columns: string) => PromiseLike<{ data?: unknown; error?: { message?: string } | null }> } } } };
+export async function saveProgramDescription(supabase: UpdateClient, programId: string, text: string): Promise<{ ok: true; description: string | null } | { ok: false; error: string }> {
+  const next = tidyProgramDescription(text);
+  const { checked } = await import("@/lib/checked-write");
+  const result = await checked(supabase.from("programs").update({ description: next }).eq("id", programId).select("id"), { expectRows: true, message: "Couldn't save the description." });
+  return result.ok ? { ok: true, description: next } : { ok: false, error: result.error ?? "Couldn't save the description." };
+}
