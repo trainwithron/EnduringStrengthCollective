@@ -5,11 +5,15 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { suggestSeasonName } from "@/lib/season-name";
+import { hasGraduated } from "@/lib/graduation";
+import Link from "next/link";
 
 export interface SeasonAthlete {
   profileId: string;
   fullName: string;
   positionName: string | null;
+  // The class year the coach gave them (null if none).
+  graduationYear?: number | null;
 }
 
 // Starts next season for a team: a new group with the same positions and coaches and the athletes ticked here, and this season is retired (kept, with all its records, in Past seasons). Tick off the ones who are
@@ -18,7 +22,9 @@ export function NewSeasonPanel({ groupId, groupName, athletes }: { groupId: stri
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(() => suggestSeasonName(groupName));
-  const [chosen, setChosen] = useState<Set<string>>(() => new Set(athletes.map((a) => a.profileId)));
+  // A player whose class has graduated starts unticked; the coach can tick them.
+  const [chosen, setChosen] = useState<Set<string>>(() => new Set(athletes.filter((a) => !hasGraduated(a.graduationYear)).map((a) => a.profileId)));
+  const [finished, setFinished] = useState<{ id: string; note: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,17 +47,51 @@ export function NewSeasonPanel({ groupId, groupName, athletes }: { groupId: stri
       setError("Tick at least one athlete to bring over.");
       return;
     }
-    if (!(await confirmDialog({ message: `Start ${trimmed} with ${chosen.size} athlete${chosen.size === 1 ? "" : "s"}? ${groupName} is retired: it and all its records are kept in Past seasons, and nothing from it is copied into the new season.`, confirmLabel: "Start the season" }))) return;
+    const leaving = athletes.filter((a) => hasGraduated(a.graduationYear) && !chosen.has(a.profileId)).length;
+    const emailNote = leaving > 0 ? ` ${leaving} graduating player${leaving === 1 ? " is" : "s are"} not coming back and will each be emailed a PDF of their own training history, to their own address only.` : "";
+    if (!(await confirmDialog({ message: `Start ${trimmed} with ${chosen.size} athlete${chosen.size === 1 ? "" : "s"}? ${groupName} is retired: it and all its records are kept in Past seasons, and nothing from it is copied into the new season.${emailNote}`, confirmLabel: "Start the season" }))) return;
     setBusy(true);
     setError(null);
-    const { data, error: rpcError } = await createBrowserClient().rpc("start_new_season", { p_group: groupId, p_name: trimmed, p_athletes: [...chosen] });
+    const { data, error: rpcError } = await createBrowserClient().rpc("start_next_season", { p_group: groupId, p_name: trimmed, p_athletes: [...chosen] });
     setBusy(false);
     if (rpcError || typeof data !== "string") {
       setError(rpcError?.message ?? "Couldn't start the season. Try again.");
       return;
     }
+    // The graduating players are emailed their history from the server; a failure there never undoes the new season.
+    if (leaving > 0) {
+      let note = "";
+      try {
+        const res = await fetch("/api/season/graduate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ groupId }) });
+        const result = await res.json().catch(() => ({}));
+        if (res.ok && !result.emailOff) {
+          const parts = [`${result.sent ?? 0} graduating player${result.sent === 1 ? "" : "s"} emailed their training history.`];
+          if (result.noEmail) parts.push(`${result.noEmail} had no email address that can receive it.`);
+          if (result.failed) parts.push(`${result.failed} could not be sent.`);
+          note = parts.join(" ");
+        } else {
+          note = "The season is started, but the graduating players could not be emailed their history just now.";
+        }
+      } catch {
+        note = "The season is started, but the graduating players could not be emailed their history just now.";
+      }
+      setFinished({ id: data, note });
+      router.refresh();
+      return;
+    }
     router.push(`/groups/${data}/team`);
     router.refresh();
+  }
+
+  if (finished) {
+    return (
+      <div className="border border-steel/25 p-4 max-w-xl">
+        <p className="font-body text-sm">{finished.note}</p>
+        <Link href={`/groups/${finished.id}/team`} className="inline-block mt-3 font-body text-sm text-rust">
+          Go to the new season →
+        </Link>
+      </div>
+    );
   }
 
   if (!open) {
@@ -76,6 +116,7 @@ export function NewSeasonPanel({ groupId, groupName, athletes }: { groupId: stri
           <label key={a.profileId} className="flex items-center gap-3 px-3 py-2 border-b border-steel/10 last:border-b-0 font-body text-sm">
             <input type="checkbox" checked={chosen.has(a.profileId)} onChange={() => toggle(a.profileId)} />
             <span className="flex-1 truncate">{a.fullName}</span>
+            {a.graduationYear ? <span className="text-xs text-steel">{hasGraduated(a.graduationYear) ? `Class of ${a.graduationYear} (graduated)` : `Class of ${a.graduationYear}`}</span> : null}
             {a.positionName && <span className="text-xs text-steel">{a.positionName}</span>}
           </label>
         ))}

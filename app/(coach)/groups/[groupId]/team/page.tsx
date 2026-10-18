@@ -11,6 +11,7 @@ import {
 } from "@/components/coach/desktop/team-depth-chart";
 import { CoachPositionScopeList, type CoachStaffRow } from "@/components/coach/desktop/coach-position-scope-list";
 import { NewSeasonPanel } from "@/components/coach/desktop/new-season-panel";
+import { ClassYearPanel } from "@/components/coach/desktop/class-year-panel";
 import { UnarchiveGroupButton } from "@/components/coach/desktop/unarchive-group-button";
 import Link from "next/link";
 
@@ -76,6 +77,10 @@ export default async function TeamPage(props: { params: Promise<{ groupId: strin
       .not("groups.archived_at", "is", null);
     pastSeasons = ((pastRows ?? []) as any[]).map((r) => r.groups).filter(Boolean).map((g) => ({ id: g.id as string, name: g.name as string })).sort((a, b) => a.name.localeCompare(b.name));
   }
+
+  // The class years (0401). Read on their own, so a database without the column yet shows no years and everything else works.
+  const gradRead = await supabase.from("group_memberships").select("profile_id, graduation_year").eq("group_id", params.groupId).eq("role", "athlete");
+  const gradById = new Map<string, number | null>(gradRead.error ? [] : ((gradRead.data ?? []) as { profile_id: string; graduation_year: number | null }[]).map((r) => [r.profile_id, r.graduation_year]));
 
   const positionNameById = new Map((positionRows ?? []).map((p) => [p.id as string, p.name as string]));
   const positions: TeamPosition[] = (positionRows ?? []).map((p) => ({
@@ -144,8 +149,9 @@ export default async function TeamPage(props: { params: Promise<{ groupId: strin
           <NewSeasonPanel
             groupId={params.groupId}
             groupName={group?.name ?? "Team"}
-            athletes={players.map((p) => ({ profileId: p.profileId, fullName: p.fullName, positionName: p.positionId ? positionNameById.get(p.positionId) ?? null : null }))}
+            athletes={players.map((p) => ({ profileId: p.profileId, fullName: p.fullName, positionName: p.positionId ? positionNameById.get(p.positionId) ?? null : null, graduationYear: gradById.get(p.profileId) ?? null }))}
           />
+          {!gradRead.error && <ClassYearPanel groupId={params.groupId} players={players.map((p) => ({ profileId: p.profileId, fullName: p.fullName, graduationYear: gradById.get(p.profileId) ?? null }))} />}
         </div>
       )}
 
