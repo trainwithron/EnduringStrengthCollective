@@ -68,6 +68,18 @@ export default {
       h.check("nor does the owner", t.includes(open) && !t.includes(priv));
       t = await tagged(coach);
       h.check("the coach of the group sees both", t.includes(open) && t.includes(priv), JSON.stringify(t));
+      // the lookup answers only an owner or admin of that organization
+      const ask = async (who) => {
+        await h.as(who);
+        const x = await tryQ(db, `select public.athlete_private_from_org($1, $2) as p`, [priv, org]);
+        await h.asSuper();
+        return x.error ? "ERR" : x.rows[0].p;
+      };
+      h.check("an organization admin gets the true answer", (await ask(admin)) === true);
+      h.check("an ordinary client gets false, never a hint who is private", (await ask(open)) === false);
+      h.check("a coach of the organization, not an owner or admin, gets false too", (await ask(coach)) === false);
+      const outsider = await h.user("AF Outsider");
+      h.check("someone from another organization gets false", (await ask(outsider)) === false);
       // one private seat is enough, in any group of the organization
       const g2 = await h.group(org, coach, "team", "AF Second Team");
       await h.member(g2, open);
@@ -78,8 +90,8 @@ export default {
       // ---- 2. the two links nobody had decided about
       const unhandled = (await db.query(`select tbl, col from public.profile_reference_unhandled() order by 1, 2`)).rows;
       h.check("every not-null link to a profile has a decision (live-catalog guard)" + (unhandled.length ? ": " + JSON.stringify(unhandled) : ""), unhandled.length === 0);
-      const pol = (await db.query(`select tbl, col, action from public.profile_reference_policy() where (tbl, col) in (('client_sub_goals','proposed_by'), ('client_assessments','created_by'))`)).rows;
-      h.check("sub-goals someone proposed and assessments someone recorded go with the person", pol.length === 2 && pol.every((p) => p.action === "delete"), JSON.stringify(pol));
+      const pol = (await db.query(`select tbl, col, action from public.profile_reference_policy() where (tbl, col) in (('client_sub_goals','proposed_by'), ('client_assessments','created_by')) order by 1`)).rows;
+      h.check("sub-goals someone proposed go with the person; deleting someone who recorded assessments about others is refused", pol.length === 2 && pol[0].tbl === "client_assessments" && pol[0].action === "refuse" && pol[1].tbl === "client_sub_goals" && pol[1].action === "delete", JSON.stringify(pol));
       // the existing decisions are untouched
       const all = (await db.query(`select count(*)::int as n from public.profile_reference_policy()`)).rows[0].n;
       h.check("the 23 earlier decisions are still there, plus two", all === 25, String(all));
@@ -136,6 +148,35 @@ export default {
       await db.query(`insert into public.group_memberships (group_id, profile_id, role) values ($1, $2, 'athlete')`, [g, two]);
       flag = (await db.query(`select intake_required from public.profiles where id = $1`, [two])).rows[0].intake_required;
       h.check("adding a seat back asks for the form again when it was never completed", flag === true);
+
+      // the person's OWN delete never clears the flag (they must not be able to switch their health form off), and the role is put back afterwards
+      const selfLeaver = await h.user("AF Self Leaver");
+      await h.member(g, selfLeaver);
+      await db.query(`update public.profiles set intake_required = true where id = $1`, [selfLeaver]);
+      await h.as(selfLeaver);
+      const own = await tryQ(db, `delete from public.group_memberships where group_id = $1 and profile_id = $2 returning id`, [g, selfLeaver]);
+      const roleAfter = (await db.query(`select current_setting('request.jwt.claim.role', true) as r`)).rows[0].r;
+      await h.asSuper();
+      flag = (await db.query(`select intake_required from public.profiles where id = $1`, [selfLeaver])).rows[0].intake_required;
+      h.check("a client can still leave on their own" + (own.error ? ": " + own.error : ""), !own.error && own.rows.length === 1);
+      h.check("but leaving does not clear their own health-form flag", flag === true);
+      h.check("and the sign-in role is back to what it was after the trigger", roleAfter === "authenticated", String(roleAfter));
+      // moving a client between groups is an update and does not touch the flag
+      const mover = await h.user("AF Mover");
+      await h.member(g, mover);
+      await db.query(`update public.profiles set intake_required = true where id = $1`, [mover]);
+      await db.query(`update public.group_memberships set group_id = $1 where group_id = $2 and profile_id = $3`, [g2, g, mover]);
+      flag = (await db.query(`select intake_required from public.profiles where id = $1`, [mover])).rows[0].intake_required;
+      h.check("moving a client to another group leaves the flag as it was", flag === true);
+
+      // a social-only seat upgraded to training asks for the form, like a new training seat
+      const upgrader = await h.user("AF Upgrader");
+      await db.query(`insert into public.group_memberships (group_id, profile_id, role, membership_type) values ($1, $2, 'athlete', 'social_only')`, [g, upgrader]);
+      flag = (await db.query(`select intake_required from public.profiles where id = $1`, [upgrader])).rows[0].intake_required;
+      h.check("a social-only member is not asked for the form", flag === false);
+      await db.query(`update public.group_memberships set membership_type = 'training' where group_id = $1 and profile_id = $2`, [g, upgrader]);
+      flag = (await db.query(`select intake_required from public.profiles where id = $1`, [upgrader])).rows[0].intake_required;
+      h.check("upgraded to a training seat, they are asked for the form", flag === true);
 
       // a coach removing a client through the app's own function
       const viaFn = await h.user("AF Via Function");

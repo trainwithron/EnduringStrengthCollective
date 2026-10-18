@@ -26,13 +26,31 @@ describe("AF3: coaches may void or resend a guardian's permission only for a liv
 });
 
 describe("AF3: deleting an account", () => {
-  it("the two links that blocked it are erased with the person, in the app list and in the database list", () => {
+  it("a sub-goal someone proposed goes with them; deleting someone who recorded assessments about others is refused, and their files are not orphaned", () => {
     const ts = src("lib/account-deletion.ts");
-    expect(ts).toContain('["client_assessments", "created_by"],');
     expect(ts).toContain('["client_sub_goals", "proposed_by"],');
+    expect(ts).not.toContain('["client_assessments", "created_by"]');
     const m = src("supabase/migrations/0418_af3_database_policies.sql");
-    expect(m).toContain("('client_assessments', 'created_by', 'delete'),");
+    expect(m).toContain("('client_assessments', 'created_by', 'refuse'),");
     expect(m).toContain("('client_sub_goals', 'proposed_by', 'delete'),");
+    expect(m).not.toContain("('client_assessments', 'created_by', 'delete')");
+  });
+
+  it("the coach page says 'not shown for this seat' when the database gives no answer, never 'not asked yet'", () => {
+    const c = src("components/coach/guardian-consent-status.tsx");
+    expect(c).toContain("if (info === null) {");
+    expect(c).toContain("Not shown for this seat.");
+    expect(c.indexOf("if (info === null) {")).toBeLessThan(c.indexOf("Not asked yet."));
+  });
+
+  it("the private-from-organization lookup answers only an owner or admin of that organization, or the server", () => {
+    const m = src("supabase/migrations/0418_af3_database_policies.sql");
+    expect(m).toContain("select (auth.role() = 'service_role' or public.is_org_owner_or_admin(p_org))");
+  });
+
+  it("a client deleting their own seat never clears their own health-form flag", () => {
+    const m = src("supabase/migrations/0418_af3_database_policies.sql");
+    expect(m).toContain("if auth.role() in ('authenticated', 'anon') and auth.uid() = old.profile_id then\n      return old;");
   });
 });
 
@@ -52,7 +70,8 @@ describe("AF3 (e): the write guard", () => {
   const guarded = ["comments", "reactions", "direct_messages", "exercise_video_comments", "training_partner_profiles", "training_partner_requests", "challenge_participants", "progress_photos", "session_exercise_videos", "body_weight_logs", "body_scans", "transformation_cards", "transformation_milestones"];
 
   it("the rest-of-the-tables paste lists exactly the approved tables, and posts has its own paste", () => {
-    const listed = Array.from(rest.matchAll(/'([a-z_]+)'/g)).map((m) => m[1]).filter((n) => n !== "authenticated");
+    const list = rest.slice(rest.indexOf("foreach t in array array["), rest.indexOf("] loop"));
+    const listed = Array.from(list.matchAll(/'([a-z_]+)'/g)).map((m) => m[1]);
     expect(new Set(listed)).toEqual(new Set(guarded));
     expect(src("supabase/migrations/0416_minor_write_guard_posts.sql")).toContain("on public.posts as restrictive for insert");
   });
@@ -65,6 +84,15 @@ describe("AF3 (e): the write guard", () => {
 
   it("the design note names the same tables as the migrations", () => {
     for (const n of [...guarded, "posts"]) expect(doc, n).toContain("`" + n + "`");
+  });
+
+  it("the scan function and the four media buckets are covered too, and the question answers only about the caller", () => {
+    expect(rest).toContain("create or replace function public.save_body_scan(");
+    expect(rest).toContain("if not public.minor_may_write(auth.uid()) then");
+    expect(rest).toContain("bucket_id not in ('progress-photos', 'athlete-exercise-videos', 'post-media', 'inbody-scans')");
+    const fn = src("supabase/migrations/0415_minor_may_write.sql");
+    expect(fn).toContain("if p_user is distinct from auth.uid() and coalesce(auth.role(), '') <> 'service_role' then");
+    expect(fn).toContain("'infinity'::date");
   });
 
   it("only the insert and update are guarded, to signed-in people, restrictively; delete is left alone", () => {

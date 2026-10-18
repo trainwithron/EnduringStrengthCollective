@@ -17,7 +17,7 @@ The app now stops a blocked child at the page gate and on every `/api` route (AF
 | Client 13 to 17, consent pending, expired, withdrawn or none | **false** |
 | Client 18 or older with a date | true |
 
-Age uses the calendar (`age(current_date, dob)`), the same boundaries the TypeScript uses; the rehearsal checks the birthday-eve and birthday cases on both sides of 13 and 18.
+Age uses the calendar (the birthday in year N, with 29 February counting from 1 March as in the TypeScript), the same boundaries the page gate uses; the rehearsal checks the birthday-eve and birthday cases on both sides of 13 and 18.
 
 ## Where it applies: restrictive policies, insert and update only
 A `RESTRICTIVE` policy is ANDed with the existing ones, so nothing that is allowed today becomes more allowed, and nothing changes for anyone the function says true to. Delete is left alone (a child can always take their own content down). The service role bypasses row security, so server routes are unaffected (they are already covered by the API guard).
@@ -50,3 +50,9 @@ One person for each row of the rule table, plus: a service-role write passes; a 
 
 ## Built
 Migrations 0415 (function), 0416 (posts), 0417 (rest); rehearsals 0415 (34 checks: every kind of person and both sides of each birthday), 0416 (13), 0417 (25, including a live-catalog guard: any table with an author-style column must be guarded or listed as deliberately left out; `support_messages` is listed). The guard sees author-style columns only (`author_id`, `sender_id`, `commenter_id`, `poster_id`, `writer_id`); a table that stores a child's words under another column name, such as the athlete column of a photo table, is covered by this list and by review, not by the guard.
+
+## After the independent review
+- `body_scans` and its weigh-in are written only by the `save_body_scan` function, which bypasses table policies, so paste C also replaces that function with one added check (the rest is the live text, compared by hash).
+- `minor_may_write(user)` answers only about the caller (or for the server): a lookup of anyone else gets false, so it cannot reveal who is a minor.
+- Uploads: paste C adds restrictive policies on file storage for the four buckets that hold a child's pictures or video (`progress-photos`, `athlete-exercise-videos`, `post-media`, `inbody-scans`); other buckets are untouched.
+- An impossible birth date (`infinity`) counts as no date.

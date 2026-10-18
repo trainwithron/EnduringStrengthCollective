@@ -27,9 +27,13 @@ export default {
         if (consent) await db.query(`insert into public.guardian_consents (athlete_id, guardian_email, token_hash, status) values ($1, 'p@example.com', $2, $3)`, [u, "h-" + u, consent]);
         return u;
       };
+      // the question is asked as the person it is about (that is how the table policies ask it)
       const may = async (who) => {
-        await h.asSuper();
+        await h.as(who);
         const r = await tryQ(db, `select public.minor_may_write($1) as ok`, [who]);
+        await h.asSuper();
+        // the signed-out visitor is not even allowed to ask (the function is not granted to them): same as not allowed
+        if (r.error && /permission denied/i.test(r.error)) return false;
         return r.error ? "ERROR " + r.error : r.rows[0].ok;
       };
       const years = (n, extraDays = 0) => `current_date - interval '${n} years' + interval '${extraDays} days'`;
@@ -118,6 +122,25 @@ export default {
       const frontDesk = await client("MW Front Desk Teen", years(16));
       await db.query(`insert into public.org_front_desk (organization_id, profile_id) values ($1, $2)`, [org, frontDesk]);
       h.check("a front-desk seat does not switch the age rules off for a known teen", (await may(frontDesk)) === false);
+
+      // ---- it answers only about the caller
+      await h.as(adult);
+      let ask = await tryQ(db, `select public.minor_may_write($1) as ok`, [child]);
+      const other = await tryQ(db, `select public.minor_may_write($1) as ok`, [adult === child ? coach : "00000000-0000-4000-8000-0000000000aa"]);
+      h.check("an adult asking about a child gets false, the same as asking about a stranger (no hint who is a minor)", ask.rows?.[0]?.ok === false && other.rows?.[0]?.ok === false, JSON.stringify([ask, other]));
+      ask = await tryQ(db, `select public.minor_may_write($1) as ok`, [teenSigned]);
+      h.check("nor does it reveal a signed guardian", ask.rows?.[0]?.ok === false);
+      await h.asService();
+      ask = await tryQ(db, `select public.minor_may_write($1) as ok`, [teenSigned]);
+      h.check("the server can ask about anyone", ask.rows?.[0]?.ok === true, JSON.stringify(ask));
+      await h.asSuper();
+
+      // ---- an impossible date does not make it raise
+      const weird = await client("MW Infinity", "'infinity'::date");
+      h.check("a date of birth of infinity counts as no date: not allowed, and no error", (await may(weird)) === false);
+      const weirdStaff = await client("MW Infinity Staff", "'-infinity'::date");
+      await h.orgMember(org, weirdStaff, "admin");
+      h.check("the same for staff: no usable date, so they pass, and no error", (await may(weirdStaff)) === true);
 
       // ---- who can call it
       await h.as(adult);

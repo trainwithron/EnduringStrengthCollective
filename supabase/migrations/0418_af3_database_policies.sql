@@ -2,10 +2,11 @@
 --
 --  1. A client who is private from the organization is also private in the feed and in tags. An organization owner or admin could still read the POSTS of a client the coach marked private (the group-level
 --     rule existed, the client-level one did not: messages, sessions and the rest already had it), and still see which TAGS such a client has. The coach of the group is unchanged.
---  2. Deleting a person's account is no longer blocked by two links nobody had decided about: the sub-goal someone proposed (client_sub_goals.proposed_by) and the assessment someone recorded
---     (client_assessments.created_by). Both go with the person, like their goals and notes. A live-catalog check in the rehearsal fails if a new not-null link to a profile is ever added without a decision.
+--  2. Deleting a person's account is no longer blocked by two links nobody had decided about: the sub-goal someone proposed (client_sub_goals.proposed_by) goes with the person, like their goals and notes; an assessment
+--     someone recorded (client_assessments.created_by) is a coach's record about another person, so deleting its author is REFUSED with the usual 'still owns shared records' answer instead of erasing it silently. A live-catalog check in the rehearsal fails if a new not-null link to a profile is ever added without a decision.
 --  3. The guardian-consent answer for a COACH is now limited to a coach of a group where the person is a TRAINING client and the group is live (not archived). A coach of a social-only seat, or of a group that was
 --     retired, no longer sees whether a child's guardian has signed. The child still sees their own.
+--  4b. A social-only seat turned into a training seat is a new client too: the health-form flag (0403) fired only on a NEW training seat, so a person who joined social-only and was later upgraded never got the form.
 --  4. When a person's last client seat is removed the health-form flag is cleared (profiles.intake_required). Adding a seat back sets it again when the form was never completed (the 0403 trigger), so nobody
 --     skips the form. Nothing else about removing a client changes.
 -- Replaces: the two posts policies, one tag policy, profile_reference_policy() and guardian_consent_state(). Adds: two small functions, one trigger.
@@ -20,6 +21,7 @@ create policy "posts_delete_own_or_coach" on public.posts for delete to authenti
   using (author_id = (select auth.uid()) or public.is_group_coach(group_id) or (public.is_org_admin_of_group(group_id) and not public.is_group_private_from_org(group_id) and not public.is_client_private_from_org(group_id, author_id)));
 
 -- Is this person marked private from the organization in ANY group of it? A tag belongs to the organization, not to one group, so one private seat is enough to keep the person's tags from its owner and admins.
+-- It answers only for an owner or admin of that organization (and the server): for anyone else it says false, so it cannot be used to find out who is private in an organization that is not theirs (the same lookup closed in 0342).
 create or replace function public.athlete_private_from_org(p_athlete uuid, p_org uuid)
 returns boolean
 language sql
@@ -27,11 +29,12 @@ stable
 security definer
 set search_path = public
 as $$
-  select exists (
-    select 1 from public.group_memberships m
-    join public.groups g on g.id = m.group_id
-    where m.profile_id = p_athlete and g.organization_id = p_org and m.private_from_org
-  )
+  select (auth.role() = 'service_role' or public.is_org_owner_or_admin(p_org))
+    and exists (
+      select 1 from public.group_memberships m
+      join public.groups g on g.id = m.group_id
+      where m.profile_id = p_athlete and g.organization_id = p_org and m.private_from_org
+    )
 $$;
 revoke all on function public.athlete_private_from_org(uuid, uuid) from public, anon;
 grant execute on function public.athlete_private_from_org(uuid, uuid) to authenticated, service_role;
@@ -64,7 +67,6 @@ as $$
     -- meaningless without the person: delete the row
     ('athlete_exercise_overrides', 'created_by', 'delete'),
     ('athlete_notes', 'created_by', 'delete'),
-    ('client_assessments', 'created_by', 'delete'),
     ('client_goals', 'created_by', 'delete'),
     ('client_habits', 'created_by', 'delete'),
     ('client_sub_goals', 'proposed_by', 'delete'),
@@ -82,6 +84,7 @@ as $$
     ('workout_assignments', 'created_by', 'delete'),
     ('workout_notes', 'created_by', 'delete'),
     -- real shared records: refuse
+    ('client_assessments', 'created_by', 'refuse'),
     ('game_score_entries', 'logged_by', 'refuse'),
     ('groups', 'created_by', 'refuse'),
     ('organizations', 'owner_id', 'refuse'),
@@ -151,6 +154,10 @@ declare
   prev_role text := current_setting('request.jwt.claim.role', true);
 begin
   begin
+    -- Never when the person deleted their own seat: the flag exists so a client cannot switch their own health form off, and leaving then coming back must not be a way round it.
+    if auth.role() in ('authenticated', 'anon') and auth.uid() = old.profile_id then
+      return old;
+    end if;
     if old.role = 'athlete' and not exists (select 1 from public.group_memberships m where m.profile_id = old.profile_id and m.role = 'athlete') then
       -- the sign-in-sensitive columns of profiles are guarded against a signed-in person's own writes; this write is the system's
       perform set_config('request.jwt.claim.role', 'service_role', true);
@@ -171,3 +178,10 @@ create trigger group_memberships_clear_intake
   after delete on public.group_memberships
   for each row when (old.role = 'athlete')
   execute function public.clear_intake_flag_when_last_client_seat_goes();
+
+-- ---- 4b. a social-only seat that becomes a training seat asks for the health form like a new training seat does (same function, same exceptions as 0403) ----------------------------------
+drop trigger if exists group_memberships_require_intake_on_upgrade on public.group_memberships;
+create trigger group_memberships_require_intake_on_upgrade
+  after update of membership_type on public.group_memberships
+  for each row when (old.membership_type is distinct from 'training' and new.membership_type = 'training' and new.role = 'athlete')
+  execute function public.require_intake_for_new_client();

@@ -1,7 +1,7 @@
 [
  {
   "id": "release-af3-database-policies",
-  "name": "Release AF3 (database policies from the post-ship audit; replaces two posts policies, one tag policy and two functions, adds two functions and one trigger)",
+  "name": "Release AF3 (database policies from the post-ship audit; replaces two posts policies, one tag policy and two functions, adds two functions and two triggers)",
   "steps": [
    "170"
   ],

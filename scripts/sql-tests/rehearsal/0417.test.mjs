@@ -10,6 +10,12 @@ const tryQ = async (db, sql, params) => {
 
 const GUARDED = ["posts", "comments", "reactions", "direct_messages", "exercise_video_comments", "training_partner_profiles", "training_partner_requests", "challenge_participants", "progress_photos", "session_exercise_videos", "body_weight_logs", "body_scans", "transformation_cards", "transformation_milestones"];
 
+// Security-definer functions that write a guarded table and are fine without the question, and why.
+const WRITERS_THAT_ARE_FINE = {
+  move_client_to_group: "coach-only: moves a client's weigh-ins to another group with them; writes nothing new",
+  send_away_reply: "a trigger: the COACH's automatic away reply, written as the coach, in answer to a client's message",
+};
+
 // Tables with a column that names who wrote the row (author_id, sender_id, commenter_id ...) that are deliberately NOT guarded, and why. Anything else with such a column must be guarded.
 const LEFT_OUT = {
   support_messages: "a child must always be able to ask for help",
@@ -85,6 +91,64 @@ export default {
       h.check("a coach can still message a child" + (r.error ? ": " + r.error : ""), !r.error);
       r = await message(child, coach);
       h.check("a child under 13 cannot message by writing to the table", !!r.error && /row-level security/i.test(r.error), JSON.stringify(r));
+
+      // ---- an upsert (insert, or update on conflict) goes through for an allowed person and not for a blocked one
+      await h.as(adult);
+      r = await tryQ(db, `insert into public.body_weight_logs (athlete_id, group_id, weight) values ($1, $2, 181) on conflict (athlete_id, logged_date) do update set weight = excluded.weight returning weight`, [adult, g]);
+      h.check("an adult's weight upsert (the app's own pattern) works, also the second time, as an update" + (r.error ? ": " + r.error : ""), !r.error && Number(r.rows[0]?.weight) === 181);
+      await h.asSuper();
+      await db.query(`insert into public.body_weight_logs (athlete_id, group_id, weight) values ($1, $2, 79)`, [child, g]);
+      await h.as(child);
+      r = await tryQ(db, `update public.body_weight_logs set weight = 70 where athlete_id = $1 returning id`, [child]);
+      h.check("a blocked client cannot change an earlier weight either", !!r.error || r.rows.length === 0, JSON.stringify(r));
+      await h.asSuper();
+      // a recipient marking a message read: refused for a blocked recipient, silently
+      await db.query(`insert into public.direct_messages (group_id, sender_id, recipient_id, body) values ($1, $2, $3, 'from coach')`, [g, coach, child]);
+      await h.as(child);
+      r = await tryQ(db, `update public.direct_messages set read_at = now() where recipient_id = $1 returning id`, [child]);
+      h.check("a blocked recipient cannot mark messages read (nothing changes, no error is shown to them)", !r.error && r.rows.length === 0, JSON.stringify(r));
+      await h.asSuper();
+
+      // ---- the scan function, which bypasses the table policies, asks the question itself
+      const scan = async (who, athlete) => {
+        await h.as(who);
+        const x = await tryQ(db, `select public.save_body_scan($1, $2, $3::jsonb, null, true) as r`, [g, athlete, JSON.stringify({ scanDate: new Date().toISOString().slice(0, 10), weightLb: 150 })]);
+        await h.asSuper();
+        return x;
+      };
+      r = await scan(adult, adult);
+      h.check("an adult can save their own scan, and the weigh-in it carries" + (r.error ? ": " + r.error : ""), !r.error);
+      r = await scan(child, child);
+      h.check("a blocked client cannot save a scan by calling the function", !!r.error && /not authorized/.test(r.error), JSON.stringify(r));
+      h.check("and no scan or weigh-in was written for them by it", (await db.query(`select count(*)::int as n from public.body_scans where athlete_id = $1`, [child])).rows[0].n === 0);
+      r = await scan(coach, child);
+      h.check("a coach can save a scan for that same client" + (r.error ? ": " + r.error : ""), !r.error);
+
+      // ---- no other function that writes a guarded table around the policies is missing the question
+      const writers = (
+        await db.query(`
+          select p.proname, pg_get_function_identity_arguments(p.oid) as args, p.prosrc
+          from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+          where n.nspname = 'public' and p.prosecdef and p.prokind = 'f'`)
+      ).rows.filter((x) => new RegExp("(insert\\s+into|update)\\s+(public\\.)?(" + GUARDED.join("|") + ")\\b", "i").test(x.prosrc));
+      const unasked = writers.filter((x) => !/minor_may_write/.test(x.prosrc) && !(x.proname in WRITERS_THAT_ARE_FINE)).map((x) => x.proname);
+      h.check("every security-definer function that writes a guarded table asks minor_may_write or is listed as fine" + (unasked.length ? ": " + unasked.join(", ") : ""), unasked.length === 0);
+
+      // ---- the pictures and videos themselves
+      const storageGuard = (await db.query(`select policyname, cmd, permissive from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname like 'minor_write_guard_storage_%' order by cmd`)).rows;
+      h.check("restrictive insert and update policies on file storage", storageGuard.length === 2 && storageGuard.every((p) => p.permissive === "RESTRICTIVE") && storageGuard[0].cmd === "INSERT" && storageGuard[1].cmd === "UPDATE", JSON.stringify(storageGuard));
+      const upload = async (who, bucket, owner) => {
+        await h.as(who);
+        const x = await tryQ(db, `insert into storage.objects (bucket_id, name, owner) values ($1, $2, $3) returning id`, [bucket, owner + "/test.jpg", who]);
+        await h.asSuper();
+        return x;
+      };
+      r = await upload(child, "progress-photos", child);
+      h.check("a blocked client cannot upload a progress photo" + (r.error ? "" : " (it went through)"), !!r.error && /row-level security/i.test(r.error), JSON.stringify(r));
+      r = await upload(child, "post-media", child);
+      h.check("nor to the feed's media bucket", !!r.error && /row-level security/i.test(r.error), JSON.stringify(r));
+      r = await upload(adult, "progress-photos", adult);
+      h.check("an adult's upload to the same bucket still works" + (r.error ? ": " + r.error : ""), !r.error);
 
       // ---- the live-catalog guard
       const authorish = (

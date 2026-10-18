@@ -1,6 +1,6 @@
 -- STEP 170 (PRECHECK, run first, changes nothing): 0418 Release AF3: database policies from the post-ship audit (a private client stays private in posts and tags; two undecided account-deletion links decided; the guardian-consent answer limited for a coach; the health-form flag cleared when the last client seat goes)
 --
--- !! This REPLACES two posts policies, one tag policy, profile_reference_policy() and guardian_consent_state(), and adds two small functions and one trigger. It is not additions-only; every replaced text was compared with the live database before this was written and matches.
+-- !! This REPLACES two posts policies, one tag policy, profile_reference_policy() and guardian_consent_state(), and adds two small functions and two triggers. It is not additions-only; every replaced text was compared with the live database before this was written and matches.
 --
 -- Paste into the Supabase SQL editor and run. Every row must say ok = true.
 -- If any row says false: do NOT run the apply file. Copy the result table and send it back.

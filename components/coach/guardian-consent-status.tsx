@@ -48,6 +48,15 @@ export function GuardianConsentStatus({ athleteId, info }: { athleteId: string; 
     await post("/api/guardian-consent/void", "Cancelled.");
   }
 
+  // The database answers a coach only for a client who trains in a live group of theirs. For any other seat, or a lookup that failed, there is no answer: say so, not "not asked yet".
+  if (info === null) {
+    return (
+      <div>
+        <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">Parent or guardian permission (under 18)</p>
+        <p className="font-body text-sm text-steel">Not shown for this seat. It is shown to a coach of a live group where this client trains.</p>
+      </div>
+    );
+  }
   return (
     <div>
       <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">Parent or guardian permission (under 18)</p>

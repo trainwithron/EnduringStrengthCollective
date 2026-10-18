@@ -15,7 +15,6 @@ const HISTORY_TABLES = ["workout_logs", "athlete_sessions", "athlete_notes"] as 
 // person's own goals, check-ins and the like) are erased first; a nullable one is just emptied.
 const AUTHOR_COLUMNS_ERASE: [string, string][] = [
   ["athlete_exercise_overrides", "created_by"],
-  ["client_assessments", "created_by"],
   ["client_goals", "created_by"],
   ["client_habits", "created_by"],
   ["client_sub_goals", "proposed_by"],

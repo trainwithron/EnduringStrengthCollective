@@ -59,6 +59,10 @@ begin
   if p_user is null then
     return false;
   end if;
+  -- It answers only about the caller (or for the server): asking about someone else gets the same 'false' as asking about nobody, so it cannot be used to learn who is a minor or who has a guardian on file.
+  if p_user is distinct from auth.uid() and coalesce(auth.role(), '') <> 'service_role' then
+    return false;
+  end if;
 
   select coalesce(bool_or(role = 'coach'), false), coalesce(bool_or(role = 'athlete'), false)
     into v_has_coach, v_has_athlete
@@ -76,6 +80,9 @@ begin
 
   select date_of_birth into v_intake_dob from public.client_intake where athlete_id = p_user limit 1;
   select birthday into v_profile_birthday from public.athlete_profile_details where athlete_id = p_user limit 1;
+  -- an impossible date counts as no date (and never makes the function raise)
+  if v_intake_dob in ('infinity'::date, '-infinity'::date) then v_intake_dob := null; end if;
+  if v_profile_birthday in ('infinity'::date, '-infinity'::date) then v_profile_birthday := null; end if;
   v_youngest := greatest(v_intake_dob, v_profile_birthday);
 
   -- staff pass unless a date on file shows they are under 18 (staff status never switches off the age rules for a known minor)

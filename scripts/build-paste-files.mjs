@@ -2674,11 +2674,12 @@ STEPS.push({
   n: "170",
   slug: "0418",
   title: "0418 Release AF3: database policies from the post-ship audit (a private client stays private in posts and tags; two undecided account-deletion links decided; the guardian-consent answer limited for a coach; the health-form flag cleared when the last client seat goes)",
-  warn: "This REPLACES two posts policies, one tag policy, profile_reference_policy() and guardian_consent_state(), and adds two small functions and one trigger. It is not additions-only; every replaced text was compared with the live database before this was written and matches.",
+  warn: "This REPLACES two posts policies, one tag policy, profile_reference_policy() and guardian_consent_state(), and adds two small functions and two triggers. It is not additions-only; every replaced text was compared with the live database before this was written and matches.",
   migrations: ["0418"],
   sees: "Success. No rows returned.",
-  afterwards: "An organization owner or admin no longer sees the posts or the tags of a client the coach marked private from the organization. Deleting a person's account is no longer blocked by sub-goals they proposed or assessments they recorded. A coach of a social-only seat or of a retired group no longer sees whether a child's guardian has signed. Removing someone's last client seat clears their health-form flag.",
+  afterwards: "An organization owner or admin no longer sees the posts or the tags of a client the coach marked private from the organization. Deleting a person's account is no longer blocked by sub-goals they proposed; deleting someone who recorded assessments about other people is refused with the usual 'still owns shared records' answer. A coach of a social-only seat or of a retired group no longer sees whether a child's guardian has signed. Removing someone's last client seat (not by themselves) clears their health-form flag, and a social-only seat turned into a training seat asks for the health form.",
   undo: [
+    'drop trigger if exists group_memberships_require_intake_on_upgrade on public.group_memberships;',
     'drop trigger if exists group_memberships_clear_intake on public.group_memberships;',
     'drop function if exists public.clear_intake_flag_when_last_client_seat_goes();',
     functionFromMigration("0402_guardian_consent.sql", "guardian_consent_state"),
@@ -2705,12 +2706,19 @@ STEPS.push({
   title: "0417 Release AF3e paste C: the restrictive write guard on the rest of the covered tables (comments, reactions, messages, photos, weights and the others)",
   migrations: ["0417"],
   sees: "Success. No rows returned.",
-  afterwards: "From now on a client with no birthday on file, under 13, or 13 to 17 without a signed guardian cannot write to these tables by calling the database directly. Nothing changes for coaches, adult clients, staff or a teen with a signed guardian. Apply only after step 168 (posts) has run a few days with no false blocks.",
-  undo: "do $$ declare t text; begin foreach t in array array['comments','reactions','direct_messages','exercise_video_comments','training_partner_profiles','training_partner_requests','challenge_participants','progress_photos','session_exercise_videos','body_weight_logs','body_scans','transformation_cards','transformation_milestones'] loop execute format('drop policy if exists minor_write_guard_insert on public.%I', t); execute format('drop policy if exists minor_write_guard_update on public.%I', t); end loop; end; $$;",
-  undoWhy: "Only if a real person is wrongly blocked from writing. It drops the guard from these tables and nothing else.",
+  afterwards: "From now on a client with no birthday on file, under 13, or 13 to 17 without a signed guardian cannot write to these tables, save a body scan, or upload a picture or video to the four media buckets by calling the database directly. Nothing changes for coaches, adult clients, staff or a teen with a signed guardian. Apply only after step 168 (posts) has run a few days with no false blocks.",
+  warn: "This REPLACES one function, save_body_scan (it only adds one check after the existing authorization; every other line is the live text), and adds restrictive policies on the file storage for four buckets.",
+  undo: [
+    "do $$ declare t text; begin foreach t in array array['comments','reactions','direct_messages','exercise_video_comments','training_partner_profiles','training_partner_requests','challenge_participants','progress_photos','session_exercise_videos','body_weight_logs','body_scans','transformation_cards','transformation_milestones'] loop execute format('drop policy if exists minor_write_guard_insert on public.%I', t); execute format('drop policy if exists minor_write_guard_update on public.%I', t); end loop; end; $$;",
+    "drop policy if exists minor_write_guard_storage_insert on storage.objects;",
+    "drop policy if exists minor_write_guard_storage_update on storage.objects;",
+    fnFromMigration("0382", "save_body_scan"),
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if a real person is wrongly blocked from writing. It drops the guard from these tables and the four file buckets, and puts save_body_scan back to the text it had.",
   rows: [
     ["step 168 (the posts guard) is already applied", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'posts' and policyname = 'minor_write_guard_insert')"],
     ["0417 is not already applied (the guard is not on these tables yet)", "not (" + "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'comments' and policyname = 'minor_write_guard_insert')" + ")"],
+    ["the function it replaces exists", "to_regprocedure('public.save_body_scan(uuid, uuid, jsonb, text, boolean)') is not null"],
     ["every table it guards exists", "to_regclass('public.comments') is not null and to_regclass('public.reactions') is not null and to_regclass('public.direct_messages') is not null and to_regclass('public.exercise_video_comments') is not null and to_regclass('public.training_partner_profiles') is not null and to_regclass('public.training_partner_requests') is not null and to_regclass('public.challenge_participants') is not null and to_regclass('public.progress_photos') is not null and to_regclass('public.session_exercise_videos') is not null and to_regclass('public.body_weight_logs') is not null and to_regclass('public.body_scans') is not null and to_regclass('public.transformation_cards') is not null and to_regclass('public.transformation_milestones') is not null"],
   ],
 });
@@ -3493,7 +3501,7 @@ for (const s of STEPS) {
 // that names the release, the step and the failed checks, and nothing is kept. After the commit one read-only result row per step says whether it is in place.
 // The individual step files stay as the fallback (and for a release that was partly applied by hand: the bundle refuses at the first applied step).
 const BUNDLES = [
-  { id: "release-af3-database-policies", name: "Release AF3 (database policies from the post-ship audit; replaces two posts policies, one tag policy and two functions, adds two functions and one trigger)", steps: ["170"] },
+  { id: "release-af3-database-policies", name: "Release AF3 (database policies from the post-ship audit; replaces two posts policies, one tag policy and two functions, adds two functions and two triggers)", steps: ["170"] },
   { id: "release-af3e-c-write-guard-rest", name: "Release AF3e paste C (the restrictive write guard on the rest of the covered tables; apply only after paste B has run clean for a few days)", steps: ["169"] },
   { id: "release-af3e-b-write-guard-posts", name: "Release AF3e paste B (the restrictive write guard on posts only)", steps: ["168"] },
   { id: "release-af3e-a-minor-may-write", name: "Release AF3e paste A (minor_may_write(): a read-only function; nothing uses it yet)", steps: ["167"] },
