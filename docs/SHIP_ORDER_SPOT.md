@@ -27,7 +27,7 @@
 | S3 | release-team-coach | (see git) | none | team coach Home tiles and menus; built on master 408e6919 |
 | D-held | (data) | - | HELD: step 138, apply-release-cn-held-all.sql, fp 8f22a2d348ee90d7, read check-intake-flag-list.sql first | Ron's word only |
 
-| CM1 | release-moderation | (see git) | Release CM1, step 163 (0411), apply-release-cm1-report-and-block-all.sql, fp ff4797b1b8c093d2 | report a post or comment and block a member in the feed; adds two small tables, two functions and one notice kind, safe before the code |
+| CM1 | release-moderation | (see git) | Release CM1, step 163 (0411), apply-release-cm1-report-and-block-all.sql, fp ebb062f459a6f76a | report a post or comment and block a member in the feed; adds two small tables, two functions and one notice kind, safe before the code |
 Fingerprint = first 16 hex of sha256 of the LF-normalized file: tr -d '\r' < supabase/apply/<file> | sha256sum | cut -c1-16.
 Apply order: CL (136), CM (137), CO (139), G (141), H (142 to 144), I (145), J (146), K1 (147), L (148); then deploy the code; then CP (140) after the code is live. Held 138 only on Ron's word.
 

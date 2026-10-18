@@ -122,6 +122,35 @@ export default {
       const kept = (await db.query(`select post_id, status, removed_at is not null as gone, content_excerpt, content_kind from public.content_reports where id = $1`, [repTiny])).rows[0];
       h.check("the post is gone but the record keeps what it said", (await db.query(`select count(*)::int as n from public.posts where id = $1`, [tinyPost])).rows[0].n === 0 && kept.post_id === null && kept.status === "handled" && kept.gone && kept.content_excerpt === "the owner-coach's post" && kept.content_kind === "post", JSON.stringify(kept));
 
+      // ---- a one-on-one space that is PRIVATE from the organization never sends a report to the organization's owner or admins: straight to the platform administrators
+      const privCoach = await h.user("RB Private Coach");
+      const privClient = await h.user("RB Private Client");
+      await h.orgMember(org2, privCoach, "coach");
+      const gp = await h.group(org2, privCoach, "one_on_one", "RB private space");
+      await h.member(gp, privClient);
+      await h.asSuper();
+      await db.query(`update public.group_memberships set private_from_org = true where group_id = $1 and profile_id = $2`, [gp, privClient]);
+      const privPost = await post(gp, privCoach, "the private coach's post");
+      await h.as(privClient);
+      const repPriv = (await db.query(`select public.report_content($1, null, 'Not okay in private') as id`, [privPost])).rows[0].id;
+      await h.asSuper();
+      h.check("the organization's owner is NOT told about a report in a private space", (await noticesOf(owner2)).length === 1, JSON.stringify(await noticesOf(owner2)));
+      h.check("the platform administrator is", (await noticesOf(admin)).length === 2);
+      await h.as(owner2);
+      h.check("the organization's owner cannot read it, handle it or remove what was reported", (await db.query(`select count(*)::int as n from public.content_reports where id = $1`, [repPriv])).rows[0].n === 0 && (await msg(db, `select public.handle_content_report($1)`, [repPriv])).includes("not found") && (await msg(db, `select public.remove_reported_content($1)`, [repPriv])).includes("not found"));
+      await h.as(admin);
+      h.check("the platform administrator reads it and can handle it", (await db.query(`select count(*)::int as n from public.content_reports where id = $1`, [repPriv])).rows[0].n === 1 && (await msg(db, `select public.handle_content_report($1)`, [repPriv])) === "");
+      await h.asSuper();
+
+      // ---- a stale click cannot delete what someone else decided to keep
+      await h.as(a);
+      const repStale = (await db.query(`select public.report_content($1, null, 'Check this one') as id`, [postByBo])).rows[0].id;
+      await h.as(c1);
+      await db.query(`select public.handle_content_report($1)`, [repStale]);
+      await h.as(c2);
+      h.check("removing a report someone else already handled is refused, and the post stays", (await msg(db, `select public.remove_reported_content($1)`, [repStale])).includes("already handled") && (await db.query(`select count(*)::int as n from public.posts where id = $1`, [postByBo])).rows[0].n === 1);
+      await h.asSuper();
+
       // ---- removing a comment says how many replies went with it
       await h.as(b);
       h.check("a member cannot remove reported content", (await msg(db, `select public.remove_reported_content($1)`, [rep])).includes("not found"));

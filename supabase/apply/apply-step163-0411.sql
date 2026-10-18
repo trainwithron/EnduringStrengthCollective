@@ -77,6 +77,7 @@ revoke all on public.content_reports from anon, authenticated;
 grant select (id, group_id, reported_author_id, post_id, comment_id, content_kind, content_excerpt, reason, status, handled_by, handled_at, removed_at, removed_by, created_at) on public.content_reports to authenticated;
 
 -- Who handles a report about p_author in p_group: the group's coaches other than the person reported; if none, the organization's owner and admins (other than them); if none, the platform administrators.
+-- A space that is private from the organization (a one-on-one client who keeps their records private from it) NEVER goes to the organization's owner and admins: with no other coach it goes straight to the platform administrators.
 create or replace function public.content_report_handlers(p_group uuid, p_author uuid)
 returns setof uuid
 language sql
@@ -89,6 +90,7 @@ as $$
   ), org_admins as (
     select om.profile_id as id from public.organization_memberships om join public.groups g on g.organization_id = om.organization_id
      where g.id = p_group and om.role in ('owner', 'admin') and om.profile_id is distinct from p_author
+       and not public.is_group_private_from_org(p_group)
   ), platform as (
     select p.id from public.profiles p where p.is_platform_admin and p.id is distinct from p_author
   )
@@ -220,7 +222,7 @@ begin
       case when exists (select 1 from public.group_memberships gm where gm.group_id = v_group and gm.profile_id = h)
              or public.is_org_admin_of_group_for(h, v_group)
            then '/groups/' || v_group || '/feed?highlight=' || v_post::text
-           else '/admin/reports' end
+           else '/reports' end
     );
   end loop;
   return v_id;
@@ -259,6 +261,7 @@ begin
   if not found or not public.can_handle_content_report(r.group_id, r.reported_author_id) then
     raise exception 'That report was not found.';
   end if;
+  -- (someone else may have handled it a moment ago; marking it again changes nothing)
   update public.content_reports set status = 'handled', handled_by = auth.uid(), handled_at = now() where id = p_report and status = 'open';
 end;
 $$;
@@ -280,13 +283,17 @@ begin
   if not found or not public.can_handle_content_report(r.group_id, r.reported_author_id) then
     raise exception 'That report was not found.';
   end if;
+  -- Two people can have the panel open: if one already decided (left it up, or removed it), the other's stale click must not delete what the first chose to keep.
+  if r.status <> 'open' then
+    raise exception 'This report was already handled.';
+  end if;
   if r.comment_id is not null then
     select count(*) into v_replies from public.comments where parent_comment_id = r.comment_id;
     delete from public.comments where id = r.comment_id;
   elsif r.post_id is not null then
     delete from public.posts where id = r.post_id;
   end if;
-  update public.content_reports set status = 'handled', handled_by = auth.uid(), handled_at = coalesce(handled_at, now()), removed_at = now(), removed_by = auth.uid() where id = p_report;
+  update public.content_reports set status = 'handled', handled_by = auth.uid(), handled_at = coalesce(handled_at, now()), removed_at = now(), removed_by = auth.uid() where id = p_report and status = 'open';
   return v_replies;
 end;
 $$;
