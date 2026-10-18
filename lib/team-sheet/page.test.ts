@@ -25,6 +25,7 @@ describe("the Team sheet page and its place in the menu", () => {
   it("the download is a read, not a write: no database change, no AI", () => {
     const r = src("app/api/team-sheet/download/route.ts");
     expect(r).toContain("export async function GET");
+    expect(r).toContain("MAX_BYTES = 4_000_000");
     expect(r).not.toMatch(/\.insert\(|\.update\(|\.upsert\(|\.delete\(|anthropic|openai/i);
   });
 });

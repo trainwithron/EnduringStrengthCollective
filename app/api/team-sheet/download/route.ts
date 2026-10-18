@@ -9,6 +9,7 @@ import { DEFAULT_PER_RACK, MAX_PER_RACK, MIN_PER_RACK, isDateKey } from "@/lib/t
 // The team sheet download (layout B, one sheet per rack): a Day sheet or a Week sheet, as an Excel file or a printable PDF. Only a coach of the group. The sheet is built as the coach, so it holds only what they may read.
 export const maxDuration = 60;
 
+const MAX_BYTES = 4_000_000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const fail = (status: number, error: string) => NextResponse.json({ error }, { status, headers: { "Cache-Control": "no-store" } });
 
@@ -43,6 +44,8 @@ export async function GET(request: Request) {
   const slug = loaded.model.groupName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 30) || "team";
   const name = `team-sheet-${slug}-${mode === "week" ? "week-of-" : ""}${date}.${format}`;
   const body = format === "pdf" ? buildSheetPdf(loaded.model) : buildSheetXlsx(loaded.model);
+  // A response over about 4.5 MB is refused by the host; the largest realistic sheet run is under 3 MB, so this only stops an extreme one with a plain message.
+  if (body.length > MAX_BYTES) return fail(413, "That sheet run is too large to send in one file. Choose a Day sheet, or make it in two parts.");
   return new NextResponse(new Uint8Array(body), {
     status: 200,
     headers: {
