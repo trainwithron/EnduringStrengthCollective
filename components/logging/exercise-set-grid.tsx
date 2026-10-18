@@ -294,7 +294,7 @@ function GridCell({
           invalid ? "border-2 border-rust " : ""
         }${
           showLock
-            ? "bg-surface border-2 border-dashed border-rust/70 text-chalk/50"
+            ? "bg-surface border-2 border-dashed border-rust/70 text-chalk/70"
             : "bg-surface border border-steel/30 text-chalk"
         }`}
       />
