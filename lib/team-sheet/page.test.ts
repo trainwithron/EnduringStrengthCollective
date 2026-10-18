@@ -12,6 +12,11 @@ describe("the Team sheet page and its place in the menu", () => {
     expect(f).not.toMatch(/whole-team|per-athlete/i);
     expect(f).toContain("/api/team-sheet/download?");
     expect(f).toContain("Timed and distance work (a plank, a carry) is not read yet: it goes in Notes.");
+    // the coach says which workout, which week and which days: the program does not need dates
+    expect(f).toContain("Training days");
+    expect(f).toContain("Day 1 goes on the first chosen day");
+    expect(f).toContain("workoutId");
+    expect(f).toContain("programId");
   });
 
   it("the page is for a coach of the group only, and is in the team menu under More", () => {
