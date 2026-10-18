@@ -8,6 +8,7 @@ import { MEAL_SLOT_DELIVERED_FEATURE } from "@/lib/ai-refund-decision";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { rowToPreferences } from "@/lib/nutrition-preferences";
 import { filterOptionsByRules, rulesForPrompt } from "@/lib/plan-preference-check";
+import { filterByMacroTolerance } from "@/lib/meal-option-tolerance";
 
 // "The Nutrition Spot" (nutrition_spot_revamp_scoping_sept19.md,
 // retiring the old "Mix & Macros" name — AI is now the primary meal-
@@ -192,8 +193,14 @@ Favorite foods / requests: ${favoriteFoods || "none given"}${rulesText ? `\n${ru
       original: o,
     }));
     const { kept, dropped: droppedOptions } = rules ? filterOptionsByRules(checked, rules) : { kept: checked, dropped: [] as typeof checked };
-    const verifiedOptions = kept.map((k) => k.original);
+    // Then the numbers: the model is only ASKED to land near the target, so each option's real macros (worked out from the matched foods) are held to it. One that is off by more than the tolerance is not offered.
+    const { kept: onTarget, dropped: offTarget } = filterByMacroTolerance(
+      kept.map((k) => k.original),
+      { proteinG: proteinTarget, carbsG: carbsTarget, fatG: fatTarget }
+    );
+    const verifiedOptions = onTarget;
     const droppedForPreferences = droppedOptions.length;
+    const droppedForMacros = offTarget.length;
 
     // The server's own record that the AI delivered something usable, so a later "the generation failed" refund can be checked against it instead of
     // believing the browser (lib/ai-refund-decision.ts). Best effort: a failed write only means an automatic refund stays possible, never blocks the coach.
@@ -209,7 +216,7 @@ Favorite foods / requests: ${favoriteFoods || "none given"}${rulesText ? `\n${ru
       }
     }
 
-    return NextResponse.json({ options: verifiedOptions, droppedForPreferences });
+    return NextResponse.json({ options: verifiedOptions, droppedForPreferences, droppedForMacros });
   } catch (err) {
     if (err instanceof AiRateLimitedError) {
       return NextResponse.json({ error: err.message }, { status: 429 });
