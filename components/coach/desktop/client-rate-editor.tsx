@@ -51,7 +51,7 @@ export function ClientRateEditor({
     <div className="flex flex-col items-start gap-0.5">
       <div className="flex items-center gap-1">
         <span className="font-body text-xs text-steel">$</span>
-        <input
+        <input aria-label="Monthly rate in dollars"
           type="number"
           min={0}
           max={100000}

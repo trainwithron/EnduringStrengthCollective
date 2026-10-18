@@ -158,14 +158,14 @@ export function ProgrammingSpotterPanel({ programId, flags }: { programId: strin
               <div key={key} className="border border-steel/20 px-3 py-2">
                 <p className="font-body text-sm text-chalk mb-2">{flag.headline}</p>
                 <div className="space-y-2">
-                  <input
+                  <input aria-label="When"
                     type="text"
                     value={condition}
                     onChange={(e) => setCondition(e.target.value)}
                     placeholder="When... (e.g. legs takes up the back half of a session)"
                     className="w-full h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust"
                   />
-                  <input
+                  <input aria-label="Do this instead"
                     type="text"
                     value={preference}
                     onChange={(e) => setPreference(e.target.value)}

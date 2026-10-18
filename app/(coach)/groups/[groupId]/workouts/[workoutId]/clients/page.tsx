@@ -9,6 +9,8 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ClientSlotRow } from "@/components/coach/client-slot-row";
 import { hasReachedProgressionCeiling } from "@/lib/move-them-back";
 
+export const metadata = { title: "Clients" };
+
 export default async function WorkoutClientsPage(
   props: {
     params: Promise<{ groupId: string; workoutId: string }>;

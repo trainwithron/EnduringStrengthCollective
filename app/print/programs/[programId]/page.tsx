@@ -10,6 +10,8 @@ import { getGroupCoachTimezone, nowInZone } from "@/lib/timezone";
 import { getViewerDisplayTimezone } from "@/lib/display-timezone-server";
 import { describePrescription, groupPrintWeeks, releasedDayIds, writeInBoxes, type PrintDay } from "@/lib/program-print";
 
+export const metadata = { title: "Programs" };
+
 // A printable copy of a program (Ron: a coach must never be stuck in our software). Plain black on white, one line per exercise with its prescription and blank boxes to write in
 // what was actually done, grouped by week and day, several days across the page. No videos. The coach can print ANY program they coach, any time. A client or a member of a group program prints only
 // the days already released to them (the same rule the app uses to show them). "Print or save as PDF" uses the browser's own print.

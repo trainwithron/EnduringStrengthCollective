@@ -27,7 +27,7 @@ export function ApplyFromField({
         aria-label="Date the new target starts"
         className="h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs"
       />
-      <span className="text-steel/80">{value === todayKey ? "today" : shortDateLabel(value)}</span>
+      <span className="text-steel">{value === todayKey ? "today" : shortDateLabel(value)}</span>
     </label>
   );
 }

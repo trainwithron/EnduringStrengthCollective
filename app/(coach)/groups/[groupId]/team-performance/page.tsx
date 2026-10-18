@@ -15,6 +15,8 @@ import { getCoachDashboardData } from "@/lib/dashboard-data";
 import { DashboardHero } from "@/components/coach/desktop/dashboard-hero";
 import { TeamPulseCard } from "@/components/coach/desktop/team-pulse-card";
 
+export const metadata = { title: "Team performance" };
+
 function dateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
     d.getDate()

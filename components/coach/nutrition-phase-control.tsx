@@ -72,7 +72,7 @@ export function NutritionPhaseControl({
       <span className="font-body text-xs text-steel uppercase tracking-wide">
         Phase tracking
       </span>
-      <select
+      <select aria-label="Phase tracking"
         value={phase ?? ""}
         onChange={(e) => handleChange(e.target.value)}
         disabled={saving}

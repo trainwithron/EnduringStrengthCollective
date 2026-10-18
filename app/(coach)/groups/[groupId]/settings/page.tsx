@@ -40,6 +40,8 @@ import { ReadDuringRestSettings } from "@/components/coach/read-during-rest-sett
 import { FAITH_PACK } from "@/lib/read-content";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 
+export const metadata = { title: "Settings" };
+
 export default async function SettingsPage(
   props: {
     params: Promise<{ groupId: string }>;
@@ -178,6 +180,9 @@ export default async function SettingsPage(
     const { count: spaceCount } = await (await createCrossOrgServerClient()).from("group_memberships").select("id", { count: "exact", head: true }).eq("profile_id", user.id).eq("role", "athlete");
     trainsWithSeveralCoaches = (spaceCount ?? 0) > 1;
   }
+  // On an organization's front desk (0400): a link to the check-in screen for people who land somewhere else. Read on its own, so a database without the table yet just shows no link.
+  const { data: deskRows } = await supabase.from("org_front_desk").select("organization_id").eq("profile_id", user.id).limit(1);
+  const onFrontDesk = (deskRows ?? []).length > 0;
   // Quiet hours and private lock screens (0395). Read on its own so a database without the columns yet shows the whole page (the two choices are then left out).
   const pushPrefsRead = await supabase.from("profiles").select("quiet_hours_start, quiet_hours_end, generic_push_text").eq("id", user.id).maybeSingle();
   const pushPrefs = pushPrefsRead.error ? null : (pushPrefsRead.data as { quiet_hours_start: number | null; quiet_hours_end: number | null; generic_push_text: boolean | null } | null);
@@ -437,6 +442,12 @@ export default async function SettingsPage(
           </SettingsGroup>
         )}
 
+        <SettingsGroup label="Help">
+          <Link href="/help" className="block font-body text-sm text-chalk">
+            Help articles, what&apos;s new and app status →
+          </Link>
+        </SettingsGroup>
+
         <SettingsGroup label="Feedback">
           <FeedbackButton />
         </SettingsGroup>
@@ -464,6 +475,14 @@ export default async function SettingsPage(
               <DeleteAccountButton />
             </div>
           </SettingsGroup>
+        )}
+
+        {onFrontDesk && (
+          <p className="font-body text-sm pt-2">
+            <Link href="/front-desk" className="text-rust">
+              Open the front desk check-in screen →
+            </Link>
+          </p>
         )}
 
         <div className="pt-2 pb-4">

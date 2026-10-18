@@ -57,14 +57,16 @@ describe("no unsafe option is ever created", () => {
   it("the AI route reads the client's rules on the server, from the database, tells the model, and drops what breaks them", () => {
     expect(route).toContain('.from("client_nutrition_preferences").select("*").eq("athlete_id", athleteId)');
     expect(route).toContain("rulesForPrompt(rules)");
-    expect(route).toContain("filterOptionsByRules(checked, rules)");
+    // the food-rule check now lives in the shared pipeline the route calls (lib/meal-option-pipeline.ts), ahead of the macro check
+    expect(route).toContain("checkMealOptions(allVerified, rules,");
+    expect(src("../../../lib/meal-option-pipeline.ts")).toContain("filterOptionsByRules(checked, rules)");
     expect(route).toContain("droppedForPreferences");
     // the rules are never taken from the request body
     expect(route).not.toMatch(/allergies\s*[,}]\s*=\s*await request/);
-    expect(route.indexOf("await request.json()")).toBeLessThan(route.indexOf("filterOptionsByRules(checked"));
+    expect(route.indexOf("await request.json()")).toBeLessThan(route.indexOf("checkMealOptions(allVerified"));
   });
   it("the check covers the matched food too, not only the AI's own words", () => {
-    expect(route).toContain("l.matchedDescription");
+    expect(src("../../../lib/meal-option-pipeline.ts")).toContain("l.matchedDescription");
   });
   it("the generator sends the client id (never the rules) and filters library options, fallback options and AI options", () => {
     expect(generator).toContain("athleteId,");

@@ -17,7 +17,8 @@ import { orgThemeToCssVars } from "@/lib/theme";
 import { baseFontFamilies, googleFontsHref } from "@/lib/google-fonts";
 
 export const metadata: Metadata = {
-  title: "Spotlight Coaching",
+  // Every page names itself in the tab (and to a screen reader), then the product: "Calendar | Spotlight Coaching".
+  title: { default: "Spotlight Coaching", template: "%s | Spotlight Coaching" },
   description: "Spotlight Coaching — group training platform",
   manifest: "/manifest.webmanifest",
   // The picture a link to the app shows when it is shared (the default Spotlight image; see lib/brand.ts). The base makes the image address absolute.

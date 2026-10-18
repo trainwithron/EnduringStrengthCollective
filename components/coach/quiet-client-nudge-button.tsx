@@ -67,7 +67,7 @@ export function QuietClientNudgeButton({ athleteFirstName }: { athleteFirstName:
               </button>
             ))}
           </div>
-          <textarea
+          <textarea aria-label="Message"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             rows={3}

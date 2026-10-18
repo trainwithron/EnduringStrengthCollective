@@ -16,6 +16,8 @@ import { GraduationSendAgain } from "@/components/coach/desktop/graduation-send-
 import { UnarchiveGroupButton } from "@/components/coach/desktop/unarchive-group-button";
 import Link from "next/link";
 
+export const metadata = { title: "Team" };
+
 export default async function TeamPage(props: { params: Promise<{ groupId: string }> }) {
   const params = await props.params;
   const supabase = await createServerClient();

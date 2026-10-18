@@ -92,7 +92,7 @@ export function MealPlanRetryBox({ groupId, state }: { groupId: string; state: R
               onChange={(e) => setText(e.target.value.slice(0, MAX_RETRY_NOTE))}
               rows={3}
               maxLength={MAX_RETRY_NOTE}
-              className="mt-2 w-full bg-transparent border border-steel/40 p-3 font-body text-base text-chalk placeholder:text-steel/60"
+              className="mt-2 w-full bg-transparent border border-steel/40 p-3 font-body text-base text-chalk placeholder:text-steel"
               placeholder="No fish, more chicken"
             />
           </label>

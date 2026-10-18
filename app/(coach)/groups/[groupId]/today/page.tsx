@@ -10,6 +10,8 @@ import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 
+export const metadata = { title: "Today" };
+
 export default async function TodayPage(
   props: {
     params: Promise<{ groupId: string }>;

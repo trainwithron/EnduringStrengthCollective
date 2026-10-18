@@ -145,7 +145,7 @@ export function BulkEditDayPanel({
         )}
       </div>
 
-      <select
+      <select aria-label="Field to change"
         value={field}
         onChange={(e) => {
           setField(e.target.value as TrackedField);
@@ -162,7 +162,7 @@ export function BulkEditDayPanel({
 
       {mode === "all" ? (
         <div className="flex items-center gap-2">
-          <input
+          <input aria-label="New value"
             type={fieldDef(field).kind === "number" && field !== "rest" && field !== "time" ? "number" : "text"}
             inputMode={field === "rest" || field === "time" ? "text" : undefined}
             value={value}

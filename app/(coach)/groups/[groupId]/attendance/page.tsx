@@ -9,6 +9,8 @@ import { loadAttendance } from "@/lib/attendance";
 import { DEFAULT_COACH_TIMEZONE, addDaysToKey, dateKeyInZone } from "@/lib/timezone";
 import { AttendanceView } from "@/components/coach/desktop/attendance-view";
 
+export const metadata = { title: "Attendance" };
+
 // Who was there: a day-by-day grid for the group over a period, with a spreadsheet of every day each athlete was present. Present = checked in at the kiosk, finished a workout in this group, or attended a group
 // session, that day in the coach's time zone.
 export default async function AttendancePage(props: { params: Promise<{ groupId: string }>; searchParams: Promise<{ from?: string; to?: string }> }) {

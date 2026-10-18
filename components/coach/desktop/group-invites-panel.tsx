@@ -71,7 +71,7 @@ export function GroupInvitesPanel({ groupId, groupName, invites }: { groupId: st
                 Made {formatDay(plan.current.createdAt)} &middot; expires in {plan.current.daysLeft} {plan.current.daysLeft === 1 ? "day" : "days"}
               </p>
               <div className="flex items-center gap-2 mt-1.5">
-                <input readOnly value={`${appOriginBrowser()}/invite/${plan.current.code}`} onFocus={(e) => e.target.select()} className="flex-1 min-w-0 h-10 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none" />
+                <input aria-label="Invite link" readOnly value={`${appOriginBrowser()}/invite/${plan.current.code}`} onFocus={(e) => e.target.select()} className="flex-1 min-w-0 h-10 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none" />
                 <button type="button" onClick={copy} className="h-10 px-3 border border-rust text-rust font-body text-sm shrink-0">
                   {copied ? "Copied" : "Copy"}
                 </button>
