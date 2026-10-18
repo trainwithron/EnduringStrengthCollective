@@ -3,7 +3,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { rateLimitResponse } from "@/lib/rate-limit";
 import { fail, requireCoach, UUID } from "@/lib/team-sheet/coach-access";
 import { MAX_UPLOAD_BYTES, readUpload } from "@/lib/team-sheet/read-upload";
-import { buildReview, loadContext } from "@/lib/team-sheet/review";
+import { buildReview, commonUnit, loadContext } from "@/lib/team-sheet/review";
 
 // Reading a filled team sheet (an Excel file or a CSV) for the review screen. Nothing is saved here and nothing is written: the file is read, checked against what the group has now, and shown back to the coach.
 // Only a coach of the group. The file is read as text; no formula in it is ever run.
@@ -18,7 +18,6 @@ export async function POST(request: Request) {
     return fail(400, "Choose a file to upload.");
   }
   const groupId = String(form.get("groupId") ?? "");
-  const unit = form.get("unit") === "kg" ? "kg" : "lb";
   const file = form.get("file");
   const access = await requireCoach(supabase, groupId);
   if (!access.ok) return access.response;
@@ -35,7 +34,8 @@ export async function POST(request: Request) {
   const loaded = await loadContext(supabase, groupId, read.racks);
   if (!loaded.ok) return fail(502, loaded.error);
   // the unit on the sheet is the unit it was printed in; a sheet printed in kg is read in kg whatever the form says
-  const sheetUnit = read.racks[0].code.unit ?? unit;
+  const sheetUnit = commonUnit(read.racks);
+  if (!sheetUnit) return fail(422, "The sheets in that file were printed in different units (lb and kg). Download them again from one Team sheet page.");
   const review = buildReview(groupId, read.racks, loaded.context, sheetUnit);
-  return NextResponse.json({ review, source: read.source }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ review, source: read.source, ignoredSheets: read.ignoredSheets }, { headers: { "Cache-Control": "no-store" } });
 }

@@ -7,7 +7,7 @@ import type { Review } from "@/lib/team-sheet/review";
 
 // Upload a filled team sheet (Excel or CSV), check what was read, and save it. Every box can be corrected here; the server reads the boxes again from the text left in them, so what is saved is exactly what this
 // screen shows after the reading. Boxes the reader is not sure of are highlighted and, if left, save nothing.
-type SaveResult = { saved: number; kept: number; replaced: number; records: number; batch: string | null; skipped?: { athlete_id: string; day: string; why: string }[]; droppedUnsure?: number };
+type SaveResult = { saved: number; kept: number; replaced: number; records: number; batch: string | null; skipped?: { athlete_id: string; day: string; why: string }[]; droppedUnsure?: number; partial?: boolean; notSaved?: number };
 
 const WEEKDAY = (label: string) => label.split(" ")[0];
 // (the sheet code goes back with the save as printed: the server decodes and checks it, so nothing in the browser can change what a box means)
@@ -23,6 +23,7 @@ export function TeamSheetUpload({ groupId }: { groupId: string }) {
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<SaveResult | null>(null);
   const [undone, setUndone] = useState(false);
+  const [ignored, setIgnored] = useState<string[]>([]);
 
   async function onFile(file: File | null) {
     if (!file) return;
@@ -31,6 +32,9 @@ export function TeamSheetUpload({ groupId }: { groupId: string }) {
     setReview(null);
     setResult(null);
     setUndone(false);
+    // a choice made for the last file does not carry over to this one
+    setReplace(false);
+    setIgnored([]);
     try {
       const form = new FormData();
       form.set("groupId", groupId);
@@ -44,7 +48,11 @@ export function TeamSheetUpload({ groupId }: { groupId: string }) {
         const t: Record<string, string> = {};
         r.sheets.forEach((s, si) => s.rows.forEach((row, ri) => row.days.forEach((cells, di) => cells.forEach((c, ei) => (t[`${si}:${ri}:${di}:${ei}`] = c.text)))));
         setTexts(t);
-        setSkip({});
+        // a row whose name is not the seat's, or a rack whose columns moved, starts left out: the coach ticks it in once they have checked
+        const sk: Record<string, boolean> = {};
+        r.sheets.forEach((s, si) => s.rows.forEach((row, ri) => { if (!row.gone && (row.nameChanged || s.columnsChanged)) sk[`${si}:${ri}`] = true; }));
+        setSkip(sk);
+        setIgnored(Array.isArray(data.ignoredSheets) ? data.ignoredSheets : []);
         setReview(r);
         setSource(data.source === "csv" ? "csv" : "xlsx");
       }
@@ -98,8 +106,12 @@ export function TeamSheetUpload({ groupId }: { groupId: string }) {
 
   async function save() {
     if (!review || saving || totals.workouts === 0) return;
-    if (replace && !(await confirmDialog({ message: "Replace the athletes' own sessions with the sheet? Their own sessions will be deleted and this cannot be undone.", confirmLabel: "Replace", destructive: true }))) return;
+    // held before the question is asked, so a second press while the question is open does nothing
     setSaving(true);
+    if (replace && !(await confirmDialog({ message: "Replace the athletes' own sessions with the sheet? Their own sessions will be deleted and this cannot be undone.", confirmLabel: "Replace", destructive: true }))) {
+      setSaving(false);
+      return;
+    }
     setError(null);
     try {
       const body = {
@@ -136,8 +148,9 @@ export function TeamSheetUpload({ groupId }: { groupId: string }) {
     return (
       <div className="space-y-4 max-w-xl">
         <p className="font-body text-sm" role="status">
-          {undone ? "That upload was undone." : `Saved ${result.saved} workout${result.saved === 1 ? "" : "s"}.`}
+          {undone ? "That upload was undone." : result.partial ? `Saved ${result.saved} workout${result.saved === 1 ? "" : "s"}, but ${result.notSaved ?? "the rest"} could not be saved.` : `Saved ${result.saved} workout${result.saved === 1 ? "" : "s"}.`}
         </p>
+        {!undone && result.partial && <p className="font-body text-sm text-rust" role="alert">Something went wrong part-way. What was saved stays saved and can be undone below; uploading the same file again keeps those and saves the rest.</p>}
         {!undone && (
           <ul className="font-body text-sm text-steel list-disc pl-5 space-y-1">
             {result.kept > 0 && <li>{result.kept} already had a session and were left as they were.</li>}
@@ -164,6 +177,7 @@ export function TeamSheetUpload({ groupId }: { groupId: string }) {
               setReview(null);
               setResult(null);
               setUndone(false);
+              setReplace(false);
             }}
             className={`${button} bg-rust text-graphite hover:opacity-90`}
           >
@@ -180,7 +194,7 @@ export function TeamSheetUpload({ groupId }: { groupId: string }) {
       <div className="max-w-xl space-y-3">
         <label className="block">
           <span className="font-body text-xs text-steel uppercase tracking-wide block mb-1">Filled team sheet (Excel or CSV)</span>
-          <input id="team-sheet-file" type="file" accept=".xlsx,.csv" disabled={busy} onChange={(e) => onFile(e.target.files?.[0] ?? null)} className="block w-full font-body text-sm text-chalk file:mr-3 file:h-11 file:px-4 file:border file:border-steel/40 file:bg-graphite file:text-chalk" />
+          <input id="team-sheet-file" type="file" accept=".xlsx,.csv" disabled={busy} onChange={(e) => { const f = e.target.files?.[0] ?? null; e.target.value = ""; void onFile(f); }} className="block w-full font-body text-sm text-chalk file:mr-3 file:h-11 file:px-4 file:border file:border-steel/40 file:bg-graphite file:text-chalk" />
         </label>
         <p className="font-body text-xs text-steel">Use the Excel file from the Team sheet page, filled in. Nothing is saved until you check it here and press Save.</p>
         {busy && (
@@ -193,6 +207,7 @@ export function TeamSheetUpload({ groupId }: { groupId: string }) {
             {error}
           </p>
         )}
+        {review && ignored.length > 0 && <p className="font-body text-xs text-steel">Not read (not a rack sheet): {ignored.join(", ")}.</p>}
       </div>
 
       {review && read && (
@@ -221,15 +236,17 @@ export function TeamSheetUpload({ groupId }: { groupId: string }) {
           {review.sheets.map((s, si) => (
             <section key={s.rack} aria-label={`Rack ${s.rack}`} className="space-y-2">
               <h2 className="font-display uppercase text-xl">Rack {s.rack}</h2>
+              {s.columnsChanged && <p className="font-body text-sm text-rust" role="alert">The exercise names across the top are not the ones this sheet was printed with. A column may have been added, removed or moved, so a box may be under the wrong exercise. Every row here starts left out; tick a row in once you have checked it, or download a fresh sheet.</p>}
               <div className="overflow-x-auto border border-steel/20">
                 <table className="border-collapse font-body text-sm min-w-full">
+                  <caption className="sr-only">Rack {s.rack}: what was read from each box, by athlete and exercise</caption>
                   <thead>
                     <tr className="bg-surface/60">
-                      <th rowSpan={2} className="text-left p-2 border border-steel/20 align-bottom">
+                      <th scope="col" rowSpan={2} className="text-left p-2 border border-steel/20 align-bottom">
                         Athlete
                       </th>
                       {s.days.map((d, di) => (
-                        <th key={d.date} colSpan={Math.max(1, d.exercises.length)} className="text-left p-2 border border-steel/20">
+                        <th key={d.date} scope="colgroup" colSpan={Math.max(1, d.exercises.length)} className="text-left p-2 border border-steel/20">
                           {d.label}
                           {d.title ? ` - ${d.title}` : ""}
                         </th>
@@ -243,7 +260,7 @@ export function TeamSheetUpload({ groupId }: { groupId: string }) {
                           </th>
                         ) : (
                           d.exercises.map((ex) => (
-                            <th key={ex.id} className="p-2 border border-steel/20 text-left align-top min-w-[8rem]">
+                            <th key={ex.id} scope="col" className="p-2 border border-steel/20 text-left align-top min-w-[8rem]">
                               <span className="block">{ex.name}</span>
                               <span className="block text-xs text-steel font-normal">{ex.missing ? "removed" : ex.kind === "unread" ? "notes only" : ex.prescription}</span>
                             </th>
@@ -263,7 +280,7 @@ export function TeamSheetUpload({ groupId }: { groupId: string }) {
                               <span>
                                 {row.name}
                                 {row.gone && <span className="block text-xs text-rust font-normal">not in this group any more</span>}
-                                {row.nameChanged && <span className="block text-xs text-rust font-normal">printed as {row.printedName}: check it is the right person</span>}
+                                {row.nameChanged && <span className="block text-xs text-rust font-normal">printed as {row.printedName}: check it is the right person, then tick it in</span>}
                                 {row.existing.some(Boolean) && <span className="block text-xs text-steel font-normal">already has: {row.existing.map((e, di) => (e ? WEEKDAY(s.days[di].label) : null)).filter(Boolean).join(", ")}</span>}
                               </span>
                             </label>

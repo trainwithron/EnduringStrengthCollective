@@ -2,8 +2,8 @@
   {
     "athlete_id": "@ANN",
     "workout_id": "@WORKOUT_MON",
-    "day": "2026-10-19",
-    "at": "2026-10-19T16:00:00.000Z",
+    "day": "2026-10-05",
+    "at": "2026-10-05T16:00:00.000Z",
     "exercises": [
       {
         "id": "@EX_SQUAT",
@@ -40,8 +40,8 @@
   {
     "athlete_id": "@ANN",
     "workout_id": "@WORKOUT_WED",
-    "day": "2026-10-21",
-    "at": "2026-10-21T16:00:00.000Z",
+    "day": "2026-10-07",
+    "at": "2026-10-07T16:00:00.000Z",
     "exercises": [
       {
         "id": "@EX_PULLUP",
@@ -65,8 +65,8 @@
   {
     "athlete_id": "@CY",
     "workout_id": "@WORKOUT_MON",
-    "day": "2026-10-19",
-    "at": "2026-10-19T16:00:00.000Z",
+    "day": "2026-10-05",
+    "at": "2026-10-05T16:00:00.000Z",
     "exercises": [
       {
         "id": "@EX_SQUAT",

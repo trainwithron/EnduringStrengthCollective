@@ -62,7 +62,11 @@ const snapshot64 = async () =>
   );
 
 // ---- the numbered steps ----
-const steps = JSON.parse(readFileSync(new URL("../../supabase/apply/steps.json", import.meta.url), "utf8"));
+const stepsFile = JSON.parse(readFileSync(new URL("../../supabase/apply/steps.json", import.meta.url), "utf8"));
+// steps.json lists the newer steps (136 and up) in the order they were written, which is not the order they are applied (171 is listed before 154). From step 154 on (the first of them in the list) they run in step-number order, which is the
+// order Ron applies them in; earlier steps keep the order they are listed in.
+const FIRST_NUMBERED = stepsFile.findIndex((s) => s.n === "154");
+const steps = [...stepsFile.slice(0, FIRST_NUMBERED), ...stepsFile.slice(FIRST_NUMBERED).sort((x, y) => Number(x.n) - Number(y.n))];
 for (const s of steps) {
   // Live today: step 13 was applied before it was fixed, so the internal functions are open to signed-in users. Reproduce that before step 24.
   if (s.n === "24") await db.exec(functionAclOpenSql());

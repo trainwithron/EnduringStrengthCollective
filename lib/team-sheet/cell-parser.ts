@@ -66,7 +66,8 @@ export function parseCell(input: unknown, opts: { unit?: SheetUnit; prescribed?:
   // body weight: "bw", or "bw" followed by the reps of each set
   if (tokens[0] === "bw" || tokens[0] === "bodyweight") {
     const rest = tokens.slice(1);
-    if (rest.length === 0) return { kind: "sets", sets: repeat({ weight: null, reps: prescribedReps, repsAssumed: true }, prescribedSets ?? 1) };
+    // body weight with no reps written and none prescribed (a range like 8-10) would save nothing: say so instead of showing it as read
+    if (rest.length === 0) return prescribedReps === null ? unsure(raw.trim(), "body weight, but no number of reps was written or prescribed") : { kind: "sets", sets: repeat({ weight: null, reps: prescribedReps, repsAssumed: true }, prescribedSets ?? 1) };
     const sets: ParsedSet[] = [];
     for (const t of rest) {
       const reps = asReps(t);
@@ -82,7 +83,7 @@ export function parseCell(input: unknown, opts: { unit?: SheetUnit; prescribed?:
     const m = /^(\d+(?:\.\d+)?)(?:x(\d+)(?:x(\d+))?)?$/.exec(t);
     if (!m) return unsure(raw.trim(), `"${t}" could not be read`);
     const weight = Number(m[1]);
-    if (!(weight > 0) || weight > MAX_WEIGHT) return unsure(raw.trim(), `${m[1]} is not a believable weight`);
+    if (!(weight >= 1) || weight > MAX_WEIGHT) return unsure(raw.trim(), `${m[1]} is not a believable weight`);
     if (m[2] === undefined) {
       sets.push({ weight, reps: prescribedReps, repsAssumed: true });
       continue;

@@ -1,7 +1,7 @@
 [
  {
   "id": "release-ts3-team-sheet-save",
-  "name": "Release TS3 (saving a filled team sheet: one table, one notice kind, two functions)",
+  "name": "Release TS3 (saving a filled team sheet: one table, one notice kind, three functions)",
   "steps": [
    "171"
   ],

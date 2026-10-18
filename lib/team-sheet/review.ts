@@ -59,6 +59,8 @@ export interface ReviewSheet {
   codeText: string;
   days: ReviewDay[];
   rows: ReviewRow[];
+  /** the exercise names across the top are not the ones this sheet was printed with: a column may have been added, removed or moved, so every box may be under the wrong exercise */
+  columnsChanged: boolean;
 }
 
 export interface Review {
@@ -97,7 +99,7 @@ export const CONTEXT_READS = {
 export async function loadContext(supabase: any, groupId: string, racks: { code: SheetCode }[]): Promise<{ ok: true; context: Context } | { ok: false; error: string }> {
   const exerciseIds = Array.from(new Set(racks.flatMap((r) => r.code.days.flatMap((d) => d.exercises))));
   const athleteIds = Array.from(new Set(racks.flatMap((r) => r.code.athletes)));
-  const exRead = await readRowsByIds(exerciseIds, (ids: string[]) => (from: number, to: number) => supabase.from("group_workout_exercises").select(CONTEXT_READS.exercises).eq("group_id", groupId).in("id", ids).order("id").range(from, to));
+  const exRead = await readRowsByIds(exerciseIds, (ids: string[]) => (from: number, to: number) => supabase.from("group_workout_exercises").select(CONTEXT_READS.exercises).eq("group_id", groupId).is("athlete_id", null).in("id", ids).order("id").range(from, to));
   if (exRead.error) return { ok: false, error: "Couldn't read the exercises. Try again." };
   const exercises = new Map<string, GweRow>((exRead.data as GweRow[]).map((e) => [e.id, e]));
   const workoutIds = Array.from(new Set(Array.from(exercises.values()).map((e) => e.workout_id)));
@@ -128,11 +130,76 @@ function kindOf(row: GweRow): ExerciseKind {
   return tracked.includes("reps") ? "reps" : "unread";
 }
 
+const baseOf = (printed: string) => printed.replace(/\s*\(\d+\)\s*$/, "").trim().toLowerCase();
+const suffixOf = (printed: string) => Number(/\((\d+)\)\s*$/.exec(printed)?.[1] ?? 1);
+
+/**
+ * Rows are matched to athletes by the NAME printed on the row, not only by position: a sheet sorted or re-ordered in Excel keeps each name with its own boxes, so a lift is never saved to the person in the row it landed in.
+ * A row whose name is not the athlete's now (and is nobody else's in the rack either) stays where it was and is flagged; so are the people who share a short name when their order was swapped. Rows that come back from
+ * the browser (no printed names) are already in the order of the code and are left alone.
+ */
+export function alignRack(rack: ParsedRack, roster: Map<string, string>): { rack: ParsedRack; flagged: Set<string> } {
+  const flagged = new Set<string>();
+  const rows = rack.rows;
+  if (rows.length === 0 || rows.every((r) => !r.printedName)) return { rack, flagged };
+  const expected = rack.code.athletes.map((id) => (roster.has(id) ? baseOf(shortName(roster.get(id))) : null));
+  const target = rows.map((r, i) => {
+    if (!r.printedName || expected[i] === null) return i;
+    const pb = baseOf(r.printedName);
+    if (pb === expected[i]) return i;
+    const others = expected.map((e, j) => (e === pb && j !== i ? j : -1)).filter((j) => j >= 0);
+    return others.length === 1 ? others[0] : -1;
+  });
+  const used = new Set<number>();
+  let ok = true;
+  for (const tg of target) {
+    if (tg < 0) continue;
+    if (used.has(tg)) ok = false;
+    used.add(tg);
+  }
+  // a clash between two rows claiming the same athlete: nobody is moved, every row that does not carry its own name is flagged
+  const final = rows.map((_, i) => (ok ? target[i] : target[i] === i ? i : -1));
+  const out: ParsedRack["rows"] = rows.map((r, i) => ({ ...r, athleteId: rack.code.athletes[i], printedName: "", cells: r.cells.map((d) => d.map(() => "")), notes: "" }));
+  const placed = new Set<number>();
+  // rows that carry a name of a seat go to that seat; the rest stay in their own seat, flagged, if it is free (a row that cannot be placed is left out, which saves nothing)
+  rows.forEach((r, i) => {
+    const tg = final[i];
+    if (tg >= 0) {
+      out[tg] = { ...r, athleteId: rack.code.athletes[tg] };
+      placed.add(tg);
+    }
+  });
+  rows.forEach((r, i) => {
+    if (final[i] >= 0) return;
+    flagged.add(rack.code.athletes[i]);
+    if (!placed.has(i)) {
+      out[i] = { ...r, athleteId: rack.code.athletes[i] };
+      placed.add(i);
+    }
+  });
+  // the same short name for two athletes: the printed numbers must still run in the order of the seats
+  const byBase = new Map<string, number[]>();
+  expected.forEach((e, i) => e !== null && byBase.set(e, [...(byBase.get(e) ?? []), i]));
+  for (const seats of byBase.values()) {
+    if (seats.length < 2) continue;
+    const numbers = seats.map((s) => suffixOf(out[s].printedName));
+    if (numbers.some((n, k) => k > 0 && n <= numbers[k - 1])) seats.forEach((s) => flagged.add(rack.code.athletes[s]));
+  }
+  return { rack: { ...rack, rows: out }, flagged };
+}
+
+/** The unit every sheet in the file was printed in, or null when they were not all the same. */
+export function commonUnit(racks: { code: SheetCode }[]): SheetUnit | null {
+  const units = new Set(racks.map((r) => r.code.unit));
+  return units.size === 1 ? Array.from(units)[0] : null;
+}
+
 export function buildReview(groupId: string, racks: ParsedRack[], context: Context, unit: SheetUnit): Review {
   const sheets: ReviewSheet[] = racks
     .slice()
     .sort((a, b) => a.code.rack - b.code.rack)
-    .map((rack) => {
+    .map((rackIn) => {
+      const { rack, flagged } = alignRack(rackIn, context.roster);
       const days: ReviewDay[] = rack.code.days.map((d) => {
         const exercises: ReviewExercise[] = d.exercises.map((id) => {
           const row = context.exercises.get(id);
@@ -163,9 +230,14 @@ export function buildReview(groupId: string, racks: ParsedRack[], context: Conte
           const wids = Array.from(new Set(day.exercises.map((e) => e.workoutId).filter((x): x is string => !!x)));
           return wids.some((w) => context.sessions.has(`${w}:${r.athleteId}`));
         });
-        return { athleteId: r.athleteId, name: gone ? r.printedName || "(not in the group)" : nowName, printedName: r.printedName, nameChanged: !gone && r.printedName !== "" && r.printedName !== nowName && !r.printedName.startsWith(nowName), gone, existing, days: dayCells, notes: r.notes };
+        return { athleteId: r.athleteId, name: gone ? r.printedName || "(not in the group)" : nowName, printedName: r.printedName, nameChanged: !gone && flagged.has(r.athleteId), gone, existing, days: dayCells, notes: r.notes };
       });
-      return { rack: rack.code.rack, code: rack.code, codeText: encodeSheetCode(rack.code), days, rows };
+      // the names across the top of the file against the exercises of the sheet (a renamed exercise is fine for one column; every column wrong means the columns moved)
+      const headers = rack.headers;
+      const columnsChanged =
+        !!headers &&
+        days.some((day, di) => day.exercises.some((ex, ei) => !ex.missing && (headers[di]?.[ei] ?? "").trim().toLowerCase() !== ex.name.trim().toLowerCase()));
+      return { rack: rack.code.rack, code: rack.code, codeText: encodeSheetCode(rack.code), days, rows, columnsChanged };
     });
 
   let filledRows = 0;
@@ -175,13 +247,17 @@ export function buildReview(groupId: string, racks: ParsedRack[], context: Conte
   let gone = 0;
   for (const s of sheets) {
     for (const row of s.rows) {
+      if (row.gone) {
+        gone++;
+        continue;
+      }
       const cells = row.days.flat();
       const filled = cells.filter((c) => c.result.kind === "sets" || c.result.kind === "skipped");
       if (filled.length > 0 || cells.some((c) => c.result.kind === "unsure")) filledRows++;
       filledCells += cells.filter((c) => c.result.kind === "sets").length;
       unsure += cells.filter((c) => c.result.kind === "unsure").length;
-      existing += row.existing.filter(Boolean).length;
-      if (row.gone) gone++;
+      // an existing session only matters (kept or replaced) for a day this athlete has something to save on
+      existing += row.existing.filter((e, di) => e && row.days[di].some((c) => c.result.kind === "sets")).length;
     }
   }
   return { groupId, unit, sheets, summary: { athletes: sheets.reduce((n, s) => n + s.rows.length, 0), filledRows, filledCells, unsure, existing, gone } };

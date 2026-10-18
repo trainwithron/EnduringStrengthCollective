@@ -6,6 +6,8 @@ const state = vi.hoisted(() => ({
   tables: {} as Record<string, { data: any; error?: any }>,
   rpc: { data: null as any, error: null as any },
   rpcCalls: [] as { name: string; args: any }[],
+  rpcQueue: [] as { data: any; error: any }[],
+  piece: 50,
   limited: false,
 }));
 
@@ -14,7 +16,8 @@ function fakeDb() {
     auth: { getUser: async () => ({ data: { user: state.user } }) },
     rpc: async (name: string, args: any) => {
       state.rpcCalls.push({ name, args });
-      return { data: state.rpc.data, error: state.rpc.error };
+      const queued = state.rpcQueue.shift();
+      return queued ?? { data: state.rpc.data, error: state.rpc.error };
     },
     from(table: string) {
       let from = 0;
@@ -52,6 +55,7 @@ function fakeDb() {
 }
 
 vi.mock("@/lib/supabase/server", () => ({ createServerClient: async () => fakeDb() }));
+vi.mock("@/lib/team-sheet/save-pieces", () => ({ savePiece: () => state.piece }));
 vi.mock("@/lib/rate-limit", () => ({ rateLimitResponse: async () => (state.limited ? new Response(JSON.stringify({ error: "slow down" }), { status: 429 }) : null) }));
 vi.mock("@/lib/timezone", async (original) => ({ ...(await original<typeof import("@/lib/timezone")>()), getGroupCoachTimezone: async () => "America/New_York" }));
 
@@ -114,6 +118,8 @@ beforeEach(() => {
   state.limited = false;
   state.rpc = { data: null, error: null };
   state.rpcCalls = [];
+  state.rpcQueue = [];
+  state.piece = 50;
   seed();
 });
 
@@ -258,14 +264,50 @@ describe("the save route", () => {
   it("the database's refusals come back as plain words, and nothing is claimed saved", async () => {
     state.rpc = { data: null, error: { message: "not authorized" } };
     expect((await save(json("save", body()))).status).toBe(403);
-    state.rpc = { data: null, error: { message: "a weight or a number of reps is not believable" } };
-    const r = await save(json("save", body()));
-    expect(r.status).toBe(422);
-    expect((await r.json()).error).toMatch(/Nothing was saved/);
     state.rpc = { data: null, error: { message: "boom" } };
     const x = await save(json("save", body()));
     expect(x.status).toBe(502);
     expect((await x.json()).error).toMatch(/Nothing was saved/);
+  });
+
+  it("a big upload goes in pieces that join into ONE upload: the first starts it, each later one adds to it, only the last asks for the notice", async () => {
+    state.piece = 1;
+    state.rpcQueue = [
+      { data: { batch: uuid(70), saved: 1, kept: 0, replaced: 0, records: 1, skipped: [] }, error: null },
+      { data: { batch: uuid(70), saved: 1, kept: 0, replaced: 1, records: 2, skipped: [{ athlete_id: "x", day: "d", why: "w" }] }, error: null },
+    ];
+    const res = await save(json("save", body()));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ batch: uuid(70), saved: 2, replaced: 1, records: 2, droppedUnsure: 1 });
+    expect(state.rpcCalls).toHaveLength(2);
+    expect(state.rpcCalls[0].args).toMatchObject({ p_batch: null, p_last: false });
+    expect(state.rpcCalls[0].args.p_rows).toHaveLength(1);
+    expect(state.rpcCalls[1].args).toMatchObject({ p_batch: uuid(70), p_last: true });
+    expect(state.rpcCalls[1].args.p_rows).toHaveLength(1);
+  });
+
+  it("a failure part-way closes the upload that was started and says exactly how many were not saved", async () => {
+    state.piece = 1;
+    state.rpcQueue = [
+      { data: { batch: uuid(70), saved: 1, kept: 0, replaced: 0, records: 0, skipped: [] }, error: null },
+      { data: null, error: { message: "boom" } },
+      { data: { batch: uuid(70), saved: 0, kept: 0, replaced: 0, records: 0, skipped: [] }, error: null },
+    ];
+    const res = await save(json("save", body()));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ partial: true, batch: uuid(70), saved: 1, notSaved: 1 });
+    expect(state.rpcCalls).toHaveLength(3);
+    expect(state.rpcCalls[2].args).toMatchObject({ p_batch: uuid(70), p_last: true, p_rows: [] });
+  });
+
+  it("sheets printed in different units are refused", async () => {
+    const kgModel: SheetModel = { ...model(), unit: "kg", racks: [{ ...makeRacks([{ id: uuid(13), fullName: "Cy Clark" }], 4)[0], number: 2 }] };
+    const b: any = body();
+    b.sheets = [b.sheets[0], { code: encodeSheetCode(rackCode(kgModel, kgModel.racks[0])), rows: [{ athleteId: uuid(13), cells: [["", ""]] }] }];
+    const res = await save(json("save", b));
+    expect(res.status).toBe(422);
+    expect((await res.json()).error).toMatch(/different units/);
+    expect(state.rpcCalls).toHaveLength(0);
   });
 });
 

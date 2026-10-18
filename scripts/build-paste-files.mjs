@@ -2673,20 +2673,22 @@ STEPS.push({
 STEPS.push({
   n: "171",
   slug: "0419",
-  title: "0419 Release TS3: saving a filled team sheet (one table, one notice kind, two functions: save the sheets as completed coach-logged workouts on their real dates, and undo a whole upload)",
+  title: "0419 Release TS3: saving a filled team sheet (one table, one notice kind, three functions: save the sheets as completed coach-logged workouts on their real dates, undo a whole upload, and a private helper that puts the record board right)",
   warn: "This REBUILDS the notification type list to add one kind (team_sheet_saved), the same widening earlier steps made; it reads the live list first and refuses if the rebuilt list does not match. Everything else is additions only.",
   migrations: ["0419"],
   sees: "Success. No rows returned.",
   afterwards: "Nothing changes on screen until the Release TS3 code is live. Then a coach can upload filled team sheets, check them on a review screen, save them as workouts on their real dates, and undo a whole upload.",
   undo: [
     "drop function if exists public.team_sheet_undo(uuid);",
-    "drop function if exists public.team_sheet_save(uuid, text, jsonb, boolean);",
+    "drop function if exists public.team_sheet_fix_record(uuid, text, text);",
+    "drop function if exists public.team_sheet_save(uuid, text, jsonb, boolean, uuid, boolean);",
     "drop table if exists public.team_sheet_batches;",
   ].join(String.fromCharCode(10)),
   undoWhy: "Only if step 171 misbehaves, and only before anyone has saved an upload: workouts an upload already saved stay (undo them from the app first). The new notice kind is left in the list; it is harmless.",
   rows: [
     ["0419 is not already applied (the batch table is not there yet)", "to_regclass('public.team_sheet_batches') is null"],
     ["the functions it finishes a workout with exist", "to_regprocedure('public.complete_workout_session(uuid)') is not null and to_regprocedure('public.recompute_training_maxes_internal(uuid, text)') is not null and to_regprocedure('public.group_in_active_org(uuid)') is not null and to_regprocedure('public.is_group_coach(uuid)') is not null"],
+    ["the tables it reads exist", "to_regclass('public.programs') is not null and to_regclass('public.workouts') is not null and to_regclass('public.group_workout_exercises') is not null and to_regclass('public.client_inactive') is not null and to_regclass('public.group_memberships') is not null"],
     ["the notification type list it widens is there", "exists (select 1 from pg_constraint c where c.conname = 'notifications_type_check' and c.conrelid = 'public.notifications'::regclass)"],
     ["the tables it writes exist", "to_regclass('public.athlete_sessions') is not null and to_regclass('public.session_exercises') is not null and to_regclass('public.set_logs') is not null and to_regclass('public.workout_logs') is not null and to_regclass('public.exercise_records') is not null and exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'athlete_sessions' and column_name = 'import_batch_id')"],
   ],
@@ -3523,7 +3525,7 @@ for (const s of STEPS) {
 // that names the release, the step and the failed checks, and nothing is kept. After the commit one read-only result row per step says whether it is in place.
 // The individual step files stay as the fallback (and for a release that was partly applied by hand: the bundle refuses at the first applied step).
 const BUNDLES = [
-  { id: "release-ts3-team-sheet-save", name: "Release TS3 (saving a filled team sheet: one table, one notice kind, two functions)", steps: ["171"] },
+  { id: "release-ts3-team-sheet-save", name: "Release TS3 (saving a filled team sheet: one table, one notice kind, three functions)", steps: ["171"] },
   { id: "release-af3-database-policies", name: "Release AF3 (database policies from the post-ship audit; replaces two posts policies, one tag policy and two functions, adds two functions and two triggers)", steps: ["170"] },
   { id: "release-af3e-c-write-guard-rest", name: "Release AF3e paste C (the restrictive write guard on the rest of the covered tables; apply only after paste B has run clean for a few days)", steps: ["169"] },
   { id: "release-af3e-b-write-guard-posts", name: "Release AF3e paste B (the restrictive write guard on posts only)", steps: ["168"] },

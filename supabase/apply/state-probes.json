@@ -1490,7 +1490,7 @@
  {
   "n": "171",
   "slug": "0419",
-  "title": "0419 Release TS3: saving a filled team sheet (one table, one notice kind, two functions: save the sheets as completed coach-logged workouts on their real dates, and undo a whole upload)",
+  "title": "0419 Release TS3: saving a filled team sheet (one table, one notice kind, three functions: save the sheets as completed coach-logged workouts on their real dates, undo a whole upload, and a private helper that puts the record board right)",
   "migrations": [
    "0419"
   ],

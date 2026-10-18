@@ -21,7 +21,7 @@ function model(): SheetModel {
     groupName: "Varsity Football",
     mode: "week",
     unit: "lb",
-    days: [day("2026-10-19", "Lower A", [ex(1, "Back squat"), ex(2, "Bench press")]), day("2026-10-21", "Upper", [ex(3, "Pull-up", { prescription: "3x8 reps" }), ex(4, "Plank", { unread: true })])],
+    days: [day("2026-10-05", "Lower A", [ex(1, "Back squat"), ex(2, "Bench press")]), day("2026-10-07", "Upper", [ex(3, "Pull-up", { prescription: "3x8 reps" }), ex(4, "Plank", { unread: true })])],
     racks: makeRacks(
       [
         { id: uuid(11), fullName: "Ann Adams" },
@@ -228,8 +228,8 @@ describe("the review", () => {
     expect(droppedUnsure).toBe(1);
     const annMon = rows.find((r) => r.athlete_id === uuid(11) && r.workout_id === WORKOUT_MON)!;
     expect(Object.keys(annMon).sort()).toEqual(["at", "athlete_id", "day", "exercises", "workout_id"]);
-    expect(annMon.day).toBe("2026-10-19");
-    expect(annMon.at).toBe("2026-10-19T16:00:00.000Z"); // noon in New York (EDT)
+    expect(annMon.day).toBe("2026-10-05");
+    expect(annMon.at).toBe("2026-10-05T16:00:00.000Z"); // noon in New York (EDT)
     expect(annMon.exercises.map((e) => e.id)).toEqual([uuid(101), uuid(102)]);
     expect(annMon.exercises[0].sets).toEqual([{ weight: 225, reps: 5 }, { weight: 235, reps: 5 }, { weight: 245, reps: 5 }]);
     expect(annMon.exercises[1].sets).toEqual([{ weight: 185, reps: 5 }, { weight: 195, reps: 3 }]);
@@ -266,7 +266,7 @@ describe("the review", () => {
 
   it("two workouts in one day become two rows, one per workout", () => {
     const m = model();
-    m.days = [{ date: "2026-10-19", label: dayLabel("2026-10-19"), title: "x", exercises: [ex(1, "Back squat"), ex(3, "Pull-up")] }];
+    m.days = [{ date: "2026-10-05", label: dayLabel("2026-10-05"), title: "x", exercises: [ex(1, "Back squat"), ex(3, "Pull-up")] }];
     m.mode = "day";
     const wb = buildSheetWorkbook(m);
     fill(wb, 1, 0, 0, "225");
