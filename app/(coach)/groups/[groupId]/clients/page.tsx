@@ -21,6 +21,7 @@ import { groupClientsDestination } from "@/lib/coach-clients-nav";
 import { getCoachedGroups, groupsInOrgOf, groupsInOrgOfOpened } from "@/lib/coach-groups";
 import { mergeRosterAcrossGroups, type RosterRowAcrossGroups } from "@/lib/coach-roster";
 import type { RosterMember } from "@/lib/types";
+import { RemovedClientsPanel, type RemovedClient } from "@/components/coach/desktop/removed-clients-panel";
 import {
   classifyNutritionTrend,
   isTrendAligned,
@@ -352,6 +353,10 @@ export default async function ClientsPage(
     if (judged > 0) phaseAlignmentSummary = { total: judged, misaligned };
   }
 
+  // People taken out of this group (Release Z1). Read on its own, so a database without the table yet just shows none.
+  const removalRead = await supabase.from("client_removals").select("id, athlete_name, removed_at, delete_after").eq("group_id", params.groupId).is("restored_at", null).is("purged_at", null).order("removed_at", { ascending: false }).limit(200);
+  const removed: RemovedClient[] = removalRead.error ? [] : ((removalRead.data ?? []) as { id: string; athlete_name: string | null; removed_at: string; delete_after: string | null }[]).map((r) => ({ id: r.id, name: r.athlete_name ?? "A former client", removedAt: r.removed_at, deleteAfter: r.delete_after }));
+
   return (
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="members">
       <div className="pb-6 border-b border-steel/20 mb-6 flex items-center justify-between">
@@ -417,6 +422,8 @@ export default async function ClientsPage(
       ) : (
         <ClientCardGrid groupId={params.groupId} members={athletes} positions={positions} />
       )}
+
+      <RemovedClientsPanel removals={removed} />
     </CoachDesktopShell>
   );
 }

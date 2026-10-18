@@ -36,6 +36,7 @@ export const CRON_JOBS: CronJob[] = [
   { job: "close-stale-sessions", path: "/api/cron/close-stale-sessions", maxAgeHours: DAILY },
   { job: "notification-push", path: "/api/cron/notification-push", maxAgeHours: FREQUENT },
   { job: "departing-coaches", path: "/api/cron/departing-coaches", maxAgeHours: 12 },
+  { job: "purge-removed-clients", path: "/api/cron/purge-removed-clients", maxAgeHours: DAILY },
   { job: "cron-watchdog", path: "/api/cron/cron-watchdog", maxAgeHours: DAILY },
 ];
 
