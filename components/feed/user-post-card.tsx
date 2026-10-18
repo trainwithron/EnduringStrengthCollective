@@ -8,15 +8,19 @@ import { DeletePostButton } from "./delete-post-button";
 import { renderWithMentions } from "./mention-text";
 import { Pin } from "lucide-react";
 import { EventAnswerButtons } from "@/components/group/group-event-answer";
+import { ReportAndBlockMenu } from "./report-and-block-menu";
 
 export function UserPostCard({
   post,
   viewerId,
   isCoach,
+  onBlocked,
 }: {
   post: FeedPost;
   viewerId: string | null;
   isCoach: boolean;
+  // Called when the viewer blocks this post's author (the list then hides their posts).
+  onBlocked?: (authorId: string) => void;
 }) {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const initials = post.author.fullName
@@ -92,6 +96,11 @@ export function UserPostCard({
           onToggle={() => setCommentsOpen((o) => !o)}
         />
       </div>
+      {viewerId && post.author.id && post.author.id !== viewerId && onBlocked && (
+        <div className="mt-2">
+          <ReportAndBlockMenu postId={post.id} authorId={post.author.id} authorName={post.author.fullName} onBlocked={onBlocked} />
+        </div>
+      )}
       {commentsOpen && (
         <InlineCommentSection postId={post.id} viewerId={viewerId} isCoach={isCoach} />
       )}

@@ -24,6 +24,14 @@
   "file": "apply-release-cm-all.sql"
  },
  {
+  "id": "release-cm1-report-and-block",
+  "name": "Release CM1 (report a post or comment, block a member; adds two small tables, two functions and one notice kind, safe before the code)",
+  "steps": [
+   "163"
+  ],
+  "file": "apply-release-cm1-report-and-block-all.sql"
+ },
+ {
   "id": "release-s1-signin-hardening",
   "name": "Release S1 (a changed sign-in email is confirmed by the new address; adds only, safe to run BEFORE the code that goes with it is live)",
   "steps": [

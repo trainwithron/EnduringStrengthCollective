@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { FeedChannel, FeedPost } from "@/lib/types";
 import { PostCard } from "./post-card";
+import { withoutBlocked } from "@/lib/content-moderation";
 
 export function FeedList({
   groupId,
@@ -12,6 +13,7 @@ export function FeedList({
   channel,
   isCoach,
   highlightPostId,
+  blockedIds = [],
 }: {
   groupId: string;
   initialPosts: FeedPost[];
@@ -22,8 +24,13 @@ export function FeedList({
   // a reply" alert) — scrolls to and rings the specific post so it's
   // never just "somewhere in the feed."
   highlightPostId?: string | null;
+  // The members the viewer has blocked (read on the server); their posts are not shown.
+  blockedIds?: string[];
 }) {
   const [posts, setPosts] = useState(initialPosts);
+  const [blocked, setBlocked] = useState<ReadonlySet<string>>(new Set(blockedIds));
+  const onBlocked = (authorId: string) => setBlocked((prev) => new Set([...prev, authorId]));
+  const visiblePosts = withoutBlocked(posts, blocked, (p) => p.author.id);
 
   useEffect(() => {
     if (!highlightPostId) return;
@@ -159,7 +166,7 @@ export function FeedList({
     };
   }, [groupId, viewerId, channel]);
 
-  if (posts.length === 0) {
+  if (visiblePosts.length === 0) {
     return (
       <p className="font-body text-sm text-steel px-5 py-10">
         No posts yet. Finish a workout or share something to get the feed going.
@@ -169,7 +176,7 @@ export function FeedList({
 
   return (
     <div className="divide-y divide-steel/15">
-      {posts.map((post) => (
+      {visiblePosts.map((post) => (
         <div
           key={post.id}
           id={`post-${post.id}`}
@@ -179,7 +186,7 @@ export function FeedList({
               : "scroll-mt-20"
           }
         >
-          <PostCard post={post} viewerId={viewerId} isCoach={isCoach} />
+          <PostCard post={post} viewerId={viewerId} isCoach={isCoach} onBlocked={onBlocked} />
         </div>
       ))}
     </div>

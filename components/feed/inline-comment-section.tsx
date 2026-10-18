@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { ReportAndBlockMenu } from "./report-and-block-menu";
+import { loadBlockedIds } from "@/lib/blocked-members";
+import { withoutBlocked } from "@/lib/content-moderation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { Trash2 } from "lucide-react";
 import { renderWithMentions } from "./mention-text";
@@ -45,9 +48,12 @@ export function InlineCommentSection({
   // replaces re-deriving "who was mentioned" from fuzzy text matching.
   const [selectedMentions, setSelectedMentions] = useState<MentionCandidate[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Members this person has blocked: their comments are not shown, and a new block takes effect at once.
+  const [blocked, setBlocked] = useState<ReadonlySet<string>>(new Set());
 
   useEffect(() => {
     const supabase = createBrowserClient();
+    void loadBlockedIds(supabase).then((ids) => setBlocked(new Set(ids)));
 
     supabase
       .from("comments")
@@ -232,9 +238,11 @@ export function InlineCommentSection({
     setComments((prev) => prev.filter((c) => c.id !== commentId));
   }
 
-  const topLevel = comments.filter((c) => !c.parent_comment_id);
+  const shown = withoutBlocked(comments, blocked, (c) => c.author_id);
+  const topLevel = shown.filter((c) => !c.parent_comment_id);
   const repliesTo = (parentId: string) =>
-    comments.filter((c) => c.parent_comment_id === parentId);
+    shown.filter((c) => c.parent_comment_id === parentId);
+  const onBlocked = (authorId: string) => setBlocked((prev) => new Set([...prev, authorId]));
 
   const canDelete = (comment: CommentRow) => comment.author_id === viewerId || isCoach;
   const replyTarget = replyTo ? comments.find((c) => c.id === replyTo) : null;
@@ -251,6 +259,8 @@ export function InlineCommentSection({
             onReply={() => setReplyTo(c.id)}
             onDelete={canDelete(c) ? () => handleDelete(c.id) : undefined}
             deleting={deletingId === c.id}
+            viewerId={viewerId}
+            onBlocked={onBlocked}
           />
           {repliesTo(c.id).length > 0 && (
             <div className="ml-6 mt-2 space-y-2 border-l border-steel/20 pl-3">
@@ -261,6 +271,8 @@ export function InlineCommentSection({
                   onReply={() => setReplyTo(c.id)}
                   onDelete={canDelete(r) ? () => handleDelete(r.id) : undefined}
                   deleting={deletingId === r.id}
+                  viewerId={viewerId}
+                  onBlocked={onBlocked}
                 />
               ))}
             </div>
@@ -328,11 +340,15 @@ function CommentLine({
   onReply,
   onDelete,
   deleting,
+  viewerId,
+  onBlocked,
 }: {
   comment: CommentRow;
   onReply: () => void;
   onDelete?: () => void;
   deleting: boolean;
+  viewerId: string | null;
+  onBlocked: (authorId: string) => void;
 }) {
   return (
     <div>
@@ -353,6 +369,9 @@ function CommentLine({
             <Trash2 className="w-3 h-3" />
             {deleting ? "Deleting…" : "Delete"}
           </button>
+        )}
+        {viewerId && comment.author_id && comment.author_id !== viewerId && (
+          <ReportAndBlockMenu commentId={comment.id} authorId={comment.author_id} authorName={comment.profiles?.full_name ?? ""} onBlocked={onBlocked} />
         )}
       </div>
     </div>

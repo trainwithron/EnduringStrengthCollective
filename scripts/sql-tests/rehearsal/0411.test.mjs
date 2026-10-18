@@ -25,7 +25,7 @@ export default {
       await h.asSuper();
       const post = (await db.query(`insert into public.posts (group_id, author_id, post_type, channel, body) values ($1, $2, 'user_post', 'general', 'a post by Bo') returning id`, [g, b])).rows[0].id;
       const own = (await db.query(`insert into public.posts (group_id, author_id, post_type, channel, body) values ($1, $2, 'user_post', 'general', 'a post by Ann') returning id`, [g, a])).rows[0].id;
-      const comment = (await db.query(`insert into public.comments (post_id, author_id, body) values ($1, $2, 'a comment by Bo') returning id`, [own, b])).rows[0].id;
+      const comment = (await db.query(`insert into public.comments (post_id, group_id, author_id, body) values ($1, $2, $3, 'a comment by Bo') returning id`, [own, g, b])).rows[0].id;
 
       const kinds = (await db.query(`select pg_get_constraintdef(c.oid) as d from pg_constraint c where c.conname = 'notifications_type_check' and c.conrelid = 'public.notifications'::regclass`)).rows[0].d;
       h.check("the notice list has content_reported and still has the kinds it had", kinds.includes("'content_reported'") && ["payment_received", "request_decision", "late_change", "space_invite"].every((k) => kinds.includes(`'${k}'`)), kinds);

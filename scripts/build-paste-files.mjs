@@ -2916,6 +2916,29 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "163",
+  slug: "0411",
+  title: "0411 Release CM1: report a post or comment, and block a member (two small tables, two functions, one new kind of notice)",
+  warn: "This REBUILDS the list of allowed notice kinds (adds one: content_reported). It refuses to run if the live list cannot be read or would lose a kind, and changes nothing in that case.",
+  migrations: ["0411"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes on screen until the Release CM1 code is live. Adds user_blocks (a member's own list of people they have stopped seeing), content_reports (reports of posts and comments, read by the group's coaches) and the functions report_content and handle_content_report. Safe to run before the code.",
+  undo: [
+    "drop function if exists public.handle_content_report(uuid);",
+    "drop function if exists public.report_content(uuid, uuid, text);",
+    "drop table if exists public.content_reports;",
+    "drop table if exists public.user_blocks;",
+    "-- the extra notification kind is left in the list (removing it could break rows that use it)",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 163 misbehaves. Run it only while the Release CM1 code is not live. Blocks and reports are forgotten.",
+  rows: [
+    ["0411 is not already applied (the reports table is not there yet)", "to_regclass('public.content_reports') is null"],
+    ["the tables and helpers it uses exist", "to_regclass('public.posts') is not null and to_regclass('public.comments') is not null and to_regclass('public.groups') is not null and to_regclass('public.group_memberships') is not null and to_regprocedure('public.is_group_coach(uuid)') is not null"],
+    ["the notification type rule exists to be widened", "exists (select 1 from pg_constraint c where c.conname = 'notifications_type_check' and c.conrelid = 'public.notifications'::regclass)"],
+  ],
+});
+
+STEPS.push({
   n: "150",
   slug: "0398",
   title: "0398 Release S1: a changed sign-in email must be confirmed by the new address first (waiting requests table)",
@@ -3082,6 +3105,7 @@ const BUNDLES = [
   { id: "release-co", name: "Release CO (nothing about a person is public unless they chose it: personal Find a coach listing; a coach adds only their own clients to a challenge; run BEFORE the code that goes with it is live)", steps: ["139"] },
   { id: "release-cn-held", name: "HELD, Ron's word first: require the health form and waiver of every client without one (read check-intake-flag-list.sql first)", steps: ["138"] },
   { id: "release-cm", name: "Release CM (the guard function and a coach's decision on a flagged screening; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["137"] },
+  { id: "release-cm1-report-and-block", name: "Release CM1 (report a post or comment, block a member; adds two small tables, two functions and one notice kind, safe before the code)", steps: ["163"] },
   { id: "release-s1-signin-hardening", name: "Release S1 (a changed sign-in email is confirmed by the new address; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["150"] },
   { id: "release-f2-client-cap", name: "Release F2 (the free plan's client limit, installed switched off; adds only)", steps: ["149"] },
   { id: "release-l-leaving-coach", name: "Release L (a leaving coach is never given an organization; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["148"] },
@@ -3364,6 +3388,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
     m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
+    m("0411", "to_regclass('public.content_reports') is not null"),
     m("0398", "to_regclass('public.pending_email_changes') is not null"),
     m("0397", "exists (select 1 from pg_trigger where tgname = 'group_memberships_free_tier_limit' and not tgisinternal)"),
     m("0396", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'organization_memberships' and column_name = 'departing_since')"),
