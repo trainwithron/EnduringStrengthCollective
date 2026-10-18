@@ -203,6 +203,40 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
   },
   {
+    slug: "remove-or-delete-a-client",
+    audience: "coach",
+    title: "Remove or delete a client",
+    summary: "Take someone off your list, and what happens to their information.",
+    body: [
+      "On a client's row menu or profile, choose Remove from my clients. They leave your lists and counts and lose their place in the group. Their account and everything about them stay, filed under the group and linked to their email, so nothing is lost.",
+      "Open Members and look under Removed clients to see who you removed. Choose Put back and they return exactly as they were, with their level, position and history. If you invite the same email again, the existing account reconnects with its history.",
+      "Delete permanently is the same removal with 30 days to change your mind. After 30 days the account is erased. Their logged workouts and notes are erased only if you tick that box. Someone who still belongs to another group keeps their account.",
+      "A client with a subscription that can still bill cannot be removed until it is canceled. Their upcoming sessions with you are cancelled and the credits go back to them, and they get a notice saying so.",
+    ],
+  },
+  {
+    slug: "pause-automatic-nutrition-suggestions",
+    audience: "coach",
+    title: "Switch off automatic nutrition suggestions for one client",
+    summary: "Stop the weekly check-in from suggesting changes for a client.",
+    body: [
+      "On a client's Nutrition tab, choose No automatic suggestions for that client. The weekly check-in then makes no suggestion for them, whatever their numbers say, until you switch it back on with one tap.",
+      "The switch follows the person, not the group: if it is on in any of your groups, the weekly check-in stays quiet for them everywhere. The buttons you press yourself, such as working out a starting target, still work.",
+      "It is separate from No macros for this client, which stops the macro numbers for them in this group. Switching that on also stops the weekly suggestions.",
+    ],
+  },
+  {
+    slug: "payment-problems",
+    audience: "coach",
+    title: "Payment problems",
+    summary: "Failed payments, refunds and disputes from your clients.",
+    body: [
+      "When a client's subscription payment fails, a refund is made in Stripe, or a client disputes a charge, it is written down and you get a notice. A payment that keeps failing is announced once, not at every retry.",
+      "On Business, Payment problems lists the last 90 days for your clients. The phone's lock screen only says there is something to open, never an amount or a name.",
+      "Nothing changes by itself: a refund does not take sessions back, and a failed payment does not end a client's access. You decide what to do, and you can adjust a client's sessions by hand. Receipts for clients come from Stripe's own emails.",
+    ],
+  },
+  {
     slug: "leaving-the-platform",
     audience: "coach",
     title: "Export everything and leave",
@@ -218,7 +252,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     title: "Contact support",
     summary: "Reach the people who run the app.",
     body: [
-      "Open Business, then Support, and write to us there. It keeps a record on both sides, and our reply appears in the same thread.",
+      "Open Business, then Support, and write to us there. It keeps a record on both sides, and our reply appears in the same thread. You get a notice when we reply.",
       "Tell us what you were doing, what you expected and what happened. A screenshot helps, but please leave out anything you would not want written down.",
       "We read every message. Check the status page first if the whole app seems slow or down.",
     ],

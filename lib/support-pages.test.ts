@@ -48,10 +48,25 @@ describe("the help center", () => {
     expect(HELP_BY_SLUG.get("download-or-delete-my-data")!.body.join(" ")).toContain("Privacy page");
   });
 
-  it("only describes things that exist: nothing about a feature that is not live yet", () => {
-    const all = HELP_ARTICLES.flatMap((a) => a.body).join("\n");
-    // These ship in later releases; their articles are added with them.
-    expect(all).not.toMatch(/Removed clients|No automatic suggestions|Payment problems?|refund does not take sessions/);
+  it("only describes things that exist: each article about a feature is there exactly while the feature's own files are", () => {
+    const live = (p: string) => existsSync(join(__dirname, "..", p));
+    const pairs: [string, string][] = [
+      ["remove-or-delete-a-client", "components/coach/desktop/removed-clients-panel.tsx"],
+      ["pause-automatic-nutrition-suggestions", "components/coach/nutrition/auto-suggest-off-toggle.tsx"],
+      ["payment-problems", "components/coach/payment-problems-section.tsx"],
+    ];
+    for (const [slug, file] of pairs) expect(!!HELP_BY_SLUG.get(slug), `${slug} must be there if and only if ${file} is`).toBe(live(file));
+    // the support article only says you get a notice once the notices exist
+    const notices = live("supabase/migrations/0410_support_reply_notices.sql");
+    expect(HELP_BY_SLUG.get("contact-support")!.body.join(" ").includes("You get a notice when we reply"), "the notice sentence and the notices go together").toBe(notices);
+    // and the what's-new entries for these four features go in only with them
+    const entries: [string, boolean][] = [
+      ["Remove a client without losing them", live(pairs[0][1])],
+      ["Pause automatic nutrition suggestions for one client", live(pairs[1][1])],
+      ["Payment problems, in one place", live(pairs[2][1])],
+      ["A notice when support replies", notices],
+    ];
+    for (const [title, isLive] of entries) expect(CHANGELOG.some((e) => e.title === title), `${title}: in what's new only while the feature is live`).toBe(isLive);
   });
 
   it("the parent-view article is only there while the feature is: if the share button is gone, the article must go too", () => {

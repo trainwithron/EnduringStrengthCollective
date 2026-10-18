@@ -10,6 +10,30 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-10-18",
+    title: "Remove a client without losing them",
+    body: "Remove from my clients takes a client off your lists and keeps their account and history; Put back under Removed clients on Members returns them as they were. Delete permanently now gives you 30 days to change your mind.",
+    audience: "coaches",
+  },
+  {
+    date: "2026-10-18",
+    title: "Payment problems, in one place",
+    body: "A failed payment, a refund or a dispute from a client now sends you a notice and shows under Payment problems on Business, for the last 90 days. Nothing else changes by itself.",
+    audience: "coaches",
+  },
+  {
+    date: "2026-10-18",
+    title: "Pause automatic nutrition suggestions for one client",
+    body: "On a client's Nutrition tab, No automatic suggestions stops the weekly check-in from suggesting changes for them, in every group, until you switch it back on.",
+    audience: "coaches",
+  },
+  {
+    date: "2026-10-18",
+    title: "A notice when support replies",
+    body: "When we answer a support request, you now get a notice, so you do not have to keep checking the thread.",
+    audience: "coaches",
+  },
+  {
+    date: "2026-10-18",
     title: "This week, for every client at a glance",
     body: "Coaches have a new This week tab on Nutrition: each client's last seven days of logging against their target, with the people who need you first.",
     audience: "coaches",

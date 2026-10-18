@@ -27,6 +27,8 @@
 | S3 | release-team-coach | (see git) | none | team coach Home tiles and menus; built on master 408e6919 |
 | D-held | (data) | - | HELD: step 138, apply-release-cn-held-all.sql, fp 8f22a2d348ee90d7, read check-intake-flag-list.sql first | Ron's word only |
 
+| HP1 | release-help-pending | (see git) | none | help articles + what's new for Z1, B1, M1, SP1; the test fails on purpose until all four features are in the tree, so rebase onto them (after they are deployed) and set the changelog date to the deploy day |
+
 Fingerprint = first 16 hex of sha256 of the LF-normalized file: tr -d '\r' < supabase/apply/<file> | sha256sum | cut -c1-16.
 Apply order: CL (136), CM (137), CO (139), G (141), H (142 to 144), I (145), J (146), K1 (147), L (148); then deploy the code; then CP (140) after the code is live. Held 138 only on Ron's word.
 
