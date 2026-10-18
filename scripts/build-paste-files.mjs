@@ -3477,6 +3477,23 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "158",
+  slug: "0406",
+  title: "0406 Release X2: an athlete no longer reads other athletes' membership rows (a restrictive read rule on group_memberships)",
+  warn: "This CHANGES what athletes can read. Apply it ONLY AFTER step 156 is applied AND the Release X1 code is live (the athlete screens that list the group's people must already be using the narrow functions). Applying it earlier makes the @mention lists and the position leaderboard show only the coaches.",
+  migrations: ["0406"],
+  sees: "Success. No rows returned.",
+  afterwards: "From now on an athlete reads their own membership row and their coaches' rows, and no other athlete's (their tier, level, privacy setting and membership type). Coaches, and an organization's owner or admin, read exactly what they did before. Everything the athlete screens list about the group's people comes through the two narrow functions from step 156.",
+  undo: "drop policy if exists \"group_memberships_select_narrow\" on public.group_memberships;",
+  undoWhy: "Only if step 158 misbehaves. Takes the restriction off again; athletes can then read teammates' membership rows as before.",
+  rows: [
+    ["0406 is not already applied (the restrictive read rule is not there yet)", "not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'group_memberships' and policyname = 'group_memberships_select_narrow')"],
+    ["step 156 is applied (the narrow read functions exist)", "to_regprocedure('public.group_member_names(uuid)') is not null and to_regprocedure('public.group_position_roster(uuid)') is not null"],
+    ["the helpers the rule uses exist", "to_regprocedure('public.is_group_coach(uuid)') is not null and to_regprocedure('public.is_org_admin_of_group(uuid)') is not null"],
+  ],
+});
+
+STEPS.push({
   n: "150",
   slug: "0398",
   title: "0398 Release S1: a changed sign-in email must be confirmed by the new address first (waiting requests table)",
@@ -3702,6 +3719,7 @@ const BUNDLES = [
   { id: "release-u1-graduation", name: "Release U1 (graduation years and the graduating player's training history; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["153"] },
   { id: "release-t1-front-desk", name: "Release T1 (the front desk; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["152"] },
   { id: "release-s2-health-answers", name: "Release S2 (health answers private to the client and their coach; apply together with the code)", steps: ["151"] },
+  { id: "release-x2-athlete-narrow-memberships", name: "Release X2 (athletes stop reading other athletes' membership rows; CHANGES access: apply only after step 156 and the Release X1 code)", steps: ["158"] },
   { id: "release-s1-signin-hardening", name: "Release S1 (a changed sign-in email is confirmed by the new address; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["150"] },
   { id: "release-f2-client-cap", name: "Release F2 (the free plan's client limit, installed switched off; adds only)", steps: ["149"] },
   { id: "release-l-leaving-coach", name: "Release L (a leaving coach is never given an organization; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["148"] },
@@ -4011,6 +4029,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0401", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_memberships' and column_name = 'graduation_year')"),
     m("0400", "to_regclass('public.org_front_desk') is not null"),
     m("0399", "to_regclass('public.health_access_grants') is not null"),
+    m("0406", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'group_memberships' and policyname = 'group_memberships_select_narrow')"),
     m("0398", "to_regclass('public.pending_email_changes') is not null"),
     m("0397", "exists (select 1 from pg_trigger where tgname = 'group_memberships_free_tier_limit' and not tgisinternal)"),
     m("0396", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'organization_memberships' and column_name = 'departing_since')"),

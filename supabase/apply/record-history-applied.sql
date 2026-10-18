@@ -94,6 +94,7 @@ from (
     ('2026100600401', 'graduation', '0401_graduation.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_memberships' and column_name = 'graduation_year')),
     ('2026100600400', 'front_desk', '0400_front_desk.sql', to_regclass('public.org_front_desk') is not null),
     ('2026100600399', 'health_answers_private', '0399_health_answers_private.sql', to_regclass('public.health_access_grants') is not null),
+    ('2026100600406', 'group_memberships_athlete_narrow', '0406_group_memberships_athlete_narrow.sql', exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'group_memberships' and policyname = 'group_memberships_select_narrow')),
     ('2026100600398', 'pending_email_changes', '0398_pending_email_changes.sql', to_regclass('public.pending_email_changes') is not null),
     ('2026100600397', 'free_tier_client_limit', '0397_free_tier_client_limit.sql', exists (select 1 from pg_trigger where tgname = 'group_memberships_free_tier_limit' and not tgisinternal)),
     ('2026100600396', 'leaving_coach_choice', '0396_leaving_coach_choice.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'organization_memberships' and column_name = 'departing_since')),

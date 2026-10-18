@@ -240,6 +240,14 @@
   "file": "apply-release-s2-health-answers-all.sql"
  },
  {
+  "id": "release-x2-athlete-narrow-memberships",
+  "name": "Release X2 (athletes stop reading other athletes' membership rows; CHANGES access: apply only after step 156 and the Release X1 code)",
+  "steps": [
+   "158"
+  ],
+  "file": "apply-release-x2-athlete-narrow-memberships-all.sql"
+ },
+ {
   "id": "release-s1-signin-hardening",
   "name": "Release S1 (a changed sign-in email is confirmed by the new address; adds only, safe to run BEFORE the code that goes with it is live)",
   "steps": [
