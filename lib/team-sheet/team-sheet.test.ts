@@ -17,7 +17,7 @@ import {
   type SheetExercise,
   type SheetModel,
 } from "@/lib/team-sheet/sheet-model";
-import { buildSheetXlsx, CODES_SHEET } from "@/lib/team-sheet/export-xlsx";
+import { buildSheetXlsx, CODES_SHEET, FORMULA_START, plainText } from "@/lib/team-sheet/export-xlsx";
 import { buildSheetPdf, rackCode } from "@/lib/team-sheet/export-pdf";
 
 const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -198,6 +198,39 @@ describe("team sheet Excel file", () => {
   it("a timed exercise says so instead of a prescription", () => {
     const m = model("day", 4, 4, [{ ...day("2026-10-21", 2), exercises: [ex(1, "Plank", { unread: true, sets: 0 }), ex(2)] }]);
     expect(cells(read(m).Sheets["Rack 1"]).flat().join("|")).toContain("timed: use Notes");
+  });
+
+  it("text that starts like a formula is written as plain text, so a name or an exercise can never run in the coach's Excel", () => {
+    const evil = ['=HYPERLINK("http://example.com","click")', "+cmd|' /C calc'!A0", "-2+3", "@SUM(A1:A9)", "\t=1+1", "\r=1+1"];
+    const m = model("week", 4, 4, [{ ...day("2026-10-19", 1), title: evil[0], exercises: [ex(1, evil[1]), ex(2, evil[2]), ex(3, evil[3])] }]);
+    m.groupName = evil[0];
+    m.racks[0].athletes.forEach((a, i) => (a.name = evil[i % evil.length]));
+    const wb = read(m);
+    let texts = 0;
+    for (const name of wb.SheetNames) {
+      const ws = wb.Sheets[name];
+      for (const key of Object.keys(ws)) {
+        if (key.startsWith("!")) continue;
+        const c = ws[key] as XLSX.CellObject;
+        expect((c as { f?: string }).f, `${name}!${key} is a formula`).toBeUndefined();
+        if (typeof c.v === "string") {
+          texts++;
+          expect(FORMULA_START.test(c.v), `${name}!${key} starts like a formula: ${c.v}`).toBe(false);
+          expect(c.t).toBe("s");
+        }
+      }
+    }
+    expect(texts).toBeGreaterThan(10);
+    const flat = cells(wb.Sheets["Rack 1"]).flat().join("|");
+    expect(flat).toContain("'=HYPERLINK(");
+    expect(flat).toContain("'@SUM(A1:A9)");
+    // ordinary text is left exactly as it is
+    expect(plainText("Marcus T.")).toBe("Marcus T.");
+    expect(plainText("3x5")).toBe("3x5");
+    expect(plainText("")).toBe("");
+    // the codes still read back after the change
+    const code = cells(wb.Sheets[CODES_SHEET])[1][1];
+    expect(decodeSheetCode(code).ok).toBe(true);
   });
 
   it("builds a large roster without trouble", () => {

@@ -7,6 +7,23 @@ import type { SheetModel } from "@/lib/team-sheet/sheet-model";
 
 export const CODES_SHEET = "_codes";
 
+// A text cell that starts with = + - or @ (or a tab or carriage return) can be run as a formula when the file is opened, or saved as CSV and opened again. Names and exercise names come from people, so every text cell
+// that could start that way gets a leading apostrophe, which Excel reads as "this is text" and the sheet shows as a quote mark. Cells are also always written as text cells, never as formulas.
+export const FORMULA_START = /^[=+\-@\t\r]/;
+export function plainText(value: string): string {
+  return FORMULA_START.test(value) ? "'" + value : value;
+}
+const safeRows = (rows: (string | number)[][]): (string | number)[][] => rows.map((r) => r.map((c) => (typeof c === "string" ? plainText(c) : c)));
+// aoa_to_sheet makes strings text cells; this makes sure nothing in the sheet is a formula (an "f" entry) whatever went in.
+function onlyText(ws: XLSX.WorkSheet): XLSX.WorkSheet {
+  for (const key of Object.keys(ws)) {
+    if (key.startsWith("!")) continue;
+    const cell = ws[key] as XLSX.CellObject;
+    if (cell && typeof cell === "object") delete (cell as { f?: string }).f;
+  }
+  return ws;
+}
+
 export function buildSheetWorkbook(model: SheetModel): XLSX.WorkBook {
   const wb = XLSX.utils.book_new();
   const week = model.mode === "week";
@@ -53,7 +70,7 @@ export function buildSheetWorkbook(model: SheetModel): XLSX.WorkBook {
       r.push("");
       rows.push(r);
     }
-    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const ws = onlyText(XLSX.utils.aoa_to_sheet(safeRows(rows)));
     ws["!cols"] = [{ wch: 18 }, ...Array.from({ length: exerciseCount }, () => ({ wch: 16 })), { wch: 30 }];
     merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: Math.max(1, lastCol) } });
     ws["!merges"] = merges;
@@ -61,7 +78,7 @@ export function buildSheetWorkbook(model: SheetModel): XLSX.WorkBook {
   }
   // the codes, one per rack, on a worksheet people do not see
   const codeRows: (string | number)[][] = [["rack", "sheet code (do not edit)"], ...model.racks.map((rk) => [rk.number, encodeSheetCode(rackCode(model, rk))])];
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(codeRows), CODES_SHEET);
+  XLSX.utils.book_append_sheet(wb, onlyText(XLSX.utils.aoa_to_sheet(safeRows(codeRows))), CODES_SHEET);
   wb.Workbook = { Sheets: wb.SheetNames.map((name) => ({ name, Hidden: name === CODES_SHEET ? 1 : 0 })) } as XLSX.WorkBook["Workbook"];
   return wb;
 }
