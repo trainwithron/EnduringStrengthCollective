@@ -49,15 +49,16 @@ export async function loadPendingInvitees(serviceRole: any, organizationId: stri
 }
 
 /**
- * Which of these people have not accepted an invitation, by the plain rule alone (isUnaccepted), the same one the database applies when ownership is handed over. A person whose account cannot be read is counted as
- * NOT accepted: for a decision about who may own the organization, an unreadable account is never assumed fine. (loadPendingInvitees, for the Invitations list, is the other way round and leaves such a person out.)
+ * Which of these people have never signed in: the rule for who may be made OWNER of an organization ("can't transfer ownership until someone is logged in"; the database applies the same one). It is stricter than
+ * isUnaccepted on purpose: a confirmed invitation link is not enough, because an email link scanner can open a link with no person acting. A person whose account cannot be read, or is not found, counts as not signed in:
+ * for a decision about who may own the organization, an unreadable account is never assumed fine.
  */
-export async function unacceptedIds(serviceRole: any, profileIds: string[]): Promise<Set<string>> {
+export async function notSignedInIds(serviceRole: any, profileIds: string[]): Promise<Set<string>> {
   const out = new Set<string>();
   await runPool(profileIds, 8, async (id) => {
     try {
       const { data, error } = await serviceRole.auth.admin.getUserById(id);
-      if (error || !data?.user || isUnaccepted(data.user)) out.add(id);
+      if (error || !data?.user || !data.user.last_sign_in_at) out.add(id);
     } catch {
       out.add(id);
     }

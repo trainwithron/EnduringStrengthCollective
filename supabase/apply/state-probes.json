@@ -1490,7 +1490,7 @@
  {
   "n": "172",
   "slug": "0420",
-  "title": "0420 Release OWN1: ownership of an organization cannot be handed to someone who has not accepted their invitation",
+  "title": "0420 Release OWN1: ownership of an organization cannot be handed to someone who has never signed in",
   "migrations": [
    "0420"
   ],

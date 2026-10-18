@@ -1,4 +1,4 @@
-// 0420: ownership of an organization cannot be handed to someone who has not accepted their invitation. Everything else about the transfer is as before.
+// 0420: ownership of an organization cannot be handed to someone who has never signed in (last_sign_in_at is empty). A confirmed invitation link is not enough. Everything else about the transfer is as before.
 const tryQ = async (db, sql, params) => {
   try {
     return { rows: (await db.query(sql, params)).rows };
@@ -26,13 +26,15 @@ export default {
       for (const p of [accepted, pending, confirmed, plain, leaving, signedIn]) await h.orgMember(org, p, "coach");
       await h.asSuper();
       await db.query(`update auth.users set last_sign_in_at = now(), email_confirmed_at = now() where id = $1`, [accepted]);
+      // the owner has signed in (an owner always has)
+      await db.query(`update auth.users set last_sign_in_at = now() where id = $1`, [owner]);
       // an invitation nobody has accepted: our marker, never confirmed, never signed in
       await db.query(`update auth.users set invited_at = now() where id = $1`, [pending]);
-      // confirmed (they clicked the link) but have not signed in yet: that is an acceptance
+      // confirmed (the link was opened, maybe by an email scanner) but nobody has signed in: NOT enough for ownership
       await db.query(`update auth.users set invited_at = now(), email_confirmed_at = now() where id = $1`, [confirmed]);
-      // signed in (so they have used the invitation) though the link was never marked confirmed: that is an acceptance too
+      // signed in (so a person has really used the account) though the link was never marked confirmed: that is enough
       await db.query(`update auth.users set invited_at = now(), last_sign_in_at = now() where id = $1`, [signedIn]);
-      // an ordinary account that was never "invited" by us and has not signed in: not an unaccepted invitation
+      // an ordinary account with no invitation marker that has never signed in: also not enough (the rule is a real sign-in)
       await db.query(`update public.organization_memberships set departing_since = now() where organization_id = $1 and profile_id = $2`, [org, leaving]);
       await db.query(`update auth.users set last_sign_in_at = now(), invited_at = now() where id = $1`, [leaving]);
 
@@ -70,24 +72,23 @@ export default {
       r = await transfer(accepted, owner);
       h.check("it can go back, to someone who is an admin and has signed in", !r.error && (await ownerNow()) === owner && (await roleOf(accepted)) === "admin");
 
-      // a confirmed-but-not-signed-in account has accepted; an ordinary account with no invitation marker is not an unaccepted invitation
+      // confirmed but never signed in is refused (an email link scanner can confirm a link with no person acting), and so is an account with no invitation marker that has never signed in
       r = await transfer(owner, confirmed);
-      h.check("someone who confirmed their invitation counts as accepted" + (r.error ? ": " + r.error : ""), !r.error && (await ownerNow()) === confirmed);
-      r = await transfer(confirmed, owner);
-      h.check("(and back)", !r.error && (await ownerNow()) === owner);
+      h.check("someone who confirmed their invitation link but has never signed in is refused", !!r.error && /has not accepted their invitation yet\. Ask them to sign in first\./.test(r.error), JSON.stringify(r));
+      r = await transfer(platformAdmin, confirmed);
+      h.check("and so for a platform admin", !!r.error && /has not accepted/.test(r.error), JSON.stringify(r));
       r = await transfer(owner, plain);
-      h.check("an account that was never invited by us and has not signed in is not treated as an unaccepted invitation" + (r.error ? ": " + r.error : ""), !r.error && (await ownerNow()) === plain);
-      r = await transfer(plain, owner);
-      h.check("(and back)", !r.error && (await ownerNow()) === owner);
+      h.check("an account that has never signed in is refused even with no invitation marker", !!r.error && /has not accepted/.test(r.error), JSON.stringify(r));
+      h.check("nothing changed", (await ownerNow()) === owner && (await roleOf(confirmed)) === "coach" && (await roleOf(plain)) === "coach");
 
       r = await transfer(owner, signedIn);
-      h.check("someone who has signed in counts as accepted even if the link was never marked confirmed (the last_sign_in_at part of the rule)" + (r.error ? ": " + r.error : ""), !r.error && (await ownerNow()) === signedIn);
+      h.check("someone who has signed in is enough, even if the link was never marked confirmed" + (r.error ? ": " + r.error : ""), !r.error && (await ownerNow()) === signedIn);
       r = await transfer(signedIn, owner);
       h.check("(and back)", !r.error && (await ownerNow()) === owner);
 
       // ---- the same refusal at the tables: the owner cannot get round it by writing the rows directly
       await h.as(owner);
-      r = await tryQ(db, `update public.organizations set owner_id = $1 where id = $2 returning id`, [pending, org]);
+      r = await tryQ(db, `update public.organizations set owner_id = $1 where id = $2 returning id`, [confirmed, org]);
       await h.asSuper();
       h.check("writing the organization's owner directly to someone who has not accepted is refused", !!r.error && /has not accepted their invitation yet/.test(r.error), JSON.stringify(r));
       await h.as(owner);

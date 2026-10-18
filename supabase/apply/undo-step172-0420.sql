@@ -1,4 +1,4 @@
--- UNDO for step 172 (0420). Only if step 172 misbehaves. Puts both functions back to the text they had and drops the new trigger and function (an unaccepted invitee can then be made owner again).
+-- UNDO for step 172 (0420). Only if step 172 misbehaves. Puts both functions back to the text they had and drops the new trigger and function (someone who has never signed in can then be made owner again).
 -- WHAT YOU SHOULD SEE: "Success. No rows returned."   Then tell Spot, and do not run the step again until Spot says why it failed.
 begin;
 drop trigger if exists organization_memberships_guard_owner_role on public.organization_memberships;

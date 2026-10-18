@@ -1,4 +1,4 @@
--- STEP 172 (PRECHECK, run first, changes nothing): 0420 Release OWN1: ownership of an organization cannot be handed to someone who has not accepted their invitation
+-- STEP 172 (PRECHECK, run first, changes nothing): 0420 Release OWN1: ownership of an organization cannot be handed to someone who has never signed in
 --
 -- !! This REPLACES two functions (transfer_organization_ownership and guard_organization_columns) and adds one function and one trigger. Each replacement only adds the refusal; the paste checks that both live functions are exactly the text they replace, and stops if not.
 --
@@ -16,5 +16,5 @@ from (
     ('the function it replaces exists',
       to_regprocedure('public.transfer_organization_ownership(uuid, uuid)') is not null and to_regprocedure('public.guard_organization_columns()') is not null),
     ('the account columns it reads exist',
-      (select count(*) from information_schema.columns where table_schema = 'auth' and table_name = 'users' and column_name in ('invited_at', 'email_confirmed_at', 'last_sign_in_at')) = 3)
+      (select count(*) from information_schema.columns where table_schema = 'auth' and table_name = 'users' and column_name = 'last_sign_in_at') = 1)
 ) as checks(check_name, ok);

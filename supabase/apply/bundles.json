@@ -1,7 +1,7 @@
 [
  {
   "id": "release-own1-owner-accepted-only",
-  "name": "Release OWN1 (ownership cannot be handed to someone who has not accepted their invitation; replaces one function)",
+  "name": "Release OWN1 (ownership cannot be handed to someone who has never signed in; replaces two functions, adds one function and one trigger)",
   "steps": [
    "172"
   ],
