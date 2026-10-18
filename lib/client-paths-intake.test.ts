@@ -26,6 +26,13 @@ describe("every door a client can come through", () => {
     expect(sql).toContain("c.role = 'coach'");
     expect(sql).toContain("i.completed_at is not null");
     expect(sql).toContain("set intake_required = true");
+    // only a genuinely NEW client: not someone already in a group (a new season copies the same people), not staff of an organization, not the front desk
+    expect(sql).toContain("m.id <> new.id and m.role = 'athlete' and m.membership_type = 'training'");
+    expect(sql).toContain("from public.organization_memberships o where o.profile_id = new.profile_id");
+    expect(sql).toContain("public.org_front_desk");
+    // and a problem inside it can never cost a client their membership
+    expect(sql).toContain("exception when others then");
+    expect(sql).toContain("raise warning 'require_intake_for_new_client: %', sqlerrm;");
     // both existing-account doors end in a membership insert: the link's function and the invitation's answer
     expect(src("components/invite/invite-join-flow.tsx")).toContain('rpc("join_group_with_invite"');
     expect(src("components/org/space-invite-answer.tsx")).toContain('rpc("answer_space_invite"');
