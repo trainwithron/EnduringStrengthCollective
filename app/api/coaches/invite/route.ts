@@ -5,6 +5,7 @@ import { toFriendlyAuthEmailError } from "@/lib/auth-email-error";
 import { appOrigin } from "@/lib/app-url";
 import { rateLimitResponse } from "@/lib/rate-limit";
 import { notifyAndEmail } from "@/lib/invite-notify";
+import { inviteEmail, makeAuthLink, sendAuthMail } from "@/lib/auth-mail";
 
 // Which org-level role an invite can grant. "owner" is set once at
 // org creation and never assigned through this flow.
@@ -93,7 +94,7 @@ export async function POST(request: Request) {
     }
     const { data: orgRow } = await serviceRole.from("organizations").select("name").eq("id", group.organization_id).maybeSingle();
     // An in-app notice and an email to the address on the account. The answer to the caller is the same either way.
-    await notifyAndEmail(serviceRole, {
+    const sent = await notifyAndEmail(serviceRole, {
       profileId: existingId,
       type: "organization_invite",
       body: `${orgRow?.name ?? "An organization"} invited you to join as ${role === "admin" ? "an admin" : role === "front_desk" ? "front desk staff" : "a coach"}.`,
@@ -101,24 +102,33 @@ export async function POST(request: Request) {
       origin: appOrigin(request),
       subject: `${orgRow?.name ?? "An organization"} invited you to join`,
     });
-    return NextResponse.json({ invited: true });
+    // Same shape as the new-address answer below: whether the email went out, never whether the address has an account. (A failed email is told to the person who invited, so they can send it again.)
+    return NextResponse.json({ invited: true, emailed: sent.emailed });
   }
   const origin = appOrigin(request);
 
-  const { data: invited, error: inviteError } = await serviceRole.auth.admin.inviteUserByEmail(
-    trimmedEmail,
-    {
-      data: { full_name: trimmedName },
-      redirectTo: `${origin}/set-password`,
-    }
-  );
-
-  if (inviteError || !invited?.user) {
-    const { error, status } = toFriendlyAuthEmailError(inviteError?.message ?? "Couldn't invite this coach.");
+  // The account and its one-time link are made here, and the email is sent by US through the transactional mail service (Brevo), so it does not depend on the auth service's own mailer (a few emails an hour, no
+  // domain authentication). A link that was made but not delivered is told to the person inviting, who can send it again or copy it from the Invitations list.
+  const made = await makeAuthLink(serviceRole, { type: "invite", email: trimmedEmail, redirectTo: `${origin}/set-password`, fullName: trimmedName });
+  if (!made.link || !made.userId) {
+    const { error, status } = toFriendlyAuthEmailError(made.error ?? "Couldn't invite this coach.");
     return NextResponse.json({ error }, { status });
   }
 
-  const newUserId = invited.user.id;
+  const newUserId = made.userId;
+  const { data: orgForMail } = await serviceRole.from("organizations").select("name").eq("id", group.organization_id).maybeSingle();
+  const { data: inviterRow } = await serviceRole.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
+  const emailTheInvite = () =>
+    sendAuthMail(
+      trimmedEmail,
+      inviteEmail({
+        toName: trimmedName,
+        orgName: (orgForMail as { name?: string } | null)?.name ?? "an organization",
+        inviterName: (inviterRow as { full_name?: string | null } | null)?.full_name ?? null,
+        role,
+        link: made.link as string,
+      })
+    );
 
   const { error: profileError } = await serviceRole
     .from("profiles")
@@ -132,7 +142,8 @@ export async function POST(request: Request) {
     if (frontDeskError) {
       return NextResponse.json({ error: `Couldn't add them to the front desk: ${frontDeskError.message}` }, { status: 502 });
     }
-    return NextResponse.json({ invited: true });
+    const emailedDesk = await emailTheInvite();
+    return NextResponse.json({ invited: true, emailed: emailedDesk });
   }
 
   const { error: groupMembershipError } = await serviceRole
@@ -155,5 +166,6 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.json({ invited: true });
+  const emailed = await emailTheInvite();
+  return NextResponse.json({ invited: true, emailed });
 }

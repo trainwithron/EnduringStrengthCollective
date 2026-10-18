@@ -25,6 +25,8 @@ import { getOrgBillingSummary } from "@/lib/org-billing-server";
 import { isBillingEnforced } from "@/lib/org-entitlements";
 import type { ButtonShape, DisplayFont, BodyFont } from "@/lib/theme";
 import { isStripeConfigured } from "@/lib/stripe";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { loadPendingInvitees } from "@/lib/coach-invite-server";
 import { ALL_BRAND_FONTS, googleFontsHref } from "@/lib/google-fonts";
 
 export const metadata = { title: "Branding" };
@@ -155,6 +157,17 @@ export default async function BrandingPage(
     profileId: r.profile_id,
     fullName: (Array.isArray(r.profiles) ? r.profiles[0]?.full_name : r.profiles?.full_name) ?? "Unknown",
   }));
+
+  // Invitations nobody has accepted yet (people invited by a new address: their account exists, never confirmed and never signed in). Listed under Invitations, with Send again / Copy link / Cancel, and left out of the
+  // member lists below. Only for an owner or admin; a person whose account cannot be read is not listed as pending on a guess.
+  const pendingInvitees =
+    tab === "team" && (orgMembership.role === "owner" || orgMembership.role === "admin")
+      ? await loadPendingInvitees(createServiceRoleClient(), [
+          ...members.filter((m) => m.role !== "owner").map((m) => ({ profileId: m.profileId, name: m.fullName, role: String(m.role) })),
+          ...frontDesk.map((p) => ({ profileId: p.profileId, name: p.fullName, role: "front_desk" })),
+        ])
+      : [];
+  const pendingIds = new Set(pendingInvitees.map((p) => p.profileId));
 
   const { data: tagRows } = await supabase
     .from("client_tags")
@@ -318,7 +331,8 @@ export default async function BrandingPage(
             organizationName={org?.name ?? "this organization"}
             me={user.id}
             myRole={orgMembership.role}
-            members={members.map((m) => ({ profileId: m.profileId, fullName: m.fullName, role: m.role, clients: teamInfo?.clientCounts[m.profileId] ?? 0, soleClients: teamInfo?.soleCoachOfClients[m.profileId] ?? 0, leaving: m.leaving, fired: m.fired, healthAccess: healthAccessIds.has(m.profileId) }))}
+            newInvites={pendingInvitees}
+            members={members.filter((m) => !pendingIds.has(m.profileId)).map((m) => ({ profileId: m.profileId, fullName: m.fullName, role: m.role, clients: teamInfo?.clientCounts[m.profileId] ?? 0, soleClients: teamInfo?.soleCoachOfClients[m.profileId] ?? 0, leaving: m.leaving, fired: m.fired, healthAccess: healthAccessIds.has(m.profileId) }))}
             invites={teamInfo?.invites ?? []}
           />
 
@@ -327,7 +341,7 @@ export default async function BrandingPage(
               The front desk list could not be read. Reload to try again.
             </p>
           ) : (
-            <FrontDeskList organizationId={orgMembership.organization_id} organizationName={org?.name ?? "this organization"} people={frontDesk} canManage={isOwnerOrAdmin} />
+            <FrontDeskList organizationId={orgMembership.organization_id} organizationName={org?.name ?? "this organization"} people={frontDesk.filter((p) => !pendingIds.has(p.profileId))} canManage={isOwnerOrAdmin} />
           )}
 
           {isOwnerOrAdmin && (

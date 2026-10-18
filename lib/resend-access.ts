@@ -67,7 +67,8 @@ export async function resendAccess(args: { supabase: any; serviceRole: any; coac
   }
 
   // The mail service sends nothing to an address it has not confirmed, so for those the platform sends the same link itself.
-  if (authUser?.email_confirmed_at) {
+  // (With the transactional mail service set up, the link below is made and sent by us instead: it does not depend on the auth service's own mailer.)
+  if (authUser?.email_confirmed_at && !isEmailConfigured()) {
     const anon = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { auth: { autoRefreshToken: false, persistSession: false } });
     const { error } = await anon.auth.resetPasswordForEmail(email!, { redirectTo: `${origin}/set-password` });
     if (!error) return { status: 200, body: { ok: true, kind: "signin_emailed", sentTo: maskEmail(email!), message: `Sent a sign-in email to ${maskEmail(email!)}. It lets them set a password and sign in. Ask them to check spam if it does not arrive in a few minutes.` } };

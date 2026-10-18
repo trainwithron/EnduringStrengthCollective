@@ -6,6 +6,8 @@ import { appOrigin } from "@/lib/app-url";
 import { isPlaceholderEmail } from "@/lib/client-claim";
 import { maskEmail } from "@/lib/mask-email";
 import { rateLimitAllows, rateLimitResponse } from "@/lib/rate-limit";
+import { isEmailConfigured } from "@/lib/email";
+import { makeAuthLink, recoveryEmail, sendAuthMail } from "@/lib/auth-mail";
 
 // A coach emails a client a link to set a new password and sign in ("I can't get in"). The email goes to the client's OWN address and the coach never sees the
 // link, so this can never be used to sign in as the client (the coach-minted claim link is only for a client who has never signed in; see /api/clients/invite-link).
@@ -53,6 +55,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Their sign-in email was changed in the last 24 hours, so a link can't be sent yet. Ask them to sign in with the new address or reset the password themselves." }, { status: 403 });
   }
 
+  // Sent by us through the transactional mail service when it is set up (a link made by the auth service), so it does not depend on the auth service's own mailer.
+  if (isEmailConfigured()) {
+    const made = await makeAuthLink(serviceRole, { type: "recovery", email, redirectTo: `${appOrigin(request)}/set-password` });
+    if (!made.link) return NextResponse.json({ error: "The email couldn't be sent. Try again in a few minutes." }, { status: 502 });
+    const sent = await sendAuthMail(email, recoveryEmail({ toName: null, link: made.link, fromCoach: "Your coach" }));
+    if (!sent) return NextResponse.json({ error: "The email couldn't be sent. Try again in a few minutes." }, { status: 502 });
+    return NextResponse.json({ ok: true, sentTo: maskEmail(email) });
+  }
   const anon = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
