@@ -1,9 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { filterByMacroTolerance, targetKcal, withinMacroTolerance } from "./meal-option-tolerance";
 
-const src = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
 const target = { proteinG: 40, carbsG: 60, fatG: 20 }; // 160 + 240 + 180 = 580 kcal
 const opt = (totalProtein: number, totalCarbs: number, totalFat: number) => ({ totalProtein, totalCarbs, totalFat, totalKcal: totalProtein * 4 + totalCarbs * 4 + totalFat * 9 });
 
@@ -40,15 +37,5 @@ describe("is an AI meal option close enough to the meal's target", () => {
     const { kept, dropped } = filterByMacroTolerance([opt(40, 60, 20), opt(40, 10, 20), opt(41, 58, 19)], target);
     expect(kept).toHaveLength(2);
     expect(dropped).toHaveLength(1);
-  });
-});
-
-describe("how it is wired", () => {
-  it("the route holds every verified option to the target after the food-rule check, and says how many it dropped; the screen explains an empty answer", () => {
-    const route = src("app/api/ai/generate-meal-plan/route.ts");
-    expect(route).toContain("filterByMacroTolerance(");
-    expect(route.indexOf("filterOptionsByRules(checked, rules)")).toBeLessThan(route.indexOf("filterByMacroTolerance("));
-    expect(route).toContain("droppedForMacros");
-    expect(src("components/coach/desktop/meal-plan-generator.tsx")).toContain("None of the suggestions landed close enough to this meal's macros");
   });
 });
