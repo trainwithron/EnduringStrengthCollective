@@ -77,10 +77,12 @@ export async function loadDobGate(supabase: SupabaseClient, userId: string): Pro
   const groupId = rows.find((m) => m.role === "athlete")?.group_id ?? null;
   if (!isClientOnly) return { gate: "ok", groupId, dateOfBirth: null, profileBirthday: null, ageBand: "unknown", cacheable: hasCoachSeat, guardian: null };
 
-  const [{ data: intake }, { data: details }] = await Promise.all([
+  const [{ data: intake, error: intakeError }, { data: details, error: detailsError }] = await Promise.all([
     supabase.from("client_intake").select("date_of_birth").eq("athlete_id", userId).maybeSingle(),
     supabase.from("athlete_profile_details").select("birthday").eq("athlete_id", userId).maybeSingle(),
   ]);
+  // A failed read of the date is not "no date": asking an adult for their birthday again because a lookup failed would be wrong, and so would letting anyone through. Not ok, not remembered.
+  if (intakeError || detailsError) return { gate: "check_failed", groupId, dateOfBirth: null, profileBirthday: null, ageBand: "unknown", cacheable: false, guardian: null };
   const dateOfBirth = ((intake as { date_of_birth?: string | null } | null)?.date_of_birth ?? null) as string | null;
   const profileBirthday = ((details as { birthday?: string | null } | null)?.birthday ?? null) as string | null;
   const band = ageBand(dateOfBirth);

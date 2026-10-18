@@ -33,7 +33,8 @@ export const API_GATE_EXEMPT_PREFIXES = [
 
 export function apiGateApplies(pathname: string): boolean {
   if (!pathname.startsWith("/api/")) return false;
-  return !API_GATE_EXEMPT_PREFIXES.some((p) => (p.endsWith("/") || p === "/api/feedback" || p === "/api/health" ? pathname.startsWith(p) : pathname === p || pathname.startsWith(p + "/")));
+  // A prefix ending in a slash covers everything below it; any other entry is that exact path or something below it (so "/api/feedbackx" and "/api/healthz" are NOT exempt).
+  return !API_GATE_EXEMPT_PREFIXES.some((p) => (p.endsWith("/") ? pathname.startsWith(p) : pathname === p || pathname.startsWith(p + "/")));
 }
 
 // The intake gate (a client added by a coach who has not finished the health form) is only for a person who is a client and nothing else: an athlete seat and no coach seat. A coach who is also someone's client

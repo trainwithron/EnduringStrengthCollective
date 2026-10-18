@@ -45,6 +45,28 @@ describe("the age gate cannot be passed by a failed lookup or by having no seat"
   });
 });
 
+describe("a failed read of the date is a failed check, not a missing date", () => {
+  function failing(table: string) {
+    const builder = (t: string) => {
+      const b: any = {
+        select: () => b,
+        eq: () => b,
+        maybeSingle: async () => (t === table ? { data: null, error: { message: "timeout" } } : { data: null, error: null }),
+        then: (resolve: (v: unknown) => void) => resolve(t === "group_memberships" ? { data: client, error: null } : { data: [], error: null }),
+      };
+      return b;
+    };
+    return { from: builder, rpc: async () => ({ data: { state: "none" }, error: null }) } as never;
+  }
+  it("a failed read of client_intake or athlete_profile_details is check_failed and never remembered", async () => {
+    for (const table of ["client_intake", "athlete_profile_details"]) {
+      const f = await loadDobGate(failing(table), "u");
+      expect(f.gate, table).toBe("check_failed");
+      expect(f.cacheable, table).toBe(false);
+    }
+  });
+});
+
 describe("the intake gate is only for a person who is a client and nothing else", () => {
   it("a client-only account is gated; a coach, a coach who is also a client and a person with no seat are not", () => {
     expect(intakeGateApplies([{ role: "athlete" }])).toBe(true);
@@ -67,7 +89,14 @@ describe("one shared guard closes the API to a blocked child, and the page list 
     for (const p of ["/api/account/export", "/api/account/delete", "/api/guardian-consent/sign", "/api/guardian-consent/request", "/api/intake/submit", "/api/legal/accept", "/api/auth/forgot-password", "/api/feedback", "/api/push/unsubscribe", "/api/health", "/api/cron/purge-removed-clients", "/api/stripe/webhook", "/api/public-booking/x/book"]) expect(apiGateApplies(p), p).toBe(false);
     expect(apiGateApplies("/groups/x")).toBe(false);
     // a prefix that merely starts with an exempt word is not exempt
-    expect(apiGateApplies("/api/healthcheck-other")).toBe(false);
+    expect(apiGateApplies("/api/healthcheck-other")).toBe(true);
+    expect(apiGateApplies("/api/feedbackx")).toBe(true);
+    expect(apiGateApplies("/api/accountx")).toBe(true);
+    expect(apiGateApplies("/api/legalx")).toBe(true);
+    expect(apiGateApplies("/api/healthz")).toBe(true);
+    expect(apiGateApplies("/api/feedback")).toBe(false);
+    expect(apiGateApplies("/api/feedback/thread")).toBe(false);
+    expect(apiGateApplies("/api/health")).toBe(false);
     expect(apiGateApplies("/api/push/unsubscribe-all")).toBe(true);
     expect(API_GATE_EXEMPT_PREFIXES.length).toBeLessThan(25);
   });
