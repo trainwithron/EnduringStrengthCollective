@@ -18,8 +18,8 @@ function Shell({ children }: { children: React.ReactNode }) {
 export default async function GuardianConsentPage(props: { params: Promise<{ token: string }> }) {
   const { token } = await props.params;
   const db = createServiceRoleClient();
-  const { data } = token.length >= 20 && token.length <= 100 ? await db.from("guardian_consents").select("athlete_id, status, expires_at, guardian_name, relationship, signed_at").eq("token_hash", hashToken(token)).maybeSingle() : { data: null };
-  const row = data as { athlete_id: string; status: string; expires_at: string; guardian_name: string | null; relationship: string | null; signed_at: string | null } | null;
+  const { data } = token.length >= 20 && token.length <= 100 ? await db.from("guardian_consents").select("athlete_id, status, expires_at, guardian_name, relationship, signed_at, voided_by").eq("token_hash", hashToken(token)).maybeSingle() : { data: null };
+  const row = data as { athlete_id: string; status: string; expires_at: string; guardian_name: string | null; relationship: string | null; signed_at: string | null; voided_by: string | null } | null;
 
   if (!row) {
     return (
@@ -37,7 +37,9 @@ export default async function GuardianConsentPage(props: { params: Promise<{ tok
     return (
       <Shell>
         <h1 className="font-display font-bold text-3xl uppercase leading-none">Permission withdrawn</h1>
-        <p className="font-body text-sm text-steel mt-3">You took back your permission for {childName}. They can&apos;t use the app until a parent or guardian gives permission again.</p>
+        <p className="font-body text-sm text-steel mt-3">
+          {row.voided_by ? `Your permission for ${childName} was cancelled by the child's coach.` : `You took back your permission for ${childName}.`} They can&apos;t use the app until a parent or guardian gives permission again.
+        </p>
       </Shell>
     );
   }

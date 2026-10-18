@@ -51,7 +51,8 @@ export function BirthdayForm({
       ? await supabase.from("client_intake").update({ date_of_birth: dob }).eq("athlete_id", user.id)
       : await supabase.from("client_intake").insert({ athlete_id: user.id, group_id: groupId, date_of_birth: dob });
     if (upsertError) {
-      setError("We couldn't save that. Check your connection and try again.");
+      // A date that is already on file cannot be changed from here (a database guard); everything else is a plain failure to save.
+      setError(upsertError.code === "42501" || /birthday can't be changed here/i.test(upsertError.message ?? "") ? "Your birthday can't be changed here. Ask your coach to contact support." : "We couldn't save that. Check your connection and try again.");
       setSaving(false);
       return;
     }

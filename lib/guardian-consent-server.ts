@@ -82,6 +82,8 @@ Spotlight Coaching`
     return { ok: false, status: 502, error: "The email could not be sent just now. Try again in a moment." };
   }
   // The request is out: waiting requests OLDER than this one stop working. Only older ones, so two requests made at the same moment (the child's and the coach's) cannot cancel each other: the newest survives.
-  await db.from("guardian_consents").update({ status: "replaced" }).eq("athlete_id", args.athleteId).eq("status", "pending").lt("created_at", row.created_at);
+  const { error: replaceError } = await db.from("guardian_consents").update({ status: "replaced" }).eq("athlete_id", args.athleteId).eq("status", "pending").lt("created_at", row.created_at);
+  // If this fails the older link simply stays usable until it expires (either link signs the same child once); say so in the log.
+  if (replaceError) console.error("[guardian-consent] could not retire the older request:", replaceError.message);
   return { ok: true };
 }

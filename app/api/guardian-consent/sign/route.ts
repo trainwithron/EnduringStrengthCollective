@@ -70,6 +70,8 @@ export async function POST(request: Request) {
     .eq("id", found.id)
     .eq("status", "pending")
     .select("id");
+  // The child already has a different standing signature (the one-signature rule fired): that is "already signed", not a failure to retry.
+  if (error?.code === "23505") return NextResponse.json({ error: "A parent or guardian has already given permission for this child." }, { status: 409 });
   if (error) return NextResponse.json({ error: "Couldn't record that. Try again." }, { status: 502 });
   if (!signed || signed.length === 0) return NextResponse.json({ error: "This has already been signed." }, { status: 409 });
 

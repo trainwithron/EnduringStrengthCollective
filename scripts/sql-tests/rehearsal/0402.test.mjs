@@ -74,7 +74,7 @@ export default {
       let u = await tryQ(db, `update public.client_intake set date_of_birth = '2012-05-01' where athlete_id = $1 returning 1`, [teen]);
       h.check("the first date of birth is the client's to give", !u.error && u.rows.length === 1, JSON.stringify(u));
       u = await tryQ(db, `update public.client_intake set date_of_birth = '1990-01-01' where athlete_id = $1`, [teen]);
-      h.check("but once on file they cannot change it to an adult's", !!u.error && /corrected by your coach/.test(u.error), JSON.stringify(u));
+      h.check("but once on file they cannot change it to an adult's", !!u.error && /can't be changed here\. Ask your coach to contact support/.test(u.error), JSON.stringify(u));
       u = await tryQ(db, `update public.client_intake set date_of_birth = '2012-05-01' where athlete_id = $1 returning 1`, [teen]);
       h.check("writing the same date again is harmless", !u.error, JSON.stringify(u));
       await h.as(coach);

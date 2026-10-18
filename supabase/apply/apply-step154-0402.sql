@@ -114,7 +114,7 @@ begin
     return new;
   end if;
   if old.date_of_birth is not null and new.date_of_birth is distinct from old.date_of_birth then
-    raise exception 'A date of birth that is on file can only be corrected by your coach through support.' using errcode = '42501';
+    raise exception 'Your birthday can''t be changed here. Ask your coach to contact support.' using errcode = '42501';
   end if;
   return new;
 end;

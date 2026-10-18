@@ -268,3 +268,28 @@ describe("how the gate is wired", () => {
     expect(route).toContain("Only the client's coach can do that.");
   });
 });
+
+describe("the small edges", () => {
+  it("a coach's cancellation is told to the guardian as the coach's, not as their own withdrawal", () => {
+    const route = src("app/api/guardian-consent/void/route.ts");
+    expect(route).toContain("sendEmail(to, `Permission cancelled for ${childName}`");
+    expect(route).toContain("coach cancelled the permission");
+    const page = src("app/guardian-consent/[token]/page.tsx");
+    expect(page).toContain("was cancelled by the child's coach");
+    expect(page).toContain("voided_by");
+  });
+
+  it("a second signature for a child who already has one is 'already signed', not 'try again'", () => {
+    const route = src("app/api/guardian-consent/sign/route.ts");
+    expect(route).toContain('error?.code === "23505"');
+    expect(route.indexOf('error?.code === "23505"')).toBeLessThan(route.indexOf("Couldn't record that. Try again."));
+    expect(src("lib/guardian-consent-server.ts")).toContain("replaceError");
+  });
+
+  it("a refused birthday change is said plainly, in the database and on the screen", () => {
+    const sentence = "Your birthday can't be changed here. Ask your coach to contact support.";
+    expect(src("components/intake/birthday-form.tsx")).toContain(sentence);
+    expect(src("supabase/migrations/0402_guardian_consent.sql")).toContain("Your birthday can''t be changed here. Ask your coach to contact support.");
+    expect(src("docs/NEEDS_RON.md")).toContain("birthday_corrected");
+  });
+});
