@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { loadDobGate } from "./dob-gate";
+import { loadDobGate, mayRememberPass, maySkipGateCheck, signDobOk } from "./dob-gate";
 import { API_GATE_EXEMPT_PREFIXES, apiGateApplies, dobGatedPage, intakeGateApplies } from "./gate-paths";
 
 const src = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
@@ -110,7 +110,7 @@ describe("one shared guard closes the API to a blocked child, and the page list 
     const mw = src("lib/supabase/middleware.ts");
     expect(mw).toContain("const gatedApi = apiGateApplies(pathname);");
     expect(mw).toContain('status: action === "unavailable" ? 503 : 403');
-    expect(mw).toContain("facts.cacheable ? await signDobOk");
+    expect(mw).toContain("(await mayRememberPass(facts)) ? await signDobOk");
   });
 });
 
@@ -127,7 +127,6 @@ describe("the blocked and guardian screens say what to do about a wrong birthday
   });
 });
 
-import { NOSEAT_OK_SECONDS, noSeatOkValid, signNoSeatOk } from "./dob-gate";
 import { gateAction } from "./gate-paths";
 
 describe("what the middleware does at a gate (the one decision function it calls)", () => {
@@ -138,38 +137,50 @@ describe("what the middleware does at a gate (the one decision function it calls
     expect(gateAction({ kind: "page", gate: "ok" })).toBe("pass");
   });
 
-  it("the API stops a known minor (403) and a failed check (503), and lets a person with no birthday yet through (the page gate sends them to the birthday screen)", () => {
+  it("the API is closed to anyone who is not ok: a known minor and an unknown age are 403 (unknown counts as a non-adult), a failed check is 503", () => {
     expect(gateAction({ kind: "api", gate: "blocked" })).toBe("forbidden");
     expect(gateAction({ kind: "api", gate: "need_guardian" })).toBe("forbidden");
+    expect(gateAction({ kind: "api", gate: "need_dob" })).toBe("forbidden");
     expect(gateAction({ kind: "api", gate: "check_failed" })).toBe("unavailable");
-    expect(gateAction({ kind: "api", gate: "need_dob" })).toBe("pass");
     expect(gateAction({ kind: "api", gate: "ok" })).toBe("pass");
   });
 
-  it("the claim step works for a client with a seat and no birthday: it is on the exempt list and need_dob passes the API anyway", () => {
+  it("the claim step works for a client with a seat and no birthday ONLY because it is on the exempt list (by exact path)", () => {
     expect(apiGateApplies("/api/clients/complete-claim")).toBe(false);
     expect(apiGateApplies("/api/clients/complete-claimx")).toBe(true);
-    expect(gateAction({ kind: "api", gate: "need_dob" })).toBe("pass");
+    expect(apiGateApplies("/api/clients/complete-claim/other")).toBe(false);
+    expect(gateAction({ kind: "api", gate: "need_dob" })).toBe("forbidden");
     expect(src("lib/supabase/middleware.ts")).toContain("gateAction({ kind: gatedApi ? \"api\" : \"page\", gate: facts.gate, onIntake })");
   });
 });
 
-describe("the ten-minute pass for a person with no seat", () => {
-  it("is signed with its own expiry, bound to the person, and refused after ten minutes or when altered", async () => {
-    const now = Date.UTC(2026, 9, 18, 12, 0, 0);
-    const pass = (await signNoSeatOk("u1", "secret", now))!;
-    expect(await noSeatOkValid(pass, "u1", "secret", now + 1000)).toBe(true);
-    expect(await noSeatOkValid(pass, "u2", "secret", now + 1000)).toBe(false);
-    expect(await noSeatOkValid(pass, "u1", "other-secret", now + 1000)).toBe(false);
-    expect(await noSeatOkValid(pass, "u1", "secret", now + (NOSEAT_OK_SECONDS + 1) * 1000)).toBe(false);
-    const [id, exp, sig] = pass.split(".");
-    expect(await noSeatOkValid(`${id}.${Number(exp) + 86400}.${sig}`, "u1", "secret", now)).toBe(false);
-    expect(await signNoSeatOk("u1", undefined, now)).toBeNull();
+describe("what may skip the lookup, and who is given a pass", () => {
+  const secret = "secret";
+  it("only the week-long pass, signed for this person and this secret, skips the lookup; another person's, a forged, a missing one and no secret do not", async () => {
+    const pass = (await signDobOk("u1", secret))!;
+    expect(await maySkipGateCheck(pass, "u1", secret)).toBe(true);
+    expect(await maySkipGateCheck(pass, "u2", secret)).toBe(false);
+    expect(await maySkipGateCheck(pass, "u1", "other")).toBe(false);
+    expect(await maySkipGateCheck(undefined, "u1", secret)).toBe(false);
+    expect(await maySkipGateCheck(pass, "u1", undefined)).toBe(false);
+    expect(await maySkipGateCheck("u1.deadbeef", "u1", secret)).toBe(false);
   });
 
-  it("is given only to a person with no seat whose check was ok, never as the week-long pass", () => {
+  it("a pass is given only for an ok check that may be remembered: an adult client with a birthday on file or a coach; never to someone with no seat, a client without a date, a teen, a child or after a failed lookup", async () => {
+    const outcome = async (opts: Parameters<typeof fake>[0]) => mayRememberPass(await loadDobGate(fake(opts), "u"));
+    expect(await outcome({ memberships: client, dob: "1990-04-01" })).toBe(true);
+    expect(await outcome({ memberships: [{ group_id: "g", role: "coach" }] })).toBe(true);
+    expect(await outcome({ memberships: [] })).toBe(false);
+    expect(await outcome({ memberships: client, dob: null })).toBe(false);
+    expect(await outcome({ memberships: client, dob: teenDob, guardian: "signed" })).toBe(false);
+    expect(await outcome({ memberships: client, dob: childDob })).toBe(false);
+    expect(await outcome({ memberships: [], failMemberships: true })).toBe(false);
+  });
+
+  it("the middleware uses exactly these two decisions and keeps no other pass", () => {
     const mw = src("lib/supabase/middleware.ts");
-    expect(mw).toContain('facts.gate === "ok" && facts.noSeat');
-    expect(mw).toContain("maxAge: NOSEAT_OK_SECONDS");
+    expect(mw).toContain("maySkipGateCheck(request.cookies.get(DOB_OK_COOKIE)?.value, user.id, process.env.CRON_SECRET)");
+    expect(mw).toContain("(await mayRememberPass(facts))");
+    expect(mw.toLowerCase()).not.toContain("noseat");
   });
 });

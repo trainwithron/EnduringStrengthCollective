@@ -217,7 +217,7 @@ describe("how the gate is wired", () => {
     const mw = src("lib/supabase/middleware.ts");
     expect(mw).toContain("gateAction({ kind: gatedApi ? \"api\" : \"page\", gate: facts.gate, onIntake })");
     // only an adult with a date on file (or someone who is not a client) is remembered; the old cookie name no longer opens anything
-    expect(mw).toContain("facts.cacheable ? await signDobOk(user.id, process.env.CRON_SECRET) : null");
+    expect(mw).toContain("(await mayRememberPass(facts)) ? await signDobOk(user.id, process.env.CRON_SECRET) : null");
     for (const open of ['pathname.startsWith("/guardian-consent/")', 'pathname === "/api/guardian-consent/sign"', 'pathname === "/api/guardian-consent/withdraw"']) expect(mw).toContain(open);
     // the request and resend routes are NOT public: they need a signed-in child or coach
     expect(mw).not.toContain('"/api/guardian-consent/request"');

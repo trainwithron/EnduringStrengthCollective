@@ -39,13 +39,13 @@ export function apiGateApplies(pathname: string): boolean {
   return !API_GATE_EXEMPT_PREFIXES.some((p) => (p.endsWith("/") ? pathname.startsWith(p) : pathname === p || pathname.startsWith(p + "/")));
 }
 
-// What the middleware does with a person at a gate. The page gate sends everyone who is not "ok" to /birthday. The API gate exists to stop KNOWN minors (under 13, 13 to 17 without a standing signature) and failed checks: a person whose
-// birthday is simply not entered yet (need_dob) is let through on the API (the page gate already sends them to /birthday), or the claim step and other pre-birthday calls would dead-end.
+// What the middleware does with a person at a gate. The page gate sends everyone who is not "ok" to /birthday. The API is closed to anyone who is not ok (unknown age counts as a non-adult); the few calls a person
+// makes BEFORE their birthday is on file (the claim step, the birthday and health steps, guardian signing ...) are on the exempt list above, by exact path.
 export type GateAction = "pass" | "redirect_birthday" | "forbidden" | "unavailable";
 export function gateAction(input: { kind: "page" | "api"; gate: "ok" | "need_dob" | "blocked" | "need_guardian" | "check_failed"; onIntake?: boolean }): GateAction {
   const { kind, gate } = input;
   if (gate === "ok") return "pass";
-  if (kind === "api") return gate === "need_dob" ? "pass" : gate === "check_failed" ? "unavailable" : "forbidden";
+  if (kind === "api") return gate === "check_failed" ? "unavailable" : "forbidden";
   // The health form is reached before a date of birth is on file (it asks for one).
   if (input.onIntake && gate === "need_dob") return "pass";
   return "redirect_birthday";

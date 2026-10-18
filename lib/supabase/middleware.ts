@@ -4,7 +4,7 @@ import { shouldResumeClaim } from "@/lib/claim-resume";
 import { LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/workspace-header";
 import { decodeWorkspaceCookie, groupIdFromPath } from "@/lib/workspace-header";
 import { MY_TRAINING_COOKIES, shouldLeaveMyTraining } from "@/lib/my-training-exit";
-import { DOB_OK_COOKIE, NOSEAT_OK_COOKIE, NOSEAT_OK_SECONDS, dobOkCookieValid, loadDobGate, noSeatOkValid, signDobOk, signNoSeatOk } from "@/lib/dob-gate";
+import { DOB_OK_COOKIE, loadDobGate, mayRememberPass, maySkipGateCheck, signDobOk } from "@/lib/dob-gate";
 import { apiGateApplies, dobGatedPage, gateAction, intakeGateApplies } from "@/lib/gate-paths";
 import { SIGNED_OUT_FRAME_HTML } from "@/lib/signed-out-frame";
 
@@ -224,8 +224,7 @@ export async function updateSession(request: NextRequest) {
   if (
     user &&
     (dobGatedPage(pathname) || onIntake || gatedApi) &&
-    !(await dobOkCookieValid(request.cookies.get(DOB_OK_COOKIE)?.value, user.id, process.env.CRON_SECRET)) &&
-    !(await noSeatOkValid(request.cookies.get(NOSEAT_OK_COOKIE)?.value, user.id, process.env.CRON_SECRET))
+    !(await maySkipGateCheck(request.cookies.get(DOB_OK_COOKIE)?.value, user.id, process.env.CRON_SECRET))
   ) {
     const facts = await loadDobGate(supabase, user.id);
     const action = gateAction({ kind: gatedApi ? "api" : "page", gate: facts.gate, onIntake });
@@ -247,11 +246,8 @@ export async function updateSession(request: NextRequest) {
       return redirectResponse;
     }
     // Only an adult client whose date of birth is on file, or a coach, is remembered for a week (facts.cacheable). A client with no date yet, a teen (a guardian can withdraw at any moment), a child, a person with no seat at all and a failed lookup are checked every time.
-    const signed = facts.cacheable ? await signDobOk(user.id, process.env.CRON_SECRET) : null;
+    const signed = (await mayRememberPass(facts)) ? await signDobOk(user.id, process.env.CRON_SECRET) : null;
     if (signed) response.cookies.set(DOB_OK_COOKIE, signed, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 24 * 7 });
-    // A person with no seat at all gets a ten-minute pass instead (their expiry is inside the signed text).
-    const noSeatSigned = !signed && facts.gate === "ok" && facts.noSeat ? await signNoSeatOk(user.id, process.env.CRON_SECRET) : null;
-    if (noSeatSigned) response.cookies.set(NOSEAT_OK_COOKIE, noSeatSigned, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: NOSEAT_OK_SECONDS });
   }
 
   // "My training" is a deliberate visit (lib/my-training-exit.ts): landing on a coach page ends it. The cookies are cleared for THIS request too, so the coach screen renders instead of a redirect
