@@ -4,6 +4,8 @@ import { createServerClient } from "@/lib/supabase/server";
 import { PrPromotionAnswerCard } from "@/components/pr-promotion/answer-card";
 import { promotionSentence } from "@/lib/pr-promotion";
 
+export const metadata = { title: "Pr promotion" };
+
 // The page a client's notification opens when their coach asks to count a record from imported history. Only the client it is about can see it (row security); anyone else gets the plain not-found line.
 export default async function PrPromotionPage(props: { params: Promise<{ id: string }> }) {
   const { id } = await props.params;

@@ -6,6 +6,9 @@ import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { StatFieldManager, type StatFieldRow } from "@/components/coach/desktop/stat-field-manager";
 import { GameStatGrid, type GameStatAthlete } from "@/components/coach/desktop/game-stat-grid";
 import { TeamGameScoreForm } from "@/components/coach/desktop/team-game-score-form";
+import { readPositionRoster } from "@/lib/group-roster-reads";
+
+export const metadata = { title: "Games" };
 
 export default async function GameDetailPage(
   props: { params: Promise<{ groupId: string; gameId: string }> }
@@ -41,17 +44,14 @@ export default async function GameDetailPage(
   // UI only *offers* what a position-scoped coach can actually save.
   const coachPositionId = viewerMembership.coach_position_id ?? null;
 
-  const [{ data: fieldRows }, { data: memberRows }, { data: entryRows }] = await Promise.all([
+  const [{ data: fieldRows }, memberRows, { data: entryRows }] = await Promise.all([
     supabase
       .from("group_stat_fields")
       .select("id, name, sort_order")
       .eq("group_id", params.groupId)
       .order("sort_order", { ascending: true }),
-    supabase
-      .from("group_memberships")
-      .select("profile_id, position_id, profiles ( full_name )")
-      .eq("group_id", params.groupId)
-      .eq("role", "athlete"),
+    // The athletes with their position through the narrow read (migration 0404): a name and a position, nothing else about anyone.
+    readPositionRoster(supabase, params.groupId),
     supabase
       .from("game_stat_entries")
       .select("athlete_id, field_id, value")
@@ -60,10 +60,10 @@ export default async function GameDetailPage(
 
   const fields: StatFieldRow[] = (fieldRows ?? []).map((f) => ({ id: f.id, name: f.name, sortOrder: f.sort_order }));
 
-  let athletes: GameStatAthlete[] = (memberRows ?? []).map((m: any) => ({
-    profileId: m.profile_id,
-    fullName: m.profiles?.full_name ?? "Unknown",
-    positionId: m.position_id ?? null,
+  let athletes: GameStatAthlete[] = (memberRows ?? []).map((m) => ({
+    profileId: m.profileId,
+    fullName: m.fullName ?? "Unknown",
+    positionId: m.positionId,
   }));
   // A position-scoped coach only sees (and can only save) their own
   // position's athletes here — matches the RLS boundary exactly rather

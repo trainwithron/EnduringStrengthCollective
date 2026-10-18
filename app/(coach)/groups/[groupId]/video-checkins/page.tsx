@@ -6,6 +6,8 @@ import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { VideoCheckinActionItem } from "@/components/athlete/video-checkin-action-item";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 
+export const metadata = { title: "Video checkins" };
+
 // Client-facing view for coach video check-ins (coach_video_checkin_idea
 // memory) — the athlete's own real-self page, same pattern as
 // progress-photos/messages: viewed as the effective athlete so a coach

@@ -54,6 +54,11 @@ export async function updateSession(request: NextRequest) {
     pathname === "/terms" ||
     pathname === "/privacy" ||
     pathname === "/refunds" ||
+    // The public support pages: the help center, what's new, and the status of the app (anyone must be able to read them, signed in or not, especially when they cannot sign in).
+    pathname === "/help" ||
+    pathname.startsWith("/help/") ||
+    pathname === "/changelog" ||
+    pathname === "/status" ||
     pathname.startsWith("/api/coaches/signup") ||
     pathname.startsWith("/invite/") ||
     pathname.startsWith("/pr/") ||

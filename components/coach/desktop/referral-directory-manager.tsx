@@ -131,14 +131,14 @@ export function ReferralDirectoryManager({ initialPartners, organizationId }: { 
         <h3 className="font-body text-xs text-steel uppercase tracking-wide mb-1">
           Add referral partner
         </h3>
-        <input
+        <input aria-label="Name"
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Name"
           className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm"
         />
-        <select
+        <select aria-label="Specialty"
           value={specialty}
           onChange={(e) => setSpecialty(e.target.value)}
           className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm"
@@ -149,28 +149,28 @@ export function ReferralDirectoryManager({ initialPartners, organizationId }: { 
             </option>
           ))}
         </select>
-        <input
+        <input aria-label="Short description (optional)"
           type="text"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Short description (optional)"
           className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm"
         />
-        <input
+        <input aria-label="Booking link"
           type="url"
           value={bookingUrl}
           onChange={(e) => setBookingUrl(e.target.value)}
           placeholder="Booking link (Jane App, Mindbody, etc.)"
           className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm"
         />
-        <input
+        <input aria-label="Discount code (optional)"
           type="text"
           value={discountCode}
           onChange={(e) => setDiscountCode(e.target.value)}
           placeholder="Discount code (optional)"
           className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm"
         />
-        <input
+        <input aria-label="Offer"
           type="text"
           value={discountDescription}
           onChange={(e) => setDiscountDescription(e.target.value)}

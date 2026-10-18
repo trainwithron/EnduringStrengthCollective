@@ -112,6 +112,16 @@ describe("eraseAccount", () => {
   });
 });
 
+describe("a space that holds another removed client is only renamed", () => {
+  it("with the history erased too, a space in keepSpaceGroups is renamed, never deleted", async () => {
+    const { db, calls } = fakeDb();
+    const r = await eraseAccount(db, "u1", { eraseHistory: true, deleteEmptyOneOnOneGroups: ["g9"], keepSpaceGroups: ["g9"] });
+    expect(calls).not.toContain("delete groups.id");
+    expect(calls).toContain("update-author groups.id");
+    expect(r.ok && r.leftover).toMatch(/kept \(renamed Former client\)/);
+  });
+});
+
 describe("their uploaded photos and videos go with the account", () => {
   const files = { progress_photos: "u1/a.jpg", session_exercise_videos: "g/s/v.mp4", posts: "https://x.supabase.co/storage/v1/object/sign/post-media/g/abc-my%20pic.png?token=t" };
   it("reads where the files are before anything is erased, and removes them only after the account is gone", async () => {

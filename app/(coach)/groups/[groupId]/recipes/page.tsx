@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
 
+export const metadata = { title: "Recipes" };
+
 // The Recipe Hub is now the "Favorite meals" tab of Nutrition. Old links, bookmarks and Ask Spot answers keep working: a coach is sent to the tab.
 export default async function RecipeHubPage(
   props: {

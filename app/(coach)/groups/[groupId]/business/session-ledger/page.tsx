@@ -10,6 +10,8 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 
+export const metadata = { title: "Session ledger" };
+
 // gym_owner_multi_trainer_session_tracking_real_prospect.md — piece 3
 // of the build spec, the real missing visibility: packages and client
 // rosters are scoped per group, per coach (coach_packages/the packages

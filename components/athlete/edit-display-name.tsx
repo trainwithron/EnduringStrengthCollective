@@ -49,7 +49,7 @@ export function EditDisplayName({ initialName, profileId }: { initialName: strin
 
   return (
     <div className="flex-1">
-      <input
+      <input aria-label="Display name"
         type="text"
         value={name}
         onChange={(e) => setName(e.target.value)}

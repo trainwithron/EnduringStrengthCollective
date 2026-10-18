@@ -1127,7 +1127,7 @@ export function MealPlanGenerator({
           High carb training / low carb rest days
         </label>
         {carbCycling && (
-          <select
+          <select aria-label="Training days per week"
             value={trainingDays}
             onChange={(e) => setTrainingDays(e.target.value)}
             className="h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs"

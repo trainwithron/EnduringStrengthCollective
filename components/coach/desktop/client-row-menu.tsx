@@ -4,12 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { MoreVertical } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { confirmDialog } from "@/components/shared/confirm-dialog";
-import { runDeleteClient } from "@/components/coach/delete-client-flow";
+import { runDeleteClient, runRemoveClient } from "@/components/coach/delete-client-flow";
 import { useTerm } from "@/components/coach/terminology-provider";
 
-// The small three-dot menu on a client's card and on a row of the Clients list: exactly two actions, the same two the client's own profile has.
+// The small three-dot menu on a client's card and on a row of the Clients list: three actions, the same the client's own profile has (Release Z1 added Remove).
 //   * Set inactive: the existing set_client_inactive call (nothing is deleted; a workout, session or message from them brings them back). A client already set aside shows "Bring back" instead.
-//   * Delete client: the one delete flow (components/coach/delete-client-flow.ts): the in-page confirm with the history tick-box.
+//   * Remove from my clients: the default way out. They leave your lists, their account and data are kept, and you can put them back (components/coach/delete-client-flow.ts).
+//   * Delete permanently: the same removal with 30 days to undo, then the account is erased; the in-page confirm has the history tick-box.
 // It sits beside the card's link, never inside it, so opening it does not open the client.
 export function ClientRowMenu({ groupId, athleteId, athleteName, setAside = false }: { groupId: string; athleteId: string; athleteName: string; setAside?: boolean }) {
   const term = useTerm();
@@ -53,6 +54,16 @@ export function ClientRowMenu({ groupId, athleteId, athleteName, setAside = fals
     window.location.reload();
   }
 
+  async function removeClient() {
+    setOpen(false);
+    setError(null);
+    setBusy(true);
+    const result = await runRemoveClient({ groupId, athleteId, athleteName });
+    setBusy(false);
+    if (result.status === "failed") setError(result.error);
+    else if (result.status === "removed") window.location.reload();
+  }
+
   async function deleteClient() {
     setOpen(false);
     setError(null);
@@ -79,9 +90,12 @@ export function ClientRowMenu({ groupId, athleteId, athleteName, setAside = fals
         <MoreVertical className="w-5 h-5" aria-hidden="true" />
       </button>
       {open && (
-        <div role="menu" className="absolute right-0 top-full z-30 mt-0.5 w-48 border border-steel/30 bg-surface shadow-lg">
+        <div role="menu" className="absolute right-0 top-full z-30 mt-0.5 w-56 border border-steel/30 bg-surface shadow-lg">
           <button type="button" role="menuitem" onClick={() => void toggleInactive()} className={item}>
             {setAside ? "Bring back" : "Set inactive"}
+          </button>
+          <button type="button" role="menuitem" onClick={() => void removeClient()} className={item}>
+            Remove from my {term("client")}s
           </button>
           <button
             type="button"
@@ -89,7 +103,7 @@ export function ClientRowMenu({ groupId, athleteId, athleteName, setAside = fals
             onClick={() => void deleteClient()}
             className={`${item} text-rust`}
           >
-            Delete {term("client")}
+            Delete {term("client")} permanently
           </button>
         </div>
       )}

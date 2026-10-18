@@ -285,7 +285,7 @@ export function FreeTextFoodLog({
     <div className="mt-2 space-y-2">
       {!estimate ? (
         <>
-          <textarea
+          <textarea aria-label={placeholder}
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder={placeholder}

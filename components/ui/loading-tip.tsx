@@ -8,7 +8,7 @@ import { pickLoadingTip } from "@/lib/loading-tips";
 export function LoadingTip() {
   const tip = pickLoadingTip();
   return (
-    <p className="font-body text-xs text-steel/80 leading-relaxed px-1">
+    <p className="font-body text-xs text-steel leading-relaxed px-1">
       <span className="text-rust">💡</span> {tip.text}
     </p>
   );

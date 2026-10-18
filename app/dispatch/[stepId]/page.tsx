@@ -5,6 +5,8 @@ import { getViewerDisplayTimezone } from "@/lib/display-timezone-server";
 import { formatInTimezone } from "@/lib/format-in-timezone";
 import { DispatchStepActions } from "@/components/coach/dispatch-step-actions";
 
+export const metadata = { title: "Dispatch" };
+
 const GOAL_LABELS: Record<string, string> = {
   weight_loss: "Lose weight",
   body_recomp: "Body recomposition",

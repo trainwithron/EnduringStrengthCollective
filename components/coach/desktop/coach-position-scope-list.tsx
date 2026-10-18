@@ -54,7 +54,7 @@ export function CoachPositionScopeList({
         {coaches.map((c) => (
           <div key={c.profileId} className="py-2.5 flex items-center justify-between gap-3">
             <span className="font-body text-sm">{c.fullName}</span>
-            <select
+            <select aria-label={`Position for ${c.fullName}`}
               value={c.coachPositionId ?? ""}
               onChange={(e) => handleChange(c.profileId, e.target.value || null)}
               className="h-8 bg-graphite border border-steel/30 text-chalk px-1.5 font-body text-xs"

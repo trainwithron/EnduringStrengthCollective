@@ -6,6 +6,8 @@ import { QrQuickLogStart } from "@/components/public/qr-quick-log-start";
 import { GymVisitorLeadForm } from "@/components/public/gym-visitor-lead-form";
 import type { TrackedField } from "@/lib/exercise-fields";
 
+export const metadata = { title: "Scan" };
+
 // equipment_qr_decal_scoping_sept19.md — a gym equipment decal deep-
 // links here with no login required (added to the public-path
 // allowlist in lib/supabase/middleware.ts). Branches on auth state: an

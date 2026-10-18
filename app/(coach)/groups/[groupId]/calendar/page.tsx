@@ -6,6 +6,8 @@ import { getEffectiveAthlete } from "@/lib/acting-as";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { CoachCalendarPageBody } from "@/components/coach/calendar-page-body";
 
+export const metadata = { title: "Calendar" };
+
 type SearchParams = Record<string, string | undefined>;
 
 // A client's calendar, or a coach on a phone. A coach on a computer goes to the coach-level Calendar (/calendar, no group in the address); old links to this

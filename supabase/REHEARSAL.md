@@ -165,6 +165,14 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0396 | yes | yes | 77 | 0396 Leaving coach choice |
 | 0397 | yes | yes | 21 | 0397 Free plan client limit |
 | 0398 | yes | yes | 8 | 0398 Waiting sign-in email changes |
+| 0399 | yes | yes | 42 | 0399 Health answers private |
+| 0400 | yes | yes | 69 | 0400 Front desk |
+| 0401 | yes | yes | 25 | 0401 Graduation years |
+| 0403 | yes | yes | 13 | 0403 Intake for every client |
+| 0404 | yes | yes | 13 | 0404 Athlete narrow reads |
+| 0405 | yes | yes | 9 | 0405 Notice names |
+| 0407 | yes | yes | 59 | 0407 Client removals |
+| 0408 | yes | yes | 18 | 0408 Nutrition suggestions switch |
 | 0409 | yes | yes | 27 | 0409 Money events |
 | 0331 | yes | yes | 10 | 0331 a payment event and its sessions are recorded in one step |
 | 0329 | yes | yes | 12 | 0329 every session costs exactly 1 credit; the waitlist offer uses the coach's time zone |

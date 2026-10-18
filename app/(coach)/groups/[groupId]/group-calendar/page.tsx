@@ -9,6 +9,8 @@ import { GroupEventAdmin, type EventPerson } from "@/components/coach/group-even
 import { getGroupCoachTimezone } from "@/lib/timezone";
 import { SwappableTerm } from "@/components/coach/swappable-term";
 
+export const metadata = { title: "Group calendar" };
+
 // One group's calendar: only this group's events (the group's name and GROUP tag are in the bar), who is In and Out, and a way to add the next one. A one-on-one
 // client's sessions never appear here; they are on the coach's Calendar.
 export default async function GroupCalendarPage(props: { params: Promise<{ groupId: string }> }) {

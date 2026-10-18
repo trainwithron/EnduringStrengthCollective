@@ -6,6 +6,7 @@ import { computeReadinessAverage } from "@/lib/wellness";
 import { computeArchetypeMacros, detectDietArchetype } from "@/lib/macros";
 import { estimateMaintenance } from "@/lib/nutrition-profile";
 import { withCronRun } from "@/lib/cron-monitor";
+import { loadPausedKeys } from "@/lib/nutrition-pause";
 import { pageAll } from "@/lib/page-all";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 import { addDaysToKey } from "@/lib/date-key";
@@ -103,10 +104,18 @@ async function handler(request: Request) {
   const planByKey = new Map<string, ReturnType<typeof rowToPhasePlan>>();
   for (const p of planPage.rows) planByKey.set(`${p.athlete_id}|${p.group_id}`, rowToPhasePlan(p as Record<string, unknown>));
 
+  // Clients whose coach has switched suggestions off ("No macros for [name]" in this group, or the automatic-suggestions safety switch in any group): nothing is suggested for them. If the list cannot be read, nothing is suggested at all.
+  const paused = await loadPausedKeys(supabase);
+  if (paused.failed) return NextResponse.json({ error: "Could not read which clients have suggestions switched off, so nothing was suggested." }, { status: 502 });
+
   // heldForAge: the engine wanted to lower a minor's calories and the cut was held (it writes no suggestion; the coach screen explains why on read).
   const results: { athleteId: string; suggested: boolean; loggedDays?: number; held?: boolean; heldForAge?: boolean }[] = [];
 
   for (const [athleteId, last] of latestByAthlete) {
+    if (paused.profiles.has(athleteId) || paused.keys.has(`${athleteId}|${last.group_id}`)) {
+      results.push({ athleteId, suggested: false });
+      continue;
+    }
     const todayKey = await todayKeyFor(last.group_id);
     const [
       { data: weightLogs },
@@ -242,7 +251,7 @@ async function handler(request: Request) {
     results.push({ athleteId, suggested: true, loggedDays: adherence.daysLogged, held: adherence.heldForLowLogging, heldForAge });
   }
 
-  const baselines = await seedBaselines(supabase, latestByAthlete, planByKey, todayKeyFor);
+  const baselines = await seedBaselines(supabase, latestByAthlete, planByKey, todayKeyFor, paused);
   return NextResponse.json({ athletes: results.length, results, baselinesSuggested: baselines.made, baselinesSkipped: baselines.skipped });
 }
 
@@ -258,7 +267,8 @@ async function seedBaselines(
   supabase: ReturnType<typeof createServiceRoleClient>,
   checkedAthletes: Map<string, unknown>,
   planByKey: Map<string, ReturnType<typeof rowToPhasePlan>>,
-  todayKeyFor: (groupId: string) => Promise<string>
+  todayKeyFor: (groupId: string) => Promise<string>,
+  paused: { keys: Set<string>; profiles: Set<string> }
 ): Promise<{ made: number; skipped: string | null }> {
   const [members, standing, baselines] = await Promise.all([
     pageAll((from, to) => supabase.from("group_memberships").select("profile_id, group_id, client_tier").eq("role", "athlete").order("profile_id").order("group_id").range(from, to)),
@@ -272,7 +282,7 @@ async function seedBaselines(
   const hadBaseline = new Set(baselines.rows.map((r) => `${r.athlete_id}|${r.group_id}`));
   const candidates = members.rows.filter((m) => {
     const key = `${m.profile_id}|${m.group_id}`;
-    return m.client_tier !== "group" && !checkedAthletes.has(m.profile_id) && !hasStanding.has(key) && !hadBaseline.has(key);
+    return m.client_tier !== "group" && !paused.keys.has(key) && !paused.profiles.has(m.profile_id) && !checkedAthletes.has(m.profile_id) && !hasStanding.has(key) && !hadBaseline.has(key);
   });
 
   const seedOne = async (m: { profile_id: string; group_id: string }): Promise<boolean> => {

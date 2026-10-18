@@ -110,7 +110,7 @@ export function TransformationCardCreator({
             Optional: pick before/after photos from your journal
           </p>
           <div className="grid grid-cols-2 gap-3">
-            <select
+            <select aria-label="Before photo"
               value={beforePhotoId}
               onChange={(e) => setBeforePhotoId(e.target.value)}
               className="h-11 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs"
@@ -122,7 +122,7 @@ export function TransformationCardCreator({
                 </option>
               ))}
             </select>
-            <select
+            <select aria-label="After photo"
               value={afterPhotoId}
               onChange={(e) => setAfterPhotoId(e.target.value)}
               className="h-11 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs"

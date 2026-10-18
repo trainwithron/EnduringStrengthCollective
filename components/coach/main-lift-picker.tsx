@@ -46,7 +46,7 @@ export function MainLiftPicker({
   return (
     <div className="flex items-center gap-2">
       <label className="font-body text-xs text-steel uppercase tracking-wide">Main lift</label>
-      <select
+      <select aria-label="Main lift"
         value={value}
         onChange={(e) => handleChange(e.target.value)}
         disabled={saving}

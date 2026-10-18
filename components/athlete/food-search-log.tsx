@@ -142,7 +142,7 @@ export function FoodSearchLog({
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Chicken breast, rice, banana…"
             aria-label="Search foods"
-            className="w-full min-h-[44px] bg-surface border border-steel/30 px-3 font-body text-sm text-chalk placeholder:text-steel/60"
+            className="w-full min-h-[44px] bg-surface border border-steel/30 px-3 font-body text-sm text-chalk placeholder:text-steel"
           />
           {added && <p className="font-body text-xs text-rust mt-2">{added}</p>}
           {searching && <p className="font-body text-xs text-steel mt-2">Searching…</p>}
