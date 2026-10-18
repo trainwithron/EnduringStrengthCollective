@@ -34,6 +34,8 @@ export function ChangeMyEmail({ currentEmail }: { currentEmail: string }) {
       setError(/rate limit|seconds|too many/i.test(updateError.message) ? "A confirmation was just sent. Wait a minute and try again." : /already|registered/i.test(updateError.message) ? "That email already has an account." : "That didn't work. Check the address and try again.");
       return;
     }
+    // A change they start themselves replaces one their coach asked for (best effort).
+    void fetch("/api/email-change/cancel-mine", { method: "POST" }).catch(() => {});
     setSentTo(email.trim().toLowerCase());
   }
 

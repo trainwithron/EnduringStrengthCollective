@@ -21,6 +21,7 @@ function routeFiles(rel: string): string[] {
 const NOT_A_SAVE = new Set([
   "/api/email-change/confirm",
   "/api/email-change/cancel",
+  "/api/email-change/cancel-mine",
   "/api/coach/start-own-account",
   "/api/coach/message-template",
   "/api/admin/trivia/generate",

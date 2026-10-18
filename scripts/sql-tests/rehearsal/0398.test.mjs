@@ -11,15 +11,20 @@ export default {
       const coach = await h.user("EC Coach");
       const client = await h.user("EC Client");
       await h.asSuper();
-      let r = await tryQ(db, `insert into public.pending_email_changes (profile_id, new_email, old_email, token_hash, requested_by, expires_at) values ($1, 'new@example.com', 'old@example.com', 'hash-1', $2, now() + interval '48 hours') returning id`, [client, coach]);
+      let r = await tryQ(db, `insert into public.pending_email_changes (profile_id, new_email, old_email, token_hash, cancel_token_hash, requested_by, expires_at) values ($1, 'new@example.com', 'old@example.com', 'hash-1', 'cancel-1', $2, now() + interval '48 hours') returning id`, [client, coach]);
       h.check("the server can record a waiting change" + (r.error ? ": " + r.error : ""), !r.error);
-      r = await tryQ(db, `insert into public.pending_email_changes (profile_id, new_email, token_hash, expires_at) values ($1, 'x@example.com', 'hash-1', now())`, [client]);
+      r = await tryQ(db, `insert into public.pending_email_changes (profile_id, new_email, token_hash, cancel_token_hash, expires_at) values ($1, 'x@example.com', 'hash-1', 'cancel-x', now())`, [client]);
       h.check("a token can only be used for one request (the hash is unique)", !!r.error);
+
+      r = await tryQ(db, `insert into public.pending_email_changes (profile_id, new_email, token_hash, cancel_token_hash, expires_at) values ($1, 'z@example.com', 'hash-3', 'cancel-1', now())`, [client]);
+      h.check("the cancel token is unique too, and different from every confirm token", !!r.error);
+      r = await tryQ(db, `select confirmable_at <= now() as ok from public.pending_email_changes where token_hash = 'hash-1'`);
+      h.check("a request can be confirmed at once unless the server sets a later time", r.rows?.[0]?.ok === true);
 
       await h.as(client);
       r = await tryQ(db, `select count(*)::int as n from public.pending_email_changes`);
       h.check("a signed-in person cannot read the waiting requests, not even their own", !!r.error || r.rows[0].n === 0, JSON.stringify(r));
-      r = await tryQ(db, `insert into public.pending_email_changes (profile_id, new_email, token_hash, expires_at) values ($1, 'y@example.com', 'hash-2', now() + interval '1 day')`, [client]);
+      r = await tryQ(db, `insert into public.pending_email_changes (profile_id, new_email, token_hash, cancel_token_hash, expires_at) values ($1, 'y@example.com', 'hash-2', 'cancel-2', now() + interval '1 day')`, [client]);
       h.check("nor write one", !!r.error);
       await h.as(coach);
       r = await tryQ(db, `update public.pending_email_changes set confirmed_at = now()`);

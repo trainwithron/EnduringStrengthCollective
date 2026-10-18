@@ -20,7 +20,9 @@ export async function POST(request: Request) {
     used: "That link was already used.",
     cancelled: "That change was cancelled.",
     taken: "That email already has an account, so nothing was changed.",
+    too_soon: "This change can't be confirmed yet. A day is kept on purpose so the current address has time to object. Try again later with the same link.",
+    stale: "This request is out of date (the situation changed since it was asked for), so nothing was changed. Ask your coach to start it again.",
     failed: "Couldn't change the email. Try again in a minute.",
   };
-  return NextResponse.json({ error: message[result.reason] ?? message.failed }, { status: result.reason === "failed" ? 500 : 409 });
+  return NextResponse.json({ error: message[result.reason] ?? message.failed, ...(result.availableAt ? { availableAt: result.availableAt } : {}) }, { status: result.reason === "failed" ? 500 : 409 });
 }

@@ -5,7 +5,7 @@ import { validateClaimEmail } from "@/lib/client-claim";
 import { rateLimitResponse } from "@/lib/rate-limit";
 import { isEmailConfigured } from "@/lib/email";
 import { appOrigin } from "@/lib/app-url";
-import { requestEmailChange, sendEmailChangeMessages } from "@/lib/email-change";
+import { abandonRequest, requestEmailChange, sendEmailChangeMessages, supersedeOlder } from "@/lib/email-change";
 
 // A coach correcting the email on a client's account AFTER the client has claimed it (a wrong-but-valid address no verification email caught). Before the claim, /api/clients/fix-email does this.
 // Afterwards it is the client's account, so this asks for the address twice, is only for that client's coach, and does NOT change the login: the new address is sent a confirmation link and the login changes only
@@ -84,19 +84,24 @@ export async function POST(request: Request) {
 
   // The login is NOT changed here. The new address gets a link and the change happens only when its owner confirms (lib/email-change.ts); the old address is told at once and can cancel.
   const { data: coachProfile } = await serviceRole.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
-  const asked = await requestEmailChange(serviceRole, { profileId: athleteId, newEmail: trimmed, oldEmail, requestedBy: user.id, groupId, origin: appOrigin(request) });
+  const { data: clientProfile } = await serviceRole.from("profiles").select("claimed_at").eq("id", athleteId).maybeSingle();
+  const hasSignedIn = !!clientProfile?.claimed_at || !!before?.user?.last_sign_in_at;
+  const asked = await requestEmailChange(serviceRole, { profileId: athleteId, newEmail: trimmed, oldEmail, requestedBy: user.id, groupId, origin: appOrigin(request), hasSignedIn });
   if (!asked.ok) return NextResponse.json({ error: "Couldn't start the change. Try again." }, { status: 500 });
-  const sent = await sendEmailChangeMessages({ coachName: coachProfile?.full_name ?? null, newEmail: trimmed, oldEmail, confirmLink: asked.confirmLink, cancelLink: asked.cancelLink });
+  const sent = await sendEmailChangeMessages({ coachName: coachProfile?.full_name ?? null, newEmail: trimmed, oldEmail, confirmLink: asked.confirmLink, cancelLink: asked.cancelLink, confirmableAt: asked.confirmableAt });
   if (!sent.toNew) {
+    // A link nobody received must not stay live, and an earlier waiting request is left exactly as it was.
+    await abandonRequest(serviceRole, asked.id);
     return NextResponse.json({ error: "The confirmation email couldn't be sent to the new address, so nothing was started. Try again in a few minutes." }, { status: 502 });
   }
+  await supersedeOlder(serviceRole, athleteId, asked.id);
 
   // Tell the client in the app that a change was asked for (best effort): nothing has changed yet.
   await serviceRole.from("notifications").insert({
     profile_id: athleteId,
     group_id: groupId,
     type: "email_change_requested",
-    body: `Your coach asked to change your sign-in email to ${trimmed}. Nothing has changed yet: it changes only if that address confirms.`,
+    body: `Your coach asked to change your sign-in email to ${trimmed}. Nothing has changed yet: it changes only if that address confirms, and not before tomorrow. If you did not expect this, cancel it from the banner at the top of the app.`,
     link_path: `/groups/${groupId}`,
   });
 

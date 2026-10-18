@@ -32,7 +32,7 @@ $g150$;
 -- ====================================================================================================
 
 -- 0398: a coach changing the sign-in email of a client who has already signed in no longer changes it on the spot. The new address is asked to confirm by an emailed link first (and the old address is told), and
--- only then does it become the login. This table holds the waiting requests: the link carries a random token, only its hash is stored, a request lasts 48 hours, and a newer request for the same person
+-- only then does it become the login. This table holds the waiting requests: each link carries its own random token (confirm for the new address, cancel for the old), only their hashes are stored, a request can be confirmed from a day after it was asked for (when the account has signed in and has a real old email) and then stays open 48 hours, and a newer request for the same person
 -- replaces an older one. Nobody reads or writes it from the app: only the server (service key) touches it.
 
 create table if not exists public.pending_email_changes (
@@ -40,9 +40,13 @@ create table if not exists public.pending_email_changes (
   profile_id uuid not null references public.profiles(id) on delete cascade,
   new_email text not null,
   old_email text,
+  -- Two different random tokens: the confirm link goes ONLY to the new address, the cancel link ONLY to the old one, so neither mail can do the other's job.
   token_hash text not null unique,
+  cancel_token_hash text not null unique,
   requested_by uuid references public.profiles(id) on delete set null,
   group_id uuid references public.groups(id) on delete set null,
+  -- The earliest the new address can confirm (a day after the request when the account has signed in and has a real old email, so the old address and the in-app banner always get time to be seen).
+  confirmable_at timestamptz not null default now(),
   expires_at timestamptz not null,
   confirmed_at timestamptz,
   cancelled_at timestamptz,
