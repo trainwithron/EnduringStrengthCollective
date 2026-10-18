@@ -46,19 +46,25 @@ export async function POST(request: Request) {
   if (!isEmailConfigured()) return NextResponse.json({ sent: 0, skipped: 0, problems: [], emailOff: true });
 
   // Players of the retired season whose class has graduated (by the year the season was retired) and who are not on next season's roster.
-  const [oldRead, nextRead] = await Promise.all([
+  const [oldRead, nextRead, exportRead] = await Promise.all([
     pageAll((from, to) => db.from("group_memberships").select("id, profile_id, graduation_year, profiles ( full_name )").eq("group_id", groupId).eq("role", "athlete").not("graduation_year", "is", null).order("id").range(from, to), { maxPages: 50 }),
     pageAll((from, to) => db.from("group_memberships").select("id, profile_id").eq("group_id", group.next_season_id).eq("role", "athlete").order("id").range(from, to), { maxPages: 50 }),
+    pageAll((from, to) => db.from("graduation_exports").select("athlete_id, claimed_at, sent_at").eq("group_id", groupId).order("athlete_id").range(from, to), { maxPages: 50 }),
   ]);
-  if (oldRead.failed || nextRead.failed || oldRead.truncated || nextRead.truncated) return NextResponse.json({ error: "Couldn't read the roster. Try again." }, { status: 502 });
+  if (oldRead.failed || nextRead.failed || oldRead.truncated || nextRead.truncated || exportRead.failed || exportRead.truncated) return NextResponse.json({ error: "Couldn't read the roster. Try again." }, { status: 502 });
 
   const staying = new Set(nextRead.rows.map((r: { profile_id: string }) => r.profile_id));
+  // Players already sent to, or being sent to right now (claimed in the last ten minutes), are left out BEFORE the batch is cut, so a class of more than one batch moves forward on every call.
+  const STALE_MS = 10 * 60 * 1000;
+  const nowMs = Date.now();
+  const handled = new Set(
+    (exportRead.rows as { athlete_id: string; claimed_at: string; sent_at: string | null }[]).filter((r) => r.sent_at || nowMs - new Date(r.claimed_at).getTime() < STALE_MS).map((r) => r.athlete_id)
+  );
   const allGraduates = (oldRead.rows as unknown as { profile_id: string; graduation_year: number; profiles: { full_name: string | null } | { full_name: string | null }[] | null }[]).filter(
     (r) => hasGraduatedBy(r.graduation_year, year) && !staying.has(r.profile_id)
   );
-  // The cap is on this call's work, not on the roster: the rest are counted and the same button sends them.
-  const graduates = allGraduates.slice(0, PER_CALL);
-  const remaining = allGraduates.length - graduates.length;
+  const graduates = allGraduates.filter((r) => !handled.has(r.profile_id));
+  const alreadyHandled = allGraduates.length - graduates.length;
 
   const preparedOn = new Date().toISOString().slice(0, 10);
   const teamName = (group.name as string) || "your team";
@@ -67,7 +73,6 @@ export async function POST(request: Request) {
     return profile?.full_name?.trim() || "A player";
   };
   const byId = new Map(graduates.map((g) => [g.profile_id, g]));
-  const STALE_MS = 10 * 60 * 1000;
 
   const result = await sendGraduationHistories(
     graduates.map((g) => ({ id: g.profile_id, name: nameOf(g) })),
@@ -112,7 +117,8 @@ export async function POST(request: Request) {
         const mail = graduationEmail({ firstName: fullName.split(/\s+/)[0] || "there", teamName });
         return sendEmail(to, mail.subject, mail.text, { name: "training-history.pdf", bytes: pdf });
       },
-    }
+    },
+    { limit: PER_CALL }
   );
-  return NextResponse.json({ ...result, remaining });
+  return NextResponse.json({ ...result, skipped: result.skipped + alreadyHandled });
 }

@@ -35,11 +35,20 @@ export const WHY = {
   recordFailed: "the app could not record the send, so nothing was sent; try again",
 } as const;
 
-export async function sendGraduationHistories(graduates: GraduateRef[], deps: SendDeps): Promise<{ sent: number; skipped: number; problems: Problem[] }> {
+// Works through the list until `limit` players have been emailed (players that cannot be sent to are reported and passed over, so they never stall the ones behind them), and says how many it did not reach.
+export async function sendGraduationHistories(
+  graduates: GraduateRef[],
+  deps: SendDeps,
+  opts: { limit?: number } = {}
+): Promise<{ sent: number; skipped: number; problems: Problem[]; remaining: number }> {
+  const limit = opts.limit ?? Number.POSITIVE_INFINITY;
   let sent = 0;
   let skipped = 0;
   const problems: Problem[] = [];
+  let reached = 0;
   for (const g of graduates) {
+    if (sent >= limit) break;
+    reached++;
     let claimed = false;
     try {
       const to = await deps.addressOf(g.id);
@@ -71,7 +80,16 @@ export async function sendGraduationHistories(graduates: GraduateRef[], deps: Se
         problems.push({ name: g.name, why: WHY.sendFailed });
         continue;
       }
-      await deps.markSent(g.id).catch(() => undefined);
+      // The email is out. Stamp it sent, and if that fails try once more and say so in the log: an unstamped claim could be taken over after ten minutes and the player emailed again.
+      try {
+        await deps.markSent(g.id);
+      } catch {
+        try {
+          await deps.markSent(g.id);
+        } catch {
+          console.error("[graduate] the email was sent but could not be marked sent");
+        }
+      }
       claimed = false; // kept: it was sent
       sent++;
     } catch {
@@ -79,5 +97,5 @@ export async function sendGraduationHistories(graduates: GraduateRef[], deps: Se
       problems.push({ name: g.name, why: WHY.sendFailed });
     }
   }
-  return { sent, skipped, problems };
+  return { sent, skipped, problems, remaining: graduates.length - reached };
 }

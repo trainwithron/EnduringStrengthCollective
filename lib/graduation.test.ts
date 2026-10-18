@@ -135,7 +135,8 @@ describe("how the pieces are wired", () => {
     expect(route).toContain("Math.abs(body.year - serverYear) <= 1");
     expect(route).toContain("isPlaceholderEmail(to)");
     expect(route).toContain("insert({ group_id: groupId, athlete_id: id })"); // the claim, made before anything is sent
-    expect(route).toContain("const graduates = allGraduates.slice(0, PER_CALL);");
+    expect(route).toContain("const graduates = allGraduates.filter((r) => !handled.has(r.profile_id));");
+    expect(route).toContain("{ limit: PER_CALL }");
     expect(route).not.toContain("limit(MAX_PLAYERS");
     // one recipient: the player's own address, nothing added
     expect(route.match(/sendEmail\(/g)!.length).toBe(1);
