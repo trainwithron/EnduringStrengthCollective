@@ -62,8 +62,16 @@ export async function GET() {
     supabase.from("read_settings").select("faith_track, note_seen_at, updated_at").eq("athlete_id", userId).maybeSingle(),
   ]);
 
+  // Everything else the app holds about this person that their own sign-in can read, found by the database itself from every table that points at them
+  // (so a table added later is included without anyone remembering to list it). Absent until the database has the function; the list below still downloads then.
+  const { data: everything, error: everythingError } = await supabase.rpc("export_my_data");
+
   const exportData = {
     exportedAt: new Date().toISOString(),
+    everything: everythingError ? null : everything,
+    everythingNote: everythingError
+      ? "The complete collection was not available this time; the sections below are still complete for the main parts of your account. Try again later or contact support."
+      : "Every table that holds something about you, keyed table.column. Secrets and sign-in tokens are left out, and so is anything a coach keeps privately about you that your sign-in cannot read.",
     profile,
     profileDetails,
     intake,

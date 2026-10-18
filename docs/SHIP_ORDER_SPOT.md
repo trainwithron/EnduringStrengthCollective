@@ -27,6 +27,8 @@
 | S3 | release-team-coach | (see git) | none | team coach Home tiles and menus; built on master 408e6919 |
 | D-held | (data) | - | HELD: step 138, apply-release-cn-held-all.sql, fp 8f22a2d348ee90d7, read check-intake-flag-list.sql first | Ron's word only |
 
+| T1 | release-trust | (see git) | Release T1, step 164 (0412), apply-release-t1-export-my-data-all.sql, fp in the step file | Download my data = everything (one function, adds only, safe before the code; the route tolerates it missing); breach runbook section; wearable-token encryption follows |
+
 Fingerprint = first 16 hex of sha256 of the LF-normalized file: tr -d '\r' < supabase/apply/<file> | sha256sum | cut -c1-16.
 Apply order: CL (136), CM (137), CO (139), G (141), H (142 to 144), I (145), J (146), K1 (147), L (148); then deploy the code; then CP (140) after the code is live. Held 138 only on Ron's word.
 
