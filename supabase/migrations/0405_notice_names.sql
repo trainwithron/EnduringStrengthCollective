@@ -85,7 +85,7 @@ begin
 
   foreach v_target_id in array new.mentioned_profile_ids
   loop
-    -- Only notify a real, current member of this post's group — a
+    -- Only notify a real, current member of this post's group - a
     -- mention captured at compose time could otherwise point at someone
     -- who's since left, or (defense in depth) an id the client didn't
     -- legitimately have available to pick from.

@@ -25,7 +25,7 @@
 | F2 | release-f2-client-cap | (see git) | Release F2, step 149 (0397), apply-release-f2-client-cap-all.sql, fp 979398d89cdde8a9 | stacked on L + F1; installed SWITCHED OFF, adds only |
 | S1 | release-signin-hardening | (see git) | Release S1, step 150 (0398), apply-release-s1-signin-hardening-all.sql, fp 8628d711b21b9d5a | built on master eb5ed58d; adds only, paste BEFORE code |
 | S3 | release-team-coach | (see git) | none | team coach Home tiles and menus; built on master 408e6919 |
-| W2 | release-minor-names | (see git) | W2b: Release W2b, step 157 (0405), apply-release-w2b-notice-names-all.sql, fp 16ca65208eba5f84; REPLACES three notice functions (not additions-only) | minors' names in the feed (code, no paste needed to deploy) + the notice triggers (paste) |
+| W2 | release-minor-names | (see git) | W2b: Release W2b, step 157 (0405), apply-release-w2b-notice-names-all.sql, fp 2dac5abb82d97a8f; REPLACES three notice functions (not additions-only) | minors' names in the feed (code, no paste needed to deploy) + the notice triggers (paste) |
 | D-held | (data) | - | HELD: step 138, apply-release-cn-held-all.sql, fp 8f22a2d348ee90d7, read check-intake-flag-list.sql first | Ron's word only |
 
 Fingerprint = first 16 hex of sha256 of the LF-normalized file: tr -d '\r' < supabase/apply/<file> | sha256sum | cut -c1-16.

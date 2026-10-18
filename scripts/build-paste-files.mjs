@@ -2921,7 +2921,8 @@ function functionFromMigration(file, name) {
   const start = text.indexOf("create or replace function public." + name + "(");
   const end = text.indexOf(String.fromCharCode(36, 36) + ";", start);
   if (start < 0 || end < 0) throw new Error("cannot find " + name + " in " + file);
-  return text.slice(start, end + 3);
+  // the pastes are plain ASCII: a long dash in an old comment becomes a hyphen
+  return text.slice(start, end + 3).replace(/—/g, "-");
 }
 
 STEPS.push({
