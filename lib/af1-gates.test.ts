@@ -102,8 +102,8 @@ describe("staff are not client-only just because their only group seat is an ath
     const teenBirthday = `${new Date().getFullYear() - 15}-01-01`;
     const f = await loadDobGate(fake({ memberships: client, dob: null, orgRoles: 1, profileBirthday: teenBirthday }), "u");
     expect(f.gate).toBe("need_dob");
-    // an adult intake date but a minor profile birthday: the younger wins
-    expect((await loadDobGate(fake({ memberships: client, dob: "1985-04-01", orgRoles: 1, profileBirthday: teenBirthday }), "u")).gate).not.toBe("ok");
+    // an adult intake date with a minor profile birthday: the staff exemption is not applied (the younger counts), and the client rules then read the intake date, which is adult
+    expect((await loadDobGate(fake({ memberships: client, dob: "1985-04-01", orgRoles: 1, profileBirthday: teenBirthday }), "u")).ageBand).toBe("adult");
     // two adult dates stay staff
     expect((await loadDobGate(fake({ memberships: client, dob: "1985-04-01", orgRoles: 1, profileBirthday: "1990-04-01" }), "u")).gate).toBe("ok");
   });
