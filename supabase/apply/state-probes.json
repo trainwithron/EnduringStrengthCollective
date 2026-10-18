@@ -1598,6 +1598,17 @@
   ]
  },
  {
+  "n": "151",
+  "slug": "0399",
+  "title": "0399 Release S2: a client's health answers are read only by the client, their coach, and an owner or admin the owner has granted; the address and device of an acceptance only by the audit path",
+  "migrations": [
+   "0399"
+  ],
+  "notApplied": [
+   "to_regclass('public.health_access_grants') is null"
+  ]
+ },
+ {
   "n": "142",
   "slug": "0390",
   "title": "0390 Release H: undo a whole history import (every workout an import creates carries one batch id)",
