@@ -129,6 +129,10 @@ export default async function BrandingPage(
   const leavingIds = new Set((leavingRows ?? []).map((r: { profile_id: string }) => r.profile_id));
   const firedIds = new Set(((leavingRows ?? []) as { profile_id: string; fired_at: string | null }[]).filter((r) => r.fired_at).map((r) => r.profile_id));
 
+  // Who the owner has let read the clients' health answers (a separate read: a database without the table yet just shows nobody).
+  const { data: grantRows } = await supabase.from("health_access_grants").select("profile_id").eq("organization_id", orgMembership.organization_id);
+  const healthAccessIds = new Set(((grantRows ?? []) as { profile_id: string }[]).map((r) => r.profile_id));
+
   const members = (memberRows ?? []).map((m) => ({
     profileId: m.profile_id,
     leaving: leavingIds.has(m.profile_id),
@@ -301,7 +305,7 @@ export default async function BrandingPage(
             organizationName={org?.name ?? "this organization"}
             me={user.id}
             myRole={orgMembership.role}
-            members={members.map((m) => ({ profileId: m.profileId, fullName: m.fullName, role: m.role, clients: teamInfo?.clientCounts[m.profileId] ?? 0, soleClients: teamInfo?.soleCoachOfClients[m.profileId] ?? 0, leaving: m.leaving, fired: m.fired }))}
+            members={members.map((m) => ({ profileId: m.profileId, fullName: m.fullName, role: m.role, clients: teamInfo?.clientCounts[m.profileId] ?? 0, soleClients: teamInfo?.soleCoachOfClients[m.profileId] ?? 0, leaving: m.leaving, fired: m.fired, healthAccess: healthAccessIds.has(m.profileId) }))}
             invites={teamInfo?.invites ?? []}
           />
 

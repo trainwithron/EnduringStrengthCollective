@@ -107,3 +107,7 @@
 - Banner (every page, while a change is waiting): "Your coach asked to change your sign-in email to {masked}. Nothing has changed yet: it changes only if that address confirms. If you did not expect this, cancel it." [Cancel the change]
 - Page when too early: "This can be confirmed in about {n} hour(s). A day is kept on purpose so the current address has time to object. Come back to this same link then." Refusals: "This change can't be confirmed yet..." / "This request is out of date (the situation changed since it was asked for), so nothing was changed. Ask your coach to start it again."
 - The client's notice now says "...it changes only if that address confirms, and not before tomorrow. If you did not expect this, cancel it from the banner at the top of the app."
+
+## Release S2 (health answers)
+- Athlete page, Health screening for an owner/admin without access: "Done." | "Needs attention: the form is not finished." / "The answers are private to this client and their coach. The organization's owner can give you access."
+- Team page: "Can read clients' health screening answers" (a checkbox on each owner/admin, owner only).

@@ -24,6 +24,14 @@
   "file": "apply-release-cm-all.sql"
  },
  {
+  "id": "release-s2-health-answers",
+  "name": "Release S2 (health answers private to the client and their coach; apply together with the code)",
+  "steps": [
+   "151"
+  ],
+  "file": "apply-release-s2-health-answers-all.sql"
+ },
+ {
   "id": "release-s1-signin-hardening",
   "name": "Release S1 (a changed sign-in email is confirmed by the new address; adds only, safe to run BEFORE the code that goes with it is live)",
   "steps": [
