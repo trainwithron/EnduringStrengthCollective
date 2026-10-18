@@ -34,8 +34,11 @@ export function useDialogA11y<T extends HTMLElement = HTMLDivElement>(open: bool
     const node = ref.current;
     if (node) {
       if (!node.hasAttribute("tabindex")) node.setAttribute("tabindex", "-1");
-      const first = node.querySelector<HTMLElement>(FOCUSABLE);
-      (first ?? node).focus();
+      // A field the screen already focused for the person (autoFocus) keeps it; otherwise focus goes to the first control.
+      if (!node.contains(document.activeElement) || document.activeElement === node) {
+        const first = node.querySelector<HTMLElement>(FOCUSABLE);
+        (first ?? node).focus();
+      }
     }
 
     function onKey(e: KeyboardEvent) {

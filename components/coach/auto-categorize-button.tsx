@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useDialogA11y } from "@/lib/use-dialog-a11y";
 import { isBadExerciseName } from "@/lib/exercise-name-guard";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { classifyExerciseCategory, type ExerciseCategory } from "@/lib/exercise-category-classifier";
@@ -29,6 +30,7 @@ export function AutoCategorizeButton({
   onApplied: (id: string, category: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const dialogRef = useDialogA11y<HTMLDivElement>(open, () => setOpen(false));
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [applying, setApplying] = useState(false);
   const [failedCount, setFailedCount] = useState(0);
@@ -80,7 +82,7 @@ export function AutoCategorizeButton({
 
   if (open) {
     return (
-      <div className="fixed inset-0 z-40 bg-graphite flex items-center justify-center p-6">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Auto-categorize" className="fixed inset-0 z-40 bg-graphite flex items-center justify-center p-6">
         <div className="bg-surface border border-steel/30 w-full max-w-2xl max-h-[80vh] flex flex-col">
           <div className="p-4 border-b border-steel/20">
             <h2 className="font-display uppercase text-lg tracking-wide">Auto-categorize</h2>

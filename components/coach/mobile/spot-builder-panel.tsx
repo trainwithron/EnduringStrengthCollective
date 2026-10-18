@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useDialogA11y } from "@/lib/use-dialog-a11y";
 import { useTerm } from "@/components/coach/terminology-provider";
 import dynamic from "next/dynamic";
 import { X, Sparkles } from "lucide-react";
@@ -54,6 +55,7 @@ export function SpotBuilderPanel({
 }) {
   const term = useTerm();
   const [stage, setStage] = useState<"compact" | "expanded" | "fullscreen">(initialAthleteId ? "expanded" : "compact");
+  const dialogRef = useDialogA11y<HTMLDivElement>(stage === "fullscreen", () => close());
   // Explicit, coach-controlled choice — not inferred from which button
   // they tap (Ron's own correction: "just a quick button, AI or
   // parse"). AI = fire full generation straight from the compact text;
@@ -305,7 +307,7 @@ export function SpotBuilderPanel({
   // own scroll container via fixed positioning (unaffected by which
   // swipe panel is currently in view underneath).
   return (
-    <div className="fixed inset-0 z-50 bg-graphite overflow-y-auto">
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="AI Program Builder" className="fixed inset-0 z-50 bg-graphite overflow-y-auto">
       <div className="sticky top-0 z-10 bg-graphite border-b border-steel/20 px-4 py-3 flex items-center justify-between">
         <p className="font-display font-bold text-lg uppercase leading-none">AI Program Builder</p>
         <button type="button" onClick={close} aria-label="Close">

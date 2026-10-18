@@ -11,6 +11,7 @@ import { RecapExerciseRow } from "./recap-exercise-row";
 import { NextWorkoutExerciseRow } from "./next-workout-exercise-row";
 import { SaveToast } from "./save-toast";
 import { flashSaved, flashSaveError } from "@/lib/save-toast";
+import { useDialogA11y } from "@/lib/use-dialog-a11y";
 
 interface NextWorkout {
   workoutId: string;
@@ -74,6 +75,7 @@ export function RecapAndUpNext({
   const [sessionNoteOpen, setSessionNoteOpen] = useState(false);
   const [exercises, setExercises] = useState(nextWorkout?.exercises ?? []);
   const [swapTarget, setSwapTarget] = useState<{ id: string; name: string } | null>(null);
+  const swapDialogRef = useDialogA11y<HTMLDivElement>(!!swapTarget, () => setSwapTarget(null));
   const [swapDraft, setSwapDraft] = useState("");
 
   async function handleSessionNoteBlur() {
@@ -283,7 +285,7 @@ export function RecapAndUpNext({
       </div>
 
       {swapTarget && (
-        <div className="fixed inset-0 z-40 bg-graphite flex items-center justify-center p-6">
+        <div ref={swapDialogRef} role="dialog" aria-modal="true" aria-label="Swap exercise" className="fixed inset-0 z-40 bg-graphite flex items-center justify-center p-6">
           <div className="bg-surface border border-steel/30 w-full max-w-sm p-5">
             <h3 className="font-display uppercase text-sm tracking-wide mb-3">Swap exercise</h3>
             <input
