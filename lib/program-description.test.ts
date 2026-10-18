@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { PROGRAM_DESCRIPTION_MAX, descriptionCounter, tidyProgramDescription } from "./program-description";
 
@@ -54,7 +54,6 @@ describe("a coach's description is never overwritten by the AI or lost on a copy
   it("no AI route and no builder helper writes programs.description on an existing program; only the import insert and the editor do", () => {
     const writers: string[] = [];
     const walk = (dir: string): string[] => {
-      const { readdirSync } = require("node:fs") as typeof import("node:fs");
       return readdirSync(dir, { withFileTypes: true }).flatMap((e: { name: string; isDirectory(): boolean }) => (e.isDirectory() ? (e.name === "node_modules" ? [] : walk(`${dir}/${e.name}`)) : /\.(ts|tsx)$/.test(e.name) && !/\.test\./.test(e.name) ? [`${dir}/${e.name}`] : []));
     };
     for (const f of [...walk("app"), ...walk("components"), ...walk("lib")]) {
