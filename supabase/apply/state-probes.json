@@ -1488,6 +1488,17 @@
   ]
  },
  {
+  "n": "171",
+  "slug": "0419",
+  "title": "0419 Release TS3: saving a filled team sheet (one table, one notice kind, two functions: save the sheets as completed coach-logged workouts on their real dates, and undo a whole upload)",
+  "migrations": [
+   "0419"
+  ],
+  "notApplied": [
+   "to_regclass('public.team_sheet_batches') is null"
+  ]
+ },
+ {
   "n": "170",
   "slug": "0418",
   "title": "0418 Release AF3: database policies from the post-ship audit (a private client stays private in posts and tags; two undecided account-deletion links decided; the guardian-consent answer limited for a coach; the health-form flag cleared when the last client seat goes)",

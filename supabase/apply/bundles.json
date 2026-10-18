@@ -1,5 +1,13 @@
 [
  {
+  "id": "release-ts3-team-sheet-save",
+  "name": "Release TS3 (saving a filled team sheet: one table, one notice kind, two functions)",
+  "steps": [
+   "171"
+  ],
+  "file": "apply-release-ts3-team-sheet-save-all.sql"
+ },
+ {
   "id": "release-af3-database-policies",
   "name": "Release AF3 (database policies from the post-ship audit; replaces two posts policies, one tag policy and two functions, adds two functions and two triggers)",
   "steps": [
