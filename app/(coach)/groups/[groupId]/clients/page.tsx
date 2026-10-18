@@ -22,6 +22,9 @@ import { getCoachedGroups, groupsInOrgOf, groupsInOrgOfOpened } from "@/lib/coac
 import { mergeRosterAcrossGroups, type RosterRowAcrossGroups } from "@/lib/coach-roster";
 import type { RosterMember } from "@/lib/types";
 import { RemovedClientsPanel, type RemovedClient } from "@/components/coach/desktop/removed-clients-panel";
+import { CoachesSection } from "@/components/coach/coaches-section";
+import { loadGroupCoaches } from "@/lib/pending-coaches";
+import { authorizeInviteManager } from "@/lib/coach-invite-server";
 import {
   classifyNutritionTrend,
   isTrendAligned,
@@ -206,8 +209,9 @@ export default async function ClientsPage(
     return a.fullName.localeCompare(b.fullName);
   });
 
-  const coaches = roster.filter((m) => m.role === "coach");
   const athletes = roster.filter((m) => m.role === "athlete");
+  // The ONE coach list at the top of the page: every coach with their role, the viewer marked, anyone who has not accepted their invitation marked with Send again / Copy link / Cancel (owners and admins only).
+  const [coachList, inviteManager] = await Promise.all([loadGroupCoaches(params.groupId), authorizeInviteManager(supabase, user.id, params.groupId)]);
 
   // coach_mobile_v2_feature_spec.md item 1 — mobile gets the A-Z/
   // needs-attention roster instead of the desktop card grid. Short-
@@ -299,6 +303,7 @@ export default async function ClientsPage(
             </div>
             <AddClientButton groupId={params.groupId} groupName={group?.name ?? "This group"} createdBy={user.id} defaultOpen={openAdd} />
           </div>
+          <CoachesSection groupId={params.groupId} viewerId={user.id} coaches={coachList.coaches} pending={coachList.pending} canManage={inviteManager.ok} />
           <CoachRosterMobile groupId={params.groupId} members={phoneClients} />
         </div>
       </CoachMobileShell>
@@ -373,6 +378,8 @@ export default async function ClientsPage(
         </div>
       </div>
 
+      <CoachesSection groupId={params.groupId} viewerId={user.id} coaches={coachList.coaches} pending={coachList.pending} canManage={inviteManager.ok} />
+
       {phaseAlignmentSummary && phaseAlignmentSummary.misaligned > 0 && (
         <div className="mb-6 px-4 py-3 border border-rust/30 bg-rust/5">
           <p className="font-body text-sm">
@@ -383,36 +390,6 @@ export default async function ClientsPage(
         </div>
       )}
 
-      {coaches.length > 0 && (
-        <div className="mb-8">
-          <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
-            Coaching Staff
-          </h2>
-          <div className="divide-y divide-steel/15">
-            {coaches.map((c) => (
-              <div key={c.profileId} className="flex items-center gap-3 py-2">
-                {c.avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={c.avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover" />
-                ) : (
-                  <div className="w-8 h-8 rounded-full bg-surface border border-steel/30 flex items-center justify-center">
-                    <span className="font-display text-xs text-chalk">
-                      {c.fullName
-                        .split(" ")
-                        .map((p) => p[0])
-                        .slice(0, 2)
-                        .join("")
-                        .toUpperCase()}
-                    </span>
-                  </div>
-                )}
-                <span className="font-body text-sm">{c.fullName}</span>
-                <span className="font-body text-xs text-rust">Coach</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* A group's invite link: one current link, tucked into a single collapsed line. Never shown for a one-on-one client's space. */}
       {(group as { group_kind?: string } | null)?.group_kind !== "one_on_one" && (

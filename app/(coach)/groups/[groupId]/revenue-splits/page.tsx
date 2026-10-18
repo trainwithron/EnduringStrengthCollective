@@ -9,6 +9,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { RevenueSplitEditor } from "@/components/coach/desktop/revenue-split-editor";
 import type { CoachShare } from "@/lib/revenue-splits";
+import { pendingCoachIds } from "@/lib/pending-coaches";
 
 export const metadata = { title: "Revenue splits" };
 
@@ -70,7 +71,9 @@ export default async function RevenueSplitsPage(
     .eq("organization_id", orgMembership.organization_id)
     .order("role", { ascending: true });
 
-  const coaches: (CoachShare & { stripeConnectStatus: string })[] = (memberRows ?? []).map((m) => ({
+  // Someone who has not accepted their invitation yet is not a working coach: no share is set for them here.
+  const notAccepted = await pendingCoachIds(params.groupId);
+  const coaches: (CoachShare & { stripeConnectStatus: string })[] = (memberRows ?? []).filter((m) => !notAccepted.has(m.profile_id)).map((m) => ({
     profileId: m.profile_id,
     fullName: (m.profiles as any)?.full_name ?? "Unknown",
     role: m.role,

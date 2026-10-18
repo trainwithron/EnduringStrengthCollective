@@ -320,14 +320,18 @@ describe("the wiring", () => {
 
   it("the Team page lists every invitation with who, role, status and the three actions, for both kinds", () => {
     const list = src("components/org/invitations-list.tsx");
-    for (const word of ["Not accepted yet", "Send again", "Copy link", "Cancel", "Invitations"]) expect(list).toContain(word);
-    expect(list).toContain("/api/coaches/invite/resend");
-    expect(list).toContain("/api/coaches/invite/link");
-    expect(list).toContain("/api/coaches/invite/cancel");
+    const actions = src("components/org/pending-invite-actions.tsx");
+    for (const word of ["Not accepted yet", "Send again", "Copy link", "Cancel", "Invitations"]) expect(list + actions).toContain(word);
+    // the three buttons are one component, used by the Invitations list and by the Coaches list
+    expect(list).toContain("<PendingInviteActions ");
+    expect(src("components/coach/coaches-section.tsx")).toContain("<PendingInviteActions ");
+    expect(actions).toContain("/api/coaches/invite/resend");
+    expect(actions).toContain("/api/coaches/invite/link");
+    expect(actions).toContain("/api/coaches/invite/cancel");
     expect(list).toContain("/org-invite/");
     // a link shown for copying belongs to its own row and is cleared by any other action
-    expect(list).toContain("shownLink?.key === key");
-    expect((list.match(/setShownLink\(null\)/g) ?? []).length).toBeGreaterThanOrEqual(4);
+    expect(actions).toContain("{shownLink && <input");
+    expect((actions.match(/setShownLink\(null\)/g) ?? []).length).toBeGreaterThanOrEqual(3);
     expect(list).toContain("The link may have expired. Use Send again.");
     const page = src("app/(coach)/groups/[groupId]/branding/page.tsx");
     expect(page).toContain("loadPendingInvitees(createServiceRoleClient()");
@@ -354,5 +358,53 @@ describe("the wiring", () => {
     expect(branch.indexOf("return NextResponse.json({ ok: true })")).toBeGreaterThan(branch.indexOf("after(async () => {"));
     expect(src("app/api/clients/send-signin-link/route.ts")).toContain('makeAuthLink(serviceRole, { type: "recovery"');
     expect(src("lib/resend-access.ts")).toContain("authUser?.email_confirmed_at && !isEmailConfigured()");
+  });
+});
+
+describe("TC1b: one plain coach list at the top of the Clients page", () => {
+  it("the page shows a Coaches section before the client content, in both the desktop and the phone layout, and the old small block is gone", () => {
+    const page = src("app/(coach)/groups/[groupId]/clients/page.tsx");
+    expect((page.match(/<CoachesSection /g) ?? []).length).toBe(2);
+    expect(page).not.toContain("Coaching Staff");
+    // desktop: right under the header, before the cards
+    expect(page.indexOf("<CoachesSection ", page.indexOf('active="members"'))).toBeLessThan(page.indexOf("phaseAlignmentSummary && phaseAlignmentSummary.misaligned > 0 && ("));
+    // phone: before the roster
+    expect(page.lastIndexOf("<CoachesSection ", page.indexOf("<CoachRosterMobile "))).toBeGreaterThan(-1);
+    expect(page).toContain("canManage={inviteManager.ok}");
+    const roster = src("components/group/roster-list.tsx");
+    expect(roster).toContain("{!viewerIsCoach && coaches.length > 0 && (");
+    expect(roster).toContain('m.role === "coach" && !hidden.has(m.profileId)');
+  });
+
+  it("each coach shows name and role; the viewer is marked You; someone who has not accepted says so and has the three buttons only for an owner or admin; there is an Invite a coach button for them and a link to the Team page", () => {
+    const s = src("components/coach/coaches-section.tsx");
+    expect(s).toContain("You");
+    expect(s).toContain("Invited, not accepted yet");
+    expect(s).toContain("{p && canManage && (");
+    expect(s).toContain("{canManage && <InviteCoachForm groupId={groupId} />}");
+    expect(s).toContain("Manage invitations on the Team page");
+    expect(s).toContain("branding?tab=team");
+  });
+
+  it("the Coaches list data: every coach seat with the organization role, and the not-accepted ones found by the same footprint-checked rule as the Team page", () => {
+    const lib = src("lib/pending-coaches.ts");
+    expect(lib).toContain('.eq("role", "coach")');
+    expect(lib).toContain("loadPendingInvitees(");
+    expect(lib).toContain('coaches.filter((c) => c.orgRole !== "owner")');
+    // never throws: a failed read lists nobody as pending
+    expect(lib).toContain("catch {");
+  });
+
+  it("people who have not accepted are left out of the places that treat coaches as working: who an athlete can message, depth-chart scopes, revenue shares, the group home roster", () => {
+    expect(src("app/(coach)/groups/[groupId]/messages/page.tsx")).toContain("!notAccepted.has(r.profile_id)");
+    expect(src("app/(coach)/groups/[groupId]/team/page.tsx")).toContain("!notAccepted.has(c.profile_id)");
+    expect(src("app/(coach)/groups/[groupId]/revenue-splits/page.tsx")).toContain("!notAccepted.has(m.profile_id)");
+    expect(src("app/(coach)/groups/[groupId]/page.tsx")).toContain("hiddenProfileIds={[...(await pendingCoachIds(params.groupId))]}");
+  });
+
+  it("Settings has Coaches and invitations, pointing at the list and the Team page", () => {
+    const settings = src("app/(coach)/groups/[groupId]/settings/page.tsx");
+    expect(settings).toContain('label="Coaches and invitations"');
+    expect(settings).toContain("See your coaches and invite one");
   });
 });
