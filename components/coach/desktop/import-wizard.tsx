@@ -56,6 +56,7 @@ import { UNKNOWN_AGE_BANNER_TEXT, YOUTH_BANNER_TEXT } from "@/lib/youth-block";
 import { AiUsageMeter } from "@/components/coach/ai-usage-meter";
 import { detectImportKind } from "@/lib/import-input-kind";
 import { buildImportPrompt } from "@/lib/import-prompt";
+import { PROGRAM_DESCRIPTION_MAX, descriptionCounter, tidyProgramDescription } from "@/lib/program-description";
 
 type Status = "idle" | "working" | "reviewing" | "done" | "error";
 
@@ -505,7 +506,9 @@ export function ImportWizard({
     processingRef.current = true;
 
     const supabase = createBrowserClient();
-    const { parsed, description, fuzzyMatches, autoNewExercises, sequencingNotes, injuryConsiderations } = importData;
+    const { parsed, fuzzyMatches, autoNewExercises, sequencingNotes, injuryConsiderations } = importData;
+    // The description the coach confirmed on the review screen, saved exactly as typed (an empty box means no description).
+    const description = tidyProgramDescription(importData.description);
     // The name the coach confirmed on the review screen: trimmed, and never blank.
     const programName = tidyProgramName(importData.programName);
     const resolutions = new Map(importData.resolutions);
@@ -1014,6 +1017,22 @@ export function ImportWizard({
             onChange={(e) => setPending((prev) => (prev ? { ...prev, programName: e.target.value } : prev))}
             className="mt-1 w-full min-h-11 bg-graphite border border-steel/40 text-chalk px-2 font-body text-base sm:text-sm focus:outline-none focus:border-rust"
           />
+        </label>
+        <label className="block mb-4">
+          <span className="font-body text-xs text-steel uppercase tracking-wide">Description (clients see this; you can change it any time)</span>
+          <textarea
+            value={pending.description}
+            maxLength={PROGRAM_DESCRIPTION_MAX}
+            rows={3}
+            onChange={(e) => setPending((prev) => (prev ? { ...prev, description: e.target.value } : prev))}
+            className="mt-1 w-full bg-graphite border border-steel/40 text-chalk px-2 py-2 font-body text-base sm:text-sm focus:outline-none focus:border-rust"
+          />
+          <span className="flex items-center justify-between mt-1">
+            <span className={`font-body text-xs ${descriptionCounter(pending.description).nearLimit ? "text-rust" : "text-steel"}`}>{descriptionCounter(pending.description).label}</span>
+            <button type="button" onClick={() => setPending((prev) => (prev ? { ...prev, description: "" } : prev))} disabled={pending.description === ""} className="font-body text-xs text-steel underline underline-offset-2 disabled:opacity-40 min-h-8">
+              Clear
+            </button>
+          </span>
         </label>
         <h3 className="font-display uppercase text-sm tracking-wide mb-2">
           {pending.fuzzyMatches.length > 0
