@@ -185,7 +185,7 @@ export function BusinessRailWidget({ groupId }: { groupId: string }) {
         <RailWidgetHeader title="Pick your top 3" />
         <div className="space-y-2">
           {[0, 1, 2].map((slot) => (
-            <select
+            <select aria-label={`Number ${slot + 1}`}
               key={slot}
               value={draft[slot] ?? ""}
               onChange={(e) => {

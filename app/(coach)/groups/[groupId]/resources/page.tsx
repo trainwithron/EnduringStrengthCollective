@@ -21,6 +21,8 @@ import { getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
 import { linksForViewer } from "@/lib/shelf";
 import { loadShelfViewer } from "@/lib/shelf-viewer";
 
+export const metadata = { title: "Resources" };
+
 type ResourceTab = "referrals" | "shop";
 
 export default async function ResourcesPage(

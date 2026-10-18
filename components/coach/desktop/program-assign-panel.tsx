@@ -1,5 +1,6 @@
 "use client";
 
+import { readHealthAnswersMany } from "@/lib/health-answers";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -136,14 +137,20 @@ export function ProgramAssignPanel({ programId, programName, groupId, aiDraft, o
     }
     let cancelled = false;
     (async () => {
-      const { data, error: intakeError } = await createBrowserClient().from("client_intake").select("athlete_id, date_of_birth, par_q_answers").in("athlete_id", ids);
+      const { data, error: intakeError } = await createBrowserClient().from("client_intake").select("athlete_id, date_of_birth").in("athlete_id", ids);
+      const screening = await readHealthAnswersMany(createBrowserClient(), ids);
       if (cancelled) return;
       // A failed read says nothing (it must not claim every client has no birthdate).
       if (intakeError) {
         setNotices([]);
         return;
       }
-      const byId = new Map(((data ?? []) as { athlete_id: string; date_of_birth: string | null; par_q_answers: unknown }[]).map((r) => [r.athlete_id, r]));
+      // The screening could not be read: say so, never read it as "nobody has a concern".
+      if (screening.failed) {
+        setNotices(["The health screening could not be checked just now. Look at each client's screening before assigning."]);
+        return;
+      }
+      const byId = new Map(((data ?? []) as { athlete_id: string; date_of_birth: string | null }[]).map((r) => [r.athlete_id, r]));
       // The coach's own decisions on flagged screenings (best effort: without them the other notes still show).
       const { data: ackRows } = await createBrowserClient().from("athlete_injury_flag_acknowledgements").select("athlete_id, decision").in("athlete_id", ids);
       if (cancelled) return;
@@ -154,7 +161,7 @@ export function ProgramAssignPanel({ programId, programName, groupId, aiDraft, o
           ids.map((id) => ({
             name: names.get(id) ?? "A client",
             dateOfBirth: byId.get(id)?.date_of_birth ?? null,
-            parqFlagged: hasFlaggedMusculoskeletalConcern((byId.get(id)?.par_q_answers as ParQAnswer[]) ?? []),
+            parqFlagged: hasFlaggedMusculoskeletalConcern((screening.answers.get(id) as ParQAnswer[]) ?? []),
             onHold: holdIds.has(id),
           }))
         )

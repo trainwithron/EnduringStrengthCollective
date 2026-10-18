@@ -74,6 +74,8 @@ export function pathBelongsToPerson(bucket: string, path: string, userId: string
   return true;
 }
 
+import { LIVE_SUBSCRIPTION_STATUSES } from "@/lib/subscription-statuses";
+
 export interface DeletionFacts {
   isPlatformAdmin: boolean;
   coachGroupCount: number;
@@ -99,7 +101,7 @@ export async function loadDeletionFacts(db: any, userId: string): Promise<Deleti
     db.from("group_memberships").select("group_id", { count: "exact", head: true }).eq("profile_id", userId).eq("role", "coach"),
     db.from("organization_memberships").select("organization_id", { count: "exact", head: true }).eq("profile_id", userId),
     db.from("groups").select("id", { count: "exact", head: true }).eq("created_by", userId),
-    db.from("membership_subscriptions").select("athlete_id", { count: "exact", head: true }).eq("athlete_id", userId).in("status", ["active", "past_due", "incomplete"]),
+    db.from("membership_subscriptions").select("athlete_id", { count: "exact", head: true }).eq("athlete_id", userId).in("status", [...LIVE_SUBSCRIPTION_STATUSES]),
   ]);
   return {
     isPlatformAdmin: profile.data?.is_platform_admin === true,
@@ -114,7 +116,7 @@ export type EraseResult = { ok: true; leftover?: string } | { ok: false; error: 
 
 // Does the deletion. Order matters: detach or erase what would block the delete, then the account itself, which removes the
 // rest through the database's own cascades. Stops at the first failure and says so.
-export async function eraseAccount(db: any, userId: string, opts: { eraseHistory: boolean; deleteEmptyOneOnOneGroups?: string[] }): Promise<EraseResult> {
+export async function eraseAccount(db: any, userId: string, opts: { eraseHistory: boolean; deleteEmptyOneOnOneGroups?: string[]; keepSpaceGroups?: string[] }): Promise<EraseResult> {
   // The real database message goes to the server log only; a coach is told in plain words what did not happen.
   const fail = (what: string, message: string): EraseResult => {
     console.error("[account deletion]", what, message);
@@ -192,9 +194,10 @@ export async function eraseAccount(db: any, userId: string, opts: { eraseHistory
       db.from("coach_packages").select("id", { count: "exact", head: true }).eq("group_id", groupId),
     ]);
     const holdsCoachRows = (templates ?? 0) > 0 || (packages ?? 0) > 0;
-    if (opts.eraseHistory && holdsCoachRows) {
+    // A space that now holds another person's removal record is never deleted (that would erase the other person's history too): it is only renamed.
+    if (opts.eraseHistory && (holdsCoachRows || (opts.keepSpaceGroups ?? []).includes(groupId))) {
       const { error } = await db.from("groups").update({ name: "Former client" }).eq("id", groupId);
-      leftover = (leftover ? leftover + " " : "") + "Their space was kept (renamed Former client) because it still holds your template programs or packages.";
+      leftover = (leftover ? leftover + " " : "") + "Their space was kept (renamed Former client) because it still holds other records (your template programs or packages, or another client you removed).";
       if (error) leftover += " It could not be renamed.";
     } else if (opts.eraseHistory) {
       const { error } = await db.from("groups").delete().eq("id", groupId);

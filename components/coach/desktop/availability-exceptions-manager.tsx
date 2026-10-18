@@ -182,7 +182,7 @@ export function AvailabilityExceptionsManager({
       </div>
 
       <div className="space-y-2">
-        <input
+        <input aria-label="Label"
           type="text"
           value={label}
           onChange={(e) => setLabel(e.target.value)}
@@ -192,14 +192,14 @@ export function AvailabilityExceptionsManager({
 
         {mode === "one_off" ? (
           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-            <input
+            <input aria-label="Starts"
               type="datetime-local"
               value={oneOffStart}
               onChange={(e) => setOneOffStart(e.target.value)}
               className="flex-1 h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust"
             />
             <span className="font-body text-xs text-steel">to</span>
-            <input
+            <input aria-label="Ends"
               type="datetime-local"
               value={oneOffEnd}
               onChange={(e) => setOneOffEnd(e.target.value)}
@@ -208,7 +208,7 @@ export function AvailabilityExceptionsManager({
           </div>
         ) : (
           <div className="flex flex-wrap items-center gap-2">
-            <select
+            <select aria-label="Day of the week"
               value={recurWeekday}
               onChange={(e) => setRecurWeekday(Number(e.target.value))}
               className="h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust"
@@ -219,14 +219,14 @@ export function AvailabilityExceptionsManager({
                 </option>
               ))}
             </select>
-            <input
+            <input aria-label="From"
               type="time"
               value={recurStart}
               onChange={(e) => setRecurStart(e.target.value)}
               className="h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust"
             />
             <span className="font-body text-xs text-steel">to</span>
-            <input
+            <input aria-label="To"
               type="time"
               value={recurEnd}
               onChange={(e) => setRecurEnd(e.target.value)}

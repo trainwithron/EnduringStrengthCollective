@@ -615,7 +615,7 @@ export function DayCard({
 
       {!collapsed && (
         <div className="px-3 pt-3">
-          <input
+          <input aria-label="Quick add an exercise"
             ref={quickEntryRef}
             type="text"
             value={quickEntryDraft}

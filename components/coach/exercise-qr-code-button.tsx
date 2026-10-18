@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useDialogA11y } from "@/lib/use-dialog-a11y";
 import QRCode from "qrcode";
 import { QrCode } from "lucide-react";
 import { appOriginBrowser } from "@/lib/app-url";
@@ -13,6 +14,7 @@ export function ExerciseQrCodeButton({ exerciseId, exerciseName }: { exerciseId:
   const [open, setOpen] = useState(false);
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [scanUrl, setScanUrl] = useState("");
+  const dialogRef = useDialogA11y<HTMLDivElement>(open, () => setOpen(false));
 
   async function handleOpen() {
     const url = `${appOriginBrowser()}/scan/${exerciseId}`;
@@ -37,6 +39,7 @@ export function ExerciseQrCodeButton({ exerciseId, exerciseName }: { exerciseId:
 
       {open && (
         <div
+          ref={dialogRef} role="dialog" aria-modal="true" aria-label="QR code for this exercise"
           className="fixed inset-0 z-50 bg-graphite/80 flex items-center justify-center px-6"
           onClick={() => setOpen(false)}
         >

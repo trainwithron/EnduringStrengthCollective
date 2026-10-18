@@ -148,7 +148,7 @@ export function AddSocialOnlyMembershipControl({
         Gives {athleteName} access to that group&apos;s Feed, chat, and leaderboard only —
         programming, billing, and credits stay anchored here, unaffected.
       </p>
-      <select
+      <select aria-label="Group to add them to"
         value={selectedGroupId}
         onChange={(e) => setSelectedGroupId(e.target.value)}
         disabled={loading}

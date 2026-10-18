@@ -5,6 +5,8 @@ import { loadDobGate } from "@/lib/dob-gate";
 import { BirthdayForm } from "@/components/intake/birthday-form";
 import { SignOutButton } from "@/components/group/sign-out-button";
 
+export const metadata = { title: "Birthday" };
+
 // The one-field date-of-birth step. Only a client without a date of birth on file, or a child under 13 waiting on a parent's consent, ever stays on this page; everyone else is sent on.
 export default async function BirthdayPage(props: { searchParams: Promise<{ next?: string }> }) {
   const search = await props.searchParams;

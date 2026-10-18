@@ -130,3 +130,7 @@ Set these in Supabase, Authentication. Review them after any project change.
 - Vercel dashboard: the project's Deployments, Logs, Environment Variables, Cron Jobs (one daily job reports failures, see `/api/health` and the cron failure alerts).
 - Supabase dashboard: SQL editor, Logs, Backups, Authentication.
 - Stripe, Twilio, Brevo, Anthropic, Daily: each provider's own status page when their calls fail.
+
+## Which pastes are applied
+
+Run `node scripts/state-report.mjs` to see, in one screen, which paste bundles are already in the database and which are still waiting. It sends one read-only query (the script refuses anything else). With `SUPABASE_ACCESS_TOKEN` set (a personal access token from the Supabase dashboard) it asks the live database itself; without it, it writes the query to `supabase/apply/state-report.sql` to paste into the SQL editor, and `node scripts/state-report.mjs --from <result.json>` reads the saved result. `--all` also lists the ones already applied. The list comes from the checks each paste file already uses ("... is not already applied"), refreshed whenever `scripts/build-paste-files.mjs` runs.

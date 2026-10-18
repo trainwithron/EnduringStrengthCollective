@@ -7,6 +7,8 @@ import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { WaiverSettings } from "@/components/coach/desktop/waiver-settings";
 
+export const metadata = { title: "Waiver" };
+
 export default async function WaiverPage(
   props: { params: Promise<{ groupId: string }> }
 ) {

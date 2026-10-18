@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 
+export const metadata = { title: "Leaderboard" };
+
 // The leaderboard now lives at the top of Team Feed's General channel
 // instead of its own tab — kept as a redirect so any old bookmarked/
 // shared link still lands somewhere real.

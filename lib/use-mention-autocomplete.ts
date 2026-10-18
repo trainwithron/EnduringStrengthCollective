@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { fetchProtectedIds } from "@/lib/name-protection-client";
+import { shownName } from "@/lib/shown-name";
+import { readGroupMemberNames } from "@/lib/group-roster-reads";
 
 export interface MentionCandidate {
   id: string;
@@ -25,17 +28,11 @@ export function useMentionAutocomplete(groupId: string | null) {
   useEffect(() => {
     if (!groupId) return;
     const supabase = createBrowserClient();
-    supabase
-      .from("group_memberships")
-      .select("profile_id, profiles ( full_name )")
-      .eq("group_id", groupId)
-      .then(({ data }) => {
-        setMembers(
-          (data ?? [])
-            .map((r: any) => ({ id: r.profile_id, fullName: r.profiles?.full_name ?? "" }))
-            .filter((m) => m.fullName)
-        );
-      });
+    // A name and an id for each member, through the narrow read (migration 0404): nothing else about anyone. Anyone who is not a confirmed adult is offered, and written into the post, as a first name and last initial ("@Sam R.").
+    readGroupMemberNames(supabase, groupId).then(async (people) => {
+      const protectedIds = await fetchProtectedIds(groupId, people.map((m) => m.id));
+      setMembers(people.map((m) => ({ id: m.id, fullName: shownName(m.fullName, m.id, protectedIds) })));
+    });
   }, [groupId]);
 
   function detectMentionQuery(value: string): string | null {

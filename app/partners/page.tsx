@@ -6,6 +6,8 @@ import { SignOutButton } from "@/components/group/sign-out-button";
 import { TrainingPartnerProfileEditor } from "@/components/athlete/training-partner-profile-editor";
 import { TrainingPartnerBrowseList, type BrowseProfile } from "@/components/athlete/training-partner-browse-list";
 
+export const metadata = { title: "Partners" };
+
 export default async function TrainingPartnersPage() {
   const supabase = await createServerClient();
   const {

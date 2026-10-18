@@ -12,6 +12,8 @@ import { getTodaysSessions } from "@/lib/todays-workout";
 import { getGroupCoachTimezone, nowInZone } from "@/lib/timezone";
 import { PICK_LABEL, VIEW_PROGRAM_LABEL, buildLogChoices, exerciseCountLine, startLabel, weekdayName } from "@/lib/coach-log-choice";
 
+export const metadata = { title: "Log" };
+
 // Coach-only: the entry point for logging an in-person session on a client's behalf. It opens on a SMALL choice and never straight into a day: "Start [Day]'s workout" (what is due today) and
 // "View whole program" (every week and day open, nothing locked for the coach), one card per program the client follows. Picking a day from the program view logs that day; Back from a day
 // returns to the program view, so there is no loop and the whole program is always reachable.

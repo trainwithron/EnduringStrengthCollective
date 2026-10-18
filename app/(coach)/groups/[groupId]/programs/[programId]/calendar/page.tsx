@@ -17,6 +17,8 @@ import { NO_SESSIONS_LINE } from "@/lib/session-credit-copy";
 import { buildCreditPicture, clientCreditPictureLine, fetchBookingCounts } from "@/lib/credit-picture";
 import { formatInTimezone } from "@/lib/format-in-timezone";
 
+export const metadata = { title: "Calendar" };
+
 const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
 function dateKey(d: Date): string {

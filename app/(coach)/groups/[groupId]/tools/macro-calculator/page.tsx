@@ -9,6 +9,8 @@ import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { MacroCalculator } from "@/components/tools/macro-calculator";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 
+export const metadata = { title: "Macro calculator" };
+
 export default async function MacroCalculatorPage(
   props: {
     params: Promise<{ groupId: string }>;

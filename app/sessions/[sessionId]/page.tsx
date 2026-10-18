@@ -32,6 +32,8 @@ import { athleteIsMinor } from "@/lib/youth-block";
 import { CoachModeBar } from "@/components/coach/mobile/coach-mode-bar";
 import { shareHref } from "@/lib/share-token";
 
+export const metadata = { title: "Workout" };
+
 export default async function SessionPage(
   props: {
     params: Promise<{ sessionId: string }>;

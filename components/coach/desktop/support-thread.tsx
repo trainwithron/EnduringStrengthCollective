@@ -105,7 +105,7 @@ export function SupportThread({
       </div>
 
       <div className="flex gap-2">
-        <input
+        <input aria-label="Reply"
           type="text"
           value={reply}
           onChange={(e) => setReply(e.target.value)}

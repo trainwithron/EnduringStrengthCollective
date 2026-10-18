@@ -9,6 +9,17 @@ import { AlertTriangle } from "lucide-react";
 // point of the standard 7-question screen: any "yes" means "talk to a
 // doctor before starting"), so the flag below is just "does any answer
 // exist and read true," not a separate clinical judgment call.
+// For an owner or admin who has not been given access to the answers (migration 0399): they see only whether the form is done.
+export function ParQHiddenNotice({ done }: { done: boolean }) {
+  return (
+    <div>
+      <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">Health screening (PAR-Q+)</p>
+      <p className="font-body text-sm text-chalk">{done ? "Done." : "Needs attention: the form is not finished."}</p>
+      <p className="font-body text-xs text-steel mt-1">The answers are private to this client and their coach. The organization&apos;s owner can give you access.</p>
+    </div>
+  );
+}
+
 export function ParQAnswersPanel({
   answers,
   reviewLine,

@@ -167,7 +167,7 @@ export function TextNoteCard({
               <LinkIcon className="w-3.5 h-3.5" />
             </button>
           </div>
-          <textarea
+          <textarea aria-label="Coaching note for this day"
             ref={textareaRef}
             value={body}
             onChange={(e) => setBody(e.target.value)}

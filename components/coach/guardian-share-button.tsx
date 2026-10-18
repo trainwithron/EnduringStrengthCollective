@@ -99,7 +99,7 @@ export function GuardianShareButton({
       <div className="space-y-2">
         <p className="font-body text-xs text-steel uppercase tracking-wide">Parent view link</p>
         <div className="flex items-center gap-2">
-          <input
+          <input aria-label="Parent view link"
             readOnly
             value={url}
             onFocus={(e) => e.currentTarget.select()}

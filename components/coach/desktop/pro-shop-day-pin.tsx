@@ -100,7 +100,7 @@ export function ProShopDayPin({
         </p>
       ) : (
         <div className="flex items-center gap-2">
-          <select
+          <select aria-label="Link to pin"
             value={selectedLinkId}
             onChange={(e) => setSelectedLinkId(e.target.value)}
             className="flex-1 h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm"

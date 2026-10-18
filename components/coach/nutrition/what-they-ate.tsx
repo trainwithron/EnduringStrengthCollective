@@ -62,7 +62,7 @@ export function WhatTheyAte({ week, weightTrend, clientName, weightUnit = "lb" }
                   </p>
                   <ul className="mt-1.5 space-y-0.5">
                     {d.meals.slice(0, 6).map((m, i) => (
-                      <li key={i} className={`font-body text-xs truncate ${m.skipped ? "text-steel/60 line-through" : "text-chalk/90"}`}>
+                      <li key={i} className={`font-body text-xs truncate ${m.skipped ? "text-steel line-through" : "text-chalk/90"}`}>
                         {m.description || m.slot || "Meal"}
                       </li>
                     ))}
