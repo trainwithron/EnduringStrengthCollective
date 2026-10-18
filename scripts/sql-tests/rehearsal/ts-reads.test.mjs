@@ -2,7 +2,7 @@
 // name is checked here against the real table definitions of the migration chain.
 import { readFileSync } from "node:fs";
 
-const TABLES = { groups: "groups", workouts: "workouts", exercises: "group_workout_exercises", roster: "group_memberships" };
+const TABLES = { groups: "groups", programs: "programs", workouts: "workouts", exercises: "group_workout_exercises", roster: "group_memberships" };
 
 // "a, b, rel ( c, d )" -> { own: [a, b], rel: { rel: [c, d] } } (one level of embedding is all these reads use)
 function parseSelect(text) {
@@ -36,7 +36,7 @@ export default {
       const src = readFileSync(new URL("../../../lib/team-sheet/load-sheet.ts", import.meta.url), "utf8").replace(/\r\n/g, "\n");
       const block = src.slice(src.indexOf("export const SHEET_READS = {"), src.indexOf("} as const;"));
       const reads = Object.fromEntries(Array.from(block.matchAll(/^\s+([a-z]+): "([^"]+)",?$/gm)).map((m) => [m[1], m[2]]));
-      h.check("the four reads were found in the source", Object.keys(reads).sort().join(",") === "exercises,groups,roster,workouts", JSON.stringify(Object.keys(reads)));
+      h.check("the four reads were found in the source", Object.keys(reads).sort().join(",") === "exercises,groups,programs,roster,workouts", JSON.stringify(Object.keys(reads)));
       await h.asSuper();
       const columns = async (table) => new Set((await db.query(`select column_name from information_schema.columns where table_schema = 'public' and table_name = $1`, [table])).rows.map((r) => r.column_name));
       for (const [name, text] of Object.entries(reads)) {
@@ -54,6 +54,10 @@ export default {
       // the filters the loader applies
       const gwe = await columns("group_workout_exercises");
       h.check("the exercises read filters on athlete_id and orders by exercise_order, which exist", gwe.has("athlete_id") && gwe.has("exercise_order"));
+      const prog = await columns("programs");
+      h.check("the programs read filters on group_id, is_active and athlete_id and orders by created_at, which exist", ["group_id", "is_active", "athlete_id", "created_at"].every((c) => prog.has(c)));
+      const wk = await columns("workouts");
+      h.check("the workouts read filters on program_id and orders by week_number, day_index and id, which exist", ["program_id", "week_number", "day_index", "id"].every((c) => wk.has(c)));
     },
   },
 };

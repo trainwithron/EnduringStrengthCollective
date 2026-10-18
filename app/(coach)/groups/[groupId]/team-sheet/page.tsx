@@ -6,6 +6,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { TeamSheetDownloadForm } from "@/components/coach/team-sheet-download-form";
 import { DEFAULT_COACH_TIMEZONE, dateKeyInZone } from "@/lib/timezone";
+import { loadSheetOptions } from "@/lib/team-sheet/load-sheet";
 
 export const metadata = { title: "Team sheet" };
 
@@ -22,10 +23,12 @@ export default async function TeamSheetPage(props: { params: Promise<{ groupId: 
   if (isReadFailure(membershipError)) return <LoadFailedPage />;
   if (membership?.role !== "coach") return <NoAccess>Only a coach of this group can make its team sheet.</NoAccess>;
 
-  const [{ data: group }, { data: zoneRow }] = await Promise.all([
+  const [{ data: group }, { data: zoneRow }, loaded] = await Promise.all([
     supabase.from("groups").select("name").eq("id", params.groupId).single(),
     supabase.from("profiles").select("timezone").eq("id", user.id).maybeSingle(),
+    loadSheetOptions(supabase, params.groupId),
   ]);
+  if (!loaded.ok) return <LoadFailedPage />;
   const timeZone = (zoneRow as { timezone?: string | null } | null)?.timezone || DEFAULT_COACH_TIMEZONE;
 
   return (
@@ -34,7 +37,7 @@ export default async function TeamSheetPage(props: { params: Promise<{ groupId: 
         <h1 className="font-display font-bold text-3xl uppercase leading-none">Team sheet</h1>
         <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">Print the workout for the weight room, one sheet for each rack. Athletes write their weights on paper; the coach keeps the sheets.</p>
       </div>
-      <TeamSheetDownloadForm groupId={params.groupId} today={dateKeyInZone(timeZone)} />
+      <TeamSheetDownloadForm groupId={params.groupId} today={dateKeyInZone(timeZone)} options={loaded.options} />
     </CoachDesktopShell>
   );
 }
