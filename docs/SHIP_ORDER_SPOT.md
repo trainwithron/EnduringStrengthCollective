@@ -44,6 +44,8 @@
 | AF3e-C | af3-database | (see git) | Release AF3e paste C, step 169 (0417), apply-release-af3e-c-write-guard-rest-all.sql, fp in the step file | the guard on the 13 other tables; ONLY after B has run clean a few days (Commander says when); RON APPLIES | APPLIED Oct 18 (Ron; verified live by Commander: 14 tables guarded, 2 storage policies; released early after a simulation over all 30 athlete accounts matched the page gate) |
 | AF3 | af3-database | (see git) | Release AF3, step 170 (0418), apply-release-af3-database-policies-all.sql, fp in the step file | REPLACES two posts policies, one tag policy, profile_reference_policy() and guardian_consent_state(); adds two functions and a trigger; code reads the same rules (guardian void/resend, account deletion list); paste BEFORE the code | APPLIED Oct 18 (Ron; verified live: both triggers, athlete_private_from_org, reviewed text, reference policy complete) |
 
+| TS3 | team-sheet-3 | (see git) | Release TS3, step 171 (0419), apply-release-ts3-team-sheet-save-all.sql, fp in the step file | team sheet upload, review, save and undo: one table, one notice kind (rebuilds the notification type list), two functions; paste BEFORE the code; NOT applied |
+
 | CS1 | release-cards-switch | (see git) | Release CS1, step 166 (0414), apply-release-cs1-post-workout-cards-all.sql, fp 105a116f7d2404b2 | APPLIED Oct 18 (by Commander, column verified live); group setting Post-workout cards and PR notices; one nullable column groups.post_workout_cards, safe before the code |
 
 | T2 | release-token-crypto | (see git) | Release T2, step 165 (0413), apply-release-t2-wearable-token-fingerprint-all.sql, fp in the step file | stacked on T1; paste BEFORE code (adds one empty column); inert until Ron sets WEARABLE_TOKEN_KEY |
