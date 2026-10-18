@@ -38,6 +38,7 @@ import { fetchFoodLogDay } from "@/lib/food-entry";
 import { AiBudgetMeter } from "@/components/coach/ai-budget-meter";
 import { retryState as retryStateFor, type RetryState } from "@/lib/meal-plan-retry";
 import { ClientGroceryList } from "@/components/athlete/client-grocery-list";
+import { WeeklyNutritionSection } from "@/components/coach/nutrition/weekly-nutrition-section";
 
 export default async function NutritionPage(
   props: {
@@ -106,10 +107,11 @@ export default async function NutritionPage(
 
     // Three tabs: Clients (a client's whole nutrition, the default), Favorite meals (the coach's own recipes) and a blank Calculator (for a prospect). The tab and
     // the redirects from the old Recipe Hub and Macro Calculator pages apply to the coach only; the client's own page below never reads `tab`.
-    const tab = searchParams.tab === "favorites" || searchParams.tab === "calculator" ? searchParams.tab : "clients";
+    const tab = searchParams.tab === "favorites" || searchParams.tab === "calculator" || searchParams.tab === "week" ? searchParams.tab : "clients";
     const tabHref = (t: string) => `/groups/${params.groupId}/nutrition${t === "clients" ? "" : `?tab=${t}`}`;
-    const TABS: { key: "clients" | "favorites" | "calculator"; label: string }[] = [
+    const TABS: { key: "clients" | "week" | "favorites" | "calculator"; label: string }[] = [
       { key: "clients", label: "Clients" },
+      { key: "week", label: "This week" },
       { key: "favorites", label: "Favorite meals" },
       { key: "calculator", label: "Calculator" },
     ];
@@ -147,7 +149,9 @@ export default async function NutritionPage(
           <AiBudgetMeter variant="banner" groupId={params.groupId} />
         </div>
 
-        {tab === "favorites" ? (
+        {tab === "week" ? (
+          <WeeklyNutritionSection groupId={params.groupId} clients={athletes.map((a) => ({ id: a.profileId, groupId: a.groupId, fullName: a.fullName }))} />
+        ) : tab === "favorites" ? (
           <FavoriteMealsTab userId={user.id} />
         ) : tab === "calculator" ? (
           <div>
