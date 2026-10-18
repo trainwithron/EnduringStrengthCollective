@@ -3,6 +3,7 @@
 -- Some clients' food and weight should only ever be approached by the coach, in person (an eating-disorder history, a recent injury or illness, a client who asked, a minor whose parent decides). For them
 -- the weekly job that suggests a calorie or macro change must stay silent. The coach switches it on from the client's Nutrition tab. It lives in its own table that only the group's coaches can read or write,
 -- NOT on the membership row, because the client reads their own membership and this note is for the coach alone. Taking a client out of the group and putting them back keeps it (it is not tied to the membership).
+-- The switch follows the PERSON, not the group: the weekly job reads it for the person whichever group their check-in is in (a season rolled over, a move, a second coach's group).
 -- The existing "No macros for [name]" switch (group_memberships.coach_sets_macros) also silences the job; this is the one that says "never, whatever the numbers are". Additions only. Re-runnable.
 create table if not exists public.client_nutrition_flags (
   group_id uuid not null references public.groups(id) on delete cascade,

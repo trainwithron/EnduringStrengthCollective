@@ -32,7 +32,7 @@ function fake(opts: { members?: Row[]; flags?: Row[]; membersError?: boolean; fl
 const slice = (rows: Row[], range?: [number, number]) => (range ? rows.slice(range[0], range[1] + 1) : rows);
 
 describe("the clients the weekly nutrition job leaves alone", () => {
-  it("includes a client whose coach switched macros off AND one with the automatic-suggestions switch on, per group", async () => {
+  it("includes a client whose coach switched macros off (per group) AND one with the automatic-suggestions switch on (the person)", async () => {
     const db = fake({
       members: [
         { profile_id: "a", group_id: "g1", coach_sets_macros: false },
@@ -43,12 +43,19 @@ describe("the clients the weekly nutrition job leaves alone", () => {
     });
     const r = await loadPausedKeys(db);
     expect(r.failed).toBe(false);
-    expect([...r.keys].sort()).toEqual(["a|g1", "b|g1"]);
+    expect([...r.keys]).toEqual(["a|g1"]);
+    expect([...r.profiles]).toEqual(["b"]);
   });
 
-  it("a client switched off in one group is not switched off in another group", async () => {
-    const db = fake({ members: [{ profile_id: "b", group_id: "g2", coach_sets_macros: null }], flags: [{ profile_id: "b", group_id: "g1" }] });
-    expect([...(await loadPausedKeys(db)).keys]).toEqual(["b|g1"]);
+  it("the safety switch follows the person: set in group A, it still silences them when their check-in is in group B", async () => {
+    const db = fake({ members: [{ profile_id: "b", group_id: "gB", coach_sets_macros: null }], flags: [{ profile_id: "b", group_id: "gA" }] });
+    const r = await loadPausedKeys(db);
+    expect(r.profiles.has("b")).toBe(true);
+    // and "No macros for" stays a per-group switch
+    const macros = await loadPausedKeys(fake({ members: [{ profile_id: "c", group_id: "gA", coach_sets_macros: false }], flags: [] }));
+    expect(macros.keys.has("c|gA")).toBe(true);
+    expect(macros.keys.has("c|gB")).toBe(false);
+    expect(macros.profiles.has("c")).toBe(false);
   });
 
   it("reads past one page of rows", async () => {
@@ -65,7 +72,7 @@ describe("the clients the weekly nutrition job leaves alone", () => {
 
   it("a database without the flags table yet (paste pending) just uses the first switch", async () => {
     const r = await loadPausedKeys(fake({ members: [{ profile_id: "a", group_id: "g", coach_sets_macros: false }], flagsError: { code: "42P01" } }));
-    expect(r).toEqual({ keys: new Set(["a|g"]), failed: false });
+    expect(r).toEqual({ keys: new Set(["a|g"]), profiles: new Set(), failed: false });
     const viaRest = await loadPausedKeys(fake({ members: [], flagsError: { code: "PGRST205" } }));
     expect(viaRest.failed).toBe(false);
   });
@@ -76,8 +83,8 @@ describe("how it is wired", () => {
   it("the weekly job skips a switched-off client in the weekly pass AND in the starting-target pass, and stops entirely if it cannot tell who", () => {
     expect(cron).toContain("loadPausedKeys(supabase)");
     expect(cron).toContain("if (paused.failed) return NextResponse.json");
-    expect(cron).toContain("if (paused.keys.has(`${athleteId}|${last.group_id}`)) {");
-    expect(cron).toContain("!paused.has(key)");
+    expect(cron).toContain("if (paused.profiles.has(athleteId) || paused.keys.has(`${athleteId}|${last.group_id}`)) {");
+    expect(cron).toContain("!paused.keys.has(key) && !paused.profiles.has(m.profile_id)");
   });
   it("the switch is a coach-only table, not a column on the membership the client reads", () => {
     const sql = src("supabase/migrations/0408_client_nutrition_flags.sql");

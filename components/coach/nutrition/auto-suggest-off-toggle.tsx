@@ -4,8 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 
-// The coach's per-client "no automatic nutrition suggestions". While it is on, the weekly check-in never suggests a calorie or macro change for this client, whatever the numbers say; the coach can still set
-// their targets by hand or work out a starting target themselves. It is a note only the coach can read (not on the membership row the client reads). One tap turns it back on.
+// The coach's per-client "no automatic nutrition suggestions". While it is on, the weekly check-in never suggests a calorie or macro change for this person, whatever the numbers say, in any group they belong to
+// (it is a safety switch, so it follows the person, including into another coach's group). The coach can still set targets by hand or work out a starting target themselves (those suggestions are asked for, not sent). It is a note only the coach can read (not on the membership row the client reads). One tap turns it back on.
 export function AutoSuggestOffToggle({ athleteId, groupId, initialOff, clientFirstName }: { athleteId: string; groupId: string; initialOff: boolean; clientFirstName: string }) {
   const router = useRouter();
   const [off, setOff] = useState(initialOff);
@@ -33,7 +33,7 @@ export function AutoSuggestOffToggle({ athleteId, groupId, initialOff, clientFir
     <div className="font-body text-sm text-steel" data-testid="auto-suggest-off-toggle">
       {off ? (
         <p className="flex flex-wrap items-center gap-x-2">
-          <span>Automatic nutrition suggestions are off for {clientFirstName}. You still set their targets yourself.</span>
+          <span>Automatic nutrition suggestions are off for {clientFirstName}, in all their groups. Doesn&apos;t stop suggestions you ask for yourself.</span>
           <button type="button" onClick={() => void set(false)} disabled={saving} className="min-h-11 px-1 text-rust underline underline-offset-2 disabled:opacity-40">
             Turn on
           </button>
