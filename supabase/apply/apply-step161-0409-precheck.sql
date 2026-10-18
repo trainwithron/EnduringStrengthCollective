@@ -10,7 +10,7 @@ from (
     ('0409 is not already applied (the money events table is not there yet)',
       to_regclass('public.payment_events') is null),
     ('the tables and helpers it uses exist',
-      to_regclass('public.groups') is not null and to_regclass('public.profiles') is not null and to_regclass('public.membership_subscriptions') is not null and to_regclass('public.group_memberships') is not null and to_regprocedure('public.is_group_coach(uuid)') is not null and to_regprocedure('public.is_org_admin_of_group(uuid)') is not null),
+      to_regclass('public.groups') is not null and to_regclass('public.profiles') is not null and to_regclass('public.membership_subscriptions') is not null and to_regclass('public.group_memberships') is not null and to_regprocedure('public.is_group_coach(uuid)') is not null and to_regprocedure('public.is_org_admin_of_group(uuid)') is not null and to_regprocedure('public.is_client_private_from_org(uuid, uuid)') is not null),
     ('the notification type rule exists to be widened',
       exists (select 1 from pg_constraint c where c.conname = 'notifications_type_check' and c.conrelid = 'public.notifications'::regclass))
 ) as checks(check_name, ok);

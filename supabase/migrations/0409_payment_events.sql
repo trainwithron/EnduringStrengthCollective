@@ -20,24 +20,44 @@ create table if not exists public.payment_events (
   currency text,
   stripe_object_id text,
   subscription_id text,
+  -- a refund: Stripe's own id of this refund (one row per refund)
+  refund_id text,
+  -- when the coach was told (empty: not yet, so a redelivery tells them once)
+  notified_at timestamptz,
   detail text,
   created_at timestamptz not null default now()
 );
+create unique index if not exists payment_events_refund_idx on public.payment_events (refund_id) where refund_id is not null;
 create index if not exists payment_events_group_idx on public.payment_events (group_id, created_at desc);
 create index if not exists payment_events_object_idx on public.payment_events (stripe_object_id) where stripe_object_id is not null;
 create index if not exists payment_events_subscription_idx on public.payment_events (subscription_id) where subscription_id is not null;
 alter table public.payment_events enable row level security;
 revoke all on public.payment_events from anon, authenticated;
 grant select on public.payment_events to authenticated;
+-- The same three rules the other money tables have (credit_purchases, membership_subscriptions):
+--   1. the client's own rows, a group's coaches, and the coach's own plan (no group). A coach who has left the group no longer reads its events.
 drop policy if exists "payment_events_select_coach_or_own" on public.payment_events;
-create policy "payment_events_select_coach_or_own" on public.payment_events for select to authenticated
+drop policy if exists "payment_events_select_own_or_coach" on public.payment_events;
+create policy "payment_events_select_own_or_coach" on public.payment_events for select to authenticated
   using (
     athlete_id = (select auth.uid())
-    -- a group's events: its coaches, and the owner or an admin of its organization (the Business page of an owner or admin counts the whole organization); a coach who has left the group no longer reads them
-    or (group_id is not null and (public.is_group_coach(group_id) or public.is_org_admin_of_group(group_id)))
-    -- the coach's own plan (no group)
+    or (group_id is not null and public.is_group_coach(group_id))
     or (group_id is null and coach_id = (select auth.uid()))
   );
+--   2. the owner or an admin of the organization (the Business page of an owner or admin counts the whole organization), but never a client who keeps their records private from the organization.
+drop policy if exists "payment_events_select_org_owner" on public.payment_events;
+create policy "payment_events_select_org_owner" on public.payment_events for select to authenticated
+  using (group_id is not null and public.is_org_admin_of_group(group_id) and (athlete_id is null or not public.is_client_private_from_org(group_id, athlete_id)));
+--   3. only the organization the person has open (a coach in two organizations reads one at a time); rows with no group (the coach's own plan) are not part of any organization's wall.
+do $wall$
+begin
+  if to_regprocedure('public.group_in_active_org(uuid)') is not null
+     and not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'payment_events' and policyname = 'org_wall_header') then
+    create policy "org_wall_header" on public.payment_events as restrictive for all to authenticated
+      using (public.group_in_active_org(group_id)) with check (public.group_in_active_org(group_id));
+  end if;
+end
+$wall$;
 
 -- One new kind of notice: a payment problem (failed payment, refund, dispute). The list is rebuilt from the live one plus this kind, and refused if it would lose any.
 do $types$
@@ -73,8 +93,9 @@ end
 $types$;
 
 -- Four read-only checks for the platform admin. Each returns what it checked, how many rows are out of step, and one example id.
--- "Past due for more than 7 days" is counted from the FIRST failed payment recorded for the subscription (the subscription row itself is rewritten on every update, so its own date says nothing); a subscription that went past due before
--- failed payments were being recorded has no date to count from and is not counted.
+-- "Past due for more than 7 days" is counted from the FIRST failed attempt of the most recent failed invoice recorded for the subscription (the subscription row itself is rewritten on every update, so its own date says nothing; a
+-- subscription that failed, recovered and failed again counts from the new failure). A subscription that went past due before failed payments were being recorded has no date to count from and is not counted; one that stays past due
+-- across several invoices is counted from the latest invoice's first failure, so it can read younger than it is.
 create or replace function public.payment_reconciliation_report()
 returns table (check_name text, what text, issue_count bigint, example text)
 language plpgsql
@@ -95,11 +116,15 @@ begin
 
   return query
   select 'past_due_over_7_days'::text,
-         'Subscriptions past due, with a failed payment first recorded more than 7 days ago'::text,
+         'Subscriptions past due, whose latest failed invoice first failed more than 7 days ago'::text,
          count(*), (array_agg(s.stripe_subscription_id order by s.stripe_subscription_id))[1]
     from public.membership_subscriptions s
+    join (select distinct on (e.subscription_id) e.subscription_id, e.stripe_object_id as invoice_id
+            from public.payment_events e
+           where e.kind = 'payment_failed' and e.subscription_id is not null
+           order by e.subscription_id, e.created_at desc) latest on latest.subscription_id = s.stripe_subscription_id
     where s.status = 'past_due'
-      and (select min(e.created_at) from public.payment_events e where e.kind = 'payment_failed' and e.subscription_id = s.stripe_subscription_id) < now() - interval '7 days';
+      and (select min(e2.created_at) from public.payment_events e2 where e2.kind = 'payment_failed' and e2.stripe_object_id = latest.invoice_id) < now() - interval '7 days';
 
   return query
   select 'billing_after_leaving'::text,

@@ -4,8 +4,10 @@ import { sendPushToProfile } from "@/lib/send-push";
 // Money events that used to leave no trace in the app (Release M1): a client's failed payment, a refund made in Stripe, a dispute (chargeback) opened and closed. Each is RECORDED (payment_events, one row per Stripe event) and the
 // coach who owns the money is told. Nothing else happens: no balance changes, no sessions are taken back, no access ends and no money moves. A refund does not take sessions off the client and a failed payment does not
 // end their access; whether either should is the coach's call (and Ron's), listed in docs/NEEDS_RON.md.
-// A redelivered event is a harmless duplicate (stripe_event_id is unique). Who the money belongs to is looked up in Stripe BEFORE anything is written: a lookup that FAILS is thrown so Stripe sends the event again (nothing
-// is recorded half-known); only a lookup that SUCCEEDS and finds no usable owner records the event unattributed (the platform report lists it). A write that fails is thrown too; a notice that fails never is.
+// A redelivered event is a harmless duplicate (stripe_event_id is unique). Who the money belongs to is looked up in Stripe BEFORE anything is written. A lookup that FAILS is thrown so Stripe sends the event again (nothing
+// is recorded half-known) ONLY while the event is recent (under a day old) and the failure could be passing; an older event, or a failure that retrying cannot fix (the key may not read that object: 401/403), is recorded
+// unattributed with a note and logged, never answered with an error (Stripe redelivers a failing event for days and can switch a failing endpoint off, which would stop checkout and subscription events too).
+// A lookup that SUCCEEDS and finds no usable owner records the event unattributed too (the platform report lists it). A write that fails is thrown; a notice that fails never is.
 export type PaymentEventKind = "payment_failed" | "refund" | "dispute_opened" | "dispute_closed";
 
 export interface PaymentEventInput {
@@ -21,6 +23,8 @@ export interface PaymentEventInput {
   currency: string | null;
   objectId: string | null;
   subscriptionId: string | null;
+  // For a refund: Stripe's own id of THIS refund (one row per refund).
+  refundId?: string | null;
   detail: string | null;
 }
 
@@ -47,26 +51,49 @@ export function problemText(kind: PaymentEventKind, name: string, amountCents: n
 export const LOCK_SCREEN_TEXT = "Open the app to see it.";
 const TITLE: Record<PaymentEventKind, string> = { payment_failed: "A payment failed", refund: "A refund was made", dispute_opened: "A payment was disputed", dispute_closed: "A dispute was closed" };
 
-// Records the event once. Returns true when this call recorded it, false when it was already recorded.
-export async function recordPaymentEvent(db: any, e: PaymentEventInput): Promise<boolean> {
-  const { error } = await db.from("payment_events").insert({
-    stripe_event_id: e.eventId,
-    kind: e.kind,
-    group_id: e.groupId,
-    athlete_id: e.athleteId,
-    coach_id: e.coachId,
-    amount_cents: e.amountCents,
-    total_cents: e.totalCents,
-    currency: e.currency,
-    stripe_object_id: e.objectId,
-    subscription_id: e.subscriptionId,
-    detail: e.detail,
-  });
-  if (error) {
-    if (error.code === "23505") return false;
-    throw error;
-  }
-  return true;
+export interface Recorded {
+  id: string | null;
+  // This call recorded it (false: it was already there).
+  first: boolean;
+  // The coach has already been told about it.
+  notified: boolean;
+}
+
+// Records the event once (one row per Stripe event, and one per Stripe refund). A repeat finds the row that is already there and says whether the coach was told.
+export async function recordPaymentEvent(db: any, e: PaymentEventInput): Promise<Recorded> {
+  const { data, error } = await db
+    .from("payment_events")
+    .insert({
+      stripe_event_id: e.eventId,
+      kind: e.kind,
+      group_id: e.groupId,
+      athlete_id: e.athleteId,
+      coach_id: e.coachId,
+      amount_cents: e.amountCents,
+      total_cents: e.totalCents,
+      currency: e.currency,
+      stripe_object_id: e.objectId,
+      subscription_id: e.subscriptionId,
+      refund_id: e.refundId ?? null,
+      detail: e.detail,
+    })
+    .select("id")
+    .single();
+  if (!error) return { id: (data as { id: string } | null)?.id ?? null, first: true, notified: false };
+  if (error.code !== "23505") throw error;
+  // Already recorded: by this event, or (a refund) by another event that carried the same refund.
+  let existing = await db.from("payment_events").select("id, notified_at").eq("stripe_event_id", e.eventId).maybeSingle();
+  if (!existing.error && !existing.data && e.refundId) existing = await db.from("payment_events").select("id, notified_at").eq("refund_id", e.refundId).maybeSingle();
+  if (existing.error) throw existing.error;
+  const row = existing.data as { id: string; notified_at: string | null } | null;
+  return { id: row?.id ?? null, first: false, notified: !!row?.notified_at };
+}
+
+// Remembers that the coach was told, so a redelivery that finds the row but no memory of a notice still tells them once.
+async function markNotified(db: any, id: string | null): Promise<void> {
+  if (!id) return;
+  const { error } = await db.from("payment_events").update({ notified_at: new Date().toISOString() }).eq("id", id);
+  if (error) console.error("[payment events] could not mark the notice as sent:", error.message);
 }
 
 // Tells the coach seat(s) of the group (or the one coach whose own plan it is). Best effort.
@@ -127,6 +154,25 @@ function isMissing(err: unknown): boolean {
   return !!e && (e.code === "resource_missing" || e.statusCode === 404);
 }
 
+export const RETRY_WINDOW_SECONDS = 24 * 3600;
+const UNATTRIBUTED_NOTE = "owner could not be looked up";
+
+// Runs a lookup. A failure is thrown (so Stripe retries) only for a recent event and only when retrying could help; otherwise the answer is "nobody", with a note for the record.
+async function attribute<T>(event: Stripe.Event, look: () => Promise<T>, fallback: T, now: number = Date.now() / 1000): Promise<{ value: T; note: string | null }> {
+  try {
+    return { value: await look(), note: null };
+  } catch (err) {
+    const e = err as { statusCode?: number; type?: string; message?: string } | null;
+    const cannotBeFixedByRetrying = e?.statusCode === 401 || e?.statusCode === 403 || e?.type === "StripePermissionError" || e?.type === "StripeAuthenticationError";
+    const recent = now - (event.created ?? 0) < RETRY_WINDOW_SECONDS;
+    if (recent && !cannotBeFixedByRetrying) throw err;
+    console.error("[payment events] recording the event unattributed, the owner could not be looked up:", event.id, e?.message ?? err);
+    return { value: fallback, note: UNATTRIBUTED_NOTE };
+  }
+}
+
+const joinNote = (a: string | null, b: string | null) => [a, b].filter(Boolean).join("; ") || null;
+
 async function whoFromSubscription(stripe: Stripe, subscriptionId: string | null): Promise<Who> {
   if (!subscriptionId) return nobody;
   try {
@@ -181,16 +227,16 @@ export async function whoFromCharge(stripe: Stripe, charge: Stripe.Charge): Prom
 // The one entry point the webhook calls for these four kinds of event.
 export async function handlePaymentProblemEvent(event: Stripe.Event, deps: { db: any; stripe: Stripe }): Promise<void> {
   const { db, stripe } = deps;
-  let input: PaymentEventInput | null = null;
+  const inputs: PaymentEventInput[] = [];
   // Only the first failed attempt of an invoice tells the coach (Stripe retries, and each retry is another event: those are recorded, not announced again).
   let announce = true;
 
   if (event.type === "invoice.payment_failed") {
     const invoice = event.data.object as Stripe.Invoice;
     const subscriptionId = subscriptionIdOfInvoice(invoice);
-    const who = await whoFromSubscription(stripe, subscriptionId);
+    const { value: who, note } = await attribute(event, () => whoFromSubscription(stripe, subscriptionId), nobody);
     const attempt = (invoice as unknown as { attempt_count?: number }).attempt_count;
-    input = {
+    inputs.push({
       eventId: event.id,
       kind: "payment_failed",
       ...who,
@@ -199,47 +245,67 @@ export async function handlePaymentProblemEvent(event: Stripe.Event, deps: { db:
       currency: invoice.currency ?? null,
       objectId: invoice.id ?? null,
       subscriptionId,
-      detail: typeof attempt === "number" ? `attempt ${attempt}` : null,
-    };
+      detail: joinNote(typeof attempt === "number" ? `attempt ${attempt}` : null, note),
+    });
     if (invoice.id) {
-      const { count } = await db.from("payment_events").select("id", { count: "exact", head: true }).eq("kind", "payment_failed").eq("stripe_object_id", invoice.id);
-      announce = (count ?? 0) === 0;
+      // Told once per invoice: if an earlier attempt's notice already went out, this one is recorded only. A read that fails is thrown (never guessed as "nobody told yet").
+      const { data: earlier, error } = await db.from("payment_events").select("id, notified_at").eq("kind", "payment_failed").eq("stripe_object_id", invoice.id);
+      if (error) throw error;
+      announce = !((earlier ?? []) as { notified_at: string | null }[]).some((r) => !!r.notified_at);
     }
   } else if (event.type === "charge.refunded") {
     const charge = event.data.object as Stripe.Charge;
-    const who = await whoFromCharge(stripe, charge);
+    const owner = await attribute(event, () => whoFromCharge(stripe, charge), nobody);
+    // Stripe's own list of this charge's refunds: one row per refund id, each with that refund's own amount, so refunds that arrive out of order or at the same moment are each right.
+    const listed = await attribute<Stripe.Refund[] | null>(event, async () => (await stripe.refunds.list({ charge: charge.id, limit: 100 })).data, null);
     const total = charge.amount_refunded ?? null;
-    // This refund is what the charge now shows refunded minus what was already recorded for it.
-    let thisRefund = total;
-    if (total != null) {
-      const { data: earlier, error } = await db.from("payment_events").select("amount_cents").eq("kind", "refund").eq("stripe_object_id", charge.id);
-      if (error) throw error;
-      const before = ((earlier ?? []) as { amount_cents: number | null }[]).reduce((n, r) => n + (r.amount_cents ?? 0), 0);
-      thisRefund = Math.max(0, total - before);
+    const note = joinNote(owner.note, listed.note);
+    const base = { kind: "refund" as const, ...owner.value, totalCents: total, currency: charge.currency ?? null, objectId: charge.id, subscriptionId: null };
+    const real = (listed.value ?? []).filter((r) => r.status !== "failed" && r.status !== "canceled");
+    if (real.length > 0) {
+      for (const r of real) inputs.push({ ...base, eventId: `${event.id}:${r.id}`, amountCents: r.amount, refundId: r.id, detail: note });
+    } else {
+      inputs.push({ ...base, eventId: event.id, amountCents: total, detail: note });
     }
-    input = { eventId: event.id, kind: "refund", ...who, amountCents: thisRefund, totalCents: total, currency: charge.currency ?? null, objectId: charge.id, subscriptionId: null, detail: null };
   } else if (event.type === "charge.dispute.created" || event.type === "charge.dispute.closed") {
     const dispute = event.data.object as Stripe.Dispute;
     const chargeId = idOf(dispute.charge);
-    const who = chargeId ? await whoFromCharge(stripe, await stripe.charges.retrieve(chargeId)) : nobody;
+    const owner = await attribute(
+      event,
+      async () => {
+        if (!chargeId) return nobody;
+        try {
+          return await whoFromCharge(stripe, await stripe.charges.retrieve(chargeId));
+        } catch (err) {
+          // A charge Stripe says is not there (another account or mode, or deleted) will never be found: unattributed, not retried for days.
+          if (isMissing(err)) return nobody;
+          throw err;
+        }
+      },
+      nobody
+    );
     const closed = event.type === "charge.dispute.closed";
-    input = {
+    inputs.push({
       eventId: event.id,
       kind: closed ? "dispute_closed" : "dispute_opened",
-      ...who,
+      ...owner.value,
       amountCents: dispute.amount ?? null,
       totalCents: null,
       currency: dispute.currency ?? null,
       objectId: dispute.id,
       subscriptionId: null,
-      detail: closed ? (dispute.status === "won" ? "you won" : dispute.status === "lost" ? "you lost" : dispute.status ?? null) : null,
-    };
+      detail: joinNote(closed ? (dispute.status === "won" ? "you won" : dispute.status === "lost" ? "you lost" : dispute.status ?? null) : null, owner.note),
+    });
   }
-  if (!input) return;
 
-  // Recorded once; the notice goes only the first time the event is handled.
-  const first = await recordPaymentEvent(db, input);
-  if (first && announce) await notifyPaymentProblem(db, input);
+  for (const input of inputs) {
+    const recorded = await recordPaymentEvent(db, input);
+    // The coach is told the first time, and also on a redelivery of an event whose notice never went out.
+    if (announce && (recorded.first || !recorded.notified)) {
+      await notifyPaymentProblem(db, input);
+      await markNotified(db, recorded.id);
+    }
+  }
 }
 
 export const PAYMENT_PROBLEM_EVENT_TYPES = ["invoice.payment_failed", "charge.refunded", "charge.dispute.created", "charge.dispute.closed"] as const;
