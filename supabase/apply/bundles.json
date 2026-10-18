@@ -24,6 +24,14 @@
   "file": "apply-release-cm-all.sql"
  },
  {
+  "id": "release-w3-intake-every-client",
+  "name": "Release W3 (every client reaches the health form, whichever door they came in by; adds a trigger only, safe before or with the code)",
+  "steps": [
+   "155"
+  ],
+  "file": "apply-release-w3-intake-every-client-all.sql"
+ },
+ {
   "id": "release-s1-signin-hardening",
   "name": "Release S1 (a changed sign-in email is confirmed by the new address; adds only, safe to run BEFORE the code that goes with it is live)",
   "steps": [

@@ -2916,6 +2916,24 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "155",
+  slug: "0403",
+  title: "0403 Release W3: every client goes through the health form and waiver, whichever door they came in by (a trigger flags someone who joins as a client without a finished form)",
+  migrations: ["0403"],
+  sees: "Success. No rows returned.",
+  afterwards: "From now on, a person who already had an account and joins a group as a client (by an invite link, or by accepting a coach's invitation) is sent to the health form and waiver on their next page, if they have not finished one. Coaches, social-only members and people who already finished the form are left alone. Nobody who is already in a group is touched.",
+  undo: [
+    "drop trigger if exists group_memberships_require_intake on public.group_memberships;",
+    "drop function if exists public.require_intake_for_new_client();",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 155 misbehaves. Removes the trigger; people it already flagged stay flagged (they still finish the form once).",
+  rows: [
+    ["0403 is not already applied (the trigger is not there yet)", "not exists (select 1 from pg_trigger where tgname = 'group_memberships_require_intake' and not tgisinternal)"],
+    ["the tables it reads exist", "to_regclass('public.group_memberships') is not null and to_regclass('public.client_intake') is not null and to_regclass('public.profiles') is not null"],
+  ],
+});
+
+STEPS.push({
   n: "150",
   slug: "0398",
   title: "0398 Release S1: a changed sign-in email must be confirmed by the new address first (waiting requests table)",
@@ -3082,6 +3100,7 @@ const BUNDLES = [
   { id: "release-co", name: "Release CO (nothing about a person is public unless they chose it: personal Find a coach listing; a coach adds only their own clients to a challenge; run BEFORE the code that goes with it is live)", steps: ["139"] },
   { id: "release-cn-held", name: "HELD, Ron's word first: require the health form and waiver of every client without one (read check-intake-flag-list.sql first)", steps: ["138"] },
   { id: "release-cm", name: "Release CM (the guard function and a coach's decision on a flagged screening; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["137"] },
+  { id: "release-w3-intake-every-client", name: "Release W3 (every client reaches the health form, whichever door they came in by; adds a trigger only, safe before or with the code)", steps: ["155"] },
   { id: "release-s1-signin-hardening", name: "Release S1 (a changed sign-in email is confirmed by the new address; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["150"] },
   { id: "release-f2-client-cap", name: "Release F2 (the free plan's client limit, installed switched off; adds only)", steps: ["149"] },
   { id: "release-l-leaving-coach", name: "Release L (a leaving coach is never given an organization; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["148"] },
@@ -3364,6 +3383,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
     m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
+    m("0403", "exists (select 1 from pg_trigger where tgname = 'group_memberships_require_intake' and not tgisinternal)"),
     m("0398", "to_regclass('public.pending_email_changes') is not null"),
     m("0397", "exists (select 1 from pg_trigger where tgname = 'group_memberships_free_tier_limit' and not tgisinternal)"),
     m("0396", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'organization_memberships' and column_name = 'departing_since')"),
