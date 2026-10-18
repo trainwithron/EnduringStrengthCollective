@@ -31,10 +31,10 @@ describe("the state report", () => {
     const other = bundles.find((b) => b.id !== bundle.id && b.steps.every((n) => withCheck.some((p) => p.n === n)))!;
     const rows = withCheck.map((p) => ({ step: p.n, applied: !bundle.steps.includes(p.n) || false }));
     const summary = summarize(rows, bundles, probes);
-    const found = summary.bundles.find((b) => b.id === bundle.id)!;
+    const found = summary.bundles.find((b: { id: string }) => b.id === bundle.id)!;
     expect(found.status).toBe("waiting");
     expect(found.waitingSteps).toEqual(bundle.steps);
-    expect(summary.bundles.find((b) => b.id === other.id)!.status).toBe(other.steps.some((n) => bundle.steps.includes(n)) ? "partly" : "applied");
+    expect(summary.bundles.find((b: { id: string }) => b.id === other.id)!.status).toBe(other.steps.some((n) => bundle.steps.includes(n)) ? "partly" : "applied");
     const text = formatReport(summary);
     expect(text).toContain("WAITING FOR A PASTE");
     expect(text).toContain(`supabase/apply/${bundle.file}`);
@@ -46,7 +46,7 @@ describe("the state report", () => {
     const multi = bundles.find((b) => b.steps.length > 1 && b.steps.every((n) => withCheck.some((p) => p.n === n)));
     if (multi) {
       const rows = withCheck.map((p) => ({ step: p.n, applied: p.n !== multi.steps[0] }));
-      const found = summarize(rows, bundles, probes).bundles.find((b) => b.id === multi.id)!;
+      const found = summarize(rows, bundles, probes).bundles.find((b: { id: string }) => b.id === multi.id)!;
       expect(found.status).toBe("partly");
       expect(formatReport(summarize(rows, bundles, probes))).toContain("PARTLY APPLIED");
     }
