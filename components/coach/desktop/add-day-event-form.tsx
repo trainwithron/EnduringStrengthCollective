@@ -44,7 +44,7 @@ export function AddDayEventForm({ coachId, dateKey, organizationId }: { coachId:
         <label className="font-body text-xs text-steel uppercase tracking-wide mb-1 block">
           Add a to-do or event
         </label>
-        <input aria-label="e.g. Call the gym about equipment"
+        <input aria-label="Add a to-do or event"
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}

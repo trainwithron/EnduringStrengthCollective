@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import ts from "typescript";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
-import { trapTarget } from "./use-dialog-a11y";
+import { escapeBelongsToInnerThing, openDialogCount, pushDialog, topDialogIs, trapTarget } from "./use-dialog-a11y";
 
 // Accessibility, kept from sliding back (Release K3). Four things are checked across the whole app, not a sample:
 //   1. every page names itself (the tab title a screen reader reads first),
@@ -123,6 +123,69 @@ describe("every full-screen sheet is a dialog", () => {
 
   it("a field the screen already focused (autoFocus) keeps focus when a dialog opens", () => {
     expect(read("lib/use-dialog-a11y.ts")).toContain("node.contains(document.activeElement)");
+  });
+
+  it("with two dialogs open only the topmost answers the keyboard, and the one below answers again once it closes", () => {
+    const a = Symbol("sheet");
+    const b = Symbol("popup");
+    const offA = pushDialog(a);
+    expect(topDialogIs(a)).toBe(true);
+    const offB = pushDialog(b);
+    expect(topDialogIs(b)).toBe(true);
+    expect(topDialogIs(a)).toBe(false);
+    offB();
+    expect(topDialogIs(a)).toBe(true);
+    offA();
+    expect(openDialogCount()).toBe(0);
+  });
+
+  it("Escape that belongs to something smaller does not also close the dialog: already used, an open select, a listbox or a combobox", () => {
+    const el = (props: { tagName?: string; closest?: (sel: string) => unknown }) => ({ tagName: "DIV", closest: () => null, ...props }) as unknown as EventTarget;
+    expect(escapeBelongsToInnerThing({ defaultPrevented: true, target: el({}) })).toBe(true);
+    expect(escapeBelongsToInnerThing({ defaultPrevented: false, target: el({ tagName: "SELECT" }) })).toBe(true);
+    expect(escapeBelongsToInnerThing({ defaultPrevented: false, target: el({ closest: (sel) => (sel.includes("listbox") ? {} : null) }) })).toBe(true);
+    expect(escapeBelongsToInnerThing({ defaultPrevented: false, target: el({ closest: (sel) => (sel.includes("aria-expanded") ? {} : null) }) })).toBe(true);
+    expect(escapeBelongsToInnerThing({ defaultPrevented: false, target: el({}) })).toBe(false);
+  });
+
+  it("the hook lets a sheet with unsaved work ask before Escape closes it, and the sheets with work use it", () => {
+    const hook = read("lib/use-dialog-a11y.ts");
+    expect(hook).toContain("Discard what you have here?");
+    expect(hook).toContain('action === "block"');
+    expect(hook).toContain("Tab from outside the dialog pulls focus in");
+    expect(read("components/coach/mobile/spot-builder-panel.tsx")).toContain('guard: () => "ask"');
+    expect(read("components/feed/new-post-composer.tsx")).toContain('guard: () => (body.trim() || file ? "ask" : "close")');
+    expect(read("components/feed/new-post-composer.tsx")).toContain('e.key === "Escape" && mentionQuery !== null');
+    expect(read("components/coach/desktop/expanded-day-scheduler.tsx")).toContain('assigning ? "block"');
+    expect(read("components/coach/desktop/recap-and-up-next.tsx")).toContain('? "ask" : "close"');
+    expect(read("components/coach/auto-categorize-button.tsx")).toContain('applying ? "block" : "close"');
+  });
+});
+
+describe("a field's name says what the field IS, never an example of what to type", () => {
+  it("no aria-label is an example value (e.g. ..., a sample like 0.00) or a name copied from an example placeholder", () => {
+    const bad: string[] = [];
+    for (const file of tsxFiles) {
+      read(file)
+        .split("\n")
+        .forEach((line, i) => {
+          for (const m of line.matchAll(/aria-label="([^"]*)"/g)) {
+            const label = m[1];
+            const placeholder = /placeholder="([^"]*)"/.exec(line)?.[1];
+            const isExample = /(^|[\s(,])e\.g\./i.test(label) || /^[\d.,$%\s]+$/.test(label) || label.includes("for example");
+            const sameAsExamplePlaceholder = placeholder === label && /e\.g\./i.test(placeholder);
+            if (isExample || sameAsExamplePlaceholder) bad.push(`${file}:${i + 1}: ${label}`);
+          }
+        });
+    }
+    expect(bad).toEqual([]);
+  });
+
+  it("the names found wrong in review are fixed (an ingredient row is not named after its sample food, the Style field is not named Conjugate)", () => {
+    expect(read("components/coach/mobile/spot-builder-panel.tsx")).not.toContain('aria-label="Conjugate"');
+    expect(read("components/coach/mobile/spot-builder-panel.tsx")).toContain('aria-label="Style"');
+    expect(read("components/coach/desktop/recipe-hub-manager.tsx")).toContain('aria-label="Ingredient name"');
+    expect(read("components/coach/desktop/recipe-hub-manager.tsx")).not.toContain('aria-label="Chicken Breast"');
   });
 });
 

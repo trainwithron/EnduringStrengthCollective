@@ -102,7 +102,7 @@ export function TrainingPartnerBrowseList({
             <p className="font-body text-xs text-moss mt-3">Request sent ✓</p>
           ) : openRequestFor === p.athleteId ? (
             <div className="mt-3 space-y-2">
-              <textarea aria-label="Introduce yourself — what you're training for, your schedule, what gym or area you're in."
+              <textarea aria-label="Introduce yourself"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 rows={2}

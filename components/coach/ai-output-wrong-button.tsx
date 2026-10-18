@@ -83,7 +83,7 @@ export function AiOutputWrongButton({ action, referenceId }: { action: AiRefundA
               {r.label}
             </button>
           ))}
-          <input aria-label="Something else"
+          <input aria-label="Your own reason"
             type="text"
             value={customReason}
             onChange={(e) => setCustomReason(e.target.value)}

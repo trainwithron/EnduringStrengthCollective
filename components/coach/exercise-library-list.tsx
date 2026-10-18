@@ -642,7 +642,7 @@ export function ExerciseLibraryList({
                           <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">
                             Description / instructions
                           </p>
-                          <textarea aria-label="How it's done, rules, setup — shown to any coach browsing this exercise."
+                          <textarea aria-label="How it is done"
                             defaultValue={ex.description ?? ""}
                             onBlur={(e) => handleDescriptionChange(ex.id, e.target.value)}
                             placeholder="How it's done, rules, setup — shown to any coach browsing this exercise."

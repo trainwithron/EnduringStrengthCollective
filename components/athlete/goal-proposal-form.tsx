@@ -145,7 +145,7 @@ export function GoalProposalForm({ athleteId, groupId, suggestedBy, fromWords }:
         <label className="font-body text-xs text-steel uppercase tracking-wide">
           {suggestedBy ? "Anything specific to add? (optional)" : "Anything specific your coach should know? (optional)"}
         </label>
-        <textarea aria-label="e.g. rear delts, an event I'm prepping for"
+        <textarea aria-label="Anything specific (optional)"
           value={priorityNote}
           onChange={(e) => setPriorityNote(e.target.value)}
           rows={2}

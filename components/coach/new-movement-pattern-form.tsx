@@ -46,7 +46,7 @@ export function NewMovementPatternForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-2">
       <div className="flex items-center gap-2">
-        <input aria-label="e.g. Horizontal Push"
+        <input aria-label="Pattern name"
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}

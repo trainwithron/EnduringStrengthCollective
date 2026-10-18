@@ -55,7 +55,11 @@ export function SpotBuilderPanel({
 }) {
   const term = useTerm();
   const [stage, setStage] = useState<"compact" | "expanded" | "fullscreen">(initialAthleteId ? "expanded" : "compact");
-  const dialogRef = useDialogA11y<HTMLDivElement>(stage === "fullscreen", () => close());
+  const dialogRef = useDialogA11y<HTMLDivElement>(stage === "fullscreen", () => close(), undefined, {
+    // Escape must not throw away a generated or half-edited program (it lives inside the wizard below), so it asks first.
+    guard: () => "ask",
+    askMessage: "Close the AI Program Builder? Anything you have generated or edited here will be lost.",
+  });
   // Explicit, coach-controlled choice — not inferred from which button
   // they tap (Ron's own correction: "just a quick button, AI or
   // parse"). AI = fire full generation straight from the compact text;
@@ -281,7 +285,7 @@ export function SpotBuilderPanel({
           </div>
           <div>
             <label className="font-body text-xs text-steel uppercase tracking-wide">Style</label>
-            <input aria-label="Conjugate"
+            <input aria-label="Style"
               type="text"
               value={programType}
               onChange={(e) => setProgramType(e.target.value)}

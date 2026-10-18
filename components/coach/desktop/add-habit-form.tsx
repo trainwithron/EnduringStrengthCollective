@@ -127,7 +127,7 @@ export function AddHabitForm({
       </div>
 
       <form onSubmit={handleAdd} className="space-y-2 pt-2 border-t border-steel/15">
-        <input aria-label="e.g. Drink 100oz water"
+        <input aria-label="New habit"
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}

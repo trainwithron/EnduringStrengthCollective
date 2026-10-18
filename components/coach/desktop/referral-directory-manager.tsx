@@ -156,7 +156,7 @@ export function ReferralDirectoryManager({ initialPartners, organizationId }: { 
           placeholder="Short description (optional)"
           className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm"
         />
-        <input aria-label="Booking link (Jane App, Mindbody, etc.)"
+        <input aria-label="Booking link"
           type="url"
           value={bookingUrl}
           onChange={(e) => setBookingUrl(e.target.value)}
@@ -170,7 +170,7 @@ export function ReferralDirectoryManager({ initialPartners, organizationId }: { 
           placeholder="Discount code (optional)"
           className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm"
         />
-        <input aria-label="e.g. 15% off first massage"
+        <input aria-label="Offer"
           type="text"
           value={discountDescription}
           onChange={(e) => setDiscountDescription(e.target.value)}

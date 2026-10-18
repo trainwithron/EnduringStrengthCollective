@@ -258,7 +258,7 @@ export function ClientSignInPanel({
         </button>
         {showEmail && (
           <form onSubmit={saveEmail} className="mt-2 flex items-center gap-2">
-            <input aria-label="client@email.com"
+            <input aria-label="Client's email"
               type="email"
               required
               value={email}

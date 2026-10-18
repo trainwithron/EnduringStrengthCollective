@@ -75,7 +75,7 @@ export function RecapAndUpNext({
   const [sessionNoteOpen, setSessionNoteOpen] = useState(false);
   const [exercises, setExercises] = useState(nextWorkout?.exercises ?? []);
   const [swapTarget, setSwapTarget] = useState<{ id: string; name: string } | null>(null);
-  const swapDialogRef = useDialogA11y<HTMLDivElement>(!!swapTarget, () => setSwapTarget(null));
+  const swapDialogRef = useDialogA11y<HTMLDivElement>(!!swapTarget, () => setSwapTarget(null), undefined, { guard: () => (swapTarget && swapDraft.trim() !== swapTarget.name ? "ask" : "close"), askMessage: "Discard this change?" });
   const [swapDraft, setSwapDraft] = useState("");
 
   async function handleSessionNoteBlur() {
@@ -222,7 +222,7 @@ export function RecapAndUpNext({
                   {sessionNoteOpen ? "Hide session note" : "Session note"}
                 </button>
                 {sessionNoteOpen && (
-                  <textarea aria-label="Coach-only note about this whole session — never visible to the athlete"
+                  <textarea aria-label="Coach-only note about this session"
                     value={sessionNote}
                     onChange={(e) => setSessionNote(e.target.value)}
                     onBlur={handleSessionNoteBlur}

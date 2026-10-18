@@ -35,7 +35,7 @@ export function NewPostComposer({
   authorId?: string | null;
 }) {
   const [open, setOpen] = useState(false);
-  const dialogRef = useDialogA11y<HTMLDivElement>(open, () => setOpen(false));
+  const dialogRef = useDialogA11y<HTMLDivElement>(open, () => setOpen(false), undefined, { guard: () => (body.trim() || file ? "ask" : "close"), askMessage: "Discard this post?" });
   const [body, setBody] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -175,6 +175,13 @@ export function NewPostComposer({
             setMentionQuery(detectMentionQuery(e.target.value));
           }}
           placeholder={placeholderForChannel(defaultChannel)}
+          // Escape closes the open @mention list first, not the whole composer.
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && mentionQuery !== null) {
+              e.preventDefault();
+              setMentionQuery(null);
+            }
+          }}
           rows={3}
           className="w-full bg-graphite border border-steel/30 text-chalk px-3 py-2 font-body focus:outline-none focus:border-rust resize-none"
         />

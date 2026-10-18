@@ -464,7 +464,7 @@ export function GroupSwitcher({
                           }`}
                         >
                           {editingTagFor === g.id ? (
-                            <input aria-label="e.g. Bodybuilding"
+                            <input aria-label="Group tag"
                               type="text"
                               autoFocus
                               value={tagDraft}

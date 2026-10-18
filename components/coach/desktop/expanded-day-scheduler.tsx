@@ -47,7 +47,7 @@ export function ExpandedDayScheduler({
   onAssigned: () => void;
   onCancel: () => void;
 }) {
-  const dialogRef = useDialogA11y<HTMLDivElement>(true, onCancel);
+  const dialogRef = useDialogA11y<HTMLDivElement>(true, onCancel, undefined, { guard: () => (assigning ? "block" : otherTime || otherMinutes ? "ask" : "close"), askMessage: "Discard this booking?" });
   const [balance, setBalance] = useState(client.balance);
   const [adjustingCredits, setAdjustingCredits] = useState(false);
   const [assigning, setAssigning] = useState(false);

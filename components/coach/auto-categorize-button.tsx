@@ -30,7 +30,7 @@ export function AutoCategorizeButton({
   onApplied: (id: string, category: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const dialogRef = useDialogA11y<HTMLDivElement>(open, () => setOpen(false));
+  const dialogRef = useDialogA11y<HTMLDivElement>(open, () => setOpen(false), undefined, { guard: () => (applying ? "block" : "close") });
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [applying, setApplying] = useState(false);
   const [failedCount, setFailedCount] = useState(0);
