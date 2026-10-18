@@ -16,6 +16,9 @@ const blankLiterals = (sql) => sql.replace(/'(?:[^']|'')*'/g, "''");
 // Throws unless the text is a single plain read made only of allowed pieces. Used on each probe and on the finished query.
 export function assertPlainRead(sql, what = "the query") {
   if (/--|\/\*|\*\/|\$/.test(sql)) throw new Error(`${what} must not contain comments or dollar quotes`);
+  // quoted identifiers and escape strings are the usual ways to smuggle a call past a name check
+  if (sql.includes('"')) throw new Error(`${what} must not contain quoted identifiers`);
+  if (/(?:^|[^A-Za-z0-9_])(?:e|u&)\s*'/i.test(sql)) throw new Error(`${what} must not contain escape strings`);
   const bare = blankLiterals(sql);
   const body = bare.trim().replace(/;$/, "");
   if (body.includes(";")) throw new Error(`${what} must be a single statement`);
@@ -105,7 +108,7 @@ export function formatReport(summary, { all = false } = {}) {
   lines.push(`WAITING FOR A PASTE (${waiting.length})`);
   if (waiting.length === 0) lines.push("  nothing: every paste is applied");
   for (const b of waiting) {
-    lines.push(`  ${b.status === "partly" ? "PARTLY APPLIED" : b.uncheckedSteps.length > 0 ? "waiting (some not checked)" : "waiting"}  ${short(b.name)}  [steps ${b.waitingSteps.join(", ")}]  file: supabase/apply/${b.file}`);
+    lines.push(`  ${b.status === "partly" ? "PARTLY APPLIED" : b.uncheckedSteps.length > 0 ? "WAITING (some steps not checked)" : "waiting"}  ${short(b.name)}  [steps ${b.waitingSteps.join(", ")}]  file: supabase/apply/${b.file}`);
     if (b.uncheckedSteps.length > 0) lines.push(`      not checked (no check available): steps ${b.uncheckedSteps.join(", ")}`);
   }
   if (unknown.length > 0) {

@@ -3,12 +3,15 @@
 //   node scripts/build-paste-files.mjs
 // scripts/sql-tests/paste-files.test.mjs applies every step in order on the live-equivalent schema and checks each precheck is true first.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { checkSql as functionAclCheckSql, undoSql as functionAclUndoSql, TRIGGER_SWEEP, triggerSweepUndoSql } from "./function-acl.mjs";
 import { probeSql as step23ProbeSql } from "./step23-probe.mjs";
 import { LIVE_TRANSFER_ORGANIZATION_OWNERSHIP } from "./live-bodies-0396.mjs";
 
 const root = new URL("../supabase/", import.meta.url);
-const outDir = new URL("apply/", root);
+// PASTE_OUT_DIR lets a test build everything into a scratch folder and compare it with what is committed.
+const outDir = process.env.PASTE_OUT_DIR ? pathToFileURL(resolve(process.env.PASTE_OUT_DIR) + "/") : new URL("apply/", root);
 mkdirSync(outDir, { recursive: true });
 
 import { readdirSync } from "node:fs";

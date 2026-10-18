@@ -41,6 +41,8 @@ function envValue(name) {
 function refuseIfTokenIsTracked(token) {
   // the token goes in on standard input, never on the command line where other programs could see it
   const found = spawnSync("git", ["grep", "-F", "-q", "-f", "-"], { cwd: root, input: token, encoding: "utf8" });
+  // git grep answers 0 = found, 1 = not found; anything else (an error, or git missing) means it could not be checked, so it refuses rather than guess
+  if (found.status !== 0 && found.status !== 1) throw new Error("Could not check whether the access token is stored in a tracked file, so it is not used.");
   if (found.status === 0) throw new Error("The access token appears in a file that git tracks. Remove it from that file (and rotate it in the Supabase dashboard) before using it here.");
 }
 

@@ -1,4 +1,7 @@
-import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { assertPlainRead, assertReadOnly, buildStateSql, formatReport, summarize } from "../scripts/state-report-lib.mjs";
 
@@ -48,6 +51,11 @@ describe("the state report", () => {
       "select pg_sleep(1)",
       "select lo_import('/etc/passwd')",
       "select 1 where 1 = (select count(*) from dblink('x', 'drop table t') as t(a int))",
+      'select "pg_terminate_backend"(1)',
+      "select \"pg_sleep\"(5)",
+      "select E'\' ; drop table t; --'",
+      "select U&'\0041'",
+      "select e'x'",
     ];
     for (const sql of bad) expect(() => assertReadOnly(sql), sql).toThrow();
     expect(() => assertReadOnly("select to_regclass('public.x') is null")).not.toThrow();
@@ -114,8 +122,22 @@ describe("the state report", () => {
     expect(found.waitingSteps).toContain(bundle.steps[0]);
     expect(found.uncheckedSteps).toContain(bundle.steps[1]);
     expect(formatReport(summarize(rows, bundles, probes))).toContain("not checked (no check available)");
-    expect(formatReport(summarize(rows, bundles, probes))).toContain("waiting (some not checked)");
+    expect(formatReport(summarize(rows, bundles, probes))).toContain("WAITING (some steps not checked)");
+    expect(formatReport(summarize(rows, bundles, probes))).not.toContain("PARTLY APPLIED  " + bundle.name.split(" (")[0]);
   });
+
+  it("the committed probes are exactly what the paste builder produces now (a forgotten rebuild fails here)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "paste-out-"));
+    try {
+      const run = spawnSync(process.execPath, ["scripts/build-paste-files.mjs"], { env: { ...process.env, PASTE_OUT_DIR: dir }, encoding: "utf8" });
+      expect(run.status, run.stderr).toBe(0);
+      const fresh = JSON.parse(readFileSync(join(dir, "state-probes.json"), "utf8"));
+      expect(fresh).toEqual(probes);
+      expect(JSON.parse(readFileSync(join(dir, "bundles.json"), "utf8"))).toEqual(bundles);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 60000);
 
   it("the command sends the query only to the read-only endpoint, keeps the token out of tracked files, and never writes to the database", () => {
     const cli = readFileSync("scripts/state-report.mjs", "utf8");
@@ -123,6 +145,7 @@ describe("the state report", () => {
     expect(cli).not.toMatch(/database\/query`/);
     expect(cli).toContain("refuseIfTokenIsTracked(token)");
     expect(cli).toContain("input: token");
+    expect(cli).toContain("found.status !== 0 && found.status !== 1");
     expect(cli).not.toMatch(/"--", token/);
     expect(cli).toContain('git("ls-files", "--error-unmatch", ".env.local")');
     expect(cli).toContain('git("check-ignore", "-q", ".env.local")');
