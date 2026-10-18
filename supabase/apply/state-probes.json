@@ -1488,6 +1488,17 @@
   ]
  },
  {
+  "n": "166",
+  "slug": "0414",
+  "title": "0414 Release CS1: a group setting for post-workout cards and PR notices (one nullable column)",
+  "migrations": [
+   "0414"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'groups' and column_name = 'post_workout_cards')"
+  ]
+ },
+ {
   "n": "165",
   "slug": "0413",
   "title": "0413 Release T2: a fingerprint column so wearable sign-in tokens can be kept scrambled (one empty column and an index)",

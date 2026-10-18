@@ -37,6 +37,8 @@ import { ageStatusFromDob } from "@/lib/youth-block";
 import { ShowNameOnShareToggle } from "@/components/athlete/show-name-on-share-toggle";
 import { DeleteAccountButton } from "@/components/athlete/delete-account-button";
 import { GamificationToggle } from "@/components/coach/gamification-toggle";
+import { PostWorkoutCardsToggle } from "@/components/coach/post-workout-cards-toggle";
+import { loadPostWorkoutCards } from "@/lib/post-workout-cards";
 import { TeamSportToggle } from "@/components/coach/team-sport-toggle";
 import { GoogleCalendarConnection } from "@/components/coach/google-calendar-connection";
 import { ReadDuringRestToggle } from "@/components/athlete/read-during-rest-toggle";
@@ -254,6 +256,8 @@ export default async function SettingsPage(
     actingAsFullName = profile?.full_name ?? "Client";
   }
 
+  // What this group does after a workout now: its own choice, or the default (off for a team-sport group, on otherwise). Read apart from the group row so a database without the column still loads the page.
+  const postWorkoutCards = isCoach ? await loadPostWorkoutCards(supabase, params.groupId) : true;
   // The coach's own blocks come first on a coach's page (their vocabulary, Read during rest, Google Calendar); a client's page starts with Notifications.
   const coachingGroup = isCoach ? (
     <SettingsGroup label="Coaching">
@@ -271,6 +275,9 @@ export default async function SettingsPage(
                 <TeamSportToggle groupId={params.groupId} initialEnabled={(group as { team_mode?: boolean | null } | null)?.team_mode === true} />
               </div>
             )}
+            <div className="mt-4 pt-4 border-t border-steel/15">
+              <PostWorkoutCardsToggle groupId={params.groupId} initialEnabled={postWorkoutCards} />
+            </div>
             <div className="mt-4 pt-4 border-t border-steel/15">
               <GamificationToggle
                 groupId={params.groupId}

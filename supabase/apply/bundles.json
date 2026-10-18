@@ -1,5 +1,13 @@
 [
  {
+  "id": "release-cs1-post-workout-cards",
+  "name": "Release CS1 (a group setting for post-workout cards and PR notices; adds one nullable column, safe before the code)",
+  "steps": [
+   "166"
+  ],
+  "file": "apply-release-cs1-post-workout-cards-all.sql"
+ },
+ {
   "id": "release-v1-guardian-consent",
   "name": "Release V1 (a parent or guardian's consent for clients aged 13 to 17; adds only, but apply BEFORE the code that goes with it is live)",
   "steps": [

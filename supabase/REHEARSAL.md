@@ -178,6 +178,7 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0411 | yes | yes | 40 | 0411 Report and block |
 | 0412 | yes | yes | 21 | 0412 Download my data (everything, a page at a time) |
 | 0413 | yes | yes | 8 | 0413 Wearable token fingerprint |
+| 0414 | yes | yes | 6 | 0414 Post-workout cards setting |
 | 0402 | yes | yes | 23 | 0402 Guardian consent |
 | 0331 | yes | yes | 10 | 0331 a payment event and its sessions are recorded in one step |
 | 0329 | yes | yes | 12 | 0329 every session costs exactly 1 credit; the waitlist offer uses the coach's time zone |

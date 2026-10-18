@@ -9,6 +9,7 @@ select v.version, v.name, array['-- applied by hand through the SQL editor; the 
 from (
   values
     ('2026100600402', 'guardian_consent', '0402_guardian_consent.sql', to_regclass('public.guardian_consents') is not null),
+    ('2026100600414', 'group_post_workout_cards', '0414_group_post_workout_cards.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'groups' and column_name = 'post_workout_cards')),
     ('2026100600413', 'wearable_token_fingerprint', '0413_wearable_token_fingerprint.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'wearable_oauth_tokens' and column_name = 'access_token_hash')),
     ('2026100600412', 'export_my_data', '0412_export_my_data.sql', to_regprocedure('public.export_my_data_table(text, text, integer, integer)') is not null),
     ('2026100600411', 'report_and_block', '0411_report_and_block.sql', to_regclass('public.content_reports') is not null),
