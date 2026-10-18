@@ -24,6 +24,14 @@
   "file": "apply-release-cm-all.sql"
  },
  {
+  "id": "release-x1-athlete-narrow-reads",
+  "name": "Release X1 (two narrow read functions for athletes' screens; adds only, safe before or with the code)",
+  "steps": [
+   "156"
+  ],
+  "file": "apply-release-x1-athlete-narrow-reads-all.sql"
+ },
+ {
   "id": "release-s1-signin-hardening",
   "name": "Release S1 (a changed sign-in email is confirmed by the new address; adds only, safe to run BEFORE the code that goes with it is live)",
   "steps": [

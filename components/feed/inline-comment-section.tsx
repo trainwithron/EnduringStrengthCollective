@@ -5,6 +5,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { Trash2 } from "lucide-react";
 import { renderWithMentions } from "./mention-text";
 import { notifyPush } from "@/lib/push-notify";
+import { readGroupMemberNames } from "@/lib/group-roster-reads";
 
 interface CommentRow {
   id: string;
@@ -65,15 +66,8 @@ export function InlineCommentSection({
       .single()
       .then(async ({ data: post }) => {
         if (!post) return;
-        const { data: rows } = await supabase
-          .from("group_memberships")
-          .select("profile_id, profiles ( full_name )")
-          .eq("group_id", post.group_id);
-        setMembers(
-          (rows ?? [])
-            .map((r: any) => ({ id: r.profile_id, fullName: r.profiles?.full_name ?? "" }))
-            .filter((m) => m.fullName)
-        );
+        const people = await readGroupMemberNames(supabase, post.group_id);
+        setMembers(people.map((m) => ({ id: m.id, fullName: m.fullName })));
       });
 
     const channel = supabase

@@ -106,7 +106,8 @@ describe("Release J: wiring", () => {
 
   it("the roster behind the attendance grid names which position link it means (a membership has two), and the leaderboard does the same", () => {
     expect(src("lib/attendance.ts")).toContain("group_positions!group_memberships_position_id_fkey ( name )");
-    expect(src("lib/leaderboard-data.ts")).toContain("group_positions!group_memberships_position_id_fkey ( name, sort_order )");
+    // the leaderboard's roster now comes through the narrow read, which keeps the same named link
+    expect(src("lib/group-roster-reads.ts")).toContain("group_positions!group_memberships_position_id_fkey ( name, sort_order )");
   });
 
   it("a season's athletes keep their membership type and history-import setting into the next season", () => {
