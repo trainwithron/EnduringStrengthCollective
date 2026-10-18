@@ -7,7 +7,7 @@ import { rateLimitResponse } from "@/lib/rate-limit";
 import { notifyAndEmail } from "@/lib/invite-notify";
 import { inviteEmail, makeAuthLink, sendAuthMail } from "@/lib/auth-mail";
 import { isEmailConfigured } from "@/lib/email";
-import { isUnaccepted, removeOrphanInvitee } from "@/lib/coach-invite-server";
+import { inviteOnlyFootprint, isUnaccepted, removeOrphanInvitee } from "@/lib/coach-invite-server";
 
 // Which org-level role an invite can grant. "owner" is set once at
 // org creation and never assigned through this flow.
@@ -80,7 +80,9 @@ export async function POST(request: Request) {
   let reuseUserId: string | null = null;
   if (typeof existingId === "string" && existingId) {
     const { data: earlier } = await serviceRole.auth.admin.getUserById(existingId);
-    if (isUnaccepted(earlier?.user)) reuseUserId = existingId;
+    // Only an unused invitation THIS organization made earlier is invited again with a fresh link. An unaccepted account that another organization invited (or that holds no seat here) is out of reach: it gets the same
+    // in-app invitation as any existing account, no seat is added and no link is made.
+    if (isUnaccepted(earlier?.user) && (await inviteOnlyFootprint(serviceRole, group.organization_id, existingId)).ok) reuseUserId = existingId;
   }
   if (typeof existingId === "string" && existingId && !reuseUserId) {
     const { data: already } =

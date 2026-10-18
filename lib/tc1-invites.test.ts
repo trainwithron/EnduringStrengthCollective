@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it } from "vitest";
 import { inviteEmail, makeAuthLink, oneLine, recoveryEmail, sendAuthMail } from "./auth-mail";
-import { authorizeInviteManager, isUnaccepted, loadInviteTarget, loadPendingInvitees, markSent, removeOrphanInvitee, sentRecently } from "./coach-invite-server";
+import { authorizeInviteManager, inviteOnlyFootprint, isUnaccepted, loadInviteTarget, loadPendingInvitees, markSent, removeOrphanInvitee, sentRecently } from "./coach-invite-server";
 
 const src = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
 const envBackup = { key: process.env.BREVO_API_KEY, from: process.env.BREVO_FROM_EMAIL };
@@ -82,62 +82,125 @@ describe("who has not accepted yet, and who may manage invitations", () => {
     expect(isUnaccepted(null)).toBe(false);
   });
 
-  function adminDb(users: Record<string, { email: string; email_confirmed_at: string | null; last_sign_in_at: string | null; invited_at?: string }>, tables: { members?: Record<string, string>; desk?: string[] }) {
+  type U = { email: string; email_confirmed_at: string | null; last_sign_in_at: string | null; invited_at?: string };
+  type Row = Record<string, unknown>;
+  // A small in-memory database: tables of rows (eq filters, maybeSingle, plain lists, counts) and the auth admin API.
+  function adminDb(users: Record<string, U>, tables: Record<string, Row[]>, deleted: string[] = [], deleteError: boolean = false) {
     return {
-      auth: { admin: { getUserById: async (id: string) => ({ data: { user: users[id] ? { id, ...users[id] } : null } }) } },
+      auth: {
+        admin: {
+          getUserById: async (id: string) => ({ data: { user: users[id] ? { id, ...users[id] } : null } }),
+          deleteUser: async (id: string) => {
+            if (deleteError) return { error: { message: "no" } };
+            deleted.push(id);
+            return { error: null };
+          },
+        },
+      },
       from: (table: string) => {
-        const filters: Record<string, string> = {};
+        let rows = [...(tables[table] ?? [])];
         const b: any = {
           select: () => b,
-          eq: (col: string, val: string) => ((filters[col] = val), b),
-          maybeSingle: async () => {
-            if (table === "organization_memberships") return { data: tables.members?.[filters.profile_id] ? { role: tables.members[filters.profile_id] } : null };
-            if (table === "org_front_desk") return { data: tables.desk?.includes(filters.profile_id) ? { profile_id: filters.profile_id } : null };
-            if (table === "profiles") return { data: { full_name: "Cade Thompson" } };
-            return { data: null };
-          },
+          eq: (col: string, val: unknown) => ((rows = rows.filter((r) => r[col] === val)), b),
+          maybeSingle: async () => ({ data: rows[0] ?? null, error: null }),
+          then: (resolve: (v: unknown) => void) => resolve({ data: rows, error: null, count: rows.length }),
         };
         return b;
       },
     };
   }
+  const ORG = "org-a";
+  const OTHER = "org-b";
+  const invitedAt = "2026-10-16T17:00:00Z";
+  const coachSeat = (profile_id: string, org = ORG) => ({ profile_id, role: "coach", groups: { organization_id: org } });
+  const unaccepted = (email: string): U => ({ email, email_confirmed_at: null, last_sign_in_at: null, invited_at: invitedAt });
 
-  it("lists the unaccepted among the people given, newest first, and leaves out anyone accepted or unreadable", async () => {
+  it("lists the unaccepted among the people given, newest first, and leaves out anyone accepted, unreadable, made another way or belonging to another organization", async () => {
     const db = adminDb(
       {
-        a: { email: "a@x.co", email_confirmed_at: null, last_sign_in_at: null, invited_at: "2026-10-16T17:00:00Z" },
-        b: { email: "b@x.co", email_confirmed_at: "2026-10-01", last_sign_in_at: "2026-10-02" },
-        c: { email: "c@x.co", email_confirmed_at: null, last_sign_in_at: null, invited_at: "2026-10-17T09:00:00Z" },
+        a: { ...unaccepted("a@x.co"), invited_at: "2026-10-16T17:00:00Z" },
+        b: { email: "b@x.co", email_confirmed_at: "2026-10-01", last_sign_in_at: "2026-10-02", invited_at: invitedAt },
+        c: { ...unaccepted("c@x.co"), invited_at: "2026-10-17T09:00:00Z" },
+        d: { email: "d@x.co", email_confirmed_at: null, last_sign_in_at: null },
+        e: unaccepted("e@x.co"),
       },
-      {}
+      {
+        organization_memberships: [
+          { profile_id: "a", organization_id: ORG, role: "admin" },
+          { profile_id: "b", organization_id: ORG, role: "coach" },
+          { profile_id: "d", organization_id: ORG, role: "coach" },
+          { profile_id: "e", organization_id: ORG, role: "coach" },
+          { profile_id: "e", organization_id: OTHER, role: "coach" },
+        ],
+        org_front_desk: [{ profile_id: "c", organization_id: ORG }],
+      }
     );
-    const list = await loadPendingInvitees(db, [
+    const list = await loadPendingInvitees(db, ORG, [
       { profileId: "a", name: "Cade", role: "admin" },
       { profileId: "b", name: "Bea", role: "coach" },
       { profileId: "c", name: "Dee", role: "front_desk" },
+      { profileId: "d", name: "Seeded", role: "coach" },
+      { profileId: "e", name: "Both orgs", role: "coach" },
       { profileId: "missing", name: "Ghost", role: "coach" },
     ]);
     expect(list.map((p) => p.profileId)).toEqual(["c", "a"]);
     expect(list[1]).toMatchObject({ name: "Cade", email: "a@x.co", role: "admin", sentAt: "2026-10-16T17:00:00Z" });
   });
 
-  it("a target must belong to the organization, must not be the owner and must not have accepted", async () => {
+  it("a target must belong to the organization, must not be the owner, must not have accepted and must exist only because this organization invited it", async () => {
     const users = {
-      p1: { email: "p1@x.co", email_confirmed_at: null, last_sign_in_at: null, invited_at: "2026-10-16T17:00:00Z" },
-      p2: { email: "p2@x.co", email_confirmed_at: "2026-10-01", last_sign_in_at: null },
-      own: { email: "own@x.co", email_confirmed_at: null, last_sign_in_at: null, invited_at: "2026-10-16T17:00:00Z" },
-      desk: { email: "d@x.co", email_confirmed_at: null, last_sign_in_at: null, invited_at: "2026-10-16T17:00:00Z" },
+      p1: unaccepted("p1@x.co"),
+      p2: { email: "p2@x.co", email_confirmed_at: "2026-10-01", last_sign_in_at: null, invited_at: invitedAt },
+      own: unaccepted("own@x.co"),
+      desk: unaccepted("d@x.co"),
       seeded: { email: "s@x.co", email_confirmed_at: null, last_sign_in_at: null },
+      shared: unaccepted("shared@x.co"),
+      client: unaccepted("client@x.co"),
     };
-    const db = adminDb(users, { members: { p1: "coach", p2: "admin", own: "owner", seeded: "coach" }, desk: ["desk"] });
-    expect(await loadInviteTarget(db, "org", "p1")).toMatchObject({ ok: true, email: "p1@x.co", role: "coach" });
-    expect(await loadInviteTarget(db, "org", "desk")).toMatchObject({ ok: true, role: "front_desk" });
-    expect(await loadInviteTarget(db, "org", "stranger")).toMatchObject({ ok: false, status: 404 });
-    expect(await loadInviteTarget(db, "org", "own")).toMatchObject({ ok: false, status: 404 });
-    expect(await loadInviteTarget(db, "org", "p2")).toMatchObject({ ok: false, status: 409 });
+    const db = adminDb(users, {
+      organization_memberships: [
+        { profile_id: "p1", organization_id: ORG, role: "coach" },
+        { profile_id: "p2", organization_id: ORG, role: "admin" },
+        { profile_id: "own", organization_id: ORG, role: "owner" },
+        { profile_id: "seeded", organization_id: ORG, role: "coach" },
+        { profile_id: "shared", organization_id: ORG, role: "coach" },
+        { profile_id: "shared", organization_id: OTHER, role: "admin" },
+        { profile_id: "client", organization_id: ORG, role: "coach" },
+      ],
+      org_front_desk: [{ profile_id: "desk", organization_id: ORG }],
+      group_memberships: [coachSeat("p1"), { profile_id: "client", role: "athlete", groups: { organization_id: ORG } }],
+    });
+    expect(await loadInviteTarget(db, ORG, "p1")).toMatchObject({ ok: true, email: "p1@x.co", role: "coach" });
+    expect(await loadInviteTarget(db, ORG, "desk")).toMatchObject({ ok: true, role: "front_desk" });
+    expect(await loadInviteTarget(db, ORG, "stranger")).toMatchObject({ ok: false, status: 404 });
+    expect(await loadInviteTarget(db, ORG, "own")).toMatchObject({ ok: false, status: 404 });
+    expect(await loadInviteTarget(db, ORG, "p2")).toMatchObject({ ok: false, status: 409 });
+    expect(await loadInviteTarget(db, ORG, "")).toMatchObject({ ok: false, status: 400 });
     // a member whose account was not made by an invitation is not an invitation to cancel or resend
-    expect(await loadInviteTarget(db, "org", "seeded")).toMatchObject({ ok: false, status: 409 });
-    expect(await loadInviteTarget(db, "org", "")).toMatchObject({ ok: false, status: 400 });
+    expect(await loadInviteTarget(db, ORG, "seeded")).toMatchObject({ ok: false, status: 409 });
+    // an account another organization also holds, or one that is a client somewhere, is out of reach: no link, no resend
+    expect(await loadInviteTarget(db, ORG, "shared")).toMatchObject({ ok: false, status: 404 });
+    expect(await loadInviteTarget(db, ORG, "client")).toMatchObject({ ok: false, status: 404 });
+    // the other organization cannot reach the first one's invitee at all
+    expect(await loadInviteTarget(db, OTHER, "p1")).toMatchObject({ ok: false, status: 404 });
+  });
+
+  it("another organization's pending invitee is out of reach: inviteOnlyFootprint says no for it, yes for the organization that invited it", async () => {
+    const db = adminDb({}, { organization_memberships: [{ profile_id: "v", organization_id: ORG, role: "admin" }], group_memberships: [coachSeat("v")] });
+    expect(await inviteOnlyFootprint(db, ORG, "v")).toEqual({ ok: true });
+    expect((await inviteOnlyFootprint(db, OTHER, "v")).ok).toBe(false);
+    // a person with no invitation seat at all is not an invitation of anyone
+    expect((await inviteOnlyFootprint(adminDb({}, {}), ORG, "nobody")).ok).toBe(false);
+  });
+
+  it("cancelling needs an account that has made nothing; anything it has made keeps it from being deleted", async () => {
+    const mk = (extra: Record<string, Row[]>) => adminDb({}, { organization_memberships: [{ profile_id: "v", organization_id: ORG, role: "coach" }], group_memberships: [coachSeat("v")], ...extra });
+    expect((await inviteOnlyFootprint(mk({}), ORG, "v", { withData: true })).ok).toBe(true);
+    for (const table of ["client_intake", "posts", "direct_messages", "programs"]) {
+      const col = table === "client_intake" ? "athlete_id" : table === "posts" ? "author_id" : table === "direct_messages" ? "sender_id" : "created_by";
+      const r = await inviteOnlyFootprint(mk({ [table]: [{ [col]: "v" }] }), ORG, "v", { withData: true });
+      expect(r.ok, table).toBe(false);
+    }
   });
 
   it("a send is remembered on the account only after it succeeded, and blocks another within ten minutes", async () => {
@@ -202,6 +265,8 @@ describe("the wiring", () => {
     // a failure after the account was made removes it again, and an unused earlier invitation takes the new-address path (a fresh link)
     expect(route).toContain("removeOrphanInvitee(serviceRole, newUserId)");
     expect(route).toContain("reuseUserId");
+    // only an invitation THIS organization made may be reused with a fresh link
+    expect(route).toContain("(await inviteOnlyFootprint(serviceRole, group.organization_id, existingId)).ok");
     expect((route.match(/return fail\(/g) ?? []).length).toBeGreaterThanOrEqual(4);
   });
 
@@ -221,11 +286,11 @@ describe("the wiring", () => {
     expect(link.indexOf("markSent(")).toBeGreaterThan(link.indexOf("makeAuthLink("));
     expect(link).not.toContain("rateLimitResponse(\"coach-invite-link-person\"");
     // a delete that failed is a cancel that did not happen
-    expect(src("app/api/coaches/invite/cancel/route.ts")).toContain("if (memberError || deskError)");
     const cancel = src("app/api/coaches/invite/cancel/route.ts");
-    expect(cancel).toContain("auth.admin.deleteUser(profileId)");
-    // the account is deleted only when nothing else belongs to it
-    expect(cancel.indexOf("(seats ?? 0) === 0")).toBeLessThan(cancel.indexOf("deleteUser"));
+    expect(cancel).toContain("inviteOnlyFootprint(db, orgId, profileId, { withData: true })");
+    expect(cancel.indexOf("inviteOnlyFootprint(")).toBeLessThan(cancel.indexOf("deleteUser("));
+    // a delete that failed is a cancel that did not happen
+    expect(cancel).toContain("if (deleteError)");
   });
 
   it("the Team page lists every invitation with who, role, status and the three actions, for both kinds", () => {

@@ -36,12 +36,13 @@ export function isUnaccepted(user: AuthUserLike): boolean {
 }
 
 /** Which of these organization people (members and front desk) have not accepted yet. A person whose account cannot be read, or whose account carries no invitation marker, is left out (never listed on a guess). */
-export async function loadPendingInvitees(serviceRole: any, people: { profileId: string; name: string; role: string }[]): Promise<PendingInvitee[]> {
+export async function loadPendingInvitees(serviceRole: any, organizationId: string, people: { profileId: string; name: string; role: string }[]): Promise<PendingInvitee[]> {
   const found: PendingInvitee[] = [];
   await runPool(people, 8, async (p) => {
     const { data } = await serviceRole.auth.admin.getUserById(p.profileId);
     const user = data?.user;
     if (!isUnaccepted(user) || !user?.email) return;
+    if (organizationId && !(await inviteOnlyFootprint(serviceRole, organizationId, p.profileId)).ok) return;
     found.push({ profileId: p.profileId, name: p.name, email: user.email as string, role: p.role, sentAt: (user.invited_at ?? user.confirmation_sent_at ?? user.created_at ?? null) as string | null });
   });
   return found.sort((a, b) => (b.sentAt ?? "").localeCompare(a.sentAt ?? ""));
@@ -70,6 +71,41 @@ export async function removeOrphanInvitee(serviceRole: any, userId: string): Pro
   }
 }
 
+/**
+ * An account that exists ONLY because this organization invited it: it holds at least one invitation seat in THIS organization (an organization role or a front-desk seat), nothing in any other organization, no
+ * client seat anywhere, and only coach seats in this organization's groups. Only such an account may have a sign-in link made for it, be sent again or be cancelled by this organization; anything else (an
+ * account another organization invited, or one that is a client somewhere) is out of reach, so one organization can never attach to or sign in as another's invitee. withData also requires that the account has made
+ * nothing yet (no health form, no posts, messages or programs), which is what cancelling (deleting the account) needs.
+ */
+export async function inviteOnlyFootprint(serviceRole: any, organizationId: string, profileId: string, opts: { withData?: boolean } = {}): Promise<{ ok: boolean; reason?: string }> {
+  const [org, desk, seats] = await Promise.all([
+    serviceRole.from("organization_memberships").select("organization_id").eq("profile_id", profileId),
+    serviceRole.from("org_front_desk").select("organization_id").eq("profile_id", profileId),
+    serviceRole.from("group_memberships").select("role, groups!inner(organization_id)").eq("profile_id", profileId),
+  ]);
+  if (org.error || desk.error || seats.error) return { ok: false, reason: "unreadable" };
+  const orgRows = (org.data ?? []) as { organization_id: string }[];
+  const deskRows = (desk.data ?? []) as { organization_id: string }[];
+  const seatRows = (seats.data ?? []) as { role: string; groups: { organization_id: string | null } | { organization_id: string | null }[] | null }[];
+  if (![...orgRows, ...deskRows].some((r) => r.organization_id === organizationId)) return { ok: false, reason: "not invited by this organization" };
+  if ([...orgRows, ...deskRows].some((r) => r.organization_id !== organizationId)) return { ok: false, reason: "belongs to another organization" };
+  for (const s of seatRows) {
+    const g = Array.isArray(s.groups) ? s.groups[0] : s.groups;
+    if (s.role !== "coach" || g?.organization_id !== organizationId) return { ok: false, reason: "has a seat that is not one of this invitation's" };
+  }
+  if (opts.withData) {
+    const checks = await Promise.all([
+      serviceRole.from("client_intake").select("athlete_id", { count: "exact", head: true }).eq("athlete_id", profileId),
+      serviceRole.from("posts").select("id", { count: "exact", head: true }).eq("author_id", profileId),
+      serviceRole.from("direct_messages").select("id", { count: "exact", head: true }).eq("sender_id", profileId),
+      serviceRole.from("programs").select("id", { count: "exact", head: true }).eq("created_by", profileId),
+    ]);
+    if (checks.some((c: { error?: unknown }) => c.error)) return { ok: false, reason: "unreadable" };
+    if (checks.some((c: { count?: number | null }) => (c.count ?? 0) > 0)) return { ok: false, reason: "has made something" };
+  }
+  return { ok: true };
+}
+
 /** The person must belong to the organization (as a member or front desk) and must not have accepted yet. */
 export async function loadInviteTarget(
   serviceRole: any,
@@ -87,6 +123,9 @@ export async function loadInviteTarget(
   const user = data?.user;
   if (!user?.email) return { ok: false, status: 404, error: "That invitation was not found." };
   if (!isUnaccepted(user)) return { ok: false, status: 409, error: "They have already accepted, so there is nothing to send. They can sign in, or use Forgot password." };
+  // A link is only ever made for an account that exists solely because THIS organization invited it.
+  const footprint = await inviteOnlyFootprint(serviceRole, organizationId, profileId);
+  if (!footprint.ok) return { ok: false, status: 404, error: "That invitation was not found." };
   const { data: profile } = await serviceRole.from("profiles").select("full_name").eq("id", profileId).maybeSingle();
   return {
     ok: true,

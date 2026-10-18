@@ -162,7 +162,7 @@ export default async function BrandingPage(
   // member lists below. Only for an owner or admin; a person whose account cannot be read is not listed as pending on a guess.
   const pendingInvitees =
     tab === "team" && (orgMembership.role === "owner" || orgMembership.role === "admin")
-      ? await loadPendingInvitees(createServiceRoleClient(), [
+      ? await loadPendingInvitees(createServiceRoleClient(), orgMembership.organization_id, [
           ...members.filter((m) => m.role !== "owner").map((m) => ({ profileId: m.profileId, name: m.fullName, role: String(m.role) })),
           ...frontDesk.map((p) => ({ profileId: p.profileId, name: p.fullName, role: "front_desk" })),
         ])
