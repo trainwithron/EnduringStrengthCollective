@@ -25,10 +25,11 @@ A `RESTRICTIVE` policy is ANDed with the existing ones, so nothing that is allow
 | Tier | Tables (the writer is `auth.uid()`) | Why |
 |---|---|---|
 | 1. Shows the child to other people | `posts`, `comments`, `reactions`, `direct_messages`, `exercise_video_comments`, `training_partner_profiles`, `training_partner_requests`, `challenge_participants` | words, a name or a request that another person sees |
-| 2. Pictures, video and body measurements | `progress_photos`, `session_exercise_videos`, `body_weight_logs`, `body_scans`, `transformation_cards`, `transformation_milestones`, `wellness_checkins` | media or body data stored under the child's name |
+| 2. Pictures, video and body measurements | `progress_photos`, `session_exercise_videos`, `body_weight_logs`, `body_scans`, `transformation_cards`, `transformation_milestones` | media or body data stored under the child's name |
 
 **Deliberately not covered**
 - Nutrition tables (`food_log_entries`, `daily_macros`, `meal_plans`, preferences): Ron decided minors and macros is a coach and parent decision, not an automatic exclusion. A restrictive policy there would be exactly that exclusion.
+- `wellness_checkins`: a child telling their coach how they feel or that something hurts is a safety signal (decided by Commander).
 - Training itself (`athlete_sessions`, `set_logs`, `session_exercises`): not social, not sensitive, and a coach logging for a child writes as the coach.
 - Safety actions (`user_blocks`, reports, `support_messages`, `support_requests`): a child must always be able to ask for help or block someone.
 - The birthday and health steps (`client_intake`, `athlete_profile_details`, `minor_consent`): the child has to be able to finish them to get unblocked.
@@ -42,7 +43,10 @@ A `RESTRICTIVE` policy is ANDed with the existing ones, so nothing that is allow
 ## Tests (rehearsal, real policies)
 One person for each row of the rule table, plus: a service-role write passes; a coach writing to a child's thread passes; a child's delete passes; and every covered table is checked for both an allowed and a refused insert. A live-catalog test (like the existing reference-policy one) fails the suite if a table with a child-visible `author`-style column is added later without being listed here or on the "deliberately not covered" list.
 
-## Decisions I need
-1. Tier lists above: right set? In particular, should `wellness_checkins` and `body_scans` be in tier 2 or left out as health data the child may want to keep logging?
-2. Training logs left out of the backstop (my recommendation) or included?
-3. The staged rollout (function, then `posts`, then the rest). Recommended; it costs two extra pastes for Ron.
+## Decisions (approved)
+1. Tier lists as written, except `wellness_checkins` stays OUT; `body_scans` stays IN.
+2. Training logs OUT.
+3. Staged rollout: paste A (function only, step 167), paste B (policies on `posts` only, step 168), paste C (the rest, step 169) after `posts` has run clean for a few days. Ron applies them.
+
+## Built
+Migrations 0415 (function), 0416 (posts), 0417 (rest); rehearsals 0415 (34 checks: every kind of person and both sides of each birthday), 0416 (13), 0417 (25, including a live-catalog guard: any table with an author-style column must be guarded or listed as deliberately left out; `support_messages` is listed). The guard sees author-style columns only (`author_id`, `sender_id`, `commenter_id`, `poster_id`, `writer_id`); a table that stores a child's words under another column name, such as the athlete column of a photo table, is covered by this list and by review, not by the guard.

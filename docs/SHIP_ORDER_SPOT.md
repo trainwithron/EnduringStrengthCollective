@@ -39,6 +39,11 @@
 
 | T1 | release-trust | (see git) | Release T1, step 164 (0412), apply-release-t1-export-my-data-all.sql, fp in the step file | Download my data = everything (one function, two functions and a private bucket, adds only, safe before the code; the route tolerates them missing); breach runbook section; wearable-token encryption follows |
 
+| AF3e-A | af3-database | (see git) | Release AF3e paste A, step 167 (0415), apply-release-af3e-a-minor-may-write-all.sql, fp in the step file | minor_may_write(): a read-only function; nothing uses it yet; safe any time; RON APPLIES |
+| AF3e-B | af3-database | (see git) | Release AF3e paste B, step 168 (0416), apply-release-af3e-b-write-guard-posts-all.sql, fp in the step file | restrictive write guard on posts only; after A; RON APPLIES |
+| AF3e-C | af3-database | (see git) | Release AF3e paste C, step 169 (0417), apply-release-af3e-c-write-guard-rest-all.sql, fp in the step file | the guard on the 13 other tables; ONLY after B has run clean a few days (Commander says when); RON APPLIES |
+| AF3 | af3-database | (see git) | Release AF3, step 170 (0418), apply-release-af3-database-policies-all.sql, fp in the step file | REPLACES two posts policies, one tag policy, profile_reference_policy() and guardian_consent_state(); adds two functions and a trigger; code reads the same rules (guardian void/resend, account deletion list); paste BEFORE the code |
+
 | CS1 | release-cards-switch | (see git) | Release CS1, step 166 (0414), apply-release-cs1-post-workout-cards-all.sql, fp 105a116f7d2404b2 | APPLIED Oct 18 (by Commander, column verified live); group setting Post-workout cards and PR notices; one nullable column groups.post_workout_cards, safe before the code |
 
 | T2 | release-token-crypto | (see git) | Release T2, step 165 (0413), apply-release-t2-wearable-token-fingerprint-all.sql, fp in the step file | stacked on T1; paste BEFORE code (adds one empty column); inert until Ron sets WEARABLE_TOKEN_KEY |

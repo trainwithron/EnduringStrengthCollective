@@ -1,3 +1,4 @@
+import { liveTrainingGroupIds } from "@/lib/guardian-consent-server";
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -19,8 +20,7 @@ export async function POST(request: Request) {
   if (!athleteId) return NextResponse.json({ error: "Missing the client." }, { status: 400 });
 
   // The coach must coach a group the client trains in (row security shows a coach only their own groups' members).
-  const { data: seats } = await supabase.from("group_memberships").select("group_id").eq("profile_id", athleteId).eq("role", "athlete");
-  const groupIds = (seats ?? []).map((s: { group_id: string }) => s.group_id);
+  const groupIds = await liveTrainingGroupIds(supabase, athleteId);
   const { data: mine } = groupIds.length ? await supabase.from("group_memberships").select("group_id").eq("profile_id", user.id).eq("role", "coach").in("group_id", groupIds).limit(1) : { data: [] };
   if (!mine || mine.length === 0) return NextResponse.json({ error: "Only the client's coach can do that." }, { status: 403 });
 

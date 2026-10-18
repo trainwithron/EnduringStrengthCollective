@@ -1488,6 +1488,50 @@
   ]
  },
  {
+  "n": "170",
+  "slug": "0418",
+  "title": "0418 Release AF3: database policies from the post-ship audit (a private client stays private in posts and tags; two undecided account-deletion links decided; the guardian-consent answer limited for a coach; the health-form flag cleared when the last client seat goes)",
+  "migrations": [
+   "0418"
+  ],
+  "notApplied": [
+   "not exists (select 1 from pg_trigger where tgname = 'group_memberships_clear_intake' and not tgisinternal)"
+  ]
+ },
+ {
+  "n": "169",
+  "slug": "0417",
+  "title": "0417 Release AF3e paste C: the restrictive write guard on the rest of the covered tables (comments, reactions, messages, photos, weights and the others)",
+  "migrations": [
+   "0417"
+  ],
+  "notApplied": [
+   "not (exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'comments' and policyname = 'minor_write_guard_insert'))"
+  ]
+ },
+ {
+  "n": "168",
+  "slug": "0416",
+  "title": "0416 Release AF3e paste B: the restrictive write guard on posts only",
+  "migrations": [
+   "0416"
+  ],
+  "notApplied": [
+   "not (exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'posts' and policyname = 'minor_write_guard_insert'))"
+  ]
+ },
+ {
+  "n": "167",
+  "slug": "0415",
+  "title": "0415 Release AF3e paste A: minor_may_write(), the one question 'may this person write things other people will see?' (function only; nothing uses it yet)",
+  "migrations": [
+   "0415"
+  ],
+  "notApplied": [
+   "to_regprocedure('public.minor_may_write(uuid)') is null"
+  ]
+ },
+ {
   "n": "166",
   "slug": "0414",
   "title": "0414 Release CS1: a group setting for post-workout cards and PR notices (one nullable column)",

@@ -1,5 +1,37 @@
 [
  {
+  "id": "release-af3-database-policies",
+  "name": "Release AF3 (database policies from the post-ship audit; replaces two posts policies, one tag policy and two functions, adds two functions and one trigger)",
+  "steps": [
+   "170"
+  ],
+  "file": "apply-release-af3-database-policies-all.sql"
+ },
+ {
+  "id": "release-af3e-c-write-guard-rest",
+  "name": "Release AF3e paste C (the restrictive write guard on the rest of the covered tables; apply only after paste B has run clean for a few days)",
+  "steps": [
+   "169"
+  ],
+  "file": "apply-release-af3e-c-write-guard-rest-all.sql"
+ },
+ {
+  "id": "release-af3e-b-write-guard-posts",
+  "name": "Release AF3e paste B (the restrictive write guard on posts only)",
+  "steps": [
+   "168"
+  ],
+  "file": "apply-release-af3e-b-write-guard-posts-all.sql"
+ },
+ {
+  "id": "release-af3e-a-minor-may-write",
+  "name": "Release AF3e paste A (minor_may_write(): a read-only function; nothing uses it yet)",
+  "steps": [
+   "167"
+  ],
+  "file": "apply-release-af3e-a-minor-may-write-all.sql"
+ },
+ {
   "id": "release-cs1-post-workout-cards",
   "name": "Release CS1 (a group setting for post-workout cards and PR notices; adds one nullable column, safe before the code)",
   "steps": [

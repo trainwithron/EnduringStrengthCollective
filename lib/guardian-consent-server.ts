@@ -87,3 +87,15 @@ Spotlight Coaching`
   if (replaceError) console.error("[guardian-consent] could not retire the older request:", replaceError.message);
   return { ok: true };
 }
+
+/**
+ * The groups where this person is a TRAINING client of a live group (not a social-only seat, not a retired/archived group). Only a coach of one of these may void or resend a guardian's permission, the same rule the
+ * database applies to the guardian-consent answer (migration 0418). Pass the signed-in coach's own client, so row security shows only the groups they can see.
+ */
+export async function liveTrainingGroupIds(supabase: any, athleteId: string): Promise<string[]> {
+  const { data: seats } = await supabase.from("group_memberships").select("group_id").eq("profile_id", athleteId).eq("role", "athlete").eq("membership_type", "training");
+  const groupIds = ((seats ?? []) as { group_id: string }[]).map((s) => s.group_id);
+  if (groupIds.length === 0) return [];
+  const { data: live } = await supabase.from("groups").select("id").in("id", groupIds).is("archived_at", null);
+  return ((live ?? []) as { id: string }[]).map((g) => g.id);
+}
