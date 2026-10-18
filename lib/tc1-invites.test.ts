@@ -407,4 +407,23 @@ describe("TC1b: one plain coach list at the top of the Clients page", () => {
     expect(settings).toContain('label="Coaches and invitations"');
     expect(settings).toContain("See your coaches and invite one");
   });
+
+  it("TC1c: the Clients link on a computer lands on /clients, so that coach-level page carries the same Coaches section at the top for every organization", () => {
+    // the real path: the group's clients page sends a computer to /clients unless it is the explicit Members view of a team or social group
+    const group = src("app/(coach)/groups/[groupId]/clients/page.tsx");
+    expect(group).toContain('redirect(search.add === "1" ? "/clients?add=1" : "/clients")');
+    expect(group).toContain("if (!showMembersView && !(await prefersAthleteStyleView()))");
+    // the landing page itself
+    const page = src("app/(coach)/clients/page.tsx");
+    expect(page).toContain('import { CoachesSection } from "@/components/coach/coaches-section";');
+    expect(page).toContain("loadGroupCoaches(anchor.id)");
+    expect(page).toContain("authorizeInviteManager(supabase, user.id, anchor.id)");
+    expect(page).toContain("<CoachesSection groupId={anchor.id} viewerId={user.id} coaches={coachList.coaches} pending={coachList.pending} canManage={inviteManager.ok} />");
+    // above the client list, below the title row, and not behind a team-only condition
+    expect(page.indexOf("<CoachesSection ")).toBeGreaterThan(page.indexOf("<AddClientButton "));
+    expect(page.indexOf("<CoachesSection ")).toBeLessThan(page.indexOf("<CoachClientsList "));
+    expect(page).not.toMatch(/&&s*<CoachesSection /);
+    // a phone is sent to the group page, which has it too
+    expect(page).toContain("redirect(`/groups/${anchor.id}/clients`)");
+  });
 });

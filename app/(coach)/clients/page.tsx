@@ -13,6 +13,9 @@ import { buildCreditPicture, fetchBookingCounts } from "@/lib/credit-picture";
 import { chunk } from "@/lib/chunk";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import type { CoachClientRow } from "@/lib/coach-client-filter";
+import { CoachesSection } from "@/components/coach/coaches-section";
+import { loadGroupCoaches } from "@/lib/pending-coaches";
+import { authorizeInviteManager } from "@/lib/coach-invite-server";
 
 export const metadata = { title: "Clients" };
 
@@ -77,6 +80,9 @@ export default async function CoachClientsPage() {
   const { data: selfProfile } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
   const selfName = (selfProfile?.full_name as string | null | undefined)?.trim() || "You";
 
+  // The plain Coaches list (every coach, who has not accepted yet, Invite a coach) sits at the top of this page for every organization: on a computer the Clients link always lands here.
+  const [coachList, inviteManager] = await Promise.all([loadGroupCoaches(anchor.id), authorizeInviteManager(supabase, user.id, anchor.id)]);
+
   return (
     <CoachDesktopShell groupId={anchor.id} groupName={anchor.name} active="clients" coachLevel>
       <div className="pb-6 border-b border-steel/20 mb-6 flex items-center justify-between gap-4">
@@ -85,6 +91,8 @@ export default async function CoachClientsPage() {
         </h1>
         <AddClientButton groupId={anchor.id} groupName={anchor.name} createdBy={user.id} />
       </div>
+      <CoachesSection groupId={anchor.id} viewerId={user.id} coaches={coachList.coaches} pending={coachList.pending} canManage={inviteManager.ok} />
+
       <CoachClientsList rows={rows} selfName={selfName} />
     </CoachDesktopShell>
   );
