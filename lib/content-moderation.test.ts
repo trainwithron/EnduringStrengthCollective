@@ -36,6 +36,9 @@ describe("blocking hides a member's posts and comments", () => {
   it("the words say nobody is told and how to undo it", () => {
     expect(BLOCK_CONFIRM("Sam")).toContain("They are not told");
     expect(BLOCK_CONFIRM("Sam")).toContain("undo this any time in Settings");
+    // and says plainly what a block covers and what it does not
+    expect(BLOCK_CONFIRM("Sam")).toContain("hides their posts and comments from you");
+    expect(BLOCK_CONFIRM("Sam")).toContain("leaderboard and your notices");
     expect(REPORT_REASON_MAX).toBe(500);
     expect(REPORTED_THANKS).toContain("A coach will take a look");
   });
@@ -72,6 +75,11 @@ describe("how it is wired", () => {
     expect(comments).toContain("withoutBlocked(comments, blocked, (c) => c.author_id)");
     expect(comments).toContain("<ReportAndBlockMenu commentId={comment.id}");
     expect(src("components/feed/user-post-card.tsx")).toContain("<ReportAndBlockMenu postId={post.id}");
+    // a block made on a comment also takes the member's posts out of the feed, and a blocked member is not offered when typing @
+    expect(src("components/feed/report-and-block-menu.tsx")).toContain("window.dispatchEvent(new CustomEvent(BLOCKED_EVENT");
+    expect(list).toContain("window.addEventListener(BLOCKED_EVENT");
+    expect(comments).toContain("window.addEventListener(BLOCKED_EVENT");
+    expect(src("lib/use-mention-autocomplete.ts")).toContain("!blocked.has(m.id)");
     expect(src("app/(coach)/groups/[groupId]/settings/page.tsx")).toContain("<BlockedMembersList initial={blockedMembers} />");
     const page = src("app/(coach)/groups/[groupId]/feed/page.tsx");
     expect(page).toContain("loadBlockedIds(supabase)");
@@ -91,17 +99,37 @@ describe("how it is wired", () => {
     const panel = src("components/feed/reported-content-panel.tsx");
     expect(panel).toContain('.eq("status", "open")');
     expect(panel).not.toContain("reporter_id");
+    expect(panel).toContain("Showing the newest {rows.length} of {total}.");
     expect(src("components/feed/reported-item-actions.tsx")).toContain('rpc("handle_content_report"');
+    expect(src("components/feed/reported-item-actions.tsx")).toContain('rpc("remove_reported_content"');
+    expect(src("components/feed/reported-item-actions.tsx")).toContain("This also removes");
+    expect(src("app/reports/page.tsx")).toContain("<ReportedContentPanel");
     expect(src("app/(coach)/groups/[groupId]/feed/page.tsx")).toContain("<ReportedContentPanel");
   });
 
   it("the migration is the member's own for blocks and the coaches' for reports, with nothing written from a browser", () => {
     const sql = src("supabase/migrations/0411_report_and_block.sql");
-    expect(sql).toContain("revoke all on public.content_reports from anon, authenticated;\ngrant select on public.content_reports to authenticated;");
-    expect(sql).toContain("using (reporter_id = (select auth.uid()) or public.is_group_coach(group_id))");
+    // nobody can select who reported: reporter_id is left out of the granted columns, and nothing selects it
+    const grant = /grant select \(([^)]*)\) on public\.content_reports to authenticated;/.exec(sql)?.[1] ?? "";
+    expect(grant).toContain("content_excerpt");
+    expect(grant).not.toContain("reporter_id");
+    expect(sql).toContain("revoke all on public.content_reports from anon, authenticated;");
+    // who handles a report: the group's coaches except the person reported, else the organization's owner/admins, else the platform administrators
+    expect(sql).toContain("gm.profile_id is distinct from p_author");
+    expect(sql).toContain("om.profile_id is distinct from p_author");
+    expect(sql).toContain("union all select id from org_admins where not exists (select 1 from coaches)");
+    expect(sql).toContain("where not exists (select 1 from coaches) and not exists (select 1 from org_admins)");
+    expect(sql).toContain("using (public.can_handle_content_report(group_id, reported_author_id))");
+    // the cap, the double tap, and the kept copy
+    expect(sql).toContain(">= 20 then");
+    expect(sql).toContain("exception when unique_violation then");
+    expect(sql).toContain("content_excerpt text");
+    expect(sql).toContain("post_id uuid references public.posts(id) on delete set null");
     expect(sql).toContain("using (blocker_id = (select auth.uid()))");
     expect(sql).toContain("create policy \"org_wall_header\" on public.content_reports as restrictive for all");
-    expect(sql).not.toMatch(/delete from public\.(posts|comments)/);
+    // nothing is deleted except by a handler through remove_reported_content
+    expect((sql.match(/delete from public\.(posts|comments)/g) ?? []).length).toBe(2);
+    expect(sql).toContain("create or replace function public.remove_reported_content");
   });
 
   it("a notice for the coaches is pushed with nothing on the lock screen but 'Open the app to review it.'", () => {

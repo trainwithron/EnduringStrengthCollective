@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { loadBlockedIds } from "@/lib/blocked-members";
 
 export interface MentionCandidate {
   id: string;
@@ -25,17 +26,18 @@ export function useMentionAutocomplete(groupId: string | null) {
   useEffect(() => {
     if (!groupId) return;
     const supabase = createBrowserClient();
-    supabase
-      .from("group_memberships")
-      .select("profile_id, profiles ( full_name )")
-      .eq("group_id", groupId)
-      .then(({ data }) => {
-        setMembers(
-          (data ?? [])
-            .map((r: any) => ({ id: r.profile_id, fullName: r.profiles?.full_name ?? "" }))
-            .filter((m) => m.fullName)
-        );
-      });
+    // A member the person has blocked is not offered when they type @ (blocking hides them, it should not also suggest them).
+    Promise.all([
+      supabase.from("group_memberships").select("profile_id, profiles ( full_name )").eq("group_id", groupId),
+      loadBlockedIds(supabase),
+    ]).then(([{ data }, blockedIds]) => {
+      const blocked = new Set(blockedIds);
+      setMembers(
+        (data ?? [])
+          .map((r: any) => ({ id: r.profile_id, fullName: r.profiles?.full_name ?? "" }))
+          .filter((m) => m.fullName && !blocked.has(m.id))
+      );
+    });
   }, [groupId]);
 
   function detectMentionQuery(value: string): string | null {

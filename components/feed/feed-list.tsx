@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { FeedChannel, FeedPost } from "@/lib/types";
 import { PostCard } from "./post-card";
-import { withoutBlocked } from "@/lib/content-moderation";
+import { BLOCKED_EVENT, withoutBlocked } from "@/lib/content-moderation";
 
 export function FeedList({
   groupId,
@@ -31,6 +31,11 @@ export function FeedList({
   const [blocked, setBlocked] = useState<ReadonlySet<string>>(new Set(blockedIds));
   const onBlocked = (authorId: string) => setBlocked((prev) => new Set([...prev, authorId]));
   const visiblePosts = withoutBlocked(posts, blocked, (p) => p.author.id);
+  useEffect(() => {
+    const on = (e: Event) => onBlocked(String((e as CustomEvent).detail));
+    window.addEventListener(BLOCKED_EVENT, on);
+    return () => window.removeEventListener(BLOCKED_EVENT, on);
+  }, []);
 
   useEffect(() => {
     if (!highlightPostId) return;

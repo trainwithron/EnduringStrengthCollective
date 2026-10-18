@@ -4,7 +4,10 @@
 export const REPORT_REASON_MAX = 500;
 
 export const BLOCK_CONFIRM = (name: string) =>
-  `Block ${name}? You will no longer see their posts or comments. They are not told. You can undo this any time in Settings.`;
+  `Block ${name}? This hides their posts and comments from you. You may still see them elsewhere, such as the leaderboard and your notices. They are not told. You can undo this any time in Settings.`;
+
+// The browser event a block sends so every open list (the feed, an open comment section) drops that member at once.
+export const BLOCKED_EVENT = "spotlight:blocked";
 export const REPORTED_THANKS = "Reported. A coach will take a look. Thank you.";
 
 // Leaves out what a blocked member wrote. Works on anything with an author id (a feed post, a comment row).

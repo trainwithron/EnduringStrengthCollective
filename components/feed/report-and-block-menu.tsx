@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { confirmDialog } from "@/components/shared/confirm-dialog";
-import { BLOCK_CONFIRM, REPORTED_THANKS, REPORT_REASON_MAX, firstNameOf } from "@/lib/content-moderation";
+import { BLOCKED_EVENT, BLOCK_CONFIRM, REPORTED_THANKS, REPORT_REASON_MAX, firstNameOf } from "@/lib/content-moderation";
 
 // A small "More" control on someone else's post or comment: Report it, or Block the person. Nothing is hidden or deleted by a report (the group's coaches look at it); a block hides that member's posts and comments from
 // the person who blocked, nobody is told. Both say plainly whether they worked.
@@ -66,6 +66,8 @@ export function ReportAndBlockMenu({
       return;
     }
     onBlocked(authorId);
+    // Tell every open list, so the member's posts leave the feed as well as the comments.
+    window.dispatchEvent(new CustomEvent(BLOCKED_EVENT, { detail: authorId }));
   }
 
   if (message) return <span className="font-body text-xs text-steel">{message}</span>;

@@ -87,6 +87,8 @@ export const ACL_REVIEWED = [
   "close_organization", "remove_org_member", "set_org_member_role",
   // Release CM1: checks the caller inside (signed in, a member of the post's group, not the author) through a local copy of auth.uid(), which this list does not recognise by pattern
   "report_content",
+  // Release CM1: these check the caller through can_handle_content_report (signed in, and one of those who handle that report, never the person reported), which this list does not recognise by name
+  "handle_content_report", "remove_reported_content", "reported_comment_reply_count",
 ];
 
 const quote = (names) => names.map((n) => `'${n}'`).join(", ");

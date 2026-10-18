@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ReportAndBlockMenu } from "./report-and-block-menu";
 import { loadBlockedIds } from "@/lib/blocked-members";
-import { withoutBlocked } from "@/lib/content-moderation";
+import { BLOCKED_EVENT, withoutBlocked } from "@/lib/content-moderation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { Trash2 } from "lucide-react";
 import { renderWithMentions } from "./mention-text";
@@ -243,6 +243,11 @@ export function InlineCommentSection({
   const repliesTo = (parentId: string) =>
     shown.filter((c) => c.parent_comment_id === parentId);
   const onBlocked = (authorId: string) => setBlocked((prev) => new Set([...prev, authorId]));
+  useEffect(() => {
+    const on = (e: Event) => setBlocked((prev) => new Set([...prev, String((e as CustomEvent).detail)]));
+    window.addEventListener(BLOCKED_EVENT, on);
+    return () => window.removeEventListener(BLOCKED_EVENT, on);
+  }, []);
 
   const canDelete = (comment: CommentRow) => comment.author_id === viewerId || isCoach;
   const replyTarget = replyTo ? comments.find((c) => c.id === replyTo) : null;
