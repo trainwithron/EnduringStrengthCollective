@@ -416,7 +416,7 @@ describe("TC1b: one plain coach list at the top of the Clients page", () => {
     // the landing page itself
     const page = src("app/(coach)/clients/page.tsx");
     expect(page).toContain('import { CoachesSection } from "@/components/coach/coaches-section";');
-    expect(page).toContain("loadGroupCoaches(anchor.id)");
+    expect(page).toContain("loadOrgCoaches(anchor.id)");
     expect(page).toContain("authorizeInviteManager(supabase, user.id, anchor.id)");
     expect(page).toContain("<CoachesSection groupId={anchor.id} viewerId={user.id} coaches={coachList.coaches} pending={coachList.pending} canManage={inviteManager.ok} />");
     // above the client list, below the title row, and not behind a team-only condition

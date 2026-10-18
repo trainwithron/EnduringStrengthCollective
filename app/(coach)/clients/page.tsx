@@ -14,7 +14,7 @@ import { chunk } from "@/lib/chunk";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import type { CoachClientRow } from "@/lib/coach-client-filter";
 import { CoachesSection } from "@/components/coach/coaches-section";
-import { loadGroupCoaches } from "@/lib/pending-coaches";
+import { loadOrgCoaches } from "@/lib/pending-coaches";
 import { authorizeInviteManager } from "@/lib/coach-invite-server";
 
 export const metadata = { title: "Clients" };
@@ -76,12 +76,16 @@ export default async function CoachClientsPage() {
     };
   });
 
+  // An organization whose clients all sit in team-sport groups gets one view of its athletes (no Cards/List, no kind filters).
+  const teamModeRows = groupIds.length > 0 ? await supabase.from("groups").select("id, team_mode").in("id", groupIds.slice(0, 200)) : { data: [] as { id: string; team_mode: boolean | null }[] };
+  const oneView = groupIds.length > 0 && groupIds.length <= 200 && ((teamModeRows.data ?? []) as { id: string; team_mode: boolean | null }[]).filter((g) => g.team_mode === true).length === groupIds.length;
+
   // The coach's own row (their personal space): shown in every organization they coach in, never counted as a client.
   const { data: selfProfile } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
   const selfName = (selfProfile?.full_name as string | null | undefined)?.trim() || "You";
 
-  // The plain Coaches list (every coach, who has not accepted yet, Invite a coach) sits at the top of this page for every organization: on a computer the Clients link always lands here.
-  const [coachList, inviteManager] = await Promise.all([loadGroupCoaches(anchor.id), authorizeInviteManager(supabase, user.id, anchor.id)]);
+  // The plain Coaches list (every coach of the organization once, who has not accepted yet, Invite a coach) sits at the top of this page for every organization: on a computer the Clients link always lands here.
+  const [coachList, inviteManager] = await Promise.all([loadOrgCoaches(anchor.id), authorizeInviteManager(supabase, user.id, anchor.id)]);
 
   return (
     <CoachDesktopShell groupId={anchor.id} groupName={anchor.name} active="clients" coachLevel>
@@ -93,7 +97,7 @@ export default async function CoachClientsPage() {
       </div>
       <CoachesSection groupId={anchor.id} viewerId={user.id} coaches={coachList.coaches} pending={coachList.pending} canManage={inviteManager.ok} />
 
-      <CoachClientsList rows={rows} selfName={selfName} />
+      <CoachClientsList rows={rows} selfName={selfName} oneView={oneView} />
     </CoachDesktopShell>
   );
 }

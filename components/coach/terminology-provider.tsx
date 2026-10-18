@@ -4,18 +4,22 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { TermForm, TermKey, TermOverride, TerminologyOverrides } from "@/lib/terminology";
 import { termText } from "@/lib/term-text";
+import { isTeamSportGroup, withTeamSportWords } from "@/lib/team-sport";
 
 interface TerminologyContextValue {
   overrides: TerminologyOverrides;
   setOverride: (key: TermKey, override: TermOverride | null) => void;
   // True inside a TerminologyProvider; lets a control (the chooser) reuse the page's own vocabulary when there is one.
   mounted: boolean;
+  // The page's group is a team-sport group (its words default to "athletes").
+  teamSport: boolean;
 }
 
 const TerminologyContext = createContext<TerminologyContextValue>({
   overrides: {},
   setOverride: () => {},
   mounted: false,
+  teamSport: false,
 });
 
 // One coach-wide (per-org) vocabulary preference, fetched once and held
@@ -36,7 +40,8 @@ export function TerminologyProvider({
   // no current group yet (e.g. a brand-new coach's first Home visit).
   groupId?: string;
 }) {
-  const [overrides, setOverrides] = useState<TerminologyOverrides>({});
+  const [saved, setOverrides] = useState<TerminologyOverrides>({});
+  const [teamSport, setTeamSport] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,10 +56,11 @@ export function TerminologyProvider({
       if (groupId) {
         const { data: group } = await supabase
           .from("groups")
-          .select("organization_id")
+          .select("organization_id, team_mode")
           .eq("id", groupId)
           .maybeSingle();
         organizationId = group?.organization_id ?? null;
+        if (!cancelled) setTeamSport(isTeamSportGroup((group as { team_mode?: boolean | null } | null)?.team_mode));
       }
 
       const { data: membership } = organizationId
@@ -103,7 +109,9 @@ export function TerminologyProvider({
     }).catch(() => {});
   }
 
-  return <TerminologyContext.Provider value={{ overrides, setOverride, mounted: true }}>{children}</TerminologyContext.Provider>;
+  // A team-sport group reads "athletes" unless the coach picked their own word.
+  const overrides = withTeamSportWords(saved, teamSport);
+  return <TerminologyContext.Provider value={{ overrides, setOverride, mounted: true, teamSport }}>{children}</TerminologyContext.Provider>;
 }
 
 export function useTerminology() {

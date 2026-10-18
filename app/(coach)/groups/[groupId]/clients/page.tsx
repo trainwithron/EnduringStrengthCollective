@@ -399,7 +399,7 @@ export default async function ClientsPage(
       {rosterError ? (
         <UnavailableState what="your clients" />
       ) : (
-        <ClientCardGrid groupId={params.groupId} members={athletes} positions={positions} />
+        <ClientCardGrid groupId={params.groupId} members={athletes} positions={positions} teamSport={group?.team_mode === true} />
       )}
 
       <RemovedClientsPanel removals={removed} />

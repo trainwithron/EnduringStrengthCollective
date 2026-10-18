@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const shell = readFileSync(join(__dirname, "..", "coach-desktop-shell.tsx"), "utf8").replace(/\r\n/g, "\n");
-const nav = shell.slice(shell.indexOf("const nav: NavEntry[] = ["), shell.indexOf("const groupHasActiveChild"));
+const nav = shell.slice(shell.indexOf("const ordinaryNav: NavEntry[] = ["), shell.indexOf("// The team-sport menu:"));
 
 describe("the three look-alike rail icons are now different", () => {
   it("Clients is a single person", () => {

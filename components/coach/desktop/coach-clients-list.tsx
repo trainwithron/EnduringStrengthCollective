@@ -12,11 +12,13 @@ const KIND_LABEL = { one_on_one: "1-on-1", online: "Online", group: "Group" } as
 
 // The coach-level Clients list: every client once, wherever the coach is standing. Filters for how they work with the coach, a name search, and one quiet number
 // per client (sessions still to schedule). Tapping a client opens their space.
-export function CoachClientsList({ rows, selfName = null }: { rows: CoachClientRow[]; selfName?: string | null }) {
+export function CoachClientsList({ rows, selfName = null, oneView = false }: { rows: CoachClientRow[]; selfName?: string | null; oneView?: boolean }) {
   const [filter, setFilter] = useState<ClientFilter>("all");
   const [query, setQuery] = useState("");
   // Cards by default; the coach's last choice is read once the page is on screen (never during the server render, so the two always agree first).
-  const [view, setView] = useState<ClientsView>(DEFAULT_CLIENTS_VIEW);
+  const [savedView, setView] = useState<ClientsView>(DEFAULT_CLIENTS_VIEW);
+  // A team-sport organization has one view (the list): no Cards/List choice and no 1-on-1/Online/Group filters.
+  const view: ClientsView = oneView ? "list" : savedView;
   useEffect(() => {
     setView(readClientsView(typeof window === "undefined" ? null : window.localStorage));
   }, []);
@@ -30,7 +32,7 @@ export function CoachClientsList({ rows, selfName = null }: { rows: CoachClientR
   return (
     <div>
       <div className="flex flex-wrap items-center gap-2 mb-4">
-        {FILTERS.map((f) => (
+        {!oneView && FILTERS.map((f) => (
           <button
             key={f}
             type="button"
@@ -41,6 +43,7 @@ export function CoachClientsList({ rows, selfName = null }: { rows: CoachClientR
             {FILTER_LABELS[f]} <span className={filter === f ? "text-graphite/80" : "text-steel"}>{counts[f]}</span>
           </button>
         ))}
+        {!oneView && (
         <div role="group" aria-label="View" className="ml-auto flex border border-steel/40 shrink-0">
           {(["cards", "list"] as const).map((v) => (
             <button
@@ -55,6 +58,7 @@ export function CoachClientsList({ rows, selfName = null }: { rows: CoachClientR
             </button>
           ))}
         </div>
+        )}
         <label className="relative block w-full sm:w-64">
           <span className="sr-only">Search clients</span>
           <Search className="w-3.5 h-3.5 text-steel absolute left-2.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
