@@ -37,6 +37,7 @@ import { addDaysToKey } from "@/lib/date-key";
 import { fetchFoodLogDay } from "@/lib/food-entry";
 import { AiBudgetMeter } from "@/components/coach/ai-budget-meter";
 import { retryState as retryStateFor, type RetryState } from "@/lib/meal-plan-retry";
+import { ClientGroceryList } from "@/components/athlete/client-grocery-list";
 
 export default async function NutritionPage(
   props: {
@@ -514,6 +515,8 @@ export default async function NutritionPage(
               </p>
             )}
           </section>
+
+          {macrosEnabled && <ClientGroceryList athleteId={athleteId} todayKey={todayKey} metric={weightUnit === "kg"} rules={clientRules} />}
 
           {!trackingOn && nutrientData && planEstimate && (
             <LogNutrients

@@ -114,3 +114,4 @@
 - Home tiles: "Roster" / "Your players, their positions and seasons."; "Depth chart" / "Who plays where, by position."; "Practices and games" / "The team calendar."; "Attendance" / "Who was there, day by day."; "Weight room" / "Check players in at the kiosk."; "TV display" / "Put the board on the weight-room screen."
 - Release Y1: "Clients are already training on this program, so the AI will not change it. Make a copy first (Assign to clients makes one), then use the AI on the copy."
 - Release B2: "None of the suggestions landed close enough to this meal's macros, so none is shown. Try again."
+- Release B4: 'Your grocery list'; 'Grocery list' (print title); "Your coach hasn't saved a meal plan for the coming week yet. Your grocery list appears here once they do."; 'Ask your coach how much.'; "Your grocery list could not be read just now. Reload the page to try again."; "Your grocery list isn't available right now. Your coach is updating your meals."
