@@ -10,6 +10,7 @@ const LABEL: Record<WeekStatus, string> = {
   no_target: "No target set",
   tracking_off: "Food tracking off",
   on_track: "On track",
+  logged: "Logged",
 };
 const TONE: Record<WeekStatus, string> = {
   nothing_logged: "text-rust",
@@ -18,6 +19,7 @@ const TONE: Record<WeekStatus, string> = {
   no_target: "text-steel",
   tracking_off: "text-steel",
   on_track: "text-chalk",
+  logged: "text-chalk",
 };
 
 const num = (n: number | null, suffix = "") => (n == null ? "–" : `${n}${suffix}`);
@@ -53,7 +55,7 @@ export async function WeeklyNutritionSection({ groupId, clients }: { groupId: st
         The last seven days for each client: what they logged, on the days they logged, against their target. The ones who need you come first. Open a client to see the detail.
       </p>
       <p className="font-body text-xs text-steel mb-3">
-        {(["nothing_logged", "under", "over", "no_target", "tracking_off", "on_track"] as WeekStatus[])
+        {(["nothing_logged", "under", "over", "no_target", "tracking_off", "on_track", "logged"] as WeekStatus[])
           .filter((s) => (counts.get(s) ?? 0) > 0)
           .map((s) => `${counts.get(s)} ${LABEL[s].toLowerCase()}`)
           .join(" · ")}
@@ -81,8 +83,9 @@ export async function WeeklyNutritionSection({ groupId, clients }: { groupId: st
                   </Link>
                   {r.suggestionsOff && <span className="block text-xs text-steel">No automatic suggestions</span>}
                 </th>
-                <td className={`p-3 ${TONE[r.status]}`}>
-                  {LABEL[r.status]}
+                {/* A client who is not judged (automatic suggestions off, or not a confirmed adult) reads "Logged 4 of 7 days" in the plain colour: no under or over, no percent, no red. */}
+                <td className={`p-3 ${r.neutral ? "text-chalk" : TONE[r.status]}`}>
+                  {r.status === "logged" ? `Logged ${r.daysLogged} of 7 days` : LABEL[r.status]}
                   {r.calorieGapPct != null && r.status !== "on_track" && <span className="text-xs"> ({r.calorieGapPct > 0 ? "+" : ""}{r.calorieGapPct}%)</span>}
                 </td>
                 <td className="p-3 text-right">{r.daysLogged} of 7</td>
