@@ -34,8 +34,8 @@ import { useTerm } from "@/components/coach/terminology-provider";
 import { SignOutButton } from "@/components/group/sign-out-button";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
 import { ViewModeToggle } from "@/components/coach/view-mode-toggle";
-import { useCoachType } from "@/components/coach/use-coach-type";
-import { hiddenForCoachType } from "@/lib/team-coach";
+import { useCoachNavFacts } from "@/components/coach/use-coach-type";
+import { hiddenForCoach } from "@/lib/team-coach";
 
 // The actual nav-link content shared by two different overlay shells:
 // CoachMoreSheet (CoachDesktopShell's own narrow-width "More" fallback,
@@ -68,7 +68,7 @@ function Item({ href, label, icon: Icon }: { href: string; label: string; icon: 
 // are coach-level pages that show every client no matter which group the coach last looked at.
 export function CoachNavLinksList({ groupId }: { groupId: string; groupName?: string }) {
   const t = useTerm();
-  const coachType = useCoachType();
+  const navFacts = useCoachNavFacts();
   const [teamMode, setTeamMode] = useState(false);
   // A one-on-one space has no team feed, so the entry is hidden there (the desktop menu does the same).
   const [groupKind, setGroupKind] = useState<string | null>(null);
@@ -109,7 +109,7 @@ export function CoachNavLinksList({ groupId }: { groupId: string; groupName?: st
         <Item href={`/groups/${groupId}/programs`} label="Programs" icon={LayoutGrid} />
         <Item href={`/groups/${groupId}/exercise-library`} label="Exercise library" icon={Dumbbell} />
         <Item href={`/groups/${groupId}/nutrition`} label="Nutrition" icon={Salad} />
-        {!hiddenForCoachType(coachType, "availability") && <Item href={`/groups/${groupId}/availability`} label="Availability" icon={CalendarClock} />}
+        {!hiddenForCoach(navFacts, "availability") && <Item href={`/groups/${groupId}/availability`} label="Availability" icon={CalendarClock} />}
         <Item href={`/groups/${groupId}/business`} label="Business overview" icon={TrendingUp} />
         <Item href={`/groups/${groupId}/settings`} label="Settings" icon={Settings} />
         <div className="flex items-center h-11 px-5 [&_button]:text-sm [&_button]:text-chalk [&_button]:gap-3 [&_svg]:w-4 [&_svg]:h-4 [&_svg]:text-steel">
@@ -128,11 +128,11 @@ export function CoachNavLinksList({ groupId }: { groupId: string; groupName?: st
           </summary>
           <div className="pb-2">
             <GroupHeader label={`${t("client", "plural", { cap: true })} and ${t("session", "plural")}`} icon={Users2} />
-            {!hiddenForCoachType(coachType, "booking-page") && <Item href={`/groups/${groupId}/business/booking-page`} label="Booking page" icon={Link2} />}
+            {!hiddenForCoach(navFacts, "booking-page") && <Item href={`/groups/${groupId}/business/booking-page`} label="Booking page" icon={Link2} />}
             <Item href={`/groups/${groupId}/group-sessions`} label="Group sessions" icon={Users2} />
-            {!hiddenForCoachType(coachType, "session-types") && <Item href={`/groups/${groupId}/business/session-types`} label="Session types" icon={Tag} />}
-            {!hiddenForCoachType(coachType, "session-ledger") && <Item href={`/groups/${groupId}/business/session-ledger`} label="Session ledger" icon={Wallet} />}
-            {!hiddenForCoachType(coachType, "leads") && <Item href={`/groups/${groupId}/business/leads`} label="Leads" icon={UserPlus} />}
+            {!hiddenForCoach(navFacts, "session-types") && <Item href={`/groups/${groupId}/business/session-types`} label="Session types" icon={Tag} />}
+            {!hiddenForCoach(navFacts, "session-ledger") && <Item href={`/groups/${groupId}/business/session-ledger`} label="Session ledger" icon={Wallet} />}
+            {!hiddenForCoach(navFacts, "leads") && <Item href={`/groups/${groupId}/business/leads`} label="Leads" icon={UserPlus} />}
 
             <GroupHeader label="Business" icon={TrendingUp} />
             <Item href={`/groups/${groupId}/business/packages`} label="Packages" icon={Layers} />
@@ -144,7 +144,7 @@ export function CoachNavLinksList({ groupId }: { groupId: string; groupName?: st
             {groupKind !== "one_on_one" && <Item href={`/groups/${groupId}/feed`} label="Team feed" icon={MessagesSquare} />}
             <Item href={`/groups/${groupId}/challenges`} label="Challenges" icon={Flag} />
             <Item href={`/groups/${groupId}/records`} label="Hall of fame" icon={Trophy} />
-            {!hiddenForCoachType(coachType, "resources") && <Item href={`/groups/${groupId}/resources`} label="Resources" icon={HeartHandshake} />}
+            {!hiddenForCoach(navFacts, "resources") && <Item href={`/groups/${groupId}/resources`} label="Resources" icon={HeartHandshake} />}
             <Item href={`/groups/${groupId}/quick-tips`} label="Quick tips" icon={Lightbulb} />
             {teamMode && (
               <>

@@ -47,6 +47,8 @@ const REVIEWED_PERMISSION_ONLY = new Set([
   "components/coach/desktop/workspace-menu.tsx",
   "components/coach/mobile/spot-clients-groups-panel.tsx",
   "components/timezone-capture.tsx",
+  // only decides whether the menus show the selling tools: it asks if the coach has any client of their own in their one-on-one spaces (one row), nothing is listed or shown
+  "components/coach/use-coach-type.ts",
   "lib/collective-intelligence-lookups.ts",
   "lib/marketplace-outcome-gather.ts",
   "lib/package-program-access.ts",

@@ -1,51 +1,148 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { TEAM_COACH_HIDDEN_NAV, hiddenForCoachType, teamHomeTiles } from "./team-coach";
+
+const db = vi.hoisted(() => ({
+  userId: "u1" as string | null,
+  coachType: "team" as string | null,
+  roles: [] as { role: string }[],
+  coached: [] as { group_id: string; groups: { group_kind: string } }[],
+  others: [] as { profile_id: string }[],
+  fail: false,
+}));
+
+vi.mock("@/lib/supabase/client", () => ({
+  createBrowserClient: () => ({
+    auth: { getUser: async () => ({ data: { user: db.userId ? { id: db.userId } : null } }) },
+    from(table: string) {
+      const result = (data: unknown) => ({ data: db.fail ? null : data, error: db.fail ? { message: "x" } : null });
+      if (table === "profiles") return { select: () => ({ eq: () => ({ maybeSingle: async () => result({ coach_type: db.coachType }) }) }) };
+      if (table === "organization_memberships") return { select: () => ({ eq: async () => result(db.roles) }) };
+      // group_memberships: the coach's own seats, then the other people in their one-on-one spaces
+      return {
+        select: (cols: string) =>
+          cols.includes("groups (")
+            ? { eq: () => ({ eq: async () => result(db.coached) }) }
+            : { in: () => ({ eq: () => ({ neq: () => ({ limit: async () => result(db.others) }) }) }) },
+      };
+    },
+  }),
+}));
+
+import { loadCoachNavFacts, resetCoachNavFacts } from "@/components/coach/use-coach-type";
+import { TEAM_COACH_HIDDEN_NAV, hiddenForCoach, pickTileTeam, teamHomeTiles, tradesMenusAsTeamCoach } from "./team-coach";
 
 const src = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
+const team = { coachType: "team" as const, hasOneOnOneClients: false, isOrgOwnerOrAdmin: false };
 
-describe("the team coach's menus and Home", () => {
-  it("a team coach does not see the tools for selling to clients; nobody else loses anything", () => {
+describe("the team coach's menus", () => {
+  it("a coach who only coaches teams does not see the tools for selling to clients; nobody else loses anything", () => {
     for (const key of ["resources", "website", "availability", "session-types", "booking-page", "leads", "session-ledger"]) {
-      expect(hiddenForCoachType("team", key), key).toBe(true);
-      expect(hiddenForCoachType("personal", key), key).toBe(false);
-      expect(hiddenForCoachType("gym", key), key).toBe(false);
-      expect(hiddenForCoachType(null, key), key).toBe(false);
+      expect(hiddenForCoach(team, key), key).toBe(true);
+      expect(hiddenForCoach({ ...team, coachType: "personal" }, key), key).toBe(false);
+      expect(hiddenForCoach({ ...team, coachType: "gym" }, key), key).toBe(false);
+      expect(hiddenForCoach({ ...team, coachType: null }, key), key).toBe(false);
+      expect(hiddenForCoach(null, key), key).toBe(false);
     }
-    // what a team coach still needs stays
-    for (const key of ["business", "packages", "waiver", "branding", "settings", "kiosk", "display", "team", "attendance", "programs"]) expect(hiddenForCoachType("team", key), key).toBe(false);
+    for (const key of ["business", "packages", "waiver", "branding", "settings", "kiosk", "display", "team", "attendance", "programs"]) expect(hiddenForCoach(team, key), key).toBe(false);
     expect(TEAM_COACH_HIDDEN_NAV.size).toBe(7);
   });
 
-  it("the team Home has a tile for the roster, the depth chart, practices and games, attendance, the weight room and the TV display", () => {
-    const tiles = teamHomeTiles("g1");
-    expect(tiles.map((t) => t.key)).toEqual(["roster", "depth", "calendar", "attendance", "weight-room", "tv"]);
-    expect(tiles.find((t) => t.key === "roster")!.href).toBe("/groups/g1/clients?view=members");
-    expect(tiles.find((t) => t.key === "depth")!.href).toBe("/groups/g1/team");
-    expect(tiles.find((t) => t.key === "calendar")!.href).toBe("/groups/g1/team/calendar");
-    expect(tiles.find((t) => t.key === "weight-room")!.href).toBe("/groups/g1/kiosk");
-    expect(tiles.find((t) => t.key === "tv")).toMatchObject({ href: "/groups/g1/display", newTab: true });
+  it("but a team coach who has a one-on-one client, or owns or administers an organization, keeps every menu (they use those tools)", () => {
+    expect(tradesMenusAsTeamCoach(team)).toBe(true);
+    expect(tradesMenusAsTeamCoach({ ...team, hasOneOnOneClients: true })).toBe(false);
+    expect(tradesMenusAsTeamCoach({ ...team, isOrgOwnerOrAdmin: true })).toBe(false);
+    expect(hiddenForCoach({ ...team, hasOneOnOneClients: true }, "booking-page")).toBe(false);
+    expect(hiddenForCoach({ ...team, isOrgOwnerOrAdmin: true }, "leads")).toBe(false);
   });
 
-  it("every tile points at a page that exists", () => {
-    for (const path of ["team/page.tsx", "team/calendar", "attendance/page.tsx", "kiosk/page.tsx", "display/page.tsx"]) {
-      expect(() => readFileSync(join(__dirname, "..", "app/(coach)/groups/[groupId]", path.endsWith(".tsx") ? path : `${path}/page.tsx`), "utf8"), path).not.toThrow();
+  it("Settings says so, and the desktop and phone menus apply it", () => {
+    expect(src("components/coach/coach-type-setting.tsx")).toContain("they always stay if you have a one-on-one client or own or administer an organization");
+    expect(src("components/coach/coach-desktop-shell.tsx")).toContain("hiddenForCoach(navFacts, i.key)");
+    const phone = src("components/coach/mobile/coach-nav-links-list.tsx");
+    for (const key of ["availability", "booking-page", "session-types", "session-ledger", "leads", "resources"]) expect(phone, key).toContain(`hiddenForCoach(navFacts, "${key}")`);
+  });
+});
+
+describe("what the menus know about the coach", () => {
+  beforeEach(() => {
+    resetCoachNavFacts();
+    Object.assign(db, { userId: "u1", coachType: "team", roles: [], coached: [], others: [], fail: false });
+  });
+
+  it("reads what they coach, whether they have a one-on-one client and whether they own or administer an organization", async () => {
+    expect((await loadCoachNavFacts())!.facts).toEqual({ coachType: "team", hasOneOnOneClients: false, isOrgOwnerOrAdmin: false });
+    resetCoachNavFacts();
+    db.roles = [{ role: "admin" }];
+    db.coached = [{ group_id: "g1", groups: { group_kind: "one_on_one" } }];
+    db.others = [{ profile_id: "client" }];
+    expect((await loadCoachNavFacts())!.facts).toEqual({ coachType: "team", hasOneOnOneClients: true, isOrgOwnerOrAdmin: true });
+  });
+
+  it("their own personal space (a one-on-one with nobody else in it) is not a client", async () => {
+    db.coached = [{ group_id: "g1", groups: { group_kind: "one_on_one" } }];
+    db.others = [];
+    expect((await loadCoachNavFacts())!.facts.hasOneOnOneClients).toBe(false);
+  });
+
+  it("a change in Settings shows at once: the cache is reset", async () => {
+    expect((await loadCoachNavFacts())!.facts.coachType).toBe("team");
+    db.coachType = "personal";
+    expect((await loadCoachNavFacts())!.facts.coachType).toBe("team"); // still the kept answer
+    resetCoachNavFacts();
+    expect((await loadCoachNavFacts())!.facts.coachType).toBe("personal");
+    expect(src("components/coach/coach-type-setting.tsx")).toContain("resetCoachNavFacts();");
+  });
+
+  it("a different person signing in on the same page never sees the first person's answer", async () => {
+    expect((await loadCoachNavFacts())!.facts.coachType).toBe("team");
+    db.userId = "u2";
+    db.coachType = "gym";
+    const second = await loadCoachNavFacts();
+    expect(second!.userId).toBe("u2");
+    expect(second!.facts.coachType).toBe("gym");
+  });
+
+  it("a failed read, or nobody signed in yet, is never kept", async () => {
+    db.fail = true;
+    expect(await loadCoachNavFacts()).toBeNull();
+    db.fail = false;
+    expect((await loadCoachNavFacts())!.facts.coachType).toBe("team");
+    resetCoachNavFacts();
+    db.userId = null;
+    expect(await loadCoachNavFacts()).toBeNull();
+    db.userId = "u1";
+    expect(await loadCoachNavFacts()).not.toBeNull();
+  });
+});
+
+describe("the team Home", () => {
+  it("has a tile for the roster, the depth chart, practices and games, attendance, the weight room and the TV display, each pointing at a real page", () => {
+    const tiles = teamHomeTiles("g1");
+    expect(tiles.map((t) => t.key)).toEqual(["roster", "depth", "calendar", "attendance", "weight-room", "tv"]);
+    expect(tiles.find((t) => t.key === "tv")).toMatchObject({ href: "/groups/g1/display", newTab: true });
+    for (const path of ["team/page.tsx", "team/calendar/page.tsx", "attendance/page.tsx", "kiosk/page.tsx", "display/page.tsx"]) {
+      expect(() => readFileSync(join(__dirname, "..", "app/(coach)/groups/[groupId]", path), "utf8"), path).not.toThrow();
     }
   });
 
-  it("the desktop menu and the phone menu both apply it, and Home shows the tiles only to a team coach", () => {
-    expect(src("components/coach/coach-desktop-shell.tsx")).toContain("hiddenForCoachType(coachType, i.key)");
-    const phone = src("components/coach/mobile/coach-nav-links-list.tsx");
-    for (const key of ["availability", "booking-page", "session-types", "session-ledger", "leads", "resources"]) expect(phone, key).toContain(`hiddenForCoachType(coachType, "${key}")`);
-    const home = src("app/(coach)/dashboard/page.tsx");
-    expect(home).toContain('coach_type?: string | null } | null)?.coach_type === "team"');
-    expect(home).toContain("{isTeamCoach && teamGroups[0] && <TeamCoachHome");
+  it("the tiles are for a team the coach really coaches: the one they last worked in, else the first by name", () => {
+    const teams = [
+      { id: "b", name: "Varsity" },
+      { id: "a", name: "JV" },
+    ];
+    expect(pickTileTeam([], null)).toBeNull();
+    expect(pickTileTeam(teams, "b")!.id).toBe("b");
+    expect(pickTileTeam(teams, "someone-elses")!.id).toBe("a");
+    expect(pickTileTeam(teams, null)!.id).toBe("a");
   });
 
-  it("a coach whose type is unknown (never asked, or a failed read) keeps the menus exactly as they were", () => {
-    const hook = src("components/coach/use-coach-type.ts");
-    expect(hook).toContain("return isCoachType(value) ? value : null;");
-    expect(hook).toContain("catch {\n        return null;");
+  it("Home builds the list from the coach's own teams, shows a switcher for several, and its team cards leave out retired seasons", () => {
+    const home = src("app/(coach)/dashboard/page.tsx");
+    expect(home).toContain('coachedForOrg.filter((g) => g.kind === "team"');
+    expect(home).toContain("pickTileTeam(tileTeams, rememberedWorkspace)");
+    expect(home).toContain("if (g && !g.archived_at) byId.set(g.id, g);");
+    expect(home).toContain("if (!(g as GroupRow).archived_at) byId.set(g.id, g as GroupRow);");
+    expect(src("components/coach/team-coach-home.tsx")).toContain("teams.length > 1");
   });
 });

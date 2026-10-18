@@ -45,8 +45,8 @@ import { DownloadAppButton } from "@/components/coach/desktop/download-app-butto
 import { FeedbackButton } from "@/components/feedback/feedback-button";
 import { ClientFinder } from "@/components/coach/desktop/client-finder";
 import { HeaderNotificationBell } from "@/components/notifications/header-bell";
-import { useCoachType } from "@/components/coach/use-coach-type";
-import { hiddenForCoachType } from "@/lib/team-coach";
+import { useCoachNavFacts } from "@/components/coach/use-coach-type";
+import { hiddenForCoach } from "@/lib/team-coach";
 import { WorkspaceMenu } from "@/components/coach/desktop/workspace-menu";
 import { LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/coach-groups";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -423,7 +423,7 @@ function CoachDesktopShellFull({
   // outside this array entirely (rendered as its own fixed link above
   // GroupSwitcher below) — it's already the flattest, first-reached
   // item, which is exactly what "Run my day" wants for it.
-  const coachType = useCoachType();
+  const navFacts = useCoachNavFacts();
   const nav: NavEntry[] = [
     // Run my day — the highest-frequency items, flat, no group/extra
     // click to reach any of them. Team Performance sits right next to
@@ -515,7 +515,7 @@ function CoachDesktopShellFull({
 
   // A team coach's menus leave out the tools that only make sense for selling to clients (lib/team-coach.ts).
   for (const entry of nav) {
-    if ("items" in entry) entry.items = entry.items.filter((i) => !hiddenForCoachType(coachType, i.key));
+    if ("items" in entry) entry.items = entry.items.filter((i) => !hiddenForCoach(navFacts, i.key));
   }
   const groupHasActiveChild = (group: NavGroup) => group.items.some((i) => i.key === active);
 
