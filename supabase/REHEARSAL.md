@@ -165,6 +165,7 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0396 | yes | yes | 77 | 0396 Leaving coach choice |
 | 0397 | yes | yes | 21 | 0397 Free plan client limit |
 | 0398 | yes | yes | 8 | 0398 Waiting sign-in email changes |
+| 0410 | yes | yes | 10 | 0410 Support notices |
 | 0331 | yes | yes | 10 | 0331 a payment event and its sessions are recorded in one step |
 | 0329 | yes | yes | 12 | 0329 every session costs exactly 1 credit; the waitlist offer uses the coach's time zone |
 | 0330 | yes | yes | 9 | 0330 only a real coach can have a public page |

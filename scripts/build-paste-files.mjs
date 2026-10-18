@@ -2916,6 +2916,27 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "162",
+  slug: "0410",
+  title: "0410 Release SP1: a reply in a support thread tells the other side (a bell notice and a push)",
+  warn: "This REBUILDS the list of allowed notice kinds (adds one: support_reply). It refuses to run if the live list cannot be read or would lose a kind, and changes nothing in that case.",
+  migrations: ["0410"],
+  sees: "Success. No rows returned.",
+  afterwards: "From now on a coach's new support message tells every platform admin, and an admin's reply tells the coach who opened the request. Nothing changes on screen except the bell. Safe to run before the code (the push needs the Release SP1 code).",
+  undo: [
+    "drop trigger if exists support_messages_notify on public.support_messages;",
+    "drop function if exists public.notify_on_support_message();",
+    "-- the extra notification kind is left in the list (removing it could break rows that use it)",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 162 misbehaves. Stops the support notices; threads work as before.",
+  rows: [
+    ["0410 is not already applied (the support notice trigger is not there yet)", "not exists (select 1 from pg_trigger where tgname = 'support_messages_notify' and not tgisinternal)"],
+    ["the support tables exist", "to_regclass('public.support_requests') is not null and to_regclass('public.support_messages') is not null and to_regclass('public.notifications') is not null"],
+    ["the notification type rule exists to be widened", "exists (select 1 from pg_constraint c where c.conname = 'notifications_type_check' and c.conrelid = 'public.notifications'::regclass)"],
+  ],
+});
+
+STEPS.push({
   n: "150",
   slug: "0398",
   title: "0398 Release S1: a changed sign-in email must be confirmed by the new address first (waiting requests table)",
@@ -3082,6 +3103,7 @@ const BUNDLES = [
   { id: "release-co", name: "Release CO (nothing about a person is public unless they chose it: personal Find a coach listing; a coach adds only their own clients to a challenge; run BEFORE the code that goes with it is live)", steps: ["139"] },
   { id: "release-cn-held", name: "HELD, Ron's word first: require the health form and waiver of every client without one (read check-intake-flag-list.sql first)", steps: ["138"] },
   { id: "release-cm", name: "Release CM (the guard function and a coach's decision on a flagged screening; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["137"] },
+  { id: "release-sp1-support-notices", name: "Release SP1 (a support reply tells the other side; adds one notice kind and a trigger, safe before the code)", steps: ["162"] },
   { id: "release-s1-signin-hardening", name: "Release S1 (a changed sign-in email is confirmed by the new address; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["150"] },
   { id: "release-f2-client-cap", name: "Release F2 (the free plan's client limit, installed switched off; adds only)", steps: ["149"] },
   { id: "release-l-leaving-coach", name: "Release L (a leaving coach is never given an organization; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["148"] },
@@ -3364,6 +3386,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
     m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
+    m("0410", "exists (select 1 from pg_trigger where tgname = 'support_messages_notify' and not tgisinternal)"),
     m("0398", "to_regclass('public.pending_email_changes') is not null"),
     m("0397", "exists (select 1 from pg_trigger where tgname = 'group_memberships_free_tier_limit' and not tgisinternal)"),
     m("0396", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'organization_memberships' and column_name = 'departing_since')"),

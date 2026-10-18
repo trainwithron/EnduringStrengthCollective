@@ -24,6 +24,14 @@
   "file": "apply-release-cm-all.sql"
  },
  {
+  "id": "release-sp1-support-notices",
+  "name": "Release SP1 (a support reply tells the other side; adds one notice kind and a trigger, safe before the code)",
+  "steps": [
+   "162"
+  ],
+  "file": "apply-release-sp1-support-notices-all.sql"
+ },
+ {
   "id": "release-s1-signin-hardening",
   "name": "Release S1 (a changed sign-in email is confirmed by the new address; adds only, safe to run BEFORE the code that goes with it is live)",
   "steps": [

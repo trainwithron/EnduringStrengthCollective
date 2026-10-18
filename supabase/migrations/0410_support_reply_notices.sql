@@ -1,0 +1,81 @@
+-- Release SP1: a reply in a support thread tells the other side.
+--
+-- The support inbox (a coach writing to the people who run the app) was a thread nobody was told about: a coach's request waited for the platform admin to happen to open the inbox, and the admin's reply waited for the coach to
+-- happen to open theirs. Now each new message in a support thread writes one notice (and the five-minute push job sends it, with only "Open the app to read it." on the lock screen):
+--   the coach wrote   -> every platform admin is told, linking to the admin support inbox;
+--   anyone else wrote -> the coach who opened the request is told, linking to their Support page.
+-- 'support_reply' is a new kind of notice (the list of allowed kinds is rebuilt from the live one plus this kind, and refused if it would lose any). Additions only. Re-runnable.
+do $types$
+declare
+  v_def text;
+  v_have text[];
+  v_all text[];
+  v_new_def text;
+  v_after int;
+begin
+  select pg_get_constraintdef(c.oid) into v_def
+  from pg_constraint c
+  where c.conname = 'notifications_type_check' and c.conrelid = 'public.notifications'::regclass;
+  if v_def is null then
+    raise exception 'notifications_type_check was not found, so the notification types cannot be widened. NOTHING was changed.';
+  end if;
+  select coalesce(array_agg(m[1] order by m[1]), '{}') into v_have from regexp_matches(v_def, '''([^'']+)''::text', 'g') as m;
+  if coalesce(cardinality(v_have), 0) < 5 then
+    raise exception 'Could not read the existing notification types from the live constraint (%). NOTHING was changed.', v_def;
+  end if;
+  select array_agg(distinct t order by t) into v_all from unnest(v_have || array['support_reply']) as t;
+  alter table public.notifications drop constraint notifications_type_check;
+  execute format(
+    'alter table public.notifications add constraint notifications_type_check check (type = any (array[%s]))',
+    (select string_agg(quote_literal(t) || '::text', ', ') from unnest(v_all) as t)
+  );
+  select pg_get_constraintdef(c.oid) into v_new_def from pg_constraint c where c.conname = 'notifications_type_check' and c.conrelid = 'public.notifications'::regclass;
+  select count(*) into v_after from regexp_matches(v_new_def, '''([^'']+)''::text', 'g');
+  if v_after <> cardinality(v_all) or cardinality(v_all) < cardinality(v_have) or exists (select 1 from unnest(v_have) t where t <> all (v_all)) then
+    raise exception 'The rebuilt notification type list does not match the live one (% before, % after). NOTHING was changed.', cardinality(v_have), v_after;
+  end if;
+end
+$types$;
+
+create or replace function public.notify_on_support_message()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  req public.support_requests%rowtype;
+  v_group uuid;
+  v_name text;
+begin
+  select * into req from public.support_requests where id = new.request_id;
+  if not found then
+    return new;
+  end if;
+  if new.author_id = req.coach_id then
+    -- the coach wrote (a new request, or a follow-up): every platform admin is told
+    select nullif(btrim(full_name), '') into v_name from public.profiles where id = new.author_id;
+    insert into public.notifications (profile_id, group_id, type, body, link_path)
+    select p.id, null, 'support_reply', coalesce(v_name, 'A coach') || ' wrote in support: ' || left(req.subject, 120), '/admin/support'
+      from public.profiles p
+     where p.is_platform_admin and p.id <> new.author_id;
+  else
+    -- someone else wrote (the people who run the app): the coach who opened the request is told, with a link to their Support page
+    select gm.group_id into v_group
+      from public.group_memberships gm
+      join public.groups g on g.id = gm.group_id
+     where gm.profile_id = req.coach_id and gm.role = 'coach' and g.organization_id = req.organization_id
+     order by g.created_at
+     limit 1;
+    insert into public.notifications (profile_id, group_id, type, body, link_path)
+    values (req.coach_id, v_group, 'support_reply', 'Support replied to your request: ' || left(req.subject, 120), case when v_group is null then '/dashboard' else '/groups/' || v_group || '/business/support' end);
+  end if;
+  return new;
+end;
+$$;
+revoke execute on function public.notify_on_support_message() from public, anon, authenticated;
+
+drop trigger if exists support_messages_notify on public.support_messages;
+create trigger support_messages_notify
+  after insert on public.support_messages
+  for each row execute function public.notify_on_support_message();
