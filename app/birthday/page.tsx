@@ -3,6 +3,7 @@ import { safePushPath } from "@/lib/push-url";
 import { createServerClient } from "@/lib/supabase/server";
 import { loadDobGate } from "@/lib/dob-gate";
 import { BirthdayForm } from "@/components/intake/birthday-form";
+import { GuardianRequestPanel } from "@/components/intake/guardian-request-panel";
 import { SignOutButton } from "@/components/group/sign-out-button";
 
 // The one-field date-of-birth step. Only a client without a date of birth on file, or a child under 13 waiting on a parent's consent, ever stays on this page; everyone else is sent on.
@@ -27,9 +28,19 @@ export default async function BirthdayPage(props: { searchParams: Promise<{ next
         <div className="flex justify-end mb-4">
           <SignOutButton />
         </div>
-        <h1 className="font-display font-bold text-3xl uppercase leading-none mb-2">One quick thing</h1>
-        <p className="font-body text-sm text-steel mb-8">What&apos;s your date of birth? We ask once so your coach and the app handle your information correctly.</p>
-        <BirthdayForm groupId={facts.groupId} coachName={coachName} initialDateOfBirth={facts.dateOfBirth ?? facts.profileBirthday} alreadySaved={!!facts.dateOfBirth} consentVerified={facts.consentVerified} nextUrl={next} />
+        {facts.gate === "need_guardian" ? (
+          <>
+            <h1 className="font-display font-bold text-3xl uppercase leading-none mb-2">One more thing</h1>
+            <p className="font-body text-sm text-steel mb-8">We need a parent or guardian&apos;s OK before you start.</p>
+            <GuardianRequestPanel state={facts.guardian?.state ?? "none"} guardianEmail={facts.guardian?.guardianEmail ?? null} requestedAt={facts.guardian?.requestedAt ?? null} coachName={coachName} />
+          </>
+        ) : (
+          <>
+            <h1 className="font-display font-bold text-3xl uppercase leading-none mb-2">One quick thing</h1>
+            <p className="font-body text-sm text-steel mb-8">What&apos;s your date of birth? We ask once so your coach and the app handle your information correctly.</p>
+            <BirthdayForm groupId={facts.groupId} coachName={coachName} initialDateOfBirth={facts.dateOfBirth ?? facts.profileBirthday} alreadySaved={!!facts.dateOfBirth} nextUrl={next} />
+          </>
+        )}
       </div>
     </main>
   );

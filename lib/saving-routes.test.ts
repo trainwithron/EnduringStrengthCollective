@@ -19,6 +19,11 @@ function routeFiles(rel: string): string[] {
 // payment, send a push or text, or are called by another service. Every other writing route must be in SAVING_API (lib/workspace-mutation.ts), so that a save made
 // through it refreshes the other panes. A new route fails this test until it is put in one of the two places on purpose.
 const NOT_A_SAVE = new Set([
+  // a guardian's consent: emailed links and a server-only record; nothing a pane shows changes
+  "/api/guardian-consent/request",
+  "/api/guardian-consent/resend",
+  "/api/guardian-consent/sign",
+  "/api/guardian-consent/withdraw",
   "/api/email-change/confirm",
   "/api/email-change/cancel",
   "/api/email-change/cancel-mine",

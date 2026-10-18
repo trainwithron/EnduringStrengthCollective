@@ -6,14 +6,13 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { isUnder13 } from "@/lib/coppa";
 import { validDateOfBirth } from "@/lib/dob-gate";
 
-// The one-field date-of-birth step every client passes once. The date is saved where the app already reads it (client_intake.date_of_birth); a child under 13 stops at the consent message below
-// until their coach has confirmed a parent or guardian's consent.
+// The one-field date-of-birth step every client passes once. The date is saved where the app already reads it (client_intake.date_of_birth). A child under 13 stops at the message below: the app is for people 13
+// and older. (A client aged 13 to 17 goes on to ask a parent or guardian for permission, on the next screen.)
 export function BirthdayForm({
   groupId,
   coachName,
   initialDateOfBirth,
   alreadySaved,
-  consentVerified,
   nextUrl,
 }: {
   groupId: string;
@@ -21,14 +20,13 @@ export function BirthdayForm({
   initialDateOfBirth: string | null;
   // The date shown was saved earlier (it is not just a suggestion from the profile's own birthday).
   alreadySaved: boolean;
-  consentVerified: boolean;
   nextUrl: string;
 }) {
   const router = useRouter();
   const [dob, setDob] = useState(initialDateOfBirth ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [blocked, setBlocked] = useState(alreadySaved && !!initialDateOfBirth && isUnder13(initialDateOfBirth, new Date()) && !consentVerified);
+  const [blocked, setBlocked] = useState(alreadySaved && !!initialDateOfBirth && isUnder13(initialDateOfBirth, new Date()));
 
   async function save() {
     if (saving) return;
@@ -58,9 +56,9 @@ export function BirthdayForm({
       return;
     }
     setSaving(false);
-    if (isUnder13(dob, new Date()) && !consentVerified) {
+    if (isUnder13(dob, new Date())) {
       setBlocked(true);
-      // Tell the coach a child is waiting (best effort; the child's screen does not depend on it).
+      // Tell the coach why this child is not training (best effort; the child's screen does not depend on it).
       void fetch("/api/intake/minor-consent-notice", { method: "POST" }).catch(() => {});
       return;
     }
@@ -72,12 +70,8 @@ export function BirthdayForm({
     return (
       <div className="border border-steel/20 p-6 space-y-4">
         <p className="font-body text-sm">
-          Because you&apos;re under 13, U.S. law (COPPA) requires your parent or guardian to give verified consent before we can collect anything else about you. {coachName ?? "Your coach"} will reach out to
-          your parent or guardian directly to complete this. Check back once that&apos;s done.
+          Spotlight Coaching is for people 13 and older, so we can&apos;t set up an account for you yet, and we haven&apos;t asked you for anything else. A parent or guardian can talk to {coachName ?? "your coach"} about other options.
         </p>
-        <button type="button" onClick={() => router.refresh()} className="font-body text-xs text-steel uppercase tracking-wide underline">
-          Check again
-        </button>
       </div>
     );
   }

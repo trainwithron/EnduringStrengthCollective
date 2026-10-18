@@ -69,6 +69,10 @@ export async function updateSession(request: NextRequest) {
     // guardian_links tokenized read-only view — a caregiver never has a
     // real session, same gotcha already hit for /pr/ and /share/.
     pathname.startsWith("/guardian/") ||
+    // A parent or guardian opens their one-time consent link from their own inbox, with no account; the token is the credential and each route checks and rate-limits itself.
+    pathname.startsWith("/guardian-consent/") ||
+    pathname === "/api/guardian-consent/sign" ||
+    pathname === "/api/guardian-consent/withdraw" ||
     pathname.startsWith("/book/") ||
     pathname.startsWith("/c/") ||
     // equipment_qr_decal_scoping_sept19.md — a walk-in scanning a gym's
@@ -204,9 +208,11 @@ export async function updateSession(request: NextRequest) {
 
   // Every client has a date of birth on file: one without it is asked once on /birthday (before reaching their group), and a child under 13 without a verified parent's consent stops there.
   // The check is cached per person in a cookie once it passes (a client who still needs a date, or a child waiting on consent, is checked every time).
-  if (user && (pathname.startsWith("/groups") || pathname.startsWith("/sessions")) && !(await dobOkCookieValid(request.cookies.get(DOB_OK_COOKIE)?.value, user.id, process.env.CRON_SECRET))) {
+  // The health form (/intake) is reached before a date of birth is on file (it asks for one), so it is only closed to a client who is under 13 (not accepted) or aged 13 to 17 with no guardian's permission yet.
+  const onIntake = pathname === "/intake" || pathname.startsWith("/intake/");
+  if (user && (pathname.startsWith("/groups") || pathname.startsWith("/sessions") || onIntake) && !(await dobOkCookieValid(request.cookies.get(DOB_OK_COOKIE)?.value, user.id, process.env.CRON_SECRET))) {
     const facts = await loadDobGate(supabase, user.id);
-    if (facts.gate !== "ok") {
+    if (facts.gate !== "ok" && !(onIntake && facts.gate === "need_dob")) {
       const redirectUrl = new URL("/birthday", request.url);
       redirectUrl.searchParams.set("next", pathname + request.nextUrl.search);
       const redirectResponse = NextResponse.redirect(redirectUrl);
@@ -215,7 +221,8 @@ export async function updateSession(request: NextRequest) {
       });
       return redirectResponse;
     }
-    const signed = await signDobOk(user.id, process.env.CRON_SECRET);
+    // A client under 18 is checked every time (a guardian can withdraw permission at any moment); only an adult, or someone who is not a client, is remembered for a week.
+    const signed = facts.ageBand === "teen" || facts.ageBand === "under13" ? null : await signDobOk(user.id, process.env.CRON_SECRET);
     if (signed) response.cookies.set(DOB_OK_COOKIE, signed, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 24 * 7 });
   }
 

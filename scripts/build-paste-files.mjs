@@ -2916,6 +2916,24 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "154",
+  slug: "0402",
+  title: "0402 Release V1: a parent or guardian's consent for a client aged 13 to 17 (a server-only table of requests and signatures, and one function that says where a client's consent stands)",
+  migrations: ["0402"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes on screen until the Release V1 code is live. Adds one empty server-only table and one function (guardian_consent_state). Apply this BEFORE the Release V1 code is deployed: with the code live, every client aged 13 to 17 is stopped at a permission screen until a parent or guardian signs.",
+  undo: [
+    "drop function if exists public.guardian_consent_state(uuid);",
+    "drop table if exists public.guardian_consents;",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 154 misbehaves. Run it only while the Release V1 code is not live. Removes every request and every signed permission (the signed words and fingerprints go with them).",
+  rows: [
+    ["0402 is not already applied (the consent table is not there yet)", "to_regclass('public.guardian_consents') is null"],
+    ["the tables and helper it uses exist", "to_regclass('public.profiles') is not null and to_regclass('public.group_memberships') is not null and to_regprocedure('public.is_group_coach(uuid)') is not null"],
+  ],
+});
+
+STEPS.push({
   n: "150",
   slug: "0398",
   title: "0398 Release S1: a changed sign-in email must be confirmed by the new address first (waiting requests table)",
@@ -3082,6 +3100,7 @@ const BUNDLES = [
   { id: "release-co", name: "Release CO (nothing about a person is public unless they chose it: personal Find a coach listing; a coach adds only their own clients to a challenge; run BEFORE the code that goes with it is live)", steps: ["139"] },
   { id: "release-cn-held", name: "HELD, Ron's word first: require the health form and waiver of every client without one (read check-intake-flag-list.sql first)", steps: ["138"] },
   { id: "release-cm", name: "Release CM (the guard function and a coach's decision on a flagged screening; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["137"] },
+  { id: "release-v1-guardian-consent", name: "Release V1 (a parent or guardian's consent for clients aged 13 to 17; adds only, but apply BEFORE the code that goes with it is live)", steps: ["154"] },
   { id: "release-s1-signin-hardening", name: "Release S1 (a changed sign-in email is confirmed by the new address; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["150"] },
   { id: "release-f2-client-cap", name: "Release F2 (the free plan's client limit, installed switched off; adds only)", steps: ["149"] },
   { id: "release-l-leaving-coach", name: "Release L (a leaving coach is never given an organization; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["148"] },
@@ -3364,6 +3383,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
     m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
+    m("0402", "to_regclass('public.guardian_consents') is not null"),
     m("0398", "to_regclass('public.pending_email_changes') is not null"),
     m("0397", "exists (select 1 from pg_trigger where tgname = 'group_memberships_free_tier_limit' and not tgisinternal)"),
     m("0396", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'organization_memberships' and column_name = 'departing_since')"),

@@ -7,19 +7,24 @@ const NOW = new Date("2026-10-12T12:00:00");
 
 describe("which clients are asked for a date of birth, and which stop at the consent message", () => {
   it("a coach, or anyone who is not a client, is never asked", () => {
-    expect(dobGateState({ isClientOnly: false, dateOfBirth: null, consentVerified: false, now: NOW })).toBe("ok");
+    expect(dobGateState({ isClientOnly: false, dateOfBirth: null, guardianSigned: false, now: NOW })).toBe("ok");
   });
   it("a client with no date on file is asked first, whatever else is true", () => {
-    expect(dobGateState({ isClientOnly: true, dateOfBirth: null, consentVerified: false, now: NOW })).toBe("need_dob");
-    expect(dobGateState({ isClientOnly: true, dateOfBirth: null, consentVerified: true, now: NOW })).toBe("need_dob");
+    expect(dobGateState({ isClientOnly: true, dateOfBirth: null, guardianSigned: false, now: NOW })).toBe("need_dob");
+    expect(dobGateState({ isClientOnly: true, dateOfBirth: null, guardianSigned: true, now: NOW })).toBe("need_dob");
   });
-  it("a child under 13 stops until a parent's consent is verified; with it, they go on", () => {
-    expect(dobGateState({ isClientOnly: true, dateOfBirth: "2018-01-05", consentVerified: false, now: NOW })).toBe("blocked");
-    expect(dobGateState({ isClientOnly: true, dateOfBirth: "2018-01-05", consentVerified: true, now: NOW })).toBe("ok");
+  it("a child under 13 is not accepted: no consent of any kind lets them in", () => {
+    expect(dobGateState({ isClientOnly: true, dateOfBirth: "2018-01-05", guardianSigned: false, now: NOW })).toBe("blocked");
+    expect(dobGateState({ isClientOnly: true, dateOfBirth: "2018-01-05", guardianSigned: true, now: NOW })).toBe("blocked");
   });
-  it("a client who is 13 or older goes on", () => {
-    expect(dobGateState({ isClientOnly: true, dateOfBirth: "2013-10-12", consentVerified: false, now: NOW })).toBe("ok");
-    expect(dobGateState({ isClientOnly: true, dateOfBirth: "1988-03-30", consentVerified: false, now: NOW })).toBe("ok");
+  it("a client aged 13 to 17 stops until a guardian has signed, then goes on", () => {
+    expect(dobGateState({ isClientOnly: true, dateOfBirth: "2013-10-12", guardianSigned: false, now: NOW })).toBe("need_guardian");
+    expect(dobGateState({ isClientOnly: true, dateOfBirth: "2013-10-12", guardianSigned: true, now: NOW })).toBe("ok");
+    expect(dobGateState({ isClientOnly: true, dateOfBirth: "2009-10-13", guardianSigned: false, now: NOW })).toBe("need_guardian"); // 17 until tomorrow
+    expect(dobGateState({ isClientOnly: true, dateOfBirth: "2008-10-12", guardianSigned: false, now: NOW })).toBe("ok"); // 18 today
+  });
+  it("an adult goes on", () => {
+    expect(dobGateState({ isClientOnly: true, dateOfBirth: "1988-03-30", guardianSigned: false, now: NOW })).toBe("ok");
   });
 });
 

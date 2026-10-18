@@ -24,6 +24,14 @@
   "file": "apply-release-cm-all.sql"
  },
  {
+  "id": "release-v1-guardian-consent",
+  "name": "Release V1 (a parent or guardian's consent for clients aged 13 to 17; adds only, but apply BEFORE the code that goes with it is live)",
+  "steps": [
+   "154"
+  ],
+  "file": "apply-release-v1-guardian-consent-all.sql"
+ },
+ {
   "id": "release-s1-signin-hardening",
   "name": "Release S1 (a changed sign-in email is confirmed by the new address; adds only, safe to run BEFORE the code that goes with it is live)",
   "steps": [

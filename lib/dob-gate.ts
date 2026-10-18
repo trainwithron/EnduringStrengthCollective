@@ -1,9 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isUnder13 } from "@/lib/coppa";
+import { ageBand, type AgeBand, type GuardianConsentState } from "@/lib/guardian-consent";
 
 // Every client has a date of birth on file (client_intake.date_of_birth, the one place the age rules read). A client who has none is asked once, on a one-field screen (/birthday), before they
-// reach their group; a client under 13 without a parent's verified consent stops at that same screen. A coach, or anyone who is not a client, is never asked.
-export type DobGate = "ok" | "need_dob" | "blocked";
+// reach their group. A client under 13 is not accepted at all ("blocked": no consent of any kind lets them in). A client aged 13 to 17 stops at the same screen until a parent or guardian has signed
+// ("need_guardian"). A coach, or anyone who is not a client, is never asked.
+export type DobGate = "ok" | "need_dob" | "blocked" | "need_guardian";
 
 export const DOB_OK_COOKIE = "dob_ok";
 
@@ -22,11 +23,13 @@ export async function dobOkCookieValid(value: string | undefined, userId: string
   return !!expected && value === expected;
 }
 
-// Pure, so the order of the checks can be tested: no date yet is asked BEFORE anything else, and a child cannot get past it without a verified parent's consent.
-export function dobGateState(input: { isClientOnly: boolean; dateOfBirth: string | null; consentVerified: boolean; now?: Date }): DobGate {
+// Pure, so the order of the checks can be tested: no date yet is asked BEFORE anything else; under 13 is always blocked; 13 to 17 needs a signed guardian consent.
+export function dobGateState(input: { isClientOnly: boolean; dateOfBirth: string | null; guardianSigned: boolean; now?: Date }): DobGate {
   if (!input.isClientOnly) return "ok";
   if (!input.dateOfBirth) return "need_dob";
-  if (isUnder13(input.dateOfBirth, input.now ?? new Date()) && !input.consentVerified) return "blocked";
+  const band = ageBand(input.dateOfBirth, input.now ?? new Date());
+  if (band === "under13") return "blocked";
+  if (band === "teen" && !input.guardianSigned) return "need_guardian";
   return "ok";
 }
 
@@ -42,12 +45,20 @@ export function validDateOfBirth(value: string, now: Date = new Date()): boolean
   return y >= now.getFullYear() - 120;
 }
 
+export interface GuardianFacts {
+  state: GuardianConsentState;
+  guardianEmail: string | null;
+  requestedAt: string | null;
+}
+
 export interface DobGateFacts {
   gate: DobGate;
   groupId: string | null;
   dateOfBirth: string | null;
   profileBirthday: string | null;
-  consentVerified: boolean;
+  ageBand: AgeBand;
+  // Only read for a client aged 13 to 17.
+  guardian: GuardianFacts | null;
 }
 
 // Reads what the gate needs for one person. "Client only" = at least one client membership and no coach membership (a coach using the app as their own client is a coach).
@@ -56,15 +67,22 @@ export async function loadDobGate(supabase: SupabaseClient, userId: string): Pro
   const rows = (memberships ?? []) as { group_id: string; role: string }[];
   const isClientOnly = rows.some((m) => m.role === "athlete") && !rows.some((m) => m.role === "coach");
   const groupId = rows.find((m) => m.role === "athlete")?.group_id ?? null;
-  if (!isClientOnly) return { gate: "ok", groupId, dateOfBirth: null, profileBirthday: null, consentVerified: false };
+  if (!isClientOnly) return { gate: "ok", groupId, dateOfBirth: null, profileBirthday: null, ageBand: "unknown", guardian: null };
 
-  const [{ data: intake }, { data: details }, { data: consent }] = await Promise.all([
+  const [{ data: intake }, { data: details }] = await Promise.all([
     supabase.from("client_intake").select("date_of_birth").eq("athlete_id", userId).maybeSingle(),
     supabase.from("athlete_profile_details").select("birthday").eq("athlete_id", userId).maybeSingle(),
-    supabase.from("minor_consent").select("verified").eq("athlete_id", userId).maybeSingle(),
   ]);
   const dateOfBirth = ((intake as { date_of_birth?: string | null } | null)?.date_of_birth ?? null) as string | null;
   const profileBirthday = ((details as { birthday?: string | null } | null)?.birthday ?? null) as string | null;
-  const consentVerified = (consent as { verified?: boolean } | null)?.verified === true;
-  return { gate: dobGateState({ isClientOnly, dateOfBirth, consentVerified }), groupId, dateOfBirth, profileBirthday, consentVerified };
+  const band = ageBand(dateOfBirth);
+  // The guardian's signature is looked up only for a client aged 13 to 17. A failed lookup is "not signed": the careful side.
+  let guardian: GuardianFacts | null = null;
+  if (band === "teen") {
+    const { data, error } = await supabase.rpc("guardian_consent_state", { p_athlete: userId });
+    const row = !error && data && typeof data === "object" ? (data as { state?: string; guardian_email?: string | null; requested_at?: string | null }) : null;
+    const state = row?.state === "signed" || row?.state === "pending" || row?.state === "withdrawn" ? row.state : "none";
+    guardian = { state, guardianEmail: row?.guardian_email ?? null, requestedAt: row?.requested_at ?? null };
+  }
+  return { gate: dobGateState({ isClientOnly, dateOfBirth, guardianSigned: guardian?.state === "signed" }), groupId, dateOfBirth, profileBirthday, ageBand: band, guardian };
 }

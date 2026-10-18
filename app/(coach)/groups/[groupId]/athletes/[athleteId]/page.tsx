@@ -60,13 +60,13 @@ import { ParqFlagNotice } from "@/components/coach/desktop/parq-flag-notice";
 import { asDecision, decisionLine } from "@/lib/par-q-outcome";
 import { parqNoticeNeeded } from "@/lib/parq-notice";
 import { ClientCalendarSection } from "@/components/coach/desktop/client-calendar-section";
-import { MinorConsentControl } from "@/components/coach/minor-consent-control";
+import { GuardianConsentStatus, type GuardianStateInfo } from "@/components/coach/guardian-consent-status";
+import { ageBand } from "@/lib/guardian-consent";
 import { ClientSignInPanel } from "@/components/coach/client-signin-panel";
 import { CorrectClientEmail } from "@/components/coach/correct-client-email";
 import { claimStatus, isPlaceholderEmail } from "@/lib/client-claim";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { claimLinkDetail } from "@/lib/invite-state";
-import { GuardianShareButton } from "@/components/coach/guardian-share-button";
 import { SettingsGroup } from "@/components/shared/settings-group";
 import { InjuryStatusToggle } from "@/components/coach/injury-status-toggle";
 import { VideoCheckinRecorder } from "@/components/coach/video-checkin-recorder";
@@ -504,6 +504,8 @@ export default async function AthleteProfilePage(
   const sharedProgram = personalProgram || group?.group_kind === "one_on_one" ? null : sharedProgramRaw;
   const activeProgram = personalProgram ?? sharedProgram;
   const isMinor = !!intake?.date_of_birth && isUnder13(intake.date_of_birth, new Date());
+  // 13 to 17: a parent or guardian's permission (Release V1) stands between the client and the app.
+  const isTeen = !!intake?.date_of_birth && ageBand(intake.date_of_birth) === "teen";
   const todayKeyForWave2 = new Date().toISOString().slice(0, 10);
   // A strength-meet goal with a linked main-lift movement pattern (used by the taper notice below).
   const isStrengthMeetGoal = latestConfirmedEventGoal?.goal_type === "powerbuilding_strongman";
@@ -516,8 +518,7 @@ export default async function AthleteProfilePage(
   // more batch instead of ~8 more sequential round trips.
   const [
     { data: activeProgramSchedule },
-    { data: minorConsentRow },
-    { data: guardianLinkRow },
+    { data: guardianStateRow },
     { data: assignmentRows },
     { data: habitLogRows },
     signedPhotoResults,
@@ -531,25 +532,7 @@ export default async function AthleteProfilePage(
     activeProgram
       ? supabase.from("programs").select("training_days").eq("id", activeProgram.id).maybeSingle()
       : Promise.resolve({ data: null }),
-    isMinor
-      ? supabase
-          .from("minor_consent")
-          .select("verified, method, notes, verified_at")
-          .eq("athlete_id", params.athleteId)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-    isMinor
-      ? supabase
-          .from("guardian_links")
-          .select("access_token, expires_at")
-          .eq("athlete_id", params.athleteId)
-          .eq("group_id", params.groupId)
-          .is("revoked_at", null)
-          .gt("expires_at", new Date().toISOString())
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
+    isTeen ? supabase.rpc("guardian_consent_state", { p_athlete: params.athleteId }) : Promise.resolve({ data: null }),
     supabase
       .from("package_assignments")
       .select("coach_package_id")
@@ -1394,22 +1377,14 @@ export default async function AthleteProfilePage(
 
           <div data-tab="overview forms">
           {isMinor && (
-            <section className="space-y-3">
-              <MinorConsentControl
-                athleteId={params.athleteId}
-                groupId={params.groupId}
-                initialVerified={minorConsentRow?.verified ?? false}
-                initialMethod={(minorConsentRow?.method as any) ?? null}
-                initialNotes={minorConsentRow?.notes ?? ""}
-                initialVerifiedAt={minorConsentRow?.verified_at ?? null}
-              />
-              <GuardianShareButton
-                athleteId={params.athleteId}
-                groupId={params.groupId}
-                consentVerified={minorConsentRow?.verified ?? false}
-                initialToken={guardianLinkRow?.access_token ?? null}
-                initialExpiresAt={(guardianLinkRow as { expires_at?: string | null } | null)?.expires_at ?? null}
-              />
+            <section className="space-y-2">
+              <p className="font-body text-xs text-steel uppercase tracking-wide">Under 13</p>
+              <p className="font-body text-sm text-rust">Spotlight Coaching is for people 13 and older, so this client is stopped at the start and nothing more is collected. No consent from a parent lets them in.</p>
+            </section>
+          )}
+          {isTeen && (
+            <section>
+              <GuardianConsentStatus athleteId={params.athleteId} info={(guardianStateRow as GuardianStateInfo | null) ?? null} />
             </section>
           )}
           </div>

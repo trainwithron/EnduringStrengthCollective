@@ -29,9 +29,12 @@ export async function POST(request: Request) {
   const { data: seat } = await supabase.from("group_memberships").select("role").eq("group_id", groupId).eq("profile_id", user.id).maybeSingle();
   if (seat?.role !== "athlete") return NextResponse.json({ error: "That space was not found." }, { status: 404 });
 
-  // A birthday first, and a child under 13 stops until a parent's consent is verified (the same rule as everywhere else).
+  // A birthday first; a child under 13 is not accepted; a client aged 13 to 17 needs a guardian's permission first (the same rule as everywhere else).
   const facts = await loadDobGate(supabase, user.id);
-  if (facts.gate !== "ok") return NextResponse.json({ error: "Add your date of birth first." }, { status: 409 });
+  if (facts.gate !== "ok") {
+    const error = facts.gate === "need_guardian" ? "A parent or guardian needs to give permission first." : facts.gate === "blocked" ? "Spotlight Coaching is for people 13 and older." : "Add your date of birth first.";
+    return NextResponse.json({ error }, { status: 409 });
+  }
 
   const db = createServiceRoleClient();
   const { data: existing } = await db.from("client_intake").select("completed_at").eq("athlete_id", user.id).maybeSingle();
