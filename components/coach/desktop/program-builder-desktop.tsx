@@ -28,6 +28,7 @@ import { ProgramChatPanel } from "./program-chat-panel";
 import { TrainingIntentSelector } from "../training-intent-selector";
 import { AiProgramBuilderBox } from "./ai-program-builder-box";
 import { REST_TEMPO_SUGGESTIONS, type TrainingIntent } from "@/lib/training-intent";
+import { ProgramDescriptionEditor } from "@/components/coach/program-description-editor";
 
 export function ProgramBuilderDesktop({
   programId,
@@ -316,12 +317,7 @@ export function ProgramBuilderDesktop({
         <div className="mt-2">
           <SaveStatusBar />
         </div>
-        {programDescription && (
-          <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">
-            <span className="uppercase tracking-wide text-xs">Description: </span>
-            {programDescription}
-          </p>
-        )}
+        <ProgramDescriptionEditor programId={programId} initialDescription={programDescription} />
         <ProgramProgressionPanel programId={programId} groupId={groupId} days={days} initialRules={initialProgressions} onDaysChange={setDays} />
         <div className="flex flex-wrap gap-3 mt-4">
           <a

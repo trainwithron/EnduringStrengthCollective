@@ -14,7 +14,7 @@ describe("joining an organization needs the person's OK", () => {
     const route = read("app/api/coaches/invite/route.ts");
     expect(route).toContain('rpc("profile_id_for_email"');
     expect(route).toContain('.from("organization_invites")');
-    expect(route.indexOf("profile_id_for_email")).toBeLessThan(route.indexOf("inviteUserByEmail"));
+    expect(route.indexOf("profile_id_for_email")).toBeLessThan(route.indexOf('makeAuthLink(serviceRole, { type: "invite"'));
     expect(route).not.toContain("pendingInvitation");
     expect(read("components/coach/desktop/invite-coach-form.tsx")).toContain("they join once they accept. Check Invitations on the Team page for anything already open");
   });

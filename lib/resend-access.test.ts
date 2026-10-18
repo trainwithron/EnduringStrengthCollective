@@ -97,8 +97,18 @@ describe("resend invite / sign-in link", () => {
     expect(r.status).toBe(200);
     expect(r.body).toMatchObject({ ok: true, kind: "signin_emailed" });
     expect((r.body as { link?: string }).link).toBeUndefined();
-    expect(state.resetCalls).toEqual(["max@example.com"]);
+    // With the mail service set up the email is made and sent by us (not by the auth service's own mailer)
+    expect(state.resetCalls).toEqual([]);
+    expect(state.sentEmails.map((e) => e.to)).toEqual(["max@example.com"]);
     expect(state.minted).toBe(0);
+  });
+
+  it("without the mail service, a confirmed client is still sent the auth service's own reset email", async () => {
+    state.emailConfigured = false;
+    const r = await run({ claimedAt: "2026-10-12T00:00:00Z", lastSignIn: "2026-10-12T00:00:00Z" });
+    expect(r.body).toMatchObject({ ok: true, kind: "signin_emailed" });
+    expect(state.resetCalls).toEqual(["max@example.com"]);
+    state.emailConfigured = true;
   });
 
   it("a signed-in client whose address was never confirmed still gets the email, sent by the platform", async () => {
