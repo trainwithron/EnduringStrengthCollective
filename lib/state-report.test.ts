@@ -156,3 +156,31 @@ describe("the state report", () => {
     expect(readFileSync(".gitignore", "utf8")).toMatch(/^\.env\*/m);
   });
 });
+
+describe("write-guard refusals in the state report", async () => {
+  const lib = await import("../scripts/state-report-lib.mjs");
+  it("counts refusals per table from the log messages, with the latest time", () => {
+    const rows = [
+      { ts: "2026-10-18 20:00:00", event_message: 'new row violates row-level security policy for table "posts"' },
+      { ts: "2026-10-18 21:00:00", event_message: 'new row violates row-level security policy for table "posts"' },
+      { ts: "2026-10-18 19:00:00", event_message: 'new row violates row-level security policy for table "body_weight_logs"' },
+      { ts: "2026-10-18 18:00:00", event_message: 'new row violates row-level security policy for table "bookings"' },
+      { ts: "2026-10-18 18:00:00", event_message: "something unrelated" },
+    ];
+    const s = lib.summarizeGuardLogs(rows);
+    expect(s.posts).toEqual({ table: "posts", count: 2, latest: "2026-10-18 21:00:00" });
+    expect(s.guarded.map((e: any) => e.table).sort()).toEqual(["body_weight_logs", "posts"]);
+    expect(s.other.map((e: any) => e.table)).toEqual(["bookings"]);
+  });
+  it("says 'none' for posts when there are no refusals, and tells the reader to look at who was refused", () => {
+    const out = lib.formatGuardLogs(lib.summarizeGuardLogs([]));
+    expect(out).toContain("posts: none");
+    expect(out).toContain("no refusals on any guarded table");
+    expect(out).toContain("false block");
+  });
+  it("the query reads only the logs and is a plain select", () => {
+    expect(lib.guardLogSql()).toMatch(/^select /);
+    expect(lib.guardLogSql()).not.toMatch(/insert|update|delete|drop/i);
+    expect(lib.GUARDED_TABLES).toHaveLength(14);
+  });
+});

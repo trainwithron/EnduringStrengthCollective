@@ -124,3 +124,39 @@ export function formatReport(summary, { all = false } = {}) {
   lines.push("", "Each answer comes from that paste's own \"is not already applied\" checks; a step is applied only when every one of its checks says so. A step that a later step replaced can show as waiting here (its check looks for the old shape); docs/NEEDS_RON.md has the real order.");
   return lines.join("\n");
 }
+
+// ---- false blocks from the write guard (Release AF3e) ------------------------------------------------------------------------------------------------------
+// The write guard refuses a child's direct writes with Postgres error 42501 ('new row violates row-level security policy for table "posts"'). The same message also comes from the older rules, so a refusal is only
+// a FALSE BLOCK if the person was one the page gate lets through; this lists the refusals per table so someone can look. Read from the project's database logs (Logs Explorer SQL), never from the data.
+export const GUARDED_TABLES = ["posts", "comments", "reactions", "direct_messages", "exercise_video_comments", "training_partner_profiles", "training_partner_requests", "challenge_participants", "progress_photos", "session_exercise_videos", "body_weight_logs", "body_scans", "transformation_cards", "transformation_milestones"];
+
+export function guardLogSql() {
+  return "select cast(timestamp as datetime) as ts, event_message from postgres_logs where event_message like '%violates row-level security policy%' order by timestamp desc limit 500";
+}
+
+// rows: [{ ts, event_message }]
+export function summarizeGuardLogs(rows) {
+  const byTable = new Map();
+  for (const r of rows ?? []) {
+    const m = /row-level security policy(?: \(USING expression\))? for table "([a-z_]+)"/.exec(String(r.event_message ?? ""));
+    if (!m) continue;
+    const e = byTable.get(m[1]) ?? { table: m[1], count: 0, latest: null };
+    e.count++;
+    const ts = String(r.ts ?? "");
+    if (!e.latest || ts > e.latest) e.latest = ts;
+    byTable.set(m[1], e);
+  }
+  const guarded = GUARDED_TABLES.map((t) => byTable.get(t)).filter(Boolean);
+  const other = [...byTable.values()].filter((e) => !GUARDED_TABLES.includes(e.table));
+  return { guarded, other, posts: byTable.get("posts") ?? { table: "posts", count: 0, latest: null } };
+}
+
+export function formatGuardLogs(summary, { sinceLabel = "the last 24 hours" } = {}) {
+  const lines = [`WRITE GUARD REFUSALS (database logs, ${sinceLabel})`];
+  lines.push(`  posts: ${summary.posts.count === 0 ? "none" : `${summary.posts.count} (latest ${summary.posts.latest})`}`);
+  for (const e of summary.guarded.filter((x) => x.table !== "posts")) lines.push(`  ${e.table}: ${e.count} (latest ${e.latest})`);
+  if (summary.guarded.length === 0) lines.push("  no refusals on any guarded table");
+  if (summary.other.length > 0) lines.push(`  other tables (not guarded by this release): ${summary.other.map((e) => `${e.table} ${e.count}`).join(", ")}`);
+  lines.push("  A refusal is only a false block if the person is one the page gate lets through (an adult with a birthday on file, a teen with a signed guardian, a coach). Look at who, not just how many.");
+  return lines.join("\n");
+}

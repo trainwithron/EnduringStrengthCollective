@@ -2,6 +2,7 @@
 //
 //   node scripts/state-report.mjs            ask the live database (needs SUPABASE_ACCESS_TOKEN, see below) and print the report
 //   node scripts/state-report.mjs --all      also list the pastes that are already applied
+//   node scripts/state-report.mjs --since 2026-10-18T18:00:00Z   the write-guard refusals section starts there (default: the last 24 hours; at most 24 hours are read)
 //   node scripts/state-report.mjs --sql      print the one query instead (paste it into the Supabase SQL editor, then use --from)
 //   node scripts/state-report.mjs --from rows.json   make the report from the query's result saved as JSON ([{"step":"159","idx":0,"applied":false}, ...])
 //
@@ -13,7 +14,7 @@
 // The step list comes from supabase/apply/state-probes.json, written by scripts/build-paste-files.mjs.
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { buildStateSql, formatReport, summarize } from "./state-report-lib.mjs";
+import { buildStateSql, formatReport, summarize, guardLogSql, summarizeGuardLogs, formatGuardLogs } from "./state-report-lib.mjs";
 
 const args = process.argv.slice(2);
 const flag = (name) => {
@@ -85,3 +86,25 @@ if (from) {
 }
 
 console.log(formatReport(summarize(rows, bundles, probes), { all: args.includes("--all") }));
+
+// Write-guard refusals from the database logs (needs the same token; read-only). If the logs cannot be read, the query is printed to run in the Supabase Logs Explorer instead.
+if (!from) {
+  console.log("");
+  const token = envValue("SUPABASE_ACCESS_TOKEN");
+  const url = envValue("NEXT_PUBLIC_SUPABASE_URL");
+  const ref = url ? new URL(url).hostname.split(".")[0] : null;
+  const since = flag("--since");
+  const start = since && !Number.isNaN(Date.parse(since)) ? new Date(since) : new Date(Date.now() - 24 * 3600 * 1000);
+  const end = new Date(Math.min(Date.now(), start.getTime() + 24 * 3600 * 1000));
+  try {
+    const qs = new URLSearchParams({ sql: guardLogSql(), iso_timestamp_start: start.toISOString(), iso_timestamp_end: end.toISOString() });
+    const res = await fetch(`https://api.supabase.com/v1/projects/${ref}/analytics/endpoints/logs.all?${qs}`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) throw new Error(`the logs did not answer (${res.status})`);
+    const body = await res.json();
+    console.log(formatGuardLogs(summarizeGuardLogs(body.result ?? body), { sinceLabel: `since ${start.toISOString()}` }));
+  } catch (e) {
+    console.log("WRITE GUARD REFUSALS: could not read the database logs (" + (e instanceof Error ? e.message : String(e)) + ").");
+    console.log("  Run this in the Supabase Logs Explorer (Postgres logs) and look for table \"posts\":");
+    console.log("  " + guardLogSql());
+  }
+}
