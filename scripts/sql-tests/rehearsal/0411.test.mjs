@@ -51,6 +51,7 @@ export default {
       const postByCoach = await post(g, c1, "a post by the coach");
       const comment = (await db.query(`insert into public.comments (post_id, group_id, author_id, body) values ($1, $2, $3, 'a comment by Bo') returning id`, [postByAnn, g, b])).rows[0].id;
       const reply = (await db.query(`insert into public.comments (post_id, group_id, author_id, body, parent_comment_id) values ($1, $2, $3, 'a reply', $4) returning id`, [postByAnn, g, a, comment])).rows[0].id;
+      const reply2 = (await db.query(`insert into public.comments (post_id, group_id, author_id, body, parent_comment_id) values ($1, $2, $3, 'a reply to the reply', $4) returning id`, [postByAnn, g, b, reply])).rows[0].id;
       const noticesOf = async (who) => (await db.query(`select body, link_path from public.notifications where profile_id = $1 and type = 'content_reported' order by created_at`, [who])).rows;
 
       const kinds = (await db.query(`select pg_get_constraintdef(c.oid) as d from pg_constraint c where c.conname = 'notifications_type_check' and c.conrelid = 'public.notifications'::regclass`)).rows[0].d;
@@ -157,9 +158,10 @@ export default {
       await h.as(a);
       const repComment = (await db.query(`select public.report_content(null, $1, 'Mean comment') as id`, [comment])).rows[0].id;
       await h.as(c2);
+      const counted = (await db.query(`select public.reported_comment_reply_count($1) as n`, [repComment])).rows[0].n;
       const replies = (await db.query(`select public.remove_reported_content($1) as n`, [repComment])).rows[0].n;
       await h.asSuper();
-      h.check("removing a comment removes its replies and reports how many", replies === 1 && (await db.query(`select count(*)::int as n from public.comments where id = any($1::uuid[])`, [[comment, reply]])).rows[0].n === 0);
+      h.check("removing a comment removes every reply under it, however deep, and the count says so before and after", counted === 2 && replies === 2 && (await db.query(`select count(*)::int as n from public.comments where id = any($1::uuid[])`, [[comment, reply, reply2]])).rows[0].n === 0);
 
       // ---- a daily cap
       await h.asSuper();

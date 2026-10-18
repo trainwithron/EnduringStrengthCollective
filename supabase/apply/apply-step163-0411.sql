@@ -288,7 +288,8 @@ begin
     raise exception 'This report was already handled.';
   end if;
   if r.comment_id is not null then
-    select count(*) into v_replies from public.comments where parent_comment_id = r.comment_id;
+    -- every reply under it, however deep (the delete cascades through all of them)
+    with recursive sub as (select id from public.comments where parent_comment_id = r.comment_id union all select c.id from public.comments c join sub s on c.parent_comment_id = s.id) select count(*) into v_replies from sub;
     delete from public.comments where id = r.comment_id;
   elsif r.post_id is not null then
     delete from public.posts where id = r.post_id;
@@ -315,7 +316,7 @@ begin
   if not found or not public.can_handle_content_report(r.group_id, r.reported_author_id) or r.comment_id is null then
     return 0;
   end if;
-  return (select count(*)::integer from public.comments where parent_comment_id = r.comment_id);
+  return (with recursive sub as (select id from public.comments where parent_comment_id = r.comment_id union all select c.id from public.comments c join sub s on c.parent_comment_id = s.id) select count(*)::integer from sub);
 end;
 $$;
 revoke execute on function public.reported_comment_reply_count(uuid) from public, anon;
