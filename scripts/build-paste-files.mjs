@@ -2921,9 +2921,10 @@ STEPS.push({
   title: "0401 Release U1: graduation (a class year for each team player, and a record of who has been emailed their training history)",
   migrations: ["0401"],
   sees: "Success. No rows returned.",
-  afterwards: "Nothing changes on screen until the Release U1 code is live. Adds one empty column (the player's graduation year) and one empty server-only table (who has been sent their history), and one new function, start_next_season, that calls the existing start_new_season (unchanged) and then copies the graduation year to the players brought into the new season. Nothing existing is replaced.",
+  afterwards: "Nothing changes on screen until the Release U1 code is live. Adds two empty columns (the player's graduation year, and the year a season's graduates were decided by) and one empty server-only table (who has been sent their history), and one new function, start_next_season, that calls the existing start_new_season (unchanged) and then copies the graduation year to the players brought into the new season. Nothing existing is replaced.",
   undo: [
-    "drop function if exists public.start_next_season(uuid, text, uuid[]);",
+    "drop function if exists public.start_next_season(uuid, text, uuid[], int);",
+    "alter table public.groups drop column if exists graduates_through;",
     "drop table if exists public.graduation_exports;",
     "alter table public.group_memberships drop constraint if exists group_memberships_graduation_year_range;",
     "alter table public.group_memberships drop column if exists graduation_year;",

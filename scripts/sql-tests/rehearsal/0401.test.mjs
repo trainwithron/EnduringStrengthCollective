@@ -50,6 +50,14 @@ export default {
       r = await tryQ(db, `insert into public.graduation_exports (group_id, athlete_id) values ($1, $2)`, [g, senior]);
       h.check("a player is recorded once per season", !!r.error);
 
+      // ---- a made-up year is ignored (only this year or the next to it is kept)
+      const g2 = await h.group(org, coach, "team", "GR Other 2026");
+      await h.member(g2, senior);
+      await h.as(coach);
+      r = await tryQ(db, `select public.start_next_season($1, 'GR Other 2027', $2::uuid[], 2099) as id`, [g2, [senior]]);
+      await h.asSuper();
+      h.check("a made-up year is not kept", !r.error && (await db.query(`select graduates_through from public.groups where id = $1`, [g2])).rows[0].graduates_through === null, JSON.stringify(r));
+
       // ---- only a coach of the season can start the next one (the existing rule, kept)
       await h.as(other);
       r = await tryQ(db, `select public.start_next_season($1, 'Nope', $2::uuid[])`, [g, [junior]]);
@@ -62,13 +70,14 @@ export default {
 
       // ---- next season: the year travels with a player who stays, and the unticked senior is left behind
       await h.as(coach);
-      r = await tryQ(db, `select public.start_next_season($1, 'GR Varsity 2027', $2::uuid[]) as id`, [g, [junior]]);
+      r = await tryQ(db, `select public.start_next_season($1, 'GR Varsity 2027', $2::uuid[], $3::int) as id`, [g, [junior], new Date().getFullYear()]);
       await h.asSuper();
       h.check("the coach starts next season with only the junior" + (r.error ? ": " + r.error : ""), !r.error && !!r.rows?.[0]?.id);
       const next = r.rows?.[0]?.id;
       h.check("the junior's graduation year came with them", (await db.query(`select graduation_year from public.group_memberships where group_id = $1 and profile_id = $2`, [next, junior])).rows[0]?.graduation_year === 2027);
       h.check("the senior is not on the new roster", (await db.query(`select count(*)::int as n from public.group_memberships where group_id = $1 and profile_id = $2`, [next, senior])).rows[0].n === 0);
       h.check("the senior's place and year in last season are untouched", (await db.query(`select graduation_year from public.group_memberships where group_id = $1 and profile_id = $2`, [g, senior])).rows[0]?.graduation_year === 2026);
+      h.check("the year that decided who graduated is kept on the retired season", (await db.query(`select graduates_through from public.groups where id = $1`, [g])).rows[0].graduates_through === new Date().getFullYear());
       h.check("last season is retired and points at the new one", (await db.query(`select archived_at is not null as a, next_season_id = $2 as n from public.groups where id = $1`, [g, next])).rows[0].a === true);
     },
   },

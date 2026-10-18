@@ -2,11 +2,13 @@
 -- emailed, once, a PDF of their own training history (sent to the player's own sign-in address only, never to a coach, parent or anyone else).
 --
 --   group_memberships.graduation_year   the year the player graduates (1990 to 2100), set by the coach (coaches already may update their group's memberships; a player cannot).
---   graduation_exports                  one row per player per season, made BEFORE the email is sent (so two calls at once cannot both send) and stamped sent_at when it has gone; a row never stamped within ten minutes
---                                       (the server died mid-send) can be taken over. Server only.
+--   graduation_exports                  one row per player per season, made BEFORE the email is sent (so two calls at once cannot both send) and stamped sent_at when it has gone. A row never stamped is never
+--                                       taken over automatically: the coach is asked. Server only.
+--   groups.graduates_through            the year that decided who had graduated, fixed when the season was retired (the coach's own calendar year then), so a later press of the button decides the same way.
 --   start_next_season                   start_new_season (migration 0394, unchanged) and then the graduation year of each player brought over is copied to the new season. New name, so nothing existing is replaced.
 -- Additions only. Re-runnable.
 alter table public.group_memberships add column if not exists graduation_year smallint;
+alter table public.groups add column if not exists graduates_through smallint;
 alter table public.group_memberships drop constraint if exists group_memberships_graduation_year_range;
 alter table public.group_memberships add constraint group_memberships_graduation_year_range check (graduation_year is null or graduation_year between 1990 and 2100);
 
@@ -20,7 +22,7 @@ create table if not exists public.graduation_exports (
 alter table public.graduation_exports enable row level security;
 revoke all on public.graduation_exports from anon, authenticated;
 
-create or replace function public.start_next_season(p_group uuid, p_name text, p_athletes uuid[])
+create or replace function public.start_next_season(p_group uuid, p_name text, p_athletes uuid[], p_graduates_through int default null)
 returns uuid
 language plpgsql
 security definer
@@ -40,8 +42,12 @@ begin
    where n.group_id = v_new and n.role = 'athlete'
      and o.group_id = p_group and o.role = 'athlete' and o.profile_id = n.profile_id
      and o.graduation_year is not null;
+  -- the year that decided who had graduated, kept on the retired season (only a plausible year: this year or next to it)
+  if p_graduates_through is not null and abs(p_graduates_through - extract(year from now())::int) <= 1 then
+    update public.groups set graduates_through = p_graduates_through where id = p_group;
+  end if;
   return v_new;
 end;
 $$;
-revoke execute on function public.start_next_season(uuid, text, uuid[]) from public, anon;
-grant execute on function public.start_next_season(uuid, text, uuid[]) to authenticated, service_role;
+revoke execute on function public.start_next_season(uuid, text, uuid[], int) from public, anon;
+grant execute on function public.start_next_season(uuid, text, uuid[], int) to authenticated, service_role;

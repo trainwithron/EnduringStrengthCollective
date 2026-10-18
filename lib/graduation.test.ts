@@ -123,7 +123,8 @@ describe("how the pieces are wired", () => {
     expect(panel).toContain('"/api/season/graduate"');
     expect(panel).toContain('rpc("start_next_season"');
     expect(panel).toContain('rpc("start_new_season"'); // the fallback before the database step is applied
-    expect(panel).toContain("body: JSON.stringify({ groupId, year })");
+    expect(panel).toContain("p_graduates_through: year");
+    expect(panel).toContain("body: JSON.stringify({ groupId })");
     expect(panel).not.toMatch(/setFinished\([^)]*\);\s*router\.refresh\(\)/);
   });
 
@@ -132,16 +133,32 @@ describe("how the pieces are wired", () => {
     expect(route).toContain('seat?.role !== "coach"');
     expect(route).toContain("!group.archived_at || !group.next_season_id");
     expect(route).toContain("hasGraduatedBy(r.graduation_year, year) && !staying.has(r.profile_id)");
-    expect(route).toContain("Math.abs(body.year - serverYear) <= 1");
+    // the deciding year is the one fixed when the season was retired; the request body cannot change it
+    expect(route).toContain("typeof group.graduates_through === \"number\" ? group.graduates_through : new Date(group.archived_at as string).getUTCFullYear()");
+    expect(route).not.toContain("body.year");
+    expect(route).not.toMatch(/as \{[^}]*year\?/);
+    expect(route).toContain("export const maxDuration = 300;");
+    // a claim that was never stamped is never taken over automatically
+    expect(route).not.toContain(".update({ claimed_at");
+    expect(route).toContain("doubtfulIds.has(r.profile_id)");
+    expect(route).toContain("That player is not waiting on a decision.");
+    expect(route).toContain("if (error) throw new Error(error.message);");
     expect(route).toContain("isPlaceholderEmail(to)");
     expect(route).toContain("insert({ group_id: groupId, athlete_id: id })"); // the claim, made before anything is sent
-    expect(route).toContain("const graduates = allGraduates.filter((r) => !handled.has(r.profile_id));");
+    expect(route).toContain("let graduates = allGraduates.filter((r) => !sentIds.has(r.profile_id) && !inFlightIds.has(r.profile_id) && !doubtfulIds.has(r.profile_id));");
     expect(route).toContain("{ limit: PER_CALL }");
     expect(route).not.toContain("limit(MAX_PLAYERS");
     // one recipient: the player's own address, nothing added
     expect(route.match(/sendEmail\(/g)!.length).toBe(1);
     expect(route).toContain("sendEmail(to, mail.subject, mail.text, { name: \"training-history.pdf\", bytes: pdf })");
     expect(route).not.toMatch(/\bcc\b|bcc/i);
+  });
+
+  it("the retired season's page offers Send anyway for a doubtful send, and sends no year", () => {
+    const again = src("components/coach/desktop/graduation-send-again.tsx");
+    expect(again).toContain("Send anyway");
+    expect(again).toContain("sendAnyway ? { groupId, sendAnyway } : { groupId }");
+    expect(again).not.toContain("year");
   });
 
   it("the migration only adds: a column, a server-only table and a new function; nothing existing is replaced", () => {

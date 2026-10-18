@@ -47,14 +47,14 @@ export function NewSeasonPanel({ groupId, groupName, athletes }: { groupId: stri
       setError("Tick at least one athlete to bring over.");
       return;
     }
-    const year = graduatedByYear();
+    const year = graduatedByYear(); // the coach's own calendar year, used once here and kept on the retired season
     const leaving = athletes.filter((a) => hasGraduatedBy(a.graduationYear, year) && !chosen.has(a.profileId)).length;
     const emailNote = leaving > 0 ? ` ${leaving} graduating player${leaving === 1 ? " is" : "s are"} not coming back and will each be emailed a PDF of their own training history, to their own address only.` : "";
     if (!(await confirmDialog({ message: `Start ${trimmed} with ${chosen.size} athlete${chosen.size === 1 ? "" : "s"}? ${groupName} is retired: it and all its records are kept in Past seasons, and nothing from it is copied into the new season.${emailNote}`, confirmLabel: "Start the season" }))) return;
     setBusy(true);
     setError(null);
     const supabase = createBrowserClient();
-    let { data, error: rpcError } = await supabase.rpc("start_next_season", { p_group: groupId, p_name: trimmed, p_athletes: [...chosen] });
+    let { data, error: rpcError } = await supabase.rpc("start_next_season", { p_group: groupId, p_name: trimmed, p_athletes: [...chosen], p_graduates_through: year });
     // Before the database step that adds start_next_season is applied, the older function does the same job (without carrying class years over).
     if (rpcError && /could not find the function|does not exist|schema cache/i.test(rpcError.message)) {
       ({ data, error: rpcError } = await supabase.rpc("start_new_season", { p_group: groupId, p_name: trimmed, p_athletes: [...chosen] }));
@@ -69,7 +69,7 @@ export function NewSeasonPanel({ groupId, groupName, athletes }: { groupId: stri
       let note = "";
       let problems: { name: string; why: string }[] = [];
       try {
-        const res = await fetch("/api/season/graduate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ groupId, year }) });
+        const res = await fetch("/api/season/graduate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ groupId }) });
         const result = await res.json().catch(() => ({}));
         if (res.ok && !result.emailOff) {
           problems = Array.isArray(result.problems) ? result.problems : [];
