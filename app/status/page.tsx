@@ -1,14 +1,15 @@
 import { HelpShell } from "@/components/support/help-shell";
-import { readHealth } from "@/lib/health-check";
+import { readHealthForPage } from "@/lib/health-check";
 
 export const metadata = { title: "Status" };
-// Read fresh every time: a status page that shows yesterday's answer is worse than none.
+// Read on every visit (never built ahead of time): a status page that shows yesterday's answer is worse than none.
 export const dynamic = "force-dynamic";
+// (The reading itself is remembered for 30 seconds and gives up after 4, so a public page cannot hammer the database or hang.)
 
-type Part = { name: string; state: "ok" | "attention" | "down" | "paused"; note: string };
+type Part = { name: string; state: "ok" | "attention" | "down" | "paused" | "unchecked"; note: string };
 
 export default async function StatusPage() {
-  const reading = await readHealth();
+  const reading = await readHealthForPage();
   const body = reading.body as { database?: string; ai?: string; jobs?: { status?: string } };
   const parts: Part[] = [
     reading.status === "error"
@@ -19,12 +20,20 @@ export default async function StatusPage() {
     parts.push(
       body.jobs?.status === "attention"
         ? { name: "Background work (reminders, check-ins, billing records)", state: "attention", note: "Some of it is running late. Nothing is lost; it catches up." }
-        : { name: "Background work (reminders, check-ins, billing records)", state: "ok", note: "Running." },
+        : body.jobs?.status === "ok"
+          ? { name: "Background work (reminders, check-ins, billing records)", state: "ok", note: "Running." }
+          : { name: "Background work (reminders, check-ins, billing records)", state: "unchecked", note: "Not being checked yet." },
       body.ai === "on" ? { name: "AI features", state: "ok", note: "On." } : { name: "AI features", state: "paused", note: "Paused for now." }
     );
   }
   const headline =
-    reading.status === "error" ? "We are having trouble" : reading.status === "degraded" ? "Working, with some work running late" : "Everything is working";
+    reading.status === "error"
+      ? "We are having trouble"
+      : reading.status === "degraded"
+        ? "Working, with some work running late"
+        : body.jobs?.status === "ok"
+          ? "Everything is working"
+          : "The app and your data are working";
   const tone = reading.status === "ok" ? "text-chalk" : "text-rust";
   return (
     <HelpShell title="Status" intro="Checked when you opened this page.">
@@ -39,7 +48,7 @@ export default async function StatusPage() {
               <p className="text-xs text-steel mt-0.5">{p.note}</p>
             </div>
             <span className={`text-xs uppercase tracking-wide shrink-0 ${p.state === "ok" ? "text-steel" : "text-rust"}`}>
-              {p.state === "ok" ? "OK" : p.state === "attention" ? "Delayed" : p.state === "paused" ? "Paused" : "Down"}
+              {p.state === "ok" ? "OK" : p.state === "attention" ? "Delayed" : p.state === "paused" ? "Paused" : p.state === "unchecked" ? "Not checked" : "Down"}
             </span>
           </li>
         ))}

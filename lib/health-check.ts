@@ -52,3 +52,33 @@ export async function readHealth(): Promise<HealthReading> {
     };
   }
 }
+
+// The reading the PUBLIC status page shows. The page is open to anyone, so it must not cost two database reads for every visit, and it must not hang when the database is slow: the reading is remembered for 30 seconds, and a
+// read that takes longer than 4 seconds counts as "we are having trouble" (which is what a person looking at a page that will not load should be told). The monitor's /api/health is not cached: it always asks.
+let remembered: { at: number; reading: HealthReading } | null = null;
+export const STATUS_PAGE_TTL_MS = 30_000;
+export const STATUS_PAGE_TIMEOUT_MS = 4_000;
+
+export function forgetStatusPageReading(): void {
+  remembered = null;
+}
+
+export async function readHealthForPage(opts: { read?: () => Promise<HealthReading>; now?: () => number; ttlMs?: number; timeoutMs?: number } = {}): Promise<HealthReading> {
+  const now = opts.now ?? Date.now;
+  const ttl = opts.ttlMs ?? STATUS_PAGE_TTL_MS;
+  if (remembered && now() - remembered.at < ttl) return remembered.reading;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const slow = new Promise<HealthReading>((resolve) => {
+    timer = setTimeout(
+      () => resolve({ httpStatus: 503, status: "error", body: { status: "error", database: "unreachable", timestamp: new Date().toISOString() } }),
+      opts.timeoutMs ?? STATUS_PAGE_TIMEOUT_MS
+    );
+  });
+  try {
+    const reading = await Promise.race([(opts.read ?? readHealth)(), slow]);
+    remembered = { at: now(), reading };
+    return reading;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}

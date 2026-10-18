@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { HELP_ARTICLES, HELP_AUDIENCES, HELP_BY_SLUG, SUPPORT_PROMISE } from "./help-articles";
 import { CHANGELOG } from "./changelog";
@@ -23,7 +23,7 @@ vi.mock("@/lib/supabase/service-role", () => ({
     },
   }),
 }));
-import { readHealth } from "./health-check";
+import { forgetStatusPageReading, readHealth, readHealthForPage, type HealthReading } from "./health-check";
 
 describe("the help center", () => {
   it("has about twenty articles for both audiences, each with a unique address and real text", () => {
@@ -52,6 +52,19 @@ describe("the help center", () => {
     const all = HELP_ARTICLES.flatMap((a) => a.body).join("\n");
     // These ship in later releases; their articles are added with them.
     expect(all).not.toMatch(/Removed clients|No automatic suggestions|Payment problems?|refund does not take sessions/);
+  });
+
+  it("the parent-view article is only there while the feature is: if the share button is gone, the article must go too", () => {
+    const featureLives = existsSync(join(__dirname, "..", "components/coach/guardian-share-button.tsx"));
+    const article = HELP_BY_SLUG.get("parent-view-link");
+    if (!featureLives) expect(article, "the parent link feature was removed: remove the article too").toBeUndefined();
+    if (article) {
+      const text = article.body.join(" ");
+      // what the page really shows and who can have one
+      expect(text).toContain("under 13");
+      expect(text).toContain("consent");
+      expect(text).toMatch(/does not show workouts, calories or macro numbers/);
+    }
   });
 
   it("is written in plain words: no internal names", () => {
@@ -97,6 +110,42 @@ describe("the status page reads the same health as the monitor", () => {
   });
 });
 
+describe("the status page's own reading", () => {
+  const ok: HealthReading = { httpStatus: 200, status: "ok", body: { status: "ok", database: "reachable", timestamp: "2026-10-18T00:00:00Z" } };
+
+  it("is remembered for 30 seconds, then read again; the monitor's reading is never remembered", async () => {
+    forgetStatusPageReading();
+    let calls = 0;
+    const read = async () => (calls++, ok);
+    let t = 1_000_000;
+    await readHealthForPage({ read, now: () => t });
+    await readHealthForPage({ read, now: () => t + 29_000 });
+    expect(calls).toBe(1);
+    await readHealthForPage({ read, now: () => t + 31_000 });
+    expect(calls).toBe(2);
+    t += 100_000;
+    forgetStatusPageReading();
+  });
+
+  it("gives up after a short wait and says we are having trouble, instead of hanging", async () => {
+    forgetStatusPageReading();
+    const never = () => new Promise<HealthReading>(() => undefined);
+    const r = await readHealthForPage({ read: never, timeoutMs: 20, ttlMs: 0 });
+    expect(r).toMatchObject({ status: "error", httpStatus: 503 });
+    forgetStatusPageReading();
+  });
+
+  it("the page tells 'not checked yet' apart from 'working' for the background work, and does not claim everything is working then", () => {
+    const page = src("app/status/page.tsx");
+    expect(page).toContain("Not being checked yet.");
+    expect(page).toContain('body.jobs?.status === "ok"');
+    expect(page).toContain("The app and your data are working");
+    expect(page).toContain("readHealthForPage()");
+    expect(src("app/api/health/route.ts")).toContain("readHealth()");
+    expect(src("app/api/health/route.ts")).not.toContain("readHealthForPage");
+  });
+});
+
 describe("how it is wired", () => {
   it("the pages are public, linked from the sign-in row and from Settings, and the health route and the status page share one reading", () => {
     const mw = src("lib/supabase/middleware.ts");
@@ -105,7 +154,6 @@ describe("how it is wired", () => {
     expect(src("components/legal/legal-links.tsx")).toContain('href="/status"');
     expect(src("app/(coach)/groups/[groupId]/settings/page.tsx")).toContain('href="/help"');
     expect(src("app/api/health/route.ts")).toContain("readHealth()");
-    expect(src("app/status/page.tsx")).toContain("readHealth()");
     expect(src("app/status/page.tsx")).toContain('dynamic = "force-dynamic"');
     expect(src("app/help/[slug]/page.tsx")).toContain("generateStaticParams");
     expect(src("components/support/help-shell.tsx")).toContain("SUPPORT_PROMISE");

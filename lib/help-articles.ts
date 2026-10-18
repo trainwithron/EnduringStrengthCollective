@@ -108,10 +108,11 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     slug: "parent-view-link",
     audience: "client",
-    title: "A parent's view of a young athlete",
-    summary: "How a parent or guardian can follow along.",
+    title: "A parent's view for a young athlete",
+    summary: "How a parent or guardian can see how a young athlete is eating.",
     body: [
-      "For an athlete under 18, the coach can send a parent or guardian a private link. It shows the athlete's training without needing a login.",
+      "For a client under 13, once a parent has given their consent, the coach can send the parent or guardian a private link. It needs no login.",
+      "The page shows today's meals as ate it, changed, skipped or not logged, and whether protein is running low. It does not show workouts, calories or macro numbers.",
       "The link is private to that one family, and it works until the date the coach sees. The coach can stop it at any time, and make a new one if it goes to the wrong person.",
     ],
   },
