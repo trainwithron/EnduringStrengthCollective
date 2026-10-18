@@ -8,18 +8,19 @@ const teenDob = `${new Date().getFullYear() - 15}-01-01`;
 const childDob = `${new Date().getFullYear() - 10}-01-01`;
 
 // A stand-in database; any table can be made to fail.
-function fake(opts: { memberships: { group_id: string; role: string }[]; dob?: string | null; guardian?: string; failMemberships?: boolean; orgRoles?: number; frontDesk?: number; failTable?: string }) {
+function fake(opts: { memberships: { group_id: string; role: string }[]; dob?: string | null; guardian?: string; failMemberships?: boolean; orgRoles?: number; frontDesk?: number; failTable?: string; profileBirthday?: string | null }) {
   const builder = (table: string) => {
     const b: any = {
       select: () => b,
       eq: () => b,
-      maybeSingle: async () => ({ data: table === "client_intake" && opts.dob ? { date_of_birth: opts.dob } : null, error: null }),
+      maybeSingle: async () => ({ data: table === "client_intake" && opts.dob ? { date_of_birth: opts.dob } : table === "athlete_profile_details" && opts.profileBirthday ? { birthday: opts.profileBirthday } : null, error: null }),
       limit: () => b,
       then: (resolve: (v: unknown) => void) => {
         if (opts.failTable === table) return resolve({ data: null, error: { message: "timeout" } });
         if (table === "group_memberships") return resolve(opts.failMemberships ? { data: null, error: { message: "timeout" } } : { data: opts.memberships, error: null });
         if (table === "organization_memberships") return resolve({ data: Array.from({ length: opts.orgRoles ?? 0 }, () => ({ organization_id: "o" })), error: null });
         if (table === "org_front_desk") return resolve({ data: Array.from({ length: opts.frontDesk ?? 0 }, () => ({ organization_id: "o" })), error: null });
+        if (table === "athlete_profile_details") return resolve({ data: opts.profileBirthday ? { birthday: opts.profileBirthday } : null, error: null });
         return resolve({ data: [], error: null });
       },
     };
@@ -95,6 +96,16 @@ describe("staff are not client-only just because their only group seat is an ath
     expect((await loadDobGate(fake({ memberships: client, dob: childDob, frontDesk: 1 }), "u")).gate).toBe("blocked");
     expect((await loadDobGate(fake({ memberships: client, dob: teenDob, orgRoles: 1 }), "u")).gate).toBe("need_guardian");
     expect((await loadDobGate(fake({ memberships: client, dob: teenDob, guardian: "signed", orgRoles: 1 }), "u")).gate).toBe("ok");
+  });
+
+  it("for staff the younger of the two dates on file counts: a minor with only a profile birthday is a client for the gate, not staff with no date", async () => {
+    const teenBirthday = `${new Date().getFullYear() - 15}-01-01`;
+    const f = await loadDobGate(fake({ memberships: client, dob: null, orgRoles: 1, profileBirthday: teenBirthday }), "u");
+    expect(f.gate).toBe("need_dob");
+    // an adult intake date but a minor profile birthday: the younger wins
+    expect((await loadDobGate(fake({ memberships: client, dob: "1985-04-01", orgRoles: 1, profileBirthday: teenBirthday }), "u")).gate).not.toBe("ok");
+    // two adult dates stay staff
+    expect((await loadDobGate(fake({ memberships: client, dob: "1985-04-01", orgRoles: 1, profileBirthday: "1990-04-01" }), "u")).gate).toBe("ok");
   });
 
   it("an adult staff member with a date on file is remembered; staff with no date are let through but not remembered", async () => {

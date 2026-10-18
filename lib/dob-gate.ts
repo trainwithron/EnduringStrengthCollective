@@ -91,11 +91,13 @@ export async function loadDobGate(supabase: SupabaseClient, userId: string): Pro
   const isStaff = ((orgRows as unknown[] | null) ?? []).length > 0 || ((deskRows as unknown[] | null) ?? []).length > 0;
   const dateOfBirth = ((intake as { date_of_birth?: string | null } | null)?.date_of_birth ?? null) as string | null;
   const profileBirthday = ((details as { birthday?: string | null } | null)?.birthday ?? null) as string | null;
-  const staffBand = ageBand(dateOfBirth);
+  // For the staff exemption the YOUNGER of the two dates on file counts (the later date): a minor who has only the profile birthday is not "staff with no date".
+  const youngest = [dateOfBirth, profileBirthday].filter((d): d is string => !!d).sort().pop() ?? null;
+  const staffBand = ageBand(youngest);
   if (isStaff && staffBand !== "under13" && staffBand !== "teen") {
     return { gate: "ok", groupId, dateOfBirth, profileBirthday, ageBand: staffBand, cacheable: staffBand === "adult", guardian: null };
   }
-  const band = staffBand;
+  const band = ageBand(dateOfBirth);
   // The guardian's signature is looked up only for a client aged 13 to 17. A failed lookup is "not signed": the careful side.
   let guardian: GuardianFacts | null = null;
   if (band === "teen") {
