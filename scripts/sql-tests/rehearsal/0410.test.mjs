@@ -34,7 +34,7 @@ export default {
 
       // ---- a follow-up from the coach tells the admins again
       await db.query(`insert into public.support_messages (request_id, author_id, body) values ($1, $2, 'Any news?')`, [req, coach]);
-      h.check("a follow-up tells the admins again", (await notices(admin)).length === 2);
+      h.check("a follow-up tells the admins again", (await notices(admin, "SN Coach%")).length === 2);
 
       // ---- a coach with no group of their own in that organization still gets the reply, linking to the dashboard
       const req2 = (await db.query(`insert into public.support_requests (organization_id, coach_id, subject) values ($1, $2, 'Question') returning id`, [org2, bareCoach])).rows[0].id;
@@ -42,6 +42,18 @@ export default {
       await db.query(`insert into public.support_messages (request_id, author_id, body) values ($1, $2, 'Hello')`, [req2, admin]);
       const b1 = await notices(bareCoach, "Support replied%");
       h.check("a coach with no group still gets the reply, linking to the dashboard", b1.length === 1 && b1[0].link_path === "/dashboard" && b1[0].group_id === null, JSON.stringify(b1));
+
+      // ---- a teammate in the same organization writes in the coach's thread: the opener hears it as a teammate's message, and the admins are told (they are the ones who need to know)
+      const mate = await h.user("SN Teammate");
+      await h.orgMember(org, mate, "coach");
+      await db.query(`insert into public.support_messages (request_id, author_id, body) values ($1, $2, 'I can add detail')`, [req, mate]);
+      const m1 = await notices(coach, "A teammate%");
+      h.check("the opener is told a teammate wrote, not that support replied", m1.length === 1 && m1[0].body === "A teammate wrote in your support request: My card was charged twice" && m1[0].link_path === `/groups/${g}/business/support`, JSON.stringify(m1));
+      h.check("the platform admins are told the teammate wrote", (await notices(admin, "SN Teammate%")).length === 1 && (await notices(admin2, "SN Teammate%")).length === 1);
+      h.check("the opener got no 'Support replied' for the teammate's message", (await notices(coach, "Support replied%")).length === 1);
+
+      // ---- an admin reply does not tell the other admin
+      h.check("an admin's reply told the coach but not the other admin", (await notices(admin2, "Support replied%")).length === 0);
 
       // ---- an ordinary person gets nothing, and nobody can call the trigger function
       const stranger = await h.user("SN Stranger");

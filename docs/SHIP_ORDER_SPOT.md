@@ -27,7 +27,7 @@
 | S3 | release-team-coach | (see git) | none | team coach Home tiles and menus; built on master 408e6919 |
 | D-held | (data) | - | HELD: step 138, apply-release-cn-held-all.sql, fp 8f22a2d348ee90d7, read check-intake-flag-list.sql first | Ron's word only |
 
-| SP1 | release-support-notify | (see git) | Release SP1, step 162 (0410), apply-release-sp1-support-notices-all.sql, fp c311eaa4050bb822 | a support reply tells the other side; adds one notice kind and a trigger, safe before the code |
+| SP1 | release-support-notify | (see git) | Release SP1, step 162 (0410), apply-release-sp1-support-notices-all.sql, fp 09a62d486e02c74e | a support reply tells the other side; adds one notice kind and a trigger, safe before the code |
 Fingerprint = first 16 hex of sha256 of the LF-normalized file: tr -d '\r' < supabase/apply/<file> | sha256sum | cut -c1-16.
 Apply order: CL (136), CM (137), CO (139), G (141), H (142 to 144), I (145), J (146), K1 (147), L (148); then deploy the code; then CP (140) after the code is live. Held 138 only on Ron's word.
 

@@ -26,8 +26,9 @@ $guard$;
 --
 -- The support inbox (a coach writing to the people who run the app) was a thread nobody was told about: a coach's request waited for the platform admin to happen to open the inbox, and the admin's reply waited for the coach to
 -- happen to open theirs. Now each new message in a support thread writes one notice (and the five-minute push job sends it, with only "Open the app to read it." on the lock screen):
---   the coach wrote   -> every platform admin is told, linking to the admin support inbox;
---   anyone else wrote -> the coach who opened the request is told, linking to their Support page.
+--   a platform admin wrote            -> the coach who opened the request is told, linking to their Support page (the other admins are not);
+--   the coach who opened it wrote     -> every platform admin is told, linking to the admin support inbox;
+--   a teammate (another member of the organization) wrote -> the coach who opened it is told "A teammate wrote in your support request", and every platform admin is told too.
 -- 'support_reply' is a new kind of notice (the list of allowed kinds is rebuilt from the live one plus this kind, and refused if it would lose any). Additions only. Re-runnable.
 do $types$
 declare
@@ -71,28 +72,44 @@ declare
   req public.support_requests%rowtype;
   v_group uuid;
   v_name text;
+  v_author_is_admin boolean;
+  v_link text;
 begin
   select * into req from public.support_requests where id = new.request_id;
   if not found then
     return new;
   end if;
-  if new.author_id = req.coach_id then
-    -- the coach wrote (a new request, or a follow-up): every platform admin is told
-    select nullif(btrim(full_name), '') into v_name from public.profiles where id = new.author_id;
+  select coalesce(p.is_platform_admin, false), nullif(btrim(p.full_name), '') into v_author_is_admin, v_name from public.profiles p where p.id = new.author_id;
+
+  -- who is told, by who wrote:
+  --   a platform admin wrote            -> the coach who opened the request (not the other admins)
+  --   the coach who opened it wrote     -> every platform admin
+  --   another member of the organization (a teammate) wrote -> the coach who opened it, as "a teammate wrote", AND every platform admin
+  if new.author_id = req.coach_id or not coalesce(v_author_is_admin, false) then
     insert into public.notifications (profile_id, group_id, type, body, link_path)
-    select p.id, null, 'support_reply', coalesce(v_name, 'A coach') || ' wrote in support: ' || left(req.subject, 120), '/admin/support'
+    select p.id, null, 'support_reply',
+           case when new.author_id = req.coach_id then coalesce(v_name, 'A coach') || ' wrote in support: ' || left(req.subject, 120)
+                else coalesce(v_name, 'A teammate') || ' wrote in a coach''s support request: ' || left(req.subject, 120) end,
+           '/admin/support'
       from public.profiles p
      where p.is_platform_admin and p.id <> new.author_id;
-  else
-    -- someone else wrote (the people who run the app): the coach who opened the request is told, with a link to their Support page
+  end if;
+
+  if new.author_id <> req.coach_id then
     select gm.group_id into v_group
       from public.group_memberships gm
       join public.groups g on g.id = gm.group_id
      where gm.profile_id = req.coach_id and gm.role = 'coach' and g.organization_id = req.organization_id
      order by g.created_at
      limit 1;
+    v_link := case when v_group is null then '/dashboard' else '/groups/' || v_group || '/business/support' end;
     insert into public.notifications (profile_id, group_id, type, body, link_path)
-    values (req.coach_id, v_group, 'support_reply', 'Support replied to your request: ' || left(req.subject, 120), case when v_group is null then '/dashboard' else '/groups/' || v_group || '/business/support' end);
+    values (
+      req.coach_id, v_group, 'support_reply',
+      case when coalesce(v_author_is_admin, false) then 'Support replied to your request: ' || left(req.subject, 120)
+           else 'A teammate wrote in your support request: ' || left(req.subject, 120) end,
+      v_link
+    );
   end if;
   return new;
 end;
