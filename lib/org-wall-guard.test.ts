@@ -10,7 +10,6 @@ const REVIEWED_PERMISSION_ONLY = new Set([
   // "is this person a coach at all / do they coach this group" checks, account/erasure/AI-budget plumbing, and server routes that check a caller before acting
   "app/api/ai/coach-conversation/route.ts",
   "app/api/ai/parse-workout/route.ts",
-  "app/api/clients/delete/route.ts",
   "app/api/clients/import-roster/undo/route.ts",
   // the team page lists this coach's retired seasons, limited to the organization of the group it is on
   "app/(coach)/groups/[groupId]/team/page.tsx",
@@ -47,6 +46,9 @@ const REVIEWED_PERMISSION_ONLY = new Set([
   "components/coach/desktop/workspace-menu.tsx",
   "components/coach/mobile/spot-clients-groups-panel.tsx",
   "components/timezone-capture.tsx",
+  // checks that the caller coaches a group the client trains in before re-sending that client's guardian request
+  "app/api/guardian-consent/resend/route.ts",
+  "app/api/guardian-consent/void/route.ts",
   // only decides whether the menus show the selling tools: it asks if the coach has any client of their own in their one-on-one spaces (one row), nothing is listed or shown
   "components/coach/use-coach-type.ts",
   "lib/collective-intelligence-lookups.ts",

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { fetchOuraDailyMetrics, refreshOuraTokens } from "@/lib/oura";
 import { withCronRun } from "@/lib/cron-monitor";
+import { sealedTokenColumns, openToken, tokenOwner } from "@/lib/token-crypto";
 
 const SYNC_WINDOW_DAYS = 7;
 
@@ -32,7 +33,7 @@ async function handler(request: Request) {
   const supabase = createServiceRoleClient();
   const { data: connections, error: connectionsError } = await supabase
     .from("wearable_connections")
-    .select("id, wearable_oauth_tokens ( access_token, refresh_token, expires_at )")
+    .select("id, profile_id, wearable_oauth_tokens ( access_token, refresh_token, expires_at )")
     .eq("provider", "oura")
     .eq("status", "active");
 
@@ -54,24 +55,25 @@ async function handler(request: Request) {
       continue;
     }
 
+    const owner = tokenOwner("wearable", "oura", connection.profile_id);
     try {
-      let accessToken = tokenRow.access_token;
+      let accessToken = openToken(tokenRow.access_token, owner, "access");
 
       // Refresh a bit ahead of the real expiry so a slow request doesn't
       // land mid-refresh window.
       const expiresSoon = new Date(tokenRow.expires_at).getTime() - Date.now() < 5 * 60 * 1000;
       if (expiresSoon) {
-        const refreshed = await refreshOuraTokens(tokenRow.refresh_token);
+        const refreshed = await refreshOuraTokens(openToken(tokenRow.refresh_token, owner, "refresh"));
         accessToken = refreshed.accessToken;
-        await supabase
+        const { error: saveError } = await supabase
           .from("wearable_oauth_tokens")
           .update({
-            access_token: refreshed.accessToken,
-            refresh_token: refreshed.refreshToken,
+            ...sealedTokenColumns(refreshed, owner, { withHash: true }),
             expires_at: refreshed.expiresAt,
             updated_at: new Date().toISOString(),
           })
           .eq("connection_id", connection.id);
+        if (saveError) throw new Error("Couldn't save the new connection tokens.");
       }
 
       const { steps, sleepScore, hrvBalance, restingHeartRate } = await fetchOuraDailyMetrics(

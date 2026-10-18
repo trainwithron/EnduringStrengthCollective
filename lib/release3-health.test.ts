@@ -72,14 +72,14 @@ describe("a child waiting for parental consent is not left waiting in silence", 
   const now = new Date("2026-10-16T12:00:00Z");
   it("is announced for an under-13 without verified consent, never for others", () => {
     expect(needsConsentNotice({ dateOfBirth: "2018-03-01", consentVerified: false, now })).toBe(true);
-    expect(needsConsentNotice({ dateOfBirth: "2018-03-01", consentVerified: true, now })).toBe(false);
+    expect(needsConsentNotice({ dateOfBirth: "2018-03-01", consentVerified: true, now })).toBe(true); // nothing lets a child under 13 in, so a verified-consent flag changes nothing
     expect(needsConsentNotice({ dateOfBirth: "2012-01-01", consentVerified: false, now })).toBe(false);
     expect(needsConsentNotice({ dateOfBirth: "2013-10-17", consentVerified: false, now })).toBe(true);
     expect(needsConsentNotice({ dateOfBirth: "2013-10-16", consentVerified: false, now })).toBe(false);
     expect(needsConsentNotice({ dateOfBirth: null, consentVerified: false, now })).toBe(false);
   });
   it("says it plainly", () => {
-    expect(consentNoticeBody("Sam Lee")).toBe("Sam Lee is under 13 and cannot use the app until parental consent is verified. Open their profile to verify it.");
+    expect(consentNoticeBody("Sam Lee")).toBe("Sam Lee is under 13, so they cannot use the app: Spotlight Coaching is for people 13 and older.");
     expect(consentNoticeBody(null)).toContain("A client is under 13");
   });
   it("the birthday step asks the server to tell the coach, and the route notifies once a week per coach", () => {

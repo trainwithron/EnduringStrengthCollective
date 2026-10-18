@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { parseGarminWebhookPayload } from "@/lib/garmin";
 import { secretsMatch } from "@/lib/webhook-secret";
+import { isSealedToken, tokenHash } from "@/lib/token-crypto";
 
 // The receiving side of Garmin's push architecture — registered as this
 // app's callback URL with Garmin at partner-approval time. No user
@@ -57,12 +58,22 @@ export async function POST(request: Request) {
   // matching the stored access token, since Garmin's push payload
   // carries no other partner-visible user identifier per its documented
   // privacy design.
-  const uniqueTokens = Array.from(new Set(rows.map((r) => r.externalUserId)));
-  const { data: tokenRows } = await supabase
-    .from("wearable_oauth_tokens")
-    .select("connection_id, access_token")
-    .in("access_token", uniqueTokens);
-  const connectionIdByToken = new Map((tokenRows ?? []).map((t) => [t.access_token, t.connection_id]));
+  // The stored token may be scrambled (see lib/token-crypto.ts), so a push is matched by the token's one-way fingerprint; a connection saved before the
+  // fingerprint existed is still matched by the token itself until the protect-wearable-tokens job has filled it in.
+  // A presented value that looks like a scrambled stored token is never a real token: someone holding a copy of the database must not be able to push data by sending the stored text back.
+  const uniqueTokens = Array.from(new Set(rows.map((r) => r.externalUserId))).filter((token) => !isSealedToken(token));
+  if (uniqueTokens.length === 0) return NextResponse.json({ synced: 0 });
+  const tokenByHash = new Map(uniqueTokens.map((token) => [tokenHash(token), token]));
+  const [byHash, byToken] = await Promise.all([
+    supabase.from("wearable_oauth_tokens").select("connection_id, access_token_hash").in("access_token_hash", Array.from(tokenByHash.keys())),
+    supabase.from("wearable_oauth_tokens").select("connection_id, access_token").in("access_token", uniqueTokens),
+  ]);
+  const connectionIdByToken = new Map<string, string>();
+  for (const t of byToken.data ?? []) connectionIdByToken.set(t.access_token, t.connection_id);
+  for (const t of byHash.data ?? []) {
+    const token = tokenByHash.get(t.access_token_hash ?? "");
+    if (token) connectionIdByToken.set(token, t.connection_id);
+  }
 
   const metricRows = rows
     .map((r) => {

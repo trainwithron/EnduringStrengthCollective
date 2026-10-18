@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { FeedChannel, FeedPost } from "@/lib/types";
 import { PostCard } from "./post-card";
+import { BLOCKED_EVENT, withoutBlocked } from "@/lib/content-moderation";
+import { fetchProtectedIds } from "@/lib/name-protection-client";
+import { protectAuthor } from "@/lib/post-name-protection";
 
 export function FeedList({
   groupId,
@@ -12,6 +15,7 @@ export function FeedList({
   channel,
   isCoach,
   highlightPostId,
+  blockedIds = [],
 }: {
   groupId: string;
   initialPosts: FeedPost[];
@@ -22,8 +26,18 @@ export function FeedList({
   // a reply" alert) — scrolls to and rings the specific post so it's
   // never just "somewhere in the feed."
   highlightPostId?: string | null;
+  // The members the viewer has blocked (read on the server); their posts are not shown.
+  blockedIds?: string[];
 }) {
   const [posts, setPosts] = useState(initialPosts);
+  const [blocked, setBlocked] = useState<ReadonlySet<string>>(new Set(blockedIds));
+  const onBlocked = (authorId: string) => setBlocked((prev) => new Set([...prev, authorId]));
+  const visiblePosts = withoutBlocked(posts, blocked, (p) => p.author.id);
+  useEffect(() => {
+    const on = (e: Event) => onBlocked(String((e as CustomEvent).detail));
+    window.addEventListener(BLOCKED_EVENT, on);
+    return () => window.removeEventListener(BLOCKED_EVENT, on);
+  }, []);
 
   useEffect(() => {
     if (!highlightPostId) return;
@@ -93,6 +107,8 @@ export function FeedList({
               ),
               commentCount: (data.comments ?? []).length,
             };
+            // A member who is not a confirmed adult is shown as a first name and last initial with no photo (asked of the server, which can see dates of birth).
+            shaped.author = protectAuthor(shaped.author, await fetchProtectedIds(groupId, [shaped.author.id]));
             // A brand-new post is never pre-pinned, but re-sort anyway so it
             // lands after any already-pinned posts rather than always at
             // the very top.
@@ -159,7 +175,7 @@ export function FeedList({
     };
   }, [groupId, viewerId, channel]);
 
-  if (posts.length === 0) {
+  if (visiblePosts.length === 0) {
     return (
       <p className="font-body text-sm text-steel px-5 py-10">
         No posts yet. Finish a workout or share something to get the feed going.
@@ -169,7 +185,7 @@ export function FeedList({
 
   return (
     <div className="divide-y divide-steel/15">
-      {posts.map((post) => (
+      {visiblePosts.map((post) => (
         <div
           key={post.id}
           id={`post-${post.id}`}
@@ -179,7 +195,7 @@ export function FeedList({
               : "scroll-mt-20"
           }
         >
-          <PostCard post={post} viewerId={viewerId} isCoach={isCoach} />
+          <PostCard post={post} viewerId={viewerId} isCoach={isCoach} onBlocked={onBlocked} />
         </div>
       ))}
     </div>

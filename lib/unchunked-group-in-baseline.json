@@ -1,8 +1,13 @@
 {
+  "app/api/guardian-consent/resend/route.ts": 1,
+  "app/api/guardian-consent/sign/route.ts": 1,
+  "app/api/guardian-consent/void/route.ts": 1,
+  "app/api/guardian-consent/withdraw/route.ts": 1,
   "app/api/intake/minor-consent-notice/route.ts": 1,
   "app/scan/[exerciseId]/page.tsx": 1,
   "components/coach/inactive-clients-panel.tsx": 3,
   "components/coach/use-coach-type.ts": 1,
+  "lib/guardian-consent-server.ts": 1,
   "lib/my-training.ts": 1,
   "lib/reference-context.ts": 2
 }

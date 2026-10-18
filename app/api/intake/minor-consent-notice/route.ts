@@ -22,8 +22,7 @@ export async function POST() {
   const groupIds = (seats ?? []).map((s: { group_id: string }) => s.group_id);
   if (groupIds.length === 0) return NextResponse.json({ ok: true, notified: 0 });
 
-  const { data: consents } = await admin.from("minor_consent").select("group_id, verified").eq("athlete_id", user.id).eq("verified", true);
-  if (!needsConsentNotice({ dateOfBirth: (intake as { date_of_birth?: string | null } | null)?.date_of_birth ?? null, consentVerified: (consents ?? []).length > 0 && groupIds.every((g) => (consents ?? []).some((c: { group_id: string }) => c.group_id === g)) })) {
+  if (!needsConsentNotice({ dateOfBirth: (intake as { date_of_birth?: string | null } | null)?.date_of_birth ?? null })) {
     return NextResponse.json({ ok: true, notified: 0 });
   }
 

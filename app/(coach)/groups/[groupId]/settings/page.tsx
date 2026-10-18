@@ -14,6 +14,8 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { SignOutButton } from "@/components/group/sign-out-button";
+import { BlockedMembersList, type BlockedMember } from "@/components/feed/blocked-members-list";
+import { loadBlockedIds } from "@/lib/blocked-members";
 import { EditDisplayName } from "@/components/athlete/edit-display-name";
 import { PushNotificationToggle } from "@/components/athlete/push-notification-toggle";
 import { SmsConsentSettings } from "@/components/athlete/sms-consent-settings";
@@ -57,6 +59,10 @@ export default async function SettingsPage(
   const params = await props.params;
   const searchParams = await props.searchParams;
   const supabase = await createServerClient();
+  // The members this person has blocked in the group feed (Settings is where a block is undone).
+  const blockedIds = await loadBlockedIds(supabase);
+  const { data: blockedPeople } = blockedIds.length > 0 ? await supabase.from("profiles").select("id, full_name").in("id", blockedIds) : { data: [] };
+  const blockedMembers: BlockedMember[] = ((blockedPeople ?? []) as { id: string; full_name: string | null }[]).map((p) => ({ id: p.id, name: p.full_name ?? "A member" }));
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -180,6 +186,9 @@ export default async function SettingsPage(
     const { count: spaceCount } = await (await createCrossOrgServerClient()).from("group_memberships").select("id", { count: "exact", head: true }).eq("profile_id", user.id).eq("role", "athlete");
     trainsWithSeveralCoaches = (spaceCount ?? 0) > 1;
   }
+  // On an organization's front desk (0400): a link to the check-in screen for people who land somewhere else. Read on its own, so a database without the table yet just shows no link.
+  const { data: deskRows } = await supabase.from("org_front_desk").select("organization_id").eq("profile_id", user.id).limit(1);
+  const onFrontDesk = (deskRows ?? []).length > 0;
   // Quiet hours and private lock screens (0395). Read on its own so a database without the columns yet shows the whole page (the two choices are then left out).
   const pushPrefsRead = await supabase.from("profiles").select("quiet_hours_start, quiet_hours_end, generic_push_text").eq("id", user.id).maybeSingle();
   const pushPrefs = pushPrefsRead.error ? null : (pushPrefsRead.data as { quiet_hours_start: number | null; quiet_hours_end: number | null; generic_push_text: boolean | null } | null);
@@ -439,6 +448,12 @@ export default async function SettingsPage(
           </SettingsGroup>
         )}
 
+        {blockedMembers.length > 0 && (
+          <SettingsGroup label="Blocked members">
+            <BlockedMembersList initial={blockedMembers} />
+          </SettingsGroup>
+        )}
+
         <SettingsGroup label="Help">
           <Link href="/help" className="block font-body text-sm text-chalk">
             Help articles, what&apos;s new and app status →
@@ -472,6 +487,14 @@ export default async function SettingsPage(
               <DeleteAccountButton />
             </div>
           </SettingsGroup>
+        )}
+
+        {onFrontDesk && (
+          <p className="font-body text-sm pt-2">
+            <Link href="/front-desk" className="text-rust">
+              Open the front desk check-in screen →
+            </Link>
+          </p>
         )}
 
         <div className="pt-2 pb-4">

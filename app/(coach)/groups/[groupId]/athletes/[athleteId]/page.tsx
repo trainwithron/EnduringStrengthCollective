@@ -1,3 +1,4 @@
+import { readHealthAnswers, type HealthRead } from "@/lib/health-answers";
 import { isEmailConfigured } from "@/lib/email";
 import { mergeLoggedList } from "@/lib/logged-list";
 import { hindsightPrs, importedWorkouts, parseRollup } from "@/lib/imported-prs";
@@ -60,17 +61,17 @@ import { ParqFlagNotice } from "@/components/coach/desktop/parq-flag-notice";
 import { asDecision, decisionLine } from "@/lib/par-q-outcome";
 import { parqNoticeNeeded } from "@/lib/parq-notice";
 import { ClientCalendarSection } from "@/components/coach/desktop/client-calendar-section";
-import { MinorConsentControl } from "@/components/coach/minor-consent-control";
+import { GuardianConsentStatus, type GuardianStateInfo } from "@/components/coach/guardian-consent-status";
+import { ageBand } from "@/lib/guardian-consent";
 import { ClientSignInPanel } from "@/components/coach/client-signin-panel";
 import { CorrectClientEmail } from "@/components/coach/correct-client-email";
 import { claimStatus, isPlaceholderEmail } from "@/lib/client-claim";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { claimLinkDetail } from "@/lib/invite-state";
-import { GuardianShareButton } from "@/components/coach/guardian-share-button";
 import { SettingsGroup } from "@/components/shared/settings-group";
 import { InjuryStatusToggle } from "@/components/coach/injury-status-toggle";
 import { VideoCheckinRecorder } from "@/components/coach/video-checkin-recorder";
-import { ParQAnswersPanel } from "@/components/coach/par-q-answers-panel";
+import { ParQAnswersPanel, ParQHiddenNotice } from "@/components/coach/par-q-answers-panel";
 import { WaiverStatusLine } from "@/components/coach/waiver-status-line";
 import { RosterSection } from "@/components/coach/desktop/roster-section";
 import { isUnder13 } from "@/lib/coppa";
@@ -262,11 +263,14 @@ export default async function AthleteProfilePage(
       .eq("group_id", params.groupId)
       .eq("shared_with_coach", true)
       .order("taken_date", { ascending: false }),
-    supabase
-      .from("client_intake")
-      .select("date_of_birth, par_q_answers, waiver_accepted, waiver_signed_name, completed_at")
-      .eq("athlete_id", params.athleteId)
-      .maybeSingle(),
+    // The form row (whether it is done, the birthdate, the signed name) and, in the same wave, the answers through the database's health_answers door (null when this viewer may not read them).
+    (async () => {
+      const rowRequest = supabase.from("client_intake").select("date_of_birth, waiver_accepted, waiver_signed_name, completed_at").eq("athlete_id", params.athleteId).maybeSingle();
+      const answersRequest = readHealthAnswers(supabase, params.athleteId);
+      const row = await rowRequest;
+      const answers = await answersRequest;
+      return { data: row.data ? { ...row.data, health: answers } : row.data, error: row.error };
+    })(),
     // Self-reported by the athlete in their own Settings — RLS already
     // scopes this to "self or a coach who actually coaches them."
     supabase
@@ -506,6 +510,8 @@ export default async function AthleteProfilePage(
   const sharedProgram = personalProgram || group?.group_kind === "one_on_one" ? null : sharedProgramRaw;
   const activeProgram = personalProgram ?? sharedProgram;
   const isMinor = !!intake?.date_of_birth && isUnder13(intake.date_of_birth, new Date());
+  // 13 to 17: a parent or guardian's permission (Release V1) stands between the client and the app.
+  const isTeen = !!intake?.date_of_birth && ageBand(intake.date_of_birth) === "teen";
   const todayKeyForWave2 = new Date().toISOString().slice(0, 10);
   // A strength-meet goal with a linked main-lift movement pattern (used by the taper notice below).
   const isStrengthMeetGoal = latestConfirmedEventGoal?.goal_type === "powerbuilding_strongman";
@@ -518,8 +524,7 @@ export default async function AthleteProfilePage(
   // more batch instead of ~8 more sequential round trips.
   const [
     { data: activeProgramSchedule },
-    { data: minorConsentRow },
-    { data: guardianLinkRow },
+    { data: guardianStateRow },
     { data: assignmentRows },
     { data: habitLogRows },
     signedPhotoResults,
@@ -533,25 +538,7 @@ export default async function AthleteProfilePage(
     activeProgram
       ? supabase.from("programs").select("training_days").eq("id", activeProgram.id).maybeSingle()
       : Promise.resolve({ data: null }),
-    isMinor
-      ? supabase
-          .from("minor_consent")
-          .select("verified, method, notes, verified_at")
-          .eq("athlete_id", params.athleteId)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-    isMinor
-      ? supabase
-          .from("guardian_links")
-          .select("access_token, expires_at")
-          .eq("athlete_id", params.athleteId)
-          .eq("group_id", params.groupId)
-          .is("revoked_at", null)
-          .gt("expires_at", new Date().toISOString())
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
+    isTeen ? supabase.rpc("guardian_consent_state", { p_athlete: params.athleteId }) : Promise.resolve({ data: null }),
     supabase
       .from("package_assignments")
       .select("coach_package_id")
@@ -633,7 +620,14 @@ export default async function AthleteProfilePage(
     ? { data: [] as any[] }
     : await supabase.from("client_sub_goals").select("id, title, target_date, proposed_by, status").eq("athlete_id", params.athleteId).eq("group_id", params.groupId).order("created_at", { ascending: true });
   const subGoals: SubGoalView[] = ((subGoalRows ?? []) as any[]).map((r: any) => ({ id: r.id as string, title: r.title as string, targetDate: (r.target_date as string | null) ?? null, proposedBy: r.proposed_by as string, status: r.status as SubGoalStatus }));
-  const parQAnswers = (intake?.par_q_answers as { question: string; answer: boolean }[]) ?? [];
+  // The answers are read through the database's health_answers door (migration 0399): the client, their coach and an owner or admin the owner has granted get them; anyone else gets null and sees only whether
+  // the form is done.
+  const health: HealthRead = (intake as { health?: HealthRead } | null)?.health ?? { kind: "none" };
+  const parQAnswers = health.kind === "ok" ? health.answers : [];
+  // The form exists but this viewer may not read the answers (an owner or admin without the owner's say-so): they see only whether it is done.
+  const answersHidden = !!intake && health.kind === "none";
+  // A failed read is said out loud, never shown as "no health screening answers on file".
+  const answersFailed = health.kind === "error";
   const parQFlaggedCount = parQAnswers.filter((a) => a.answer).length;
   // The health screening line on Overview: only while there are more flagged answers than this coach has acknowledged.
   const parqNotice = !selfView && parqNoticeNeeded(parQFlaggedCount, (parqAckRow as { flagged_count?: number | null } | null)?.flagged_count);
@@ -1154,7 +1148,15 @@ export default async function AthleteProfilePage(
                           .filter(Boolean)
                           .join(" + ")}
                 </p>
+                {answersFailed ? (
+                  <p className="font-body text-sm text-rust" role="alert">
+                    Couldn&apos;t load this client&apos;s health screening. Reload the page to try again.
+                  </p>
+                ) : answersHidden ? (
+                  <ParQHiddenNotice done={!!intake?.completed_at} />
+                ) : (
                 <ParQAnswersPanel answers={parQAnswers} reviewLine={decisionLine(asDecision((parqAckRow as { decision?: string | null } | null)?.decision), (parqAckRow as { acknowledged_at?: string | null } | null)?.acknowledged_at ?? null)} />
+                )}
                 {intake && (
                   <WaiverStatusLine
                     waiverAccepted={!!intake.waiver_accepted}
@@ -1396,22 +1398,14 @@ export default async function AthleteProfilePage(
 
           <div data-tab="overview forms">
           {isMinor && (
-            <section className="space-y-3">
-              <MinorConsentControl
-                athleteId={params.athleteId}
-                groupId={params.groupId}
-                initialVerified={minorConsentRow?.verified ?? false}
-                initialMethod={(minorConsentRow?.method as any) ?? null}
-                initialNotes={minorConsentRow?.notes ?? ""}
-                initialVerifiedAt={minorConsentRow?.verified_at ?? null}
-              />
-              <GuardianShareButton
-                athleteId={params.athleteId}
-                groupId={params.groupId}
-                consentVerified={minorConsentRow?.verified ?? false}
-                initialToken={guardianLinkRow?.access_token ?? null}
-                initialExpiresAt={(guardianLinkRow as { expires_at?: string | null } | null)?.expires_at ?? null}
-              />
+            <section className="space-y-2">
+              <p className="font-body text-xs text-steel uppercase tracking-wide">Under 13</p>
+              <p className="font-body text-sm text-rust">Spotlight Coaching is for people 13 and older, so this client is stopped at the start and nothing more is collected. No consent from a parent lets them in.</p>
+            </section>
+          )}
+          {isTeen && (
+            <section>
+              <GuardianConsentStatus athleteId={params.athleteId} info={(guardianStateRow as GuardianStateInfo | null) ?? null} />
             </section>
           )}
           </div>

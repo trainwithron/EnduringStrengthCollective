@@ -24,12 +24,29 @@
 | F1 | release-f1-free-tier-ai | (see git) | none | free tier AI gate behind COACH_BILLING_ENFORCED (off); built on master 1493ad60, independent of L |
 | F2 | release-f2-client-cap | (see git) | Release F2, step 149 (0397), apply-release-f2-client-cap-all.sql, fp 979398d89cdde8a9 | stacked on L + F1; installed SWITCHED OFF, adds only |
 | S1 | release-signin-hardening | (see git) | Release S1, step 150 (0398), apply-release-s1-signin-hardening-all.sql, fp 8628d711b21b9d5a | built on master eb5ed58d; adds only, paste BEFORE code |
+| S2 | release-health-answers | (see git) | Release S2, step 151 (0399), apply-release-s2-health-answers-all.sql, fp 331e4a4fa00b98b1 | built on master 408e6919; apply and deploy together |
 | S3 | release-team-coach | (see git) | none | team coach Home tiles and menus; built on master 408e6919 |
+| V1 | release-guardian | (see git) | Release V1, step 154 (0402), apply-release-v1-guardian-consent-all.sql, fp 7198afb8dbd00aff | guardian consent 13 to 17 + under-13 hard block; ADDITIONS ONLY (server-only table + one function) but APPLY BEFORE DEPLOY: with the code live every 13 to 17 client is stopped until a guardian signs |
+| Z1 | release-snapshot-delete | (see git) | Release Z1, step 159 (0407), apply-release-z1-client-removals-all.sql, fp 726bef10c071be7d | remove a client without destroying them + 30-day undo for a permanent delete; adds two tables and two functions, safe before the code; saves the per-client rate, cancels upcoming sessions, archives an emptied one-on-one space, refuses a live subscription |
+| W2 | release-minor-names | (see git) | W2b: Release W2b, step 157 (0405), apply-release-w2b-notice-names-all.sql, fp 2dac5abb82d97a8f; REPLACES three notice functions (not additions-only) | minors' names in the feed (code, no paste needed to deploy) + the notice triggers (paste) |
+| X1 | release-athlete-read | (see git) | Release X1, step 156 (0404), apply-release-x1-athlete-narrow-reads-all.sql, fp 67dbd8a2536b6c9c | athlete narrow reads (two read-only functions + athlete screens moved, with fallback); ADDITIONS ONLY |
+| W3 | release-intake-paths | (see git) | Release W3, step 155 (0403), apply-release-w3-intake-every-client-all.sql, fp b7fdb5ffac587391 | every client reaches the health form; ADDITIONS ONLY (one trigger); no code change |
+| U1 | release-graduation | (see git) | Release U1, step 153 (0401), apply-release-u1-graduation-all.sql, fp e1ad756a75fed295 | graduation years + emailed history PDF; ADDITIONS ONLY (column, server-only table, new function start_next_season); does not touch 0399/0400 |
+| T1 | release-front-desk | (see git) | Release T1, step 152 (0400), apply-release-t1-front-desk-all.sql, fp 2af5e220cdde4567 | front desk role + organization check-in screen; adds only, safe before the code; apply after S2's 151 |
 | D-held | (data) | - | HELD: step 138, apply-release-cn-held-all.sql, fp 8f22a2d348ee90d7, read check-intake-flag-list.sql first | Ron's word only |
 
 | HP1 | release-help-pending | (see git) | none | ORDER: keep unmerged until Z1, B1, M1 and SP1 are ALL deployed; then rebase, set the four lib/changelog.ts dates (hard-coded 2026-10-18) to the deploy day, run the suite, ship. Help articles + what's new for those four; its test fails on purpose on any tree without all four features |
 
+| T1 | release-trust | (see git) | Release T1, step 164 (0412), apply-release-t1-export-my-data-all.sql, fp in the step file | Download my data = everything (one function, two functions and a private bucket, adds only, safe before the code; the route tolerates them missing); breach runbook section; wearable-token encryption follows |
+
+| T2 | release-token-crypto | (see git) | Release T2, step 165 (0413), apply-release-t2-wearable-token-fingerprint-all.sql, fp in the step file | stacked on T1; paste BEFORE code (adds one empty column); inert until Ron sets WEARABLE_TOKEN_KEY |
+
+| CM1 | release-moderation | (see git) | Release CM1, step 163 (0411), apply-release-cm1-report-and-block-all.sql, fp ebb062f459a6f76a | report a post or comment and block a member in the feed; adds two small tables, two functions and one notice kind, safe before the code |
+| SP1 | release-support-notify | (see git) | Release SP1, step 162 (0410), apply-release-sp1-support-notices-all.sql, fp 09a62d486e02c74e | a support reply tells the other side; adds one notice kind and a trigger, safe before the code |
 Fingerprint = first 16 hex of sha256 of the LF-normalized file: tr -d '\r' < supabase/apply/<file> | sha256sum | cut -c1-16.
 Apply order: CL (136), CM (137), CO (139), G (141), H (142 to 144), I (145), J (146), K1 (147), L (148); then deploy the code; then CP (140) after the code is live. Held 138 only on Ron's word.
+
+| M1 | release-money-safe | (see git) | Release M1, step 161 (0409), apply-release-m1-payment-events-all.sql, fp d291b6b927ce4ef3 | failed payments, refunds, disputes recorded + coach told + platform checks; adds one table and one notice kind, moves no money; after the code, Ron switches on 4 Stripe webhook events |
+| B1 | release-nutrition-flag | (see git) | Release B1, step 160 (0408), apply-release-b1-nutrition-flag-all.sql, fp 6c013ec4fd15e14b | no automatic nutrition suggestions for one client; adds one coach-only table, safe before the code |
 
 When V1 (guardian consent) is deployed: also remove the help article parent-view-link (lib/help-articles.ts); the support-pages test fails until it is gone.

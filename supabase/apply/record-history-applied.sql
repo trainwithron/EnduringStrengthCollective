@@ -8,6 +8,16 @@ insert into supabase_migrations.schema_migrations (version, name, statements, cr
 select v.version, v.name, array['-- applied by hand through the SQL editor; the SQL is supabase/migrations/' || v.file], 'ronarnold4210@gmail.com'
 from (
   values
+    ('2026100600402', 'guardian_consent', '0402_guardian_consent.sql', to_regclass('public.guardian_consents') is not null),
+    ('2026100600413', 'wearable_token_fingerprint', '0413_wearable_token_fingerprint.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'wearable_oauth_tokens' and column_name = 'access_token_hash')),
+    ('2026100600412', 'export_my_data', '0412_export_my_data.sql', to_regprocedure('public.export_my_data_table(text, text, integer, integer)') is not null),
+    ('2026100600411', 'report_and_block', '0411_report_and_block.sql', to_regclass('public.content_reports') is not null),
+    ('2026100600410', 'support_reply_notices', '0410_support_reply_notices.sql', exists (select 1 from pg_trigger where tgname = 'support_messages_notify' and not tgisinternal)),
+    ('2026100600409', 'payment_events', '0409_payment_events.sql', to_regclass('public.payment_events') is not null),
+    ('2026100600408', 'client_nutrition_flags', '0408_client_nutrition_flags.sql', to_regclass('public.client_nutrition_flags') is not null),
+    ('2026100600407', 'client_removals', '0407_client_removals.sql', to_regclass('public.client_removals') is not null),
+    ('2026100600405', 'notice_names', '0405_notice_names.sql', to_regprocedure('public.notice_display_name(uuid)') is not null),
+    ('2026100600404', 'athlete_narrow_reads', '0404_athlete_narrow_reads.sql', to_regprocedure('public.group_member_names(uuid)') is not null),
     ('2026100600236', 'workout_session_integrity', '0236_workout_session_integrity.sql', exists (select 1 from pg_indexes where schemaname = 'public' and indexname = 'workout_logs_session_id_key')),
     ('2026100600237', 'join_group_with_invite', '0237_join_group_with_invite.sql', exists (select 1 from pg_proc where proname = 'join_group_with_invite' and pronamespace = 'public'::regnamespace)),
     ('2026100600238', 'close_loose_self_join_policy', '0238_close_loose_self_join_policy.sql', exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'group_memberships' and policyname = 'memberships_insert_coach_or_self' and with_check not like '%has_valid_group_invite%')),
@@ -67,6 +77,10 @@ from (
     ('2026100600331', 'purchase_grants_once', '0331_purchase_grants_once.sql', to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null),
     ('2026100600338', 'guardian_links_scoped', '0338_guardian_links_scoped.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'guardian_links' and column_name = 'expires_at')),
     ('2026100600367', 'rest_range', '0367_rest_range.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')),
+    ('2026100600403', 'intake_for_every_client', '0403_intake_for_every_client.sql', exists (select 1 from pg_trigger where tgname = 'group_memberships_require_intake' and not tgisinternal)),
+    ('2026100600401', 'graduation', '0401_graduation.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_memberships' and column_name = 'graduation_year')),
+    ('2026100600400', 'front_desk', '0400_front_desk.sql', to_regclass('public.org_front_desk') is not null),
+    ('2026100600399', 'health_answers_private', '0399_health_answers_private.sql', to_regclass('public.health_access_grants') is not null),
     ('2026100600398', 'pending_email_changes', '0398_pending_email_changes.sql', to_regclass('public.pending_email_changes') is not null),
     ('2026100600397', 'free_tier_client_limit', '0397_free_tier_client_limit.sql', exists (select 1 from pg_trigger where tgname = 'group_memberships_free_tier_limit' and not tgisinternal)),
     ('2026100600396', 'leaving_coach_choice', '0396_leaving_coach_choice.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'organization_memberships' and column_name = 'departing_since')),
