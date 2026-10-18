@@ -102,6 +102,8 @@ describe("who has not accepted yet, and who may manage invitations", () => {
         const b: any = {
           select: () => b,
           eq: (col: string, val: unknown) => ((rows = rows.filter((r) => r[col] === val)), b),
+          is: (col: string) => ((rows = rows.filter((r) => r[col] == null)), b),
+          gt: (col: string, val: string) => ((rows = rows.filter((r) => String(r[col]) > val)), b),
           maybeSingle: async () => ({ data: rows[0] ?? null, error: null }),
           then: (resolve: (v: unknown) => void) => resolve({ data: rows, error: null, count: rows.length }),
         };
@@ -191,6 +193,26 @@ describe("who has not accepted yet, and who may manage invitations", () => {
     expect((await inviteOnlyFootprint(db, OTHER, "v")).ok).toBe(false);
     // a person with no invitation seat at all is not an invitation of anyone
     expect((await inviteOnlyFootprint(adminDb({}, {}), ORG, "nobody")).ok).toBe(false);
+  });
+
+  it("an account somebody else has an open invitation for is out of reach too: another organization's in-app invitation, a space invitation or a client invitation", async () => {
+    const future = new Date(Date.now() + 86400000).toISOString();
+    const past = new Date(Date.now() - 86400000).toISOString();
+    const base = { organization_memberships: [{ profile_id: "v", organization_id: ORG, role: "admin" }], group_memberships: [coachSeat("v")] };
+    const users = { v: unaccepted("v@x.co") };
+    // none open: fine
+    expect((await inviteOnlyFootprint(adminDb(users, base), ORG, "v")).ok).toBe(true);
+    // org B invited the same account in the app and it is still open: org A may not mint a link for it
+    expect((await inviteOnlyFootprint(adminDb(users, { ...base, organization_invites: [{ invited_profile_id: "v", organization_id: OTHER, answered_at: null, expires_at: future }] }), ORG, "v")).ok).toBe(false);
+    // answered or expired ones do not count
+    expect((await inviteOnlyFootprint(adminDb(users, { ...base, organization_invites: [{ invited_profile_id: "v", organization_id: OTHER, answered_at: "2026-10-01", expires_at: future }] }), ORG, "v")).ok).toBe(true);
+    expect((await inviteOnlyFootprint(adminDb(users, { ...base, organization_invites: [{ invited_profile_id: "v", organization_id: OTHER, answered_at: null, expires_at: past }] }), ORG, "v")).ok).toBe(true);
+    // this organization's own open in-app invitation is not a problem
+    expect((await inviteOnlyFootprint(adminDb(users, { ...base, organization_invites: [{ invited_profile_id: "v", organization_id: ORG, answered_at: null, expires_at: future }] }), ORG, "v")).ok).toBe(true);
+    // a space invitation or a client invitation that is still open
+    expect((await inviteOnlyFootprint(adminDb(users, { ...base, space_invites: [{ invited_profile_id: "v", answered_at: null, expires_at: future }] }), ORG, "v")).ok).toBe(false);
+    expect((await inviteOnlyFootprint(adminDb(users, { ...base, client_invites: [{ athlete_id: "v", used_at: null, revoked_at: null, expires_at: future }] }), ORG, "v")).ok).toBe(false);
+    expect((await inviteOnlyFootprint(adminDb(users, { ...base, client_invites: [{ athlete_id: "v", used_at: null, revoked_at: "2026-10-02", expires_at: future }] }), ORG, "v")).ok).toBe(true);
   });
 
   it("cancelling needs an account that has made nothing; anything it has made keeps it from being deleted", async () => {
@@ -291,6 +313,9 @@ describe("the wiring", () => {
     expect(cancel.indexOf("inviteOnlyFootprint(")).toBeLessThan(cancel.indexOf("deleteUser("));
     // a delete that failed is a cancel that did not happen
     expect(cancel).toContain("if (deleteError)");
+    // the account is looked at again right before the delete
+    expect(cancel.indexOf("getUserById(profileId)")).toBeLessThan(cancel.indexOf("deleteUser("));
+    expect(cancel).toContain("if (!isUnaccepted(fresh?.user))");
   });
 
   it("the Team page lists every invitation with who, role, status and the three actions, for both kinds", () => {

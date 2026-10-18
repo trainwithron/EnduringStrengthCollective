@@ -78,17 +78,24 @@ export async function removeOrphanInvitee(serviceRole: any, userId: string): Pro
  * nothing yet (no health form, no posts, messages or programs), which is what cancelling (deleting the account) needs.
  */
 export async function inviteOnlyFootprint(serviceRole: any, organizationId: string, profileId: string, opts: { withData?: boolean } = {}): Promise<{ ok: boolean; reason?: string }> {
-  const [org, desk, seats] = await Promise.all([
+  const nowIso = new Date().toISOString();
+  const [org, desk, seats, orgInvites, spaceInvites, clientInvites] = await Promise.all([
     serviceRole.from("organization_memberships").select("organization_id").eq("profile_id", profileId),
     serviceRole.from("org_front_desk").select("organization_id").eq("profile_id", profileId),
     serviceRole.from("group_memberships").select("role, groups!inner(organization_id)").eq("profile_id", profileId),
+    // Open (unanswered, unexpired) in-app invitations from anybody: if another organization or a space has invited this account, a link made for it could be used to accept that invitation as the account.
+    serviceRole.from("organization_invites").select("organization_id").eq("invited_profile_id", profileId).is("answered_at", null).gt("expires_at", nowIso),
+    serviceRole.from("space_invites").select("id").eq("invited_profile_id", profileId).is("answered_at", null).gt("expires_at", nowIso),
+    serviceRole.from("client_invites").select("id").eq("athlete_id", profileId).is("used_at", null).is("revoked_at", null).gt("expires_at", nowIso),
   ]);
-  if (org.error || desk.error || seats.error) return { ok: false, reason: "unreadable" };
+  if (org.error || desk.error || seats.error || orgInvites.error || spaceInvites.error || clientInvites.error) return { ok: false, reason: "unreadable" };
   const orgRows = (org.data ?? []) as { organization_id: string }[];
   const deskRows = (desk.data ?? []) as { organization_id: string }[];
   const seatRows = (seats.data ?? []) as { role: string; groups: { organization_id: string | null } | { organization_id: string | null }[] | null }[];
   if (![...orgRows, ...deskRows].some((r) => r.organization_id === organizationId)) return { ok: false, reason: "not invited by this organization" };
   if ([...orgRows, ...deskRows].some((r) => r.organization_id !== organizationId)) return { ok: false, reason: "belongs to another organization" };
+  if (((orgInvites.data ?? []) as { organization_id: string }[]).some((r) => r.organization_id !== organizationId)) return { ok: false, reason: "another organization has invited this account" };
+  if (((spaceInvites.data ?? []) as unknown[]).length > 0 || ((clientInvites.data ?? []) as unknown[]).length > 0) return { ok: false, reason: "has an open invitation of another kind" };
   for (const s of seatRows) {
     const g = Array.isArray(s.groups) ? s.groups[0] : s.groups;
     if (s.role !== "coach" || g?.organization_id !== organizationId) return { ok: false, reason: "has a seat that is not one of this invitation's" };
