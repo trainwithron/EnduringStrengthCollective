@@ -14,6 +14,8 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { SignOutButton } from "@/components/group/sign-out-button";
+import { BlockedMembersList, type BlockedMember } from "@/components/feed/blocked-members-list";
+import { loadBlockedIds } from "@/lib/blocked-members";
 import { EditDisplayName } from "@/components/athlete/edit-display-name";
 import { PushNotificationToggle } from "@/components/athlete/push-notification-toggle";
 import { SmsConsentSettings } from "@/components/athlete/sms-consent-settings";
@@ -57,6 +59,10 @@ export default async function SettingsPage(
   const params = await props.params;
   const searchParams = await props.searchParams;
   const supabase = await createServerClient();
+  // The members this person has blocked in the group feed (Settings is where a block is undone).
+  const blockedIds = await loadBlockedIds(supabase);
+  const { data: blockedPeople } = blockedIds.length > 0 ? await supabase.from("profiles").select("id, full_name").in("id", blockedIds) : { data: [] };
+  const blockedMembers: BlockedMember[] = ((blockedPeople ?? []) as { id: string; full_name: string | null }[]).map((p) => ({ id: p.id, name: p.full_name ?? "A member" }));
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -436,6 +442,12 @@ export default async function SettingsPage(
         {!isCoach && showNameAvailable && (
           <SettingsGroup label="Sharing your workout picture">
             <ShowNameOnShareToggle profileId={athleteId} initialOn={showNameOn} />
+          </SettingsGroup>
+        )}
+
+        {blockedMembers.length > 0 && (
+          <SettingsGroup label="Blocked members">
+            <BlockedMembersList initial={blockedMembers} />
           </SettingsGroup>
         )}
 

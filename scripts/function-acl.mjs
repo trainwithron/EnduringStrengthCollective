@@ -85,6 +85,8 @@ export const ACL_REVIEWED = [
   "join_group_with_invite", "set_sms_consent", "request_workspace_org", "answer_organization_invite", "leave_organization", "group_in_active_org", "ensure_personal_space", "group_is_new_and_mine", "coach_in_org", "client_of_coach_in_org", "attach_refund_reason", "refund_coach_credit", "group_session_counts",
   // Release H: each checks the caller inside (owner, admin or the member themselves; signed-in only) through is_org_owner_or_admin, which this list does not recognise by name
   "close_organization", "remove_org_member", "set_org_member_role",
+  // Release CM1: checks the caller inside (signed in, a member of the post's group, not the author) through a local copy of auth.uid(), which this list does not recognise by pattern
+  "report_content",
 ];
 
 const quote = (names) => names.map((n) => `'${n}'`).join(", ");

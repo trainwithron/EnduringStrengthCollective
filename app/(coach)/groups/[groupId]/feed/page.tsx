@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { FeedList } from "@/components/feed/feed-list";
+import { ReportedContentPanel } from "@/components/feed/reported-content-panel";
+import { loadBlockedIds } from "@/lib/blocked-members";
 import { NewPostComposer } from "@/components/feed/new-post-composer";
 import { PostComposerDesktop } from "@/components/feed/desktop/post-composer-desktop";
 import { ChannelTabs } from "@/components/feed/channel-tabs";
@@ -176,6 +178,8 @@ export default async function FeedPage(
     // anything gets posted, everyone can see the leaderboard").
     channel === "general" && !noSharedGroup ? getGroupLeaderboardRankings(supabase, feedGroupId, loadNameProtectedIds) : Promise.resolve(null),
   ]);
+  // The members this person has blocked: their posts are left out of the list.
+  const blockedIds = await loadBlockedIds(supabase);
   const feedBroadcastLevel =
     (viewerProfile?.feed_broadcast_level as "full" | "prs_only" | "checkin_only" | "private") ?? "full";
 
@@ -236,6 +240,7 @@ export default async function FeedPage(
             <ClearChannelButton groupId={params.groupId} channel={channel} />
           </div>
           <div className="pt-6">
+            <ReportedContentPanel groupId={params.groupId} />
             {leaderboardCard}
             <PostComposerDesktop
               groupId={params.groupId}
@@ -250,6 +255,7 @@ export default async function FeedPage(
               channel={channel}
               isCoach={isCoach}
               highlightPostId={highlightPostId}
+              blockedIds={blockedIds}
             />
           </div>
         </div>
@@ -292,6 +298,12 @@ export default async function FeedPage(
 
       <ChannelTabs basePath={selfView ? `/groups/${params.groupId}/feed?group=${feedGroupId}` : `/groups/${params.groupId}/feed`} active={channel} />
 
+      {renderAsCoach && !noSharedGroup && !isActingAsOther && (
+        <div className="px-5">
+          <ReportedContentPanel groupId={feedGroupId} />
+        </div>
+      )}
+
       {leaderboardCard && <div className="px-5">{leaderboardCard}</div>}
 
       <FeedList
@@ -302,6 +314,7 @@ export default async function FeedPage(
         channel={channel}
         isCoach={renderAsCoach}
         highlightPostId={highlightPostId}
+        blockedIds={blockedIds}
       />
       {!noSharedGroup && (
       <NewPostComposer
