@@ -101,7 +101,7 @@ export async function POST(request: Request) {
     profile_id: athleteId,
     group_id: groupId,
     type: "email_change_requested",
-    body: `Your coach asked to change your sign-in email to ${trimmed}. Nothing has changed yet: it changes only if that address confirms, and not before tomorrow. If you did not expect this, cancel it from the banner at the top of the app.`,
+    body: `Your coach asked to change your sign-in email to ${trimmed}. Nothing has changed yet: it changes only if that address confirms${new Date(asked.confirmableAt).getTime() - Date.now() > 3600_000 ? ", and not before tomorrow" : ""}. If you did not expect this, cancel it from the banner at the top of the app.`,
     link_path: `/groups/${groupId}`,
   });
 

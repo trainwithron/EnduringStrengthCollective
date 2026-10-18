@@ -140,7 +140,7 @@ export async function confirmEmailChange(db: any, token: string, now: Date = new
     }
     const { data: newer } = await db.from("pending_email_changes").select("id").eq("profile_id", row.profile_id).is("confirmed_at", null).is("cancelled_at", null).gt("created_at", row.created_at).limit(1);
     if ((newer ?? []).length > 0) {
-      await close();
+      // A newer request is waiting: this one is not used now, but it is not closed either, so it stays valid if the newer one's email never arrives or it is cancelled. The claim is given back below.
       return { ok: false, reason: "stale" };
     }
 

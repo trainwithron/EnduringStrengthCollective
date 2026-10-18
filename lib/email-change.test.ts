@@ -189,6 +189,9 @@ describe("a sign-in email change waits for the new address", () => {
     const first = await ask(newer);
     await ask(newer, { newEmail: "other@example.com" });
     expect(await confirmEmailChange(newer, tokenFrom(first.confirmLink))).toEqual({ ok: false, reason: "stale" });
+    // the older request is not closed by that: it stays open (so it is still valid if the newer email never arrives)
+    expect(newer.rows[0].cancelled_at).toBeNull();
+    expect(newer.rows[0].confirmed_at).toBeNull();
   });
 
   it("an address someone else has by then leaves the request open and says so", async () => {
@@ -253,6 +256,11 @@ describe("a sign-in email change waits for the new address", () => {
 });
 
 describe("wiring", () => {
+  it("the client's notice says \"not before tomorrow\" only when there is a wait, and the banner is on the notifications page too", () => {
+    const route = src("app/api/clients/correct-email/route.ts");
+    expect(route).toContain("new Date(asked.confirmableAt).getTime() - Date.now() > 3600_000");
+    expect(src("app/notifications/page.tsx")).toContain("<PendingEmailChangeBanner userId={user.id} />");
+  });
   it("the coach's correction never changes the login itself, and only supersedes after the email went out", () => {
     const route = src("app/api/clients/correct-email/route.ts");
     expect(route).not.toContain("updateUserById");
