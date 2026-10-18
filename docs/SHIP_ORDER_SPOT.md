@@ -27,5 +27,6 @@
 | S3 | release-team-coach | (see git) | none | team coach Home tiles and menus; built on master 408e6919 |
 | D-held | (data) | - | HELD: step 138, apply-release-cn-held-all.sql, fp 8f22a2d348ee90d7, read check-intake-flag-list.sql first | Ron's word only |
 
+| B1 | release-nutrition-flag | (see git) | Release B1, step 160 (0408), apply-release-b1-nutrition-flag-all.sql, fp b7554a491f870ab0 | no automatic nutrition suggestions for one client; adds one coach-only table, safe before the code |
 Fingerprint = first 16 hex of sha256 of the LF-normalized file: tr -d '\r' < supabase/apply/<file> | sha256sum | cut -c1-16.
 Apply order: CL (136), CM (137), CO (139), G (141), H (142 to 144), I (145), J (146), K1 (147), L (148); then deploy the code; then CP (140) after the code is live. Held 138 only on Ron's word.
