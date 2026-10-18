@@ -143,8 +143,8 @@ describe("the front desk reaches clients only through the database's functions",
     const route = src("app/api/coaches/invite/route.ts");
     expect(route).not.toContain("invite_open");
     expect(route).not.toContain("status: 409");
-    expect(route).toContain('if (inviteRowError?.code === "23505") return NextResponse.json({ invited: true });');
-    expect(src("components/coach/desktop/invite-coach-form.tsx")).toContain("choose Resend there");
+    expect(route).toContain('if (inviteRowError?.code === "23505") return NextResponse.json({ invited: true, emailed: true });');
+    expect(src("components/coach/desktop/invite-coach-form.tsx")).toContain("send it again, copy the link or cancel it there");
   });
 
   it("the front-desk link is asked per person and a signed-out or failed read is never kept", () => {

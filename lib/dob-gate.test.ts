@@ -43,7 +43,8 @@ describe("the date is asked before the client reaches their group", () => {
   const read = (rel: string) => readFileSync(join(__dirname, "..", rel), "utf8").replace(/\r\n/g, "\n");
   it("the sign-in gate covers group and session pages and sends to the one-field screen", () => {
     const mw = read("lib/supabase/middleware.ts");
-    expect(mw).toContain('pathname.startsWith("/groups") || pathname.startsWith("/sessions")');
+    expect(mw).toContain("dobGatedPage(pathname)");
+    expect(read("lib/gate-paths.ts")).toContain('"/groups", "/sessions');
     expect(mw).toContain('new URL("/birthday", request.url)');
   });
   it("the date is saved where the app already reads it", () => {

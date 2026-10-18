@@ -1,7 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { appOrigin } from "@/lib/app-url";
 import { clientIp, rateLimitAllows } from "@/lib/rate-limit";
+import { isEmailConfigured } from "@/lib/email";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { makeAuthLink, recoveryEmail, sendAuthMail } from "@/lib/auth-mail";
 
 // Sends the "reset your password" email. It is sent from the SERVER (not the browser library) so the link carries the session in the address and works on any
 // device: a link made by the browser library only works in the browser that asked, so a reset asked for on a computer and opened on a phone said "invalid or
@@ -17,6 +20,26 @@ export async function POST(request: Request) {
   const ip = clientIp(request);
   if (!(await rateLimitAllows(`forgot-password-ip:${ip}`, 10, 3600)) || !(await rateLimitAllows(`forgot-password:${email}`, 3, 3600))) {
     return NextResponse.json({ error: "Too many requests. Wait a few minutes and try again." }, { status: 429 });
+  }
+
+  // With the transactional mail service set up, the email is sent by us (a link made by the auth service, delivered by Brevo), so it does not depend on the auth service's own mailer. Whatever happens, the answer is the
+  // same "ok" for an address that has an account and one that does not. Without the mail service the older route below is used.
+  if (isEmailConfigured()) {
+    const db = createServiceRoleClient();
+    // All of it runs AFTER the answer is sent, so an address with an account and one without take exactly the same time to answer (the response time must not reveal which emails have accounts).
+    const origin = appOrigin(request);
+    after(async () => {
+      try {
+        const made = await makeAuthLink(db, { type: "recovery", email, redirectTo: `${origin}/set-password` });
+        if (made.link) {
+          const sent = await sendAuthMail(email, recoveryEmail({ toName: null, link: made.link }));
+          if (!sent) console.error("[forgot-password] the reset email could not be sent through the mail service");
+        }
+      } catch (err) {
+        console.error("[forgot-password] the reset email failed:", err instanceof Error ? err.message : "unknown");
+      }
+    });
+    return NextResponse.json({ ok: true });
   }
 
   const anon = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {

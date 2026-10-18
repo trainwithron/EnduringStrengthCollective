@@ -13,6 +13,7 @@ export function InviteCoachForm({ groupId }: { groupId: string }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [emailed, setEmailed] = useState(true);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -29,6 +30,7 @@ export function InviteCoachForm({ groupId }: { groupId: string }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Couldn't invite this coach.");
 
+      setEmailed(data.emailed !== false);
       setSuccess(true);
       setFullName("");
       setEmail("");
@@ -64,9 +66,15 @@ export function InviteCoachForm({ groupId }: { groupId: string }) {
       </p>
       {success ? (
         <div>
-          <p className="font-body text-sm text-positive">
-            If that person has no open invitation, we sent one, and they join once they accept. Check Invitations on the Team page for anything already open, and choose Resend there.
-          </p>
+          {emailed ? (
+            <p className="font-body text-sm text-positive">
+              If that person has no open invitation, we sent one, and they join once they accept. Check Invitations on the Team page for anything already open: you can send it again, copy the link or cancel it there.
+            </p>
+          ) : (
+            <p className="font-body text-sm text-rust" role="alert">
+              The invitation was made, but the email did not go out. Open Invitations on the Team page and choose Send again, or Copy link and send it yourself.
+            </p>
+          )}
           <button
             type="button"
             onClick={() => setOpen(false)}

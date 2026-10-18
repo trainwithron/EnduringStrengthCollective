@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { confirmDialog } from "@/components/shared/confirm-dialog";
+import { InvitationsList } from "@/components/org/invitations-list";
+import type { PendingInvitee } from "@/lib/coach-invite-server";
 
 export interface TeamMember {
   profileId: string;
@@ -45,6 +47,7 @@ export function TeamMembersPanel({
   myRole,
   members,
   invites,
+  newInvites = [],
 }: {
   groupId: string;
   organizationId: string;
@@ -53,6 +56,8 @@ export function TeamMembersPanel({
   myRole: string;
   members: TeamMember[];
   invites: TeamInvite[];
+  // People invited by a new email address who have not accepted yet (their account is waiting).
+  newInvites?: PendingInvitee[];
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
@@ -291,35 +296,7 @@ export function TeamMembersPanel({
         })}
       </div>
 
-      {invites.length > 0 && (
-        <div className="mt-6">
-          <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">Waiting to answer</p>
-          <div className="border border-steel/20 divide-y divide-steel/15">
-            {invites.map((i) => {
-              const expired = new Date(i.expiresAt) < new Date();
-              return (
-                <div key={i.id} className="p-3 flex flex-wrap items-center justify-between gap-2">
-                  <p className="font-body text-sm">
-                    {i.name}
-                    <span className="text-steel text-xs uppercase tracking-wide ml-2">{ROLE_WORD[i.role] ?? i.role}</span>
-                    <span className="text-steel text-xs ml-2">{expired ? "expired" : `until ${new Date(i.expiresAt).toLocaleDateString()}`}</span>
-                  </p>
-                  {isOwnerOrAdmin && (
-                    <div className="flex items-center gap-4">
-                      <button type="button" onClick={() => resend(i)} disabled={busy === `ext-${i.id}`} className="font-body text-xs text-steel underline disabled:opacity-40">
-                        Send again
-                      </button>
-                      <button type="button" onClick={() => cancel(i)} disabled={busy === `cancel-${i.id}`} className="font-body text-xs text-rust disabled:opacity-40">
-                        Cancel
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      <InvitationsList groupId={groupId} canManage={isOwnerOrAdmin} invites={invites} newInvites={newInvites} busy={busy} onResendExisting={resend} onCancelExisting={cancel} />
 
       {error && (
         <p className="font-body text-xs text-rust mt-3" role="alert">
