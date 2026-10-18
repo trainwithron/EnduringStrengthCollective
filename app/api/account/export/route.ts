@@ -71,6 +71,10 @@ export async function GET(request: Request) {
     supabase.from("read_settings").select("faith_track, note_seen_at, updated_at").eq("athlete_id", userId).maybeSingle(),
   ]);
 
+  // What they accepted and when (terms, privacy, waiver): read through the columns they are allowed to read (the address and device of an acceptance are kept apart, for the server only), because the table no longer
+  // has a table-wide read and so the generic collector cannot list it.
+  const { data: legalRows, error: legalError } = await supabase.from("legal_acceptances").select("id, document, version, accepted_at, text_snapshot").eq("profile_id", userId).order("accepted_at", { ascending: true });
+
   // Their own screening answers, read through the same door as everyone's.
   const ownAnswers = intake ? await readHealthAnswers(supabase, userId) : null;
   if (ownAnswers?.kind === "error") return NextResponse.json({ error: "Couldn't read your health screening, so the export wasn't made. Try again in a moment." }, { status: 503 });
@@ -80,6 +84,7 @@ export async function GET(request: Request) {
 
   const exportData = {
     exportedAt: new Date().toISOString(),
+    legalAcceptances: legalError ? null : (legalRows ?? []),
     everything: everything ? everything.tables : null,
     everythingComplete: everything ? everything.complete : false,
     everythingNote: everything
