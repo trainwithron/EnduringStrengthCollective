@@ -2916,6 +2916,25 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "150",
+  slug: "0398",
+  title: "0398 Release S1: a changed sign-in email must be confirmed by the new address first (waiting requests table)",
+  migrations: ["0398"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes on screen until the Release S1 code is live. Adds one empty table for sign-in email changes waiting for confirmation (nobody can read it from the app) and two new kinds of notice. Safe to run before the code is live.",
+  undo: [
+    "drop table if exists public.pending_email_changes;",
+    "-- the two extra notification kinds are left in the list (removing them could break rows that use them)",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 150 misbehaves. Run it only while the Release S1 code is not live (changing a client's sign-in email reads this table). A change still waiting for confirmation is simply dropped.",
+  rows: [
+    ["0398 is not already applied (the waiting-requests table is not there yet)", "to_regclass('public.pending_email_changes') is null"],
+    ["the tables it builds on exist", "to_regclass('public.profiles') is not null and to_regclass('public.groups') is not null and to_regclass('public.notifications') is not null"],
+    ["the notification type rule exists to be widened", "exists (select 1 from pg_constraint c where c.conname = 'notifications_type_check' and c.conrelid = 'public.notifications'::regclass)"],
+  ],
+});
+
+STEPS.push({
   n: "142",
   slug: "0390",
   title: "0390 Release H: undo a whole history import (every workout an import creates carries one batch id)",
@@ -3063,6 +3082,7 @@ const BUNDLES = [
   { id: "release-co", name: "Release CO (nothing about a person is public unless they chose it: personal Find a coach listing; a coach adds only their own clients to a challenge; run BEFORE the code that goes with it is live)", steps: ["139"] },
   { id: "release-cn-held", name: "HELD, Ron's word first: require the health form and waiver of every client without one (read check-intake-flag-list.sql first)", steps: ["138"] },
   { id: "release-cm", name: "Release CM (the guard function and a coach's decision on a flagged screening; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["137"] },
+  { id: "release-s1-signin-hardening", name: "Release S1 (a changed sign-in email is confirmed by the new address; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["150"] },
   { id: "release-f2-client-cap", name: "Release F2 (the free plan's client limit, installed switched off; adds only)", steps: ["149"] },
   { id: "release-l-leaving-coach", name: "Release L (a leaving coach is never given an organization; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["148"] },
   { id: "release-k1-notifications", name: "Release K1 (quiet hours, private lock screen, payment and invite pushes; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["147"] },
@@ -3344,6 +3364,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
     m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
+    m("0398", "to_regclass('public.pending_email_changes') is not null"),
     m("0397", "exists (select 1 from pg_trigger where tgname = 'group_memberships_free_tier_limit' and not tgisinternal)"),
     m("0396", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'organization_memberships' and column_name = 'departing_since')"),
     m("0395", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'notifications' and column_name = 'pushed_at')"),

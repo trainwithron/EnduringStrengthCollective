@@ -67,6 +67,7 @@ from (
     ('2026100600331', 'purchase_grants_once', '0331_purchase_grants_once.sql', to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null),
     ('2026100600338', 'guardian_links_scoped', '0338_guardian_links_scoped.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'guardian_links' and column_name = 'expires_at')),
     ('2026100600367', 'rest_range', '0367_rest_range.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')),
+    ('2026100600398', 'pending_email_changes', '0398_pending_email_changes.sql', to_regclass('public.pending_email_changes') is not null),
     ('2026100600397', 'free_tier_client_limit', '0397_free_tier_client_limit.sql', exists (select 1 from pg_trigger where tgname = 'group_memberships_free_tier_limit' and not tgisinternal)),
     ('2026100600396', 'leaving_coach_choice', '0396_leaving_coach_choice.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'organization_memberships' and column_name = 'departing_since')),
     ('2026100600395', 'push_quality', '0395_push_quality.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'notifications' and column_name = 'pushed_at')),

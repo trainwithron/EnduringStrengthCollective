@@ -29,5 +29,10 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({ error: "Couldn't update the email — try again." }, { status: 500 });
   }
-  return NextResponse.json({ ok: true, email: trimmed });
+  // A sign-in link already emailed or handed out belongs to the OLD address: it stops working now, so a mistyped address cannot be used to claim the account. The coach sends a new one to the right address.
+  const retiredAt = new Date().toISOString();
+  const retiredNow = await serviceRole.from("client_invites").update({ used_at: retiredAt, revoked_at: retiredAt, revoked_by: user.id }).eq("athlete_id", athleteId).is("used_at", null).select("id");
+  // the revoked_* columns not being there yet is answered by retiring the links the way this always worked
+  const retired = retiredNow.error ? (await serviceRole.from("client_invites").update({ used_at: retiredAt }).eq("athlete_id", athleteId).is("used_at", null).select("id")).data : retiredNow.data;
+  return NextResponse.json({ ok: true, email: trimmed, retiredLinks: (retired ?? []).length });
 }

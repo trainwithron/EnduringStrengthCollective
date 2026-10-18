@@ -83,7 +83,7 @@ describe("confirm questions", () => {
     const pairs: [string, string][] = [
       ["components/coach/assign-sessions-control.tsx", 'confirmLabel: "Set balance"'],
       ["components/coach/session-credits-control.tsx", 'confirmLabel: "Remove session"'],
-      ["components/coach/correct-client-email.tsx", 'confirmLabel: "Change email"'],
+      ["components/coach/correct-client-email.tsx", 'confirmLabel: "Send the confirmation"'],
       ["components/coach/desktop/bulk-macro-range-form.tsx", 'confirmLabel: "Apply targets"'],
       ["components/coach/desktop/meal-plan-generator.tsx", 'confirmLabel: "Build plan"'],
       ["components/coach/desktop/needs-payment-panel.tsx", 'confirmLabel: "Put on hold"'],

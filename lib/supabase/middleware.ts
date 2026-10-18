@@ -115,6 +115,9 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/claim/") ||
     pathname.startsWith("/claim-invalid") ||
     pathname.startsWith("/confirm-email") ||
+    // A sign-in email change is confirmed or cancelled from the link in an email, on any device and with no session; the token is the credential.
+    pathname.startsWith("/email-change") ||
+    pathname.startsWith("/api/email-change/") ||
     pathname.startsWith("/forgot-password") ||
     // Vercel Cron calls these with no user session at all — the
     // CRON_SECRET bearer check inside each route is the real auth, same

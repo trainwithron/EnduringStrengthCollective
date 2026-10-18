@@ -3,13 +3,13 @@ import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { validateClaimEmail } from "@/lib/client-claim";
 import { rateLimitResponse } from "@/lib/rate-limit";
-import { isEmailConfigured, sendEmail } from "@/lib/email";
+import { isEmailConfigured } from "@/lib/email";
+import { appOrigin } from "@/lib/app-url";
+import { requestEmailChange, sendEmailChangeMessages } from "@/lib/email-change";
 
-// A coach correcting the email on a client's account AFTER the client has
-// claimed it (a wrong-but-valid address no verification email caught). Before the
-// claim, /api/clients/fix-email does this. Afterwards it is the client's account,
-// so this asks for the address twice, is only for that client's coach, and tells
-// the client in the app that it happened.
+// A coach correcting the email on a client's account AFTER the client has claimed it (a wrong-but-valid address no verification email caught). Before the claim, /api/clients/fix-email does this.
+// Afterwards it is the client's account, so this asks for the address twice, is only for that client's coach, and does NOT change the login: the new address is sent a confirmation link and the login changes only
+// when its owner confirms it; the old address is told at once and can cancel; the client is told in the app.
 export async function POST(request: Request) {
   const supabase = await createServerClient();
   const {
@@ -68,41 +68,38 @@ export async function POST(request: Request) {
 
   const { data: before } = await serviceRole.auth.admin.getUserById(athleteId);
   const oldEmail = before?.user?.email ?? null;
-
-  const { error } = await serviceRole.auth.admin.updateUserById(athleteId, { email: trimmed, email_confirm: true });
-  if (error) {
-    // GoTrue reports a duplicate only as a generic failure, so check the list ourselves. This caller is a
-    // signed-in coach of the client, so telling them is fine.
-    let taken = false;
-    for (let page = 1; page <= 20 && !taken; page++) {
-      const { data } = await serviceRole.auth.admin.listUsers({ page, perPage: 1000 });
-      if (!data?.users?.length) break;
-      taken = data.users.some((u) => u.id !== athleteId && (u.email ?? "").toLowerCase() === trimmed.toLowerCase());
-      if (data.users.length < 1000) break;
-    }
-    return NextResponse.json(
-      { error: taken ? "That email already has an account, so nothing was changed." : "Couldn't update the email. Try again." },
-      { status: taken ? 409 : 500 }
-    );
+  if (oldEmail && oldEmail.toLowerCase() === trimmed.toLowerCase()) {
+    return NextResponse.json({ error: "That is already their sign-in email." }, { status: 400 });
   }
 
-  // Tell the client in the app. Best effort: the change has already happened either way.
+  // GoTrue reports a duplicate only as a generic failure, so check the list ourselves. This caller is a signed-in coach of the client, so telling them is fine.
+  let taken = false;
+  for (let page = 1; page <= 20 && !taken; page++) {
+    const { data } = await serviceRole.auth.admin.listUsers({ page, perPage: 1000 });
+    if (!data?.users?.length) break;
+    taken = data.users.some((u) => u.id !== athleteId && (u.email ?? "").toLowerCase() === trimmed.toLowerCase());
+    if (data.users.length < 1000) break;
+  }
+  if (taken) return NextResponse.json({ error: "That email already has an account, so nothing was changed." }, { status: 409 });
+
+  // The login is NOT changed here. The new address gets a link and the change happens only when its owner confirms (lib/email-change.ts); the old address is told at once and can cancel.
+  const { data: coachProfile } = await serviceRole.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
+  const asked = await requestEmailChange(serviceRole, { profileId: athleteId, newEmail: trimmed, oldEmail, requestedBy: user.id, groupId, origin: appOrigin(request) });
+  if (!asked.ok) return NextResponse.json({ error: "Couldn't start the change. Try again." }, { status: 500 });
+  const sent = await sendEmailChangeMessages({ coachName: coachProfile?.full_name ?? null, newEmail: trimmed, oldEmail, confirmLink: asked.confirmLink, cancelLink: asked.cancelLink });
+  if (!sent.toNew) {
+    return NextResponse.json({ error: "The confirmation email couldn't be sent to the new address, so nothing was started. Try again in a few minutes." }, { status: 502 });
+  }
+
+  // Tell the client in the app that a change was asked for (best effort): nothing has changed yet.
   await serviceRole.from("notifications").insert({
     profile_id: athleteId,
     group_id: groupId,
-    type: "email_changed",
-    body: "Your coach updated the email address on your account. You now sign in with the new one.",
+    type: "email_change_requested",
+    body: `Your coach asked to change your sign-in email to ${trimmed}. Nothing has changed yet: it changes only if that address confirms.`,
     link_path: `/groups/${groupId}`,
   });
 
-  // Tell the OLD address too, when email can be sent: if the change was not wanted, that is where they will see it.
-  if (oldEmail && !oldEmail.endsWith("@pending.invalid") && isEmailConfigured()) {
-    await sendEmail(
-      oldEmail,
-      "Your sign-in email was changed",
-      "Your coach changed the email address you sign in with. If you did not expect this, contact your coach right away."
-    ).catch(() => false);
-  }
+  return NextResponse.json({ ok: true, pending: true, email: trimmed, oldNotified: sent.toOld });
 
-  return NextResponse.json({ ok: true, email: trimmed });
 }

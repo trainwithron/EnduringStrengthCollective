@@ -29,8 +29,8 @@ export function CorrectClientEmail({
     const first = clientName.split(" ")[0] || "them";
     if (
       !await confirmDialog({
-        message: `Change ${first}'s sign-in email${currentEmail ? ` from ${currentEmail}` : ""} to ${email.trim()}? They will sign in and reset their password with this address from now on, and we will tell them in the app.`,
-        confirmLabel: "Change email",
+        message: `Ask to change ${first}'s sign-in email${currentEmail ? ` from ${currentEmail}` : ""} to ${email.trim()}? We email that address a link; the email changes only when its owner confirms it. The old address is told right away and ${first} is told in the app. Until then they keep signing in as they do now.`,
+        confirmLabel: "Send the confirmation",
       })
     ) {
       return;
@@ -45,7 +45,10 @@ export function CorrectClientEmail({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Couldn't change the email.");
-      setMessage({ kind: "ok", text: "Email changed. They have been notified in the app." });
+      setMessage({
+        kind: "ok",
+        text: `We sent a confirmation link to ${typeof data.email === "string" ? data.email : "the new address"}. The sign-in email changes only when it is confirmed (within 48 hours); until then nothing is different for ${first}. ${data.oldNotified ? "The old address was told." : ""}`.trim(),
+      });
       setEmail("");
       setConfirm("");
     } catch (err) {
