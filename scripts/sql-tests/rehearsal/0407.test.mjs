@@ -87,6 +87,12 @@ export default {
       h.check("a client with a live subscription cannot be removed", !!r.error && /live subscription/i.test(r.error), JSON.stringify(r));
       r = await callAs(coach, `select public.remove_client($1, $2, true, false)`, [g, sub]);
       h.check("nor deleted permanently", !!r.error && /live subscription/i.test(r.error), JSON.stringify(r));
+      for (const status of ["past_due", "incomplete", "paused"]) {
+        await db.query(`update public.membership_subscriptions set status = $2 where athlete_id = $1`, [sub, status]);
+        r = await callAs(coach, `select public.remove_client($1, $2)`, [g, sub]);
+        h.check("a " + status + " subscription also refuses the removal (it can still bill)", !!r.error && /live subscription/i.test(r.error), JSON.stringify(r));
+      }
+      h.check("the statuses the table allows are exactly those checked here plus canceled", (await db.query(`select pg_get_constraintdef(c.oid) as d from pg_constraint c where c.conrelid = 'public.membership_subscriptions'::regclass and c.contype = 'c'`)).rows.some((x) => ["active", "past_due", "canceled", "incomplete", "paused"].every((s) => x.d.includes("'" + s + "'")) && (x.d.match(/'[a-z_]+'::text/g) ?? []).length === 5), "if this fails a new status was added: decide whether it can bill");
       await db.query(`update public.membership_subscriptions set status = 'canceled' where athlete_id = $1`, [sub]);
       r = await callAs(coach, `select public.remove_client($1, $2)`, [g, sub]);
       h.check("once the subscription is cancelled they can be", !r.error, JSON.stringify(r));
@@ -188,8 +194,8 @@ export default {
       h.check("removing a client with a repeating series works" + (r.error ? ": " + r.error : ""), !r.error);
       h.check("the count includes the series' sessions (2) and the single one (1)", (await db.query(`select cancelled_bookings from public.client_removals where id = $1`, [r.rows?.[0]?.id])).rows[0].cancelled_bookings === 3);
       h.check("no session of theirs is left confirmed", (await db.query(`select count(*)::int as n from public.bookings where athlete_id = $1 and status = 'confirmed'`, [jo])).rows[0].n === 0);
-      const notice = (await db.query(`select type, body from public.notifications where profile_id = $1 order by created_at desc limit 1`, [jo])).rows[0];
-      h.check("the client gets one notice saying how many were cancelled", notice && notice.type === "request_decision" && /cancelled 3 of your upcoming sessions/.test(notice.body), JSON.stringify(notice));
+      const notice = (await db.query(`select type, body, link_path from public.notifications where profile_id = $1 order by created_at desc limit 1`, [jo])).rows[0];
+      h.check("the client gets one notice saying how many were cancelled", notice && notice.type === "schedule_applied" && notice.link_path === "/" && /cancelled 3 of your upcoming sessions/.test(notice.body), JSON.stringify(notice));
 
       // ---- the time of a scheduled group session is not cancelled behind its back
       const kit = await h.user("RM Kit");
@@ -199,6 +205,18 @@ export default {
       r = await callAs(coach, `select public.remove_client($1, $2)`, [g, kit]);
       h.check("a client who holds the time of a scheduled group session is told to change the session first, in plain words", !!r.error && /Change the group session first/.test(r.error), JSON.stringify(r));
       h.check("and nothing was removed", (await db.query(`select count(*)::int as n from public.group_memberships where group_id = $1 and profile_id = $2`, [g, kit])).rows[0].n === 1);
+
+      // ---- a seat in an upcoming group class is given up, the credit returns, and it is counted
+      const lee = await h.user("RM Lee");
+      await h.member(g, lee);
+      await db.query(`insert into public.session_credits (athlete_id, group_id, balance) values ($1, $2, 0) on conflict do nothing`, [lee, g]);
+      const cls = (await db.query(`insert into public.group_sessions (coach_id, title, start_at, end_at, capacity) values ($1, 'RM seat class', now() + interval '6 days', now() + interval '6 days 1 hour', 8) returning id`, [coach])).rows[0].id;
+      await db.query(`insert into public.group_session_attendees (group_session_id, athlete_id, group_id, status, credit_taken) values ($1, $2, $3, 'joined', true)`, [cls, lee, g]);
+      r = await callAs(coach, `select public.remove_client($1, $2) as id`, [g, lee]);
+      h.check("removing a client who holds a seat in an upcoming class works" + (r.error ? ": " + r.error : ""), !r.error);
+      h.check("the seat is given up", (await db.query(`select status from public.group_session_attendees where group_session_id = $1 and athlete_id = $2`, [cls, lee])).rows[0].status === "cancelled");
+      h.check("the credit came back", (await db.query(`select balance from public.session_credits where athlete_id = $1 and group_id = $2`, [lee, g])).rows[0].balance === 1);
+      h.check("and it is counted", (await db.query(`select cancelled_bookings from public.client_removals where id = $1`, [r.rows?.[0]?.id])).rows[0].cancelled_bookings === 1);
 
       // ---- someone else's group is unaffected
       h.check("the other coach's group is untouched", g2 !== null);

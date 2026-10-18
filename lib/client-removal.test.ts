@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { LIVE_SUBSCRIPTION_STATUSES } from "./subscription-statuses";
 import { DELETE_CONFIRM, REMOVE_CONFIRM, UNDO_DAYS, daysLeft, removalLine } from "./client-removal";
 
 const src = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
@@ -128,7 +129,7 @@ describe("the scheduled erase after 30 days", () => {
   it("erases the account when nothing stands in the way, with the coach's choice about history, leaving a person-free note", async () => {
     const w = world({});
     expect(await purgeOneRemoval(w.db, { ...removal, erase_history: true }, NOW)).toBe("erased");
-    expect(acct.erase).toHaveBeenCalledWith(w.db, "a", { eraseHistory: true, deleteEmptyOneOnOneGroups: [] });
+    expect(acct.erase).toHaveBeenCalledWith(w.db, "a", { eraseHistory: true, deleteEmptyOneOnOneGroups: [], keepSpaceGroups: [] });
     expect(w.log()).toHaveLength(1);
     expect(w.log()[0]).toMatchObject({ removal_id: "r1", group_id: "g", outcome: "erased" });
     expect(Object.keys(w.log()[0]).join()).not.toMatch(/name|email/);
@@ -148,10 +149,25 @@ describe("the scheduled erase after 30 days", () => {
   it("a one-on-one space that held only this client goes with them; one that still has a client does not", async () => {
     let w = world({ groups: [{ id: "g", group_kind: "one_on_one" }] });
     await purgeOneRemoval(w.db, removal, NOW);
-    expect(acct.erase).toHaveBeenLastCalledWith(w.db, "a", { eraseHistory: false, deleteEmptyOneOnOneGroups: ["g"] });
+    expect(acct.erase).toHaveBeenLastCalledWith(w.db, "a", { eraseHistory: false, deleteEmptyOneOnOneGroups: ["g"], keepSpaceGroups: [] });
     w = world({ groups: [{ id: "g", group_kind: "one_on_one" }], memberships: [{ group_id: "g", profile_id: "someone", role: "athlete" }] });
     await purgeOneRemoval(w.db, removal, NOW);
-    expect(acct.erase).toHaveBeenLastCalledWith(w.db, "a", { eraseHistory: false, deleteEmptyOneOnOneGroups: [] });
+    expect(acct.erase).toHaveBeenLastCalledWith(w.db, "a", { eraseHistory: false, deleteEmptyOneOnOneGroups: [], keepSpaceGroups: [] });
+  });
+
+  it("a space that now holds another client's removal is kept (renamed), never deleted: A deleted for good, B only removed, A's day 30", async () => {
+    const w = world({
+      groups: [{ id: "g", group_kind: "one_on_one" }],
+      removals: [
+        { id: "r1", group_id: "g", athlete_id: "a", erase_history: true, delete_after: "2026-11-01T00:00:00Z" },
+        { id: "rb", group_id: "g", athlete_id: "b", erase_history: false },
+      ],
+    });
+    expect(await purgeOneRemoval(w.db, { ...removal, erase_history: true }, NOW)).toBe("erased");
+    expect(acct.erase).toHaveBeenLastCalledWith(w.db, "a", { eraseHistory: true, deleteEmptyOneOnOneGroups: ["g"], keepSpaceGroups: ["g"] });
+    // B's own record is untouched by A's erase
+    expect(w.row("rb").purged_at ?? null).toBeNull();
+    expect(w.row("rb").restored_at ?? null).toBeNull();
   });
 
   it("someone who still belongs to another group is NOT erased: only the removal stands, and the record says so", async () => {
@@ -229,6 +245,23 @@ describe("the scheduled erase after 30 days", () => {
   });
 });
 
+describe("a subscription that can still bill stops a removal", () => {
+  it("every status the table allows except canceled is on the live list, checked against the migrations", () => {
+    const allowed = new Set<string>();
+    for (const f of ["supabase/migrations/0063_stripe_checkout.sql", "supabase/migrations/0186_membership_subscription_paused_status.sql"]) {
+      const text = src(f);
+      const m = /check \(status in \(([^)]*)\)\)/i.exec(text.slice(text.indexOf("membership_subscriptions")));
+      if (m) {
+        allowed.clear();
+        for (const s of m[1].match(/'[a-z_]+'/g) ?? []) allowed.add(s.replace(/'/g, ""));
+      }
+    }
+    expect([...allowed].sort()).toEqual(["active", "canceled", "incomplete", "past_due", "paused"]);
+    expect([...LIVE_SUBSCRIPTION_STATUSES].sort()).toEqual([...allowed].filter((s) => s !== "canceled").sort());
+    expect(src("supabase/migrations/0407_client_removals.sql")).toContain("s.status <> 'canceled'");
+  });
+});
+
 describe("a plain removal whose group was deleted", () => {
   it("is discarded after 30 days with a person-free note; a recent one, one that can still be put back, and a scheduled delete are left alone", async () => {
     const old = "2026-10-01T00:00:00Z";
@@ -254,7 +287,7 @@ describe("how it is wired", () => {
     expect(sql).toContain("create trigger group_memberships_unarchive_one_on_one\n  after insert on public.group_memberships");
     expect(sql).toContain("update public.groups set archived_at = null where id = new.group_id and group_kind = 'one_on_one' and archived_at is not null;");
     expect(sql).toContain("v_prev_archived");
-    expect(sql).toContain("'request_decision'");
+    expect(sql).toContain("'schedule_applied'");
     expect(sql).toContain("Change the group session first.");
     expect(sql).toContain("v_cancelled := v_cancelled + coalesce(public.cancel_recurring_booking_series(b.id), 0);");
     expect(sql).toContain("create unique index if not exists client_removal_log_one_per_removal");

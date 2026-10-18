@@ -65,11 +65,19 @@ export async function purgeOneRemoval(db: any, r: DueRemoval, now: Date = new Da
 
   // The space that held only this client (nobody else is in it now that they are out).
   const emptyOneOnOne: string[] = [];
+  const keepSpace: string[] = [];
   if (r.group_id) {
     const { data: space } = await db.from("groups").select("id, group_kind").eq("id", r.group_id).maybeSingle();
     if ((space as { group_kind?: string } | null)?.group_kind === "one_on_one") {
       const { count } = await db.from("group_memberships").select("profile_id", { count: "exact", head: true }).eq("group_id", r.group_id).eq("role", "athlete");
       if ((count ?? 0) === 0) emptyOneOnOne.push(r.group_id);
+      // Another client of this space who was only removed (kept, restorable) still has their history filed under it: the space is renamed, never deleted.
+      const { data: others, error: othersError } = await db.from("client_removals").select("id").eq("group_id", r.group_id).neq("id", r.id).is("restored_at", null).is("purged_at", null);
+      if (othersError) {
+        await note("Couldn't check whether anyone else's records are in their space; will try again.", { ...retryLater, ...release });
+        return "failed";
+      }
+      if ((others ?? []).length > 0) keepSpace.push(r.group_id);
     }
   }
 
@@ -83,7 +91,7 @@ export async function purgeOneRemoval(db: any, r: DueRemoval, now: Date = new Da
     return "failed";
   }
 
-  const result = await eraseAccount(db, r.athlete_id, { eraseHistory: r.erase_history, deleteEmptyOneOnOneGroups: emptyOneOnOne });
+  const result = await eraseAccount(db, r.athlete_id, { eraseHistory: r.erase_history, deleteEmptyOneOnOneGroups: emptyOneOnOne, keepSpaceGroups: keepSpace });
   if (!result.ok) {
     // Left marked "erasing" (Put back is refused until the erase is finished) with the reason; the next run picks it up.
     await note(result.error + " Will try again in a week.", retryLater);

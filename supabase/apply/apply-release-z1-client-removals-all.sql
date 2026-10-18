@@ -119,7 +119,7 @@ begin
   if not found then
     raise exception 'That person isn''t a client in this group.';
   end if;
-  if exists (select 1 from public.membership_subscriptions s where s.athlete_id = p_athlete and s.group_id = p_group and s.status in ('active', 'past_due', 'incomplete')) then
+  if exists (select 1 from public.membership_subscriptions s where s.athlete_id = p_athlete and s.group_id = p_group and s.status <> 'canceled') then
     raise exception 'They have a live subscription. Cancel it first so they are not billed after they leave.';
   end if;
 
@@ -147,6 +147,20 @@ begin
     v_cancelled := v_cancelled + 1;
   end loop;
   update public.booking_waitlist_entries set status = 'cancelled' where athlete_id = p_athlete and group_id = p_group and status in ('waiting', 'offered');
+  -- A seat (or a place on the waitlist) in an upcoming group class or event of this group is given up the way the app's own leave does it: the credit comes back and the next person on the waitlist is offered the seat.
+  for b in
+    select a.group_session_id as id, coalesce(gs.kind, 'class') as kind from public.group_session_attendees a
+    join public.group_sessions gs on gs.id = a.group_session_id
+    where a.athlete_id = p_athlete and a.group_id = p_group and a.status in ('joined', 'waitlisted') and gs.status = 'scheduled' and gs.start_at > now()
+    order by gs.start_at
+  loop
+    if b.kind = 'event' then
+      update public.group_session_attendees set status = 'cancelled', credit_taken = false, updated_at = now() where group_session_id = b.id and athlete_id = p_athlete;
+    else
+      perform public.leave_group_session(b.id, p_athlete);
+    end if;
+    v_cancelled := v_cancelled + 1;
+  end loop;
 
   insert into public.client_removals (group_id, athlete_id, athlete_name, athlete_email, membership, billing_rate, cancelled_bookings, removed_by, delete_after, erase_history)
   values (p_group, p_athlete, v_name, v_email, to_jsonb(m), v_rate, v_cancelled, me, case when p_permanent then now() + interval '30 days' else null end, p_permanent and p_erase_history)
@@ -170,7 +184,7 @@ begin
   if v_cancelled > 0 then
     select nullif(btrim(full_name), '') into v_name_me from public.profiles where id = me;
     insert into public.notifications (profile_id, group_id, type, body, link_path)
-    values (p_athlete, p_group, 'request_decision', coalesce(v_name_me, 'Your coach') || ' cancelled ' || v_cancelled::text || ' of your upcoming session' || case when v_cancelled = 1 then '' else 's' end || '. The credits were returned to you.', '/dashboard');
+    values (p_athlete, p_group, 'schedule_applied', coalesce(v_name_me, 'Your coach') || ' cancelled ' || v_cancelled::text || ' of your upcoming session' || case when v_cancelled = 1 then '' else 's' end || '. The credits were returned to you.', '/');
   end if;
 
   perform public.audit_record('group_memberships', m.id::text, 'update', jsonb_build_object('event', case when p_permanent then 'client_deleted_30_day_undo' else 'client_removed' end, 'group', p_group, 'client', p_athlete, 'by', me, 'removal', v_id, 'cancelled_bookings', v_cancelled, 'space_archived', v_archived));
