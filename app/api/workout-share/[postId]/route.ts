@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { getSharedWorkout } from "@/lib/shared-workout";
+import { loadFeedProtectedIds } from "@/lib/post-name-protection-server";
+import { protectAuthor } from "@/lib/post-name-protection";
 
 // Powers the in-feed "expand" on a workout card — same data the public
 // /share/[postId] page shows, just fetched on demand instead of always
@@ -28,6 +30,13 @@ export async function GET(_request: Request, props: { params: Promise<{ postId: 
   if (!canShare) {
     const { data: membership } = await supabase.from("group_memberships").select("role").eq("group_id", shared.groupId).eq("profile_id", user.id).maybeSingle();
     canShare = membership?.role === "coach";
+  }
+  // The author and the group's coach see the name in full. Everyone else sees what the feed shows: a first name and last initial and no photo for anyone who is not a confirmed adult (the expanded card must not give
+  // a minor's full name or photo to a teammate when the card in the feed above it does not).
+  if (!canShare) {
+    const protectedIds = await loadFeedProtectedIds([shared.authorId]);
+    const author = protectAuthor({ id: shared.authorId, fullName: shared.athleteName, avatarUrl: shared.athleteAvatarUrl }, protectedIds);
+    return NextResponse.json({ ...shared, athleteName: author.fullName, athleteAvatarUrl: author.avatarUrl, canShare });
   }
   return NextResponse.json({ ...shared, canShare });
 }

@@ -33,6 +33,7 @@ import { SettingsGroup } from "@/components/shared/settings-group";
 import { ExportDataButton } from "@/components/athlete/export-data-button";
 import { FeedBroadcastSettings } from "@/components/athlete/feed-broadcast-settings";
 import { resolveShowName } from "@/lib/share-name";
+import { ageStatusFromDob } from "@/lib/youth-block";
 import { ShowNameOnShareToggle } from "@/components/athlete/show-name-on-share-toggle";
 import { DeleteAccountButton } from "@/components/athlete/delete-account-button";
 import { GamificationToggle } from "@/components/coach/gamification-toggle";
@@ -442,7 +443,7 @@ export default async function SettingsPage(
           </SettingsGroup>
         )}
 
-        {!isCoach && showNameAvailable && (
+        {!isCoach && showNameAvailable && ageStatusFromDob(ownDob) === "adult" && (
           <SettingsGroup label="Sharing your workout picture">
             <ShowNameOnShareToggle profileId={athleteId} initialOn={showNameOn} />
           </SettingsGroup>
