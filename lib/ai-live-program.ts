@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { chunk } from "@/lib/chunk";
 
 // The AI day builder writes straight into the program that is open. That is right while a program is being built, but a program clients are already training on must not change under them without the coach's
 // sign-off, so the AI builds and fixes only programs nobody follows yet. "Followed" means: the program is switched on, is not an unsigned AI draft, and at least one of its workouts has been started by someone.
@@ -17,9 +18,15 @@ export async function readProgramIsFollowed(supabase: SupabaseClient, programId:
     const { data: workouts, error: workoutsError } = await supabase.from("workouts").select("id").eq("program_id", programId);
     const ids = (workouts ?? []).map((w: { id: string }) => w.id);
     if (workoutsError) hasStartedWorkouts = true;
-    else if (ids.length > 0) {
-      const { count, error: startedError } = await supabase.from("athlete_sessions").select("id", { count: "exact", head: true }).in("workout_id", ids);
-      hasStartedWorkouts = startedError ? true : (count ?? 0) > 0;
+    else {
+      // The workouts are asked about 100 at a time (a long list in one request would be too long to send); the first one that has been started settles it, and any failure counts as "followed".
+      for (const part of chunk(ids, 100)) {
+        const { count, error: startedError } = await supabase.from("athlete_sessions").select("id", { count: "exact", head: true }).in("workout_id", part);
+        if (startedError || (count ?? 0) > 0) {
+          hasStartedWorkouts = true;
+          break;
+        }
+      }
     }
   }
   return programIsFollowed({ isActive: !!program.is_active, aiDraft: !!program.ai_draft, hasStartedWorkouts });

@@ -48,6 +48,39 @@ describe("the AI does not change a program clients are following", () => {
     expect(await readProgramIsFollowed(make({ active: true, workoutsError: true }), "p")).toBe(true);
   });
 
+  it("a program with 450 workouts is asked about 100 at a time, stops at the first started one, and treats any failed request as followed", async () => {
+    const ids = Array.from({ length: 450 }, (_, i) => `w${i}`);
+    const calls: number[] = [];
+    const make = (startedIn: number | null, failAt: number | null = null) =>
+      ({
+        from: (table: string) => {
+          let asked: string[] = [];
+          const q: any = {
+            select: () => q,
+            eq: () => q,
+            in: (_c: string, v: string[]) => ((asked = v), q),
+            maybeSingle: async () => ({ data: { is_active: true, ai_draft: false }, error: null }),
+            then: (r: (v: unknown) => void) => {
+              if (table === "workouts") return r({ data: ids.map((id) => ({ id })), error: null });
+              calls.push(asked.length);
+              const call = calls.length - 1;
+              if (failAt === call) return r({ count: null, error: { message: "too long" } });
+              return r({ count: startedIn === call ? 2 : 0, error: null });
+            },
+          };
+          return q;
+        },
+      }) as never;
+    expect(await readProgramIsFollowed(make(null), "p")).toBe(false);
+    expect(calls).toEqual([100, 100, 100, 100, 50]);
+    calls.length = 0;
+    expect(await readProgramIsFollowed(make(1), "p")).toBe(true);
+    expect(calls).toEqual([100, 100]); // stopped at the first started one
+    calls.length = 0;
+    expect(await readProgramIsFollowed(make(null, 2), "p")).toBe(true);
+    expect(calls.length).toBe(3);
+  });
+
   it("the builder box shows the server's sentence", () => {
     expect(src("components/coach/desktop/ai-program-builder-box.tsx")).toContain("(data.error as string | undefined) ?? COULDNT");
   });
