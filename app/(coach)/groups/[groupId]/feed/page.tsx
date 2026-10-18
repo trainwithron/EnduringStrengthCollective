@@ -13,6 +13,7 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { LiveGroupLeaderboard } from "@/components/leaderboard/live-group-leaderboard";
 import { getGroupLeaderboardRankings, getPositionLeaderboardRankings } from "@/lib/leaderboard-data";
 import { loadNameProtectedIds } from "@/lib/minor-names";
+import { protectPostAuthors } from "@/lib/post-name-protection";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { cookies } from "next/headers";
@@ -196,6 +197,9 @@ export default async function FeedPage(
       shaped = [mapPostRow(highlighted, feedGroupId, athleteId), ...shaped];
     }
   }
+
+  // Anyone who is not a confirmed adult is shown as a first name and last initial with no photo (the same rule as the leaderboard).
+  shaped = await protectPostAuthors(shaped);
 
   // Position-grouped rankings only cost a query for team_mode groups —
   // the common case (team_mode off) skips this entirely. team_mode was
