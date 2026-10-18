@@ -24,8 +24,10 @@ export interface SheetExercise {
   sets: number;
   /** reps to assume for a weight written alone; null when the sheet is a range or AMRAP */
   reps: number | null;
-  /** a timed or distance exercise: not read by the upload yet, written in Notes */
+  /** a timed, distance or height exercise (no weight, no reps): not read by the upload yet, written in Notes */
   unread: boolean;
+  /** reps only (a pull-up, a push-up): what is written in the box is the reps of each set */
+  repsOnly?: boolean;
 }
 
 export interface SheetDay {

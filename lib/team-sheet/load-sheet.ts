@@ -28,20 +28,28 @@ export interface LoadSheetInput {
 }
 
 type WorkoutRow = { id: string; title: string | null; scheduled_date: string; day_index: number | null };
+// The columns each read asks for. Written once so a test can check every name against the database's own table definitions (a column that does not exist makes the whole read fail, and a mocked test cannot see that).
+export const SHEET_READS = {
+  groups: "id, name, group_kind",
+  workouts: "id, title, scheduled_date, day_index",
+  exercises: "id, workout_id, exercise_name, display_name, exercise_order, athlete_id, tracked_fields, group_workout_exercise_sets ( set_order, target_reps, target_time_seconds, target_distance )",
+  roster: "profile_id, profiles ( full_name )",
+} as const;
+
 type ExerciseRow = {
   id: string;
   workout_id: string;
   exercise_name: string;
+  display_name: string | null;
   exercise_order: number | null;
-  prescribed_sets: number | null;
-  prescribed_reps: string | null;
-  prescribed_load_note: string | null;
+  athlete_id: string | null;
+  tracked_fields: string[] | null;
   group_workout_exercise_sets: { set_order: number | null; target_reps: string | null; target_time_seconds: number | null; target_distance: number | null }[] | null;
 };
 
 export async function loadSheetModel(supabase: any, input: LoadSheetInput): Promise<LoadSheetResult> {
   if (!isDateKey(input.date)) return { ok: false, status: 400, error: "Choose a date." };
-  const { data: group, error: groupError } = await supabase.from("groups").select("id, name, group_kind").eq("id", input.groupId).maybeSingle();
+  const { data: group, error: groupError } = await supabase.from("groups").select(SHEET_READS.groups).eq("id", input.groupId).maybeSingle();
   if (groupError) return { ok: false, status: 502, error: "Couldn't read the group. Try again." };
   if (!group) return { ok: false, status: 404, error: "That group wasn't found." };
   if (group.group_kind === "one_on_one") return { ok: false, status: 409, error: "A team sheet is for a team or a class, not a one-on-one client." };
@@ -49,7 +57,7 @@ export async function loadSheetModel(supabase: any, input: LoadSheetInput): Prom
   const dates = input.mode === "week" ? weekDates(input.date) : [input.date];
   const { data: workouts, error: workoutError } = await supabase
     .from("workouts")
-    .select("id, title, scheduled_date, day_index")
+    .select(SHEET_READS.workouts)
     .eq("group_id", input.groupId)
     .in("scheduled_date", dates)
     .order("scheduled_date", { ascending: true })
@@ -63,8 +71,10 @@ export async function loadSheetModel(supabase: any, input: LoadSheetInput): Prom
   const exerciseRead = await readRowsByIds(workoutRows.map((w) => w.id), (ids: string[]) => (from: number, to: number) =>
     supabase
       .from("group_workout_exercises")
-      .select("id, workout_id, exercise_name, exercise_order, prescribed_sets, prescribed_reps, prescribed_load_note, group_workout_exercise_sets ( set_order, target_reps, target_time_seconds, target_distance )")
+      .select(SHEET_READS.exercises)
       .in("workout_id", ids)
+      // the team's own exercises: an exercise written for one athlete (a per-client program) is not on the team's sheet
+      .is("athlete_id", null)
       .order("exercise_order", { ascending: true })
       .order("id", { ascending: true })
       .range(from, to)
@@ -81,9 +91,14 @@ export async function loadSheetModel(supabase: any, input: LoadSheetInput): Prom
     for (const w of todays) {
       for (const e of byWorkout.get(w.id) ?? []) {
         const sets = [...(e.group_workout_exercise_sets ?? [])].sort((a, b) => (a.set_order ?? 0) - (b.set_order ?? 0));
-        const p = describePrescription({ prescribed_sets: e.prescribed_sets, prescribed_reps: e.prescribed_reps, sets, load_note: e.prescribed_load_note });
-        const unread = sets.some((s) => (s.target_time_seconds ?? 0) > 0 || (s.target_distance ?? 0) > 0);
-        exercises.push({ id: e.id, name: e.exercise_name, prescription: p.text, sets: p.sets, reps: p.reps, unread });
+        const p = describePrescription({ sets });
+        // What the exercise records decides how it is read: weight (and reps) are read; reps alone are read as reps; anything with neither (a plank's time, a jump's height, a sprint) goes in Notes for now.
+        const tracked = e.tracked_fields && e.tracked_fields.length > 0 ? e.tracked_fields : ["reps", "weight"];
+        const hasWeight = tracked.includes("weight");
+        const hasReps = tracked.includes("reps");
+        const unread = !hasWeight && !hasReps;
+        const repsOnly = !hasWeight && hasReps;
+        exercises.push({ id: e.id, name: (e.display_name ?? "").trim() || e.exercise_name, prescription: repsOnly ? `${p.text} reps` : p.text, sets: p.sets, reps: p.reps, unread, repsOnly });
       }
     }
     days.push({ date, label: dayLabel(date), title: todays.map((w) => (w.title ?? "").trim()).filter(Boolean).join(" / ").slice(0, 40), exercises });
@@ -92,7 +107,7 @@ export async function loadSheetModel(supabase: any, input: LoadSheetInput): Prom
   if (total === 0) return { ok: false, status: 404, error: "That workout has no exercises yet." };
   if (total > MAX_EXERCISES_TOTAL) return { ok: false, status: 422, error: `That is ${total} exercises, more than one sheet can carry (${MAX_EXERCISES_TOTAL}). Choose a Day sheet, or a shorter week.` };
 
-  const roster = await pageAll((from: number, to: number) => supabase.from("group_memberships").select("profile_id, profiles ( full_name )").eq("group_id", input.groupId).eq("role", "athlete").order("profile_id").range(from, to), { maxPages: 10 });
+  const roster = await pageAll((from: number, to: number) => supabase.from("group_memberships").select(SHEET_READS.roster).eq("group_id", input.groupId).eq("role", "athlete").order("profile_id").range(from, to), { maxPages: 10 });
   if (roster.failed) return { ok: false, status: 502, error: "Couldn't read the roster. Try again." };
   if (roster.truncated || roster.rows.length > MAX_ATHLETES) return { ok: false, status: 422, error: `That roster is larger than one sheet run can carry (${MAX_ATHLETES} athletes).` };
   if (roster.rows.length === 0) return { ok: false, status: 404, error: "There are no athletes in this group yet." };

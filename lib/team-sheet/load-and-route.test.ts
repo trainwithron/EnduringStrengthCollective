@@ -19,7 +19,16 @@ function fakeDb(tables: Record<string, { data: any; error?: any }>) {
       let to = 999;
       let paged = false;
       const chain: any = {};
-      for (const m of ["select", "eq", "in", "order", "neq", "is", "gte", "lte"]) chain[m] = () => chain;
+      const filters: ((row: any) => boolean)[] = [];
+      for (const m of ["select", "eq", "order", "neq", "gte", "lte"]) chain[m] = () => chain;
+      chain.is = (col: string, val: unknown) => {
+        filters.push((row) => (row?.[col] ?? null) === val);
+        return chain;
+      };
+      chain.in = (col: string, vals: unknown[]) => {
+        filters.push((row) => !(col in (row ?? {})) || vals.includes(row[col]));
+        return chain;
+      };
       chain.range = (f: number, t: number) => {
         from = f;
         to = t;
@@ -29,7 +38,7 @@ function fakeDb(tables: Record<string, { data: any; error?: any }>) {
       const answer = () => {
         const t = tables[table] ?? { data: null };
         if (t.error) return { data: null, error: t.error };
-        const rows = t.data;
+        const rows = Array.isArray(t.data) ? t.data.filter((row: any) => filters.every((fn) => fn(row))) : t.data;
         return { data: paged && Array.isArray(rows) ? rows.slice(from, to + 1) : rows, error: null };
       };
       // a single-row read of a table scripted with several rows answers with the first
@@ -53,6 +62,18 @@ import { GET } from "@/app/api/team-sheet/download/route";
 
 const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const G = uuid(1);
+// an exercise row as the database returns it: sets are rows, tracked_fields says what is recorded
+const gwe = (id: string, workout: string, name: string, order: number, over: Record<string, unknown> = {}, sets = 3, reps: string | null = "5") => ({
+  id,
+  workout_id: workout,
+  exercise_name: name,
+  display_name: null,
+  exercise_order: order,
+  athlete_id: null,
+  tracked_fields: ["reps", "weight"],
+  group_workout_exercise_sets: Array.from({ length: sets }, (_, i) => ({ set_order: i + 1, target_reps: reps, target_time_seconds: null, target_distance: null })),
+  ...over,
+});
 const input = { groupId: G, mode: "day" as const, date: "2026-10-21", perRack: 4, unit: "lb" as const };
 
 function seed(over: Partial<Record<string, { data: any; error?: any }>> = {}) {
@@ -61,8 +82,11 @@ function seed(over: Partial<Record<string, { data: any; error?: any }>> = {}) {
     workouts: { data: [{ id: uuid(10), title: "Lower A", scheduled_date: "2026-10-21", day_index: 1 }] },
     group_workout_exercises: {
       data: [
-        { id: uuid(20), workout_id: uuid(10), exercise_name: "Back squat", exercise_order: 1, prescribed_sets: 3, prescribed_reps: "5", prescribed_load_note: null, group_workout_exercise_sets: [] },
-        { id: uuid(21), workout_id: uuid(10), exercise_name: "Plank", exercise_order: 2, prescribed_sets: 3, prescribed_reps: null, prescribed_load_note: null, group_workout_exercise_sets: [{ set_order: 1, target_reps: null, target_time_seconds: 45, target_distance: null }] },
+        gwe(uuid(20), uuid(10), "Back squat", 1),
+        gwe(uuid(21), uuid(10), "Plank", 2, { tracked_fields: ["time"] }, 1, null),
+        gwe(uuid(22), uuid(10), "Pull-up", 3, { tracked_fields: ["reps"] }, 3, "8"),
+        gwe(uuid(23), uuid(10), "Bench (Marcus only)", 4, { athlete_id: uuid(31) }),
+        gwe(uuid(24), uuid(10), "Hang clean", 5, { display_name: "Power clean" }, 4, "3"),
       ],
     },
     group_memberships: { data: [{ profile_id: uuid(31), profiles: { full_name: "Marcus Taylor" } }, { profile_id: uuid(32), profiles: [{ full_name: "Devon Rivers" }] }, { profile_id: uuid(33), profiles: { full_name: "Eli Stone" } }] },
@@ -86,9 +110,15 @@ describe("loading the team sheet", () => {
     expect(r.model.groupName).toBe("Varsity Football");
     expect(r.model.days).toHaveLength(1);
     expect(r.model.days[0].title).toBe("Lower A");
-    expect(r.model.days[0].exercises.map((e) => e.name)).toEqual(["Back squat", "Plank"]);
+    expect(r.model.days[0].exercises.map((e) => e.name)).toEqual(["Back squat", "Plank", "Pull-up", "Power clean"]);
     expect(r.model.days[0].exercises[0]).toMatchObject({ prescription: "3x5", sets: 3, reps: 5, unread: false });
+    // a timed exercise (nothing weighed, nothing counted) is left for Notes
     expect(r.model.days[0].exercises[1].unread).toBe(true);
+    // reps only: the box holds reps, and the sheet says so
+    expect(r.model.days[0].exercises[2]).toMatchObject({ prescription: "3x8 reps", unread: false, repsOnly: true });
+    // an exercise written for one athlete is not on the team's sheet; the coach's display name is what is printed
+    expect(r.model.days[0].exercises.some((e) => /Marcus only/.test(e.name))).toBe(false);
+    expect(r.model.days[0].exercises[3]).toMatchObject({ name: "Power clean", prescription: "4x3" });
     expect(r.model.racks.map((k) => k.athletes.map((a) => a.name))).toEqual([["Devon R.", "Eli S.", "Marcus T."]]);
   });
 
@@ -109,8 +139,8 @@ describe("loading the team sheet", () => {
       workouts: { data: [{ id: uuid(10), title: "Lower A", scheduled_date: "2026-10-19", day_index: 1 }, { id: uuid(11), title: "Upper", scheduled_date: "2026-10-21", day_index: 1 }] },
       group_workout_exercises: {
         data: [
-          { id: uuid(20), workout_id: uuid(10), exercise_name: "Back squat", exercise_order: 1, prescribed_sets: 3, prescribed_reps: "5", prescribed_load_note: null, group_workout_exercise_sets: [] },
-          { id: uuid(21), workout_id: uuid(11), exercise_name: "Bench press", exercise_order: 1, prescribed_sets: 4, prescribed_reps: "5", prescribed_load_note: null, group_workout_exercise_sets: [] },
+          gwe(uuid(20), uuid(10), "Back squat", 1, {}, 3, "5"),
+          gwe(uuid(21), uuid(11), "Bench press", 1, {}, 4, "5"),
         ],
       },
     });
@@ -123,8 +153,8 @@ describe("loading the team sheet", () => {
       workouts: { data: [{ id: uuid(10), title: "Lift", scheduled_date: "2026-10-21", day_index: 1 }, { id: uuid(11), title: "Speed", scheduled_date: "2026-10-21", day_index: 2 }] },
       group_workout_exercises: {
         data: [
-          { id: uuid(20), workout_id: uuid(10), exercise_name: "Squat", exercise_order: 1, prescribed_sets: 3, prescribed_reps: "5", prescribed_load_note: null, group_workout_exercise_sets: [] },
-          { id: uuid(21), workout_id: uuid(11), exercise_name: "Sprint", exercise_order: 1, prescribed_sets: 3, prescribed_reps: "1", prescribed_load_note: null, group_workout_exercise_sets: [] },
+          gwe(uuid(20), uuid(10), "Squat", 1, {}, 3, "5"),
+          gwe(uuid(21), uuid(11), "Sprint", 1, {}, 3, "1"),
         ],
       },
     });
@@ -141,7 +171,7 @@ describe("loading the team sheet", () => {
     seed({ group_memberships: { data: [] } });
     expect(await loadSheetModel(fakeDb(state.tables), input)).toMatchObject({ ok: false, status: 404 });
     seed({
-      group_workout_exercises: { data: Array.from({ length: 41 }, (_, i) => ({ id: uuid(100 + i), workout_id: uuid(10), exercise_name: `E${i}`, exercise_order: i, prescribed_sets: 3, prescribed_reps: "5", prescribed_load_note: null, group_workout_exercise_sets: [] })) },
+      group_workout_exercises: { data: Array.from({ length: 41 }, (_, i) => (gwe(uuid(100 + i), uuid(10), `E${i}`, i))) },
     });
     const many = await loadSheetModel(fakeDb(state.tables), input);
     expect(many).toMatchObject({ ok: false, status: 422 });
