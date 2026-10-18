@@ -226,7 +226,7 @@ export default async function BusinessDashboardPage(
         </p>
       </div>
 
-      <PaymentProblemsSection groupId={params.groupId} timezone={displayZone} />
+      <PaymentProblemsSection groupIds={groupIds} timezone={displayZone} />
 
       {/* MRR is the hero: recurring revenue is the actual "is this
           business healthy right now" number — a single month's income

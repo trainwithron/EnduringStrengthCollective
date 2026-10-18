@@ -38,20 +38,30 @@ create table if not exists public.payment_events (
   group_id uuid references public.groups(id) on delete set null,
   athlete_id uuid references public.profiles(id) on delete set null,
   coach_id uuid references public.profiles(id) on delete set null,
+  -- this event's own amount (for a refund: this refund); total_cents: everything refunded on the charge so far
   amount_cents int,
+  total_cents int,
   currency text,
   stripe_object_id text,
+  subscription_id text,
   detail text,
   created_at timestamptz not null default now()
 );
 create index if not exists payment_events_group_idx on public.payment_events (group_id, created_at desc);
 create index if not exists payment_events_object_idx on public.payment_events (stripe_object_id) where stripe_object_id is not null;
+create index if not exists payment_events_subscription_idx on public.payment_events (subscription_id) where subscription_id is not null;
 alter table public.payment_events enable row level security;
 revoke all on public.payment_events from anon, authenticated;
 grant select on public.payment_events to authenticated;
 drop policy if exists "payment_events_select_coach_or_own" on public.payment_events;
 create policy "payment_events_select_coach_or_own" on public.payment_events for select to authenticated
-  using ((group_id is not null and public.is_group_coach(group_id)) or athlete_id = (select auth.uid()) or coach_id = (select auth.uid()));
+  using (
+    athlete_id = (select auth.uid())
+    -- a group's events: its coaches, and the owner or an admin of its organization (the Business page of an owner or admin counts the whole organization); a coach who has left the group no longer reads them
+    or (group_id is not null and (public.is_group_coach(group_id) or public.is_org_admin_of_group(group_id)))
+    -- the coach's own plan (no group)
+    or (group_id is null and coach_id = (select auth.uid()))
+  );
 
 -- One new kind of notice: a payment problem (failed payment, refund, dispute). The list is rebuilt from the live one plus this kind, and refused if it would lose any.
 do $types$
@@ -87,6 +97,8 @@ end
 $types$;
 
 -- Four read-only checks for the platform admin. Each returns what it checked, how many rows are out of step, and one example id.
+-- "Past due for more than 7 days" is counted from the FIRST failed payment recorded for the subscription (the subscription row itself is rewritten on every update, so its own date says nothing); a subscription that went past due before
+-- failed payments were being recorded has no date to count from and is not counted.
 create or replace function public.payment_reconciliation_report()
 returns table (check_name text, what text, issue_count bigint, example text)
 language plpgsql
@@ -107,16 +119,18 @@ begin
 
   return query
   select 'past_due_over_7_days'::text,
-         'Subscriptions that have been past due for more than 7 days'::text,
-         count(*), (array_agg(s.stripe_subscription_id order by s.updated_at))[1]
-    from public.membership_subscriptions s where s.status = 'past_due' and s.updated_at < now() - interval '7 days';
+         'Subscriptions past due, with a failed payment first recorded more than 7 days ago'::text,
+         count(*), (array_agg(s.stripe_subscription_id order by s.stripe_subscription_id))[1]
+    from public.membership_subscriptions s
+    where s.status = 'past_due'
+      and (select min(e.created_at) from public.payment_events e where e.kind = 'payment_failed' and e.subscription_id = s.stripe_subscription_id) < now() - interval '7 days';
 
   return query
   select 'billing_after_leaving'::text,
          'Subscriptions still billing a person who is no longer a client of the group'::text,
-         count(*), (array_agg(s.stripe_subscription_id order by s.updated_at))[1]
+         count(*), (array_agg(s.stripe_subscription_id order by s.stripe_subscription_id))[1]
     from public.membership_subscriptions s
-    where s.status <> 'canceled'
+    where s.status in ('active', 'past_due', 'paused')
       and not exists (select 1 from public.group_memberships gm where gm.group_id = s.group_id and gm.profile_id = s.athlete_id);
 
   return query

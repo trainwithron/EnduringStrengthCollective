@@ -19,11 +19,17 @@ export default {
       const client = await h.user("PE Client");
       const gone = await h.user("PE Gone Client");
       const admin = await h.user("PE Admin");
+      const orgAdmin = await h.user("PE Org Admin");
+      const leaver = await h.user("PE Leaver");
+      const undated = await h.user("PE Undated");
       const org = await h.org(coach, "PE Gym");
       await h.orgMember(org, other, "coach");
       const g = await h.group(org, coach, "team", "PE team");
       const g2 = await h.group(org, other, "team", "PE other team");
       await h.member(g, client);
+      await h.member(g, undated);
+      await h.orgMember(org, orgAdmin, "admin");
+      await h.member(g, leaver, "coach");
 
       await h.asSuper();
       await db.query(`update public.profiles set is_platform_admin = true where id = $1`, [admin]);
@@ -35,6 +41,8 @@ export default {
 
       // ---- the ledger
       await db.query(`insert into public.payment_events (stripe_event_id, kind, group_id, athlete_id, amount_cents, currency, stripe_object_id) values ('evt_1', 'payment_failed', $1, $2, 5000, 'usd', 'in_1'), ('evt_2', 'refund', $1, $2, 2500, 'usd', 'ch_1'), ('evt_3', 'refund', null, null, 900, 'usd', 'ch_2'), ('evt_4', 'dispute_opened', $1, $2, 2500, 'usd', 'dp_1'), ('evt_5', 'dispute_opened', $1, $2, 1000, 'usd', 'dp_2'), ('evt_6', 'dispute_closed', $1, $2, 1000, 'usd', 'dp_2')`, [g, client]);
+      await db.query(`update public.payment_events set subscription_id = 'sub_pastdue', created_at = now() - interval '10 days' where stripe_event_id = 'evt_1'`);
+      await db.query(`insert into public.payment_events (stripe_event_id, kind, coach_id, amount_cents, currency, stripe_object_id) values ('evt_own', 'payment_failed', $1, 4900, 'usd', 'in_own')`, [coach]);
       h.check("a Stripe event is recorded once: the same event again is refused", (await msg(db, `insert into public.payment_events (stripe_event_id, kind) values ('evt_1', 'refund')`)).length > 0);
       h.check("only the four kinds are allowed", (await msg(db, `insert into public.payment_events (stripe_event_id, kind) values ('evt_x', 'chargeback')`)).length > 0);
 
@@ -42,6 +50,14 @@ export default {
       h.check("the coach of the group reads its money events", (await db.query(`select count(*)::int as n from public.payment_events where group_id = $1`, [g])).rows[0].n === 5);
       h.check("but not the unattributed one", (await db.query(`select count(*)::int as n from public.payment_events where stripe_object_id = 'ch_2'`)).rows[0].n === 0);
       h.check("a browser cannot write a money event", (await msg(db, `insert into public.payment_events (stripe_event_id, kind, group_id) values ('evt_y', 'refund', $1)`, [g])).length > 0);
+      h.check("and the coach's own plan problem (no group) is theirs to read", (await db.query(`select count(*)::int as n from public.payment_events where stripe_object_id = 'in_own'`)).rows[0].n === 1);
+      await h.as(orgAdmin);
+      h.check("an admin of the organization reads its groups' money events", (await db.query(`select count(*)::int as n from public.payment_events where group_id = $1`, [g])).rows[0].n === 5);
+      h.check("but not a coach's own plan", (await db.query(`select count(*)::int as n from public.payment_events where stripe_object_id = 'in_own'`)).rows[0].n === 0);
+      await h.asSuper();
+      await db.query(`delete from public.group_memberships where group_id = $1 and profile_id = $2`, [g, leaver]);
+      await h.as(leaver);
+      h.check("a coach who has left the group no longer reads its money events", (await db.query(`select count(*)::int as n from public.payment_events`)).rows[0].n === 0);
       await h.as(other);
       h.check("another coach reads none of them", (await db.query(`select count(*)::int as n from public.payment_events`)).rows[0].n === 0);
       await h.as(client);
@@ -56,13 +72,13 @@ export default {
 
       await h.asSuper();
       // a subscription past due for 10 days, and one still billing a person who is not in the group
-      await db.query(`insert into public.membership_subscriptions (athlete_id, group_id, stripe_subscription_id, status, updated_at) values ($1, $2, 'sub_pastdue', 'past_due', now() - interval '10 days'), ($3, $2, 'sub_left', 'active', now())`, [client, g, gone]);
+      await db.query(`insert into public.membership_subscriptions (athlete_id, group_id, stripe_subscription_id, status, updated_at) values ($1, $2, 'sub_pastdue', 'past_due', now()), ($3, $2, 'sub_left', 'active', now()), ($4, $2, 'sub_undated', 'past_due', now() - interval '30 days'), ($5, $2, 'sub_incomplete', 'incomplete', now())`, [client, g, gone, undated, leaver]);
       await h.as(admin);
       const report = (await db.query(`select check_name, issue_count::int as n, example from public.payment_reconciliation_report()`)).rows;
       const by = (name) => report.find((r) => r.check_name === name);
       h.check("the report has the four checks", report.length === 4, JSON.stringify(report));
       h.check("it finds the refund it could not match to a client", by("refund_not_attributed")?.n === 1 && by("refund_not_attributed")?.example === "ch_2", JSON.stringify(by("refund_not_attributed")));
-      h.check("the subscription past due more than 7 days", by("past_due_over_7_days")?.n === 1 && by("past_due_over_7_days")?.example === "sub_pastdue", JSON.stringify(by("past_due_over_7_days")));
+      h.check("the subscription whose first failed payment is more than 7 days old (one with no failure recorded is not counted)", by("past_due_over_7_days")?.n === 1 && by("past_due_over_7_days")?.example === "sub_pastdue", JSON.stringify(by("past_due_over_7_days")));
       h.check("the subscription still billing someone who is not a client of the group", by("billing_after_leaving")?.n === 1 && by("billing_after_leaving")?.example === "sub_left", JSON.stringify(by("billing_after_leaving")));
       h.check("the dispute still open (one opened and closed does not count)", by("dispute_open")?.n === 1 && by("dispute_open")?.example === "dp_1", JSON.stringify(by("dispute_open")));
       await h.asSuper();

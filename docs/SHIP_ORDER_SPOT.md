@@ -27,6 +27,6 @@
 | S3 | release-team-coach | (see git) | none | team coach Home tiles and menus; built on master 408e6919 |
 | D-held | (data) | - | HELD: step 138, apply-release-cn-held-all.sql, fp 8f22a2d348ee90d7, read check-intake-flag-list.sql first | Ron's word only |
 
-| M1 | release-money-safe | (see git) | Release M1, step 161 (0409), apply-release-m1-payment-events-all.sql, fp f9acaf0d92dac064 | failed payments, refunds, disputes recorded + coach told + platform checks; adds one table and one notice kind, moves no money; after the code, Ron switches on 4 Stripe webhook events |
+| M1 | release-money-safe | (see git) | Release M1, step 161 (0409), apply-release-m1-payment-events-all.sql, fp 335f65a3d6271bb5 | failed payments, refunds, disputes recorded + coach told + platform checks; adds one table and one notice kind, moves no money; after the code, Ron switches on 4 Stripe webhook events |
 Fingerprint = first 16 hex of sha256 of the LF-normalized file: tr -d '\r' < supabase/apply/<file> | sha256sum | cut -c1-16.
 Apply order: CL (136), CM (137), CO (139), G (141), H (142 to 144), I (145), J (146), K1 (147), L (148); then deploy the code; then CP (140) after the code is live. Held 138 only on Ron's word.
