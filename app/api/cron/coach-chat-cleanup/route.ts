@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { withCronRun } from "@/lib/cron-monitor";
+import { sweepAccountExports } from "@/lib/account-export";
 
 // AI Assistant Phase 2 — enforces the resolved 90-day retention window for
 // Collective Intelligence chat transcripts
@@ -35,7 +36,10 @@ async function handler(request: Request) {
     await supabase.from("coach_chat_threads").delete().in("id", expiredIds);
   }
 
-  return NextResponse.json({ deletedThreads: expiredIds.length });
+  // Also tidies away any large "Download my data" files older than a day (they are made for a short-lived link and nothing else).
+  const removedExports = await sweepAccountExports(supabase);
+
+  return NextResponse.json({ deletedThreads: expiredIds.length, removedExports });
 }
 
 export const GET = withCronRun("coach-chat-cleanup", handler);

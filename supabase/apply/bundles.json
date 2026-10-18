@@ -1,7 +1,7 @@
 [
  {
   "id": "release-t1-export-my-data",
-  "name": "Release T1 (Download my data gives a person everything the app holds about them; adds one function, safe before the code)",
+  "name": "Release T1 (Download my data gives a person everything the app holds about them; adds two functions and a private bucket, safe before the code)",
   "steps": [
    "164"
   ],

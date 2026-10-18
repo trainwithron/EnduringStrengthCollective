@@ -11,8 +11,22 @@ export function ExportDataButton() {
     setError(null);
     try {
       const res = await fetch("/api/account/export");
+      if (res.status === 429) {
+        setError("You have downloaded a few times already. Try again in an hour.");
+        return;
+      }
       if (!res.ok) {
         setError("Couldn't export your data — try again.");
+        return;
+      }
+      // A large download is handed over as a short private link instead of being sent in this response.
+      if (res.headers.get("X-Export-Link")) {
+        const { downloadUrl } = (await res.json()) as { downloadUrl?: string };
+        if (!downloadUrl) {
+          setError("Couldn't export your data — try again.");
+          return;
+        }
+        window.location.assign(downloadUrl);
         return;
       }
       const blob = await res.blob();

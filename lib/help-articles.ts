@@ -122,7 +122,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     title: "Download or delete my data",
     summary: "Your information is yours.",
     body: [
-      "In Settings, Download my data gives you a copy of what you have put into the app.",
+      "In Settings, Download my data gives you a copy of what the app holds about you as a member and client: your logs, plans, messages, bookings and settings. It is a file you can keep. A very large one arrives as a short private link that stops working after a few minutes. Coaches use Export my business for their own records.",
       "Delete my account removes your account. Some records your coach keeps for their business, such as payment records, are kept without your name on them. The Privacy page explains what is kept and why.",
       "If you are not sure, talk to your coach first: removing you from their list does not delete your account.",
     ],
