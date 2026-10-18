@@ -220,8 +220,8 @@ export const HELP_ARTICLES: HelpArticle[] = [
     title: "Switch off automatic nutrition suggestions for one client",
     summary: "Stop the weekly check-in from suggesting changes for a client.",
     body: [
-      "On a client's Nutrition tab, choose No automatic suggestions for that client. The weekly check-in then makes no suggestion for them, whatever their numbers say, until you switch it back on with one tap.",
-      "The switch follows the person, not the group: if it is on in any of your groups, the weekly check-in stays quiet for them everywhere. The buttons you press yourself, such as working out a starting target, still work.",
+      "On a client's Nutrition tab, choose No automatic suggestions for that client. The weekly check-in then makes no suggestion for them, whatever their numbers say, until it is switched back on.",
+      "It applies to the person in every group they are in, including another coach's. Only the group that switched it off can switch it back on, with one tap; in another group you can see that it is on and switch it off there too. The buttons you press yourself, such as working out a starting target, still work.",
       "It is separate from No macros for this client, which stops the macro numbers for them in this group. Switching that on also stops the weekly suggestions.",
     ],
   },

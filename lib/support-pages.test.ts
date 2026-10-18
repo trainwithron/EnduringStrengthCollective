@@ -1,3 +1,6 @@
+// ORDER FOR RELEASE HP1: the help articles and what's-new entries below are tied to four features (Z1 remove a client, B1 automatic suggestions switch, M1 payment problems, SP1 support notices).
+// The test "each article about a feature is there exactly while the feature's own files are" FAILS on any tree where HP1 is merged before all four are in it. So HP1 stays unmerged until
+// Z1, B1, M1 and SP1 are all deployed; then rebase it, set the four what's-new dates in lib/changelog.ts to the deploy day, run the suite, and ship.
 import { describe, it, expect, vi } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
