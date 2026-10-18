@@ -2916,6 +2916,27 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "161",
+  slug: "0409",
+  title: "0409 Release M1: failed payments, refunds and disputes are recorded and the coach is told (a ledger of money events, one new kind of notice, a platform report); no money moves",
+  warn: "This REBUILDS the list of allowed notice kinds (adds one: payment_problem). It refuses to run if the live list cannot be read or would lose a kind, and changes nothing in that case.",
+  migrations: ["0409"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes on screen until the Release M1 code is live. Adds one table (payment_events: a record of each failed payment, refund and dispute Stripe reports, a coach reads their own groups') and a read-only report for the platform admin. It moves no money and changes no balance. After the code is live, switch on four more event types for the webhook in the Stripe dashboard (invoice.payment_failed, charge.refunded, charge.dispute.created, charge.dispute.closed).",
+  undo: [
+    "drop function if exists public.payment_reconciliation_report();",
+    "drop table if exists public.payment_events;",
+    "-- the extra notification kind is left in the list (removing it could break rows that use it)",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 161 misbehaves. Run it only while the Release M1 code is not live. The record of failed payments, refunds and disputes is dropped with the table.",
+  rows: [
+    ["0409 is not already applied (the money events table is not there yet)", "to_regclass('public.payment_events') is null"],
+    ["the tables and helpers it uses exist", "to_regclass('public.groups') is not null and to_regclass('public.profiles') is not null and to_regclass('public.membership_subscriptions') is not null and to_regclass('public.group_memberships') is not null and to_regprocedure('public.is_group_coach(uuid)') is not null"],
+    ["the notification type rule exists to be widened", "exists (select 1 from pg_constraint c where c.conname = 'notifications_type_check' and c.conrelid = 'public.notifications'::regclass)"],
+  ],
+});
+
+STEPS.push({
   n: "150",
   slug: "0398",
   title: "0398 Release S1: a changed sign-in email must be confirmed by the new address first (waiting requests table)",
@@ -3082,6 +3103,7 @@ const BUNDLES = [
   { id: "release-co", name: "Release CO (nothing about a person is public unless they chose it: personal Find a coach listing; a coach adds only their own clients to a challenge; run BEFORE the code that goes with it is live)", steps: ["139"] },
   { id: "release-cn-held", name: "HELD, Ron's word first: require the health form and waiver of every client without one (read check-intake-flag-list.sql first)", steps: ["138"] },
   { id: "release-cm", name: "Release CM (the guard function and a coach's decision on a flagged screening; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["137"] },
+  { id: "release-m1-payment-events", name: "Release M1 (failed payments, refunds and disputes recorded and the coach told; adds one table and one notice kind, moves no money, safe before the code)", steps: ["161"] },
   { id: "release-s1-signin-hardening", name: "Release S1 (a changed sign-in email is confirmed by the new address; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["150"] },
   { id: "release-f2-client-cap", name: "Release F2 (the free plan's client limit, installed switched off; adds only)", steps: ["149"] },
   { id: "release-l-leaving-coach", name: "Release L (a leaving coach is never given an organization; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["148"] },
@@ -3364,6 +3386,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
     m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
+    m("0409", "to_regclass('public.payment_events') is not null"),
     m("0398", "to_regclass('public.pending_email_changes') is not null"),
     m("0397", "exists (select 1 from pg_trigger where tgname = 'group_memberships_free_tier_limit' and not tgisinternal)"),
     m("0396", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'organization_memberships' and column_name = 'departing_since')"),
