@@ -1,5 +1,7 @@
 // 0419: saving a filled team sheet. Sessions on their real dates, finished the way any workout is, nothing pings an athlete or the feed, one notice for the coach, an athlete's own session kept unless replaced,
 // training maxes right whatever order sheets are saved in, and a whole upload taken back.
+import { readFileSync } from "node:fs";
+
 const tryQ = async (db, sql, params) => {
   try {
     return { rows: (await db.query(sql, params)).rows };
@@ -169,6 +171,31 @@ export default {
       u = await tryQ(db, `select public.team_sheet_undo($1) as r`, [rep.batch]);
       await h.asSuper();
       h.check("undoing the replace removes the sheet's session and does not bring the replaced one back", !u.error && (await db.query(`select count(*)::int as n from public.athlete_sessions where athlete_id = $1 and workout_id = $2`, [cy, mon])).rows[0].n === 0, JSON.stringify(u));
+
+      // ---- the rows the APP builds (the fixture the app's own tests check) are accepted by the function, as written
+      const fx = JSON.parse(readFileSync(new URL("../fixtures/team-sheet-save-rows.json", import.meta.url), "utf8"));
+      const fxMon = await mkWorkout("Fixture Monday", "2026-10-19", 11);
+      const fxWed = await mkWorkout("Fixture Wednesday", "2026-10-21", 12);
+      const ids = {
+        "@ANN": ann,
+        "@BO": bo,
+        "@CY": cy,
+        "@WORKOUT_MON": fxMon,
+        "@WORKOUT_WED": fxWed,
+        "@EX_SQUAT": await mkEx(fxMon, "Back squat", 1),
+        "@EX_BENCH": await mkEx(fxMon, "Bench press", 2),
+        "@EX_PULLUP": await mkEx(fxWed, "Pull-up", 1),
+        "@EX_PLANK": await mkEx(fxWed, "Plank", 2),
+      };
+      const fxRows = JSON.parse(JSON.stringify(fx).replace(/"(@[A-Z_]+)"/g, (_m, name) => JSON.stringify(ids[name] ?? name)));
+      h.check("the fixture has rows, and every name in it was replaced", fxRows.length > 0 && !JSON.stringify(fxRows).includes("@"), JSON.stringify(fxRows).slice(0, 200));
+      const fxRes = await save(coach, fxRows);
+      h.check("the function takes the app's rows as they are" + (fxRes.error ? ": " + fxRes.error : ""), !fxRes.error && fxRes.saved === fxRows.length && (fxRes.skipped ?? []).length === 0, JSON.stringify(fxRes));
+      const fxSets = (await db.query(`select count(*)::int as n from public.set_logs sl join public.session_exercises se on se.id = sl.session_exercise_id join public.athlete_sessions s on s.id = se.session_id where s.import_batch_id = $1`, [fxRes.batch])).rows[0].n;
+      const wantSets = fxRows.reduce((n, r) => n + r.exercises.reduce((m, e) => m + e.sets.length, 0), 0);
+      h.check("every set in the fixture was written (" + wantSets + ")", fxSets === wantSets, String(fxSets));
+      const fxDates = (await db.query(`select distinct to_char(s.completed_at at time zone 'UTC', 'YYYY-MM-DD') as d from public.athlete_sessions s where s.import_batch_id = $1 order by 1`, [fxRes.batch])).rows.map((x) => x.d);
+      h.check("on the days the sheet said", JSON.stringify(fxDates) === JSON.stringify([...new Set(fxRows.map((r) => r.day))].sort()), JSON.stringify(fxDates));
     },
   },
 };

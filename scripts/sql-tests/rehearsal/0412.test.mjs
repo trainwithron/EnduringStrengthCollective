@@ -63,7 +63,7 @@ export default {
 
       // what must never come out
       const all = JSON.stringify([profile, weights, sent, p1, p2]);
-      h.check("nothing about Bo is in it", !all.includes("Bo wrote this") && !all.includes("for Bo") && !all.includes("222"));
+      h.check("nothing about Bo is in it", !all.includes("Bo wrote this") && !all.includes("for Bo") && !/"weight":"?222(\.0+)?"?[,}]/.test(all)); // Bo's weight is 222: looked for as a weight, because a bare "222" turns up now and then inside a random id
       const posts = await page(ann, "posts", "author_id");
       h.check("her posts are hers only", posts.rows.length === 1 && posts.rows[0].body === "Ann wrote this");
       await h.as(ann);

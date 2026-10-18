@@ -1,8 +1,8 @@
-// The team sheet's reads (lib/team-sheet/load-sheet.ts SHEET_READS) name columns. A column that does not exist makes the whole read fail in production, and a test with a made-up database cannot see that, so every
-// name is checked here against the real table definitions of the migration chain.
+// The team sheet's reads name columns (SHEET_READS in lib/team-sheet/load-sheet.ts, CONTEXT_READS in lib/team-sheet/review.ts, SAVED_UPLOAD_COLUMNS in lib/team-sheet/reads.ts). A column that does not exist makes the whole
+// read fail in production, and a test with a made-up database cannot see that, so every name is checked here against the real table definitions of the migration chain.
 import { readFileSync } from "node:fs";
 
-const TABLES = { groups: "groups", programs: "programs", workouts: "workouts", exercises: "group_workout_exercises", roster: "group_memberships" };
+const read = (rel) => readFileSync(new URL(`../../../${rel}`, import.meta.url), "utf8").replace(/\r\n/g, "\n");
 
 // "a, b, rel ( c, d )" -> { own: [a, b], rel: { rel: [c, d] } } (one level of embedding is all these reads use)
 function parseSelect(text) {
@@ -28,36 +28,53 @@ function parseSelect(text) {
   return { own, rel };
 }
 
+// { key: "select text" } entries of an exported object
+function parseBlock(src, start) {
+  const from = src.indexOf(start);
+  const block = src.slice(from, src.indexOf("} as const;", from));
+  return Object.fromEntries(Array.from(block.matchAll(/^\s+([a-z]+): "([^"]+)",?$/gm)).map((m) => [m[1], m[2]]));
+}
+
 export default {
   name: "Team sheet reads name real columns",
   migrations: [],
   phases: {
-    async "0418"({ db, h }) {
-      const src = readFileSync(new URL("../../../lib/team-sheet/load-sheet.ts", import.meta.url), "utf8").replace(/\r\n/g, "\n");
-      const block = src.slice(src.indexOf("export const SHEET_READS = {"), src.indexOf("} as const;"));
-      const reads = Object.fromEntries(Array.from(block.matchAll(/^\s+([a-z]+): "([^"]+)",?$/gm)).map((m) => [m[1], m[2]]));
-      h.check("the four reads were found in the source", Object.keys(reads).sort().join(",") === "exercises,groups,programs,roster,workouts", JSON.stringify(Object.keys(reads)));
+    async "0419"({ db, h }) {
+      const sheet = parseBlock(read("lib/team-sheet/load-sheet.ts"), "export const SHEET_READS = {");
+      const context = parseBlock(read("lib/team-sheet/review.ts"), "export const CONTEXT_READS = {");
+      const saved = /SAVED_UPLOAD_COLUMNS = "([^"]+)"/.exec(read("lib/team-sheet/reads.ts"))?.[1];
+      h.check("every read was found in the source", Object.keys(sheet).sort().join(",") === "exercises,groups,programs,roster,workouts" && Object.keys(context).sort().join(",") === "exercises,roster,sessions,workouts" && !!saved, JSON.stringify([Object.keys(sheet), Object.keys(context), !!saved]));
+      const reads = [
+        ...Object.entries(sheet).map(([k, v]) => [`load ${k}`, { groups: "groups", programs: "programs", workouts: "workouts", exercises: "group_workout_exercises", roster: "group_memberships" }[k], v]),
+        ...Object.entries(context).map(([k, v]) => [`review ${k}`, { exercises: "group_workout_exercises", workouts: "workouts", roster: "group_memberships", sessions: "athlete_sessions" }[k], v]),
+        ["saved uploads", "team_sheet_batches", saved ?? ""],
+      ];
       await h.asSuper();
       const columns = async (table) => new Set((await db.query(`select column_name from information_schema.columns where table_schema = 'public' and table_name = $1`, [table])).rows.map((r) => r.column_name));
-      for (const [name, text] of Object.entries(reads)) {
-        const table = TABLES[name];
+      for (const [name, table, text] of reads) {
         const { own, rel } = parseSelect(text);
         const have = await columns(table);
         const missing = own.filter((c) => !have.has(c));
-        h.check(`${name}: every column of ${table} it reads exists` + (missing.length ? " (missing: " + missing.join(", ") + ")" : ""), missing.length === 0);
+        h.check(`${name}: every column of ${table} it reads exists` + (missing.length ? " (missing: " + missing.join(", ") + ")" : ""), have.size > 0 && missing.length === 0);
         for (const [relTable, cols] of Object.entries(rel)) {
           const relHave = await columns(relTable);
           const relMissing = cols.filter((c) => !relHave.has(c));
           h.check(`${name}: every column of ${relTable} it embeds exists` + (relMissing.length ? " (missing: " + relMissing.join(", ") + ")" : ""), relHave.size > 0 && relMissing.length === 0);
         }
       }
-      // the filters the loader applies
-      const gwe = await columns("group_workout_exercises");
-      h.check("the exercises read filters on athlete_id and orders by exercise_order, which exist", gwe.has("athlete_id") && gwe.has("exercise_order"));
-      const prog = await columns("programs");
-      h.check("the programs read filters on group_id, is_active and athlete_id and orders by created_at, which exist", ["group_id", "is_active", "athlete_id", "created_at"].every((c) => prog.has(c)));
-      const wk = await columns("workouts");
-      h.check("the workouts read filters on program_id and orders by week_number, day_index and id, which exist", ["program_id", "week_number", "day_index", "id"].every((c) => wk.has(c)));
+      // the filters and orderings the reads and routes apply
+      const need = {
+        group_workout_exercises: ["athlete_id", "exercise_order", "group_id", "id", "workout_id"],
+        programs: ["group_id", "is_active", "athlete_id", "created_at"],
+        workouts: ["program_id", "week_number", "day_index", "id", "group_id"],
+        group_memberships: ["group_id", "role", "profile_id"],
+        athlete_sessions: ["group_id", "workout_id", "id"],
+        team_sheet_batches: ["group_id", "created_at", "id"],
+      };
+      for (const [table, cols] of Object.entries(need)) {
+        const have = await columns(table);
+        h.check(`${table}: the columns the reads filter and order on exist`, cols.every((c) => have.has(c)), cols.filter((c) => !have.has(c)).join(", "));
+      }
     },
   },
 };

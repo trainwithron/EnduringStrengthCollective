@@ -129,3 +129,18 @@ export function describeCell(cell: ParsedCell, unit: SheetUnit = "lb"): string {
   const assumed = cell.sets.some((s) => s.repsAssumed && s.reps !== null);
   return parts.join(", ") + (assumed ? " (reps from the sheet)" : "");
 }
+
+export type BoxKind = "load" | "reps" | "unread";
+export type BoxResult = ParsedCell | { kind: "unread" };
+
+/**
+ * One box on a sheet, read by what its exercise records. Weight exercises are read as weights ("225 235 245"); a reps-only exercise (a pull-up) is read as reps ("10 10 8", which is body weight with those reps); an
+ * exercise with neither (a plank's time) is not read: what is written there is kept as a note. The same function reads the box on the review screen and again on the server.
+ */
+export function readBox(kind: BoxKind, text: string, opts: { unit: SheetUnit; sets: number; reps: number | null }): BoxResult {
+  if (kind === "unread") return { kind: "unread" };
+  const prescribed = { sets: opts.sets, reps: opts.reps };
+  const t = text.trim();
+  if (kind === "reps" && t !== "" && /^[\d\s,;/]+$/.test(t)) return parseCell("BW " + t, { unit: opts.unit, prescribed });
+  return parseCell(t, { unit: opts.unit, prescribed });
+}

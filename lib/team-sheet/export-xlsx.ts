@@ -6,6 +6,7 @@ import { rackCode, instructionLines } from "@/lib/team-sheet/export-pdf";
 import type { SheetModel } from "@/lib/team-sheet/sheet-model";
 
 export const CODES_SHEET = "_codes";
+export const CODE_LABEL = "Sheet code (do not edit)";
 
 // A text cell that starts with = + - or @ (or a tab or carriage return) can be run as a formula when the file is opened, or saved as CSV and opened again. Names and exercise names come from people, so every text cell
 // that could start that way gets a leading apostrophe, which Excel reads as "this is text" and the sheet shows as a quote mark. Cells are also always written as text cells, never as formulas.
@@ -70,6 +71,9 @@ export function buildSheetWorkbook(model: SheetModel): XLSX.WorkBook {
       r.push("");
       rows.push(r);
     }
+    // The sheet's own code, in plain sight below the athletes, so a sheet saved as CSV (which keeps only one worksheet and none of the hidden ones) still says what it is.
+    rows.push([]);
+    rows.push([CODE_LABEL, encodeSheetCode(rackCode(model, rack))]);
     const ws = onlyText(XLSX.utils.aoa_to_sheet(safeRows(rows)));
     ws["!cols"] = [{ wch: 18 }, ...Array.from({ length: exerciseCount }, () => ({ wch: 16 })), { wch: 30 }];
     merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: Math.max(1, lastCol) } });
