@@ -13,6 +13,8 @@ import { SwappableTerm } from "@/components/coach/swappable-term";
 import { ALL_PROGRAMS_HREF } from "@/lib/programs-scope";
 import { ProgramImportLauncher } from "@/components/coach/desktop/program-import-launcher";
 
+export const metadata = { title: "Programs" };
+
 export default async function ProgramsListPage(
   props: {
     params: Promise<{ groupId: string }>;

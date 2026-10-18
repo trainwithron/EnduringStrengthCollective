@@ -8,6 +8,8 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { BroadcastComposer, type BroadcastAthlete, type BroadcastGroup } from "@/components/coach/broadcast-composer";
 import { isUnder13 } from "@/lib/coppa";
 
+export const metadata = { title: "Announce" };
+
 // Bulk announcement composer. Recipients are limited to groups where the
 // viewer is a COACH (never an org-admin-only view of other coaches'
 // groups) and to training memberships — the send route re-validates all

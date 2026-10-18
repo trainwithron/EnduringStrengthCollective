@@ -3,12 +3,15 @@
 //   node scripts/build-paste-files.mjs
 // scripts/sql-tests/paste-files.test.mjs applies every step in order on the live-equivalent schema and checks each precheck is true first.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { checkSql as functionAclCheckSql, undoSql as functionAclUndoSql, TRIGGER_SWEEP, triggerSweepUndoSql } from "./function-acl.mjs";
 import { probeSql as step23ProbeSql } from "./step23-probe.mjs";
 import { LIVE_TRANSFER_ORGANIZATION_OWNERSHIP } from "./live-bodies-0396.mjs";
 
 const root = new URL("../supabase/", import.meta.url);
-const outDir = new URL("apply/", root);
+// PASTE_OUT_DIR lets a test build everything into a scratch folder and compare it with what is committed.
+const outDir = process.env.PASTE_OUT_DIR ? pathToFileURL(resolve(process.env.PASTE_OUT_DIR) + "/") : new URL("apply/", root);
 mkdirSync(outDir, { recursive: true });
 
 import { readdirSync } from "node:fs";
@@ -2979,6 +2982,38 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "151",
+  slug: "0399",
+  title: "0399 Release S2: a client's health answers are read only by the client, their coach, and an owner or admin the owner has granted; the address and device of an acceptance only by the audit path",
+  migrations: ["0399"],
+  sees: "Success. No rows returned.",
+  afterwards: "Takes effect at once and the Release S2 code must be live with it: the health answers can no longer be read straight from the table (the app reads them through new functions), and an organization's owner and admins stop seeing the answers (they still see whether the form is done) unless the owner grants it. Apply this step and deploy the code together; the code is written to keep working on either side of the paste only for the pages that do not read the answers.",
+  undo: [
+    "drop trigger if exists organization_memberships_drop_health_grant_role on public.organization_memberships;",
+    "drop function if exists public.drop_health_grant_on_role_change();",
+    "drop trigger if exists organization_memberships_drop_health_grant on public.organization_memberships;",
+    "drop function if exists public.drop_health_grant_on_leaving();",
+    "-- signed-out visitors get back exactly what they held before",
+    "grant delete, insert, references, select, trigger, truncate, update on public.client_intake to anon;",
+    "grant insert, select on public.legal_acceptances to anon;",
+    "drop function if exists public.legal_acceptance_audit(uuid);",
+    "grant select on public.legal_acceptances to authenticated;",
+    "grant select on public.client_intake to authenticated;",
+    "drop function if exists public.set_health_access(uuid, uuid, boolean);",
+    "drop function if exists public.health_answers_many(uuid[]);",
+    "drop function if exists public.health_answers(uuid);",
+    "drop function if exists public._can_read_health_answers(uuid);",
+    "drop table if exists public.health_access_grants;",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 151 misbehaves. It gives the owner and admins their old read of the answers back (and a coach their old read of an acceptance's address and device); run it only if you accept that.",
+  rows: [
+    ["0399 is not already applied (the grants table is not there yet)", "to_regclass('public.health_access_grants') is null"],
+    ["the tables it protects exist", "to_regclass('public.client_intake') is not null and to_regclass('public.legal_acceptances') is not null"],
+    ["the helpers it uses exist", "to_regprocedure('public.is_group_coach(uuid)') is not null and to_regprocedure('public.is_client_private_from_org(uuid, uuid)') is not null and to_regprocedure('public.is_org_owner_or_admin(uuid)') is not null and to_regprocedure('public.audit_record(text, text, text, jsonb)') is not null"],
+  ],
+});
+
+STEPS.push({
   n: "142",
   slug: "0390",
   title: "0390 Release H: undo a whole history import (every workout an import creates carries one batch id)",
@@ -3127,6 +3162,7 @@ const BUNDLES = [
   { id: "release-cn-held", name: "HELD, Ron's word first: require the health form and waiver of every client without one (read check-intake-flag-list.sql first)", steps: ["138"] },
   { id: "release-cm", name: "Release CM (the guard function and a coach's decision on a flagged screening; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["137"] },
   { id: "release-t1-front-desk", name: "Release T1 (the front desk; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["152"] },
+  { id: "release-s2-health-answers", name: "Release S2 (health answers private to the client and their coach; apply together with the code)", steps: ["151"] },
   { id: "release-s1-signin-hardening", name: "Release S1 (a changed sign-in email is confirmed by the new address; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["150"] },
   { id: "release-f2-client-cap", name: "Release F2 (the free plan's client limit, installed switched off; adds only)", steps: ["149"] },
   { id: "release-l-leaving-coach", name: "Release L (a leaving coach is never given an organization; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["148"] },
@@ -3410,6 +3446,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0338", has.col("guardian_links", "expires_at")),
     m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
     m("0400", "to_regclass('public.org_front_desk') is not null"),
+    m("0399", "to_regclass('public.health_access_grants') is not null"),
     m("0398", "to_regclass('public.pending_email_changes') is not null"),
     m("0397", "exists (select 1 from pg_trigger where tgname = 'group_memberships_free_tier_limit' and not tgisinternal)"),
     m("0396", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'organization_memberships' and column_name = 'departing_since')"),
@@ -3577,5 +3614,7 @@ writeFileSync(
 );
 writeFileSync(new URL("check-copy-result.sql", outDir), "-- READ-ONLY. Run after step 30 and LOOK at it before step 31: the original program and its copy, side by side. The two rows must show the same numbers.\nwith pair as (\n  select 'original (Main Group)' as which, '5b8a8a3a-344d-4192-a892-f74494fff9ab'::uuid as program_id\n  union all\n  select 'copy (The Home Team)', (select id from public.programs where group_id = '060017b5-e613-4204-a101-c6a14c3a9630' and name = 'christmas_abs_program' order by created_at desc limit 1)\n)\nselect p.which,\n  (select count(*) from public.workouts w where w.program_id = p.program_id) as workouts,\n  (select count(*) from public.group_workout_exercises x join public.workouts w on w.id = x.workout_id where w.program_id = p.program_id) as exercises,\n  (select count(*) from public.group_workout_exercise_sets s join public.group_workout_exercises x on x.id = s.group_workout_exercise_id join public.workouts w on w.id = x.workout_id where w.program_id = p.program_id) as sets,\n  (select count(*) from public.workout_notes n join public.workouts w on w.id = n.workout_id where w.program_id = p.program_id) as notes,\n  (select count(*) from public.exercise_progressions q where q.program_id = p.program_id) as progressions\nfrom pair p;\n");
 writeFileSync(new URL("check-step23-probe.sql", outDir), step23ProbeSql(migrationSql("0281")));
+// The step list for scripts/state-report.mjs: each step with the check that says it is NOT yet applied (every row labelled "... is not already applied"; older steps have none and are reported as no check), so a read-only report can tell which pastes are in the database.
+writeFileSync(new URL("state-probes.json", outDir), JSON.stringify(STEPS.map((s) => ({ n: s.n, slug: s.slug, title: s.title, migrations: s.migrations, notApplied: s.rows.filter((r) => /not already applied/i.test(r[0])).map((r) => r[1]) })), null, 1));
 writeFileSync(new URL("steps.json", outDir), JSON.stringify(STEPS.map((s) => ({ n: s.n, slug: s.slug, migrations: s.migrations, rows: s.rows.length })), null, 1));
 console.log(`wrote ${STEPS.length} steps to supabase/apply/`);

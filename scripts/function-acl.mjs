@@ -87,6 +87,8 @@ export const ACL_REVIEWED = [
   "close_organization", "remove_org_member", "set_org_member_role",
   // Release T1 (front desk): each looks at who is calling inside (a front-desk person of the organization, or its owner/admin/coach, through _front_desk_may_act; remove_front_desk: an owner/admin or the person themselves).
   "front_desk_orgs", "front_desk_find", "front_desk_check_in", "remove_front_desk",
+  // Release S2: each answers only through _can_read_health_answers (the client, their coach, or an owner/admin the owner granted), which looks at who is calling inside.
+  "health_answers", "health_answers_many",
 ];
 
 const quote = (names) => names.map((n) => `'${n}'`).join(", ");

@@ -189,7 +189,7 @@ export function WeightLogWidget({
       </div>
 
       <form onSubmit={handleSubmit} className="flex items-center gap-2">
-        <input
+        <input aria-label={`Weight (${weightUnit})`}
           type="number"
           inputMode="decimal"
           step="0.1"

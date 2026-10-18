@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useDialogA11y } from "@/lib/use-dialog-a11y";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { generateSlotsForDate, formatSlotTime, resolveBlockedRangesForDate, bookingFitsAvailability, type AvailabilityWindow } from "@/lib/booking-slots";
 import { DEFAULT_COACH_TIMEZONE, zonedTimeToUtc } from "@/lib/timezone";
@@ -46,6 +47,7 @@ export function ExpandedDayScheduler({
   onAssigned: () => void;
   onCancel: () => void;
 }) {
+  const dialogRef = useDialogA11y<HTMLDivElement>(true, onCancel, undefined, { guard: () => (assigning ? "block" : otherTime || otherMinutes ? "ask" : "close"), askMessage: "Discard this booking?" });
   const [balance, setBalance] = useState(client.balance);
   const [adjustingCredits, setAdjustingCredits] = useState(false);
   const [assigning, setAssigning] = useState(false);
@@ -152,7 +154,7 @@ export function ExpandedDayScheduler({
   ].sort((a, b) => (a.time ?? "").localeCompare(b.time ?? ""));
 
   return (
-    <div className="fixed inset-0 z-50 bg-graphite flex items-center justify-center p-6">
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Schedule session" className="fixed inset-0 z-50 bg-graphite flex items-center justify-center p-6">
       <div className="bg-graphite border border-rust/40 w-full max-w-2xl max-h-[85vh] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden shadow-2xl">
         <div className="p-5 border-b border-steel/20 flex items-start justify-between gap-4">
           <div>

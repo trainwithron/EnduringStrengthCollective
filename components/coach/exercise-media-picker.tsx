@@ -210,7 +210,7 @@ export function ExerciseMediaPicker({
 
       {!youtubeUrl && (
         <div className="flex gap-2">
-          <input
+          <input aria-label="YouTube link"
             type="text"
             value={urlDraft}
             onChange={(e) => setUrlDraft(e.target.value)}

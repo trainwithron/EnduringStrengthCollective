@@ -10,6 +10,8 @@ import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { OneRepMaxCalculator } from "@/components/tools/one-rep-max-calculator";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 
+export const metadata = { title: "One rep max" };
+
 export default async function OneRepMaxPage(
   props: {
     params: Promise<{ groupId: string }>;

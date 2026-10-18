@@ -51,7 +51,7 @@ export function CalendarClientList({ clients, selectedClientId }: { clients: Cal
               <span
                 title={`${picture.toBook} left to schedule`}
                 aria-label={`${picture.toBook} left to schedule`}
-                className={`font-body text-sm tabular-nums w-7 text-right ${picture.toBook > 0 ? "text-chalk" : "text-steel/40"}`}
+                className={`font-body text-sm tabular-nums w-7 text-right ${picture.toBook > 0 ? "text-chalk" : "text-steel"}`}
               >
                 {picture.toBook}
               </span>

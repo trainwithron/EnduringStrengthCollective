@@ -9,6 +9,8 @@ import { activityPeriod, loadCoachActivity } from "@/lib/coach-activity";
 import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { CoachActivityTable } from "@/components/org/coach-activity-table";
 
+export const metadata = { title: "Team activity" };
+
 // What each coach in the organization has done in a period, for the owner and admins: clients, sessions delivered, no-shows and late cancels, quiet clients, low balances, and a payroll ESTIMATE with a spreadsheet
 // of the sessions behind it. Counts only what row security shows the viewer: a client who keeps their records private from the organization is not in these numbers.
 export default async function TeamActivityPage(props: { params: Promise<{ groupId: string }>; searchParams: Promise<{ from?: string; to?: string }> }) {

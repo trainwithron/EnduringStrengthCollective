@@ -2,6 +2,8 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { NoAccess } from "@/components/shared/no-access";
 import { OrgTrainerRequestForm } from "@/components/public/org-trainer-request-form";
 
+export const metadata = { title: "Join" };
+
 // org_calendar_spotter_trainer_dispatch_scoping_sept19.md — a forward-
 // facing org-level intake page, parallel to (not replacing) the
 // existing single-coach /book/[coachId] flow. Deliberately public — a

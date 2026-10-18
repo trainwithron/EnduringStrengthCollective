@@ -40,6 +40,8 @@ import { ReadDuringRestSettings } from "@/components/coach/read-during-rest-sett
 import { FAITH_PACK } from "@/lib/read-content";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 
+export const metadata = { title: "Settings" };
+
 export default async function SettingsPage(
   props: {
     params: Promise<{ groupId: string }>;
@@ -439,6 +441,12 @@ export default async function SettingsPage(
             <ShowNameOnShareToggle profileId={athleteId} initialOn={showNameOn} />
           </SettingsGroup>
         )}
+
+        <SettingsGroup label="Help">
+          <Link href="/help" className="block font-body text-sm text-chalk">
+            Help articles, what&apos;s new and app status →
+          </Link>
+        </SettingsGroup>
 
         <SettingsGroup label="Feedback">
           <FeedbackButton />

@@ -11,6 +11,8 @@ import { getEffectiveAthlete } from "@/lib/acting-as";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { loadDirectThread } from "@/lib/direct-thread";
 
+export const metadata = { title: "Messages" };
+
 export default async function MessageThreadPage(
   props: { params: Promise<{ groupId: string; otherId: string }>; searchParams: Promise<{ draft?: string }> }
 ) {

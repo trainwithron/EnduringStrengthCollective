@@ -7,6 +7,8 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { CreateAndOpenProgram } from "@/components/coach/create-and-open-program";
 import { getCoachedGroups, pickAnchorGroup } from "@/lib/coach-groups";
 
+export const metadata = { title: "New" };
+
 // "New program" and "Build program": there is no screen to fill in. The program is made at once and the builder opens (components/coach/create-and-open-program.tsx); the AI Program Builder is at
 // the top of the builder. An old link with ?method=ai now does the same: the builder opens with its AI box, which builds from a description and offers to import pasted program text.
 export default async function NewProgramPage(

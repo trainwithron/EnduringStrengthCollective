@@ -8,6 +8,8 @@ import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { AboutYouForm } from "@/components/athlete/about-you-form";
 import { readDateOfBirth, rowToBodyProfile } from "@/lib/client-body-profile";
 
+export const metadata = { title: "About you" };
+
 // A client's own inputs for the calculator (height, weight, sex, activity, goal, optional body fat). Client only: a coach edits these in the client's Targets.
 export default async function AboutYouPage(props: { params: Promise<{ groupId: string }> }) {
   const params = await props.params;

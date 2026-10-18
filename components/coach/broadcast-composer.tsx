@@ -174,7 +174,7 @@ export function BroadcastComposer({
             Insert first name
           </button>
         </div>
-        <textarea
+        <textarea aria-label="Message to send"
           ref={textareaRef}
           value={template}
           onChange={(e) => setTemplate(e.target.value)}

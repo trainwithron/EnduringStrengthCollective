@@ -1,6 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
+import { useDialogA11y } from "@/lib/use-dialog-a11y";
 import { CoachNavLinksList } from "./coach-nav-links-list";
 
 // The coach mobile "More" sheet (coach_mobile_app_redesign_plan.md,
@@ -21,10 +22,11 @@ export function CoachMoreSheet({
   groupName: string;
   onClose: () => void;
 }) {
+  const dialogRef = useDialogA11y<HTMLElement>(true, onClose);
   return (
     <div className="fixed inset-0 z-50 flex">
       <div className="absolute inset-0 bg-graphite/80" onClick={onClose} aria-hidden="true" />
-      <aside className="relative w-[280px] max-w-[85vw] h-full bg-graphite border-r border-steel/20 flex flex-col overflow-y-auto">
+      <aside ref={dialogRef} role="dialog" aria-modal="true" aria-label="More" className="relative w-[280px] max-w-[85vw] h-full bg-graphite border-r border-steel/20 flex flex-col overflow-y-auto">
         <div className="flex items-center justify-between px-3 h-14 border-b border-steel/20 shrink-0">
           <p className="font-display uppercase text-sm tracking-wide text-chalk px-2">More</p>
           <button

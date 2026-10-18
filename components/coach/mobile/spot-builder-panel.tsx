@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useDialogA11y } from "@/lib/use-dialog-a11y";
 import { useTerm } from "@/components/coach/terminology-provider";
 import dynamic from "next/dynamic";
 import { X, Sparkles } from "lucide-react";
@@ -54,6 +55,11 @@ export function SpotBuilderPanel({
 }) {
   const term = useTerm();
   const [stage, setStage] = useState<"compact" | "expanded" | "fullscreen">(initialAthleteId ? "expanded" : "compact");
+  const dialogRef = useDialogA11y<HTMLDivElement>(stage === "fullscreen", () => close(), undefined, {
+    // Escape must not throw away a generated or half-edited program (it lives inside the wizard below), so once the wizard is up it asks first; on the loading screen there is nothing to lose.
+    guard: () => (library && aliases ? "ask" : "close"),
+    askMessage: "Close the AI Program Builder? Anything you have generated or edited here will be lost.",
+  });
   // Explicit, coach-controlled choice — not inferred from which button
   // they tap (Ron's own correction: "just a quick button, AI or
   // parse"). AI = fire full generation straight from the compact text;
@@ -148,7 +154,7 @@ export function SpotBuilderPanel({
         </p>
 
         {!initialAthleteId && (
-          <select
+          <select aria-label="Client"
             value={athleteId ?? ""}
             onChange={(e) => {
               const c = (clients ?? []).find((c) => c.id === e.target.value);
@@ -166,7 +172,7 @@ export function SpotBuilderPanel({
           </select>
         )}
 
-        <input
+        <input aria-label="Describe the program"
           type="text"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
@@ -224,7 +230,7 @@ export function SpotBuilderPanel({
         ) : (
           <div className="mb-3">
             <label className="font-body text-xs text-steel uppercase tracking-wide">{term("client", "singular", { cap: true })}</label>
-            <select
+            <select aria-label="Client"
               value={athleteId ?? ""}
               onChange={(e) => {
                 const c = (clients ?? []).find((c) => c.id === e.target.value);
@@ -243,7 +249,7 @@ export function SpotBuilderPanel({
           </div>
         )}
 
-        <textarea
+        <textarea aria-label="Describe the program"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           rows={2}
@@ -254,7 +260,7 @@ export function SpotBuilderPanel({
         <div className="grid grid-cols-3 gap-2 mt-3">
           <div>
             <label className="font-body text-xs text-steel uppercase tracking-wide">Progression</label>
-            <select
+            <select aria-label="Progression"
               value={progressionRule}
               onChange={(e) => setProgressionRule(e.target.value as ProgressionRule)}
               className="w-full h-9 mt-1 bg-graphite border border-steel/30 text-chalk px-1 font-body text-xs"
@@ -268,7 +274,7 @@ export function SpotBuilderPanel({
           </div>
           <div>
             <label className="font-body text-xs text-steel uppercase tracking-wide">Weeks</label>
-            <input
+            <input aria-label="Weeks"
               type="number"
               min={1}
               max={16}
@@ -279,7 +285,7 @@ export function SpotBuilderPanel({
           </div>
           <div>
             <label className="font-body text-xs text-steel uppercase tracking-wide">Style</label>
-            <input
+            <input aria-label="Style"
               type="text"
               value={programType}
               onChange={(e) => setProgramType(e.target.value)}
@@ -305,7 +311,7 @@ export function SpotBuilderPanel({
   // own scroll container via fixed positioning (unaffected by which
   // swipe panel is currently in view underneath).
   return (
-    <div className="fixed inset-0 z-50 bg-graphite overflow-y-auto">
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="AI Program Builder" className="fixed inset-0 z-50 bg-graphite overflow-y-auto">
       <div className="sticky top-0 z-10 bg-graphite border-b border-steel/20 px-4 py-3 flex items-center justify-between">
         <p className="font-display font-bold text-lg uppercase leading-none">AI Program Builder</p>
         <button type="button" onClick={close} aria-label="Close">

@@ -17,6 +17,8 @@ export interface TeamMember {
   leaving?: boolean;
   // Let go by the organization (shown as "Let go" instead of "Leaving").
   fired?: boolean;
+  // Whether this owner or admin can read the clients' health screening answers (the owner grants it; migration 0399). Everyone else on the team sees only "done" or "needs attention".
+  healthAccess?: boolean;
 }
 
 export interface TeamInvite {
@@ -101,6 +103,11 @@ export function TeamMembersPanel({
     after?.();
     router.refresh();
     return true;
+  }
+
+  // The owner lets an owner or admin read the clients' health screening answers, or takes it back.
+  async function setHealthAccess(m: TeamMember, on: boolean) {
+    await run(`health-${m.profileId}`, () => db().rpc("set_health_access", { p_org: organizationId, p_profile: m.profileId, p_on: on }));
   }
 
   async function changeRole(m: TeamMember) {
@@ -216,6 +223,17 @@ export function TeamMembersPanel({
                   </p>
                 )}
               </div>
+              {isOwner && (m.role === "owner" || m.role === "admin") && !m.leaving && (
+                <label className="flex items-center gap-2 min-h-11 mt-1 font-body text-xs text-steel">
+                  <input
+                    type="checkbox"
+                    checked={!!m.healthAccess}
+                    disabled={busy === `health-${m.profileId}`}
+                    onChange={(e) => setHealthAccess(m, e.target.checked)}
+                  />
+                  Can read clients&apos; health screening answers
+                </label>
+              )}
               {canTouch && !isRemoving && (
                 <div className="flex flex-wrap items-center gap-4 mt-2">
                   {isOwner && (

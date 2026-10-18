@@ -10,6 +10,8 @@ import { dayStatus, programProgress, progressLine } from "@/lib/client-preview-p
 import { formatShortDate } from "@/lib/program-schedule";
 import { ViewAsClientLabel } from "@/components/coach/desktop/view-as-client-label";
 
+export const metadata = { title: "View" };
+
 // "View as client" (desktop): the coach sees roughly what the client sees, read only, in a phone-width frame. Everything here is a plain server-rendered read: there is no form,
 // no button that saves anything and no write code at all, so nothing can change from this page. The client is named in the address and the page first checks that the viewer
 // coaches this group and that the client is an athlete in it; no impersonation cookie is used. The same rule as the client's profile page: the viewer must coach this group.

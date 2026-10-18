@@ -283,7 +283,7 @@ export function AddClientButton({
           <p className="font-body text-xs text-steel mt-1.5">{resentNote.message}</p>
           {resentNote.link && (
             <div className="flex items-center gap-2 mt-2">
-              <input readOnly value={resentNote.link} onFocus={(e) => e.target.select()} className="flex-1 h-11 min-w-0 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none" />
+              <input aria-label="Invite link" readOnly value={resentNote.link} onFocus={(e) => e.target.select()} className="flex-1 h-11 min-w-0 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none" />
               <button
                 type="button"
                 onClick={() => void navigator.clipboard.writeText(resentNote.link!).catch(() => setError("Couldn't copy. Select the link and copy it by hand."))}
@@ -409,7 +409,7 @@ export function AddClientButton({
             <div>
               <p className="font-body text-xs text-steel mb-2">Works for 7 days.</p>
               <div className="flex items-center gap-2">
-                <input readOnly value={link} onFocus={(e) => e.target.select()} className="flex-1 h-11 min-w-0 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none" />
+                <input aria-label="Invite link" readOnly value={link} onFocus={(e) => e.target.select()} className="flex-1 h-11 min-w-0 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none" />
                 <button type="button" onClick={copy} className="h-11 px-3 border border-rust text-rust font-body text-xs shrink-0">
                   {copied ? "Copied" : "Copy"}
                 </button>

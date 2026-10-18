@@ -15,6 +15,8 @@ import { MessagesTwoPane } from "@/components/messages/messages-two-pane";
 import { AwayReplyCard } from "@/components/coach/away-reply-card";
 import { loadAwayReply } from "@/lib/away-reply-data";
 
+export const metadata = { title: "Messages" };
+
 interface ConversationRow {
   otherId: string;
   fullName: string;

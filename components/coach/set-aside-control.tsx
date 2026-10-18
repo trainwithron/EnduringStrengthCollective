@@ -58,7 +58,7 @@ export function SetAsideControl({ athleteId, groupId }: { athleteId: string; gro
           : "Hide this client from your dashboard and quiet-client alerts without deleting anything. Only you can see this, not the client. A workout, session or message from them brings them back (a session you schedule for them counts). A weekly schedule you already set up keeps running until you end it."}
       </p>
       {state === "active" && (
-        <input
+        <input aria-label="Note (optional)"
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder="Note (optional)"
