@@ -53,8 +53,8 @@ describe("the state report", () => {
       "select 1 where 1 = (select count(*) from dblink('x', 'drop table t') as t(a int))",
       'select "pg_terminate_backend"(1)',
       "select \"pg_sleep\"(5)",
-      "select E'\' ; drop table t; --'",
-      "select U&'\0041'",
+      String.raw`select E'\' ; drop table t; --'`,
+      String.raw`select U&'\0041'`,
       "select e'x'",
     ];
     for (const sql of bad) expect(() => assertReadOnly(sql), sql).toThrow();
