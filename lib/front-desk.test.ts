@@ -126,6 +126,9 @@ describe("the front desk reaches clients only through the database's functions",
     const sql = src("supabase/migrations/0400_front_desk.sql");
     expect(sql).toContain("interval '15 minutes') >= 10 then");
     expect(sql).toContain("jsonb_build_object('result', 'throttled')");
+    // the try that locks a client counts too
+    expect(sql).toContain("if v_verdict in ('wrong', 'locked') then");
+    expect(sql).not.toMatch(/_front_desk_display_name[\s\S]{0,200}immutable/);
   });
 
   it("the invitation route makes a front-desk row, never a membership or a group seat, for the new role", () => {
@@ -136,11 +139,20 @@ describe("the front desk reaches clients only through the database's functions",
     expect(frontDeskBranch.indexOf("return NextResponse.json({ invited: true });")).toBeLessThan(frontDeskBranch.indexOf('.from("group_memberships")'));
   });
 
-  it("an invitation that is already open is said out loud with a pointer to Resend, not answered as if it had just been sent", () => {
+  it("the answer to an invitation is the same whether or not an account or an open invitation exists; the form points at the Invitations list", () => {
     const route = src("app/api/coaches/invite/route.ts");
-    expect(route).toContain('code: "invite_open"');
-    expect(route).toContain("status: 409");
-    expect(route).toContain("choose Resend");
+    expect(route).not.toContain("invite_open");
+    expect(route).not.toContain("status: 409");
+    expect(route).toContain('if (inviteRowError?.code === "23505") return NextResponse.json({ invited: true });');
+    expect(src("components/coach/desktop/invite-coach-form.tsx")).toContain("choose Resend there");
+  });
+
+  it("the front-desk link is asked per person and a signed-out or failed read is never kept", () => {
+    const hook = src("components/front-desk/use-on-front-desk.ts");
+    expect(hook).toContain("kept.userId === user.id");
+    expect(hook).toContain("if (!user) return false;");
+    expect(hook.indexOf("if (error) return false;")).toBeLessThan(hook.indexOf("kept = {"));
+    expect(hook).not.toContain("asked ??=");
   });
 
   it("only an owner or admin reaches the invitation and the removal buttons", () => {

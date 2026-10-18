@@ -65,7 +65,7 @@ export function InviteCoachForm({ groupId }: { groupId: string }) {
       {success ? (
         <div>
           <p className="font-body text-sm text-positive">
-            Invitation sent. They join once they accept.
+            If that person has no open invitation, we sent one, and they join once they accept. Check Invitations on the Team page for anything already open, and choose Resend there.
           </p>
           <button
             type="button"

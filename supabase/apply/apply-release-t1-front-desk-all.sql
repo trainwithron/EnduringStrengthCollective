@@ -110,7 +110,7 @@ revoke execute on function public._front_desk_scope(uuid) from public, anon, aut
 create or replace function public._front_desk_display_name(p_name text, p_dob date)
 returns text
 language sql
-immutable
+stable
 set search_path = public
 as $$
   select case
@@ -284,7 +284,8 @@ begin
     return jsonb_build_object('result', 'throttled');
   end if;
   v_verdict := public._check_kiosk_pin(p_group, p_athlete, p_pin);
-  if v_verdict = 'wrong' then
+  -- a wrong code and the try that locks the client both count against the person (otherwise five tries per client would cost them only four misses)
+  if v_verdict in ('wrong', 'locked') then
     insert into public.front_desk_pin_misses (caller) values (v_me);
     delete from public.front_desk_pin_misses x where x.caller = v_me and x.missed_at < now() - interval '1 day';
   end if;

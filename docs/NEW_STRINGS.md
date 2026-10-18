@@ -115,7 +115,7 @@
 
 ## Release T1 (front desk)
 
-- Menu and Settings: "Front desk" / "Open the front desk check-in screen →". Invitation already open: "There is already an open invitation for this person. Find it under Invitations on the Team page and choose Resend."
+- Menu and Settings: "Front desk" / "Open the front desk check-in screen →". Invitation sent (the same words whatever the state): "If that person has no open invitation, we sent one, and they join once they accept. Check Invitations on the Team page for anything already open, and choose Resend there."
 
 - Invite form, permission level: "Front desk (check-in only)"; note: "Front desk staff check clients in on the front-desk screen and can see nothing else: no health answers, programs, messages or reports."
 - Invitation page / notice: "invited you to join as front desk staff, to check clients in."; Team page role word "Front desk".

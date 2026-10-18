@@ -246,6 +246,21 @@ export default {
       v = await checkIn(deskT, three[0][0], three[0][1], "1234");
       h.check("and after 15 minutes the person can try again", v.result === "ok", JSON.stringify(v));
 
+      // the try that locks a client counts against the person too, and so does every try on a locked client
+      const deskL = await h.user("FD Locking Desk");
+      await db.query(`insert into public.org_front_desk (organization_id, profile_id) values ($1, $2)`, [org, deskL]);
+      const cl = await h.user("Throttle Four");
+      const gl = await h.group(org, coach, "one_on_one", "FD Throttle Four");
+      await h.member(gl, cl);
+      await h.as(coach);
+      await db.query("select public.set_kiosk_pin($1, $2, '1234')", [gl, cl]);
+      await h.asSuper();
+      const lockedResults = [];
+      for (let k = 0; k < 10; k++) lockedResults.push((await checkIn(deskL, gl, cl, "0000")).result);
+      h.check("five tries lock the client (4 wrong + the locking try), and further tries on it are 'locked'", lockedResults.slice(0, 6).join() === "wrong,wrong,wrong,wrong,locked,locked", lockedResults.join());
+      v = await checkIn(deskL, three[0][0], three[0][1], "1234");
+      h.check("ten recorded misses (the locking try and the locked tries included) hold the person back", v.result === "throttled", JSON.stringify(v));
+
       // ---- an owner or admin whose access has ended has no say over the front desk
       await db.query(`insert into public.org_front_desk (organization_id, profile_id) values ($1, $2) on conflict do nothing`, [org, desk]);
       await db.query(`update public.organization_memberships set access_ended_at = now() where organization_id = $1 and profile_id = $2`, [org, admin]);
