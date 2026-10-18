@@ -8,5 +8,5 @@ from (
     ('0408 is not already applied (the flags table is not there yet)',
       to_regclass('public.client_nutrition_flags') is null),
     ('the tables and helper it uses exist',
-      to_regclass('public.groups') is not null and to_regclass('public.profiles') is not null and to_regprocedure('public.is_group_coach(uuid)') is not null)
+      to_regclass('public.groups') is not null and to_regclass('public.profiles') is not null and to_regprocedure('public.is_group_coach(uuid)') is not null and to_regclass('public.group_memberships') is not null)
 ) as checks(check_name, ok);

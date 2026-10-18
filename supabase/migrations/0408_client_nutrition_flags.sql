@@ -22,7 +22,11 @@ drop policy if exists "client_nutrition_flags_coach_all" on public.client_nutrit
 create policy "client_nutrition_flags_coach_all" on public.client_nutrition_flags for all
   to authenticated
   using (public.is_group_coach(group_id))
-  with check (public.is_group_coach(group_id));
+  -- the person must be a client of the group the coach is writing for (the switch follows the person into every group, so a coach must not be able to silence someone who is not theirs)
+  with check (
+    public.is_group_coach(group_id)
+    and exists (select 1 from public.group_memberships gm where gm.group_id = client_nutrition_flags.group_id and gm.profile_id = client_nutrition_flags.profile_id and gm.role = 'athlete')
+  );
 
 do $$
 begin
@@ -33,3 +37,31 @@ begin
   end if;
 end
 $$;
+
+-- What a coach of the person's group is shown: is "no automatic suggestions" in force for this person? 'this' = switched on in this group; 'other' = switched on only in another of their groups (the weekly job still honours it);
+-- 'none' = not on anywhere. It answers only that, and only to a coach of the group for a client of that group: never which coach set it, nor in which group.
+create or replace function public.nutrition_auto_off_state(p_group uuid, p_profile uuid)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null or not public.is_group_coach(p_group) then
+    return 'none';
+  end if;
+  if not exists (select 1 from public.group_memberships gm where gm.group_id = p_group and gm.profile_id = p_profile and gm.role = 'athlete') then
+    return 'none';
+  end if;
+  if exists (select 1 from public.client_nutrition_flags f where f.group_id = p_group and f.profile_id = p_profile and f.auto_off) then
+    return 'this';
+  end if;
+  if exists (select 1 from public.client_nutrition_flags f where f.profile_id = p_profile and f.auto_off) then
+    return 'other';
+  end if;
+  return 'none';
+end;
+$$;
+revoke execute on function public.nutrition_auto_off_state(uuid, uuid) from public, anon;
+grant execute on function public.nutrition_auto_off_state(uuid, uuid) to authenticated, service_role;

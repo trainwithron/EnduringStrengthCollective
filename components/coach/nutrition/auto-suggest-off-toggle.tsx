@@ -4,11 +4,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 
+export type AutoSuggestState = "none" | "this" | "other";
+
 // The coach's per-client "no automatic nutrition suggestions". While it is on, the weekly check-in never suggests a calorie or macro change for this person, whatever the numbers say, in any group they belong to
-// (it is a safety switch, so it follows the person, including into another coach's group). The coach can still set targets by hand or work out a starting target themselves (those suggestions are asked for, not sent). It is a note only the coach can read (not on the membership row the client reads). One tap turns it back on.
-export function AutoSuggestOffToggle({ athleteId, groupId, initialOff, clientFirstName }: { athleteId: string; groupId: string; initialOff: boolean; clientFirstName: string }) {
+// (it is a safety switch, so it follows the person, including into another coach's group). The coach can still set targets by hand or work out a starting target themselves (those suggestions are asked for, not sent).
+// "this": switched on here. "other": switched on in another of their groups, which the weekly job honours here too; the coach can also switch it on for this group. Turning it back on here never lifts another group's switch.
+export function AutoSuggestOffToggle({ athleteId, groupId, initialState, clientFirstName }: { athleteId: string; groupId: string; initialState: AutoSuggestState; clientFirstName: string }) {
   const router = useRouter();
-  const [off, setOff] = useState(initialOff);
+  const [state, setState] = useState<AutoSuggestState>(initialState);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,7 +26,8 @@ export function AutoSuggestOffToggle({ athleteId, groupId, initialOff, clientFir
     if (saveError || !data || data.length === 0) {
       setError("That didn't save. Nothing was changed.");
     } else {
-      setOff(next);
+      setState(next ? "this" : "none");
+      // The person may still be switched off in another group; the screen is read again to say so.
       router.refresh();
     }
     setSaving(false);
@@ -31,14 +35,23 @@ export function AutoSuggestOffToggle({ athleteId, groupId, initialOff, clientFir
 
   return (
     <div className="font-body text-sm text-steel" data-testid="auto-suggest-off-toggle">
-      {off ? (
+      {state === "this" && (
         <p className="flex flex-wrap items-center gap-x-2">
           <span>Automatic nutrition suggestions are off for {clientFirstName}, in all their groups. Doesn&apos;t stop suggestions you ask for yourself.</span>
           <button type="button" onClick={() => void set(false)} disabled={saving} className="min-h-11 px-1 text-rust underline underline-offset-2 disabled:opacity-40">
             Turn on
           </button>
         </p>
-      ) : (
+      )}
+      {state === "other" && (
+        <p className="flex flex-wrap items-center gap-x-2">
+          <span>Automatic nutrition suggestions are off for {clientFirstName} (set in another of their groups). Doesn&apos;t stop suggestions you ask for yourself.</span>
+          <button type="button" onClick={() => void set(true)} disabled={saving} className="min-h-11 px-1 text-rust underline underline-offset-2 disabled:opacity-40">
+            Switch off here too
+          </button>
+        </p>
+      )}
+      {state === "none" && (
         <button type="button" onClick={() => void set(true)} disabled={saving} className="min-h-11 text-steel underline underline-offset-2 text-xs disabled:opacity-40">
           No automatic suggestions for {clientFirstName}
         </button>

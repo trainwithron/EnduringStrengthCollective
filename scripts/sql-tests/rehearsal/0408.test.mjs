@@ -41,6 +41,30 @@ export default {
       h.check("and cannot change it", own.rows.length === 0);
       h.check("the client cannot add one for themselves", (await msg(db, `insert into public.client_nutrition_flags (group_id, profile_id, auto_off) values ($1, $2, false) on conflict do nothing`, [group, client])).length > 0);
 
+      // ---- the switch follows the person: a coach may only write it for a client of their own group
+      const stranger = await h.user("NF Stranger");
+      await h.as(coach);
+      h.check("a coach cannot switch it on for a person who is not a client of their group", (await msg(db, `insert into public.client_nutrition_flags (group_id, profile_id, auto_off) values ($1, $2, true)`, [group, stranger])).length > 0);
+      h.check("nor for another coach's client by naming their own group", (await msg(db, `insert into public.client_nutrition_flags (group_id, profile_id, auto_off) values ($1, $2, true)`, [group, other])).length > 0);
+
+      // ---- and the state a coach is shown is person-wide but reveals only a word
+      await h.asSuper();
+      await h.member(otherGroup, client);
+      const state = async (who, g) => {
+        await h.as(who);
+        const rows = (await db.query(`select public.nutrition_auto_off_state($1, $2) as s`, [g, client])).rows;
+        await h.asSuper();
+        return rows[0].s;
+      };
+      h.check("the coach who set it sees 'this'", (await state(coach, group)) === "this");
+      h.check("a second coach of the same person sees 'other' (switched off in another of their groups)", (await state(other, otherGroup)) === "other");
+      h.check("a coach with no such client sees 'none', not whether anyone set it", (await state(other, group)) === "none");
+      h.check("a client sees 'none'", (await state(client, group)) === "none");
+      await h.asSuper();
+      await db.query(`update public.client_nutrition_flags set auto_off = false where group_id = $1 and profile_id = $2`, [group, client]);
+      h.check("and 'none' once it is off everywhere", (await state(other, otherGroup)) === "none");
+      await db.query(`update public.client_nutrition_flags set auto_off = true where group_id = $1 and profile_id = $2`, [group, client]);
+
       await h.asSuper();
       await db.query(`delete from public.group_memberships where group_id = $1 and profile_id = $2`, [group, client]);
       h.check("it survives the client being taken out of the group (and so is there when they are put back)", (await db.query(`select auto_off from public.client_nutrition_flags where group_id = $1 and profile_id = $2`, [group, client])).rows[0]?.auto_off === true);

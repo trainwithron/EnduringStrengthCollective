@@ -91,7 +91,11 @@ describe("how it is wired", () => {
     expect(sql).toContain("create table if not exists public.client_nutrition_flags");
     expect(sql).toContain("using (public.is_group_coach(group_id))");
     expect(sql).not.toMatch(/alter table public\.group_memberships/);
+    expect(sql).toContain("gm.profile_id = client_nutrition_flags.profile_id and gm.role = 'athlete'");
+    expect(sql).toContain("create or replace function public.nutrition_auto_off_state");
     expect(src("components/coach/nutrition/auto-suggest-off-toggle.tsx")).toContain('.from("client_nutrition_flags")');
+    expect(src("components/coach/nutrition/auto-suggest-off-toggle.tsx")).toContain("Switch off here too");
+    expect(src("components/coach/nutrition/auto-suggest-off-switch.tsx")).toContain('rpc("nutrition_auto_off_state"');
     expect(src("components/coach/nutrition/client-nutrition.tsx")).toContain("<AutoSuggestOffSwitch");
   });
 });

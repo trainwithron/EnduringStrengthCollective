@@ -2921,12 +2921,15 @@ STEPS.push({
   title: "0408 Release B1: a coach can switch off automatic nutrition suggestions for one client (a coach-only note per client)",
   migrations: ["0408"],
   sees: "Success. No rows returned.",
-  afterwards: "Nothing changes on screen until the Release B1 code is live. Adds one empty table (client_nutrition_flags) that only the group's coaches can read or write. Until the code is live the weekly nutrition job behaves as before. Safe to run before the code.",
-  undo: "drop table if exists public.client_nutrition_flags;",
+  afterwards: "Nothing changes on screen until the Release B1 code is live. Adds one empty table (client_nutrition_flags) that only the group's coaches can read or write, and one small read function (nutrition_auto_off_state) that tells a coach only whether suggestions are off for their client. Until the code is live the weekly nutrition job behaves as before. Safe to run before the code.",
+  undo: [
+    "drop function if exists public.nutrition_auto_off_state(uuid, uuid);",
+    "drop table if exists public.client_nutrition_flags;",
+  ].join(String.fromCharCode(10)),
   undoWhy: "Only if step 160 misbehaves. Run it only while the Release B1 code is not live, and be aware that dropping it forgets which clients had suggestions switched off (the weekly job would suggest for them again).",
   rows: [
     ["0408 is not already applied (the flags table is not there yet)", "to_regclass('public.client_nutrition_flags') is null"],
-    ["the tables and helper it uses exist", "to_regclass('public.groups') is not null and to_regclass('public.profiles') is not null and to_regprocedure('public.is_group_coach(uuid)') is not null"],
+    ["the tables and helper it uses exist", "to_regclass('public.groups') is not null and to_regclass('public.profiles') is not null and to_regprocedure('public.is_group_coach(uuid)') is not null and to_regclass('public.group_memberships') is not null"],
   ],
 });
 
