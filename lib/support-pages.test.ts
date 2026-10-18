@@ -127,6 +127,22 @@ describe("the status page's own reading", () => {
     forgetStatusPageReading();
   });
 
+  it("a good reading is remembered 30 seconds but a bad one only 5, so a recovered database stops looking troubled almost at once", async () => {
+    forgetStatusPageReading();
+    const bad: HealthReading = { httpStatus: 503, status: "error", body: { status: "error", database: "unreachable", timestamp: "2026-10-18T00:00:00Z" } };
+    let calls = 0;
+    const read = async () => (calls++ === 0 ? bad : ok);
+    const t = 5_000_000;
+    expect((await readHealthForPage({ read, now: () => t })).status).toBe("error");
+    expect((await readHealthForPage({ read, now: () => t + 4_000 })).status).toBe("error");
+    expect(calls).toBe(1);
+    expect((await readHealthForPage({ read, now: () => t + 6_000 })).status).toBe("ok");
+    expect(calls).toBe(2);
+    await readHealthForPage({ read, now: () => t + 20_000 });
+    expect(calls).toBe(2);
+    forgetStatusPageReading();
+  });
+
   it("gives up after a short wait and says we are having trouble, instead of hanging", async () => {
     forgetStatusPageReading();
     const never = () => new Promise<HealthReading>(() => undefined);

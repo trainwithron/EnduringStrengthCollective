@@ -57,6 +57,8 @@ export async function readHealth(): Promise<HealthReading> {
 // read that takes longer than 4 seconds counts as "we are having trouble" (which is what a person looking at a page that will not load should be told). The monitor's /api/health is not cached: it always asks.
 let remembered: { at: number; reading: HealthReading } | null = null;
 export const STATUS_PAGE_TTL_MS = 30_000;
+// A bad reading (the database did not answer, or the read ran out of time) is remembered for only a few seconds, so a database that has recovered stops being reported as troubled almost at once.
+export const STATUS_PAGE_BAD_TTL_MS = 5_000;
 export const STATUS_PAGE_TIMEOUT_MS = 4_000;
 
 export function forgetStatusPageReading(): void {
@@ -66,7 +68,7 @@ export function forgetStatusPageReading(): void {
 export async function readHealthForPage(opts: { read?: () => Promise<HealthReading>; now?: () => number; ttlMs?: number; timeoutMs?: number } = {}): Promise<HealthReading> {
   const now = opts.now ?? Date.now;
   const ttl = opts.ttlMs ?? STATUS_PAGE_TTL_MS;
-  if (remembered && now() - remembered.at < ttl) return remembered.reading;
+  if (remembered && now() - remembered.at < (remembered.reading.status === "error" ? Math.min(ttl, STATUS_PAGE_BAD_TTL_MS) : ttl)) return remembered.reading;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const slow = new Promise<HealthReading>((resolve) => {
     timer = setTimeout(
