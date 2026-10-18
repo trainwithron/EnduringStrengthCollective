@@ -439,6 +439,12 @@ export default async function SettingsPage(
           </SettingsGroup>
         )}
 
+        <SettingsGroup label="Help">
+          <Link href="/help" className="block font-body text-sm text-chalk">
+            Help articles, what's new and app status →
+          </Link>
+        </SettingsGroup>
+
         <SettingsGroup label="Feedback">
           <FeedbackButton />
         </SettingsGroup>
