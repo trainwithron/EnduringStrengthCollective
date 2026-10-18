@@ -49,6 +49,7 @@ export const JOB_ADDED: Record<string, Date> = {
   "close-stale-sessions": new Date("2026-10-17T00:00:00Z"),
   "notification-push": new Date("2026-10-17T00:00:00Z"),
   "departing-coaches": new Date("2026-10-18T00:00:00Z"),
+  "purge-removed-clients": new Date("2026-10-18T00:00:00Z"),
 };
 export const NEW_JOB_GRACE_HOURS = 48;
 
