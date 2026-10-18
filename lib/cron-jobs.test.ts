@@ -93,3 +93,12 @@ describe("alert cadence", () => {
     expect(shouldAlertForFailures(0)).toBe(false);
   });
 });
+
+describe("a job added in a release is not reported 'never run' before it has had its chance", () => {
+  it("the jobs added on 17 and 18 October have their date in JOB_ADDED (a new job without one turns the health check to 'attention' the moment it ships)", async () => {
+    const { JOB_ADDED } = await import("./cron-jobs");
+    for (const job of ["close-stale-sessions", "notification-push", "departing-coaches", "purge-removed-clients", "protect-wearable-tokens"]) {
+      if (fs.readFileSync(path.join(__dirname, "..", "vercel.json"), "utf8").includes(`/api/cron/${job}`)) expect(JOB_ADDED[job], job).toBeInstanceOf(Date);
+    }
+  });
+});

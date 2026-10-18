@@ -7,6 +7,7 @@ import { Camera } from "lucide-react";
 import type { FeedChannel } from "@/lib/types";
 import { useMentionAutocomplete } from "@/lib/use-mention-autocomplete";
 import { notifyPush } from "@/lib/push-notify";
+import { nameForOthers } from "@/lib/name-protection-client";
 
 // The generic "form check / win / shoutout" copy reads oddly on Team
 // Chat, which is plain conversation, not activity-sharing — and flatly
@@ -116,7 +117,7 @@ export function PostComposerDesktop({
         .select("full_name")
         .eq("id", user.id)
         .maybeSingle();
-      const authorName = viewerProfile?.full_name ?? "Someone";
+      const authorName = viewerProfile?.full_name ? await nameForOthers(groupId, user.id, viewerProfile.full_name) : "Someone";
       const feedUrl = `/groups/${groupId}/feed`;
       for (const id of mentionedIds) {
         if (id !== user.id) notifyPush(id, "You were mentioned", `${authorName} mentioned you in a post`, feedUrl);

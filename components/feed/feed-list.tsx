@@ -5,6 +5,8 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import type { FeedChannel, FeedPost } from "@/lib/types";
 import { PostCard } from "./post-card";
 import { BLOCKED_EVENT, withoutBlocked } from "@/lib/content-moderation";
+import { fetchProtectedIds } from "@/lib/name-protection-client";
+import { protectAuthor } from "@/lib/post-name-protection";
 
 export function FeedList({
   groupId,
@@ -105,6 +107,8 @@ export function FeedList({
               ),
               commentCount: (data.comments ?? []).length,
             };
+            // A member who is not a confirmed adult is shown as a first name and last initial with no photo (asked of the server, which can see dates of birth).
+            shaped.author = protectAuthor(shaped.author, await fetchProtectedIds(groupId, [shaped.author.id]));
             // A brand-new post is never pre-pinned, but re-sort anyway so it
             // lands after any already-pinned posts rather than always at
             // the very top.

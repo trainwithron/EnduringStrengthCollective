@@ -85,6 +85,10 @@ export const ACL_REVIEWED = [
   "join_group_with_invite", "set_sms_consent", "request_workspace_org", "answer_organization_invite", "leave_organization", "group_in_active_org", "ensure_personal_space", "group_is_new_and_mine", "coach_in_org", "client_of_coach_in_org", "attach_refund_reason", "refund_coach_credit", "group_session_counts",
   // Release H: each checks the caller inside (owner, admin or the member themselves; signed-in only) through is_org_owner_or_admin, which this list does not recognise by name
   "close_organization", "remove_org_member", "set_org_member_role",
+  // Release T1 (front desk): each looks at who is calling inside (a front-desk person of the organization, or its owner/admin/coach, through _front_desk_may_act; remove_front_desk: an owner/admin or the person themselves).
+  "front_desk_orgs", "front_desk_find", "front_desk_check_in", "remove_front_desk",
+  // Release S2: each answers only through _can_read_health_answers (the client, their coach, or an owner/admin the owner granted), which looks at who is calling inside.
+  "health_answers", "health_answers_many",
   // Release CM1: checks the caller inside (signed in, a member of the post's group, not the author) through a local copy of auth.uid(), which this list does not recognise by pattern
   "report_content",
   // Release CM1: these check the caller through can_handle_content_report (signed in, and one of those who handle that report, never the person reported), which this list does not recognise by name

@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { loadBlockedIds } from "@/lib/blocked-members";
+import { fetchProtectedIds } from "@/lib/name-protection-client";
+import { shownName } from "@/lib/shown-name";
+import { readGroupMemberNames } from "@/lib/group-roster-reads";
 
 export interface MentionCandidate {
   id: string;
@@ -27,16 +30,12 @@ export function useMentionAutocomplete(groupId: string | null) {
     if (!groupId) return;
     const supabase = createBrowserClient();
     // A member the person has blocked is not offered when they type @ (blocking hides them, it should not also suggest them).
-    Promise.all([
-      supabase.from("group_memberships").select("profile_id, profiles ( full_name )").eq("group_id", groupId),
-      loadBlockedIds(supabase),
-    ]).then(([{ data }, blockedIds]) => {
+    // A name and an id for each member, through the narrow read (migration 0404): nothing else about anyone. Anyone who is not a confirmed adult is offered, and written into the post, as a first name and last initial ("@Sam R.").
+    Promise.all([readGroupMemberNames(supabase, groupId), loadBlockedIds(supabase)]).then(async ([everyone, blockedIds]) => {
       const blocked = new Set(blockedIds);
-      setMembers(
-        (data ?? [])
-          .map((r: any) => ({ id: r.profile_id, fullName: r.profiles?.full_name ?? "" }))
-          .filter((m) => m.fullName && !blocked.has(m.id))
-      );
+      const people = everyone.filter((m) => !blocked.has(m.id));
+      const protectedIds = await fetchProtectedIds(groupId, people.map((m) => m.id));
+      setMembers(people.map((m) => ({ id: m.id, fullName: shownName(m.fullName, m.id, protectedIds) })));
     });
   }, [groupId]);
 

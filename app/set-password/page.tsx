@@ -7,6 +7,7 @@ import { establishSessionFromLink } from "@/lib/auth-link-client";
 import { LinkConflictNotice } from "@/components/auth/link-conflict-notice";
 import { isPlaceholderEmail, validateClaimEmail, validateNewPassword } from "@/lib/client-claim";
 import { loadStartInputs, pickStartGroup } from "@/lib/start-group";
+import { FRONT_DESK_PATH, landsOnFrontDesk } from "@/lib/front-desk";
 import { LegalAcceptance } from "@/components/legal/legal-acceptance";
 import { LegalLinks } from "@/components/legal/legal-links";
 import { SigningInNotice } from "@/components/auth/signing-in-notice";
@@ -128,6 +129,13 @@ function SetPasswordForm() {
 
     // Same "find their first group, route in" logic as app/login/page.tsx.
     const membership = pickStartGroup(await loadStartInputs(supabase, user.id));
+
+    // Front-desk staff who do not coach go straight to the front-desk screen.
+    if (await landsOnFrontDesk(supabase, user.id, membership)) {
+      router.push(FRONT_DESK_PATH);
+      router.refresh();
+      return;
+    }
 
     // New clients added via the Add Client flow are flagged
     // intake_required — send them to the PAR-Q+/waiver intake first,

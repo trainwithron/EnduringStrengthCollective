@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 // for visual emphasis; the real notification (who actually gets pinged)
 // is resolved server-side against real member names in the database
 // trigger, not this regex.
-const MENTION_PATTERN = /@[A-Z][a-zA-Z'-]*(?:\s[A-Z][a-zA-Z'-]*)?/g;
+const MENTION_PATTERN = /@[A-Z][a-zA-Z'-]*(?:\s[A-Z][a-zA-Z'-]*\.?)?/g;
 
 export function renderWithMentions(body: string): ReactNode[] {
   const parts = body.split(MENTION_PATTERN);

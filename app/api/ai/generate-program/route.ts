@@ -1,3 +1,4 @@
+import { readHealthAnswers, HEALTH_READ_FAILED_MESSAGE } from "@/lib/health-answers";
 import { freeTierUseOrRefuse } from "@/lib/free-tier-server";
 import { safeErrorDetail } from "@/lib/safe-error";
 import { NextResponse } from "next/server";
@@ -220,14 +221,16 @@ export async function POST(request: Request) {
       .eq("profile_id", athleteId)
       .maybeSingle();
     if (athleteMembership?.role === "athlete") {
-      const [{ data: intakeRow }, { data: noteRow }] = await Promise.all([
-        supabase.from("client_intake").select("par_q_answers").eq("athlete_id", athleteId).maybeSingle(),
+      const [parQ, { data: noteRow }] = await Promise.all([
+        readHealthAnswers(supabase, athleteId),
         supabase.from("athlete_notes").select("body").eq("athlete_id", athleteId).eq("group_id", groupId).maybeSingle(),
       ]);
       // Under 18, or no birthdate on file: the youth protections apply (an unknown age is never treated as an adult).
       ageStatus = effectiveAgeStatus(await athleteAgeStatus(supabase, athleteId), athleteId === user.id);
       isYouth = ageStatus !== "adult";
-      const flagged = hasFlaggedMusculoskeletalConcern((intakeRow?.par_q_answers as any[]) ?? []);
+      // A screening that could not be read is not "no concern": nothing is generated.
+      if (parQ.kind === "error") return NextResponse.json({ error: HEALTH_READ_FAILED_MESSAGE }, { status: 503 });
+      const flagged = hasFlaggedMusculoskeletalConcern(parQ.kind === "ok" ? parQ.answers : []);
       const noteText = noteRow?.body?.trim() || null;
       if (flagged || noteText) {
         injuryContextText =
