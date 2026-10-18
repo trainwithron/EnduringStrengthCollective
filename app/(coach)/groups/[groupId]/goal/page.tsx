@@ -12,6 +12,8 @@ import { SubGoalsSection } from "@/components/shared/sub-goals-section";
 import type { SubGoalStatus, SubGoalView } from "@/lib/sub-goals";
 import type { GoalType } from "@/lib/goal-reversal";
 
+export const metadata = { title: "Goal" };
+
 // Client always sets/owns the goal (goal_date_aware_nutrition_and_
 // programming_idea.md) — this is deliberately an athlete-only page, not
 // a coach-authored one. The coach confirms from the client's profile

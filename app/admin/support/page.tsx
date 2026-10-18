@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { SupportThread, type SupportMessageRow } from "@/components/coach/desktop/support-thread";
 
+export const metadata = { title: "Support" };
+
 export default async function AdminSupportPage() {
   const supabase = await createServerClient();
   const {

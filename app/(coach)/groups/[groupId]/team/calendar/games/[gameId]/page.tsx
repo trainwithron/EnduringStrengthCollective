@@ -8,6 +8,8 @@ import { GameStatGrid, type GameStatAthlete } from "@/components/coach/desktop/g
 import { TeamGameScoreForm } from "@/components/coach/desktop/team-game-score-form";
 import { readPositionRoster } from "@/lib/group-roster-reads";
 
+export const metadata = { title: "Games" };
+
 export default async function GameDetailPage(
   props: { params: Promise<{ groupId: string; gameId: string }> }
 ) {

@@ -10,6 +10,7 @@ import { X, Search, Dumbbell } from "lucide-react";
 import { clientActivityStatus } from "@/lib/client-activity-status";
 import { computeQuietTier, QUIET_TIER_LABEL } from "@/lib/quiet-client-tier";
 import { initialsOf } from "@/lib/initials";
+import { useDialogA11y } from "@/lib/use-dialog-a11y";
 
 interface ClientOption {
   id: string;
@@ -46,6 +47,8 @@ export function ViewAsClientPicker({ onClose }: { onClose: () => void }) {
   // Not needed for "Log My Own Workout"/picking one's own group — that's
   // the coach acting as themselves, no identity/attribution risk.
   const [pendingClient, setPendingClient] = useState<ClientOption | null>(null);
+  // Opened by its parent, so it is always open while it is on the screen. Escape backs out of the confirm step first, then closes.
+  const dialogRef = useDialogA11y<HTMLDivElement>(true, () => (pendingClient ? setPendingClient(null) : onClose()), pendingClient?.id ?? "list");
 
   useEffect(() => {
     let cancelled = false;
@@ -166,7 +169,7 @@ export function ViewAsClientPicker({ onClose }: { onClose: () => void }) {
 
   if (pendingClient) {
     return (
-      <div className="fixed inset-0 z-40 bg-graphite text-chalk font-body flex flex-col">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="View as client" className="fixed inset-0 z-40 bg-graphite text-chalk font-body flex flex-col">
         <header className="px-5 pt-8 pb-4 border-b border-steel/20 flex items-center justify-between gap-3">
           <h1 className="font-display font-bold text-2xl uppercase leading-none">View as {pendingClient.fullName}?</h1>
           <button
@@ -205,7 +208,7 @@ export function ViewAsClientPicker({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-40 bg-graphite text-chalk font-body flex flex-col">
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="View as client" className="fixed inset-0 z-40 bg-graphite text-chalk font-body flex flex-col">
       <header className="px-5 pt-8 pb-4 border-b border-steel/20 flex items-center justify-between gap-3">
         <h1 className="font-display font-bold text-2xl uppercase leading-none">View as Client</h1>
         <button type="button" onClick={onClose} aria-label="Close" className="text-steel active:text-rust">
@@ -227,7 +230,7 @@ export function ViewAsClientPicker({ onClose }: { onClose: () => void }) {
 
       <div className="px-5 py-3 border-b border-steel/20 flex items-center gap-2">
         <Search className="w-4 h-4 text-steel shrink-0" />
-        <input
+        <input aria-label="Search clients"
           type="text"
           autoFocus
           value={query}

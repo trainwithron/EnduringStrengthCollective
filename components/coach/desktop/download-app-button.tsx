@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { useDialogA11y } from "@/lib/use-dialog-a11y";
 import { Smartphone, X, Copy, Check } from "lucide-react";
 
 // A coach building programs is sitting at a desktop, not their phone — the
@@ -23,6 +24,7 @@ export function DownloadAppButton({
   const [open, setOpen] = useState(false);
   const [origin, setOrigin] = useState("");
   const [copied, setCopied] = useState(false);
+  const dialogRef = useDialogA11y<HTMLDivElement>(open, () => setOpen(false));
 
   useEffect(() => {
     setOrigin(window.location.origin);
@@ -82,7 +84,7 @@ export function DownloadAppButton({
         // the modal, at a point inside the modal's own reported rect).
         // A portal is the standard fix: it escapes the DOM tree (and
         // therefore every ancestor's stacking context) entirely.
-        <div className="fixed inset-0 z-50 bg-graphite flex items-center justify-center px-6">
+        <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Get the app on your phone" className="fixed inset-0 z-50 bg-graphite flex items-center justify-center px-6">
           <div className="bg-surface border border-steel/30 max-w-md w-full p-6 relative">
             <button
               type="button"

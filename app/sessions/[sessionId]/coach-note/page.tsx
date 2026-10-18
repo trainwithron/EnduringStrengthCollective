@@ -6,6 +6,8 @@ import { redirect } from "next/navigation";
 import { createCrossOrgServerClient as createServerClient } from "@/lib/supabase/server";
 import { AcknowledgeSessionPatternNoteButton } from "@/components/coach/acknowledge-session-pattern-note-button";
 
+export const metadata = { title: "Coach note" };
+
 // Session Pattern Spotter's coach-facing page
 // (habit_spotter_and_post_workout_coach_page_research_sept19.md) — a
 // dedicated route rather than squeezed into QuickViewBubble's condensed-

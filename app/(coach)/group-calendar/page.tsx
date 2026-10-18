@@ -7,6 +7,8 @@ import { SwappableTerm } from "@/components/coach/swappable-term";
 import { getCoachedGroups } from "@/lib/coach-groups";
 import { CHOOSE_ORGANIZATION_PATH, getActiveAnchor } from "@/lib/active-anchor";
 
+export const metadata = { title: "Group calendar" };
+
 // The Group tab's calendar, from a coach-level page: it never guesses a group. With one group it goes straight to that group's calendar; with several, the coach picks
 // which first, so a calendar can never show the wrong group's name.
 export default async function PickGroupCalendarPage() {

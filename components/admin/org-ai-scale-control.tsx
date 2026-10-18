@@ -35,7 +35,7 @@ export function OrgAiScaleControl({ organizationId, initialScale }: { organizati
       <label className="font-body text-xs text-steel block" htmlFor={`ai-scale-${organizationId}`}>
         AI budget scale
       </label>
-      <p className="font-body text-[11px] text-steel/80 max-w-[16rem] ml-auto">blank = standard · 1 = full · 0 = included AI off (a bought top-up balance still works)</p>
+      <p className="font-body text-[11px] text-steel max-w-[16rem] ml-auto">blank = standard · 1 = full · 0 = included AI off (a bought top-up balance still works)</p>
       <div className="flex items-center gap-1 justify-end mt-1">
         <input
           id={`ai-scale-${organizationId}`}

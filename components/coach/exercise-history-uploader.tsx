@@ -285,7 +285,7 @@ export function ExerciseHistoryUploader({
           <div className="col-span-2">
             <ExerciseNameInput value={manualExercise} onChange={setManualExercise} suggestions={exerciseSuggestions} />
           </div>
-          <input
+          <input aria-label={quickUnit === "kg" ? "Weight (kg)" : "Weight (lbs)"}
             type="number"
             inputMode="decimal"
             placeholder={quickUnit === "kg" ? "Weight (kg)" : "Weight (lbs)"}
@@ -293,7 +293,7 @@ export function ExerciseHistoryUploader({
             onChange={(e) => setManualWeight(e.target.value)}
             className="h-10 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
           />
-          <input
+          <input aria-label="Reps"
             type="number"
             inputMode="numeric"
             placeholder="Reps"
@@ -301,7 +301,7 @@ export function ExerciseHistoryUploader({
             onChange={(e) => setManualReps(e.target.value)}
             className="h-10 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
           />
-          <input
+          <input aria-label="RPE (optional)"
             type="number"
             inputMode="decimal"
             step="0.5"
@@ -310,7 +310,7 @@ export function ExerciseHistoryUploader({
             onChange={(e) => setManualRpe(e.target.value)}
             className="h-10 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
           />
-          <input
+          <input aria-label="Date"
             type="date"
             value={manualDate}
             max={todayDateKey()}

@@ -96,7 +96,7 @@ describe("Release J: wiring", () => {
   it("starting a season asks first, says nothing is copied from the old one, and the database function does the work in one step", () => {
     const panel = src("components/coach/desktop/new-season-panel.tsx");
     expect(panel).toContain("confirmDialog(");
-    expect(panel).toContain('rpc("start_new_season"');
+    expect(panel).toContain('rpc("start_next_season"');
     expect(panel).toContain("nothing from it is copied into the new season");
     const sql = src("supabase/migrations/0394_team_seasons.sql");
     expect(sql).toContain("revoke execute on function public.start_new_season(uuid, text, uuid[]) from public, anon;");

@@ -28,6 +28,8 @@ import { isHabitDueOn } from "@/lib/habits";
 import { gatherMacroSuggestion } from "@/lib/nutrition-block-adjustment-gather";
 import { assignedMealsBySlotFromMeals, type MealEntryPayload } from "@/lib/meal-plan-assignment";
 
+export const metadata = { title: "Calendar" };
+
 export default async function ClientCalendarDayPage(
   props: {
     params: Promise<{ groupId: string; athleteId: string; date: string }>;

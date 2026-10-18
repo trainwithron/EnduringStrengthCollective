@@ -7,6 +7,8 @@ import { LeaderboardRows } from "@/components/leaderboard/leaderboard-rows";
 import { GameScoreLogForm } from "@/components/coach/desktop/game-score-log-form";
 import { computeGameLeaderboard } from "@/lib/game-leaderboard";
 
+export const metadata = { title: "Games" };
+
 // Per-exercise leaderboard for any "game" exercise (team warm-up games —
 // 0175 — or any future one): a coach logs an athlete's score after
 // playing, ranked by each athlete's best score. Reached from the

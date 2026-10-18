@@ -9,6 +9,8 @@ import { GroupSessionsManager, type ClassRow, type ClientOption } from "@/compon
 import { getCoachedGroups, orgGroupIdsOf } from "@/lib/coach-groups";
 import { getGroupCoachTimezone } from "@/lib/timezone";
 
+export const metadata = { title: "Group sessions" };
+
 // A coach's small-group sessions: schedule one with spots, see who is in and waiting, add or remove people, mark attendance.
 // Needs migration 0263; until it is applied the page says so.
 export default async function GroupSessionsPage(props: { params: Promise<{ groupId: string }> }) {

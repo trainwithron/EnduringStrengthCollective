@@ -181,7 +181,7 @@ export function ClientSignInPanel({
             One-time link — works once and expires in 48 hours. Creating a new one cancels this one.
           </p>
           <div className="flex items-center gap-2">
-            <input
+            <input aria-label="Sign-in link"
               readOnly
               value={link}
               onFocus={(e) => e.target.select()}
@@ -258,7 +258,7 @@ export function ClientSignInPanel({
         </button>
         {showEmail && (
           <form onSubmit={saveEmail} className="mt-2 flex items-center gap-2">
-            <input
+            <input aria-label="Client's email"
               type="email"
               required
               value={email}

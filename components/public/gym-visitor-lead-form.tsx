@@ -61,7 +61,7 @@ export function GymVisitorLeadForm({
       <p className="font-body text-xs text-steel text-center">
         Interested in training here? Leave your info and we&apos;ll follow up.
       </p>
-      <input
+      <input aria-label="Your name"
         type="text"
         value={fullName}
         onChange={(e) => setFullName(e.target.value)}
@@ -69,7 +69,7 @@ export function GymVisitorLeadForm({
         required
         className="w-full h-11 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
       />
-      <input
+      <input aria-label="Phone or email"
         type="text"
         value={contactInfo}
         onChange={(e) => setContactInfo(e.target.value)}
@@ -77,7 +77,7 @@ export function GymVisitorLeadForm({
         required
         className="w-full h-11 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
       />
-      <textarea
+      <textarea aria-label="What are you looking to work on? (optional)"
         value={note}
         onChange={(e) => setNote(e.target.value)}
         placeholder="What are you looking to work on? (optional)"

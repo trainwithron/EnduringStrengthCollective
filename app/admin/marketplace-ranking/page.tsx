@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { MarketplaceRankingWeightsForm } from "@/components/admin/marketplace-ranking-weights-form";
 
+export const metadata = { title: "Marketplace ranking" };
+
 export default async function AdminMarketplaceRankingPage() {
   const supabase = await createServerClient();
   const {

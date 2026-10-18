@@ -22,6 +22,8 @@ import { pickFeedGroup } from "@/lib/start-group";
 import { FeedGroupPicker } from "@/components/feed/feed-group-picker";
 import type { FeedChannel, FeedPost } from "@/lib/types";
 
+export const metadata = { title: "Feed" };
+
 const VALID_CHANNELS: FeedChannel[] = ["announcements", "form_checks", "pr_board", "general", "team_chat"];
 
 function mapPostRow(p: any, groupId: string, viewerId: string | null): FeedPost {

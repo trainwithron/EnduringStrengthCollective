@@ -6,6 +6,8 @@ import { NewOrganizationForm } from "@/components/admin/new-organization-form";
 import { OrgBillingExemptToggle } from "@/components/admin/org-billing-exempt-toggle";
 import { OrgAiScaleControl } from "@/components/admin/org-ai-scale-control";
 
+export const metadata = { title: "Organizations" };
+
 export default async function AdminOrganizationsPage() {
   const supabase = await createServerClient();
   const {

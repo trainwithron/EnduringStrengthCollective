@@ -61,7 +61,7 @@ export function DispatchStepActions({ stepId }: { stepId: string }) {
 
       {askingQuestion ? (
         <div className="space-y-2">
-          <textarea
+          <textarea aria-label="Your question"
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             placeholder="e.g. Could they potentially do a different day?"

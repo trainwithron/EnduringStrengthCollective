@@ -16,7 +16,7 @@ describe("joining an organization needs the person's OK", () => {
     expect(route).toContain('.from("organization_invites")');
     expect(route.indexOf("profile_id_for_email")).toBeLessThan(route.indexOf("inviteUserByEmail"));
     expect(route).not.toContain("pendingInvitation");
-    expect(read("components/coach/desktop/invite-coach-form.tsx")).toContain("Invitation sent. They join once they accept.");
+    expect(read("components/coach/desktop/invite-coach-form.tsx")).toContain("they join once they accept. Check Invitations on the Team page for anything already open");
   });
   it("the invitation answer never reveals whether an address has an account, and a seat is never given in a group with a private client", () => {
     const route = read("app/api/coaches/invite/route.ts");

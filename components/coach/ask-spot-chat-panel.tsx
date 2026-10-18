@@ -346,7 +346,7 @@ export function AskSpotChatPanel() {
       </div>
 
       <div className="p-3 border-t border-steel/20 flex gap-2 shrink-0">
-        <input
+        <input aria-label="Ask a question"
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}

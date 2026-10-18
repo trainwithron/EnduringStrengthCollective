@@ -11,6 +11,8 @@ import { LiveGroupLeaderboard } from "@/components/leaderboard/live-group-leader
 import { DisplayWorkoutPanel, type DisplayExercise } from "@/components/coach/desktop/display-workout-panel";
 import { DisplayAutoRefresh } from "@/components/coach/display-auto-refresh";
 
+export const metadata = { title: "Display" };
+
 function dateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
     d.getDate()

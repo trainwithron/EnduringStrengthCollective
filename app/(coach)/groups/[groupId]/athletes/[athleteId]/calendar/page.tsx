@@ -7,6 +7,8 @@ import { ClientCalendarSection } from "@/components/coach/desktop/client-calenda
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 
+export const metadata = { title: "Calendar" };
+
 export default async function ClientCalendarPage(
   props: {
     params: Promise<{ groupId: string; athleteId: string }>;

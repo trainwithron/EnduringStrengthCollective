@@ -7,7 +7,8 @@ import { verifyMealOptions, type RawMealOption } from "@/lib/meal-option-verific
 import { MEAL_SLOT_DELIVERED_FEATURE } from "@/lib/ai-refund-decision";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { rowToPreferences } from "@/lib/nutrition-preferences";
-import { filterOptionsByRules, rulesForPrompt } from "@/lib/plan-preference-check";
+import { rulesForPrompt } from "@/lib/plan-preference-check";
+import { checkMealOptions } from "@/lib/meal-option-pipeline";
 
 // "The Nutrition Spot" (nutrition_spot_revamp_scoping_sept19.md,
 // retiring the old "Mix & Macros" name — AI is now the primary meal-
@@ -183,17 +184,8 @@ Favorite foods / requests: ${favoriteFoods || "none given"}${rulesText ? `\n${ru
     // is dropped rather than surfaced as pickable with an unverified
     // number (nutrition_spot_revamp_scoping_sept19.md's own bar).
     const allVerified = await verifyMealOptions(supabase, parsed.options as RawMealOption[]);
-    // The model is told the rules, and every option is ALSO checked against them here: an option that names an allergen, a food they dislike or breaks their diet is never
-    // returned, whatever the model did. (A line that says "may contain" is not modelled.)
-    // The text checked is the option's name, each ingredient line AND the real food each line was matched to, but what is returned is the original verified option.
-    const checked = allVerified.map((o) => ({
-      recipeName: o.recipeName,
-      ingredients: o.ingredients.flatMap((l) => [l.rawLine, ...(l.matchedDescription ? [l.matchedDescription] : [])]),
-      original: o,
-    }));
-    const { kept, dropped: droppedOptions } = rules ? filterOptionsByRules(checked, rules) : { kept: checked, dropped: [] as typeof checked };
-    const verifiedOptions = kept.map((k) => k.original);
-    const droppedForPreferences = droppedOptions.length;
+    // The model is told the rules and asked for the target, and every option is ALSO checked here (lib/meal-option-pipeline.ts): food rules first, then the numbers.
+    const { options: verifiedOptions, droppedForPreferences, droppedForMacros } = checkMealOptions(allVerified, rules, { proteinG: proteinTarget, carbsG: carbsTarget, fatG: fatTarget });
 
     // The server's own record that the AI delivered something usable, so a later "the generation failed" refund can be checked against it instead of
     // believing the browser (lib/ai-refund-decision.ts). Best effort: a failed write only means an automatic refund stays possible, never blocks the coach.
@@ -209,7 +201,7 @@ Favorite foods / requests: ${favoriteFoods || "none given"}${rulesText ? `\n${ru
       }
     }
 
-    return NextResponse.json({ options: verifiedOptions, droppedForPreferences });
+    return NextResponse.json({ options: verifiedOptions, droppedForPreferences, droppedForMacros });
   } catch (err) {
     if (err instanceof AiRateLimitedError) {
       return NextResponse.json({ error: err.message }, { status: 429 });

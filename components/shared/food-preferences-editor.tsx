@@ -38,7 +38,7 @@ function ChipList({ label, hint, items, onChange, placeholder, max }: { label: s
   return (
     <div>
       <p className="font-body text-xs text-steel uppercase tracking-wide">{label}</p>
-      {hint && <p className="font-body text-xs text-steel/80 mt-0.5">{hint}</p>}
+      {hint && <p className="font-body text-xs text-steel mt-0.5">{hint}</p>}
       <div className="flex flex-wrap gap-1.5 mt-2">
         {items.map((item) => (
           <span key={item} className="inline-flex items-center gap-1 border border-steel/30 bg-surface/40 pl-2.5 font-body text-sm text-chalk">
@@ -105,7 +105,7 @@ export function FoodPreferencesEditor({
     <div className="space-y-5">
       <div>
         <p className="font-body text-xs text-steel uppercase tracking-wide">Allergies</p>
-        <p className="font-body text-xs text-steel/80 mt-0.5">An allergy is never offered. Pick all that apply.</p>
+        <p className="font-body text-xs text-steel mt-0.5">An allergy is never offered. Pick all that apply.</p>
         <div className="flex flex-wrap gap-1.5 mt-2">
           {ALLERGEN_KEYS.map((key) => {
             const on = prefs.allergies.some((a) => a.toLowerCase() === key);
@@ -176,7 +176,7 @@ export function FoodPreferencesEditor({
             {otherError}
           </p>
         )}
-        <p className="font-body text-xs text-steel/80 mt-1.5">Up to {MAX_ALLERGY_ITEMS}. Meals are checked for these words. &ldquo;May contain&rdquo; and cross-contact are not checked.</p>
+        <p className="font-body text-xs text-steel mt-1.5">Up to {MAX_ALLERGY_ITEMS}. Meals are checked for these words. &ldquo;May contain&rdquo; and cross-contact are not checked.</p>
       </div>
 
       {/* One box for what a person wants left out. Old intolerances and old dislikes are both shown here; a new entry is saved as a dislike (both are kept out of plans, neither is an allergy),
@@ -279,12 +279,12 @@ export function FoodPreferencesEditor({
             <label className="block">
               <span className="font-body text-xs text-steel">Protein target (g per pound)</span>
               <input type="number" step="0.05" min={0.6} max={1.5} value={prefs.proteinGPerLb} onChange={(e) => set({ proteinGPerLb: Number(e.target.value) })} className={`${field} mt-1`} />
-              {grams && <span className="font-body text-xs text-steel/80">About {grams.targetG} g a day to aim for</span>}
+              {grams && <span className="font-body text-xs text-steel">About {grams.targetG} g a day to aim for</span>}
             </label>
             <label className="block">
               <span className="font-body text-xs text-steel">Protein floor (g per pound)</span>
               <input type="number" step="0.05" min={0.4} max={1.5} value={prefs.proteinFloorGPerLb} onChange={(e) => set({ proteinFloorGPerLb: Number(e.target.value) })} className={`${field} mt-1`} />
-              {grams && <span className="font-body text-xs text-steel/80">Below about {grams.floorG} g a day is a shortfall; between the floor and the target is a solid day</span>}
+              {grams && <span className="font-body text-xs text-steel">Below about {grams.floorG} g a day is a shortfall; between the floor and the target is a solid day</span>}
             </label>
           </div>
           </details>

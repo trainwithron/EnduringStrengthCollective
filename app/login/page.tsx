@@ -9,6 +9,7 @@ import { LegalLinks } from "@/components/legal/legal-links";
 import { friendlySignInError } from "@/lib/sign-in-errors";
 import { isStandaloneDisplay, isMobileUserAgent } from "@/lib/pwa";
 import { loadStartInputs, parseLastGroupCookie, pickStartGroup, startPath } from "@/lib/start-group";
+import { FRONT_DESK_PATH, landsOnFrontDesk } from "@/lib/front-desk";
 
 export default function LoginPage() {
   return (
@@ -83,6 +84,13 @@ function LoginForm() {
     const membership = pickStartGroup(
       await loadStartInputs(supabase, data.user.id, parseLastGroupCookie(lastGroupCookie))
     );
+
+    // Front-desk staff (invited to check clients in) who do not coach land on the front-desk screen.
+    if (await landsOnFrontDesk(supabase, data.user.id, membership)) {
+      router.push(FRONT_DESK_PATH);
+      router.refresh();
+      return;
+    }
 
     // A coach on a phone lands on their own client profile (startPath); at a computer, on the desktop Home.
     router.push(startPath(membership, isStandaloneDisplay() || isMobileUserAgent()));

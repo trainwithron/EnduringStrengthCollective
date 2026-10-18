@@ -6,6 +6,8 @@ import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 
+export const metadata = { title: "Leads" };
+
 // equipment_qr_decal_scoping_sept19.md — where a gym_visitor_lead
 // (a walk-in scanning an equipment QR code and expressing interest)
 // actually surfaces for the coach, beyond just the one-time push
