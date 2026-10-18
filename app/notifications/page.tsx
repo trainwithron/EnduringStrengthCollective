@@ -1,3 +1,4 @@
+import { PendingEmailChangeBanner } from "@/components/auth/pending-email-change-banner";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createCrossOrgServerClient as createServerClient } from "@/lib/supabase/server";
@@ -72,6 +73,7 @@ export default async function NotificationsPage() {
 
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body px-5 py-8">
+      <PendingEmailChangeBanner userId={user.id} />
       <div className="max-w-2xl mx-auto">
         <Link href={homeGroupId ? `/groups/${homeGroupId}` : "/"} className="font-body text-xs text-steel uppercase tracking-wide">
           &larr; Home
