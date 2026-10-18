@@ -15,6 +15,7 @@ import { grantLinkedGroupAccess, revokeLinkedGroupAccess } from "@/lib/package-g
 import { dispatchWebhookEvent } from "@/lib/webhook-dispatch";
 import { LIFT_OFF_MONTHLY_CREDITS } from "@/lib/coach-credits";
 import { recordAiTopUp } from "@/lib/ai-topup";
+import { handlePaymentProblemEvent } from "@/lib/payment-events";
 import type Stripe from "stripe";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -648,6 +649,16 @@ export async function POST(request: Request) {
           amountCents: invoice.amount_paid ?? 0,
           eventKey: event.id,
         });
+        break;
+      }
+
+      // Money problems (Release M1): a failed payment, a refund made in Stripe, a dispute opened or closed. Each is RECORDED and the coach is told; no balance, session or access is changed and no money moves
+      // (lib/payment-events.ts). Needs these four event types switched on for the webhook in the Stripe dashboard.
+      case "invoice.payment_failed":
+      case "charge.refunded":
+      case "charge.dispute.created":
+      case "charge.dispute.closed": {
+        await handlePaymentProblemEvent(event, { db: supabase, stripe });
         break;
       }
 
