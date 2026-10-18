@@ -52,7 +52,10 @@ describe("the athlete screens use the narrow reads", () => {
       .filter((l) => !l.trim().startsWith("--"))
       .join("\n");
     expect(sql.match(/create or replace function public\./g)!.length).toBe(2);
-    expect(sql.match(/not public\.is_group_member\(p_group\)/g)!.length).toBe(2);
+    // a member, or the group's organization owner/admin (with the private-client rule), and nobody else
+    expect(sql.match(/if not v_member and not public\.is_org_admin_of_group\(p_group\) then/g)!.length).toBe(2);
+    expect(sql.match(/v_member := public\.is_group_member\(p_group\);/g)!.length).toBe(2);
+    expect(sql.match(/is_client_private_from_org/g)!.length).toBeGreaterThanOrEqual(2);
     expect(sql).not.toMatch(/client_tier|training_level|private_from_org|membership_type/);
   });
 });
