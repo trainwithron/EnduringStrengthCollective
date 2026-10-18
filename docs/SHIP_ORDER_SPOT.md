@@ -39,6 +39,8 @@
 
 | T1 | release-trust | (see git) | Release T1, step 164 (0412), apply-release-t1-export-my-data-all.sql, fp in the step file | Download my data = everything (one function, two functions and a private bucket, adds only, safe before the code; the route tolerates them missing); breach runbook section; wearable-token encryption follows |
 
+| CS1 | release-cards-switch | (see git) | Release CS1, step 166 (0414), apply-release-cs1-post-workout-cards-all.sql, fp 105a116f7d2404b2 | APPLIED Oct 18 (by Commander, column verified live); group setting Post-workout cards and PR notices; one nullable column groups.post_workout_cards, safe before the code |
+
 | T2 | release-token-crypto | (see git) | Release T2, step 165 (0413), apply-release-t2-wearable-token-fingerprint-all.sql, fp in the step file | stacked on T1; paste BEFORE code (adds one empty column); inert until Ron sets WEARABLE_TOKEN_KEY |
 
 | CM1 | release-moderation | (see git) | Release CM1, step 163 (0411), apply-release-cm1-report-and-block-all.sql, fp ebb062f459a6f76a | report a post or comment and block a member in the feed; adds two small tables, two functions and one notice kind, safe before the code |
