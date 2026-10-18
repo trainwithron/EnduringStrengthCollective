@@ -1495,7 +1495,7 @@
    "0420"
   ],
   "notApplied": [
-   "not exists (select 1 from pg_proc where proname = 'transfer_organization_ownership' and pronamespace = 'public'::regnamespace and prosrc like '%has not accepted their invitation%')"
+   "not exists (select 1 from pg_trigger where tgname = 'organization_memberships_guard_owner_role' and not tgisinternal)"
   ]
  },
  {

@@ -2,7 +2,10 @@
 -- transfer_organization_ownership only checked that the new owner was a member and not leaving, so an invited coach who had never signed in could be made the owner. It now also refuses a person whose account is still an
 -- unaccepted invitation, by the same rule as the Invitations list (lib/coach-invite-server.ts isUnaccepted): our invitation marker is on the account (invited_at) and it has never been confirmed (email_confirmed_at) or
 -- signed in (last_sign_in_at). The server key is still allowed through (it has no signed-in person and is how support acts). Everything else is exactly as it was (migration 0396): the owner or a platform admin
--- may transfer, not to the current owner, the new owner must be a member and not leaving, the old owner becomes an admin. Replaces one function. Re-runnable.
+-- may transfer, not to the current owner, the new owner must be a member and not leaving, the old owner becomes an admin.
+-- The same refusal is also made at the table, so an owner cannot get round it by writing the organization or a membership row directly: guard_organization_columns (the owner_id change) refuses an unaccepted
+-- person, and a new guard on membership roles refuses 'owner' for anyone who is not the organization's owner_id (ownership moves only through the function, which sets owner_id first).
+-- Replaces two functions and adds one function and one trigger. Re-runnable.
 create or replace function public.transfer_organization_ownership(p_organization_id uuid, p_new_owner_id uuid)
  returns void
  language plpgsql
@@ -62,3 +65,54 @@ begin
     where organization_id = p_organization_id and profile_id = v_current_owner;
 end;
 $function$;
+
+-- The table-level guard on who owns an organization, with the same refusal added (everything else exactly as in 0273).
+create or replace function public.guard_organization_columns()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if coalesce(auth.role(), '') not in ('authenticated', 'anon') then
+    return new;
+  end if;
+  if new.platform_fee_pct is distinct from old.platform_fee_pct then
+    raise exception 'The platform fee can only be changed by the platform.' using errcode = '42501';
+  end if;
+  if new.owner_id is distinct from old.owner_id then
+    if not (auth.uid() = old.owner_id or public.is_platform_admin())
+       or not exists (select 1 from public.organization_memberships m where m.organization_id = new.id and m.profile_id = new.owner_id) then
+      raise exception 'Only the owner can transfer an organization, and only to one of its members.' using errcode = '42501';
+    end if;
+    if exists (select 1 from auth.users u where u.id = new.owner_id and u.invited_at is not null and u.email_confirmed_at is null and u.last_sign_in_at is null) then
+      raise exception 'That person has not accepted their invitation yet. Ask them to sign in first.' using errcode = '42501';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+-- A membership can become 'owner' only for the person the organization names as its owner. The transfer function sets owner_id first and then this role, so it passes; a direct write of the role does not.
+create or replace function public.guard_org_membership_owner_role()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if coalesce(auth.role(), '') not in ('authenticated', 'anon') then
+    return new;
+  end if;
+  if new.role = 'owner' and old.role is distinct from 'owner'
+     and not exists (select 1 from public.organizations o where o.id = new.organization_id and o.owner_id = new.profile_id) then
+    raise exception 'Ownership is handed over with Transfer ownership, not by changing a role.' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+revoke execute on function public.guard_org_membership_owner_role() from public, anon, authenticated;
+drop trigger if exists organization_memberships_guard_owner_role on public.organization_memberships;
+create trigger organization_memberships_guard_owner_role
+  before update of role on public.organization_memberships
+  for each row execute function public.guard_org_membership_owner_role();

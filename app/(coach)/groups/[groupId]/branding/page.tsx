@@ -196,7 +196,7 @@ export default async function BrandingPage(
   const isOwnerOrAdmin = orgMembership.role === "owner" || orgMembership.role === "admin";
   // Ownership can only go to someone who has accepted their invitation (the database refuses otherwise): those who have not are left out of the list, and the owner is told when that leaves nobody.
   const transferPool = isOwner ? members.filter((m) => m.profileId !== user.id && !m.leaving) : [];
-  const waiting = isOwner && transferPool.length > 0 ? await unacceptedIds(createServiceRoleClient(), transferPool.map((m) => m.profileId)) : new Set<string>();
+  const waiting = isOwner && tab === "team" && transferPool.length > 0 ? await unacceptedIds(createServiceRoleClient(), transferPool.map((m) => m.profileId)) : new Set<string>();
   const basePath = `/groups/${params.groupId}/branding`;
 
   // Plan & Billing is invisible until COACH_BILLING_ENFORCED is on, except

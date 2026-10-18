@@ -18,17 +18,20 @@ export default {
       const pending = await h.user("OW Pending Invitee");
       const confirmed = await h.user("OW Confirmed Not Signed In");
       const plain = await h.user("OW No Marker");
+      const signedIn = await h.user("OW Signed In Unconfirmed");
       const leaving = await h.user("OW Leaving");
       const outsider = await h.user("OW Outsider");
       const platformAdmin = await h.platformAdmin("OW Real Platform Admin");
       const org = await h.org(owner, "OW Gym");
-      for (const p of [accepted, pending, confirmed, plain, leaving]) await h.orgMember(org, p, "coach");
+      for (const p of [accepted, pending, confirmed, plain, leaving, signedIn]) await h.orgMember(org, p, "coach");
       await h.asSuper();
       await db.query(`update auth.users set last_sign_in_at = now(), email_confirmed_at = now() where id = $1`, [accepted]);
       // an invitation nobody has accepted: our marker, never confirmed, never signed in
       await db.query(`update auth.users set invited_at = now() where id = $1`, [pending]);
       // confirmed (they clicked the link) but have not signed in yet: that is an acceptance
       await db.query(`update auth.users set invited_at = now(), email_confirmed_at = now() where id = $1`, [confirmed]);
+      // signed in (so they have used the invitation) though the link was never marked confirmed: that is an acceptance too
+      await db.query(`update auth.users set invited_at = now(), last_sign_in_at = now() where id = $1`, [signedIn]);
       // an ordinary account that was never "invited" by us and has not signed in: not an unaccepted invitation
       await db.query(`update public.organization_memberships set departing_since = now() where organization_id = $1 and profile_id = $2`, [org, leaving]);
       await db.query(`update auth.users set last_sign_in_at = now(), invited_at = now() where id = $1`, [leaving]);
@@ -75,6 +78,36 @@ export default {
       r = await transfer(owner, plain);
       h.check("an account that was never invited by us and has not signed in is not treated as an unaccepted invitation" + (r.error ? ": " + r.error : ""), !r.error && (await ownerNow()) === plain);
       r = await transfer(plain, owner);
+      h.check("(and back)", !r.error && (await ownerNow()) === owner);
+
+      r = await transfer(owner, signedIn);
+      h.check("someone who has signed in counts as accepted even if the link was never marked confirmed (the last_sign_in_at part of the rule)" + (r.error ? ": " + r.error : ""), !r.error && (await ownerNow()) === signedIn);
+      r = await transfer(signedIn, owner);
+      h.check("(and back)", !r.error && (await ownerNow()) === owner);
+
+      // ---- the same refusal at the tables: the owner cannot get round it by writing the rows directly
+      await h.as(owner);
+      r = await tryQ(db, `update public.organizations set owner_id = $1 where id = $2 returning id`, [pending, org]);
+      await h.asSuper();
+      h.check("writing the organization's owner directly to someone who has not accepted is refused", !!r.error && /has not accepted their invitation yet/.test(r.error), JSON.stringify(r));
+      await h.as(owner);
+      r = await tryQ(db, `update public.organization_memberships set role = 'owner' where organization_id = $1 and profile_id = $2 returning id`, [org, pending]);
+      await h.asSuper();
+      h.check("so is making their membership the owner's directly", !!r.error && /handed over with Transfer ownership/.test(r.error), JSON.stringify(r));
+      await h.as(owner);
+      r = await tryQ(db, `update public.organization_memberships set role = 'owner' where organization_id = $1 and profile_id = $2 returning id`, [org, accepted]);
+      await h.asSuper();
+      h.check("and so is making anyone else's membership the owner's by changing the role, even someone who has accepted", !!r.error && /handed over with Transfer ownership/.test(r.error), JSON.stringify(r));
+      h.check("nothing changed: still the same owner, and neither of them is an owner", (await ownerNow()) === owner && (await roleOf(pending)) === "coach" && (await roleOf(accepted)) !== "owner");
+      await h.as(owner);
+      r = await tryQ(db, `update public.organization_memberships set role = 'admin' where organization_id = $1 and profile_id = $2 returning id`, [org, accepted]);
+      await h.asSuper();
+      h.check("changing a role to admin directly is untouched" + (r.error ? ": " + r.error : ""), !r.error);
+      await db.query(`update public.organization_memberships set role = 'coach' where organization_id = $1 and profile_id = $2`, [org, accepted]);
+      // the owner row itself can still be rewritten as owner (nothing changes), and the transfer function still passes the guard it now has to get through
+      r = await transfer(owner, accepted);
+      h.check("the transfer function itself still passes both guards for an accepted coach" + (r.error ? ": " + r.error : ""), !r.error && (await roleOf(accepted)) === "owner");
+      r = await transfer(accepted, owner);
       h.check("(and back)", !r.error && (await ownerNow()) === owner);
 
       // ---- the older rules still hold

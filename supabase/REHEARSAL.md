@@ -184,7 +184,7 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0416 | yes | yes | 13 | 0416 Write guard on posts |
 | 0417 | yes | yes | 37 | 0417 Write guard on the rest |
 | 0418 | yes | yes | 39 | 0418 AF3 database policies |
-| 0420 | yes | yes | 20 | 0420 Ownership only to someone who has accepted |
+| 0420 | yes | yes | 29 | 0420 Ownership only to someone who has accepted |
 | 0331 | yes | yes | 10 | 0331 a payment event and its sessions are recorded in one step |
 | 0329 | yes | yes | 12 | 0329 every session costs exactly 1 credit; the waitlist offer uses the coach's time zone |
 | 0330 | yes | yes | 9 | 0330 only a real coach can have a public page |

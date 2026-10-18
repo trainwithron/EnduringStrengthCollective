@@ -48,6 +48,11 @@ describe("OWN1: the database and the screen", () => {
     expect(m).toContain("u.invited_at is not null and u.email_confirmed_at is null and u.last_sign_in_at is null");
     for (const old of ["Only the current owner or a platform admin can transfer ownership", "That person already owns this organization", "The new owner must already be a member of this organization", "That coach is leaving this organization and cannot be made its owner."]) expect(m, old).toContain(old);
     expect(m).toContain("set role = 'admin'");
+    // the same refusal at the table, and the membership guard
+    expect(m).toContain("create or replace function public.guard_organization_columns()");
+    expect(m.split("That person has not accepted their invitation yet. Ask them to sign in first.").length - 1).toBe(2);
+    expect(m).toContain("create trigger organization_memberships_guard_owner_role");
+    expect(m).toContain("Ownership is handed over with Transfer ownership, not by changing a role.");
   });
 
   it("the Team page leaves unaccepted people out of the list, and says what to do when that leaves nobody", () => {
@@ -55,6 +60,8 @@ describe("OWN1: the database and the screen", () => {
     expect(page).toContain("unacceptedIds(createServiceRoleClient()");
     expect(page).toContain("candidates={transferPool.filter((m) => !waiting.has(m.profileId))");
     expect(page).toContain("waitingOnInvitation={waiting.size}");
+    // the lookups are only made on the Team tab, where the list is shown
+    expect(page).toContain('isOwner && tab === "team" && transferPool.length > 0');
     const button = src("components/coach/desktop/transfer-ownership-button.tsx");
     expect(button).toContain("You can transfer ownership once a coach has accepted their invitation.");
     expect(button).toContain("if (waitingOnInvitation === 0) return null;");
