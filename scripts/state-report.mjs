@@ -39,6 +39,8 @@ function envValue(name) {
 
 // Refuses to go on if the token text appears in any file git tracks.
 function refuseIfTokenIsTracked(token) {
+  // an empty pattern would match every line of every file, so a blank token is refused before git is asked
+  if (!token || !token.trim()) throw new Error("SUPABASE_ACCESS_TOKEN is empty, so it is not used.");
   // the token goes in on standard input, never on the command line where other programs could see it
   const found = spawnSync("git", ["grep", "-F", "-q", "-f", "-"], { cwd: root, input: token, encoding: "utf8" });
   // git grep answers 0 = found, 1 = not found; anything else (an error, or git missing) means it could not be checked, so it refuses rather than guess

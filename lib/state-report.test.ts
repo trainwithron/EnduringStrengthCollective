@@ -145,6 +145,8 @@ describe("the state report", () => {
     expect(cli).not.toMatch(/database\/query`/);
     expect(cli).toContain("refuseIfTokenIsTracked(token)");
     expect(cli).toContain("input: token");
+    expect(cli).toContain("if (!token || !token.trim())");
+    expect(cli.indexOf("if (!token || !token.trim())")).toBeLessThan(cli.indexOf("spawnSync(\"git\", [\"grep\""));
     expect(cli).toContain("found.status !== 0 && found.status !== 1");
     expect(cli).not.toMatch(/"--", token/);
     expect(cli).toContain('git("ls-files", "--error-unmatch", ".env.local")');
