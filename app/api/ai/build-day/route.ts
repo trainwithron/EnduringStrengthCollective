@@ -19,6 +19,7 @@ import { loadNotesBlock } from "@/lib/client-notes-server";
 import { loadReferenceBlock } from "@/lib/reference-context";
 import { resolveAiExerciseName, exercisesWanted, allowsRepeats, applyTimedConsistency, dedupeDay, isMobilityTitle, longDayFlag, mobilityDaysWanted, mobilityInstruction, mobilityRole, plainLibraryName, ruleKey } from "@/lib/ai-day-rules";
 import { DAY_MAX_TOKENS, TOO_LONG_MESSAGE, TRUNCATED_RETRY_NOTE, buildDaySystemPrompt, buildDayUserText, checkRunToken, issueRunToken, readDayResult, runTokenIsStale, truncatedRetryTimeoutMs, type BuiltDay } from "@/lib/ai-day-run";
+import { FOLLOWED_PROGRAM_MESSAGE, readProgramIsFollowed } from "@/lib/ai-live-program";
 
 // ONE workout per call (about 10 to 20 seconds), so a long program is many short calls and none of them can hit a time limit.
 export const maxDuration = 60;
@@ -51,6 +52,11 @@ export async function POST(request: Request) {
   const groupId = program.group_id as string;
   const { data: membership } = await supabase.from("group_memberships").select("role").eq("group_id", groupId).eq("profile_id", user.id).maybeSingle();
   if (membership?.role !== "coach") return NextResponse.json({ error: "Only coaches can build programs." }, { status: 403 });
+
+  // A program clients are already training on is not changed by the AI (it would reach them with no sign-off): the coach makes a copy and uses the AI on the copy. Checked before anything is charged.
+  if (await readProgramIsFollowed(supabase, programId)) {
+    return NextResponse.json({ error: FOLLOWED_PROGRAM_MESSAGE, code: "program_followed" }, { status: 409 });
+  }
 
   // A run is charged once, on its first day. Later days carry the signed token instead. A token is also checked against the log: if more days were built under it than it counts (it was used again
   // after a newer one was issued) it is stale, and the run is charged as a new one.
