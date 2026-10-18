@@ -56,6 +56,7 @@ describe("the athlete screens use the narrow reads", () => {
     expect(sql.match(/if not v_member and not public\.is_org_admin_of_group\(p_group\) then/g)!.length).toBe(2);
     expect(sql.match(/v_member := public\.is_group_member\(p_group\);/g)!.length).toBe(2);
     expect(sql.match(/is_client_private_from_org/g)!.length).toBeGreaterThanOrEqual(2);
-    expect(sql).not.toMatch(/client_tier|training_level|private_from_org|membership_type/);
+    // none of the sensitive columns is returned (the private-client RULE is applied through a function, not by returning the column)
+    expect(sql).not.toMatch(/client_tier|training_level|membership_type|m\.private_from_org/);
   });
 });
