@@ -24,6 +24,14 @@
   "file": "apply-release-cm-all.sql"
  },
  {
+  "id": "release-w2b-notice-names",
+  "name": "Release W2b (notices name a member under 18 as a first name and last initial; REPLACES three notice functions, so it is not additions-only)",
+  "steps": [
+   "157"
+  ],
+  "file": "apply-release-w2b-notice-names-all.sql"
+ },
+ {
   "id": "release-s1-signin-hardening",
   "name": "Release S1 (a changed sign-in email is confirmed by the new address; adds only, safe to run BEFORE the code that goes with it is live)",
   "steps": [

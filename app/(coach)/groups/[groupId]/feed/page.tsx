@@ -13,7 +13,7 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { LiveGroupLeaderboard } from "@/components/leaderboard/live-group-leaderboard";
 import { getGroupLeaderboardRankings, getPositionLeaderboardRankings } from "@/lib/leaderboard-data";
 import { loadNameProtectedIds } from "@/lib/minor-names";
-import { protectPostAuthors } from "@/lib/post-name-protection";
+import { protectPostAuthors } from "@/lib/post-name-protection-server";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { cookies } from "next/headers";

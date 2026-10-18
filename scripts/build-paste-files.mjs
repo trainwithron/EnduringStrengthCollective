@@ -2915,6 +2915,37 @@ STEPS.push({
   ],
 });
 
+// One function exactly as an earlier migration made it (from its "create or replace" line to the closing $$;), so an undo can put it back.
+function functionFromMigration(file, name) {
+  const text = readFileSync(new URL("../supabase/migrations/" + file, import.meta.url), "utf8").replace(/\r\n/g, String.fromCharCode(10));
+  const start = text.indexOf("create or replace function public." + name + "(");
+  const end = text.indexOf(String.fromCharCode(36, 36) + ";", start);
+  if (start < 0 || end < 0) throw new Error("cannot find " + name + " in " + file);
+  return text.slice(start, end + 3);
+}
+
+STEPS.push({
+  n: "157",
+  slug: "0405",
+  title: "0405 Release W2b: the bell notices that name a person ('X commented on your post', 'X mentioned you') show a member under 18, or of unknown age, as a first name and last initial",
+  warn: "This REPLACES three existing notice functions (notify_on_comment, notify_on_mention, notify_on_post_mention). It is not an additions-only step. They behave as before except for the name in the notice.",
+  migrations: ["0405"],
+  sees: "Success. No rows returned.",
+  afterwards: "From now on, a notice that names the person who commented or mentioned someone shows 'Sam R.' for a member under 18 or whose age is not known; coaches and adults are named in full. Notices already written keep the name they have.",
+  undo: [
+    functionFromMigration("0073_notify_on_comment_reply.sql", "notify_on_comment"),
+    functionFromMigration("0093_structured_mentions.sql", "notify_on_mention"),
+    functionFromMigration("0093_structured_mentions.sql", "notify_on_post_mention"),
+    "drop function if exists public.notice_display_name(uuid);",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 157 misbehaves. Puts the three notice functions back to the text migrations 0073 and 0093 gave them (full names in notices).",
+  rows: [
+    ["0405 is not already applied (the notice-name function is not there yet)", "to_regprocedure('public.notice_display_name(uuid)') is null"],
+    ["the notice functions it replaces exist", "to_regprocedure('public.notify_on_comment()') is not null and to_regprocedure('public.notify_on_mention()') is not null and to_regprocedure('public.notify_on_post_mention()') is not null"],
+    ["the tables it reads exist", "to_regclass('public.profiles') is not null and to_regclass('public.client_intake') is not null and to_regclass('public.organization_memberships') is not null"],
+  ],
+});
+
 STEPS.push({
   n: "150",
   slug: "0398",
@@ -3082,6 +3113,7 @@ const BUNDLES = [
   { id: "release-co", name: "Release CO (nothing about a person is public unless they chose it: personal Find a coach listing; a coach adds only their own clients to a challenge; run BEFORE the code that goes with it is live)", steps: ["139"] },
   { id: "release-cn-held", name: "HELD, Ron's word first: require the health form and waiver of every client without one (read check-intake-flag-list.sql first)", steps: ["138"] },
   { id: "release-cm", name: "Release CM (the guard function and a coach's decision on a flagged screening; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["137"] },
+  { id: "release-w2b-notice-names", name: "Release W2b (notices name a member under 18 as a first name and last initial; REPLACES three notice functions, so it is not additions-only)", steps: ["157"] },
   { id: "release-s1-signin-hardening", name: "Release S1 (a changed sign-in email is confirmed by the new address; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["150"] },
   { id: "release-f2-client-cap", name: "Release F2 (the free plan's client limit, installed switched off; adds only)", steps: ["149"] },
   { id: "release-l-leaving-coach", name: "Release L (a leaving coach is never given an organization; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["148"] },
@@ -3364,6 +3396,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
     m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
+    m("0405", "to_regprocedure('public.notice_display_name(uuid)') is not null"),
     m("0398", "to_regclass('public.pending_email_changes') is not null"),
     m("0397", "exists (select 1 from pg_trigger where tgname = 'group_memberships_free_tier_limit' and not tgisinternal)"),
     m("0396", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'organization_memberships' and column_name = 'departing_since')"),

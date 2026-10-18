@@ -56,8 +56,9 @@ export function InlineCommentSection({
     const protect = async (rows: any[]) => {
       const gid = await groupPromise;
       const ids = rows.map((r) => r.author_id as string).filter(Boolean);
-      if (!gid || ids.length === 0) return rows;
-      const protectedIds = await fetchProtectedIds(gid, ids);
+      if (ids.length === 0) return rows;
+      // If the post's group cannot be found nobody can be checked, so everyone is shown shortened.
+      const protectedIds = gid ? await fetchProtectedIds(gid, ids) : new Set(["*"]);
       return rows.map((r) => (r.profiles && r.author_id ? { ...r, profiles: { ...r.profiles, full_name: shownName(r.profiles.full_name, r.author_id, protectedIds) } } : r));
     };
 
@@ -70,19 +71,14 @@ export function InlineCommentSection({
 
     // Mention candidates — every member of this post's group, fetched
     // once so typing "@" doesn't need a round trip per keystroke.
-    supabase
-      .from("posts")
-      .select("group_id")
-      .eq("id", postId)
-      .single()
-      .then(async ({ data: post }) => {
-        if (!post) return;
+    groupPromise.then(async (gid) => {
+        if (!gid) return;
         const { data: rows } = await supabase
           .from("group_memberships")
           .select("profile_id, profiles ( full_name )")
-          .eq("group_id", post.group_id);
+          .eq("group_id", gid);
         const people = (rows ?? []).map((r: any) => ({ id: r.profile_id as string, fullName: (r.profiles?.full_name ?? "") as string })).filter((m) => m.fullName);
-        const protectedIds = await fetchProtectedIds(post.group_id, people.map((m) => m.id));
+        const protectedIds = await fetchProtectedIds(gid, people.map((m) => m.id));
         setMembers(people.map((m) => ({ id: m.id, fullName: shownName(m.fullName, m.id, protectedIds) })));
       });
 
