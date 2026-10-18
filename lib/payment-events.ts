@@ -332,7 +332,13 @@ export async function handlePaymentProblemEvent(event: Stripe.Event, deps: { db:
         upgradedFallback = true;
         const { error: upgradeError } = await db.from("payment_events").update({ refund_id: input.refundId, amount_cents: input.amountCents, total_cents: input.totalCents, detail: input.detail }).eq("id", row.id);
         if (upgradeError && upgradeError.code !== "23505") throw upgradeError;
-        recorded = { id: row.id, first: false, notified: !!row.notified_at, stored: input };
+        if (upgradeError) {
+          // That refund already has its own row (another event recorded it): the fallback row is redundant and would count it twice, so it goes.
+          const { error: dropError } = await db.from("payment_events").delete().eq("id", row.id);
+          if (dropError) throw dropError;
+        } else {
+          recorded = { id: row.id, first: false, notified: !!row.notified_at, stored: input };
+        }
       }
     }
     if (!recorded) recorded = await recordPaymentEvent(db, input);

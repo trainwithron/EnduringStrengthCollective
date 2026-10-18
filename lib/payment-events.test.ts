@@ -17,7 +17,7 @@ function world(opts: { seats?: Row[]; profiles?: Row[]; failInsert?: boolean; fa
     tables,
     from(table: string) {
       const filters: ((r: Row) => boolean)[] = [];
-      let op: "select" | "insert" | "update" = "select";
+      let op: "select" | "insert" | "update" | "delete" = "select";
       let values: Row = {};
       const q: any = {
         select: () => q,
@@ -25,6 +25,7 @@ function world(opts: { seats?: Row[]; profiles?: Row[]; failInsert?: boolean; fa
         is: (c: string, v: unknown) => (filters.push((r) => (r[c] ?? null) === v), q),
         insert: (v: Row) => ((op = "insert"), (values = v), q),
         update: (v: Row) => ((op = "update"), (values = v), q),
+        delete: () => ((op = "delete"), q),
         single: async () => run().then((r: any) => ({ data: r.data?.[0] ?? null, error: r.error })),
         maybeSingle: async () => run().then((r: any) => ({ data: r.data?.[0] ?? null, error: r.error })),
         then: (resolve: (v: unknown) => void) => run().then(resolve),
@@ -44,7 +45,12 @@ function world(opts: { seats?: Row[]; profiles?: Row[]; failInsert?: boolean; fa
           tables[table].push(values);
           return { data: null, error: null };
         }
+        if (op === "delete") {
+          tables[table] = tables[table].filter((x) => !filters.every((f2) => f2(x)));
+          return { data: null, error: null };
+        }
         if (op === "update") {
+          if (table === "payment_events" && values.refund_id && tables.payment_events.some((r) => r.refund_id === values.refund_id)) return { data: null, error: { code: "23505", message: "dup refund" } };
           for (const r of tables[table].filter((x) => filters.every((f2) => f2(x)))) Object.assign(r, values);
           return { data: null, error: null };
         }
@@ -383,6 +389,20 @@ describe("a lookup that FAILS is retried while it can help; only one that succee
     expect(db2.tables.notifications).toHaveLength(2);
   });
 
+  it("a fallback row whose refund already has its own row is removed, so the refund is never counted twice", async () => {
+    const db = world({ seats, profiles });
+    const meta = { athlete_id: "ath", group_id: "grp" };
+    const charge = { id: "ch_1", payment_intent: "pi_1", amount_refunded: 900, currency: "usd" };
+    await handlePaymentProblemEvent(evt("charge.refunded", charge, "evt_f"), { db, stripe: fakeStripe({ sessionMeta: meta, refunds: [] }) });
+    // another event for the same charge recorded the real refund first
+    await handlePaymentProblemEvent(evt("charge.refunded", charge, "evt_other"), { db, stripe: fakeStripe({ sessionMeta: meta, refunds: [{ id: "re_1", amount: 900 }] }) });
+    expect(db.tables.payment_events.map((r) => [r.stripe_event_id, r.refund_id ?? null])).toEqual([["evt_f", null], ["evt_other:re_1", "re_1"]]);
+    // the first event is delivered again with the list working: its fallback row is dropped, not left beside the real one
+    await handlePaymentProblemEvent(evt("charge.refunded", charge, "evt_f"), { db, stripe: fakeStripe({ sessionMeta: meta, refunds: [{ id: "re_1", amount: 900 }] }) });
+    expect(db.tables.payment_events.map((r) => r.refund_id)).toEqual(["re_1"]);
+    expect(db.tables.payment_events.reduce((n, r) => n + r.amount_cents, 0)).toBe(900);
+  });
+
   it("the 'coach was told' mark is made only when a notice was really written: no coach seat or a refused notice leaves it open", async () => {
     const noSeat = world({ seats: [], profiles });
     await handlePaymentProblemEvent(evt("invoice.payment_failed", failedInvoice()), { db: noSeat, stripe: fakeStripe() });
@@ -412,7 +432,10 @@ describe("how it is wired", () => {
     expect(route).toContain("handlePaymentProblemEvent(event, { db: supabase, stripe })");
     const lib = src("lib/payment-events.ts");
     // it records and notifies: it never touches balances, sessions, subscriptions or Stripe objects
-    expect(lib).not.toMatch(/session_credits|credit_purchases|apply_session_credit|membership_subscriptions|transfers\.|refunds\.create|subscriptions\.(update|cancel)|\.delete\(/);
+    expect(lib).not.toMatch(/session_credits|credit_purchases|apply_session_credit|membership_subscriptions|transfers\.|refunds\.create|subscriptions\.(update|cancel)/);
+    // the one thing it ever removes is its own redundant fallback row
+    expect((lib.match(/\.delete\(/g) ?? []).length).toBe(1);
+    expect((lib.match(/from\("payment_events"\)\.delete\(/g) ?? []).length).toBe(1);
     // the only thing it ever changes is the 'coach was told' mark on its own record
     expect((lib.match(/\.update\(/g) ?? []).length).toBe(2);
     expect((lib.match(/from\("payment_events"\)\.update\(/g) ?? []).length).toBe(2);
