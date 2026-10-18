@@ -3,6 +3,8 @@ import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
 import { TriviaReviewPanel } from "@/components/admin/trivia-review-panel";
 
+export const metadata = { title: "Trivia" };
+
 // Platform-admin-only review queue for the trivia flash-round content
 // bank (custom_shape_theming_idea.md) — same gate/shell pattern as
 // app/admin/support/page.tsx.

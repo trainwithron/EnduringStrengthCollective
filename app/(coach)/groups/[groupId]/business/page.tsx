@@ -17,6 +17,7 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ClientRateEditor } from "@/components/coach/desktop/client-rate-editor";
 import { SwappableTerm } from "@/components/coach/swappable-term";
 import { StatHeroTile } from "@/components/coach/desktop/stat-hero-tile";
+import { PaymentProblemsSection } from "@/components/coach/payment-problems-section";
 import { ratesByMembership } from "@/lib/client-rates";
 import {
   computeEstimatedMRR,
@@ -27,6 +28,8 @@ import {
   computeRealPausedMRR,
   computeActivePayingClients,
 } from "@/lib/business-metrics";
+
+export const metadata = { title: "Business" };
 
 const TIER_LABELS: Record<string, string> = {
   one_on_one: "1-on-1",
@@ -224,6 +227,8 @@ export default async function BusinessDashboardPage(
             : "Set up packages to see real income and MRR here — until then, the manual rate estimate below is your only signal."}
         </p>
       </div>
+
+      <PaymentProblemsSection groupIds={groupIds} timezone={displayZone} />
 
       {/* MRR is the hero: recurring revenue is the actual "is this
           business healthy right now" number — a single month's income

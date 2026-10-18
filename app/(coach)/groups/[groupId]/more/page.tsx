@@ -7,6 +7,8 @@ import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { buildMoreSections } from "@/lib/more-links";
 
+export const metadata = { title: "More" };
+
 // Where you go, as opposed to Settings, which holds what you configure: goals, tools, photos, messages, community.
 export default async function MorePage(props: { params: Promise<{ groupId: string }> }) {
   const params = await props.params;

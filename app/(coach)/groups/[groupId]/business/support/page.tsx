@@ -7,6 +7,8 @@ import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { SupportInbox, type SupportRequestRow } from "@/components/coach/desktop/support-inbox";
 
+export const metadata = { title: "Support" };
+
 export default async function SupportPage(
   props: { params: Promise<{ groupId: string }> }
 ) {

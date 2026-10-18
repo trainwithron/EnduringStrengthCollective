@@ -1,12 +1,14 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useDialogA11y } from "@/lib/use-dialog-a11y";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { Camera, X } from "lucide-react";
 import type { FeedChannel } from "@/lib/types";
 import { useMentionAutocomplete } from "@/lib/use-mention-autocomplete";
 import { notifyPush } from "@/lib/push-notify";
+import { nameForOthers } from "@/lib/name-protection-client";
 
 // The generic "form check / win / shoutout" copy reads oddly on Team
 // Chat, which is plain conversation, not activity-sharing — and flatly
@@ -34,6 +36,7 @@ export function NewPostComposer({
   authorId?: string | null;
 }) {
   const [open, setOpen] = useState(false);
+  const dialogRef = useDialogA11y<HTMLDivElement>(open, () => setOpen(false), undefined, { guard: () => (body.trim() || file ? "ask" : "close"), askMessage: "Discard this post?" });
   const [body, setBody] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -125,7 +128,7 @@ export function NewPostComposer({
         .select("full_name")
         .eq("id", posterId)
         .maybeSingle();
-      const authorName = viewerProfile?.full_name ?? "Someone";
+      const authorName = viewerProfile?.full_name ? await nameForOthers(groupId, posterId, viewerProfile.full_name) : "Someone";
       const feedUrl = `/groups/${groupId}/feed`;
       for (const id of mentionedIds) {
         if (id !== posterId) notifyPush(id, "You were mentioned", `${authorName} mentioned you in a post`, feedUrl);
@@ -157,7 +160,7 @@ export function NewPostComposer({
   }
 
   return (
-    <div className="fixed inset-0 bg-graphite z-40 flex items-end">
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="New post" className="fixed inset-0 bg-graphite z-40 flex items-end">
       <div className="w-full bg-surface p-5 pb-8">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-display uppercase text-lg">New post</h2>
@@ -166,13 +169,20 @@ export function NewPostComposer({
           </button>
         </div>
 
-        <textarea
+        <textarea aria-label={placeholderForChannel(defaultChannel)}
           value={body}
           onChange={(e) => {
             setBody(e.target.value);
             setMentionQuery(detectMentionQuery(e.target.value));
           }}
           placeholder={placeholderForChannel(defaultChannel)}
+          // Escape closes the open @mention list first, not the whole composer.
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && mentionQuery !== null) {
+              e.preventDefault();
+              setMentionQuery(null);
+            }
+          }}
           rows={3}
           className="w-full bg-graphite border border-steel/30 text-chalk px-3 py-2 font-body focus:outline-none focus:border-rust resize-none"
         />

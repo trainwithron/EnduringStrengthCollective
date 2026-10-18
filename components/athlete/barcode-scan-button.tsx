@@ -318,7 +318,7 @@ function BarcodeScanPanel({
       )}
 
       <div className="flex items-center gap-2">
-        <input
+        <input aria-label="Type barcode number"
           type="text"
           inputMode="numeric"
           value={manualCode}

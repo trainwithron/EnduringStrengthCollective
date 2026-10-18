@@ -7,6 +7,8 @@ import {
   type PartnerRequestRow,
 } from "@/components/athlete/training-partner-requests-panel";
 
+export const metadata = { title: "Requests" };
+
 export default async function TrainingPartnerRequestsPage() {
   const supabase = await createServerClient();
   const {

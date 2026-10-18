@@ -100,14 +100,14 @@ ${trimmedBody}`,
     <div className="max-w-2xl space-y-6">
       {composing ? (
         <div className="border border-steel/20 p-4 space-y-3">
-          <input
+          <input aria-label="Subject"
             type="text"
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
             placeholder="Subject"
             className="w-full h-10 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
           />
-          <textarea
+          <textarea aria-label="What's going on?"
             value={body}
             onChange={(e) => setBody(e.target.value)}
             placeholder="What's going on?"

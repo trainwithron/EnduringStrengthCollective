@@ -206,7 +206,7 @@ export function QuickAddNlButton({
 
   return (
     <div className="space-y-2">
-      <textarea
+      <textarea aria-label="Describe your sets"
         autoFocus
         value={text}
         onChange={(e) => setText(e.target.value)}

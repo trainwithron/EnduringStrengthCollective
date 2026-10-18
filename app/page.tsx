@@ -9,6 +9,7 @@ import { Differentiation } from "@/components/marketing/differentiation";
 import { FinalCta } from "@/components/marketing/final-cta";
 import { BetaBanner, WhyIBuiltThis } from "@/components/marketing/founder-note";
 import { SignOutButton } from "@/components/group/sign-out-button";
+import { FRONT_DESK_PATH, landsOnFrontDesk } from "@/lib/front-desk";
 
 // A signed-in user landing on "/" (e.g. opening the installed app, or a
 // bookmark) should never see the marketing page — that's only a front
@@ -28,6 +29,8 @@ export default async function HomePage(props: { searchParams: Promise<{ source?:
   if (user) {
     const lastGroupId = parseLastGroupCookie((await cookies()).get("last_group")?.value);
     const membership = pickStartGroup(await loadStartInputs(supabase, user.id, lastGroupId));
+
+    if (await landsOnFrontDesk(supabase, user.id, membership)) redirect(FRONT_DESK_PATH);
 
     if (membership) {
       // A coach on a phone or the installed app opens on their own client profile; at a computer, the desktop Home.

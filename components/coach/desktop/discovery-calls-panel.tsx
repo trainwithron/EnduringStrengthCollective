@@ -67,7 +67,7 @@ export function DiscoveryCallsPanel({
         needed.
       </p>
       <div className="flex items-center gap-2 max-w-md mb-6">
-        <input
+        <input aria-label="Booking link"
           readOnly
           value={link}
           onFocus={(e) => e.target.select()}

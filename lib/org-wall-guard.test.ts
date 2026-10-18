@@ -10,7 +10,6 @@ const REVIEWED_PERMISSION_ONLY = new Set([
   // "is this person a coach at all / do they coach this group" checks, account/erasure/AI-budget plumbing, and server routes that check a caller before acting
   "app/api/ai/coach-conversation/route.ts",
   "app/api/ai/parse-workout/route.ts",
-  "app/api/clients/delete/route.ts",
   "app/api/clients/import-roster/undo/route.ts",
   // the team page lists this coach's retired seasons, limited to the organization of the group it is on
   "app/(coach)/groups/[groupId]/team/page.tsx",

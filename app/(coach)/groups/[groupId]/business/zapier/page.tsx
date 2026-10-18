@@ -7,6 +7,8 @@ import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ZapierSettings } from "@/components/coach/desktop/zapier-settings";
 
+export const metadata = { title: "Zapier" };
+
 export default async function ZapierPage(props: { params: Promise<{ groupId: string }> }) {
   const params = await props.params;
   await redirectOneOnOneToAnchor(params.groupId, "business/zapier");

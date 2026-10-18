@@ -11,6 +11,8 @@ import { BookingPageSettings, type BookingPageRow } from "@/components/coach/des
 import { PublicSessionTypesEditor, type PublicTypeEditRow } from "@/components/coach/desktop/public-session-types-editor";
 import { normalizeSlug, slugProblem } from "@/lib/public-booking";
 
+export const metadata = { title: "Booking page" };
+
 // The coach's public booking page: the address people book at, and which session types they can pick. Coach-wide (one page
 // per coach, not per group), like availability and session types. Needs migration 0261; until it is applied the page says so.
 export default async function BookingPageSettingsPage(props: { params: Promise<{ groupId: string }> }) {

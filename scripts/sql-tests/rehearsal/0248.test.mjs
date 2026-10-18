@@ -75,7 +75,7 @@ export default {
       await h.as(coach);
       const bal = await balance();
       await h.as(coach);
-      const series = (await h.rows(`select * from public.create_recurring_booking_series($1, $2, $3, $4, 60, 20)`, [coach, ann, group, "2026-10-20T10:00:00Z"]))[0];
+      const series = (await h.rows(`select * from public.create_recurring_booking_series($1, $2, $3, $4, 60, 20)`, [coach, ann, group, new Date(Date.UTC(2027, 0, 12, 11, 0, 0)).toISOString()]))[0];
       h.check("a 20-week series books all 20 with no credits taken", series.booked_count === 20 && series.failed_count === 0 && (await balance()) === bal, JSON.stringify(series));
       await h.asSuper();
       const hours = await h.rows(`select distinct to_char(start_at at time zone 'America/New_York', 'HH24:MI') as t from public.bookings where recurring_series_id = $1`, [series.series_id]);

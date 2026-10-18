@@ -203,7 +203,7 @@ export function RecipeHubManager({
         <label className="font-body text-xs text-steel uppercase tracking-wide mb-2 block">
           Describe a recipe
         </label>
-        <textarea
+        <textarea aria-label="Meal description"
           rows={2}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
@@ -546,7 +546,7 @@ function IngredientEditor({
   return (
     <div className="border border-steel/15 p-2.5">
       <div className="grid grid-cols-[1fr_auto_auto] gap-2 items-start">
-        <input
+        <input aria-label="Ingredient name"
           type="text"
           value={labelDraft}
           onChange={(e) => setLabelDraft(e.target.value)}
@@ -558,7 +558,7 @@ function IngredientEditor({
           placeholder="Chicken Breast"
           className="h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust"
         />
-        <select
+        <select aria-label="Ingredient role"
           value={ingredient.role}
           onChange={(e) => {
             const role = e.target.value as IngredientRole;

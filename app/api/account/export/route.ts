@@ -1,16 +1,24 @@
 import { NextResponse } from "next/server";
+import { readHealthAnswers } from "@/lib/health-answers";
 import { createServerClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { rateLimitResponse } from "@/lib/rate-limit";
+import { collectEverything, deliveryFor, storeAccountExport, type ExportClient } from "@/lib/account-export";
 
-// Runs entirely under the caller's own authenticated session — every
-// query below is already scoped to their own id, and RLS backs that up
-// regardless, so no service-role client is needed here (unlike the
-// deletion route, which has to touch rows it doesn't own).
-export async function GET() {
+// Every read runs under the caller's own authenticated session — each query is scoped to their own id and row security backs that up regardless. The server key
+// is used for exactly one thing: putting a download too large to send directly into a private bucket (lib/account-export.ts) so it can be handed over as a short link.
+// The collection can take a while for a person with a lot of data, one small database call per page of each table.
+export const maxDuration = 60;
+
+export async function GET(request: Request) {
   const supabase = await createServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+
+  const limited = await rateLimitResponse("account-export-hour", user.id, 5, 3600);
+  if (limited) return limited;
 
   const userId = user.id;
 
@@ -40,7 +48,8 @@ export async function GET() {
   ] = await Promise.all([
     supabase.from("profiles").select("full_name, avatar_url").eq("id", userId).maybeSingle(),
     supabase.from("athlete_profile_details").select("*").eq("athlete_id", userId).maybeSingle(),
-    supabase.from("client_intake").select("*").eq("athlete_id", userId).maybeSingle(),
+    // The answers come through health_answers (the table no longer hands them out); everything else on the row as before.
+    supabase.from("client_intake").select("athlete_id, group_id, waiver_signed_name, waiver_accepted, completed_at, created_at, updated_at, date_of_birth").eq("athlete_id", userId).maybeSingle(),
     supabase.from("body_weight_logs").select("*").eq("athlete_id", userId),
     supabase.from("wellness_checkins").select("*").eq("athlete_id", userId),
     supabase.from("athlete_sessions").select("*").eq("athlete_id", userId),
@@ -62,11 +71,23 @@ export async function GET() {
     supabase.from("read_settings").select("faith_track, note_seen_at, updated_at").eq("athlete_id", userId).maybeSingle(),
   ]);
 
+  // Their own screening answers, read through the same door as everyone's.
+  const ownAnswers = intake ? await readHealthAnswers(supabase, userId) : null;
+  if (ownAnswers?.kind === "error") return NextResponse.json({ error: "Couldn't read your health screening, so the export wasn't made. Try again in a moment." }, { status: 503 });
+  // Everything else the app holds about this person as a member and client that their own sign-in can read, found by the database itself from every table that names them (so a table added
+  // later is included without anyone remembering to list it). Null until the database has the functions; the list below still downloads then.
+  const everything = await collectEverything(supabase as unknown as ExportClient);
+
   const exportData = {
     exportedAt: new Date().toISOString(),
+    everything: everything ? everything.tables : null,
+    everythingComplete: everything ? everything.complete : false,
+    everythingNote: everything
+      ? "Everything the app holds about you as a member and client that your sign-in can read, one entry per table and column that names you, newest first. A table that is cut or could not be read says why. Sign-in tokens and other secrets are left out, and so is anything a coach keeps privately about you. A coach's records of their own business are not here: coaches use Export my business."
+      : "The complete collection was not available this time; the sections below are still complete for the main parts of your account. Try again later or contact support.",
     profile,
     profileDetails,
-    intake,
+    intake: intake ? { ...intake, par_q_answers: ownAnswers?.kind === "ok" ? ownAnswers.answers : [] } : intake,
     bodyWeightLogs,
     wellnessCheckins,
     athleteSessions,
@@ -88,7 +109,16 @@ export async function GET() {
     readSettings,
   };
 
-  return new NextResponse(JSON.stringify(exportData, null, 2), {
+  const body = JSON.stringify(exportData);
+  if (deliveryFor(Buffer.byteLength(body)) === "link") {
+    const link = await storeAccountExport(createServiceRoleClient(), userId, body);
+    if (!link) return NextResponse.json({ error: "Your download is large and could not be prepared this time. Try again in a few minutes." }, { status: 502 });
+    // A browser opening the address gets the file; the button in Settings asks with fetch and is handed the link to open.
+    if (request.headers.get("sec-fetch-mode") === "navigate") return NextResponse.redirect(link, 302);
+    return NextResponse.json({ downloadUrl: link }, { headers: { "X-Export-Link": "1" } });
+  }
+
+  return new NextResponse(body, {
     status: 200,
     headers: {
       "Content-Type": "application/json",

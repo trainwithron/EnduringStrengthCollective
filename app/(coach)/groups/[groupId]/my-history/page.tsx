@@ -7,6 +7,8 @@ import { createServerClient } from "@/lib/supabase/server";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ExerciseHistoryUploader } from "@/components/coach/exercise-history-uploader";
 
+export const metadata = { title: "My history" };
+
 // Locked design #2 (coach_onboarding_history_ingestion_scoping_sept19.md):
 // the optional one-time client-facing entry point into the SAME uploader
 // UI the coach's page uses — reuses ExerciseHistoryUploader verbatim,

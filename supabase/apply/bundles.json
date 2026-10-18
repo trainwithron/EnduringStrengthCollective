@@ -1,5 +1,85 @@
 [
  {
+  "id": "release-v1-guardian-consent",
+  "name": "Release V1 (a parent or guardian's consent for clients aged 13 to 17; adds only, but apply BEFORE the code that goes with it is live)",
+  "steps": [
+   "154"
+  ],
+  "file": "apply-release-v1-guardian-consent-all.sql"
+ },
+ {
+  "id": "release-t2-wearable-token-fingerprint",
+  "name": "Release T2 (a fingerprint column so wearable sign-in tokens can be kept scrambled; adds one empty column, run BEFORE the code that goes with it is live)",
+  "steps": [
+   "165"
+  ],
+  "file": "apply-release-t2-wearable-token-fingerprint-all.sql"
+ },
+ {
+  "id": "release-t1-export-my-data",
+  "name": "Release T1 (Download my data gives a person everything the app holds about them; adds two functions and a private bucket, safe before the code)",
+  "steps": [
+   "164"
+  ],
+  "file": "apply-release-t1-export-my-data-all.sql"
+ },
+ {
+  "id": "release-cm1-report-and-block",
+  "name": "Release CM1 (report a post or comment, block a member; adds two small tables, two functions and one notice kind, safe before the code)",
+  "steps": [
+   "163"
+  ],
+  "file": "apply-release-cm1-report-and-block-all.sql"
+ },
+ {
+  "id": "release-sp1-support-notices",
+  "name": "Release SP1 (a support reply tells the other side; adds one notice kind and a trigger, safe before the code)",
+  "steps": [
+   "162"
+  ],
+  "file": "apply-release-sp1-support-notices-all.sql"
+ },
+ {
+  "id": "release-m1-payment-events",
+  "name": "Release M1 (failed payments, refunds and disputes recorded and the coach told; adds one table and one notice kind, moves no money, safe before the code)",
+  "steps": [
+   "161"
+  ],
+  "file": "apply-release-m1-payment-events-all.sql"
+ },
+ {
+  "id": "release-b1-nutrition-flag",
+  "name": "Release B1 (switch off automatic nutrition suggestions for one client; adds one coach-only table, safe before the code)",
+  "steps": [
+   "160"
+  ],
+  "file": "apply-release-b1-nutrition-flag-all.sql"
+ },
+ {
+  "id": "release-z1-client-removals",
+  "name": "Release Z1 (remove a client without destroying them, and a 30-day undo for a permanent delete; adds only, safe before the code)",
+  "steps": [
+   "159"
+  ],
+  "file": "apply-release-z1-client-removals-all.sql"
+ },
+ {
+  "id": "release-w2b-notice-names",
+  "name": "Release W2b (notices name a member under 18 as a first name and last initial; REPLACES three notice functions, so it is not additions-only)",
+  "steps": [
+   "157"
+  ],
+  "file": "apply-release-w2b-notice-names-all.sql"
+ },
+ {
+  "id": "release-x1-athlete-narrow-reads",
+  "name": "Release X1 (two narrow read functions for athletes' screens; adds only, safe before or with the code)",
+  "steps": [
+   "156"
+  ],
+  "file": "apply-release-x1-athlete-narrow-reads-all.sql"
+ },
+ {
   "id": "release-co",
   "name": "Release CO (nothing about a person is public unless they chose it: personal Find a coach listing; a coach adds only their own clients to a challenge; run BEFORE the code that goes with it is live)",
   "steps": [
@@ -24,12 +104,36 @@
   "file": "apply-release-cm-all.sql"
  },
  {
-  "id": "release-v1-guardian-consent",
-  "name": "Release V1 (a parent or guardian's consent for clients aged 13 to 17; adds only, but apply BEFORE the code that goes with it is live)",
+  "id": "release-w3-intake-every-client",
+  "name": "Release W3 (every client reaches the health form, whichever door they came in by; adds a trigger only, safe before or with the code)",
   "steps": [
-   "154"
+   "155"
   ],
-  "file": "apply-release-v1-guardian-consent-all.sql"
+  "file": "apply-release-w3-intake-every-client-all.sql"
+ },
+ {
+  "id": "release-u1-graduation",
+  "name": "Release U1 (graduation years and the graduating player's training history; adds only, safe to run BEFORE the code that goes with it is live)",
+  "steps": [
+   "153"
+  ],
+  "file": "apply-release-u1-graduation-all.sql"
+ },
+ {
+  "id": "release-t1-front-desk",
+  "name": "Release T1 (the front desk; adds only, safe to run BEFORE the code that goes with it is live)",
+  "steps": [
+   "152"
+  ],
+  "file": "apply-release-t1-front-desk-all.sql"
+ },
+ {
+  "id": "release-s2-health-answers",
+  "name": "Release S2 (health answers private to the client and their coach; apply together with the code)",
+  "steps": [
+   "151"
+  ],
+  "file": "apply-release-s2-health-answers-all.sql"
  },
  {
   "id": "release-s1-signin-hardening",

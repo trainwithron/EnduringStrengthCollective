@@ -7,6 +7,8 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { KioskPinManager } from "@/components/coach/desktop/kiosk-pin-manager";
 import { loadKioskPinStatus } from "@/lib/kiosk-pin-status";
 
+export const metadata = { title: "Settings" };
+
 // The admin surface for Kiosk Check-In — separate from the locked-down
 // /kiosk screen itself on purpose: PINs are viewed/reset here, on the
 // coach's own normal desktop session, never on the shared tablet that

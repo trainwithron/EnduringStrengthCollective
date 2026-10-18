@@ -1,29 +1,40 @@
-import { confirmDialogWithChoice } from "@/components/shared/confirm-dialog";
+import { confirmDialog, confirmDialogWithChoice } from "@/components/shared/confirm-dialog";
+import { DELETE_CONFIRM, REMOVE_CONFIRM } from "@/lib/client-removal";
 
 export type DeleteClientResult = { status: "cancelled" } | { status: "deleted"; spaceGone: boolean } | { status: "failed"; error: string };
+export type RemoveClientResult = { status: "cancelled" } | { status: "removed" } | { status: "failed"; error: string };
 
-// The ONE way a client is deleted (from their profile or from a card's menu): the in-page confirm, with the one extra choice (also erase their logged workouts and the coach's notes) as a tick-box in
-// the same dialog, then the delete request. The server still checks everything that matters (the caller coaches the group, the person is a plain client of it, the rest of their groups are this
-// coach's too, no live subscription).
+async function post(path: string, payload: Record<string, unknown>, failure: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const res = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return { ok: false, error: data.error ?? failure };
+    return { ok: true };
+  } catch {
+    return { ok: false, error: `${failure.replace(/\.$/, "")}. Check your connection.` };
+  }
+}
+
+// "Remove from my clients": the default way to get rid of a client. They leave the coach's lists and counts and lose the group; their account and data are kept and the coach can put them back at any time.
+export async function runRemoveClient({ groupId, athleteId, athleteName }: { groupId: string; athleteId: string; athleteName: string }): Promise<RemoveClientResult> {
+  const confirmed = await confirmDialog({ message: REMOVE_CONFIRM(athleteName), confirmLabel: "Remove", cancelLabel: "Cancel" });
+  if (!confirmed) return { status: "cancelled" };
+  const result = await post("/api/clients/remove", { groupId, athleteId, permanent: false }, "Couldn't remove this client. Nothing was changed.");
+  return result.ok ? { status: "removed" } : { status: "failed", error: result.error };
+}
+
+// "Delete permanently": the same removal, with 30 days to change your mind before the account is erased. The one extra choice (also erase their logged workouts and the coach's notes) is a tick-box in the same dialog.
+// The server still checks everything that matters (the caller coaches the group and the person is a client of it).
 export async function runDeleteClient({ groupId, athleteId, athleteName }: { groupId: string; athleteId: string; athleteName: string }): Promise<DeleteClientResult> {
   const { confirmed, checked } = await confirmDialogWithChoice({
-    message: `Delete ${athleteName}? This permanently removes their account and cannot be undone.`,
+    message: DELETE_CONFIRM(athleteName),
     confirmLabel: "Delete",
     cancelLabel: "Cancel",
     destructive: true,
     checkbox: { label: "Also erase their logged workouts and my notes about them", checked: false },
   });
   if (!confirmed) return { status: "cancelled" };
-  try {
-    const res = await fetch("/api/clients/delete", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ groupId, athleteId, eraseHistory: checked }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) return { status: "failed", error: data.error ?? "Couldn't delete this client. Nothing was deleted." };
-    return { status: "deleted", spaceGone: Array.isArray(data.deletedGroupIds) && data.deletedGroupIds.includes(groupId) };
-  } catch {
-    return { status: "failed", error: "Couldn't delete this client. Check your connection. Nothing was deleted." };
-  }
+  const result = await post("/api/clients/remove", { groupId, athleteId, permanent: true, eraseHistory: checked }, "Couldn't delete this client. Nothing was changed.");
+  // The person is out of the group now; a one-on-one space that held only them is still there (it goes when the account does).
+  return result.ok ? { status: "deleted", spaceGone: false } : { status: "failed", error: result.error };
 }

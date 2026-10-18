@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { exchangeOuraCode, fetchOuraDailyMetrics } from "@/lib/oura";
+import { sealedTokenColumns, tokenOwner } from "@/lib/token-crypto";
 
 // How far back a brand-new connection backfills. Oura's API will serve
 // further back than this, but 90 days is enough real history to give
@@ -147,8 +148,7 @@ export async function GET(request: Request) {
     const { error: tokenError } = await serviceRole.from("wearable_oauth_tokens").upsert(
       {
         connection_id: connection.id,
-        access_token: tokens.accessToken,
-        refresh_token: tokens.refreshToken,
+        ...sealedTokenColumns(tokens, tokenOwner("wearable", "oura", user.id), { withHash: true }),
         expires_at: tokens.expiresAt,
         updated_at: new Date().toISOString(),
       },

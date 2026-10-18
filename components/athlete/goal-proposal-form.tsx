@@ -74,7 +74,7 @@ export function GoalProposalForm({ athleteId, groupId, suggestedBy, fromWords }:
       )}
       <div>
         <label className="font-body text-xs text-steel uppercase tracking-wide">Goal</label>
-        <select
+        <select aria-label="Goal"
           value={goalType}
           onChange={(e) => setGoalType(e.target.value as GoalType)}
           className="w-full h-11 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm mt-1"
@@ -88,7 +88,7 @@ export function GoalProposalForm({ athleteId, groupId, suggestedBy, fromWords }:
       </div>
 
       {goalType === "custom" && (
-        <input
+        <input aria-label="Describe your goal"
           value={customLabel}
           onChange={(e) => setCustomLabel(e.target.value)}
           placeholder="Describe your goal"
@@ -98,13 +98,13 @@ export function GoalProposalForm({ athleteId, groupId, suggestedBy, fromWords }:
 
       {goalTypeHasEventFields(goalType) && (
         <div className="grid grid-cols-2 gap-2">
-          <input
+          <input aria-label="Sport / event"
             value={eventType}
             onChange={(e) => setEventType(e.target.value)}
             placeholder="Sport / event"
             className="h-11 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm"
           />
-          <select
+          <select aria-label="Event priority"
             value={eventPriority}
             onChange={(e) => setEventPriority(e.target.value as "" | "A" | "B" | "C")}
             className="h-11 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm"
@@ -133,7 +133,7 @@ export function GoalProposalForm({ athleteId, groupId, suggestedBy, fromWords }:
         <label className="font-body text-xs text-steel uppercase tracking-wide">
           Target date (optional)
         </label>
-        <input
+        <input aria-label="Target date (optional)"
           type="date"
           value={targetDate}
           onChange={(e) => setTargetDate(e.target.value)}
@@ -145,7 +145,7 @@ export function GoalProposalForm({ athleteId, groupId, suggestedBy, fromWords }:
         <label className="font-body text-xs text-steel uppercase tracking-wide">
           {suggestedBy ? "Anything specific to add? (optional)" : "Anything specific your coach should know? (optional)"}
         </label>
-        <textarea
+        <textarea aria-label="Anything specific (optional)"
           value={priorityNote}
           onChange={(e) => setPriorityNote(e.target.value)}
           rows={2}

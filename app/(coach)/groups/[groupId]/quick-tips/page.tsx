@@ -12,6 +12,8 @@ import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { ATHLETE_QUICK_TIPS, COACH_QUICK_TIPS, type QuickTip } from "@/lib/quick-tips-content";
 import { Lightbulb } from "lucide-react";
 
+export const metadata = { title: "Quick tips" };
+
 function TipList({ tips }: { tips: QuickTip[] }) {
   return (
     <ol className="space-y-5">

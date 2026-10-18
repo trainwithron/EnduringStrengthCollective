@@ -2,6 +2,8 @@ import Link from "next/link";
 import { createServerClient } from "@/lib/supabase/server";
 import { InviteJoinFlow } from "@/components/invite/invite-join-flow";
 
+export const metadata = { title: "Invite" };
+
 export default async function InvitePage(
   props: {
     params: Promise<{ code: string }>;

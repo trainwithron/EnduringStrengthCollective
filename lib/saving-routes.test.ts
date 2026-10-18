@@ -25,6 +25,10 @@ const NOT_A_SAVE = new Set([
   "/api/guardian-consent/void",
   "/api/guardian-consent/sign",
   "/api/guardian-consent/withdraw",
+  // asks which members must be shown as a first name and last initial; reads only
+  "/api/groups/[groupId]/name-protection",
+  // emails graduating players their own training history after a new season is started; it changes nothing a pane shows
+  "/api/season/graduate",
   "/api/email-change/confirm",
   "/api/email-change/cancel",
   "/api/email-change/cancel-mine",

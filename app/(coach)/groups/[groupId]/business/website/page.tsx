@@ -7,6 +7,8 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { WebsiteSettings } from "@/components/coach/desktop/website-settings";
 import { cleanSite, reviewsFromJson, type SiteBackground } from "@/lib/coach-site";
 
+export const metadata = { title: "Website" };
+
 export default async function WebsitePage(props: { params: Promise<{ groupId: string }> }) {
   const params = await props.params;
   const supabase = await createServerClient();

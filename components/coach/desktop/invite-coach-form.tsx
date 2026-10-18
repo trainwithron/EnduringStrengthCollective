@@ -9,7 +9,7 @@ export function InviteCoachForm({ groupId }: { groupId: string }) {
   const [open, setOpen] = useState(false);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
-  const [orgRole, setOrgRole] = useState<"coach" | "admin">("coach");
+  const [orgRole, setOrgRole] = useState<"coach" | "admin" | "front_desk">("coach");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -65,7 +65,7 @@ export function InviteCoachForm({ groupId }: { groupId: string }) {
       {success ? (
         <div>
           <p className="font-body text-sm text-positive">
-            Invitation sent. They join once they accept.
+            If that person has no open invitation, we sent one, and they join once they accept. Check Invitations on the Team page for anything already open, and choose Resend there.
           </p>
           <button
             type="button"
@@ -110,15 +110,17 @@ export function InviteCoachForm({ groupId }: { groupId: string }) {
             <select
               id="coach-role"
               value={orgRole}
-              onChange={(e) => setOrgRole(e.target.value as "coach" | "admin")}
+              onChange={(e) => setOrgRole(e.target.value as "coach" | "admin" | "front_desk")}
               className="w-full h-10 mt-1 bg-graphite border border-steel/30 text-chalk px-2.5 font-body text-sm focus:outline-none focus:border-rust"
             >
               <option value="coach">Coach</option>
               <option value="admin">Admin</option>
+              <option value="front_desk">Front desk (check-in only)</option>
             </select>
             <p className="font-body text-xs text-steel mt-1">
-              Admins and coaches have the same access today — this just records their level for
-              when permission tiers are built out.
+              {orgRole === "front_desk"
+                ? "Front desk staff check clients in on the front-desk screen and can see nothing else: no health answers, programs, messages or reports."
+                : "Admins and coaches have the same access today — this just records their level for when permission tiers are built out."}
             </p>
           </div>
           {error && (

@@ -7,6 +7,8 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ExerciseLibraryTabs } from "@/components/coach/exercise-library-tabs";
 import type { EquipmentType } from "@/lib/equipment-classifier";
 
+export const metadata = { title: "Exercise library" };
+
 export default async function ExerciseLibraryPage(
   props: {
     params: Promise<{ groupId: string }>;

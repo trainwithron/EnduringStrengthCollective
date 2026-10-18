@@ -176,7 +176,7 @@ export function WorkspaceMenu({ groupId, orgName, large = false }: { groupId: st
               </button>
             ) : (
               <div className="p-3 space-y-2">
-                <input
+                <input aria-label="Group name"
                   autoFocus
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
@@ -186,7 +186,7 @@ export function WorkspaceMenu({ groupId, orgName, large = false }: { groupId: st
                   placeholder="Group name"
                   className="w-full h-10 bg-graphite border border-steel/30 text-chalk px-2 font-body text-base sm:text-sm"
                 />
-                <select
+                <select aria-label="Kind of group"
                   value={newKind}
                   onChange={(e) => setNewKind(e.target.value as "team" | "social")}
                   className="w-full h-10 bg-graphite border border-steel/30 text-chalk px-2 font-body text-base sm:text-sm"

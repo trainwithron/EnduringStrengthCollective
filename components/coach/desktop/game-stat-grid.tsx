@@ -92,7 +92,7 @@ export function GameStatGrid({
                 return (
                   <td key={f.id} className="py-2 px-2">
                     {editable ? (
-                      <input
+                      <input aria-label={`${a.fullName}, ${f.name}`}
                         type="number"
                         value={value}
                         onChange={(e) => handleChange(a.profileId, f.id, e.target.value)}

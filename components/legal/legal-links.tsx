@@ -17,6 +17,12 @@ export function LegalLinks({ className = "" }: { className?: string }) {
       <Link href="/refunds" className="underline underline-offset-2">
         Refunds
       </Link>
+      <Link href="/help" className="underline underline-offset-2">
+        Help
+      </Link>
+      <Link href="/status" className="underline underline-offset-2">
+        Status
+      </Link>
     </p>
   );
 }

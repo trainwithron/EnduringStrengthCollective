@@ -11,6 +11,8 @@ import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 
+export const metadata = { title: "Challenges" };
+
 export default async function ChallengesPage(
   props: {
     params: Promise<{ groupId: string }>;
