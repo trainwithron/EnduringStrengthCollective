@@ -30,11 +30,11 @@ describe("the upload page and its screens", () => {
     expect(c).toContain("printed as {row.printedName}: check it is the right person");
   });
 
-  it("an athlete's own session is kept unless the coach chooses to replace it, and replacing asks first and says it cannot be undone", () => {
+  it("an existing session is kept unless the coach chooses to replace it; only an earlier sheet's or an import's finished session is replaced, and replacing asks first and says it cannot be undone", () => {
     const c = src("components/coach/team-sheet-upload.tsx");
     expect(c).toContain("Keep what is there (recommended)");
     expect(c).toContain("const [replace, setReplace] = useState(false);");
-    expect(c).toContain("their own session is deleted and cannot be brought back");
+    expect(c).toContain("a session the athlete logged, one in progress or a booked one is always kept");
     expect(c).toContain("destructive: true");
     expect(c).toContain("Undoing this upload removes the sheet&apos;s workouts but does not bring back the sessions it replaced.");
   });

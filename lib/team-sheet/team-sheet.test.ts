@@ -1,8 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createHash } from "node:crypto";
 import { inflateSync } from "node:zlib";
 import * as XLSX from "xlsx";
-import { decodeSheetCode, encodeSheetCode, type SheetCode } from "@/lib/team-sheet/sheet-code";
+import { decodeSheetCode, encodeSheetCode, isSheetDay, type SheetCode } from "@/lib/team-sheet/sheet-code";
 import {
   MAX_COLUMNS_PER_PAGE,
   MAX_EXERCISES_PER_DAY,
@@ -19,6 +19,15 @@ import {
 } from "@/lib/team-sheet/sheet-model";
 import { buildSheetXlsx, CODES_SHEET, FORMULA_START, plainText } from "@/lib/team-sheet/export-xlsx";
 import { buildSheetPdf, rackCode } from "@/lib/team-sheet/export-pdf";
+
+// sheet codes carry real dates and the reader refuses a day more than a day ahead or two years back, so these tests run on a fixed clock
+beforeAll(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-11-01T12:00:00Z"));
+});
+afterAll(() => {
+  vi.useRealTimers();
+});
 
 const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const ex = (n: number, name = `Exercise ${n}`, extra: Partial<SheetExercise> = {}): SheetExercise => ({ id: uuid(1000 + n), name, prescription: "3x5", sets: 3, reps: 5, unread: false, ...extra });
@@ -305,5 +314,28 @@ describe("team sheet PDF", () => {
     const b = buildSheetPdf(model("week", 4, 200));
     expect(b.length).toBeLessThan(8_000_000);
     expect(Date.now() - started).toBeLessThan(15_000);
+  });
+});
+
+describe("the day in a sheet code", () => {
+  const code = (date: string): SheetCode => ({ v: 1, groupId: uuid(9999), mode: "day", unit: "lb", rack: 1, days: [{ date, exercises: [uuid(1)] }], athletes: [uuid(5)] });
+  it("must be a real day, not a day ahead of today by more than one, and not more than two years back", () => {
+    expect(isSheetDay("2026-10-05")).toBe(true);
+    expect(isSheetDay("2026-11-02")).toBe(true);
+    expect(isSheetDay("2026-11-04")).toBe(false);
+    expect(isSheetDay("2024-11-02")).toBe(true);
+    expect(isSheetDay("2024-10-30")).toBe(false);
+    expect(isSheetDay("1999-05-01")).toBe(false);
+    expect(isSheetDay("2026-02-31")).toBe(false);
+    expect(isSheetDay("2026-13-01")).toBe(false);
+    expect(isSheetDay("not a day")).toBe(false);
+  });
+  it("a forged code with such a day is refused cleanly, with its own reason", () => {
+    expect(decodeSheetCode(encodeSheetCode(code("2026-10-05"))).ok).toBe(true);
+    for (const bad of ["2026-02-31", "1999-05-01", "2030-01-01"]) {
+      const r = decodeSheetCode(encodeSheetCode(code(bad)));
+      expect(r.ok, bad).toBe(false);
+      if (!r.ok) expect(r.reason).toMatch(/real day in the last two years/);
+    }
   });
 });

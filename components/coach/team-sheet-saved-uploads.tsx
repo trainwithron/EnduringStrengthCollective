@@ -60,7 +60,7 @@ export function TeamSheetSavedUploads({ groupId, uploads }: { groupId: string; u
                 {u.first_day ? `, ${dayRange(u.first_day, u.last_day)}` : ""}
               </p>
               <p className="font-body text-xs text-steel">
-                {u.source === "csv" ? "CSV" : u.source === "photo" ? "Photo" : "Excel"}
+                {u.source === "csv" ? "CSV" : "Excel"}
                 {u.records_count > 0 ? `, ${u.records_count} new record${u.records_count === 1 ? "" : "s"}` : ""}
                 {u.kept_count > 0 ? `, ${u.kept_count} left as they were` : ""}
                 {u.replaced_count > 0 ? `, ${u.replaced_count} replaced` : ""}

@@ -33,6 +33,8 @@ export type ParsedCell =
   | { kind: "unsure"; raw: string; reason: string };
 
 export const MAX_WEIGHT = 2000;
+/** the same ceiling in kilograms (about 2000 lb): saved weights are kept in pounds, and the database refuses anything over 2000 lb */
+export const MAX_WEIGHT_KG = 900;
 export const MAX_REPS = 100;
 export const MAX_SETS = 20;
 
@@ -83,7 +85,7 @@ export function parseCell(input: unknown, opts: { unit?: SheetUnit; prescribed?:
     const m = /^(\d+(?:\.\d+)?)(?:x(\d+)(?:x(\d+))?)?$/.exec(t);
     if (!m) return unsure(raw.trim(), `"${t}" could not be read`);
     const weight = Number(m[1]);
-    if (!(weight >= 1) || weight > MAX_WEIGHT) return unsure(raw.trim(), `${m[1]} is not a believable weight`);
+    if (!(weight >= 1) || weight > (unit === "kg" ? MAX_WEIGHT_KG : MAX_WEIGHT)) return unsure(raw.trim(), `${m[1]} is not a believable weight`);
     if (m[2] === undefined) {
       sets.push({ weight, reps: prescribedReps, repsAssumed: true });
       continue;

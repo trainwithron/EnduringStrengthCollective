@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import * as XLSX from "xlsx";
 
 const state = vi.hoisted(() => ({
@@ -112,6 +112,15 @@ const uploadReq = (file: Buffer | null, name = "sheet.xlsx", fields: Record<stri
   return new Request("https://app.test/api/team-sheet/upload", { method: "POST", body: form });
 };
 const json = (url: string, body: unknown) => new Request(`https://app.test/api/team-sheet/${url}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: typeof body === "string" ? body : JSON.stringify(body) });
+
+// sheet codes carry real dates and the reader refuses a day more than a day ahead or two years back, so these tests run on a fixed clock
+beforeAll(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-11-01T12:00:00Z"));
+});
+afterAll(() => {
+  vi.useRealTimers();
+});
 
 beforeEach(() => {
   state.user = { id: "coach-1" };

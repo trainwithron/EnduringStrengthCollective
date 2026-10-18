@@ -108,7 +108,7 @@ export function TeamSheetUpload({ groupId }: { groupId: string }) {
     if (!review || saving || totals.workouts === 0) return;
     // held before the question is asked, so a second press while the question is open does nothing
     setSaving(true);
-    if (replace && !(await confirmDialog({ message: "Replace the athletes' own sessions with the sheet? Their own sessions will be deleted and this cannot be undone.", confirmLabel: "Replace", destructive: true }))) {
+    if (replace && !(await confirmDialog({ message: "Replace the sessions an earlier sheet or import saved with this sheet? They will be deleted and this cannot be undone. Sessions the athletes logged themselves are kept.", confirmLabel: "Replace", destructive: true }))) {
       setSaving(false);
       return;
     }
@@ -154,7 +154,7 @@ export function TeamSheetUpload({ groupId }: { groupId: string }) {
         {!undone && (
           <ul className="font-body text-sm text-steel list-disc pl-5 space-y-1">
             {result.kept > 0 && <li>{result.kept} already had a session and were left as they were.</li>}
-            {result.replaced > 0 && <li>{result.replaced} of the athletes&apos; own sessions were replaced with the sheet.</li>}
+            {result.replaced > 0 && <li>{result.replaced} earlier session{result.replaced === 1 ? " was" : "s were"} replaced with the sheet.</li>}
             {result.records > 0 && <li>{result.records} new record{result.records === 1 ? "" : "s"}, set quietly on the day they were lifted. No one is notified except you.</li>}
             {(result.droppedUnsure ?? 0) > 0 && <li>{result.droppedUnsure} box{result.droppedUnsure === 1 ? "" : "es"} the reader was not sure of were left blank.</li>}
             {(result.skipped ?? []).length > 0 && <li>{result.skipped!.length} row{result.skipped!.length === 1 ? "" : "s"} could not be saved: {Array.from(new Set(result.skipped!.map((s) => s.why))).join("; ")}.</li>}
@@ -214,6 +214,9 @@ export function TeamSheetUpload({ groupId }: { groupId: string }) {
         <>
           <div className="border border-steel/25 p-4 max-w-3xl space-y-3">
             <p className="font-body text-sm">
+              This sheet is in <b>{review.unit}</b>.{review.unit === "kg" ? " Weights are kept in pounds, so 100 kg is saved as 220.46 lb and shows as 100 kg to anyone who uses kilograms." : ""}
+            </p>
+            <p className="font-body text-sm">
               <b>{totals.workouts}</b> workout{totals.workouts === 1 ? "" : "s"} for <b>{totals.athletes}</b> athlete{totals.athletes === 1 ? "" : "s"} are ready to save.
               {totals.unsure > 0 && <span className="text-rust"> {totals.unsure} box{totals.unsure === 1 ? " is" : "es are"} highlighted because the reader was not sure; fix them or they will be left blank.</span>}
             </p>
@@ -224,7 +227,7 @@ export function TeamSheetUpload({ groupId }: { groupId: string }) {
                   <input id="team-sheet-keep" type="radio" name="existing" checked={!replace} onChange={() => setReplace(false)} className="accent-rust" /> Keep what is there (recommended)
                 </label>
                 <label className="flex items-center gap-2 font-body text-sm">
-                  <input id="team-sheet-replace" type="radio" name="existing" checked={replace} onChange={() => setReplace(true)} className="accent-rust" /> Replace it with the sheet (their own session is deleted and cannot be brought back)
+                  <input id="team-sheet-replace" type="radio" name="existing" checked={replace} onChange={() => setReplace(true)} className="accent-rust" /> Replace it with the sheet (only a finished session an earlier sheet or an import saved is replaced and cannot be brought back; a session the athlete logged, one in progress or a booked one is always kept)
                 </label>
               </fieldset>
             )}

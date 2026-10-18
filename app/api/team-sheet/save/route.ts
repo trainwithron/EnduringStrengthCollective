@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   const groupId = typeof body?.groupId === "string" ? body.groupId : "";
   const access = await requireCoach(supabase, groupId);
   if (!access.ok) return access.response;
-  const source = body.source === "csv" ? "csv" : body.source === "photo" ? "photo" : "xlsx";
+  const source = body.source === "csv" ? "csv" : "xlsx";
   const replace = body.replace === true;
   const sheets: unknown[] = Array.isArray(body.sheets) ? body.sheets : [];
   if (sheets.length === 0 || sheets.length > 60) return fail(400, "There is nothing to save.");

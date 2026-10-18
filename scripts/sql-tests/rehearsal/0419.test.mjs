@@ -15,6 +15,7 @@ export default {
   migrations: ["0419"],
   phases: {
     async "0419"({ db, h }) {
+      h.check("the dates in this test are still inside the two-year window the save allows (move them forward if this fails)", Date.now() < Date.parse("2028-08-01T00:00:00Z"));
       const owner = await h.user("TS Owner");
       const coach = await h.user("TS Coach");
       const ann = await h.user("TS Ann");
@@ -129,10 +130,10 @@ export default {
       bad = await save(coach, []);
       h.check("no rows is refused", /between 1 and 400/.test(bad.error ?? ""), JSON.stringify(bad));
 
-      // ---- replace: Cy's own session is replaced only when the coach says so
+      // ---- replace never deletes a session the athlete logged themselves
       const rep = await save(coach, [row(cy, mon, "2026-10-05", [{ id: monSquat, sets: sets([215, 5]) }])], true);
-      h.check("replace swaps the athlete's own session for the sheet's", rep.saved === 1 && rep.replaced === 1 && rep.kept === 0, JSON.stringify(rep));
-      h.check("the old session is gone and the new one is the sheet's", (await db.query(`select count(*)::int as n from public.athlete_sessions where id = $1`, [cySession])).rows[0].n === 0 && (await db.query(`select count(*)::int as n from public.athlete_sessions where athlete_id = $1 and workout_id = $2 and import_batch_id = $3`, [cy, mon, rep.batch])).rows[0].n === 1);
+      h.check("replace keeps the athlete's own session and says why", rep.saved === 0 && rep.replaced === 0 && (rep.skipped ?? []).length === 1 && /kept, not replaced/.test(rep.skipped[0].why), JSON.stringify(rep));
+      h.check("the athlete's own session is still there, untouched", (await db.query(`select count(*)::int as n from public.athlete_sessions where id = $1 and import_batch_id is null and status = 'completed'`, [cySession])).rows[0].n === 1);
 
       // ---- who may undo
       await h.as(ann);
@@ -151,7 +152,7 @@ export default {
       const mine = await tryQ(db, `select count(*)::int as n from public.team_sheet_batches where group_id = $1`, [g]);
       const direct = await tryQ(db, `insert into public.team_sheet_batches (group_id, source) values ($1, 'xlsx')`, [g]);
       await h.asSuper();
-      h.check("the coach sees their uploads", (mine.rows?.[0]?.n ?? 0) >= 2);
+      h.check("the coach sees their uploads", (mine.rows?.[0]?.n ?? 0) >= 1);
       h.check("but nobody writes the table directly", !!direct.error);
 
       // ---- undo the first upload
@@ -168,11 +169,6 @@ export default {
       u = await tryQ(db, `select public.team_sheet_undo($1)`, [batch]);
       await h.asSuper();
       h.check("undoing it twice is refused", !!u.error && /already undone/.test(u.error), JSON.stringify(u));
-      // the replaced session of the second upload is NOT brought back by undoing that upload
-      await h.as(coach);
-      u = await tryQ(db, `select public.team_sheet_undo($1) as r`, [rep.batch]);
-      await h.asSuper();
-      h.check("undoing the replace removes the sheet's session and does not bring the replaced one back", !u.error && (await db.query(`select count(*)::int as n from public.athlete_sessions where athlete_id = $1 and workout_id = $2`, [cy, mon])).rows[0].n === 0, JSON.stringify(u));
 
       // ---- the rows the APP builds (the fixture the app's own tests check) are accepted by the function, as written
       const fx = JSON.parse(readFileSync(new URL("../fixtures/team-sheet-save-rows.json", import.meta.url), "utf8"));
@@ -258,6 +254,31 @@ export default {
       h.check("after a replace with 290 the board holds only 290 (the phantom 300 is gone)" + (res2.error ? ": " + res2.error : ""), res2.replaced === 1 && z.length === 1 && Number(z[0].value) === 290 && z[0].superseded_at === null, JSON.stringify([res2, z]));
       const deeMax = (await db.query("select source_weight from public.athlete_training_maxes where athlete_id = $1 and exercise_name = 'Row'", [dee])).rows;
       h.check("and the training max of an exercise the replacement does not have is recomputed (Dee's Row max is gone with the replaced session)", deeMax.length === 0, JSON.stringify(deeMax));
+
+      // what replace may delete: only a finished session a coach logged or that was imported; in progress, booked, paid with a credit and the athlete's own are kept
+      const mkSession = async (athlete, extra) => (await db.query("insert into public.athlete_sessions (workout_id, group_id, athlete_id, status, started_at, completed_at, logged_by_coach, is_historical" + (extra.cols ?? "") + ") values ($1, $2, $3, $4, '2026-10-02T15:00:00Z', $5, $6, $7" + (extra.vals ?? "") + ") returning id", [xw, g, athlete, extra.status ?? "completed", extra.status === "in_progress" ? null : "2026-10-02T16:00:00Z", !!extra.coach, !!extra.hist])).rows[0].id;
+      const rp1 = await mkAth("TS Rep In Progress");
+      const rp2 = await mkAth("TS Rep Imported");
+      const rp3 = await mkAth("TS Rep Coach Logged");
+      const rp4 = await mkAth("TS Rep Credit");
+      await h.asSuper();
+      const sInProgress = await mkSession(rp1, { status: "in_progress", coach: true });
+      const sImported = await mkSession(rp2, { hist: true });
+      const sCoach = await mkSession(rp3, { coach: true });
+      const sCredit = await mkSession(rp4, { coach: true, cols: ", deduct_session_credit", vals: ", true" });
+      const repAll = await save(coach, [rp1, rp2, rp3, rp4].map((a) => row(a, xw, "2026-10-05", [{ id: xRow, sets: sets([110, 5]) }])), true);
+      const left = async (id) => (await db.query("select count(*)::int as n from public.athlete_sessions where id = $1", [id])).rows[0].n;
+      h.check("replace swaps a finished coach-logged session and an imported one", repAll.replaced === 2 && repAll.saved === 2 && (await left(sImported)) === 0 && (await left(sCoach)) === 0, JSON.stringify(repAll));
+      h.check("and keeps one in progress and one that took a credit, each with its reason", (await left(sInProgress)) === 1 && (await left(sCredit)) === 1 && (repAll.skipped ?? []).length === 2 && repAll.skipped.every((x) => /kept, not replaced/.test(x.why)), JSON.stringify(repAll));
+      res2 = await save(coach, [row(rp1, xw, "2026-10-05", [{ id: xRow, sets: sets([110, 5]) }])], false);
+      h.check("without replace, an existing session is simply kept", res2.saved === 0 && res2.kept === 1, JSON.stringify(res2));
+
+      // the days a sheet may carry: a real day, not in the future, not more than two years back
+      res2 = await save(coach, [
+        row(eve, xw, "2023-01-02", [{ id: xRow, sets: sets([100, 5]) }]),
+        { athlete_id: eve, workout_id: xw, day: "2026-02-31", at: "2026-03-01T12:00:00Z", exercises: [{ id: xRow, sets: sets([100, 5]) }] },
+      ]);
+      h.check("a day more than two years back and a day that is not on the calendar are each skipped with a reason, not an error", !res2.error && res2.saved === 0 && (res2.skipped ?? []).length === 2 && /two years/.test(res2.skipped.map((x) => x.why).join(";")), JSON.stringify(res2));
 
       // undo in the wrong order still leaves the board with a holder
       await db.query("insert into public.exercise_records (group_id, exercise_name, tracked_field, direction, value, athlete_id, achieved_at) values ($1, 'Safety bar squat', 'weight', 'higher_better', 90, $2, '2026-08-01T12:00:00Z')", [g, fay]);

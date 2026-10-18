@@ -1,11 +1,21 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import * as XLSX from "xlsx";
 import { buildSheetWorkbook } from "@/lib/team-sheet/export-xlsx";
 import { MAX_UNPACKED_BYTES, MAX_ZIP_ENTRIES, readUpload, unplain, zipLooksSafe } from "@/lib/team-sheet/read-upload";
 import { alignRack, buildReview, commonUnit, type Context } from "@/lib/team-sheet/review";
 import { readBox } from "@/lib/team-sheet/cell-parser";
+import { toSaveRows } from "@/lib/team-sheet/review";
 import { dayLabel, makeRacks, type SheetExercise, type SheetModel } from "@/lib/team-sheet/sheet-model";
+
+// sheet codes carry real dates and the reader refuses a day more than a day ahead or two years back, so these tests run on a fixed clock
+beforeAll(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-11-01T12:00:00Z"));
+});
+afterAll(() => {
+  vi.useRealTimers();
+});
 
 const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const G = uuid(1);
@@ -229,5 +239,37 @@ describe("the file as a whole", () => {
 
   it("only the team's own exercises are read when a sheet is reviewed", () => {
     expect(readFileSync("lib/team-sheet/review.ts", "utf8")).toMatch(/\.eq\("group_id", groupId\)\.is\("athlete_id", null\)\.in\("id", ids\)/);
+  });
+});
+
+describe("a sheet printed in kilograms", () => {
+  const kgReview = () => {
+    const m = { ...model(), unit: "kg" as const };
+    const wb = buildSheetWorkbook(m);
+    put(wb, 0, 0, { t: "s", v: "100 100 90" });
+    put(wb, 1, 0, { t: "s", v: "132.5x3" });
+    put(wb, 2, 0, { t: "s", v: "950" });
+    const r = readUpload(toBuffer(wb), "s.xlsx");
+    if (!r.ok) throw new Error(r.error);
+    return buildReview(G, r.racks, context([[uuid(11), "Ann Adams"], [uuid(12), "Bo Brown"], [uuid(13), "Cy Clark"]]), "kg");
+  };
+  it("is saved in pounds: 100 kg is stored as 220.46, whoever lifted it", () => {
+    const { rows } = toSaveRows(kgReview(), "America/New_York");
+    const ann = rows.find((r) => r.athlete_id === uuid(11))!;
+    expect(ann.exercises[0].sets.map((s) => s.weight)).toEqual([220.46, 220.46, 198.42]);
+    const bo = rows.find((r) => r.athlete_id === uuid(12))!;
+    expect(bo.exercises[0].sets).toEqual([{ weight: 292.11, reps: 3 }]);
+  });
+  it("a weight no one lifts in kilograms is not sure, so it can never turn into more than the database allows", () => {
+    expect(kgReview().sheets[0].rows.find((r) => r.athleteId === uuid(13))!.days[0][0].result.kind).toBe("unsure");
+    expect(readBox("load", "899", { unit: "kg", sets: 3, reps: 5 }).kind).toBe("sets");
+  });
+  it("a sheet in pounds is saved exactly as written", () => {
+    const wb = buildSheetWorkbook(model());
+    put(wb, 0, 0, { t: "s", v: "225 235" });
+    const r = readUpload(toBuffer(wb), "s.xlsx");
+    if (!r.ok) throw new Error(r.error);
+    const { rows } = toSaveRows(buildReview(G, r.racks, context([[uuid(11), "Ann Adams"], [uuid(12), "Bo Brown"], [uuid(13), "Cy Clark"]]), "lb"), "America/New_York");
+    expect(rows[0].exercises[0].sets.map((s) => s.weight)).toEqual([225, 235]);
   });
 });

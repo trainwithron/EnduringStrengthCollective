@@ -5,7 +5,7 @@
 --   team_sheet_save()      for each athlete and workout: a completed, coach-logged session dated on the sheet's day, its exercises and its sets. It finishes each session with the same function a finished workout
 --                          uses (complete_workout_session), so the workout log, personal records and the group's record board are written exactly as for any workout, and then puts the real date on them. It makes NO
 --                          feed post, NO share card and NO per-set notice; the coach gets ONE notice summarizing the upload. An athlete who already has a session for that workout is left alone (kept) unless the coach
---                          chose to replace it. Training maxes are recomputed once at the end from the real best sets, so a Tuesday set saved on Thursday cannot overwrite a newer max.
+--                          chose to replace it, and then only a FINISHED session that a coach logged or that was imported is replaced; one the athlete logged, one in progress, a booked one and one that took a credit are always kept. Training maxes are recomputed once at the end from the real best sets, so a Tuesday set saved on Thursday cannot overwrite a newer max.
 --   team_sheet_undo()      deletes exactly the sessions that upload made (their sets, workout logs and the records they set), puts back the records they replaced, and recomputes the training maxes. A session that was
 --                          REPLACED by an upload is not brought back.
 -- A row that cannot be saved is skipped with its reason and the rest are saved; a session being replaced is only deleted if its replacement is written. Rows are matched to the workout the sheet was printed for
@@ -47,7 +47,7 @@ create table if not exists public.team_sheet_batches (
   id uuid primary key default gen_random_uuid(),
   group_id uuid not null references public.groups(id) on delete cascade,
   created_by uuid references public.profiles(id) on delete set null,
-  source text not null check (source in ('xlsx', 'csv', 'photo')),
+  source text not null check (source in ('xlsx', 'csv')),
   created_at timestamptz not null default now(),
   sessions_saved int not null default 0,
   athletes_count int not null default 0,
@@ -109,6 +109,7 @@ declare
   v_day date;
   v_at timestamptz;
   v_existing uuid;
+  v_replaceable boolean;
   v_session uuid;
   v_se uuid;
   v_gwe record;
@@ -139,7 +140,7 @@ begin
   if me is null or not public.is_group_coach(p_group) or not coalesce(public.group_in_active_org(p_group), false) then
     raise exception 'not authorized';
   end if;
-  if p_source is null or p_source not in ('xlsx', 'csv', 'photo') then
+  if p_source is null or p_source not in ('xlsx', 'csv') then
     raise exception 'unknown source';
   end if;
   if p_rows is null or jsonb_typeof(p_rows) <> 'array' or jsonb_array_length(p_rows) > 400 or (jsonb_array_length(p_rows) = 0 and (p_batch is null or not coalesce(p_last, true))) then
@@ -187,6 +188,9 @@ begin
     if v_why is null and (v_day > current_date + 1 or v_at > now() + interval '1 day') then
       v_why := 'that day is in the future';
     end if;
+    if v_why is null and v_day < current_date - 731 then
+      v_why := 'that day is more than two years ago';
+    end if;
     if v_why is null and (v_at < v_day::timestamptz - interval '1 day' or v_at > v_day::timestamptz + interval '2 days') then
       v_why := 'the time does not match the day';
     end if;
@@ -202,9 +206,17 @@ begin
     end if;
     v_seen := v_seen || (v_athlete::text || '/' || v_workout::text);
 
-    select s2.id into v_existing from public.athlete_sessions s2 where s2.workout_id = v_workout and s2.athlete_id = v_athlete;
+    -- only a finished session that a coach logged or that was imported can be replaced; anything the athlete logged themselves, in progress, booked or paid for with a credit is never deleted
+    select s2.id,
+           (s2.status = 'completed' and s2.booking_id is null and not coalesce(s2.deduct_session_credit, false) and (coalesce(s2.logged_by_coach, false) or coalesce(s2.is_historical, false)))
+      into v_existing, v_replaceable
+      from public.athlete_sessions s2 where s2.workout_id = v_workout and s2.athlete_id = v_athlete;
     if v_existing is not null and not coalesce(p_replace, false) then
       v_kept := v_kept + 1;
+      continue;
+    end if;
+    if v_existing is not null and not coalesce(v_replaceable, false) then
+      v_skipped := v_skipped || jsonb_build_object('athlete_id', r ->> 'athlete_id', 'day', r ->> 'day', 'why', 'their own session for that workout (logged by them, in progress, booked or paid for) was kept, not replaced');
       continue;
     end if;
 
@@ -290,8 +302,11 @@ begin
       update public.exercise_records er set achieved_at = v_at
         where er.set_log_id in (select sl.id from public.set_logs sl join public.session_exercises se on se.id = sl.session_exercise_id where se.session_id = v_session);
       v_row_ok := true;
-    exception when others then
-      v_why := case when sqlerrm like 'team_sheet: %' then substr(sqlerrm, 13) else 'the row has a value that could not be read' end;
+    exception
+      when unique_violation then
+        v_why := 'this athlete already has a session for that workout that day';
+      when others then
+        v_why := case when sqlerrm like 'team_sheet: %' then substr(sqlerrm, 13) else 'the row has a value that could not be read' end;
     end;
 
     if not v_row_ok then

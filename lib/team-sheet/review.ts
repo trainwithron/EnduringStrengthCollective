@@ -2,6 +2,7 @@
 // session for that workout). It is built twice with the same code: once to show the coach, and again on the server from the text the coach confirmed, so what is saved is never what a browser claims it parsed.
 import { chunk } from "@/lib/chunk";
 import { readRowsByIds } from "@/lib/read-by-ids";
+import { liftStoredFromInput } from "@/lib/lift-weight";
 import { zonedTimeToUtc } from "@/lib/timezone";
 import { describeCell, readBox, type ParsedCell, type SheetUnit } from "@/lib/team-sheet/cell-parser";
 import type { ParsedRack } from "@/lib/team-sheet/read-upload";
@@ -289,7 +290,8 @@ export function toSaveRows(review: Review, timeZone: string, skipAthletes: Set<s
             entry = { athlete_id: row.athleteId, workout_id: ex.workoutId, day: day.date, at: zonedTimeToUtc(day.date, "12:00", timeZone).toISOString(), exercises: [] };
             byWorkout.set(ex.workoutId, entry);
           }
-          entry.exercises.push({ id: ex.id, sets: cell.result.sets.map((s) => ({ weight: s.weight, reps: s.reps })) });
+          // every lifted weight is STORED in pounds: a sheet printed in kilograms is converted here (100 kg is saved as 220.46), once, on the way in
+          entry.exercises.push({ id: ex.id, sets: cell.result.sets.map((s) => ({ weight: s.weight === null ? null : liftStoredFromInput(s.weight, review.unit), reps: s.reps })) });
         });
         rows.push(...byWorkout.values());
       });

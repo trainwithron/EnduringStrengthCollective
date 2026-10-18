@@ -37,7 +37,15 @@ export function encodeSheetCode(code: SheetCode): string {
 
 export type DecodeResult = { ok: true; code: SheetCode } | { ok: false; reason: string };
 
-export function decodeSheetCode(text: unknown): DecodeResult {
+const DAY_MS = 86_400_000;
+/** a real calendar day (2026-02-31 is not one), no more than a day ahead and no more than two years back */
+export function isSheetDay(day: string, now: Date = new Date()): boolean {
+  const d = new Date(`${day}T00:00:00Z`);
+  if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== day) return false;
+  return d.getTime() <= now.getTime() + 2 * DAY_MS && d.getTime() >= now.getTime() - 731 * DAY_MS;
+}
+
+export function decodeSheetCode(text: unknown, now: Date = new Date()): DecodeResult {
   const s = typeof text === "string" ? text.trim() : "";
   const m = /^TS1\.([A-Za-z0-9_-]+)\.([0-9a-f]{8})$/.exec(s);
   if (!m) return { ok: false, reason: "That is not a team sheet code." };
@@ -50,13 +58,15 @@ export function decodeSheetCode(text: unknown): DecodeResult {
     const days = (j.d as unknown[]).map((d) => {
       const arr = d as [unknown, unknown];
       if (!Array.isArray(arr) || typeof arr[0] !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(arr[0]) || !Array.isArray(arr[1]) || arr[1].length > 40 || !(arr[1] as unknown[]).every(hex)) throw new Error("day");
+      if (!isSheetDay(arr[0], now)) throw new Error("date");
       return { date: arr[0], exercises: (arr[1] as string[]).map((h) => expand(h.toLowerCase())) };
     });
     if (!(j.a as unknown[]).every(hex)) return { ok: false, reason: "The sheet code is not one this version reads." };
     const code: SheetCode = { v: 1, groupId: expand(j.g.toLowerCase()), mode: j.m === "w" ? "week" : "day", unit: j.u === "k" ? "kg" : "lb", rack: j.k, days, athletes: (j.a as string[]).map((h) => expand(h.toLowerCase())) };
     if (![code.groupId, ...code.athletes, ...code.days.flatMap((d) => d.exercises)].every((u) => UUID.test(u))) return { ok: false, reason: "The sheet code is not one this version reads." };
     return { ok: true, code };
-  } catch {
+  } catch (e) {
+    if (e instanceof Error && e.message === "date") return { ok: false, reason: "The sheet code has a date that is not a real day in the last two years." };
     return { ok: false, reason: "The sheet code is not one this version reads." };
   }
 }

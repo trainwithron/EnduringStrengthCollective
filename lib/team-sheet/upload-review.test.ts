@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import * as XLSX from "xlsx";
 import { buildSheetWorkbook, CODE_LABEL, CODES_SHEET } from "@/lib/team-sheet/export-xlsx";
 import { MAX_UPLOAD_BYTES, readUpload } from "@/lib/team-sheet/read-upload";
@@ -7,6 +7,15 @@ import { buildReview, toSaveRows, type Context } from "@/lib/team-sheet/review";
 import { dayLabel, makeRacks, type SheetExercise, type SheetModel } from "@/lib/team-sheet/sheet-model";
 import { encodeSheetCode } from "@/lib/team-sheet/sheet-code";
 import { rackCode } from "@/lib/team-sheet/export-pdf";
+
+// sheet codes carry real dates and the reader refuses a day more than a day ahead or two years back, so these tests run on a fixed clock
+beforeAll(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-11-01T12:00:00Z"));
+});
+afterAll(() => {
+  vi.useRealTimers();
+});
 
 const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const G = uuid(1);
