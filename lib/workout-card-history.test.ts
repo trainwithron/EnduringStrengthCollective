@@ -18,8 +18,9 @@ describe("the workout card on every finished workout", () => {
   it("finishing a workout takes whoever submitted it, a coach for a client and a client under 18 included, to the card", () => {
     const button = read("components/session/complete-workout-button.tsx");
     expect(button).toContain("if (announced.href) navHref = announced.href;");
-    expect(button).not.toContain("skipLink");
-    // only the feed post is held back for a client under 18
-    expect(button).toContain("skipPost: !!coachMode?.clientIsMinor,");
+    // the card is held back only when the group has switched post-workout cards off (never because a coach logged it); the feed post is also held back for a client under 18
+    expect(button).toContain("skipLink: !cardsOn,");
+    expect(button).toContain("const cardsOn = postWorkoutCards;");
+    expect(button).toContain("skipPost: !cardsOn || !!coachMode?.clientIsMinor,");
   });
 });

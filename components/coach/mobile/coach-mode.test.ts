@@ -34,8 +34,10 @@ describe("coach mode: a coach logging a workout for a client on the phone", () =
     expect(btn).toContain("if (announced.href) navHref = announced.href;");
     expect(btn).toContain("else if (coachMode) navHref = coachMode.homeHref;");
     // a coach logging for a client under 18 posts nothing to the feed but still gets the card (the rule itself is in lib/announce-workout-log.ts)
-    expect(btn).toContain("skipPost: !!coachMode?.clientIsMinor,");
-    expect(btn).not.toContain("skipLink");
+    expect(btn).toContain("skipPost: !cardsOn || !!coachMode?.clientIsMinor,");
+    // the card is skipped only when the group has cards switched off, never because a coach logged it
+    expect(btn).toContain("skipLink: !cardsOn,");
+    expect(btn).toContain("const cardsOn = postWorkoutCards;");
     expect(btn).toContain("finishNavigation(existingPost ?");
   });
   it("it never uses the act-as cookie, which would write as the client", () => {
