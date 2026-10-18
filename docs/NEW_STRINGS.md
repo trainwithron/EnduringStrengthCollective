@@ -115,8 +115,10 @@
 
 ## Release T1 (front desk)
 
+- Menu and Settings: "Front desk" / "Open the front desk check-in screen →". Invitation already open: "There is already an open invitation for this person. Find it under Invitations on the Team page and choose Resend."
+
 - Invite form, permission level: "Front desk (check-in only)"; note: "Front desk staff check clients in on the front-desk screen and can see nothing else: no health answers, programs, messages or reports."
 - Invitation page / notice: "invited you to join as front desk staff, to check clients in."; Team page role word "Front desk".
 - Team page: "Front desk"; "Nobody yet. Invite someone below and choose Front desk."; "Open the check-in screen →"; confirm "Remove {name} from the front desk of {organization}? They can no longer check clients in."; error "Couldn't remove them. Try again."; "The front desk list could not be read. Reload to try again."
 - Front-desk screen: "Type your name to check in"; placeholder "Your name…"; "Keep typing…"; "No match. Check the spelling, or ask the front desk."; "Couldn't look that up. Try again."; "Enter your check-in code"; "Not {first name}? Go back"; "Checked in!"; "No front desk here" / "You are not on an organization's front desk. Ask the owner to invite you, then open this page again."; "Which front desk?"
-- Check-in answers: "That code is not right. Try again."; "Too many wrong tries. Try again later, or ask the client's coach."; "No check-in code is set for this client yet. Ask their coach to set one."; "Couldn't check in. Try again."
+- Check-in answers: "Too many wrong codes just now. Wait a few minutes and try again."; "That code is not right. Try again."; "Too many wrong tries. Try again later, or ask the client's coach."; "No check-in code is set for this client yet. Ask their coach to set one."; "Couldn't check in. Try again."

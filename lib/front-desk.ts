@@ -13,7 +13,8 @@ export interface FrontDeskOrg {
 export interface FrontDeskMatch {
   athlete_id: string;
   group_id: string;
-  full_name: string | null;
+  // Already shortened by the database for anyone under 18 or of unknown age ("Sam R."); the screen shows exactly this and never asks for the full name.
+  display_name: string | null;
   has_pin: boolean;
 }
 
@@ -27,10 +28,17 @@ export async function isFrontDeskPerson(supabase: SupabaseClient, userId: string
   }
 }
 
-// Where a person lands: front-desk staff who are not coaches go to the front-desk screen; everyone else keeps the usual start. (A coach who is also on the front desk lands as a coach and opens the screen from the Team page.)
+// Where a person lands: only someone whose ONLY role is the front desk (no group seat of any kind, so not a coach and not a client, and no organization membership, so not an owner, admin or coach of one) goes to the
+// front-desk screen. Everyone else keeps their usual start and opens the screen from the Front desk link (the menu, Settings, or the Team page). A failed read means "not only the front desk".
 export async function landsOnFrontDesk(supabase: SupabaseClient, userId: string, membership: { role: string } | null): Promise<boolean> {
-  if (membership?.role === "coach") return false;
-  return isFrontDeskPerson(supabase, userId);
+  if (membership) return false;
+  if (!(await isFrontDeskPerson(supabase, userId))) return false;
+  try {
+    const { data, error } = await supabase.from("organization_memberships").select("organization_id").eq("profile_id", userId).limit(1);
+    return !error && (data ?? []).length === 0;
+  } catch {
+    return false;
+  }
 }
 
 // What the check-in answers mean, in words the person at the desk can say out loud.
@@ -40,6 +48,8 @@ export function checkInMessage(result: string): string {
       return "That code is not right. Try again.";
     case "locked":
       return "Too many wrong tries. Try again later, or ask the client's coach.";
+    case "throttled":
+      return "Too many wrong codes just now. Wait a few minutes and try again.";
     case "no_pin":
       return "No check-in code is set for this client yet. Ask their coach to set one.";
     default:

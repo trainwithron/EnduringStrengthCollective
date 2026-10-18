@@ -53,28 +53,74 @@ alter table public.org_front_desk enable row level security;
 revoke all on public.org_front_desk from anon, authenticated;
 grant select on public.org_front_desk to authenticated;
 
--- A person sees their own row; an owner or admin sees the organization's. Nobody writes directly: the server (service role) adds, and the functions below remove.
-drop policy if exists "org_front_desk_select" on public.org_front_desk;
-create policy "org_front_desk_select" on public.org_front_desk for select to authenticated
-  using (profile_id = (select auth.uid()) or public.is_org_owner_or_admin(organization_id));
-
--- Internal. May the signed-in person work this organization's front desk: a front-desk person of it, or an owner, admin or coach of it whose access has not ended.
-create or replace function public._front_desk_may_act(p_org uuid)
+-- Is the signed-in person an owner or admin of this organization whose access has not ended (the plain is_org_owner_or_admin ignores a let-go or ended membership, so it is not used for the front desk).
+create or replace function public.is_org_active_owner_or_admin(target_org_id uuid)
 returns boolean
 language sql
 stable
 security definer
 set search_path = public
 as $$
-  select auth.uid() is not null and (
-    exists (select 1 from public.org_front_desk f where f.organization_id = p_org and f.profile_id = auth.uid())
-    or exists (
-      select 1 from public.organization_memberships om
-      where om.organization_id = p_org and om.profile_id = auth.uid() and om.fired_at is null and om.access_ended_at is null
-    )
+  select exists (
+    select 1 from public.organization_memberships om
+    where om.organization_id = target_org_id and om.profile_id = (select auth.uid()) and om.role in ('owner', 'admin') and om.fired_at is null and om.access_ended_at is null
   )
 $$;
-revoke execute on function public._front_desk_may_act(uuid) from public, anon, authenticated;
+revoke execute on function public.is_org_active_owner_or_admin(uuid) from public, anon;
+grant execute on function public.is_org_active_owner_or_admin(uuid) to authenticated, service_role;
+
+-- A person sees their own row; an owner or admin (with access) sees the organization's. Nobody writes directly: the server (service role) adds, and the functions below remove.
+drop policy if exists "org_front_desk_select" on public.org_front_desk;
+create policy "org_front_desk_select" on public.org_front_desk for select to authenticated
+  using (profile_id = (select auth.uid()) or public.is_org_active_owner_or_admin(organization_id));
+
+-- Wrong check-in codes typed by one signed-in person, to stop one person from locking many clients out (each client's own lock is unchanged). Server-side only.
+create table if not exists public.front_desk_pin_misses (
+  caller uuid not null references public.profiles(id) on delete cascade,
+  missed_at timestamptz not null default now()
+);
+create index if not exists front_desk_pin_misses_caller_idx on public.front_desk_pin_misses (caller, missed_at);
+alter table public.front_desk_pin_misses enable row level security;
+revoke all on public.front_desk_pin_misses from anon, authenticated;
+
+-- Internal. How far the signed-in person may work this organization's front desk: 'all' for a front-desk person of it or its owner or an admin (whose access has not ended), 'coach' for an ordinary coach of it
+-- (only the clients of groups they coach themselves), null for anyone else.
+create or replace function public._front_desk_scope(p_org uuid)
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select case
+    when auth.uid() is null then null
+    when exists (select 1 from public.org_front_desk f where f.organization_id = p_org and f.profile_id = auth.uid()) then 'all'
+    when public.is_org_active_owner_or_admin(p_org) then 'all'
+    when exists (
+      select 1 from public.organization_memberships om
+      where om.organization_id = p_org and om.profile_id = auth.uid() and om.fired_at is null and om.access_ended_at is null
+    ) then 'coach'
+    else null
+  end
+$$;
+revoke execute on function public._front_desk_scope(uuid) from public, anon, authenticated;
+
+-- Internal. The name shown on the shared check-in tablet: the full name for someone whose date of birth says 18 or over, otherwise (under 18, or no date of birth on file) first name and last initial, "Sam R."
+-- (the same rule as the shared boards, lib/minor-names.ts).
+create or replace function public._front_desk_display_name(p_name text, p_dob date)
+returns text
+language sql
+immutable
+set search_path = public
+as $$
+  select case
+    when nullif(trim(coalesce(p_name, '')), '') is null then 'An athlete'
+    when p_dob is not null and p_dob + interval '18 years' <= current_date then trim(p_name)
+    when cardinality(regexp_split_to_array(trim(p_name), '\s+')) = 1 then trim(p_name)
+    else (regexp_split_to_array(trim(p_name), '\s+'))[1] || ' ' || upper(left((regexp_split_to_array(trim(p_name), '\s+'))[cardinality(regexp_split_to_array(trim(p_name), '\s+'))], 1)) || '.'
+  end
+$$;
+revoke execute on function public._front_desk_display_name(text, date) from public, anon, authenticated;
 
 -- The organizations the signed-in person can work the front desk of, with their names (a front-desk person cannot read the organizations table).
 create or replace function public.front_desk_orgs()
@@ -99,10 +145,11 @@ $$;
 revoke execute on function public.front_desk_orgs() from public, anon;
 grant execute on function public.front_desk_orgs() to authenticated, service_role;
 
--- Find a client by name for the check-in screen: at least two letters, at most 25 answers, only clients who train in a live group of this organization and have not made their records private from it.
--- The answer is a name, the group to check in to, and whether a check-in code has been set.
+-- Find a client by name for the check-in screen: at least two letters, at most 25 answers, only clients who train in a live group of this organization and have not made their records private from it. A front-desk
+-- person, the owner and an admin search the whole organization; an ordinary coach only the clients of groups they coach. The answer is a name (shortened for anyone under 18 or of unknown age, and the search
+-- matches that shortened name, so a child's full name cannot be found by guessing), the group to check in to, and whether a check-in code has been set.
 create or replace function public.front_desk_find(p_org uuid, p_query text)
-returns table (athlete_id uuid, group_id uuid, full_name text, has_pin boolean)
+returns table (athlete_id uuid, group_id uuid, display_name text, has_pin boolean)
 language plpgsql
 stable
 security definer
@@ -110,26 +157,32 @@ set search_path = public
 as $$
 declare
   q text := trim(coalesce(p_query, ''));
+  v_scope text := public._front_desk_scope(p_org);
 begin
-  if auth.uid() is null or not public._front_desk_may_act(p_org) then
+  if v_scope is null then
     raise exception 'not authorized';
   end if;
   if length(q) < 2 then
     return;
   end if;
   return query
-    select m.profile_id, m.group_id, p.full_name,
-           exists (select 1 from public.kiosk_pins kp where kp.group_id = m.group_id and kp.athlete_id = m.profile_id)
-    from public.group_memberships m
-    join public.groups g on g.id = m.group_id
-    join public.profiles p on p.id = m.profile_id
-    where g.organization_id = p_org
-      and g.archived_at is null
-      and m.role = 'athlete'
-      and m.membership_type = 'training'
-      and not m.private_from_org
-      and p.full_name ilike '%' || replace(replace(replace(q, '\', '\\'), '%', '\%'), '_', '\_') || '%'
-    order by p.full_name, m.group_id
+    select s.profile_id, s.group_id, s.shown,
+           exists (select 1 from public.kiosk_pins kp where kp.group_id = s.group_id and kp.athlete_id = s.profile_id)
+    from (
+      select m.profile_id, m.group_id, public._front_desk_display_name(p.full_name, ci.date_of_birth) as shown
+      from public.group_memberships m
+      join public.groups g on g.id = m.group_id
+      join public.profiles p on p.id = m.profile_id
+      left join public.client_intake ci on ci.athlete_id = m.profile_id
+      where g.organization_id = p_org
+        and g.archived_at is null
+        and m.role = 'athlete'
+        and m.membership_type = 'training'
+        and not m.private_from_org
+        and (v_scope = 'all' or public.is_group_coach(m.group_id))
+    ) s
+    where s.shown ilike '%' || replace(replace(replace(q, '\', '\\'), '%', '\%'), '_', '\_') || '%'
+    order by s.shown, s.group_id
     limit 25;
 end;
 $$;
@@ -206,11 +259,18 @@ set search_path = public
 as $$
 declare
   v_org uuid;
+  v_scope text;
   v_verdict text;
   v_at timestamptz;
+  v_me uuid := auth.uid();
 begin
   select g.organization_id into v_org from public.groups g where g.id = p_group and g.archived_at is null;
-  if auth.uid() is null or v_org is null or not public._front_desk_may_act(v_org) then
+  v_scope := case when v_org is null then null else public._front_desk_scope(v_org) end;
+  if v_scope is null then
+    raise exception 'not authorized';
+  end if;
+  -- an ordinary coach checks in only the clients of groups they coach themselves
+  if v_scope <> 'all' and not public.is_group_coach(p_group) then
     raise exception 'not authorized';
   end if;
   if not exists (
@@ -219,7 +279,15 @@ begin
   ) then
     raise exception 'not authorized';
   end if;
+  -- No more than 10 wrong codes from one signed-in person in 15 minutes, across all clients: then a plain "wait" (the code is not even tested). A client's own lock (five wrong tries) is unchanged.
+  if (select count(*) from public.front_desk_pin_misses x where x.caller = v_me and x.missed_at > now() - interval '15 minutes') >= 10 then
+    return jsonb_build_object('result', 'throttled');
+  end if;
   v_verdict := public._check_kiosk_pin(p_group, p_athlete, p_pin);
+  if v_verdict = 'wrong' then
+    insert into public.front_desk_pin_misses (caller) values (v_me);
+    delete from public.front_desk_pin_misses x where x.caller = v_me and x.missed_at < now() - interval '1 day';
+  end if;
   if v_verdict <> 'ok' then
     return jsonb_build_object('result', v_verdict);
   end if;
@@ -238,7 +306,7 @@ security definer
 set search_path = public
 as $$
 begin
-  if auth.uid() is null or not (public.is_org_owner_or_admin(p_org) or p_profile = auth.uid()) then
+  if auth.uid() is null or not (public.is_org_active_owner_or_admin(p_org) or p_profile = auth.uid()) then
     raise exception 'Only an owner or admin can remove someone from the front desk.';
   end if;
   delete from public.org_front_desk where organization_id = p_org and profile_id = p_profile;
@@ -293,6 +361,41 @@ end;
 $$;
 revoke execute on function public.answer_organization_invite(uuid, boolean) from public, anon;
 grant execute on function public.answer_organization_invite(uuid, boolean) to authenticated, service_role;
+
+-- Closing the organization ends its front desk too. Exactly the 0396 function, plus the one delete.
+create or replace function public.close_organization(p_org uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := auth.uid();
+  m record;
+  v_members int := 0;
+  v_leaving int := 0;
+begin
+  if me is null then
+    raise exception 'Sign in first.';
+  end if;
+  if not exists (select 1 from public.organizations where id = p_org and owner_id = me) then
+    raise exception 'Only the owner can close the organization.';
+  end if;
+  for m in select profile_id from public.organization_memberships where organization_id = p_org and profile_id <> me order by created_at, profile_id loop
+    if coalesce((public._detach_coach_from_org(p_org, m.profile_id, me, true) ->> 'leaving')::boolean, false) then
+      v_leaving := v_leaving + 1;
+    end if;
+    v_members := v_members + 1;
+  end loop;
+  update public.organization_invites set answered_at = now(), accepted = false where organization_id = p_org and answered_at is null;
+  -- the front desk ends with the team (a front-desk person is not a member, so the loop above does not reach them)
+  delete from public.org_front_desk where organization_id = p_org;
+  perform public.audit_record('organizations', p_org::text, 'update', jsonb_build_object('event', 'close_organization', 'members_left', v_members, 'still_to_choose', v_leaving, 'closed_by', me));
+  return jsonb_build_object('members_left', v_members, 'still_to_choose', v_leaving);
+end;
+$$;
+revoke execute on function public.close_organization(uuid) from public, anon;
+grant execute on function public.close_organization(uuid) to authenticated, service_role;
 
 commit;
 

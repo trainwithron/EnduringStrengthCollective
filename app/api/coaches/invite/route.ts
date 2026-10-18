@@ -87,8 +87,10 @@ export async function POST(request: Request) {
       .select("id")
       .single();
     if (inviteRowError || !invite) {
-      // An open invitation already exists: answer as if it was just sent.
-      if (inviteRowError?.code === "23505") return NextResponse.json({ invited: true });
+      // An open invitation to this person already exists in this organization (an owner or admin sees it on the Team page): say so, and point at Resend.
+      if (inviteRowError?.code === "23505") {
+        return NextResponse.json({ error: "There is already an open invitation for this person. Find it under Invitations on the Team page and choose Resend.", code: "invite_open" }, { status: 409 });
+      }
       return NextResponse.json({ error: "Couldn't send the invitation. Try again." }, { status: 502 });
     }
     const { data: orgRow } = await serviceRole.from("organizations").select("name").eq("id", group.organization_id).maybeSingle();

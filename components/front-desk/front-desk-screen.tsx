@@ -70,7 +70,7 @@ export function FrontDeskScreen({ organizationId, organizationName }: { organiza
         setSubmitting(false);
         return;
       }
-      setView({ mode: "confirmed", name: client.full_name ?? "Client", at: result.checked_in_at ?? new Date().toISOString() });
+      setView({ mode: "confirmed", name: client.display_name ?? "Client", at: result.checked_in_at ?? new Date().toISOString() });
       setSubmitting(false);
       setTimeout(() => {
         setView({ mode: "search" });
@@ -100,7 +100,7 @@ export function FrontDeskScreen({ organizationId, organizationName }: { organiza
     return (
       <main className="min-h-screen bg-graphite text-chalk flex flex-col items-center justify-center px-6">
         <p className="font-body text-sm text-steel mb-1">Enter your check-in code</p>
-        <h1 className="font-display font-bold text-3xl uppercase mb-8">{client.full_name ?? "Client"}</h1>
+        <h1 className="font-display font-bold text-3xl uppercase mb-8">{client.display_name ?? "Client"}</h1>
         {!client.has_pin ? (
           <p className="font-body text-rust text-center max-w-xs mb-8">{checkInMessage("no_pin")}</p>
         ) : (
@@ -141,7 +141,7 @@ export function FrontDeskScreen({ organizationId, organizationName }: { organiza
           </>
         )}
         <button type="button" onClick={() => setView({ mode: "search" })} className="mt-10 font-body text-sm text-steel underline underline-offset-2">
-          Not {(client.full_name ?? "this client").split(" ")[0]}? Go back
+          Not {(client.display_name ?? "this client").split(" ")[0]}? Go back
         </button>
       </main>
     );
@@ -195,7 +195,7 @@ export function FrontDeskScreen({ organizationId, organizationName }: { organiza
             onClick={() => openPin(m)}
             className="w-full h-16 bg-surface border border-steel/20 flex items-center px-5 font-body text-lg active:bg-rust/10 active:border-rust/40"
           >
-            {m.full_name ?? "Client"}
+            {m.display_name ?? "Client"}
           </button>
         ))}
       </div>

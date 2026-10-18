@@ -5,33 +5,44 @@ import { checkInMessage, isFrontDeskPerson, landsOnFrontDesk, FRONT_DESK_PATH } 
 
 const src = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
 
-const client = (rows: unknown[] | null, error: unknown = null, throws = false) =>
+// A stand-in database: the front-desk table and the organization memberships, each answering (or failing, or throwing) on its own.
+type Table = { rows: unknown[] | null; error?: unknown; throws?: boolean };
+const db = (tables: { org_front_desk: Table; organization_memberships?: Table }) =>
   ({
-    from: () => ({
+    from: (name: "org_front_desk" | "organization_memberships") => ({
       select: () => ({
         eq: () => ({
           limit: async () => {
-            if (throws) throw new Error("x");
-            return { data: rows, error };
+            const t = tables[name] ?? { rows: [] };
+            if (t.throws) throw new Error("x");
+            return { data: t.rows, error: t.error ?? null };
           },
         }),
       }),
     }),
   }) as never;
 
+const DESK = { rows: [{ organization_id: "o1" }] };
+const NONE = { rows: [] };
+
 describe("who lands on the front-desk screen", () => {
-  it("a front-desk person who is not a coach does; a coach does not, even if also on the front desk", async () => {
-    const desk = client([{ organization_id: "o1" }]);
-    expect(await isFrontDeskPerson(desk, "u")).toBe(true);
-    expect(await landsOnFrontDesk(desk, "u", null)).toBe(true);
-    expect(await landsOnFrontDesk(desk, "u", { role: "athlete" })).toBe(true);
-    expect(await landsOnFrontDesk(desk, "u", { role: "coach" })).toBe(false);
+  it("only a person whose ONLY role is the front desk does", async () => {
+    expect(await isFrontDeskPerson(db({ org_front_desk: DESK }), "u")).toBe(true);
+    expect(await landsOnFrontDesk(db({ org_front_desk: DESK, organization_memberships: NONE }), "u", null)).toBe(true);
+  });
+
+  it("not a coach, not a client, and not an owner, admin or coach of an organization", async () => {
+    expect(await landsOnFrontDesk(db({ org_front_desk: DESK, organization_memberships: NONE }), "u", { role: "coach" })).toBe(false);
+    expect(await landsOnFrontDesk(db({ org_front_desk: DESK, organization_memberships: NONE }), "u", { role: "athlete" })).toBe(false);
+    expect(await landsOnFrontDesk(db({ org_front_desk: DESK, organization_memberships: { rows: [{ organization_id: "o1" }] } }), "u", null)).toBe(false);
   });
 
   it("nobody else does, and a failed read lands them where they always landed", async () => {
-    expect(await landsOnFrontDesk(client([]), "u", null)).toBe(false);
-    expect(await landsOnFrontDesk(client(null, { message: "x" }), "u", null)).toBe(false);
-    expect(await landsOnFrontDesk(client(null, null, true), "u", { role: "athlete" })).toBe(false);
+    expect(await landsOnFrontDesk(db({ org_front_desk: NONE, organization_memberships: NONE }), "u", null)).toBe(false);
+    expect(await landsOnFrontDesk(db({ org_front_desk: { rows: null, error: { message: "x" } } }), "u", null)).toBe(false);
+    expect(await landsOnFrontDesk(db({ org_front_desk: { rows: null, throws: true } }), "u", null)).toBe(false);
+    expect(await landsOnFrontDesk(db({ org_front_desk: DESK, organization_memberships: { rows: null, error: { message: "x" } } }), "u", null)).toBe(false);
+    expect(await landsOnFrontDesk(db({ org_front_desk: DESK, organization_memberships: { rows: null, throws: true } }), "u", null)).toBe(false);
   });
 
   it("sign-in, the home page, the first-password page and email confirmation all use that one rule", () => {
@@ -41,12 +52,21 @@ describe("who lands on the front-desk screen", () => {
     }
     expect(FRONT_DESK_PATH).toBe("/front-desk");
   });
+
+  it("everyone else can still reach the screen: a Front desk link in the menu, in Settings, and on the Team page", () => {
+    expect(src("components/coach/coach-desktop-shell.tsx")).toContain('{ key: "front-desk" as const, label: "Front desk", href: "/front-desk"');
+    expect(src("components/coach/coach-desktop-shell.tsx")).toContain("useOnFrontDesk()");
+    expect(src("components/front-desk/use-on-front-desk.ts")).toContain('.from("org_front_desk")');
+    expect(src("app/(coach)/groups/[groupId]/settings/page.tsx")).toContain('href="/front-desk"');
+    expect(src("components/org/front-desk-list.tsx")).toContain("/front-desk?org=");
+  });
 });
 
 describe("the check-in answers", () => {
   it("each has its own plain words", () => {
     expect(checkInMessage("wrong")).toMatch(/not right/);
     expect(checkInMessage("locked")).toMatch(/Too many wrong tries/);
+    expect(checkInMessage("throttled")).toMatch(/Wait a few minutes/);
     expect(checkInMessage("no_pin")).toMatch(/No check-in code/);
     expect(checkInMessage("anything else")).toMatch(/Couldn't check in/);
   });
@@ -63,6 +83,12 @@ describe("the front desk reaches clients only through the database's functions",
     expect(page).not.toMatch(/\.from\(/);
   });
 
+  it("the screen shows exactly the name the database sent (shortened for anyone under 18 or of unknown age), on the list, the code screen and the confirmation", () => {
+    const screen = src("components/front-desk/front-desk-screen.tsx");
+    expect(screen).not.toContain("full_name");
+    expect(screen.match(/display_name/g)!.length).toBeGreaterThanOrEqual(4);
+  });
+
   it("the migration keeps the front desk out of every organization-wide rule: its own table, no organization role, no group seat", () => {
     const sql = src("supabase/migrations/0400_front_desk.sql");
     expect(sql).toContain("create table if not exists public.org_front_desk");
@@ -76,12 +102,45 @@ describe("the front desk reaches clients only through the database's functions",
     expect(sql).toContain("if auth.uid() is null or not public.is_group_coach(p_group_id) then");
   });
 
+  it("an ordinary coach is held to groups they coach, in the search and in the check-in", () => {
+    const sql = src("supabase/migrations/0400_front_desk.sql");
+    expect(sql).toContain("and (v_scope = 'all' or public.is_group_coach(m.group_id))");
+    expect(sql).toContain("if v_scope <> 'all' and not public.is_group_coach(p_group) then");
+  });
+
+  it("the search matches the shortened name, never the full name of a minor", () => {
+    const sql = src("supabase/migrations/0400_front_desk.sql");
+    expect(sql).toContain("where s.shown ilike");
+    expect(sql).toContain("_front_desk_display_name(p.full_name, ci.date_of_birth)");
+    expect(sql).toContain("p_dob is not null and p_dob + interval '18 years' <= current_date");
+  });
+
+  it("access that has ended, and a closed organization, end the front desk's reach", () => {
+    const sql = src("supabase/migrations/0400_front_desk.sql");
+    expect(sql).toContain("om.fired_at is null and om.access_ended_at is null");
+    expect(sql).toContain("delete from public.org_front_desk where organization_id = p_org;");
+    expect(sql).toContain("using (profile_id = (select auth.uid()) or public.is_org_active_owner_or_admin(organization_id));");
+  });
+
+  it("wrong codes are limited per person (10 in 15 minutes), on top of each client's own lock", () => {
+    const sql = src("supabase/migrations/0400_front_desk.sql");
+    expect(sql).toContain("interval '15 minutes') >= 10 then");
+    expect(sql).toContain("jsonb_build_object('result', 'throttled')");
+  });
+
   it("the invitation route makes a front-desk row, never a membership or a group seat, for the new role", () => {
     const route = src("app/api/coaches/invite/route.ts");
     expect(route).toContain('"front_desk"');
     expect(route).toContain('.from("org_front_desk").insert(');
     const frontDeskBranch = route.slice(route.indexOf('if (role === "front_desk") {'));
     expect(frontDeskBranch.indexOf("return NextResponse.json({ invited: true });")).toBeLessThan(frontDeskBranch.indexOf('.from("group_memberships")'));
+  });
+
+  it("an invitation that is already open is said out loud with a pointer to Resend, not answered as if it had just been sent", () => {
+    const route = src("app/api/coaches/invite/route.ts");
+    expect(route).toContain('code: "invite_open"');
+    expect(route).toContain("status: 409");
+    expect(route).toContain("choose Resend");
   });
 
   it("only an owner or admin reaches the invitation and the removal buttons", () => {

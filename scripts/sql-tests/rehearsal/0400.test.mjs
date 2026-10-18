@@ -29,6 +29,8 @@ export default {
       await h.member(gAnn, ann);
       const gPriv = await h.group(org, coach, "one_on_one", "FD Private");
       await h.member(gPriv, anders);
+      const coach2 = await h.user("FD Second Coach");
+      await h.orgMember(org, coach2, "coach");
       const gSocial = await h.group(org, coach, "team", "FD Social group");
       await h.member(gSocial, social);
       const gRetired = await h.group(org, coach, "team", "FD Retired season");
@@ -39,6 +41,15 @@ export default {
       await db.query(`update public.group_memberships set private_from_org = true where group_id = $1 and profile_id = $2`, [gPriv, anders]);
       await db.query(`update public.group_memberships set membership_type = 'social_only' where group_id = $1 and profile_id = $2`, [gSocial, social]);
       await db.query(`update public.groups set archived_at = now() where id = $1`, [gRetired]);
+      // dates of birth: Ann is an adult, a minor and a client with no date on file are shortened
+      const minor = await h.user("Anders Minorson");
+      const unknownAge = await h.user("Anders Unknownson");
+      const gMinor = await h.group(org, coach, "one_on_one", "FD Minor");
+      await h.member(gMinor, minor);
+      const gUnknown = await h.group(org, coach, "one_on_one", "FD Unknown");
+      await h.member(gUnknown, unknownAge);
+      await h.asSuper();
+      await db.query("insert into public.client_intake (athlete_id, group_id, date_of_birth) values ($1, $2, '1990-04-01'), ($3, $4, (current_date - interval '15 years')::date)", [ann, gAnn, minor, gMinor]);
       for (const [g, a] of [[gAnn, ann], [gPriv, anders], [gOther, elsewhere]]) {
         await h.as(g === gOther ? otherOwner : coach);
         await db.query(`select public.set_kiosk_pin($1, $2, '1234')`, [g, a]);
@@ -85,6 +96,7 @@ export default {
       await h.asSuper();
 
       // ---- finding a client
+      let v0;
       const find = async (who, orgId, q) => {
         await h.as(who);
         const x = await tryQ(db, `select * from public.front_desk_find($1, $2)`, [orgId, q]);
@@ -93,7 +105,17 @@ export default {
       };
       r = await find(desk, org, "an");
       h.check("a name search finds the client with the group to check in to and whether a code is set", r.rows?.length >= 1 && r.rows.some((x) => x.athlete_id === ann && x.group_id === gAnn && x.has_pin === true), JSON.stringify(r));
-      h.check("only name, group and 'has a code' come back", Object.keys(r.rows?.[0] ?? {}).sort().join() === "athlete_id,full_name,group_id,has_pin");
+      h.check("only a name, group and 'has a code' come back", Object.keys(r.rows?.[0] ?? {}).sort().join() === "athlete_id,display_name,group_id,has_pin");
+      h.check("an adult is shown by full name", r.rows?.some((x) => x.athlete_id === ann && x.display_name === "Ann Anderson"), JSON.stringify(r));
+      r = await find(desk, org, "Anders M");
+      h.check("a client under 18 is shown as first name and last initial", r.rows?.length === 1 && r.rows[0].display_name === "Anders M.", JSON.stringify(r));
+      r = await find(desk, org, "minorson");
+      h.check("and cannot be found by guessing their surname", r.rows?.length === 0, JSON.stringify(r));
+      r = await find(desk, org, "unknown");
+      h.check("a client with no date of birth on file is shortened too", r.rows?.length === 0, JSON.stringify(r));
+      r = await find(desk, org, "Anders U");
+      h.check("and is found only by the shortened name", r.rows?.length === 1 && r.rows[0].display_name === "Anders U.", JSON.stringify(r));
+      r = await find(desk, org, "an");
       h.check("a client who keeps their records private from the organization is not listed", !r.rows?.some((x) => x.athlete_id === anders));
       h.check("nor a person who is only in a social group", !r.rows?.some((x) => x.athlete_id === social));
       h.check("nor one in a retired season", !r.rows?.some((x) => x.athlete_id === retired));
@@ -112,6 +134,19 @@ export default {
       }
       r = await find(ann, org, "ann");
       h.check("a client cannot", !!r.error);
+
+      // an ordinary coach sees only the clients of groups they coach themselves
+      r = await find(coach2, org, "ann");
+      h.check("a second coach of the organization finds none of another coach's clients", !r.error && r.rows.length === 0, JSON.stringify(r));
+      r = await find(coach, org, "ann");
+      h.check("a coach finds their own client", !r.error && r.rows.some((x) => x.athlete_id === ann), JSON.stringify(r));
+      v0 = await (async () => {
+        await h.as(coach2);
+        const x = await tryQ(db, "select public.front_desk_check_in($1, $2, '1234') as r", [gAnn, ann]);
+        await h.asSuper();
+        return x;
+      })();
+      h.check("and a second coach cannot check in another coach's client", !!v0.error, JSON.stringify(v0));
 
       // ---- checking in
       const checkIn = async (who, group, athlete, pin) => {
@@ -186,6 +221,52 @@ export default {
       h.check("a front-desk person can leave", !r.error && (await db.query(`select count(*)::int as n from public.org_front_desk where profile_id = $1`, [desk])).rows[0].n === 0);
       r = await find(desk, org, "ann");
       h.check("and then can no longer search", !!r.error);
+
+      // ---- one person cannot lock many clients out: at most 10 wrong codes in 15 minutes across all clients
+      const deskT = await h.user("FD Throttled Desk");
+      await db.query(`insert into public.org_front_desk (organization_id, profile_id) values ($1, $2)`, [org, deskT]);
+      const three = [];
+      for (const n of ["One", "Two", "Three"]) {
+        const c = await h.user("Throttle " + n);
+        const g = await h.group(org, coach, "one_on_one", "FD Throttle " + n);
+        await h.member(g, c);
+        await h.as(coach);
+        await db.query(`select public.set_kiosk_pin($1, $2, '1234')`, [g, c]);
+        await h.asSuper();
+        three.push([g, c]);
+      }
+      const wrongs = [];
+      for (const [i, [g, c]] of three.entries()) for (let k = 0; k < (i === 2 ? 2 : 4); k++) wrongs.push((await checkIn(deskT, g, c, "0000")).result);
+      h.check("ten wrong codes across three clients are all answered 'wrong' (no client reached its own five-try lock)", wrongs.length === 10 && wrongs.every((x) => x === "wrong"), wrongs.join());
+      v = await checkIn(deskT, three[2][0], three[2][1], "1234");
+      h.check("the eleventh try is held back even with the right code", v.result === "throttled" && (await countCheckins(three[2][0], three[2][1])) === 0, JSON.stringify(v));
+      v = await checkIn(coach, three[2][0], three[2][1], "1234");
+      h.check("another person (the client's coach) is not held back", v.result === "ok", JSON.stringify(v));
+      await db.query(`update public.front_desk_pin_misses set missed_at = now() - interval '20 minutes' where caller = $1`, [deskT]);
+      v = await checkIn(deskT, three[0][0], three[0][1], "1234");
+      h.check("and after 15 minutes the person can try again", v.result === "ok", JSON.stringify(v));
+
+      // ---- an owner or admin whose access has ended has no say over the front desk
+      await db.query(`insert into public.org_front_desk (organization_id, profile_id) values ($1, $2) on conflict do nothing`, [org, desk]);
+      await db.query(`update public.organization_memberships set access_ended_at = now() where organization_id = $1 and profile_id = $2`, [org, admin]);
+      await h.as(admin);
+      r = await tryQ(db, `select public.remove_front_desk($1, $2)`, [org, desk]);
+      h.check("an admin whose access has ended cannot remove a front-desk person", !!r.error);
+      r = await tryQ(db, `select count(*)::int as n from public.org_front_desk where organization_id = $1`, [org]);
+      h.check("nor see who is on the front desk", r.rows?.[0]?.n === 0, JSON.stringify(r));
+      await h.asSuper();
+      r = await find(admin, org, "ann");
+      h.check("nor use the screen", !!r.error);
+      await db.query(`update public.organization_memberships set access_ended_at = null where organization_id = $1 and profile_id = $2`, [org, admin]);
+
+      // ---- closing the organization ends its front desk
+      await h.as(owner);
+      r = await tryQ(db, `select public.close_organization($1)`, [org]);
+      await h.asSuper();
+      h.check("closing the organization works" + (r.error ? ": " + r.error : ""), !r.error);
+      h.check("and ends its front desk", (await db.query(`select count(*)::int as n from public.org_front_desk where organization_id = $1`, [org])).rows[0].n === 0);
+      r = await find(deskT, org, "ann");
+      h.check("a front-desk person of a closed organization can no longer search", !!r.error);
     },
   },
 };

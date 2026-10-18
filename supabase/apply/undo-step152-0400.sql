@@ -5,8 +5,11 @@ drop function if exists public.remove_front_desk(uuid, uuid);
 drop function if exists public.front_desk_check_in(uuid, uuid, text);
 drop function if exists public.front_desk_find(uuid, text);
 drop function if exists public.front_desk_orgs();
-drop function if exists public._front_desk_may_act(uuid);
+drop function if exists public._front_desk_display_name(text, date);
+drop function if exists public._front_desk_scope(uuid);
+drop table if exists public.front_desk_pin_misses;
 drop table if exists public.org_front_desk;
+drop function if exists public.is_org_active_owner_or_admin(uuid);
 delete from public.organization_invites where role = 'front_desk';
 alter table public.organization_invites drop constraint if exists organization_invites_role_check;
 alter table public.organization_invites add constraint organization_invites_role_check check (role in ('admin', 'coach'));
@@ -90,6 +93,35 @@ begin
     end if;
   end if;
   return inv.organization_id;
+end;
+$$;
+create or replace function public.close_organization(p_org uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := auth.uid();
+  m record;
+  v_members int := 0;
+  v_leaving int := 0;
+begin
+  if me is null then
+    raise exception 'Sign in first.';
+  end if;
+  if not exists (select 1 from public.organizations where id = p_org and owner_id = me) then
+    raise exception 'Only the owner can close the organization.';
+  end if;
+  for m in select profile_id from public.organization_memberships where organization_id = p_org and profile_id <> me order by created_at, profile_id loop
+    if coalesce((public._detach_coach_from_org(p_org, m.profile_id, me, true) ->> 'leaving')::boolean, false) then
+      v_leaving := v_leaving + 1;
+    end if;
+    v_members := v_members + 1;
+  end loop;
+  update public.organization_invites set answered_at = now(), accepted = false where organization_id = p_org and answered_at is null;
+  perform public.audit_record('organizations', p_org::text, 'update', jsonb_build_object('event', 'close_organization', 'members_left', v_members, 'still_to_choose', v_leaving, 'closed_by', me));
+  return jsonb_build_object('members_left', v_members, 'still_to_choose', v_leaving);
 end;
 $$;
 commit;
