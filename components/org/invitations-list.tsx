@@ -7,6 +7,8 @@ import type { TeamInvite } from "@/components/org/team-members-panel";
 import type { PendingInvitee } from "@/lib/coach-invite-server";
 
 const ROLE_WORD: Record<string, string> = { owner: "Owner", admin: "Admin", coach: "Coach", front_desk: "Front desk" };
+// A link made by an invitation stops working after about an hour, so one sent longer ago than that is likely dead.
+const linkIsOld = (iso: string | null) => !!iso && Date.now() - new Date(iso).getTime() > 3600 * 1000;
 const dateOf = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString() : "");
 
 // Everyone who has been invited and has not joined yet. Two kinds, one list: a person invited by a NEW email address (their account is waiting; the link goes out by email and can be sent again, copied or cancelled
@@ -32,7 +34,8 @@ export function InvitationsList({
   const [working, setWorking] = useState<string | null>(null);
   const [message, setMessage] = useState<{ kind: "ok" | "problem"; text: string } | null>(null);
   // A link the browser would not copy for us, shown so it can be selected and copied by hand.
-  const [shownLink, setShownLink] = useState<string | null>(null);
+  // ... and only next to its own row; any other action clears it.
+  const [shownLink, setShownLink] = useState<{ key: string; link: string } | null>(null);
 
   async function post(path: string, profileId: string): Promise<{ ok: boolean; data: any }> {
     const res = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ groupId, profileId }) });
@@ -43,6 +46,7 @@ export function InvitationsList({
   async function resend(p: PendingInvitee) {
     setWorking(`resend-${p.profileId}`);
     setMessage(null);
+    setShownLink(null);
     try {
       const { ok, data } = await post("/api/coaches/invite/resend", p.profileId);
       if (!ok) setMessage({ kind: "problem", text: data.error || "Couldn't send it again. Try again." });
@@ -61,6 +65,7 @@ export function InvitationsList({
   async function copyLink(p: PendingInvitee) {
     setWorking(`copy-${p.profileId}`);
     setMessage(null);
+    setShownLink(null);
     try {
       const { ok, data } = await post("/api/coaches/invite/link", p.profileId);
       if (!ok || typeof data.link !== "string") {
@@ -72,7 +77,7 @@ export function InvitationsList({
         setMessage({ kind: "ok", text: `Link copied. It works once, for ${p.name} only, and replaces any earlier link.` });
       } catch {
         // The browser would not let the page copy: show it so it can be selected by hand.
-        setShownLink(data.link);
+        setShownLink({ key: p.profileId, link: data.link });
         setMessage({ kind: "ok", text: "Copy this link and send it to the person. It works once, for them only." });
       }
     } catch {
@@ -86,6 +91,7 @@ export function InvitationsList({
     if (!(await confirmDialog({ message: `Cancel the invitation to ${p.name}? Their link stops working.`, confirmLabel: "Cancel invitation", cancelLabel: "Keep it", destructive: true }))) return;
     setWorking(`cancel-${p.profileId}`);
     setMessage(null);
+    setShownLink(null);
     try {
       const { ok, data } = await post("/api/coaches/invite/cancel", p.profileId);
       if (!ok) setMessage({ kind: "problem", text: data.error || "Couldn't cancel that invitation. Try again." });
@@ -98,17 +104,21 @@ export function InvitationsList({
   }
 
   async function copyExisting(i: TeamInvite) {
+    setShownLink(null);
+    setMessage(null);
     const link = `${window.location.origin}/org-invite/${i.id}`;
     try {
       await navigator.clipboard.writeText(link);
       setMessage({ kind: "ok", text: `Link copied. ${i.name} signs in and answers it there.` });
     } catch {
-      setShownLink(link);
+      setShownLink({ key: i.id, link });
       setMessage({ kind: "ok", text: "Copy this link and send it to the person." });
     }
   }
 
   if (invites.length === 0 && newInvites.length === 0) return null;
+  const linkBox = (key: string) =>
+    shownLink?.key === key ? <input readOnly value={shownLink.link} onFocus={(e) => e.currentTarget.select()} aria-label="Invitation link" className="basis-full w-full h-10 bg-graphite border border-steel/30 text-chalk px-2.5 font-body text-xs" /> : null;
   const button = "font-body text-xs underline disabled:opacity-40";
   return (
     <div className="mt-6">
@@ -122,6 +132,7 @@ export function InvitationsList({
               <span className="block text-steel text-xs">
                 {p.email} · Not accepted yet{p.sentAt ? ` · sent ${dateOf(p.sentAt)}` : ""}
               </span>
+              {linkIsOld(p.sentAt) && <span className="block text-steel text-xs">The link may have expired. Use Send again.</span>}
             </p>
             {canManage && (
               <div className="flex items-center gap-4">
@@ -136,6 +147,7 @@ export function InvitationsList({
                 </button>
               </div>
             )}
+            {linkBox(p.profileId)}
           </div>
         ))}
         {invites.map((i) => {
@@ -160,11 +172,11 @@ export function InvitationsList({
                   </button>
                 </div>
               )}
+              {linkBox(i.id)}
             </div>
           );
         })}
       </div>
-      {shownLink && <input readOnly value={shownLink} onFocus={(e) => e.currentTarget.select()} aria-label="Invitation link" className="w-full h-10 mt-2 bg-graphite border border-steel/30 text-chalk px-2.5 font-body text-xs" />}
       {message && (
         <p className={`font-body text-xs mt-2 ${message.kind === "ok" ? "text-positive" : "text-rust"}`} role={message.kind === "ok" ? "status" : "alert"}>
           {message.text}

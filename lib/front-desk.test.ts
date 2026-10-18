@@ -143,7 +143,7 @@ describe("the front desk reaches clients only through the database's functions",
     const route = src("app/api/coaches/invite/route.ts");
     expect(route).not.toContain("invite_open");
     expect(route).not.toContain("status: 409");
-    expect(route).toContain('if (inviteRowError?.code === "23505") return NextResponse.json({ invited: true });');
+    expect(route).toContain('if (inviteRowError?.code === "23505") return NextResponse.json({ invited: true, emailed: true });');
     expect(src("components/coach/desktop/invite-coach-form.tsx")).toContain("send it again, copy the link or cancel it there");
   });
 

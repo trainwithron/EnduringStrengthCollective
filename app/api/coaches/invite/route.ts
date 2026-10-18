@@ -6,6 +6,8 @@ import { appOrigin } from "@/lib/app-url";
 import { rateLimitResponse } from "@/lib/rate-limit";
 import { notifyAndEmail } from "@/lib/invite-notify";
 import { inviteEmail, makeAuthLink, sendAuthMail } from "@/lib/auth-mail";
+import { isEmailConfigured } from "@/lib/email";
+import { isUnaccepted, removeOrphanInvitee } from "@/lib/coach-invite-server";
 
 // Which org-level role an invite can grant. "owner" is set once at
 // org creation and never assigned through this flow.
@@ -75,13 +77,18 @@ export async function POST(request: Request) {
   // Someone who already has an account is not put into the organization: they get an invitation they accept or decline (Release BD). Only a brand-new address is invited by email below,
   // and that person joins by setting their own password.
   const { data: existingId } = await serviceRole.rpc("profile_id_for_email", { p_email: trimmedEmail });
+  let reuseUserId: string | null = null;
   if (typeof existingId === "string" && existingId) {
+    const { data: earlier } = await serviceRole.auth.admin.getUserById(existingId);
+    if (isUnaccepted(earlier?.user)) reuseUserId = existingId;
+  }
+  if (typeof existingId === "string" && existingId && !reuseUserId) {
     const { data: already } =
       role === "front_desk"
         ? await serviceRole.from("org_front_desk").select("profile_id").eq("organization_id", group.organization_id).eq("profile_id", existingId).maybeSingle()
         : await serviceRole.from("organization_memberships").select("id").eq("organization_id", group.organization_id).eq("profile_id", existingId).maybeSingle();
     // The answer is the same whether or not the address has an account (or is already a member), so an organization cannot be used to find out who has an account.
-    if (already) return NextResponse.json({ invited: true });
+    if (already) return NextResponse.json({ invited: true, emailed: true });
     const { data: invite, error: inviteRowError } = await serviceRole
       .from("organization_invites")
       .insert({ organization_id: group.organization_id, invited_profile_id: existingId, role, group_id: role === "front_desk" ? null : groupId, created_by: user.id })
@@ -89,7 +96,7 @@ export async function POST(request: Request) {
       .single();
     if (inviteRowError || !invite) {
       // An open invitation already exists: answer exactly as if it was just sent. The answer never depends on whether an address has an account; the real state is the Invitations list the owner sees on the Team page.
-      if (inviteRowError?.code === "23505") return NextResponse.json({ invited: true });
+      if (inviteRowError?.code === "23505") return NextResponse.json({ invited: true, emailed: true });
       return NextResponse.json({ error: "Couldn't send the invitation. Try again." }, { status: 502 });
     }
     const { data: orgRow } = await serviceRole.from("organizations").select("name").eq("id", group.organization_id).maybeSingle();
@@ -108,40 +115,54 @@ export async function POST(request: Request) {
   const origin = appOrigin(request);
 
   // The account and its one-time link are made here, and the email is sent by US through the transactional mail service (Brevo), so it does not depend on the auth service's own mailer (a few emails an hour, no
-  // domain authentication). A link that was made but not delivered is told to the person inviting, who can send it again or copy it from the Invitations list.
-  const made = await makeAuthLink(serviceRole, { type: "invite", email: trimmedEmail, redirectTo: `${origin}/set-password`, fullName: trimmedName });
-  if (!made.link || !made.userId) {
-    const { error, status } = toFriendlyAuthEmailError(made.error ?? "Couldn't invite this coach.");
-    return NextResponse.json({ error }, { status });
+  // domain authentication). A link that was made but not delivered is told to the person inviting, who can send it again or copy it from the Invitations list. Without the mail service set up, the auth service's
+  // own invitation email is used, as before.
+  let link: string | null = null;
+  let newUserId: string;
+  if (isEmailConfigured()) {
+    const made = await makeAuthLink(serviceRole, { type: "invite", email: trimmedEmail, redirectTo: `${origin}/set-password`, fullName: trimmedName });
+    if (!made.link || !made.userId) {
+      const { error, status } = toFriendlyAuthEmailError(made.error ?? "Couldn't invite this coach.");
+      return NextResponse.json({ error }, { status });
+    }
+    link = made.link;
+    newUserId = made.userId;
+  } else {
+    const { data: invited, error: inviteError } = await serviceRole.auth.admin.inviteUserByEmail(trimmedEmail, { data: { full_name: trimmedName }, redirectTo: `${origin}/set-password` });
+    if (inviteError || !invited?.user) {
+      const { error, status } = toFriendlyAuthEmailError(inviteError?.message ?? "Couldn't invite this coach.");
+      return NextResponse.json({ error }, { status });
+    }
+    newUserId = invited.user.id;
   }
-
-  const newUserId = made.userId;
+  // An account made by THIS invitation that then fails half way is removed again (an account nobody can sign in to, with no seat, would otherwise be left behind); one that was already there is left alone.
+  const fail = async (message: string) => {
+    if (!reuseUserId) await removeOrphanInvitee(serviceRole, newUserId);
+    return NextResponse.json({ error: message }, { status: 502 });
+  };
   const { data: orgForMail } = await serviceRole.from("organizations").select("name").eq("id", group.organization_id).maybeSingle();
   const { data: inviterRow } = await serviceRole.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
-  const emailTheInvite = () =>
-    sendAuthMail(
+  // With the auth service's own invitation email there is nothing for us to send (true: it was asked to).
+  const emailTheInvite = async () =>
+    link === null ? true : sendAuthMail(
       trimmedEmail,
       inviteEmail({
         toName: trimmedName,
         orgName: (orgForMail as { name?: string } | null)?.name ?? "an organization",
         inviterName: (inviterRow as { full_name?: string | null } | null)?.full_name ?? null,
         role,
-        link: made.link as string,
+        link: link as string,
       })
     );
 
-  const { error: profileError } = await serviceRole
-    .from("profiles")
-    .insert({ id: newUserId, full_name: trimmedName });
-  if (profileError) {
-    return NextResponse.json({ error: `Couldn't create their profile: ${profileError.message}` }, { status: 502 });
+  if (!reuseUserId) {
+    const { error: profileError } = await serviceRole.from("profiles").insert({ id: newUserId, full_name: trimmedName });
+    if (profileError) return fail("Couldn't create their profile. Try again.");
   }
 
   if (role === "front_desk") {
     const { error: frontDeskError } = await serviceRole.from("org_front_desk").insert({ organization_id: group.organization_id, profile_id: newUserId, added_by: user.id });
-    if (frontDeskError) {
-      return NextResponse.json({ error: `Couldn't add them to the front desk: ${frontDeskError.message}` }, { status: 502 });
-    }
+    if (frontDeskError && frontDeskError.code !== "23505") return fail("Couldn't add them to the front desk. Try again.");
     const emailedDesk = await emailTheInvite();
     return NextResponse.json({ invited: true, emailed: emailedDesk });
   }
@@ -149,22 +170,12 @@ export async function POST(request: Request) {
   const { error: groupMembershipError } = await serviceRole
     .from("group_memberships")
     .insert({ group_id: groupId, profile_id: newUserId, role: "coach" });
-  if (groupMembershipError) {
-    return NextResponse.json(
-      { error: `Couldn't add them to the group: ${groupMembershipError.message}` },
-      { status: 502 }
-    );
-  }
+  if (groupMembershipError && groupMembershipError.code !== "23505") return fail("Couldn't add them to the group. Try again.");
 
   const { error: orgMembershipError } = await serviceRole
     .from("organization_memberships")
     .insert({ organization_id: group.organization_id, profile_id: newUserId, role });
-  if (orgMembershipError) {
-    return NextResponse.json(
-      { error: `Couldn't add them to the organization: ${orgMembershipError.message}` },
-      { status: 502 }
-    );
-  }
+  if (orgMembershipError && orgMembershipError.code !== "23505") return fail("Couldn't add them to the organization. Try again.");
 
   const emailed = await emailTheInvite();
   return NextResponse.json({ invited: true, emailed });

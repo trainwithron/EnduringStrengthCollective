@@ -33,8 +33,12 @@ export async function POST(request: Request) {
     const { error } = await db.from("group_memberships").delete().eq("profile_id", profileId).eq("group_id", seat.group_id);
     if (error) return NextResponse.json({ error: "Couldn't cancel that invitation. Try again." }, { status: 502 });
   }
-  await db.from("organization_memberships").delete().eq("organization_id", orgId).eq("profile_id", profileId);
-  await db.from("org_front_desk").delete().eq("organization_id", orgId).eq("profile_id", profileId);
+  const [{ error: memberError }, { error: deskError }] = await Promise.all([
+    db.from("organization_memberships").delete().eq("organization_id", orgId).eq("profile_id", profileId),
+    db.from("org_front_desk").delete().eq("organization_id", orgId).eq("profile_id", profileId),
+  ]);
+  // A row that is still there is a cancel that did not happen: say so, and keep the account.
+  if (memberError || deskError) return NextResponse.json({ error: "Couldn't cancel that invitation. Try again." }, { status: 502 });
 
   // The never-used account goes too, unless it belongs somewhere else (another seat, another organization).
   const [{ count: seats }, { count: orgs }, { count: desks }] = await Promise.all([

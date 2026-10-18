@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { appOrigin } from "@/lib/app-url";
 import { clientIp, rateLimitAllows } from "@/lib/rate-limit";
@@ -26,11 +26,19 @@ export async function POST(request: Request) {
   // same "ok" for an address that has an account and one that does not. Without the mail service the older route below is used.
   if (isEmailConfigured()) {
     const db = createServiceRoleClient();
-    const made = await makeAuthLink(db, { type: "recovery", email, redirectTo: `${appOrigin(request)}/set-password` });
-    if (made.link) {
-      const sent = await sendAuthMail(email, recoveryEmail({ toName: null, link: made.link }));
-      if (!sent) console.error("[forgot-password] the reset email could not be sent through the mail service");
-    }
+    // All of it runs AFTER the answer is sent, so an address with an account and one without take exactly the same time to answer (the response time must not reveal which emails have accounts).
+    const origin = appOrigin(request);
+    after(async () => {
+      try {
+        const made = await makeAuthLink(db, { type: "recovery", email, redirectTo: `${origin}/set-password` });
+        if (made.link) {
+          const sent = await sendAuthMail(email, recoveryEmail({ toName: null, link: made.link }));
+          if (!sent) console.error("[forgot-password] the reset email could not be sent through the mail service");
+        }
+      } catch (err) {
+        console.error("[forgot-password] the reset email failed:", err instanceof Error ? err.message : "unknown");
+      }
+    });
     return NextResponse.json({ ok: true });
   }
 

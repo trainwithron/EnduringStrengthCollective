@@ -25,22 +25,37 @@ export async function makeAuthLink(serviceRole: any, args: { type: AuthLinkType;
   return { link, userId, error: null };
 }
 
+// Text an administrator chose (an organization name, an inviter's name, an invitee's name) goes into a subject line and a body sent to a stranger's address: one line, no control characters, at most 60 characters.
+// Control characters and line/paragraph separators, built from their numbers so the source holds no invisible characters.
+const CONTROL_CHARACTERS = new RegExp("[" + String.fromCharCode(0) + "-" + String.fromCharCode(31) + String.fromCharCode(127) + "-" + String.fromCharCode(159) + String.fromCharCode(0x2028) + String.fromCharCode(0x2029) + "]+", "g");
+
+export function oneLine(text: string | null | undefined, max = 60): string {
+  return (text ?? "")
+    .replace(CONTROL_CHARACTERS, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, max)
+    .trim();
+}
+
 const ROLE_PHRASE: Record<string, string> = { admin: "an admin", coach: "a coach", front_desk: "front desk staff", owner: "the owner" };
 
 export function inviteEmail(args: { toName: string; orgName: string; inviterName: string | null; role: string; link: string }): { subject: string; text: string } {
-  const first = args.toName.trim().split(/\s+/)[0] || "there";
-  const by = args.inviterName ? `${args.inviterName} invited you` : "You have been invited";
+  const first = oneLine(args.toName).split(" ")[0] || "there";
+  const orgName = oneLine(args.orgName) || "an organization";
+  const inviter = oneLine(args.inviterName);
+  const by = inviter ? `${inviter} invited you` : "You have been invited";
   return {
-    subject: `${args.orgName} invited you to join`,
+    subject: `${orgName} invited you to join`,
     text: [
       `Hi ${first},`,
       "",
-      `${by} to join ${args.orgName} on Spotlight Coaching as ${ROLE_PHRASE[args.role] ?? "a coach"}.`,
+      `${by} to join ${orgName} on Spotlight Coaching as ${ROLE_PHRASE[args.role] ?? "a coach"}.`,
       "",
       "Open this link to choose a password and get started:",
       args.link,
       "",
-      "The link works once and stops working after a day. If it has stopped working, ask whoever invited you to send it again.",
+      "The link works once and expires, so use it soon. If it has stopped working, ask whoever invited you to send a new one.",
       "",
       "You are getting this because someone invited you on Spotlight Coaching. If you were not expecting it, you can ignore this message.",
     ].join("\n"),
@@ -48,18 +63,19 @@ export function inviteEmail(args: { toName: string; orgName: string; inviterName
 }
 
 export function recoveryEmail(args: { toName: string | null; link: string; fromCoach?: string | null }): { subject: string; text: string } {
-  const first = (args.toName ?? "").trim().split(/\s+/)[0];
+  const first = oneLine(args.toName).split(" ")[0];
+  const fromCoach = oneLine(args.fromCoach);
   return {
-    subject: args.fromCoach ? "Your sign-in link" : "Reset your password",
+    subject: fromCoach ? "Your sign-in link" : "Reset your password",
     text: [
       first ? `Hi ${first},` : "Hi,",
       "",
-      args.fromCoach ? `${args.fromCoach} sent you this link to set a password and sign in:` : "Open this link to choose a new password:",
+      fromCoach ? `${fromCoach} sent you this link to set a password and sign in:` : "Open this link to choose a new password:",
       args.link,
       "",
-      "The link works once and stops working after a day.",
+      "The link works once and expires, so use it soon.",
       "",
-      args.fromCoach ? "If you were not expecting this, you can ignore this message." : "If you did not ask for this, you can ignore this message. Your password stays as it is.",
+      fromCoach ? "If you were not expecting this, you can ignore this message." : "If you did not ask for this, you can ignore this message. Your password stays as it is.",
     ].join("\n"),
   };
 }
