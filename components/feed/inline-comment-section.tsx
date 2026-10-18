@@ -7,6 +7,7 @@ import { renderWithMentions } from "./mention-text";
 import { notifyPush } from "@/lib/push-notify";
 import { fetchProtectedIds, nameForOthers } from "@/lib/name-protection-client";
 import { shownName } from "@/lib/shown-name";
+import { readGroupMemberNames } from "@/lib/group-roster-reads";
 
 interface CommentRow {
   id: string;
@@ -73,11 +74,7 @@ export function InlineCommentSection({
     // once so typing "@" doesn't need a round trip per keystroke.
     groupPromise.then(async (gid) => {
         if (!gid) return;
-        const { data: rows } = await supabase
-          .from("group_memberships")
-          .select("profile_id, profiles ( full_name )")
-          .eq("group_id", gid);
-        const people = (rows ?? []).map((r: any) => ({ id: r.profile_id as string, fullName: (r.profiles?.full_name ?? "") as string })).filter((m) => m.fullName);
+        const people = await readGroupMemberNames(supabase, gid);
         const protectedIds = await fetchProtectedIds(gid, people.map((m) => m.id));
         setMembers(people.map((m) => ({ id: m.id, fullName: shownName(m.fullName, m.id, protectedIds) })));
       });

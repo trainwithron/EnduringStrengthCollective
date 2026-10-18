@@ -2948,6 +2948,24 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "156",
+  slug: "0404",
+  title: "0404 Release X1: the narrow reads athletes' screens use to see who else is in their group (a name, a photo, a role and a position, nothing else)",
+  migrations: ["0404"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes on screen. Adds two read-only functions (group_member_names, group_position_roster) that only a member of the group can use; the athlete screens that list the group's members (the @mention lists, the position leaderboard, the game stat grid) use them once the Release X1 code is live and fall back to the older read until then.",
+  undo: [
+    "drop function if exists public.group_position_roster(uuid);",
+    "drop function if exists public.group_member_names(uuid);",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 156 misbehaves. Run it only while the Release X1 code is not live (the code then falls back to the older read on its own).",
+  rows: [
+    ["0404 is not already applied (the member-names function is not there yet)", "to_regprocedure('public.group_member_names(uuid)') is null"],
+    ["the tables and helper it uses exist", "to_regclass('public.group_memberships') is not null and to_regclass('public.profiles') is not null and to_regclass('public.group_positions') is not null and to_regprocedure('public.is_group_member(uuid)') is not null"],
+  ],
+});
+
+STEPS.push({
   n: "150",
   slug: "0398",
   title: "0398 Release S1: a changed sign-in email must be confirmed by the new address first (waiting requests table)",
@@ -3115,6 +3133,7 @@ const BUNDLES = [
   { id: "release-cn-held", name: "HELD, Ron's word first: require the health form and waiver of every client without one (read check-intake-flag-list.sql first)", steps: ["138"] },
   { id: "release-cm", name: "Release CM (the guard function and a coach's decision on a flagged screening; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["137"] },
   { id: "release-w2b-notice-names", name: "Release W2b (notices name a member under 18 as a first name and last initial; REPLACES three notice functions, so it is not additions-only)", steps: ["157"] },
+  { id: "release-x1-athlete-narrow-reads", name: "Release X1 (two narrow read functions for athletes' screens; adds only, safe before or with the code)", steps: ["156"] },
   { id: "release-s1-signin-hardening", name: "Release S1 (a changed sign-in email is confirmed by the new address; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["150"] },
   { id: "release-f2-client-cap", name: "Release F2 (the free plan's client limit, installed switched off; adds only)", steps: ["149"] },
   { id: "release-l-leaving-coach", name: "Release L (a leaving coach is never given an organization; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["148"] },
@@ -3398,6 +3417,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0338", has.col("guardian_links", "expires_at")),
     m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
     m("0405", "to_regprocedure('public.notice_display_name(uuid)') is not null"),
+    m("0404", "to_regprocedure('public.group_member_names(uuid)') is not null"),
     m("0398", "to_regclass('public.pending_email_changes') is not null"),
     m("0397", "exists (select 1 from pg_trigger where tgname = 'group_memberships_free_tier_limit' and not tgisinternal)"),
     m("0396", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'organization_memberships' and column_name = 'departing_since')"),

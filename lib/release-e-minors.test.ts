@@ -26,7 +26,7 @@ describe("a member under 18 is shown as first name and last initial on shared bo
     const lb = src("lib/leaderboard-data.ts");
     expect(lb).toContain("if (!onSharedBoards((log.profiles as any)?.feed_broadcast_level)) continue;");
     expect(lb).toContain("shownName(");
-    expect(lb).toContain(".filter((m: any) => onSharedBoards(m.profiles?.feed_broadcast_level))");
+    expect(lb).toContain(".filter((m) => onSharedBoards(m.feedBroadcastLevel))");
     expect(src("app/(coach)/groups/[groupId]/records/page.tsx")).toContain("shownName(row.profiles.full_name, row.athlete_id, minors)");
     expect(src("app/(coach)/groups/[groupId]/challenges/[challengeId]/page.tsx")).toContain("shownName((p.profiles as any)?.full_name, p.profile_id, minors)");
     // the check is made for the people ON the page (a member who left, a participant from another group), not the group's current seats
