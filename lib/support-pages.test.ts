@@ -2,7 +2,7 @@
 // The test "each article about a feature is there exactly while the feature's own files are" FAILS on any tree where HP1 is merged before all four are in it. So HP1 stays unmerged until
 // Z1, B1, M1 and SP1 are all deployed; then rebase it, set the four what's-new dates in lib/changelog.ts to the deploy day, run the suite, and ship.
 import { describe, it, expect, vi } from "vitest";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { HELP_ARTICLES, HELP_AUDIENCES, HELP_BY_SLUG, SUPPORT_PROMISE } from "./help-articles";
 import { CHANGELOG } from "./changelog";
@@ -72,16 +72,14 @@ describe("the help center", () => {
     for (const [title, isLive] of entries) expect(CHANGELOG.some((e) => e.title === title), `${title}: in what's new only while the feature is live`).toBe(isLive);
   });
 
-  it("the parent-view article is only there while the feature is: if the share button is gone, the article must go too", () => {
-    const featureLives = existsSync(join(__dirname, "..", "components/coach/guardian-share-button.tsx"));
-    const article = HELP_BY_SLUG.get("parent-view-link");
-    if (!featureLives) expect(article, "the parent link feature was removed: remove the article too").toBeUndefined();
-    if (article) {
-      const text = article.body.join(" ");
-      // what the page really shows and who can have one
-      expect(text).toContain("under 13");
-      expect(text).toContain("consent");
-      expect(text).toMatch(/does not show workouts, calories or macro numbers/);
+  it("there is no parent-view article: a coach can no longer create a parent link (nothing renders the share button), and the help center says nothing about one", () => {
+    const walk = (dir: string): string[] =>
+      readdirSync(join(__dirname, "..", dir), { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(dir, e.name)) : /[.](ts|tsx)$/.test(e.name) ? [join(dir, e.name)] : []));
+    // keyed on the button being USED (some screen imports it), not on its file existing
+    const users = [...walk("app"), ...walk("components")].filter((f) => /GuardianShareButton/.test(readFileSync(join(__dirname, "..", f), "utf8")));
+    if (users.length === 0) {
+      expect(HELP_BY_SLUG.get("parent-view-link"), "nothing renders the parent-link button, so the help center must not describe it").toBeUndefined();
+      expect(HELP_ARTICLES.flatMap((a) => [a.title, a.summary, ...a.body]).join(" ")).not.toMatch(/guardian a private link|A parent.s view/i);
     }
   });
 

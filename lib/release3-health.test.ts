@@ -44,14 +44,6 @@ describe("consent and injury controls tell the truth", () => {
   });
 });
 
-describe("the parent view reads the stored plan shape and the link secret is the database's", () => {
-  it("the share button no longer chooses the secret and reads it back", () => {
-    const b = src("components/coach/guardian-share-button.tsx");
-    expect(b).not.toContain("crypto.randomUUID()");
-    expect(b).toContain('.select("access_token, expires_at")');
-  });
-});
-
 describe("macros and allergens", () => {
   it("a carnivore or keto day never gets negative fat when protein already uses the calories", () => {
     for (const archetype of ["carnivore", "keto"] as const) {

@@ -157,7 +157,6 @@ describe("a screen shows the saved state only when the write saved (saved() retu
   // The files fixed in the Release F review: each keeps the result of saved() and acts on it. A bare 'await saved(' statement followed by a state change would bring the old behaviour back.
   const FIXED = [
     "components/athlete/progress-photo-journal.tsx",
-    "components/coach/guardian-share-button.tsx",
     "components/coach/desktop/program-card-grid.tsx",
     "components/coach/desktop/habit-manager.tsx",
     "components/coach/desktop/pro-shop-manager.tsx",
