@@ -6,19 +6,23 @@ export function RosterList({
   groupId,
   viewerId,
   viewerIsCoach,
+  hiddenProfileIds = [],
 }: {
   members: RosterMember[];
   groupId: string;
   viewerId?: string;
   viewerIsCoach: boolean;
+  // Coaches who have not accepted their invitation yet: not shown as working coaches.
+  hiddenProfileIds?: string[];
 }) {
-  const coaches = members.filter((m) => m.role === "coach");
+  const hidden = new Set(hiddenProfileIds);
+  const coaches = members.filter((m) => m.role === "coach" && !hidden.has(m.profileId));
   const athletes = members.filter((m) => m.role === "athlete");
   const isOnlyCoach = coaches.length === 1;
 
   return (
     <section className="px-5">
-      {coaches.length > 0 && (
+      {!viewerIsCoach && coaches.length > 0 && (
         <div className="pt-6">
           <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
             Coaching staff

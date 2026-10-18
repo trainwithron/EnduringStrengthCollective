@@ -13,6 +13,7 @@ import { UnavailableState } from "@/components/ui/unavailable-state";
 import { createServerClient } from "@/lib/supabase/server";
 import { GroupHubHeader } from "@/components/group/group-hub-header";
 import { RosterList } from "@/components/group/roster-list";
+import { pendingCoachIds } from "@/lib/pending-coaches";
 import { WellnessCheckinPopup } from "@/components/athlete/wellness-checkin-popup";
 import { shouldShowLifeImpactPrompt, pickLifeImpactPrompt } from "@/lib/life-impact-prompt";
 import type { WellnessCheckinValues } from "@/components/athlete/wellness-checkin-widget";
@@ -963,6 +964,7 @@ export default async function GroupHubPage(
       </section>
 
       <RosterList
+        hiddenProfileIds={[...(await pendingCoachIds(params.groupId))]}
         members={roster}
         groupId={params.groupId}
         viewerId={user?.id}

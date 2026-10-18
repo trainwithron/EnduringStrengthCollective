@@ -10,6 +10,7 @@ import {
   type TeamPlayer,
 } from "@/components/coach/desktop/team-depth-chart";
 import { CoachPositionScopeList, type CoachStaffRow } from "@/components/coach/desktop/coach-position-scope-list";
+import { pendingCoachIds } from "@/lib/pending-coaches";
 import { NewSeasonPanel } from "@/components/coach/desktop/new-season-panel";
 import { ClassYearPanel } from "@/components/coach/desktop/class-year-panel";
 import { GraduationSendAgain } from "@/components/coach/desktop/graduation-send-again";
@@ -103,7 +104,10 @@ export default async function TeamPage(props: { params: Promise<{ groupId: strin
     }))
     .sort((a, b) => a.fullName.localeCompare(b.fullName));
 
+  // A coach who has not accepted their invitation yet is not a working coach: they hold no depth-chart scope.
+  const notAccepted = await pendingCoachIds(params.groupId);
   const coaches: CoachStaffRow[] = (coachRows ?? [])
+    .filter((c: any) => !notAccepted.has(c.profile_id))
     .map((c: any) => ({
       profileId: c.profile_id,
       fullName: c.profiles?.full_name ?? "Unknown",

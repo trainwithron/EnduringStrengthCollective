@@ -14,6 +14,7 @@ import { selectedConversation } from "@/lib/messages-list";
 import { MessagesTwoPane } from "@/components/messages/messages-two-pane";
 import { AwayReplyCard } from "@/components/coach/away-reply-card";
 import { loadAwayReply } from "@/lib/away-reply-data";
+import { pendingCoachIds } from "@/lib/pending-coaches";
 
 export const metadata = { title: "Messages" };
 
@@ -187,7 +188,9 @@ export default async function MessagesPage(props: { params: Promise<{ groupId: s
       : Promise.resolve({ data: null }),
   ]);
 
-  const others = (coaches ?? []).map((r: any) => ({
+  // A coach who has not accepted their invitation yet cannot read a message: they are not offered.
+  const notAccepted = await pendingCoachIds(params.groupId);
+  const others = (coaches ?? []).filter((r: any) => !notAccepted.has(r.profile_id)).map((r: any) => ({
     id: r.profile_id,
     fullName: r.profiles?.full_name ?? "Coach",
     avatarUrl: r.profiles?.avatar_url ?? null,

@@ -347,6 +347,17 @@ export default async function SettingsPage(
           </SettingsGroup>
         )}
 
+        {isCoach && !effective.isActingAsOther && (
+          <SettingsGroup label="Coaches and invitations">
+            <Link href={`/groups/${params.groupId}/clients`} className="font-body text-sm font-bold text-rust">
+              See your coaches and invite one →
+            </Link>
+            <Link href={`/groups/${params.groupId}/branding?tab=team`} className="font-body text-sm text-steel underline underline-offset-2 mt-2 inline-block">
+              Manage invitations on the Team page
+            </Link>
+          </SettingsGroup>
+        )}
+
         {isCoach && leaveInfo && (
           <SettingsGroup label="Organization">
             <LeaveOrganizationControl organizationId={leaveInfo.id} organizationName={leaveInfo.name} others={leaveInfo.others} soleClients={leaveInfo.soleClients} unknown={leaveInfo.unknown} />
