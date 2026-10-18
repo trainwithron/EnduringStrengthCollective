@@ -154,7 +154,7 @@ export function CoachNavLinksList({ groupId }: { groupId: string; groupName?: st
             <GroupHeader label="Community" icon={Flag} />
             {!teamSport && groupKind !== "one_on_one" && <Item href={`/groups/${groupId}/feed`} label="Team feed" icon={MessagesSquare} />}
             {teamSport ? (
-              teamSportMoreMenu(groupId).map((m) => <Item key={m.key} href={m.href} label={m.label} icon={m.key === "challenges" ? Flag : Trophy} />)
+              teamSportMoreMenu(groupId).map((m) => <Item key={m.key} href={m.href} label={m.label} icon={m.key === "challenges" ? Flag : m.key === "team-sheet" ? ClipboardList : Trophy} />)
             ) : (
               <>
                 <Item href={`/groups/${groupId}/challenges`} label="Challenges" icon={Flag} />

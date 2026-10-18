@@ -123,6 +123,7 @@ type Active =
   | "team"
   | "attendance"
   | "team-calendar"
+  | "team-sheet"
   | "game-detail"
   | "team-performance"
   | "messages"
@@ -532,6 +533,7 @@ function CoachDesktopShellFull({
     "team-performance": Activity,
     challenges: Flag,
     records: Trophy,
+    "team-sheet": ClipboardList,
   };
   const teamLeaves: NavLeaf[] = teamSportMenu(groupId).map((item) => ({
     key: item.key as Active,

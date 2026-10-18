@@ -16,7 +16,7 @@ describe("TC2: a team-sport group's short menu", () => {
 
   it("the menu is Athletes, Team calendar, Attendance, Depth chart, Team feed, Messages, Team performance; Challenges and Hall of fame sit under one More", () => {
     expect(teamSportMenu(G).map((m) => m.label)).toEqual(["Athletes", "Team calendar", "Attendance", "Depth chart", "Team feed", "Messages", "Team performance"]);
-    expect(teamSportMoreMenu(G).map((m) => m.label)).toEqual(["Challenges", "Hall of fame"]);
+    expect(teamSportMoreMenu(G).map((m) => m.label)).toEqual(["Challenges", "Hall of fame", "Team sheet"]);
     // Athletes is this team's own roster (its Members view), not the coach-wide client list
     expect(teamSportMenu(G)[0].href).toBe(`/groups/${G}/clients?view=members`);
     expect(teamSportMenu(G)[1].href).toBe(`/groups/${G}/team/calendar`);

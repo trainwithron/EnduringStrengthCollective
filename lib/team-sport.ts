@@ -32,6 +32,7 @@ export function teamSportMoreMenu(groupId: string): TeamMenuItem[] {
   return [
     { key: "challenges", label: "Challenges", href: `/groups/${groupId}/challenges` },
     { key: "records", label: "Hall of fame", href: `/groups/${groupId}/records` },
+    { key: "team-sheet", label: "Team sheet", href: `/groups/${groupId}/team-sheet` },
   ];
 }
 
