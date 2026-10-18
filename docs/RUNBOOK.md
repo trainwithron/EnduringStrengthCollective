@@ -130,3 +130,24 @@ Set these in Supabase, Authentication. Review them after any project change.
 - Vercel dashboard: the project's Deployments, Logs, Environment Variables, Cron Jobs (one daily job reports failures, see `/api/health` and the cron failure alerts).
 - Supabase dashboard: SQL editor, Logs, Backups, Authentication.
 - Stripe, Twilio, Brevo, Anthropic, Daily: each provider's own status page when their calls fail.
+
+## 10. People's information may have been seen by someone who should not have seen it (a data breach)
+
+Section 4 is for a leaked secret. This is for the harder case: you have reason to think real people's information (names, emails, health or food details, photos, payment history, messages) was read, copied or exposed. A bug that showed one client another client's data counts. Work through it in order; do the first two steps before you understand it.
+
+**Do not delete anything, do not "clean up", and do not reply to the person who reported it until step 3.** Evidence disappears quickly.
+
+1. **Stop it.** If a bug is exposing data, switch the feature off or roll the deploy back (section 2) right now; a few minutes of a broken screen is better than another hour of exposure. If a secret is involved, rotate it (section 4). If one account is misusing access, take it out of the groups it can reach (Supabase, `group_memberships`) or disable the user (Supabase, Authentication).
+2. **Keep the evidence.** Before anything else changes: save the Vercel runtime logs and the Supabase logs for the time window (export or screenshot them), note the time you found out and who told you, and take a copy of `audit_log` rows for the people and tables involved (`select * from public.audit_log where created_at > now() - interval '30 days' order by created_at desc limit 500;`, then narrow). The audit log keeps ids and field names, not the text of what was written. Run section 5's backup so you have a copy of how the data looked.
+3. **Find out what was exposed, to whom, and for how long.** Write down four things: which tables or screens (for example `food_log_entries`, a coach's client list, a stored file bucket); which people (one client? one group? everyone?); who could have seen it (one other member, a whole organization, anyone on the internet); and from when to when. Ask the narrow questions first: was it readable only by someone who was already signed in to this app, or by anyone with a link? Was it read, or only readable? The logs and the audit log are how you tell. If you cannot tell, say "could have been" and not "was".
+4. **Fix the cause** with the smallest safe change, then check the fix the way the problem was found (not only that the screen looks right: sign in as the other person and try again). Add a test or a rehearsal so it cannot come back.
+5. **Decide who must be told, with a lawyer.** Whether, when and how you must tell the affected people, an authority, your payment provider or an insurer depends on where they live, what kind of information it was, and whether the people are minors. Those rules have deadlines and they differ from place to place, so this document names none: call the lawyer you use for the Terms and Privacy pages the same day, give them the four facts from step 3, and ask exactly three things: who must be told, by when, and what the notice must say. Also tell the coaches whose clients are involved before their clients hear it elsewhere. A client under 18 means their parent or guardian is told too.
+6. **Tell the affected people plainly.** Say what happened, what information it involved, when, what you have done, what they should do (change a password, watch for a message), and how to reach you. Do not minimize it and do not blame; do not name other people. A plain template to start from:
+
+   > Subject: Something we need to tell you about your information
+   >
+   > On [date] we found that [what happened, in one plain sentence]. It involved [the kinds of information]. It was possible for [who] to see it from [when] to [when]. We [fixed it / switched it off] on [date]. What you can do: [one or two concrete steps, or "nothing is needed"]. If you have questions, write to [the support address] and we will answer you personally. We are sorry.
+
+7. **Write it down and learn from it** within a week: the timeline, the cause, what was exposed, who was told and when, what changed so it cannot happen again. Keep it with the evidence. If it was a code bug, say which review step should have caught it and add that check.
+
+Who does what: when Ron is the only person, the order above is the order of the day. If someone else (a developer or an assistant) is helping, Ron decides about telling people; the helper's job is steps 1 to 4.
