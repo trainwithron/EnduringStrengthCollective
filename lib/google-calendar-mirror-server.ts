@@ -3,6 +3,7 @@ import {
   refreshGoogleCalendarTokens,
   upsertWorkCalendarEvent,
 } from "@/lib/google-calendar";
+import { sealedTokenColumns, openToken } from "@/lib/token-crypto";
 
 // Mirrors one booking into the coach's Google work calendar, if they have connected one. Used by the browser-triggered route
 // (/api/google-calendar/mirror-event, which checks the caller has standing on the booking first) and by the recurring-session
@@ -35,16 +36,15 @@ export async function mirrorBookingToGoogleCalendar(serviceRole: any, bookingId:
   if (!tokenRow) return { skipped: "no tokens on file" };
 
   try {
-    let accessToken = tokenRow.access_token;
+    let accessToken = openToken(tokenRow.access_token);
     const expiresSoon = new Date(tokenRow.expires_at).getTime() - Date.now() < 5 * 60 * 1000;
     if (expiresSoon) {
-      const refreshed = await refreshGoogleCalendarTokens(tokenRow.refresh_token);
+      const refreshed = await refreshGoogleCalendarTokens(openToken(tokenRow.refresh_token));
       accessToken = refreshed.accessToken;
       await serviceRole
         .from("google_calendar_oauth_tokens")
         .update({
-          access_token: refreshed.accessToken,
-          refresh_token: refreshed.refreshToken,
+          ...sealedTokenColumns(refreshed),
           expires_at: refreshed.expiresAt,
           updated_at: new Date().toISOString(),
         })

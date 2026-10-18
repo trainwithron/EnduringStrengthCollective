@@ -1,5 +1,13 @@
 [
  {
+  "id": "release-t2-wearable-token-fingerprint",
+  "name": "Release T2 (a fingerprint column so wearable sign-in tokens can be kept scrambled; adds one empty column, run BEFORE the code that goes with it is live)",
+  "steps": [
+   "165"
+  ],
+  "file": "apply-release-t2-wearable-token-fingerprint-all.sql"
+ },
+ {
   "id": "release-t1-export-my-data",
   "name": "Release T1 (Download my data gives a person everything the app holds about them; adds two functions and a private bucket, safe before the code)",
   "steps": [

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { fetchGoogleHealthDailyMetrics, refreshGoogleHealthTokens } from "@/lib/google-health";
 import { withCronRun } from "@/lib/cron-monitor";
+import { sealedTokenColumns, openToken } from "@/lib/token-crypto";
 
 // Mirrors app/api/oura/sync/route.ts exactly — triggered daily by the
 // Vercel Cron entry in vercel.json, CRON_SECRET-gated, polls the
@@ -54,17 +55,16 @@ async function handler(request: Request) {
     }
 
     try {
-      let accessToken = tokenRow.access_token;
+      let accessToken = openToken(tokenRow.access_token);
 
       const expiresSoon = new Date(tokenRow.expires_at).getTime() - Date.now() < 5 * 60 * 1000;
       if (expiresSoon) {
-        const refreshed = await refreshGoogleHealthTokens(tokenRow.refresh_token);
+        const refreshed = await refreshGoogleHealthTokens(openToken(tokenRow.refresh_token));
         accessToken = refreshed.accessToken;
         await supabase
           .from("wearable_oauth_tokens")
           .update({
-            access_token: refreshed.accessToken,
-            refresh_token: refreshed.refreshToken,
+            ...sealedTokenColumns(refreshed),
             expires_at: refreshed.expiresAt,
             updated_at: new Date().toISOString(),
           })

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { fetchOuraDailyMetrics, refreshOuraTokens } from "@/lib/oura";
 import { withCronRun } from "@/lib/cron-monitor";
+import { sealedTokenColumns, openToken } from "@/lib/token-crypto";
 
 const SYNC_WINDOW_DAYS = 7;
 
@@ -55,19 +56,18 @@ async function handler(request: Request) {
     }
 
     try {
-      let accessToken = tokenRow.access_token;
+      let accessToken = openToken(tokenRow.access_token);
 
       // Refresh a bit ahead of the real expiry so a slow request doesn't
       // land mid-refresh window.
       const expiresSoon = new Date(tokenRow.expires_at).getTime() - Date.now() < 5 * 60 * 1000;
       if (expiresSoon) {
-        const refreshed = await refreshOuraTokens(tokenRow.refresh_token);
+        const refreshed = await refreshOuraTokens(openToken(tokenRow.refresh_token));
         accessToken = refreshed.accessToken;
         await supabase
           .from("wearable_oauth_tokens")
           .update({
-            access_token: refreshed.accessToken,
-            refresh_token: refreshed.refreshToken,
+            ...sealedTokenColumns(refreshed),
             expires_at: refreshed.expiresAt,
             updated_at: new Date().toISOString(),
           })

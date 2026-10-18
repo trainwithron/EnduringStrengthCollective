@@ -70,6 +70,7 @@ Assume the worst: someone has it. Rotate first, investigate second.
 | `BREVO_API_KEY` | Brevo, delete the key and create a new one | Update Vercel, redeploy |
 | `DAILY_API_KEY` | Daily dashboard, create a new key | Update Vercel, redeploy |
 | `CRON_SECRET`, `GARMIN_WEBHOOK_SECRET` | Generate a new random value | Update Vercel (and Garmin's registration) and redeploy |
+| `WEARABLE_TOKEN_KEY` | Generate 32 random bytes (64 hex characters). Do NOT swap it casually: tokens stored scrambled with the old key can no longer be read | Update Vercel and redeploy; every connected wearable and Google Calendar must be reconnected by its owner (they see a normal "reconnect" state). If the key leaks together with a copy of the database, rotate it and ask people to reconnect |
 | `VAPID_PRIVATE_KEY` | New key pair | Everyone's push subscriptions stop working and must be renewed; avoid unless forced |
 | OAuth client secrets (Oura, Withings, Garmin, Google) | Rotate in each provider's console | Update Vercel, redeploy; connected users may need to reconnect |
 

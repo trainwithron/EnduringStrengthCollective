@@ -2916,6 +2916,24 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "165",
+  slug: "0413",
+  title: "0413 Release T2: a fingerprint column so wearable sign-in tokens can be kept scrambled (one empty column and an index)",
+  migrations: ["0413"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes on screen. Adds one empty column to the wearable sign-in token table; the app fills it in itself. Nothing is scrambled until the key is set in Vercel. Run this BEFORE the Release T2 code is live (the Garmin lookup and the daily protect job read the column).",
+  undo: [
+    "drop index if exists public.wearable_oauth_tokens_access_token_hash_idx;",
+    "alter table public.wearable_oauth_tokens drop column if exists access_token_hash;",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 165 misbehaves, and only while the Release T2 code is not live. If tokens were already scrambled, do not undo: Garmin updates could no longer be matched to a person.",
+  rows: [
+    ["0413 is not already applied (the fingerprint column is not there yet)", "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'wearable_oauth_tokens' and column_name = 'access_token_hash')"],
+    ["the table it builds on exists", "to_regclass('public.wearable_oauth_tokens') is not null"],
+  ],
+});
+
+STEPS.push({
   n: "164",
   slug: "0412",
   title: "0412 Release T1: Download my data gives a person everything the app holds about them (two small functions and a private bucket)",
@@ -3099,6 +3117,7 @@ for (const s of STEPS) {
 // that names the release, the step and the failed checks, and nothing is kept. After the commit one read-only result row per step says whether it is in place.
 // The individual step files stay as the fallback (and for a release that was partly applied by hand: the bundle refuses at the first applied step).
 const BUNDLES = [
+  { id: "release-t2-wearable-token-fingerprint", name: "Release T2 (a fingerprint column so wearable sign-in tokens can be kept scrambled; adds one empty column, run BEFORE the code that goes with it is live)", steps: ["165"] },
   { id: "release-t1-export-my-data", name: "Release T1 (Download my data gives a person everything the app holds about them; adds two functions and a private bucket, safe before the code)", steps: ["164"] },
   { id: "release-co", name: "Release CO (nothing about a person is public unless they chose it: personal Find a coach listing; a coach adds only their own clients to a challenge; run BEFORE the code that goes with it is live)", steps: ["139"] },
   { id: "release-cn-held", name: "HELD, Ron's word first: require the health form and waiver of every client without one (read check-intake-flag-list.sql first)", steps: ["138"] },
@@ -3385,6 +3404,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
     m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
+    m("0413", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'wearable_oauth_tokens' and column_name = 'access_token_hash')"),
     m("0412", "to_regprocedure('public.export_my_data_table(text, text, integer, integer)') is not null"),
     m("0398", "to_regclass('public.pending_email_changes') is not null"),
     m("0397", "exists (select 1 from pg_trigger where tgname = 'group_memberships_free_tier_limit' and not tgisinternal)"),

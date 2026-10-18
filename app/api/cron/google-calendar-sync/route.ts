@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { listPersonalCalendarEvents, refreshGoogleCalendarTokens } from "@/lib/google-calendar";
 import { withCronRun } from "@/lib/cron-monitor";
+import { sealedTokenColumns, openToken } from "@/lib/token-crypto";
 
 // Daily sync of each connected coach's personal Google Calendar events
 // into google_calendar_personal_events, for rendering inside the in-app
@@ -50,16 +51,15 @@ async function handler(request: Request) {
     }
 
     try {
-      let accessToken = tokenRow.access_token;
+      let accessToken = openToken(tokenRow.access_token);
       const expiresSoon = new Date(tokenRow.expires_at).getTime() - Date.now() < 5 * 60 * 1000;
       if (expiresSoon) {
-        const refreshed = await refreshGoogleCalendarTokens(tokenRow.refresh_token);
+        const refreshed = await refreshGoogleCalendarTokens(openToken(tokenRow.refresh_token));
         accessToken = refreshed.accessToken;
         await supabase
           .from("google_calendar_oauth_tokens")
           .update({
-            access_token: refreshed.accessToken,
-            refresh_token: refreshed.refreshToken,
+            ...sealedTokenColumns(refreshed),
             expires_at: refreshed.expiresAt,
             updated_at: new Date().toISOString(),
           })

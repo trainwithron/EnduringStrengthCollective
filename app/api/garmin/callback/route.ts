@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { exchangeGarminCode } from "@/lib/garmin";
+import { sealedTokenColumns } from "@/lib/token-crypto";
 
 // Garmin redirects back here after the user approves (or denies) access.
 // Mirrors app/api/oura/callback/route.ts's shape (state/CSRF check,
@@ -81,8 +82,7 @@ export async function GET(request: Request) {
     const { error: tokenError } = await serviceRole.from("wearable_oauth_tokens").upsert(
       {
         connection_id: connection.id,
-        access_token: tokens.accessToken,
-        refresh_token: tokens.refreshToken,
+        ...sealedTokenColumns(tokens, { withHash: true }),
         expires_at: tokens.expiresAt,
         updated_at: new Date().toISOString(),
       },
