@@ -90,6 +90,23 @@ describe("staff are not client-only just because their only group seat is an ath
     expect((await loadDobGate(fake({ memberships: client, dob: childDob }), "u")).gate).toBe("blocked");
   });
 
+  it("staff never switch off the age rules for a known minor: a child or a teen with a staff row stays a client for the gate", async () => {
+    expect((await loadDobGate(fake({ memberships: client, dob: childDob, orgRoles: 1 }), "u")).gate).toBe("blocked");
+    expect((await loadDobGate(fake({ memberships: client, dob: childDob, frontDesk: 1 }), "u")).gate).toBe("blocked");
+    expect((await loadDobGate(fake({ memberships: client, dob: teenDob, orgRoles: 1 }), "u")).gate).toBe("need_guardian");
+    expect((await loadDobGate(fake({ memberships: client, dob: teenDob, guardian: "signed", orgRoles: 1 }), "u")).gate).toBe("ok");
+  });
+
+  it("an adult staff member with a date on file is remembered; staff with no date are let through but not remembered", async () => {
+    expect(await mayRememberPass(await loadDobGate(fake({ memberships: client, dob: "1985-04-01", orgRoles: 1 }), "u"))).toBe(true);
+    expect(await mayRememberPass(await loadDobGate(fake({ memberships: client, dob: "1985-04-01", frontDesk: 1 }), "u"))).toBe(true);
+    const noDate = await loadDobGate(fake({ memberships: client, dob: null, orgRoles: 1 }), "u");
+    expect(noDate.gate).toBe("ok");
+    expect(await mayRememberPass(noDate)).toBe(false);
+    // minor with a staff row is never remembered
+    expect(await mayRememberPass(await loadDobGate(fake({ memberships: client, dob: teenDob, guardian: "signed", orgRoles: 1 }), "u"))).toBe(false);
+  });
+
   it("a failed staff lookup is a failed check, never a pass", async () => {
     for (const failTable of ["organization_memberships", "org_front_desk"]) expect((await loadDobGate(fake({ memberships: client, dob: null, failTable }), "u")).gate, failTable).toBe("check_failed");
   });
