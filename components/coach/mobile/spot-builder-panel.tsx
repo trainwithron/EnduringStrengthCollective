@@ -56,8 +56,8 @@ export function SpotBuilderPanel({
   const term = useTerm();
   const [stage, setStage] = useState<"compact" | "expanded" | "fullscreen">(initialAthleteId ? "expanded" : "compact");
   const dialogRef = useDialogA11y<HTMLDivElement>(stage === "fullscreen", () => close(), undefined, {
-    // Escape must not throw away a generated or half-edited program (it lives inside the wizard below), so it asks first.
-    guard: () => "ask",
+    // Escape must not throw away a generated or half-edited program (it lives inside the wizard below), so once the wizard is up it asks first; on the loading screen there is nothing to lose.
+    guard: () => (library && aliases ? "ask" : "close"),
     askMessage: "Close the AI Program Builder? Anything you have generated or edited here will be lost.",
   });
   // Explicit, coach-controlled choice — not inferred from which button

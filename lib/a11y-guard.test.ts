@@ -153,7 +153,7 @@ describe("every full-screen sheet is a dialog", () => {
     expect(hook).toContain("Discard what you have here?");
     expect(hook).toContain('action === "block"');
     expect(hook).toContain("Tab from outside the dialog pulls focus in");
-    expect(read("components/coach/mobile/spot-builder-panel.tsx")).toContain('guard: () => "ask"');
+    expect(read("components/coach/mobile/spot-builder-panel.tsx")).toContain('guard: () => (library && aliases ? "ask" : "close")');
     expect(read("components/feed/new-post-composer.tsx")).toContain('guard: () => (body.trim() || file ? "ask" : "close")');
     expect(read("components/feed/new-post-composer.tsx")).toContain('e.key === "Escape" && mentionQuery !== null');
     expect(read("components/coach/desktop/expanded-day-scheduler.tsx")).toContain('assigning ? "block"');
