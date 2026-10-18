@@ -87,7 +87,6 @@ export function FrontDeskScreen({ organizationId, organizationName }: { organiza
   // The fourth digit checks the client in at once, with no extra tap.
   useEffect(() => {
     if (view.mode === "pin" && pin.length === 4 && !submitting) void submit(view.client, pin);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pin, view, submitting]);
 
   function pressDigit(d: string) {
