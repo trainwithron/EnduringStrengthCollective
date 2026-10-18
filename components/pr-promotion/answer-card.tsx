@@ -7,7 +7,7 @@ import { announceWorkoutLog } from "@/lib/announce-workout-log";
 
 // The client's one-tap answer. Yes: that imported workout becomes a real logged workout dated when it was done (one database function), then the card and the feed post are made exactly as when a
 // workout is finished (lib/announce-workout-log.ts) and the client lands on their celebration card. Not now: nothing changes.
-export function PrPromotionAnswerCard({ promotionId, groupId, athleteId }: { promotionId: string; groupId: string; athleteId: string }) {
+export function PrPromotionAnswerCard({ promotionId, groupId, athleteId, postCard = true }: { promotionId: string; groupId: string; athleteId: string; postCard?: boolean }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,6 +24,12 @@ export function PrPromotionAnswerCard({ promotionId, groupId, athleteId }: { pro
       return;
     }
     if (!accept || !logId) {
+      router.push(`/groups/${groupId}`);
+      router.refresh();
+      return;
+    }
+    // The group has its post-workout cards switched off: the record counts, nothing is posted or offered to share.
+    if (!postCard) {
       router.push(`/groups/${groupId}`);
       router.refresh();
       return;

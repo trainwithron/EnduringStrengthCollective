@@ -2671,6 +2671,21 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "166",
+  slug: "0414",
+  title: "0414 Release CS1: a group setting for post-workout cards and PR notices (one nullable column)",
+  migrations: ["0414"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes on screen until the Release CS1 code is live, and no group behaves differently by this alone: an empty setting means the default (off for a team-sport group, on otherwise). Adds one nullable column to groups. Safe to run before the code.",
+  undo: "alter table public.groups drop column if exists post_workout_cards;",
+  undoWhy: "Only if step 166 misbehaves. Run it only while the Release CS1 code is not live; any coach's choice stored in the column is lost and every group goes back to its default.",
+  rows: [
+    ["0414 is not already applied (the setting column is not there yet)", "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'groups' and column_name = 'post_workout_cards')"],
+    ["the table it builds on exists", "to_regclass('public.groups') is not null"],
+  ],
+});
+
+STEPS.push({
   n: "165",
   slug: "0413",
   title: "0413 Release T2: a fingerprint column so wearable sign-in tokens can be kept scrambled (one empty column and an index)",
@@ -3402,6 +3417,7 @@ for (const s of STEPS) {
 // that names the release, the step and the failed checks, and nothing is kept. After the commit one read-only result row per step says whether it is in place.
 // The individual step files stay as the fallback (and for a release that was partly applied by hand: the bundle refuses at the first applied step).
 const BUNDLES = [
+  { id: "release-cs1-post-workout-cards", name: "Release CS1 (a group setting for post-workout cards and PR notices; adds one nullable column, safe before the code)", steps: ["166"] },
   { id: "release-v1-guardian-consent", name: "Release V1 (a parent or guardian's consent for clients aged 13 to 17; adds only, but apply BEFORE the code that goes with it is live)", steps: ["154"] },
   { id: "release-t2-wearable-token-fingerprint", name: "Release T2 (a fingerprint column so wearable sign-in tokens can be kept scrambled; adds one empty column, run BEFORE the code that goes with it is live)", steps: ["165"] },
   { id: "release-t1-export-my-data", name: "Release T1 (Download my data gives a person everything the app holds about them; adds two functions and a private bucket, safe before the code)", steps: ["164"] },
@@ -3643,6 +3659,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
   const m = (n, marker) => ({ n, file: index[n], marker });
   const items = [
     m("0402", "to_regclass('public.guardian_consents') is not null"),
+    m("0414", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'groups' and column_name = 'post_workout_cards')"),
     m("0413", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'wearable_oauth_tokens' and column_name = 'access_token_hash')"),
     m("0412", "to_regprocedure('public.export_my_data_table(text, text, integer, integer)') is not null"),
     m("0411", "to_regclass('public.content_reports') is not null"),

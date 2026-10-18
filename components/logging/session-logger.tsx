@@ -39,6 +39,7 @@ export function SessionLogger({
   canUploadVideo,
   startedAt,
   gamificationEnabled,
+  postWorkoutCards = true,
   pendingGateTask,
   todayDate,
   coachNoteByExerciseName,
@@ -62,6 +63,8 @@ export function SessionLogger({
   canUploadVideo: boolean;
   startedAt: string;
   gamificationEnabled: boolean;
+  // The group's post-workout cards setting (default true when not passed).
+  postWorkoutCards?: boolean;
   pendingGateTask?: PendingGateTask | null;
   todayDate?: string;
   // The swipe-card carousel's coach-note-first callout — keyed by
@@ -441,6 +444,7 @@ export function SessionLogger({
           disabled={false}
           raised={raised && !exercises.every((e) => isNoLoadExercise(e.exerciseName))}
           coachMode={coachMode}
+          postWorkoutCards={postWorkoutCards}
           pauseHref={coachMode ? coachMode.homeHref : `/groups/${groupId}`}
         />
       )}

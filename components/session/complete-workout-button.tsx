@@ -47,6 +47,7 @@ export function CompleteWorkoutButton({
   raised,
   coachMode,
   pauseHref,
+  postWorkoutCards = true,
 }: {
   sessionId: string;
   // Where "Pause for now" goes (the person's Home, or the coach's Home when logging for a client).
@@ -57,6 +58,8 @@ export function CompleteWorkoutButton({
   // Set when a coach is logging this session FOR a client (not the client's own login): finishing goes straight back to the coach's home instead of the client's share card, and
   // no feed post is made in the name of a client under 18.
   coachMode?: { homeHref: string; clientIsMinor: boolean };
+  // The group's "Post-workout cards and PR notices" setting (off: no feed card, no share card).
+  postWorkoutCards?: boolean;
 }) {
   const liftUnit = useLiftUnit();
   const [submitting, setSubmitting] = useState(false);
@@ -300,13 +303,16 @@ export function CompleteWorkoutButton({
 
     // The feed card (the athlete's own sharing choice is kept on the post) and the link to the celebratory share card: one shared function, also used when a client agrees to count a record from
     // imported history (lib/announce-workout-log.ts). Everyone who finishes a workout gets the workout card, a coach logging for a client included (to share or text to them; the client finds it in their history). A coach logging for a client under 18 posts nothing to the feed, but still gets the card; back to the coach's home only if the card cannot be made.
+    const cardsOn = postWorkoutCards;
     const announced = await announceWorkoutLog(supabase, {
       workoutLogId: result.workout_log_id,
       athleteId: result.athlete_id,
       groupId: result.group_id,
       broadcastLevel,
       hasPrs: newPrs.length > 0,
-      skipPost: !!coachMode?.clientIsMinor,
+      // No feed card and no share card when the group has them switched off.
+      skipPost: !cardsOn || !!coachMode?.clientIsMinor,
+      skipLink: !cardsOn,
     });
 
     // Every completed workout gets a celebratory, shareable card instead of silently landing back on the group hub.

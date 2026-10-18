@@ -1,3 +1,4 @@
+import { loadPostWorkoutCards } from "@/lib/post-workout-cards";
 import { redirect } from "next/navigation";
 import { isReadFailure } from "@/lib/read-failed";
 import { NoAccess } from "@/components/shared/no-access";
@@ -168,6 +169,8 @@ export default async function SessionPage(
     );
   }
   const gamificationEnabled = groupRow?.gamification_enabled ?? true;
+  // The group's "Post-workout cards and PR notices" setting (off by default for a team-sport group): whether finishing makes a feed card and a share card.
+  const postWorkoutCards = await loadPostWorkoutCards(supabase, session.group_id);
   const viewerIsCoach = viewerMembership?.role === "coach";
   const canUploadVideo = isOwnSession || viewerIsCoach;
   const exerciseSwipeDirection: "vertical" | "horizontal" | null =
@@ -678,6 +681,7 @@ export default async function SessionPage(
         canUploadVideo={canUploadVideo}
         startedAt={session.started_at}
         gamificationEnabled={gamificationEnabled}
+        postWorkoutCards={postWorkoutCards}
         pendingGateTask={pendingGateTask}
         todayDate={todayKey}
         coachNoteByExerciseName={coachNoteByExerciseName}

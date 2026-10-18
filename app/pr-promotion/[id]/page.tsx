@@ -1,3 +1,4 @@
+import { loadPostWorkoutCards } from "@/lib/post-workout-cards";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
@@ -33,6 +34,7 @@ export default async function PrPromotionPage(props: { params: Promise<{ id: str
     );
   }
 
+  const cardsOn = await loadPostWorkoutCards(supabase, promo.group_id as string);
   const session = promo.athlete_sessions as unknown as { started_at: string | null; completed_at: string | null } | null;
   const when = (session?.completed_at ?? session?.started_at) as string | null;
 
@@ -42,7 +44,7 @@ export default async function PrPromotionPage(props: { params: Promise<{ id: str
       <p className="font-body text-base mt-3">{promotionSentence(Number(promo.weight), promo.exercise_name as string, when)}</p>
       <p className="font-body text-sm text-steel mt-2">It keeps its original date.</p>
       {promo.status === "asked" ? (
-        <PrPromotionAnswerCard promotionId={promo.id as string} groupId={promo.group_id as string} athleteId={user.id} />
+        <PrPromotionAnswerCard promotionId={promo.id as string} groupId={promo.group_id as string} athleteId={user.id} postCard={cardsOn} />
       ) : (
         <p className="font-body text-sm text-steel mt-6">{promo.status === "agreed" ? "It counts as a PR now." : "You said not now."}</p>
       )}

@@ -1,3 +1,4 @@
+import { loadPostWorkoutCards } from "@/lib/post-workout-cards";
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -34,6 +35,8 @@ async function recordMilestone(
   athleteBody: string,
   coachBody: string
 ): Promise<boolean> {
+  // A group with its post-workout cards and notices switched off (the default for a team-sport group) gets no milestone celebrations for its athletes: nothing is recorded and nobody is told.
+  if (!(await loadPostWorkoutCards(supabase, groupId))) return false;
   const { data: inserted } = await supabase
     .from("milestone_events")
     .insert({ athlete_id: athleteId, group_id: groupId, milestone_type: milestoneType, detail })
