@@ -190,9 +190,12 @@ export default {
       const series = (await db.query(`insert into public.recurring_booking_series (coach_id, athlete_id, group_id, weekday, start_time, duration_minutes, occurrences_total) values ($1, $2, $3, 2, '10:00', 60, 3) returning id`, [coach, jo, g])).rows[0].id;
       await db.query(`insert into public.bookings (coach_id, athlete_id, group_id, start_at, end_at, recurring_series_id) values ($1, $2, $3, now() + interval '3 days', now() + interval '3 days 1 hour', $4), ($1, $2, $3, now() + interval '10 days', now() + interval '10 days 1 hour', $4)`, [coach, jo, g, series]);
       await db.query(`insert into public.bookings (coach_id, athlete_id, group_id, start_at, end_at) values ($1, $2, $3, now() + interval '5 days', now() + interval '5 days 1 hour')`, [coach, jo, g]);
+      // a frozen (paused) series must not survive either: the daily resume job would book new sessions for someone who left
+      const frozen = (await db.query(`insert into public.recurring_booking_series (coach_id, athlete_id, group_id, weekday, start_time, duration_minutes, occurrences_total, status) values ($1, $2, $3, 3, '10:00', 60, 3, 'paused') returning id`, [coach, jo, g])).rows[0].id;
       r = await callAs(coach, `select public.remove_client($1, $2) as id`, [g, jo]);
       h.check("removing a client with a repeating series works" + (r.error ? ": " + r.error : ""), !r.error);
       h.check("the count includes the series' sessions (2) and the single one (1)", (await db.query(`select cancelled_bookings from public.client_removals where id = $1`, [r.rows?.[0]?.id])).rows[0].cancelled_bookings === 3);
+      h.check("a frozen (paused) series is ended too", (await db.query(`select status from public.recurring_booking_series where id = $1`, [frozen])).rows[0].status === "cancelled");
       h.check("no session of theirs is left confirmed", (await db.query(`select count(*)::int as n from public.bookings where athlete_id = $1 and status = 'confirmed'`, [jo])).rows[0].n === 0);
       const notice = (await db.query(`select type, body, link_path from public.notifications where profile_id = $1 order by created_at desc limit 1`, [jo])).rows[0];
       h.check("the client gets one notice saying how many were cancelled", notice && notice.type === "schedule_applied" && notice.link_path === "/" && /cancelled 3 of your upcoming sessions/.test(notice.body), JSON.stringify(notice));

@@ -25,7 +25,7 @@
 | F2 | release-f2-client-cap | (see git) | Release F2, step 149 (0397), apply-release-f2-client-cap-all.sql, fp 979398d89cdde8a9 | stacked on L + F1; installed SWITCHED OFF, adds only |
 | S1 | release-signin-hardening | (see git) | Release S1, step 150 (0398), apply-release-s1-signin-hardening-all.sql, fp 8628d711b21b9d5a | built on master eb5ed58d; adds only, paste BEFORE code |
 | S3 | release-team-coach | (see git) | none | team coach Home tiles and menus; built on master 408e6919 |
-| Z1 | release-snapshot-delete | (see git) | Release Z1, step 159 (0407), apply-release-z1-client-removals-all.sql, fp 390e253bc58f706f | remove a client without destroying them + 30-day undo for a permanent delete; adds two tables and two functions, safe before the code; saves the per-client rate, cancels upcoming sessions, archives an emptied one-on-one space, refuses a live subscription |
+| Z1 | release-snapshot-delete | (see git) | Release Z1, step 159 (0407), apply-release-z1-client-removals-all.sql, fp 726bef10c071be7d | remove a client without destroying them + 30-day undo for a permanent delete; adds two tables and two functions, safe before the code; saves the per-client rate, cancels upcoming sessions, archives an emptied one-on-one space, refuses a live subscription |
 | D-held | (data) | - | HELD: step 138, apply-release-cn-held-all.sql, fp 8f22a2d348ee90d7, read check-intake-flag-list.sql first | Ron's word only |
 
 Fingerprint = first 16 hex of sha256 of the LF-normalized file: tr -d '\r' < supabase/apply/<file> | sha256sum | cut -c1-16.

@@ -103,7 +103,7 @@ begin
   select to_jsonb(r) into v_rate from public.client_billing_rates r where r.membership_id = m.id;
 
   -- Their upcoming sessions with this group's coaches end here. Each goes through the same cancel the app uses (a coach cancelling always gives the credit back and offers the slot to the waitlist).
-  for b in select id from public.recurring_booking_series where athlete_id = p_athlete and group_id = p_group and status = 'active' loop
+  for b in select id from public.recurring_booking_series where athlete_id = p_athlete and group_id = p_group and status in ('active', 'paused') loop
     v_cancelled := v_cancelled + coalesce(public.cancel_recurring_booking_series(b.id), 0);
   end loop;
   for b in select id from public.bookings where athlete_id = p_athlete and group_id = p_group and status = 'confirmed' and start_at > now() order by start_at loop
