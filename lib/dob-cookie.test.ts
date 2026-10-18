@@ -27,6 +27,7 @@ function fake(opts: { memberships: { group_id: string; role: string }[]; dob: st
     const b: any = {
       select: () => b,
       eq: () => b,
+      limit: () => b,
       maybeSingle: async () => answer(table === "client_intake" ? (opts.dob ? { date_of_birth: opts.dob } : null) : null),
       then: (resolve: (v: unknown) => void) => resolve(answer(table === "group_memberships" ? opts.memberships : [])),
     };

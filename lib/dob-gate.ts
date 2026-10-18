@@ -73,8 +73,20 @@ export async function loadDobGate(supabase: SupabaseClient, userId: string): Pro
   if (membershipError) return { gate: "check_failed", groupId: null, dateOfBirth: null, profileBirthday: null, ageBand: "unknown", cacheable: false, guardian: null };
   const rows = (memberships ?? []) as { group_id: string; role: string }[];
   const hasCoachSeat = rows.some((m) => m.role === "coach");
-  const isClientOnly = rows.some((m) => m.role === "athlete") && !hasCoachSeat;
+  const hasAthleteSeat = rows.some((m) => m.role === "athlete");
   const groupId = rows.find((m) => m.role === "athlete")?.group_id ?? null;
+  // Staff are not "client only" even when their only group seat is an athlete seat (a gym owner who also trains, a front-desk person): anyone who holds an organization role (owner, admin, coach: clients belong to an
+  // organization only through a group) or a front-desk seat is treated like a coach seat. Looked up only when it could matter (an athlete seat and no coach seat); a failed lookup is a failed check.
+  let isStaff = false;
+  if (hasAthleteSeat && !hasCoachSeat) {
+    const [{ data: orgRows, error: orgError }, { data: deskRows, error: deskError }] = await Promise.all([
+      supabase.from("organization_memberships").select("organization_id").eq("profile_id", userId).limit(1),
+      supabase.from("org_front_desk").select("organization_id").eq("profile_id", userId).limit(1),
+    ]);
+    if (orgError || deskError) return { gate: "check_failed", groupId, dateOfBirth: null, profileBirthday: null, ageBand: "unknown", cacheable: false, guardian: null };
+    isStaff = ((orgRows as unknown[] | null) ?? []).length > 0 || ((deskRows as unknown[] | null) ?? []).length > 0;
+  }
+  const isClientOnly = hasAthleteSeat && !hasCoachSeat && !isStaff;
   if (!isClientOnly) return { gate: "ok", groupId, dateOfBirth: null, profileBirthday: null, ageBand: "unknown", cacheable: hasCoachSeat, guardian: null };
 
   const [{ data: intake, error: intakeError }, { data: details, error: detailsError }] = await Promise.all([

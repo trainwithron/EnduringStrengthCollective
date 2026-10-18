@@ -42,6 +42,6 @@ describe("every door a client can come through", () => {
     const mw = src("lib/supabase/middleware.ts");
     expect(mw).toContain("loadDobGate(supabase, user.id)");
     expect(mw).toContain("profile?.intake_required");
-    expect(src("lib/dob-gate.ts")).toContain("rows.some((m) => m.role === \"athlete\") && !hasCoachSeat");
+    expect(src("lib/dob-gate.ts")).toContain("hasAthleteSeat && !hasCoachSeat && !isStaff");
   });
 });

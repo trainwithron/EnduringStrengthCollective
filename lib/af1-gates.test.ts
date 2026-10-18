@@ -8,14 +8,20 @@ const teenDob = `${new Date().getFullYear() - 15}-01-01`;
 const childDob = `${new Date().getFullYear() - 10}-01-01`;
 
 // A stand-in database; any table can be made to fail.
-function fake(opts: { memberships: { group_id: string; role: string }[]; dob?: string | null; guardian?: string; failMemberships?: boolean }) {
+function fake(opts: { memberships: { group_id: string; role: string }[]; dob?: string | null; guardian?: string; failMemberships?: boolean; orgRoles?: number; frontDesk?: number; failTable?: string }) {
   const builder = (table: string) => {
     const b: any = {
       select: () => b,
       eq: () => b,
       maybeSingle: async () => ({ data: table === "client_intake" && opts.dob ? { date_of_birth: opts.dob } : null, error: null }),
-      then: (resolve: (v: unknown) => void) =>
-        resolve(table === "group_memberships" ? (opts.failMemberships ? { data: null, error: { message: "timeout" } } : { data: opts.memberships, error: null }) : { data: [], error: null }),
+      limit: () => b,
+      then: (resolve: (v: unknown) => void) => {
+        if (opts.failTable === table) return resolve({ data: null, error: { message: "timeout" } });
+        if (table === "group_memberships") return resolve(opts.failMemberships ? { data: null, error: { message: "timeout" } } : { data: opts.memberships, error: null });
+        if (table === "organization_memberships") return resolve({ data: Array.from({ length: opts.orgRoles ?? 0 }, () => ({ organization_id: "o" })), error: null });
+        if (table === "org_front_desk") return resolve({ data: Array.from({ length: opts.frontDesk ?? 0 }, () => ({ organization_id: "o" })), error: null });
+        return resolve({ data: [], error: null });
+      },
     };
     return b;
   };
@@ -51,6 +57,7 @@ describe("a failed read of the date is a failed check, not a missing date", () =
       const b: any = {
         select: () => b,
         eq: () => b,
+        limit: () => b,
         maybeSingle: async () => (t === table ? { data: null, error: { message: "timeout" } } : { data: null, error: null }),
         then: (resolve: (v: unknown) => void) => resolve(t === "group_memberships" ? { data: client, error: null } : { data: [], error: null }),
       };
@@ -64,6 +71,32 @@ describe("a failed read of the date is a failed check, not a missing date", () =
       expect(f.gate, table).toBe("check_failed");
       expect(f.cacheable, table).toBe(false);
     }
+  });
+});
+
+describe("staff are not client-only just because their only group seat is an athlete seat", () => {
+  it("an organization owner or admin who also trains as a client, with no birthday on file, is ok (the staff screens and their API calls work)", async () => {
+    const f = await loadDobGate(fake({ memberships: client, dob: null, orgRoles: 1 }), "u");
+    expect(f.gate).toBe("ok");
+    expect(f.cacheable).toBe(false);
+  });
+
+  it("a front-desk person with only an athlete seat is ok too", async () => {
+    expect((await loadDobGate(fake({ memberships: client, dob: null, frontDesk: 1 }), "u")).gate).toBe("ok");
+  });
+
+  it("a plain client with no organization role and no front-desk seat is still asked for the birthday, and a child is still blocked", async () => {
+    expect((await loadDobGate(fake({ memberships: client, dob: null }), "u")).gate).toBe("need_dob");
+    expect((await loadDobGate(fake({ memberships: client, dob: childDob }), "u")).gate).toBe("blocked");
+  });
+
+  it("a failed staff lookup is a failed check, never a pass", async () => {
+    for (const failTable of ["organization_memberships", "org_front_desk"]) expect((await loadDobGate(fake({ memberships: client, dob: null, failTable }), "u")).gate, failTable).toBe("check_failed");
+  });
+
+  it("the staff lookup only happens when it could matter (an athlete seat and no coach seat)", async () => {
+    const coach = await loadDobGate(fake({ memberships: [{ group_id: "g", role: "coach" }], failTable: "organization_memberships" }), "u");
+    expect(coach.gate).toBe("ok");
   });
 });
 
