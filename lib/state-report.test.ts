@@ -105,15 +105,16 @@ describe("the state report", () => {
   });
 
   it("one unchecked step does not take a bundle that has waiting steps off the waiting list", () => {
-    const bundle = bundles.find((b) => b.steps.length >= 2 && withChecks.some((p) => p.n === b.steps[0]) && withChecks.some((p) => p.n === b.steps[1]));
+    const bundle = bundles.find((b) => b.steps.length === 2 && withChecks.some((p) => p.n === b.steps[0]) && withChecks.some((p) => p.n === b.steps[1]));
     if (!bundle) return;
     // the first step is answered as not applied; the second has no answer at all
     const rows = withChecks.flatMap((p) => (p.n === bundle.steps[1] ? [] : answer(p.n, p.n === bundle.steps[0] ? false : true)));
     const found = summarize(rows, bundles, probes).bundles.find((b: BundleRow) => b.id === bundle.id)!;
-    expect(["waiting", "partly"]).toContain(found.status);
+    expect(found.status).toBe("waiting");
     expect(found.waitingSteps).toContain(bundle.steps[0]);
     expect(found.uncheckedSteps).toContain(bundle.steps[1]);
     expect(formatReport(summarize(rows, bundles, probes))).toContain("not checked (no check available)");
+    expect(formatReport(summarize(rows, bundles, probes))).toContain("waiting (some not checked)");
   });
 
   it("the command sends the query only to the read-only endpoint, keeps the token out of tracked files, and never writes to the database", () => {
@@ -121,6 +122,8 @@ describe("the state report", () => {
     expect(cli).toContain("/database/query/read-only");
     expect(cli).not.toMatch(/database\/query`/);
     expect(cli).toContain("refuseIfTokenIsTracked(token)");
+    expect(cli).toContain("input: token");
+    expect(cli).not.toMatch(/"--", token/);
     expect(cli).toContain('git("ls-files", "--error-unmatch", ".env.local")');
     expect(cli).toContain('git("check-ignore", "-q", ".env.local")');
     expect(cli).toContain("buildStateSql(probes)");

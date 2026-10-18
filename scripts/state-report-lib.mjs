@@ -77,7 +77,7 @@ export function summarize(rows, bundles, probes) {
       known.length === 0
         ? "unknown"
         : known.some((s) => s === "waiting" || s === "partly")
-          ? known.every((s) => s === "waiting") && known.length === states.length ? "waiting" : "partly"
+          ? known.every((s) => s === "waiting") ? "waiting" : "partly"
           : states.includes("unknown") ? "unknown" : "applied";
     return {
       id: b.id,
@@ -105,7 +105,7 @@ export function formatReport(summary, { all = false } = {}) {
   lines.push(`WAITING FOR A PASTE (${waiting.length})`);
   if (waiting.length === 0) lines.push("  nothing: every paste is applied");
   for (const b of waiting) {
-    lines.push(`  ${b.status === "partly" ? "PARTLY APPLIED" : "waiting"}  ${short(b.name)}  [steps ${b.waitingSteps.join(", ")}]  file: supabase/apply/${b.file}`);
+    lines.push(`  ${b.status === "partly" ? "PARTLY APPLIED" : b.uncheckedSteps.length > 0 ? "waiting (some not checked)" : "waiting"}  ${short(b.name)}  [steps ${b.waitingSteps.join(", ")}]  file: supabase/apply/${b.file}`);
     if (b.uncheckedSteps.length > 0) lines.push(`      not checked (no check available): steps ${b.uncheckedSteps.join(", ")}`);
   }
   if (unknown.length > 0) {

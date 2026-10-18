@@ -39,7 +39,8 @@ function envValue(name) {
 
 // Refuses to go on if the token text appears in any file git tracks.
 function refuseIfTokenIsTracked(token) {
-  const found = git("grep", "-F", "-q", "--", token);
+  // the token goes in on standard input, never on the command line where other programs could see it
+  const found = spawnSync("git", ["grep", "-F", "-q", "-f", "-"], { cwd: root, input: token, encoding: "utf8" });
   if (found.status === 0) throw new Error("The access token appears in a file that git tracks. Remove it from that file (and rotate it in the Supabase dashboard) before using it here.");
 }
 
