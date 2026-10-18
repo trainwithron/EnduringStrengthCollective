@@ -46,7 +46,7 @@ export function CoachTypeSetting({ profileId, initial }: { profileId: string; in
         ))}
       </div>
       <p className="font-body text-xs text-steel mt-2">
-        A team coach&apos;s menus leave out booking pages, availability, session types, the website, the pro shop and referrals, leads and the session ledger. They come back if you choose another option here, and they always stay if you have a one-on-one client or own or administer an organization.
+        A team coach&apos;s menus leave out booking pages, availability, session types, the website, the pro shop and referrals, leads and the session ledger. They come back if you choose another option here, and they always stay if you have a one-on-one client or run an organization with other coaches or staff.
       </p>
       {message && (
         <p className="font-body text-xs text-steel mt-1" role="status">

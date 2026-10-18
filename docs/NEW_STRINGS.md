@@ -110,5 +110,5 @@
 
 ## Release S3 (team coach)
 
-- Settings > What you coach: "A team coach's menus leave out booking pages, availability, session types, the website, the pro shop and referrals, leads and the session ledger. They come back if you choose another option here, and they always stay if you have a one-on-one client or own or administer an organization."
+- Settings > What you coach: "A team coach's menus leave out booking pages, availability, session types, the website, the pro shop and referrals, leads and the session ledger. They come back if you choose another option here, and they always stay if you have a one-on-one client or run an organization with other coaches or staff."
 - Home tiles: "Roster" / "Your players, their positions and seasons."; "Depth chart" / "Who plays where, by position."; "Practices and games" / "The team calendar."; "Attendance" / "Who was there, day by day."; "Weight room" / "Check players in at the kiosk."; "TV display" / "Put the board on the weight-room screen."

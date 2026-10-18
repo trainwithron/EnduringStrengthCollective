@@ -4,7 +4,7 @@ import type { CoachType } from "@/lib/coach-type";
 // The team coach (Ron, Oct 17): a coach who said at signup that they coach "a team or a class" (profiles.coach_type = 'team') gets the team home, and the business tools that only make sense for selling to clients are
 // left out of their menus: booking pages and availability, session types, the website, the pro shop and referrals, leads and the session ledger. Nothing is removed from the app and the pages still open for anyone who
 // goes to them; this only decides what the menus show.
-// coach_type is what the coach SAID, not what they do, so the menus are only trimmed for a coach who really only coaches teams: one with a one-on-one client, or who owns or administers an organization, keeps every menu
+// coach_type is what the coach SAID, not what they do, so the menus are only trimmed for a coach who really only coaches teams: one with a one-on-one client, or who owns or administers an organization that is run with other people, keeps every menu
 // (they use those tools). A coach who changes what they coach in Settings gets the other menus back at once.
 export const TEAM_COACH_HIDDEN_NAV = new Set(["resources", "website", "availability", "session-types", "booking-page", "leads", "session-ledger"]);
 
@@ -12,12 +12,12 @@ export interface CoachNavFacts {
   coachType: CoachType | null;
   // The coach has a client of their own in a one-on-one space.
   hasOneOnOneClients: boolean;
-  // The coach owns or administers an organization.
-  isOrgOwnerOrAdmin: boolean;
+  // The coach owns or administers an organization that has at least one other member (a coach or staff). The solo organization every self-signup coach gets does not count.
+  runsOrgWithOthers: boolean;
 }
 
 export const tradesMenusAsTeamCoach = (facts: CoachNavFacts | null | undefined): boolean =>
-  !!facts && facts.coachType === "team" && !facts.hasOneOnOneClients && !facts.isOrgOwnerOrAdmin;
+  !!facts && facts.coachType === "team" && !facts.hasOneOnOneClients && !facts.runsOrgWithOthers;
 
 export const hiddenForCoach = (facts: CoachNavFacts | null | undefined, navKey: string): boolean => tradesMenusAsTeamCoach(facts) && TEAM_COACH_HIDDEN_NAV.has(navKey);
 

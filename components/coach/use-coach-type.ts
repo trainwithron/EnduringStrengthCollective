@@ -25,7 +25,7 @@ export async function loadCoachNavFacts(): Promise<{ userId: string; facts: Coac
     if (cache && cache.userId === user.id) return cache;
     const [{ data: profile, error: profileError }, { data: roles, error: rolesError }, { data: coached, error: coachedError }] = await Promise.all([
       supabase.from("profiles").select("coach_type").eq("id", user.id).maybeSingle(),
-      supabase.from("organization_memberships").select("role").eq("profile_id", user.id),
+      supabase.from("organization_memberships").select("organization_id, role").eq("profile_id", user.id),
       supabase.from("group_memberships").select("group_id, groups ( group_kind )").eq("profile_id", user.id).eq("role", "coach"),
     ]);
     if (profileError || rolesError || coachedError) return null;
@@ -39,11 +39,19 @@ export async function loadCoachNavFacts(): Promise<{ userId: string; facts: Coac
       if (othersError) return null;
       hasOneOnOneClients = (others ?? []).length > 0 || oneOnOneIds.length > 100;
     }
+    // An organization they own or administer counts only when it is run with other people: every self-signup coach owns a solo organization, which is not "running a gym".
+    const runIds = ((roles ?? []) as { organization_id: string; role: string }[]).filter((r) => r.role === "owner" || r.role === "admin").map((r) => r.organization_id);
+    let runsOrgWithOthers = false;
+    if (runIds.length > 0) {
+      const { data: others, error: othersError } = await supabase.from("organization_memberships").select("profile_id").in("organization_id", runIds.slice(0, 100)).neq("profile_id", user.id).limit(1);
+      if (othersError) return null;
+      runsOrgWithOthers = (others ?? []).length > 0 || runIds.length > 100;
+    }
     const value = (profile as { coach_type?: string | null } | null)?.coach_type;
     const facts: CoachNavFacts = {
       coachType: isCoachType(value) ? value : null,
       hasOneOnOneClients,
-      isOrgOwnerOrAdmin: ((roles ?? []) as { role: string }[]).some((r) => r.role === "owner" || r.role === "admin"),
+      runsOrgWithOthers,
     };
     cache = { userId: user.id, facts };
     return cache;
