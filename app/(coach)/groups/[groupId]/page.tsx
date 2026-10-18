@@ -72,6 +72,8 @@ import { ReviewPromptSection } from "@/components/athlete/review-prompt-section"
 import type { TodayMacros, TodayHabit } from "@/components/athlete/today-widget";
 import type { WeightLogEntry } from "@/components/athlete/weight-log-widget";
 
+export const metadata = { title: "Home" };
+
 function monthLabel(year: number, monthIndex: number): string {
   return new Date(year, monthIndex, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
 }

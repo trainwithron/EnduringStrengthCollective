@@ -15,6 +15,8 @@ import { AvailabilityExceptionsManager } from "@/components/coach/desktop/availa
 import { TimezoneControl } from "@/components/coach/desktop/timezone-control";
 import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 
+export const metadata = { title: "Availability" };
+
 export default async function AvailabilityPage(
   props: {
     params: Promise<{ groupId: string }>;

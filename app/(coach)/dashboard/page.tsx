@@ -49,6 +49,8 @@ import { TerminologyFirstRunCard } from "@/components/coach/desktop/terminology-
 import { GettingStartedCard } from "@/components/coach/desktop/getting-started-card";
 import { NeedsYouLoader, NeedsYouLoading } from "@/components/coach/desktop/needs-you-loader";
 
+export const metadata = { title: "Home" };
+
 interface GroupRow {
   id: string;
   name: string;

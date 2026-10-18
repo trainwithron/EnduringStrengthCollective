@@ -56,7 +56,7 @@ export function GameScoreLogForm({
     <div className="flex items-end gap-3 mb-6">
       <div className="flex flex-col gap-1">
         <label className="font-body text-xs text-steel uppercase tracking-wide">Athlete</label>
-        <select
+        <select aria-label="Athlete"
           value={athleteId}
           onChange={(e) => setAthleteId(e.target.value)}
           className="h-10 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
@@ -70,7 +70,7 @@ export function GameScoreLogForm({
       </div>
       <div className="flex flex-col gap-1">
         <label className="font-body text-xs text-steel uppercase tracking-wide">Points</label>
-        <input
+        <input aria-label="Points"
           type="number"
           inputMode="numeric"
           min={0}

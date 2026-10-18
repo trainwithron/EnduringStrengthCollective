@@ -7,6 +7,8 @@ import { createServerClient } from "@/lib/supabase/server";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ProgressPhotoJournal } from "@/components/athlete/progress-photo-journal";
 
+export const metadata = { title: "Progress photos" };
+
 // Transformation Cards' private photo journal. Deliberately always the
 // REAL signed-in user's own id — never the "View as Client" effective
 // athlete used elsewhere in this app. A coach standing in for a client

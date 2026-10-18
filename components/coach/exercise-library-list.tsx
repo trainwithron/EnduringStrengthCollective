@@ -75,6 +75,8 @@ export function ExerciseLibraryList({
   const [exercises, setExercises] = useState(initialExercises);
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<LibraryFilters>(NO_FILTERS);
+  // Show only the exercises that still have no demo video (the gap to close, one at a time).
+  const [onlyWithoutVideo, setOnlyWithoutVideo] = useState(false);
   const [newName, setNewName] = useState("");
   const [newCategory, setNewCategory] = useState<string>("");
   const [newEquipmentType, setNewEquipmentType] = useState<string>("");
@@ -239,6 +241,7 @@ export function ExerciseLibraryList({
   const visible = exercises
     .filter((e) => e.name.toLowerCase().includes(search.trim().toLowerCase()))
     .filter((e) => matchesFilters({ pattern: e.pattern ?? null, unilateral: !!e.unilateral, tier: e.tier }, filters))
+    .filter((e) => !onlyWithoutVideo || !(e.videoPath || e.youtubeUrl))
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const withVideoCount = exercises.filter((e) => e.videoPath || e.youtubeUrl).length;
@@ -412,7 +415,7 @@ export function ExerciseLibraryList({
       </div>
       {/* The toolbar wraps on a narrow screen (a fixed-width search box plus the category and add controls ran off the right edge of a phone). */}
       <div className="flex flex-wrap items-center gap-3 mb-4">
-        <input
+        <input aria-label="Search exercises"
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -461,7 +464,7 @@ export function ExerciseLibraryList({
             </option>
           ))}
         </select>
-        <input
+        <input aria-label="New exercise name"
           type="text"
           value={newName}
           onChange={(e) => handleNewNameChange(e.target.value)}
@@ -530,11 +533,19 @@ export function ExerciseLibraryList({
           {exercises.length - withVideoCount > 0
             ? `${exercises.length - withVideoCount} still worth adding one to.`
             : "every exercise is covered."}
+          {exercises.length - withVideoCount > 0 && (
+            <>
+              {" "}
+              <button type="button" onClick={() => setOnlyWithoutVideo((v) => !v)} aria-pressed={onlyWithoutVideo} className="text-rust underline underline-offset-2">
+                {onlyWithoutVideo ? "Show all exercises" : "Show only those without a video"}
+              </button>
+            </>
+          )}
         </p>
       )}
 
       {visible.length === 0 ? (
-        <p className="font-body text-sm text-steel py-6">{filtersActive(filters) ? "No exercises match. Clear a filter." : "No exercises match."}</p>
+        <p className="font-body text-sm text-steel py-6">{onlyWithoutVideo && !search.trim() && !filtersActive(filters) ? "Every exercise has a video." : filtersActive(filters) || onlyWithoutVideo ? "No exercises match. Clear a filter." : "No exercises match."}</p>
       ) : (
         <div className="space-y-6">
           {grouped.map((group) => (
@@ -586,7 +597,7 @@ export function ExerciseLibraryList({
                         // above the list.
                         <span className="font-body text-xs text-amber-400">⚠ No video</span>
                       )}
-                      <select
+                      <select aria-label="Category"
                         value={ex.category ?? ""}
                         onChange={(e) => handleCategoryChange(ex.id, e.target.value)}
                         className="h-8 bg-surface border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust"
@@ -642,7 +653,7 @@ export function ExerciseLibraryList({
                           <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">
                             Description / instructions
                           </p>
-                          <textarea
+                          <textarea aria-label="How it is done"
                             defaultValue={ex.description ?? ""}
                             onBlur={(e) => handleDescriptionChange(ex.id, e.target.value)}
                             placeholder="How it's done, rules, setup — shown to any coach browsing this exercise."

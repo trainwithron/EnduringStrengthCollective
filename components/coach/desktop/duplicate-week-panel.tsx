@@ -661,7 +661,7 @@ export function DuplicateWeekPanel({
 
       <div className="flex items-center gap-2">
         <span className="font-body text-xs text-steel uppercase tracking-wide">Weeks to add</span>
-        <input
+        <input aria-label="Weeks to add"
           type="number"
           value={weeks}
           onChange={(e) => setWeeks(e.target.value)}
@@ -817,7 +817,7 @@ export function DuplicateWeekPanel({
             <div key={label} className="flex items-center gap-2">
               <span className="font-body text-xs text-steel w-20">{label}</span>
               <span className="font-body text-xs text-steel">Reps</span>
-              <input
+              <input aria-label={`${label} reps`}
                 type="number"
                 value={wave[i].reps}
                 onChange={(e) => updateWaveStep(i, { reps: Number(e.target.value) })}

@@ -7,6 +7,8 @@ import { StatFieldManager, type StatFieldRow } from "@/components/coach/desktop/
 import { GameStatGrid, type GameStatAthlete } from "@/components/coach/desktop/game-stat-grid";
 import { TeamGameScoreForm } from "@/components/coach/desktop/team-game-score-form";
 
+export const metadata = { title: "Games" };
+
 export default async function GameDetailPage(
   props: { params: Promise<{ groupId: string; gameId: string }> }
 ) {

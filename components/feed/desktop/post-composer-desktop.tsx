@@ -133,7 +133,7 @@ export function PostComposerDesktop({
 
   return (
     <div className="border border-steel/20 bg-surface/40 rounded-token-lg p-4 mb-6">
-      <textarea
+      <textarea aria-label={placeholderForChannel(defaultChannel)}
         value={body}
         onChange={(e) => {
           setBody(e.target.value);

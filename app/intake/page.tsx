@@ -1,3 +1,4 @@
+import { readHealthAnswers } from "@/lib/health-answers";
 import { LoadFailedPage } from "@/components/ui/load-failed-page";
 import { isReadFailure } from "@/lib/read-failed";
 import { redirect } from "next/navigation";
@@ -5,6 +6,8 @@ import { safePushPath } from "@/lib/push-url";
 import { createServerClient } from "@/lib/supabase/server";
 import { IntakeForm } from "@/components/intake/intake-form";
 import { SignOutButton } from "@/components/group/sign-out-button";
+
+export const metadata = { title: "Intake" };
 
 export default async function IntakePage(
   props: { searchParams: Promise<{ next?: string }> }
@@ -57,9 +60,11 @@ export default async function IntakePage(
 
   const { data: existing } = await supabase
     .from("client_intake")
-    .select("par_q_answers, waiver_accepted, waiver_signed_name, completed_at, date_of_birth")
+    .select("waiver_accepted, waiver_signed_name, completed_at, date_of_birth")
     .eq("athlete_id", user.id)
     .maybeSingle();
+  // Their own answers, through the same door everyone else uses.
+  const ownAnswers = await readHealthAnswers(supabase, user.id);
 
   const { data: consent } = await supabase
     .from("minor_consent")
@@ -87,7 +92,7 @@ export default async function IntakePage(
           waiverText={org?.waiver_text ?? null}
           waiverPdfUrl={waiverPdfUrl}
           nextUrl={searchParams.next && safePushPath(searchParams.next) !== "/" ? safePushPath(searchParams.next) : `/groups/${membership.group_id}`}
-          initialParQAnswers={(existing?.par_q_answers as { question: string; answer: boolean }[]) ?? []}
+          initialParQAnswers={ownAnswers.kind === "ok" ? ownAnswers.answers : []}
           initialWaiverAccepted={existing?.waiver_accepted ?? false}
           initialWaiverSignedName={existing?.waiver_signed_name ?? ""}
           alreadyCompleted={!!existing?.completed_at}

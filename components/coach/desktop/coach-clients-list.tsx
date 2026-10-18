@@ -82,7 +82,7 @@ export function CoachClientsList({ rows, selfName = null }: { rows: CoachClientR
       ) : (
         view === "cards" ? <ClientsCardView rows={shown} /> : <ClientsListView rows={shown} />
       )}
-      <p className="font-body text-[11px] text-steel/70 mt-2">The number is how many sessions are left to schedule.</p>
+      <p className="font-body text-[11px] text-steel mt-2">The number is how many sessions are left to schedule.</p>
     </div>
   );
 }
@@ -103,7 +103,7 @@ export function ClientsListView({ rows }: { rows: CoachClientRow[] }) {
                         owed {c.owed}
                       </span>
                     )}
-                    <span title={`${c.toBook} left to schedule`} aria-label={`${c.toBook} left to schedule`} className={`font-body text-sm tabular-nums w-7 text-right ${c.toBook > 0 ? "text-chalk" : "text-steel/40"}`}>
+                    <span title={`${c.toBook} left to schedule`} aria-label={`${c.toBook} left to schedule`} className={`font-body text-sm tabular-nums w-7 text-right ${c.toBook > 0 ? "text-chalk" : "text-steel"}`}>
                       {c.toBook}
                     </span>
                   </span>
@@ -143,10 +143,10 @@ export function ClientsCardView({ rows }: { rows: CoachClientRow[] }) {
                   {KIND_LABEL[clientKind(c)]}
                   {c.setAside ? " · set aside" : ""}
                 </span>
-                {c.groupKind !== "one_on_one" && c.groupName && <span className="block font-body text-xs text-steel/80 truncate">{c.groupName}</span>}
+                {c.groupKind !== "one_on_one" && c.groupName && <span className="block font-body text-xs text-steel truncate">{c.groupName}</span>}
               </span>
               <span className="flex flex-col items-end shrink-0">
-                <span title={`${c.toBook} left to schedule`} aria-label={`${c.toBook} left to schedule`} className={`font-display text-xl tabular-nums leading-none ${c.toBook > 0 ? "text-chalk" : "text-steel/40"}`}>
+                <span title={`${c.toBook} left to schedule`} aria-label={`${c.toBook} left to schedule`} className={`font-display text-xl tabular-nums leading-none ${c.toBook > 0 ? "text-chalk" : "text-steel"}`}>
                   {c.toBook}
                 </span>
                 <span className="font-body text-[10px] text-steel mt-1">to schedule</span>

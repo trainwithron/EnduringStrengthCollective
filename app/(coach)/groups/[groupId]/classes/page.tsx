@@ -8,6 +8,8 @@ import { loadClassCards } from "@/lib/class-cards";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { getGroupCoachTimezone } from "@/lib/timezone";
 
+export const metadata = { title: "Classes" };
+
 // A client's Group sessions page: the coach's small-group sessions, spots left, one tap to join. Needs migration 0263.
 export default async function ClassesPage(props: { params: Promise<{ groupId: string }> }) {
   const params = await props.params;

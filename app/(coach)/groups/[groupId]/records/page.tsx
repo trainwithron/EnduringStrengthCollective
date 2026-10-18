@@ -12,6 +12,8 @@ import { loadNameProtectedIds } from "@/lib/minor-names";
 import { shownName } from "@/lib/shown-name";
 import { onSharedBoards } from "@/lib/board-visibility";
 
+export const metadata = { title: "Records" };
+
 interface RecordRow {
   id: string;
   exerciseName: string;

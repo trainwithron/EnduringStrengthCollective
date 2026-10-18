@@ -126,7 +126,7 @@ export function RevenueSplitEditor({
                   {coach?.role === "owner" && <span className="text-steel"> (owner)</span>}
                 </span>
                 <div className="flex items-center gap-3">
-                  <input
+                  <input aria-label={`Share for ${share.fullName}`}
                     type="number"
                     min={0}
                     max={maxShareFor(share.profileId)}

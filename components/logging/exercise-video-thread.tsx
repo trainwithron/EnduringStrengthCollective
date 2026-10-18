@@ -235,7 +235,7 @@ function VideoWithComments({
 
       {viewerId && (
         <div className="flex items-center gap-2 mt-2">
-          <input
+          <input aria-label="Add feedback"
             type="text"
             value={body}
             onChange={(e) => setBody(e.target.value)}

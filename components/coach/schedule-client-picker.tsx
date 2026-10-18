@@ -35,7 +35,7 @@ export function ScheduleClientPicker({
       <label className="font-body text-xs text-steel uppercase tracking-wide">
         Calendar for
       </label>
-      <select
+      <select aria-label="Calendar for"
         value={selectedId ?? ""}
         onChange={(e) => {
           const value = e.target.value;

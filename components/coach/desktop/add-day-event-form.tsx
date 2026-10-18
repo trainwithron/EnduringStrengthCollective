@@ -44,7 +44,7 @@ export function AddDayEventForm({ coachId, dateKey, organizationId }: { coachId:
         <label className="font-body text-xs text-steel uppercase tracking-wide mb-1 block">
           Add a to-do or event
         </label>
-        <input
+        <input aria-label="Add a to-do or event"
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -52,7 +52,7 @@ export function AddDayEventForm({ coachId, dateKey, organizationId }: { coachId:
           className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2.5 font-body text-sm"
         />
       </div>
-      <input
+      <input aria-label="Time (optional)"
         type="time"
         value={time}
         onChange={(e) => setTime(e.target.value)}
