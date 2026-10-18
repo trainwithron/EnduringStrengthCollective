@@ -28,6 +28,7 @@ import { NeedsPaymentPanel } from "@/components/coach/desktop/needs-payment-pane
 import { LateChangesPanel } from "@/components/coach/late-changes-panel";
 import { ScheduleRequestsPanel } from "@/components/coach/schedule-requests-panel";
 import { LeavingCoachBanner } from "@/components/coach/leaving-coach-banner";
+import { TeamCoachHome } from "@/components/coach/team-coach-home";
 import { loadMyDepartures } from "@/lib/leaving-coach";
 import { supportEmail } from "@/lib/legal";
 import { ExpiryCheckInPanel } from "@/components/coach/expiry-checkin-panel";
@@ -536,6 +537,14 @@ export default async function CoachHomePage() {
   // recommended order is static layout, then smart backend (both here),
   // then customization last.
   // One section per organization they are leaving, each exporting THAT organization (from their own coached groups, which are read before the page is narrowed to the active organization).
+  // A coach who said they coach a team gets the team tiles on top of Home (lib/team-coach.ts). A failed read just means the usual Home.
+  let isTeamCoach = false;
+  try {
+    const { data: typeRow } = await supabase.from("profiles").select("coach_type").eq("id", user.id).maybeSingle();
+    isTeamCoach = (typeRow as { coach_type?: string | null } | null)?.coach_type === "team";
+  } catch {
+    isTeamCoach = false;
+  }
   const departures = await loadMyDepartures(supabase, user.id);
   const myCoachedGroups = (coachedRows ?? []).map((row) => (row as any).groups as GroupRow | null).filter((g): g is GroupRow => !!g);
   const departuresWithExport = departures.map((d) => ({ ...d, exportGroupId: myCoachedGroups.find((g) => g.organization_id === d.organizationId)?.id ?? null }));
@@ -544,6 +553,7 @@ export default async function CoachHomePage() {
       <DashboardAutoRefresh />
       {stuckInDesktopModeOnRealPhone && <StuckDesktopModeBanner />}
       <LeavingCoachBanner departures={departuresWithExport} supportEmail={supportEmail()} />
+      {isTeamCoach && teamGroups[0] && <TeamCoachHome groupId={teamGroups[0].id} teamName={teamGroups[0].name} />}
       <CoachProfileEditor
         coachId={user.id}
         coachName={viewerProfile?.full_name ?? "Coach"}

@@ -107,3 +107,6 @@
 - Banner (every page, while a change is waiting): "Your coach asked to change your sign-in email to {masked}. Nothing has changed yet: it changes only if that address confirms. If you did not expect this, cancel it." [Cancel the change]
 - Page when too early: "This can be confirmed in about {n} hour(s). A day is kept on purpose so the current address has time to object. Come back to this same link then." Refusals: "This change can't be confirmed yet..." / "This request is out of date (the situation changed since it was asked for), so nothing was changed. Ask your coach to start it again."
 - The client's notice now says "...it changes only if that address confirms, and not before tomorrow. If you did not expect this, cancel it from the banner at the top of the app."
+
+## Release S3 (team coach)
+- Home tiles: "Roster" / "Your players, their positions and seasons."; "Depth chart" / "Who plays where, by position."; "Practices and games" / "The team calendar."; "Attendance" / "Who was there, day by day."; "Weight room" / "Check players in at the kiosk."; "TV display" / "Put the board on the weight-room screen."
