@@ -78,6 +78,15 @@ describe("collecting a person's download", () => {
     expect(out?.complete).toBe(false);
   });
 
+  it("stops at a total size in bytes too, so a very wide download cannot pass the file or time limit, and names what it left out", async () => {
+    const wide = Array.from({ length: 10 }, (_, i) => ({ id: `r${i}`, blob: "x".repeat(1000) }));
+    const out = await collectEverything(fakeClient({ "a.athlete_id": wide, "b.athlete_id": wide }), { pageRows: 2, maxTotalBytes: 5000 });
+    const total = Object.values(out!.tables).reduce((n, t) => n + t.rows.length, 0);
+    expect(total).toBeLessThan(20);
+    expect(Object.values(out!.tables).some((t) => /size limit/.test(t.note ?? ""))).toBe(true);
+    expect(out?.complete).toBe(false);
+  });
+
   it("stops reading when the time runs out and says so", async () => {
     let clock = 0;
     const out = await collectEverything(fakeClient({ "a.athlete_id": rows(6) }), { pageRows: 2, timeBudgetMs: 100, now: () => (clock += 60) });

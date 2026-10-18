@@ -7,7 +7,8 @@ export const EXPORT_BUCKET = "account-exports";
 export const PAGE_ROWS = 1000;
 export const MAX_ROWS_PER_TABLE = 50_000;
 export const MAX_TOTAL_ROWS = 300_000;
-export const TIME_BUDGET_MS = 40_000;
+export const MAX_TOTAL_BYTES = 60 * 1024 * 1024;
+export const TIME_BUDGET_MS = 35_000;
 const CONCURRENCY = 4;
 // A response over about 4.5 MB is refused by the host, so anything over this is handed over as a short-lived private link instead.
 export const INLINE_LIMIT_BYTES = 4_000_000;
@@ -37,12 +38,13 @@ export const noteFor = (error: { message: string; code?: string }): string => (e
  */
 export async function collectEverything(
   client: ExportClient,
-  options: { now?: () => number; pageRows?: number; maxRowsPerTable?: number; maxTotalRows?: number; timeBudgetMs?: number } = {},
+  options: { now?: () => number; pageRows?: number; maxRowsPerTable?: number; maxTotalRows?: number; maxTotalBytes?: number; timeBudgetMs?: number } = {},
 ): Promise<{ tables: Record<string, ExportTable>; complete: boolean } | null> {
   const now = options.now ?? Date.now;
   const pageRows = options.pageRows ?? PAGE_ROWS;
   const perTable = options.maxRowsPerTable ?? MAX_ROWS_PER_TABLE;
   const total = options.maxTotalRows ?? MAX_TOTAL_ROWS;
+  const maxBytes = options.maxTotalBytes ?? MAX_TOTAL_BYTES;
   const started = now();
   const budget = options.timeBudgetMs ?? TIME_BUDGET_MS;
 
@@ -52,6 +54,7 @@ export async function collectEverything(
 
   const tables: Record<string, ExportTable> = {};
   let used = 0;
+  let bytes = 0;
   let complete = true;
   let next = 0;
 
@@ -59,7 +62,7 @@ export async function collectEverything(
     const key = `${tbl}.${col}`;
     const out: ExportTable = { rows: [], truncated: false };
     for (let offset = 0; ; offset += pageRows) {
-      if (used >= total) {
+      if (used >= total || bytes >= maxBytes) {
         out.truncated = true;
         out.note = "Left out: the download reached its size limit.";
         break;
@@ -82,6 +85,7 @@ export async function collectEverything(
       const got = ((page.data as { rows?: unknown }).rows ?? []) as Record<string, unknown>[];
       const more = Boolean((page.data as { more?: unknown }).more);
       out.rows.push(...got);
+      bytes += JSON.stringify(got).length;
       used -= room - got.length;
       if (!more) break;
       if (out.rows.length >= perTable) {
