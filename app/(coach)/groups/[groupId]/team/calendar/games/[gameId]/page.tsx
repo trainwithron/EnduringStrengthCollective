@@ -7,6 +7,8 @@ import { StatFieldManager, type StatFieldRow } from "@/components/coach/desktop/
 import { GameStatGrid, type GameStatAthlete } from "@/components/coach/desktop/game-stat-grid";
 import { TeamGameScoreForm } from "@/components/coach/desktop/team-game-score-form";
 import { readPositionRoster } from "@/lib/group-roster-reads";
+import { loadNameProtectedIds } from "@/lib/minor-names";
+import { shownName } from "@/lib/shown-name";
 
 export const metadata = { title: "Games" };
 
@@ -60,9 +62,11 @@ export default async function GameDetailPage(
 
   const fields: StatFieldRow[] = (fieldRows ?? []).map((f) => ({ id: f.id, name: f.name, sortOrder: f.sort_order }));
 
+  // A non-coach sees anyone who is not a confirmed adult as a first name and last initial (the roster of a youth team is not a list of children's full names).
+  const protectedIds = isCoach ? new Set<string>() : await loadNameProtectedIds((memberRows ?? []).map((m) => m.profileId));
   let athletes: GameStatAthlete[] = (memberRows ?? []).map((m) => ({
     profileId: m.profileId,
-    fullName: m.fullName ?? "Unknown",
+    fullName: shownName(m.fullName ?? "Unknown", m.profileId, protectedIds),
     positionId: m.positionId,
   }));
   // A position-scoped coach only sees (and can only save) their own

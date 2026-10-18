@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Search, Delete } from "lucide-react";
+import { FRONT_DESK_MIN_QUERY } from "@/lib/front-desk";
 
 interface RosterEntry {
   athleteId: string;
@@ -33,7 +34,8 @@ export function KioskCheckinScreen({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return roster;
+    // Nobody is listed until a couple of letters are typed: a tablet at the door does not show everyone at once.
+    if (q.length < FRONT_DESK_MIN_QUERY) return [];
     return roster.filter((r) => r.fullName.toLowerCase().includes(q));
   }, [roster, query]);
 
@@ -187,7 +189,10 @@ export function KioskCheckinScreen({
       </div>
 
       <div className="max-w-md mx-auto space-y-2 max-h-[60vh] overflow-y-auto">
-        {filtered.length === 0 && (
+        {query.trim().length < FRONT_DESK_MIN_QUERY && (
+          <p className="font-body text-sm text-steel text-center py-6">Type the first letters of your name.</p>
+        )}
+        {query.trim().length >= FRONT_DESK_MIN_QUERY && filtered.length === 0 && (
           <p className="font-body text-sm text-steel text-center py-6">No match.</p>
         )}
         {filtered.map((r) => (

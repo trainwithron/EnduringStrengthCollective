@@ -49,8 +49,9 @@ import { resolveShowName } from "@/lib/share-name";
 
 describe("the default depends on age until the client chooses (Ron's decision)", () => {
   const asOf = new Date("2026-10-11T12:00:00");
-  it("a client's own choice always wins", () => {
-    expect(resolveShowName(true, "2015-01-01", asOf)).toBe(true);
+  it("an adult's own choice wins; a minor's stored choice never turns the name on", () => {
+    expect(resolveShowName(true, "2015-01-01", asOf)).toBe(false);
+    expect(resolveShowName(true, "1990-01-01", asOf)).toBe(true);
     expect(resolveShowName(false, "1990-01-01", asOf)).toBe(false);
   });
   it("no choice yet: off under 18, on for an adult, OFF when there is no date of birth (release E)", () => {

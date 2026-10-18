@@ -6,6 +6,8 @@ import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { LeaderboardRows } from "@/components/leaderboard/leaderboard-rows";
 import { GameScoreLogForm } from "@/components/coach/desktop/game-score-log-form";
 import { computeGameLeaderboard } from "@/lib/game-leaderboard";
+import { loadNameProtectedIds } from "@/lib/minor-names";
+import { shownName } from "@/lib/shown-name";
 
 export const metadata = { title: "Games" };
 
@@ -53,9 +55,11 @@ export default async function GameLeaderboardPage(
       : Promise.resolve({ data: null }),
   ]);
 
+  // Anyone who is not a confirmed adult is shown to the other athletes as a first name and last initial (the coach sees full names), like every other board.
+  const protectedIds = isCoach ? new Set<string>() : await loadNameProtectedIds((entryRows ?? []).map((e: any) => e.athlete_id as string));
   const entries = (entryRows ?? []).map((e: any) => ({
     athleteId: e.athlete_id,
-    fullName: e.profiles?.full_name ?? "Unknown",
+    fullName: shownName(e.profiles?.full_name ?? "Unknown", e.athlete_id as string, protectedIds),
     points: Number(e.points),
   }));
   const ranking = computeGameLeaderboard(entries);

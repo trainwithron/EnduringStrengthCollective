@@ -5,6 +5,8 @@ import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
 import { KioskCheckinScreen } from "@/components/coach/kiosk-checkin-screen";
 import { loadKioskPinStatus } from "@/lib/kiosk-pin-status";
+import { loadNameProtectedIds } from "@/lib/minor-names";
+import { shownName } from "@/lib/shown-name";
 
 export const metadata = { title: "Kiosk" };
 
@@ -60,10 +62,12 @@ export default async function KioskPage(
     .eq("role", "athlete");
   const pinStatus = await loadKioskPinStatus(supabase, params.groupId);
 
+  // A shared tablet at the entrance: anyone who is not a confirmed adult appears as a first name and last initial, here and on the confirmation screen.
+  const protectedIds = await loadNameProtectedIds((memberships ?? []).map((m: any) => m.profile_id as string));
   const roster = (memberships ?? [])
     .map((m: any) => ({
       athleteId: m.profile_id as string,
-      fullName: (m.profiles?.full_name as string | null) ?? "Unknown",
+      fullName: shownName((m.profiles?.full_name as string | null) ?? "Unknown", m.profile_id as string, protectedIds),
       hasPin: pinStatus.get(m.profile_id as string) ?? false,
     }))
     .sort((a, b) => a.fullName.localeCompare(b.fullName));

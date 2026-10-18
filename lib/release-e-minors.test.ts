@@ -97,11 +97,12 @@ describe("who is shown by a shortened name", () => {
 
 describe("a shared picture protects someone whose age is not known", () => {
   const asOf = new Date("2026-10-11T12:00:00");
-  it("the name is hidden by default under 18 AND when there is no date of birth; a choice always wins", () => {
+  it("the name is hidden by default under 18 AND when there is no date of birth; an adult's choice wins and a minor's never turns it on", () => {
     expect(resolveShowName(null, null, asOf)).toBe(false);
     expect(resolveShowName(null, "2012-05-05", asOf)).toBe(false);
     expect(resolveShowName(null, "1985-03-03", asOf)).toBe(true);
-    expect(resolveShowName(true, null, asOf)).toBe(true);
+    expect(resolveShowName(true, null, asOf)).toBe(false);
+    expect(resolveShowName(true, "1985-03-03", asOf)).toBe(true);
   });
   it("the photo is hidden whenever the name is", () => {
     expect(src("lib/shared-workout.ts")).toContain("athleteAvatarUrl: nameHidden ? null :");
