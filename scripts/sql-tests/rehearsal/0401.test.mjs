@@ -50,6 +50,16 @@ export default {
       r = await tryQ(db, `insert into public.graduation_exports (group_id, athlete_id) values ($1, $2)`, [g, senior]);
       h.check("a player is recorded once per season", !!r.error);
 
+      // ---- the deciding year cannot be written directly, by a coach or by anyone
+      await h.as(coach);
+      r = await tryQ(db, `update public.groups set graduates_through = 2026 where id = $1`, [g]);
+      h.check("a coach cannot change the graduation year of a season directly", !!r.error, JSON.stringify(r));
+      await h.asSuper();
+      r = await tryQ(db, `update public.groups set graduates_through = 2026 where id = $1`, [g]);
+      h.check("nor can anyone else outside start_next_season", !!r.error, JSON.stringify(r));
+      r = await tryQ(db, `update public.groups set name = name where id = $1`, [g]);
+      h.check("other changes to the season are untouched", !r.error, JSON.stringify(r));
+
       // ---- a made-up year is ignored (only this year or the next to it is kept)
       const g2 = await h.group(org, coach, "team", "GR Other 2026");
       await h.member(g2, senior);

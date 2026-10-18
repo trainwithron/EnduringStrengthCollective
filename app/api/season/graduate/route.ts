@@ -3,9 +3,8 @@ import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { rateLimitResponse } from "@/lib/rate-limit";
 import { isEmailConfigured, sendEmail } from "@/lib/email";
-import { isPlaceholderEmail } from "@/lib/placeholder-email";
 import { buildTextPdf } from "@/lib/simple-pdf";
-import { graduationEmail, hasGraduatedBy, historyLines } from "@/lib/graduation";
+import { decidingYear, graduationEmail, hasGraduatedBy, historyLines, mailableAddress } from "@/lib/graduation";
 import { pageAll } from "@/lib/page-all";
 import { loadTrainingHistory } from "@/lib/graduation-server";
 import { sendGraduationHistories, type Claim } from "@/lib/graduation-send";
@@ -50,7 +49,7 @@ export async function POST(request: Request) {
   if (!isEmailConfigured()) return NextResponse.json({ sent: 0, skipped: 0, problems: [], uncertain: [], remaining: 0, emailOff: true });
 
   // The one year that decides who has graduated, fixed when the season was retired.
-  const year = typeof group.graduates_through === "number" ? group.graduates_through : new Date(group.archived_at as string).getUTCFullYear();
+  const year = decidingYear(group.graduates_through, group.archived_at as string);
 
   // Players of the retired season whose class has graduated and who are not on next season's roster.
   const [oldRead, nextRead, exportRead] = await Promise.all([
@@ -95,10 +94,11 @@ export async function POST(request: Request) {
   const result = await sendGraduationHistories(
     graduates.map((g) => ({ id: g.profile_id, name: nameOf(g) })),
     {
+      // Only an address the player has actually signed in with: a coach-created account is marked confirmed at creation, so a typo (jon@gmial.com) would look fine, and their whole history would go to a stranger.
       async addressOf(id) {
         const { data: auth } = await db.auth.admin.getUserById(id);
         const to = auth?.user?.email ?? "";
-        return !to || isPlaceholderEmail(to) ? null : to;
+        return mailableAddress(to, auth?.user?.last_sign_in_at);
       },
       // A unique row per season and player, made BEFORE the email goes. Any existing row means someone else has this player.
       async claim(id): Promise<Claim> {

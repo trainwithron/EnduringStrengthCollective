@@ -22,6 +22,32 @@ create table if not exists public.graduation_exports (
 alter table public.graduation_exports enable row level security;
 revoke all on public.graduation_exports from anon, authenticated;
 
+-- graduates_through is set by start_next_season and by nothing else: a coach (or anyone) updating the column directly is refused, so the year that decides who is emailed cannot be changed afterwards.
+create or replace function public.guard_graduates_through()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if current_setting('app.start_next_season', true) = 'on' then
+    return new;
+  end if;
+  if tg_op = 'INSERT' then
+    if new.graduates_through is not null then
+      raise exception 'The graduation year of a season is set when the season is retired.' using errcode = '42501';
+    end if;
+  elsif new.graduates_through is distinct from old.graduates_through then
+    raise exception 'The graduation year of a season is set when the season is retired.' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+revoke execute on function public.guard_graduates_through() from public, anon, authenticated;
+drop trigger if exists groups_guard_graduates_through on public.groups;
+create trigger groups_guard_graduates_through
+  before insert or update of graduates_through on public.groups
+  for each row execute function public.guard_graduates_through();
+
 create or replace function public.start_next_season(p_group uuid, p_name text, p_athletes uuid[], p_graduates_through int default null)
 returns uuid
 language plpgsql
@@ -44,7 +70,9 @@ begin
      and o.graduation_year is not null;
   -- the year that decided who had graduated, kept on the retired season (only a plausible year: this year or next to it)
   if p_graduates_through is not null and abs(p_graduates_through - extract(year from now())::int) <= 1 then
+    perform set_config('app.start_next_season', 'on', true);
     update public.groups set graduates_through = p_graduates_through where id = p_group;
+    perform set_config('app.start_next_season', 'off', true);
   end if;
   return v_new;
 end;

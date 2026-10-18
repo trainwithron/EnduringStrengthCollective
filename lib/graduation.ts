@@ -15,6 +15,18 @@ export function hasGraduatedBy(graduationYear: number | null | undefined, byYear
   return typeof graduationYear === "number" && Number.isFinite(graduationYear) && graduationYear <= byYear;
 }
 
+// The one year that decides who has graduated: the year fixed on the retired season when it was retired; for a season retired before that existed, the UTC year it was retired in. Nothing in a request changes it.
+export function decidingYear(graduatesThrough: number | null | undefined, archivedAt: string): number {
+  return typeof graduatesThrough === "number" ? graduatesThrough : new Date(archivedAt).getUTCFullYear();
+}
+
+// An address a graduation PDF may be sent to: not a placeholder, and one the player has signed in with at least once (proof it reaches them).
+export function mailableAddress(email: string | null | undefined, lastSignInAt: string | null | undefined): string | null {
+  const to = (email ?? "").trim();
+  if (!to || to.toLowerCase().endsWith("@pending.invalid") || !lastSignInAt) return null;
+  return to;
+}
+
 export function hasGraduated(graduationYear: number | null | undefined, now: Date = new Date()): boolean {
   return hasGraduatedBy(graduationYear, graduatedByYear(now));
 }

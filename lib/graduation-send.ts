@@ -29,7 +29,7 @@ export interface Problem {
 }
 
 export const WHY = {
-  noAddress: "there is no email address that can receive it (they were set up by their coach and never signed in)",
+  noAddress: "there is no email address we can be sure is theirs (they never signed in with it, so it may have been typed by their coach)",
   tooLong: "their history is longer than can be sent (over 2,000 workouts) or could not be read in full, so none of it was sent",
   sendFailed: "the email could not be sent just now; try again",
   recordFailed: "the app could not record the send, so nothing was sent; try again",

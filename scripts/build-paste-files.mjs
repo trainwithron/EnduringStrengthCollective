@@ -2924,6 +2924,8 @@ STEPS.push({
   afterwards: "Nothing changes on screen until the Release U1 code is live. Adds two empty columns (the player's graduation year, and the year a season's graduates were decided by) and one empty server-only table (who has been sent their history), and one new function, start_next_season, that calls the existing start_new_season (unchanged) and then copies the graduation year to the players brought into the new season. Nothing existing is replaced.",
   undo: [
     "drop function if exists public.start_next_season(uuid, text, uuid[], int);",
+    "drop trigger if exists groups_guard_graduates_through on public.groups;",
+    "drop function if exists public.guard_graduates_through();",
     "alter table public.groups drop column if exists graduates_through;",
     "drop table if exists public.graduation_exports;",
     "alter table public.group_memberships drop constraint if exists group_memberships_graduation_year_range;",

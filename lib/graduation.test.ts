@@ -134,7 +134,7 @@ describe("how the pieces are wired", () => {
     expect(route).toContain("!group.archived_at || !group.next_season_id");
     expect(route).toContain("hasGraduatedBy(r.graduation_year, year) && !staying.has(r.profile_id)");
     // the deciding year is the one fixed when the season was retired; the request body cannot change it
-    expect(route).toContain("typeof group.graduates_through === \"number\" ? group.graduates_through : new Date(group.archived_at as string).getUTCFullYear()");
+    expect(route).toContain("decidingYear(group.graduates_through, group.archived_at as string)");
     expect(route).not.toContain("body.year");
     expect(route).not.toMatch(/as \{[^}]*year\?/);
     expect(route).toContain("export const maxDuration = 300;");
@@ -143,7 +143,7 @@ describe("how the pieces are wired", () => {
     expect(route).toContain("doubtfulIds.has(r.profile_id)");
     expect(route).toContain("That player is not waiting on a decision.");
     expect(route).toContain("if (error) throw new Error(error.message);");
-    expect(route).toContain("isPlaceholderEmail(to)");
+    expect(route).toContain("mailableAddress(to, auth?.user?.last_sign_in_at)");
     expect(route).toContain("insert({ group_id: groupId, athlete_id: id })"); // the claim, made before anything is sent
     expect(route).toContain("let graduates = allGraduates.filter((r) => !sentIds.has(r.profile_id) && !inFlightIds.has(r.profile_id) && !doubtfulIds.has(r.profile_id));");
     expect(route).toContain("{ limit: PER_CALL }");
@@ -173,5 +173,19 @@ describe("how the pieces are wired", () => {
     const email = src("lib/email.ts");
     expect(email).toContain("attachment?: EmailAttachment");
     expect(email).toContain("...(attachment ? { attachment: [{ name: attachment.name, content: Buffer.from(attachment.bytes).toString(\"base64\") }] } : {})");
+  });
+});
+
+describe("the deciding year and the address check", () => {
+  it("the year stored on the retired season wins; an old season falls back to the year it was retired in", async () => {
+    const { decidingYear, mailableAddress } = await import("./graduation");
+    expect(decidingYear(2027, "2026-06-01T12:00:00Z")).toBe(2027);
+    expect(decidingYear(null, "2026-06-01T12:00:00Z")).toBe(2026);
+    expect(decidingYear(undefined, "2026-12-31T23:59:59Z")).toBe(2026);
+    // an address is only used once the player has signed in with it
+    expect(mailableAddress("sam@example.com", "2026-01-01T00:00:00Z")).toBe("sam@example.com");
+    expect(mailableAddress("sam@example.com", null)).toBeNull();
+    expect(mailableAddress("client-abc@pending.invalid", "2026-01-01T00:00:00Z")).toBeNull();
+    expect(mailableAddress("", "2026-01-01T00:00:00Z")).toBeNull();
   });
 });
