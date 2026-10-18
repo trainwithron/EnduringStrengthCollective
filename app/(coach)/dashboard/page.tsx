@@ -28,6 +28,8 @@ import { NeedsPaymentPanel } from "@/components/coach/desktop/needs-payment-pane
 import { LateChangesPanel } from "@/components/coach/late-changes-panel";
 import { ScheduleRequestsPanel } from "@/components/coach/schedule-requests-panel";
 import { LeavingCoachBanner } from "@/components/coach/leaving-coach-banner";
+import { TeamCoachHome } from "@/components/coach/team-coach-home";
+import { pickTileTeam } from "@/lib/team-coach";
 import { loadMyDepartures } from "@/lib/leaving-coach";
 import { supportEmail } from "@/lib/legal";
 import { ExpiryCheckInPanel } from "@/components/coach/expiry-checkin-panel";
@@ -47,12 +49,15 @@ import { TerminologyFirstRunCard } from "@/components/coach/desktop/terminology-
 import { GettingStartedCard } from "@/components/coach/desktop/getting-started-card";
 import { NeedsYouLoader, NeedsYouLoading } from "@/components/coach/desktop/needs-you-loader";
 
+export const metadata = { title: "Home" };
+
 interface GroupRow {
   id: string;
   name: string;
   focus_tag: string | null;
   group_kind: string | null;
   organization_id: string | null;
+  archived_at?: string | null;
 }
 
 export default async function CoachHomePage() {
@@ -172,7 +177,7 @@ export default async function CoachHomePage() {
     supabase.from("coach_profiles").select("bio, photo_url").eq("coach_id", user.id).maybeSingle(),
     supabase.from("profiles").select("terminology_asked_at").eq("id", user.id).maybeSingle(),
     supabase.from("coach_profiles").select("completion_message").eq("coach_id", user.id).maybeSingle(),
-    supabase.from("group_memberships").select("groups ( id, name, focus_tag, group_kind, organization_id )").eq("profile_id", user.id).eq("role", "coach"),
+    supabase.from("group_memberships").select("groups ( id, name, focus_tag, group_kind, organization_id, archived_at )").eq("profile_id", user.id).eq("role", "coach"),
     supabase.from("coach_dashboard_layout").select("hidden_tiles, tile_order, tile_metric_overrides").eq("coach_id", user.id).maybeSingle(),
     supabase.from("coach_briefings").select("id, briefing_date").eq("coach_id", user.id).gte("briefing_date", addDaysToKey(utcTodayKey, -1)).lte("briefing_date", addDaysToKey(utcTodayKey, 1)),
     supabase
@@ -197,7 +202,8 @@ export default async function CoachHomePage() {
   const byId = new Map<string, GroupRow>();
   for (const row of coachedRows ?? []) {
     const g = (row as any).groups as GroupRow | null;
-    if (g) byId.set(g.id, g);
+    // a retired season is not one of Home's teams
+    if (g && !g.archived_at) byId.set(g.id, g);
   }
   const adminOrgIds = (orgMemberships ?? [])
     .filter((m) => m.role === "owner" || m.role === "admin")
@@ -211,7 +217,7 @@ export default async function CoachHomePage() {
       : Promise.resolve({ data: null }),
     // Every group of the organizations they administer (more than 1,000 for a gym with that many one-on-one clients, so a page at a time), by name.
     adminOrgIds.length > 0
-      ? pageAll((from, to) => supabase.from("groups").select("id, name, focus_tag, group_kind, organization_id").in("organization_id", adminOrgIds).order("id").range(from, to)).then((r) => ({
+      ? pageAll((from, to) => supabase.from("groups").select("id, name, focus_tag, group_kind, organization_id, archived_at").in("organization_id", adminOrgIds).order("id").range(from, to)).then((r) => ({
           data: r.rows.sort((a, b) => String(a.name ?? "").localeCompare(String(b.name ?? ""))),
         }))
       : Promise.resolve({ data: null }),
@@ -223,7 +229,7 @@ export default async function CoachHomePage() {
           .order("sort_order", { ascending: true })
       : Promise.resolve({ data: null }),
   ]);
-  for (const g of allGroupRows.data ?? []) byId.set(g.id, g as GroupRow);
+  for (const g of allGroupRows.data ?? []) if (!(g as GroupRow).archived_at) byId.set(g.id, g as GroupRow);
 
   // Only the active organization's groups from here on (the coached groups above may span several organizations).
   for (const g of [...byId.values()]) if (inActiveOrg([g], homeOrgId).length === 0) byId.delete(g.id);
@@ -536,6 +542,17 @@ export default async function CoachHomePage() {
   // recommended order is static layout, then smart backend (both here),
   // then customization last.
   // One section per organization they are leaving, each exporting THAT organization (from their own coached groups, which are read before the page is narrowed to the active organization).
+  // A coach who said they coach a team gets the team tiles on top of Home (lib/team-coach.ts). A failed read just means the usual Home.
+  let isTeamCoach = false;
+  try {
+    const { data: typeRow } = await supabase.from("profiles").select("coach_type").eq("id", user.id).maybeSingle();
+    isTeamCoach = (typeRow as { coach_type?: string | null } | null)?.coach_type === "team";
+  } catch {
+    isTeamCoach = false;
+  }
+  // The teams the tiles are for: only teams this coach really coaches (getCoachedGroups leaves retired seasons out), in the organization Home is showing, the one they last worked in first.
+  const tileTeams = coachedForOrg.filter((g) => g.kind === "team" && (!homeOrgId || g.orgId === homeOrgId)).map((g) => ({ id: g.id, name: g.name }));
+  const tileTeam = pickTileTeam(tileTeams, rememberedWorkspace);
   const departures = await loadMyDepartures(supabase, user.id);
   const myCoachedGroups = (coachedRows ?? []).map((row) => (row as any).groups as GroupRow | null).filter((g): g is GroupRow => !!g);
   const departuresWithExport = departures.map((d) => ({ ...d, exportGroupId: myCoachedGroups.find((g) => g.organization_id === d.organizationId)?.id ?? null }));
@@ -544,6 +561,7 @@ export default async function CoachHomePage() {
       <DashboardAutoRefresh />
       {stuckInDesktopModeOnRealPhone && <StuckDesktopModeBanner />}
       <LeavingCoachBanner departures={departuresWithExport} supportEmail={supportEmail()} />
+      {isTeamCoach && tileTeams.length > 0 && tileTeam && <TeamCoachHome teams={tileTeams} initialId={tileTeam.id} />}
       <CoachProfileEditor
         coachId={user.id}
         coachName={viewerProfile?.full_name ?? "Coach"}

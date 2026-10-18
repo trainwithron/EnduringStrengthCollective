@@ -14,6 +14,8 @@ import { chunk } from "@/lib/chunk";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import type { CoachClientRow } from "@/lib/coach-client-filter";
 
+export const metadata = { title: "Clients" };
+
 // The coach's full client list: every client across all the groups they coach (a one-on-one client and a group member each appear once), wherever the coach
 // is standing. This is what "Clients" always means; a team or social group's own roster is "Members" (a different view).
 export default async function CoachClientsPage() {

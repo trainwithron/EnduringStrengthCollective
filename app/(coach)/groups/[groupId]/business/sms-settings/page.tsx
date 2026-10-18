@@ -9,6 +9,8 @@ import { SmsSettingsForm } from "@/components/coach/desktop/sms-settings-form";
 import { SMS_MONTHLY_CAP_MESSAGE, smsMonthlyCap, smsUsedThisMonth } from "@/lib/sms-dispatch";
 import { isTwilioConfigured } from "@/lib/twilio";
 
+export const metadata = { title: "Sms settings" };
+
 export default async function SmsSettingsPage(
   props: { params: Promise<{ groupId: string }> }
 ) {

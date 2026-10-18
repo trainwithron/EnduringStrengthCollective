@@ -8,6 +8,8 @@ import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { SessionTypeManager, type SessionTypeRow } from "@/components/coach/desktop/session-type-manager";
 
+export const metadata = { title: "Session types" };
+
 // gym_owner_multi_trainer_session_tracking_real_prospect.md — coach-wide,
 // not group-scoped (a session type isn't tied to one specific client's
 // group), same as coach_availability_windows. Reached from any group's

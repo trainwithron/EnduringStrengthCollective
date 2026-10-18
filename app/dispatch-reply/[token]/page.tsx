@@ -1,6 +1,8 @@
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { DispatchReplyForm } from "@/components/public/dispatch-reply-form";
 
+export const metadata = { title: "Dispatch reply" };
+
 // Public — where a prospect (no account) answers a trainer's
 // "ask a question" step. Token-gated, same shape as guardian_links'
 // own tokenized public access.

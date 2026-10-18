@@ -5,6 +5,8 @@ import { isEmailConfigured } from "@/lib/email";
 import { findRankedCoaches, type RankedCoachResult } from "@/lib/marketplace-browse";
 import type { GoalType } from "@/lib/marketplace-coach-ranking";
 
+export const metadata = { title: "Find a coach" };
+
 // public_marketplace_vision.md's real, buildable-now v1 — a prospect
 // searches by ZIP + goal, sees real ranked coaches. Deliberately public
 // (createServiceRoleClient, same trust model as /join/[orgSlug] and

@@ -151,7 +151,7 @@ export function RecapExerciseRow({
             <label className="font-body text-xs text-steel uppercase tracking-wide block mb-1">
               Note for this exercise
             </label>
-            <input
+            <input aria-label="Note for this exercise"
               type="text"
               value={note}
               onChange={(e) => setNote(e.target.value)}

@@ -177,7 +177,7 @@ export function KioskCheckinScreen({
 
       <div className="max-w-md mx-auto mb-6 relative">
         <Search className="w-5 h-5 text-steel absolute left-3 top-1/2 -translate-y-1/2" />
-        <input
+        <input aria-label="Search your name"
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}

@@ -7,6 +7,8 @@ import { createServerClient } from "@/lib/supabase/server";
 import { IntakeForm } from "@/components/intake/intake-form";
 import { SignOutButton } from "@/components/group/sign-out-button";
 
+export const metadata = { title: "Intake" };
+
 export default async function IntakePage(
   props: { searchParams: Promise<{ next?: string }> }
 ) {

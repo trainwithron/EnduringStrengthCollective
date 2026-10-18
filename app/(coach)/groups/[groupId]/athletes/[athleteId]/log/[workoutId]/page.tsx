@@ -9,6 +9,8 @@ import { getWorkoutOverviewData } from "@/lib/workout-overview-data";
 import { WorkoutOverviewView } from "@/components/logging/workout-overview-view";
 import { CoachModeBar } from "@/components/coach/mobile/coach-mode-bar";
 
+export const metadata = { title: "Log a workout" };
+
 export default async function LogWorkoutForClientPage(
   props: {
     params: Promise<{ groupId: string; athleteId: string; workoutId: string }>;

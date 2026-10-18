@@ -6,6 +6,8 @@ import { createServerClient } from "@/lib/supabase/server";
 import { KioskCheckinScreen } from "@/components/coach/kiosk-checkin-screen";
 import { loadKioskPinStatus } from "@/lib/kiosk-pin-status";
 
+export const metadata = { title: "Kiosk" };
+
 // The locked-down tablet-at-the-entrance screen (mobile_more_tab_
 // condensed_widget_hub_sept30.md's Kiosk Check-In follow-up). Same
 // bare-page precedent as app/groups/[groupId]/display/page.tsx — never

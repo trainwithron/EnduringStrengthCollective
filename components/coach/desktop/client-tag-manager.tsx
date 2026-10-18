@@ -143,7 +143,7 @@ export function ClientTagManager({
       )}
 
       <div className="flex items-center gap-2">
-        <input
+        <input aria-label="New tag name"
           type="text"
           value={newName}
           onChange={(e) => setNewName(e.target.value)}

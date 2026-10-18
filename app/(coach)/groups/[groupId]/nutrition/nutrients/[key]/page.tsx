@@ -11,6 +11,8 @@ import { NutrientDetailView } from "@/components/nutrition/nutrient-detail-view"
 import { loadNutrientDetailFacts } from "@/lib/nutrient-detail-facts";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 
+export const metadata = { title: "Nutrients" };
+
 // One nutrient in depth: today, the last 7 and 30 days as a percent of the person's reference intake, which foods it came from, and everyday foods that could help (checked against
 // their allergies and food rules). Read-only. The same page serves the client (their own data) and their coach (the client picked with ?athleteId=, coach wording). Nothing here is
 // sent to the AI.

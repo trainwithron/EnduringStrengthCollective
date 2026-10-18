@@ -26,6 +26,8 @@ import type { ButtonShape, DisplayFont, BodyFont } from "@/lib/theme";
 import { isStripeConfigured } from "@/lib/stripe";
 import { ALL_BRAND_FONTS, googleFontsHref } from "@/lib/google-fonts";
 
+export const metadata = { title: "Branding" };
+
 type OrgTab = "team" | "branding" | "workout-card" | "tags" | "dispatch" | "terminology" | "credits" | "plan";
 
 export default async function BrandingPage(

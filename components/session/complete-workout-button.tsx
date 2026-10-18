@@ -413,7 +413,7 @@ export function CompleteWorkoutButton({
       >
         <p className="font-body text-sm text-chalk mb-2">Log today&apos;s weight while you&apos;re here?</p>
         <div className="flex items-center gap-2">
-          <input
+          <input aria-label={`Weight (${liftUnitLabel(liftUnit)})`}
             type="number"
             inputMode="decimal"
             step="0.1"

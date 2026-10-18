@@ -8,6 +8,8 @@ import {
   type JournalPhotoOption,
 } from "@/components/athlete/transformation-card-creator";
 
+export const metadata = { title: "New" };
+
 // Card creation — the one deliberate, athlete-chosen step in the whole
 // Transformation Cards flow. Detection (the milestone that landed the
 // athlete here) already happened automatically; nothing gets published

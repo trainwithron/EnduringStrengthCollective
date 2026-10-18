@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { resetCoachNavFacts } from "@/components/coach/use-coach-type";
 import { COACH_TYPES, type CoachType } from "@/lib/coach-type";
 
 // "What do you coach?" — answered at signup, changeable here. It decides which way Add client leans first.
@@ -9,6 +11,7 @@ export function CoachTypeSetting({ profileId, initial }: { profileId: string; in
   const [value, setValue] = useState<CoachType | "">(initial ?? "");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const router = useRouter();
 
   async function choose(next: CoachType) {
     const previous = value;
@@ -23,6 +26,9 @@ export function CoachTypeSetting({ profileId, initial }: { profileId: string; in
       return;
     }
     setMessage("Saved.");
+    // The menus follow at once.
+    resetCoachNavFacts();
+    router.refresh();
   }
 
   return (
@@ -39,6 +45,9 @@ export function CoachTypeSetting({ profileId, initial }: { profileId: string; in
           </label>
         ))}
       </div>
+      <p className="font-body text-xs text-steel mt-2">
+        A team coach&apos;s menus leave out booking pages, availability, session types, the website, the pro shop and referrals, leads and the session ledger. They come back if you choose another option here, and they always stay if you have a one-on-one client or run an organization with other coaches or staff.
+      </p>
       {message && (
         <p className="font-body text-xs text-steel mt-1" role="status">
           {message}

@@ -29,6 +29,8 @@ import { Lock } from "lucide-react";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { ProgramPlainView } from "@/components/shared/program-plain-view-server";
 
+export const metadata = { title: "Programs" };
+
 // Always the saved program, never a copy kept from an earlier visit.
 export const dynamic = "force-dynamic";
 

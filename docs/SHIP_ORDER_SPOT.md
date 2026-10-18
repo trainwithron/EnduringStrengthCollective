@@ -25,7 +25,10 @@
 | F2 | release-f2-client-cap | (see git) | Release F2, step 149 (0397), apply-release-f2-client-cap-all.sql, fp 979398d89cdde8a9 | stacked on L + F1; installed SWITCHED OFF, adds only |
 | S1 | release-signin-hardening | (see git) | Release S1, step 150 (0398), apply-release-s1-signin-hardening-all.sql, fp 8628d711b21b9d5a | built on master eb5ed58d; adds only, paste BEFORE code |
 | S2 | release-health-answers | (see git) | Release S2, step 151 (0399), apply-release-s2-health-answers-all.sql, fp 331e4a4fa00b98b1 | built on master 408e6919; apply and deploy together |
+| S3 | release-team-coach | (see git) | none | team coach Home tiles and menus; built on master 408e6919 |
 | D-held | (data) | - | HELD: step 138, apply-release-cn-held-all.sql, fp 8f22a2d348ee90d7, read check-intake-flag-list.sql first | Ron's word only |
 
 Fingerprint = first 16 hex of sha256 of the LF-normalized file: tr -d '\r' < supabase/apply/<file> | sha256sum | cut -c1-16.
 Apply order: CL (136), CM (137), CO (139), G (141), H (142 to 144), I (145), J (146), K1 (147), L (148); then deploy the code; then CP (140) after the code is live. Held 138 only on Ron's word.
+
+When V1 (guardian consent) is deployed: also remove the help article parent-view-link (lib/help-articles.ts); the support-pages test fails until it is gone.

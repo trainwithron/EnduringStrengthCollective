@@ -5,6 +5,8 @@ import { createServerClient } from "@/lib/supabase/server";
 import { describeAction, describeChanges } from "@/lib/audit-format";
 import { formatInTimezone } from "@/lib/format-in-timezone";
 
+export const metadata = { title: "Audit" };
+
 const TABLES = ["profiles", "session_credits", "bookings", "organization_billing", "athlete_sessions", "workout_logs", "posts", "direct_messages", "training_partner_requests"];
 
 // The platform admin's view of the audit trail: privileged changes and blocked attempts, newest first. Read-only; the log itself cannot be

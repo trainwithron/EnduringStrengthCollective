@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 
+export const metadata = { title: "Success" };
+
 export default async function BillingSuccessPage(
   props: {
     params: Promise<{ groupId: string }>;

@@ -37,6 +37,8 @@ import { RecurringBookingButton } from "@/components/athlete/recurring-booking-b
 import { RecurringConflictBadge } from "@/components/coach/desktop/recurring-conflict-badge";
 import { sessionBalanceLine, NO_SESSIONS_SLOT_LABEL } from "@/lib/session-credit-copy";
 
+export const metadata = { title: "Calendar" };
+
 export default async function DayDetailPage(
   props: {
     params: Promise<{ groupId: string; programId: string; date: string }>;

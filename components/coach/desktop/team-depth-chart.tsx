@@ -175,7 +175,7 @@ export function TeamDepthChart({
           )}
         </div>
         <div className="flex items-center gap-2">
-          <input
+          <input aria-label="Position name"
             type="text"
             value={newPositionName}
             onChange={(e) => setNewPositionName(e.target.value)}
@@ -274,7 +274,7 @@ function PlayerRow({
             />
           </label>
         )}
-        <select
+        <select aria-label={`Position for ${player.fullName}`}
           value={player.positionId ?? ""}
           onChange={(e) => onAssign(player.profileId, e.target.value || null)}
           className="h-8 bg-graphite border border-steel/30 text-chalk px-1.5 font-body text-xs"

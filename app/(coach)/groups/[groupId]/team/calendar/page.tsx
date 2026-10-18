@@ -7,6 +7,8 @@ import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { TeamPracticeScheduleForm, type PracticeScheduleRow } from "@/components/coach/desktop/team-practice-schedule-form";
 import { TeamGameForm } from "@/components/coach/desktop/team-game-form";
 
+export const metadata = { title: "Calendar" };
+
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 function dateKey(d: Date): string {

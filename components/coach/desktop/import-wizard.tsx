@@ -1512,7 +1512,7 @@ export function ImportWizard({
               <div className="space-y-2 mb-4">
                 {[0, 1, 2, 3].map((i) => (
                   <div key={i} className="flex items-center gap-2">
-                    <select
+                    <select aria-label={`Lift ${i + 1}`}
                       value={gzclpLiftNames[i]}
                       disabled={status === "working"}
                       onChange={(e) =>

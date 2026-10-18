@@ -442,7 +442,7 @@ export function BrandingForm({
                 >
                   Badge
                 </span>
-                <input
+                <input aria-label="Sample input (preview)"
                   readOnly
                   value="Input"
                   className="w-20 h-8 text-xs px-2 border bg-transparent"

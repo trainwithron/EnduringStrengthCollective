@@ -57,12 +57,15 @@ export function WearablePlaceholder({
           status={withingsStatus}
           initialError={withingsError}
         />
-        <GarminConnection
-          groupId={groupId}
-          connected={garminConnected}
-          status={garminStatus}
-          initialError={garminError}
-        />
+        {/* Garmin Connect is not offered for now (Ron, Oct 17): the button is hidden for everyone who has not connected, and stays for anyone already connected so they can still disconnect. The routes and the webhook are untouched. */}
+        {garminConnected && (
+          <GarminConnection
+            groupId={groupId}
+            connected={garminConnected}
+            status={garminStatus}
+            initialError={garminError}
+          />
+        )}
         <GoogleHealthConnection
           groupId={groupId}
           connected={googleHealthConnected}

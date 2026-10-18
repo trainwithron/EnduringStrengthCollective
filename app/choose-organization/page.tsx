@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { coachedOrgs, getCoachedGroups } from "@/lib/coach-groups";
 
+export const metadata = { title: "Choose organization" };
+
 // Which organization are you working in? Shown to a coach who runs more than one organization when nothing valid is remembered (a new browser, or the remembered workspace is gone). Only organization
 // NAMES are listed: nothing of any organization (clients, programs, money) is shown until one is chosen. Choosing sets the workspace, and every coach page follows it until they choose another.
 export default async function ChooseOrganizationPage(props: { searchParams: Promise<{ next?: string }> }) {

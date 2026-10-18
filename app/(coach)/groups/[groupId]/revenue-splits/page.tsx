@@ -10,6 +10,8 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { RevenueSplitEditor } from "@/components/coach/desktop/revenue-split-editor";
 import type { CoachShare } from "@/lib/revenue-splits";
 
+export const metadata = { title: "Revenue splits" };
+
 export default async function RevenueSplitsPage(
   props: {
     params: Promise<{ groupId: string }>;

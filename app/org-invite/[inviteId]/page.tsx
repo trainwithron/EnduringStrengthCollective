@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { createCrossOrgServerClient as createServerClient } from "@/lib/supabase/server";
 import { OrgInviteAnswer } from "@/components/org/org-invite-answer";
 
+export const metadata = { title: "Org invite" };
+
 // An invitation to join an organization, for someone who already has an account. They see who invited them and choose; nothing is joined until they accept.
 export default async function OrgInvitePage(props: { params: Promise<{ inviteId: string }> }) {
   const { inviteId } = await props.params;

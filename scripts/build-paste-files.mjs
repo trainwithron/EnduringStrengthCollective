@@ -3,12 +3,15 @@
 //   node scripts/build-paste-files.mjs
 // scripts/sql-tests/paste-files.test.mjs applies every step in order on the live-equivalent schema and checks each precheck is true first.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { checkSql as functionAclCheckSql, undoSql as functionAclUndoSql, TRIGGER_SWEEP, triggerSweepUndoSql } from "./function-acl.mjs";
 import { probeSql as step23ProbeSql } from "./step23-probe.mjs";
 import { LIVE_TRANSFER_ORGANIZATION_OWNERSHIP } from "./live-bodies-0396.mjs";
 
 const root = new URL("../supabase/", import.meta.url);
-const outDir = new URL("apply/", root);
+// PASTE_OUT_DIR lets a test build everything into a scratch folder and compare it with what is committed.
+const outDir = process.env.PASTE_OUT_DIR ? pathToFileURL(resolve(process.env.PASTE_OUT_DIR) + "/") : new URL("apply/", root);
 mkdirSync(outDir, { recursive: true });
 
 import { readdirSync } from "node:fs";
@@ -3565,5 +3568,7 @@ writeFileSync(
 );
 writeFileSync(new URL("check-copy-result.sql", outDir), "-- READ-ONLY. Run after step 30 and LOOK at it before step 31: the original program and its copy, side by side. The two rows must show the same numbers.\nwith pair as (\n  select 'original (Main Group)' as which, '5b8a8a3a-344d-4192-a892-f74494fff9ab'::uuid as program_id\n  union all\n  select 'copy (The Home Team)', (select id from public.programs where group_id = '060017b5-e613-4204-a101-c6a14c3a9630' and name = 'christmas_abs_program' order by created_at desc limit 1)\n)\nselect p.which,\n  (select count(*) from public.workouts w where w.program_id = p.program_id) as workouts,\n  (select count(*) from public.group_workout_exercises x join public.workouts w on w.id = x.workout_id where w.program_id = p.program_id) as exercises,\n  (select count(*) from public.group_workout_exercise_sets s join public.group_workout_exercises x on x.id = s.group_workout_exercise_id join public.workouts w on w.id = x.workout_id where w.program_id = p.program_id) as sets,\n  (select count(*) from public.workout_notes n join public.workouts w on w.id = n.workout_id where w.program_id = p.program_id) as notes,\n  (select count(*) from public.exercise_progressions q where q.program_id = p.program_id) as progressions\nfrom pair p;\n");
 writeFileSync(new URL("check-step23-probe.sql", outDir), step23ProbeSql(migrationSql("0281")));
+// The step list for scripts/state-report.mjs: each step with the check that says it is NOT yet applied (every row labelled "... is not already applied"; older steps have none and are reported as no check), so a read-only report can tell which pastes are in the database.
+writeFileSync(new URL("state-probes.json", outDir), JSON.stringify(STEPS.map((s) => ({ n: s.n, slug: s.slug, title: s.title, migrations: s.migrations, notApplied: s.rows.filter((r) => /not already applied/i.test(r[0])).map((r) => r[1]) })), null, 1));
 writeFileSync(new URL("steps.json", outDir), JSON.stringify(STEPS.map((s) => ({ n: s.n, slug: s.slug, migrations: s.migrations, rows: s.rows.length })), null, 1));
 console.log(`wrote ${STEPS.length} steps to supabase/apply/`);
