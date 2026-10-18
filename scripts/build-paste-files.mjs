@@ -2921,16 +2921,17 @@ STEPS.push({
   title: "0407 Release Z1: take a client out of a group without destroying them (Remove from my clients, Delete permanently with 30 days to undo)",
   migrations: ["0407"],
   sees: "Success. No rows returned.",
-  afterwards: "Nothing changes on screen until the Release Z1 code is live. Adds one table (client_removals: who was taken out of which group, with their name, email and membership as they were) and two functions (remove_client, restore_removed_client). Safe to run before the code.",
+  afterwards: "Nothing changes on screen until the Release Z1 code is live. Adds two tables (client_removals: who was taken out of which group, with their name, email, membership and rate as they were; client_removal_log: a person-free note of each permanent erase) and two functions (remove_client, restore_removed_client). Safe to run before the code.",
   undo: [
     "drop function if exists public.restore_removed_client(uuid);",
     "drop function if exists public.remove_client(uuid, uuid, boolean, boolean);",
+    "drop table if exists public.client_removal_log;",
     "drop table if exists public.client_removals;",
   ].join(String.fromCharCode(10)),
   undoWhy: "Only if step 159 misbehaves. Run it only while the Release Z1 code is not live, and only if no client has been removed yet: dropping the table forgets how removed clients were (their memberships are not restored).",
   rows: [
     ["0407 is not already applied (the removals table is not there yet)", "to_regclass('public.client_removals') is null"],
-    ["the tables and helpers it uses exist", "to_regclass('public.group_memberships') is not null and to_regclass('public.profiles') is not null and to_regprocedure('public.is_group_coach(uuid)') is not null and to_regprocedure('public.audit_record(text, text, text, jsonb)') is not null"],
+    ["the tables and helpers it uses exist", "to_regclass('public.group_memberships') is not null and to_regclass('public.profiles') is not null and to_regclass('public.client_billing_rates') is not null and to_regclass('public.membership_subscriptions') is not null and to_regclass('public.recurring_booking_series') is not null and to_regclass('public.booking_waitlist_entries') is not null and to_regprocedure('public.is_group_coach(uuid)') is not null and to_regprocedure('public.cancel_booking_and_refund_credit(uuid)') is not null and to_regprocedure('public.cancel_recurring_booking_series(uuid)') is not null and to_regprocedure('public.audit_record(text, text, text, jsonb)') is not null"],
   ],
 });
 

@@ -112,6 +112,22 @@ describe("eraseAccount", () => {
   });
 });
 
+describe("the scheduled delete of a removed client does the retryable space step before the account", () => {
+  it("with spacesBeforeDelete the emptied space is dealt with BEFORE the account is deleted; the default stays after", async () => {
+    const before = fakeDb();
+    await eraseAccount(before.db, "u1", { eraseHistory: true, deleteEmptyOneOnOneGroups: ["g9"], spacesBeforeDelete: true });
+    expect(before.calls.indexOf("delete groups.id")).toBeGreaterThan(-1);
+    expect(before.calls.indexOf("delete groups.id")).toBeLessThan(before.calls.indexOf("deleteUser u1"));
+    expect(before.calls[before.calls.length - 1]).toBe("deleteUser u1");
+  });
+  it("a failed account delete leaves the steps safe to repeat and still removes no file", async () => {
+    const { db, calls } = fakeDb("deleteUser");
+    const r = await eraseAccount(db, "u1", { eraseHistory: false, deleteEmptyOneOnOneGroups: ["g9"], spacesBeforeDelete: true });
+    expect(r.ok).toBe(false);
+    expect(calls.some((c) => c.startsWith("remove "))).toBe(false);
+  });
+});
+
 describe("their uploaded photos and videos go with the account", () => {
   const files = { progress_photos: "u1/a.jpg", session_exercise_videos: "g/s/v.mp4", posts: "https://x.supabase.co/storage/v1/object/sign/post-media/g/abc-my%20pic.png?token=t" };
   it("reads where the files are before anything is erased, and removes them only after the account is gone", async () => {

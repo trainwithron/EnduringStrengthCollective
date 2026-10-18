@@ -354,8 +354,8 @@ export default async function ClientsPage(
   }
 
   // People taken out of this group (Release Z1). Read on its own, so a database without the table yet just shows none.
-  const removalRead = await supabase.from("client_removals").select("id, athlete_name, removed_at, delete_after").eq("group_id", params.groupId).is("restored_at", null).is("purged_at", null).order("removed_at", { ascending: false }).limit(200);
-  const removed: RemovedClient[] = removalRead.error ? [] : ((removalRead.data ?? []) as { id: string; athlete_name: string | null; removed_at: string; delete_after: string | null }[]).map((r) => ({ id: r.id, name: r.athlete_name ?? "A former client", removedAt: r.removed_at, deleteAfter: r.delete_after }));
+  const removalRead = await supabase.from("client_removals").select("id, athlete_name, removed_at, delete_after, erasing_since, cancelled_bookings").eq("group_id", params.groupId).is("restored_at", null).is("purged_at", null).order("removed_at", { ascending: false }).limit(200);
+  const removed: RemovedClient[] = removalRead.error ? [] : ((removalRead.data ?? []) as { id: string; athlete_name: string | null; removed_at: string; delete_after: string | null; erasing_since: string | null; cancelled_bookings: number | null }[]).map((r) => ({ id: r.id, name: r.athlete_name ?? "A former client", removedAt: r.removed_at, deleteAfter: r.delete_after, erasing: r.erasing_since !== null, cancelledBookings: r.cancelled_bookings ?? 0 }));
 
   return (
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="members">

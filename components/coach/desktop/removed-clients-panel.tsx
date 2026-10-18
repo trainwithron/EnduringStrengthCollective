@@ -8,6 +8,8 @@ export interface RemovedClient {
   name: string;
   removedAt: string;
   deleteAfter: string | null;
+  erasing: boolean;
+  cancelledBookings: number;
 }
 
 // People the coach has taken out of their clients (Release Z1): kept clients can be put back at any time; a client deleted permanently can be put back until the date shown, after which the account is erased.
@@ -43,9 +45,9 @@ export function RemovedClientsPanel({ removals }: { removals: RemovedClient[] })
           <li key={r.id} className="p-3 flex flex-wrap items-center gap-3">
             <div className="flex-1 min-w-[12rem]">
               <p className="font-body text-sm">{r.name}</p>
-              <p className={`font-body text-xs ${r.deleteAfter ? "text-rust" : "text-steel"}`}>{removalLine({ removedAt: r.removedAt, deleteAfter: r.deleteAfter })}</p>
+              <p className={`font-body text-xs ${r.deleteAfter ? "text-rust" : "text-steel"}`}>{removalLine({ removedAt: r.removedAt, deleteAfter: r.deleteAfter, erasing: r.erasing, cancelledBookings: r.cancelledBookings })}</p>
             </div>
-            <button type="button" onClick={() => restore(r.id)} disabled={busy !== null} className="min-h-11 px-3 border border-steel/40 font-body text-sm disabled:opacity-40">
+            <button type="button" onClick={() => restore(r.id)} disabled={busy !== null || r.erasing} className="min-h-11 px-3 border border-steel/40 font-body text-sm disabled:opacity-40">
               {busy === r.id ? "Putting back…" : "Put back"}
             </button>
           </li>

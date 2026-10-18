@@ -114,7 +114,7 @@ export type EraseResult = { ok: true; leftover?: string } | { ok: false; error: 
 
 // Does the deletion. Order matters: detach or erase what would block the delete, then the account itself, which removes the
 // rest through the database's own cascades. Stops at the first failure and says so.
-export async function eraseAccount(db: any, userId: string, opts: { eraseHistory: boolean; deleteEmptyOneOnOneGroups?: string[] }): Promise<EraseResult> {
+export async function eraseAccount(db: any, userId: string, opts: { eraseHistory: boolean; deleteEmptyOneOnOneGroups?: string[]; spacesBeforeDelete?: boolean }): Promise<EraseResult> {
   // The real database message goes to the server log only; a coach is told in plain words what did not happen.
   const fail = (what: string, message: string): EraseResult => {
     console.error("[account deletion]", what, message);
@@ -166,44 +166,52 @@ export async function eraseAccount(db: any, userId: string, opts: { eraseHistory
     return fail("Couldn't clear what else belongs to them", detachError.message ?? "");
   }
 
+  // A one-on-one space that held only this client. Deleting the space also deletes everything filed under it (logged workouts, notes,
+  // sessions), so it is only removed when the coach chose to erase history. Otherwise it stays, renamed, so the records the coach
+  // kept still have somewhere to live and no name of the person remains.
+  const handleSpaces = async (carried: string | undefined): Promise<string | undefined> => {
+    let leftover = carried;
+    for (const groupId of opts.deleteEmptyOneOnOneGroups ?? []) {
+      // The coach's own rows filed in this space (template programs with no client on them, coach packages) would be deleted with it. The space is kept (renamed) instead.
+      const [{ count: templates }, { count: packages }] = await Promise.all([
+        db.from("programs").select("id", { count: "exact", head: true }).eq("group_id", groupId).is("athlete_id", null),
+        db.from("coach_packages").select("id", { count: "exact", head: true }).eq("group_id", groupId),
+      ]);
+      const holdsCoachRows = (templates ?? 0) > 0 || (packages ?? 0) > 0;
+      if (opts.eraseHistory && holdsCoachRows) {
+        const { error } = await db.from("groups").update({ name: "Former client" }).eq("id", groupId);
+        leftover = (leftover ? leftover + " " : "") + "Their space was kept (renamed Former client) because it still holds your template programs or packages.";
+        if (error) leftover += " It could not be renamed.";
+      } else if (opts.eraseHistory) {
+        const { error } = await db.from("groups").delete().eq("id", groupId);
+        if (error) leftover = (leftover ? leftover + " " : "") + "Their account is gone, but their empty space could not be removed (payment records still point at it). It stays under the name Former client.";
+        if (error) await db.from("groups").update({ name: "Former client" }).eq("id", groupId);
+      } else {
+        const { error } = await db.from("groups").update({ name: "Former client" }).eq("id", groupId);
+        if (error) leftover = (leftover ? leftover + " " : "") + "Their account is gone, but their space could not be renamed.";
+      }
+    }
+    return leftover;
+  };
+  let leftover: string | undefined;
+  // The scheduled delete of a removed client does this first, while the account can still be retried: every step is safe to repeat.
+  if (opts.spacesBeforeDelete) leftover = await handleSpaces(leftover);
+
   const { error: deleteError } = await db.auth.admin.deleteUser(userId);
   if (deleteError) return fail("Couldn't delete the account", deleteError.message);
 
   // Their uploaded files, only now that the account is really gone (a failed delete must not leave a person with missing photos).
-  let leftover: string | undefined;
   for (const [bucket, paths] of files) {
     const all = [...paths];
     for (let i = 0; i < all.length; i += 100) {
       const { error } = await db.storage.from(bucket).remove(all.slice(i, i + 100));
       if (error) {
         console.error("[account deletion] storage", bucket, error.message);
-        leftover = "Their account is gone, but some of their uploaded photos or videos could not be removed from storage.";
+        leftover = (leftover ? leftover + " " : "") + "Their account is gone, but some of their uploaded photos or videos could not be removed from storage.";
       }
     }
   }
 
-  // A one-on-one space that held only this client. Deleting the space also deletes everything filed under it (logged workouts, notes,
-  // sessions), so it is only removed when the coach chose to erase history. Otherwise it stays, renamed, so the records the coach
-  // kept still have somewhere to live and no name of the person remains.
-  for (const groupId of opts.deleteEmptyOneOnOneGroups ?? []) {
-    // The coach's own rows filed in this space (template programs with no client on them, coach packages) would be deleted with it. The space is kept (renamed) instead.
-    const [{ count: templates }, { count: packages }] = await Promise.all([
-      db.from("programs").select("id", { count: "exact", head: true }).eq("group_id", groupId).is("athlete_id", null),
-      db.from("coach_packages").select("id", { count: "exact", head: true }).eq("group_id", groupId),
-    ]);
-    const holdsCoachRows = (templates ?? 0) > 0 || (packages ?? 0) > 0;
-    if (opts.eraseHistory && holdsCoachRows) {
-      const { error } = await db.from("groups").update({ name: "Former client" }).eq("id", groupId);
-      leftover = (leftover ? leftover + " " : "") + "Their space was kept (renamed Former client) because it still holds your template programs or packages.";
-      if (error) leftover += " It could not be renamed.";
-    } else if (opts.eraseHistory) {
-      const { error } = await db.from("groups").delete().eq("id", groupId);
-      if (error) leftover = (leftover ? leftover + " " : "") + "Their account is gone, but their empty space could not be removed (payment records still point at it). It stays under the name Former client.";
-      if (error) await db.from("groups").update({ name: "Former client" }).eq("id", groupId);
-    } else {
-      const { error } = await db.from("groups").update({ name: "Former client" }).eq("id", groupId);
-      if (error) leftover = (leftover ? leftover + " " : "") + "Their account is gone, but their space could not be renamed.";
-    }
-  }
+  if (!opts.spacesBeforeDelete) leftover = await handleSpaces(leftover);
   return leftover ? { ok: true, leftover } : { ok: true };
 }

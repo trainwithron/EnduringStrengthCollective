@@ -8,5 +8,5 @@ from (
     ('0407 is not already applied (the removals table is not there yet)',
       to_regclass('public.client_removals') is null),
     ('the tables and helpers it uses exist',
-      to_regclass('public.group_memberships') is not null and to_regclass('public.profiles') is not null and to_regprocedure('public.is_group_coach(uuid)') is not null and to_regprocedure('public.audit_record(text, text, text, jsonb)') is not null)
+      to_regclass('public.group_memberships') is not null and to_regclass('public.profiles') is not null and to_regclass('public.client_billing_rates') is not null and to_regclass('public.membership_subscriptions') is not null and to_regclass('public.recurring_booking_series') is not null and to_regclass('public.booking_waitlist_entries') is not null and to_regprocedure('public.is_group_coach(uuid)') is not null and to_regprocedure('public.cancel_booking_and_refund_credit(uuid)') is not null and to_regprocedure('public.cancel_recurring_booking_series(uuid)') is not null and to_regprocedure('public.audit_record(text, text, text, jsonb)') is not null)
 ) as checks(check_name, ok);

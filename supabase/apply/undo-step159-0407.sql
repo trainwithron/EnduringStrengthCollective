@@ -3,5 +3,6 @@
 begin;
 drop function if exists public.restore_removed_client(uuid);
 drop function if exists public.remove_client(uuid, uuid, boolean, boolean);
+drop table if exists public.client_removal_log;
 drop table if exists public.client_removals;
 commit;

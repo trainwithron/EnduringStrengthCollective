@@ -46,10 +46,13 @@ describe("one delete flow, no typed name", () => {
     expect(control).toContain("runDeleteClient(");
     expect(control).not.toMatch(/Type .* to confirm|confirmName/);
   });
-  it("the server drops the typed-name requirement but keeps every real check", () => {
+  it("the old erase-at-once route is closed (410): the 30-day way is the only way to erase a client", () => {
     const route = read("app/api/clients/delete/route.ts");
-    expect(route).not.toContain("confirmName");
-    for (const check of ["rateLimitResponse", "Only the coach of this group can delete a client.", "That person isn't a client in this group.", "don't coach", "deletionBlocker("]) expect(route).toContain(check);
+    expect(route).toContain("status: 410");
+    expect(route).not.toMatch(/eraseAccount|deleteUser|createServiceRoleClient/);
+    // and the real checks live where the erase now happens: the remove route (permanent) and the database function
+    const remove = read("app/api/clients/remove/route.ts");
+    for (const check of ["rateLimitResponse", "Only a coach of this group can remove a client.", "deletionBlocker("]) expect(remove).toContain(check);
   });
   it("the dialog's tick-box comes back with the answer, and only when confirmed", async () => {
     const store = createConfirmStore();
