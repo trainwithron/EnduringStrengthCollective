@@ -22,10 +22,14 @@ drop policy if exists "client_nutrition_flags_coach_all" on public.client_nutrit
 create policy "client_nutrition_flags_coach_all" on public.client_nutrition_flags for all
   to authenticated
   using (public.is_group_coach(group_id))
-  -- the person must be a client of the group the coach is writing for (the switch follows the person into every group, so a coach must not be able to silence someone who is not theirs)
+  -- to SWITCH IT ON the person must be a client of the group the coach is writing for (the switch follows the person into every group, so a coach must not be able to silence someone who is not theirs);
+  -- the coach of the group where it was set can always SWITCH IT OFF, even after the client has left that group, so it can never be stuck on with nobody able to clear it
   with check (
     public.is_group_coach(group_id)
-    and exists (select 1 from public.group_memberships gm where gm.group_id = client_nutrition_flags.group_id and gm.profile_id = client_nutrition_flags.profile_id and gm.role = 'athlete')
+    and (
+      auto_off = false
+      or exists (select 1 from public.group_memberships gm where gm.group_id = client_nutrition_flags.group_id and gm.profile_id = client_nutrition_flags.profile_id and gm.role = 'athlete')
+    )
   );
 
 do $$

@@ -68,6 +68,13 @@ export default {
       await h.asSuper();
       await db.query(`delete from public.group_memberships where group_id = $1 and profile_id = $2`, [group, client]);
       h.check("it survives the client being taken out of the group (and so is there when they are put back)", (await db.query(`select auto_off from public.client_nutrition_flags where group_id = $1 and profile_id = $2`, [group, client])).rows[0]?.auto_off === true);
+
+      // ---- and it can always be cleared by the coach of the group where it was set, even after the client left that group
+      await h.as(coach);
+      h.check("a client who left cannot be switched ON for (they are not in the group)", (await msg(db, `insert into public.client_nutrition_flags (group_id, profile_id, auto_off) values ($1, $2, true) on conflict (group_id, profile_id) do update set auto_off = true`, [group, client])).length > 0);
+      const cleared = await db.query(`update public.client_nutrition_flags set auto_off = false where group_id = $1 and profile_id = $2 returning auto_off`, [group, client]);
+      h.check("but the coach can clear it, so it is never stuck on", cleared.rows.length === 1 && cleared.rows[0].auto_off === false);
+      await h.asSuper();
     },
   },
 };
