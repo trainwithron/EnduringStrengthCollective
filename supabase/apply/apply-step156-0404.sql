@@ -22,6 +22,8 @@ $guard$;
 
 -- Release X1: the narrow reads an athlete's screens use to see who else is in their group.
 --
+-- An owner or admin of the group's organization who holds no seat in the group can use them too (as the existing policy lets them read the rows today), with the same rule that keeps a client who is private
+-- from the organization out of sight.
 -- Today any member of a group can read every column of every membership row of that group (client_tier, training_level, private_from_org, membership_type and the rest), though the athlete screens need only a name, a
 -- photo, a role and, for a team, a position. These two functions answer exactly that and nothing else, only for a member of the group:
 --   group_member_names(group)      who is in the group: id, name, photo, role   (the @mention lists)
@@ -34,15 +36,22 @@ stable
 security definer
 set search_path = public
 as $$
+declare
+  v_member boolean;
 begin
-  if auth.uid() is null or not public.is_group_member(p_group) then
+  if auth.uid() is null then
+    return;
+  end if;
+  v_member := public.is_group_member(p_group);
+  if not v_member and not public.is_org_admin_of_group(p_group) then
     return;
   end if;
   return query
     select m.profile_id, p.full_name, p.avatar_url, m.role::text
     from public.group_memberships m
     join public.profiles p on p.id = m.profile_id
-    where m.group_id = p_group;
+    where m.group_id = p_group
+      and (v_member or m.role <> 'athlete' or not public.is_client_private_from_org(m.group_id, m.profile_id));
 end;
 $$;
 revoke execute on function public.group_member_names(uuid) from public, anon;
@@ -55,8 +64,14 @@ stable
 security definer
 set search_path = public
 as $$
+declare
+  v_member boolean;
 begin
-  if auth.uid() is null or not public.is_group_member(p_group) then
+  if auth.uid() is null then
+    return;
+  end if;
+  v_member := public.is_group_member(p_group);
+  if not v_member and not public.is_org_admin_of_group(p_group) then
     return;
   end if;
   return query
@@ -64,7 +79,8 @@ begin
     from public.group_memberships m
     join public.profiles p on p.id = m.profile_id
     left join public.group_positions gp on gp.id = m.position_id
-    where m.group_id = p_group and m.role = 'athlete';
+    where m.group_id = p_group and m.role = 'athlete'
+      and (v_member or not public.is_client_private_from_org(m.group_id, m.profile_id));
 end;
 $$;
 revoke execute on function public.group_position_roster(uuid) from public, anon;

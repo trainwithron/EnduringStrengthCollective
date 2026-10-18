@@ -25,7 +25,7 @@
 | F2 | release-f2-client-cap | (see git) | Release F2, step 149 (0397), apply-release-f2-client-cap-all.sql, fp 979398d89cdde8a9 | stacked on L + F1; installed SWITCHED OFF, adds only |
 | S1 | release-signin-hardening | (see git) | Release S1, step 150 (0398), apply-release-s1-signin-hardening-all.sql, fp 8628d711b21b9d5a | built on master eb5ed58d; adds only, paste BEFORE code |
 | S3 | release-team-coach | (see git) | none | team coach Home tiles and menus; built on master 408e6919 |
-| X1 | release-athlete-read | (see git) | Release X1, step 156 (0404), apply-release-x1-athlete-narrow-reads-all.sql, fp 62f065ce676af6d5 | athlete narrow reads (two read-only functions + athlete screens moved, with fallback); ADDITIONS ONLY |
+| X1 | release-athlete-read | (see git) | Release X1, step 156 (0404), apply-release-x1-athlete-narrow-reads-all.sql, fp 67dbd8a2536b6c9c | athlete narrow reads (two read-only functions + athlete screens moved, with fallback); ADDITIONS ONLY |
 | D-held | (data) | - | HELD: step 138, apply-release-cn-held-all.sql, fp 8f22a2d348ee90d7, read check-intake-flag-list.sql first | Ron's word only |
 
 Fingerprint = first 16 hex of sha256 of the LF-normalized file: tr -d '\r' < supabase/apply/<file> | sha256sum | cut -c1-16.
