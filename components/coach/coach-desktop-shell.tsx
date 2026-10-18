@@ -48,6 +48,7 @@ import { HeaderNotificationBell } from "@/components/notifications/header-bell";
 import { useCoachNavFacts } from "@/components/coach/use-coach-type";
 import { useOnFrontDesk } from "@/components/front-desk/use-on-front-desk";
 import { hiddenForCoach } from "@/lib/team-coach";
+import { isTeamSportGroup, teamSportMenu, teamSportMoreMenu, TEAM_SPORT_BUSINESS_LABEL, teamSportBusinessHref } from "@/lib/team-sport";
 import { WorkspaceMenu } from "@/components/coach/desktop/workspace-menu";
 import { LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/coach-groups";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -427,7 +428,9 @@ function CoachDesktopShellFull({
   // item, which is exactly what "Run my day" wants for it.
   const navFacts = useCoachNavFacts();
   const onFrontDesk = useOnFrontDesk();
-  const nav: NavEntry[] = [
+  // A team-sport group (never a coach-level page) gets its own short menu: lib/team-sport.ts.
+  const teamSport = isTeamSportGroup(teamMode) && !coachLevel;
+  const ordinaryNav: NavEntry[] = [
     // Run my day — the highest-frequency items, flat, no group/extra
     // click to reach any of them. Team Performance sits right next to
     // Dashboard (not folded into a new group) since it's a light,
@@ -517,6 +520,55 @@ function CoachDesktopShellFull({
     },
   ];
 
+  // The team-sport menu: Athletes, Team calendar, Attendance (the check-in kiosk is inside it), Depth chart, Team feed, Messages, Team performance, then Coaching, one More (Challenges, Hall of fame) and Settings.
+  // No Business area, no Group dashboard, no Group calendar or Group sessions; Business is one quiet link under Settings.
+  const teamIcons: Record<string, typeof LayoutGrid> = {
+    members: Users2,
+    "team-calendar": CalendarDays,
+    attendance: ClipboardList,
+    team: ClipboardList,
+    feed: MessagesSquare,
+    messages: Mail,
+    "team-performance": Activity,
+    challenges: Flag,
+    records: Trophy,
+  };
+  const teamLeaves: NavLeaf[] = teamSportMenu(groupId).map((item) => ({
+    key: item.key as Active,
+    label: item.label,
+    href: item.href,
+    icon: teamIcons[item.key] ?? LayoutGrid,
+    ...(item.key === "members" ? { badge: clientsUnread, termKey: "client" as const, termForm: "plural" as const } : {}),
+    ...(item.key === "feed" ? { badge: feedUnread } : {}),
+    ...(item.key === "messages" ? { badge: messagesUnread } : {}),
+  }));
+  const ordinarySettings = ordinaryNav.find((e): e is NavGroup => isGroup(e) && e.label === "Settings");
+  const teamNav: NavEntry[] = [
+    ...teamLeaves,
+    ...ordinaryNav.filter((e): e is NavGroup => isGroup(e) && e.label === "Coaching"),
+    {
+      label: "More",
+      icon: Layers,
+      items: teamSportMoreMenu(groupId).map((item) => ({ key: item.key as Active, label: item.label, href: item.href, icon: teamIcons[item.key] ?? LayoutGrid })),
+    },
+    {
+      label: "Settings",
+      icon: Settings,
+      items: [
+        // The check-in kiosk and its PIN live inside Attendance for a team, so there is no separate kiosk entry here.
+        ...(ordinarySettings?.items.filter((i) => i.key !== "kiosk") ?? []),
+        { key: "business", label: TEAM_SPORT_BUSINESS_LABEL, href: teamSportBusinessHref(groupId), icon: TrendingUp },
+        ...(isPlatformAdmin
+          ? [
+              { key: "admin-organizations" as const, label: "Organizations", href: "/admin/organizations", icon: Building2 },
+              { key: "admin-ranking" as const, label: "Marketplace ranking", href: "/admin/marketplace-ranking", icon: SlidersHorizontal },
+            ]
+          : []),
+      ],
+    },
+  ];
+  const nav: NavEntry[] = teamSport ? teamNav : ordinaryNav;
+
   // A team coach's menus leave out the tools that only make sense for selling to clients (lib/team-coach.ts).
   for (const entry of nav) {
     if ("items" in entry) entry.items = entry.items.filter((i) => !hiddenForCoach(navFacts, i.key));
@@ -538,6 +590,7 @@ function CoachDesktopShellFull({
   // spec exactly rather than guessing one onto every icon.
   const flatWidgetByKey: Partial<Record<Active, React.ReactNode>> = {
     clients: <ClientsRailWidget groupId={groupId} />,
+    members: <ClientsRailWidget groupId={groupId} />,
     messages: <MessagesRailWidget groupId={groupId} />,
     feed: <FeedRailWidget groupId={groupId} />,
     calendar: <CalendarRailWidget groupId={groupId} />,

@@ -67,6 +67,7 @@ export function ClientCardGrid({
   groupId,
   members,
   positions = [],
+  teamSport = false,
 }: {
   groupId: string;
   members: RosterMember[];
@@ -76,6 +77,8 @@ export function ClientCardGrid({
   // Empty for any non-team-mode group (the page never fetches it) —
   // the filter/search stay exactly as useful as before for those.
   positions?: { id: string; name: string }[];
+  // A team-sport group's roster is one compact view: no card-size choice.
+  teamSport?: boolean;
 }) {
   const t = useTerm();
   const [rows, setRows] = useState(members);
@@ -90,7 +93,7 @@ export function ClientCardGrid({
   const [goalFilter, setGoalFilter] = useState<MilestonePhaseTag | "all">("all");
   const [positionFilter, setPositionFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
-  const [size, setSize] = useState<CardSize>("medium");
+  const [size, setSize] = useState<CardSize>(teamSport ? "small" : "medium");
   const [page, setPage] = useState(0);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkTier, setBulkTier] = useState<ClientTier>(null);
@@ -126,8 +129,8 @@ export function ClientCardGrid({
   >(new Map());
 
   useEffect(() => {
-    setSize(readCardSize(STORAGE_KEY));
-  }, []);
+    if (!teamSport) setSize(readCardSize(STORAGE_KEY));
+  }, [teamSport]);
 
   // useState(members) only seeds from the prop on first mount — a newly
   // added client (Add Client, an invite redeemed, etc.) updates the
@@ -588,7 +591,7 @@ export function ClientCardGrid({
               </button>
             )}
           </div>
-          <CardSizeToggle size={size} onChange={handleSizeChange} />
+          {!teamSport && <CardSizeToggle size={size} onChange={handleSizeChange} />}
         </div>
       </div>
 

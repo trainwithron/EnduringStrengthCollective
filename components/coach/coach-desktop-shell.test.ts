@@ -13,8 +13,8 @@ describe("coach desktop shell", () => {
     expect(shell).toContain("last_group=");
   });
   it("the rail is Clients, Calendar, Messages, then the groups Coaching, Business, Group and Settings (no More tools)", () => {
-    const navStart = shell.indexOf("const nav: NavEntry[] = [");
-    const navEnd = shell.indexOf("const groupHasActiveChild");
+    const navStart = shell.indexOf("const ordinaryNav: NavEntry[] = [");
+    const navEnd = shell.indexOf("// The team-sport menu:");
     const nav = shell.slice(navStart, navEnd);
     const order = ['label: "Clients"', 'label: "Calendar"', 'label: "Messages"', 'label: "Coaching"', 'label: "Business"', 'label: "Group"', 'label: "Settings"'];
     let last = -1;

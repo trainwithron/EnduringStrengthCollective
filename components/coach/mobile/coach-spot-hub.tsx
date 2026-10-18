@@ -16,6 +16,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { useTerm } from "@/components/coach/terminology-provider";
 import { getCoachedGroups, LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/coach-groups";
 import { hubOrgs, hubStartOrgId, type HubOrg } from "@/lib/hub-orgs";
+import { isTeamSportGroup, TEAM_SPORT_HIDDEN_HUB_TILES } from "@/lib/team-sport";
 
 type TileKey = "clients" | "business" | "calendar" | "program" | "ask-spot" | "quick-payment";
 
@@ -61,6 +62,22 @@ export function CoachSpotHub({
   const [profileId, setProfileId] = useState<string | undefined>(undefined);
   // The group every tile acts on. A coach who runs more than one organization chooses the organization in the header; the tiles then use that organization's group.
   const [activeGroupId, setActiveGroupId] = useState(groupId);
+  // A team-sport group has no Business or Quick payment tile (lib/team-sport.ts). Unknown until read, which shows every tile.
+  const [teamSport, setTeamSport] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    createBrowserClient()
+      .from("groups")
+      .select("team_mode")
+      .eq("id", activeGroupId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled) setTeamSport(isTeamSportGroup((data as { team_mode?: boolean | null } | null)?.team_mode));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeGroupId]);
   const [orgs, setOrgs] = useState<HubOrg[]>([]);
   const router = useRouter();
   const [orgId, setOrgId] = useState<string | null>(null);
@@ -282,7 +299,7 @@ export function CoachSpotHub({
                       <span className="font-body text-sm text-chalk text-center">Home</span>
                     </a>
                   )}
-                  {TILES.map((tile) => {
+                  {TILES.filter((tile) => !(teamSport && TEAM_SPORT_HIDDEN_HUB_TILES.includes(tile.key))).map((tile) => {
                     const Icon = tile.icon;
                     return (
                       <button

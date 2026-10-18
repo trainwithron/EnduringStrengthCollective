@@ -37,6 +37,7 @@ import { ageStatusFromDob } from "@/lib/youth-block";
 import { ShowNameOnShareToggle } from "@/components/athlete/show-name-on-share-toggle";
 import { DeleteAccountButton } from "@/components/athlete/delete-account-button";
 import { GamificationToggle } from "@/components/coach/gamification-toggle";
+import { TeamSportToggle } from "@/components/coach/team-sport-toggle";
 import { GoogleCalendarConnection } from "@/components/coach/google-calendar-connection";
 import { ReadDuringRestToggle } from "@/components/athlete/read-during-rest-toggle";
 import { ReadDuringRestSettings } from "@/components/coach/read-during-rest-settings";
@@ -139,7 +140,7 @@ export default async function SettingsPage(
         .maybeSingle(),
       supabase
         .from("groups")
-        .select("gamification_enabled, name, group_kind")
+        .select("gamification_enabled, name, group_kind, team_mode")
         .eq("id", params.groupId)
         .maybeSingle(),
       supabase
@@ -265,6 +266,11 @@ export default async function SettingsPage(
             <p className="font-body text-xs text-steel mt-1">
               Programs, clients, business tools — the full site.
             </p>
+            {(group as { group_kind?: string } | null)?.group_kind !== "one_on_one" && (
+              <div className="mt-4 pt-4 border-t border-steel/15">
+                <TeamSportToggle groupId={params.groupId} initialEnabled={(group as { team_mode?: boolean | null } | null)?.team_mode === true} />
+              </div>
+            )}
             <div className="mt-4 pt-4 border-t border-steel/15">
               <GamificationToggle
                 groupId={params.groupId}

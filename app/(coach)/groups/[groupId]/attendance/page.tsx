@@ -8,6 +8,7 @@ import { activityPeriod } from "@/lib/coach-activity";
 import { loadAttendance } from "@/lib/attendance";
 import { DEFAULT_COACH_TIMEZONE, addDaysToKey, dateKeyInZone } from "@/lib/timezone";
 import { AttendanceView } from "@/components/coach/desktop/attendance-view";
+import Link from "next/link";
 
 export const metadata = { title: "Attendance" };
 
@@ -39,9 +40,25 @@ export default async function AttendancePage(props: { params: Promise<{ groupId:
 
   return (
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="attendance">
-      <div className="pb-6 border-b border-steel/20 mb-6">
-        <h1 className="font-display font-bold text-3xl uppercase leading-none">Attendance</h1>
-        <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">Who was there, day by day. Present means checked in at the kiosk, finished a workout in this group, or attended a group session that day ({timeZone}).</p>
+      <div className="pb-6 border-b border-steel/20 mb-6 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="font-display font-bold text-3xl uppercase leading-none">Attendance</h1>
+          <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">Who was there, day by day. Present means checked in at the kiosk, finished a workout in this group, or attended a group session that day ({timeZone}).</p>
+        </div>
+        {/* The check-in kiosk is part of attendance: every kiosk check-in lands in this same list. It opens full screen on the weight-room tablet. */}
+        <div className="flex flex-col items-start sm:items-end gap-2">
+          <a
+            href={`/groups/${params.groupId}/kiosk`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center h-11 px-5 bg-rust text-graphite font-body text-sm font-medium hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rust"
+          >
+            Open check-in kiosk
+          </a>
+          <Link href={`/groups/${params.groupId}/kiosk/settings`} className="font-body text-xs text-steel underline underline-offset-4 hover:text-rust">
+            Kiosk PIN and settings
+          </Link>
+        </div>
       </div>
       {attendance.failed && (
         <p className="font-body text-sm text-rust mb-4" role="alert">

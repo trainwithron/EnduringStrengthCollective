@@ -36,6 +36,7 @@ import { DownloadAppButton } from "@/components/coach/desktop/download-app-butto
 import { ViewModeToggle } from "@/components/coach/view-mode-toggle";
 import { useCoachNavFacts } from "@/components/coach/use-coach-type";
 import { hiddenForCoach } from "@/lib/team-coach";
+import { isTeamSportGroup, teamSportMenu, teamSportMoreMenu, TEAM_SPORT_BUSINESS_LABEL, teamSportBusinessHref } from "@/lib/team-sport";
 
 // The actual nav-link content shared by two different overlay shells:
 // CoachMoreSheet (CoachDesktopShell's own narrow-width "More" fallback,
@@ -74,6 +75,7 @@ export function CoachNavLinksList({ groupId }: { groupId: string; groupName?: st
   const [groupKind, setGroupKind] = useState<string | null>(null);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [hasClients, setHasClients] = useState(false);
+  const teamSport = isTeamSportGroup(teamMode);
 
   useEffect(() => {
     let cancelled = false;
@@ -106,11 +108,16 @@ export function CoachNavLinksList({ groupId }: { groupId: string; groupName?: st
   return (
     <>
       <div className="pt-3">
+        {/* A team-sport group: its own short list first (the same entries as the computer menu), no Business, one calendar, attendance with the kiosk inside it. */}
+        {teamSport &&
+          teamSportMenu(groupId)
+            .filter((m) => m.key !== "members" && m.key !== "messages")
+            .map((m) => <Item key={m.key} href={m.href} label={m.label} icon={m.key === "team-calendar" ? CalendarDays : m.key === "feed" ? MessagesSquare : ClipboardList} />)}
         <Item href={`/groups/${groupId}/programs`} label="Programs" icon={LayoutGrid} />
         <Item href={`/groups/${groupId}/exercise-library`} label="Exercise library" icon={Dumbbell} />
         <Item href={`/groups/${groupId}/nutrition`} label="Nutrition" icon={Salad} />
-        {!hiddenForCoach(navFacts, "availability") && <Item href={`/groups/${groupId}/availability`} label="Availability" icon={CalendarClock} />}
-        <Item href={`/groups/${groupId}/business`} label="Business overview" icon={TrendingUp} />
+        {!teamSport && !hiddenForCoach(navFacts, "availability") && <Item href={`/groups/${groupId}/availability`} label="Availability" icon={CalendarClock} />}
+        {!teamSport && <Item href={`/groups/${groupId}/business`} label="Business overview" icon={TrendingUp} />}
         <Item href={`/groups/${groupId}/settings`} label="Settings" icon={Settings} />
         <div className="flex items-center h-11 px-5 [&_button]:text-sm [&_button]:text-chalk [&_button]:gap-3 [&_svg]:w-4 [&_svg]:h-4 [&_svg]:text-steel">
           <ViewModeToggle targetMode="desktop" label="Desktop mode" groupId={groupId} />
@@ -120,33 +127,43 @@ export function CoachNavLinksList({ groupId }: { groupId: string; groupName?: st
         </div>
       </div>
 
-      {hasClients && (
+      {(hasClients || teamSport) && (
         <details className="group mt-2 border-t border-steel/20">
           <summary className="flex items-center justify-between h-12 px-5 font-body text-sm text-steel cursor-pointer list-none [&::-webkit-details-marker]:hidden">
             More tools
             <ChevronDown className="w-4 h-4 transition-transform group-open:rotate-180" strokeWidth={2.25} />
           </summary>
           <div className="pb-2">
-            <GroupHeader label={`${t("client", "plural", { cap: true })} and ${t("session", "plural")}`} icon={Users2} />
-            {!hiddenForCoach(navFacts, "booking-page") && <Item href={`/groups/${groupId}/business/booking-page`} label="Booking page" icon={Link2} />}
-            <Item href={`/groups/${groupId}/group-sessions`} label="Group sessions" icon={Users2} />
-            {!hiddenForCoach(navFacts, "session-types") && <Item href={`/groups/${groupId}/business/session-types`} label="Session types" icon={Tag} />}
-            {!hiddenForCoach(navFacts, "session-ledger") && <Item href={`/groups/${groupId}/business/session-ledger`} label="Session ledger" icon={Wallet} />}
-            {!hiddenForCoach(navFacts, "leads") && <Item href={`/groups/${groupId}/business/leads`} label="Leads" icon={UserPlus} />}
+            {!teamSport && <GroupHeader label={`${t("client", "plural", { cap: true })} and ${t("session", "plural")}`} icon={Users2} />}
+            {!teamSport && !hiddenForCoach(navFacts, "booking-page") && <Item href={`/groups/${groupId}/business/booking-page`} label="Booking page" icon={Link2} />}
+            {!teamSport && <Item href={`/groups/${groupId}/group-sessions`} label="Group sessions" icon={Users2} />}
+            {!teamSport && !hiddenForCoach(navFacts, "session-types") && <Item href={`/groups/${groupId}/business/session-types`} label="Session types" icon={Tag} />}
+            {!teamSport && !hiddenForCoach(navFacts, "session-ledger") && <Item href={`/groups/${groupId}/business/session-ledger`} label="Session ledger" icon={Wallet} />}
+            {!teamSport && !hiddenForCoach(navFacts, "leads") && <Item href={`/groups/${groupId}/business/leads`} label="Leads" icon={UserPlus} />}
 
-            <GroupHeader label="Business" icon={TrendingUp} />
-            <Item href={`/groups/${groupId}/business/packages`} label="Packages" icon={Layers} />
-            <Item href={`/groups/${groupId}/business/waiver`} label="Waiver" icon={ClipboardList} />
-            <Item href={`/groups/${groupId}/business/zapier`} label="Zapier" icon={Zap} />
-            <Item href={`/groups/${groupId}/branding`} label="Organization settings" icon={Palette} />
+            {!teamSport && (
+              <>
+                <GroupHeader label="Business" icon={TrendingUp} />
+                <Item href={`/groups/${groupId}/business/packages`} label="Packages" icon={Layers} />
+                <Item href={`/groups/${groupId}/business/waiver`} label="Waiver" icon={ClipboardList} />
+                <Item href={`/groups/${groupId}/business/zapier`} label="Zapier" icon={Zap} />
+                <Item href={`/groups/${groupId}/branding`} label="Organization settings" icon={Palette} />
+              </>
+            )}
 
             <GroupHeader label="Community" icon={Flag} />
-            {groupKind !== "one_on_one" && <Item href={`/groups/${groupId}/feed`} label="Team feed" icon={MessagesSquare} />}
-            <Item href={`/groups/${groupId}/challenges`} label="Challenges" icon={Flag} />
-            <Item href={`/groups/${groupId}/records`} label="Hall of fame" icon={Trophy} />
+            {!teamSport && groupKind !== "one_on_one" && <Item href={`/groups/${groupId}/feed`} label="Team feed" icon={MessagesSquare} />}
+            {teamSport ? (
+              teamSportMoreMenu(groupId).map((m) => <Item key={m.key} href={m.href} label={m.label} icon={m.key === "challenges" ? Flag : Trophy} />)
+            ) : (
+              <>
+                <Item href={`/groups/${groupId}/challenges`} label="Challenges" icon={Flag} />
+                <Item href={`/groups/${groupId}/records`} label="Hall of fame" icon={Trophy} />
+              </>
+            )}
             {!hiddenForCoach(navFacts, "resources") && <Item href={`/groups/${groupId}/resources`} label="Resources" icon={HeartHandshake} />}
             <Item href={`/groups/${groupId}/quick-tips`} label="Quick tips" icon={Lightbulb} />
-            {teamMode && (
+            {teamMode && !teamSport && (
               <>
                 <Item href={`/groups/${groupId}/team`} label="Depth chart" icon={ClipboardList} />
                 <Item href={`/groups/${groupId}/team/calendar`} label="Team calendar" icon={CalendarDays} />
@@ -164,6 +181,7 @@ export function CoachNavLinksList({ groupId }: { groupId: string; groupName?: st
               Kiosk display
             </a>
             <Item href={`/groups/${groupId}/business/sms-settings`} label="Text messages" icon={MessageCircle} />
+            {teamSport && <Item href={teamSportBusinessHref(groupId)} label={TEAM_SPORT_BUSINESS_LABEL} icon={TrendingUp} />}
             <Item href={`/groups/${groupId}/business/support`} label="Support" icon={HeartHandshake} />
             {isPlatformAdmin && (
               <>
