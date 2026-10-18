@@ -24,7 +24,8 @@ $guard$;
 -- emailed, once, a PDF of their own training history (sent to the player's own sign-in address only, never to a coach, parent or anyone else).
 --
 --   group_memberships.graduation_year   the year the player graduates (1990 to 2100), set by the coach (coaches already may update their group's memberships; a player cannot).
---   graduation_exports                  one row per player per season once their history has been emailed, so it is never sent twice. Server only.
+--   graduation_exports                  one row per player per season, made BEFORE the email is sent (so two calls at once cannot both send) and stamped sent_at when it has gone; a row never stamped within ten minutes
+--                                       (the server died mid-send) can be taken over. Server only.
 --   start_next_season                   start_new_season (migration 0394, unchanged) and then the graduation year of each player brought over is copied to the new season. New name, so nothing existing is replaced.
 -- Additions only. Re-runnable.
 alter table public.group_memberships add column if not exists graduation_year smallint;
@@ -34,7 +35,8 @@ alter table public.group_memberships add constraint group_memberships_graduation
 create table if not exists public.graduation_exports (
   group_id uuid not null references public.groups(id) on delete cascade,
   athlete_id uuid not null references public.profiles(id) on delete cascade,
-  sent_at timestamptz not null default now(),
+  claimed_at timestamptz not null default now(),
+  sent_at timestamptz,
   primary key (group_id, athlete_id)
 );
 alter table public.graduation_exports enable row level security;

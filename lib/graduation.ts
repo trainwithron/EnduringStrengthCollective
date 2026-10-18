@@ -1,4 +1,6 @@
 import type { PdfLine } from "@/lib/simple-pdf";
+import { formatLift } from "@/lib/lift-weight";
+import type { WeightUnit } from "@/lib/units";
 
 // Graduation (Release U1). A team player can have a graduation year ("class of 2027"). When a coach starts next season, a player whose class has graduated is left unticked by default, and each of them is emailed,
 // once, a PDF of their own training history.
@@ -8,8 +10,13 @@ export function graduatedByYear(now: Date = new Date()): number {
   return now.getFullYear();
 }
 
+// One rule, one year: the screen decides the year once (the coach's own calendar year when they start the season) and sends it to the server, which uses that same year to decide who to email.
+export function hasGraduatedBy(graduationYear: number | null | undefined, byYear: number): boolean {
+  return typeof graduationYear === "number" && Number.isFinite(graduationYear) && graduationYear <= byYear;
+}
+
 export function hasGraduated(graduationYear: number | null | undefined, now: Date = new Date()): boolean {
-  return typeof graduationYear === "number" && Number.isFinite(graduationYear) && graduationYear <= graduatedByYear(now);
+  return hasGraduatedBy(graduationYear, graduatedByYear(now));
 }
 
 // What the coach types in the class-year box: nothing clears it; four digits between 1990 and 2100 sets it; anything else is refused (null with ok false).
@@ -36,17 +43,16 @@ export interface HistorySession {
   exercises: HistoryExercise[];
 }
 
-const trimNum = (n: number) => (Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100));
-
-export function formatSet(s: HistorySet, unit: string): string {
-  if (s.weight != null && s.reps != null) return `${trimNum(s.weight)}${s.weight === 0 ? "" : ` ${unit}`} x ${s.reps}`;
+// Lifted weights are STORED in pounds for everyone (lib/lift-weight.ts); a player who chose kilograms is shown kilograms, converted on the way out, exactly as the app shows them.
+export function formatSet(s: HistorySet, unit: WeightUnit): string {
+  if (s.weight != null && s.reps != null) return s.weight === 0 ? `0 x ${s.reps}` : `${formatLift(s.weight, unit)} x ${s.reps}`;
   if (s.reps != null) return `${s.reps} reps`;
-  if (s.weight != null) return `${trimNum(s.weight)} ${unit}`;
+  if (s.weight != null) return formatLift(s.weight, unit);
   return "done";
 }
 
 // The lines of the PDF: who and what it covers, a short summary, the best set of every lift, then every session in date order. Pure, so the PDF can be tested without a database.
-export function historyLines(args: { fullName: string; teamName: string; unit: string; sessions: HistorySession[]; preparedOn: string }): PdfLine[] {
+export function historyLines(args: { fullName: string; teamName: string; unit: WeightUnit; sessions: HistorySession[]; preparedOn: string }): PdfLine[] {
   const { fullName, teamName, unit, preparedOn } = args;
   const sessions = [...args.sessions].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.title.localeCompare(b.title)));
   const lines: PdfLine[] = [];

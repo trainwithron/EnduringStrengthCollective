@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { parseGraduationYear, hasGraduated } from "@/lib/graduation";
+import { parseGraduationYear, hasGraduatedBy, graduatedByYear } from "@/lib/graduation";
 
 export interface ClassYearPlayer {
   profileId: string;
@@ -26,8 +26,8 @@ export function ClassYearPanel({ groupId, players }: { groupId: string; players:
       setErrors((e) => ({ ...e, [p.profileId]: "" }));
       return;
     }
-    const { error } = await createBrowserClient().from("group_memberships").update({ graduation_year: parsed.value }).eq("group_id", groupId).eq("profile_id", p.profileId).eq("role", "athlete");
-    if (error) {
+    const { data: updated, error } = await createBrowserClient().from("group_memberships").update({ graduation_year: parsed.value }).eq("group_id", groupId).eq("profile_id", p.profileId).eq("role", "athlete").select("profile_id");
+    if (error || (updated ?? []).length === 0) {
       setErrors((e) => ({ ...e, [p.profileId]: "Couldn't save. Try again." }));
       return;
     }
@@ -48,7 +48,7 @@ export function ClassYearPanel({ groupId, players }: { groupId: string; players:
             <label htmlFor={`class-year-${p.profileId}`} className="flex-1 truncate">
               {p.fullName}
             </label>
-            {saved[p.profileId] && hasGraduated(saved[p.profileId]) ? <span className="text-xs text-steel">graduated</span> : null}
+            {saved[p.profileId] && hasGraduatedBy(saved[p.profileId], graduatedByYear()) ? <span className="text-xs text-steel">graduated</span> : null}
             <input
               id={`class-year-${p.profileId}`}
               inputMode="numeric"

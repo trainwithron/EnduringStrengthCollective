@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { formatSet, graduatedByYear, graduationEmail, hasGraduated, historyLines, parseGraduationYear, type HistorySession } from "./graduation";
+import { formatSet, graduatedByYear, graduationEmail, hasGraduated, hasGraduatedBy, historyLines, parseGraduationYear, type HistorySession } from "./graduation";
 import { buildTextPdf, wrapLine } from "./simple-pdf";
 
 const src = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
@@ -14,6 +14,8 @@ describe("who has graduated", () => {
     expect(hasGraduated(2027, june)).toBe(true);
     expect(hasGraduated(2028, june)).toBe(false);
     expect(hasGraduated(null, june)).toBe(false);
+    expect(hasGraduatedBy(2027, 2027)).toBe(true);
+    expect(hasGraduatedBy(2028, 2027)).toBe(false);
     expect(hasGraduated(undefined, june)).toBe(false);
   });
 
@@ -46,14 +48,26 @@ describe("the training history in the PDF", () => {
     expect(text.indexOf("2026-09-03  Upper A")).toBeLessThan(text.indexOf("2026-09-10  Lower A"));
     expect(text).toContain("Back Squat: 225 lb x 5, 245 lb x 3");
     expect(text).toContain("Plank: 60 reps");
+    expect(text).toContain("Plank: 60 reps");
   });
 
   it("uses the unit the player uses, and writes a plain note when nothing was logged", () => {
-    expect(formatSet({ weight: 100, reps: 5 }, "kg")).toBe("100 kg x 5");
+    // lifted weights are stored in pounds for everyone: a kilogram player's 225 lb squat is 102.1 kg, never "225 kg"
+    expect(formatSet({ weight: 225, reps: 5 }, "kg")).toBe("102.1 kg x 5");
+    expect(formatSet({ weight: 225, reps: 5 }, "lb")).toBe("225 lb x 5");
     expect(formatSet({ weight: 0, reps: 10 }, "lb")).toBe("0 x 10");
     expect(formatSet({ weight: null, reps: null }, "lb")).toBe("done");
     const none = historyLines({ fullName: "Sam", teamName: "T", unit: "lb", sessions: [], preparedOn: "2026-12-01" }).map((l) => l.text).join("\n");
     expect(none).toContain("No completed workouts were logged in the app.");
+  });
+
+  it("a kilogram player's whole PDF is in kilograms, converted from the stored pounds, in the heaviest sets and in every workout", () => {
+    const kg = historyLines({ fullName: "Sam Rivera", teamName: "Varsity 2026", unit: "kg", sessions, preparedOn: "2026-12-01" }).map((l) => l.text).join("\n");
+    expect(kg).toContain("Back Squat: 115.7 kg x 1 (2026-09-03)"); // 255 lb
+    expect(kg).toContain("Bench Press: 83.9 kg x 5 (2026-09-03)"); // 185 lb
+    expect(kg).toContain("Back Squat: 102.1 kg x 5, 111.1 kg x 3"); // 225 lb, 245 lb
+    expect(kg).not.toMatch(/\b(255|185|225|245) kg/);
+    expect(kg).not.toMatch(/ lb\b/);
   });
 
   it("the email goes to the player alone: no copy, no parent, no coach, and it says so", () => {
@@ -104,20 +118,25 @@ describe("the PDF file", () => {
 describe("how the pieces are wired", () => {
   it("the new-season panel starts unticked for graduates, says who will be emailed, and calls the server afterwards", () => {
     const panel = src("components/coach/desktop/new-season-panel.tsx");
-    expect(panel).toContain("athletes.filter((a) => !hasGraduated(a.graduationYear))");
+    expect(panel).toContain("athletes.filter((a) => !hasGraduatedBy(a.graduationYear, graduatedByYear()))");
     expect(panel).toContain("will each be emailed a PDF of their own training history, to their own address only");
     expect(panel).toContain('"/api/season/graduate"');
-    expect(panel).toContain('.rpc("start_next_season"');
+    expect(panel).toContain('rpc("start_next_season"');
+    expect(panel).toContain('rpc("start_new_season"'); // the fallback before the database step is applied
+    expect(panel).toContain("body: JSON.stringify({ groupId, year })");
+    expect(panel).not.toMatch(/setFinished\([^)]*\);\s*router\.refresh\(\)/);
   });
 
   it("the server decides who is emailed from the records, only for a retired and rolled-over season, only to the player, once", () => {
     const route = src("app/api/season/graduate/route.ts");
     expect(route).toContain('seat?.role !== "coach"');
     expect(route).toContain("!group.archived_at || !group.next_season_id");
-    expect(route).toContain("hasGraduated(r.graduation_year, retiredAt) && !staying.has(r.profile_id)");
-    expect(route).toContain("done.has(g.profile_id)");
+    expect(route).toContain("hasGraduatedBy(r.graduation_year, year) && !staying.has(r.profile_id)");
+    expect(route).toContain("Math.abs(body.year - serverYear) <= 1");
     expect(route).toContain("isPlaceholderEmail(to)");
-    expect(route).toContain("history.failed || history.truncated");
+    expect(route).toContain("insert({ group_id: groupId, athlete_id: id })"); // the claim, made before anything is sent
+    expect(route).toContain("const graduates = allGraduates.slice(0, PER_CALL);");
+    expect(route).not.toContain("limit(MAX_PLAYERS");
     // one recipient: the player's own address, nothing added
     expect(route.match(/sendEmail\(/g)!.length).toBe(1);
     expect(route).toContain("sendEmail(to, mail.subject, mail.text, { name: \"training-history.pdf\", bytes: pdf })");

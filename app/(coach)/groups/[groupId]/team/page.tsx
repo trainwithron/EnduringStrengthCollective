@@ -12,6 +12,7 @@ import {
 import { CoachPositionScopeList, type CoachStaffRow } from "@/components/coach/desktop/coach-position-scope-list";
 import { NewSeasonPanel } from "@/components/coach/desktop/new-season-panel";
 import { ClassYearPanel } from "@/components/coach/desktop/class-year-panel";
+import { GraduationSendAgain } from "@/components/coach/desktop/graduation-send-again";
 import { UnarchiveGroupButton } from "@/components/coach/desktop/unarchive-group-button";
 import Link from "next/link";
 
@@ -137,6 +138,8 @@ export default async function TeamPage(props: { params: Promise<{ groupId: strin
           <UnarchiveGroupButton groupId={params.groupId} />
         </p>
       )}
+
+      {archivedAt && nextSeasonId && group?.group_kind === "team" && [...gradById.values()].some((y) => y != null) && <GraduationSendAgain groupId={params.groupId} />}
 
       {rosterFailed && (
         <p className="font-body text-sm text-rust mb-4" role="alert">
