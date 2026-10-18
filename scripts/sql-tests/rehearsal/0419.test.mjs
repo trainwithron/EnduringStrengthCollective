@@ -31,7 +31,7 @@ export default {
       const mkWorkout = async (title, day, idx) => (await db.query("insert into public.workouts (program_id, group_id, title, day_index, scheduled_date) values ($1, $2, $3, $4, $5) returning id", [prog, g, title, idx, day])).rows[0].id;
       const mon = await mkWorkout("Lower A", "2026-10-19", 1);
       const wed = await mkWorkout("Lower B", "2026-10-21", 2);
-      const mkEx = async (workout, name, order) => (await db.query("insert into public.group_workout_exercises (workout_id, group_id, exercise_name, exercise_order, prescribed_sets, prescribed_reps) values ($1, $2, $3, $4, 3, '5') returning id", [workout, g, name, order])).rows[0].id;
+      const mkEx = async (workout, name, order) => (await db.query("insert into public.group_workout_exercises (workout_id, group_id, exercise_name, exercise_order) values ($1, $2, $3, $4) returning id", [workout, g, name, order])).rows[0].id;
       const monSquat = await mkEx(mon, "Back squat", 1);
       const monBench = await mkEx(mon, "Bench press", 2);
       const wedSquat = await mkEx(wed, "Back squat", 1);
