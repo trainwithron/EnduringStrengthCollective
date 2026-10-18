@@ -1,3 +1,4 @@
+import { readHealthAnswers } from "@/lib/health-answers";
 import { freeTierUseOrRefuse } from "@/lib/free-tier-server";
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
@@ -109,11 +110,11 @@ export async function POST(request: Request) {
   if (clientId) {
     const { data: seat } = await supabase.from("group_memberships").select("training_level").eq("profile_id", clientId).eq("group_id", program.group_id as string).maybeSingle();
     storedLevel = ((seat as { training_level?: Level | null } | null)?.training_level ?? null) as Level | null;
-    const [{ data: intakeRow }, { data: noteRow }] = await Promise.all([
-      supabase.from("client_intake").select("par_q_answers").eq("athlete_id", clientId).maybeSingle(),
+    const [parQ, { data: noteRow }] = await Promise.all([
+      readHealthAnswers(supabase, clientId),
       supabase.from("athlete_notes").select("body").eq("athlete_id", clientId).eq("group_id", program.group_id as string).maybeSingle(),
     ]);
-    const flagged = hasFlaggedMusculoskeletalConcern((intakeRow?.par_q_answers as any[]) ?? []);
+    const flagged = hasFlaggedMusculoskeletalConcern(parQ ?? []);
     const noteText = noteRow?.body?.trim() || null;
     if (flagged || noteText) injuryContext = `This client has flagged a musculoskeletal or health concern${flagged ? " on their intake screening" : ""}.${noteText ? ` The coach's own note: "${noteText}"` : ""}`;
     // Under 18, or no birthdate on file: the youth protections apply (an unknown age is never treated as an adult).

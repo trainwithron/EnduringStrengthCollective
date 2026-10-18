@@ -1,3 +1,4 @@
+import { readHealthAnswers } from "@/lib/health-answers";
 import { freeTierUseOrRefuse } from "@/lib/free-tier-server";
 import { NextResponse } from "next/server";
 import { isBadExerciseName, cleanExerciseName, exerciseNameProblem } from "@/lib/exercise-name-guard";
@@ -130,11 +131,11 @@ export async function POST(request: Request) {
   let youthUnknownAge = false;
   const athleteId = program.athlete_id as string | null;
   if (athleteId) {
-    const [{ data: intakeRow }, { data: noteRow }] = await Promise.all([
-      supabase.from("client_intake").select("par_q_answers").eq("athlete_id", athleteId).maybeSingle(),
+    const [parQ, { data: noteRow }] = await Promise.all([
+      readHealthAnswers(supabase, athleteId),
       supabase.from("athlete_notes").select("body").eq("athlete_id", athleteId).eq("group_id", groupId).maybeSingle(),
     ]);
-    const flagged = hasFlaggedMusculoskeletalConcern((intakeRow?.par_q_answers as any[]) ?? []);
+    const flagged = hasFlaggedMusculoskeletalConcern(parQ ?? []);
     const noteText = noteRow?.body?.trim() || null;
     if (flagged || noteText) {
       injuryContext = `This client has flagged a musculoskeletal or health concern${flagged ? " on their intake screening" : ""}.${noteText ? ` The coach's own note: "${noteText}"` : ""}`;

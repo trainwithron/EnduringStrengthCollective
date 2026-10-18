@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readHealthAnswers } from "@/lib/health-answers";
 import { createServerClient } from "@/lib/supabase/server";
 
 // Runs entirely under the caller's own authenticated session — every
@@ -40,7 +41,8 @@ export async function GET() {
   ] = await Promise.all([
     supabase.from("profiles").select("full_name, avatar_url").eq("id", userId).maybeSingle(),
     supabase.from("athlete_profile_details").select("*").eq("athlete_id", userId).maybeSingle(),
-    supabase.from("client_intake").select("*").eq("athlete_id", userId).maybeSingle(),
+    // The answers come through health_answers (the table no longer hands them out); everything else on the row as before.
+    supabase.from("client_intake").select("athlete_id, group_id, waiver_signed_name, waiver_accepted, completed_at, created_at, updated_at, date_of_birth").eq("athlete_id", userId).maybeSingle(),
     supabase.from("body_weight_logs").select("*").eq("athlete_id", userId),
     supabase.from("wellness_checkins").select("*").eq("athlete_id", userId),
     supabase.from("athlete_sessions").select("*").eq("athlete_id", userId),
@@ -62,11 +64,13 @@ export async function GET() {
     supabase.from("read_settings").select("faith_track, note_seen_at, updated_at").eq("athlete_id", userId).maybeSingle(),
   ]);
 
+  // Their own screening answers, read through the same door as everyone's.
+  const ownAnswers = intake ? await readHealthAnswers(supabase, userId) : null;
   const exportData = {
     exportedAt: new Date().toISOString(),
     profile,
     profileDetails,
-    intake,
+    intake: intake ? { ...intake, par_q_answers: ownAnswers ?? [] } : intake,
     bodyWeightLogs,
     wellnessCheckins,
     athleteSessions,

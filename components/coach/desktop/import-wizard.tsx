@@ -1,5 +1,6 @@
 "use client";
 
+import { readHealthAnswers } from "@/lib/health-answers";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cleanImportedProgramName, PROGRAM_NAME_MAX, tidyProgramName } from "@/lib/program-name";
@@ -255,8 +256,8 @@ export function ImportWizard({
     let cancelled = false;
     async function run() {
       const supabase = createBrowserClient();
-      const [{ data: intakeRow }, { data: ackRow }] = await Promise.all([
-        supabase.from("client_intake").select("par_q_answers").eq("athlete_id", athleteId).maybeSingle(),
+      const [parQ, { data: ackRow }] = await Promise.all([
+        readHealthAnswers(supabase, athleteId as string),
         supabase
           .from("athlete_injury_flag_acknowledgements")
           .select("athlete_id")
@@ -264,7 +265,7 @@ export function ImportWizard({
           .eq("athlete_id", athleteId)
           .maybeSingle(),
       ]);
-      const flagged = hasFlaggedMusculoskeletalConcern((intakeRow?.par_q_answers as any[]) ?? []);
+      const flagged = hasFlaggedMusculoskeletalConcern(parQ ?? []);
       if (!cancelled) setShowInjuryBanner(flagged && !ackRow);
     }
     run();

@@ -1,3 +1,4 @@
+import { readHealthAnswers } from "@/lib/health-answers";
 import { isEmailConfigured } from "@/lib/email";
 import { mergeLoggedList } from "@/lib/logged-list";
 import { hindsightPrs, importedWorkouts, parseRollup } from "@/lib/imported-prs";
@@ -262,7 +263,7 @@ export default async function AthleteProfilePage(
       .order("taken_date", { ascending: false }),
     supabase
       .from("client_intake")
-      .select("date_of_birth, par_q_answers, waiver_accepted, waiver_signed_name, completed_at")
+      .select("date_of_birth, waiver_accepted, waiver_signed_name, completed_at")
       .eq("athlete_id", params.athleteId)
       .maybeSingle(),
     // Self-reported by the athlete in their own Settings — RLS already
@@ -631,7 +632,11 @@ export default async function AthleteProfilePage(
     ? { data: [] as any[] }
     : await supabase.from("client_sub_goals").select("id, title, target_date, proposed_by, status").eq("athlete_id", params.athleteId).eq("group_id", params.groupId).order("created_at", { ascending: true });
   const subGoals: SubGoalView[] = ((subGoalRows ?? []) as any[]).map((r: any) => ({ id: r.id as string, title: r.title as string, targetDate: (r.target_date as string | null) ?? null, proposedBy: r.proposed_by as string, status: r.status as SubGoalStatus }));
-  const parQAnswers = (intake?.par_q_answers as { question: string; answer: boolean }[]) ?? [];
+  // The answers are read through the database's health_answers door (migration 0399): the client, their coach and an owner or admin the owner has granted get them; anyone else gets null and sees only whether
+  // the form is done.
+  const parQRead = await readHealthAnswers(supabase, params.athleteId);
+  const parQAnswers = parQRead ?? [];
+  const answersHidden = !!intake && parQRead === null;
   const parQFlaggedCount = parQAnswers.filter((a) => a.answer).length;
   // The health screening line on Overview: only while there are more flagged answers than this coach has acknowledged.
   const parqNotice = !selfView && parqNoticeNeeded(parQFlaggedCount, (parqAckRow as { flagged_count?: number | null } | null)?.flagged_count);
@@ -1152,7 +1157,7 @@ export default async function AthleteProfilePage(
                           .filter(Boolean)
                           .join(" + ")}
                 </p>
-                <ParQAnswersPanel answers={parQAnswers} reviewLine={decisionLine(asDecision((parqAckRow as { decision?: string | null } | null)?.decision), (parqAckRow as { acknowledged_at?: string | null } | null)?.acknowledged_at ?? null)} />
+                <ParQAnswersPanel hidden={answersHidden ? { done: !!intake?.completed_at } : null} answers={parQAnswers} reviewLine={decisionLine(asDecision((parqAckRow as { decision?: string | null } | null)?.decision), (parqAckRow as { acknowledged_at?: string | null } | null)?.acknowledged_at ?? null)} />
                 {intake && (
                   <WaiverStatusLine
                     waiverAccepted={!!intake.waiver_accepted}

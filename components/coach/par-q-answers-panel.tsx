@@ -12,11 +12,24 @@ import { AlertTriangle } from "lucide-react";
 export function ParQAnswersPanel({
   answers,
   reviewLine,
+  hidden = null,
 }: {
   answers: { question: string; answer: boolean }[];
+  // Set for an owner or admin who has not been given access to the answers: they see only whether the form is done.
+  hidden?: { done: boolean } | null;
   // "Reviewed by you: Train with changes (Oct 12)", once the coach has decided.
   reviewLine?: string | null;
 }) {
+  if (hidden) {
+    return (
+      <div>
+        <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">Health screening (PAR-Q+)</p>
+        <p className="font-body text-sm text-chalk">{hidden.done ? "Done." : "Needs attention: the form is not finished."}</p>
+        <p className="font-body text-xs text-steel mt-1">The answers are private to this client and their coach. The organization’s owner can give you access.</p>
+      </div>
+    );
+  }
+
   // No answers is said out loud, never silent: a coach reading nothing could take it for "no concerns".
   if (answers.length === 0) {
     return (

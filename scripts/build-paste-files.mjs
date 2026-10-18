@@ -2935,6 +2935,33 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "151",
+  slug: "0399",
+  title: "0399 Release S2: a client's health answers are read only by the client, their coach, and an owner or admin the owner has granted; the address and device of an acceptance only by the audit path",
+  migrations: ["0399"],
+  sees: "Success. No rows returned.",
+  afterwards: "Takes effect at once and the Release S2 code must be live with it: the health answers can no longer be read straight from the table (the app reads them through new functions), and an organization's owner and admins stop seeing the answers (they still see whether the form is done) unless the owner grants it. Apply this step and deploy the code together; the code is written to keep working on either side of the paste only for the pages that do not read the answers.",
+  undo: [
+    "drop trigger if exists organization_memberships_drop_health_grant on public.organization_memberships;",
+    "drop function if exists public.drop_health_grant_on_leaving();",
+    "drop function if exists public.legal_acceptance_audit(uuid);",
+    "grant select on public.legal_acceptances to authenticated;",
+    "grant select on public.client_intake to authenticated;",
+    "drop function if exists public.set_health_access(uuid, uuid, boolean);",
+    "drop function if exists public.health_answers_many(uuid[]);",
+    "drop function if exists public.health_answers(uuid);",
+    "drop function if exists public._can_read_health_answers(uuid, uuid);",
+    "drop table if exists public.health_access_grants;",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 199 misbehaves. It gives the owner and admins their old read of the answers back (and a coach their old read of an acceptance's address and device); run it only if you accept that.",
+  rows: [
+    ["0399 is not already applied (the grants table is not there yet)", "to_regclass('public.health_access_grants') is null"],
+    ["the tables it protects exist", "to_regclass('public.client_intake') is not null and to_regclass('public.legal_acceptances') is not null"],
+    ["the helpers it uses exist", "to_regprocedure('public.is_group_coach(uuid)') is not null and to_regprocedure('public.is_client_private_from_org(uuid, uuid)') is not null and to_regprocedure('public.is_org_owner_or_admin(uuid)') is not null and to_regprocedure('public.audit_record(text, text, text, jsonb)') is not null"],
+  ],
+});
+
+STEPS.push({
   n: "142",
   slug: "0390",
   title: "0390 Release H: undo a whole history import (every workout an import creates carries one batch id)",
@@ -3082,6 +3109,7 @@ const BUNDLES = [
   { id: "release-co", name: "Release CO (nothing about a person is public unless they chose it: personal Find a coach listing; a coach adds only their own clients to a challenge; run BEFORE the code that goes with it is live)", steps: ["139"] },
   { id: "release-cn-held", name: "HELD, Ron's word first: require the health form and waiver of every client without one (read check-intake-flag-list.sql first)", steps: ["138"] },
   { id: "release-cm", name: "Release CM (the guard function and a coach's decision on a flagged screening; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["137"] },
+  { id: "release-s2-health-answers", name: "Release S2 (health answers private to the client and their coach; apply together with the code)", steps: ["151"] },
   { id: "release-s1-signin-hardening", name: "Release S1 (a changed sign-in email is confirmed by the new address; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["150"] },
   { id: "release-f2-client-cap", name: "Release F2 (the free plan's client limit, installed switched off; adds only)", steps: ["149"] },
   { id: "release-l-leaving-coach", name: "Release L (a leaving coach is never given an organization; adds only, safe to run BEFORE the code that goes with it is live)", steps: ["148"] },
@@ -3364,6 +3392,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
     m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
+    m("0399", "to_regclass('public.health_access_grants') is not null"),
     m("0398", "to_regclass('public.pending_email_changes') is not null"),
     m("0397", "exists (select 1 from pg_trigger where tgname = 'group_memberships_free_tier_limit' and not tgisinternal)"),
     m("0396", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'organization_memberships' and column_name = 'departing_since')"),
