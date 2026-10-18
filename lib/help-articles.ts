@@ -79,7 +79,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     summary: "A shopping list built from your meal plan.",
     body: [
       "When your coach has saved a meal plan for you, the Nutrition tab shows Your grocery list: the next seven days of your plan, added up and rounded to what you buy.",
-      "Use Copy to paste it into a notes app, or Print to take it to the store.",
+      "Use Copy to put it in a notes app, or Print to take it to the store.",
       "Foods that break your food preferences are left off. If something is missing or wrong, tell your coach.",
     ],
   },
@@ -187,7 +187,6 @@ export const HELP_ARTICLES: HelpArticle[] = [
     summary: "Selling sessions and memberships.",
     body: [
       "Under Business you set up packages. Payments go through Stripe, so you connect your Stripe account first.",
-      "When a payment fails, is refunded or is disputed, you get a notice and it is listed under Payment problems on the Business page. These are records only: a refund does not take sessions back and a failed payment does not end access. You decide what to do.",
       "Money questions about your own plan are best sent through Support so they are on record.",
     ],
   },

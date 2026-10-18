@@ -51,7 +51,7 @@ describe("the help center", () => {
   it("only describes things that exist: nothing about a feature that is not live yet", () => {
     const all = HELP_ARTICLES.flatMap((a) => a.body).join("\n");
     // These ship in later releases; their articles are added with them.
-    expect(all).not.toMatch(/Removed clients|No automatic suggestions|Payment problems?/);
+    expect(all).not.toMatch(/Removed clients|No automatic suggestions|Payment problems?|refund does not take sessions/);
   });
 
   it("is written in plain words: no internal names", () => {
