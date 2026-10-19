@@ -64,6 +64,8 @@ export function AddClientButton({
   // An owner or admin adding a one-on-one client can choose which coach in the organization holds them (default: themselves).
   const [orgCoaches, setOrgCoaches] = useState<{ id: string; name: string }[]>([]);
   const [assignTo, setAssignTo] = useState("");
+  // The organization a new one-on-one client is added to (the one this page belongs to), shown on the form so it never happens silently; `checked` is false until it is read.
+  const [orgInfo, setOrgInfo] = useState<{ checked: boolean; name: string | null }>({ checked: false, name: null });
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
@@ -76,7 +78,8 @@ export function AddClientButton({
       const { data } = await supabase.from("profiles").select("coach_type").eq("id", user.id).maybeSingle();
       const type = (data as { coach_type?: string | null } | null)?.coach_type;
       if (!cancelled) setGroupsFirst(type === "team" || type === "gym");
-      const { data: current } = await supabase.from("groups").select("organization_id").eq("id", groupId).maybeSingle();
+      const { data: current } = await supabase.from("groups").select("organization_id, organizations ( name )").eq("id", groupId).maybeSingle();
+      if (!cancelled) setOrgInfo({ checked: true, name: current?.organization_id ? ((current as { organizations?: { name?: string | null } | null }).organizations?.name ?? null) : null });
       if (!current?.organization_id) return;
       const { data: mine } = await supabase.from("organization_memberships").select("role").eq("organization_id", current.organization_id).eq("profile_id", user.id).maybeSingle();
       if (mine?.role !== "owner" && mine?.role !== "admin") return;
@@ -252,6 +255,11 @@ export function AddClientButton({
 
   const nameForm = (
     <form onSubmit={addByName} className="space-y-3">
+      {step === "one_on_one" && orgInfo.checked && (
+        <p className="font-body text-xs text-steel" data-adding-to>
+          {orgInfo.name ? <>Adding to <span className="text-chalk">{orgInfo.name}</span>.</> : "This space is not part of an organization, so a one-on-one client cannot be added from here. Open one of your organizations first."}
+        </p>
+      )}
       <div>
         <label htmlFor="client-name" className="font-body text-xs text-steel">
           Full name
