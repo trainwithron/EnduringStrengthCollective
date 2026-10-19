@@ -117,8 +117,10 @@ describe("the coach-level pages and pickers stand on the organization the coach 
     expect(read("components/coach/coach-desktop-shell.tsx")).not.toContain("LAST_WORKSPACE_GROUP_COOKIE");
     expect(read("lib/supabase/middleware.ts")).toContain("response.cookies.set(LAST_WORKSPACE_GROUP_COOKIE");
     const theme = read("lib/org-theme-server.ts");
-    expect(theme).toContain('get("last_workspace_group")');
-    expect(theme.indexOf("ACTIVE_ORG_COOKIE_NAME)?.value")).toBeLessThan(theme.indexOf('get("last_workspace_group")'));
+    // the remembered workspace is read once per request for the colors and the team words together (lib/workspace-group-row.ts)
+    expect(theme).toContain("(await getWorkspaceGroupRow()).row?.organization_id");
+    expect(read("lib/workspace-group-row.ts")).toContain("get(LAST_WORKSPACE_GROUP_COOKIE)");
+    expect(theme.indexOf("ACTIVE_ORG_COOKIE_NAME)?.value")).toBeLessThan(theme.indexOf("getWorkspaceGroupRow()).row"));
   });
 });
 

@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Suspense } from "react";
+import { after } from "next/server";
 import { readRowsByIds } from "@/lib/read-by-ids";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
@@ -11,7 +13,8 @@ import { ProgramsList } from "@/components/coach/desktop/programs-list";
 import { defaultList, type RemovedProgram } from "@/lib/programs-filter";
 import { sweepEmptyPrograms } from "@/lib/empty-sweep";
 import { SwappableTerm } from "@/components/coach/swappable-term";
-import { computeProgramCardVisuals } from "@/lib/program-card-data";
+import { ProgramVisualsLoader } from "@/components/coach/desktop/program-visuals-loader";
+import type { ProgramCardVisualData } from "@/lib/program-card-data";
 import { coachedOrgs, getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
 import { CHOOSE_ORGANIZATION_PATH, getActiveAnchor } from "@/lib/active-anchor";
 import { getCoachClients } from "@/lib/coach-clients";
@@ -20,7 +23,6 @@ import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
 import { ProgramsPhoneList } from "@/components/coach/mobile/programs-phone-list";
 import { LearnedSection } from "@/components/coach/learned-section";
 import { ConversationInviteSection } from "@/components/coach/conversation-section";
-import { countAssignedTo } from "@/lib/program-assigned";
 import { ALL_PROGRAMS_HREF, clientFromSearch, groupFromSearch, scopePrograms } from "@/lib/programs-scope";
 
 export const metadata = { title: "Programs" };
@@ -52,10 +54,12 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
   // (A phone gets this same page, over the whole organization it is working in: it used to be sent to ONE group's programs, and the "Show all programs" link on that page sent it straight back.)
   const inOrg = groupsInOrgOf(groups, anchor.id);
   const groupIds = inOrg.map((g) => g.id);
-  // His own programs with nothing in them (no exercise, no session, no copy), untouched for 24 hours, are removed quietly (AI builder leftovers).
-  await sweepEmptyPrograms(supabase, user.id, groupIds);
+  // His own programs with nothing in them (no exercise, no session, no copy), untouched for 24 hours, are removed quietly (AI builder leftovers). After the page is sent (SPEED, Oct 19): it never holds
+  // the page up, and a program it removes is gone from the next visit.
+  after(() => sweepEmptyPrograms(supabase, user.id, groupIds));
+  // Everything below that does not depend on another read runs at once (SPEED, Oct 19: the page took 4.5 to 5 seconds reading one thing after another).
   // (The coach's groups can pass a request's URL limit and the 1,000-row cap, so the ids go in groups and each is read a page at a time; the newest change first after they are put together.)
-  const { data: programsUnsorted, error: programsError } = await readRowsByIds(groupIds, (g) => (from, to) =>
+  const programsRead = readRowsByIds(groupIds, (g) => (from, to) =>
     supabase
       .from("programs")
       .select("id, group_id, name, is_active, ai_draft, cover_image_path, athlete_id, source_program_id, training_intent, updated_at, profiles!programs_athlete_id_fkey ( full_name ), workouts(id, group_workout_exercises(count))")
@@ -64,12 +68,11 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
       .order("id")
       .range(from, to)
   );
-  const programs = programsUnsorted.sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
 
   // Every program the coach removed (kept, with every log), library or one client's: found under "Removed programs" and under its client, with Put back and Delete.
-  const { data: hiddenRows } = clientId
-    ? { data: [] }
-    : await readRowsByIds(groupIds, (g) => (from, to) =>
+  const hiddenRead = clientId
+    ? Promise.resolve({ data: [] as any[] })
+    : readRowsByIds(groupIds, (g) => (from, to) =>
         supabase
           .from("programs")
           .select("id, name, group_id, athlete_id, archived_at, profiles!programs_athlete_id_fkey ( full_name )")
@@ -79,12 +82,29 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
           .order("id")
           .range(from, to)
       ).then((r) => ({ data: r.data.sort((a, b) => String(b.archived_at).localeCompare(String(a.archived_at))).slice(0, 200) }));
-  const removed: RemovedProgram[] = ((hiddenRows ?? []) as any[]).map((r) => ({ id: r.id, name: r.name, groupId: r.group_id, athleteId: r.athlete_id ?? null, athleteName: r.profiles?.full_name ?? null }));
 
   // How many template slots each library program holds (the Templates filter and the card's mark).
-  const { data: slotRows } = await readRowsByIds(groupIds, (g) => (from, to) =>
+  const slotsRead = readRowsByIds(groupIds, (g) => (from, to) =>
     supabase.from("group_workout_exercises").select("id, workouts!inner ( program_id )").eq("is_slot", true).in("group_id", g).order("id").range(from, to)
   );
+  // "Assigned to": the people holding a copy of a program (the copies in this organization's groups, read by group, not by a long list of program ids).
+  const copiesRead = clientId
+    ? Promise.resolve({ data: [] as any[] })
+    : readRowsByIds(groupIds, (g) => (from, to) =>
+        supabase.from("programs").select("id, source_program_id").in("group_id", g).not("source_program_id", "is", null).not("athlete_id", "is", null).is("archived_at", null).order("id").range(from, to)
+      );
+
+  const [{ data: programsUnsorted, error: programsError }, { data: hiddenRows }, { data: slotRows }, { data: copyRows }, onPhone] = await Promise.all([
+    programsRead,
+    hiddenRead,
+    slotsRead,
+    copiesRead,
+    prefersAthleteStyleView(),
+  ]);
+  const programs = programsUnsorted.sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
+  const removed: RemovedProgram[] = ((hiddenRows ?? []) as any[]).map((r) => ({ id: r.id, name: r.name, groupId: r.group_id, athleteId: r.athlete_id ?? null, athleteName: r.profiles?.full_name ?? null }));
+  const assignedCounts = new Map<string, number>();
+  for (const r of (copyRows ?? []) as { source_program_id: string }[]) assignedCounts.set(r.source_program_id, (assignedCounts.get(r.source_program_id) ?? 0) + 1);
   const slotCountByProgram = new Map<string, number>();
   for (const r of (slotRows ?? []) as any[]) {
     const pid = r.workouts?.program_id as string | undefined;
@@ -131,10 +151,9 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
   const scoped = scopePrograms(all, clientId, clientGroupId);
   const cards = clientId ? scoped : defaultList(scoped);
   // "Assigned to (n)": the people holding copies, plus the person holding the program itself (the first person a program is assigned to gets the original).
-  const assignedCounts = clientId ? new Map<string, number>() : await countAssignedTo(supabase, scoped.filter((c) => !c.sourceProgramId).map((c) => c.id));
   for (const c of scoped) if (!c.sourceProgramId) c.assignedCount = (assignedCounts.get(c.id) ?? 0) + (c.athleteId ? 1 : 0);
   // A phone gets simple cards in the mobile shell (not this desktop page squeezed): name, Active, days, tap to open.
-  if (await prefersAthleteStyleView()) {
+  if (onPhone) {
     return (
       <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
         {/* Programs lives under More on the phone, so More is lit here (not Home). */}
@@ -167,8 +186,13 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
   }
 
   const uncoveredProgramIds = cards.filter((c) => !c.coverImagePath).map((c) => c.id);
-  const visualsMap = await computeProgramCardVisuals(supabase, uncoveredProgramIds, user.id);
-  const visualsByProgramId = Object.fromEntries(visualsMap);
+  // The list shows at once; the cards' charts stream in after (SPEED, Oct 19).
+  const listWith = (visualsByProgramId: Record<string, ProgramCardVisualData>) =>
+    clientId ? (
+      <ProgramCardGrid groupId={anchor.id} programs={cards} visualsByProgramId={visualsByProgramId} />
+    ) : (
+      <ProgramsList groupId={anchor.id} programs={scoped} removed={removed} visualsByProgramId={visualsByProgramId} />
+    );
 
   return (
     <CoachDesktopShell groupId={anchor.id} groupName={anchor.name} active="programs" coachLevel>
@@ -208,10 +232,10 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
 
       {programsError ? (
         <UnavailableState what="your programs" />
-      ) : clientId ? (
-        <ProgramCardGrid groupId={anchor.id} programs={cards} visualsByProgramId={visualsByProgramId} />
       ) : (
-        <ProgramsList groupId={anchor.id} programs={scoped} removed={removed} visualsByProgramId={visualsByProgramId} />
+        <Suspense fallback={listWith({})}>
+          <ProgramVisualsLoader supabase={supabase} coachId={user.id} programIds={uncoveredProgramIds} render={listWith} />
+        </Suspense>
       )}
 
       {!clientId && <LearnedSection supabase={supabase} coachId={user.id} />}

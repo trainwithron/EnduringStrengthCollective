@@ -25,7 +25,9 @@ describe("the what-do-you-call-your-people card is asked once, for good", () => 
   });
   it("Home reads the flag on its own, so a database without the column does not break Home", () => {
     const home = read("app/(coach)/dashboard/page.tsx");
-    expect(home).toContain('.select("terminology_asked_at")');
+    // one read of the profile row, with a plain fallback read when the column is not there yet (SPEED, Oct 19)
+    expect(home).toContain('.select("full_name, timezone, terminology_asked_at, coach_type")');
+    expect(home).toContain("askedRead: { data: null, error: full.error }");
     expect(home).toContain("askedOnServer={askedRead.error ? null :");
   });
   it("the migration adds one column and marks every existing coach as answered", () => {

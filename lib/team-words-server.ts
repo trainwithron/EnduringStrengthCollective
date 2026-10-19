@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase/server";
+import { getWorkspaceGroupRow } from "@/lib/workspace-group-row";
 import { ACTIVE_ORG_COOKIE_NAME, LAST_WORKSPACE_GROUP_COOKIE, decodeWorkspaceCookie } from "@/lib/workspace-header";
 import { NO_TEAM_WORDS_HINT, isTeamSportGroup, orgIsTeamOnly, type TeamWordsHint } from "@/lib/team-sport";
 
@@ -12,9 +13,10 @@ export const getTeamWordsHint = cache(async (): Promise<TeamWordsHint> => {
     const groupId = decodeWorkspaceCookie(jar.get(LAST_WORKSPACE_GROUP_COOKIE)?.value);
     if (!groupId) return NO_TEAM_WORDS_HINT;
     const chosenOrg = decodeWorkspaceCookie(jar.get(ACTIVE_ORG_COOKIE_NAME)?.value);
+    // The same read as the layout's colors (lib/workspace-group-row.ts): once per request.
+    const { row: group, failed } = await getWorkspaceGroupRow();
+    if (failed || !group) return NO_TEAM_WORDS_HINT;
     const supabase = await createServerClient();
-    const { data: group, error } = await supabase.from("groups").select("organization_id, team_mode").eq("id", groupId).maybeSingle();
-    if (error || !group) return NO_TEAM_WORDS_HINT;
     const groupTeamSport = isTeamSportGroup((group as { team_mode?: boolean | null }).team_mode);
     let orgTeamOnly = false;
     const organizationId = (group as { organization_id?: string | null }).organization_id;

@@ -63,7 +63,7 @@ describe("wiring", () => {
     const api = read("app/api/programs/sweep-empty-days/route.ts");
     expect(api).toContain("isBrandNewProgram");
     expect(api).toContain("sweepEmptyDays(supabase, programId, dayIds)");
-    expect(read("app/(coach)/programs/page.tsx")).toContain("await sweepEmptyPrograms(supabase, user.id, groupIds);");
+    expect(read("app/(coach)/programs/page.tsx")).toContain("after(() => sweepEmptyPrograms(supabase, user.id, groupIds));");
     const sweep = read("lib/empty-sweep.ts");
     expect(sweep).toContain(".eq(\"created_by\", viewerId)");
     expect(sweep).toContain("workout_logs(count)");

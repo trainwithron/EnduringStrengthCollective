@@ -57,8 +57,9 @@ describe("the pieces are wired", () => {
     const route = read("app/my-training/open/route.ts");
     expect(route).toContain("UUID.test(groupId)");
     expect(route).toContain('from("group_memberships")');
-    expect(route).toContain('if (membership.role === "coach") {');
-    expect(route).toContain("JSON.stringify({ athleteId: user.id, groupId })");
+    expect(route).toContain("setMyTrainingCookies(response, { userId: user.id, groupId, role: membership.role });");
+    expect(read("lib/my-training-cookies.ts")).toContain('if (role !== "coach") return;');
+    expect(read("lib/my-training-cookies.ts")).toContain("JSON.stringify({ athleteId: userId, groupId })");
   });
   it("both coach pickers go straight to My training: no 'Which group's program?' step", () => {
     for (const f of ["components/athlete/view-as-client-picker.tsx", "components/coach/mobile/spot-clients-groups-panel.tsx"]) {
@@ -107,7 +108,9 @@ describe("The coach as their own client (personal space)", () => {
     const route = read("app/my-space/route.ts");
     expect(route).toContain('rpc("ensure_personal_space")');
     expect(route).toContain("/groups/${spaceId}/athletes/${user.id}");
-    expect(route).toContain("/my-training/open?group=${spaceId}");
+    // straight into the client app with the same cookies (SPEED, Oct 19: one hop instead of three)
+    expect(route).toContain("setMyTrainingCookies(response, { userId: user.id, groupId: spaceId as string, role: (seat as { role: string }).role });");
+    expect(route).toContain("NextResponse.redirect(new URL(`/groups/${spaceId}`, url))");
     expect(read("app/my-training/page.tsx")).toContain('redirect("/my-space?view=client")');
   });
   it("on their own profile the Billing tab, the message box and the video check-in are gone", () => {
