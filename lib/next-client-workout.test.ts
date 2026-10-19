@@ -132,3 +132,41 @@ describe("the Home button reads only what it should and goes where 'Log their wo
     expect(phone).toContain('const startLabel = ownOpen ? "Resume workout" : "Start workout";');
   });
 });
+
+// Oct 19 audit: after "Pause for now" nothing on Home said a client's workout was waiting; Home still said "Start".
+describe("a coach-logged workout left open or paused in the last 36 hours", () => {
+  function fakeOpen(rows: { id: string; athlete_id: string; group_id: string; started_at: string }[]) {
+    const calls: string[] = [];
+    const chain: any = {
+      select: () => chain,
+      in: (c: string) => (calls.push(`${c} in`), chain),
+      eq: (c: string, v: unknown) => (calls.push(`${c}=${String(v)}`), chain),
+      gte: (c: string) => (calls.push(`${c}>=`), chain),
+      order: () => chain,
+      range: async () => ({ data: rows, error: null }),
+      maybeSingle: async () => ({ data: { full_name: "Jaxson Kremer" }, error: null }),
+    };
+    return { calls, from: () => chain };
+  }
+  it("is found for the newest open one, named, with the session to open", async () => {
+    const { loadOpenClientWorkout } = await import("@/components/coach/next-client-workout-section");
+    const sb = fakeOpen([
+      { id: "old", athlete_id: "a1", group_id: "g1", started_at: "2026-10-18T20:00:00Z" },
+      { id: "new", athlete_id: "a2", group_id: "g1", started_at: "2026-10-19T14:00:00Z" },
+    ]);
+    const open = await loadOpenClientWorkout(sb, ["g1"], NOW);
+    expect(open).toMatchObject({ sessionId: "new", athleteId: "a2", name: "Jaxson K." });
+    expect(sb.calls).toEqual(expect.arrayContaining(["group_id in", "logged_by_coach=true", "status in", "started_at>="]));
+  });
+  it("none open means nothing", async () => {
+    const { loadOpenClientWorkout } = await import("@/components/coach/next-client-workout-section");
+    expect(await loadOpenClientWorkout(fakeOpen([]), ["g1"], NOW)).toBeNull();
+  });
+  it("Home says 'Resume <name>'s workout' and opens the session where it stopped; the next client's button is not repeated for the same person", () => {
+    const src = read("components/coach/next-client-workout-section.tsx");
+    expect(src).toContain("Resume {open.name}&apos;s workout");
+    expect(src).toContain("/sessions/${open.sessionId}?resume=1");
+    expect(src).toContain("const showNext = next && next.athleteId !== open?.athleteId;");
+    expect(src).toContain("OPEN_WORKOUT_HOURS = 36");
+  });
+});
