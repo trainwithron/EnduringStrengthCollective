@@ -423,8 +423,7 @@ export default async function NutritionPage(
             Your coach has marked you as currently injured
           </p>
           <p className="font-body text-xs text-steel">
-            Your calorie target has been raised to at least maintenance while you recover —
-            undereating during an injury measurably slows healing.{" "}
+            Eating enough matters while you recover: undereating during an injury measurably slows healing.{" "}
             <a
               href="https://www.childrensmercy.org/departments-and-clinics/orthopedics/sports-medicine/nutrition-for-injury-recovery-in-athletes/"
               target="_blank"
