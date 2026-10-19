@@ -71,7 +71,8 @@ describe("the phone coach home of a team-sport group (the Trojans: one team grou
     expect(home.links.map((l) => l.label)).toEqual(["Team calendar", "Team feed", "Athletes", "Messages", "Settings"]);
     expect(home.links.map((l) => l.href)).toEqual([`/groups/${TROJANS}/team/calendar`, `/groups/${TROJANS}/feed`, expect.stringContaining(TROJANS), `/groups/${TROJANS}/messages`, `/groups/${TROJANS}/settings`]);
     const more = home.moreLinks.map((l) => l.label);
-    for (const wanted of ["All programs", "Attendance", "Depth chart", "Team performance", "Team sheet"]) expect(more, wanted).toContain(wanted);
+    // only the phone app's own places (Oct 19): the computer pages (Depth chart, Team performance, Team sheet, Challenges, the exercise library) are not offered on the phone
+    expect(more).toEqual(["All programs", "Nutrition", "Attendance"]);
     // the coach's own training is ONE row at the top of the Athletes list, not a second entry here
     expect(more).not.toContain("My own training");
     expect(JSON.stringify(home.links)).not.toContain("my-space");

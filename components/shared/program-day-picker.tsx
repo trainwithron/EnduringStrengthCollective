@@ -1,9 +1,25 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Check, ChevronRight, Dumbbell, StickyNote } from "lucide-react";
+import { ProgramAssignPanel } from "@/components/coach/desktop/program-assign-panel";
 import { agoLabel, dayCardTitle, defaultWeek, exerciseCountLabel, previewLine, programStats, weekIsComplete, type PlainDay, type PlainWeek } from "@/lib/program-plain-view";
+
+// The builder's "Assign to clients" button and its panel, on the phone's program view (the panel is a portal, so it opens over the whole screen).
+function AssignToClients({ programId, programName, groupId, aiDraft }: { programId: string; programName: string; groupId: string; aiDraft: boolean }) {
+  const [open, setOpen] = useState(false);
+  const router = useRouter();
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className="min-h-11 inline-flex items-center px-4 border border-rust text-rust font-body text-sm rounded-full">
+        Assign to clients
+      </button>
+      {open && <ProgramAssignPanel programId={programId} programName={programName} groupId={groupId} aiDraft={aiDraft} onClose={() => setOpen(false)} onChanged={() => router.refresh()} />}
+    </>
+  );
+}
 
 // The plain program view (FitPros is the reference): a stats card, a row of weeks, a card for each day of the chosen week, and a bottom sheet with the day's workout and its Start button.
 // Read-only. The coach gets "Edit program" to reach the builder.
@@ -20,6 +36,7 @@ export function ProgramDayPicker({
   isCoachViewing,
   nowIso,
   startLabel,
+  assign = null,
 }: {
   title: string;
   weeks: PlainWeek[];
@@ -35,6 +52,8 @@ export function ProgramDayPicker({
   nowIso: string;
   // Overrides the day sheet's button text (the coach logging for a client says "Log this workout").
   startLabel?: string;
+  // The coach's own view: the builder's "Assign to clients" button and panel, the same ones (null for a client, and for the coach logging for a client).
+  assign?: { programId: string; programName: string; groupId: string; aiDraft: boolean } | null;
 }) {
   const [weekNumber, setWeekNumber] = useState(() => defaultWeek(weeks, currentWeek));
   const [open, setOpen] = useState<{ week: number; day: PlainDay } | null>(null);
@@ -47,16 +66,20 @@ export function ProgramDayPicker({
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-28">
       <header className="px-5 pt-8 pb-3">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
           <Link href={backHref} className="font-body text-sm text-rust min-h-11 inline-flex items-center">
             &larr; Back
           </Link>
-          {canEdit && editHref && (
-            <Link href={editHref} className="min-h-11 inline-flex items-center px-4 border border-rust text-rust font-body text-sm rounded-full">
-              Edit program
-            </Link>
-          )}
+          <span className="flex flex-wrap items-center justify-end gap-2">
+            {assign && <AssignToClients {...assign} />}
+            {canEdit && editHref && (
+              <Link href={editHref} className="min-h-11 inline-flex items-center px-4 border border-rust text-rust font-body text-sm rounded-full">
+                Edit program
+              </Link>
+            )}
+          </span>
         </div>
+
         <h1 className="font-display font-bold text-3xl leading-none mt-1 uppercase break-words">{title}</h1>
       </header>
 

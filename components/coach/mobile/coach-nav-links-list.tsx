@@ -35,7 +35,7 @@ function Item({ href, label, icon: Icon }: { href: string; label: string; icon: 
 }
 
 // The phone More list: only the phone app's own places (lib/phone-coach-routes.ts; Ron, Oct 19: one real phone app, not the computer pages squeezed onto a phone). Every link here is a page that stays a
-// page on the phone (a test checks none of them is redirected), there is no Desktop mode button, and "More tools" holds only the team pages. The group switcher is not here: Spotlight > Clients and groups
+// page on the phone (a test checks none of them is redirected), there is no button to switch to the computer layout, and "More tools" holds only the team pages. The group switcher is not here: Spotlight > Clients and groups
 // already switches and creates groups, and Clients, Messages and Calendar are coach-level pages that show every client no matter which group the coach last looked at.
 export function CoachNavLinksList({ groupId }: { groupId: string; groupName?: string }) {
   const [teamMode, setTeamMode] = useState(false);
@@ -80,7 +80,7 @@ export function CoachNavLinksList({ groupId }: { groupId: string; groupName?: st
   return (
     <>
       <div className="pt-3">
-        {/* A team-sport group: its team pages first (Team calendar, Attendance, Team feed: only the ones that are pages on the phone). */}
+        {/* A team-sport group: its team pages first (only the ones that are pages on the phone). */}
         {teamSport &&
           teamSportMenu(groupId)
             .filter((m) => m.key !== "members" && m.key !== "messages" && phoneCoachRedirect(m.href) === null)

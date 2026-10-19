@@ -272,11 +272,8 @@ export default async function SettingsPage(
               href={inPersonalSpace ? "/dashboard" : `/groups/${params.groupId}/dashboard`}
               className="font-body text-sm font-bold text-rust"
             >
-              Your coaching workspace →
+              Coach home →
             </Link>
-            <p className="font-body text-xs text-steel mt-1">
-              Programs, clients, business tools — the full site.
-            </p>
             {(group as { group_kind?: string } | null)?.group_kind !== "one_on_one" && (
               <div className="mt-4 pt-4 border-t border-steel/15">
                 <TeamSportToggle groupId={params.groupId} initialEnabled={(group as { team_mode?: boolean | null } | null)?.team_mode === true} />

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
+import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { DirectMessageThread } from "@/components/messages/direct-message-thread";
 import { CoachProfilePopup } from "@/components/shared/coach-profile-popup";
@@ -118,7 +119,14 @@ export default async function MessageThreadPage(
           fixedComposer
         />
       </div>
-      <BottomTabBar groupId={params.groupId} activeOverride="settings" />
+      {/* One phone app for coaches: a coach on a phone gets the coach bar (Messages lit), Spotlight and More; a client keeps their own bar. */}
+      {viewerIsCoach && showMobileView ? (
+        <CoachMobileShell groupId={params.groupId} groupName="" activeOverride="messages">
+          {null}
+        </CoachMobileShell>
+      ) : (
+        <BottomTabBar groupId={params.groupId} activeOverride="settings" />
+      )}
     </main>
   );
 }

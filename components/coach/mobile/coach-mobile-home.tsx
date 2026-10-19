@@ -17,7 +17,7 @@ import { homeTitle } from "@/lib/phone-home-title";
 
 // The coach's phone Home, kept to what a coach in the gym needs (Ron, Oct 19: "look how repetitive this is"): the title, the "Did X's session happen?" cards when there are any, ONE big button for the next client's
 // workout (or "Resume ..." for one left open), and the few things that need a decision (late changes, requests) only when they exist. Nothing repeats what the bottom bar already does (Home, Clients, Messages, Calendar,
-// More): no clients card, no quick-actions block, no business tiles (those are under More > Business), no Desktop Mode button (under More), and no start button for the coach's OWN workout: that is the "Coach (you)" row
+// More): no clients card, no quick-actions block, no business tiles, no Desktop Mode button (the phone is one phone app: lib/phone-coach-routes.ts), and no start button for the coach's OWN workout: that is the "Coach (you)" row
 // at the top of the Clients list.
 export async function CoachMobileHome({
   groupId,

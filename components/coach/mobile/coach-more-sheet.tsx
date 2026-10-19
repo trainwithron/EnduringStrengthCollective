@@ -7,7 +7,8 @@ import { CoachNavLinksList } from "./coach-nav-links-list";
 // The coach mobile "More" sheet (coach_mobile_app_redesign_plan.md,
 // locked 2026-09-14) — everything the old flat drawer nav used to hold,
 // minus the four destinations that are now real bottom tabs (Home,
-// Roster, Messages, Calendar). Still CoachDesktopShell's own narrow-
+// Roster, Messages, Calendar), and only the phone app's own places (no
+// switch to the computer layout, no computer pages: lib/phone-coach-routes.ts). Still CoachDesktopShell's own narrow-
 // width "More" fallback (coach-desktop-shell.tsx) — CoachMobileShell's
 // own "More" tab now opens CoachMoreDrawer instead
 // (mobile_more_tab_condensed_widget_hub_sept30.md), which reuses the

@@ -10,6 +10,7 @@ import { ProgramChips } from "@/components/athlete/program-chips";
 import { BookingModeLine } from "@/components/athlete/booking-mode-line";
 import { dateKeyInZone, getGroupCoachTimezone, nowInZone } from "@/lib/timezone";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
+import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
 import { UpcomingGroupEvents } from "@/components/group/group-event-answer";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
@@ -167,7 +168,14 @@ export default async function ProgramCalendarPage(
           )}
         </div>
         {showMobileView && (
+          // One phone app for coaches: a coach (not acting as a client) gets the coach bar, Spotlight and More; a client keeps their own bar.
+        viewingAsAthlete ? (
           <BottomTabBar groupId={params.groupId} activeOverride="calendar" />
+        ) : (
+          <CoachMobileShell groupId={params.groupId} groupName="" activeOverride="calendar">
+            {null}
+          </CoachMobileShell>
+        )
         )}
       </main>
     );
@@ -578,7 +586,14 @@ export default async function ProgramCalendarPage(
       )}
 
       {showMobileView && (
-        <BottomTabBar groupId={params.groupId} activeOverride="calendar" />
+        // One phone app for coaches: a coach (not acting as a client) gets the coach bar, Spotlight and More; a client keeps their own bar.
+        viewingAsAthlete ? (
+          <BottomTabBar groupId={params.groupId} activeOverride="calendar" />
+        ) : (
+          <CoachMobileShell groupId={params.groupId} groupName="" activeOverride="calendar">
+            {null}
+          </CoachMobileShell>
+        )
       )}
     </main>
   );

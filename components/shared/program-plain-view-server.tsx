@@ -66,6 +66,9 @@ export async function ProgramPlainView({
     ? computeScheduledDates(program.start_date!, program.training_days!, rows.map((w) => ({ id: w.id, scheduledDate: w.scheduled_date })))
     : new Map<string, Date>();
   const timezone = await getGroupCoachTimezone(supabase, groupId);
+  // Assign works on the phone too (Ron, Oct 19): the coach's view of a program gets the builder's own "Assign to clients" and its panel (which signs off an AI draft first, as in the builder).
+  const canAssign = isCoach && !workoutHrefBase;
+  const { data: draftRow } = canAssign ? await supabase.from("programs").select("ai_draft").eq("id", programId).maybeSingle() : { data: null };
   const today = nowInZone(timezone);
 
   const byWeek = new Map<number, PlainWeek>();
@@ -120,6 +123,7 @@ export async function ProgramPlainView({
       workoutHrefBase={workoutHrefBase ?? `/groups/${groupId}/workouts`}
       startLabel={startLabel}
       canEdit={isCoach && !workoutHrefBase}
+      assign={canAssign ? { programId, programName: program.name, groupId, aiDraft: (draftRow as { ai_draft?: boolean } | null)?.ai_draft === true } : null}
       isCoachViewing={isCoach && !!program.athlete_id && program.athlete_id !== userId}
       nowIso={new Date().toISOString()}
     />

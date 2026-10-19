@@ -62,7 +62,7 @@ describe("the word is chosen once and changed in Settings", () => {
   it("the phone's coach screens carry the vocabulary, so the Spotlight tile and More list use the chosen word", () => {
     expect(read("./mobile/coach-mobile-shell.tsx")).toContain("<TerminologyProvider groupId={groupId}>");
     expect(read("./mobile/coach-spot-hub.tsx")).toContain('t("client", "plural", { cap: true })');
-    expect(read("./mobile/coach-nav-links-list.tsx")).toContain('${t("client", "plural", { cap: true })} and ${t("session", "plural")}');
+    // (the phone More list no longer has the "Clients and sessions" heading: those pages are on the computer)
   });
   it("the main buttons, headers and empty states use the chosen word", () => {
     expect(read("./desktop/add-client-button.tsx")).toContain('Add {t("client")}');

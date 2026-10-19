@@ -43,10 +43,11 @@ describe("the coach's phone Home is short", () => {
   it("the title starts below the fixed Spotlight button, so it is never covered", () => {
     expect(home).toContain('className="px-5 pt-[108px] pb-4"');
   });
-  it("the More sheet has Programs and Desktop mode, and the bottom bar has Home, Clients, Messages, Calendar, More", () => {
+  it("the More sheet has Programs and no Desktop mode (one phone app, Oct 19), and the bottom bar has Home, Clients, Messages, Calendar, More", () => {
     const more = read("components/coach/mobile/coach-nav-links-list.tsx");
     expect(more).toContain('<Item href="/programs" label="Programs"');
-    expect(more).toContain('<ViewModeToggle targetMode="desktop" label="Desktop mode"');
+    expect(more).not.toContain("Desktop mode");
+    expect(more).not.toContain("ViewModeToggle");
     const bar = read("components/athlete/bottom-tab-bar.tsx");
     for (const label of ['label: "Home"', 'term("client", "plural", { cap: true })', 'label: "Messages"', 'label: "Calendar"', 'label: "More"']) expect(bar).toContain(label);
   });

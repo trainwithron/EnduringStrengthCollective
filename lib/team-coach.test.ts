@@ -65,7 +65,8 @@ describe("the team coach's menus", () => {
     expect(src("components/coach/coach-type-setting.tsx")).toContain("they always stay if you have a one-on-one client or run an organization with other coaches or staff");
     expect(src("components/coach/coach-desktop-shell.tsx")).toContain("hiddenForCoach(navFacts, i.key)");
     const phone = src("components/coach/mobile/coach-nav-links-list.tsx");
-    for (const key of ["availability", "booking-page", "session-types", "session-ledger", "leads", "resources"]) expect(phone, key).toContain(`hiddenForCoach(navFacts, "${key}")`);
+    // the phone More list no longer offers those pages at all (they are computer pages: lib/phone-coach-routes.ts), so there is nothing left there to hide
+    for (const key of ["availability", "booking-page", "session-types", "session-ledger", "leads", "resources"]) expect(phone, key).not.toContain(key);
   });
 });
 

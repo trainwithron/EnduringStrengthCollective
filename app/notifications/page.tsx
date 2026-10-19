@@ -9,6 +9,8 @@ import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { isValidTimeZone } from "@/lib/format-in-timezone";
 import { CHOOSE_ORGANIZATION_PATH, getActiveAnchor } from "@/lib/active-anchor";
 import { noticeHref } from "@/lib/notice-links";
+import { prefersAthleteStyleView } from "@/lib/pwa-server";
+import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
 
 export const metadata = { title: "Notifications" };
 
@@ -38,8 +40,10 @@ export default async function NotificationsPage() {
 
   // A coach sees the OPEN organization's notifications here, never another organization's (a coach who runs several chooses one first).
   let visibleRows = rows ?? [];
+  let coachAnchor: { id: string; name: string } | null = null;
   if (isCoach) {
     const active = await getActiveAnchor(supabase, user.id);
+    coachAnchor = active?.anchor ?? null;
     if (active?.needsChoice) redirect(`${CHOOSE_ORGANIZATION_PATH}?next=/notifications`);
     if (active) {
       const orgGroupIds = new Set(active.groups.filter((g) => g.orgId === active.orgId).map((g) => g.id));
@@ -62,6 +66,17 @@ export default async function NotificationsPage() {
       {rowsError ? <LoadFailed /> : <NotificationList initial={entries} timezone={timezone} />}
     </div>
   );
+
+  // One phone app for coaches: on a phone the coach's notifications sit in the same coach bar, Spotlight and More as every other coach page (not the computer shell).
+  if (isCoach && coachAnchor && (await prefersAthleteStyleView())) {
+    return (
+      <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
+        <CoachMobileShell groupId={coachAnchor.id} groupName={coachAnchor.name}>
+          <div className="px-5 pt-[108px]">{content}</div>
+        </CoachMobileShell>
+      </main>
+    );
+  }
 
   if (isCoach) {
     const { data: orgMembership } = await supabase

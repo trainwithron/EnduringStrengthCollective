@@ -42,6 +42,7 @@ describe("Texting is not advertised", () => {
     expect(shell).toContain('label: "Text messages"');
     const phone = read("components/coach/mobile/coach-nav-links-list.tsx");
     expect(phone).not.toContain("SMS notifications");
-    expect(phone.indexOf('label="Text messages"')).toBeGreaterThan(phone.indexOf('GroupHeader label="Other"'));
+    // the phone app has no Text messages entry at all (a computer page: lib/phone-coach-routes.ts sends it to Settings on a phone)
+    expect(phone).not.toContain("Text messages");
   });
 });
