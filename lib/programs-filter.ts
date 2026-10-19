@@ -36,9 +36,11 @@ export interface FilterableProgram {
 
 export const isClientCopy = (p: FilterableProgram): boolean => !!p.athleteId && !!p.sourceProgramId;
 
-// The default list: library programs and one-client programs, never client copies.
+// The default list: library programs and one-client programs (including one handed to its first person), never client copies; except a copy whose source is not in the list (archived, or
+// in another organization), which would otherwise be in no list at all.
 export function defaultList<T extends FilterableProgram>(all: T[]): T[] {
-  return all.filter((p) => !isClientCopy(p));
+  const ids = new Set(all.map((p) => p.id));
+  return all.filter((p) => !isClientCopy(p) || !ids.has(p.sourceProgramId as string));
 }
 
 export function applyProgramsFilter<T extends FilterableProgram>(all: T[], mode: ProgramsFilterMode, value: string | null): T[] {

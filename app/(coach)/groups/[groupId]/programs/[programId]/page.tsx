@@ -72,6 +72,16 @@ export default async function ProgramDetailPage(
       .single(),
   ]);
 
+  // A program handed to its first person moved into that person's space (migration 0424): an old link to it opens it where it is now, if this person can see it there.
+  if (!membership || !program) {
+    const { data: moved } = await supabase.from("programs").select("group_id").eq("id", params.programId).maybeSingle();
+    const movedTo = (moved as { group_id?: string | null } | null)?.group_id ?? null;
+    if (movedTo && movedTo !== params.groupId) {
+      const query = new URLSearchParams(Object.entries(searchParams).filter(([, v]) => typeof v === "string") as [string, string][]).toString();
+      redirect(`/groups/${movedTo}/programs/${params.programId}${query ? `?${query}` : ""}`);
+    }
+  }
+
   if (!membership) {
     return (
       <NoAccess>This program isn&apos;t available, or you don&apos;t have access to it.</NoAccess>
@@ -326,7 +336,7 @@ async function CoachProgramBuilder({
     const [{ data: coachSeat }, { data: clientSeat }, assignedTo] = await Promise.all([
       supabase.from("group_memberships").select("role").eq("group_id", clientGroupId).eq("profile_id", coachId).maybeSingle(),
       supabase.from("group_memberships").select("role, profiles ( full_name )").eq("group_id", clientGroupId).eq("profile_id", forClientId).maybeSingle(),
-      loadAssignedTo(supabase, programId),
+      loadAssignedTo(supabase, programId, { includeSelf: true }),
     ]);
     if (coachSeat?.role === "coach" && clientSeat?.role === "athlete") {
       const full = (((clientSeat.profiles as { full_name?: string | null } | null)?.full_name) ?? "").trim();
