@@ -317,3 +317,8 @@ body::before {
 #client-profile-body:not([data-active-tab="overview"]) .profile-grid > div {
   max-width: 56rem;
 }
+
+/* A page that is loading keeps clear of the split screen's left half (components/coach/desktop/split-half.tsx sets the width while the half is on screen; unset everywhere else, so 0). */
+[data-loading-fallback] {
+  margin-left: var(--split-reserved, 0px);
+}

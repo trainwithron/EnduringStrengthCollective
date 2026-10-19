@@ -47,7 +47,7 @@ describe("Cards | List", () => {
   it("cards are tap-sized links in a responsive grid", () => {
     const cards = renderToStaticMarkup(createElement(ClientsCardView, { rows: ROWS }));
     expect(cards).toContain("min-h-11");
-    expect(cards).toContain("grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4");
+    expect(cards).toContain("grid-cols-[repeat(auto-fill,minmax(280px,1fr))]");
   });
   it("filters and search apply to both views (one filtered list feeds either view), and the footer note stays", () => {
     const src = readFileSync(new URL("./coach-clients-list.tsx", import.meta.url), "utf8").replace(/\r\n/g, "\n");

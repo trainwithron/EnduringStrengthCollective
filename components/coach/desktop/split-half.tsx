@@ -37,7 +37,37 @@ export function SplitHalfHost({ children }: { children: React.ReactNode }) {
     const key = frameKey(next.view, next.groupId);
     setOpened((prev) => (prev.some((o) => o.key === key) ? prev : [...prev, { key, view: next.view, groupId: next.groupId }]));
   }, []);
-  const shownKey = slot ? frameKey(slot.view, slot.groupId) : null;
+  // While the other side is loading its next page (a loading screen replaces the whole page, panel included), the half stays where it was instead of vanishing: the last slot is held until the next
+  // page is in. It then either brings its own slot, or has no panel and the half is hidden.
+  const [held, setHeld] = useState<Slot | null>(null);
+  const last = useRef<Slot | null>(null);
+  useEffect(() => {
+    if (slot) {
+      last.current = slot;
+      setHeld(null);
+      return;
+    }
+    if (!last.current) return;
+    const keep = last.current;
+    const check = () => setHeld(document.querySelector("[data-loading-fallback]") ? keep : null);
+    // At once too: the loading screen is often already on the page when this runs (and a page in the background gets no animation frames).
+    check();
+    const frame = requestAnimationFrame(check);
+    const mo = new MutationObserver(check);
+    mo.observe(document.body, { childList: true, subtree: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      mo.disconnect();
+    };
+  }, [slot]);
+  const showing = slot ?? held;
+  // The width the half takes from the left edge, for the loading screens to keep clear of (globals.css, [data-loading-fallback]).
+  useEffect(() => {
+    const root = document.documentElement;
+    if (showing && !embedded) root.style.setProperty("--split-reserved", `${Math.round(showing.rect.left + showing.rect.width)}px`);
+    else root.style.removeProperty("--split-reserved");
+  }, [showing, embedded]);
+  const shownKey = showing ? frameKey(showing.view, showing.groupId) : null;
   // One stable value: a new object on every render would make every slot report itself again, forever.
   const api = useMemo(() => ({ setSlot }), [setSlot]);
 
@@ -46,14 +76,14 @@ export function SplitHalfHost({ children }: { children: React.ReactNode }) {
       {children}
       {!embedded &&
         opened.map((o) => {
-          const shown = o.key === shownKey && slot;
+          const shown = o.key === shownKey && showing;
           const dest = splitPathFor(o.view, o.groupId);
           return (
             <div
               key={o.key}
               data-split-frame={o.key}
               className="fixed z-20 flex flex-col"
-              style={shown ? { top: slot.rect.top, left: slot.rect.left, width: slot.rect.width, height: slot.rect.height, pointerEvents: slot.covered ? "none" : undefined } : { display: "none" }}
+              style={shown ? { top: showing.rect.top, left: showing.rect.left, width: showing.rect.width, height: showing.rect.height, pointerEvents: showing.covered ? "none" : undefined } : { display: "none" }}
             >
               <PaneFrame pane={{ id: `split-${o.key}`, dest: { id: `split-${o.key}`, label: dest.label, path: dest.path, section: "Split screen" } }} hidden={!shown} />
             </div>

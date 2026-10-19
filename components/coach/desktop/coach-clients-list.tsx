@@ -134,7 +134,8 @@ const initialsOf = (name: string): string =>
 // The same clients as cards: initials, name, how they work with the coach, their space, and the one quiet number (sessions left to schedule). The whole card opens the client.
 export function ClientsCardView({ rows }: { rows: CoachClientRow[] }) {
   return (
-    <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3" aria-label="Clients">
+    // Columns from the space the list HAS, not the window: with the split screen open the page is half the window, and window-sized columns squeezed a name to one letter a line.
+    <ul className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-3" aria-label="Clients">
       {rows.map((c) => (
         <li key={`${c.id}:${c.groupId}`} className="relative">
           <Link

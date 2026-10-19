@@ -17,7 +17,7 @@ export function NeedsYouStrip({ view }: { view: NeedsYouView }) {
         </p>
       ) : (
         <div className="space-y-2">
-          <ul className="grid gap-2 lg:grid-cols-3">
+          <ul className="grid gap-2 grid-cols-[repeat(auto-fill,minmax(240px,1fr))]">
             {filled.map(({ slot, title, item }) => (
               <li key={slot} className="border border-rust/40 p-3 flex flex-col gap-2" data-testid={`needs-you-${slot}`}>
                 <p className="font-display uppercase text-xs tracking-wide text-steel">{title}</p>
