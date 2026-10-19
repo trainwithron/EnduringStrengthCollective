@@ -8,6 +8,7 @@ import { rateLimitResponse } from "@/lib/rate-limit";
 import { notifyAndEmail } from "@/lib/invite-notify";
 import { appOrigin } from "@/lib/app-url";
 import { resendAccess } from "@/lib/resend-access";
+import { pickExistingSpace, type ClientSpaceCandidate } from "@/lib/existing-client-space";
 
 // Creates a client BEFORE they've ever signed in: a real auth account and
 // profile, silently — no email is sent, so nothing reaches them until the
@@ -62,6 +63,27 @@ export async function POST(request: Request) {
     if (asClient?.role === "athlete") {
       const result = await resendAccess({ supabase, serviceRole, coachId: user.id, groupId, athleteId: existingId, origin: appOrigin(request) });
       return NextResponse.json(result.status === 200 ? { resent: true, profileId: existingId, groupId, ...result.body } : result.body, { status: result.status });
+    }
+  }
+
+  // The person is already this coach's client in ANOTHER space of the same organization (the form made a new empty one-on-one space first): send their access again for the space they are in, and say which, instead of
+  // inviting them to a second space. The form drops the new empty space (through the server's own empty-space check).
+  if (existingId) {
+    const { data: spaceOrg } = await serviceRole.from("groups").select("organization_id").eq("id", groupId).maybeSingle();
+    const { data: theirSpaces } = await serviceRole.from("group_memberships").select("group_id, groups ( group_kind, organization_id )").eq("profile_id", existingId).eq("role", "athlete");
+    // Only this organization's spaces, a handful at most; for each, one check that the caller coaches it.
+    const sameOrg = ((theirSpaces ?? []) as any[])
+      .filter((r) => r.group_id !== groupId && r.groups?.organization_id && r.groups.organization_id === (spaceOrg as { organization_id?: string | null } | null)?.organization_id)
+      .slice(0, 10);
+    const candidates: ClientSpaceCandidate[] = [];
+    for (const r of sameOrg) {
+      const { data: seat } = await serviceRole.from("group_memberships").select("role").eq("group_id", r.group_id).eq("profile_id", user.id).maybeSingle();
+      candidates.push({ groupId: r.group_id as string, groupKind: (r.groups?.group_kind ?? "") as string, organizationId: (r.groups?.organization_id ?? null) as string | null, coachedByCaller: seat?.role === "coach" });
+    }
+    const existingSpace = pickExistingSpace(candidates, groupId, (spaceOrg as { organization_id?: string | null } | null)?.organization_id ?? null);
+    if (existingSpace) {
+      const result = await resendAccess({ supabase, serviceRole, coachId: user.id, groupId: existingSpace, athleteId: existingId, origin: appOrigin(request) });
+      return NextResponse.json(result.status === 200 ? { resent: true, existingSpace: true, profileId: existingId, groupId: existingSpace, ...result.body } : result.body, { status: result.status });
     }
   }
 

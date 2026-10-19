@@ -20,7 +20,7 @@ describe("client booking screens follow the coach's booking mode", () => {
     });
   }
   it("the coach picks the mode on the Availability page, with three plainly named options", () => {
-    expect(read("../app/(coach)/groups/[groupId]/availability/page.tsx")).toContain("BookingModeSelect");
+    expect(read("../components/coach/desktop/availability-settings.tsx")).toContain("BookingModeSelect");
     const select = read("../components/coach/desktop/booking-mode-select.tsx");
     expect(select).toContain("Clients book on their own");
     expect(select).toContain("Clients request, I confirm");

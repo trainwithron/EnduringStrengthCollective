@@ -43,6 +43,7 @@ interface CompleteWorkoutResult {
 export function CompleteWorkoutButton({
   sessionId,
   allSetsResolved,
+  completedSetCount,
   disabled,
   raised,
   coachMode,
@@ -53,6 +54,8 @@ export function CompleteWorkoutButton({
   // Where "Pause for now" goes (the person's Home, or the coach's Home when logging for a client).
   pauseHref: string;
   allSetsResolved: boolean;
+  // Sets marked done so far. With none, Complete asks "No sets are logged yet. Complete anyway?" once, so a stray tap does not finish, post and notify an empty workout.
+  completedSetCount?: number;
   disabled: boolean;
   raised?: boolean;
   // Set when a coach is logging this session FOR a client (not the client's own login): finishing goes straight back to the coach's home instead of the client's share card, and
@@ -64,6 +67,7 @@ export function CompleteWorkoutButton({
   const liftUnit = useLiftUnit();
   const [submitting, setSubmitting] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [emptyAsked, setEmptyAsked] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
@@ -459,18 +463,26 @@ export function CompleteWorkoutButton({
     >
       {confirming && (
         <div className="mb-3 p-3 border border-rust/40 bg-surface/60">
-          <p className="font-body text-sm text-chalk">Complete this workout, or pause it and pick it up later.</p>
+          <p className="font-body text-sm text-chalk">
+            {emptyAsked ? "No sets are logged yet. Complete anyway?" : "Complete this workout, or pause it and pick it up later."}
+          </p>
           <div className="flex flex-wrap items-center gap-3 mt-3">
             <button
               type="button"
               onClick={() => {
+                // Nothing is marked done yet: ask once more, deliberately, before finishing an empty workout.
+                if (completedSetCount === 0 && !emptyAsked) {
+                  setEmptyAsked(true);
+                  return;
+                }
                 setConfirming(false);
+                setEmptyAsked(false);
                 handleComplete();
               }}
               disabled={submitting}
               className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
             >
-              {submitting ? "Finishing…" : "Complete workout"}
+              {submitting ? "Finishing…" : emptyAsked ? "Complete anyway" : "Complete workout"}
             </button>
             <button
               type="button"
@@ -482,7 +494,10 @@ export function CompleteWorkoutButton({
             </button>
             <button
               type="button"
-              onClick={() => setConfirming(false)}
+              onClick={() => {
+                setConfirming(false);
+                setEmptyAsked(false);
+              }}
               disabled={submitting}
               className="h-11 px-3 border border-steel/30 text-steel font-body text-sm"
             >

@@ -48,7 +48,7 @@ import { HeaderNotificationBell } from "@/components/notifications/header-bell";
 import { useCoachNavFacts } from "@/components/coach/use-coach-type";
 import { useOnFrontDesk } from "@/components/front-desk/use-on-front-desk";
 import { hiddenForCoach } from "@/lib/team-coach";
-import { isTeamSportGroup, teamSportMenu, teamSportMoreMenu, TEAM_SPORT_BUSINESS_LABEL, teamSportBusinessHref } from "@/lib/team-sport";
+import { isTeamSportGroup, moneyHiddenFor, orgIsTeamOnly, teamSportMenu, teamSportMoreMenu, TEAM_SPORT_BUSINESS_LABEL, teamSportBusinessHref } from "@/lib/team-sport";
 import { WorkspaceMenu } from "@/components/coach/desktop/workspace-menu";
 import { LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/coach-groups";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -188,6 +188,8 @@ function CoachDesktopShellFull({
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [openSupportCount, setOpenSupportCount] = useState(0);
   const [teamMode, setTeamMode] = useState(false);
+  // Every group of this organization is a team-sport group (read with the group below): no money numbers anywhere in this shell.
+  const [orgTeamOnly, setOrgTeamOnly] = useState(false);
   const [groupKind, setGroupKind] = useState<"one_on_one" | "social" | "team" | null>(null);
   const [orgName, setOrgName] = useState<string | null>(null);
   // In a one-on-one space the name up top is the client: this is who, so the name can open their profile.
@@ -215,13 +217,20 @@ function CoachDesktopShellFull({
       const supabase = createBrowserClient();
       const { data } = await supabase
         .from("groups")
-        .select("team_mode, group_kind, organizations ( name )")
+        .select("team_mode, group_kind, organization_id, organizations ( name )")
         .eq("id", groupId)
         .maybeSingle();
       if (!cancelled) {
         setTeamMode(data?.team_mode ?? false);
         setGroupKind((data?.group_kind as "one_on_one" | "social" | "team" | null) ?? "team");
         setOrgName((data as any)?.organizations?.name ?? null);
+      }
+      const orgId = (data as { organization_id?: string | null } | null)?.organization_id ?? null;
+      if (orgId) {
+        const { data: orgGroups, error: orgGroupsError } = await supabase.from("groups").select("team_mode").eq("organization_id", orgId).limit(500);
+        if (!cancelled) setOrgTeamOnly(!orgGroupsError && orgIsTeamOnly((orgGroups ?? []) as { team_mode?: boolean | null }[]));
+      } else if (!cancelled) {
+        setOrgTeamOnly(false);
       }
       if (data?.group_kind === "one_on_one") {
         const { data: member } = await supabase.from("group_memberships").select("profile_id").eq("group_id", groupId).eq("role", "athlete").limit(1).maybeSingle();
@@ -431,6 +440,8 @@ function CoachDesktopShellFull({
   const onFrontDesk = useOnFrontDesk();
   // A team-sport group (never a coach-level page) gets its own short menu: lib/team-sport.ts.
   const teamSport = isTeamSportGroup(teamMode) && !coachLevel;
+  // ONE rule for the money numbers (Business tile / view, rail Business icon, income, MRR, paying clients): lib/team-sport.ts moneyHiddenFor.
+  const moneyHidden = moneyHiddenFor({ coachLevel: !!coachLevel, groupIsTeamSport: isTeamSportGroup(teamMode), orgTeamOnly });
   const ordinaryNav: NavEntry[] = [
     // Run my day — the highest-frequency items, flat, no group/extra
     // click to reach any of them. Team Performance sits right next to
@@ -462,7 +473,7 @@ function CoachDesktopShellFull({
         { key: "packages", label: "Packages", href: `/groups/${groupId}/business/packages`, icon: Layers },
         { key: "resources", label: "Pro shop and referrals", href: `/groups/${groupId}/resources`, icon: HeartHandshake },
         { key: "website", label: "My website", href: `/groups/${groupId}/business/website`, icon: Globe },
-        { key: "availability", label: "Availability", href: `/groups/${groupId}/availability`, icon: CalendarClock },
+        { key: "availability", label: "Availability", href: "/calendar?tab=availability", icon: CalendarClock },
         { key: "session-types", label: "Session types", href: `/groups/${groupId}/business/session-types`, icon: Tag },
         { key: "booking-page", label: "Booking page", href: `/groups/${groupId}/business/booking-page`, icon: Link2 },
         { key: "waiver", label: "Waiver", href: `/groups/${groupId}/business/waiver`, icon: ClipboardList },
@@ -569,7 +580,7 @@ function CoachDesktopShellFull({
       ],
     },
   ];
-  const nav: NavEntry[] = teamSport ? teamNav : ordinaryNav;
+  const nav: NavEntry[] = teamSport ? teamNav : ordinaryNav.filter((e) => !(moneyHidden && "items" in e && e.label === "Business"));
 
   // A team coach's menus leave out the tools that only make sense for selling to clients (lib/team-coach.ts).
   for (const entry of nav) {
@@ -761,7 +772,7 @@ function CoachDesktopShellFull({
             groupName={groupName}
             sectionLabel={sectionLabel}
             sectionSubLinks={sectionSubLinks}
-            teamSport={teamSport}
+            hideMoney={moneyHidden}
           />
         )}
 

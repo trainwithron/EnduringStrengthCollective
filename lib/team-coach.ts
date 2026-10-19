@@ -51,3 +51,15 @@ export function pickTileTeam(teams: TeamChoice[], rememberedGroupId: string | nu
   if (teams.length === 0) return null;
   return teams.find((t) => t.id === rememberedGroupId) ?? [...teams].sort((a, b) => a.name.localeCompare(b.name))[0];
 }
+
+/**
+ * The teams the Home tiles (Roster, Depth chart, Practices and games, Attendance, Weight room, TV display) are for: a group the coach coaches in the organization Home shows that is a TEAM-SPORT group, meaning its
+ * team_mode switch is ON. A group whose kind is "team" but whose team_mode is off (an ordinary group with a shared program, a community group) is not a football team and never gets football tiles.
+ */
+export function tileTeamsFor(
+  groups: { id: string; name: string; kind: string; orgId: string }[],
+  teamModeById: ReadonlyMap<string, boolean | null | undefined>,
+  homeOrgId: string | null
+): TeamChoice[] {
+  return groups.filter((g) => g.kind === "team" && teamModeById.get(g.id) === true && (!homeOrgId || g.orgId === homeOrgId)).map((g) => ({ id: g.id, name: g.name }));
+}

@@ -26,7 +26,7 @@ export default async function CoachCalendarRoute(props: { searchParams: Promise<
   if (active?.needsChoice) redirect(`${CHOOSE_ORGANIZATION_PATH}?next=/calendar`);
   const anchor = active?.anchor ?? null;
   if (anchor) {
-    if (await prefersAthleteStyleView()) {
+    if ((await prefersAthleteStyleView()) && searchParams.tab !== "availability") {
       const qs = new URLSearchParams();
       for (const [k, v] of Object.entries(searchParams)) if (typeof v === "string") qs.set(k, v);
       redirect(`/groups/${anchor.id}/calendar${qs.size > 0 ? `?${qs.toString()}` : ""}`);

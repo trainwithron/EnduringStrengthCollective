@@ -50,7 +50,9 @@ describe("tap a time on the coach's day, then add something there", () => {
   it("the day page uses it, for any coach (desktop and phone share the page)", () => {
     const page = read("app/(coach)/groups/[groupId]/calendar/[date]/page.tsx");
     expect(page).toContain("<DayCalendar");
-    expect(page).toContain("Tap a time on the day to add a session, an event or time off.");
+    // said once, right above the grid, not also under the title
+    expect(page).not.toContain("Tap a time on the day to add a session, an event or time off.");
+    expect(read("components/coach/desktop/day-calendar.tsx").match(/Tap a time to add a session, an event or time off./g)?.length).toBe(1);
   });
   it("a new availability window defaults to a slot every 30 minutes", () => {
     expect(read("components/coach/availability-manager.tsx")).toContain('useState("30")');

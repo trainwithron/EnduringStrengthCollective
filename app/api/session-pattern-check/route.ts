@@ -3,7 +3,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, extractJson, isAiConfigured } from "@/lib/anthropic-client";
 import { validateNoHallucinatedNumbers } from "@/lib/coach-briefing-numeral-guard";
 import { gatherSessionPatternFindings } from "@/lib/session-pattern-spotter-gather";
-import { sendPushToProfile } from "@/lib/send-push";
+import { sendCoachPush } from "@/lib/coach-notice";
 import { getCallerGroupRole } from "@/lib/group-access";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { isZeroAiCoach } from "@/lib/free-tier-server";
@@ -138,7 +138,7 @@ export async function POST(request: Request) {
     body: `New note on ${athleteName}'s session`,
     link_path: linkPath,
   });
-  await sendPushToProfile(admin, coachId, "New note on a client's session", `${athleteName} — worth a look`, linkPath);
+  await sendCoachPush(admin, coachId, "session_notes", "New note on a client's session", `${athleteName} — worth a look`, linkPath);
 
   return NextResponse.json({ ok: true, foundSomething: true });
 }

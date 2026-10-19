@@ -206,7 +206,7 @@ describe("a workout the coach put on one day shows on the client's Home with the
   it("Home loads the assignments and passes them to the day and the week and month cells", () => {
     const page = src("app/(coach)/groups/[groupId]/page.tsx");
     expect(page).toContain("loadAssignedWorkouts(supabase, athleteId, params.groupId");
-    expect(page).toContain("resolveSessionsForDate(programContexts, loggedIds, targetDate, today, isToday, assignedByDate)");
+    expect(page).toContain("resolveSessionsForDate(programContexts, loggedIds, targetDate, today, isToday, assignedByDate");
     expect(page).toContain("resolveSessionsForDate(programContexts, loggedIds, date, today, false, assignedByDate)");
     expect(src("components/athlete/day-card.tsx")).toContain("{x.note &&");
   });

@@ -6,6 +6,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { PAR_Q_QUESTIONS } from "@/lib/par-q-questions";
 import { DEFAULT_WAIVER_TEXT } from "@/lib/intake-waiver";
 import { isUnder13 } from "@/lib/coppa";
+import { ageBand } from "@/lib/guardian-consent";
 import { LegalLinks } from "@/components/legal/legal-links";
 
 type Step = "dob" | "blocked" | "form";
@@ -100,6 +101,13 @@ export function IntakeForm({
     }
 
     setDobSubmitting(false);
+    // A client aged 13 to 17 needs a parent or guardian's OK before anything else: straight to that screen now, instead of filling the whole health form first and meeting a dead end at Submit (Oct 19 audit).
+    // The screen is the same one the rest of the app sends them to (the birthday page asks the guardian for permission); they return here afterwards. The coach is told (best effort).
+    if (ageBand(dateOfBirth, new Date()) === "teen") {
+      void fetch("/api/intake/minor-consent-notice", { method: "POST" }).catch(() => {});
+      router.push(`/birthday?next=${encodeURIComponent("/intake")}`);
+      return;
+    }
     setStep(isUnder13(dateOfBirth, new Date()) && !parentalConsentVerified ? "blocked" : "form");
   }
 

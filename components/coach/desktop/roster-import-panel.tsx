@@ -166,6 +166,8 @@ export function RosterImportPanel({ groupId, groupName, onAdded, onClose }: { gr
           </div>
         )}
         {!undone && <p className="font-body text-xs text-steel mt-2">Build their programs and schedules now. When you&apos;re ready, send each sign-in link from their profile.</p>}
+        {/* Anyone who also signs up with this group&apos;s invite link would become a second person, so each person gets their own sign-in link (not the group link). */}
+        {!undone && addedIds.length > 0 && <p className="font-body text-xs text-steel mt-2">These people now have accounts. Send each one their own sign-in link from their profile. If they use the group&apos;s invite link instead, they will be added a second time.</p>}
         {error && (
           <p className="font-body text-xs text-rust mt-2" role="alert">
             {error}

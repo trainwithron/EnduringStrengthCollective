@@ -6,6 +6,7 @@ import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { buildMoreSections } from "@/lib/more-links";
+import { inOwnPersonalSpace } from "@/lib/personal-space";
 
 export const metadata = { title: "More" };
 
@@ -27,11 +28,13 @@ export default async function MorePage(props: { params: Promise<{ groupId: strin
   ]);
   if (!membership) redirect("/");
 
+  // In the coach's OWN personal space the coach sees what a client sees (My goal, My exercise history, the Macro calculator).
+  const ownSpace = membership.role === "coach" && (await inOwnPersonalSpace(supabase, params.groupId, user.id));
   const sections = buildMoreSections({
     groupId: params.groupId,
     athleteId,
-    isCoach: membership.role === "coach",
-    historyImportEnabled: !!membership.history_import_enabled,
+    isCoach: membership.role === "coach" && !ownSpace,
+    historyImportEnabled: !!membership.history_import_enabled || ownSpace,
   });
 
   return (

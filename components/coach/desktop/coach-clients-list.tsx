@@ -4,11 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ClientRowMenu } from "@/components/coach/desktop/client-row-menu";
 import { LayoutGrid, List, Search } from "lucide-react";
+import { WAITING_ON_GUARDIAN_LABEL } from "@/lib/guardian-wait";
+import { EMAIL_NOT_CONFIRMED_LABEL } from "@/lib/unconfirmed-emails-label";
 import { DEFAULT_CLIENTS_VIEW, readClientsView, writeClientsView, type ClientsView } from "@/lib/clients-view-pref";
 import { filterClients, filterCounts, FILTER_LABELS, clientKind, type ClientFilter, type CoachClientRow } from "@/lib/coach-client-filter";
 
 const FILTERS: ClientFilter[] = ["all", "one_on_one", "online", "group", "set_aside"];
-const KIND_LABEL = { one_on_one: "1-on-1", online: "Online", group: "Group" } as const;
+const KIND_LABEL = { one_on_one: "In person", online: "Online", group: "Group" } as const;
 
 // The coach-level Clients list: every client once, wherever the coach is standing. Filters for how they work with the coach, a name search, and one quiet number
 // per client (sessions still to schedule). Tapping a client opens their space.
@@ -60,7 +62,7 @@ export function CoachClientsList({ rows, selfName = null, oneView = false }: { r
         </div>
         )}
         <label className="relative block w-full sm:w-64">
-          <span className="sr-only">Search clients</span>
+          <span className="sr-only">{oneView ? "Search athletes" : "Search clients"}</span>
           <Search className="w-3.5 h-3.5 text-steel absolute left-2.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
           <input
             type="search"
@@ -82,11 +84,11 @@ export function CoachClientsList({ rows, selfName = null, oneView = false }: { r
         </Link>
       )}
       {shown.length === 0 ? (
-        <p className="font-body text-sm text-steel py-6">{rows.length === 0 ? "No clients yet." : "No one matches."}</p>
+        <p className="font-body text-sm text-steel py-6">{rows.length === 0 ? (oneView ? "No athletes yet. Add one to get started." : "No clients yet.") : "No one matches."}</p>
       ) : (
         view === "cards" ? <ClientsCardView rows={shown} /> : <ClientsListView rows={shown} />
       )}
-      <p className="font-body text-[11px] text-steel mt-2">The number is how many sessions are left to schedule.</p>
+      {!oneView && <p className="font-body text-[11px] text-steel mt-2">The number is how many sessions are left to schedule.</p>}
     </div>
   );
 }
@@ -99,6 +101,8 @@ export function ClientsListView({ rows }: { rows: CoachClientRow[] }) {
               <li key={`${c.id}:${c.groupId}`} className="flex items-center">
                 <Link href={`/groups/${c.groupId}/athletes/${c.id}`} className="flex flex-1 min-w-0 items-center gap-3 py-2.5 px-1 hover:bg-surface/60">
                   <span className="font-body text-sm text-chalk flex-1 min-w-0 truncate">{c.fullName}</span>
+                  {c.waitingOnGuardian && <span className="font-body text-xs text-rust shrink-0">{WAITING_ON_GUARDIAN_LABEL}</span>}
+                  {c.emailUnconfirmed && <span className="font-body text-xs text-rust shrink-0">{EMAIL_NOT_CONFIRMED_LABEL}</span>}
                   <span className="font-body text-xs text-steel shrink-0 hidden sm:inline">{KIND_LABEL[clientKind(c)]}</span>
                   {c.groupKind !== "one_on_one" && <span className="font-body text-xs text-steel hidden md:inline truncate min-w-0 max-w-[22rem]">{c.groupName}</span>}
                   <span className="flex items-center justify-end gap-2 shrink-0 w-24 pr-2">
@@ -112,7 +116,7 @@ export function ClientsListView({ rows }: { rows: CoachClientRow[] }) {
                     </span>
                   </span>
                 </Link>
-                <ClientRowMenu groupId={c.groupId} athleteId={c.id} athleteName={c.fullName} setAside={!!c.setAside} />
+                <ClientRowMenu groupId={c.groupId} athleteId={c.id} athleteName={c.fullName} setAside={!!c.setAside} clientType={clientKind(c)} />
               </li>
             ))}
           </ul>
@@ -148,6 +152,8 @@ export function ClientsCardView({ rows }: { rows: CoachClientRow[] }) {
                   {c.setAside ? " · set aside" : ""}
                 </span>
                 {c.groupKind !== "one_on_one" && c.groupName && <span className="block font-body text-xs text-steel truncate">{c.groupName}</span>}
+                {c.waitingOnGuardian && <span className="block font-body text-xs text-rust truncate">{WAITING_ON_GUARDIAN_LABEL}</span>}
+                {c.emailUnconfirmed && <span className="block font-body text-xs text-rust truncate">{EMAIL_NOT_CONFIRMED_LABEL}</span>}
               </span>
               <span className="flex flex-col items-end shrink-0">
                 <span title={`${c.toBook} left to schedule`} aria-label={`${c.toBook} left to schedule`} className={`font-display text-xl tabular-nums leading-none ${c.toBook > 0 ? "text-chalk" : "text-steel"}`}>
@@ -163,7 +169,7 @@ export function ClientsCardView({ rows }: { rows: CoachClientRow[] }) {
             </span>
           </Link>
           <div className="absolute top-0 right-0">
-            <ClientRowMenu groupId={c.groupId} athleteId={c.id} athleteName={c.fullName} setAside={!!c.setAside} />
+            <ClientRowMenu groupId={c.groupId} athleteId={c.id} athleteName={c.fullName} setAside={!!c.setAside} clientType={clientKind(c)} />
           </div>
         </li>
       ))}

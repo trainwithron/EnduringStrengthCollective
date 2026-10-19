@@ -13,6 +13,9 @@ export interface CandidateBooking {
 // booking for a client with multiple weekly sessions.
 const DEFAULT_TOLERANCE_MINUTES = 120;
 
+// A day's worth: the booking is already narrowed to today, so this only picks the nearest of them.
+export const SAME_DAY_TOLERANCE_MINUTES = 24 * 60;
+
 export function findMatchingBookingId(
   bookings: CandidateBooking[],
   sessionStartedAt: Date,

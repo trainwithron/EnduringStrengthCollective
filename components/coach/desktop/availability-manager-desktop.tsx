@@ -5,28 +5,9 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { Copy, Pencil, Trash2 } from "lucide-react";
 import type { AvailabilityWindowRow } from "../availability-manager";
-import { STEP_PRESETS, copyTargets, isSessionRuleError, previewSessionTimes, timeToMinutes, timingHint, timingWarning, validateWindow, type WindowDraft } from "@/lib/availability-edit";
+import { copyTargets, isSessionRuleError, previewSessionTimes, timeToMinutes, timingHint, timingWarning, validateWindow, type WindowDraft } from "@/lib/availability-edit";
 
 const RULE_PENDING = "A session longer than the time between starts needs a database update that has not been applied yet. Nothing was changed.";
-
-// 15, 30, 45 and 60 as one-tap choices for how often a slot starts; any whole number can still be typed in the box.
-function StepPresets({ value, onPick }: { value: number | string; onPick: (n: number) => void }) {
-  return (
-    <div className="flex flex-wrap gap-1.5" role="group" aria-label="How often a slot starts">
-      {STEP_PRESETS.map((n) => (
-        <button
-          key={n}
-          type="button"
-          onClick={() => onPick(n)}
-          aria-pressed={Number(value) === n}
-          className={`h-8 px-2.5 border font-body text-xs ${Number(value) === n ? "border-rust text-rust" : "border-steel/30 text-steel"}`}
-        >
-          {n}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 // The three numbers, unmistakable (Ron, Oct 6): how often a start is offered, how long a session lasts, and the gap left between sessions, with a live
 // preview of the times they make and a warning (never a block) when they fight each other. The gap is the coach's buffer for all their hours: it is saved
@@ -70,7 +51,6 @@ function WindowTimingFields({
           <span className="font-body text-xs text-steel uppercase tracking-wide">Slot every (min)</span>
           <input type="number" min={5} value={Number.isFinite(step) ? step : ""} onChange={(e) => onStep(Number(e.target.value))} className={`${inputCls} w-24`} />
           <span className="font-body text-[11px] text-steel max-w-[9rem]">How often a start time is offered</span>
-          <StepPresets value={step} onPick={onStep} />
         </label>
         {sessionEnabled && (
           <label className="flex flex-col gap-1">
@@ -83,7 +63,7 @@ function WindowTimingFields({
               onChange={(e) => onSession(e.target.value === "" ? null : Number(e.target.value))}
               className={`${inputCls} w-24`}
             />
-            <span className="font-body text-[11px] text-steel max-w-[9rem]">How long the session lasts</span>
+            <span className="font-body text-[11px] text-steel max-w-[9rem]">How long the session lasts. Empty = the same as the slot.</span>
           </label>
         )}
         {gapEnabled && (
@@ -644,9 +624,7 @@ export function AvailabilityManagerDesktop({
   );
 }
 
-const PRESETS = [30, 40, 45, 50, 55, 60];
-
-// One control for the common case: "my sessions are 55 minutes" for every window at once. A window can still differ (edit it on its row).
+// One control for the common case: "my sessions are 55 minutes" for every window at once. Type the length and Save; empty keeps the slot step as the length. A window can still differ (edit its row).
 function SessionLengthForAll({
   coachId,
   current,
@@ -658,26 +636,30 @@ function SessionLengthForAll({
   windows: AvailabilityWindowRow[];
   onChanged: (minutes: number | null) => void;
 }) {
-  const [custom, setCustom] = useState("");
+  const single = current.length === 1 ? current[0] : null;
+  const [value, setValue] = useState(single != null ? String(single) : "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const single = current.length === 1 ? current[0] : undefined;
+  const [saved, setSaved] = useState(false);
 
-  async function apply(minutes: number | null) {
-    if (minutes != null && (!Number.isInteger(minutes) || minutes < 5 || minutes > 480)) {
-      setErr("Session length must be a whole number from 5 to 480 minutes.");
+  async function save() {
+    const typed = value.trim();
+    const minutes = typed === "" ? null : Number(typed);
+    if (minutes != null && (!Number.isInteger(minutes) || minutes < 5 || minutes > 240)) {
+      setErr("Session length must be a whole number from 5 to 240 minutes.");
       return;
     }
     // A session may be longer than the time between starts, but it has to fit inside each window: say which window is the problem instead of failing the whole change.
     const tooShort = minutes == null ? [] : windows.filter((w) => timeToMinutes(w.endTime) - timeToMinutes(w.startTime) < minutes);
     if (tooShort.length > 0) {
       setErr(
-        `${tooShort.map((w) => `${WEEKDAYS[w.weekday]} ${w.startTime.slice(0, 5)}–${w.endTime.slice(0, 5)} is shorter than ${minutes} minutes`).join("; ")}. Make that window longer (edit its row) first, then set the session length again. Nothing was changed.`
+        `${tooShort.map((w) => `${WEEKDAYS[w.weekday]} ${w.startTime.slice(0, 5)}–${w.endTime.slice(0, 5)} is shorter than ${minutes} minutes`).join("; ")}. Make that window longer (edit its row) first, then set the length.`
       );
       return;
     }
     setBusy(true);
     setErr(null);
+    setSaved(false);
     const supabase = createBrowserClient();
     const { error } = await supabase.from("coach_availability_windows").update({ session_minutes: minutes }).eq("coach_id", coachId);
     setBusy(false);
@@ -685,45 +667,44 @@ function SessionLengthForAll({
       setErr(isSessionRuleError(error.message) ? RULE_PENDING : "That didn't save. Nothing was changed. Try again.");
       return;
     }
+    setSaved(true);
     onChanged(minutes);
   }
 
   return (
     <div className="border border-steel/20 p-3 mb-3">
-      <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">Session length for all your hours</p>
-      <div className="flex flex-wrap items-center gap-2">
-        {PRESETS.map((m) => (
-          <button
-            key={m}
-            type="button"
-            disabled={busy}
-            aria-pressed={single === m}
-            onClick={() => apply(m)}
-            className={`h-9 px-3 border font-body text-xs disabled:opacity-40 ${single === m ? "border-rust bg-rust/10 text-chalk" : "border-steel/30 text-steel"}`}
-          >
-            {m} min
+      <label className="block">
+        <span className="font-body text-xs text-steel uppercase tracking-wide">Session length (minutes)</span>
+        <span className="mt-2 flex flex-wrap items-center gap-2">
+          <input
+            type="number"
+            min={5}
+            max={240}
+            value={value}
+            onChange={(e) => {
+              setValue(e.target.value);
+              setSaved(false);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void save();
+              }
+            }}
+            className={`${inputCls} w-24`}
+          />
+          <button type="button" disabled={busy} onClick={save} className="h-9 px-4 border border-steel/40 text-chalk font-body text-sm disabled:opacity-40">
+            {busy ? "Saving…" : "Save"}
           </button>
-        ))}
-        <input
-          type="number"
-          min={5}
-          value={custom}
-          onChange={(e) => setCustom(e.target.value)}
-          placeholder="Other"
-          aria-label="Other session length in minutes"
-          className={`${inputCls} w-20`}
-        />
-        <button type="button" disabled={busy || !custom.trim()} onClick={() => apply(Number(custom))} className="h-9 px-3 border border-steel/30 text-chalk font-body text-xs disabled:opacity-40">
-          Set
-        </button>
-        <button type="button" disabled={busy || single === null} onClick={() => apply(null)} className="h-9 px-3 text-steel font-body text-xs underline underline-offset-2 disabled:opacity-40">
-          Same as the slot
-        </button>
-      </div>
-      <p className="font-body text-xs text-steel mt-2">
-        Slots keep starting on your slot step; each booking lasts this long. A 55-minute session in 60-minute slots leaves a 5-minute gap. The gap between sessions is set in the field next to it when you add or edit a window (it is the same setting as the buffer under Booking rules).
-      </p>
-      {current.length > 1 && <p className="font-body text-xs text-steel mt-1">Your windows currently differ; picking a length sets it on all of them.</p>}
+          {saved && (
+            <span className="font-body text-xs text-positive" role="status">
+              Saved
+            </span>
+          )}
+        </span>
+      </label>
+      <p className="font-body text-xs text-steel mt-2">Applies to all your hours. Slots keep starting on your slot step; each booking lasts this long. A 55-minute session in 60-minute slots leaves a 5-minute gap.</p>
+      {current.length > 1 && <p className="font-body text-xs text-steel mt-1">Your windows currently differ; saving a length sets it on all of them.</p>}
       {err && (
         <p className="font-body text-xs text-rust mt-2" role="alert">
           {err}

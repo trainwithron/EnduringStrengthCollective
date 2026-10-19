@@ -5,6 +5,7 @@ import { loadTeamInfo } from "@/lib/org-team";
 import { readStayingMembers } from "@/lib/org-members";
 import { CoachTypeSetting } from "@/components/coach/coach-type-setting";
 import { PushPreferences } from "@/components/athlete/push-preferences";
+import { NoticeSwitches } from "@/components/coach/notice-switches";
 import { isCoachType, type CoachType } from "@/lib/coach-type";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -142,7 +143,7 @@ export default async function SettingsPage(
         .maybeSingle(),
       supabase
         .from("groups")
-        .select("gamification_enabled, name, group_kind, team_mode")
+        .select("gamification_enabled, name, group_kind, team_mode, organization_id")
         .eq("id", params.groupId)
         .maybeSingle(),
       supabase
@@ -195,6 +196,9 @@ export default async function SettingsPage(
   const onFrontDesk = (deskRows ?? []).length > 0;
   // Quiet hours and private lock screens (0395). Read on its own so a database without the columns yet shows the whole page (the two choices are then left out).
   const pushPrefsRead = await supabase.from("profiles").select("quiet_hours_start, quiet_hours_end, generic_push_text").eq("id", user.id).maybeSingle();
+  // The kinds of notice this coach switched off (profiles.notices_off, migration 0423). Until it is applied the read fails and the switches are simply not shown.
+  const noticesRead = await supabase.from("profiles").select("notices_off").eq("id", user.id).maybeSingle();
+  const noticesOff: string[] | null = noticesRead.error ? null : ((noticesRead.data as { notices_off?: string[] | null } | null)?.notices_off ?? []);
   const pushPrefs = pushPrefsRead.error ? null : (pushPrefsRead.data as { quiet_hours_start: number | null; quiet_hours_end: number | null; generic_push_text: boolean | null } | null);
   // What this coach coaches (0392). Read on its own so a database that does not have the column yet still shows the whole page.
   let coachTypeNow: CoachType | null = null;
@@ -259,10 +263,13 @@ export default async function SettingsPage(
   // What this group does after a workout now: its own choice, or the default (off for a team-sport group, on otherwise). Read apart from the group row so a database without the column still loads the page.
   const postWorkoutCards = isCoach ? await loadPostWorkoutCards(supabase, params.groupId) : true;
   // The coach's own blocks come first on a coach's page (their vocabulary, Read during rest, Google Calendar); a client's page starts with Notifications.
+  // The coach's own personal space (their own client app) belongs to no organization: the vocabulary below is an ORGANIZATION's setting (it would be saved into some organization the coach owns, arbitrarily), and "Your coaching
+  // workspace" has to open the coach's Home, not the empty workspace of this personal space (Oct 19 audit).
+  const inPersonalSpace = effective.isActingAsOther && (group as { organization_id?: string | null } | null)?.organization_id == null;
   const coachingGroup = isCoach ? (
     <SettingsGroup label="Coaching">
             <Link
-              href={`/groups/${params.groupId}/dashboard`}
+              href={inPersonalSpace ? "/dashboard" : `/groups/${params.groupId}/dashboard`}
               className="font-body text-sm font-bold text-rust"
             >
               Your coaching workspace →
@@ -306,7 +313,7 @@ export default async function SettingsPage(
             )}
           </SettingsGroup>
   ) : null;
-  const terminologyGroup = isCoach ? (
+  const terminologyGroup = isCoach && !inPersonalSpace ? (
     <SettingsGroup label="What do you call your people?">
             <TerminologyChooser groupId={params.groupId} />
           </SettingsGroup>
@@ -315,6 +322,7 @@ export default async function SettingsPage(
     <SettingsGroup label="Notifications">
           <PushNotificationToggle variant="settings" profileId={user.id} audience={isCoach ? "coach" : "client"} />
           <PushPreferences profileId={user.id} initialStart={pushPrefs?.quiet_hours_start ?? null} initialEnd={pushPrefs?.quiet_hours_end ?? null} initialGeneric={pushPrefs?.generic_push_text === true} available={!!pushPrefs} />
+          {isCoach && !effective.isActingAsOther && <NoticeSwitches profileId={user.id} initialOff={noticesOff ?? []} available={noticesOff !== null} />}
         </SettingsGroup>
   );
 
@@ -387,7 +395,7 @@ export default async function SettingsPage(
         )}
 
         <SettingsGroup label="Profile">
-          {!isCoach && !effective.isActingAsOther && (
+          {((!isCoach && !effective.isActingAsOther) || inPersonalSpace) && (
             <Link href={`/groups/${params.groupId}/about-you`} className="block py-3 border-b border-steel/20 font-body text-sm text-chalk">
               About you: height, weight, activity and units &rarr;
             </Link>

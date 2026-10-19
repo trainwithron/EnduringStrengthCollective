@@ -3,6 +3,7 @@
 import { DraggableClientName } from "./draggable-client-name";
 import { useCalendarScheduling } from "./calendar-scheduling-context";
 import { buildCreditPicture } from "@/lib/credit-picture";
+import type { ClientTierLite } from "@/lib/session-type-default";
 
 export interface CalendarClientRow {
   profileId: string;
@@ -13,6 +14,8 @@ export interface CalendarClientRow {
   // Sessions the coach scheduled that have not happened yet, and past ones waiting to be marked (see lib/credit-picture.ts).
   booked?: number;
   toMark?: number;
+  // In person ("one_on_one"), "online" or "group": Online clients are left out of the list until asked for (lib/client-type.ts).
+  tier?: ClientTierLite;
 }
 
 // The main calendar's client list: just names, each with ONE quiet number, how many sessions are still available to schedule (Ron, Oct 6: "nice and easy").

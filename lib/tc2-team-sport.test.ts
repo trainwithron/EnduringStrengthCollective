@@ -53,7 +53,7 @@ describe("TC2: the menus use it", () => {
 
   it("the computer menu switches to the team menu for a team-sport group, never on a coach-level page", () => {
     expect(shell).toContain("const teamSport = isTeamSportGroup(teamMode) && !coachLevel;");
-    expect(shell).toContain("const nav: NavEntry[] = teamSport ? teamNav : ordinaryNav;");
+    expect(shell).toContain("const nav: NavEntry[] = teamSport ? teamNav : ordinaryNav.filter(");
     const team = shell.slice(shell.indexOf("// The team-sport menu:"), shell.indexOf("const nav: NavEntry[] = teamSport"));
     expect(team).toContain("teamSportMenu(groupId)");
     expect(team).toContain('label: "More"');
@@ -117,7 +117,7 @@ describe("TC2: where a group is made a team sport, and one view of the athletes"
   it("the group's Settings has a plain switch for it (not for a one-on-one space)", () => {
     const s = src("app/(coach)/groups/[groupId]/settings/page.tsx");
     expect(s).toContain("<TeamSportToggle ");
-    expect(s).toContain('.select("gamification_enabled, name, group_kind, team_mode")');
+    expect(s).toContain('.select("gamification_enabled, name, group_kind, team_mode, organization_id")');
     expect(s).toContain('group_kind !== "one_on_one" && (');
     const t = src("components/coach/team-sport-toggle.tsx");
     expect(t).toContain("This group is a team sport");

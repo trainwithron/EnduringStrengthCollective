@@ -39,7 +39,7 @@ describe("session types on hours", () => {
     expect(src).toContain("session_type_id: draft.sessionTypeId ?? null");
     expect(src).toContain("session_type_id: w.sessionTypeId");
     expect(src).toContain('(sessionTypeEnabled ? ", session_type_id" : "")');
-    expect(read("../../../app/(coach)/groups/[groupId]/availability/page.tsx")).toContain("sessionTypeEnabled={sessionTypeEnabled}");
+    expect(read("../../../components/coach/desktop/calendar-page-tabs.tsx")).toContain("sessionTypeEnabled={sessionTypeEnabled}");
   });
 });
 

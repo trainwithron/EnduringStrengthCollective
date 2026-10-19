@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { computeScheduledDates, isLocked, isSameDay, unlockDate } from "./program-schedule";
 import { dateKeyInZone, getGroupCoachTimezone, nowInZone } from "./timezone";
 import { getActivePrograms, type ActiveProgram } from "./active-programs";
+import { loadDoneAt, pickUpWhereLeftOff } from "./program-pickup";
 import { buildSessionStack, type DaySessionCard, type ProgramToday, type StackFallback } from "./session-stack";
 
 export type TodaysWorkoutResult =
@@ -16,7 +17,7 @@ export type TodaysWorkoutResult =
 // scheduled workout, else the next unlogged one, held back until its date
 // arrives. With a start date and training days set, nothing is "ready" before
 // its own day.
-async function resolveProgramToday(
+async function resolveProgramByCalendar(
   supabase: SupabaseClient,
   program: ActiveProgram,
   athleteId: string,
@@ -98,6 +99,22 @@ async function resolveProgramToday(
 
   if (!next) return { ...base, kind: "all_done", workoutId: null, title: null, unlocksOn: null };
   return { ...base, kind: "ready", workoutId: next.id, title: next.title, unlocksOn: null };
+}
+
+// Which workout is the default: right AFTER the one completed most recently, in program order (lib/program-pickup.ts), not the one a date or the first gap gives. WHETHER there is something to do today (ready, done today, held back,
+// all done) is still decided above, exactly as before, so the coach's due lists and the rest of Today do not change; only the workout offered is swapped for the one where they left off.
+async function resolveProgramToday(supabase: SupabaseClient, program: ActiveProgram, athleteId: string, timezone: string): Promise<ProgramToday> {
+  const result = await resolveProgramByCalendar(supabase, program, athleteId, timezone);
+  const offersAWorkout = result.kind === "ready" || (result.kind === "done_today" && result.after?.kind === "ready");
+  if (!offersAWorkout) return result;
+  const { data: workouts } = await supabase.from("workouts").select("id, title, week_number, day_index").eq("program_id", program.id);
+  if (!workouts || workouts.length === 0) return result;
+  const { doneAt } = await loadDoneAt(supabase, athleteId, workouts.map((w) => w.id));
+  const pick = pickUpWhereLeftOff(workouts, doneAt);
+  if (pick.kind !== "next") return result;
+  const title = workouts.find((w) => w.id === pick.workout.id)?.title ?? null;
+  if (result.kind === "ready") return pick.workout.id === result.workoutId ? result : { ...result, workoutId: pick.workout.id, title };
+  return result.after && result.after.workoutId !== pick.workout.id ? { ...result, after: { kind: "ready", workoutId: pick.workout.id, unlocksOn: null } } : result;
 }
 
 export interface TodaysSessions {

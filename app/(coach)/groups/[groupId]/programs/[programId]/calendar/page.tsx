@@ -5,11 +5,15 @@ import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { computeScheduledDates, isSameDay, isLocked } from "@/lib/program-schedule";
+import { getActivePrograms } from "@/lib/active-programs";
+import { ProgramChips } from "@/components/athlete/program-chips";
+import { BookingModeLine } from "@/components/athlete/booking-mode-line";
 import { dateKeyInZone, getGroupCoachTimezone, nowInZone } from "@/lib/timezone";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { UpcomingGroupEvents } from "@/components/group/group-event-answer";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
+import { insideWindowHours } from "@/lib/cancel-window";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { Lock } from "lucide-react";
@@ -119,7 +123,20 @@ export default async function ProgramCalendarPage(
 
   const backHref = `/groups/${params.groupId}/programs/${params.programId}`;
 
-  if (!program.start_date || !program.training_days || program.training_days.length === 0) {
+  const { data: workouts } = await supabase
+    .from("workouts")
+    .select("id, title, week_number, day_index, scheduled_date, group_workout_exercises(count)")
+    .eq("program_id", params.programId)
+    .order("week_number", { ascending: true })
+    .order("day_index", { ascending: true });
+
+  // Every program the client has active, so the calendar can offer each one (it shows one at a time).
+  const activePrograms = viewingAsAthlete ? await getActivePrograms(supabase, params.groupId, athleteId) : [];
+
+  // A program is on the calendar only when the coach has put it there (a start date AND training days). Nothing is placed for them.
+  const trainingDays = program.training_days && program.training_days.length > 0 ? program.training_days : null;
+
+  if (!program.start_date || !trainingDays) {
     return (
       <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
         {isActingAsOther && (
@@ -132,19 +149,22 @@ export default async function ProgramCalendarPage(
           <h1 className="font-display font-bold text-4xl leading-none mt-3 uppercase">
             {program.name}
           </h1>
+          {viewingAsAthlete && <ProgramChips groupId={params.groupId} programs={activePrograms.map((p) => ({ id: p.id, name: p.label?.trim() || p.name }))} currentId={params.programId} />}
         </header>
         <div className="px-5 py-6 max-w-[50ch]">
           <p className="font-body text-sm text-steel">
             {viewingAsAthlete
-              ? "This program has no dates yet, so there is no calendar. Your coach can add them. Your workouts are still on Home."
+              ? "No days set. Your coach hasn't put this program on the calendar yet. Open it from Home."
               : "Set a start date and training days on this program to see it as a calendar."}
           </p>
-          <Link
-            href={viewingAsAthlete ? `/groups/${params.groupId}` : backHref}
-            className="inline-flex items-center h-11 mt-3 font-body text-sm text-rust"
-          >
-            {viewingAsAthlete ? "Go to Home" : "Go to program settings"} &rarr;
+          <Link href={backHref} className="inline-flex items-center h-11 mt-3 font-body text-sm text-rust">
+            {viewingAsAthlete ? "Open this program" : "Go to program settings"} &rarr;
           </Link>
+          {viewingAsAthlete && (
+            <Link href={`/groups/${params.groupId}`} className="block h-11 leading-[44px] font-body text-sm text-steel underline underline-offset-2">
+              Go to Home
+            </Link>
+          )}
         </div>
         {showMobileView && (
           <BottomTabBar groupId={params.groupId} activeOverride="calendar" />
@@ -153,16 +173,9 @@ export default async function ProgramCalendarPage(
     );
   }
 
-  const { data: workouts } = await supabase
-    .from("workouts")
-    .select("id, title, week_number, day_index, scheduled_date, group_workout_exercises(count)")
-    .eq("program_id", params.programId)
-    .order("week_number", { ascending: true })
-    .order("day_index", { ascending: true });
-
   const scheduledDateByDayId = computeScheduledDates(
     program.start_date,
-    program.training_days,
+    trainingDays,
     (workouts ?? []).map((w) => ({ id: w.id, scheduledDate: w.scheduled_date }))
   );
 
@@ -207,6 +220,19 @@ export default async function ProgramCalendarPage(
     hasAvailability = (count ?? 0) > 0;
   }
 
+  // How this coach takes sessions: when the coach schedules everyone, the client's calendar says so (and offers a Message button).
+  let bookingMode = "free";
+  // The coach's cancellation window (24 hours with no policy row): a client cancelling inside it is told the coach decides whether it counts.
+  let cancelWindowHours: number | null = null;
+  if (viewingAsAthlete && coachMembership) {
+    const sb = await supabase.from("coach_booking_policies").select("booking_mode, cancellation_window_hours").eq("coach_id", coachMembership.profile_id).maybeSingle();
+    if (!sb.error) {
+      bookingMode = (sb.data?.booking_mode as string | null) ?? "coach_schedules";
+      cancelWindowHours = (sb.data?.cancellation_window_hours as number | null) ?? null;
+    }
+  }
+  // When the coach schedules everyone the client cannot pick a day or a time, so empty days are not tappable and training days open the workout.
+  const daysTappable = hasAvailability && bookingMode !== "coach_schedules";
   // The client's own sessions show whether or not the coach has set up open hours, and whichever coach booked them.
   if (viewingAsAthlete) {
     const { data: bookingRows } = await supabase
@@ -310,7 +336,10 @@ export default async function ProgramCalendarPage(
             {clientCreditPictureLine(buildCreditPicture({ balance: creditBalance, booked: creditBooked, toMark: 0 }), NO_SESSIONS_LINE)}
           </p>
         )}
+        {viewingAsAthlete && <ProgramChips groupId={params.groupId} programs={activePrograms.map((p) => ({ id: p.id, name: p.label?.trim() || p.name }))} currentId={params.programId} />}
       </header>
+
+      {viewingAsAthlete && coachMembership && bookingMode === "coach_schedules" && <BookingModeLine groupId={params.groupId} />}
 
       {viewingAsAthlete && <UpcomingGroupEvents athleteId={athleteId} timezone={timezone} />}
 
@@ -329,7 +358,9 @@ export default async function ProgramCalendarPage(
                   </span>
                   <CancelBookingButton
                     bookingId={b.id}
-                    rescheduleHref={`${backHref}/calendar/${dateKeyInZone(timezone, start)}?reschedule=${b.id}`}
+                    rescheduleHref={bookingMode === "coach_schedules" ? undefined : `${backHref}/calendar/${dateKeyInZone(timezone, start)}?reschedule=${b.id}`}
+                    messageHref={bookingMode === "coach_schedules" ? `/groups/${params.groupId}/messages` : undefined}
+                    insideWindowHours={insideWindowHours(start, cancelWindowHours)}
                   />
                 </div>
               );
@@ -429,7 +460,8 @@ export default async function ProgramCalendarPage(
                 return (
                   <Link
                     key={i}
-                    href={`/groups/${params.groupId}/workouts/${w.id}`}
+                    // A training day with sessions on offer opens the day page, which shows the workout card above the open times, so a client who trains Mon/Wed/Fri can still ask for or book a session on those days (Oct 19 audit).
+                    href={daysTappable ? `${backHref}/calendar/${dateKey(date)}${rescheduleSuffix ? `?${rescheduleSuffix.slice(1)}` : ""}` : `/groups/${params.groupId}/workouts/${w.id}`}
                     className={cellClass}
                   >
                     {cellContent}
@@ -437,7 +469,7 @@ export default async function ProgramCalendarPage(
                 );
               }
 
-              if (!w && hasAvailability) {
+              if (!w && daysTappable) {
                 return (
                   <Link
                     key={i}

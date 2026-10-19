@@ -1,4 +1,5 @@
-import { countByIds } from "@/lib/read-by-ids";
+import { readRowsByIds } from "@/lib/read-by-ids";
+import { fetchInactiveKeys, inactiveKey } from "@/lib/inactive-ids";
 import { resolveDayMacros, standingForDate } from "@/lib/macro-resolution";
 import { fetchStandingHistory } from "@/lib/standing-macros";
 import Link from "next/link";
@@ -18,10 +19,13 @@ import { ProgressLookPanel } from "@/components/coach/progress-look-panel";
 import { TodayWidget, type TodayMacros } from "@/components/athlete/today-widget";
 import { CoachHomeComplications } from "./coach-home-complications";
 import { CoachMobileShell } from "./coach-mobile-shell";
+import { SessionCheckSection } from "@/components/coach/session-check-section";
+import { NextClientWorkoutSection } from "@/components/coach/next-client-workout-section";
 import { getNeedsAttentionItems } from "@/lib/needs-attention-data";
 import { getCoachedGroups, groupsInOrgOf, groupsInOrgOfOpened } from "@/lib/coach-groups";
 import { isTeamSportGroup } from "@/lib/team-sport";
 import { TeamCoachPhoneHome } from "./team-coach-phone-home";
+import { homeTitle } from "@/lib/phone-home-title";
 
 // The coach mobile Home (coach_mobile_app_redesign_plan.md, locked
 // 2026-09-14) — replaces the old pattern of a coach on mobile seeing
@@ -44,7 +48,11 @@ export async function CoachMobileHome({
   if (isTeamSportGroup((teamRow as { team_mode?: boolean | null } | null)?.team_mode)) return <TeamCoachPhoneHome groupId={groupId} groupName={groupName} />;
   const timezone = await getGroupCoachTimezone(supabase, groupId);
   // The panels below read for the whole coach; on a phone Home they stay inside this group's organization (another one appears only after switching to it).
-  const orgGroupIds = (await groupsInOrgOfOpened(supabase, coachId, groupId)).map((g) => g.id);
+  const orgGroups = await groupsInOrgOfOpened(supabase, coachId, groupId);
+  const orgGroupIds = orgGroups.map((g) => g.id);
+  // The title is the ORGANIZATION the coach is working in (Ron, Oct 19); the group this page is for sits under it when it has a name of its own. A client's own space keeps the client's name.
+  const pageGroup = orgGroups.find((g) => g.id === groupId);
+  const title = homeTitle(pageGroup, groupName);
   const todayKey = dateKeyInZone(timezone);
   const weekAgoKey = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
@@ -69,11 +77,17 @@ export async function CoachMobileHome({
 
   // The first-run card is for a workspace with no clients at all. A coach whose clients are in another group of THIS organization, looking at an empty group, is told which one this is instead.
   let clientsElsewhere = false;
+  let clientsElsewhereCount = 0;
   if ((rosterRows ?? []).length === 0) {
     const others = orgGroupIds.filter((id) => id !== groupId);
     if (others.length > 0) {
-      const { count } = await countByIds(others, (g) => supabase.from("group_memberships").select("profile_id", { count: "exact", head: true }).eq("role", "athlete").in("group_id", g));
-      clientsElsewhere = (count ?? 0) > 0;
+      // Active clients only, each person once: the same number the Clients page calls "All" (clients set aside are its own count there).
+      const [{ data: elsewhere }, asideKeys] = await Promise.all([
+        readRowsByIds(others, (g) => (from, to) => supabase.from("group_memberships").select("profile_id, group_id").eq("role", "athlete").in("group_id", g).order("id").range(from, to)),
+        fetchInactiveKeys(supabase, others),
+      ]);
+      clientsElsewhereCount = new Set(((elsewhere ?? []) as { profile_id: string; group_id: string }[]).filter((m) => !asideKeys.has(inactiveKey(m.group_id, m.profile_id))).map((m) => m.profile_id)).size;
+      clientsElsewhere = clientsElsewhereCount > 0;
     }
   }
 
@@ -151,7 +165,8 @@ export async function CoachMobileHome({
             horizontal position, so this header needs real vertical
             clearance to not render underneath it. */}
         <header className="px-5 pt-16 pb-4">
-          <h1 className="font-display font-bold text-3xl leading-none uppercase truncate">{groupName}</h1>
+          <h1 className="font-display font-bold text-3xl leading-none uppercase truncate">{title.main}</h1>
+          {title.sub && <p className="font-body text-sm text-steel mt-1 truncate">{title.sub}</p>}
         </header>
 
         {/* Pinned at the top of the coach's Home, whatever else is (or is not) on the page: the coach's own workout. It makes the coach's own space the first time and opens it as their own client app. */}
@@ -166,6 +181,8 @@ export async function CoachMobileHome({
         </div>
 
         <div className="px-5">
+          <SessionCheckSection coachId={coachId} groupIds={orgGroupIds} />
+          <NextClientWorkoutSection coachId={coachId} groupIds={orgGroupIds} />
           <LateChangesPanel groupIds={orgGroupIds} />
           <ScheduleRequestsPanel groupIds={orgGroupIds} />
           <ExpiryCheckInPanel groupIds={orgGroupIds} />
@@ -261,8 +278,13 @@ export async function CoachMobileHome({
         {!topDue && !soloAthlete && (rosterRows ?? []).length === 0 && clientsElsewhere && (
           <section className="px-5 pb-6">
             <div className="border border-steel/20 p-4">
-              <p className="font-body text-sm text-chalk">No clients in {groupName}.</p>
-              <p className="font-body text-xs text-steel mt-1">Your clients are in another group of this organization.</p>
+              {/* An organization's main group (a community group) can have no one in it while the organization's clients live in their own one-on-one groups: say how many there are, never "no clients". */}
+              <p className="font-body text-sm text-chalk">
+                {clientsElsewhereCount} {clientsElsewhereCount === 1 ? "client" : "clients"} in this organization.
+              </p>
+              <Link href="/clients" className="inline-block mt-2 font-body text-xs text-rust uppercase tracking-wide">
+                See your clients &rarr;
+              </Link>
             </div>
           </section>
         )}
@@ -298,7 +320,7 @@ export async function CoachMobileHome({
         )}
 
         {/* Always there, so Home is never a dead end: the empty-state buttons above disappear once a coach has clients. */}
-        {((rosterRows ?? []).length > 0 || (programCount ?? 0) > 0) && (
+        {((rosterRows ?? []).length > 0 || (programCount ?? 0) > 0 || clientsElsewhere) && (
           <section className="px-5 pb-6">
             <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">Quick actions</h2>
             <div className="grid grid-cols-2 gap-2">
@@ -315,7 +337,7 @@ export async function CoachMobileHome({
                 Clients
               </Link>
               <Link
-                href={`/groups/${groupId}/programs`}
+                href="/programs"
                 className="h-11 flex items-center justify-center border border-steel/40 text-chalk font-display uppercase text-sm font-bold"
               >
                 Programs

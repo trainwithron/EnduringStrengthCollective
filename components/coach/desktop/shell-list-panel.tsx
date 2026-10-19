@@ -47,21 +47,21 @@ export function ShellListPanel({
   groupName,
   sectionLabel,
   sectionSubLinks,
-  teamSport = false,
+  hideMoney = false,
 }: {
   coachId: string;
   groupId: string;
   groupName: string;
   sectionLabel: string | null;
   sectionSubLinks: SectionSubLink[];
-  /** a team-sport group has no Business area (lib/team-sport.ts): no Business button here either */
-  teamSport?: boolean;
+  /** a team-sport group, or an organization that is all team-sport groups, has no money numbers (lib/team-sport.ts, moneyHiddenFor): no Business tile, no Business view (even one pinned earlier), no income / MRR / paying-client tiles */
+  hideMoney?: boolean;
 }) {
   const [width, setWidth] = useState(DEFAULT_LIST_PANEL_WIDTH);
   const [collapsed, setCollapsed] = useState(false);
   const [pickedView, setView] = useState<ListPanelView>("roster");
-  // a Business view pinned earlier (in another group) never shows in a team-sport group
-  const view: ListPanelView = teamSport && pickedView === "business" ? "roster" : pickedView;
+  // a Business view pinned earlier (in another group) never shows where the money numbers are hidden
+  const view: ListPanelView = hideMoney && pickedView === "business" ? "roster" : pickedView;
   const [dragging, setDragging] = useState(false);
   // Bumped when someone is added from the panel, so the list below is read again and shows them.
   const [rosterVersion, setRosterVersion] = useState(0);
@@ -169,7 +169,7 @@ export function ShellListPanel({
           </div>
         )}
 
-        <div className={`grid ${teamSport ? "grid-cols-3" : "grid-cols-2"} gap-1 mb-2`}>
+        <div className={`grid ${hideMoney ? "grid-cols-3" : "grid-cols-2"} gap-1 mb-2`}>
           <button
             type="button"
             onClick={() => selectView("roster")}
@@ -179,7 +179,7 @@ export function ShellListPanel({
           >
             Clients
           </button>
-          {!teamSport && (
+          {!hideMoney && (
           <button
             type="button"
             onClick={() => selectView("business")}
@@ -226,7 +226,7 @@ export function ShellListPanel({
             <RosterMiniList key={rosterVersion} groupId={groupId} />
           </>
         )}
-        {view === "business" && <BusinessMiniDashboard groupId={groupId} />}
+        {view === "business" && !hideMoney && <BusinessMiniDashboard groupId={groupId} />}
         {view === "calendar" && <CalendarMiniView groupId={groupId} />}
         {view === "program" && <ProgramPanelList groupId={groupId} />}
       </div>

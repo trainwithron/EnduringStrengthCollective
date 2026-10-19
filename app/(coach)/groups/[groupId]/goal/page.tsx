@@ -8,6 +8,7 @@ import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { GoalProposalForm } from "@/components/athlete/goal-proposal-form";
 import { GoalAnswerControl } from "@/components/athlete/goal-answer-control";
 import { GOAL_TYPE_LABELS } from "@/lib/goal-types";
+import { inOwnPersonalSpace } from "@/lib/personal-space";
 import { SubGoalsSection } from "@/components/shared/sub-goals-section";
 import type { SubGoalStatus, SubGoalView } from "@/lib/sub-goals";
 import type { GoalType } from "@/lib/goal-reversal";
@@ -35,7 +36,8 @@ export default async function GoalPage(props: { params: Promise<{ groupId: strin
 
   if (isReadFailure(membershipError)) return <LoadFailedPage />;
 
-  if (membership?.role !== "athlete") {
+  // A coach in their OWN personal space sets their own goal there.
+  if (membership?.role !== "athlete" && !(await inOwnPersonalSpace(supabase, params.groupId, user.id))) {
     return (
       <NoAccess>This page is for clients to set their own goal.</NoAccess>
     );

@@ -2,7 +2,7 @@ import { loadPostWorkoutCards } from "@/lib/post-workout-cards";
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { sendPushToProfile } from "@/lib/send-push";
+import { sendCoachPush } from "@/lib/coach-notice";
 import { computeReverseDietMilestone } from "@/lib/metabolic-trend";
 import { computeRecoveryVolumeMilestone } from "@/lib/recovery-volume-milestone";
 import { computeReadinessAverage } from "@/lib/wellness";
@@ -23,6 +23,9 @@ const REVERSE_DIET_WINDOW_WEEKS = 6;
 const RECOVERY_VOLUME_WINDOW_WEEKS = 4;
 const PHASE_ALIGNMENT_WINDOW_WEEKS = 6;
 const COOLDOWN_WEEKS = 8; // don't refire the same athlete+type again this soon
+
+// A coach is pushed ONCE per run about all their clients' milestones (a week of them is one push, not one per client), in their daytime; each milestone still has its own notice in the app.
+const pendingMilestonePushes = new Map<string, { body: string; link: string }[]>();
 
 // A scheduled job that loops over people needs room to finish: the function may run up to five minutes (the default is far shorter, and a long list would be cut off part way).
 export const maxDuration = 300;
@@ -66,7 +69,7 @@ async function recordMilestone(
       body: coachBody,
       link_path: coachLinkPath,
     });
-    await sendPushToProfile(supabase, coachRow.profile_id, "Client milestone", coachBody, coachLinkPath);
+    pendingMilestonePushes.set(coachRow.profile_id, [...(pendingMilestonePushes.get(coachRow.profile_id) ?? []), { body: coachBody, link: coachLinkPath }]);
   }
   return true;
 }
@@ -90,6 +93,18 @@ async function alreadyFiredRecently(
 }
 
 async function handler(request: Request) {
+  pendingMilestonePushes.clear();
+  const response = await scan(request);
+  const db = createServiceRoleClient();
+  for (const [coachId, items] of pendingMilestonePushes) {
+    const one = items.length === 1;
+    await sendCoachPush(db, coachId, "milestones", one ? "Client milestone" : `${items.length} client milestones`, one ? items[0].body : items.map((i) => i.body).slice(0, 3).join(" ") + (items.length > 3 ? ` and ${items.length - 3} more.` : ""), one ? items[0].link : "/dashboard", { daytimeOnly: true }).catch(() => 0);
+  }
+  pendingMilestonePushes.clear();
+  return response;
+}
+
+async function scan(request: Request) {
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "CRON_SECRET isn't configured." }, { status: 503 });
   }

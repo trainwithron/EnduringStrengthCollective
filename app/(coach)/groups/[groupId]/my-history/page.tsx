@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ExerciseHistoryUploader } from "@/components/coach/exercise-history-uploader";
+import { inOwnPersonalSpace } from "@/lib/personal-space";
 
 export const metadata = { title: "My history" };
 
@@ -38,7 +39,9 @@ export default async function MyHistoryPage(
 
   if (isReadFailure(membershipError)) return <LoadFailedPage />;
 
-  if (membership?.role !== "athlete" || !membership.history_import_enabled) {
+  // A coach in their OWN personal space brings in their own history without anyone to enable it (and imports as a coach, so mixed units and flagged rows are theirs to settle).
+  const ownSpace = membership?.role === "coach" && (await inOwnPersonalSpace(supabase, params.groupId, user.id));
+  if (!ownSpace && (membership?.role !== "athlete" || !membership.history_import_enabled)) {
     return (
       <NoAccess>Ask your coach to enable this before you can enter your own exercise history.</NoAccess>
     );
@@ -71,7 +74,7 @@ export default async function MyHistoryPage(
         athleteId={user.id}
         groupId={params.groupId}
         exerciseSuggestions={exerciseSuggestions}
-        viewerIsCoach={false}
+        viewerIsCoach={ownSpace}
       />
       <BottomTabBar groupId={params.groupId} />
     </main>

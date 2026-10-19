@@ -3,6 +3,7 @@ import { isReadFailure } from "@/lib/read-failed";
 import Link from "next/link";
 import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
+import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { UnavailableState } from "@/components/ui/unavailable-state";
@@ -44,6 +45,9 @@ export default async function ProgramsListPage(
       <NoAccess>Only coaches can manage programs.</NoAccess>
     );
   }
+
+  // A phone has no desktop programs page: it gets the simple cards (name, Active, days, tap to open) over the whole organization.
+  if (await prefersAthleteStyleView()) redirect("/programs");
 
   const { data: group } = await supabase
     .from("groups")

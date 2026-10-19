@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { isUnder13 } from "@/lib/coppa";
+import { ageBand } from "@/lib/guardian-consent";
 import { validDateOfBirth } from "@/lib/dob-gate";
 
 // The one-field date-of-birth step every client passes once. The date is saved where the app already reads it (client_intake.date_of_birth). A child under 13 stops at the message below: the app is for people 13
@@ -63,6 +64,8 @@ export function BirthdayForm({
       void fetch("/api/intake/minor-consent-notice", { method: "POST" }).catch(() => {});
       return;
     }
+    // A client aged 13 to 17 goes on to the parent or guardian screen next: the coach is told they are waiting (best effort).
+    if (ageBand(dob, new Date()) === "teen") void fetch("/api/intake/minor-consent-notice", { method: "POST" }).catch(() => {});
     router.push(nextUrl);
     router.refresh();
   }

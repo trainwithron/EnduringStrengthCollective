@@ -8,7 +8,9 @@ describe("every place that says when a locked workout opens uses the one real op
   it("the day card (via the day's workout info), the Today list and the phone home (via today's workout), the programs page and the workout page", () => {
     expect(read("lib/athlete-day-schedule.ts")).toContain("unlocksOn: unlockDate(match.date, visibilityWindow)");
     const today = read("lib/todays-workout.ts");
-    expect(today.match(/unlockDate\(/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(today.match(/unlockDate\(/g)?.length).toBeGreaterThanOrEqual(1);
+    // the Home Today card (where they pick up) holds a workout back by the same opening date
+    expect(read("lib/program-day-contexts.ts")).toContain("unlocksOn: unlockDate(entry.date, c.program.visibilityWindow)");
     expect(today).not.toContain("unlocksOn: scheduledDate ?? null");
     expect(today).not.toContain("unlocksOn: nextDate ?? null");
     expect(read("app/(coach)/groups/[groupId]/programs/[programId]/page.tsx")).toContain("Unlocks {formatShortDate(unlockDate(scheduledDate!, program.visibility_window))}");

@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getCoachedGroups, LAST_WORKSPACE_GROUP_COOKIE, pickAnchorGroup, type CoachedGroup } from "@/lib/coach-groups";
+import { ACTIVE_ORG_COOKIE, decodeCookieValue, rememberedGroupForActiveOrg } from "@/lib/active-org";
 
 // The group a coach-level page (Programs, Calendar, Clients, Group calendar, Messages...) stands on, and so the organization it shows. It follows the organization the coach CHOSE: the remembered
 // workspace group (written by the organization switcher, by the organization chooser, and by visiting any team or social group). With nothing valid remembered and more than one organization, the
@@ -34,16 +35,9 @@ export function chooseActiveAnchor(groups: CoachedGroup[], rememberedGroupId: st
 export async function getActiveAnchor(supabase: SupabaseClient, coachId: string): Promise<ActiveAnchor | null> {
   const groups = await getCoachedGroups(supabase, coachId);
   if (groups.length === 0) return null;
-  const remembered = decodeCookie((await cookies()).get(LAST_WORKSPACE_GROUP_COOKIE)?.value);
+  const jar = await cookies();
+  // The organization comes from the dedicated choice (ACTIVE_ORG_COOKIE), never from the last group opened; the last group only picks WHICH group of that organization.
+  const remembered = rememberedGroupForActiveOrg(groups, decodeCookieValue(jar.get(ACTIVE_ORG_COOKIE)?.value), decodeCookieValue(jar.get(LAST_WORKSPACE_GROUP_COOKIE)?.value));
   const chosen = chooseActiveAnchor(groups, remembered);
   return chosen ? { ...chosen, groups } : null;
-}
-
-function decodeCookie(raw: string | undefined): string | null {
-  if (!raw) return null;
-  try {
-    return decodeURIComponent(raw);
-  } catch {
-    return raw;
-  }
 }

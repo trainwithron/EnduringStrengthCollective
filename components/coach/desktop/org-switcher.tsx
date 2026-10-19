@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import { LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/coach-groups";
+import { ACTIVE_ORG_COOKIE } from "@/lib/active-org";
 
 export interface SwitchableOrg {
   id: string;
@@ -69,6 +70,7 @@ export function OrgSwitcher({
   function chooseOrg(org: SwitchableOrg) {
     try {
       document.cookie = `${LAST_WORKSPACE_GROUP_COOKIE}=${encodeURIComponent(org.anchorGroupId)}; path=/; max-age=${60 * 60 * 24 * 90}`;
+      document.cookie = `${ACTIVE_ORG_COOKIE}=${encodeURIComponent(org.id)}; path=/; max-age=${60 * 60 * 24 * 90}`;
     } catch {
       // Non-fatal: Home falls back to that org's first group.
     }

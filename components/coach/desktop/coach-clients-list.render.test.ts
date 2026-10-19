@@ -37,7 +37,7 @@ describe("Cards | List", () => {
   });
   it("a card carries the kind, the space, and the one quiet number: sessions left to schedule (and owed)", () => {
     const cards = renderToStaticMarkup(createElement(ClientsCardView, { rows: ROWS }));
-    expect(cards).toContain("1-on-1");
+    expect(cards).toContain("In person");
     expect(cards).toContain("Online");
     expect(cards).toContain("Coast to Coast Online");
     expect(cards).toContain("3 left to schedule");

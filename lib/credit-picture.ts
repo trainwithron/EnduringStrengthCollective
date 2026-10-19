@@ -20,12 +20,14 @@ export interface CreditPicture {
   // Booked sessions beyond what is left (neutral: "booked ahead").
   bookedAhead: number;
   toMark: number;
-  // From the ledger, when known: sessions bought and sessions done, for the click-through sentence.
+  // From the ledger, when known: the CURRENT package's size and sessions done from it, for the click-through sentence (lib/credit-ledger-totals.ts).
   bought?: number | null;
   done?: number | null;
+  // Of `bought`, how many were still unused from earlier packages when the current one began ("including 2 carried over").
+  carriedOver?: number | null;
 }
 
-export function buildCreditPicture(input: { balance: number | null | undefined; booked: number; toMark: number; bought?: number | null; done?: number | null }): CreditPicture {
+export function buildCreditPicture(input: { balance: number | null | undefined; booked: number; toMark: number; bought?: number | null; done?: number | null; carriedOver?: number | null }): CreditPicture {
   const balance = input.balance ?? 0;
   const left = Math.max(0, balance);
   const booked = Math.max(0, input.booked);
@@ -38,6 +40,7 @@ export function buildCreditPicture(input: { balance: number | null | undefined; 
     toMark: Math.max(0, input.toMark),
     bought: input.bought ?? null,
     done: input.done ?? null,
+    carriedOver: input.carriedOver ?? null,
   };
 }
 

@@ -130,7 +130,8 @@ export function FoodLogSection({
           />
           {planRetry && <MealPlanRetryBox groupId={groupId} state={planRetry} />}
         </>
-      ) : (
+      ) : coachProgramming ? (
+        // Nothing is promised to a client whose coach does not set macros or a meal plan for them ("Your coach is still setting up your meal plan" would wait forever).
         <MealCheckoffList
           athleteId={athleteId}
           groupId={groupId}
@@ -139,7 +140,7 @@ export function FoodLogSection({
           initialEntries={initialEntries}
           onEntryLogged={handleMealEntryLogged}
         />
-      )}
+      ) : null}
 
       <div className="space-y-2">
         <FoodSearchLog athleteId={athleteId} groupId={groupId} logDate={logDate} onLogged={handleQuickLogged} />

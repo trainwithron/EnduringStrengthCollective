@@ -13,6 +13,8 @@ import { ConfirmDialogHost } from "@/components/shared/confirm-dialog";
 import { cookies } from "next/headers";
 import { LAST_WORKSPACE_GROUP_COOKIE, decodeWorkspaceCookie } from "@/lib/workspace-header";
 import { getViewerOrgTheme } from "@/lib/org-theme-server";
+import { getTeamWordsHint } from "@/lib/team-words-server";
+import { TeamWordsHintProvider } from "@/components/coach/team-words-hint";
 import { orgThemeToCssVars } from "@/lib/theme";
 import { baseFontFamilies, googleFontsHref } from "@/lib/google-fonts";
 
@@ -55,7 +57,7 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const theme = await getViewerOrgTheme();
+  const [theme, teamWordsHint] = await Promise.all([getViewerOrgTheme(), getTeamWordsHint()]);
   const cssVars = orgThemeToCssVars(theme);
   // Which remembered workspace this look was made for; the coach area compares it with the cookie after each page change (components/shared/org-theme-sync.tsx).
   const workspaceGroup = decodeWorkspaceCookie((await cookies()).get(LAST_WORKSPACE_GROUP_COOKIE)?.value) ?? "";
@@ -89,7 +91,7 @@ export default async function RootLayout({
         <SetOutboxReplay />
         <AddToHomeScreenPrompt />
         <LoadingWatchdog />
-        {children}
+        <TeamWordsHintProvider hint={teamWordsHint}>{children}</TeamWordsHintProvider>
         <LegalReacceptGate />
         <TimezoneCapture />
         <ConfirmDialogHost />

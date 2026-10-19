@@ -23,15 +23,22 @@ export function hubOrgs(groups: CoachedGroup[], rememberedGroupId: string | null
     .sort((a, b) => a.orgName.localeCompare(b.orgName));
 }
 
-// Which organization the hub starts on: the one the organization switcher last chose (the same memory Home uses), else the organization of the page the coach is on.
+// Which organization the hub starts on: the organization of the PAGE the coach is on (every request a page makes names that page's group, and the database refuses another organization's rows, so tiles that opened on a
+// different organization from the page read blank: Oct 19 audit); only a page that belongs to no organization (the coach's own space) falls back to the one chosen with the switcher.
 export function hubStartOrgId(groups: CoachedGroup[], rememberedGroupId: string | null | undefined, currentGroupId: string): string | null {
+  const current = groups.find((g) => g.id === currentGroupId);
+  if (current) return current.orgId;
   const remembered = rememberedGroupId ? groups.find((g) => g.id === rememberedGroupId && g.kind !== "one_on_one") : undefined;
-  if (remembered) return remembered.orgId;
+  return remembered?.orgId ?? null;
+}
+
+// The organization the page itself belongs to, or null on a page of no organization (the coach's own space).
+export function pageOrgId(groups: CoachedGroup[], currentGroupId: string): string | null {
   return groups.find((g) => g.id === currentGroupId)?.orgId ?? null;
 }
 
 /**
- * Which group the Spotlight hub's tiles act on when it opens. On a page that belongs to an organization it stays what it was (that organization's group; with several organizations, the chosen one's anchor group). On a page
+ * Which group the Spotlight hub's tiles act on when it opens. On a page that belongs to an organization it is that page's own organization (the page's group, or that organization's usual group when the page is a client's own space). On a page
  * that belongs to NO organization (the coach's own personal space, which is where a phone lands) the tiles must never act on that space: they act on the organization the coach chose, or on the only organization they have,
  * and with several organizations and none chosen the coach is asked to choose (needsChoice) instead of being shown their own programs as if they were the organization's.
  */
@@ -41,13 +48,14 @@ export function hubStartGroup(groups: CoachedGroup[], rememberedGroupId: string 
   const remembered = rememberedGroupId ? groups.find((g) => g.id === rememberedGroupId && g.kind !== "one_on_one") : undefined;
   const current = groups.find((g) => g.id === currentGroupId);
   if (orgIds.length === 1 && current) return { groupId: currentGroupId, needsChoice: false };
+  if (current) {
+    // the page's own organization, never a remembered other one
+    const anchor = pickAnchorGroup(groups.filter((g) => g.orgId === current.orgId), currentGroupId);
+    return { groupId: anchor?.id ?? current.id, needsChoice: false };
+  }
   if (remembered) {
     const anchor = pickAnchorGroup(groups.filter((g) => g.orgId === remembered.orgId), rememberedGroupId);
     return { groupId: anchor?.id ?? remembered.id, needsChoice: false };
-  }
-  if (current) {
-    const anchor = pickAnchorGroup(groups.filter((g) => g.orgId === current.orgId), rememberedGroupId);
-    return { groupId: anchor?.id ?? current.id, needsChoice: false };
   }
   // the page's group is in no organization (a personal space): one organization is the answer, several need a choice
   if (orgIds.length === 1) return { groupId: pickAnchorGroup(groups, rememberedGroupId)?.id ?? null, needsChoice: false };

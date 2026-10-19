@@ -17,7 +17,9 @@ import { findThreadsNeedingReply } from "@/lib/notification-priority";
 import { getCoachedGroups, LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/coach-groups";
 import { getActiveAnchor } from "@/lib/active-anchor";
 import { orgIsTeamOnly } from "@/lib/team-sport";
-import { activeOrgId, clientCountsByOrg, inActiveOrg, rememberedOrgId } from "@/lib/active-org";
+import { SessionCheckSection } from "@/components/coach/session-check-section";
+import { NextClientWorkoutSection } from "@/components/coach/next-client-workout-section";
+import { ACTIVE_ORG_COOKIE, activeOrgId, clientCountsByOrg, decodeCookieValue, inActiveOrg, rememberedGroupForActiveOrg, rememberedOrgId } from "@/lib/active-org";
 import { getCoachDashboardData } from "@/lib/dashboard-data";
 import { PulseTabs } from "@/components/coach/desktop/pulse-tabs";
 import { DashboardStatTiles } from "@/components/coach/desktop/dashboard-stat-tiles";
@@ -31,7 +33,7 @@ import { LateChangesPanel } from "@/components/coach/late-changes-panel";
 import { ScheduleRequestsPanel } from "@/components/coach/schedule-requests-panel";
 import { LeavingCoachBanner } from "@/components/coach/leaving-coach-banner";
 import { TeamCoachHome } from "@/components/coach/team-coach-home";
-import { pickTileTeam } from "@/lib/team-coach";
+import { pickTileTeam, tileTeamsFor } from "@/lib/team-coach";
 import { loadMyDepartures } from "@/lib/leaving-coach";
 import { supportEmail } from "@/lib/legal";
 import { ExpiryCheckInPanel } from "@/components/coach/expiry-checkin-panel";
@@ -151,7 +153,8 @@ export default async function CoachHomePage() {
   // Home belongs to ONE organization at a time: the one the coach chose with the organization switcher (else their first). Everything on it, and every count, is that
   // organization's; another one appears only after switching to it.
   // The organization they last used (the switcher remembers it); with none remembered, the one with the most clients.
-  const rememberedWorkspace = (await cookies()).get(LAST_WORKSPACE_GROUP_COOKIE)?.value ?? null;
+  const lastWorkspaceCookie = (await cookies()).get(LAST_WORKSPACE_GROUP_COOKIE)?.value ?? null;
+  const activeOrgCookie = (await cookies()).get(ACTIVE_ORG_COOKIE)?.value ?? null;
   // The briefing is filed under the coach's own day (their time zone, set below), which is the UTC day or a day either side of it: read that window, keep the right one once the zone is known.
   const utcTodayKey = new Date().toISOString().slice(0, 10);
   // Round 1: everything that needs only who the coach is, as one batch.
@@ -199,6 +202,8 @@ export default async function CoachHomePage() {
   ]);
 
   // More than one organization and none remembered: ask which one, rather than guessing the biggest (lib/active-anchor.ts).
+  // The organization is the one the coach CHOSE (its own cookie); opening a group does not change it.
+  const rememberedWorkspace = rememberedGroupForActiveOrg(coachedForOrg, decodeCookieValue(activeOrgCookie), decodeCookieValue(lastWorkspaceCookie));
   if (!rememberedOrgId(coachedForOrg, rememberedWorkspace) && new Set(coachedForOrg.map((g) => g.orgId)).size > 1) redirect("/choose-organization?next=/dashboard");
   const clientsByOrg = rememberedOrgId(coachedForOrg, rememberedWorkspace) ? {} : await clientCountsByOrg(supabase, coachedForOrg);
   const homeOrgId = activeOrgId(coachedForOrg, rememberedWorkspace, clientsByOrg);
@@ -561,7 +566,10 @@ export default async function CoachHomePage() {
     isTeamCoach = false;
   }
   // The teams the tiles are for: only teams this coach really coaches (getCoachedGroups leaves retired seasons out), in the organization Home is showing, the one they last worked in first.
-  const tileTeams = coachedForOrg.filter((g) => g.kind === "team" && (!homeOrgId || g.orgId === homeOrgId)).map((g) => ({ id: g.id, name: g.name }));
+  // Football tiles only for a group whose team_mode is ON (a "team" kind alone is not a team sport).
+  const tileCandidates = coachedForOrg.filter((g) => g.kind === "team" && (!homeOrgId || g.orgId === homeOrgId));
+  const tileModeRows = tileCandidates.length > 0 ? await supabase.from("groups").select("id, team_mode").in("id", tileCandidates.map((g) => g.id).slice(0, 100)) : { data: [] as { id: string; team_mode: boolean | null }[], error: null };
+  const tileTeams = tileModeRows.error ? [] : tileTeamsFor(coachedForOrg, new Map(((tileModeRows.data ?? []) as { id: string; team_mode: boolean | null }[]).map((r) => [r.id, r.team_mode])), homeOrgId);
   const tileTeam = pickTileTeam(tileTeams, rememberedWorkspace);
   const departures = await loadMyDepartures(supabase, user.id);
   const myCoachedGroups = (coachedRows ?? []).map((row) => (row as any).groups as GroupRow | null).filter((g): g is GroupRow => !!g);
@@ -586,7 +594,7 @@ export default async function CoachHomePage() {
 
       {allGroups[0] && <TerminologyFirstRunCard groupId={allGroups[0].id} askedOnServer={askedRead.error ? null : !!(askedRead.data as { terminology_asked_at?: string | null } | null)?.terminology_asked_at} />}
 
-      {clientCards.length === 0 && teamCards.length === 0 && socialCards.length === 0 && allGroups[0] && (
+      {!moneyHidden && clientCards.length === 0 && teamCards.length === 0 && socialCards.length === 0 && allGroups[0] && (
         <GettingStartedCard groupId={(allGroups.find((g) => g.group_kind !== "one_on_one") ?? allGroups[0]).id} />
       )}
 
@@ -594,7 +602,11 @@ export default async function CoachHomePage() {
         <NeedsYouLoader input={needsYouInput} />
       </Suspense>
 
-      <YourDayPanel schedule={yourDaySchedule} attention={yourDayAttention} timezone={coachTimezone} />
+      <SessionCheckSection coachId={user.id} groupIds={allGroupIds} />
+
+      <NextClientWorkoutSection coachId={user.id} groupIds={allGroupIds} />
+
+      <YourDayPanel schedule={yourDaySchedule} attention={yourDayAttention} timezone={coachTimezone} showPayments={!moneyHidden} />
 
       {/* Replaces the old team-mode-only Team Pulse side column
           (home_dashboard_merge_and_pulse_tabs_redesign.md) — every
@@ -603,14 +615,17 @@ export default async function CoachHomePage() {
           separate "Roster" tile lower on this page (same data,
           collapsed-and-buried) was removed rather than showing the same
           clients/groups twice on one page. */}
-      <div className="mb-6">
-        <PulseTabs
-          clientCards={clientCards}
-          teamPulses={dashboardData.teamPulses}
-          teamCards={teamCards}
-          socialCards={socialCards}
-        />
-      </div>
+      {/* A team organization has its team tiles above; the 1-on-1 / athlete / group pulse tabs, the athlete counts and the "invite your first client" lines are for coaches who sell to clients. */}
+      {!moneyHidden && (
+        <div className="mb-6">
+          <PulseTabs
+            clientCards={clientCards}
+            teamPulses={dashboardData.teamPulses}
+            teamCards={teamCards}
+            socialCards={socialCards}
+          />
+        </div>
+      )}
 
       {/* The stack below is what the strip's "N more" opens; the strip's buttons also jump to the panel that handles the request. Nothing in it changed. */}
       <div id="needs-stack">
@@ -632,6 +647,7 @@ export default async function CoachHomePage() {
         {!moneyHidden && <NeedsPaymentPanel rows={dashboardData.needsPayment} />}
       </div>
 
+      {!moneyHidden && (
       <DashboardTileGrid
         initialOrder={(layoutRow?.tile_order as string[] | undefined) ?? []}
         initialHidden={(layoutRow?.hidden_tiles as string[] | undefined) ?? []}
@@ -650,6 +666,7 @@ export default async function CoachHomePage() {
           },
         ]}
       />
+      )}
     </>
   );
 

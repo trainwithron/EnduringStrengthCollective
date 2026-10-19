@@ -1,18 +1,21 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MoreVertical } from "lucide-react";
+import { Check, MoreVertical } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { runDeleteClient, runRemoveClient } from "@/components/coach/delete-client-flow";
 import { useTerm } from "@/components/coach/terminology-provider";
+import { CLIENT_TYPE_CHOICES, type ClientType } from "@/lib/client-type";
 
-// The small three-dot menu on a client's card and on a row of the Clients list: three actions, the same the client's own profile has (Release Z1 added Remove).
+// The small three-dot menu on a client's card and on a row of the Clients list: three actions, the same the client's own profile has (Release Z1 added Remove), and above them the client's type.
+//   * Client type: In person / Online / Group, one tap, no confirm. It is the tier the coach sets on the client (group_memberships.client_tier), the same value the Clients filters read; the calendar's
+//     client list leaves Online clients out until asked for. "Set inactive" below is the type's fourth choice, Set aside.
 //   * Set inactive: the existing set_client_inactive call (nothing is deleted; a workout, session or message from them brings them back). A client already set aside shows "Bring back" instead.
 //   * Remove from my clients: the default way out. They leave your lists, their account and data are kept, and you can put them back (components/coach/delete-client-flow.ts).
 //   * Delete permanently: the same removal with 30 days to undo, then the account is erased; the in-page confirm has the history tick-box.
 // It sits beside the card's link, never inside it, so opening it does not open the client.
-export function ClientRowMenu({ groupId, athleteId, athleteName, setAside = false }: { groupId: string; athleteId: string; athleteName: string; setAside?: boolean }) {
+export function ClientRowMenu({ groupId, athleteId, athleteName, setAside = false, clientType = null }: { groupId: string; athleteId: string; athleteName: string; setAside?: boolean; clientType?: ClientType | null }) {
   const term = useTerm();
   const boxRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -48,6 +51,21 @@ export function ClientRowMenu({ groupId, athleteId, athleteName, setAside = fals
     const { error: rpcError } = await supabase.rpc("set_client_inactive", { p_athlete_id: athleteId, p_group_id: groupId, p_inactive: !setAside, p_note: null });
     setBusy(false);
     if (rpcError) {
+      setError("That didn't save. Nothing was changed. Try again.");
+      return;
+    }
+    window.location.reload();
+  }
+
+  async function chooseType(next: ClientType) {
+    setOpen(false);
+    if (next === clientType) return;
+    setBusy(true);
+    setError(null);
+    const supabase = createBrowserClient();
+    const { data, error: updateError } = await supabase.from("group_memberships").update({ client_tier: next }).eq("group_id", groupId).eq("profile_id", athleteId).eq("role", "athlete").select("profile_id");
+    setBusy(false);
+    if (updateError || !data || data.length === 0) {
       setError("That didn't save. Nothing was changed. Try again.");
       return;
     }
@@ -91,6 +109,14 @@ export function ClientRowMenu({ groupId, athleteId, athleteName, setAside = fals
       </button>
       {open && (
         <div role="menu" className="absolute right-0 top-full z-30 mt-0.5 w-56 border border-steel/30 bg-surface shadow-lg">
+          <p className="px-3 pt-2 pb-0.5 font-body text-xs text-steel uppercase tracking-wide">Client type</p>
+          {CLIENT_TYPE_CHOICES.map((choice) => (
+            <button key={choice.value} type="button" role="menuitemradio" aria-checked={clientType === choice.value} onClick={() => void chooseType(choice.value)} className={`${item} flex items-center justify-between`}>
+              {choice.label}
+              {clientType === choice.value && <Check className="w-4 h-4 text-rust" aria-hidden="true" />}
+            </button>
+          ))}
+          <div className="border-t border-steel/20 my-0.5" aria-hidden="true" />
           <button type="button" role="menuitem" onClick={() => void toggleInactive()} className={item}>
             {setAside ? "Bring back" : "Set inactive"}
           </button>

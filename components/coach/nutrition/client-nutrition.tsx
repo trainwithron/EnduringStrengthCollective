@@ -13,6 +13,7 @@ import { FoodTrackingSwitch } from "@/components/coach/nutrition/food-tracking-s
 import { MacrosOffSwitch } from "@/components/coach/nutrition/macros-off-switch";
 import { AutoSuggestOffSwitch } from "@/components/coach/nutrition/auto-suggest-off-switch";
 import { PreferencesSection } from "@/components/coach/nutrition/preferences-section";
+import { AllergiesConfirmBanner } from "@/components/coach/nutrition/allergies-confirm-banner";
 import { ClientAnswersPanel } from "@/components/coach/nutrition/client-answers-panel";
 import { PlanTriesPanel, type PlanTryView } from "@/components/coach/nutrition/plan-tries-panel";
 import type { RecalcAnswer } from "@/lib/recalc-prompt";
@@ -226,6 +227,8 @@ export async function ClientNutrition({
   // A client with no row simply has no saved rules. A row that could not be READ is different: the planner builds nothing then (it would be made without their allergies).
   if (prefsReadError) console.error("[client-nutrition] could not read food rules:", prefsReadError.message);
   const prefs = rowToPreferences(prefsRow as Record<string, unknown> | null);
+  // No saved row at all: allergies were never asked (a failed read is a different case, handled above). Until the coach confirms none or enters some, no plan is built.
+  const allergiesAsked = !!prefsRow || !!prefsReadError;
   const foodRules = { allergies: prefs.allergies, intolerances: prefs.intolerances, dislikes: prefs.dislikes, dietType: prefs.dietType };
   const rulesText = hasFoodRules(prefs) ? restrictionsTextFromPreferences(prefs) : "";
   let updatedByName: string | null = null;
@@ -660,6 +663,7 @@ export async function ClientNutrition({
             />
           </div>
         )}
+        {!allergiesAsked && <AllergiesConfirmBanner athleteId={athleteId} clientName={firstName} />}
         <PreferencesSection
           athleteId={athleteId}
           initial={prefs}
@@ -706,6 +710,7 @@ export async function ClientNutrition({
           proteinGPerLb={prefs.proteinGPerLb}
           foodRules={foodRules}
           rulesReadable={!prefsReadError}
+          allergiesAsked={allergiesAsked}
           weightUnit={bodyProfile.weightUnit}
           initialActivity={bodyProfile.activity}
           clientName={clientName}

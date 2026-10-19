@@ -51,3 +51,30 @@ export function withTeamSportWords(overrides: import("@/lib/terminology").Termin
 
 /** An organization whose groups are ALL team-sport groups (and there is at least one): a coach there is running a team, so no money numbers (MRR, income, payments) appear on their Home. */
 export const orgIsTeamOnly = (groups: { team_mode?: boolean | null }[]): boolean => groups.length > 0 && groups.every((g) => isTeamSportGroup(g.team_mode));
+
+/**
+ * ONE rule for where the money numbers (Business tile and view, income, MRR, paying clients, the rail's Business icon) are hidden in the coach shell.
+ * - On a group's own page: when that group is a team-sport group, or its organization is all team-sport groups.
+ * - On a coach-level page (Home, Clients, Calendar, Programs; the group in the address is only an anchor for the rail): only when the organization is all team-sport groups, so a coach with a mix of teams and
+ *   individual clients still sees their business there.
+ */
+export function moneyHiddenFor(opts: { coachLevel: boolean; groupIsTeamSport: boolean; orgTeamOnly: boolean }): boolean {
+  return opts.orgTeamOnly || (!opts.coachLevel && opts.groupIsTeamSport);
+}
+
+/**
+ * What the SERVER knows about the open workspace when it draws the first frame (root layout, from the remembered workspace group): that group, whether it is a team-sport group, and whether its whole
+ * organization is team-sport groups. The coach shells start their words from it, so "Athletes" is on the first server-drawn frame instead of "Clients" until a browser-side read finishes.
+ */
+export interface TeamWordsHint {
+  groupId: string | null;
+  groupTeamSport: boolean;
+  orgTeamOnly: boolean;
+}
+export const NO_TEAM_WORDS_HINT: TeamWordsHint = { groupId: null, groupTeamSport: false, orgTeamOnly: false };
+
+/** Should a page on `groupId` (or on no group: Home) start out saying "athletes"? The same rule the browser-side read applies afterwards, so the two never disagree. */
+export function teamWordsFromHint(hint: TeamWordsHint, groupId: string | undefined): boolean {
+  if (!groupId) return hint.orgTeamOnly;
+  return hint.groupId !== null && hint.groupId === groupId.toLowerCase() && (hint.groupTeamSport || hint.orgTeamOnly);
+}

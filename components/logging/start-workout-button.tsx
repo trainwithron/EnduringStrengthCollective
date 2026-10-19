@@ -1,12 +1,13 @@
 "use client";
 
 import { loggableReps, loggableWeight } from "@/lib/set-value-limits";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { ExerciseSetTarget } from "@/lib/types";
 import type { TrackedField } from "@/lib/exercise-fields";
-import { findMatchingBookingId } from "@/lib/booking-session-link";
+import { findMatchingBookingId, SAME_DAY_TOLERANCE_MINUTES } from "@/lib/booking-session-link";
+import { bookingCreditLine } from "@/lib/booking-credit-line";
 
 interface TemplateExercise {
   id: string;
@@ -60,32 +61,64 @@ export function StartWorkoutButton({
   // A coach logging in person never spends a session credit unless they
   // choose to here (default OFF) — see migration 0231.
   const [deductCredit, setDeductCredit] = useState(false);
+  // The booking this session fulfills, if there is one (found before Start so the coach is told what will happen to the client's sessions). A linked booking takes its own session off when the workout is finished,
+  // so the "Use 1 session credit" choice is shown ONLY when no booking is linked: with one, ticking it would take a second, and leaving it unticked still took one (Oct 19 audit).
+  const [linked, setLinked] = useState<{ id: string; startAt: Date } | null>(null);
+  const [linkChecked, setLinkChecked] = useState(false);
   const router = useRouter();
 
-  async function handleStart() {
-    setStarting(true);
-    setError(null);
-    const supabase = createBrowserClient();
-
-    // Calendar Spotter Phase 2 — link this session to the real booking
-    // it fulfills, if one exists, so "booked 60 min, actually took 40"
-    // becomes a real, queryable question later. A freeform/unbooked
+  async function findLinkedBooking(supabase: ReturnType<typeof createBrowserClient>): Promise<{ id: string; startAt: Date } | null> {
+    // Calendar Spotter Phase 2 — link this session to the real booking it fulfills, if one exists, so "booked 60 min, actually took 40" becomes a real, queryable question later. A freeform/unbooked
     // session correctly finds nothing and stays null.
+    // Any of the client's confirmed, not yet settled sessions TODAY on the coach's clock (this phone's), the nearest to now: a coach logging a 3:00 session at 8 AM still has it linked (and told so), and a booking
+    // further away no longer sits unlinked beside a ticked credit box to be charged a second time when "Did this session happen?" is answered Yes.
     const now = new Date();
-    const windowStart = new Date(now.getTime() - 3 * 60 * 60000).toISOString();
-    const windowEnd = new Date(now.getTime() + 3 * 60 * 60000).toISOString();
+    const dayStart = new Date(now);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(dayStart);
+    dayEnd.setDate(dayEnd.getDate() + 1);
     const { data: candidateBookings } = await supabase
       .from("bookings")
       .select("id, start_at")
       .eq("athlete_id", athleteId)
       .eq("group_id", groupId)
       .eq("status", "confirmed")
-      .gte("start_at", windowStart)
-      .lte("start_at", windowEnd);
-    const bookingId = findMatchingBookingId(
-      (candidateBookings ?? []).map((b) => ({ id: b.id, startAt: new Date(b.start_at) })),
-      now
-    );
+      .eq("credit_state", "unsettled")
+      .is("attended_at", null)
+      .gte("start_at", dayStart.toISOString())
+      .lt("start_at", dayEnd.toISOString());
+    const candidates = (candidateBookings ?? []).map((b) => ({ id: b.id as string, startAt: new Date(b.start_at as string) }));
+    const id = findMatchingBookingId(candidates, now, SAME_DAY_TOLERANCE_MINUTES);
+    return id ? candidates.find((c) => c.id === id) ?? null : null;
+  }
+
+  useEffect(() => {
+    if (!loggedByCoach) return;
+    let cancelled = false;
+    findLinkedBooking(createBrowserClient())
+      .then((b) => {
+        if (cancelled) return;
+        setLinked(b);
+        setLinkChecked(true);
+      })
+      .catch(() => {
+        if (!cancelled) setLinkChecked(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [athleteId, groupId, loggedByCoach]);
+
+  async function handleStart() {
+    setStarting(true);
+    setError(null);
+    const supabase = createBrowserClient();
+
+    // The booking found before Start, or looked up now if that read had not finished.
+    const bookingId = (linkChecked ? linked : await findLinkedBooking(supabase))?.id ?? null;
+    // With a booking linked, the booking takes its own session off at the end: the credit box is not asked and not sent.
+    const takeCredit = !!loggedByCoach && !bookingId && deductCredit;
 
     // The sets each template exercise starts with. An explicit per-set
     // target_weight/target_reps is a real coach decision, so it still
@@ -114,7 +147,7 @@ export function StartWorkoutButton({
       p_athlete_id: athleteId,
       p_logged_by_coach: loggedByCoach ?? false,
       p_session_type_id: sessionTypeId || null,
-      p_deduct_session_credit: !!loggedByCoach && deductCredit,
+      p_deduct_session_credit: takeCredit,
       p_booking_id: bookingId,
       p_exercises: exercises.map((ex) => ({
         group_workout_exercise_id: ex.id,
@@ -147,7 +180,7 @@ export function StartWorkoutButton({
         athlete_id: athleteId,
         logged_by_coach: loggedByCoach ?? false,
         session_type_id: sessionTypeId || null,
-        deduct_session_credit: !!loggedByCoach && deductCredit,
+        deduct_session_credit: takeCredit,
         booking_id: bookingId,
       })
       .select("id")
@@ -219,7 +252,10 @@ export function StartWorkoutButton({
           </select>
         </div>
       )}
-      {loggedByCoach && (
+      {loggedByCoach && linked && (
+        <p className="mb-2 text-center font-body text-xs text-steel">{bookingCreditLine(linked.startAt, clientName)}</p>
+      )}
+      {loggedByCoach && !linked && (
         <label className="mb-2 flex items-center justify-center gap-2 font-body text-xs text-steel">
           <input
             type="checkbox"

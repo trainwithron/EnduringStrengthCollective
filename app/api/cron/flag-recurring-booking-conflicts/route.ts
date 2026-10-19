@@ -1,7 +1,7 @@
 import { fetchSessionMinutes, sessionMinutesFor } from "@/lib/availability-windows";
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { sendPushToProfile } from "@/lib/send-push";
+import { sendCoachPush } from "@/lib/coach-notice";
 import { resolveBlockedRangesForDate, bookingFitsAvailability, type AvailabilityWindow } from "@/lib/booking-slots";
 import { DEFAULT_COACH_TIMEZONE, dateKeyInZone } from "@/lib/timezone";
 import { formatInTimezone } from "@/lib/format-in-timezone";
@@ -125,7 +125,7 @@ async function handler(request: Request) {
       body,
       link_path: `/groups/${entry.groupId}/calendar`,
     });
-    await sendPushToProfile(supabase, coachId, "Recurring sessions need a look", body, `/groups/${entry.groupId}/calendar`);
+    await sendCoachPush(supabase, coachId, "bookings", "Recurring sessions need a look", body, `/groups/${entry.groupId}/calendar`, { daytimeOnly: true });
   }
 
   return NextResponse.json({ ok: true, flaggedCount });

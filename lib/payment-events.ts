@@ -1,5 +1,5 @@
 import type Stripe from "stripe";
-import { sendPushToProfile } from "@/lib/send-push";
+import { sendCoachPush } from "@/lib/coach-notice";
 
 // Money events that used to leave no trace in the app (Release M1): a client's failed payment, a refund made in Stripe, a dispute (chargeback) opened and closed. Each is RECORDED (payment_events, one row per Stripe event) and the
 // coach who owns the money is told. Nothing else happens: no balance changes, no sessions are taken back, no access ends and no money moves. A refund does not take sessions off the client and a failed payment does not
@@ -139,7 +139,7 @@ export async function notifyPaymentProblem(db: any, e: PaymentEventInput): Promi
         continue;
       }
       delivered++;
-      await sendPushToProfile(db, coachId, TITLE[e.kind], LOCK_SCREEN_TEXT, link).catch(() => 0);
+      await sendCoachPush(db, coachId, "payments", TITLE[e.kind], LOCK_SCREEN_TEXT, link).catch(() => 0);
     }
     return delivered;
   } catch (err) {

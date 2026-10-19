@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase/server";
 import { getCoachedGroups, LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/coach-groups";
+import { ACTIVE_ORG_COOKIE, decodeCookieValue, rememberedGroupForActiveOrg } from "@/lib/active-org";
 import { readRowsByIds } from "@/lib/read-by-ids";
 import { coachPhoneLanding, teamOnlyOrgs } from "@/lib/coach-landing";
 import { COACH_PHONE_LANDING } from "@/lib/start-group";
@@ -19,13 +20,8 @@ export async function GET(request: Request) {
   let target = COACH_PHONE_LANDING;
   try {
     const groups = await getCoachedGroups(supabase, user.id);
-    const raw = (await cookies()).get(LAST_WORKSPACE_GROUP_COOKIE)?.value;
-    let remembered: string | null = null;
-    try {
-      remembered = raw ? decodeURIComponent(raw) : null;
-    } catch {
-      remembered = raw ?? null;
-    }
+    const jar = await cookies();
+    const remembered = rememberedGroupForActiveOrg(groups, decodeCookieValue(jar.get(ACTIVE_ORG_COOKIE)?.value), decodeCookieValue(jar.get(LAST_WORKSPACE_GROUP_COOKIE)?.value));
     const modes = await readRowsByIds(groups.map((g) => g.id), (ids) => (from, to) => supabase.from("groups").select("id, team_mode").in("id", ids).order("id").range(from, to));
     // a failed read leaves the landing as it was: their own client app
     if (!modes.error) {

@@ -71,7 +71,10 @@ describe("the phone coach home of a team-sport group (the Trojans: one team grou
     expect(home.links.map((l) => l.label)).toEqual(["Team calendar", "Team feed", "Athletes", "Messages", "Settings"]);
     expect(home.links.map((l) => l.href)).toEqual([`/groups/${TROJANS}/team/calendar`, `/groups/${TROJANS}/feed`, expect.stringContaining(TROJANS), `/groups/${TROJANS}/messages`, `/groups/${TROJANS}/settings`]);
     const more = home.moreLinks.map((l) => l.label);
-    for (const wanted of ["All programs", "Attendance", "Depth chart", "Team performance", "Team sheet", "My own training"]) expect(more, wanted).toContain(wanted);
+    for (const wanted of ["All programs", "Attendance", "Depth chart", "Team performance", "Team sheet"]) expect(more, wanted).toContain(wanted);
+    // the coach's own training is ONE row at the top of the Athletes list, not a second entry here
+    expect(more).not.toContain("My own training");
+    expect(JSON.stringify(home.links)).not.toContain("my-space");
     // the organization's programs, not this group's alone
     expect(home.moreLinks.find((l) => l.key === "programs")?.href).toBe("/programs");
   });
@@ -199,5 +202,32 @@ describe("Programs on a phone", () => {
     expect(page).toContain("if (await prefersAthleteStyleView())");
     expect(page.indexOf("<ProgramsPhoneList")).toBeLessThan(page.indexOf("<ProgramsList "));
     expect(page).toContain("<CoachMobileShell groupId={anchor.id} groupName={anchor.name}>");
+  });
+});
+
+describe("the coach's own training on a phone: ONE row at the top of the Clients (Athletes) list", () => {
+  const src = (p: string) => readFileSync(p, "utf8");
+  it("the phone roster page leads its list with the coach's own row, which opens their own client app", async () => {
+    const page = src("app/(coach)/groups/[groupId]/clients/page.tsx");
+    expect(page).toContain("<CoachOwnRow name={selfName} />");
+    expect(page.indexOf("<CoachOwnRow")).toBeLessThan(page.indexOf("<CoachRosterMobile"));
+    expect(page.indexOf("<CoachOwnRow")).toBeGreaterThan(page.indexOf("if (await prefersAthleteStyleView())"));
+    const { COACH_OWN_ROW_HREF } = await import("@/components/coach/mobile/coach-own-row");
+    expect(COACH_OWN_ROW_HREF).toBe("/my-space?view=client");
+  });
+  it("it reads as the coach's name with (you), and the team coach home's Athletes link leads to that same page", async () => {
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { createElement } = await import("react");
+    const { CoachOwnRow } = await import("@/components/coach/mobile/coach-own-row");
+    const html = renderToStaticMarkup(createElement(CoachOwnRow, { name: "Coach Ron" }));
+    expect(html).toContain("Coach Ron (you)");
+    expect(html).toContain('href="/my-space?view=client"');
+    const home = teamPhoneHome({ groupId: TROJANS, program: null });
+    expect(home.links.find((l) => l.label === "Athletes")?.href).toBe(`/groups/${TROJANS}/clients?view=members`);
+  });
+  it("there is no second way in from the coach side: not in More tools, not on the team home, not in the phone hub", () => {
+    for (const f of ["lib/team-phone-home.ts", "components/coach/mobile/team-coach-phone-home.tsx", "components/coach/mobile/coach-spot-hub.tsx", "components/coach/mobile/coach-nav-links-list.tsx"]) {
+      expect(src(f), f).not.toMatch(/my-space|My own training/);
+    }
   });
 });

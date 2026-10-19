@@ -157,6 +157,9 @@ export function SessionLogger({
     [exercises]
   );
 
+  // How many sets are marked done: with none, Complete asks once more before finishing an empty workout (Oct 19 audit: 5 of 127 workout logs had zero sets).
+  const completedSetCount = useMemo(() => exercises.reduce((n, ex) => n + ex.sets.filter((s) => s.status === "completed").length, 0), [exercises]);
+
   // Every mutation below routes through the functional form of setState, so
   // two concurrent saves (e.g. blurring the reps field right as the complete
   // button is tapped) always merge onto the latest committed state instead
@@ -241,10 +244,18 @@ export function SessionLogger({
         return;
       }
 
-      const { data: sets } = await supabase
+      const { data: sets, error: setsError } = await supabase
         .from("set_logs")
         .insert({ session_exercise_id: sessionExercise.id, set_order: 0 })
         .select("id, set_order, weight, reps, rpe, rir, tempo, time_seconds, height, distance, rest_seconds, pace, status");
+
+      // An exercise whose first set did not save is not kept: it would show with no sets to log. It is taken off again and the person is told, instead of an empty exercise appearing (or nothing at all).
+      if (setsError || !sets || sets.length === 0) {
+        // Deliberately not checked here: this only tidies up the exercise that was just made, the person is told below that it did not save, and the failure bar says if the cleanup itself failed.
+        await saved(supabase.from("session_exercises").delete().eq("id", sessionExercise.id));
+        setAddNameProblem("Couldn't add that exercise. Check your signal and try again.");
+        return;
+      }
 
       setExercises((prev) => [
         ...prev,
@@ -277,6 +288,8 @@ export function SessionLogger({
       ]);
       setNewExerciseName("");
       setAddingExercise(false);
+    } catch {
+      setAddNameProblem("Couldn't add that exercise. Check your signal and try again.");
     } finally {
       setAddExerciseBusy(false);
     }
@@ -441,6 +454,7 @@ export function SessionLogger({
         <CompleteWorkoutButton
           sessionId={sessionId}
           allSetsResolved={allSetsResolved}
+          completedSetCount={completedSetCount}
           disabled={false}
           raised={raised && !exercises.every((e) => isNoLoadExercise(e.exerciseName))}
           coachMode={coachMode}

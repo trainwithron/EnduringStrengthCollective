@@ -2,7 +2,8 @@ import { createServerClient } from "@/lib/supabase/server";
 import { ProgramDayPicker } from "@/components/shared/program-day-picker";
 import { computeScheduledDates, formatShortDate, isLocked, isSameDay, unlockDate, type VisibilityWindow } from "@/lib/program-schedule";
 import { getGroupCoachTimezone, nowInZone } from "@/lib/timezone";
-import { currentWeekFor, exerciseLine, type PlainDay, type PlainWeek } from "@/lib/program-plain-view";
+import { exerciseLine, type PlainDay, type PlainWeek } from "@/lib/program-plain-view";
+import { loadDoneAt, pickUpWhereLeftOff, weekOf } from "@/lib/program-pickup";
 import { demoThumbPath, findDemo, type DemoRow } from "@/lib/exercise-demo";
 
 // The plain program view on a phone, for the coach, a client, and the coach's own training: every week, pick the week, tap a day, see the workout, start it. Read-only; the builder is "Edit program".
@@ -68,11 +69,9 @@ export async function ProgramPlainView({
   const today = nowInZone(timezone);
 
   const byWeek = new Map<number, PlainWeek>();
-  let todayWeek: number | null = null;
   for (const w of rows) {
     const when = scheduled.get(w.id);
     const isToday = when ? isSameDay(when, today) : false;
-    if (isToday) todayWeek = w.week_number;
     // The coach's own setting "show days ahead" is the only lock, and never for the coach.
     const locked = !isCoach && when ? isLocked(when, today, program.visibility_window ?? undefined) : false;
     let totalSets = 0;
@@ -103,14 +102,20 @@ export async function ProgramPlainView({
     byWeek.set(w.week_number, week);
   }
   const weeks = [...byWeek.values()].sort((a, b) => a.weekNumber - b.weekNumber);
-  const current = currentWeekFor({ startDate: program.start_date, weekNumbers: weeks.map((w) => w.weekNumber), todayWeekFromSchedule: todayWeek, today });
+  // Opens where they left off: the week and day right AFTER the workout completed most recently, in program order. Not tied to dates; earlier weeks and skipped days stay one tap away.
+  const { doneAt } = await loadDoneAt(supabase, subjectId, rows.map((w) => w.id as string));
+  const pick = pickUpWhereLeftOff(rows, doneAt);
+  const current = pick.kind === "next" ? weekOf(pick.workout) : pick.kind === "complete" ? weekOf(pick.lastDone) : null;
+  const upNextDayId = pick.kind === "next" ? pick.workout.id : null;
 
   return (
     <ProgramDayPicker
       title={program.name}
       weeks={weeks}
       currentWeek={current}
-      backHref={backHref ?? (isCoach ? `/groups/${groupId}/programs` : `/groups/${groupId}`)}
+      upNextDayId={upNextDayId}
+      programComplete={pick.kind === "complete"}
+      backHref={backHref ?? (isCoach ? "/programs" : `/groups/${groupId}`)}
       editHref={isCoach && !workoutHrefBase ? `/groups/${groupId}/programs/${programId}?edit=1` : null}
       workoutHrefBase={workoutHrefBase ?? `/groups/${groupId}/workouts`}
       startLabel={startLabel}

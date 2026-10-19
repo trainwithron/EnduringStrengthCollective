@@ -68,8 +68,9 @@ export function PhotoLogFoodButton({
   async function handleConfirm() {
     if (!estimate) return;
     setSaving(true);
+    setError(null);
     const supabase = createBrowserClient();
-    const { data } = await supabase
+    const { data, error: saveError } = await supabase
       .from("food_log_entries")
       .insert({
         athlete_id: athleteId,
@@ -86,6 +87,11 @@ export function PhotoLogFoodButton({
       .select("id")
       .single();
     setSaving(false);
+    // A save that did not land keeps the estimate on screen and says so (it used to do nothing at all).
+    if (saveError || !data) {
+      setError("That didn't save. Your estimate is still here: check your connection and tap Confirm & log again.");
+      return;
+    }
     if (data) {
       onLogged({
         id: data.id,
@@ -111,6 +117,11 @@ export function PhotoLogFoodButton({
         <p className="font-body text-xs text-steel mt-1">
           Rough visual estimate — photo-based logging is the least precise option here.
         </p>
+        {error && (
+          <p className="font-body text-xs text-rust mt-1" role="alert">
+            {error}
+          </p>
+        )}
         <div className="flex items-center gap-2 mt-2">
           <button
             type="button"

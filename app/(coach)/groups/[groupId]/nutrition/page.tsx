@@ -236,6 +236,14 @@ export default async function NutritionPage(
     .eq("profile_id", athleteId)
     .maybeSingle();
   const trackingOn = (trackingRow as { food_tracking_enabled?: boolean | null } | null)?.food_tracking_enabled !== false;
+  // The coach's "No macros for <client>" switch (read on its own, so a database without the column reads as on). With it off the page makes no promise of a meal plan or a target (Oct 19 audit).
+  const { data: macrosRow } = await supabase
+    .from("group_memberships")
+    .select("coach_sets_macros")
+    .eq("group_id", params.groupId)
+    .eq("profile_id", athleteId)
+    .maybeSingle();
+  const coachSetsMacros = (macrosRow as { coach_sets_macros?: boolean | null } | null)?.coach_sets_macros !== false;
 
   const { data: groupRow } = await supabase
     .from("groups")
@@ -423,8 +431,7 @@ export default async function NutritionPage(
             Your coach has marked you as currently injured
           </p>
           <p className="font-body text-xs text-steel">
-            Your calorie target has been raised to at least maintenance while you recover —
-            undereating during an injury measurably slows healing.{" "}
+            Eating enough matters while you recover: undereating during an injury measurably slows healing.{" "}
             <a
               href="https://www.childrensmercy.org/departments-and-clinics/orthopedics/sports-medicine/nutrition-for-injury-recovery-in-athletes/"
               target="_blank"
@@ -504,7 +511,7 @@ export default async function NutritionPage(
             {trackingOn ? (
               <FoodLogSection
                 target={todayMacros}
-                coachProgramming={macrosEnabled}
+                coachProgramming={macrosEnabled && coachSetsMacros}
                 nutrients={nutrientData}
                 plan={savedPlanMeals ? { meals: clientPlan.meals, hiddenCount: clientPlan.hiddenCount, emptiedMeals: clientPlan.emptiedMeals } : null}
                 planRetry={planRetry}

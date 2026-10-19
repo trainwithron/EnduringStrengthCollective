@@ -6,6 +6,8 @@
 // whole day at a glance" view. Tapping an empty spot on it hands that exact time (snapped to 5 minutes) to onPickTime, which opens the add sheet; the flat slot
 // list below it still has the Book/Cancel/Assign controls for sessions already on the day.
 const PX_PER_MIN = 1;
+// Room above the first hour and below the last, so the first label (centered on its line, half above it) is not cut by the grid's top border.
+const GRID_EDGE_PX = 12;
 const PAD_MINUTES = 60;
 const DEFAULT_START_MIN = 6 * 60; // 6:00 AM
 const DEFAULT_END_MIN = 21 * 60; // 9:00 PM
@@ -69,6 +71,12 @@ export function snapTapToMinutes(offsetPx: number, rangeStart: number): number {
   return Math.round((rangeStart + offsetPx / PX_PER_MIN) / 15) * 15;
 }
 
+// Where a block sits: its top edge ON the line of its start time and its bottom at start + length (a 6:00 session of 55 minutes ends at 6:55, drawn 55/60 of the hour), one pixel per minute from the
+// grid's first hour. A block shorter than 18 minutes is drawn 18 tall so its label stays readable.
+export function blockBox(startMinutes: number, endMinutes: number, rangeStart: number): { top: number; height: number } {
+  return { top: (startMinutes - rangeStart) * PX_PER_MIN, height: Math.max(18, (endMinutes - startMinutes) * PX_PER_MIN) };
+}
+
 export function DayHourGrid({
   windows,
   bookings,
@@ -115,7 +123,7 @@ export function DayHourGrid({
   }
 
   return (
-    <div className="flex border border-steel/20 mb-6 max-w-2xl">
+    <div className="flex border border-steel/20 mb-6 max-w-2xl" style={{ paddingTop: GRID_EDGE_PX, paddingBottom: GRID_EDGE_PX }}>
       <div className="w-14 shrink-0 border-r border-steel/20 relative" style={{ height: gridHeight }}>
         {hourMarks.map((min) => (
           <div
@@ -145,7 +153,7 @@ export function DayHourGrid({
         {hourMarks.map((min) => (
           <div
             key={min}
-            className="absolute left-0 right-0 border-t border-steel/10"
+            className="absolute left-0 right-0 border-t border-steel/25"
             style={{ top: topFor(min) }}
           />
         ))}
@@ -169,7 +177,7 @@ export function DayHourGrid({
             <div
               key={b.id}
               className="absolute left-0 right-0 bg-steel/20 text-chalk px-2 py-0.5 overflow-hidden pointer-events-none"
-              style={{ top: topFor(start), height: Math.max(18, (end - start) * PX_PER_MIN) }}
+              style={blockBox(start, end, rangeStart)}
             >
               <p className="font-body text-xs leading-tight truncate">
                 {formatMinutes(start)} · {b.label}
@@ -185,7 +193,7 @@ export function DayHourGrid({
             <div
               key={b.id}
               className="absolute left-1 right-1 bg-rust/80 text-graphite px-2 py-0.5 overflow-hidden"
-              style={{ top: topFor(start), height: Math.max(18, (end - start) * PX_PER_MIN) }}
+              style={blockBox(start, end, rangeStart)}
               onClick={(e) => e.stopPropagation()}
             >
               <p className="font-body text-xs font-medium leading-tight truncate">

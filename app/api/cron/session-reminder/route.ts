@@ -4,6 +4,7 @@ import { sendPushToProfile } from "@/lib/send-push";
 import { dispatchSms } from "@/lib/sms-dispatch";
 import { formatInTimezone, timezoneForProfiles } from "@/lib/format-in-timezone";
 import { withCronRun } from "@/lib/cron-monitor";
+import { emailClientNotice, reminderEmail, shouldReleaseClaim, wasDelivered, type EmailOutcome } from "@/lib/client-notice-email";
 
 // acuity_replacement_gap_audit_sept16.md — the single clearest,
 // highest-value gap against Acuity: zero reminder/confirmation infra
@@ -51,6 +52,8 @@ async function handler(request: Request) {
 
   let sent = 0;
   let smsSent = 0;
+  let emailed = 0;
+  let released = 0;
   for (const booking of upcoming ?? []) {
     // The reminder is CLAIMED first (only if nobody has yet): if marking it fails, nothing is sent, so a failed write can never make the same reminder go out again on every run, and two overlapping runs
     // cannot both send it.
@@ -90,11 +93,25 @@ async function handler(request: Request) {
     });
     if (smsResult.sent) smsSent += 1;
 
-    // (Marked as sent above, whether or not a push subscription existed: the reminder "happened" for this booking either way.)
-    if (count > 0) sent += 1;
+    // Almost no client has phone alerts on, so when neither a phone alert nor a text reached them the same line goes by email (not in their quiet hours; never to a placeholder address).
+    let email: EmailOutcome | null = null;
+    if (count === 0 && !smsResult.sent) {
+      const mail = reminderEmail({ coachName: (booking as any).profiles?.full_name, time: when, groupId: booking.group_id });
+      email = await emailClientNotice(supabase, booking.athlete_id, mail.subject, mail.text).catch(() => "failed" as EmailOutcome);
+      if (email === "sent") emailed += 1;
+    }
+
+    // The reminder counts as sent only if some channel delivered it. Otherwise the claim is given back (while the session has not started) so the next run tries again.
+    const delivered = wasDelivered({ pushCount: count, smsSent: !!smsResult.sent, email });
+    if (shouldReleaseClaim(delivered, booking.start_at, now)) {
+      await supabase.from("bookings").update({ reminder_sent_at: null }).eq("id", booking.id).eq("reminder_sent_at", now.toISOString());
+      released += 1;
+      continue;
+    }
+    if (delivered) sent += 1;
   }
 
-  return NextResponse.json({ checked: upcoming?.length ?? 0, sent, smsSent });
+  return NextResponse.json({ checked: upcoming?.length ?? 0, sent, smsSent, emailed, released });
 }
 
 export const GET = withCronRun("session-reminder", handler);

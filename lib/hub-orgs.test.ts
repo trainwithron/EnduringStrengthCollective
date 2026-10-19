@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { hubOrgs, hubStartOrgId } from "./hub-orgs";
+import { hubOrgs, hubStartGroup, hubStartOrgId, pageOrgId } from "./hub-orgs";
 import type { CoachedGroup } from "./coach-groups";
 
 const g = (id: string, name: string, orgId: string, orgName: string, kind: CoachedGroup["kind"] = "team"): CoachedGroup => ({ id, name, kind, orgId, orgName });
@@ -29,12 +29,24 @@ describe("which organizations the hub offers", () => {
 });
 
 describe("which organization the hub starts on", () => {
-  it("is the one the organization switcher last chose (the memory Home uses), else the page's own", () => {
-    expect(hubStartOrgId(groups, "c1", "a1")).toBe("C");
+  it("is the organization of the PAGE the coach is on, whatever was remembered (Oct 19 audit: on a Trojans page with Enduring Strength remembered the tiles read blank)", () => {
+    expect(hubStartOrgId(groups, "a1", "c1")).toBe("C");
+    expect(hubStartOrgId(groups, "c1", "a1")).toBe("A");
     expect(hubStartOrgId(groups, null, "b1")).toBe("B");
     expect(hubStartOrgId(groups, "a2", "b1")).toBe("B");
     expect(hubStartOrgId(groups, "gone", "a1")).toBe("A");
     expect(hubStartOrgId([], null, "x")).toBeNull();
+  });
+  it("only a page of no organization (the coach's own space) starts on the one chosen with the switcher", () => {
+    expect(hubStartOrgId(groups, "c1", "personal-space")).toBe("C");
+    expect(hubStartOrgId(groups, null, "personal-space")).toBeNull();
+    expect(pageOrgId(groups, "c1")).toBe("C");
+    expect(pageOrgId(groups, "personal-space")).toBeNull();
+  });
+  it("the group the tiles act on is the page's own group (or its organization's usual group on a client's own space), never a remembered other organization's", () => {
+    expect(hubStartGroup(groups, "a1", "c1")).toEqual({ groupId: "c1", needsChoice: false });
+    expect(hubStartGroup(groups, "c1", "b1")).toEqual({ groupId: "b1", needsChoice: false });
+    expect(hubStartGroup(groups, "c1", "a2")).toEqual({ groupId: "a1", needsChoice: false });
   });
 });
 
@@ -47,6 +59,15 @@ describe("the hub is wired to it", () => {
       expect(hub).toMatch(new RegExp(`<${t}[^>]*groupId=\{activeGroupId\}`));
     }
     expect(hub).not.toMatch(/<(SpotClientsGroupsPanel|BusinessMiniDashboard|CalendarMiniView|ProgramMiniView|QuickPaymentPanel)[^>]*groupId=\{groupId\}/);
+  });
+  it("choosing ANOTHER organization closes the hub and goes to that organization's Home (the page being viewed keeps naming its own organization, which the database walls off from the other one)", () => {
+    expect(hub).toContain("const leavesPage = pageOrg.current !== next.orgId;");
+    // a full page load, not router.push: the soft navigation hung on a loading skeleton in the live check
+    expect(hub).toContain('window.location.assign("/dashboard");');
+    expect(hub).not.toContain('router.push("/dashboard")');
+    expect(hub).toContain("pageOrg.current = pageOrgId(groups, groupId);");
+    // the chosen organization is written before leaving, so Home opens on it
+    expect(hub.indexOf("ACTIVE_ORG_COOKIE}=")).toBeLessThan(hub.indexOf("if (leavesPage) {"));
   });
   it("remembers the choice the way the organization switcher does, and does not override a hub opened for one client", () => {
     expect(hub).toContain("LAST_WORKSPACE_GROUP_COOKIE");

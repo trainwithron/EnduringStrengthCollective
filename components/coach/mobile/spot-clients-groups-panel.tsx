@@ -1,15 +1,16 @@
 "use client";
 
-import { readRowsByIds } from "@/lib/read-by-ids";
-
 import { useEffect, useState } from "react";
 import { createGroupWithCoach } from "@/lib/create-group";
 import { useTerm } from "@/components/coach/terminology-provider";
 import { useRouter } from "next/navigation";
 import { Dumbbell, Plus } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { clientActivityStatus } from "@/lib/client-activity-status";
-import { computeQuietTier, QUIET_TIER_LABEL } from "@/lib/quiet-client-tier";
+import { loadCoachClientList, type ListedClient } from "@/lib/coach-client-list";
+import { isOnlineClient, offeredForBooking } from "@/lib/client-type";
+import { nextSessionLabel, orderByNextSession } from "@/lib/next-session-order";
+import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
+import { useShowOnlineClients } from "@/components/coach/use-show-online-clients";
 import { initialsOf } from "@/lib/initials";
 
 // the_spot_dropdown_widget_redesign_sept16.md "REVISED 2026-09-19" — the
@@ -33,16 +34,6 @@ type GroupKind = "one_on_one" | "social" | "team";
 const GROUP_KIND_LABELS: Record<GroupKind, string> = { one_on_one: "1-on-1", social: "Social", team: "Groups" };
 const GROUP_KIND_ORDER: GroupKind[] = ["team", "social", "one_on_one"];
 
-interface ClientOption {
-  id: string;
-  orgId: string;
-  fullName: string;
-  groupId: string;
-  avatarUrl: string | null;
-  lastWorkoutAt: string | null;
-  trainingDays: number[] | null;
-}
-
 interface CoachedGroupOption {
   id: string;
   orgId: string;
@@ -64,7 +55,10 @@ async function getCurrentOrgId(supabase: ReturnType<typeof createBrowserClient>,
 export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }: { groupId: string; onNavigated: () => void; fromHub?: boolean }) {
   const router = useRouter();
   const term = useTerm();
-  const [clients, setClients] = useState<ClientOption[] | null>(null);
+  const [clients, setClients] = useState<ListedClient[] | null>(null);
+  const [showOnline, setShowOnline] = useShowOnlineClients();
+  // The coach's clock and the moment the list was read: the order (who is coming up) and the times under the names are as of then.
+  const [clock, setClock] = useState<{ timezone: string; now: Date }>({ timezone: DEFAULT_COACH_TIMEZONE, now: new Date() });
   const [groups, setGroups] = useState<CoachedGroupOption[] | null>(null);
   const [orgs, setOrgs] = useState<{ id: string; name: string }[]>([]);
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
@@ -73,7 +67,7 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
   // this client from here on, until they exit), a categorically
   // different action from desktop's "Client Profile" button, which only
   // opens a read-only page. A one-tap confirm, matching Ron's own call.
-  const [pendingClient, setPendingClient] = useState<ClientOption | null>(null);
+  const [pendingClient, setPendingClient] = useState<ListedClient | null>(null);
   const [myGroups, setMyGroups] = useState<{ groupId: string; name: string }[]>([]);
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
@@ -125,51 +119,6 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
         setSelectedOrgId(preferred);
         setGroups(allGroups.sort((x, y) => x.name.localeCompare(y.name)));
       }
-
-      // Clients = the people in this coach's one-on-one groups (a 1:1
-      // client's own group is bookkeeping, not a "group" to list).
-      const soloGroups = allGroups.filter((g) => g.kind === "one_on_one");
-      if (soloGroups.length === 0) {
-        if (!cancelled) setClients([]);
-        return;
-      }
-      const orgByGroup = new Map(soloGroups.map((g) => [g.id, g.orgId]));
-
-      const { data: memberRows } = await readRowsByIds(soloGroups.map((g) => g.id), (ids) => (from, to) =>
-        supabase.from("group_memberships").select("group_id, profile_id, profiles ( id, full_name, avatar_url )").in("group_id", ids).eq("role", "athlete").order("id").range(from, to)
-      );
-
-      if (cancelled) return;
-      const seen = new Set<string>();
-      const rows: { id: string; orgId: string; fullName: string; groupId: string; avatarUrl: string | null }[] = [];
-      for (const row of (memberRows ?? []) as any[]) {
-        const id = row.profiles?.id;
-        if (!id || seen.has(id)) continue;
-        seen.add(id);
-        rows.push({ id, orgId: orgByGroup.get(row.group_id) ?? "", fullName: row.profiles?.full_name ?? "Client", groupId: row.group_id, avatarUrl: row.profiles?.avatar_url ?? null });
-      }
-
-      const athleteIds = rows.map((r) => r.id);
-      const [{ data: logRows }, { data: programRows }] =
-        athleteIds.length > 0
-          ? await Promise.all([
-              supabase.from("workout_logs").select("athlete_id, created_at").in("athlete_id", athleteIds).order("created_at", { ascending: false }),
-              supabase.from("programs").select("athlete_id, training_days").eq("is_active", true).in("athlete_id", athleteIds),
-            ])
-          : [{ data: [] }, { data: [] }];
-
-      const lastByAthlete = new Map<string, string>();
-      for (const row of logRows ?? []) {
-        if (!lastByAthlete.has(row.athlete_id)) lastByAthlete.set(row.athlete_id, row.created_at);
-      }
-      const trainingDaysByAthlete = new Map<string, number[] | null>();
-      for (const row of programRows ?? []) {
-        trainingDaysByAthlete.set(row.athlete_id, row.training_days ?? null);
-      }
-
-      const options: ClientOption[] = rows.map((r) => ({ ...r, lastWorkoutAt: lastByAthlete.get(r.id) ?? null, trainingDays: trainingDaysByAthlete.get(r.id) ?? null }));
-      options.sort((a, b) => a.fullName.localeCompare(b.fullName));
-      if (!cancelled) setClients(options);
     }
     run();
     return () => {
@@ -177,14 +126,40 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
     };
   }, [groupId, fromHub]);
 
-  function requestActAsClient(client: ClientOption) {
+  // The list is the calendar's list (lib/coach-client-list.ts): every client of the chosen organization once, with their type and next session. No sessions-left number here (Ron, Oct 19): the order is who is coming up.
+  const clientAnchorGroup = (groups ?? []).find((g) => g.orgId === selectedOrgId)?.id ?? null;
+  useEffect(() => {
+    if (!clientAnchorGroup) {
+      if (groups !== null) setClients([]);
+      return;
+    }
+    let cancelled = false;
+    setClients(null);
+    (async () => {
+      const supabase = createBrowserClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+      const now = new Date();
+      const [list, { data: profile }] = await Promise.all([loadCoachClientList(supabase, user.id, clientAnchorGroup, now), supabase.from("profiles").select("timezone").eq("id", user.id).maybeSingle()]);
+      if (cancelled) return;
+      setClock({ timezone: (profile as { timezone?: string | null } | null)?.timezone || DEFAULT_COACH_TIMEZONE, now });
+      setClients(list);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [clientAnchorGroup, groups]);
+
+  function requestActAsClient(client: ListedClient) {
     if (busy) return;
     setPendingClient(client);
   }
 
   // Primary action: the explicit in-person log route (athlete comes from
   // the URL, coach-role checked, "Logging for X", marked coach-logged).
-  function logSessionFor(client: ClientOption) {
+  function logSessionFor(client: ListedClient) {
     if (busy) return;
     onNavigated();
     router.push(`/groups/${client.groupId}/athletes/${client.id}/log`);
@@ -192,7 +167,7 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
 
   // Opens the client's own page (sessions, schedule, notes). Each one-on-one client lives in their own group, so this is the way to
   // reach them from here.
-  function openProfileFor(client: ClientOption) {
+  function openProfileFor(client: ListedClient) {
     if (busy) return;
     onNavigated();
     router.push(`/groups/${client.groupId}/athletes/${client.id}`);
@@ -275,8 +250,12 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
     router.push(`/groups/${made.id}/dashboard`);
   }
 
-  const filteredClients = (clients ?? []).filter(
-    (c) => c.orgId === selectedOrgId && c.fullName.toLowerCase().includes(query.trim().toLowerCase())
+  // Same rule as the calendar's client list: set-aside and Online clients are left out until asked for (lib/client-type.ts).
+  const onlineCount = (clients ?? []).filter((c) => !c.setAside && isOnlineClient(c.tier)).length;
+  // Order: a session still ahead today first (soonest), then a later day (soonest), then everyone else A to Z (lib/next-session-order.ts).
+  const filteredClients = orderByNextSession(
+    offeredForBooking(clients ?? [], { tierOf: (c) => c.tier, isSetAside: (c) => c.setAside, showOnline }).filter((c) => c.fullName.toLowerCase().includes(query.trim().toLowerCase())),
+    { nextOf: (c) => c.nextStartIso, nameOf: (c) => c.fullName, timezone: clock.timezone, now: clock.now }
   );
   // Team and social groups only: a one-on-one group is its client, listed above.
   const LISTED_GROUP_KINDS: GroupKind[] = ["team", "social"];
@@ -372,14 +351,25 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
           placeholder={`Search ${term("client", "plural")}…`}
           className="w-full h-9 mb-2 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust"
         />
-        <div className="max-h-48 overflow-y-auto space-y-1">
+        <div className="max-h-[55vh] overflow-y-auto space-y-1">
           {clients === null && <p className="font-body text-sm text-steel px-1 py-2">Loading…</p>}
           {clients !== null && filteredClients.length === 0 && (
-            <p className="font-body text-sm text-steel px-1 py-2">{query.trim() ? "No match." : `No one-on-one ${term("client", "plural")} yet.`}</p>
+            <p className="font-body text-sm text-steel px-1 py-2">{query.trim() ? "No match." : `No ${term("client", "plural")} to show.`}</p>
+          )}
+          {/* A coach with no clients at all (a new coach) is offered the way to add one right here (Oct 19 audit: no Add button on their first phone screen). */}
+          {clients !== null && clients.length === 0 && !query.trim() && (
+            <button
+              type="button"
+              onClick={() => {
+                onNavigated();
+                router.push(`/groups/${clientAnchorGroup ?? groupId}/clients?add=1`);
+              }}
+              className="w-full h-11 bg-rust text-graphite font-display uppercase text-sm font-bold"
+            >
+              Add a {term("client")}
+            </button>
           )}
           {filteredClients.map((c) => {
-            const status = clientActivityStatus(c.lastWorkoutAt);
-            const tier = computeQuietTier({ lastLoggedAt: c.lastWorkoutAt ? new Date(c.lastWorkoutAt) : null, now: new Date(), trainingDays: c.trainingDays });
             return (
               <div key={c.id} className="border border-steel/15 px-2 py-2">
                 <div className="flex items-center gap-2.5">
@@ -391,11 +381,10 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
                       <span className="font-display text-xs text-chalk">{initialsOf(c.fullName)}</span>
                     </div>
                   )}
-                  <span className="font-body text-sm text-chalk truncate flex-1 text-left min-w-0">{c.fullName}</span>
-                  <span className="font-body text-xs text-steel shrink-0 flex items-center gap-1">
-                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${status.dotClass}`} />
-                    {tier !== "none" ? QUIET_TIER_LABEL[tier] : status.text}
-                  </span>
+                  <div className="flex-1 min-w-0 text-left">
+                    <span className="block font-body text-base text-chalk break-words">{c.fullName}</span>
+                    {c.nextStartIso && <span className="block font-body text-xs text-steel">{nextSessionLabel(c.nextStartIso, clock.timezone, clock.now)}</span>}
+                  </div>
                 </div>
                 <div className="mt-2 flex items-center gap-2">
                   {/* Primary: the explicit in-person log route ("Logging for X",
@@ -429,6 +418,11 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
             );
           })}
         </div>
+        {onlineCount > 0 && (
+          <button type="button" aria-pressed={showOnline} onClick={() => setShowOnline(!showOnline)} className="mt-1 min-h-11 font-body text-xs text-steel underline underline-offset-2">
+            {showOnline ? "Hide online clients" : `Show online clients (${onlineCount})`}
+          </button>
+        )}
       </div>
 
       <div>

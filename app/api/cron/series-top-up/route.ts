@@ -4,7 +4,7 @@ import { supabaseSeriesStore } from "@/lib/series-store";
 import { topUpSeries } from "@/lib/series-engine";
 import { GOOGLE_MIRROR_WEEKS } from "@/lib/series-schedule";
 import { mirrorBookingToGoogleCalendar } from "@/lib/google-calendar-mirror-server";
-import { sendPushToProfile } from "@/lib/send-push";
+import { sendCoachPush } from "@/lib/coach-notice";
 import { formatInTimezone } from "@/lib/format-in-timezone";
 import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { withCronRun } from "@/lib/cron-monitor";
@@ -55,7 +55,7 @@ async function handler(request: Request) {
           body,
           link_path: `/groups/${s.group_id}/calendar`,
         });
-        await sendPushToProfile(db, s.coach_id, "Recurring session conflict", body, `/groups/${s.group_id}/calendar`).catch(() => 0);
+        await sendCoachPush(db, s.coach_id, "bookings", "Recurring session conflict", body, `/groups/${s.group_id}/calendar`, { daytimeOnly: true }).catch(() => 0);
         // Remember it so tomorrow's run leaves it alone.
         await store.updateSeries(s.id, { skippedStarts: [...((s.skipped_starts ?? []) as string[]), ...taken.map((t) => t.startIso)] });
         reported += 1;

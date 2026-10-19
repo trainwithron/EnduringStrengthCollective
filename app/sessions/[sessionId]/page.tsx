@@ -25,6 +25,7 @@ import { readLoggedSets } from "@/lib/read-logged-sets";
 import { resumeSession } from "@/lib/resume-session";
 import { countsForProgress } from "@/lib/set-types";
 import { computeVolumeHistory } from "@/lib/exercise-volume-history";
+import { sessionBackHref } from "@/lib/session-back-href";
 import { ExitWorkoutButton } from "@/components/session/exit-workout-button";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 import { findDemo, type DemoRow } from "@/lib/exercise-demo";
@@ -613,9 +614,9 @@ export default async function SessionPage(
       }
     : null;
   const coachHomeHref = `/groups/${session.group_id}`;
-  const backHref = session.workout_id
-    ? `/groups/${session.group_id}/workouts/${session.workout_id}`
-    : `/groups/${session.group_id}`;
+  // A coach logging for a client goes Back to that client's log overview (their day), still in coach mode. The group's workout page is the coach's own template view: for most one-on-one clients it says
+  // "This workout isn't available" and its Go to Home leaves coach mode (Oct 19 audit).
+  const backHref = sessionBackHref({ groupId: session.group_id, athleteId: session.athlete_id, workoutId: session.workout_id, coachMode: !!coachModeClient });
 
   return (
     <main className={`min-h-screen overflow-x-clip bg-graphite text-chalk font-body ${session.status === "in_progress" ? "pb-16" : "pb-32"}`}>

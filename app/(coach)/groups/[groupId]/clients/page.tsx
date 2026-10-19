@@ -18,6 +18,7 @@ import { pendingRequestCount } from "@/lib/client-request-count";
 import { SwappableTerm } from "@/components/coach/swappable-term";
 import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
 import { CoachRosterMobile } from "@/components/coach/mobile/coach-roster-mobile";
+import { CoachOwnRow } from "@/components/coach/mobile/coach-own-row";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { groupClientsDestination } from "@/lib/coach-clients-nav";
 import { getCoachedGroups, groupsInOrgOf, groupsInOrgOfOpened } from "@/lib/coach-groups";
@@ -293,6 +294,9 @@ export default async function ClientsPage(
     );
 
     const requestCount = await pendingRequestCount(supabase);
+    // The coach's own row (their personal space) leads the list, as on a computer; never counted as a client.
+    const { data: selfProfile } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
+    const selfName = (selfProfile?.full_name as string | null | undefined)?.trim() || "You";
 
     return (
       <CoachMobileShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} activeOverride="roster">
@@ -312,6 +316,7 @@ export default async function ClientsPage(
             </div>
           </div>
           <CoachesSection groupId={params.groupId} viewerId={user.id} coaches={coachList.coaches} pending={coachList.pending} canManage={inviteManager.ok} signIns={signIns} />
+          <CoachOwnRow name={selfName} />
           <CoachRosterMobile groupId={params.groupId} members={phoneClients} />
         </div>
       </CoachMobileShell>

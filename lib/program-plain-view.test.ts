@@ -82,6 +82,6 @@ describe("the page", () => {
     expect(picker).toContain("Open this workout");
     expect(picker).toContain("Edit program");
     expect(picker).toContain("canEdit && editHref");
-    expect(picker).toContain("This week");
+    expect(picker).toContain("Up next");
   });
 });

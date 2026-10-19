@@ -44,6 +44,7 @@ export function NutritionTools({
   proteinGPerLb,
   foodRules,
   rulesReadable = true,
+  allergiesAsked = true,
   weightUnit = "lb",
   initialActivity = null,
   clientName,
@@ -71,6 +72,7 @@ export function NutritionTools({
   foodRules?: FoodRules;
   // False when the client's saved food rules could not be read: the planner builds nothing then.
   rulesReadable?: boolean;
+  allergiesAsked?: boolean;
   // How the client sees weight, and the activity level they gave: the calculator starts from them.
   weightUnit?: WeightUnit;
   initialActivity?: ActivityLevel | null;
@@ -138,6 +140,7 @@ export function NutritionTools({
           proteinGPerLb={proteinGPerLb}
           foodRules={foodRules}
           rulesReadable={rulesReadable}
+          allergiesAsked={allergiesAsked}
           clientName={clientName}
         />
       </div>

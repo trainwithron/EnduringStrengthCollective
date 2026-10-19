@@ -18,6 +18,10 @@ import { WellnessCheckinPopup } from "@/components/athlete/wellness-checkin-popu
 import { shouldShowLifeImpactPrompt, pickLifeImpactPrompt } from "@/lib/life-impact-prompt";
 import type { WellnessCheckinValues } from "@/components/athlete/wellness-checkin-widget";
 import { DayCard } from "@/components/athlete/day-card";
+import { MyProgramsBlock } from "@/components/athlete/my-programs-block";
+import { homeProgramCards, programPickups } from "@/lib/home-programs";
+import { loadDoneAt } from "@/lib/program-pickup";
+import { readRowsByIds } from "@/lib/read-by-ids";
 import { AboutYouCard } from "@/components/athlete/about-you-card";
 import { aboutYouComplete, rowToBodyProfile } from "@/lib/client-body-profile";
 import type { WeightUnit } from "@/lib/units";
@@ -167,7 +171,7 @@ export default async function GroupHubPage(
     // that isn't actually something to train from today.
     supabase
       .from("programs")
-      .select("id, name, athlete_id, cover_image_path, workouts(count)")
+      .select("id, name, athlete_id, cover_image_path, created_at, workouts(count)")
       .eq("group_id", params.groupId)
       .eq("is_active", true)
       .or(`athlete_id.is.null,athlete_id.eq.${athleteId ?? ""}`)
@@ -330,6 +334,32 @@ export default async function GroupHubPage(
   const coachId = roster.find((m) => m.role === "coach")?.profileId;
   // In a one-on-one space a program with no client on it is the coach's template, not the client's: only programs made for the client are listed.
   const shownPrograms = (programs ?? []).filter((p: any) => (group as { group_kind?: string } | null)?.group_kind !== "one_on_one" || p.athlete_id !== null);
+  // "Your programs" on Home: every active program with where the client is up to (Week N, Day M) and how many are done, by order, so it works for programs with no dates.
+  const programWorkoutRead = athleteId && shownPrograms.length > 0
+    ? await readRowsByIds(shownPrograms.map((p: any) => p.id as string), (ids) => (from, to) => supabase.from("workouts").select("id, program_id, title, week_number, day_index").in("program_id", ids).order("id").range(from, to))
+    : { data: [] as any[], error: null };
+  // When each workout was last completed (a finished session or a logged workout), so every program can pick up right after the one done last.
+  const programDoneRead = athleteId && programWorkoutRead.data.length > 0
+    ? await loadDoneAt(supabase, athleteId, programWorkoutRead.data.map((w: any) => w.id as string))
+    : { doneAt: new Map<string, string>(), failed: false };
+  // A workout the client left open or paused in the last 36 hours (their own, not one a coach logged for them): Home says so, with a way back in. After three days with sets logged the nightly job saves it as done.
+  const { data: openOwnSession } =
+    isToday && user && athleteId === user.id && !isCoachViewer(roster, user.id)
+      ? await supabase
+          .from("athlete_sessions")
+          .select("id")
+          .eq("athlete_id", athleteId)
+          .eq("group_id", params.groupId)
+          .eq("logged_by_coach", false)
+          .in("status", ["in_progress", "abandoned"])
+          .gte("started_at", new Date(Date.now() - 36 * 3600000).toISOString())
+          .order("started_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      : { data: null };
+  const homeProgramInputs = shownPrograms.map((p: any) => ({ id: p.id as string, name: p.name as string, created_at: p.created_at as string | null }));
+  const homePrograms = homeProgramCards(homeProgramInputs, programWorkoutRead.data, programDoneRead.doneAt);
+  const homePickups = programPickups(homeProgramInputs, programWorkoutRead.data, programDoneRead.doneAt);
   const uncoveredProgramIds = shownPrograms
     .filter((p: any) => !p.cover_image_path)
     .map((p: any) => p.id);
@@ -432,7 +462,8 @@ export default async function GroupHubPage(
     }
 
     if (view === "day") {
-      daySessions = resolveSessionsForDate(programContexts, loggedIds, targetDate, today, isToday, assignedByDate);
+      // Today's card for each program is where they pick up (the workout right after the one done last), not the one the calendar puts on today.
+      daySessions = resolveSessionsForDate(programContexts, loggedIds, targetDate, today, isToday, assignedByDate, programDoneRead.failed || programWorkoutRead.error ? undefined : { byProgram: homePickups, doneToday: (iso: string) => dateKeyInZone(timezone, new Date(iso)) === todayKey });
       dayWorkout = summarizeSessions(daySessions, emptyDayInfo(programContexts, isToday));
       if (isToday) {
         const { count: priorWorkoutCount } = await supabase
@@ -856,6 +887,12 @@ export default async function GroupHubPage(
                   lifeImpactPrompt={lifeImpactPrompt}
                 />
               )}
+              {openOwnSession && (
+                <Link href={`/sessions/${(openOwnSession as { id: string }).id}?resume=1`} className="block border border-rust bg-rust/10 px-4 py-3 active:bg-rust/15">
+                  <span className="block font-display font-bold uppercase text-lg leading-tight text-chalk">Finish your workout</span>
+                  <span className="block font-body text-sm text-steel">You left one open. Pick up where you stopped.</span>
+                </Link>
+              )}
               <DayCard
                 groupId={params.groupId}
                 athleteId={athleteId}
@@ -878,6 +915,7 @@ export default async function GroupHubPage(
                 mealLine={mealLine}
                 sessionsLeft={sessionsLeft}
                 ownChoice={isCoach && !isActingAsOther && athleteId === user?.id}
+                afterWorkout={isToday && !programsError && !programWorkoutRead.error && !programDoneRead.failed ? <MyProgramsBlock groupId={params.groupId} programs={homePrograms} /> : null}
               />
               {isToday && weekClasses && (
                 <section aria-label="Group classes this week">
@@ -941,6 +979,8 @@ export default async function GroupHubPage(
       )}
 
       {/* Today's workout comes first; the program list is reference. */}
+      {/* On a phone's Today view the programs are right under today's workout (MyProgramsBlock); this list is for every other view. */}
+      {!(showMobileView && athleteId && view === "day" && isToday && !programsError && !programWorkoutRead.error && !programDoneRead.failed) && (
       <section className="px-5 pt-6">
         <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
           Programs
@@ -962,6 +1002,7 @@ export default async function GroupHubPage(
           <p className="font-body text-sm text-steel py-2">Your coach is setting up your program. It will show up here as soon as it is ready.</p>
         )}
       </section>
+      )}
 
       <RosterList
         hiddenProfileIds={[...(await pendingCoachIds(params.groupId))]}
