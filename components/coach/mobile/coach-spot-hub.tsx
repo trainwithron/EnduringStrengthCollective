@@ -16,7 +16,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { useTerm } from "@/components/coach/terminology-provider";
 import { getCoachedGroups, LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/coach-groups";
 import { ACTIVE_ORG_COOKIE, readBrowserCookie, rememberedGroupForActiveOrg } from "@/lib/active-org";
-import { hubOrgs, hubStartGroup, hubStartOrgId, type HubOrg } from "@/lib/hub-orgs";
+import { hubOrgs, hubStartGroup, hubStartOrgId, pageOrgId, type HubOrg } from "@/lib/hub-orgs";
 import { isTeamSportGroup, TEAM_SPORT_HIDDEN_HUB_TILES } from "@/lib/team-sport";
 
 type TileKey = "clients" | "business" | "calendar" | "program" | "ask-spot" | "quick-payment";
@@ -84,6 +84,8 @@ export function CoachSpotHub({
   const [needsOrg, setNeedsOrg] = useState(false);
   const router = useRouter();
   const [orgId, setOrgId] = useState<string | null>(null);
+  // The organization the PAGE belongs to (null on the coach's own space). Choosing another organization in the hub leaves this page for that organization's Home.
+  const pageOrg = useRef<string | null>(null);
   const orgsRequested = useRef(false);
   useEffect(() => {
     // Only needed for the notification tile's test message.
@@ -109,6 +111,7 @@ export function CoachSpotHub({
         const rememberedId = rememberedGroupForActiveOrg(groups, readBrowserCookie(ACTIVE_ORG_COOKIE), readBrowserCookie(LAST_WORKSPACE_GROUP_COOKIE));
         const list = hubOrgs(groups, rememberedId);
         const start = hubStartOrgId(groups, rememberedId, groupId);
+        pageOrg.current = pageOrgId(groups, groupId);
         setOrgs(list);
         setOrgId(start);
         // Starts on the organization Home is showing (the one chosen with the organization switcher), except when the hub was opened for one particular client. On the coach's own space (no organization) it
@@ -132,12 +135,19 @@ export function CoachSpotHub({
     setNeedsOrg(false);
     setActiveGroupId(next.anchorGroupId);
     setBuilderOpen(false);
+    // The page being viewed belongs to one organization, and every request it makes names that page's group; the database refuses another organization's rows to such a request. So the tiles of ANOTHER
+    // organization read blank (no program, no bookings, zeros) while this page stays open. Choosing another organization therefore closes the hub and goes to that organization's Home.
+    const leavesPage = pageOrg.current !== next.orgId;
     try {
       // The same memory the organization switcher keeps, so Home follows the hub.
       document.cookie = `${LAST_WORKSPACE_GROUP_COOKIE}=${encodeURIComponent(next.anchorGroupId)}; path=/; max-age=${60 * 60 * 24 * 90}`;
       document.cookie = `${ACTIVE_ORG_COOKIE}=${encodeURIComponent(next.orgId)}; path=/; max-age=${60 * 60 * 24 * 90}`;
     } catch {
       // not remembered; the hub still switched
+    }
+    if (leavesPage) {
+      close();
+      router.push("/dashboard");
     }
     router.refresh(); // the colors, fonts and icon follow the organization chosen
   }
