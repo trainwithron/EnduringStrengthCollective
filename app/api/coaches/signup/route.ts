@@ -6,6 +6,7 @@ import { toFriendlyAuthEmailError } from "@/lib/auth-email-error";
 import { rateLimitResponse, rateLimitAllows, clientIp } from "@/lib/rate-limit";
 import { SIGNUP_DOCUMENTS } from "@/lib/legal";
 import { recordLegalAcceptances } from "@/lib/legal-record";
+import { discardHalfCreatedAccount } from "@/lib/discard-half-account";
 import { appOrigin } from "@/lib/app-url";
 import { isCoachType, starterGroupName } from "@/lib/coach-type";
 
@@ -88,6 +89,8 @@ export async function POST(request: Request) {
     .insert({ id: newUserId, full_name: trimmedName });
   if (profileError) {
     console.error("signup: couldn't create the profile:", profileError.message);
+    // The account made a moment ago has nothing behind it: remove it so the retry is a clean start.
+    await discardHalfCreatedAccount(serviceRole, newUserId);
     return NextResponse.json({ error: "Couldn't create your profile. Please try again." }, { status: 502 });
   }
 
@@ -107,12 +110,15 @@ export async function POST(request: Request) {
   }
   if (!legalRecorded) console.error(`signup: legal acceptance NOT recorded for new coach ${newUserId}`);
 
+  // Set once the organization really exists: only a failure BEFORE that removes the account (after it, the signup stands and later best-effort steps never undo it).
+  let organizationMade = false;
   try {
     const { groupId } = await createOrganization(serviceRole, {
       name: trimmedOrgName,
       starterGroupName: starterGroupName(coachType),
       ownerId: newUserId,
     });
+    organizationMade = true;
 
     // What they coach. Best-effort and on its own, so a database that does not have the column yet still signs people up.
     if (coachType) {
@@ -148,6 +154,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ groupId, pendingConfirmation: true, confirmationEmailSent: !resendError, legalRecorded });
   } catch (err) {
     console.error("signup: couldn't set up the organization:", err instanceof Error ? err.message : err);
+    // Same: the account (and its profile) is removed so the person can try again with the same address.
+    if (!organizationMade) await discardHalfCreatedAccount(serviceRole, newUserId);
     return NextResponse.json({ error: "Couldn't set up your organization. Please try again." }, { status: 502 });
   }
 }
