@@ -25,7 +25,8 @@ export function CoachMobileShell({
 }: {
   groupId: string;
   groupName: string;
-  activeOverride?: "home" | "roster" | "messages" | "calendar";
+  // "more" for a page that lives under More (Programs).
+  activeOverride?: "home" | "roster" | "messages" | "calendar" | "more";
   children: React.ReactNode;
 }) {
   const [moreOpen, setMoreOpen] = useState(false);

@@ -37,6 +37,7 @@ export function ProgramDayPicker({
   nowIso,
   startLabel,
   assign = null,
+  belowSpotlight = false,
 }: {
   title: string;
   weeks: PlainWeek[];
@@ -54,6 +55,8 @@ export function ProgramDayPicker({
   startLabel?: string;
   // The coach's own view: the builder's "Assign to clients" button and panel, the same ones (null for a client, and for the coach logging for a client).
   assign?: { programId: string; programName: string; groupId: string; aiDraft: boolean } | null;
+  // Inside the coach's phone app the Spotlight button is fixed at the top centre: the header starts below it.
+  belowSpotlight?: boolean;
 }) {
   const [weekNumber, setWeekNumber] = useState(() => defaultWeek(weeks, currentWeek));
   const [open, setOpen] = useState<{ week: number; day: PlainDay } | null>(null);
@@ -65,7 +68,7 @@ export function ProgramDayPicker({
 
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-28">
-      <header className="px-5 pt-8 pb-3">
+      <header className={`px-5 ${belowSpotlight ? "pt-16" : "pt-8"} pb-3`}>
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
           <Link href={backHref} className="font-body text-sm text-rust min-h-11 inline-flex items-center">
             &larr; Back
