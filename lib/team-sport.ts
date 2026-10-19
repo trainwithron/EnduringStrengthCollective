@@ -51,3 +51,13 @@ export function withTeamSportWords(overrides: import("@/lib/terminology").Termin
 
 /** An organization whose groups are ALL team-sport groups (and there is at least one): a coach there is running a team, so no money numbers (MRR, income, payments) appear on their Home. */
 export const orgIsTeamOnly = (groups: { team_mode?: boolean | null }[]): boolean => groups.length > 0 && groups.every((g) => isTeamSportGroup(g.team_mode));
+
+/**
+ * ONE rule for where the money numbers (Business tile and view, income, MRR, paying clients, the rail's Business icon) are hidden in the coach shell.
+ * - On a group's own page: when that group is a team-sport group, or its organization is all team-sport groups.
+ * - On a coach-level page (Home, Clients, Calendar, Programs; the group in the address is only an anchor for the rail): only when the organization is all team-sport groups, so a coach with a mix of teams and
+ *   individual clients still sees their business there.
+ */
+export function moneyHiddenFor(opts: { coachLevel: boolean; groupIsTeamSport: boolean; orgTeamOnly: boolean }): boolean {
+  return opts.orgTeamOnly || (!opts.coachLevel && opts.groupIsTeamSport);
+}
