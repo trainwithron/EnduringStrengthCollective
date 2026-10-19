@@ -8,6 +8,9 @@ import { MyProgramsBlock } from "@/components/athlete/my-programs-block";
 import { ProgramChips } from "@/components/athlete/program-chips";
 import { BookingModeLine } from "@/components/athlete/booking-mode-line";
 import { ProgramDayPicker } from "@/components/shared/program-day-picker";
+import { resolveSessionsForDate, type ProgramDayContext } from "@/lib/program-day-contexts";
+import { computeScheduledDates } from "@/lib/program-schedule";
+import type { ActiveProgram } from "@/lib/active-programs";
 
 const read = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
 
@@ -97,7 +100,50 @@ describe("Johann: both programs show on Home", () => {
     expect(day).toContain("const pick = isToday ? pickups?.byProgram.get(c.program.id) : undefined;");
     const today = read("lib/todays-workout.ts");
     expect(today).toContain("pickUpWhereLeftOff(workouts, doneAt)");
-    expect(today).not.toContain("todaysWorkout");
+    // WHETHER there is something today is still the calendar's old answer (so the coach's due lists do not change); the pick only swaps WHICH workout is offered
+    expect(today).toContain("resolveProgramByCalendar(supabase, program, athleteId, timezone)");
+    expect(today).toContain("if (!offersAWorkout) return result;");
+  });
+});
+
+describe("Home Today: on the calendar keeps its rest days; off the calendar offers where he picks up", () => {
+  const prog = (over: Partial<ActiveProgram>): ActiveProgram => ({ id: "A", name: "A", label: null, sortOrder: null, createdAt: "2026-09-16", athleteId: "me", startDate: "2026-09-21", trainingDays: [1, 3, 5], visibilityWindow: "week", ...over });
+  const dates = computeScheduledDates("2026-09-21", [1, 3, 5], aWorkouts.map((w) => ({ id: w.id })));
+  const scheduledCtx: ProgramDayContext = {
+    program: prog({}),
+    heading: "A",
+    unscheduled: false,
+    scheduled: aWorkouts.map((w) => ({ workoutId: w.id, title: w.id, date: dates.get(w.id)! })),
+    all: [],
+  };
+  const unscheduledCtx: ProgramDayContext = { program: prog({ id: "B", startDate: "2026-09-29", trainingDays: null }), heading: "B", unscheduled: true, scheduled: [], all: bWorkouts.map((w) => ({ id: w.id, title: w.id })) };
+  const doneAt = done({ a1: "2026-09-17T14:55:24Z", b1: "2026-09-28T22:01:43Z", b2: "2026-10-06T16:18:17Z", b3: "2026-10-07T15:46:26Z" });
+  const pickups = { byProgram: programPickups([A, B], [...aWorkouts, ...bWorkouts], doneAt), doneToday: () => false };
+  const logged = new Set(["a1", "b1", "b2", "b3"]);
+
+  it("a rest day on the calendar is still a rest day (nothing offered); a playlist program still offers where he picks up", () => {
+    const sunday = new Date("2026-10-18T00:00:00");
+    const out = resolveSessionsForDate([scheduledCtx, unscheduledCtx], logged, sunday, sunday, true, undefined, pickups);
+    expect(out.map((s) => s.programId)).toEqual(["B"]);
+    expect(out[0]).toMatchObject({ status: "planned", workoutId: "b4" });
+  });
+  it("on a training day the card is a workout, and the pickup rule decides WHICH one (Day 2, not the one the date gives)", () => {
+    // 2026-09-23 is the date the calendar gives Day 2 of A; pick a later training day where the calendar would give another workout
+    const dayOf = (id: string) => dates.get(id)!;
+    const wed = new Date(dayOf("a5"));
+    const out = resolveSessionsForDate([scheduledCtx], logged, wed, wed, true, undefined, pickups);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ status: "planned", workoutId: "a2" });
+    // without the pickup the calendar's own answer is unchanged
+    const plain = resolveSessionsForDate([scheduledCtx], logged, wed, wed, true);
+    expect(plain[0]).toMatchObject({ workoutId: "a5" });
+  });
+  it("other dates (Week and Month views) follow the calendar, never the pickup", () => {
+    const wed = new Date(dates.get("a5")!);
+    const later = new Date(wed);
+    later.setDate(later.getDate() + 7);
+    const out = resolveSessionsForDate([scheduledCtx], logged, wed, later, false, undefined, pickups);
+    expect(out[0].workoutId).toBe("a5");
   });
 });
 

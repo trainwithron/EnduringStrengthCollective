@@ -138,13 +138,19 @@ export function resolveSessionsForDate(
   for (const c of contexts) {
     let info: DayWorkoutInfo;
     const pick = isToday ? pickups?.byProgram.get(c.program.id) : undefined;
-    if (pick) {
+    if (pick && c.unscheduled) {
+      // Not on the calendar: Today offers where they pick up.
       info = pickupSession(c, pick, today, pickups!.doneToday);
     } else if (c.unscheduled) {
       if (!isToday) continue;
       info = resolveNextUnloggedWorkout(c.all, loggedIds);
     } else {
       info = resolveDayWorkout(c.scheduled, loggedIds, targetDate, today, c.program.visibilityWindow);
+      // On the calendar: today stays as it was (a workout on a training day, nothing on a rest day); the pickup rule only decides WHICH workout is offered on a training day.
+      if (pick && info.status === "planned" && pick.kind === "next") {
+        const entry = c.scheduled.find((s) => s.workoutId === pick.workout.id);
+        if (!entry || !isLocked(entry.date, today, c.program.visibilityWindow)) info = { status: "planned", workoutId: pick.workout.id, title: pick.workout.title ?? info.title };
+      }
     }
     if (!info.workoutId) continue;
     if (info.status === "rest" || info.status === "no-program" || info.status === "unscheduled") continue;

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { computeScheduledDates, isLocked, unlockDate } from "./program-schedule";
+import { computeScheduledDates, isLocked, isSameDay, unlockDate } from "./program-schedule";
 import { dateKeyInZone, getGroupCoachTimezone, nowInZone } from "./timezone";
 import { getActivePrograms, type ActiveProgram } from "./active-programs";
 import { loadDoneAt, pickUpWhereLeftOff } from "./program-pickup";
@@ -17,7 +17,7 @@ export type TodaysWorkoutResult =
 // scheduled workout, else the next unlogged one, held back until its date
 // arrives. With a start date and training days set, nothing is "ready" before
 // its own day.
-async function resolveProgramToday(
+async function resolveProgramByCalendar(
   supabase: SupabaseClient,
   program: ActiveProgram,
   athleteId: string,
@@ -33,7 +33,7 @@ async function resolveProgramToday(
 
   const { data: workouts } = await supabase
     .from("workouts")
-    .select("id, title, week_number, day_index, scheduled_date")
+    .select("id, title, scheduled_date")
     .eq("program_id", program.id)
     .order("week_number", { ascending: true })
     .order("day_index", { ascending: true });
@@ -42,43 +42,79 @@ async function resolveProgramToday(
     return { ...base, kind: "empty", workoutId: null, title: null, unlocksOn: null };
   }
 
-  // Pick up where they left off: the workout right AFTER the one completed most recently, in program order (lib/program-pickup.ts). Not tied to dates or training days.
+  const { data: logs } = await supabase
+    .from("workout_logs")
+    .select("workout_id")
+    .eq("athlete_id", athleteId)
+    .in(
+      "workout_id",
+      workouts.map((w) => w.id)
+    );
+
+  const loggedIds = new Set((logs ?? []).map((l) => l.workout_id));
+  const next = workouts.find((w) => !loggedIds.has(w.id));
+
+  if (program.startDate && program.trainingDays && program.trainingDays.length > 0) {
+    const scheduledDateByDayId = computeScheduledDates(
+      program.startDate,
+      program.trainingDays,
+      workouts.map((w) => ({ id: w.id, scheduledDate: w.scheduled_date }))
+    );
+    const now = nowInZone(timezone);
+
+    // Prefer whichever workout's own computed date is literally today — the
+    // same thing the calendar page highlights as "Today" — over the rolling
+    // "next unlogged in sequence" pick below. Without this, one skipped day
+    // leaves the Workout tab handing back that stale overdue workout while the
+    // calendar has already moved on.
+    const todaysWorkout = workouts.find((w) => {
+      const d = scheduledDateByDayId.get(w.id);
+      return d && isSameDay(d, now);
+    });
+    if (todaysWorkout) {
+      if (!loggedIds.has(todaysWorkout.id)) {
+        return { ...base, kind: "ready", workoutId: todaysWorkout.id, title: todaysWorkout.title, unlocksOn: null };
+      }
+      // Done for today. Work out what would be next, so the single-workout callers can keep
+      // handing the athlete the following workout when it is already unlocked.
+      let after: ProgramToday["after"] = null;
+      if (next) {
+        const nextDate = scheduledDateByDayId.get(next.id);
+        after = isLocked(nextDate, now, program.visibilityWindow)
+          ? { kind: "locked", workoutId: next.id, unlocksOn: nextDate ? unlockDate(nextDate, program.visibilityWindow) : null }
+          : { kind: "ready", workoutId: next.id, unlocksOn: null };
+      }
+      return { ...base, kind: "done_today", workoutId: todaysWorkout.id, title: todaysWorkout.title, unlocksOn: null, after };
+    }
+
+    // No workout falls on today (a rest day for THIS program): fall back to
+    // the rolling next-unlogged pick, gated by the same lock check.
+    if (!next) return { ...base, kind: "all_done", workoutId: null, title: null, unlocksOn: null };
+    const scheduledDate = scheduledDateByDayId.get(next.id);
+    if (isLocked(scheduledDate, now, program.visibilityWindow)) {
+      return { ...base, kind: "locked", workoutId: next.id, title: next.title, unlocksOn: scheduledDate ? unlockDate(scheduledDate, program.visibilityWindow) : null };
+    }
+    return { ...base, kind: "ready", workoutId: next.id, title: next.title, unlocksOn: null };
+  }
+
+  if (!next) return { ...base, kind: "all_done", workoutId: null, title: null, unlocksOn: null };
+  return { ...base, kind: "ready", workoutId: next.id, title: next.title, unlocksOn: null };
+}
+
+// Which workout is the default: right AFTER the one completed most recently, in program order (lib/program-pickup.ts), not the one a date or the first gap gives. WHETHER there is something to do today (ready, done today, held back,
+// all done) is still decided above, exactly as before, so the coach's due lists and the rest of Today do not change; only the workout offered is swapped for the one where they left off.
+async function resolveProgramToday(supabase: SupabaseClient, program: ActiveProgram, athleteId: string, timezone: string): Promise<ProgramToday> {
+  const result = await resolveProgramByCalendar(supabase, program, athleteId, timezone);
+  const offersAWorkout = result.kind === "ready" || (result.kind === "done_today" && result.after?.kind === "ready");
+  if (!offersAWorkout) return result;
+  const { data: workouts } = await supabase.from("workouts").select("id, title, week_number, day_index").eq("program_id", program.id);
+  if (!workouts || workouts.length === 0) return result;
   const { doneAt } = await loadDoneAt(supabase, athleteId, workouts.map((w) => w.id));
   const pick = pickUpWhereLeftOff(workouts, doneAt);
-  if (pick.kind === "empty") return { ...base, kind: "empty", workoutId: null, title: null, unlocksOn: null };
-
-  const todayKey = dateKeyInZone(timezone);
-  const doneToday = pick.lastDone && pick.lastDoneAt ? dateKeyInZone(timezone, new Date(pick.lastDoneAt)) === todayKey : false;
-  const lastTitle = pick.lastDone ? (workouts.find((w) => w.id === pick.lastDone!.id)?.title ?? null) : null;
-
-  // The coach's "show days ahead" setting still holds a workout back until its date (only for a program that has dates); it never decides WHICH workout is the default.
-  const hasSchedule = !!program.startDate && !!program.trainingDays && program.trainingDays.length > 0;
-  const scheduledDateByDayId = hasSchedule
-    ? computeScheduledDates(program.startDate!, program.trainingDays!, workouts.map((w) => ({ id: w.id, scheduledDate: w.scheduled_date })))
-    : new Map<string, Date>();
-  const now = nowInZone(timezone);
-  const nextState = (w: { id: string; title: string | null }): { kind: "locked"; workoutId: string; unlocksOn: Date | null } | { kind: "ready"; workoutId: string; unlocksOn: null } => {
-    const date = scheduledDateByDayId.get(w.id);
-    return date && isLocked(date, now, program.visibilityWindow)
-      ? { kind: "locked", workoutId: w.id, unlocksOn: unlockDate(date, program.visibilityWindow) }
-      : { kind: "ready", workoutId: w.id, unlocksOn: null };
-  };
-
-  if (pick.kind === "complete") {
-    if (doneToday) return { ...base, kind: "done_today", workoutId: pick.lastDone.id, title: lastTitle, unlocksOn: null, after: null };
-    return { ...base, kind: "all_done", workoutId: null, title: null, unlocksOn: null };
-  }
-
-  const next = workouts.find((w) => w.id === pick.workout.id)!;
-  if (doneToday && pick.lastDone) {
-    // Finished today: keep the checked card for it, and offer what comes next.
-    const s = nextState(next);
-    return { ...base, kind: "done_today", workoutId: pick.lastDone.id, title: lastTitle, unlocksOn: null, after: s.kind === "locked" ? { kind: "locked", workoutId: s.workoutId, unlocksOn: s.unlocksOn } : { kind: "ready", workoutId: s.workoutId, unlocksOn: null } };
-  }
-  const s = nextState(next);
-  return s.kind === "locked"
-    ? { ...base, kind: "locked", workoutId: next.id, title: next.title, unlocksOn: s.unlocksOn }
-    : { ...base, kind: "ready", workoutId: next.id, title: next.title, unlocksOn: null };
+  if (pick.kind !== "next") return result;
+  const title = workouts.find((w) => w.id === pick.workout.id)?.title ?? null;
+  if (result.kind === "ready") return pick.workout.id === result.workoutId ? result : { ...result, workoutId: pick.workout.id, title };
+  return result.after && result.after.workoutId !== pick.workout.id ? { ...result, after: { kind: "ready", workoutId: pick.workout.id, unlocksOn: null } } : result;
 }
 
 export interface TodaysSessions {
