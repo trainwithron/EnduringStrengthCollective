@@ -15,8 +15,10 @@ const read = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
 describe("allergies never asked", () => {
   it("the banner says so plainly, offers the one-tap confirmation and a way to enter them", () => {
     const html = renderToStaticMarkup(createElement(AllergiesConfirmBanner, { athleteId: "a1", clientName: "Cindie" }));
-    expect(html).toContain("Cindie hasn&#x27;t been asked about food allergies. Meal plans can&#x27;t be built until you confirm they have none, or enter them below.");
-    expect(html).toContain("Cindie has no allergies");
+    expect(html).toContain("Cindie hasn&#x27;t been asked about food allergies. Ask them, then confirm they have none or enter them below. Meal plans can&#x27;t be built until then.");
+    // the button says what the coach is attesting to, not a fact the app has not checked
+    expect(html).toContain("I asked Cindie: no allergies");
+    expect(html).not.toContain("Cindie has no allergies");
     expect(html).toContain('href="#preferences"');
   });
   const nutrition = read("components/coach/nutrition/client-nutrition.tsx");

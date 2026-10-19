@@ -30,11 +30,11 @@ export function AllergiesConfirmBanner({ athleteId, clientName }: { athleteId: s
   return (
     <div className="mb-4 border border-rust/50 p-3 space-y-2" role="note" data-allergies-banner>
       <p className="font-body text-sm text-chalk">
-        {clientName} hasn&apos;t been asked about food allergies. Meal plans can&apos;t be built until you confirm they have none, or enter them below.
+        {clientName} hasn&apos;t been asked about food allergies. Ask them, then confirm they have none or enter them below. Meal plans can&apos;t be built until then.
       </p>
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" onClick={confirmNone} disabled={busy} className="h-10 px-4 border border-rust text-rust font-body text-sm disabled:opacity-40">
-          {busy ? "Saving…" : `${clientName} has no allergies`}
+          {busy ? "Saving…" : `I asked ${clientName}: no allergies`}
         </button>
         <a href="#preferences" className="font-body text-xs text-steel underline underline-offset-2">
           Enter their allergies
