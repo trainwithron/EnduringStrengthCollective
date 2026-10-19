@@ -12,6 +12,7 @@ from (
     ('2026100600419', 'team_sheet_save', '0419_team_sheet_save.sql', to_regclass('public.team_sheet_batches') is not null),
     ('2026100600420', 'transfer_ownership_accepted_only', '0420_transfer_ownership_accepted_only.sql', exists (select 1 from pg_trigger where tgname = 'organization_memberships_guard_owner_role' and not tgisinternal)),
     ('2026100600422', 'client_requests', '0422_client_requests.sql', to_regclass('public.client_requests') is not null),
+    ('2026100600426', 'org_wall_set_based', '0426_org_wall_set_based.sql', to_regprocedure('public.active_org_group_ids()') is not null),
     ('2026100600425', 'org_wall_follows_active_org', '0425_org_wall_follows_active_org.sql', exists (select 1 from pg_proc p where p.oid = to_regprocedure('public.request_workspace_org()') and position('x-workspace-org' in p.prosrc) > 0)),
     ('2026100600424', 'first_assignee_gets_the_original', '0424_first_assignee_gets_the_original.sql', exists (select 1 from pg_proc p where p.oid = to_regprocedure('public.assign_program_to_client(uuid, uuid, uuid, text, date)') and position('c.source_program_id = src.id' in p.prosrc) > 0)),
     ('2026100600423', 'coach_notice_switches', '0423_coach_notice_switches.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'notices_off')),

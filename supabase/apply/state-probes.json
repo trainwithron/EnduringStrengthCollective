@@ -1565,6 +1565,17 @@
   ]
  },
  {
+  "n": "178",
+  "slug": "0426",
+  "title": "0426 SPEED A: the organization wall asks once per query, not once per row (one new function; the 90 org_wall_header policies rewritten in place)",
+  "migrations": [
+   "0426"
+  ],
+  "notApplied": [
+   "not (to_regprocedure('public.active_org_group_ids()') is not null)"
+  ]
+ },
+ {
   "n": "170",
   "slug": "0418",
   "title": "0418 Release AF3: database policies from the post-ship audit (a private client stays private in posts and tags; two undecided account-deletion links decided; the guardian-consent answer limited for a coach; the health-form flag cleared when the last client seat goes)",

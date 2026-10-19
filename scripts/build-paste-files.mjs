@@ -2825,6 +2825,23 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "178",
+  slug: "0426",
+  title: "0426 SPEED A: the organization wall asks once per query, not once per row (one new function; the 90 org_wall_header policies rewritten in place)",
+  warn: "This adds one function (active_org_group_ids) and rewrites the org_wall_header policy on every table that has it, in place (same name, same restrictive rule). It means exactly what group_in_active_org means today (checked on the live data, every row of all 90 tables). The paste checks that every one of those policies still reads exactly group_in_active_org(group_id) and that group_in_active_org is exactly the text it matches, and stops if not.",
+  migrations: ["0426"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing looks different; pages that read many rows (Programs, Home) answer faster. Safe with or without the FIX 4 code: it only calls request_workspace_org.",
+  undo: "do $$\ndeclare r record;\nbegin\n  for r in select tablename from pg_policies where schemaname = 'public' and policyname = 'org_wall_header' and qual like '%active_org_group_ids()%' loop\n    execute format('alter policy org_wall_header on public.%I using (public.group_in_active_org(group_id)) with check (public.group_in_active_org(group_id))', r.tablename);\n  end loop;\nend $$;\ndrop function if exists public.active_org_group_ids();",
+  undoWhy: "Only if step 178 misbehaves. Puts every org_wall_header policy back on group_in_active_org(group_id) and drops the new function (the wall is then asked once per row again).",
+  rows: [
+    ["0426 is not already applied (the set function is not there yet)", "not (to_regprocedure('public.active_org_group_ids()') is not null)"],
+    ["every org_wall_header policy still reads exactly group_in_active_org(group_id)", "(select count(*) from pg_policies where schemaname = 'public' and policyname = 'org_wall_header') > 0 and (select count(*) from pg_policies where schemaname = 'public' and policyname = 'org_wall_header' and (qual is distinct from 'group_in_active_org(group_id)' or with_check is distinct from 'group_in_active_org(group_id)')) = 0"],
+    ["group_in_active_org is exactly the text this matches (0358: the personal space passes)", md5Is("group_in_active_org(uuid)", "16adf3eebb81c0762e6c0904df85b3e6")],
+  ],
+});
+
+STEPS.push({
   n: "170",
   slug: "0418",
   title: "0418 Release AF3: database policies from the post-ship audit (a private client stays private in posts and tags; two undecided account-deletion links decided; the guardian-consent answer limited for a coach; the health-form flag cleared when the last client seat goes)",
@@ -3658,6 +3675,7 @@ const BUNDLES = [
   { id: "release-ts3-team-sheet-save", name: "Release TS3 (saving a filled team sheet: one table, one notice kind, three functions)", steps: ["171"] },
   { id: "release-own1-owner-accepted-only", name: "Release OWN1 (ownership cannot be handed to someone who has never signed in; replaces two functions, adds one function and one trigger)", steps: ["172"] },
   { id: "release-tc3b-client-requests", name: "Release TC3 part B (Request to train with me on a coach's public page: one column, three tables, eight functions)", steps: ["174"] },
+  { id: "speed-a-org-wall-set-based", name: "SPEED A (the organization wall asks once per query, not once per row: one function, 90 policies rewritten in place)", steps: ["178"] },
   { id: "fix4-org-wall-follows-active-org", name: "FIX 4 (the organization wall follows the organization the person chose; replaces one function)", steps: ["177"] },
   { id: "fix2-first-assignee-gets-the-original", name: "FIX 2 (the first person a program is assigned to gets the original; replaces one function)", steps: ["176"] },
   { id: "release-ns-coach-notice-switches", name: "Release NS (a coach's own switches for the kinds of notice: one column, two functions, one trigger)", steps: ["175"] },
@@ -3911,6 +3929,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0419", "to_regclass('public.team_sheet_batches') is not null"),
     m("0420", "exists (select 1 from pg_trigger where tgname = 'organization_memberships_guard_owner_role' and not tgisinternal)"),
     m("0422", "to_regclass('public.client_requests') is not null"),
+    m("0426", "to_regprocedure('public.active_org_group_ids()') is not null"),
     m("0425", "exists (select 1 from pg_proc p where p.oid = to_regprocedure('public.request_workspace_org()') and position('x-workspace-org' in p.prosrc) > 0)"),
     m("0424", "exists (select 1 from pg_proc p where p.oid = to_regprocedure('public.assign_program_to_client(uuid, uuid, uuid, text, date)') and position('c.source_program_id = src.id' in p.prosrc) > 0)"),
     m("0423", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'notices_off')"),

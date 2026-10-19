@@ -24,6 +24,14 @@
   "file": "apply-release-tc3b-client-requests-all.sql"
  },
  {
+  "id": "speed-a-org-wall-set-based",
+  "name": "SPEED A (the organization wall asks once per query, not once per row: one function, 90 policies rewritten in place)",
+  "steps": [
+   "178"
+  ],
+  "file": "apply-speed-a-org-wall-set-based-all.sql"
+ },
+ {
   "id": "fix4-org-wall-follows-active-org",
   "name": "FIX 4 (the organization wall follows the organization the person chose; replaces one function)",
   "steps": [
