@@ -11,7 +11,7 @@ const STALE_SESSION_DAYS = 3;
 
 // A client's own workout left open or paused with sets logged is saved as finished (lib/stale-session-complete.ts), through the same function the Complete button uses, then dated and timed by its last set.
 // No database change: complete_workout_session already accepts the service role. A failure on one session never stops the rest.
-async function saveStaleWorkoutsWithSets(db: ReturnType<typeof createServiceRoleClient>): Promise<{ saved: number; failed: number }> {
+async function saveStaleWorkoutsWithSets(db: ReturnType<typeof createServiceRoleClient>, dryRun = false): Promise<{ saved: number; failed: number; wouldSave?: { sessionId: string; athleteId: string; sets: number; lastSetAt: string }[] }> {
   const now = new Date();
   const cutoffIso = new Date(now.getTime() - STALE_SESSION_DAYS * 86400000).toISOString();
   const { data: open, error } = await db
@@ -19,6 +19,8 @@ async function saveStaleWorkoutsWithSets(db: ReturnType<typeof createServiceRole
     .select("id, athlete_id, group_id, started_at, resumed_at")
     .in("status", ["in_progress", "abandoned"])
     .eq("logged_by_coach", false)
+    // a client who was since deleted leaves a session with no athlete: nothing to save it for
+    .not("athlete_id", "is", null)
     .lt("started_at", cutoffIso)
     .order("started_at")
     .limit(500);
@@ -34,7 +36,10 @@ async function saveStaleWorkoutsWithSets(db: ReturnType<typeof createServiceRole
   }));
   let saved = 0;
   let failed = 0;
-  for (const s of pickSessionsToComplete(sessions, sets, now, STALE_SESSION_DAYS)) {
+  const picked = pickSessionsToComplete(sessions, sets, now, STALE_SESSION_DAYS);
+  // ?dryRun=1: only report who would be saved, change nothing.
+  if (dryRun) return { saved: 0, failed: 0, wouldSave: picked.map((s) => ({ sessionId: s.id, athleteId: s.athleteId, sets: s.sets, lastSetAt: s.lastSetAt })) };
+  for (const s of picked) {
     const { error: completeError } = await db.rpc("complete_workout_session", { p_session_id: s.id });
     if (completeError) {
       failed += 1;
@@ -69,6 +74,9 @@ async function handler(request: Request) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
   const supabase = createServiceRoleClient();
+  if (new URL(request.url).searchParams.get("dryRun") === "1") {
+    return NextResponse.json({ ok: true, dryRun: true, ...(await saveStaleWorkoutsWithSets(supabase, true).catch(() => ({ saved: 0, failed: 1 }))) });
+  }
   // First save the ones with sets logged; close_stale_sessions then only pauses what is left (nothing logged).
   const savedWork = await saveStaleWorkoutsWithSets(supabase).catch(() => ({ saved: 0, failed: 1 }));
   const { data, error } = await supabase.rpc("close_stale_sessions", { p_days: STALE_SESSION_DAYS });
