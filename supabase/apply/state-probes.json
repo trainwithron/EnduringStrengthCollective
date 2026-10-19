@@ -1521,6 +1521,17 @@
   ]
  },
  {
+  "n": "174",
+  "slug": "0422",
+  "title": "0422 Release TC3 part B: \"Request to train with me\" on a coach's public page (one new column, three new tables, eight functions, two notice kinds; a request grants nothing until the coach approves)",
+  "migrations": [
+   "0422"
+  ],
+  "notApplied": [
+   "to_regclass('public.client_requests') is null"
+  ]
+ },
+ {
   "n": "170",
   "slug": "0418",
   "title": "0418 Release AF3: database policies from the post-ship audit (a private client stays private in posts and tags; two undecided account-deletion links decided; the guardian-consent answer limited for a coach; the health-form flag cleared when the last client seat goes)",

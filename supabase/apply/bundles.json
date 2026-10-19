@@ -16,6 +16,14 @@
   "file": "apply-release-own1-owner-accepted-only-all.sql"
  },
  {
+  "id": "release-tc3b-client-requests",
+  "name": "Release TC3 part B (Request to train with me on a coach's public page: one column, three tables, eight functions)",
+  "steps": [
+   "174"
+  ],
+  "file": "apply-release-tc3b-client-requests-all.sql"
+ },
+ {
   "id": "release-tc3-coach-join-links",
   "name": "Release TC3 (one invitation link per invited person: one new table)",
   "steps": [
