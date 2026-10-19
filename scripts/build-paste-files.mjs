@@ -2695,6 +2695,30 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "172",
+  slug: "0420",
+  title: "0420 Release OWN1: ownership of an organization cannot be handed to someone who has never signed in",
+  warn: "This REPLACES two functions (transfer_organization_ownership and guard_organization_columns) and adds one function and one trigger. Each replacement only adds the refusal; the paste checks that both live functions are exactly the text they replace, and stops if not.",
+  migrations: ["0420"],
+  sees: "Success. No rows returned.",
+  afterwards: "An owner (or a platform admin) who tries to transfer ownership to someone who has never signed in (an invitation nobody has used) is told so in plain words and nothing changes, whether it is done with Transfer ownership or by writing the organization directly. A membership can only become owner for the person the organization names as its owner. Everything else is as before.",
+  undo: [
+    "drop trigger if exists organization_memberships_guard_owner_role on public.organization_memberships;",
+    "drop function if exists public.guard_org_membership_owner_role();",
+    fnFromMigration("0273", "guard_organization_columns"),
+    fnFromMigration("0396", "transfer_organization_ownership"),
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 172 misbehaves. Puts both functions back to the text they had and drops the new trigger and function (someone who has never signed in can then be made owner again).",
+  rows: [
+    ["0420 is not already applied (the new membership guard is not there yet)", "not exists (select 1 from pg_trigger where tgname = 'organization_memberships_guard_owner_role' and not tgisinternal)"],
+    ["the transfer function is exactly the text this replaces", md5Is("transfer_organization_ownership(uuid, uuid)", "234f41b71d19ee8853dc432b95d7283c")],
+    ["the organization guard is exactly the text this replaces", md5Is("guard_organization_columns()", "a8c146d8aa8dd143bf9a05b497ccc1f9")],
+    ["the function it replaces exists", "to_regprocedure('public.transfer_organization_ownership(uuid, uuid)') is not null and to_regprocedure('public.guard_organization_columns()') is not null"],
+    ["the account columns it reads exist", "(select count(*) from information_schema.columns where table_schema = 'auth' and table_name = 'users' and column_name = 'last_sign_in_at') = 1"],
+  ],
+});
+
+STEPS.push({
   n: "170",
   slug: "0418",
   title: "0418 Release AF3: database policies from the post-ship audit (a private client stays private in posts and tags; two undecided account-deletion links decided; the guardian-consent answer limited for a coach; the health-form flag cleared when the last client seat goes)",
@@ -3526,6 +3550,7 @@ for (const s of STEPS) {
 // The individual step files stay as the fallback (and for a release that was partly applied by hand: the bundle refuses at the first applied step).
 const BUNDLES = [
   { id: "release-ts3-team-sheet-save", name: "Release TS3 (saving a filled team sheet: one table, one notice kind, three functions)", steps: ["171"] },
+  { id: "release-own1-owner-accepted-only", name: "Release OWN1 (ownership cannot be handed to someone who has never signed in; replaces two functions, adds one function and one trigger)", steps: ["172"] },
   { id: "release-af3-database-policies", name: "Release AF3 (database policies from the post-ship audit; replaces two posts policies, one tag policy and two functions, adds two functions and two triggers)", steps: ["170"] },
   { id: "release-af3e-c-write-guard-rest", name: "Release AF3e paste C (the restrictive write guard on the rest of the covered tables; apply only after paste B has run clean for a few days)", steps: ["169"] },
   { id: "release-af3e-b-write-guard-posts", name: "Release AF3e paste B (the restrictive write guard on posts only)", steps: ["168"] },
@@ -3773,6 +3798,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
   const items = [
     m("0402", "to_regclass('public.guardian_consents') is not null"),
     m("0419", "to_regclass('public.team_sheet_batches') is not null"),
+    m("0420", "exists (select 1 from pg_trigger where tgname = 'organization_memberships_guard_owner_role' and not tgisinternal)"),
     m("0418", "exists (select 1 from pg_trigger where tgname = 'group_memberships_clear_intake' and not tgisinternal)"),
     m("0417", "(exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'comments' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'reactions' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'direct_messages' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'exercise_video_comments' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'training_partner_profiles' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'training_partner_requests' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'challenge_participants' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'progress_photos' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'session_exercise_videos' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'body_weight_logs' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'body_scans' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'transformation_cards' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'transformation_milestones' and policyname = 'minor_write_guard_insert'))"),
     m("0416", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'posts' and policyname = 'minor_write_guard_insert')"),

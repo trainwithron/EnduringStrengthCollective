@@ -48,6 +48,24 @@ export async function loadPendingInvitees(serviceRole: any, organizationId: stri
   return found.sort((a, b) => (b.sentAt ?? "").localeCompare(a.sentAt ?? ""));
 }
 
+/**
+ * Which of these people have never signed in: the rule for who may be made OWNER of an organization ("can't transfer ownership until someone is logged in"; the database applies the same one). It is stricter than
+ * isUnaccepted on purpose: a confirmed invitation link is not enough, because an email link scanner can open a link with no person acting. A person whose account cannot be read, or is not found, counts as not signed in:
+ * for a decision about who may own the organization, an unreadable account is never assumed fine.
+ */
+export async function notSignedInIds(serviceRole: any, profileIds: string[]): Promise<Set<string>> {
+  const out = new Set<string>();
+  await runPool(profileIds, 8, async (id) => {
+    try {
+      const { data, error } = await serviceRole.auth.admin.getUserById(id);
+      if (error || !data?.user || !data.user.last_sign_in_at) out.add(id);
+    } catch {
+      out.add(id);
+    }
+  });
+  return out;
+}
+
 export const RESEND_COOLDOWN_SECONDS = 600;
 
 /** Was a send of this kind made for this account in the last ten minutes? Read from the account itself, written only AFTER a send succeeded, so a failed attempt never locks anybody out. */

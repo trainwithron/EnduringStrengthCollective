@@ -26,7 +26,7 @@ import { isBillingEnforced } from "@/lib/org-entitlements";
 import type { ButtonShape, DisplayFont, BodyFont } from "@/lib/theme";
 import { isStripeConfigured } from "@/lib/stripe";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { loadPendingInvitees } from "@/lib/coach-invite-server";
+import { loadPendingInvitees, notSignedInIds } from "@/lib/coach-invite-server";
 import { ALL_BRAND_FONTS, googleFontsHref } from "@/lib/google-fonts";
 
 export const metadata = { title: "Branding" };
@@ -194,6 +194,9 @@ export default async function BrandingPage(
 
   const isOwner = orgMembership.role === "owner";
   const isOwnerOrAdmin = orgMembership.role === "owner" || orgMembership.role === "admin";
+  // Ownership can only go to someone who has signed in (the database refuses otherwise): those who have not are left out of the list, and the owner is told when that leaves nobody.
+  const transferPool = isOwner ? members.filter((m) => m.profileId !== user.id && !m.leaving) : [];
+  const waiting = isOwner && tab === "team" && transferPool.length > 0 ? await notSignedInIds(createServiceRoleClient(), transferPool.map((m) => m.profileId)) : new Set<string>();
   const basePath = `/groups/${params.groupId}/branding`;
 
   // Plan & Billing is invisible until COACH_BILLING_ENFORCED is on, except
@@ -350,9 +353,8 @@ export default async function BrandingPage(
               {isOwner && (
                 <TransferOwnershipButton
                   organizationId={orgMembership.organization_id}
-                  candidates={members
-                    .filter((m) => m.profileId !== user.id && !m.leaving)
-                    .map((m) => ({ profileId: m.profileId, fullName: m.fullName }))}
+                  candidates={transferPool.filter((m) => !waiting.has(m.profileId)).map((m) => ({ profileId: m.profileId, fullName: m.fullName }))}
+                  waitingOnInvitation={waiting.size}
                 />
               )}
             </div>
