@@ -24,6 +24,14 @@
   "file": "apply-release-tc3b-client-requests-all.sql"
  },
  {
+  "id": "fix4-org-wall-follows-active-org",
+  "name": "FIX 4 (the organization wall follows the organization the person chose; replaces one function)",
+  "steps": [
+   "177"
+  ],
+  "file": "apply-fix4-org-wall-follows-active-org-all.sql"
+ },
+ {
   "id": "fix2-first-assignee-gets-the-original",
   "name": "FIX 2 (the first person a program is assigned to gets the original; replaces one function)",
   "steps": [

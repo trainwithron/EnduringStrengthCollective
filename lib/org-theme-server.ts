@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { ACTIVE_ORG_COOKIE_NAME, decodeWorkspaceCookie } from "@/lib/workspace-header";
 import { createServerClient } from "@/lib/supabase/server";
 import {
   DEFAULT_ORG_THEME,
@@ -49,6 +50,15 @@ export async function getViewerOrgTheme(groupId?: string): Promise<OrgTheme> {
     // mount, so at least the coach's most recently viewed group's org
     // themes the rest of the app instead of an arbitrary one.
     // The organization the coach CHOSE (the workspace switcher and visiting a group both remember it) themes everything, including the coach-level pages that are not under a group.
+    // FIX 4: first the organization the coach CHOSE (active_org), when it is one they belong to (row security shows a group of it only to a member).
+    if (!organizationId) {
+      const chosen = decodeWorkspaceCookie((await cookies()).get(ACTIVE_ORG_COOKIE_NAME)?.value);
+      if (chosen) {
+        const { data: ofOrg } = await supabase.from("groups").select("id").eq("organization_id", chosen).limit(1);
+        if ((ofOrg ?? []).length > 0) organizationId = chosen;
+      }
+    }
+
     if (!organizationId) {
       const workspaceRaw = (await cookies()).get("last_workspace_group")?.value;
       if (workspaceRaw) {

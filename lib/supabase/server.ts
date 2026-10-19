@@ -2,10 +2,14 @@ import { cache } from "react";
 import { createServerClient as createSupabaseServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/workspace-header";
-import { decodeWorkspaceCookie, WORKSPACE_HEADER } from "@/lib/workspace-header";
+import { ACTIVE_ORG_COOKIE_NAME, decodeWorkspaceCookie, WORKSPACE_HEADER, WORKSPACE_ORG_HEADER } from "@/lib/workspace-header";
 
-function workspaceHeaders(group: string | null): { headers: Record<string, string> } | undefined {
-  return group ? { headers: { [WORKSPACE_HEADER]: group } } : undefined;
+// The remembered group (x-workspace-group) and the organization the person chose (x-workspace-org, FIX 4): the database follows the chosen organization when the person belongs to it.
+function workspaceHeaders(group: string | null, org: string | null): { headers: Record<string, string> } | undefined {
+  const headers: Record<string, string> = {};
+  if (group) headers[WORKSPACE_HEADER] = group;
+  if (org) headers[WORKSPACE_ORG_HEADER] = org;
+  return Object.keys(headers).length > 0 ? { headers } : undefined;
 }
 
 async function buildServerClient(crossOrg = false) {
@@ -16,7 +20,7 @@ async function buildServerClient(crossOrg = false) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       // Defense in depth (lib/workspace-header.ts): data requests name the open workspace. The middleware keeps the remembered workspace in step with the group page being opened.
-      global: crossOrg ? undefined : workspaceHeaders(decodeWorkspaceCookie(cookieStore.get(LAST_WORKSPACE_GROUP_COOKIE)?.value)),
+      global: crossOrg ? undefined : workspaceHeaders(decodeWorkspaceCookie(cookieStore.get(LAST_WORKSPACE_GROUP_COOKIE)?.value), decodeWorkspaceCookie(cookieStore.get(ACTIVE_ORG_COOKIE_NAME)?.value)),
       cookies: {
         getAll() {
           return cookieStore.getAll();

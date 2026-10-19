@@ -50,7 +50,6 @@ import { useOnFrontDesk } from "@/components/front-desk/use-on-front-desk";
 import { hiddenForCoach } from "@/lib/team-coach";
 import { isTeamSportGroup, moneyHiddenFor, orgIsTeamOnly, teamSportMenu, teamSportMoreMenu, TEAM_SPORT_BUSINESS_LABEL, teamSportBusinessHref } from "@/lib/team-sport";
 import { WorkspaceMenu } from "@/components/coach/desktop/workspace-menu";
-import { LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/coach-groups";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { bestEffort } from "@/lib/saved";
 import { TerminologyProvider } from "@/components/coach/terminology-provider";
@@ -304,8 +303,7 @@ function CoachDesktopShellFull({
       document.cookie = `last_group=${encodeURIComponent(
         JSON.stringify({ id: groupId, name: groupName })
       )}; path=/; max-age=${60 * 60 * 24 * 90}`;
-      // The same group is the remembered WORKSPACE: the organization a coach is working in stays chosen when they go to Programs, Calendar, Clients or Messages (lib/active-anchor.ts).
-      document.cookie = `${LAST_WORKSPACE_GROUP_COOKIE}=${encodeURIComponent(groupId)}; path=/; max-age=${60 * 60 * 24 * 90}`;
+      // The remembered WORKSPACE (last_workspace_group) is NOT written here (FIX 4): only the middleware sets it, on a real visit to a page of the chosen organization (or after the coach confirmed switching).
     } catch {
       // Non-fatal — Home just falls back to its minimal shell.
     }

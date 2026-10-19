@@ -85,3 +85,38 @@ export async function clientCountsByOrg(supabase: SupabaseClient, groups: GroupL
 export function inActiveOrg<T extends { organization_id: string | null }>(groups: T[], orgId: string | null): T[] {
   return orgId ? groups.filter((g) => g.organization_id === orgId) : groups;
 }
+
+// FIX 4 (Ron, Oct 19: "It should be just a quick, are you sure you want to switch ...? Yes, no, and then yes, go. Obviously, no, stop."). What opening a group page does to the organization the
+// app is in: a prefetch, a frame or anything but a page load changes nothing; a page of the chosen organization (or with none chosen yet) is remembered as the open workspace, as before; a page of
+// ANOTHER organization asks a coach first (the chooser page as a confirm). The personal space belongs to no organization and changes nothing.
+export type WorkspaceDecision = "nothing" | "remember" | "confirm";
+export function workspaceDecision({
+  isPageLoad,
+  inFrame,
+  pageOrg,
+  activeOrg,
+  isCoachThere,
+}: {
+  isPageLoad: boolean;
+  inFrame: boolean;
+  pageOrg: string | null;
+  activeOrg: string | null;
+  isCoachThere: boolean;
+}): WorkspaceDecision {
+  if (!isPageLoad || !pageOrg) return "nothing";
+  if (!activeOrg || pageOrg === activeOrg) return "remember";
+  if (inFrame) return "nothing";
+  return isCoachThere ? "confirm" : "remember";
+}
+
+/** A browser prefetch (Next's router, or the browser's own speculative load): never a real visit. */
+export function isPrefetchRequest(headers: { get(name: string): string | null }): boolean {
+  if (headers.get("next-router-prefetch")) return true;
+  const purpose = `${headers.get("purpose") ?? ""} ${headers.get("sec-purpose") ?? ""}`.toLowerCase();
+  return purpose.includes("prefetch");
+}
+
+/** The chooser page as the one-question confirm: "Switch to <name>?" Yes switches and opens the page, No stays. */
+export function switchConfirmPath(orgId: string, next: string): string {
+  return `/choose-organization?switch=${encodeURIComponent(orgId)}&next=${encodeURIComponent(next)}`;
+}

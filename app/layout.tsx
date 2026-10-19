@@ -11,7 +11,7 @@ import { LegalReacceptGate } from "@/components/legal/legal-reaccept-gate";
 import { TimezoneCapture } from "@/components/timezone-capture";
 import { ConfirmDialogHost } from "@/components/shared/confirm-dialog";
 import { cookies } from "next/headers";
-import { LAST_WORKSPACE_GROUP_COOKIE, decodeWorkspaceCookie } from "@/lib/workspace-header";
+import { ACTIVE_ORG_COOKIE_NAME, LAST_WORKSPACE_GROUP_COOKIE, decodeWorkspaceCookie } from "@/lib/workspace-header";
 import { getViewerOrgTheme } from "@/lib/org-theme-server";
 import { getTeamWordsHint } from "@/lib/team-words-server";
 import { TeamWordsHintProvider } from "@/components/coach/team-words-hint";
@@ -61,9 +61,11 @@ export default async function RootLayout({
   const cssVars = orgThemeToCssVars(theme);
   // Which remembered workspace this look was made for; the coach area compares it with the cookie after each page change (components/shared/org-theme-sync.tsx).
   const workspaceGroup = decodeWorkspaceCookie((await cookies()).get(LAST_WORKSPACE_GROUP_COOKIE)?.value) ?? "";
+  // ...and which chosen organization (FIX 4: the look follows it).
+  const activeOrg = decodeWorkspaceCookie((await cookies()).get(ACTIVE_ORG_COOKIE_NAME)?.value) ?? "";
 
   return (
-    <html lang="en" style={cssVars} data-workspace-group={workspaceGroup}>
+    <html lang="en" style={cssVars} data-workspace-group={workspaceGroup} data-active-org={activeOrg}>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

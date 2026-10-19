@@ -1554,6 +1554,17 @@
   ]
  },
  {
+  "n": "177",
+  "slug": "0425",
+  "title": "0425 FIX 4: the organization wall follows the organization the person chose (replaces one function)",
+  "migrations": [
+   "0425"
+  ],
+  "notApplied": [
+   "not exists (select 1 from pg_proc p where p.oid = to_regprocedure('public.request_workspace_org()') and position('x-workspace-org' in p.prosrc) > 0)"
+  ]
+ },
+ {
   "n": "170",
   "slug": "0418",
   "title": "0418 Release AF3: database policies from the post-ship audit (a private client stays private in posts and tags; two undecided account-deletion links decided; the guardian-consent answer limited for a coach; the health-form flag cleared when the last client seat goes)",

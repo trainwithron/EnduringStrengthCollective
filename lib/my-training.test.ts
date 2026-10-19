@@ -119,7 +119,8 @@ describe("The coach as their own client (personal space)", () => {
     expect(page).toContain("{!selfView && <VideoCheckinRecorder");
   });
   it("the personal space never becomes the open workspace, and is invisible to every coach-wide scope", () => {
-    expect(read("lib/supabase/middleware.ts")).toContain("if (ownMembership && memberOrg)");
+    // a group with no organization (the personal space) gives workspaceDecision no organization: nothing is written
+    expect(read("lib/supabase/middleware.ts")).toContain('if (decision === "remember" && memberOrg) {');
     expect(read("lib/coach-groups.ts")).toContain("!g.organization_id");
   });
 });
