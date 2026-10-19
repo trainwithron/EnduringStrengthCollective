@@ -16,6 +16,14 @@
   "file": "apply-release-own1-owner-accepted-only-all.sql"
  },
  {
+  "id": "release-ns-coach-notice-switches",
+  "name": "Release NS (a coach's own switches for the kinds of notice: one column, two functions, one trigger)",
+  "steps": [
+   "175"
+  ],
+  "file": "apply-release-ns-coach-notice-switches-all.sql"
+ },
+ {
   "id": "release-tc3-coach-join-links",
   "name": "Release TC3 (one invitation link per invited person: one new table)",
   "steps": [

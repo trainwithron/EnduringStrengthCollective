@@ -134,7 +134,7 @@ describe("the other background pushes to coaches", () => {
     expect(m).not.toContain("sendPushToProfile(");
     for (const f of ["app/api/cron/flag-recurring-booking-conflicts/route.ts", "app/api/cron/series-top-up/route.ts"]) {
       const s = read(f);
-      expect(s, f).toContain('"booking_conflicts"');
+      expect(s, f).toContain('"bookings"');
       expect(s, f).toContain("daytimeOnly: true");
       expect(s, f).not.toContain("sendPushToProfile(");
     }

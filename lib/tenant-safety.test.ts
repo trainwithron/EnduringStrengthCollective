@@ -46,7 +46,7 @@ describe("tenant safety (migration 0340 and the pages that take a client id from
     const route = read("app/api/session-pattern-check/route.ts");
     expect(route).toContain("const admin = createServiceRoleClient();");
     expect(route).toContain('await admin.from("notifications").insert(');
-    expect(route).toContain("sendPushToProfile(admin, coachId");
+    expect(route).toContain("sendCoachPush(admin, coachId");
     expect(route).not.toContain('supabase.from("session_pattern_checks")');
   });
 });

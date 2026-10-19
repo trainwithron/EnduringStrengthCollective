@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { sendPushToProfile } from "@/lib/send-push";
+import { sendCoachPush } from "@/lib/coach-notice";
 import { findThreadsNeedingReply } from "@/lib/notification-priority";
 import { DEFAULT_COACH_TIMEZONE, nowInZone } from "@/lib/timezone";
 import { withCronRun } from "@/lib/cron-monitor";
@@ -137,7 +137,7 @@ async function handler(request: Request) {
     const summary = parts.join(" · ");
     // A coach who runs several organizations gets each one's digest labeled with its name.
     const title = (orgCountByCoach.get(coachId)?.size ?? 1) > 1 && orgName ? `${orgName}: since you last checked` : "Your business, since you last checked";
-    const sent = await sendPushToProfile(supabase, coachId, title, summary, "/dashboard");
+    const sent = await sendCoachPush(supabase, coachId, "briefing", title, summary, "/dashboard");
     results.push({ coachId, sent: sent > 0, summary });
   };
   const run = await runPool([...groupIdsByCoach.entries()], COACHES_AT_ONCE, processEntry, { deadlineMs: TIME_BUDGET_MS });

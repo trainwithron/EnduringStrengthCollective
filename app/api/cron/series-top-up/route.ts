@@ -55,7 +55,7 @@ async function handler(request: Request) {
           body,
           link_path: `/groups/${s.group_id}/calendar`,
         });
-        await sendCoachPush(db, s.coach_id, "booking_conflicts", "Recurring session conflict", body, `/groups/${s.group_id}/calendar`, { daytimeOnly: true }).catch(() => 0);
+        await sendCoachPush(db, s.coach_id, "bookings", "Recurring session conflict", body, `/groups/${s.group_id}/calendar`, { daytimeOnly: true }).catch(() => 0);
         // Remember it so tomorrow's run leaves it alone.
         await store.updateSeries(s.id, { skippedStarts: [...((s.skipped_starts ?? []) as string[]), ...taken.map((t) => t.startIso)] });
         reported += 1;

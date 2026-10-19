@@ -5,6 +5,7 @@ import { loadTeamInfo } from "@/lib/org-team";
 import { readStayingMembers } from "@/lib/org-members";
 import { CoachTypeSetting } from "@/components/coach/coach-type-setting";
 import { PushPreferences } from "@/components/athlete/push-preferences";
+import { NoticeSwitches } from "@/components/coach/notice-switches";
 import { isCoachType, type CoachType } from "@/lib/coach-type";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -195,6 +196,9 @@ export default async function SettingsPage(
   const onFrontDesk = (deskRows ?? []).length > 0;
   // Quiet hours and private lock screens (0395). Read on its own so a database without the columns yet shows the whole page (the two choices are then left out).
   const pushPrefsRead = await supabase.from("profiles").select("quiet_hours_start, quiet_hours_end, generic_push_text").eq("id", user.id).maybeSingle();
+  // The kinds of notice this coach switched off (profiles.notices_off, migration 0423). Until it is applied the read fails and the switches are simply not shown.
+  const noticesRead = await supabase.from("profiles").select("notices_off").eq("id", user.id).maybeSingle();
+  const noticesOff: string[] | null = noticesRead.error ? null : ((noticesRead.data as { notices_off?: string[] | null } | null)?.notices_off ?? []);
   const pushPrefs = pushPrefsRead.error ? null : (pushPrefsRead.data as { quiet_hours_start: number | null; quiet_hours_end: number | null; generic_push_text: boolean | null } | null);
   // What this coach coaches (0392). Read on its own so a database that does not have the column yet still shows the whole page.
   let coachTypeNow: CoachType | null = null;
@@ -315,6 +319,7 @@ export default async function SettingsPage(
     <SettingsGroup label="Notifications">
           <PushNotificationToggle variant="settings" profileId={user.id} audience={isCoach ? "coach" : "client"} />
           <PushPreferences profileId={user.id} initialStart={pushPrefs?.quiet_hours_start ?? null} initialEnd={pushPrefs?.quiet_hours_end ?? null} initialGeneric={pushPrefs?.generic_push_text === true} available={!!pushPrefs} />
+          {isCoach && !effective.isActingAsOther && <NoticeSwitches profileId={user.id} initialOff={noticesOff ?? []} available={noticesOff !== null} />}
         </SettingsGroup>
   );
 

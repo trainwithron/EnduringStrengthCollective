@@ -1,4 +1,4 @@
-import { sendPushToProfile } from "@/lib/send-push";
+import { sendCoachPush } from "@/lib/coach-notice";
 
 // A coach is told when a client pays: a notice in the app and a push. Best effort and silent on failure: the payment is already recorded, and a notice that fails must never make Stripe retry the event.
 // One notice per coach seat of the group; the client's name is in the text, which a person who wants private lock screens turns off (sendPushToProfile).
@@ -22,7 +22,7 @@ export async function notifyPaymentReceived(
     for (const coachId of coachIds) {
       const { error } = await db.from("notifications").insert({ profile_id: coachId, group_id: args.groupId, type: "payment_received", body, link_path: link, pushed_at: new Date().toISOString() });
       if (error) console.error("[payment notice] the notification was refused:", error.message);
-      await sendPushToProfile(db, coachId, "Payment received", lockScreenBody, link).catch(() => 0);
+      await sendCoachPush(db, coachId, "payments", "Payment received", lockScreenBody, link).catch(() => 0);
     }
     return { coaches: coachIds.length };
   } catch (e) {

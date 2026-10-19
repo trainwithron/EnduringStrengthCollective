@@ -5,7 +5,8 @@ import { readPushPrefs } from "@/lib/push-prefs";
 
 // ONE place a coach-facing push goes through, so a coach's own switch for that KIND of notice is checked in the same place for everything that sends one (no job can get around it). The switch is a list of kinds the
 // coach turned OFF (profiles.notices_off); a database without that column yet, an unreadable row or a failed read means the notice is ON (nothing a coach wants is lost to a missing setting).
-export type CoachNoticeKind = "low_sessions" | "milestones" | "booking_conflicts";
+import type { CoachNoticeKind } from "@/lib/coach-notice-kinds";
+export type { CoachNoticeKind };
 
 // Background jobs run at fixed UTC times, which can be the middle of a coach's night. A job's push waits for the coach's daytime (7:00 to 20:59 in their own time zone) or is skipped; the notice in the app is unaffected.
 export const DAYTIME_START_HOUR = 7;
@@ -44,5 +45,5 @@ export async function sendCoachPush(
       // an unreadable time zone: send (a push is never lost to a bad setting)
     }
   }
-  return sendPushToProfile(db, profileId, title, body, url, { ignoreQuiet: opts.ignoreQuiet });
+  return opts.ignoreQuiet ? sendPushToProfile(db, profileId, title, body, url, { ignoreQuiet: true }) : sendPushToProfile(db, profileId, title, body, url);
 }
