@@ -62,7 +62,9 @@ describe("the hub is wired to it", () => {
   });
   it("choosing ANOTHER organization closes the hub and goes to that organization's Home (the page being viewed keeps naming its own organization, which the database walls off from the other one)", () => {
     expect(hub).toContain("const leavesPage = pageOrg.current !== next.orgId;");
-    expect(hub).toContain('if (leavesPage) {\n      close();\n      router.push("/dashboard");');
+    // a full page load, not router.push: the soft navigation hung on a loading skeleton in the live check
+    expect(hub).toContain('window.location.assign("/dashboard");');
+    expect(hub).not.toContain('router.push("/dashboard")');
     expect(hub).toContain("pageOrg.current = pageOrgId(groups, groupId);");
     // the chosen organization is written before leaving, so Home opens on it
     expect(hub.indexOf("ACTIVE_ORG_COOKIE}=")).toBeLessThan(hub.indexOf("if (leavesPage) {"));
