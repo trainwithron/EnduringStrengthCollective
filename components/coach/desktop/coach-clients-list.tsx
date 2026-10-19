@@ -8,7 +8,7 @@ import { DEFAULT_CLIENTS_VIEW, readClientsView, writeClientsView, type ClientsVi
 import { filterClients, filterCounts, FILTER_LABELS, clientKind, type ClientFilter, type CoachClientRow } from "@/lib/coach-client-filter";
 
 const FILTERS: ClientFilter[] = ["all", "one_on_one", "online", "group", "set_aside"];
-const KIND_LABEL = { one_on_one: "1-on-1", online: "Online", group: "Group" } as const;
+const KIND_LABEL = { one_on_one: "In person", online: "Online", group: "Group" } as const;
 
 // The coach-level Clients list: every client once, wherever the coach is standing. Filters for how they work with the coach, a name search, and one quiet number
 // per client (sessions still to schedule). Tapping a client opens their space.

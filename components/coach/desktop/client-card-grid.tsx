@@ -36,7 +36,7 @@ function todayIso() {
 }
 
 const TIER_LABELS: Record<NonNullable<ClientTier>, string> = {
-  one_on_one: "1-on-1",
+  one_on_one: "In person",
   online: "Online",
   group: "Group",
 };

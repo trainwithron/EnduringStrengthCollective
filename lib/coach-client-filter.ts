@@ -1,4 +1,4 @@
-// The coach-level Clients list: every client once, with filters for how they work with the coach (1-on-1, online, group) and for the ones set aside, and a
+// The coach-level Clients list: every client once, with filters for how they work with the coach (in person, online, group) and for the ones set aside, and a
 // name search. Set-aside clients are hidden until asked for.
 
 export type ClientFilter = "all" | "one_on_one" | "online" | "group" | "set_aside";
@@ -18,7 +18,7 @@ export interface CoachClientRow {
 
 export const FILTER_LABELS: Record<ClientFilter, string> = {
   all: "All",
-  one_on_one: "1-on-1",
+  one_on_one: "In person",
   online: "Online",
   group: "Group",
   set_aside: "Set aside",

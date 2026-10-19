@@ -34,13 +34,13 @@ describe("the desktop Clients page for a team organization with ZERO athletes", 
   it("shows no 1-on-1 / Online / Group filters, no Cards/List toggle, no sessions footnote, and says 'No athletes yet. Add one to get started.'", () => {
     const html = renderToStaticMarkup(createElement(CoachClientsList, { rows: [], oneView: true }));
     expect(html).toContain("No athletes yet. Add one to get started.");
-    expect(html).not.toMatch(/1-on-1|Online|Set aside|Cards|sessions are left to schedule|No clients yet/);
+    expect(html).not.toMatch(/1-on-1|In person|Online|Set aside|Cards|sessions are left to schedule|No clients yet/);
     expect(html).toContain("Search athletes");
   });
   it("an ordinary coach's empty list is unchanged", () => {
     const html = renderToStaticMarkup(createElement(CoachClientsList, { rows: [], oneView: false }));
     expect(html).toContain("No clients yet.");
-    expect(html).toContain("1-on-1");
+    expect(html).toContain("In person");
   });
 });
 
