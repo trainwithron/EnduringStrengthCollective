@@ -2,7 +2,8 @@ import Link from "next/link";
 import { PendingInviteActions } from "@/components/org/pending-invite-actions";
 import { InviteCoachForm } from "@/components/coach/desktop/invite-coach-form";
 import type { GroupCoachRow } from "@/lib/pending-coaches";
-import type { PendingInvitee } from "@/lib/coach-invite-server";
+import { inviteLinkProbablyDead, signInWords, type PendingInvitee, type SignInFacts } from "@/lib/coach-invite-server";
+import { SendSignInLink } from "@/components/org/send-sign-in-link";
 
 const ROLE_WORD: Record<string, string> = { owner: "Owner", admin: "Admin", coach: "Coach", front_desk: "Front desk" };
 
@@ -14,12 +15,15 @@ export function CoachesSection({
   coaches,
   pending,
   canManage,
+  signIns = {},
 }: {
   groupId: string;
   viewerId: string;
   coaches: GroupCoachRow[];
   pending: PendingInvitee[];
   canManage: boolean;
+  /** an owner or admin sees how each coach stands: invited, signed in (when), never signed in */
+  signIns?: Record<string, SignInFacts>;
 }) {
   const pendingById = new Map(pending.map((p) => [p.profileId, p]));
   const sorted = [...coaches].sort((a, b) => {
@@ -38,6 +42,7 @@ export function CoachesSection({
         <ul className="divide-y divide-steel/15">
           {sorted.map((c) => {
             const p = pendingById.get(c.profileId);
+            const facts = canManage ? signIns[c.profileId] : undefined;
             return (
               <li key={c.profileId} className="flex flex-wrap items-center gap-3 py-2">
                 {c.avatarUrl ? (
@@ -56,16 +61,19 @@ export function CoachesSection({
                   </div>
                 )}
                 <span className="font-body text-sm">
-                  {c.fullName}
+                  <Link href={`/groups/${groupId}/coaches/${c.profileId}`} className="underline-offset-2 hover:underline">
+                    {c.fullName}
+                  </Link>
                   {c.profileId === viewerId && <span className="text-steel text-xs ml-2">You</span>}
                 </span>
                 <span className="font-body text-xs text-rust">{ROLE_WORD[c.orgRole] ?? "Coach"}</span>
-                {p && <span className="font-body text-xs text-steel">Invited, not accepted yet</span>}
-                {p && canManage && (
+                {(p || facts) && <span className="font-body text-xs text-steel">{facts ? signInWords(facts) : "Invited, not accepted yet"}</span>}
+                {canManage && c.profileId !== viewerId && c.orgRole !== "owner" && (
                   <div className="ml-auto flex flex-wrap items-center gap-x-4">
-                    <PendingInviteActions groupId={groupId} profileId={p.profileId} name={p.name} email={p.email} />
+                    {p ? <PendingInviteActions groupId={groupId} profileId={p.profileId} name={p.name} email={p.email} sendLabel="Send sign-in link" /> : <SendSignInLink groupId={groupId} profileId={c.profileId} name={c.fullName} />}
                   </div>
                 )}
+                {p && canManage && facts && inviteLinkProbablyDead(facts) && <p className="basis-full font-body text-xs text-rust">That link expired or was already used. Send a new one.</p>}
               </li>
             );
           })}

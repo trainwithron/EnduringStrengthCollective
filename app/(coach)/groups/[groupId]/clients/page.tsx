@@ -23,7 +23,7 @@ import { mergeRosterAcrossGroups, type RosterRowAcrossGroups } from "@/lib/coach
 import type { RosterMember } from "@/lib/types";
 import { RemovedClientsPanel, type RemovedClient } from "@/components/coach/desktop/removed-clients-panel";
 import { CoachesSection } from "@/components/coach/coaches-section";
-import { loadGroupCoaches } from "@/lib/pending-coaches";
+import { loadGroupCoaches, signInsFor } from "@/lib/pending-coaches";
 import { authorizeInviteManager } from "@/lib/coach-invite-server";
 import {
   classifyNutritionTrend,
@@ -212,6 +212,7 @@ export default async function ClientsPage(
   const athletes = roster.filter((m) => m.role === "athlete");
   // The ONE coach list at the top of the page: every coach with their role, the viewer marked, anyone who has not accepted their invitation marked with Send again / Copy link / Cancel (owners and admins only).
   const [coachList, inviteManager] = await Promise.all([loadGroupCoaches(params.groupId), authorizeInviteManager(supabase, user.id, params.groupId)]);
+  const signIns = await signInsFor(coachList.coaches, inviteManager.ok, user.id);
 
   // coach_mobile_v2_feature_spec.md item 1 — mobile gets the A-Z/
   // needs-attention roster instead of the desktop card grid. Short-
@@ -303,7 +304,7 @@ export default async function ClientsPage(
             </div>
             <AddClientButton groupId={params.groupId} groupName={group?.name ?? "This group"} createdBy={user.id} defaultOpen={openAdd} />
           </div>
-          <CoachesSection groupId={params.groupId} viewerId={user.id} coaches={coachList.coaches} pending={coachList.pending} canManage={inviteManager.ok} />
+          <CoachesSection groupId={params.groupId} viewerId={user.id} coaches={coachList.coaches} pending={coachList.pending} canManage={inviteManager.ok} signIns={signIns} />
           <CoachRosterMobile groupId={params.groupId} members={phoneClients} />
         </div>
       </CoachMobileShell>
@@ -378,7 +379,7 @@ export default async function ClientsPage(
         </div>
       </div>
 
-      <CoachesSection groupId={params.groupId} viewerId={user.id} coaches={coachList.coaches} pending={coachList.pending} canManage={inviteManager.ok} />
+      <CoachesSection groupId={params.groupId} viewerId={user.id} coaches={coachList.coaches} pending={coachList.pending} canManage={inviteManager.ok} signIns={signIns} />
 
       {phaseAlignmentSummary && phaseAlignmentSummary.misaligned > 0 && (
         <div className="mb-6 px-4 py-3 border border-rust/30 bg-rust/5">

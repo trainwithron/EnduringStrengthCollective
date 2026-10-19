@@ -35,6 +35,64 @@ export function isUnaccepted(user: AuthUserLike): boolean {
   return !!user && !!user.invited_at && !user.email_confirmed_at && !user.last_sign_in_at;
 }
 
+export type SignInState = "unaccepted" | "signed_in" | "never";
+export interface SignInFacts {
+  state: SignInState;
+  lastSignInAt: string | null;
+  /** when the newest invitation email or link for this account was made (an unaccepted account only) */
+  linkMadeAt: string | null;
+}
+
+/** In words an owner can read: an invitation nobody has used, a person who has signed in (and when), or an account that has never signed in (made some other way, or a link opened without a sign-in). */
+export function signInFacts(user: (AuthUserLike & { app_metadata?: Record<string, unknown> | null }) | null | undefined): SignInFacts {
+  const meta = (user?.app_metadata ?? {}) as Record<string, unknown>;
+  const stamps = [user?.invited_at, meta.invite_emailed_at, meta.invite_link_made_at]
+    .filter((x): x is string => typeof x === "string")
+    .map((x) => ({ x, ms: Date.parse(x) }))
+    .filter((s) => Number.isFinite(s.ms))
+    .sort((a, b) => b.ms - a.ms);
+  if (isUnaccepted(user)) return { state: "unaccepted", lastSignInAt: null, linkMadeAt: stamps[0]?.x ?? null };
+  if (user?.last_sign_in_at) return { state: "signed_in", lastSignInAt: user.last_sign_in_at, linkMadeAt: null };
+  return { state: "never", lastSignInAt: null, linkMadeAt: null };
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** "Oct 16", or "Oct 16, 2025" when it was not this year (UTC, so the server and the browser agree). */
+export function shortDate(iso: string, now: Date = new Date()): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}${d.getUTCFullYear() === now.getUTCFullYear() ? "" : `, ${d.getUTCFullYear()}`}`;
+}
+
+/** The row's state in plain words. */
+export function signInWords(f: SignInFacts, now: Date = new Date()): string {
+  if (f.state === "unaccepted") return "Invited, not accepted yet";
+  if (f.state === "signed_in" && f.lastSignInAt) return `Signed in ${shortDate(f.lastSignInAt, now)}`;
+  return "Has never signed in";
+}
+
+/** An invitation link older than a day has most likely stopped working (links expire), or was replaced by a newer one. */
+export const INVITE_LINK_STALE_MS = 24 * 60 * 60 * 1000;
+export function inviteLinkProbablyDead(f: SignInFacts, nowMs: number = Date.now()): boolean {
+  if (f.state !== "unaccepted" || !f.linkMadeAt) return false;
+  const ms = Date.parse(f.linkMadeAt);
+  return Number.isFinite(ms) && nowMs - ms > INVITE_LINK_STALE_MS;
+}
+
+/** Sign-in facts for a list of people, read with the server key (a person whose account cannot be read is left out, never guessed). */
+export async function loadSignInFacts(serviceRole: any, profileIds: string[]): Promise<Record<string, SignInFacts>> {
+  const out: Record<string, SignInFacts> = {};
+  await runPool(profileIds, 8, async (id) => {
+    try {
+      const { data, error } = await serviceRole.auth.admin.getUserById(id);
+      if (!error && data?.user) out[id] = signInFacts(data.user);
+    } catch {
+      // left out
+    }
+  });
+  return out;
+}
+
 /** Which of these organization people (members and front desk) have not accepted yet. A person whose account cannot be read, or whose account carries no invitation marker, is left out (never listed on a guess). */
 export async function loadPendingInvitees(serviceRole: any, organizationId: string, people: { profileId: string; name: string; role: string }[]): Promise<PendingInvitee[]> {
   const found: PendingInvitee[] = [];
@@ -51,13 +109,13 @@ export async function loadPendingInvitees(serviceRole: any, organizationId: stri
 export const RESEND_COOLDOWN_SECONDS = 600;
 
 /** Was a send of this kind made for this account in the last ten minutes? Read from the account itself, written only AFTER a send succeeded, so a failed attempt never locks anybody out. */
-export function sentRecently(appMetadata: Record<string, unknown> | null | undefined, field: "invite_emailed_at" | "invite_link_made_at", nowMs: number = Date.now()): boolean {
+export function sentRecently(appMetadata: Record<string, unknown> | null | undefined, field: "invite_emailed_at" | "invite_link_made_at" | "signin_emailed_at", nowMs: number = Date.now()): boolean {
   const at = appMetadata?.[field];
   const ms = typeof at === "string" ? Date.parse(at) : NaN;
   return Number.isFinite(ms) && nowMs - ms < RESEND_COOLDOWN_SECONDS * 1000;
 }
 
-export async function markSent(serviceRole: any, userId: string, appMetadata: Record<string, unknown> | null | undefined, field: "invite_emailed_at" | "invite_link_made_at", nowMs: number = Date.now()): Promise<void> {
+export async function markSent(serviceRole: any, userId: string, appMetadata: Record<string, unknown> | null | undefined, field: "invite_emailed_at" | "invite_link_made_at" | "signin_emailed_at", nowMs: number = Date.now()): Promise<void> {
   await serviceRole.auth.admin.updateUserById(userId, { app_metadata: { ...(appMetadata ?? {}), [field]: new Date(nowMs).toISOString() } });
 }
 
@@ -140,5 +198,40 @@ export async function loadInviteTarget(
     name: (profile as { full_name?: string | null } | null)?.full_name ?? "",
     role: member?.role ?? "front_desk",
     appMetadata: ((user.app_metadata ?? {}) as Record<string, unknown>),
+  };
+}
+
+/**
+ * Who a "send sign-in link" may go to: a person of THIS organization (a member that is not the owner, or front desk) with a readable account and an email. An account that is still an unaccepted invitation must also pass the
+ * invitation-only footprint (so one organization never reaches another's invitee); an account that has signed in is the person's own and the link only ever goes to their own inbox.
+ */
+export async function loadSignInTarget(
+  serviceRole: any,
+  organizationId: string,
+  profileId: string
+): Promise<{ ok: true; email: string; name: string; role: string; unaccepted: boolean; appMetadata: Record<string, unknown> } | { ok: false; status: number; error: string }> {
+  if (!profileId) return { ok: false, status: 400, error: "Missing the person." };
+  const [{ data: member }, { data: desk }] = await Promise.all([
+    serviceRole.from("organization_memberships").select("role").eq("organization_id", organizationId).eq("profile_id", profileId).maybeSingle(),
+    serviceRole.from("org_front_desk").select("profile_id").eq("organization_id", organizationId).eq("profile_id", profileId).maybeSingle(),
+  ]);
+  if (!member && !desk) return { ok: false, status: 404, error: "That person was not found." };
+  if (member?.role === "owner") return { ok: false, status: 409, error: "The owner signs in with their own password. They can use Forgot password." };
+  const { data } = await serviceRole.auth.admin.getUserById(profileId);
+  const user = data?.user;
+  if (!user?.email) return { ok: false, status: 404, error: "That person was not found." };
+  const unaccepted = isUnaccepted(user);
+  if (unaccepted) {
+    const footprint = await inviteOnlyFootprint(serviceRole, organizationId, profileId);
+    if (!footprint.ok) return { ok: false, status: 404, error: "That person was not found." };
+  }
+  const { data: profile } = await serviceRole.from("profiles").select("full_name").eq("id", profileId).maybeSingle();
+  return {
+    ok: true,
+    email: user.email as string,
+    name: (profile as { full_name?: string | null } | null)?.full_name ?? "",
+    role: member?.role ?? "front_desk",
+    unaccepted,
+    appMetadata: (user.app_metadata ?? {}) as Record<string, unknown>,
   };
 }

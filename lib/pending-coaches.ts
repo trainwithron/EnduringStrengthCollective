@@ -1,5 +1,5 @@
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { loadPendingInvitees, type PendingInvitee } from "@/lib/coach-invite-server";
+import { loadPendingInvitees, loadSignInFacts, type PendingInvitee, type SignInFacts } from "@/lib/coach-invite-server";
 import { pageAll } from "@/lib/page-all";
 
 // The coaches of one group who have not accepted their invitation yet. The invitation already gave them a coach seat in the group, so every list of "the coaches" would otherwise show and count them as working
@@ -97,4 +97,14 @@ async function withRolesAndPending(db: ReturnType<typeof createServiceRoleClient
 /** The ids of a group's coaches who have not accepted yet, for filtering pickers and tallies. */
 export async function pendingCoachIds(groupId: string): Promise<Set<string>> {
   return new Set((await loadGroupCoaches(groupId)).pending.map((p) => p.profileId));
+}
+
+/** For an owner or admin only: how each coach (other than themselves and the owner) stands: invited, signed in (when) or never signed in. Anyone else gets nothing, so the account lookups are not made for them. Never throws. */
+export async function signInsFor(coaches: GroupCoachRow[], canManage: boolean, viewerId: string): Promise<Record<string, SignInFacts>> {
+  if (!canManage) return {};
+  try {
+    return await loadSignInFacts(createServiceRoleClient(), coaches.filter((c) => c.profileId !== viewerId && c.orgRole !== "owner").map((c) => c.profileId));
+  } catch {
+    return {};
+  }
 }

@@ -761,6 +761,7 @@ function CoachDesktopShellFull({
             groupName={groupName}
             sectionLabel={sectionLabel}
             sectionSubLinks={sectionSubLinks}
+            teamSport={teamSport}
           />
         )}
 

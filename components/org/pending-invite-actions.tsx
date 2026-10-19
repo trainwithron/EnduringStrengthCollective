@@ -6,7 +6,7 @@ import { confirmDialog } from "@/components/shared/confirm-dialog";
 
 // Send again / Copy link / Cancel for ONE person who was invited by a new email address and has not accepted yet. Used in the Invitations list on the Team page and right in the row of the Coaching staff lists, so
 // there is one behaviour in both places. The routes check that the person doing it owns or administers the organization; this only asks and shows the plain answers.
-export function PendingInviteActions({ groupId, profileId, name, email }: { groupId: string; profileId: string; name: string; email: string }) {
+export function PendingInviteActions({ groupId, profileId, name, email, sendLabel = "Send again" }: { groupId: string; profileId: string; name: string; email: string; sendLabel?: string }) {
   const router = useRouter();
   const [working, setWorking] = useState<string | null>(null);
   const [message, setMessage] = useState<{ kind: "ok" | "problem"; text: string } | null>(null);
@@ -83,7 +83,7 @@ export function PendingInviteActions({ groupId, profileId, name, email }: { grou
     <>
       <div className="flex items-center gap-4">
         <button type="button" onClick={resend} disabled={working !== null} className={`${button} text-steel`}>
-          {working === "resend" ? "Sending…" : "Send again"}
+          {working === "resend" ? "Sending…" : sendLabel}
         </button>
         <button type="button" onClick={copyLink} disabled={working !== null} className={`${button} text-steel`}>
           {working === "copy" ? "Making…" : "Copy link"}
@@ -92,6 +92,7 @@ export function PendingInviteActions({ groupId, profileId, name, email }: { grou
           Cancel
         </button>
       </div>
+      <p className="basis-full font-body text-xs text-steel">Copy link makes a new link and replaces the one in the email. Use one or the other.</p>
       {shownLink && <input readOnly value={shownLink} onFocus={(e) => e.currentTarget.select()} aria-label="Invitation link" className="basis-full w-full h-10 bg-graphite border border-steel/30 text-chalk px-2.5 font-body text-xs" />}
       {message && (
         <p className={`basis-full font-body text-xs ${message.kind === "ok" ? "text-positive" : "text-rust"}`} role={message.kind === "ok" ? "status" : "alert"}>

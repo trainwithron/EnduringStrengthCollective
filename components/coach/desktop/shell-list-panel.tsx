@@ -46,16 +46,21 @@ export function ShellListPanel({
   groupName,
   sectionLabel,
   sectionSubLinks,
+  teamSport = false,
 }: {
   coachId: string;
   groupId: string;
   groupName: string;
   sectionLabel: string | null;
   sectionSubLinks: SectionSubLink[];
+  /** a team-sport group has no Business area (lib/team-sport.ts): no Business button here either */
+  teamSport?: boolean;
 }) {
   const [width, setWidth] = useState(DEFAULT_LIST_PANEL_WIDTH);
   const [collapsed, setCollapsed] = useState(false);
-  const [view, setView] = useState<ListPanelView>("roster");
+  const [pickedView, setView] = useState<ListPanelView>("roster");
+  // a Business view pinned earlier (in another group) never shows in a team-sport group
+  const view: ListPanelView = teamSport && pickedView === "business" ? "roster" : pickedView;
   const [dragging, setDragging] = useState(false);
   // Bumped when someone is added from the panel, so the list below is read again and shows them.
   const [rosterVersion, setRosterVersion] = useState(0);
@@ -162,7 +167,7 @@ export function ShellListPanel({
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-1 mb-2">
+        <div className={`grid ${teamSport ? "grid-cols-3" : "grid-cols-2"} gap-1 mb-2`}>
           <button
             type="button"
             onClick={() => selectView("roster")}
@@ -172,6 +177,7 @@ export function ShellListPanel({
           >
             Clients
           </button>
+          {!teamSport && (
           <button
             type="button"
             onClick={() => selectView("business")}
@@ -182,6 +188,7 @@ export function ShellListPanel({
           >
             💰 Business
           </button>
+          )}
           <button
             type="button"
             onClick={() => selectView("calendar")}
