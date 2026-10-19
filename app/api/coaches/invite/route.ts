@@ -6,7 +6,7 @@ import { appOrigin } from "@/lib/app-url";
 import { rateLimitResponse } from "@/lib/rate-limit";
 import { notifyAndEmail } from "@/lib/invite-notify";
 import { inviteEmail, makeAuthLink, sendAuthMail } from "@/lib/auth-mail";
-import { isEmailConfigured } from "@/lib/email";
+import { ensureJoinLink, joinLinkUrl } from "@/lib/coach-join-link";
 import { inviteOnlyFootprint, isUnaccepted, removeOrphanInvitee } from "@/lib/coach-invite-server";
 
 // Which org-level role an invite can grant. "owner" is set once at
@@ -116,27 +116,15 @@ export async function POST(request: Request) {
   }
   const origin = appOrigin(request);
 
-  // The account and its one-time link are made here, and the email is sent by US through the transactional mail service (Brevo), so it does not depend on the auth service's own mailer (a few emails an hour, no
-  // domain authentication). A link that was made but not delivered is told to the person inviting, who can send it again or copy it from the Invitations list. Without the mail service set up, the auth service's
-  // own invitation email is used, as before.
-  let link: string | null = null;
-  let newUserId: string;
-  if (isEmailConfigured()) {
-    const made = await makeAuthLink(serviceRole, { type: "invite", email: trimmedEmail, redirectTo: `${origin}/set-password`, fullName: trimmedName });
-    if (!made.link || !made.userId) {
-      const { error, status } = toFriendlyAuthEmailError(made.error ?? "Couldn't invite this coach.");
-      return NextResponse.json({ error }, { status });
-    }
-    link = made.link;
-    newUserId = made.userId;
-  } else {
-    const { data: invited, error: inviteError } = await serviceRole.auth.admin.inviteUserByEmail(trimmedEmail, { data: { full_name: trimmedName }, redirectTo: `${origin}/set-password` });
-    if (inviteError || !invited?.user) {
-      const { error, status } = toFriendlyAuthEmailError(inviteError?.message ?? "Couldn't invite this coach.");
-      return NextResponse.json({ error }, { status });
-    }
-    newUserId = invited.user.id;
+  // The account is made here: the auth service makes it when it is asked for a link, and that link is thrown away. The invitation is OUR join link (lib/coach-join-link.ts): one per person, the same in the email we send
+  // through the transactional mail service (Brevo) and in the one an administrator copies, and it is used up only by choosing a password on its page, never by opening it. A link that was made but not delivered is told
+  // to the person inviting, who can email it again or copy it from the Invitations list.
+  const made = await makeAuthLink(serviceRole, { type: "invite", email: trimmedEmail, redirectTo: `${origin}/set-password`, fullName: trimmedName });
+  if (!made.userId) {
+    const { error, status } = toFriendlyAuthEmailError(made.error ?? "Couldn't invite this coach.");
+    return NextResponse.json({ error }, { status });
   }
+  const newUserId: string = made.userId;
   // An account made by THIS invitation that then fails half way is removed again (an account nobody can sign in to, with no seat, would otherwise be left behind); one that was already there is left alone.
   const fail = async (message: string) => {
     if (!reuseUserId) await removeOrphanInvitee(serviceRole, newUserId);
@@ -144,18 +132,20 @@ export async function POST(request: Request) {
   };
   const { data: orgForMail } = await serviceRole.from("organizations").select("name").eq("id", group.organization_id).maybeSingle();
   const { data: inviterRow } = await serviceRole.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
-  // With the auth service's own invitation email there is nothing for us to send (true: it was asked to).
-  const emailTheInvite = async () =>
-    link === null ? true : sendAuthMail(
+  const emailTheInvite = async () => {
+    const link = await ensureJoinLink(serviceRole, { organizationId: group.organization_id, profileId: newUserId, kind: "invite", createdBy: user.id, extend: true });
+    if (!link.ok) return false;
+    return sendAuthMail(
       trimmedEmail,
       inviteEmail({
         toName: trimmedName,
         orgName: (orgForMail as { name?: string } | null)?.name ?? "an organization",
         inviterName: (inviterRow as { full_name?: string | null } | null)?.full_name ?? null,
         role,
-        link: link as string,
+        link: joinLinkUrl(origin, link.row.id),
       })
     );
+  };
 
   if (!reuseUserId) {
     const { error: profileError } = await serviceRole.from("profiles").insert({ id: newUserId, full_name: trimmedName });

@@ -3,18 +3,18 @@ import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { rateLimitResponse } from "@/lib/rate-limit";
 import { appOrigin } from "@/lib/app-url";
-import { makeAuthLink } from "@/lib/auth-mail";
-import { authorizeInviteManager, loadInviteTarget, markSent, sentRecently } from "@/lib/coach-invite-server";
+import { ensureJoinLink, joinLinkUrl } from "@/lib/coach-join-link";
+import { authorizeInviteManager, loadInviteTarget } from "@/lib/coach-invite-server";
 
-// A fresh one-time invitation link to copy and send yourself (a text message) when an email does not arrive. Making it replaces the earlier link. Only an owner or admin of the organization, only for a person
-// who belongs to it and has not accepted yet. The link is a sign-in credential for that one person's new account: it is shown to the person inviting and never stored or logged.
+// The invitation link of a person who has not accepted yet, to copy and send yourself (a text message). It is the SAME link the email carries: copying it changes nothing, cancels nothing and can be done as often as you like.
+// It works for 14 days, is used up only when the person chooses their password on its page (opening it does nothing), and is only ever shown for an account that has not signed in. Only an owner or admin of the organization.
 export async function POST(request: Request) {
   const supabase = await createServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  const limited = await rateLimitResponse("coach-invite-link", user.id, 20, 3600);
+  const limited = await rateLimitResponse("coach-invite-link", user.id, 60, 3600);
   if (limited) return limited;
 
   const raw = await request.json().catch(() => null);
@@ -27,11 +27,7 @@ export async function POST(request: Request) {
   const target = await loadInviteTarget(db, auth.manager.organizationId, profileId);
   if (!target.ok) return NextResponse.json({ error: target.error }, { status: target.status });
 
-  // One link per person per ten minutes, read from the account and written only AFTER a link was made: a double tap does not replace the link the first tap made, and a failure never locks anybody out.
-  if (sentRecently(target.appMetadata, "invite_link_made_at")) return NextResponse.json({ error: "A link was just made for them. Use that one, or wait a few minutes." }, { status: 429 });
-
-  const made = await makeAuthLink(db, { type: "invite", email: target.email, redirectTo: `${appOrigin(request)}/set-password`, fullName: target.name });
-  if (!made.link) return NextResponse.json({ error: "Couldn't make a new link. Try again in a few minutes." }, { status: 502 });
-  await markSent(db, profileId, target.appMetadata, "invite_link_made_at");
-  return NextResponse.json({ link: made.link }, { headers: { "cache-control": "no-store" } });
+  const made = await ensureJoinLink(db, { organizationId: auth.manager.organizationId, profileId, kind: "invite", createdBy: user.id, extend: false });
+  if (!made.ok) return NextResponse.json({ error: "Couldn't get the link. Try again in a few minutes." }, { status: 502 });
+  return NextResponse.json({ link: joinLinkUrl(appOrigin(request), made.row.id), expiresAt: made.row.expires_at }, { headers: { "cache-control": "no-store" } });
 }

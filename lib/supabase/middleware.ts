@@ -120,6 +120,9 @@ export async function updateSession(request: NextRequest) {
     // session cookie yet, same gotcha already hit once for /pr/ and
     // /share/.
     pathname.startsWith("/set-password") ||
+    // A coach invitation's join page and the POST that finishes it are opened before anyone has a session; the link's signature is the credential (lib/coach-join-link.ts).
+    pathname.startsWith("/join-coach/") ||
+    pathname.startsWith("/api/coaches/join") ||
     // A client's single-use claim link (and its expired-link page) is opened
     // before they have any session; the token itself is the credential.
     pathname.startsWith("/claim/") ||

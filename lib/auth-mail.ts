@@ -55,7 +55,7 @@ export function inviteEmail(args: { toName: string; orgName: string; inviterName
       "Open this link to choose a password and get started:",
       args.link,
       "",
-      "The link works once and expires, so use it soon. If it has stopped working, ask whoever invited you to send a new one.",
+      "The link is yours alone and works for 14 days. Opening it does not use it up: you choose your password on the page it opens. If it has stopped working, ask whoever invited you to send it again.",
       "",
       "You are getting this because someone invited you on Spotlight Coaching. If you were not expecting it, you can ignore this message.",
     ].join("\n"),

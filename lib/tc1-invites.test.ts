@@ -19,7 +19,7 @@ describe("invitation and sign-in emails are made and sent by us", () => {
     expect(m.text).toContain("Hi Cade,");
     expect(m.text).toContain("Ron Arnold invited you to join Lee County West Trojans on Spotlight Coaching as an admin.");
     expect(m.text).toContain("https://x.example/verify?token=abc");
-    expect(m.text).toMatch(/works once/);
+    expect(m.text).toMatch(/Opening it does not use it up/);
     // no promise about how long it lasts
     expect(m.text).not.toMatch(/a day|24 hours|hour/i);
     expect(inviteEmail({ toName: "", orgName: "O", inviterName: null, role: "front_desk", link: "l" }).text).toContain("front desk staff");
@@ -270,7 +270,9 @@ describe("who has not accepted yet, and who may manage invitations", () => {
 describe("the wiring", () => {
   it("a coach invitation no longer depends on the auth service's mailer: the link is made and the email sent by us, and the answer says whether the email went out", () => {
     const route = src("app/api/coaches/invite/route.ts");
-    expect(route).toContain("inviteUserByEmail("); // only the fallback when the mail service is not set up
+    // the invitation is OUR join link (one per person), not the auth service's one-time link
+    expect(route).toContain("ensureJoinLink(");
+    expect(route).not.toContain("inviteUserByEmail(");
     expect(route).toContain('makeAuthLink(serviceRole, { type: "invite"');
     expect(route).toContain("sendAuthMail(");
     expect(route).toContain("{ invited: true, emailed }");
@@ -281,9 +283,6 @@ describe("the wiring", () => {
     for (const a of answers) expect(a, a).toContain("emailed");
     // the neutral answer for a person who is already a member is unchanged
     expect(route).toContain("if (already) return NextResponse.json({ invited: true, emailed: true });");
-    // without the mail service the auth service's own invitation email is used, as before
-    expect(route).toContain("inviteUserByEmail(");
-    expect(route.indexOf("if (isEmailConfigured())")).toBeLessThan(route.indexOf("inviteUserByEmail("));
     // a failure after the account was made removes it again, and an unused earlier invitation takes the new-address path (a fresh link)
     expect(route).toContain("removeOrphanInvitee(serviceRole, newUserId)");
     expect(route).toContain("reuseUserId");
@@ -302,10 +301,13 @@ describe("the wiring", () => {
     expect(src("app/api/coaches/invite/link/route.ts")).toContain('"cache-control": "no-store"');
     // the ten-minute rule is read from the account and written only after success, on both
     const resend = src("app/api/coaches/invite/resend/route.ts");
-    expect(resend.indexOf("sentRecently(")).toBeLessThan(resend.indexOf("makeAuthLink("));
+    expect(resend.indexOf("sentRecently(")).toBeLessThan(resend.indexOf("ensureJoinLink("));
     expect(resend).toContain("if (emailed) await markSent(");
     const link = src("app/api/coaches/invite/link/route.ts");
-    expect(link.indexOf("markSent(")).toBeGreaterThan(link.indexOf("makeAuthLink("));
+    // copying the link changes nothing and cancels nothing: no cooldown, no new link, the same one every time
+    expect(link).not.toContain("markSent(");
+    expect(link).not.toContain("sentRecently(");
+    expect(link).toContain("extend: false");
     expect(link).not.toContain("rateLimitResponse(\"coach-invite-link-person\"");
     // a delete that failed is a cancel that did not happen
     const cancel = src("app/api/coaches/invite/cancel/route.ts");
@@ -321,7 +323,7 @@ describe("the wiring", () => {
   it("the Team page lists every invitation with who, role, status and the three actions, for both kinds", () => {
     const list = src("components/org/invitations-list.tsx");
     const actions = src("components/org/pending-invite-actions.tsx");
-    for (const word of ["Not accepted yet", "Send again", "Copy link", "Cancel", "Invitations"]) expect(list + actions).toContain(word);
+    for (const word of ["Not accepted yet", "Email it", "Copy invite link", "Cancel", "Invitations"]) expect(list + actions).toContain(word);
     // the three buttons are one component, used by the Invitations list and by the Coaches list
     expect(list).toContain("<PendingInviteActions ");
     expect(src("components/coach/coaches-section.tsx")).toContain("<PendingInviteActions ");

@@ -70,7 +70,7 @@ export function CoachesSection({
                 {(p || facts) && <span className="font-body text-xs text-steel">{facts ? signInWords(facts) : "Invited, not accepted yet"}</span>}
                 {canManage && c.profileId !== viewerId && c.orgRole !== "owner" && (
                   <div className="ml-auto flex flex-wrap items-center gap-x-4">
-                    {p ? <PendingInviteActions groupId={groupId} profileId={p.profileId} name={p.name} email={p.email} sendLabel="Send sign-in link" /> : <SendSignInLink groupId={groupId} profileId={c.profileId} name={c.fullName} />}
+                    {p ? <PendingInviteActions groupId={groupId} profileId={p.profileId} name={p.name} email={p.email} /> : <SendSignInLink groupId={groupId} profileId={c.profileId} name={c.fullName} />}
                   </div>
                 )}
                 {p && canManage && facts && inviteLinkProbablyDead(facts) && <p className="basis-full font-body text-xs text-rust">That link expired or was already used. Send a new one.</p>}

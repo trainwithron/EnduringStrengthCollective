@@ -4,9 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { confirmDialog } from "@/components/shared/confirm-dialog";
 
-// Send again / Copy link / Cancel for ONE person who was invited by a new email address and has not accepted yet. Used in the Invitations list on the Team page and right in the row of the Coaching staff lists, so
+// Copy invite link / Email it / Cancel for ONE person who was invited by a new email address and has not accepted yet. The email and the copied link are the SAME link: neither changes or cancels the other. Used in the Invitations list on the Team page and right in the row of the Coaching staff lists, so
 // there is one behaviour in both places. The routes check that the person doing it owns or administers the organization; this only asks and shows the plain answers.
-export function PendingInviteActions({ groupId, profileId, name, email, sendLabel = "Send again" }: { groupId: string; profileId: string; name: string; email: string; sendLabel?: string }) {
+export function PendingInviteActions({ groupId, profileId, name, email, sendLabel = "Email it" }: { groupId: string; profileId: string; name: string; email: string; sendLabel?: string }) {
   const router = useRouter();
   const [working, setWorking] = useState<string | null>(null);
   const [message, setMessage] = useState<{ kind: "ok" | "problem"; text: string } | null>(null);
@@ -26,9 +26,9 @@ export function PendingInviteActions({ groupId, profileId, name, email, sendLabe
     try {
       const { ok, data } = await post("/api/coaches/invite/resend");
       if (!ok) setMessage({ kind: "problem", text: data.error || "Couldn't send it again. Try again." });
-      else if (data.emailed === false) setMessage({ kind: "problem", text: `A new link was made for ${name}, but the email did not go out. Use Copy link and send it yourself.` });
+      else if (data.emailed === false) setMessage({ kind: "problem", text: `The email to ${name} did not go out. Use Copy invite link and send it yourself.` });
       else {
-        setMessage({ kind: "ok", text: `Sent again to ${email}.` });
+        setMessage({ kind: "ok", text: `Emailed to ${email}. It is the same link, good for another 14 days.` });
         router.refresh();
       }
     } catch {
@@ -45,15 +45,15 @@ export function PendingInviteActions({ groupId, profileId, name, email, sendLabe
     try {
       const { ok, data } = await post("/api/coaches/invite/link");
       if (!ok || typeof data.link !== "string") {
-        setMessage({ kind: "problem", text: data.error || "Couldn't make the link. Try again." });
+        setMessage({ kind: "problem", text: data.error || "Couldn't get the link. Try again." });
         return;
       }
       try {
         await navigator.clipboard.writeText(data.link);
-        setMessage({ kind: "ok", text: `Link copied. It works once, for ${name} only, and replaces any earlier link.` });
+        setMessage({ kind: "ok", text: `Link copied. It is the same link as in the email, good for 14 days, and used up only when ${name} chooses a password.` });
       } catch {
         setShownLink(data.link);
-        setMessage({ kind: "ok", text: "Copy this link and send it to the person. It works once, for them only." });
+        setMessage({ kind: "ok", text: "Copy this link and send it to the person. It is the same link as in the email." });
       }
     } catch {
       setMessage({ kind: "problem", text: "Couldn't make the link. Check your connection and try again." });
@@ -86,13 +86,13 @@ export function PendingInviteActions({ groupId, profileId, name, email, sendLabe
           {working === "resend" ? "Sending…" : sendLabel}
         </button>
         <button type="button" onClick={copyLink} disabled={working !== null} className={`${button} text-steel`}>
-          {working === "copy" ? "Making…" : "Copy link"}
+          {working === "copy" ? "Getting…" : "Copy invite link"}
         </button>
         <button type="button" onClick={cancel} disabled={working !== null} className={`${button} text-rust no-underline`}>
           Cancel
         </button>
       </div>
-      <p className="basis-full font-body text-xs text-steel">Copy link makes a new link and replaces the one in the email. Use one or the other.</p>
+      <p className="basis-full font-body text-xs text-steel">The email and the copied link are the same link. Copying or emailing it again never cancels anything; opening it does not use it up.</p>
       {shownLink && <input readOnly value={shownLink} onFocus={(e) => e.currentTarget.select()} aria-label="Invitation link" className="basis-full w-full h-10 bg-graphite border border-steel/30 text-chalk px-2.5 font-body text-xs" />}
       {message && (
         <p className={`basis-full font-body text-xs ${message.kind === "ok" ? "text-positive" : "text-rust"}`} role={message.kind === "ok" ? "status" : "alert"}>

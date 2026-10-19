@@ -1488,6 +1488,17 @@
   ]
  },
  {
+  "n": "173",
+  "slug": "0421",
+  "title": "0421 Release TC3: one invitation link per invited person (one new table, only the server reads it; no link or secret is stored in it)",
+  "migrations": [
+   "0421"
+  ],
+  "notApplied": [
+   "to_regclass('public.coach_join_links') is null"
+  ]
+ },
+ {
   "n": "170",
   "slug": "0418",
   "title": "0418 Release AF3: database policies from the post-ship audit (a private client stays private in posts and tags; two undecided account-deletion links decided; the guardian-consent answer limited for a coach; the health-form flag cleared when the last client seat goes)",

@@ -3,11 +3,13 @@ import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { rateLimitResponse } from "@/lib/rate-limit";
 import { appOrigin } from "@/lib/app-url";
-import { inviteEmail, makeAuthLink, recoveryEmail, sendAuthMail } from "@/lib/auth-mail";
+import { inviteEmail, recoveryEmail, sendAuthMail } from "@/lib/auth-mail";
+import { ensureJoinLink, joinLinkUrl } from "@/lib/coach-join-link";
 import { authorizeInviteManager, loadSignInTarget, markSent, sentRecently } from "@/lib/coach-invite-server";
 
-// "Send sign-in link": works for ANY coach of the organization, in any state. An invitation nobody has used gets the invitation again (a new one-time link, by email). A person who has already signed in, or never did, gets a
-// sign-in / password link by email to THEIR OWN address; the link is never shown to the person who asked, so an administrator cannot use it to become someone else. Only an owner or admin of the organization.
+// "Send sign-in link": works for ANY coach of the organization, in any state, and always by email. An invitation nobody has used gets its invitation again (the SAME link, moved out another 14 days). A person who has
+// signed in, or never did, gets a link of the other kind, to set a new password on the join page, emailed to THEIR OWN address; that link is never shown to the person who asked, so an administrator cannot use it to become
+// someone else. Opening either link changes nothing. Only an owner or admin of the organization.
 export async function POST(request: Request) {
   const supabase = await createServerClient();
   const {
@@ -31,23 +33,19 @@ export async function POST(request: Request) {
   const field = target.unaccepted ? "invite_emailed_at" : "signin_emailed_at";
   if (sentRecently(target.appMetadata, field)) return NextResponse.json({ error: "It was just sent. Give it a few minutes." }, { status: 429 });
 
-  const redirectTo = `${appOrigin(request)}/set-password`;
-  if (target.unaccepted) {
-    const made = await makeAuthLink(db, { type: "invite", email: target.email, redirectTo, fullName: target.name });
-    if (!made.link) return NextResponse.json({ error: "Couldn't make a new link. Try again in a few minutes." }, { status: 502 });
-    const { data: org } = await db.from("organizations").select("name").eq("id", auth.manager.organizationId).maybeSingle();
-    const emailed = await sendAuthMail(
-      target.email,
-      inviteEmail({ toName: target.name, orgName: (org as { name?: string } | null)?.name ?? "an organization", inviterName: auth.manager.callerName, role: target.role, link: made.link })
-    );
-    if (emailed) await markSent(db, profileId, target.appMetadata, field);
-    return NextResponse.json({ ok: true, emailed, kind: "invitation" });
-  }
+  const made = await ensureJoinLink(db, { organizationId: auth.manager.organizationId, profileId, kind: target.unaccepted ? "invite" : "signin", createdBy: user.id, extend: true });
+  if (!made.ok) return NextResponse.json({ error: "Couldn't get the link. Try again in a few minutes." }, { status: 502 });
+  const link = joinLinkUrl(appOrigin(request), made.row.id);
 
-  const made = await makeAuthLink(db, { type: "recovery", email: target.email, redirectTo });
-  if (!made.link) return NextResponse.json({ error: "Couldn't make a sign-in link. Try again in a few minutes." }, { status: 502 });
-  const emailed = await sendAuthMail(target.email, recoveryEmail({ toName: target.name, link: made.link, fromCoach: auth.manager.callerName ?? "Your organization" }));
+  let message;
+  if (target.unaccepted) {
+    const { data: org } = await db.from("organizations").select("name").eq("id", auth.manager.organizationId).maybeSingle();
+    message = inviteEmail({ toName: target.name, orgName: (org as { name?: string } | null)?.name ?? "an organization", inviterName: auth.manager.callerName, role: target.role, link });
+  } else {
+    message = recoveryEmail({ toName: target.name, link, fromCoach: auth.manager.callerName ?? "Your organization" });
+  }
+  const emailed = await sendAuthMail(target.email, message);
   if (emailed) await markSent(db, profileId, target.appMetadata, field);
   // the link itself is never returned
-  return NextResponse.json({ ok: true, emailed, kind: "sign-in" });
+  return NextResponse.json({ ok: true, emailed, kind: target.unaccepted ? "invitation" : "sign-in" });
 }

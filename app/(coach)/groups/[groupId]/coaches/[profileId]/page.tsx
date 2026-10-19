@@ -120,7 +120,7 @@ export default async function CoachProfilePage(props: { params: Promise<{ groupI
             <h2 className="font-display uppercase text-lg tracking-wide">Sign-in</h2>
             <div className="flex flex-wrap items-center gap-x-4">
               {pending ? (
-                <PendingInviteActions groupId={groupId} profileId={pending.profileId} name={pending.name} email={pending.email} sendLabel="Send sign-in link" />
+                <PendingInviteActions groupId={groupId} profileId={pending.profileId} name={pending.name} email={pending.email} />
               ) : (
                 <SendSignInLink groupId={groupId} profileId={profileId} name={coach.fullName} />
               )}

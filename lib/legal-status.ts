@@ -24,7 +24,7 @@ export function gateCopy(needs: LegalDocument[]): { heading: string; body: strin
 }
 
 // Pages that must stay readable and usable without agreeing first: the documents themselves and the signed-out flows.
-const OPEN_PREFIXES = ["/terms", "/privacy", "/beta", "/refunds", "/login", "/signup", "/invite", "/join", "/set-password", "/forgot-password", "/reset-password", "/claim", "/book", "/share", "/pr", "/auth", "/api"];
+const OPEN_PREFIXES = ["/terms", "/privacy", "/beta", "/refunds", "/login", "/signup", "/invite", "/join", "/join-coach", "/set-password", "/forgot-password", "/reset-password", "/claim", "/book", "/share", "/pr", "/auth", "/api"];
 
 export function legalGateAppliesTo(pathname: string): boolean {
   if (pathname === "/") return false;
