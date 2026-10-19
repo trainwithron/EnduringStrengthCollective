@@ -473,7 +473,7 @@ function CoachDesktopShellFull({
         { key: "packages", label: "Packages", href: `/groups/${groupId}/business/packages`, icon: Layers },
         { key: "resources", label: "Pro shop and referrals", href: `/groups/${groupId}/resources`, icon: HeartHandshake },
         { key: "website", label: "My website", href: `/groups/${groupId}/business/website`, icon: Globe },
-        { key: "availability", label: "Availability", href: `/groups/${groupId}/availability`, icon: CalendarClock },
+        { key: "availability", label: "Availability", href: "/calendar?tab=availability", icon: CalendarClock },
         { key: "session-types", label: "Session types", href: `/groups/${groupId}/business/session-types`, icon: Tag },
         { key: "booking-page", label: "Booking page", href: `/groups/${groupId}/business/booking-page`, icon: Link2 },
         { key: "waiver", label: "Waiver", href: `/groups/${groupId}/business/waiver`, icon: ClipboardList },

@@ -39,7 +39,7 @@ const PAGES: PageDef[] = [
   { key: "recipes", label: "Favorite meals", section: "Nutrition", path: "nutrition?tab=favorites", keywords: ["food", "meals", "recipes", "recipe hub"] },
   { key: "business", label: "Business overview", section: "Business", path: "business", keywords: ["money", "income", "revenue", "mrr"] },
   { key: "packages", label: "Packages", section: "Business", path: "business/packages", keywords: ["pricing", "plans", "subscriptions"] },
-  { key: "availability", label: "Availability", section: "Business", path: "availability", keywords: ["hours", "open", "schedule"] },
+  { key: "availability", label: "Availability", section: "Business", path: "calendar?tab=availability", keywords: ["hours", "open", "schedule"] },
   { key: "session-types", label: "Session types", section: "Business", path: "business/session-types", keywords: ["online", "in person"] },
   { key: "booking-page", label: "Booking page", section: "Business", path: "business/booking-page", keywords: ["public", "link", "book"] },
   { key: "group-sessions", label: "Group sessions", section: "Business", path: "group-sessions", keywords: ["classes"] },

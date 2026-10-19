@@ -73,7 +73,8 @@ describe("the wiring", () => {
     expect(cron).toContain("start_at, end_at");
     expect(cron).toContain("new Date(booking.end_at)");
   });
-  it("the hours editor has 15, 30, 45 and 60 as one-tap steps", () => {
-    expect(read("../coach/desktop/availability-manager-desktop.tsx")).toContain("<StepPresets");
+  it("the hours editor has ONE field for how often a slot starts (the 15 / 30 / 45 / 60 chips are gone)", () => {
+    expect(read("../coach/desktop/availability-manager-desktop.tsx")).not.toContain("StepPresets");
+    expect(read("../coach/desktop/availability-manager-desktop.tsx")).toContain("Slot every (min)");
   });
 });

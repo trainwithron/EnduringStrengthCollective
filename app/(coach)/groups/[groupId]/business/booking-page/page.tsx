@@ -100,7 +100,7 @@ export default async function BookingPageSettingsPage(props: { params: Promise<{
             <div className="border border-rust/40 px-4 py-3 max-w-2xl">
               <p className="font-body text-sm text-chalk">
                 You haven&apos;t set your weekly hours, so nobody can book yet.{" "}
-                <Link href={`/groups/${params.groupId}/availability`} className="underline">
+                <Link href="/calendar?tab=availability" className="underline">
                   Set your hours
                 </Link>
               </p>

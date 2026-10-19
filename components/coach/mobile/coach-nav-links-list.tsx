@@ -117,7 +117,7 @@ export function CoachNavLinksList({ groupId }: { groupId: string; groupName?: st
         <Item href="/programs" label="Programs" icon={LayoutGrid} />
         <Item href={`/groups/${groupId}/exercise-library`} label="Exercise library" icon={Dumbbell} />
         <Item href={`/groups/${groupId}/nutrition`} label="Nutrition" icon={Salad} />
-        {!teamSport && !hiddenForCoach(navFacts, "availability") && <Item href={`/groups/${groupId}/availability`} label="Availability" icon={CalendarClock} />}
+        {!teamSport && !hiddenForCoach(navFacts, "availability") && <Item href="/calendar?tab=availability" label="Availability" icon={CalendarClock} />}
         {!teamSport && <Item href={`/groups/${groupId}/business`} label="Business overview" icon={TrendingUp} />}
         <Item href={`/groups/${groupId}/settings`} label="Settings" icon={Settings} />
         <div className="flex items-center h-11 px-5 [&_button]:text-sm [&_button]:text-chalk [&_button]:gap-3 [&_svg]:w-4 [&_svg]:h-4 [&_svg]:text-steel">

@@ -20,6 +20,7 @@ import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
 import { BookingModeLine } from "@/components/athlete/booking-mode-line";
+import { AvailabilityBookingSettings, AvailabilityTimeOff } from "@/components/coach/desktop/availability-settings";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { computeScheduledDates } from "@/lib/program-schedule";
 import { ScheduleClientPicker } from "@/components/coach/schedule-client-picker";
@@ -125,7 +126,8 @@ export async function CoachCalendarPageBody(
   // doesn't need the full booking/scheduling dashboard built for running
   // a business. The same coach in a plain browser tab still gets the
   // full desktop calendar below. Acting as a client always wins.
-  const showMobileView = isActingAsOther || !isCoach || await prefersAthleteStyleView();
+  // (A coach asking for the Availability tab gets the full page even on a phone: that is the one place availability lives.)
+  const showMobileView = isActingAsOther || !isCoach || (await prefersAthleteStyleView() && searchParams.tab !== "availability");
 
   let actingAsFullName: string | null = null;
   if (isActingAsOther) {
@@ -1232,7 +1234,11 @@ export async function CoachCalendarPageBody(
         <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">
           Your sessions with clients, your time off and your own events. A
           client&apos;s workouts live on their own calendar: tap a name to open
-          it. Set your recurring hours on the Availability tab below.
+          it. Let clients book:{" "}
+          <Link href={`${basePath}?tab=availability`} className="text-rust underline underline-offset-2">
+            Availability
+          </Link>
+          .
         </p>
       </div>
 
@@ -1248,10 +1254,14 @@ export async function CoachCalendarPageBody(
 
       <CalendarPageTabs
         coachId={user.id}
-        initialWindows={availabilityWindows}
+        initialWindows={windowsWithTypes}
+        sessionTypes={sessionTypes.map((s) => ({ id: s.id, name: s.name }))}
+        sessionTypeEnabled={windowTypeRows != null}
         sessionLengthEnabled={!sessionProbe.error}
         initialBufferMinutes={gapPolicy?.buffer_minutes ?? 0}
         initialTab={searchParams.tab === "availability" ? "availability" : "schedule"}
+        settingsSlot={<AvailabilityBookingSettings coachId={user.id} />}
+        timeOffSlot={<AvailabilityTimeOff coachId={user.id} />}
       >
       {/* mobile_must_fit_screen_standing_rule — this two-column layout
           (a fixed 260px "Needs attention"/"Clients" rail beside the

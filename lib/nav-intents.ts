@@ -79,7 +79,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   D({ id: "team-performance", label: "Team performance", path: "/groups/{groupId}/team-performance", roles: ["coach"], devices: ["desktop"], synonyms: ["team performance", "team stats", "team trends", "readiness trends"] }),
   // ---- Calendar and booking ----
   D({ id: "calendar", label: "Calendar", path: "/groups/{groupId}/calendar", roles: ["coach", "athlete"], synonyms: ["calendar", "my calendar", "schedule", "my schedule", "bookings", "sessions", "appointments", "book a session", "book session", "when am i booked", "what is on today", "upcoming sessions", "agenda"] }),
-  D({ id: "availability", label: "Availability", path: "/groups/{groupId}/availability", roles: ["coach"], devices: ["desktop"], synonyms: ["availability", "my availability", "working hours", "open hours", "set hours", "business hours", "when i am free", "booking hours", "set my hours"] }),
+  D({ id: "availability", label: "Availability", path: "/calendar?tab=availability", roles: ["coach"], devices: ["desktop"], synonyms: ["availability", "my availability", "working hours", "open hours", "set hours", "business hours", "when i am free", "booking hours", "set my hours"] }),
   D({ id: "today", label: "Today's workout", path: "/groups/{groupId}/today", roles: ["athlete"], synonyms: ["today", "todays workout", "start workout", "my workout", "workout", "train", "start training", "what is my workout", "workout of the day", "log workout", "start my workout"] }),
   // ---- Programming ----
   D({ id: "programs", label: "Programs", path: "/groups/{groupId}/programs", roles: ["coach", "athlete"], synonyms: ["programs", "my programs", "program list", "training programs", "program builder", "builder", "programming", "all programs"] }),

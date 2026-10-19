@@ -183,7 +183,7 @@ export const HOWTOS: HowTo[] = [
       "book with me link", "guest booking", "people book without an account", "scheduling link",
     ],
     steps: [
-      { text: "Set your weekly hours first, so there are times to book.", href: "/groups/{groupId}/availability", linkLabel: "Availability" },
+      { text: "Set your weekly hours first, so there are times to book.", href: "/calendar?tab=availability", linkLabel: "Availability" },
       { text: "Open Booking Page. Pick your address (for example /book/ron) and add a headline and introduction.", href: "/groups/{groupId}/business/booking-page", linkLabel: "Booking Page" },
       { text: "Under Sessions people can book, tick the session types to offer and set each one's length, where it happens, and an optional price to display." },
       { text: "Turn on Take bookings on this page, press Save, and share the link. Prices stay hidden unless you switch them on." },

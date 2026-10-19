@@ -19,7 +19,7 @@ export function GettingStartedCard({ groupId }: { groupId: string }) {
     {
       title: "Set your availability",
       body: "Tell the app when you can train people so booking and your calendar work.",
-      href: `/groups/${groupId}/availability`,
+      href: "/calendar?tab=availability",
       cta: "Set availability",
     },
   ];

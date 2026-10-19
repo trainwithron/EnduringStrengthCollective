@@ -11,6 +11,10 @@ export function CalendarPageTabs({
   initialTab,
   sessionLengthEnabled = false,
   initialBufferMinutes,
+  sessionTypes = [],
+  sessionTypeEnabled = false,
+  settingsSlot = null,
+  timeOffSlot = null,
   children,
 }: {
   coachId: string;
@@ -21,13 +25,20 @@ export function CalendarPageTabs({
     endTime: string;
     slotDurationMinutes: number;
     sessionMinutes?: number | null;
+    sessionTypeId?: string | null;
   }[];
   // The same three numbers as the Availability page: how often a start is offered, how long a session lasts, and the gap between sessions.
   sessionLengthEnabled?: boolean;
   initialBufferMinutes?: number;
+  // The coach's own session types, and whether a window of hours can carry one (until the database update is applied the choice is hidden).
+  sessionTypes?: { id: string; name: string }[];
+  sessionTypeEnabled?: boolean;
   // Lets a deep link (e.g. the Scheduling Spot's "Edit" action) land
   // straight on Availability instead of always defaulting to Schedule.
   initialTab?: Tab;
+  // The Availability tab is the ONE place for availability: how clients book and the booking rules first (settingsSlot), then the recurring hours, then time off (timeOffSlot).
+  settingsSlot?: React.ReactNode;
+  timeOffSlot?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const [tab, setTab] = useState<Tab>(initialTab ?? "schedule");
@@ -62,12 +73,18 @@ export function CalendarPageTabs({
       {tab === "schedule" ? (
         children
       ) : (
-        <AvailabilityManagerDesktop
-          coachId={coachId}
-          initialWindows={initialWindows.map((w) => ({ ...w, sessionMinutes: w.sessionMinutes ?? null }))}
-          sessionLengthEnabled={sessionLengthEnabled}
-          initialBufferMinutes={initialBufferMinutes}
-        />
+        <div>
+          {settingsSlot}
+          <AvailabilityManagerDesktop
+            coachId={coachId}
+            initialWindows={initialWindows.map((w) => ({ ...w, sessionMinutes: w.sessionMinutes ?? null, sessionTypeId: w.sessionTypeId ?? null }))}
+            sessionLengthEnabled={sessionLengthEnabled}
+            initialBufferMinutes={initialBufferMinutes}
+            sessionTypes={sessionTypes}
+            sessionTypeEnabled={sessionTypeEnabled}
+          />
+          {timeOffSlot}
+        </div>
       )}
     </div>
   );

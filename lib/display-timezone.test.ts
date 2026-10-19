@@ -73,7 +73,7 @@ describe("time off is entered in the coach's saved zone, not the browser's", () 
     expect(src).not.toContain("toLocaleString(undefined");
     expect(src).toContain("recurEnd <= recurStart");
     expect(src).toContain("setExceptions(before)");
-    expect(read("app/(coach)/groups/[groupId]/availability/page.tsx")).toContain("timezone={coachProfile?.timezone ?? DEFAULT_COACH_TIMEZONE}");
+    expect(read("components/coach/desktop/availability-settings.tsx")).toContain("timezone={coachProfile?.timezone ?? DEFAULT_COACH_TIMEZONE}");
   });
 });
 
