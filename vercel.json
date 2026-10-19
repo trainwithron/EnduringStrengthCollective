@@ -105,6 +105,10 @@
       "schedule": "30 7 * * *"
     },
     {
+      "path": "/api/cron/low-session-digest",
+      "schedule": "5 * * * *"
+    },
+    {
       "path": "/api/cron/cron-watchdog",
       "schedule": "0 9 * * *"
     }

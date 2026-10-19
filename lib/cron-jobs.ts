@@ -38,6 +38,7 @@ export const CRON_JOBS: CronJob[] = [
   { job: "departing-coaches", path: "/api/cron/departing-coaches", maxAgeHours: 12 },
   { job: "protect-wearable-tokens", path: "/api/cron/protect-wearable-tokens", maxAgeHours: DAILY },
   { job: "purge-removed-clients", path: "/api/cron/purge-removed-clients", maxAgeHours: DAILY },
+  { job: "low-session-digest", path: "/api/cron/low-session-digest", maxAgeHours: FREQUENT },
   { job: "cron-watchdog", path: "/api/cron/cron-watchdog", maxAgeHours: DAILY },
 ];
 
@@ -52,6 +53,7 @@ export const JOB_ADDED: Record<string, Date> = {
   "departing-coaches": new Date("2026-10-18T00:00:00Z"),
   "protect-wearable-tokens": new Date("2026-10-18T00:00:00Z"),
   "purge-removed-clients": new Date("2026-10-18T00:00:00Z"),
+  "low-session-digest": new Date("2026-10-19T00:00:00Z"),
 };
 export const NEW_JOB_GRACE_HOURS = 48;
 
