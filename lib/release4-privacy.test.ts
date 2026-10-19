@@ -56,7 +56,8 @@ describe("a webhook name must resolve to public addresses only", () => {
 
 describe("the organization owner is not alerted about a private client, and a client on hold gets no text alert", () => {
   it("both low-balance routes skip the owner for a private client", () => {
-    expect(src("app/api/credits/low-balance-check/route.ts")).toContain("!(athleteSeat as { private_from_org?: boolean } | null)?.private_from_org");
+    // the push now comes from the hourly digest job, which leaves the owner out of a client who is private from the organization
+    expect(src("app/api/cron/low-session-digest/route.ts")).toContain("!privateSeat.has(`${gid}:${athleteId}`)");
     const sms = src("app/api/sms/low-credit-alert/route.ts");
     expect(sms).toContain("!(athleteMember as { private_from_org?: boolean }).private_from_org");
     expect(sms).toContain('reason: "payment_hold"');
