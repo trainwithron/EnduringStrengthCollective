@@ -29,7 +29,7 @@ describe("the 5 AM burst becomes ONE push", () => {
     expect(p.recipientId).toBe(RON);
     expect(p.title).toBe("4 clients are running low");
     expect(p.body).toBe("Sawyer S. 0 left, Cindie D. 1 left, Karina R. 1 left, Oliver B. 1 left");
-    expect(p.url).toBe("/clients");
+    expect(p.url).toBe("/running-low");
     expect(plan.pushes[0].clients.filter((c) => c.name === "Oliver B.")).toHaveLength(1);
   });
   it("Oliver's second seat at '2 left' does not push (no '2 left' / '3 left' alerts any more) but is remembered quietly", () => {
@@ -44,7 +44,7 @@ describe("the 5 AM burst becomes ONE push", () => {
     const down = planLowSessionDigests(baseInput([row("cindie", 0, { alertLevel: 1 })]));
     expect(down.pushes[0].title).toBe("Cindie D. is running low");
     expect(down.pushes[0].body).toContain("0 left");
-    expect(down.pushes[0].url).toBe("/groups/g-cindie/athletes/cindie");
+    expect(down.pushes[0].url).toBe("/groups/g-cindie/athletes/cindie?tab=settings#add-sessions");
   });
   it("a client with seats in two groups is one person, told about once, and neither seat repeats tomorrow", () => {
     const plan = planLowSessionDigests(baseInput([row("cindie", 1), row("cindie", 1, { groupId: "g-cindie-2" })]));

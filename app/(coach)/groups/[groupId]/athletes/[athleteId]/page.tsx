@@ -1529,7 +1529,7 @@ export default async function AthleteProfilePage(
             </SettingsGroup>
             </div>
 
-            <div data-tab="settings">
+            <div data-tab="settings" id="add-sessions" className="scroll-mt-24">
             <SettingsGroup label="Assign sessions">
               <AssignSessionsControl
                 key={`assign-${creditsRow?.balance ?? 0}`}

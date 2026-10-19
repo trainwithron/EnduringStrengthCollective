@@ -1,4 +1,5 @@
 import { lowBalanceCrossing, tierForBalance, type LowBalanceTier } from "@/lib/reup";
+import { addSessionsHref, RUNNING_LOW_PATH } from "@/lib/add-sessions-link";
 
 // Running-low alerts go out as ONE push per person per day (Ron, Oct 19: five pushes in one minute at 5:26 AM, one per client, because he was marking sessions attended and each mark pushed at once). A daily job collects
 // every client who has newly reached "1 left" or "out" and sends each recipient a single digest, in the coach's morning. A client appears once, at their lowest balance. "3 left" and "2 left" no longer push at all.
@@ -54,11 +55,11 @@ export function digestText(clients: { athleteId: string; groupId: string; name: 
   const sorted = [...clients].sort((a, b) => a.balance - b.balance || a.name.localeCompare(b.name));
   if (sorted.length === 1) {
     const c = sorted[0];
-    return { title: `${c.name} is running low`, body: `${c.name} ${left(c.balance)}. A good moment to talk about renewing.`, url: `/groups/${c.groupId}/athletes/${c.athleteId}` };
+    return { title: `${c.name} is running low`, body: `${c.name} ${left(c.balance)}. A good moment to talk about renewing.`, url: addSessionsHref(c.groupId, c.athleteId) };
   }
   const named = sorted.slice(0, MAX_NAMED).map((c) => `${c.name} ${left(c.balance)}`);
   const more = sorted.length - named.length;
-  return { title: `${sorted.length} clients are running low`, body: `${named.join(", ")}${more > 0 ? `, and ${more} more` : ""}`, url: "/clients" };
+  return { title: `${sorted.length} clients are running low`, body: `${named.join(", ")}${more > 0 ? `, and ${more} more` : ""}`, url: RUNNING_LOW_PATH };
 }
 
 export function planLowSessionDigests(input: DigestInput): DigestPlan {
