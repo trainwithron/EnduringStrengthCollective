@@ -17,7 +17,10 @@ describe("a coach's own personal space on the phone", () => {
   });
   it("the first-run card is only for a coach with no clients anywhere", () => {
     expect(home).toContain("clientsElsewhere");
-    expect(home).toContain("No clients in {groupName}.");
+    // never "No clients" while the organization has some in its other groups: it says how many, with a way to them
+    expect(home).not.toContain("No clients in {groupName}.");
+    expect(home).toContain("in this organization.");
+    expect(home).toContain("See your clients");
     expect(home).toContain("&& !clientsElsewhere &&");
   });
 });

@@ -146,8 +146,10 @@ export function CoachSpotHub({
       // not remembered; the hub still switched
     }
     if (leavesPage) {
-      close();
-      router.push("/dashboard");
+      // A full page load, not a client-side navigation: the soft navigation after the switch hung on a loading skeleton in the live check (Oct 19), and a full load also brings the new organization's colors,
+      // fonts and icon. The chosen organization is already in the cookies.
+      window.location.assign("/dashboard");
+      return;
     }
     router.refresh(); // the colors, fonts and icon follow the organization chosen
   }
