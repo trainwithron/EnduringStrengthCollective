@@ -356,6 +356,19 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
           {clients !== null && filteredClients.length === 0 && (
             <p className="font-body text-sm text-steel px-1 py-2">{query.trim() ? "No match." : `No ${term("client", "plural")} to show.`}</p>
           )}
+          {/* A coach with no clients at all (a new coach) is offered the way to add one right here (Oct 19 audit: no Add button on their first phone screen). */}
+          {clients !== null && clients.length === 0 && !query.trim() && (
+            <button
+              type="button"
+              onClick={() => {
+                onNavigated();
+                router.push(`/groups/${clientAnchorGroup ?? groupId}/clients?add=1`);
+              }}
+              className="w-full h-11 bg-rust text-graphite font-display uppercase text-sm font-bold"
+            >
+              Add a {term("client")}
+            </button>
+          )}
           {filteredClients.map((c) => {
             return (
               <div key={c.id} className="border border-steel/15 px-2 py-2">

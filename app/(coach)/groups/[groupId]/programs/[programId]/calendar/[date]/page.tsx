@@ -15,6 +15,7 @@ import { zonedTimeToUtc, DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { addDaysToDateKey } from "@/lib/series-schedule";
 import { BookSlotButton } from "@/components/athlete/book-slot-button";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
+import { MessageCoachLink } from "@/components/athlete/message-coach-link";
 import { insideWindowHours } from "@/lib/cancel-window";
 import { RescheduleSlotButton } from "@/components/athlete/reschedule-slot-button";
 import { RequestSlotButton } from "@/components/athlete/request-slot-button";
@@ -524,7 +525,9 @@ export default async function DayDetailPage(
           <p className="font-body text-sm text-steel py-2">
             {bookingMode === "coach_schedules"
               ? "Your coach schedules your sessions. Message them to set one up."
-              : "No open hours on this day."}
+              : "No open hours on this day. Message your coach to ask for a time."}
+            <br />
+            <MessageCoachLink groupId={params.groupId} />
           </p>
         ) : (
           <div className="divide-y divide-steel/15">

@@ -25,6 +25,7 @@ import { AddDayEventForm } from "@/components/coach/desktop/add-day-event-form";
 import { getActiveProgramForAthlete, getAllProgramWorkouts, getScheduledWorkouts, dateKeyOf } from "@/lib/athlete-day-schedule";
 import { BookSlotButton } from "@/components/athlete/book-slot-button";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
+import { MessageCoachLink } from "@/components/athlete/message-coach-link";
 import { MarkAttendedControl, type CreditState } from "@/components/coach/mark-attended-control";
 import { RescheduleSlotButton } from "@/components/athlete/reschedule-slot-button";
 import { RequestSlotButton } from "@/components/athlete/request-slot-button";
@@ -377,7 +378,9 @@ export default async function CoachDayDetailPage(
             <p className="font-body text-sm text-steel py-2">
               {bookingMode === "coach_schedules"
                 ? "Your coach schedules your sessions. Message them to set one up."
-                : "No open hours on this day."}
+                : "No open hours on this day. Message your coach to ask for a time."}
+              <br />
+              <MessageCoachLink groupId={params.groupId} />
             </p>
           ) : (
             <div className="divide-y divide-steel/15">
