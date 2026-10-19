@@ -15,6 +15,7 @@ import { PushNotificationToggle } from "@/components/athlete/push-notification-t
 import { createBrowserClient } from "@/lib/supabase/client";
 import { useTerm } from "@/components/coach/terminology-provider";
 import { getCoachedGroups, LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/coach-groups";
+import { ACTIVE_ORG_COOKIE, readBrowserCookie, rememberedGroupForActiveOrg } from "@/lib/active-org";
 import { hubOrgs, hubStartGroup, hubStartOrgId, type HubOrg } from "@/lib/hub-orgs";
 import { isTeamSportGroup, TEAM_SPORT_HIDDEN_HUB_TILES } from "@/lib/team-sport";
 
@@ -104,8 +105,8 @@ export function CoachSpotHub({
           return;
         }
         const groups = await getCoachedGroups(supabase, data.user.id);
-        const remembered = document.cookie.split("; ").find((c) => c.startsWith(`${LAST_WORKSPACE_GROUP_COOKIE}=`))?.split("=")[1];
-        const rememberedId = remembered ? decodeURIComponent(remembered) : null;
+        // The organization is the one the coach CHOSE (its own cookie); the last group opened only picks a group inside it.
+        const rememberedId = rememberedGroupForActiveOrg(groups, readBrowserCookie(ACTIVE_ORG_COOKIE), readBrowserCookie(LAST_WORKSPACE_GROUP_COOKIE));
         const list = hubOrgs(groups, rememberedId);
         const start = hubStartOrgId(groups, rememberedId, groupId);
         setOrgs(list);
@@ -134,6 +135,7 @@ export function CoachSpotHub({
     try {
       // The same memory the organization switcher keeps, so Home follows the hub.
       document.cookie = `${LAST_WORKSPACE_GROUP_COOKIE}=${encodeURIComponent(next.anchorGroupId)}; path=/; max-age=${60 * 60 * 24 * 90}`;
+      document.cookie = `${ACTIVE_ORG_COOKIE}=${encodeURIComponent(next.orgId)}; path=/; max-age=${60 * 60 * 24 * 90}`;
     } catch {
       // not remembered; the hub still switched
     }

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { activeOrgId, clientCountsByOrg } from "@/lib/active-org";
+import { ACTIVE_ORG_COOKIE, activeOrgId, clientCountsByOrg, readBrowserCookie, rememberedGroupForActiveOrg } from "@/lib/active-org";
 import { getCoachedGroups, groupsInOrgOf, LAST_WORKSPACE_GROUP_COOKIE, type CoachedGroup } from "@/lib/coach-groups";
 
 // For code that runs in the browser (finders, pickers, rail widgets): the coached groups of the organization the coach is IN. That is the organization of the page's group; on a page with no
@@ -11,7 +11,7 @@ export async function activeOrgGroupsFor(supabase: SupabaseClient, coachId: stri
     const inOrg = groupsInOrgOf(all, anchorGroupId);
     if (inOrg.length > 0) return inOrg;
   }
-  const remembered = readRememberedWorkspaceGroup();
+  const remembered = rememberedGroupForActiveOrg(all, readBrowserCookie(ACTIVE_ORG_COOKIE), readRememberedWorkspaceGroup());
   const rememberedValid = !!remembered && all.some((g) => g.id === remembered && g.kind !== "one_on_one");
   const needsCounts = !rememberedValid && new Set(all.map((g) => g.orgId)).size > 1;
   const counts = needsCounts ? await clientCountsByOrg(supabase, all) : {};

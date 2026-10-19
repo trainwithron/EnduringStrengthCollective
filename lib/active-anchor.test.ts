@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { chooseActiveAnchor } from "@/lib/active-anchor";
+import { rememberedGroupForActiveOrg } from "@/lib/active-org";
 import type { CoachedGroup } from "@/lib/coach-groups";
 
 const g = (id: string, name: string, orgId: string, orgName: string, kind: CoachedGroup["kind"] = "team"): CoachedGroup => ({ id, name, orgId, orgName, kind });
@@ -49,8 +50,49 @@ describe("which organization a coach-level page stands on", () => {
   });
 });
 
+// Ron's bug: he chose Enduring Strength Co., then a plain /calendar showed Coast2Coast, because opening any group page (even a prefetched link) rewrote "the last group opened", which used to BE the organization.
+// Now the organization is its own cookie (active_org); the last group opened only picks a group inside it. Cookies at the time: last_group = Trojans, last_workspace_group = a placeholder id.
+describe("the chosen organization is its own cookie", () => {
+  const PLACEHOLDER = "11111111-2222-3333-4444-555555555555";
+  const stand = (activeOrg: string | null, lastWorkspace: string | null) => chooseActiveAnchor(groups, rememberedGroupForActiveOrg(groups, activeOrg, lastWorkspace));
+  it("a valid chosen organization wins, even when the last group opened is in another organization", () => {
+    const r = stand("es", "home");
+    expect(r!.orgId).toBe("es");
+    expect(r!.anchor.id).toBe("collective");
+    expect(r!.needsChoice).toBe(false);
+    expect(stand("c2c", "trojans")!.orgId).toBe("c2c");
+    expect(stand("lee", PLACEHOLDER)!.orgId).toBe("lee");
+  });
+  it("the last group opened inside the chosen organization is still the group used", () => {
+    const two = [...groups, g("es-b", "Second Team", "es", "Enduring Strength Co.")];
+    expect(rememberedGroupForActiveOrg(two, "es", "es-b")).toBe("es-b");
+    expect(rememberedGroupForActiveOrg(two, "es", "home")).toBe("collective");
+  });
+  it("nothing chosen, or a chosen organization that is not the coach's (a stale or placeholder value), sends a coach with three organizations to the chooser, never to the first", () => {
+    for (const bad of [null, "", PLACEHOLDER, "not-an-org"]) {
+      expect(rememberedGroupForActiveOrg(groups, bad, "trojans"), String(bad)).toBeNull();
+      expect(stand(bad, "trojans")!.needsChoice, String(bad)).toBe(true);
+      expect(stand(bad, PLACEHOLDER)!.needsChoice, String(bad)).toBe(true);
+    }
+  });
+  it("a coach with one organization is never asked", () => {
+    const one = groups.filter((x) => x.orgId === "es");
+    expect(chooseActiveAnchor(one, rememberedGroupForActiveOrg(one, PLACEHOLDER, PLACEHOLDER))!.needsChoice).toBe(false);
+  });
+  it("a one-on-one client's group is not a home for the organization", () => {
+    expect(rememberedGroupForActiveOrg(groups.filter((x) => x.kind === "one_on_one"), "es", "client-a")).toBeNull();
+  });
+});
+
 describe("the pieces that make the choice stick", () => {
   const read = (rel: string) => readFileSync(join(__dirname, "..", rel), "utf8").replace(/\r\n/g, "\n");
+  it("only a deliberate choice writes the organization cookie: the chooser, the switcher and the phone hub write it; the middleware and the shell (which follow every page opened) do not", () => {
+    for (const f of ["app/choose-organization/select/route.ts", "components/coach/desktop/org-switcher.tsx", "components/coach/mobile/coach-spot-hub.tsx"]) expect(read(f), f).toContain("ACTIVE_ORG_COOKIE");
+    for (const f of ["lib/supabase/middleware.ts", "components/coach/coach-desktop-shell.tsx"]) expect(read(f), f).not.toContain("ACTIVE_ORG_COOKIE");
+  });
+  it("every reader of the organization goes through rememberedGroupForActiveOrg", () => {
+    for (const f of ["lib/active-anchor.ts", "app/(coach)/dashboard/page.tsx", "app/coach-landing/route.ts", "lib/active-org-groups.ts", "components/coach/mobile/coach-spot-hub.tsx"]) expect(read(f), f).toContain("rememberedGroupForActiveOrg(");
+  });
   it("every coach-level page sends the coach to the chooser instead of guessing", () => {
     for (const f of ["app/(coach)/programs/page.tsx", "app/(coach)/clients/page.tsx", "app/(coach)/calendar/page.tsx", "app/(coach)/group-calendar/page.tsx"]) {
       expect(read(f)).toContain("active?.needsChoice");

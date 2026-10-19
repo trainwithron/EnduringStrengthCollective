@@ -18,7 +18,7 @@ import { getCoachedGroups, LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/coach-group
 import { getActiveAnchor } from "@/lib/active-anchor";
 import { orgIsTeamOnly } from "@/lib/team-sport";
 import { SessionCheckSection } from "@/components/coach/session-check-section";
-import { activeOrgId, clientCountsByOrg, inActiveOrg, rememberedOrgId } from "@/lib/active-org";
+import { ACTIVE_ORG_COOKIE, activeOrgId, clientCountsByOrg, decodeCookieValue, inActiveOrg, rememberedGroupForActiveOrg, rememberedOrgId } from "@/lib/active-org";
 import { getCoachDashboardData } from "@/lib/dashboard-data";
 import { PulseTabs } from "@/components/coach/desktop/pulse-tabs";
 import { DashboardStatTiles } from "@/components/coach/desktop/dashboard-stat-tiles";
@@ -152,7 +152,8 @@ export default async function CoachHomePage() {
   // Home belongs to ONE organization at a time: the one the coach chose with the organization switcher (else their first). Everything on it, and every count, is that
   // organization's; another one appears only after switching to it.
   // The organization they last used (the switcher remembers it); with none remembered, the one with the most clients.
-  const rememberedWorkspace = (await cookies()).get(LAST_WORKSPACE_GROUP_COOKIE)?.value ?? null;
+  const lastWorkspaceCookie = (await cookies()).get(LAST_WORKSPACE_GROUP_COOKIE)?.value ?? null;
+  const activeOrgCookie = (await cookies()).get(ACTIVE_ORG_COOKIE)?.value ?? null;
   // The briefing is filed under the coach's own day (their time zone, set below), which is the UTC day or a day either side of it: read that window, keep the right one once the zone is known.
   const utcTodayKey = new Date().toISOString().slice(0, 10);
   // Round 1: everything that needs only who the coach is, as one batch.
@@ -200,6 +201,8 @@ export default async function CoachHomePage() {
   ]);
 
   // More than one organization and none remembered: ask which one, rather than guessing the biggest (lib/active-anchor.ts).
+  // The organization is the one the coach CHOSE (its own cookie); opening a group does not change it.
+  const rememberedWorkspace = rememberedGroupForActiveOrg(coachedForOrg, decodeCookieValue(activeOrgCookie), decodeCookieValue(lastWorkspaceCookie));
   if (!rememberedOrgId(coachedForOrg, rememberedWorkspace) && new Set(coachedForOrg.map((g) => g.orgId)).size > 1) redirect("/choose-organization?next=/dashboard");
   const clientsByOrg = rememberedOrgId(coachedForOrg, rememberedWorkspace) ? {} : await clientCountsByOrg(supabase, coachedForOrg);
   const homeOrgId = activeOrgId(coachedForOrg, rememberedWorkspace, clientsByOrg);
