@@ -199,8 +199,9 @@ function BarcodeScanPanel({
   async function handleConfirm() {
     if (!result) return;
     setSaving(true);
+    setError(null);
     const supabase = createBrowserClient();
-    const { data } = await supabase
+    const { data, error: saveError } = await supabase
       .from("food_log_entries")
       .insert({
         athlete_id: athleteId,
@@ -217,6 +218,11 @@ function BarcodeScanPanel({
       .select("id")
       .single();
     setSaving(false);
+    // A save that did not land keeps the estimate on screen and says so (it used to do nothing at all).
+    if (saveError || !data) {
+      setError("That didn't save. Your estimate is still here: check your connection and tap Confirm & log again.");
+      return;
+    }
     if (data) {
       onLogged({
         id: data.id,

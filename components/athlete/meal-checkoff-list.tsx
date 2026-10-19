@@ -54,6 +54,8 @@ export function MealCheckoffList({
   const [entries, setEntries] = useState(initialEntries);
   const [savingSlot, setSavingSlot] = useState<string | null>(null);
   const [modifyingSlot, setModifyingSlot] = useState<string | null>(null);
+  // "I ate this" / "Skip" that did not save says so (it used to do nothing).
+  const [logError, setLogError] = useState<string | null>(null);
 
   // Free-form logged foods (status quick_log) can carry a meal name like "snack" too; only entries ticked off against the plan count as the plan's meal being logged.
   const entryBySlot = new Map(entries.filter((e) => e.mealSlot && e.status !== "quick_log").map((e) => [e.mealSlot as string, e]));
@@ -75,7 +77,9 @@ export function MealCheckoffList({
       fat_g: status === "ate_it" ? fatTarget : 0,
     };
     const supabase = createBrowserClient();
-    const { data } = await supabase.from("food_log_entries").insert(payload).select("id").single();
+    setLogError(null);
+    const { data, error: logSaveError } = await supabase.from("food_log_entries").insert(payload).select("id").single();
+    if (logSaveError || !data) setLogError("That didn't save. Check your connection and tap again.");
     if (data) {
       const newEntry: FoodLogEntry = {
         id: data.id,
@@ -109,6 +113,11 @@ export function MealCheckoffList({
 
   return (
     <div className="space-y-2">
+      {logError && (
+        <p className="font-body text-xs text-rust" role="alert">
+          {logError}
+        </p>
+      )}
       {meals.map((meal) => {
         const logged = entryBySlot.get(meal.spec.id);
         const primaryOption = meal.options[0];
@@ -249,8 +258,9 @@ export function FreeTextFoodLog({
   async function handleConfirm() {
     if (!estimate) return;
     setSaving(true);
+    setError(null);
     const supabase = createBrowserClient();
-    const { data } = await supabase
+    const { data, error: saveError } = await supabase
       .from("food_log_entries")
       .insert({
         athlete_id: athleteId,
@@ -267,6 +277,11 @@ export function FreeTextFoodLog({
       .select("id")
       .single();
     setSaving(false);
+    // A save that did not land keeps the estimate on screen and says so (it used to do nothing at all).
+    if (saveError || !data) {
+      setError("That didn't save. Your estimate is still here: check your connection and tap Confirm & log again.");
+      return;
+    }
     if (data) {
       onLogged({
         id: data.id,
@@ -320,6 +335,11 @@ export function FreeTextFoodLog({
             ~{estimate.calories} kcal · {estimate.proteinG}p / {estimate.carbsG}c / {estimate.fatG}f
           </p>
           <p className="font-body text-xs text-steel mt-1">Rough estimate — not lab-precise.</p>
+          {error && (
+            <p className="font-body text-xs text-rust mt-1" role="alert">
+              {error}
+            </p>
+          )}
           <div className="flex items-center gap-2 mt-2">
             <button
               type="button"
