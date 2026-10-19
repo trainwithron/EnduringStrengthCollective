@@ -30,3 +30,23 @@ describe("the start button", () => {
     expect(src).toContain("(linkChecked ? linked : await findLinkedBooking(supabase))?.id ?? null");
   });
 });
+
+describe("linking the client's session of the same day", () => {
+  it("looks at today on the coach's clock, confirmed and not yet settled or marked, and takes the nearest to now", () => {
+    expect(src).toContain('.eq("credit_state", "unsettled")');
+    expect(src).toContain('.is("attended_at", null)');
+    expect(src).toContain(".gte(\"start_at\", dayStart.toISOString())");
+    expect(src).toContain(".lt(\"start_at\", dayEnd.toISOString())");
+    expect(src).toContain("findMatchingBookingId(candidates, now, SAME_DAY_TOLERANCE_MINUTES)");
+    expect(src).not.toContain("3 * 60 * 60000");
+  });
+  it("the nearest of the day's sessions wins; none that day links nothing, so the credit box shows as before", async () => {
+    const { findMatchingBookingId, SAME_DAY_TOLERANCE_MINUTES } = await import("@/lib/booking-session-link");
+    const now = new Date(2026, 9, 19, 8, 0);
+    const morning = { id: "morning", startAt: new Date(2026, 9, 19, 9, 0) };
+    const afternoon = { id: "afternoon", startAt: new Date(2026, 9, 19, 15, 0) };
+    expect(findMatchingBookingId([afternoon], now, SAME_DAY_TOLERANCE_MINUTES)).toBe("afternoon");
+    expect(findMatchingBookingId([afternoon, morning], now, SAME_DAY_TOLERANCE_MINUTES)).toBe("morning");
+    expect(findMatchingBookingId([], now, SAME_DAY_TOLERANCE_MINUTES)).toBeNull();
+  });
+});

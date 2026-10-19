@@ -50,7 +50,7 @@ export async function NextClientWorkoutSection({ coachId, groupIds }: { coachId:
         <span className="block font-display uppercase text-lg font-bold leading-tight">Start {next.name}&apos;s workout</span>
         <span className="block font-body text-sm">{nextSessionLabel(next.startIso, timezone, now)}</span>
       </Link>
-      {!next.hasProgram && <p className="font-body text-sm text-steel mt-2">No program yet for {next.name}.</p>}
+      {!next.hasProgram && <p className="font-body text-sm text-steel mt-2">No program yet for {next.name}</p>}
     </section>
   );
 }

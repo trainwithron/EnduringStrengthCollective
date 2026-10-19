@@ -40,3 +40,13 @@ describe("Start workout on the coach's phone Home", () => {
     expect(bar).toContain("Logging for {clientName}");
   });
 });
+
+describe("the phone Home's organization client count agrees with the Clients page", () => {
+  it("counts each active client once and leaves out the ones set aside", () => {
+    const home = readFileSync("components/coach/mobile/coach-mobile-home.tsx", "utf8").replace(/\r\n/g, "\n");
+    expect(home).toContain("fetchInactiveKeys(supabase, others)");
+    expect(home).toContain("!asideKeys.has(inactiveKey(m.group_id, m.profile_id))");
+    expect(home).toContain(".map((m) => m.profile_id)).size");
+    expect(home).not.toContain("countByIds");
+  });
+});

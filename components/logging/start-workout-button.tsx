@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { ExerciseSetTarget } from "@/lib/types";
 import type { TrackedField } from "@/lib/exercise-fields";
-import { findMatchingBookingId } from "@/lib/booking-session-link";
+import { findMatchingBookingId, SAME_DAY_TOLERANCE_MINUTES } from "@/lib/booking-session-link";
 import { bookingCreditLine } from "@/lib/booking-credit-line";
 
 interface TemplateExercise {
@@ -70,19 +70,25 @@ export function StartWorkoutButton({
   async function findLinkedBooking(supabase: ReturnType<typeof createBrowserClient>): Promise<{ id: string; startAt: Date } | null> {
     // Calendar Spotter Phase 2 — link this session to the real booking it fulfills, if one exists, so "booked 60 min, actually took 40" becomes a real, queryable question later. A freeform/unbooked
     // session correctly finds nothing and stays null.
+    // Any of the client's confirmed, not yet settled sessions TODAY on the coach's clock (this phone's), the nearest to now: a coach logging a 3:00 session at 8 AM still has it linked (and told so), and a booking
+    // further away no longer sits unlinked beside a ticked credit box to be charged a second time when "Did this session happen?" is answered Yes.
     const now = new Date();
-    const windowStart = new Date(now.getTime() - 3 * 60 * 60000).toISOString();
-    const windowEnd = new Date(now.getTime() + 3 * 60 * 60000).toISOString();
+    const dayStart = new Date(now);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(dayStart);
+    dayEnd.setDate(dayEnd.getDate() + 1);
     const { data: candidateBookings } = await supabase
       .from("bookings")
       .select("id, start_at")
       .eq("athlete_id", athleteId)
       .eq("group_id", groupId)
       .eq("status", "confirmed")
-      .gte("start_at", windowStart)
-      .lte("start_at", windowEnd);
+      .eq("credit_state", "unsettled")
+      .is("attended_at", null)
+      .gte("start_at", dayStart.toISOString())
+      .lt("start_at", dayEnd.toISOString());
     const candidates = (candidateBookings ?? []).map((b) => ({ id: b.id as string, startAt: new Date(b.start_at as string) }));
-    const id = findMatchingBookingId(candidates, now);
+    const id = findMatchingBookingId(candidates, now, SAME_DAY_TOLERANCE_MINUTES);
     return id ? candidates.find((c) => c.id === id) ?? null : null;
   }
 

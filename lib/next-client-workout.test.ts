@@ -116,7 +116,9 @@ describe("the Home button reads only what it should and goes where 'Log their wo
   it("source: the button goes to the client's log page, or to their profile with a plain line when there is no program", () => {
     const src = read("components/coach/next-client-workout-section.tsx");
     expect(src).toContain("/log` : `/groups/${next.groupId}/athletes/${next.athleteId}`");
-    expect(src).toContain("No program yet for {next.name}.");
+    // the short name already ends with a period ("Cindie D."): none is added
+    expect(src).toContain("No program yet for {next.name}</p>");
+    expect(src).not.toContain("No program yet for {next.name}.");
     expect(src).toContain("Start {next.name}&apos;s workout");
     expect(src).toContain("nextSessionLabel(next.startIso, timezone, now)");
   });

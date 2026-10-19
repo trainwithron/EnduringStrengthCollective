@@ -1,4 +1,5 @@
-import { countByIds } from "@/lib/read-by-ids";
+import { readRowsByIds } from "@/lib/read-by-ids";
+import { fetchInactiveKeys, inactiveKey } from "@/lib/inactive-ids";
 import { resolveDayMacros, standingForDate } from "@/lib/macro-resolution";
 import { fetchStandingHistory } from "@/lib/standing-macros";
 import Link from "next/link";
@@ -80,8 +81,12 @@ export async function CoachMobileHome({
   if ((rosterRows ?? []).length === 0) {
     const others = orgGroupIds.filter((id) => id !== groupId);
     if (others.length > 0) {
-      const { count } = await countByIds(others, (g) => supabase.from("group_memberships").select("profile_id", { count: "exact", head: true }).eq("role", "athlete").in("group_id", g));
-      clientsElsewhereCount = count ?? 0;
+      // Active clients only, each person once: the same number the Clients page calls "All" (clients set aside are its own count there).
+      const [{ data: elsewhere }, asideKeys] = await Promise.all([
+        readRowsByIds(others, (g) => (from, to) => supabase.from("group_memberships").select("profile_id, group_id").eq("role", "athlete").in("group_id", g).order("id").range(from, to)),
+        fetchInactiveKeys(supabase, others),
+      ]);
+      clientsElsewhereCount = new Set(((elsewhere ?? []) as { profile_id: string; group_id: string }[]).filter((m) => !asideKeys.has(inactiveKey(m.group_id, m.profile_id))).map((m) => m.profile_id)).size;
       clientsElsewhere = clientsElsewhereCount > 0;
     }
   }
