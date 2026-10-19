@@ -6,13 +6,15 @@ import { BookingModeSelect, type BookingMode } from "@/components/coach/desktop/
 import { AvailabilityExceptionsManager } from "@/components/coach/desktop/availability-exceptions-manager";
 import { TimezoneControl } from "@/components/coach/desktop/timezone-control";
 import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
+import { ensureDefaultPublicPage } from "@/lib/default-public-page";
+import { ConsultationLinkBlock } from "@/components/coach/desktop/consultation-link-block";
 
 // ONE Availability place (Calendar > Availability): how clients book first, then the booking rules, then the time zone; below the recurring hours come the time-off blocks. These used to live on a second page,
 // /groups/<id>/availability, which now sends the coach here. Each read that depends on a later database update hides its control until the column exists, as before.
 export async function AvailabilityBookingSettings({ coachId }: { coachId: string }) {
   const supabase = await createServerClient();
   const [{ data: coachProfile, error: profileError }, { data: policyRow, error: policyError }, nudgeResult, headsUpResult, bookingModeResult] = await Promise.all([
-    supabase.from("profiles").select("timezone").eq("id", coachId).maybeSingle(),
+    supabase.from("profiles").select("timezone, full_name").eq("id", coachId).maybeSingle(),
     supabase.from("coach_booking_policies").select("cancellation_window_hours, buffer_minutes, minimum_notice_hours, credit_expiry_days").eq("coach_id", coachId).maybeSingle(),
     supabase.from("coach_booking_policies").select("reup_nudges_enabled").eq("coach_id", coachId).maybeSingle(),
     supabase.from("coach_booking_policies").select("expiry_heads_up_days").eq("coach_id", coachId).maybeSingle(),
@@ -31,9 +33,14 @@ export async function AvailabilityBookingSettings({ coachId }: { coachId: string
   // A coach who never chose is shown the real default, "I schedule everyone", selected.
   const bookingMode: BookingMode | null = bookingModeResult.error ? null : ((bookingModeResult.data?.booking_mode as BookingMode | null) ?? "coach_schedules");
 
+  // Every coach has a public page: made here, once, the first time this screen opens (no address to pick, nothing to set up). A database without the booking-page tables yet simply shows no block.
+  const publicPage = await ensureDefaultPublicPage(supabase, coachId, (coachProfile as { full_name?: string | null } | null)?.full_name);
+  const { count: openWindowCount } = await supabase.from("coach_availability_windows").select("id", { count: "exact", head: true }).eq("coach_id", coachId);
+
   return (
     <div>
       {bookingMode !== null && <BookingModeSelect coachId={coachId} initialMode={bookingMode} />}
+      {publicPage && <ConsultationLinkBlock coachId={coachId} slug={publicPage.slug} enabled={publicPage.enabled} acceptsRequests={publicPage.acceptsRequests} hasOpenHours={(openWindowCount ?? 0) > 0} />}
 
       <section className="mb-6" aria-labelledby="booking-rules">
         <h2 id="booking-rules" className="font-display uppercase text-lg tracking-wide mb-2">

@@ -37,6 +37,8 @@ async function load(slugParam: string, preview: boolean) {
     isOwner = user?.id === page.coach_id;
   }
   if (!site.published && !isOwner) return null;
+  // The coach's one switch (Calendar > Availability): off means the link shows a plain "not available" page, to everyone but the coach previewing it.
+  if (!page.enabled && !isOwner) return null;
 
   const [{ data: profile }, { data: membership }] = await Promise.all([
     db.from("profiles").select("full_name").eq("id", page.coach_id).maybeSingle(),
