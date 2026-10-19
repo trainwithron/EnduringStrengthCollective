@@ -3,6 +3,8 @@ import { configuredAppUrl } from "@/lib/app-url";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AddToHomeScreenPrompt } from "@/components/add-to-home-screen-prompt";
+import { NavProgress } from "@/components/shared/nav-progress";
+import { Suspense } from "react";
 import { PwaContextCookie } from "@/components/pwa-context-cookie";
 import { SetOutboxReplay } from "@/components/set-outbox-replay";
 import { SaveFailedToast } from "@/components/ui/save-failed-toast";
@@ -91,6 +93,10 @@ export default async function RootLayout({
       <body className="font-body bg-graphite text-chalk min-h-screen">
         <PwaContextCookie />
         <SetOutboxReplay />
+        {/* A thin bar the moment a link is tapped, until the next page is there (Ron, Oct 19: taps that looked unresponsive). */}
+        <Suspense fallback={null}>
+          <NavProgress />
+        </Suspense>
         <AddToHomeScreenPrompt />
         <LoadingWatchdog />
         <TeamWordsHintProvider hint={teamWordsHint}>{children}</TeamWordsHintProvider>
