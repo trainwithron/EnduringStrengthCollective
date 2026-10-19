@@ -58,7 +58,7 @@ describe("How clients book: three large choices, the current one visibly selecte
     const html = renderToStaticMarkup(createElement(BookingModeSelect, { coachId: "c1", initialMode: "coach_schedules" }));
     expect(html.match(/role="radio"/g)?.length).toBe(3);
     expect(html.match(/aria-checked="true"/g)?.length).toBe(1);
-    expect(html).toMatch(/aria-checked="true"[^>]*>(?:(?!<\/button>).)*I schedule everyone/s);
+    expect(html).toMatch(/aria-checked="true"[^>]*>(?:(?!<\/button>)[\s\S])*I schedule everyone/);
     expect(html).toContain("How clients book");
   });
   it("saves the moment one is tapped and says Saved", () => {

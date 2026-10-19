@@ -223,6 +223,16 @@ export function DayTimeGrid({
     };
   }, []);
 
+  // Escape closes the Book pop-up (not while it is booking, and not while the repeat-weekly form is open: that has its own Cancel).
+  useEffect(() => {
+    if (pendingMin == null) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && !assigning && !repeating) setPendingMin(null);
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [pendingMin, assigning, repeating]);
+
   async function book() {
     if (!client || pendingMin == null) return;
     sendNotifications();

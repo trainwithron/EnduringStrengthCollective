@@ -76,3 +76,28 @@ describe("the Book pop-up appears at the time that was picked", () => {
     expect(grid).toContain("fixed bottom-4 left-1/2 -translate-x-1/2 z-40");
   });
 });
+
+describe("Escape and a click outside close the pop-up and the dialog", () => {
+  it("Book pop-up: Escape closes it unless it is booking or the repeat form is open; a click outside closes it too", () => {
+    const grid = read("components/coach/desktop/day-time-grid.tsx");
+    expect(grid).toContain('if (e.key === "Escape" && !assigning && !repeating) setPendingMin(null);');
+    expect(grid).toContain("onClick={() => !assigning && !repeating && setPendingMin(null)}");
+  });
+  it("Cancel dialog: Escape keeps the session", () => {
+    const d = read("components/coach/session-cancel-dialog.tsx");
+    expect(d).toContain('if (e.key === "Escape" && !busy) onClose();');
+  });
+});
+
+describe("the header menu lists every organization, one click to switch", () => {
+  const m = read("components/coach/desktop/workspace-menu.tsx");
+  it("reads all the coach's organizations on load and marks the current one", () => {
+    expect(m).toContain('from("organization_memberships").select("organization_id, organizations ( name )")');
+    expect(m).toContain("{orgs.length > 1 && (");
+    expect(m).toContain("aria-checked={here}");
+    expect(m).toContain("/choose-organization/select?org=${o.id}&next=/dashboard");
+  });
+  it("is a plain link (no prefetch of a route that sets a cookie)", () => {
+    expect(m).toContain("<a key={o.id} href=");
+  });
+});

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createGroupWithCoach } from "@/lib/create-group";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Plus } from "lucide-react";
+import { Check, ChevronDown, Plus } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 
 interface WorkspaceGroup {
@@ -20,7 +20,9 @@ export function WorkspaceMenu({ groupId, orgName, large = false }: { groupId: st
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [groups, setGroups] = useState<WorkspaceGroup[]>([]);
-  const [otherOrgs, setOtherOrgs] = useState<{ id: string; name: string; groupId: string }[]>([]);
+  // EVERY organization the coach belongs to (read as soon as the bar is up, so the list is there the moment the menu opens), and the one this page is in. Switching is one click, from any page.
+  const [orgs, setOrgs] = useState<{ id: string; name: string }[]>([]);
+  const [currentOrgId, setCurrentOrgId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [newKind, setNewKind] = useState<"team" | "social">("team");
@@ -52,20 +54,38 @@ export function WorkspaceMenu({ groupId, orgName, large = false }: { groupId: st
           .map((g) => ({ id: g.id as string, name: (g.name as string) ?? "Group", kind: (g.group_kind === "social" ? "social" : "team") as "team" | "social" }))
           .sort((a, b) => a.name.localeCompare(b.name))
       );
-      // Other organizations only appear for a coach who belongs to two or more.
-      const orgs = new Map<string, { id: string; name: string; groupId: string }>();
-      for (const g of rows) {
-        if (g.organization_id && g.organization_id !== currentOrgId && !orgs.has(g.organization_id)) {
-          orgs.set(g.organization_id, { id: g.organization_id, name: g.organizations?.name ?? "Organization", groupId: g.id });
-        }
-      }
-      setOtherOrgs([...orgs.values()].sort((a, b) => a.name.localeCompare(b.name)));
     }
     load();
     return () => {
       cancelled = true;
     };
   }, [open, groupId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadOrgs() {
+      const supabase = createBrowserClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+      const [{ data: memberships }, { data: here }] = await Promise.all([
+        supabase.from("organization_memberships").select("organization_id, organizations ( name )").eq("profile_id", user.id),
+        supabase.from("groups").select("organization_id").eq("id", groupId).maybeSingle(),
+      ]);
+      if (cancelled) return;
+      const list = ((memberships ?? []) as unknown as { organization_id: string; organizations: { name: string | null } | { name: string | null }[] | null }[]).map((m) => ({
+        id: m.organization_id,
+        name: (Array.isArray(m.organizations) ? m.organizations[0]?.name : m.organizations?.name) ?? "Organization",
+      }));
+      setOrgs(list.sort((a, b) => a.name.localeCompare(b.name)));
+      setCurrentOrgId((here as { organization_id?: string | null } | null)?.organization_id ?? null);
+    }
+    void loadOrgs();
+    return () => {
+      cancelled = true;
+    };
+  }, [groupId]);
 
   useEffect(() => {
     if (!open) return;
@@ -158,14 +178,19 @@ export function WorkspaceMenu({ groupId, orgName, large = false }: { groupId: st
               ))}
             </>
           )}
-          {otherOrgs.length > 0 && (
+          {orgs.length > 1 && (
             <>
-              <p className="px-3 pt-2 pb-1 font-body text-xs text-steel uppercase tracking-wide">Other organizations</p>
-              {otherOrgs.map((o) => (
-                <Link key={o.id} href={`/groups/${o.groupId}/dashboard`} role="menuitem" onClick={() => setOpen(false)} className={itemClass}>
-                  <span className="truncate">{o.name}</span>
-                </Link>
-              ))}
+              <p className="px-3 pt-2 pb-1 font-body text-xs text-steel uppercase tracking-wide">Organizations</p>
+              {orgs.map((o) => {
+                const here = o.id === currentOrgId;
+                // A plain link (not a prefetched one): choosing remembers the organization and opens its Home.
+                return (
+                  <a key={o.id} href={`/choose-organization/select?org=${o.id}&next=/dashboard`} role="menuitemradio" aria-checked={here} className={`${itemClass} justify-between`}>
+                    <span className="truncate">{o.name}</span>
+                    {here && <Check className="w-4 h-4 shrink-0 text-rust ml-2" aria-label="Current organization" />}
+                  </a>
+                );
+              })}
             </>
           )}
           <div className="border-t border-steel/20 mt-1">
