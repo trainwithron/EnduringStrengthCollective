@@ -109,7 +109,8 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
   return {
     title: `${data.coachName}${data.orgName ? ` - ${data.orgName}` : ""}`,
     description: data.content.headline || `${data.coachName}, coaching.`,
-    robots: data.published ? { index: true, follow: true } : { index: false, follow: false },
+    // Shared by link, never harvested by search engines: every coach has this page now (made automatically), and a coach's name must not appear in search results just because they opened a tab.
+    robots: { index: false, follow: false },
   };
 }
 

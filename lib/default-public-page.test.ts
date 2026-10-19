@@ -117,3 +117,15 @@ describe("the public link", () => {
     expect(page).toContain("if (!page.enabled && !isOwner) return null;");
   });
 });
+
+describe("search engines", () => {
+  it("never index the coach's public page or the booking page: they are shared by link", () => {
+    const c = read("app/c/[slug]/page.tsx");
+    expect(c).toContain("robots: { index: false, follow: false },");
+    expect(c).not.toContain("index: true");
+    const book = read("app/book/[coachId]/page.tsx");
+    expect(book).toContain("const robots = { index: false, follow: false };");
+    expect(book.match(/robots \}/g)?.length).toBe(2);
+    expect(read("app/c/[slug]/request/page.tsx")).toContain("robots: { index: false, follow: false }");
+  });
+});

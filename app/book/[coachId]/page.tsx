@@ -23,9 +23,11 @@ async function pageFor(param: string) {
 
 export async function generateMetadata(props: { params: Promise<{ coachId: string }> }): Promise<Metadata> {
   const { coachId } = await props.params;
-  if (isUuid(coachId)) return { title: "Booking page" };
+  // Shared by link, not by search engines.
+  const robots = { index: false, follow: false };
+  if (isUuid(coachId)) return { title: "Booking page", robots };
   const found = await pageFor(coachId);
-  return { title: found?.view ? `Book with ${found.view.coachName}` : "Booking page" };
+  return { title: found?.view ? `Book with ${found.view.coachName}` : "Booking page", robots };
 }
 
 export default async function BookPage(props: { params: Promise<{ coachId: string }> }) {
