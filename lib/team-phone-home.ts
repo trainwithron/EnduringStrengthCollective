@@ -41,7 +41,6 @@ export function teamPhoneHome({ groupId, program }: { groupId: string; program: 
     ...teamSportMoreMenu(groupId),
     { key: "exercise-library", label: "Exercise library", href: `/groups/${groupId}/exercise-library` },
     { key: "nutrition", label: "Nutrition", href: `/groups/${groupId}/nutrition` },
-    { key: "my-training", label: "My own training", href: "/my-space?view=client" },
   ];
   return {
     program: program ? { name: program.name, summary: programSummary(program.workouts), href: `/groups/${groupId}/programs/${program.id}` } : null,
