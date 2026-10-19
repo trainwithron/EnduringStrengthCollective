@@ -87,7 +87,8 @@ export function MealPlanGenerator({
   initialPhase,
   proteinGPerLb,
   foodRules,
-  rulesReadable = true,
+  rulesReadable: rulesReadableProp = true,
+  allergiesAsked = true,
   clientName,
 }: {
   athleteId: string;
@@ -120,6 +121,8 @@ export function MealPlanGenerator({
   foodRules?: FoodRules;
   // False when this client's saved food rules could not be READ. Nothing is built or saved then: a plan made without their allergies is how an allergen reaches a client.
   rulesReadable?: boolean;
+  // False when the client has NO saved food-preferences row: allergies were never asked, and "never asked" must not read as "no allergies" (Oct 19 audit). Nothing is built until the coach confirms none or enters them.
+  allergiesAsked?: boolean;
   // The client's name, only so it can be kept OUT of the meals saved to the coach's library.
   clientName?: string;
 }) {
@@ -229,7 +232,11 @@ export function MealPlanGenerator({
   const effectiveRules: FoodRules = mergeRules(foodRules, typedRules);
   const typedUnderstood = describeTypedRules(typedRules);
   const typedNotSaved = newFromTyped(foodRules, typedRules);
-  const RULES_UNREADABLE = "Couldn't read this client's food rules, so nothing can be built. Reload the page and try again.";
+  // One gate for every way of building or saving a plan: the food rules must be readable AND the allergy question answered.
+  const rulesReadable = rulesReadableProp && allergiesAsked;
+  const RULES_UNREADABLE = !rulesReadableProp
+    ? "Couldn't read this client's food rules, so nothing can be built. Reload the page and try again."
+    : "Allergies haven't been asked yet, so nothing can be built. Confirm above that this client has none, or enter them in Preferences.";
 
   // The diet the library is filtered by: the client's own diet type when they have one, else what the restrictions text says.
   function libraryDiet(recipeArchetype: string): DietType {
