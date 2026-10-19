@@ -9,6 +9,7 @@ import { formatInTimezone } from "@/lib/format-in-timezone";
 import { dateKeyInZone } from "@/lib/timezone";
 import { mirrorGoogleCalendarEvent } from "@/lib/mirror-google-calendar-event";
 import { MarkAttendedControl, type CreditState } from "@/components/coach/mark-attended-control";
+import { BookingDateControl } from "@/components/coach/booking-date-control";
 import { useTerm } from "@/components/coach/terminology-provider";
 import { buildCreditPicture, fetchBookingCounts, type BookingCounts } from "@/lib/credit-picture";
 import { coachCreditSentence } from "@/lib/credit-sentence";
@@ -46,6 +47,8 @@ export function ClientSchedulePanel({ client, timezone, sessionTypes }: { client
   // A session just marked attended stays in the list until the panel is opened again, so its Undo is still there.
   const [kept, setKept] = useState<Record<string, BookingRow>>({});
   const [showAllUpcoming, setShowAllUpcoming] = useState(false);
+  // The session whose day is being changed (tap its date).
+  const [movingId, setMovingId] = useState<string | null>(null);
   const groupId = client.groupId;
 
   const load = useCallback(async () => {
@@ -189,9 +192,29 @@ export function ClientSchedulePanel({ client, timezone, sessionTypes }: { client
                 {waitingRows.map((b) => (
                   <li key={b.id} className="py-2">
                     <p className="font-body text-xs text-chalk">
-                      {when(b.start_at)}
+                      <button
+                        type="button"
+                        onClick={() => setMovingId((id) => (id === b.id ? null : b.id))}
+                        aria-expanded={movingId === b.id}
+                        aria-label={`${when(b.start_at)}. Change the day`}
+                        className="underline decoration-dotted underline-offset-2 text-left"
+                      >
+                        {when(b.start_at)}
+                      </button>
                       {typeName(b.session_type_id) ? ` · ${typeName(b.session_type_id)}` : ""}
                     </p>
+                    {movingId === b.id && (
+                      <BookingDateControl
+                        bookingId={b.id}
+                        startIso={b.start_at}
+                        timezone={timezone}
+                        onMoved={() => {
+                          setMovingId(null);
+                          router.refresh();
+                          load().catch(() => {});
+                        }}
+                      />
+                    )}
                     <div className="mt-1">
                       <MarkAttendedControl
                         bookingId={b.id}

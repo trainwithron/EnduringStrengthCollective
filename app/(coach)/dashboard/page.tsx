@@ -17,6 +17,7 @@ import { findThreadsNeedingReply } from "@/lib/notification-priority";
 import { getCoachedGroups, LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/coach-groups";
 import { getActiveAnchor } from "@/lib/active-anchor";
 import { orgIsTeamOnly } from "@/lib/team-sport";
+import { SessionCheckSection } from "@/components/coach/session-check-section";
 import { activeOrgId, clientCountsByOrg, inActiveOrg, rememberedOrgId } from "@/lib/active-org";
 import { getCoachDashboardData } from "@/lib/dashboard-data";
 import { PulseTabs } from "@/components/coach/desktop/pulse-tabs";
@@ -593,6 +594,8 @@ export default async function CoachHomePage() {
       <Suspense fallback={<NeedsYouLoading />}>
         <NeedsYouLoader input={needsYouInput} />
       </Suspense>
+
+      <SessionCheckSection coachId={user.id} groupIds={allGroupIds} />
 
       <YourDayPanel schedule={yourDaySchedule} attention={yourDayAttention} timezone={coachTimezone} showPayments={!moneyHidden} />
 

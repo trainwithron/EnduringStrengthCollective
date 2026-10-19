@@ -15,6 +15,9 @@ const ORG_TIED_TABLES = [
 const REVIEWED = new Set([
   // services that run for every coach with no screen (cron, webhook, public booking page), where "this coach's rows" is the right unit
   "app/api/cron/series-top-up/route.ts::bookings",
+  // moving one session: the clash check must see EVERY session and discovery call of the coach in every organization (a coach cannot be in two places), times only, nothing shown
+  "app/api/bookings/move/route.ts::bookings",
+  "app/api/bookings/move/route.ts::discovery_bookings",
   "app/api/discovery-availability/[coachId]/route.ts::bookings",
   "app/api/stripe/webhook/route.ts::revenue_split_transfers",
   "lib/series-store.ts::bookings",

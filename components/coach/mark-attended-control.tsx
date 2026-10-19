@@ -51,6 +51,8 @@ export function MarkAttendedControl({
         setState("settled");
         if (athleteId && groupId) checkAndNotifyLowSessionBalance(athleteId, groupId);
       }
+      // The client hears it was completed (best effort, one push for this one session).
+      void fetch("/api/bookings/completed-notice", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ bookingId }), keepalive: true }).catch(() => undefined);
     } else if (fn === "undo_booking_attended") {
       setAttended(false);
       if (state === "settled") setState("unsettled");
