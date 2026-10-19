@@ -61,3 +61,20 @@ export const orgIsTeamOnly = (groups: { team_mode?: boolean | null }[]): boolean
 export function moneyHiddenFor(opts: { coachLevel: boolean; groupIsTeamSport: boolean; orgTeamOnly: boolean }): boolean {
   return opts.orgTeamOnly || (!opts.coachLevel && opts.groupIsTeamSport);
 }
+
+/**
+ * What the SERVER knows about the open workspace when it draws the first frame (root layout, from the remembered workspace group): that group, whether it is a team-sport group, and whether its whole
+ * organization is team-sport groups. The coach shells start their words from it, so "Athletes" is on the first server-drawn frame instead of "Clients" until a browser-side read finishes.
+ */
+export interface TeamWordsHint {
+  groupId: string | null;
+  groupTeamSport: boolean;
+  orgTeamOnly: boolean;
+}
+export const NO_TEAM_WORDS_HINT: TeamWordsHint = { groupId: null, groupTeamSport: false, orgTeamOnly: false };
+
+/** Should a page on `groupId` (or on no group: Home) start out saying "athletes"? The same rule the browser-side read applies afterwards, so the two never disagree. */
+export function teamWordsFromHint(hint: TeamWordsHint, groupId: string | undefined): boolean {
+  if (!groupId) return hint.orgTeamOnly;
+  return hint.groupId !== null && hint.groupId === groupId.toLowerCase() && (hint.groupTeamSport || hint.orgTeamOnly);
+}

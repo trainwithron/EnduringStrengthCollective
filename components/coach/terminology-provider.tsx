@@ -4,7 +4,8 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { TermForm, TermKey, TermOverride, TerminologyOverrides } from "@/lib/terminology";
 import { termText } from "@/lib/term-text";
-import { isTeamSportGroup, orgIsTeamOnly, withTeamSportWords } from "@/lib/team-sport";
+import { isTeamSportGroup, orgIsTeamOnly, teamWordsFromHint, withTeamSportWords } from "@/lib/team-sport";
+import { useTeamWordsHint } from "@/components/coach/team-words-hint";
 
 interface TerminologyContextValue {
   overrides: TerminologyOverrides;
@@ -41,7 +42,10 @@ export function TerminologyProvider({
   groupId?: string;
 }) {
   const [saved, setOverrides] = useState<TerminologyOverrides>({});
-  const [teamSport, setTeamSport] = useState(false);
+  // The server drew the first frame knowing whether this workspace is a team (root layout hint), so a team coach reads "Athletes" from the very first frame, with no "Clients" flash. The browser-side read
+  // below still decides afterwards and corrects it if it changed.
+  const hint = useTeamWordsHint();
+  const [teamSport, setTeamSport] = useState(() => teamWordsFromHint(hint, groupId));
 
   // The page is first drawn by the server, which does not know the group is a team: a team coach would see "Clients" until the read below finishes. So the last answer for this group is remembered in this browser
   // and applied the moment the page is up (the read below still decides, and corrects it if it changed).
