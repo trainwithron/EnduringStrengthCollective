@@ -19,24 +19,13 @@ describe("Add client in the left panel", () => {
     expect(html).toContain("h-11");
     expect(html).not.toMatch(/(^| )bg-rust( |")/); // outlined, not the filled main-action style: the panel's main job is finding a client
   });
-  it("sits at the top of the client list, above the first client, in the open panel only", () => {
-    const roster = panel.slice(panel.indexOf('{view === "roster" && ('));
-    expect(roster.indexOf("<AddClientButton")).toBeGreaterThan(-1);
-    expect(roster.indexOf("<AddClientButton")).toBeLessThan(roster.indexOf("<RosterMiniList"));
-    // the collapsed panel returns early with only the expand tab, so nothing of this shows there
-    const collapsedBranch = panel.slice(panel.indexOf("if (collapsed) {"), panel.indexOf("return (\n    <div\n      className=\"hidden lg:flex shrink-0 border-r"));
-    expect(collapsedBranch).not.toContain("AddClientButton");
+  it("the Clients tile shows the full Clients page in the panel, which has the same Add client (split screen, Ron, Oct 19)", () => {
+    expect(panel).not.toContain("<AddClientButton");
+    expect(panel).not.toContain("<RosterMiniList");
+    expect(src("../../../app/(coach)/clients/page.tsx")).toContain("<AddClientButton");
   });
-  it("only in the Clients view, not in Business, Calendar or Program", () => {
-    expect(panel.match(/<AddClientButton/g)).toHaveLength(1);
-    expect(panel.indexOf("<AddClientButton")).toBeGreaterThan(panel.indexOf('{view === "roster" && ('));
-    expect(panel.indexOf("<AddClientButton")).toBeLessThan(panel.indexOf('{view === "business"'));
-  });
-  it("the list shows the new client at once: it is read again when someone is added", () => {
+  it("the button still tells whoever opened it that someone was added", () => {
     expect(button).toContain("onAdded?.();");
-    expect(panel).toContain("onAdded={() => {");
-    expect(panel).toContain("setRosterVersion((v) => v + 1);");
-    expect(panel).toContain("<RosterMiniList key={rosterVersion}");
   });
   it("the shell hands the panel the group's name", () => {
     expect(shell).toContain("groupName={groupName}");
@@ -65,9 +54,7 @@ describe("the coach's groups are read again after someone is added", () => {
     vi.doUnmock("@/lib/supabase/client");
     vi.doUnmock("@/lib/coach-groups");
   });
-  it("the panel forgets them just before the list is read again", () => {
-    const at = panel.indexOf("forgetOrgGroups();");
-    expect(at).toBeGreaterThan(-1);
-    expect(at).toBeLessThan(panel.indexOf("setRosterVersion((v) => v + 1);"));
+  it("the panel no longer reads a list of its own (the full Clients page in it reads its own)", () => {
+    expect(panel).not.toContain("forgetOrgGroups();");
   });
 });

@@ -4,6 +4,7 @@ import { EmbeddedProvider } from "@/components/shared/embedded-context";
 import { WorkspaceHost } from "@/components/coach/workspace/workspace-host";
 import { OrgThemeSync } from "@/components/shared/org-theme-sync";
 import { PendingEmailChangeBanner } from "@/components/auth/pending-email-change-banner";
+import { SplitHalfHost } from "@/components/coach/desktop/split-half";
 
 // The coach's own areas (/groups, /clients, /dashboard) share this layout. It stays mounted while the coach moves between their pages, which is what lets the
 // workspace (the panel and floating cards, with the pages loaded in them) survive navigating the main page. (The (coach) folder is a route group: it is not in the
@@ -23,7 +24,10 @@ export default async function CoachAreaLayout({ children }: { children: React.Re
     <EmbeddedProvider embedded={embedded}>
       {!embedded && <OrgThemeSync />}
       {!embedded && userId && <PendingEmailChangeBanner userId={userId} />}
-      <WorkspaceHost userId={userId}>{children}</WorkspaceHost>
+      {/* SplitHalfHost keeps the left half's pages (the list panel's tiles) alive while the main page changes, the same way the workspace keeps its panes. */}
+      <WorkspaceHost userId={userId}>
+        <SplitHalfHost>{children}</SplitHalfHost>
+      </WorkspaceHost>
     </EmbeddedProvider>
   );
 }

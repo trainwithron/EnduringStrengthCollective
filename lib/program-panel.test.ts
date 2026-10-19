@@ -50,8 +50,8 @@ describe("the side panel's program list", () => {
 describe("the Program tab", () => {
   const panel = read("components/coach/desktop/shell-list-panel.tsx");
   const list = read("components/coach/desktop/program-panel-list.tsx");
-  it("the tab shows the list, not the whole builder", () => {
-    expect(panel).toContain('{view === "program" && <ProgramPanelList groupId={groupId} />}');
+  it("the tab shows the full Programs page in the half (split screen, Ron, Oct 19), not the old in-panel builder", () => {
+    expect(read("lib/coach-shell-panel-storage.ts")).toContain('if (view === "program") return { path: `/groups/${groupId}/programs`, label: "Programs" };');
     expect(panel).not.toContain("EmbeddedProgramBuilder");
     // the in-panel full builder and its data route were removed with this change
     expect(existsSync(join(__dirname, "..", "components/coach/desktop/embedded-program-builder.tsx"))).toBe(false);

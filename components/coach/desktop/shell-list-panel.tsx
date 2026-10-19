@@ -4,11 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
-  DEFAULT_LIST_PANEL_WIDTH,
   MIN_LIST_PANEL_WIDTH,
   MAX_LIST_PANEL_WIDTH,
-  readListPanelWidth,
-  writeListPanelWidth,
+  readSplitWidth,
+  writeSplitWidth,
   readListPanelCollapsed,
   writeListPanelCollapsed,
   readListPanelView,
@@ -17,12 +16,7 @@ import {
 } from "@/lib/coach-shell-panel-storage";
 import { NeedsAttentionStrip } from "./needs-attention-strip";
 import { PendingRequestsLine } from "./pending-requests-line";
-import { RosterMiniList } from "./roster-mini-list";
-import { AddClientButton } from "./add-client-button";
-import { forgetOrgGroups } from "@/lib/use-org-group-ids";
-import { BusinessMiniDashboard } from "./business-mini-dashboard";
-import { CalendarMiniView } from "./calendar-mini-view";
-import { ProgramPanelList } from "./program-panel-list";
+import { SplitHalfSlot } from "./split-half";
 
 export interface SectionSubLink {
   key: string;
@@ -41,6 +35,11 @@ export interface SectionSubLink {
 // Needs Attention strip and, when the current page belongs to a
 // multi-page section, that section's own sub-links so nothing existing
 // becomes unreachable.
+//
+// Split screen (Ron, Oct 19: "If you click Business, it should pull up the full Business page in that half, or Clients, it should pull up your full client list"): each tile shows its section's FULL
+// page below the tiles, in a frame of its own (the same frame the workspace panes use: the app's own pages only, drawn without the app's chrome, and links inside stay inside the half, so Build a program
+// builds there). The page on the other side is never touched. The panel opens at half the window; a dragged width is remembered. The frames themselves live in the coach layout (split-half.tsx) so they
+// survive the other side changing pages; each tile keeps its page (and its place in it) while another is shown.
 export function ShellListPanel({
   coachId,
   groupId,
@@ -57,19 +56,17 @@ export function ShellListPanel({
   /** a team-sport group, or an organization that is all team-sport groups, has no money numbers (lib/team-sport.ts, moneyHiddenFor): no Business tile, no Business view (even one pinned earlier), no income / MRR / paying-client tiles */
   hideMoney?: boolean;
 }) {
-  const [width, setWidth] = useState(DEFAULT_LIST_PANEL_WIDTH);
+  const [width, setWidth] = useState(MIN_LIST_PANEL_WIDTH);
   const [collapsed, setCollapsed] = useState(false);
   const [pickedView, setView] = useState<ListPanelView>("roster");
   // a Business view pinned earlier (in another group) never shows where the money numbers are hidden
   const view: ListPanelView = hideMoney && pickedView === "business" ? "roster" : pickedView;
   const [dragging, setDragging] = useState(false);
-  // Bumped when someone is added from the panel, so the list below is read again and shows them.
-  const [rosterVersion, setRosterVersion] = useState(0);
   const dragStartX = useRef(0);
   const dragStartWidth = useRef(0);
 
   useEffect(() => {
-    setWidth(readListPanelWidth());
+    setWidth(readSplitWidth(window.innerWidth));
     setCollapsed(readListPanelCollapsed());
     setView(readListPanelView());
   }, []);
@@ -87,7 +84,7 @@ export function ShellListPanel({
   const handleMouseUp = useCallback(() => {
     setDragging(false);
     setWidth((w) => {
-      writeListPanelWidth(w);
+      writeSplitWidth(w);
       return w;
     });
     window.removeEventListener("mousemove", handleMouseMove);
@@ -143,7 +140,8 @@ export function ShellListPanel({
       className="hidden lg:flex shrink-0 border-r border-steel/20 sticky top-14 h-[calc(100vh-56px)] relative"
       style={{ width }}
     >
-      <div className="flex-1 min-w-0 overflow-y-auto p-3">
+      <div className="flex-1 min-w-0 flex flex-col">
+      <div className="shrink-0 max-h-[45%] overflow-y-auto p-3 pb-0">
         <NeedsAttentionStrip coachId={coachId} groupId={groupId} />
         <PendingRequestsLine groupId={groupId} />
 
@@ -186,7 +184,7 @@ export function ShellListPanel({
             className={`h-7 font-body text-xs uppercase tracking-wide border ${
               view === "business" ? "border-rust text-rust bg-rust/10" : "border-steel/30 text-steel"
             }`}
-            title="Pin the Business mini-dashboard"
+            title="Your Business page, in this half"
           >
             💰 Business
           </button>
@@ -197,7 +195,7 @@ export function ShellListPanel({
             className={`h-7 font-body text-xs uppercase tracking-wide border ${
               view === "calendar" ? "border-rust text-rust bg-rust/10" : "border-steel/30 text-steel"
             }`}
-            title="Pin the Calendar mini-view"
+            title="Your Calendar, in this half"
           >
             📅 Calendar
           </button>
@@ -207,28 +205,17 @@ export function ShellListPanel({
             className={`h-7 font-body text-xs uppercase tracking-wide border ${
               view === "program" ? "border-rust text-rust bg-rust/10" : "border-steel/30 text-steel"
             }`}
-            title="Your programs, and build a new one"
+            title="Your programs, in this half: build one here while the other side stays put"
           >
             🏋 Program
           </button>
         </div>
 
-        {view === "roster" && (
-          <>
-            {/* One obvious click to add a client from anywhere in the coach app: the same Add client as on the Clients page, opening right here. Only in the open panel. */}
-            <div className="mb-2">
-              <AddClientButton groupId={groupId} groupName={groupName} createdBy={coachId} onAdded={() => {
-                  // A new one-on-one client gets a group of their own: the cached list of the coach's groups must be read again or the list would not show them.
-                  forgetOrgGroups();
-                  setRosterVersion((v) => v + 1);
-                }} />
-            </div>
-            <RosterMiniList key={rosterVersion} groupId={groupId} />
-          </>
-        )}
-        {view === "business" && !hideMoney && <BusinessMiniDashboard groupId={groupId} />}
-        {view === "calendar" && <CalendarMiniView groupId={groupId} />}
-        {view === "program" && <ProgramPanelList groupId={groupId} />}
+      </div>
+        {/* The full page of the picked tile (hideMoney never shows Business: `view` is already roster there). */}
+        <div className="flex-1 min-h-0 flex flex-col border-t border-steel/20 mt-2">
+          <SplitHalfSlot view={view} groupId={groupId} covered={dragging} />
+        </div>
       </div>
 
       {/* Drag-to-resize edge + full-collapse tab (item 3-4). */}

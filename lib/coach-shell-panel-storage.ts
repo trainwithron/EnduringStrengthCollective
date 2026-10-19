@@ -41,6 +41,41 @@ export function writeListPanelWidth(width: number): void {
   }
 }
 
+// The panel is the left half of a split screen (Ron, Oct 19: "If you click Business, it should pull up the full Business page in that half"): each tile shows its section's full page, and the panel opens at
+// HALF the window until the coach drags the divider, after which that width is remembered. Its own key, so a width saved for the old narrow lists does not keep the half narrow.
+const SPLIT_WIDTH_KEY = "coach-shell-split-width";
+
+export function defaultSplitWidth(windowWidth: number): number {
+  return Math.max(MIN_LIST_PANEL_WIDTH, Math.round(windowWidth / 2));
+}
+
+export function readSplitWidth(windowWidth: number): number {
+  try {
+    const raw = window.localStorage.getItem(SPLIT_WIDTH_KEY);
+    const parsed = raw ? parseInt(raw, 10) : NaN;
+    if (Number.isFinite(parsed)) return Math.min(MAX_LIST_PANEL_WIDTH, Math.max(MIN_LIST_PANEL_WIDTH, parsed));
+  } catch {
+    // Storage unavailable: half the window.
+  }
+  return defaultSplitWidth(windowWidth);
+}
+
+export function writeSplitWidth(width: number): void {
+  try {
+    window.localStorage.setItem(SPLIT_WIDTH_KEY, String(Math.round(width)));
+  } catch {
+    // Non-fatal: the drag still works for this session.
+  }
+}
+
+/** The full page each tile shows in the panel. */
+export function splitPathFor(view: ListPanelView, groupId: string): { path: string; label: string } {
+  if (view === "business") return { path: `/groups/${groupId}/business`, label: "Business" };
+  if (view === "calendar") return { path: `/groups/${groupId}/calendar`, label: "Calendar" };
+  if (view === "program") return { path: `/groups/${groupId}/programs`, label: "Programs" };
+  return { path: "/clients", label: "Clients" };
+}
+
 export function readListPanelCollapsed(): boolean {
   try {
     return window.localStorage.getItem(COLLAPSED_KEY) === "1";

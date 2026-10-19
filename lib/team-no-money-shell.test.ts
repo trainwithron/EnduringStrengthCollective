@@ -46,7 +46,9 @@ describe("the shell applies it itself, not page by page", () => {
   it("the left panel ignores a Business view pinned earlier, in any group, and never renders the mini dashboard", () => {
     const panel = read("components/coach/desktop/shell-list-panel.tsx");
     expect(panel).toContain('hideMoney && pickedView === "business" ? "roster" : pickedView');
-    expect(panel).toContain('view === "business" && !hideMoney && <BusinessMiniDashboard');
+    // the half shows the view that survived that rule, so a team never gets the Business page there either
+    expect(panel).toContain("<SplitHalfSlot view={view} groupId={groupId} covered={dragging} />");
+    expect(panel).not.toContain("BusinessMiniDashboard");
     expect(panel).not.toContain("teamSport");
   });
   it("the Clients page renders the panel only through the shell (no page passes its own flag)", () => {
