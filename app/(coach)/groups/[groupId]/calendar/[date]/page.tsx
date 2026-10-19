@@ -729,15 +729,12 @@ export default async function CoachDayDetailPage(
         <h1 className="font-display font-bold text-3xl uppercase leading-none mt-3">
           {date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
         </h1>
-        {selectedClient ? (
+        {/* The instruction to tap a time is said once, right above the grid (DayCalendar). */}
+        {selectedClient && (
           <p className="font-body text-sm text-steel mt-3">
             Assigning for <span className="text-chalk font-medium">{selectedClient.fullName}</span>
             {" — "}
             {coachCreditSentence(buildCreditPicture({ balance: selectedClient.balance, booked: selectedClient.booked, toMark: 0 }), selectedClient.fullName)}
-          </p>
-        ) : (
-          <p className="font-body text-xs text-steel mt-3">
-            Tap a time on the day to add a session, an event or time off.
           </p>
         )}
       </div>
