@@ -1,4 +1,3 @@
-import { notifyPush } from "@/lib/push-notify";
 
 // acuity_replacement_gap_audit_sept16.md — real gap: zero confirmation/
 // reminder infra existed around bookings. This is the confirmation half
@@ -16,19 +15,13 @@ import { notifyPush } from "@/lib/push-notify";
 // forget exactly like the push call: a coach with SMS off, or no
 // Twilio credentials configured at all, just gets a no-op response.
 export function notifyBookingConfirmed(athleteId: string, groupId: string, startAt: string) {
-  const when = new Date(startAt).toLocaleString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-  notifyPush(
-    athleteId,
-    "Session confirmed",
-    `You're booked for ${when}.`,
-    `/groups/${groupId}/calendar`
-  );
+  // The phone alert, and an email when no phone was reached, are sent by the server (it re-reads the booking, the names and the client's time zone itself).
+  fetch("/api/bookings/confirmed-notice", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ athleteId, groupId, startAt }),
+    keepalive: true,
+  }).catch(() => {});
 
   fetch("/api/sms/booking-confirmation", {
     method: "POST",
