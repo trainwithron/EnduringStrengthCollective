@@ -21,6 +21,7 @@ import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
 import { BookingModeLine } from "@/components/athlete/booking-mode-line";
 import { SessionCheckSection } from "@/components/coach/session-check-section";
+import { SessionCountLine } from "@/components/coach/session-count-line";
 import { AvailabilityBookingSettings, AvailabilityTimeOff } from "@/components/coach/desktop/availability-settings";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { computeScheduledDates } from "@/lib/program-schedule";
@@ -259,6 +260,7 @@ export async function CoachCalendarPageBody(
               <h1 className="font-display font-bold text-3xl leading-none uppercase">Calendar</h1>
             </header>
             <div className="px-5 pb-24">
+              <SessionCountLine coachId={user.id} groupIds={orgGroupIds} timezone={coachTz} view="month" year={gYear} monthIndex={gMonthIndex} weekStartKey={null} />
               <SessionCheckSection coachId={user.id} groupIds={orgGroupIds} />
               <ScheduleClientPicker groupId={params.groupId} clients={scheduleClients} />
               <div className="flex items-center justify-between mt-3">
@@ -1251,6 +1253,8 @@ export async function CoachCalendarPageBody(
       )}
 
       <SchedulingSpotterPanel flags={schedulingSpotterFlags} availabilityHref={`${basePath}?tab=availability`} />
+
+      <SessionCountLine coachId={user.id} groupIds={orgGroupIds} timezone={timezone} view={view} year={year} monthIndex={monthIndex} weekStartKey={dateKey(weekStart)} />
 
       <SessionCheckSection coachId={user.id} groupIds={orgGroupIds} />
 
