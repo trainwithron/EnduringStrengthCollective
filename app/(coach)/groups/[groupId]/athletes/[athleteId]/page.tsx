@@ -35,7 +35,7 @@ import { AthleteNotesEditor } from "@/components/coach/athlete-notes-editor";
 import { SessionCreditsControl } from "@/components/coach/session-credits-control";
 import { buildCreditPicture, fetchBookingCounts } from "@/lib/credit-picture";
 import { coachCreditSentence } from "@/lib/credit-sentence";
-import { ledgerTotals } from "@/lib/credit-ledger-totals";
+import { currentPackageTotals } from "@/lib/credit-ledger-totals";
 import { pageAll } from "@/lib/page-all";
 import { AssignSessionsControl } from "@/components/coach/assign-sessions-control";
 import { SessionLedgerList } from "@/components/coach/session-ledger-list";
@@ -393,9 +393,9 @@ export default async function AthleteProfilePage(
       .eq("group_id", params.groupId)
       .order("created_at", { ascending: false })
       .limit(40),
-    // Totals come from the whole history (the list above shows only the latest).
+    // The current package comes from the whole history, oldest first (the list above shows only the latest).
     pageAll((from, to) =>
-      supabase.from("session_credit_ledger").select("id, kind, amount").eq("athlete_id", params.athleteId).eq("group_id", params.groupId).order("id", { ascending: true }).range(from, to)
+      supabase.from("session_credit_ledger").select("id, kind, amount, balance_after").eq("athlete_id", params.athleteId).eq("group_id", params.groupId).order("created_at", { ascending: true }).order("id", { ascending: true }).range(from, to)
     ),
     fetchBookingCounts(supabase, { athleteId: params.athleteId, groupId: params.groupId }),
     // Weekly schedules for this client (recurring_booking_series, 0210 + 0259). If the newer columns are not there yet this errors
@@ -809,7 +809,7 @@ export default async function AthleteProfilePage(
 
   // The plain sentence about where their sessions stand: totals from the whole history (the list shows only the latest), booked and waiting-to-mark from the calendar.
   const profileCounts = profileBookingCounts.get(`${params.athleteId}:${params.groupId}`);
-  const ledgerSums = ledgerTotals(ledgerAll.rows as { kind: string; amount: number }[], { prepaidAhead: profileCounts?.prepaidAhead ?? 0 });
+  const ledgerSums = currentPackageTotals(ledgerAll.rows as { kind: string; amount: number; balance_after: number | null }[], { prepaidAhead: profileCounts?.prepaidAhead ?? 0 });
   const ledgerEntries: LedgerEntry[] = (ledgerRows ?? []).map((r) => ({
     id: r.id as string,
     kind: r.kind as LedgerEntry["kind"],
@@ -1508,6 +1508,7 @@ export default async function AthleteProfilePage(
                     toMark: profileCounts?.toMark ?? 0,
                     bought: ledgerAll.failed ? null : ledgerSums.bought,
                     done: ledgerAll.failed ? null : ledgerSums.done,
+                    carriedOver: ledgerAll.failed ? null : ledgerSums.carriedOver,
                   }),
                   profile?.full_name ?? "This client"
                 )}

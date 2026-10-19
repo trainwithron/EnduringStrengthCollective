@@ -24,7 +24,7 @@ export function coachCreditSentence(p: CreditPicture, name: string, noun: Noun =
   const split = p.booked > 0 ? `: ${p.booked} ${bookedWord}${p.toBook > 0 ? ` and ${p.toBook} still to schedule` : ""}` : "";
 
   if (p.bought != null && p.done != null && p.bought > 0) {
-    const head = `${count(p.bought, noun)} bought`;
+    const head = `${count(p.bought, noun)} bought${p.carriedOver && p.carriedOver > 0 ? ` (including ${p.carriedOver} carried over)` : ""}`;
     if (p.done >= p.bought && p.booked === 0 && p.left === 0) {
       return `${head}, ${p.bought === 1 ? "and it has been completed" : `all ${p.bought} completed`}.${owesClause}${marked}`;
     }
