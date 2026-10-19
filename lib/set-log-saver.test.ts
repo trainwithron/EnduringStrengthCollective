@@ -245,3 +245,34 @@ describe("deleteSetLogRow / writeOrDeleteSetLogRow", () => {
     expect(seen).toEqual(["delete set_logs s3", "update set_logs"]);
   });
 });
+
+// Oct 19 audit: one stuck queued set (its exercise removed, or the workout finished elsewhere) blocked Complete on every future workout.
+describe("writeSetLogRow: nothing left to save counts as saved", () => {
+  const clientWithRead = (update: { data: unknown[] | null; error: unknown }, read: { data: unknown; error: unknown }) => ({
+    from: () => ({
+      update: () => ({ eq: () => ({ select: async () => update }) }),
+      select: () => ({ eq: () => ({ maybeSingle: async () => read }) }),
+    }),
+  });
+  it("a 0-row update on a set that no longer exists is done", async () => {
+    expect(await writeSetLogRow(clientWithRead({ data: [], error: null }, { data: null, error: null }) as never, "s1", { reps: 5 })).toBe(true);
+  });
+  it("a 0-row update on a set that is still there (blocked) stays a failure", async () => {
+    expect(await writeSetLogRow(clientWithRead({ data: [], error: null }, { data: { id: "s1" }, error: null }) as never, "s1", { reps: 5 })).toBe(false);
+  });
+  it("a 0-row update whose look-up itself failed stays a failure (never guess)", async () => {
+    expect(await writeSetLogRow(clientWithRead({ data: [], error: null }, { data: null, error: { message: "network" } }) as never, "s1", { reps: 5 })).toBe(false);
+  });
+  it("a workout finished on another device ('already completed') is done: no retry can ever succeed", async () => {
+    expect(await writeSetLogRow(clientWithRead({ data: null, error: { message: "This workout is already completed" } }, { data: null, error: null }) as never, "s1", { reps: 5 })).toBe(true);
+  });
+  it("any other error is still a failure", async () => {
+    expect(await writeSetLogRow(clientWithRead({ data: null, error: { message: "boom" } }, { data: null, error: null }) as never, "s1", { reps: 5 })).toBe(false);
+  });
+  it("a stuck set no longer blocks Complete: the saver clears it once the write reports done", async () => {
+    const saver = new SetLogSaver({ write: async () => true, backoffMs: [] });
+    saver.queue("gone", { reps: 5 });
+    expect(await saver.flush()).toBe(true);
+    expect(saver.unsaved).toEqual([]);
+  });
+});

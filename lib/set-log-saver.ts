@@ -197,7 +197,20 @@ export class SetLogSaver {
   }
 }
 
-// One real write to set_logs; true only when exactly one row was updated.
+// An update that changed no row is a failure ONLY while the set is still there to be saved. When the set no longer exists (its exercise was removed, the workout was cleared) there is nothing to save, and counting
+// it as unsaved would block "Complete workout" on this and every later workout (Oct 19 audit). So after a zero-row update the set is looked for once: gone means done; still there (blocked, or a failed read) stays a failure.
+async function setIsGone(client: unknown, id: string): Promise<boolean> {
+  const table = (client as { from: (t: string) => { select?: (cols: string) => { eq: (c: string, v: string) => { maybeSingle: () => PromiseLike<{ data: unknown; error: unknown }> } } } }).from("set_logs");
+  if (typeof table.select !== "function") return false;
+  try {
+    const { data, error } = await table.select("id").eq("id", id).maybeSingle();
+    return !error && !data;
+  } catch {
+    return false;
+  }
+}
+
+// One real write to set_logs; true only when exactly one row was updated (or the set is gone, or its workout was finished elsewhere: nothing left to save).
 export async function writeSetLogRow(
   client: {
     from: (table: string) => {
@@ -210,6 +223,8 @@ export async function writeSetLogRow(
   payload: Record<string, unknown>
 ): Promise<boolean> {
   const { data, error } = await client.from("set_logs").update(payload).eq("id", id).select("id");
+  // The workout was finished on another device: the database refuses any change to its sets, and no retry can ever succeed.
+  if (error && isTerminalSetLogError(error)) return true;
   // The set_type column arrives with its database step. If the code is live before that step, the merged update (weight, reps, status and the set type together) would fail on the missing column and
   // take the logged values with it: write the rest without the set type instead (the warm-up mark simply is not stored until the step is applied).
   if (error && "set_type" in payload && /set_type/.test(String((error as { message?: unknown }).message ?? ""))) {
@@ -217,8 +232,11 @@ export async function writeSetLogRow(
     void _dropped;
     if (Object.keys(rest).length === 0) return true;
     const second = await client.from("set_logs").update(rest).eq("id", id).select("id");
+    if (second.error && isTerminalSetLogError(second.error)) return true;
+    if (!second.error && Array.isArray(second.data) && second.data.length === 0) return setIsGone(client, id);
     return !second.error && Array.isArray(second.data) && second.data.length === 1;
   }
+  if (!error && Array.isArray(data) && data.length === 0) return setIsGone(client, id);
   return !error && Array.isArray(data) && data.length === 1;
 }
 
