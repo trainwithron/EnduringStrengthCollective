@@ -112,3 +112,31 @@ describe("wiring", () => {
     expect(read("lib/cron-jobs.ts")).toContain('{ job: "low-session-digest", path: "/api/cron/low-session-digest", maxAgeHours: FREQUENT }');
   });
 });
+
+describe("the other background pushes to coaches", () => {
+  it("daytime only: 7:00 to 20:59 in the coach's own zone", async () => {
+    const { isCoachDaytime } = await import("@/lib/coach-notice");
+    for (const h of [0, 3, 5, 6, 21, 22, 23]) expect(isCoachDaytime(h), String(h)).toBe(false);
+    for (const h of [7, 8, 12, 20]) expect(isCoachDaytime(h), String(h)).toBe(true);
+  });
+  it("a switched-off kind sends nothing; a missing setting means on", async () => {
+    const { coachNoticeIsOff } = await import("@/lib/coach-notice");
+    const db = (row: unknown, error: unknown = null) => ({ from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: row, error }) }) }) }) }) as never;
+    expect(await coachNoticeIsOff(db({ notices_off: ["low_sessions"] }), "p", "low_sessions")).toBe(true);
+    expect(await coachNoticeIsOff(db({ notices_off: ["milestones"] }), "p", "low_sessions")).toBe(false);
+    expect(await coachNoticeIsOff(db(null, { message: "column does not exist" }), "p", "low_sessions")).toBe(false);
+    expect(await coachNoticeIsOff(db({ notices_off: null }), "p", "low_sessions")).toBe(false);
+  });
+  it("milestones are ONE push per coach per run, and the midnight conflict jobs push only in the coach's daytime, all through the one sender", () => {
+    const m = read("app/api/cron/milestone-scan/route.ts");
+    expect(m).toContain("pendingMilestonePushes");
+    expect(m).toContain('"milestones"');
+    expect(m).not.toContain("sendPushToProfile(");
+    for (const f of ["app/api/cron/flag-recurring-booking-conflicts/route.ts", "app/api/cron/series-top-up/route.ts"]) {
+      const s = read(f);
+      expect(s, f).toContain('"booking_conflicts"');
+      expect(s, f).toContain("daytimeOnly: true");
+      expect(s, f).not.toContain("sendPushToProfile(");
+    }
+  });
+});
