@@ -126,13 +126,6 @@ export async function POST(request: Request) {
       if (typeError) console.error("signup: couldn't save what they coach:", typeError.message);
     }
 
-    // "A team or a class" gets the team features on its first group, not only the trimmed team menus (Oct 19 audit): the roster, depth chart, attendance and the team calendar. Best-effort (a database without the column
-    // still signs people up), and the coach can switch it off in the group's Settings.
-    if (coachType === "team") {
-      const { error: teamError } = await serviceRole.from("groups").update({ team_mode: true }).eq("id", groupId);
-      if (teamError) console.error("signup: couldn't switch on the team features:", teamError.message);
-    }
-
     // A brand-new coach starts in "request" booking (a client asks, the coach approves); they can change it any time in their availability settings. Coaches who signed up before this
     // keep what they have. Best-effort: with no row, booking behaves as it always did.
     const { error: modeError } = await serviceRole
