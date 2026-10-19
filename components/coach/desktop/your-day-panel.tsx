@@ -14,10 +14,13 @@ export function YourDayPanel({
   schedule,
   attention,
   timezone,
+  showPayments = true,
 }: {
   schedule: ScheduleEntry[];
   attention: AttentionItem[];
   timezone: string;
+  /** false for a team organization: nothing about payments on its Home */
+  showPayments?: boolean;
 }) {
   const { shown, hidden } = rankAttention(attention, 6);
   return (
@@ -56,7 +59,7 @@ export function YourDayPanel({
       <div className="border border-steel/20 bg-surface p-4">
         <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">{attentionHeadline(attention.length)}</h2>
         {shown.length === 0 ? (
-          <p className="font-body text-sm text-steel">Replies, payments and check-ins that need you will show up here.</p>
+          <p className="font-body text-sm text-steel">{showPayments ? "Replies, payments and check-ins that need you will show up here." : "Replies and check-ins that need you will show up here."}</p>
         ) : (
           <ul className="space-y-2">
             {shown.map((a) => (

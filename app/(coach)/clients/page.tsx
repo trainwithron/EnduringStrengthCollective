@@ -3,6 +3,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { NoAccess } from "@/components/shared/no-access";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { CoachClientsList } from "@/components/coach/desktop/coach-clients-list";
+import { orgIsTeamOnly } from "@/lib/team-sport";
 import { AddClientButton } from "@/components/coach/desktop/add-client-button";
 import { SwappableTerm } from "@/components/coach/swappable-term";
 import { getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
@@ -78,7 +79,11 @@ export default async function CoachClientsPage() {
 
   // An organization whose clients all sit in team-sport groups gets one view of its athletes (no Cards/List, no kind filters).
   const teamModeRows = groupIds.length > 0 ? await supabase.from("groups").select("id, team_mode").in("id", groupIds.slice(0, 200)) : { data: [] as { id: string; team_mode: boolean | null }[] };
-  const oneView = groupIds.length > 0 && groupIds.length <= 200 && ((teamModeRows.data ?? []) as { id: string; team_mode: boolean | null }[]).filter((g) => g.team_mode === true).length === groupIds.length;
+  const clientsAllInTeams = groupIds.length > 0 && groupIds.length <= 200 && ((teamModeRows.data ?? []) as { id: string; team_mode: boolean | null }[]).filter((g) => g.team_mode === true).length === groupIds.length;
+  // ...and by the organization's TYPE, so a team organization with no athletes yet is the same single list (not a client list with empty 1-on-1 / Online / Group filters).
+  const orgGroupRows = inOrg.length > 0 ? await supabase.from("groups").select("id, team_mode").in("id", inOrg.map((g) => g.id).slice(0, 200)) : { data: [] as { id: string; team_mode: boolean | null }[], error: null };
+  const orgTeamOnly = !orgGroupRows.error && orgIsTeamOnly((orgGroupRows.data ?? []) as { team_mode?: boolean | null }[]);
+  const oneView = orgTeamOnly || clientsAllInTeams;
 
   // The coach's own row (their personal space): shown in every organization they coach in, never counted as a client.
   const { data: selfProfile } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();

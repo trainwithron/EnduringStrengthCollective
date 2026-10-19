@@ -60,7 +60,7 @@ export function CoachClientsList({ rows, selfName = null, oneView = false }: { r
         </div>
         )}
         <label className="relative block w-full sm:w-64">
-          <span className="sr-only">Search clients</span>
+          <span className="sr-only">{oneView ? "Search athletes" : "Search clients"}</span>
           <Search className="w-3.5 h-3.5 text-steel absolute left-2.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
           <input
             type="search"
@@ -82,11 +82,11 @@ export function CoachClientsList({ rows, selfName = null, oneView = false }: { r
         </Link>
       )}
       {shown.length === 0 ? (
-        <p className="font-body text-sm text-steel py-6">{rows.length === 0 ? "No clients yet." : "No one matches."}</p>
+        <p className="font-body text-sm text-steel py-6">{rows.length === 0 ? (oneView ? "No athletes yet. Add one to get started." : "No clients yet.") : "No one matches."}</p>
       ) : (
         view === "cards" ? <ClientsCardView rows={shown} /> : <ClientsListView rows={shown} />
       )}
-      <p className="font-body text-[11px] text-steel mt-2">The number is how many sessions are left to schedule.</p>
+      {!oneView && <p className="font-body text-[11px] text-steel mt-2">The number is how many sessions are left to schedule.</p>}
     </div>
   );
 }

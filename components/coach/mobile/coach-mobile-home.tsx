@@ -315,7 +315,7 @@ export async function CoachMobileHome({
                 Clients
               </Link>
               <Link
-                href={`/groups/${groupId}/programs`}
+                href="/programs"
                 className="h-11 flex items-center justify-center border border-steel/40 text-chalk font-display uppercase text-sm font-bold"
               >
                 Programs

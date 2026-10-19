@@ -586,7 +586,7 @@ export default async function CoachHomePage() {
 
       {allGroups[0] && <TerminologyFirstRunCard groupId={allGroups[0].id} askedOnServer={askedRead.error ? null : !!(askedRead.data as { terminology_asked_at?: string | null } | null)?.terminology_asked_at} />}
 
-      {clientCards.length === 0 && teamCards.length === 0 && socialCards.length === 0 && allGroups[0] && (
+      {!moneyHidden && clientCards.length === 0 && teamCards.length === 0 && socialCards.length === 0 && allGroups[0] && (
         <GettingStartedCard groupId={(allGroups.find((g) => g.group_kind !== "one_on_one") ?? allGroups[0]).id} />
       )}
 
@@ -594,7 +594,7 @@ export default async function CoachHomePage() {
         <NeedsYouLoader input={needsYouInput} />
       </Suspense>
 
-      <YourDayPanel schedule={yourDaySchedule} attention={yourDayAttention} timezone={coachTimezone} />
+      <YourDayPanel schedule={yourDaySchedule} attention={yourDayAttention} timezone={coachTimezone} showPayments={!moneyHidden} />
 
       {/* Replaces the old team-mode-only Team Pulse side column
           (home_dashboard_merge_and_pulse_tabs_redesign.md) — every
@@ -603,14 +603,17 @@ export default async function CoachHomePage() {
           separate "Roster" tile lower on this page (same data,
           collapsed-and-buried) was removed rather than showing the same
           clients/groups twice on one page. */}
-      <div className="mb-6">
-        <PulseTabs
-          clientCards={clientCards}
-          teamPulses={dashboardData.teamPulses}
-          teamCards={teamCards}
-          socialCards={socialCards}
-        />
-      </div>
+      {/* A team organization has its team tiles above; the 1-on-1 / athlete / group pulse tabs, the athlete counts and the "invite your first client" lines are for coaches who sell to clients. */}
+      {!moneyHidden && (
+        <div className="mb-6">
+          <PulseTabs
+            clientCards={clientCards}
+            teamPulses={dashboardData.teamPulses}
+            teamCards={teamCards}
+            socialCards={socialCards}
+          />
+        </div>
+      )}
 
       {/* The stack below is what the strip's "N more" opens; the strip's buttons also jump to the panel that handles the request. Nothing in it changed. */}
       <div id="needs-stack">
@@ -632,6 +635,7 @@ export default async function CoachHomePage() {
         {!moneyHidden && <NeedsPaymentPanel rows={dashboardData.needsPayment} />}
       </div>
 
+      {!moneyHidden && (
       <DashboardTileGrid
         initialOrder={(layoutRow?.tile_order as string[] | undefined) ?? []}
         initialHidden={(layoutRow?.hidden_tiles as string[] | undefined) ?? []}
@@ -650,6 +654,7 @@ export default async function CoachHomePage() {
           },
         ]}
       />
+      )}
     </>
   );
 

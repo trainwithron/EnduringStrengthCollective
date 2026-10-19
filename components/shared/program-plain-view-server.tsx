@@ -115,7 +115,7 @@ export async function ProgramPlainView({
       currentWeek={current}
       upNextDayId={upNextDayId}
       programComplete={pick.kind === "complete"}
-      backHref={backHref ?? (isCoach ? `/groups/${groupId}/programs` : `/groups/${groupId}`)}
+      backHref={backHref ?? (isCoach ? "/programs" : `/groups/${groupId}`)}
       editHref={isCoach && !workoutHrefBase ? `/groups/${groupId}/programs/${programId}?edit=1` : null}
       workoutHrefBase={workoutHrefBase ?? `/groups/${groupId}/workouts`}
       startLabel={startLabel}
