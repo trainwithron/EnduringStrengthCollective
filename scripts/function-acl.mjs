@@ -95,6 +95,8 @@ export const ACL_REVIEWED = [
   "handle_content_report", "remove_reported_content", "reported_comment_reply_count",
   // AF3e (step 167): the write guard used inside row-security policies, so signed-in people must be able to run it. It answers only about the caller: asking about anyone else gets false (p_user is distinct from auth.uid()), which this list does not recognise by pattern.
   "minor_may_write",
+  // TC3 part B (step 174): each takes the caller through a local copy of auth.uid() (me) and answers or refuses for that person only (a request is made by the signed-in visitor, answered only by the coach it was addressed to), which this list does not recognise by pattern
+  "submit_client_request", "approve_client_request", "decline_client_request", "decline_all_client_requests",
 ];
 
 const quote = (names) => names.map((n) => `'${n}'`).join(", ");

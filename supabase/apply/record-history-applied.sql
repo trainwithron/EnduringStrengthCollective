@@ -11,6 +11,7 @@ from (
     ('2026100600402', 'guardian_consent', '0402_guardian_consent.sql', to_regclass('public.guardian_consents') is not null),
     ('2026100600419', 'team_sheet_save', '0419_team_sheet_save.sql', to_regclass('public.team_sheet_batches') is not null),
     ('2026100600420', 'transfer_ownership_accepted_only', '0420_transfer_ownership_accepted_only.sql', exists (select 1 from pg_trigger where tgname = 'organization_memberships_guard_owner_role' and not tgisinternal)),
+    ('2026100600422', 'client_requests', '0422_client_requests.sql', to_regclass('public.client_requests') is not null),
     ('2026100600423', 'coach_notice_switches', '0423_coach_notice_switches.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'notices_off')),
     ('2026100600421', 'coach_join_links', '0421_coach_join_links.sql', to_regclass('public.coach_join_links') is not null),
     ('2026100600418', 'af3_database_policies', '0418_af3_database_policies.sql', exists (select 1 from pg_trigger where tgname = 'group_memberships_clear_intake' and not tgisinternal)),

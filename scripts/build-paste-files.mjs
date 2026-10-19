@@ -2735,6 +2735,36 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "174",
+  slug: "0422",
+  title: "0422 Release TC3 part B: \"Request to train with me\" on a coach's public page (one new column, three new tables, eight functions, two notice kinds; a request grants nothing until the coach approves)",
+  warn: "Adds one column (on by default) to the booking pages, three tables, eight functions and two notice kinds (the notification type list is rebuilt from the live list plus the two new kinds, and the paste stops if the result does not match). Nothing existing is replaced.",
+  migrations: ["0422"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes on screen until the Release TC3 part B code is live. Run this BEFORE that code. Once the code is live, a coach whose public page is on gets a Request to train with me button there (they can switch it off in Booking page settings); a request waits for the coach and grants nothing until they approve it.",
+  undo: [
+    "drop function if exists public.decline_all_client_requests(uuid);",
+    "drop function if exists public.decline_client_request(uuid);",
+    "drop function if exists public.approve_client_request(uuid);",
+    "drop function if exists public.coach_client_request_count(uuid);",
+    "drop function if exists public.coach_client_requests(text, uuid);",
+    "drop function if exists public.submit_client_request(uuid, date);",
+    "drop function if exists public.client_request_org(uuid);",
+    "drop function if exists public.client_request_short_name(text);",
+    "drop table if exists public.client_request_blocks;",
+    "drop table if exists public.client_request_attempts;",
+    "drop table if exists public.client_requests;",
+    "alter table public.coach_booking_pages drop column if exists accepts_requests;",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 174 misbehaves, and only while the Release TC3 part B code is not live (the code needs these). Waiting requests are lost. The two notice kinds stay in the allowed list (harmless).",
+  rows: [
+    ["0422 is not already applied (the requests table is not there yet)", "to_regclass('public.client_requests') is null"],
+    ["the tables and functions it uses exist", "to_regclass('public.coach_booking_pages') is not null and to_regclass('public.client_intake') is not null and to_regclass('public.athlete_profile_details') is not null and to_regclass('public.notifications') is not null and to_regprocedure('public.age_threshold_date(date, integer)') is not null"],
+    ["the notification type list can be read", "exists (select 1 from pg_constraint where conname = 'notifications_type_check' and conrelid = 'public.notifications'::regclass)"],
+  ],
+});
+
+STEPS.push({
   n: "175",
   slug: "0423",
   title: "0423 Release NS: a coach's own switches for the kinds of notice (one new column on profiles, two functions, one trigger on notifications; nothing existing is replaced)",
@@ -3588,6 +3618,7 @@ for (const s of STEPS) {
 const BUNDLES = [
   { id: "release-ts3-team-sheet-save", name: "Release TS3 (saving a filled team sheet: one table, one notice kind, three functions)", steps: ["171"] },
   { id: "release-own1-owner-accepted-only", name: "Release OWN1 (ownership cannot be handed to someone who has never signed in; replaces two functions, adds one function and one trigger)", steps: ["172"] },
+  { id: "release-tc3b-client-requests", name: "Release TC3 part B (Request to train with me on a coach's public page: one column, three tables, eight functions)", steps: ["174"] },
   { id: "release-ns-coach-notice-switches", name: "Release NS (a coach's own switches for the kinds of notice: one column, two functions, one trigger)", steps: ["175"] },
   { id: "release-tc3-coach-join-links", name: "Release TC3 (one invitation link per invited person: one new table)", steps: ["173"] },
   { id: "release-af3-database-policies", name: "Release AF3 (database policies from the post-ship audit; replaces two posts policies, one tag policy and two functions, adds two functions and two triggers)", steps: ["170"] },
@@ -3838,6 +3869,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0402", "to_regclass('public.guardian_consents') is not null"),
     m("0419", "to_regclass('public.team_sheet_batches') is not null"),
     m("0420", "exists (select 1 from pg_trigger where tgname = 'organization_memberships_guard_owner_role' and not tgisinternal)"),
+    m("0422", "to_regclass('public.client_requests') is not null"),
     m("0423", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'notices_off')"),
     m("0421", "to_regclass('public.coach_join_links') is not null"),
     m("0418", "exists (select 1 from pg_trigger where tgname = 'group_memberships_clear_intake' and not tgisinternal)"),

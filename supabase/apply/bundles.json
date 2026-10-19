@@ -16,6 +16,14 @@
   "file": "apply-release-own1-owner-accepted-only-all.sql"
  },
  {
+  "id": "release-tc3b-client-requests",
+  "name": "Release TC3 part B (Request to train with me on a coach's public page: one column, three tables, eight functions)",
+  "steps": [
+   "174"
+  ],
+  "file": "apply-release-tc3b-client-requests-all.sql"
+ },
+ {
   "id": "release-ns-coach-notice-switches",
   "name": "Release NS (a coach's own switches for the kinds of notice: one column, two functions, one trigger)",
   "steps": [

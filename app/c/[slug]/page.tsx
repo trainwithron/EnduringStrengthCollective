@@ -10,6 +10,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { cleanParam } from "@/lib/public-booking-route";
 import { canSignProofs } from "@/lib/public-booking-proof";
 import { isEmailConfigured } from "@/lib/email";
+import { requestTargetFor } from "@/lib/client-requests";
 import { DEFAULT_ORG_THEME } from "@/lib/theme";
 import { ownImagePath, pickBrandOrg, reviewsFromJson, safeWebUrl, siteColors, cleanSite, type SiteBackground } from "@/lib/coach-site";
 
@@ -74,6 +75,8 @@ async function load(slugParam: string, preview: boolean) {
   };
   const publicUrl = (path: string | null) => (path ? db.storage.from("coach-profile-photos").getPublicUrl(path).data.publicUrl : null);
   const canBook = !!page.enabled && canSignProofs() && isEmailConfigured();
+  // "Request to train with me": only when the coach's page is on, the coach left the request switch on, and a request has an organization to go to (the same check the request itself makes).
+  const canRequest = (await requestTargetFor(db, slug)) !== null;
   return {
     slug,
     coachName: (profile?.full_name as string | null) ?? "Your coach",
@@ -87,6 +90,7 @@ async function load(slugParam: string, preview: boolean) {
     heroUrl: publicUrl(ownImagePath(site.hero_path, page.coach_id)),
     coverUrl: publicUrl(ownImagePath(site.cover_path, page.coach_id)),
     canBook,
+    canRequest,
     showPrices: !!page.show_prices,
     packages: (packages ?? []) as { id: string; name: string; sessions_per_week: number; billing_type: string; sessions_granted: number; rate_cents: number }[],
     shop: (shop ?? [])
@@ -136,6 +140,17 @@ export default async function CoachSitePage(props: { params: Promise<{ slug: str
       Book a consultation
     </Link>
   ) : null;
+  const requestButton = d.canRequest ? (
+    <Link href={`/c/${d.slug}/request`} className="inline-flex items-center justify-center h-12 px-6 font-semibold text-base" style={d.canBook ? { border: `2px solid ${c.accent}`, color: c.text } : { background: c.accent, color: c.bg }}>
+      Request to train with me
+    </Link>
+  ) : null;
+  const buttons = bookButton || requestButton ? (
+    <div className="flex flex-wrap gap-3">
+      {bookButton}
+      {requestButton}
+    </div>
+  ) : null;
 
   return (
     <main className="min-h-screen" style={{ background: c.bg, color: c.text, fontFamily: `'${d.fontBody}', system-ui, sans-serif` }}>
@@ -170,7 +185,7 @@ export default async function CoachSitePage(props: { params: Promise<{ slug: str
         </div>
       </header>
 
-      {bookButton && <div className="max-w-2xl mx-auto px-5 pb-2">{bookButton}</div>}
+      {buttons && <div className="max-w-2xl mx-auto px-5 pb-2">{buttons}</div>}
 
       {(c2.whoIHelp || c2.whatIDo) && (
         <section className={section}>
@@ -254,10 +269,10 @@ export default async function CoachSitePage(props: { params: Promise<{ slug: str
         </section>
       )}
 
-      {bookButton && (
+      {buttons && (
         <section className={`${section} text-center`}>
           <h2 className="text-xl font-bold uppercase" style={heading}>Ready to start?</h2>
-          <div className="mt-4">{bookButton}</div>
+          <div className="mt-4 flex flex-wrap justify-center gap-3">{bookButton}{requestButton}</div>
         </section>
       )}
     </main>

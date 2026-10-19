@@ -13,6 +13,8 @@ import { ClientCardGrid } from "@/components/coach/desktop/client-card-grid";
 import { UnavailableState } from "@/components/ui/unavailable-state";
 import { GroupInvitesPanel, type GroupInviteRow } from "@/components/coach/desktop/group-invites-panel";
 import { AddClientButton } from "@/components/coach/desktop/add-client-button";
+import { RequestsLink } from "@/components/coach/requests-link";
+import { pendingRequestCount } from "@/lib/client-request-count";
 import { SwappableTerm } from "@/components/coach/swappable-term";
 import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
 import { CoachRosterMobile } from "@/components/coach/mobile/coach-roster-mobile";
@@ -291,6 +293,7 @@ export default async function ClientsPage(
       )
     );
 
+    const requestCount = await pendingRequestCount(supabase);
     // The coach's own row (their personal space) leads the list, as on a computer; never counted as a client.
     const { data: selfProfile } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
     const selfName = (selfProfile?.full_name as string | null | undefined)?.trim() || "You";
@@ -307,7 +310,10 @@ export default async function ClientsPage(
                 {phoneClients.length} <SwappableTerm termKey="client" form={phoneClients.length === 1 ? "singular" : "plural"} />
               </p>
             </div>
-            <AddClientButton groupId={params.groupId} groupName={group?.name ?? "This group"} createdBy={user.id} defaultOpen={openAdd} />
+            <div className="flex flex-wrap items-center gap-2">
+              <RequestsLink count={requestCount} />
+              <AddClientButton groupId={params.groupId} groupName={group?.name ?? "This group"} createdBy={user.id} defaultOpen={openAdd} />
+            </div>
           </div>
           <CoachesSection groupId={params.groupId} viewerId={user.id} coaches={coachList.coaches} pending={coachList.pending} canManage={inviteManager.ok} signIns={signIns} />
           <CoachOwnRow name={selfName} />

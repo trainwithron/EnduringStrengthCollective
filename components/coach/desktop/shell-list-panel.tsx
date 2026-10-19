@@ -16,6 +16,7 @@ import {
   type ListPanelView,
 } from "@/lib/coach-shell-panel-storage";
 import { NeedsAttentionStrip } from "./needs-attention-strip";
+import { PendingRequestsLine } from "./pending-requests-line";
 import { RosterMiniList } from "./roster-mini-list";
 import { AddClientButton } from "./add-client-button";
 import { forgetOrgGroups } from "@/lib/use-org-group-ids";
@@ -144,6 +145,7 @@ export function ShellListPanel({
     >
       <div className="flex-1 min-w-0 overflow-y-auto p-3">
         <NeedsAttentionStrip coachId={coachId} groupId={groupId} />
+        <PendingRequestsLine groupId={groupId} />
 
         {sectionSubLinks.length > 0 && (
           <div className="mb-3 pb-3 border-b border-steel/20">

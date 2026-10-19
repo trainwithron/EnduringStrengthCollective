@@ -1521,6 +1521,17 @@
   ]
  },
  {
+  "n": "174",
+  "slug": "0422",
+  "title": "0422 Release TC3 part B: \"Request to train with me\" on a coach's public page (one new column, three new tables, eight functions, two notice kinds; a request grants nothing until the coach approves)",
+  "migrations": [
+   "0422"
+  ],
+  "notApplied": [
+   "to_regclass('public.client_requests') is null"
+  ]
+ },
+ {
   "n": "175",
   "slug": "0423",
   "title": "0423 Release NS: a coach's own switches for the kinds of notice (one new column on profiles, two functions, one trigger on notifications; nothing existing is replaced)",
