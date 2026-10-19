@@ -44,11 +44,11 @@ describe("the coach's phone Home is short", () => {
     expect(home).toContain('className="px-5 pt-[108px] pb-4"');
   });
   it("the More sheet has Programs and Desktop mode, and the bottom bar has Home, Clients, Messages, Calendar, More", () => {
-    const more = read("components/coach/mobile/coach-more-sheet.tsx");
+    const more = read("components/coach/mobile/coach-nav-links-list.tsx");
     expect(more).toContain('<Item href="/programs" label="Programs"');
     expect(more).toContain('<ViewModeToggle targetMode="desktop" label="Desktop mode"');
     const bar = read("components/athlete/bottom-tab-bar.tsx");
-    for (const label of ["Home", "Clients", "Messages", "Calendar", "More"]) expect(bar).toContain(label);
+    for (const label of ['label: "Home"', 'term("client", "plural", { cap: true })', 'label: "Messages"', 'label: "Calendar"', 'label: "More"']) expect(bar).toContain(label);
   });
   it("says who is being logged for on the coach-logs-for-a-client bar", () => {
     const bar = read("components/coach/mobile/coach-mode-bar.tsx");
