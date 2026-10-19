@@ -52,6 +52,7 @@ import { pageAll } from "@/lib/page-all";
 import { TerminologyFirstRunCard } from "@/components/coach/desktop/terminology-first-run-card";
 import { GettingStartedCard } from "@/components/coach/desktop/getting-started-card";
 import { NeedsYouLoader, NeedsYouLoading } from "@/components/coach/desktop/needs-you-loader";
+import { noticeHref } from "@/lib/notice-links";
 
 export const metadata = { title: "Home" };
 
@@ -468,7 +469,7 @@ export default async function CoachHomePage() {
     id: n.id,
     type: n.type,
     body: n.body,
-    linkPath: n.link_path,
+    linkPath: noticeHref(n.type, n.link_path),
     createdAt: n.created_at,
   }));
 

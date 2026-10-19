@@ -72,8 +72,13 @@ export async function CoachMobileHome({
               Add a client
             </Link>
           )}
-          <LateChangesPanel groupIds={orgGroupIds} />
-          <ScheduleRequestsPanel groupIds={orgGroupIds} />
+          {/* The same anchors as the computer Home: a booking-request or late-change notice opens /dashboard#late-changes, which on a phone is this page. */}
+          <div id="late-changes" className="scroll-mt-24">
+            <LateChangesPanel groupIds={orgGroupIds} />
+          </div>
+          <div id="schedule-requests" className="scroll-mt-24">
+            <ScheduleRequestsPanel groupIds={orgGroupIds} />
+          </div>
           <ExpiryCheckInPanel groupIds={orgGroupIds} />
           <InactiveClientsPanel groupIds={orgGroupIds} />
           <ProgressLookPanel groupIds={orgGroupIds} />

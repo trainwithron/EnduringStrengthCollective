@@ -5,6 +5,7 @@ import { withCronRun } from "@/lib/cron-monitor";
 import { runPool } from "@/lib/run-pool";
 import { PUSHED_BY_JOB, pushBodyFor, pushTitleFor, STALE_PUSH_HOURS } from "@/lib/notification-push";
 import { isQuietNow, readPushPrefs } from "@/lib/push-prefs";
+import { noticeHref } from "@/lib/notice-links";
 
 // Every five minutes: pushes the notices the DATABASE writes (a client's booking request, a late change, a schedule request, the decision on a request), which no other code path sends. Each notice is claimed
 // (marked pushed) before it is sent, so it goes out once; a notice older than a few hours is marked and not sent (it would only be noise). The person's quiet hours and private lock screen apply (sendPushToProfile).
@@ -51,7 +52,7 @@ async function handler(request: Request) {
   let sent = 0;
   type Claimed = { id: string; profile_id: string; type: string; body: string; link_path: string };
   const run = await runPool((claimed ?? []) as Claimed[], AT_ONCE, async (n) => {
-    sent += await sendPushToProfile(db, n.profile_id, pushTitleFor(n.type), pushBodyFor(n.type), n.link_path || "/dashboard");
+    sent += await sendPushToProfile(db, n.profile_id, pushTitleFor(n.type), pushBodyFor(n.type), noticeHref(n.type, n.link_path || "/dashboard"));
   }, { deadlineMs: 90_000 });
   if (run.failed.length > 0) console.error(`notification-push: ${run.failed.length} pushes failed`);
 

@@ -6,7 +6,8 @@ import { GOOGLE_MIRROR_WEEKS } from "@/lib/series-schedule";
 import { mirrorBookingToGoogleCalendar } from "@/lib/google-calendar-mirror-server";
 import { sendCoachPush } from "@/lib/coach-notice";
 import { formatInTimezone } from "@/lib/format-in-timezone";
-import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
+import { DEFAULT_COACH_TIMEZONE, dateKeyInZone } from "@/lib/timezone";
+import { bookingDayHref } from "@/lib/notice-links";
 import { withCronRun } from "@/lib/cron-monitor";
 
 // Runs daily. Keeps every running "no end date" schedule booked 12 weeks ahead, and sends to Google Calendar any recurring
@@ -47,15 +48,17 @@ async function handler(request: Request) {
         const { data: athlete } = await db.from("profiles").select("full_name").eq("id", s.athlete_id).maybeSingle();
         const tz = s.timezone ?? DEFAULT_COACH_TIMEZONE;
         const when = taken.map((t) => formatInTimezone(new Date(t.startIso), tz, "dateTime")).join(", ");
+        // Opens the day of the first week that could not be booked (nothing was booked there, so there is no session to point at).
+        const link = bookingDayHref(s.group_id, dateKeyInZone(tz, new Date(taken[0].startIso)));
         const body = `Could not book ${athlete?.full_name ?? "a client"}'s weekly session on ${when}: the time is taken. That week is left empty.`;
         await db.from("notifications").insert({
           profile_id: s.coach_id,
           group_id: s.group_id,
           type: "recurring_booking_conflict",
           body,
-          link_path: `/groups/${s.group_id}/calendar`,
+          link_path: link,
         });
-        await sendCoachPush(db, s.coach_id, "bookings", "Recurring session conflict", body, `/groups/${s.group_id}/calendar`, { daytimeOnly: true }).catch(() => 0);
+        await sendCoachPush(db, s.coach_id, "bookings", "Recurring session conflict", body, link, { daytimeOnly: true }).catch(() => 0);
         // Remember it so tomorrow's run leaves it alone.
         await store.updateSeries(s.id, { skippedStarts: [...((s.skipped_starts ?? []) as string[]), ...taken.map((t) => t.startIso)] });
         reported += 1;

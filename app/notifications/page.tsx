@@ -8,6 +8,7 @@ import { LoadFailed } from "@/components/ui/load-failed";
 import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { isValidTimeZone } from "@/lib/format-in-timezone";
 import { CHOOSE_ORGANIZATION_PATH, getActiveAnchor } from "@/lib/active-anchor";
+import { noticeHref } from "@/lib/notice-links";
 
 export const metadata = { title: "Notifications" };
 
@@ -25,7 +26,7 @@ export default async function NotificationsPage() {
     supabase.from("group_memberships").select("group_id, role").eq("profile_id", user.id),
     supabase
       .from("notifications")
-      .select("id, body, link_path, read_at, created_at, group_id, groups ( name )")
+      .select("id, type, body, link_path, read_at, created_at, group_id, groups ( name )")
       .eq("profile_id", user.id)
       .order("created_at", { ascending: false })
       .limit(200),
@@ -49,7 +50,7 @@ export default async function NotificationsPage() {
   const entries: CenterEntry[] = visibleRows.map((n: any) => ({
     id: n.id,
     body: n.body,
-    linkPath: n.link_path ?? "/",
+    linkPath: noticeHref(n.type, n.link_path),
     createdAt: n.created_at,
     readAt: n.read_at,
     groupName: n.groups?.name ?? null,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { saved } from "@/lib/saved";
@@ -16,6 +16,10 @@ export function RecurringConflictBadge({ bookingId }: { bookingId: string }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const router = useRouter();
+  // A conflict notice links to this session (#booking-<id>): the page scrolls to it and its choices are already open.
+  useEffect(() => {
+    if (window.location.hash === `#booking-${bookingId}`) setOpen(true);
+  }, [bookingId]);
 
   async function resolve(cancel: boolean) {
     setBusy(true);
@@ -27,7 +31,7 @@ export function RecurringConflictBadge({ bookingId }: { bookingId: string }) {
   }
 
   return (
-    <div className="relative inline-block">
+    <div id={`booking-${bookingId}`} className="relative inline-block scroll-mt-24">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

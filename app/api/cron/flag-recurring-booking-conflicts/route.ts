@@ -6,6 +6,7 @@ import { resolveBlockedRangesForDate, bookingFitsAvailability, type Availability
 import { DEFAULT_COACH_TIMEZONE, dateKeyInZone } from "@/lib/timezone";
 import { formatInTimezone } from "@/lib/format-in-timezone";
 import { withCronRun } from "@/lib/cron-monitor";
+import { bookingDayHref, RECURRING_CONFLICTS_PATH } from "@/lib/notice-links";
 
 // acuity_replacement_gap_audit_sept16.md — recurring bookings, Q4's
 // confirmed answer: flag a future occurrence for the coach to resolve
@@ -82,7 +83,8 @@ async function handler(request: Request) {
 
   let flaggedCount = 0;
   // One summary for each coach per run, not one push per session: a coach who changes their hours could otherwise get dozens at once.
-  const flaggedByCoach = new Map<string, { groupId: string; names: Set<string>; count: number }>();
+  // `first` is the earliest flagged session: with only one, the notice opens that session on its day.
+  const flaggedByCoach = new Map<string, { groupId: string; names: Set<string>; count: number; first: { id: string; groupId: string; dateKey: string; ms: number } | null }>();
   for (const booking of bookings) {
     const timezone = timezoneByCoach.get(booking.coach_id) ?? DEFAULT_COACH_TIMEZONE;
     const windows = windowsByCoach.get(booking.coach_id) ?? [];
@@ -107,7 +109,9 @@ async function handler(request: Request) {
 
     if (!bookingFitsAvailability(bookingDate, windows, blockedRanges, timezone, localNoon, new Date(booking.end_at))) {
       await supabase.from("bookings").update({ needs_coach_resolution: true }).eq("id", booking.id);
-      const entry = flaggedByCoach.get(booking.coach_id) ?? { groupId: booking.group_id, names: new Set<string>(), count: 0 };
+      const entry = flaggedByCoach.get(booking.coach_id) ?? { groupId: booking.group_id, names: new Set<string>(), count: 0, first: null };
+      const ms = bookingDate.getTime();
+      if (!entry.first || ms < entry.first.ms) entry.first = { id: booking.id, groupId: booking.group_id, dateKey: dateKeyInZone(timezone, bookingDate), ms };
       entry.names.add(nameByAthlete.get(booking.athlete_id) ?? "a client");
       entry.count++;
       flaggedByCoach.set(booking.coach_id, entry);
@@ -118,14 +122,16 @@ async function handler(request: Request) {
   for (const [coachId, entry] of flaggedByCoach) {
     const who = [...entry.names].slice(0, 3).join(", ") + (entry.names.size > 3 ? ` and ${entry.names.size - 3} more` : "");
     const body = `${entry.count} recurring session${entry.count === 1 ? "" : "s"} (${who}) no longer fit your available hours. Open the calendar to resolve ${entry.count === 1 ? "it" : "them"}.`;
+    // One session: its day, scrolled to it with its choices open. Several: the list of them, each opening its own day.
+    const link = entry.count === 1 && entry.first ? bookingDayHref(entry.first.groupId, entry.first.dateKey, entry.first.id) : RECURRING_CONFLICTS_PATH;
     await supabase.from("notifications").insert({
       profile_id: coachId,
       group_id: entry.groupId,
       type: "recurring_booking_conflict",
       body,
-      link_path: `/groups/${entry.groupId}/calendar`,
+      link_path: link,
     });
-    await sendCoachPush(supabase, coachId, "bookings", "Recurring sessions need a look", body, `/groups/${entry.groupId}/calendar`, { daytimeOnly: true });
+    await sendCoachPush(supabase, coachId, "bookings", "Recurring sessions need a look", body, link, { daytimeOnly: true });
   }
 
   return NextResponse.json({ ok: true, flaggedCount });

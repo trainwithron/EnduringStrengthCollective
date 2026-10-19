@@ -7,6 +7,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { Bell } from "lucide-react";
 import { timeAgo } from "@/lib/notification-days";
 import { activeOrgGroupsFor } from "@/lib/active-org-groups";
+import { noticeHref } from "@/lib/notice-links";
 
 export interface NotificationEntry {
   id: string;
@@ -126,7 +127,7 @@ export function NotificationBell({
   function handleOpenNotification(n: NotificationEntry) {
     setOpen(false);
     markRead([n.id]);
-    router.push(n.linkPath);
+    router.push(noticeHref(n.type, n.linkPath));
   }
 
   return (
@@ -171,7 +172,7 @@ export function NotificationBell({
                 {items.map((n) => (
                   <Link
                     key={n.id}
-                    href={n.linkPath}
+                    href={noticeHref(n.type, n.linkPath)}
                     onClick={() => handleOpenNotification(n)}
                     className={`block px-3 py-2.5 ${!n.readAt ? "bg-rust/5" : ""}`}
                   >
