@@ -89,6 +89,8 @@ export function ExerciseCard({
   // two set_logs rows with the same set_order (found and fixed for the
   // coach-builder equivalent of this same bug tonight).
   const [addSetBusy, setAddSetBusy] = useState(false);
+  // "+ Set" that did not save says so (a weak signal used to do nothing at all, and the person tapped again and again).
+  const [addSetError, setAddSetError] = useState<string | null>(null);
   // Taking a set off: a logged set asks first (confirmRemoveId), then can be put back for a few seconds (removed).
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
   const [removed, setRemoved] = useState<{ set: SetLogEntry; error?: string } | null>(null);
@@ -162,17 +164,19 @@ export function ExerciseCard({
   async function handleAddSet() {
     if (addSetBusy || undoBusy) return;
     setAddSetBusy(true);
+    setAddSetError(null);
     try {
       const supabase = createBrowserClient();
       const nextOrder =
         exercise.sets.length > 0 ? Math.max(...exercise.sets.map((s) => s.setOrder)) + 1 : 0;
 
-      const { data: set } = await supabase
+      const { data: set, error: addError } = await supabase
         .from("set_logs")
         .insert({ session_exercise_id: exercise.id, set_order: nextOrder })
         .select("id, set_order, weight, reps, rpe, rir, tempo, time_seconds, height, distance, rest_seconds, pace, status")
         .single();
 
+      if (addError || !set) setAddSetError("Couldn't add the set. Check your signal and tap + again.");
       if (set) {
         onSetAdded({
           id: set.id,
@@ -190,6 +194,8 @@ export function ExerciseCard({
           status: set.status,
         });
       }
+    } catch {
+      setAddSetError("Couldn't add the set. Check your signal and tap + again.");
     } finally {
       setAddSetBusy(false);
     }
@@ -508,6 +514,11 @@ export function ExerciseCard({
         onFlagChange={(setId, flag) => onSetChange(setId, { dataFlag: flag })}
       />
 
+      {addSetError && (
+        <p className="font-body text-xs text-rust" role="alert">
+          {addSetError}
+        </p>
+      )}
       {!readOnly && (
         <SetStepper
           count={exercise.sets.length}
