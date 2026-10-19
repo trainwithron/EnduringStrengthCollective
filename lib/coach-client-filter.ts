@@ -11,6 +11,8 @@ export interface CoachClientRow {
   groupKind: "one_on_one" | "social" | "team";
   tier: "one_on_one" | "online" | "group" | null;
   setAside: boolean;
+  // Aged 13 to 17 with no signed guardian permission yet (the Clients list says "Waiting on a guardian").
+  waitingOnGuardian?: boolean;
   // Sessions still to schedule, and sessions already delivered beyond the balance (coach only).
   toBook: number;
   owed: number;

@@ -12,6 +12,8 @@ import { getCoachClients } from "@/lib/coach-clients";
 import { fetchInactiveKeys, inactiveKey } from "@/lib/inactive-ids";
 import { buildCreditPicture, fetchBookingCounts } from "@/lib/credit-picture";
 import { chunk } from "@/lib/chunk";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { waitingOnGuardian } from "@/lib/guardian-wait";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import type { CoachClientRow } from "@/lib/coach-client-filter";
 import { CoachesSection } from "@/components/coach/coaches-section";
@@ -50,14 +52,27 @@ export default async function CoachClientsPage() {
   const clientIds = clients.map((c) => c.id);
   const groupIds = Array.from(new Set(clients.map((c) => c.groupId)));
 
-  const [setAside, counts, creditRows, tierRows] = await Promise.all([
+  const [setAside, counts, creditRows, tierRows, dobRows] = await Promise.all([
     fetchInactiveKeys(supabase, groupIds),
     fetchBookingCounts(supabase, { coachId: user.id }),
     Promise.all(chunk(clientIds, 100).map((ids) => supabase.from("session_credits").select("athlete_id, group_id, balance").in("athlete_id", ids))).then((rs) => rs.flatMap((r) => r.data ?? [])),
     Promise.all(
       chunk(clientIds, 100).map((ids) => supabase.from("group_memberships").select("profile_id, group_id, client_tier").in("profile_id", ids).eq("role", "athlete"))
     ).then((rs) => rs.flatMap((r) => r.data ?? [])),
+    // Birth dates, only to mark a client aged 13 to 17 whose parent or guardian has not signed yet.
+    Promise.all(chunk(clientIds, 100).map((ids) => supabase.from("client_intake").select("athlete_id, date_of_birth").in("athlete_id", ids))).then((rs) => rs.flatMap((r) => r.data ?? [])),
   ]);
+  const dobByClient = new Map((dobRows as { athlete_id: string; date_of_birth: string | null }[]).map((r) => [r.athlete_id, r.date_of_birth]));
+  const teenIds = [...dobByClient.entries()].filter(([, dob]) => waitingOnGuardian(dob, false)).map(([id]) => id);
+  const signedTeens = new Set<string>();
+  if (teenIds.length > 0) {
+    // Read with the server's own access (the table is not readable from a browser), for this coach's own clients only.
+    const admin = createServiceRoleClient();
+    for (const ids of chunk(teenIds, 100)) {
+      const { data } = await admin.from("guardian_consents").select("athlete_id").eq("status", "signed").in("athlete_id", ids);
+      for (const r of (data ?? []) as { athlete_id: string }[]) signedTeens.add(r.athlete_id);
+    }
+  }
   const balance = new Map((creditRows as { athlete_id: string; group_id: string; balance: number }[]).map((r) => [`${r.athlete_id}:${r.group_id}`, r.balance]));
   const tier = new Map((tierRows as { profile_id: string; group_id: string; client_tier: CoachClientRow["tier"] }[]).map((r) => [`${r.profile_id}:${r.group_id}`, r.client_tier ?? null]));
 
@@ -74,6 +89,7 @@ export default async function CoachClientsPage() {
       setAside: setAside.has(inactiveKey(c.groupId, c.id)),
       toBook: picture.toBook,
       owed: picture.owed,
+      waitingOnGuardian: waitingOnGuardian(dobByClient.get(c.id), signedTeens.has(c.id)),
     };
   });
 
