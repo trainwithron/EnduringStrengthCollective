@@ -380,7 +380,7 @@ describe("TC1b: one plain coach list at the top of the Clients page", () => {
     const s = src("components/coach/coaches-section.tsx");
     expect(s).toContain("You");
     expect(s).toContain("Invited, not accepted yet");
-    expect(s).toContain("{p && canManage && (");
+    expect(s).toContain("{canManage && c.profileId !== viewerId && c.orgRole !== \"owner\" && (");
     expect(s).toContain("{canManage && <InviteCoachForm groupId={groupId} />}");
     expect(s).toContain("Manage invitations on the Team page");
     expect(s).toContain("branding?tab=team");
@@ -418,7 +418,7 @@ describe("TC1b: one plain coach list at the top of the Clients page", () => {
     expect(page).toContain('import { CoachesSection } from "@/components/coach/coaches-section";');
     expect(page).toContain("loadOrgCoaches(anchor.id)");
     expect(page).toContain("authorizeInviteManager(supabase, user.id, anchor.id)");
-    expect(page).toContain("<CoachesSection groupId={anchor.id} viewerId={user.id} coaches={coachList.coaches} pending={coachList.pending} canManage={inviteManager.ok} />");
+    expect(page).toContain("<CoachesSection groupId={anchor.id} viewerId={user.id} coaches={coachList.coaches} pending={coachList.pending} canManage={inviteManager.ok} signIns={signIns} />");
     // above the client list, below the title row, and not behind a team-only condition
     expect(page.indexOf("<CoachesSection ")).toBeGreaterThan(page.indexOf("<AddClientButton "));
     expect(page.indexOf("<CoachesSection ")).toBeLessThan(page.indexOf("<CoachClientsList "));

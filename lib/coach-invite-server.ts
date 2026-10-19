@@ -41,6 +41,8 @@ export interface SignInFacts {
   lastSignInAt: string | null;
   /** when the newest invitation email or link for this account was made (an unaccepted account only) */
   linkMadeAt: string | null;
+  /** signed in within ten minutes of an invitation link being made: most likely an email scanner or a message preview opened it, not the person */
+  signedInRightAfterLink: boolean;
 }
 
 /** In words an owner can read: an invitation nobody has used, a person who has signed in (and when), or an account that has never signed in (made some other way, or a link opened without a sign-in). */
@@ -51,9 +53,13 @@ export function signInFacts(user: (AuthUserLike & { app_metadata?: Record<string
     .map((x) => ({ x, ms: Date.parse(x) }))
     .filter((s) => Number.isFinite(s.ms))
     .sort((a, b) => b.ms - a.ms);
-  if (isUnaccepted(user)) return { state: "unaccepted", lastSignInAt: null, linkMadeAt: stamps[0]?.x ?? null };
-  if (user?.last_sign_in_at) return { state: "signed_in", lastSignInAt: user.last_sign_in_at, linkMadeAt: null };
-  return { state: "never", lastSignInAt: null, linkMadeAt: null };
+  if (isUnaccepted(user)) return { state: "unaccepted", lastSignInAt: null, linkMadeAt: stamps[0]?.x ?? null, signedInRightAfterLink: false };
+  if (user?.last_sign_in_at) {
+    const at = Date.parse(user.last_sign_in_at);
+    const right = Number.isFinite(at) && stamps.some((s) => at >= s.ms && at - s.ms < 10 * 60 * 1000);
+    return { state: "signed_in", lastSignInAt: user.last_sign_in_at, linkMadeAt: null, signedInRightAfterLink: right };
+  }
+  return { state: "never", lastSignInAt: null, linkMadeAt: null, signedInRightAfterLink: false };
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -67,7 +73,7 @@ export function shortDate(iso: string, now: Date = new Date()): string {
 /** The row's state in plain words. */
 export function signInWords(f: SignInFacts, now: Date = new Date()): string {
   if (f.state === "unaccepted") return "Invited, not accepted yet";
-  if (f.state === "signed_in" && f.lastSignInAt) return `Signed in ${shortDate(f.lastSignInAt, now)}`;
+  if (f.state === "signed_in" && f.lastSignInAt) return `Signed in ${shortDate(f.lastSignInAt, now)}${f.signedInRightAfterLink ? " by an invitation link, right after it was made (a link preview can do that, so they may not have set a password)" : ""}`;
   return "Has never signed in";
 }
 

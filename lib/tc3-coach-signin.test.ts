@@ -162,10 +162,19 @@ describe("Send sign-in link", () => {
 describe("how a coach stands, in words", () => {
   it("is invited, signed in (when) or never signed in", () => {
     expect(signInWords(signInFacts({ invited_at: "2026-10-17T09:00:00Z" }))).toBe("Invited, not accepted yet");
-    expect(signInWords(signInFacts({ invited_at: "2026-10-17T09:00:00Z", email_confirmed_at: "2026-10-17T09:05:00Z", last_sign_in_at: "2026-10-17T09:05:00Z" }), new Date("2026-10-20T00:00:00Z"))).toBe("Signed in Oct 17");
+    expect(signInWords(signInFacts({ invited_at: "2026-10-17T09:00:00Z", email_confirmed_at: "2026-10-17T09:05:00Z", last_sign_in_at: "2026-10-17T15:00:00Z" }), new Date("2026-10-20T00:00:00Z"))).toBe("Signed in Oct 17");
     expect(signInWords(signInFacts({ invited_at: "2026-10-17T09:00:00Z", email_confirmed_at: "2026-10-17T09:05:00Z" }))).toBe("Has never signed in");
     expect(signInWords(signInFacts({}))).toBe("Has never signed in");
     expect(shortDate("2025-03-04T10:00:00Z", new Date("2026-10-20T00:00:00Z"))).toBe("Mar 4, 2025");
+  });
+
+  it("signed in seconds after an invitation link was made is labeled honestly (Kade's case), and a plain later sign-in is not", () => {
+    const kade = signInFacts({ invited_at: "2026-10-17T21:48:49Z", email_confirmed_at: "2026-10-17T21:49:02Z", last_sign_in_at: "2026-10-17T21:49:02Z", app_metadata: { invite_emailed_at: "2026-10-17T21:47:53Z", invite_link_made_at: "2026-10-17T21:48:49Z" } });
+    expect(kade.signedInRightAfterLink).toBe(true);
+    expect(signInWords(kade, new Date("2026-10-18T00:00:00Z"))).toMatch(/^Signed in Oct 17 by an invitation link, right after it was made/);
+    const later = signInFacts({ invited_at: "2026-10-17T21:48:49Z", last_sign_in_at: "2026-10-19T08:00:00Z", app_metadata: { invite_link_made_at: "2026-10-17T21:48:49Z" } });
+    expect(later.signedInRightAfterLink).toBe(false);
+    expect(signInWords(later, new Date("2026-10-20T00:00:00Z"))).toBe("Signed in Oct 19");
   });
 
   it("an invitation whose newest link is over a day old says so", () => {
