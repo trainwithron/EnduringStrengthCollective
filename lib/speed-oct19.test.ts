@@ -83,3 +83,11 @@ describe("6 /my-space?view=client", () => {
     expect(read("app/my-training/open/route.ts")).toContain("setMyTrainingCookies(");
   });
 });
+
+describe("the Programs charts finish quickly (measured live: charts for every card kept the page loading 10 to 12 seconds)", () => {
+  it("only the first 12 cards without a cover get a chart; the rest show the plain card", () => {
+    const page = read("app/(coach)/programs/page.tsx");
+    expect(page).toContain("const CHARTED_CARDS = 12;");
+    expect(page).toContain("const uncoveredProgramIds = cards.filter((c) => !c.coverImagePath).slice(0, CHARTED_CARDS).map((c) => c.id);");
+  });
+});

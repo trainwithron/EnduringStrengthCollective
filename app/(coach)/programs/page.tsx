@@ -27,6 +27,10 @@ import { ALL_PROGRAMS_HREF, clientFromSearch, groupFromSearch, scopePrograms } f
 
 export const metadata = { title: "Programs" };
 
+// Charts are drawn for the cards a coach sees first only (SPEED, Oct 19, measured live: charts for every card kept the page loading 10 to 12 seconds and loaded the database the whole time).
+// The list is newest changed first, so these are the top cards; the rest show the plain card. A dozen programs is a few hundred rows in a handful of requests.
+const CHARTED_CARDS = 12;
+
 // The coach's Programs page: ALL of their programs, whichever group or client each one belongs to, wherever the coach is standing. It is scoped to one client only when the address says so
 // (?client=, which a client's own Programs tab uses), with a plain label and a one-click way back to everything. Nothing about the scope is stored, so it never sticks.
 export default async function CoachProgramsPage(props: { searchParams: Promise<{ client?: string | string[]; group?: string | string[] }> }) {
@@ -194,7 +198,8 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
     );
   }
 
-  const uncoveredProgramIds = cards.filter((c) => !c.coverImagePath).map((c) => c.id);
+  // Charts only for the first CHARTED_CARDS cards without a cover (the ones on screen; newest changed first): the rest show the plain card.
+  const uncoveredProgramIds = cards.filter((c) => !c.coverImagePath).slice(0, CHARTED_CARDS).map((c) => c.id);
   // The list shows at once; the cards' charts stream in after (SPEED, Oct 19).
   const listWith = (visualsByProgramId: Record<string, ProgramCardVisualData>) =>
     clientId ? (
