@@ -223,7 +223,7 @@ function ProgramCard({
                 Template, {program.slotCount} {program.slotCount === 1 ? "slot" : "slots"}
               </p>
             )}
-            {!program.athleteId && <p className="font-body text-xs text-steel mt-0.5">Assigned to ({program.assignedCount ?? 0})</p>}
+            {!program.sourceProgramId && <p className="font-body text-xs text-steel mt-0.5">Assigned to ({program.assignedCount ?? 0})</p>}
             {program.athleteName && <p className="font-body text-xs text-rust mt-0.5 truncate">For {firstName(program.athleteName)}</p>}
           </Link>
           )}

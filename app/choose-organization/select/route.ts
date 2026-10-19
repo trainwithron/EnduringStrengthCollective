@@ -2,11 +2,13 @@ import { NextResponse } from "next/server";
 import { safeNextPath } from "@/lib/safe-next";
 import { createServerClient } from "@/lib/supabase/server";
 import { getCoachedGroups, LAST_WORKSPACE_GROUP_COOKIE, pickAnchorGroup } from "@/lib/coach-groups";
-import { ACTIVE_ORG_COOKIE } from "@/lib/active-org";
+import { ACTIVE_ORG_COOKIE, isPrefetchRequest } from "@/lib/active-org";
 
 // Choosing an organization: the organization must be one the signed-in coach is a coach in (anything else goes back to the chooser). The workspace is remembered as that organization's usual team or
 // social group, and every coach page follows it.
 export async function GET(request: Request) {
+  // A prefetch (a link to this route seen on screen) is never a choice: nothing is set (FIX 4: prefetches used to switch the organization on their own).
+  if (isPrefetchRequest(request.headers)) return new NextResponse(null, { status: 204 });
   const url = new URL(request.url);
   const supabase = await createServerClient();
   const {

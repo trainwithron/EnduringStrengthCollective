@@ -44,7 +44,7 @@ describe("the header is wired in everywhere data is read", () => {
   });
   it("opening a group page makes it the workspace, only for a group the person belongs to", () => {
     const mw = read("lib/supabase/middleware.ts");
-    expect(mw).toContain('.from("group_memberships").select("group_id, groups ( organization_id )").eq("group_id", pageGroup).eq("profile_id", user.id)');
+    expect(mw).toContain('.from("group_memberships").select("group_id, role, groups ( organization_id )").eq("group_id", pageGroup).eq("profile_id", user.id)');
     expect(mw).toContain("request.cookies.set(LAST_WORKSPACE_GROUP_COOKIE");
   });
   it("pages that open a person's own row from a link or list spanning organizations read without the workspace header", () => {

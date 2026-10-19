@@ -158,7 +158,7 @@ describe("the middleware sends the phone", () => {
   const block = mw.slice(mw.indexOf("One real phone app for coaches"), mw.indexOf("return phoneResponse;") + 30);
   it("right after the My training exit, before the workspace cookie", () => {
     expect(mw.indexOf("shouldLeaveMyTraining(pathname")).toBeLessThan(mw.indexOf("One real phone app for coaches"));
-    expect(mw.indexOf("One real phone app for coaches")).toBeLessThan(mw.indexOf("const pageGroup = user ? groupIdFromPath(pathname) : null;"));
+    expect(mw.indexOf("One real phone app for coaches")).toBeLessThan(mw.indexOf("const pageGroup = user && request.method"));
   });
   it("page loads only, never the API or a frame (the computer's panes and split half show any page)", () => {
     expect(block).toContain('request.method === "GET"');

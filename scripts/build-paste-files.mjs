@@ -2786,6 +2786,45 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "176",
+  slug: "0424",
+  title: "0424 FIX 2: the first person a program is assigned to gets the original, later people get a copy (replaces one function)",
+  warn: "This REPLACES one function (assign_program_to_client). It is the 0337 text word for word with the attach rule widened to an active program in a group with no clients, and narrowed so a program someone already has a copy of, or a template with slots, is always copied. The paste checks the live function is exactly the text it replaces, and stops if not.",
+  migrations: ["0424"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes on screen until the FIX 2 code is live (safe either order). Then assigning a program from the library to its first person hands them the program itself; the next person gets their own copy, and the program list shows who has it.",
+  undo: [
+    fnFromMigration("0337", "assign_program_to_client"),
+    "revoke execute on function public.assign_program_to_client(uuid, uuid, uuid, text, date) from public, anon;",
+    "grant execute on function public.assign_program_to_client(uuid, uuid, uuid, text, date) to authenticated, service_role;",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 176 misbehaves. Puts the function back to its 0337 text (an active library program is copied again for everyone).",
+  rows: [
+    ["0424 is not already applied (the function does not yet check for copies)", "not exists (select 1 from pg_proc p where p.oid = to_regprocedure('public.assign_program_to_client(uuid, uuid, uuid, text, date)') and position('c.source_program_id = src.id' in p.prosrc) > 0)"],
+    ["the function is exactly the text this replaces (0337)", md5Is("assign_program_to_client(uuid, uuid, uuid, text, date)", "ea532ac6f03eb202b54e26147fec00df")],
+    ["the slot column it reads exists", "(select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercises' and column_name = 'is_slot') = 1"],
+    ["the copy column it reads exists", "(select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'source_program_id') = 1"],
+  ],
+});
+
+STEPS.push({
+  n: "177",
+  slug: "0425",
+  title: "0425 FIX 4: the organization wall follows the organization the person chose (replaces one function)",
+  warn: "This REPLACES one function (request_workspace_org). It first reads the organization the app says the person chose (x-workspace-org), only when the person belongs to it, and otherwise falls back to the group header exactly as before. The paste checks the live function is exactly the text it replaces (0348), and stops if not.",
+  migrations: ["0425"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes on screen until the FIX 4 code is live (safe either order: until then no request sends the new header, so the rule is exactly as before). Then the organization the coach chose is the one every page shows, even on a page that belongs to a group of another organization.",
+  undo: fnFromMigration("0348", "request_workspace_org") + String.fromCharCode(10) + "revoke execute on function public.request_workspace_org() from public, anon;" + String.fromCharCode(10) + "grant execute on function public.request_workspace_org() to authenticated, service_role;",
+  undoWhy: "Only if step 177 misbehaves. Puts the function back to its 0348 text (the wall follows the last group opened again).",
+  rows: [
+    ["0425 is not already applied (the function does not read the organization header yet)", "not exists (select 1 from pg_proc p where p.oid = to_regprocedure('public.request_workspace_org()') and position('x-workspace-org' in p.prosrc) > 0)"],
+    ["the function is exactly the text this replaces (0348)", md5Is("request_workspace_org()", "c473cde0ef535c443f12c98d76baa6fb")],
+    ["the tables it reads exist", "to_regclass('public.organization_memberships') is not null and to_regclass('public.group_memberships') is not null and to_regclass('public.groups') is not null"],
+  ],
+});
+
+STEPS.push({
   n: "170",
   slug: "0418",
   title: "0418 Release AF3: database policies from the post-ship audit (a private client stays private in posts and tags; two undecided account-deletion links decided; the guardian-consent answer limited for a coach; the health-form flag cleared when the last client seat goes)",
@@ -3619,6 +3658,8 @@ const BUNDLES = [
   { id: "release-ts3-team-sheet-save", name: "Release TS3 (saving a filled team sheet: one table, one notice kind, three functions)", steps: ["171"] },
   { id: "release-own1-owner-accepted-only", name: "Release OWN1 (ownership cannot be handed to someone who has never signed in; replaces two functions, adds one function and one trigger)", steps: ["172"] },
   { id: "release-tc3b-client-requests", name: "Release TC3 part B (Request to train with me on a coach's public page: one column, three tables, eight functions)", steps: ["174"] },
+  { id: "fix4-org-wall-follows-active-org", name: "FIX 4 (the organization wall follows the organization the person chose; replaces one function)", steps: ["177"] },
+  { id: "fix2-first-assignee-gets-the-original", name: "FIX 2 (the first person a program is assigned to gets the original; replaces one function)", steps: ["176"] },
   { id: "release-ns-coach-notice-switches", name: "Release NS (a coach's own switches for the kinds of notice: one column, two functions, one trigger)", steps: ["175"] },
   { id: "release-tc3-coach-join-links", name: "Release TC3 (one invitation link per invited person: one new table)", steps: ["173"] },
   { id: "release-af3-database-policies", name: "Release AF3 (database policies from the post-ship audit; replaces two posts policies, one tag policy and two functions, adds two functions and two triggers)", steps: ["170"] },
@@ -3870,6 +3911,8 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0419", "to_regclass('public.team_sheet_batches') is not null"),
     m("0420", "exists (select 1 from pg_trigger where tgname = 'organization_memberships_guard_owner_role' and not tgisinternal)"),
     m("0422", "to_regclass('public.client_requests') is not null"),
+    m("0425", "exists (select 1 from pg_proc p where p.oid = to_regprocedure('public.request_workspace_org()') and position('x-workspace-org' in p.prosrc) > 0)"),
+    m("0424", "exists (select 1 from pg_proc p where p.oid = to_regprocedure('public.assign_program_to_client(uuid, uuid, uuid, text, date)') and position('c.source_program_id = src.id' in p.prosrc) > 0)"),
     m("0423", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'notices_off')"),
     m("0421", "to_regclass('public.coach_join_links') is not null"),
     m("0418", "exists (select 1 from pg_trigger where tgname = 'group_memberships_clear_intake' and not tgisinternal)"),

@@ -21,6 +21,7 @@ import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { cookies } from "next/headers";
 import { getCoachedGroups, LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/coach-groups";
+import { ACTIVE_ORG_COOKIE, decodeCookieValue, rememberedGroupForActiveOrg } from "@/lib/active-org";
 import { pickFeedGroup } from "@/lib/start-group";
 import { FeedGroupPicker } from "@/components/feed/feed-group-picker";
 import type { FeedChannel, FeedPost } from "@/lib/types";
@@ -127,8 +128,11 @@ export default async function FeedPage(
   if (selfView && user) {
     const shared = (await getCoachedGroups(supabase, user.id)).filter((g) => g.kind !== "one_on_one");
     feedChoices = shared.map((g) => ({ id: g.id, name: g.name, orgName: g.orgName }));
-    const remembered = (await cookies()).get(LAST_WORKSPACE_GROUP_COOKIE)?.value;
-    const picked = pickFeedGroup(feedChoices, searchParams.group, remembered ? decodeURIComponent(remembered) : null);
+    // The feed opens on a group of the organization the coach CHOSE (FIX 4), not simply the last group opened.
+    const jar = await cookies();
+    const lastGroup = decodeCookieValue(jar.get(LAST_WORKSPACE_GROUP_COOKIE)?.value);
+    const remembered = rememberedGroupForActiveOrg(shared, decodeCookieValue(jar.get(ACTIVE_ORG_COOKIE)?.value), lastGroup) ?? lastGroup;
+    const picked = pickFeedGroup(feedChoices, searchParams.group, remembered);
     if (picked) feedGroupId = picked.id;
     else noSharedGroup = true;
   }

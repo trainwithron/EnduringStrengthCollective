@@ -9,6 +9,7 @@ import { apiGateApplies, dobGatedPage, gateAction, intakeGateApplies } from "@/l
 import { SIGNED_OUT_FRAME_HTML } from "@/lib/signed-out-frame";
 import { isPhoneView, phoneCoachRedirect } from "@/lib/phone-coach-routes";
 import { PWA_STANDALONE_COOKIE, VIEW_OVERRIDE_COOKIE } from "@/lib/pwa";
+import { ACTIVE_ORG_COOKIE, decodeCookieValue, isPrefetchRequest, switchConfirmPath, workspaceDecision } from "@/lib/active-org";
 
 // Every page a client can use. A client who has not finished the health form and waiver (profiles.intake_required) reaches none of them, not just /groups: a workout link, a notification or a typed address
 // all land on the form first.
@@ -291,13 +292,31 @@ export async function updateSession(request: NextRequest) {
 
   // Defense in depth (lib/workspace-header.ts): opening a group's page makes that group the open workspace, so every data request the page and its API calls make names the right organization.
   // Only a group the person belongs to can become the workspace (a pasted link to someone else's group changes nothing). The new value is also given to this very request, which is still being rendered.
-  const pageGroup = user ? groupIdFromPath(pathname) : null;
-  if (user && pageGroup && decodeWorkspaceCookie(request.cookies.get(LAST_WORKSPACE_GROUP_COOKIE)?.value) !== pageGroup) {
-    const { data: ownMembership } = await supabase.from("group_memberships").select("group_id, groups ( organization_id )").eq("group_id", pageGroup).eq("profile_id", user.id).maybeSingle();
+  // FIX 4 (one organization value everywhere): a prefetch never changes anything, and a page of ANOTHER organization than the one chosen asks first ("Switch to <name>?" on the chooser page; Yes switches,
+  // No stays). See workspaceDecision in lib/active-org.ts.
+  const pageGroup = user && request.method === "GET" && !isPrefetchRequest(request.headers) ? groupIdFromPath(pathname) : null;
+  // With an organization chosen every group page is checked (a group remembered earlier may belong to another organization); with none, only a group not already remembered (as before).
+  const chosenOrg = decodeCookieValue(request.cookies.get(ACTIVE_ORG_COOKIE)?.value);
+  if (user && pageGroup && (chosenOrg || decodeWorkspaceCookie(request.cookies.get(LAST_WORKSPACE_GROUP_COOKIE)?.value) !== pageGroup)) {
+    const { data: ownMembership } = await supabase.from("group_memberships").select("group_id, role, groups ( organization_id )").eq("group_id", pageGroup).eq("profile_id", user.id).maybeSingle();
     // The personal space belongs to no organization, so it never becomes the open workspace: the organization the person was in stays open.
     const memberGroup = (ownMembership as unknown as { groups: { organization_id: string | null } | { organization_id: string | null }[] | null } | null)?.groups;
     const memberOrg = Array.isArray(memberGroup) ? memberGroup[0]?.organization_id : memberGroup?.organization_id;
-    if (ownMembership && memberOrg) {
+    const decision = workspaceDecision({
+      isPageLoad: !!ownMembership,
+      inFrame: request.headers.get("sec-fetch-dest") === "iframe",
+      pageOrg: memberOrg ?? null,
+      activeOrg: chosenOrg,
+      isCoachThere: (ownMembership as { role?: string } | null)?.role === "coach",
+    });
+    if (decision === "confirm" && memberOrg) {
+      const confirmResponse = NextResponse.redirect(new URL(switchConfirmPath(memberOrg, pathname + request.nextUrl.search), request.url));
+      response.cookies.getAll().forEach((cookie) => {
+        confirmResponse.cookies.set(cookie);
+      });
+      return confirmResponse;
+    }
+    if (decision === "remember" && memberOrg) {
       request.cookies.set(LAST_WORKSPACE_GROUP_COOKIE, encodeURIComponent(pageGroup));
       const carried = response.cookies.getAll();
       response = NextResponse.next({ request });

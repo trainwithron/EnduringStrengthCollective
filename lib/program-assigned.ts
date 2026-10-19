@@ -11,15 +11,16 @@ export interface AssignedInstance {
   startDate: string | null;
 }
 
-export async function loadAssignedTo(supabase: SupabaseClient, programId: string): Promise<AssignedInstance[]> {
-  const { data } = await supabase
-    .from("programs")
-    .select("id, athlete_id, group_id, start_date, profiles!programs_athlete_id_fkey ( full_name )")
-    .eq("source_program_id", programId)
+// With includeSelf the person who holds the program ITSELF is included too, listed first (the first person a program is assigned to gets the original: migration 0424). The delete checks leave it
+// out: they count the people holding copies.
+export async function loadAssignedTo(supabase: SupabaseClient, programId: string, { includeSelf = false }: { includeSelf?: boolean } = {}): Promise<AssignedInstance[]> {
+  const base = supabase.from("programs").select("id, athlete_id, group_id, start_date, profiles!programs_athlete_id_fkey ( full_name )");
+  const { data } = await (includeSelf ? base.or(`id.eq.${programId},source_program_id.eq.${programId}`) : base.eq("source_program_id", programId))
     .is("archived_at", null)
     .not("athlete_id", "is", null)
     .order("created_at", { ascending: false });
-  return ((data ?? []) as any[]).map((r) => ({
+  const rows = [...((data ?? []) as any[])].sort((a, b) => Number(b.id === programId) - Number(a.id === programId));
+  return rows.map((r) => ({
     instanceId: r.id as string,
     athleteId: r.athlete_id as string,
     athleteName: ((r.profiles?.full_name as string | null) ?? "Unknown").trim() || "Unknown",

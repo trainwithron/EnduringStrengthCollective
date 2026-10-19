@@ -113,10 +113,14 @@ describe("the coach-level pages and pickers stand on the organization the coach 
     // every read of the coach's bookings and sessions on the calendar goes by the organization's groups (in groups of ids: lib/read-by-ids.ts)
     expect((cal.match(/readRowsByIds\(\s*orgGroupIds|readByIds\(\s*orgGroupIds/g) ?? []).length).toBeGreaterThanOrEqual(5);
   });
-  it("visiting a team or social group remembers it as the workspace, and the theme follows the workspace (read once per request: lib/workspace-group-row.ts)", () => {
-    expect(read("components/coach/coach-desktop-shell.tsx")).toContain("LAST_WORKSPACE_GROUP_COOKIE");
-    expect(read("lib/org-theme-server.ts")).toContain("(await getWorkspaceGroupRow()).row?.organization_id");
+  it("visiting a group of the chosen organization remembers it as the workspace (the middleware alone, FIX 4), and the theme follows the chosen organization, then the workspace", () => {
+    expect(read("components/coach/coach-desktop-shell.tsx")).not.toContain("LAST_WORKSPACE_GROUP_COOKIE");
+    expect(read("lib/supabase/middleware.ts")).toContain("response.cookies.set(LAST_WORKSPACE_GROUP_COOKIE");
+    const theme = read("lib/org-theme-server.ts");
+    // the remembered workspace is read once per request for the colors and the team words together (lib/workspace-group-row.ts)
+    expect(theme).toContain("(await getWorkspaceGroupRow()).row?.organization_id");
     expect(read("lib/workspace-group-row.ts")).toContain("get(LAST_WORKSPACE_GROUP_COOKIE)");
+    expect(theme.indexOf("ACTIVE_ORG_COOKIE_NAME)?.value")).toBeLessThan(theme.indexOf("getWorkspaceGroupRow()).row"));
   });
 });
 

@@ -40,9 +40,10 @@ describe("One program in the library, an independent version for each person", (
     expect(page).toContain('.not("source_program_id", "is", null).not("athlete_id", "is", null).is("archived_at", null)');
     expect(read("components/coach/desktop/program-card-grid.tsx")).toContain("Assigned to ({program.assignedCount ?? 0})");
   });
-  it("assigning always copies and adds no client name; nothing calls the attach step", () => {
+  it("assigning hands the program itself to its first person and copies for everyone after (the database decides), with no client name added", () => {
     const lib = read("lib/program-duplication.ts");
-    expect(lib).not.toContain("assign_program_to_client");
+    expect(lib).toContain('.rpc("assign_program_to_client", {');
+    expect(lib).toContain("p_client_name: null,");
     const panel = read("components/coach/desktop/program-assign-panel.tsx");
     expect(panel).not.toContain("clientName");
     expect(read("components/coach/client-program-actions.tsx")).not.toContain("clientName: athleteFullName");
