@@ -2735,6 +2735,27 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "175",
+  slug: "0423",
+  title: "0423 Release NS: a coach's own switches for the kinds of notice (one new column on profiles, two functions, one trigger on notifications; nothing existing is replaced)",
+  warn: "Additions only: one column (empty by default, so everything stays on), two functions and one BEFORE INSERT trigger on notifications that only ever drops a notice for someone who switched that kind off.",
+  migrations: ["0423"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes on screen until the Release NS code is live. Run this BEFORE that code (Settings > Notifications reads and writes the column). No notice is dropped for anyone until they switch a kind off.",
+  undo: [
+    "drop trigger if exists notifications_respect_switch on public.notifications;",
+    "drop function if exists public.notifications_respect_switch();",
+    "drop function if exists public.notice_kind_of(text);",
+    "alter table public.profiles drop column if exists notices_off;",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 175 misbehaves, and only while the Release NS code is not live (the code reads the column). Every notice is delivered again; the switches people set are lost.",
+  rows: [
+    ["0423 is not already applied (the switch column is not there yet)", "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'notices_off')"],
+    ["the tables it uses exist", "to_regclass('public.profiles') is not null and to_regclass('public.notifications') is not null"],
+  ],
+});
+
+STEPS.push({
   n: "170",
   slug: "0418",
   title: "0418 Release AF3: database policies from the post-ship audit (a private client stays private in posts and tags; two undecided account-deletion links decided; the guardian-consent answer limited for a coach; the health-form flag cleared when the last client seat goes)",
@@ -3567,6 +3588,7 @@ for (const s of STEPS) {
 const BUNDLES = [
   { id: "release-ts3-team-sheet-save", name: "Release TS3 (saving a filled team sheet: one table, one notice kind, three functions)", steps: ["171"] },
   { id: "release-own1-owner-accepted-only", name: "Release OWN1 (ownership cannot be handed to someone who has never signed in; replaces two functions, adds one function and one trigger)", steps: ["172"] },
+  { id: "release-ns-coach-notice-switches", name: "Release NS (a coach's own switches for the kinds of notice: one column, two functions, one trigger)", steps: ["175"] },
   { id: "release-tc3-coach-join-links", name: "Release TC3 (one invitation link per invited person: one new table)", steps: ["173"] },
   { id: "release-af3-database-policies", name: "Release AF3 (database policies from the post-ship audit; replaces two posts policies, one tag policy and two functions, adds two functions and two triggers)", steps: ["170"] },
   { id: "release-af3e-c-write-guard-rest", name: "Release AF3e paste C (the restrictive write guard on the rest of the covered tables; apply only after paste B has run clean for a few days)", steps: ["169"] },
@@ -3816,6 +3838,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0402", "to_regclass('public.guardian_consents') is not null"),
     m("0419", "to_regclass('public.team_sheet_batches') is not null"),
     m("0420", "exists (select 1 from pg_trigger where tgname = 'organization_memberships_guard_owner_role' and not tgisinternal)"),
+    m("0423", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'notices_off')"),
     m("0421", "to_regclass('public.coach_join_links') is not null"),
     m("0418", "exists (select 1 from pg_trigger where tgname = 'group_memberships_clear_intake' and not tgisinternal)"),
     m("0417", "(exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'comments' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'reactions' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'direct_messages' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'exercise_video_comments' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'training_partner_profiles' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'training_partner_requests' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'challenge_participants' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'progress_photos' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'session_exercise_videos' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'body_weight_logs' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'body_scans' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'transformation_cards' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'transformation_milestones' and policyname = 'minor_write_guard_insert'))"),
