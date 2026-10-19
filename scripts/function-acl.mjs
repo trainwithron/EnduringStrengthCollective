@@ -83,6 +83,10 @@ export const AUDIT_WRITERS = SERVER_ONLY_SIGNATURES.filter((s) => s[2]).map((s) 
 export const ACL_REVIEWED = [
   "coach_ai_multiplier", "coach_client_steps", "get_invite_info", "has_valid_group_invite", "athlete_in_org", "can_view_org_branding",
   "join_group_with_invite", "set_sms_consent", "request_workspace_org", "answer_organization_invite", "leave_organization", "group_in_active_org", "ensure_personal_space", "group_is_new_and_mine", "coach_in_org", "client_of_coach_in_org", "attach_refund_reason", "refund_coach_credit", "group_session_counts",
+  // SPEED A (0426): the organization wall's set helper. An RLS helper with no caller check, like group_in_active_org: it returns group ids only (no names, no rows), the groups of the
+  // organization the request names plus the groups with no organization, i.e. the same set group_in_active_org answers about one id at a time. Ids grant nothing on their own (every table still asks
+  // row security). Reviewed for the paste; called out to Commander for the line-by-line review.
+  "active_org_group_ids",
   // Release H: each checks the caller inside (owner, admin or the member themselves; signed-in only) through is_org_owner_or_admin, which this list does not recognise by name
   "close_organization", "remove_org_member", "set_org_member_role",
   // Release T1 (front desk): each looks at who is calling inside (a front-desk person of the organization, or its owner/admin/coach, through _front_desk_may_act; remove_front_desk: an owner/admin or the person themselves).
