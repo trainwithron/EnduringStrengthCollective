@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { TermForm, TermKey, TermOverride, TerminologyOverrides } from "@/lib/terminology";
 import { termText } from "@/lib/term-text";
-import { isTeamSportGroup, withTeamSportWords } from "@/lib/team-sport";
+import { isTeamSportGroup, orgIsTeamOnly, withTeamSportWords } from "@/lib/team-sport";
 
 interface TerminologyContextValue {
   overrides: TerminologyOverrides;
@@ -43,6 +43,17 @@ export function TerminologyProvider({
   const [saved, setOverrides] = useState<TerminologyOverrides>({});
   const [teamSport, setTeamSport] = useState(false);
 
+  // The page is first drawn by the server, which does not know the group is a team: a team coach would see "Clients" until the read below finishes. So the last answer for this group is remembered in this browser
+  // and applied the moment the page is up (the read below still decides, and corrects it if it changed).
+  useEffect(() => {
+    if (!groupId) return;
+    try {
+      if (window.localStorage.getItem(`team-sport-words:${groupId}`) === "1") setTeamSport(true);
+    } catch {
+      // storage unavailable: the read below still sets it
+    }
+  }, [groupId]);
+
   useEffect(() => {
     let cancelled = false;
     async function run() {
@@ -60,7 +71,19 @@ export function TerminologyProvider({
           .eq("id", groupId)
           .maybeSingle();
         organizationId = group?.organization_id ?? null;
-        if (!cancelled) setTeamSport(isTeamSportGroup((group as { team_mode?: boolean | null } | null)?.team_mode));
+        // A team-sport group, or a group in an organization whose groups are ALL team-sport groups, says "athletes".
+        let isTeam = isTeamSportGroup((group as { team_mode?: boolean | null } | null)?.team_mode);
+        if (!isTeam && organizationId) {
+          const { data: orgGroups, error: orgGroupsError } = await supabase.from("groups").select("team_mode").eq("organization_id", organizationId).limit(500);
+          isTeam = !orgGroupsError && orgIsTeamOnly((orgGroups ?? []) as { team_mode?: boolean | null }[]);
+        }
+        if (!cancelled) setTeamSport(isTeam);
+        try {
+          if (isTeam) window.localStorage.setItem(`team-sport-words:${groupId}`, "1");
+          else window.localStorage.removeItem(`team-sport-words:${groupId}`);
+        } catch {
+          // storage unavailable: nothing is remembered
+        }
       }
 
       const { data: membership } = organizationId
