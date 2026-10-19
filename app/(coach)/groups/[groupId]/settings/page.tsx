@@ -395,7 +395,7 @@ export default async function SettingsPage(
         )}
 
         <SettingsGroup label="Profile">
-          {!isCoach && !effective.isActingAsOther && (
+          {((!isCoach && !effective.isActingAsOther) || inPersonalSpace) && (
             <Link href={`/groups/${params.groupId}/about-you`} className="block py-3 border-b border-steel/20 font-body text-sm text-chalk">
               About you: height, weight, activity and units &rarr;
             </Link>

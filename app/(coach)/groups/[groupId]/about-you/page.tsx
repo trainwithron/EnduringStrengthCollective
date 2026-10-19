@@ -7,6 +7,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { AboutYouForm } from "@/components/athlete/about-you-form";
 import { readDateOfBirth, rowToBodyProfile } from "@/lib/client-body-profile";
+import { inOwnPersonalSpace } from "@/lib/personal-space";
 
 export const metadata = { title: "About you" };
 
@@ -23,7 +24,8 @@ export default async function AboutYouPage(props: { params: Promise<{ groupId: s
 
   if (isReadFailure(membershipError)) return <LoadFailedPage />;
 
-  if (membership?.role !== "athlete") {
+  // A coach in their OWN personal space is the client there.
+  if (membership?.role !== "athlete" && !(await inOwnPersonalSpace(supabase, params.groupId, user.id))) {
     return <NoAccess>This page is for clients. A coach edits these in the client&apos;s Nutrition area.</NoAccess>;
   }
 
