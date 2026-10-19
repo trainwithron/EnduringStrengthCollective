@@ -53,7 +53,7 @@ describe("TC2: the menus use it", () => {
 
   it("the computer menu switches to the team menu for a team-sport group, never on a coach-level page", () => {
     expect(shell).toContain("const teamSport = isTeamSportGroup(teamMode) && !coachLevel;");
-    expect(shell).toContain("const nav: NavEntry[] = teamSport ? teamNav : ordinaryNav;");
+    expect(shell).toContain("const nav: NavEntry[] = teamSport ? teamNav : ordinaryNav.filter(");
     const team = shell.slice(shell.indexOf("// The team-sport menu:"), shell.indexOf("const nav: NavEntry[] = teamSport"));
     expect(team).toContain("teamSportMenu(groupId)");
     expect(team).toContain('label: "More"');

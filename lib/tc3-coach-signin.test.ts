@@ -429,8 +429,8 @@ describe("the screens", () => {
 
   it("a team-sport group has no Business button in the left panel, and a pinned Business view never shows there", () => {
     const panel = src("components/coach/desktop/shell-list-panel.tsx");
-    expect(panel).toContain("{!teamSport && (");
-    expect(panel).toContain('teamSport && pickedView === "business" ? "roster" : pickedView');
-    expect(src("components/coach/coach-desktop-shell.tsx")).toContain("teamSport={teamSport}");
+    expect(panel).toContain("{!hideMoney && (");
+    expect(panel).toContain('hideMoney && pickedView === "business" ? "roster" : pickedView');
+    expect(src("components/coach/coach-desktop-shell.tsx")).toContain("hideMoney={moneyHidden}");
   });
 });
