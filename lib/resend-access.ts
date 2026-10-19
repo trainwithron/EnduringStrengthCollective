@@ -5,6 +5,7 @@ import { maskEmail } from "@/lib/mask-email";
 import { mintClaimLink } from "@/lib/client-claim-server";
 import { emailClaimLink } from "@/lib/claim-email";
 import { rateLimitAllows } from "@/lib/rate-limit";
+import { everSignedIn } from "@/lib/ever-signed-in";
 
 // "Resend invite / send a sign-in link": a coach can do this for a client at ANY time, whatever state the person is in, and is never refused for the state (Ron, Oct 17). What is sent depends on the person:
 //   * never signed in  -> their sign-in (claim) link, emailed to the address on the account, or handed to the coach to copy or text when there is no address or email is not set up; a link that still works is replaced.
@@ -40,10 +41,10 @@ export async function resendAccess(args: { supabase: any; serviceRole: any; coac
   const email: string | null = authUser?.email ?? null;
   const hasRealEmail = !!email && !isPlaceholderEmail(email);
   // Someone who opened the claim link but never finished choosing a password has a sign-in time but no real email and was never claimed: they still need a claim link, not a password reset.
-  const everSignedIn = !!profile.claimed_at || (!!authUser?.last_sign_in_at && hasRealEmail);
+  const signedIn = everSignedIn({ claimedAt: profile.claimed_at, lastSignInAt: authUser?.last_sign_in_at, email });
 
   // ---- has not signed in: the claim link
-  if (!everSignedIn) {
+  if (!signedIn) {
     const minted = await mintClaimLink(serviceRole, coachId, athleteId, origin);
     if (!minted.ok) return { status: 500, body: { error: "Couldn't make the link. Try again." } };
     if (hasRealEmail && isEmailConfigured()) {

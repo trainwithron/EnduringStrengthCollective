@@ -7,7 +7,7 @@ import { hostResolvesPublic, isPrivateAddress } from "@/lib/webhook-url";
 const src = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
 
 // A stand-in for the two database clients loadUnclaimedClient uses.
-function fakes({ claimedAt = null as string | null, lastSignIn = null as string | null, callerRole = "coach", memberRole = "athlete" } = {}) {
+function fakes({ claimedAt = null as string | null, lastSignIn = null as string | null, email = null as string | null, callerRole = "coach", memberRole = "athlete" } = {}) {
   const table = (rows: Record<string, unknown>) => {
     const q: any = { select: () => q, eq: () => q, maybeSingle: () => Promise.resolve({ data: rows }) };
     return q;
@@ -15,7 +15,7 @@ function fakes({ claimedAt = null as string | null, lastSignIn = null as string 
   const supabase: any = { from: () => table({ role: callerRole }) };
   const serviceRole: any = {
     from: (name: string) => (name === "profiles" ? table({ full_name: "Sam", claimed_at: claimedAt }) : table({ role: memberRole })),
-    auth: { admin: { getUserById: async () => ({ data: { user: { last_sign_in_at: lastSignIn } } }) } },
+    auth: { admin: { getUserById: async () => ({ data: { user: { last_sign_in_at: lastSignIn, email } } }) } },
   };
   return { supabase, serviceRole };
 }
@@ -25,8 +25,8 @@ describe("a coach can only touch the account of a client who has never signed in
     const { supabase, serviceRole } = fakes();
     expect(await loadUnclaimedClient(supabase, serviceRole, "coach", "g", "a")).toEqual({ ok: true, fullName: "Sam" });
   });
-  it("a client who signed in some other way (no claimed stamp, but a sign-in on record) is refused", async () => {
-    const { supabase, serviceRole } = fakes({ lastSignIn: "2026-10-01T10:00:00Z" });
+  it("a client who signed in some other way (no claimed stamp, but a sign-in on record and a real email) is refused", async () => {
+    const { supabase, serviceRole } = fakes({ lastSignIn: "2026-10-01T10:00:00Z", email: "sam@example.com" });
     const r = await loadUnclaimedClient(supabase, serviceRole, "coach", "g", "a");
     expect(r).toMatchObject({ ok: false, status: 409 });
   });

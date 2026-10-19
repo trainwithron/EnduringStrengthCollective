@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { CLAIM_LINK_LIFETIME_HOURS, generateClaimToken, hashClaimToken } from "@/lib/client-claim";
+import { everSignedIn } from "@/lib/ever-signed-in";
 
 // Shared guard for the coach-side claim routes: the caller must coach the
 // group, the athlete must be an athlete member of it, and the account must
@@ -41,9 +42,10 @@ export async function loadUnclaimedClient(
     return { ok: false, status: 409, error: "They've already signed in — this is their account now." };
   }
   // "Claimed" is only stamped by the claim flow. A client who signed in any other way (a password reset, an emailed link) has no stamp but HAS signed in; the sign-in record the login service keeps is the truth, so a coach
-  // can never mint a link for, or change the email of, an account its owner has already used.
+  // can never mint a link for, or change the email of, an account its owner has already used. The rule is the SAME one Resend uses (lib/ever-signed-in.ts): a sign-in with no real email behind it is someone partway through
+  // the claim (opened the link, never chose a password), who still needs their link (Oct 19 audit: Glen K. and Max A.).
   const { data: authUser } = await serviceRole.auth.admin.getUserById(athleteId);
-  if (authUser?.user?.last_sign_in_at) {
+  if (everSignedIn({ claimedAt: null, lastSignInAt: authUser?.user?.last_sign_in_at, email: authUser?.user?.email })) {
     return { ok: false, status: 409, error: "They've already signed in — this is their account now." };
   }
   return { ok: true, fullName: profile.full_name };
