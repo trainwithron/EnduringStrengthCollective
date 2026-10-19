@@ -1873,6 +1873,17 @@
   ]
  },
  {
+  "n": "158",
+  "slug": "0406",
+  "title": "0406 Release X2: an athlete no longer reads other athletes' membership rows (a restrictive read rule on group_memberships)",
+  "migrations": [
+   "0406"
+  ],
+  "notApplied": [
+   "not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'group_memberships' and policyname = 'group_memberships_select_narrow')"
+  ]
+ },
+ {
   "n": "150",
   "slug": "0398",
   "title": "0398 Release S1: a changed sign-in email must be confirmed by the new address first (waiting requests table)",

@@ -171,6 +171,7 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0403 | yes | yes | 13 | 0403 Intake for every client |
 | 0404 | yes | yes | 13 | 0404 Athlete narrow reads |
 | 0405 | yes | yes | 9 | 0405 Notice names |
+| 0406 | yes | yes | 20 | 0406 Athlete narrow memberships |
 | 0407 | yes | yes | 59 | 0407 Client removals |
 | 0408 | yes | yes | 18 | 0408 Nutrition suggestions switch |
 | 0409 | yes | yes | 27 | 0409 Money events |
@@ -191,7 +192,6 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0424 | yes | yes | 11 | 0424 first assignee gets the original |
 | 0425 | yes | yes | 10 | 0425 the organization wall follows the chosen organization |
 | 0426 | yes | yes | 10 | 0426 the organization wall, once per query |
-| 0406 | yes | yes | 20 | 0406 Athlete narrow memberships |
 | 0331 | yes | yes | 10 | 0331 a payment event and its sessions are recorded in one step |
 | 0329 | yes | yes | 12 | 0329 every session costs exactly 1 credit; the waitlist offer uses the coach's time zone |
 | 0330 | yes | yes | 9 | 0330 only a real coach can have a public page |
