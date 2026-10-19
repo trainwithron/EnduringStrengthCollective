@@ -342,6 +342,21 @@ export default async function GroupHubPage(
   const programDoneRead = athleteId && programWorkoutRead.data.length > 0
     ? await loadDoneAt(supabase, athleteId, programWorkoutRead.data.map((w: any) => w.id as string))
     : { doneAt: new Map<string, string>(), failed: false };
+  // A workout the client left open or paused in the last 36 hours (their own, not one a coach logged for them): Home says so, with a way back in. After three days with sets logged the nightly job saves it as done.
+  const { data: openOwnSession } =
+    isToday && user && athleteId === user.id && !isCoachViewer(roster, user.id)
+      ? await supabase
+          .from("athlete_sessions")
+          .select("id")
+          .eq("athlete_id", athleteId)
+          .eq("group_id", params.groupId)
+          .eq("logged_by_coach", false)
+          .in("status", ["in_progress", "abandoned"])
+          .gte("started_at", new Date(Date.now() - 36 * 3600000).toISOString())
+          .order("started_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      : { data: null };
   const homeProgramInputs = shownPrograms.map((p: any) => ({ id: p.id as string, name: p.name as string, created_at: p.created_at as string | null }));
   const homePrograms = homeProgramCards(homeProgramInputs, programWorkoutRead.data, programDoneRead.doneAt);
   const homePickups = programPickups(homeProgramInputs, programWorkoutRead.data, programDoneRead.doneAt);
@@ -871,6 +886,12 @@ export default async function GroupHubPage(
                   initialCheckin={wellnessCheckin}
                   lifeImpactPrompt={lifeImpactPrompt}
                 />
+              )}
+              {openOwnSession && (
+                <Link href={`/sessions/${(openOwnSession as { id: string }).id}?resume=1`} className="block border border-rust bg-rust/10 px-4 py-3 active:bg-rust/15">
+                  <span className="block font-display font-bold uppercase text-lg leading-tight text-chalk">Finish your workout</span>
+                  <span className="block font-body text-sm text-steel">You left one open. Pick up where you stopped.</span>
+                </Link>
               )}
               <DayCard
                 groupId={params.groupId}
