@@ -55,7 +55,8 @@ describe("team sheet cell reader: weights", () => {
 describe("team sheet cell reader: body weight", () => {
   it("BW alone is the prescribed sets and reps", () => {
     expect(sets(parseCell("BW", { prescribed: { sets: 3, reps: 10 } }))).toEqual([[null, 10, true], [null, 10, true], [null, 10, true]]);
-    expect(sets(parseCell("bw"))).toEqual([[null, null, true]]);
+    // no reps written and none prescribed would save nothing: the reader says it is not sure
+    expect(parseCell("bw").kind).toBe("unsure");
     expect(sets(parseCell("Bodyweight", { prescribed: { sets: 2, reps: 8 } }))).toEqual([[null, 8, true], [null, 8, true]]);
   });
   it("BW followed by numbers is the reps of each set", () => {

@@ -93,6 +93,8 @@ export const ACL_REVIEWED = [
   "report_content",
   // Release CM1: these check the caller through can_handle_content_report (signed in, and one of those who handle that report, never the person reported), which this list does not recognise by name
   "handle_content_report", "remove_reported_content", "reported_comment_reply_count",
+  // AF3e (step 167): the write guard used inside row-security policies, so signed-in people must be able to run it. It answers only about the caller: asking about anyone else gets false (p_user is distinct from auth.uid()), which this list does not recognise by pattern.
+  "minor_may_write",
 ];
 
 const quote = (names) => names.map((n) => `'${n}'`).join(", ");

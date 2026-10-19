@@ -2671,6 +2671,54 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "171",
+  slug: "0419",
+  title: "0419 Release TS3: saving a filled team sheet (one table, one notice kind, three functions: save the sheets as completed coach-logged workouts on their real dates, undo a whole upload, and a private helper that puts the record board right)",
+  warn: "This REBUILDS the notification type list to add one kind (team_sheet_saved), the same widening earlier steps made; it reads the live list first and refuses if the rebuilt list does not match. Everything else is additions only.",
+  migrations: ["0419"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes on screen until the Release TS3 code is live. Then a coach can upload filled team sheets, check them on a review screen, save them as workouts on their real dates, and undo a whole upload.",
+  undo: [
+    "drop function if exists public.team_sheet_undo(uuid);",
+    "drop function if exists public.team_sheet_fix_record(uuid, text, text);",
+    "drop function if exists public.team_sheet_save(uuid, text, jsonb, boolean, uuid, boolean);",
+    "drop table if exists public.team_sheet_batches;",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 171 misbehaves, and only before anyone has saved an upload: workouts an upload already saved stay (undo them from the app first). The new notice kind is left in the list; it is harmless.",
+  rows: [
+    ["0419 is not already applied (the batch table is not there yet)", "to_regclass('public.team_sheet_batches') is null"],
+    ["the functions it finishes a workout with exist", "to_regprocedure('public.complete_workout_session(uuid)') is not null and to_regprocedure('public.recompute_training_maxes_internal(uuid, text)') is not null and to_regprocedure('public.group_in_active_org(uuid)') is not null and to_regprocedure('public.is_group_coach(uuid)') is not null"],
+    ["the tables it reads exist", "to_regclass('public.programs') is not null and to_regclass('public.workouts') is not null and to_regclass('public.group_workout_exercises') is not null and to_regclass('public.client_inactive') is not null and to_regclass('public.group_memberships') is not null"],
+    ["the notification type list it widens is there", "exists (select 1 from pg_constraint c where c.conname = 'notifications_type_check' and c.conrelid = 'public.notifications'::regclass)"],
+    ["the tables it writes exist", "to_regclass('public.athlete_sessions') is not null and to_regclass('public.session_exercises') is not null and to_regclass('public.set_logs') is not null and to_regclass('public.workout_logs') is not null and to_regclass('public.exercise_records') is not null and exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'athlete_sessions' and column_name = 'import_batch_id')"],
+  ],
+});
+
+STEPS.push({
+  n: "172",
+  slug: "0420",
+  title: "0420 Release OWN1: ownership of an organization cannot be handed to someone who has never signed in",
+  warn: "This REPLACES two functions (transfer_organization_ownership and guard_organization_columns) and adds one function and one trigger. Each replacement only adds the refusal; the paste checks that both live functions are exactly the text they replace, and stops if not.",
+  migrations: ["0420"],
+  sees: "Success. No rows returned.",
+  afterwards: "An owner (or a platform admin) who tries to transfer ownership to someone who has never signed in (an invitation nobody has used) is told so in plain words and nothing changes, whether it is done with Transfer ownership or by writing the organization directly. A membership can only become owner for the person the organization names as its owner. Everything else is as before.",
+  undo: [
+    "drop trigger if exists organization_memberships_guard_owner_role on public.organization_memberships;",
+    "drop function if exists public.guard_org_membership_owner_role();",
+    fnFromMigration("0273", "guard_organization_columns"),
+    fnFromMigration("0396", "transfer_organization_ownership"),
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 172 misbehaves. Puts both functions back to the text they had and drops the new trigger and function (someone who has never signed in can then be made owner again).",
+  rows: [
+    ["0420 is not already applied (the new membership guard is not there yet)", "not exists (select 1 from pg_trigger where tgname = 'organization_memberships_guard_owner_role' and not tgisinternal)"],
+    ["the transfer function is exactly the text this replaces", md5Is("transfer_organization_ownership(uuid, uuid)", "234f41b71d19ee8853dc432b95d7283c")],
+    ["the organization guard is exactly the text this replaces", md5Is("guard_organization_columns()", "a8c146d8aa8dd143bf9a05b497ccc1f9")],
+    ["the function it replaces exists", "to_regprocedure('public.transfer_organization_ownership(uuid, uuid)') is not null and to_regprocedure('public.guard_organization_columns()') is not null"],
+    ["the account columns it reads exist", "(select count(*) from information_schema.columns where table_schema = 'auth' and table_name = 'users' and column_name = 'last_sign_in_at') = 1"],
+  ],
+});
+
+STEPS.push({
   n: "173",
   slug: "0421",
   title: "0421 Release TC3: one invitation link per invited person (one new table, only the server reads it; no link or secret is stored in it)",
@@ -3517,6 +3565,8 @@ for (const s of STEPS) {
 // that names the release, the step and the failed checks, and nothing is kept. After the commit one read-only result row per step says whether it is in place.
 // The individual step files stay as the fallback (and for a release that was partly applied by hand: the bundle refuses at the first applied step).
 const BUNDLES = [
+  { id: "release-ts3-team-sheet-save", name: "Release TS3 (saving a filled team sheet: one table, one notice kind, three functions)", steps: ["171"] },
+  { id: "release-own1-owner-accepted-only", name: "Release OWN1 (ownership cannot be handed to someone who has never signed in; replaces two functions, adds one function and one trigger)", steps: ["172"] },
   { id: "release-tc3-coach-join-links", name: "Release TC3 (one invitation link per invited person: one new table)", steps: ["173"] },
   { id: "release-af3-database-policies", name: "Release AF3 (database policies from the post-ship audit; replaces two posts policies, one tag policy and two functions, adds two functions and two triggers)", steps: ["170"] },
   { id: "release-af3e-c-write-guard-rest", name: "Release AF3e paste C (the restrictive write guard on the rest of the covered tables; apply only after paste B has run clean for a few days)", steps: ["169"] },
@@ -3764,6 +3814,8 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
   const m = (n, marker) => ({ n, file: index[n], marker });
   const items = [
     m("0402", "to_regclass('public.guardian_consents') is not null"),
+    m("0419", "to_regclass('public.team_sheet_batches') is not null"),
+    m("0420", "exists (select 1 from pg_trigger where tgname = 'organization_memberships_guard_owner_role' and not tgisinternal)"),
     m("0421", "to_regclass('public.coach_join_links') is not null"),
     m("0418", "exists (select 1 from pg_trigger where tgname = 'group_memberships_clear_intake' and not tgisinternal)"),
     m("0417", "(exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'comments' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'reactions' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'direct_messages' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'exercise_video_comments' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'training_partner_profiles' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'training_partner_requests' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'challenge_participants' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'progress_photos' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'session_exercise_videos' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'body_weight_logs' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'body_scans' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'transformation_cards' and policyname = 'minor_write_guard_insert') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'transformation_milestones' and policyname = 'minor_write_guard_insert'))"),

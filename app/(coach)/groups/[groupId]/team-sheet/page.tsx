@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { LoadFailedPage } from "@/components/ui/load-failed-page";
 import { isReadFailure } from "@/lib/read-failed";
@@ -10,7 +11,7 @@ import { loadSheetOptions } from "@/lib/team-sheet/load-sheet";
 
 export const metadata = { title: "Team sheet" };
 
-// Print the day's (or the week's) workout for the team, one sheet per rack, so athletes can write their weights on paper. Reading the filled sheets back in is a later step.
+// Print the day's (or the week's) workout for the team, one sheet per rack, so athletes can write their weights on paper. 
 export default async function TeamSheetPage(props: { params: Promise<{ groupId: string }> }) {
   const params = await props.params;
   const supabase = await createServerClient();
@@ -36,6 +37,11 @@ export default async function TeamSheetPage(props: { params: Promise<{ groupId: 
       <div className="pb-6 border-b border-steel/20 mb-6">
         <h1 className="font-display font-bold text-3xl uppercase leading-none">Team sheet</h1>
         <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">Print the workout for the weight room, one sheet for each rack. Athletes write their weights on paper; the coach keeps the sheets.</p>
+        <p className="font-body text-xs text-steel mt-2">
+          <Link href={`/groups/${params.groupId}/team-sheet/upload`} className="text-rust underline underline-offset-4">
+            Upload filled sheets
+          </Link>
+        </p>
       </div>
       <TeamSheetDownloadForm groupId={params.groupId} today={dateKeyInZone(timeZone)} options={loaded.options} />
     </CoachDesktopShell>

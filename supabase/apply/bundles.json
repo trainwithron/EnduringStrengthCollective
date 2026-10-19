@@ -1,5 +1,21 @@
 [
  {
+  "id": "release-ts3-team-sheet-save",
+  "name": "Release TS3 (saving a filled team sheet: one table, one notice kind, three functions)",
+  "steps": [
+   "171"
+  ],
+  "file": "apply-release-ts3-team-sheet-save-all.sql"
+ },
+ {
+  "id": "release-own1-owner-accepted-only",
+  "name": "Release OWN1 (ownership cannot be handed to someone who has never signed in; replaces two functions, adds one function and one trigger)",
+  "steps": [
+   "172"
+  ],
+  "file": "apply-release-own1-owner-accepted-only-all.sql"
+ },
+ {
   "id": "release-tc3-coach-join-links",
   "name": "Release TC3 (one invitation link per invited person: one new table)",
   "steps": [

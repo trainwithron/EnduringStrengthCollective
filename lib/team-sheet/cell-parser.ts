@@ -33,6 +33,8 @@ export type ParsedCell =
   | { kind: "unsure"; raw: string; reason: string };
 
 export const MAX_WEIGHT = 2000;
+/** the same ceiling in kilograms (about 2000 lb): saved weights are kept in pounds, and the database refuses anything over 2000 lb */
+export const MAX_WEIGHT_KG = 900;
 export const MAX_REPS = 100;
 export const MAX_SETS = 20;
 
@@ -66,7 +68,8 @@ export function parseCell(input: unknown, opts: { unit?: SheetUnit; prescribed?:
   // body weight: "bw", or "bw" followed by the reps of each set
   if (tokens[0] === "bw" || tokens[0] === "bodyweight") {
     const rest = tokens.slice(1);
-    if (rest.length === 0) return { kind: "sets", sets: repeat({ weight: null, reps: prescribedReps, repsAssumed: true }, prescribedSets ?? 1) };
+    // body weight with no reps written and none prescribed (a range like 8-10) would save nothing: say so instead of showing it as read
+    if (rest.length === 0) return prescribedReps === null ? unsure(raw.trim(), "body weight, but no number of reps was written or prescribed") : { kind: "sets", sets: repeat({ weight: null, reps: prescribedReps, repsAssumed: true }, prescribedSets ?? 1) };
     const sets: ParsedSet[] = [];
     for (const t of rest) {
       const reps = asReps(t);
@@ -82,7 +85,7 @@ export function parseCell(input: unknown, opts: { unit?: SheetUnit; prescribed?:
     const m = /^(\d+(?:\.\d+)?)(?:x(\d+)(?:x(\d+))?)?$/.exec(t);
     if (!m) return unsure(raw.trim(), `"${t}" could not be read`);
     const weight = Number(m[1]);
-    if (!(weight > 0) || weight > MAX_WEIGHT) return unsure(raw.trim(), `${m[1]} is not a believable weight`);
+    if (!(weight >= 1) || weight > (unit === "kg" ? MAX_WEIGHT_KG : MAX_WEIGHT)) return unsure(raw.trim(), `${m[1]} is not a believable weight`);
     if (m[2] === undefined) {
       sets.push({ weight, reps: prescribedReps, repsAssumed: true });
       continue;
@@ -128,4 +131,19 @@ export function describeCell(cell: ParsedCell, unit: SheetUnit = "lb"): string {
   const parts = cell.sets.map((s) => `${s.weight === null ? "BW" : `${s.weight} ${unit}`}${s.reps === null ? "" : ` x ${s.reps}`}`);
   const assumed = cell.sets.some((s) => s.repsAssumed && s.reps !== null);
   return parts.join(", ") + (assumed ? " (reps from the sheet)" : "");
+}
+
+export type BoxKind = "load" | "reps" | "unread";
+export type BoxResult = ParsedCell | { kind: "unread" };
+
+/**
+ * One box on a sheet, read by what its exercise records. Weight exercises are read as weights ("225 235 245"); a reps-only exercise (a pull-up) is read as reps ("10 10 8", which is body weight with those reps); an
+ * exercise with neither (a plank's time) is not read: what is written there is kept as a note. The same function reads the box on the review screen and again on the server.
+ */
+export function readBox(kind: BoxKind, text: string, opts: { unit: SheetUnit; sets: number; reps: number | null }): BoxResult {
+  if (kind === "unread") return { kind: "unread" };
+  const prescribed = { sets: opts.sets, reps: opts.reps };
+  const t = text.trim();
+  if (kind === "reps" && t !== "" && /^[\d\s,;/]+$/.test(t)) return parseCell("BW " + t, { unit: opts.unit, prescribed });
+  return parseCell(t, { unit: opts.unit, prescribed });
 }

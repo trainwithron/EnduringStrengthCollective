@@ -1488,6 +1488,28 @@
   ]
  },
  {
+  "n": "171",
+  "slug": "0419",
+  "title": "0419 Release TS3: saving a filled team sheet (one table, one notice kind, three functions: save the sheets as completed coach-logged workouts on their real dates, undo a whole upload, and a private helper that puts the record board right)",
+  "migrations": [
+   "0419"
+  ],
+  "notApplied": [
+   "to_regclass('public.team_sheet_batches') is null"
+  ]
+ },
+ {
+  "n": "172",
+  "slug": "0420",
+  "title": "0420 Release OWN1: ownership of an organization cannot be handed to someone who has never signed in",
+  "migrations": [
+   "0420"
+  ],
+  "notApplied": [
+   "not exists (select 1 from pg_trigger where tgname = 'organization_memberships_guard_owner_role' and not tgisinternal)"
+  ]
+ },
+ {
   "n": "173",
   "slug": "0421",
   "title": "0421 Release TC3: one invitation link per invited person (one new table, only the server reads it; no link or secret is stored in it)",
