@@ -10,6 +10,7 @@ import { mirrorGoogleCalendarEvent } from "@/lib/mirror-google-calendar-event";
 export function CancelBookingButton({
   bookingId,
   rescheduleHref,
+  messageHref,
   recurringSeriesId,
   viewer = "client",
   insideWindowHours,
@@ -20,6 +21,8 @@ export function CancelBookingButton({
   // open slot instead of cancelling outright. Omitted from contexts where
   // there's no natural page to reschedule from.
   rescheduleHref?: string;
+  // When the coach schedules everyone (no moving by the client), the page to message the coach on instead of a Reschedule that leads nowhere (Oct 19 audit).
+  messageHref?: string;
   // acuity_replacement_gap_audit_sept16.md — only set when this
   // occurrence belongs to a real recurring series. Cancelling just this
   // one occurrence is the default "Cancel" button's existing behavior,
@@ -106,6 +109,14 @@ export function CancelBookingButton({
   return (
     <div className="flex flex-col items-end gap-1">
       <div className="flex items-center gap-2">
+        {!rescheduleHref && messageHref && (
+          <Link
+            href={messageHref}
+            className="h-11 px-3 flex items-center border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust transition-colors"
+          >
+            Message your coach to move it
+          </Link>
+        )}
         {rescheduleHref && (
           <Link
             href={rescheduleHref}

@@ -15,6 +15,7 @@ import { zonedTimeToUtc, DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { addDaysToDateKey } from "@/lib/series-schedule";
 import { BookSlotButton } from "@/components/athlete/book-slot-button";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
+import { insideWindowHours } from "@/lib/cancel-window";
 import { RescheduleSlotButton } from "@/components/athlete/reschedule-slot-button";
 import { RequestSlotButton } from "@/components/athlete/request-slot-button";
 import { RequestDifferentTime } from "@/components/athlete/request-different-time";
@@ -388,14 +389,18 @@ export default async function DayDetailPage(
   // Clients book themselves only when the coach has switched self-booking on (off by default; the database enforces it too). When it is
   // off, the open times are not offered; the client still sees their own sessions and can cancel or move them.
   let bookingMode = "free" as "free" | "request" | "coach_schedules";
+  let cancelWindowHours: number | null = null;
   if (coachMembership) {
     const sb = await supabase
       .from("coach_booking_policies")
-      .select("booking_mode")
+      .select("booking_mode, cancellation_window_hours")
       .eq("coach_id", coachMembership.profile_id)
       .maybeSingle();
     // Until the database update that adds the switch is applied, the select errors and booking behaves as before.
-    if (!sb.error) bookingMode = ((sb.data?.booking_mode as string | null) ?? "coach_schedules") as typeof bookingMode;
+    if (!sb.error) {
+      bookingMode = ((sb.data?.booking_mode as string | null) ?? "coach_schedules") as typeof bookingMode;
+      cancelWindowHours = (sb.data?.cancellation_window_hours as number | null) ?? null;
+    }
     // A coach (booking for a client they are viewing as, or for themselves) is never refused: they book directly.
     if (membership.role === "coach") bookingMode = "free";
   }
@@ -577,7 +582,9 @@ export default async function DayDetailPage(
                       start.getTime() > Date.now() ? (
                         <CancelBookingButton
                           bookingId={booking.id}
-                          rescheduleHref={`${backHref}?reschedule=${booking.id}`}
+                          rescheduleHref={bookingMode === "coach_schedules" ? undefined : `${backHref}?reschedule=${booking.id}`}
+                          messageHref={bookingMode === "coach_schedules" ? `/groups/${params.groupId}/messages` : undefined}
+                          insideWindowHours={insideWindowHours(start, cancelWindowHours)}
                           recurringSeriesId={booking.recurring_series_id}
                         />
                       ) : (

@@ -13,6 +13,7 @@ import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { UpcomingGroupEvents } from "@/components/group/group-event-answer";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
+import { insideWindowHours } from "@/lib/cancel-window";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { Lock } from "lucide-react";
@@ -221,10 +222,17 @@ export default async function ProgramCalendarPage(
 
   // How this coach takes sessions: when the coach schedules everyone, the client's calendar says so (and offers a Message button).
   let bookingMode = "free";
+  // The coach's cancellation window (24 hours with no policy row): a client cancelling inside it is told the coach decides whether it counts.
+  let cancelWindowHours: number | null = null;
   if (viewingAsAthlete && coachMembership) {
-    const sb = await supabase.from("coach_booking_policies").select("booking_mode").eq("coach_id", coachMembership.profile_id).maybeSingle();
-    if (!sb.error) bookingMode = (sb.data?.booking_mode as string | null) ?? "coach_schedules";
+    const sb = await supabase.from("coach_booking_policies").select("booking_mode, cancellation_window_hours").eq("coach_id", coachMembership.profile_id).maybeSingle();
+    if (!sb.error) {
+      bookingMode = (sb.data?.booking_mode as string | null) ?? "coach_schedules";
+      cancelWindowHours = (sb.data?.cancellation_window_hours as number | null) ?? null;
+    }
   }
+  // When the coach schedules everyone the client cannot pick a day or a time, so empty days are not tappable and training days open the workout.
+  const daysTappable = hasAvailability && bookingMode !== "coach_schedules";
   // The client's own sessions show whether or not the coach has set up open hours, and whichever coach booked them.
   if (viewingAsAthlete) {
     const { data: bookingRows } = await supabase
@@ -350,7 +358,9 @@ export default async function ProgramCalendarPage(
                   </span>
                   <CancelBookingButton
                     bookingId={b.id}
-                    rescheduleHref={`${backHref}/calendar/${dateKeyInZone(timezone, start)}?reschedule=${b.id}`}
+                    rescheduleHref={bookingMode === "coach_schedules" ? undefined : `${backHref}/calendar/${dateKeyInZone(timezone, start)}?reschedule=${b.id}`}
+                    messageHref={bookingMode === "coach_schedules" ? `/groups/${params.groupId}/messages` : undefined}
+                    insideWindowHours={insideWindowHours(start, cancelWindowHours)}
                   />
                 </div>
               );
@@ -451,7 +461,7 @@ export default async function ProgramCalendarPage(
                   <Link
                     key={i}
                     // A training day with sessions on offer opens the day page, which shows the workout card above the open times, so a client who trains Mon/Wed/Fri can still ask for or book a session on those days (Oct 19 audit).
-                    href={hasAvailability ? `${backHref}/calendar/${dateKey(date)}${rescheduleSuffix ? `?${rescheduleSuffix.slice(1)}` : ""}` : `/groups/${params.groupId}/workouts/${w.id}`}
+                    href={daysTappable ? `${backHref}/calendar/${dateKey(date)}${rescheduleSuffix ? `?${rescheduleSuffix.slice(1)}` : ""}` : `/groups/${params.groupId}/workouts/${w.id}`}
                     className={cellClass}
                   >
                     {cellContent}
@@ -459,7 +469,7 @@ export default async function ProgramCalendarPage(
                 );
               }
 
-              if (!w && hasAvailability) {
+              if (!w && daysTappable) {
                 return (
                   <Link
                     key={i}

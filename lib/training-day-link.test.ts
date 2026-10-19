@@ -7,7 +7,7 @@ const read = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
 describe("a training day on the client's program calendar", () => {
   const page = read("app/(coach)/groups/[groupId]/programs/[programId]/calendar/page.tsx");
   it("opens the day page (workout card above the open times) when sessions are on offer, and the workout itself when they are not", () => {
-    expect(page).toContain("href={hasAvailability ? `${backHref}/calendar/${dateKey(date)}");
+    expect(page).toContain("href={daysTappable ? `${backHref}/calendar/${dateKey(date)}");
     expect(page).toContain(": `/groups/${params.groupId}/workouts/${w.id}`}");
   });
   it("the day page still shows that day's workout card above the open sessions", () => {
