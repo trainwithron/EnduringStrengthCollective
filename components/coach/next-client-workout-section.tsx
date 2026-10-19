@@ -36,16 +36,47 @@ export async function loadNextClientToday(supabase: any, coachId: string, groupI
   return { athleteId: next.athlete_id, groupId: next.group_id, startIso: next.start_at, name: shortClientName((profile as { full_name?: string | null } | null)?.full_name), hasProgram: programs.length > 0 };
 }
 
+// A workout the coach started for a client and left open or paused in the last 36 hours (Oct 19 audit: after "Pause for now" nothing on Home said a client's workout was waiting). The newest one, in the open
+// organization's groups. Home then says "Resume <name>'s workout" and opens that session where it stopped.
+export const OPEN_WORKOUT_HOURS = 36;
+export async function loadOpenClientWorkout(supabase: any, groupIds: string[], now: Date = new Date()) {
+  const { data, error } = await readRowsByIds(groupIds, (ids) => (from, to) =>
+    supabase
+      .from("athlete_sessions")
+      .select("id, athlete_id, group_id, started_at")
+      .in("group_id", ids)
+      .eq("logged_by_coach", true)
+      .in("status", ["in_progress", "abandoned"])
+      .gte("started_at", new Date(now.getTime() - OPEN_WORKOUT_HOURS * 3600000).toISOString())
+      .order("started_at", { ascending: false })
+      .order("id")
+      .range(from, to)
+  );
+  if (error || !data || data.length === 0) return null;
+  const newest = (data as { id: string; athlete_id: string; group_id: string; started_at: string }[]).sort((a, b) => b.started_at.localeCompare(a.started_at))[0];
+  const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", newest.athlete_id).maybeSingle();
+  return { sessionId: newest.id, athleteId: newest.athlete_id, groupId: newest.group_id, startedIso: newest.started_at, name: shortClientName((profile as { full_name?: string | null } | null)?.full_name) };
+}
+
 export async function NextClientWorkoutSection({ coachId, groupIds }: { coachId: string; groupIds: string[] }) {
   const supabase = await createServerClient();
   const now = new Date();
   const { data: me } = await supabase.from("profiles").select("timezone").eq("id", coachId).maybeSingle();
   const timezone = (me as { timezone?: string | null } | null)?.timezone || DEFAULT_COACH_TIMEZONE;
-  const next = await loadNextClientToday(supabase, coachId, groupIds, timezone, now);
-  if (!next) return null;
+  const [next, open] = await Promise.all([loadNextClientToday(supabase, coachId, groupIds, timezone, now), loadOpenClientWorkout(supabase, groupIds, now)]);
+  const resume = open ? (
+    <Link href={`/sessions/${open.sessionId}?resume=1`} className="block w-full min-h-16 px-4 py-3 bg-rust text-graphite text-center">
+      <span className="block font-display uppercase text-lg font-bold leading-tight">Resume {open.name}&apos;s workout</span>
+      <span className="block font-body text-sm">Started {nextSessionLabel(open.startedIso, timezone, now)}</span>
+    </Link>
+  ) : null;
+  // The same client is already named above: no second button for them.
+  const showNext = next && next.athleteId !== open?.athleteId;
+  if (!showNext) return resume ? <section aria-label="Next client workout" className="mb-6">{resume}</section> : null;
   const href = next.hasProgram ? `/groups/${next.groupId}/athletes/${next.athleteId}/log` : `/groups/${next.groupId}/athletes/${next.athleteId}`;
   return (
-    <section aria-label="Next client workout" className="mb-6">
+    <section aria-label="Next client workout" className="mb-6 space-y-2">
+      {resume}
       <Link href={href} className="block w-full min-h-16 px-4 py-3 bg-rust text-graphite text-center">
         <span className="block font-display uppercase text-lg font-bold leading-tight">Start {next.name}&apos;s workout</span>
         <span className="block font-body text-sm">{nextSessionLabel(next.startIso, timezone, now)}</span>
