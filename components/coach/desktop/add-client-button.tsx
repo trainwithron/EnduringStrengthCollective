@@ -172,6 +172,11 @@ export function AddClientButton({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Couldn't add this ${t("client")}.`);
       if (data.resent) {
+        // Already their client in another space: the empty space this form just made is not needed (the server only removes a new, yours and empty one).
+        if (data.existingSpace && createdGroupIdRef.current && data.groupId !== createdGroupIdRef.current) {
+          void removeEmptySpace(createdGroupIdRef.current);
+          createdGroupIdRef.current = null;
+        }
         setResentNote({ message: typeof data.message === "string" ? data.message : "Sent again.", link: typeof data.link === "string" ? data.link : null });
         setFullName("");
         setEmail("");
