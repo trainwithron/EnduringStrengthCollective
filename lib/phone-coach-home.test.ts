@@ -15,6 +15,9 @@ import { chooseActiveAnchor } from "@/lib/active-anchor";
 import { hubStartGroup } from "@/lib/hub-orgs";
 import type { CoachedGroup } from "@/lib/coach-groups";
 import { orgIsTeamOnly } from "@/lib/team-sport";
+import { coachPhoneLanding, teamOnlyOrgs } from "@/lib/coach-landing";
+import { COACH_PHONE_ENTRY, COACH_PHONE_LANDING, startPath } from "@/lib/start-group";
+import { ProgramsPhoneList } from "@/components/coach/mobile/programs-phone-list";
 import { programSummary, teamPhoneHome } from "@/lib/team-phone-home";
 import { TeamCoachPhoneHome } from "@/components/coach/mobile/team-coach-phone-home";
 
@@ -117,7 +120,8 @@ describe("wiring", () => {
     expect(src("components/coach/mobile/coach-nav-links-list.tsx")).toContain('<Item href="/programs" label="Programs"');
     const p = src("app/(coach)/programs/page.tsx");
     expect(p).not.toContain("redirect(`/groups/${anchor.id}/programs`)");
-    expect(p).not.toContain("prefersAthleteStyleView");
+    // (a phone is no longer redirected: it gets the simple cards below)
+    expect(p).not.toContain("redirect(`/groups/${anchor.id}/programs`)");
     expect(p).toContain("Change organization");
   });
 
@@ -142,5 +146,58 @@ describe("wiring", () => {
     const d = src("app/(coach)/dashboard/page.tsx");
     expect(d).toContain("{!moneyHidden && <NeedsPaymentPanel");
     expect(d).toContain('x.key !== "mrr" && x.key !== "income"');
+  });
+});
+
+describe("where a coach on a phone lands", () => {
+  // Ron: three organizations; Home Team and Trojans are team organizations (one team group each); the Collective also has a client's own one-on-one space, so it is not.
+  const CLIENT_SPACE = "c0000000-0000-4000-8000-000000000001";
+  const groups: CoachedGroup[] = [...ron, { id: CLIENT_SPACE, name: "A Client", kind: "one_on_one", orgId: "org-esc", orgName: "Enduring Strength Co." }];
+  const modes = new Map<string, boolean | null>([[HOME_TEAM, true], [COLLECTIVE, true], [TROJANS, true], [CLIENT_SPACE, false]]);
+  const teamOnly = teamOnlyOrgs(groups, modes);
+
+  it("only organizations whose every group is a team-sport group count as team organizations", () => {
+    expect([...teamOnly].sort()).toEqual(["org-c2c", "org-trojans"]);
+  });
+  it("a phone first asks which organization (several, none chosen, a team one among them), then lands on the team coach home", () => {
+    expect(coachPhoneLanding(groups, null, teamOnly)).toEqual({ to: "choose" });
+    expect(coachPhoneLanding(groups, TROJANS, teamOnly)).toEqual({ to: "coach-home", groupId: TROJANS });
+    expect(coachPhoneLanding(groups, HOME_TEAM, teamOnly)).toEqual({ to: "coach-home", groupId: HOME_TEAM });
+  });
+  it("everyone else keeps landing on their own client app", () => {
+    expect(coachPhoneLanding(groups, COLLECTIVE, teamOnly)).toEqual({ to: "own" });
+    expect(coachPhoneLanding(groups, null, new Set())).toEqual({ to: "own" });
+    expect(coachPhoneLanding([], null, teamOnly)).toEqual({ to: "own" });
+    expect(coachPhoneLanding([ron[2]], null, new Set())).toEqual({ to: "own" });
+    // one organization, a team one: straight to its coach home
+    expect(coachPhoneLanding([ron[2]], null, teamOnlyOrgs([ron[2]], new Map([[TROJANS, true]])))).toEqual({ to: "coach-home", groupId: TROJANS });
+  });
+  it("sign-in sends a coach on a phone to the landing decision, a coach at a computer to the dashboard, and the landing route redirects only", () => {
+    expect(startPath({ group_id: TROJANS, role: "coach" }, true)).toBe(COACH_PHONE_ENTRY);
+    expect(startPath({ group_id: TROJANS, role: "coach" }, false)).toBe("/dashboard");
+    expect(COACH_PHONE_LANDING).toBe("/my-space?view=client");
+    const r = src("app/coach-landing/route.ts");
+    expect(r).toContain("/choose-organization?next=/coach-landing");
+    expect(r).not.toMatch(/\.(insert|update|upsert|delete)\(|\.rpc\(/);
+  });
+});
+
+describe("Programs on a phone", () => {
+  it("is simple cards (name, Active, days, tap to open), with no toolbar, filter or import launcher", async () => {
+    const programs = [
+      { id: "p1", name: "8-Week Middle School Athletic Development Program", isActive: true, workoutCount: 24, coverImagePath: null, athleteId: null, athleteName: null, groupId: TROJANS },
+      { id: "p2", name: "Christmas abs", isActive: false, workoutCount: 5, coverImagePath: null, athleteId: "a", athleteName: "Casey", groupId: PERSONAL },
+    ];
+    const tree = JSON.stringify(ProgramsPhoneList({ programs, groupIdFor: (p) => p.groupId ?? TROJANS, newProgramGroupId: TROJANS }), (k, v) => (k === "type" || k === "_owner" || k === "_store" ? undefined : v));
+    expect(tree).toContain("8-Week Middle School Athletic Development Program");
+    expect(tree).toContain("Active");
+    expect(tree).toContain("Not active");
+    expect(tree).toContain(`/groups/${TROJANS}/programs/p1`);
+    expect(tree).toContain(`/groups/${TROJANS}/programs/new`);
+    expect(tree).not.toMatch(/import|filter|upload|Templates/i);
+    const page = src("app/(coach)/programs/page.tsx");
+    expect(page).toContain("if (await prefersAthleteStyleView())");
+    expect(page.indexOf("<ProgramsPhoneList")).toBeLessThan(page.indexOf("<ProgramsList "));
+    expect(page).toContain("<CoachMobileShell groupId={anchor.id} groupName={anchor.name}>");
   });
 });

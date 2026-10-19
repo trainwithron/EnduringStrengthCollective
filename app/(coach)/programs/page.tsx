@@ -15,6 +15,9 @@ import { computeProgramCardVisuals } from "@/lib/program-card-data";
 import { coachedOrgs, getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
 import { CHOOSE_ORGANIZATION_PATH, getActiveAnchor } from "@/lib/active-anchor";
 import { getCoachClients } from "@/lib/coach-clients";
+import { prefersAthleteStyleView } from "@/lib/pwa-server";
+import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
+import { ProgramsPhoneList } from "@/components/coach/mobile/programs-phone-list";
 import { LearnedSection } from "@/components/coach/learned-section";
 import { ConversationInviteSection } from "@/components/coach/conversation-section";
 import { countAssignedTo } from "@/lib/program-assigned";
@@ -129,6 +132,38 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
   const cards = clientId ? scoped : defaultList(scoped);
   const assignedCounts = clientId ? new Map<string, number>() : await countAssignedTo(supabase, scoped.filter((c) => !c.athleteId).map((c) => c.id));
   for (const c of scoped) if (!c.athleteId) c.assignedCount = assignedCounts.get(c.id) ?? 0;
+  // A phone gets simple cards in the mobile shell (not this desktop page squeezed): name, Active, days, tap to open.
+  if (await prefersAthleteStyleView()) {
+    return (
+      <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
+        <CoachMobileShell groupId={anchor.id} groupName={anchor.name}>
+          <header className="px-5 pt-16 pb-3">
+            <h1 className="font-display font-bold text-3xl leading-none uppercase">
+              <SwappableTerm termKey="program" form="plural" className="capitalize" />
+            </h1>
+            {clientId ? (
+              <p className="font-body text-sm text-chalk mt-2" role="status">
+                {scopedName}&apos;s programs.{" "}
+                <Link href={ALL_PROGRAMS_HREF} className="text-rust underline underline-offset-2">
+                  Show all programs
+                </Link>
+              </p>
+            ) : null}
+            {coachedOrgs(groups).length > 1 && (
+              <p className="font-body text-sm text-steel mt-2">
+                Programs of <span className="text-chalk">{anchor.orgName}</span>.{" "}
+                <Link href={`${CHOOSE_ORGANIZATION_PATH}?next=/programs`} className="text-rust underline underline-offset-2">
+                  Change organization
+                </Link>
+              </p>
+            )}
+          </header>
+          {programsError ? <UnavailableState what="your programs" /> : <ProgramsPhoneList programs={cards} groupIdFor={(p) => p.groupId ?? anchor.id} newProgramGroupId={newProgramGroupId} />}
+        </CoachMobileShell>
+      </main>
+    );
+  }
+
   const uncoveredProgramIds = cards.filter((c) => !c.coverImagePath).map((c) => c.id);
   const visualsMap = await computeProgramCardVisuals(supabase, uncoveredProgramIds, user.id);
   const visualsByProgramId = Object.fromEntries(visualsMap);

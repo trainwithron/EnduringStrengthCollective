@@ -57,11 +57,13 @@ export function pickFeedGroup<T extends { id: string; name: string }>(sharedGrou
 
 // Where a person lands once the group is known. A coach at a computer lands on the desktop Home; a coach on a phone (or the installed app) lands on their OWN client profile, the same app a client has, with the
 // Spot button for the business side and a picker to look at any client (Ron, Oct 16: "I open my app and it's a client profile but it's my profile"). Everyone else lands in their group's page.
+// A coach on a phone arrives at the landing decision (app/coach-landing/route.ts, lib/coach-landing.ts): the coach home of a team organization, the organization chooser, or their own client app (COACH_PHONE_LANDING).
+export const COACH_PHONE_ENTRY = "/coach-landing";
 export const COACH_PHONE_LANDING = "/my-space?view=client";
 export function startPath(membership: Pick<StartMembership, "group_id" | "role"> | null, onPhone: boolean): string {
   if (!membership) return "/";
   if (membership.role !== "coach") return `/groups/${membership.group_id}`;
-  return onPhone ? COACH_PHONE_LANDING : "/dashboard";
+  return onPhone ? COACH_PHONE_ENTRY : "/dashboard";
 }
 
 // Reads what the rule needs. Works with the browser or the server client (the person reads their own rows).

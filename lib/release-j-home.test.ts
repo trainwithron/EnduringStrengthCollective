@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { COACH_PHONE_LANDING, pickFeedGroup, startPath } from "./start-group";
+import { COACH_PHONE_ENTRY, COACH_PHONE_LANDING, pickFeedGroup, startPath } from "./start-group";
 
 const root = join(__dirname, "..");
 const src = (p: string) => readFileSync(join(root, p), "utf8").replace(/\r\n/g, "\n");
@@ -10,7 +10,8 @@ describe("where a person lands", () => {
   const coach = { group_id: "g1", role: "coach" };
   const client = { group_id: "g2", role: "athlete" };
   it("a coach on a phone opens on their own client profile; at a computer, the desktop Home", () => {
-    expect(startPath(coach, true)).toBe(COACH_PHONE_LANDING);
+    expect(startPath(coach, true)).toBe(COACH_PHONE_ENTRY);
+    expect(COACH_PHONE_ENTRY).toBe("/coach-landing");
     expect(COACH_PHONE_LANDING).toBe("/my-space?view=client");
     expect(startPath(coach, false)).toBe("/dashboard");
   });
