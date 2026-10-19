@@ -24,6 +24,14 @@
   "file": "apply-release-tc3b-client-requests-all.sql"
  },
  {
+  "id": "fix2-first-assignee-gets-the-original",
+  "name": "FIX 2 (the first person a program is assigned to gets the original; replaces one function)",
+  "steps": [
+   "176"
+  ],
+  "file": "apply-fix2-first-assignee-gets-the-original-all.sql"
+ },
+ {
   "id": "release-ns-coach-notice-switches",
   "name": "Release NS (a coach's own switches for the kinds of notice: one column, two functions, one trigger)",
   "steps": [
