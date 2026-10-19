@@ -117,7 +117,7 @@ describe("TC2: where a group is made a team sport, and one view of the athletes"
   it("the group's Settings has a plain switch for it (not for a one-on-one space)", () => {
     const s = src("app/(coach)/groups/[groupId]/settings/page.tsx");
     expect(s).toContain("<TeamSportToggle ");
-    expect(s).toContain('.select("gamification_enabled, name, group_kind, team_mode")');
+    expect(s).toContain('.select("gamification_enabled, name, group_kind, team_mode, organization_id")');
     expect(s).toContain('group_kind !== "one_on_one" && (');
     const t = src("components/coach/team-sport-toggle.tsx");
     expect(t).toContain("This group is a team sport");

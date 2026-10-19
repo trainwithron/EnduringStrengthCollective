@@ -143,7 +143,7 @@ export default async function SettingsPage(
         .maybeSingle(),
       supabase
         .from("groups")
-        .select("gamification_enabled, name, group_kind, team_mode")
+        .select("gamification_enabled, name, group_kind, team_mode, organization_id")
         .eq("id", params.groupId)
         .maybeSingle(),
       supabase
@@ -263,10 +263,13 @@ export default async function SettingsPage(
   // What this group does after a workout now: its own choice, or the default (off for a team-sport group, on otherwise). Read apart from the group row so a database without the column still loads the page.
   const postWorkoutCards = isCoach ? await loadPostWorkoutCards(supabase, params.groupId) : true;
   // The coach's own blocks come first on a coach's page (their vocabulary, Read during rest, Google Calendar); a client's page starts with Notifications.
+  // The coach's own personal space (their own client app) belongs to no organization: the vocabulary below is an ORGANIZATION's setting (it would be saved into some organization the coach owns, arbitrarily), and "Your coaching
+  // workspace" has to open the coach's Home, not the empty workspace of this personal space (Oct 19 audit).
+  const inPersonalSpace = effective.isActingAsOther && (group as { organization_id?: string | null } | null)?.organization_id == null;
   const coachingGroup = isCoach ? (
     <SettingsGroup label="Coaching">
             <Link
-              href={`/groups/${params.groupId}/dashboard`}
+              href={inPersonalSpace ? "/dashboard" : `/groups/${params.groupId}/dashboard`}
               className="font-body text-sm font-bold text-rust"
             >
               Your coaching workspace →
@@ -310,7 +313,7 @@ export default async function SettingsPage(
             )}
           </SettingsGroup>
   ) : null;
-  const terminologyGroup = isCoach ? (
+  const terminologyGroup = isCoach && !inPersonalSpace ? (
     <SettingsGroup label="What do you call your people?">
             <TerminologyChooser groupId={params.groupId} />
           </SettingsGroup>
