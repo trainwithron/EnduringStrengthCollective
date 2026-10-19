@@ -12,6 +12,8 @@ import {
 import { getActivePrograms, type ActiveProgram } from "./active-programs";
 import { programHeading } from "./session-stack";
 import { dateKeyOf } from "./athlete-day-schedule";
+import type { Pickup } from "./program-pickup";
+import { isLocked, unlockDate } from "./program-schedule";
 
 // Several programs can be active for one client at once: a main program, a
 // mobility program on off days, a warm-up flow. Each has its own schedule.
@@ -92,13 +94,36 @@ export async function loadAssignedWorkouts(supabase: SupabaseClient, athleteId: 
 // was done, one that was missed, or one not yet unlocked. A program resting
 // that day contributes nothing, so a mobility program shows on days the main
 // program is off.
+// Where each program picks up (the workout right after the one done last, lib/program-pickup.ts) and whether a completion time falls on today. When given, TODAY's card for each program is that workout, not the one the
+// calendar puts on today; other dates (Week and Month views) still follow the calendar.
+export interface PickupToday {
+  byProgram: ReadonlyMap<string, Pickup>;
+  doneToday: (completedAtIso: string) => boolean;
+}
+
+function pickupSession(c: ProgramDayContext, pick: Pickup, today: Date, doneToday: (iso: string) => boolean): DayWorkoutInfo {
+  if (pick.kind === "empty") return { status: "no-program", workoutId: null, title: null };
+  // Finished today: the checked card for it (what comes next is the card under it tomorrow, or after Start another).
+  if (pick.lastDone && pick.lastDoneAt && doneToday(pick.lastDoneAt)) return { status: "done", workoutId: pick.lastDone.id, title: pick.lastDone.title ?? "Workout" };
+  if (pick.kind === "complete") return { status: "done", workoutId: null, title: null };
+  const w = pick.workout;
+  const title = w.title ?? "Workout";
+  // The coach's "show days ahead" setting still holds a workout back until its date (only when the program has dates); it never decides which workout is the default.
+  const entry = c.scheduled.find((s) => s.workoutId === w.id);
+  if (entry && isLocked(entry.date, today, c.program.visibilityWindow)) {
+    return { status: "locked", workoutId: w.id, title, unlocksOn: unlockDate(entry.date, c.program.visibilityWindow) };
+  }
+  return { status: "planned", workoutId: w.id, title };
+}
+
 export function resolveSessionsForDate(
   contexts: ProgramDayContext[],
   loggedIds: Set<string>,
   targetDate: Date,
   today: Date,
   isToday: boolean,
-  assignedByDate?: Map<string, AssignedWorkout>
+  assignedByDate?: Map<string, AssignedWorkout>,
+  pickups?: PickupToday
 ): DaySession[] {
   const assigned = assignedByDate?.get(dateKeyOf(targetDate));
   if (assigned) {
@@ -112,7 +137,10 @@ export function resolveSessionsForDate(
   const out: DaySession[] = [];
   for (const c of contexts) {
     let info: DayWorkoutInfo;
-    if (c.unscheduled) {
+    const pick = isToday ? pickups?.byProgram.get(c.program.id) : undefined;
+    if (pick) {
+      info = pickupSession(c, pick, today, pickups!.doneToday);
+    } else if (c.unscheduled) {
       if (!isToday) continue;
       info = resolveNextUnloggedWorkout(c.all, loggedIds);
     } else {

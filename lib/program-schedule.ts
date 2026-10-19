@@ -67,26 +67,6 @@ export function defaultTrainingDaysForCount(daysPerWeek: number): number[] | nul
   return DEFAULT_TRAINING_DAYS_BY_COUNT[daysPerWeek] ?? null;
 }
 
-/**
- * The training days to lay a program out on a calendar with. The coach's own days win. A program that has a start date but no training days (assigned by hand, or imported) is spread evenly by how many workouts its busiest
- * week has (4 a week: Mon, Tue, Thu, Fri), so it still shows on the client's calendar instead of nowhere. Read-time only: nothing is saved, and the coach's own setting replaces it the moment it is set.
- */
-export function effectiveTrainingDays(
-  trainingDays: number[] | null | undefined,
-  workouts: { week_number: number | null }[]
-): { days: number[] | null; guessed: boolean } {
-  if (trainingDays && trainingDays.length > 0) return { days: trainingDays, guessed: false };
-  if (workouts.length === 0) return { days: null, guessed: false };
-  const perWeek = new Map<number, number>();
-  for (const w of workouts) {
-    const wk = w.week_number && w.week_number > 0 ? w.week_number : 1;
-    perWeek.set(wk, (perWeek.get(wk) ?? 0) + 1);
-  }
-  const busiest = Math.min(7, Math.max(...perWeek.values()));
-  const days = defaultTrainingDaysForCount(busiest);
-  return days ? { days, guessed: true } : { days: null, guessed: false };
-}
-
 export function formatShortDate(date: Date): string {
   return date.toLocaleDateString("en-US", {
     weekday: "short",

@@ -448,11 +448,9 @@ export async function CoachCalendarPageBody(
     // program ahead of a shared one. (This used to ask for "the" active program, which errors when there are two and left the whole Calendar tab without workouts.)
     const activePrograms = await getActivePrograms(supabase, params.groupId, athleteId);
     const scheduledPrograms = activePrograms.filter((p) => p.startDate && p.trainingDays?.length);
-    // A program with a start date but no training days still has a calendar (its days are spread evenly, read-time only) when nothing with its own days comes first.
-    const datedPrograms = activePrograms.filter((p) => p.startDate && !p.trainingDays?.length);
-    const chosen = scheduledPrograms.find((p) => p.athleteId === athleteId) ?? scheduledPrograms[0] ?? datedPrograms.find((p) => p.athleteId === athleteId) ?? datedPrograms[0] ?? null;
+    const chosen = scheduledPrograms.find((p) => p.athleteId === athleteId) ?? scheduledPrograms[0] ?? null;
     const program = chosen ? { id: chosen.id, start_date: chosen.startDate, training_days: chosen.trainingDays } : null;
-    const programHasSchedule = !!program?.start_date;
+    const programHasSchedule = !!(program?.start_date && program.training_days?.length);
 
     if (program && programHasSchedule) {
       const suffix = searchParams.reschedule ? `?reschedule=${searchParams.reschedule}` : "";

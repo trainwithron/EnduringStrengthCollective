@@ -11,6 +11,8 @@ export function ProgramDayPicker({
   title,
   weeks,
   currentWeek,
+  upNextDayId = null,
+  programComplete = false,
   backHref,
   editHref,
   workoutHrefBase,
@@ -22,6 +24,9 @@ export function ProgramDayPicker({
   title: string;
   weeks: PlainWeek[];
   currentWeek: number | null;
+  // The workout right after the one done last (where they pick up), and whether the last workout of the program is done.
+  upNextDayId?: string | null;
+  programComplete?: boolean;
   backHref: string;
   editHref: string | null;
   workoutHrefBase: string;
@@ -35,6 +40,7 @@ export function ProgramDayPicker({
   const [open, setOpen] = useState<{ week: number; day: PlainDay } | null>(null);
   const week = weeks.find((w) => w.weekNumber === weekNumber);
   const stats = programStats(weeks);
+  const upNext = upNextDayId ? weeks.flatMap((w) => w.days.map((d) => ({ week: w.weekNumber, day: d }))).find((x) => x.day.id === upNextDayId) ?? null : null;
   const now = new Date(nowIso);
   const circumference = 2 * Math.PI * 22;
 
@@ -95,6 +101,16 @@ export function ProgramDayPicker({
             </div>
           </section>
 
+          {upNext && !upNext.day.lockedLabel && (
+            <Link
+              href={`${workoutHrefBase}/${upNext.day.id}`}
+              className="mx-5 mt-4 flex items-center justify-center min-h-14 rounded-full bg-rust text-graphite font-display font-bold uppercase tracking-wide text-base"
+            >
+              {startLabel ? startLabel : isCoachViewing ? "Open" : "Continue"}: {dayCardTitle(upNext.week, upNext.day)}
+            </Link>
+          )}
+          {programComplete && <p className="mx-5 mt-4 font-body text-sm text-chalk text-center">Program complete. Every week is below if you want to do one again.</p>}
+
           <nav className="mt-4 overflow-x-auto px-5" aria-label="Weeks">
             <div className="flex gap-2 w-max">
               {weeks.map((w) => {
@@ -111,7 +127,7 @@ export function ProgramDayPicker({
                       Week {w.weekNumber}
                       {weekIsComplete(w) && <Check className="w-4 h-4 text-positive" strokeWidth={3} aria-label="Week complete" />}
                     </span>
-                    {currentWeek === w.weekNumber && <span className="font-body text-[10px] text-rust leading-none">This week</span>}
+                    {currentWeek === w.weekNumber && <span className="font-body text-[10px] text-rust leading-none">{programComplete ? "Last week" : "Up next"}</span>}
                   </button>
                 );
               })}
@@ -134,7 +150,11 @@ export function ProgramDayPicker({
                     <span className="min-w-0 flex-1">
                       <span className="block font-body text-lg font-semibold leading-tight break-words">
                         {dayCardTitle(weekNumber, d)}
-                        {d.isToday && <span className="ml-2 font-display text-xs uppercase tracking-wide text-rust align-middle">Today</span>}
+                        {d.id === upNextDayId ? (
+                          <span className="ml-2 font-display text-xs uppercase tracking-wide text-rust align-middle">Up next</span>
+                        ) : (
+                          d.isToday && <span className="ml-2 font-display text-xs uppercase tracking-wide text-rust align-middle">Today</span>
+                        )}
                       </span>
                       <span className="block font-body text-sm text-steel truncate mt-0.5">{d.lockedLabel ?? (previewLine(d.exercises) || "Nothing in this day yet.")}</span>
                       <span className="block font-body text-xs mt-1">

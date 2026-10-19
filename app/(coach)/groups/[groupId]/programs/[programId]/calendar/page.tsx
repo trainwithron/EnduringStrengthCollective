@@ -4,7 +4,7 @@ import Link from "next/link";
 import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
-import { computeScheduledDates, effectiveTrainingDays, isSameDay, isLocked } from "@/lib/program-schedule";
+import { computeScheduledDates, isSameDay, isLocked } from "@/lib/program-schedule";
 import { getActivePrograms } from "@/lib/active-programs";
 import { ProgramChips } from "@/components/athlete/program-chips";
 import { BookingModeLine } from "@/components/athlete/booking-mode-line";
@@ -129,9 +129,11 @@ export default async function ProgramCalendarPage(
     .order("week_number", { ascending: true })
     .order("day_index", { ascending: true });
 
-  // A program with a start date but no training days is spread evenly by its busiest week (read-time only), so it still shows on the calendar.
-  const laidOut = program.start_date ? effectiveTrainingDays(program.training_days, workouts ?? []) : { days: null, guessed: false };
-  const trainingDays = laidOut.days;
+  // Every program the client has active, so the calendar can offer each one (it shows one at a time).
+  const activePrograms = viewingAsAthlete ? await getActivePrograms(supabase, params.groupId, athleteId) : [];
+
+  // A program is on the calendar only when the coach has put it there (a start date AND training days). Nothing is placed for them.
+  const trainingDays = program.training_days && program.training_days.length > 0 ? program.training_days : null;
 
   if (!program.start_date || !trainingDays) {
     return (
@@ -146,19 +148,22 @@ export default async function ProgramCalendarPage(
           <h1 className="font-display font-bold text-4xl leading-none mt-3 uppercase">
             {program.name}
           </h1>
+          {viewingAsAthlete && <ProgramChips groupId={params.groupId} programs={activePrograms.map((p) => ({ id: p.id, name: p.label?.trim() || p.name }))} currentId={params.programId} />}
         </header>
         <div className="px-5 py-6 max-w-[50ch]">
           <p className="font-body text-sm text-steel">
             {viewingAsAthlete
-              ? "This program has no dates yet, so there is no calendar. Your coach can add them. Your workouts are still on Home."
+              ? "No days set. Your coach hasn't put this program on the calendar yet. Open it from Home."
               : "Set a start date and training days on this program to see it as a calendar."}
           </p>
-          <Link
-            href={viewingAsAthlete ? `/groups/${params.groupId}` : backHref}
-            className="inline-flex items-center h-11 mt-3 font-body text-sm text-rust"
-          >
-            {viewingAsAthlete ? "Go to Home" : "Go to program settings"} &rarr;
+          <Link href={backHref} className="inline-flex items-center h-11 mt-3 font-body text-sm text-rust">
+            {viewingAsAthlete ? "Open this program" : "Go to program settings"} &rarr;
           </Link>
+          {viewingAsAthlete && (
+            <Link href={`/groups/${params.groupId}`} className="block h-11 leading-[44px] font-body text-sm text-steel underline underline-offset-2">
+              Go to Home
+            </Link>
+          )}
         </div>
         {showMobileView && (
           <BottomTabBar groupId={params.groupId} activeOverride="calendar" />
@@ -220,9 +225,6 @@ export default async function ProgramCalendarPage(
     const sb = await supabase.from("coach_booking_policies").select("booking_mode").eq("coach_id", coachMembership.profile_id).maybeSingle();
     if (!sb.error) bookingMode = (sb.data?.booking_mode as string | null) ?? "coach_schedules";
   }
-  // Every program the client has active, so the calendar can offer each one (it shows one at a time).
-  const activePrograms = viewingAsAthlete ? await getActivePrograms(supabase, params.groupId, athleteId) : [];
-
   // The client's own sessions show whether or not the coach has set up open hours, and whichever coach booked them.
   if (viewingAsAthlete) {
     const { data: bookingRows } = await supabase
@@ -327,9 +329,6 @@ export default async function ProgramCalendarPage(
           </p>
         )}
         {viewingAsAthlete && <ProgramChips groupId={params.groupId} programs={activePrograms.map((p) => ({ id: p.id, name: p.label?.trim() || p.name }))} currentId={params.programId} />}
-        {laidOut.guessed && (
-          <p className="font-body text-xs text-steel mt-3">Days are not set for this program, so its workouts are spread evenly across the week ({laidOut.days?.map((d) => WEEKDAY_LABELS[d]).join(", ")}).</p>
-        )}
       </header>
 
       {viewingAsAthlete && coachMembership && bookingMode === "coach_schedules" && <BookingModeLine groupId={params.groupId} />}
