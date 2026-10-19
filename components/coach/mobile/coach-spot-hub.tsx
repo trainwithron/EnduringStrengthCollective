@@ -15,7 +15,7 @@ import { PushNotificationToggle } from "@/components/athlete/push-notification-t
 import { createBrowserClient } from "@/lib/supabase/client";
 import { useTerm } from "@/components/coach/terminology-provider";
 import { getCoachedGroups, LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/coach-groups";
-import { hubOrgs, hubStartOrgId, type HubOrg } from "@/lib/hub-orgs";
+import { hubOrgs, hubStartGroup, hubStartOrgId, type HubOrg } from "@/lib/hub-orgs";
 import { isTeamSportGroup, TEAM_SPORT_HIDDEN_HUB_TILES } from "@/lib/team-sport";
 
 type TileKey = "clients" | "business" | "calendar" | "program" | "ask-spot" | "quick-payment";
@@ -79,6 +79,8 @@ export function CoachSpotHub({
     };
   }, [activeGroupId]);
   const [orgs, setOrgs] = useState<HubOrg[]>([]);
+  // Several organizations, none chosen, and the page belongs to none (the coach's own space): the tiles ask which organization instead of acting on the wrong one.
+  const [needsOrg, setNeedsOrg] = useState(false);
   const router = useRouter();
   const [orgId, setOrgId] = useState<string | null>(null);
   const orgsRequested = useRef(false);
@@ -105,13 +107,16 @@ export function CoachSpotHub({
         const remembered = document.cookie.split("; ").find((c) => c.startsWith(`${LAST_WORKSPACE_GROUP_COOKIE}=`))?.split("=")[1];
         const rememberedId = remembered ? decodeURIComponent(remembered) : null;
         const list = hubOrgs(groups, rememberedId);
-        if (list.length === 0) return;
         const start = hubStartOrgId(groups, rememberedId, groupId);
         setOrgs(list);
         setOrgId(start);
-        // Starts on the organization Home is showing (the one chosen with the organization switcher), except when the hub was opened for one particular client.
-        const startOrg = list.find((o) => o.orgId === start);
-        if (startOrg && !initialAthleteId) setActiveGroupId(startOrg.anchorGroupId);
+        // Starts on the organization Home is showing (the one chosen with the organization switcher), except when the hub was opened for one particular client. On the coach's own space (no organization) it
+        // starts on the chosen or only organization, never on the space itself.
+        if (!initialAthleteId) {
+          const startGroup = hubStartGroup(groups, rememberedId, groupId);
+          if (startGroup.needsChoice) setNeedsOrg(true);
+          else if (startGroup.groupId) setActiveGroupId(startGroup.groupId);
+        }
       } catch {
         // the hub keeps working on the page's own group; the next open tries again
         orgsRequested.current = false;
@@ -123,6 +128,7 @@ export function CoachSpotHub({
     const next = orgs.find((o) => o.orgId === nextOrgId);
     if (!next) return;
     setOrgId(next.orgId);
+    setNeedsOrg(false);
     setActiveGroupId(next.anchorGroupId);
     setBuilderOpen(false);
     try {
@@ -271,6 +277,11 @@ export function CoachSpotHub({
                   aria-label="Organization"
                   className="h-8 max-w-[9rem] bg-graphite border border-steel/30 text-chalk font-body text-xs px-1 truncate"
                 >
+                  {orgId === null && (
+                    <option value="" disabled>
+                      Choose an organization
+                    </option>
+                  )}
                   {orgs.map((o) => (
                     <option key={o.orgId} value={o.orgId}>
                       {o.orgName}
@@ -319,22 +330,28 @@ export function CoachSpotHub({
                   </div>
                 </div>
               )}
-              {view === "clients" && (
+              {needsOrg && ["clients", "business", "calendar", "program", "quick-payment"].includes(view) && (
+                <div className="h-full overflow-y-auto p-4">
+                  <p className="font-body text-sm text-chalk">Which organization are you working in?</p>
+                  <p className="font-body text-xs text-steel mt-1">Choose it at the top of this panel. Until then this would show your own space, not the organization.</p>
+                </div>
+              )}
+              {view === "clients" && !needsOrg && (
                 <div className="h-full overflow-y-auto p-4">
                   <SpotClientsGroupsPanel key={activeGroupId} groupId={activeGroupId} onNavigated={close} fromHub />
                 </div>
               )}
-              {view === "business" && (
+              {view === "business" && !needsOrg && (
                 <div className="h-full overflow-y-auto p-4">
                   <BusinessMiniDashboard key={activeGroupId} groupId={activeGroupId} expanded />
                 </div>
               )}
-              {view === "calendar" && (
+              {view === "calendar" && !needsOrg && (
                 <div className="h-full overflow-y-auto p-4">
                   <CalendarMiniView key={activeGroupId} groupId={activeGroupId} />
                 </div>
               )}
-              {view === "program" && (
+              {view === "program" && !needsOrg && (
                 <div className="h-full overflow-y-auto p-4">
                   {builderOpen ? (
                     <SpotBuilderPanel
@@ -363,7 +380,7 @@ export function CoachSpotHub({
                   <AskSpotChatPanel />
                 </div>
               )}
-              {view === "quick-payment" && (
+              {view === "quick-payment" && !needsOrg && (
                 <div className="h-full overflow-y-auto">
                   <QuickPaymentPanel key={activeGroupId} groupId={activeGroupId} />
                 </div>

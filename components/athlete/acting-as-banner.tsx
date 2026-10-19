@@ -48,8 +48,8 @@ export function ActingAsBanner({ athleteFullName, groupId, isSelf = false }: { a
           <span className="truncate">{self ? "Me" : athleteFullName}</span>
           <ChevronDown className="w-4 h-4 shrink-0" strokeWidth={2.5} />
         </button>
-        <button type="button" onClick={exit} disabled={exiting} className="shrink-0 min-h-11 font-body text-xs uppercase tracking-wide underline underline-offset-2 disabled:opacity-50">
-          {exiting ? "Going…" : "Coach home"}
+        <button type="button" onClick={exit} disabled={exiting} className="shrink-0 min-h-11 px-3 border border-graphite/60 font-body text-xs font-bold uppercase tracking-wide disabled:opacity-50">
+          {exiting ? "Going…" : "← Back to coach home"}
         </button>
       </div>
 

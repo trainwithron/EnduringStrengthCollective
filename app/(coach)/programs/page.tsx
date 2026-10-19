@@ -12,10 +12,9 @@ import { defaultList, type RemovedProgram } from "@/lib/programs-filter";
 import { sweepEmptyPrograms } from "@/lib/empty-sweep";
 import { SwappableTerm } from "@/components/coach/swappable-term";
 import { computeProgramCardVisuals } from "@/lib/program-card-data";
-import { getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
+import { coachedOrgs, getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
 import { CHOOSE_ORGANIZATION_PATH, getActiveAnchor } from "@/lib/active-anchor";
 import { getCoachClients } from "@/lib/coach-clients";
-import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { LearnedSection } from "@/components/coach/learned-section";
 import { ConversationInviteSection } from "@/components/coach/conversation-section";
 import { countAssignedTo } from "@/lib/program-assigned";
@@ -47,9 +46,7 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
       </NoAccess>
     );
   }
-  // Phones keep their own pages.
-  if (await prefersAthleteStyleView()) redirect(`/groups/${anchor.id}/programs`);
-
+  // (A phone gets this same page, over the whole organization it is working in: it used to be sent to ONE group's programs, and the "Show all programs" link on that page sent it straight back.)
   const inOrg = groupsInOrgOf(groups, anchor.id);
   const groupIds = inOrg.map((g) => g.id);
   // His own programs with nothing in them (no exercise, no session, no copy), untouched for 24 hours, are removed quietly (AI builder leftovers).
@@ -152,6 +149,14 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
             </Link>
           </p>
         ) : null}
+        {coachedOrgs(groups).length > 1 && (
+          <p className="font-body text-sm text-steel mt-2">
+            Programs of <span className="text-chalk">{anchor.orgName}</span>.{" "}
+            <Link href={`${CHOOSE_ORGANIZATION_PATH}?next=/programs`} className="text-rust underline underline-offset-2">
+              Change organization
+            </Link>
+          </p>
+        )}
         <p className="font-body text-sm text-steel mt-2">
           {cards.length} {cards.length === 1 ? "program" : "programs"}
         </p>

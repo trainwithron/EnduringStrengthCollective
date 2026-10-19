@@ -15,6 +15,8 @@ import { OrgNotificationsPanel, type OrgNotification } from "@/components/coach/
 import { MarkAllSeenButton } from "@/components/coach/desktop/mark-all-seen-button";
 import { findThreadsNeedingReply } from "@/lib/notification-priority";
 import { getCoachedGroups, LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/coach-groups";
+import { getActiveAnchor } from "@/lib/active-anchor";
+import { orgIsTeamOnly } from "@/lib/team-sport";
 import { activeOrgId, clientCountsByOrg, inActiveOrg, rememberedOrgId } from "@/lib/active-org";
 import { getCoachDashboardData } from "@/lib/dashboard-data";
 import { PulseTabs } from "@/components/coach/desktop/pulse-tabs";
@@ -58,6 +60,7 @@ interface GroupRow {
   group_kind: string | null;
   organization_id: string | null;
   archived_at?: string | null;
+  team_mode?: boolean | null;
 }
 
 export default async function CoachHomePage() {
@@ -117,6 +120,11 @@ export default async function CoachHomePage() {
   // squeezed desktop shell again instead of a loop, which is the correct
   // tradeoff (annoying beats broken).
   if (await prefersAthleteStyleView()) {
+    // A phone goes to the coach home of the organization the coach is working IN (the one they chose, or their only one), not to whichever group they joined first: the first group is often another organization's.
+    // With several organizations and none chosen it asks, on one plain screen.
+    const active = await getActiveAnchor(supabase, user.id);
+    if (active?.needsChoice) redirect("/choose-organization?next=/dashboard");
+    if (active) redirect(`/groups/${active.anchor.id}`);
     const lastGroupId = parseLastGroupCookie((await cookies()).get("last_group")?.value);
     const start = pickStartGroup(await loadStartInputs(supabase, user.id, lastGroupId));
     redirect(`/groups/${start?.group_id ?? coachedGroupRows[0].group_id}`);
@@ -177,7 +185,7 @@ export default async function CoachHomePage() {
     supabase.from("coach_profiles").select("bio, photo_url").eq("coach_id", user.id).maybeSingle(),
     supabase.from("profiles").select("terminology_asked_at").eq("id", user.id).maybeSingle(),
     supabase.from("coach_profiles").select("completion_message").eq("coach_id", user.id).maybeSingle(),
-    supabase.from("group_memberships").select("groups ( id, name, focus_tag, group_kind, organization_id, archived_at )").eq("profile_id", user.id).eq("role", "coach"),
+    supabase.from("group_memberships").select("groups ( id, name, focus_tag, group_kind, organization_id, archived_at, team_mode )").eq("profile_id", user.id).eq("role", "coach"),
     supabase.from("coach_dashboard_layout").select("hidden_tiles, tile_order, tile_metric_overrides").eq("coach_id", user.id).maybeSingle(),
     supabase.from("coach_briefings").select("id, briefing_date").eq("coach_id", user.id).gte("briefing_date", addDaysToKey(utcTodayKey, -1)).lte("briefing_date", addDaysToKey(utcTodayKey, 1)),
     supabase
@@ -217,7 +225,7 @@ export default async function CoachHomePage() {
       : Promise.resolve({ data: null }),
     // Every group of the organizations they administer (more than 1,000 for a gym with that many one-on-one clients, so a page at a time), by name.
     adminOrgIds.length > 0
-      ? pageAll((from, to) => supabase.from("groups").select("id, name, focus_tag, group_kind, organization_id, archived_at").in("organization_id", adminOrgIds).order("id").range(from, to)).then((r) => ({
+      ? pageAll((from, to) => supabase.from("groups").select("id, name, focus_tag, group_kind, organization_id, archived_at, team_mode").in("organization_id", adminOrgIds).order("id").range(from, to)).then((r) => ({
           data: r.rows.sort((a, b) => String(a.name ?? "").localeCompare(String(b.name ?? ""))),
         }))
       : Promise.resolve({ data: null }),
@@ -271,6 +279,8 @@ export default async function CoachHomePage() {
   }));
 
   const allGroupIds = allGroups.map((g) => g.id);
+  // A team organization (every group a team-sport group) has no money on Home: no MRR, income or payments tiles, no needs-payment strip.
+  const moneyHidden = orgIsTeamOnly(allGroups);
   // The briefing's items name a group: only this organization's are shown.
   collectiveIntelligenceItems = collectiveIntelligenceItems.filter((i) => !i.groupId || allGroupIds.includes(i.groupId));
 
@@ -619,7 +629,7 @@ export default async function CoachHomePage() {
         </div>
         <InactiveClientsPanel groupIds={allGroupIds} />
         <ProgressLookPanel groupIds={allGroupIds} />
-        <NeedsPaymentPanel rows={dashboardData.needsPayment} />
+        {!moneyHidden && <NeedsPaymentPanel rows={dashboardData.needsPayment} />}
       </div>
 
       <DashboardTileGrid
@@ -630,7 +640,7 @@ export default async function CoachHomePage() {
             key: "stats",
             label: "Stats",
             node: (
-              <DashboardStatTiles tiles={dashboardData.statTiles.tiles} initialOverrides={tileMetricOverrides} />
+              <DashboardStatTiles tiles={moneyHidden ? dashboardData.statTiles.tiles.filter((x) => x.key !== "mrr" && x.key !== "income") : dashboardData.statTiles.tiles} initialOverrides={tileMetricOverrides} />
             ),
           },
           {

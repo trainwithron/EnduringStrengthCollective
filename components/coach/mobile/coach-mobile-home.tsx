@@ -20,6 +20,8 @@ import { CoachHomeComplications } from "./coach-home-complications";
 import { CoachMobileShell } from "./coach-mobile-shell";
 import { getNeedsAttentionItems } from "@/lib/needs-attention-data";
 import { getCoachedGroups, groupsInOrgOf, groupsInOrgOfOpened } from "@/lib/coach-groups";
+import { isTeamSportGroup } from "@/lib/team-sport";
+import { TeamCoachPhoneHome } from "./team-coach-phone-home";
 
 // The coach mobile Home (coach_mobile_app_redesign_plan.md, locked
 // 2026-09-14) — replaces the old pattern of a coach on mobile seeing
@@ -37,19 +39,23 @@ export async function CoachMobileHome({
   coachId: string;
 }) {
   const supabase = await createServerClient();
+  // A team-sport group gets its own short phone home (the active program, the team, one More tools): no money, no first-client nag, no Needs attention strip.
+  const { data: teamRow } = await supabase.from("groups").select("team_mode").eq("id", groupId).maybeSingle();
+  if (isTeamSportGroup((teamRow as { team_mode?: boolean | null } | null)?.team_mode)) return <TeamCoachPhoneHome groupId={groupId} groupName={groupName} />;
   const timezone = await getGroupCoachTimezone(supabase, groupId);
   // The panels below read for the whole coach; on a phone Home they stay inside this group's organization (another one appears only after switching to it).
   const orgGroupIds = (await groupsInOrgOfOpened(supabase, coachId, groupId)).map((g) => g.id);
   const todayKey = dateKeyInZone(timezone);
   const weekAgoKey = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-  const [dueRoster, { data: purchaseRows }, coachMrr, { data: rosterRows }, needsAttentionItems] =
+  const [dueRoster, { data: purchaseRows }, coachMrr, { data: rosterRows }, needsAttentionItems, { count: programCount }] =
     await Promise.all([
       getTodaysDueRoster(supabase, { groupId }),
       supabase.from("credit_purchases").select("amount_cents, created_at").eq("group_id", groupId),
       loadCoachMrr(supabase, coachId, groupId),
       supabase.from("group_memberships").select("profile_id, profiles ( full_name )").eq("group_id", groupId).eq("role", "athlete"),
       getNeedsAttentionItems(supabase, { coachId, groupIds: [groupId] }),
+      supabase.from("programs").select("id", { count: "exact", head: true }).eq("group_id", groupId).is("archived_at", null),
     ]);
 
   const incomeEvents = (purchaseRows ?? []).map((p) => ({
@@ -261,7 +267,7 @@ export async function CoachMobileHome({
           </section>
         )}
 
-        {!topDue && !soloAthlete && (rosterRows ?? []).length === 0 && !clientsElsewhere && (
+        {!topDue && !soloAthlete && (rosterRows ?? []).length === 0 && !clientsElsewhere && (programCount ?? 0) === 0 && (
           <section className="px-5 pb-6">
             <div className="border border-steel/20 p-4">
               <p className="font-body text-sm text-chalk">Welcome. Two things get you started:</p>
@@ -292,7 +298,7 @@ export async function CoachMobileHome({
         )}
 
         {/* Always there, so Home is never a dead end: the empty-state buttons above disappear once a coach has clients. */}
-        {(rosterRows ?? []).length > 0 && (
+        {((rosterRows ?? []).length > 0 || (programCount ?? 0) > 0) && (
           <section className="px-5 pb-6">
             <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">Quick actions</h2>
             <div className="grid grid-cols-2 gap-2">

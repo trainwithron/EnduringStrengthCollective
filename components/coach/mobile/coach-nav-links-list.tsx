@@ -113,7 +113,8 @@ export function CoachNavLinksList({ groupId }: { groupId: string; groupName?: st
           teamSportMenu(groupId)
             .filter((m) => m.key !== "members" && m.key !== "messages")
             .map((m) => <Item key={m.key} href={m.href} label={m.label} icon={m.key === "team-calendar" ? CalendarDays : m.key === "feed" ? MessagesSquare : ClipboardList} />)}
-        <Item href={`/groups/${groupId}/programs`} label="Programs" icon={LayoutGrid} />
+        {/* The organization the coach is working in (the coach-level page), never the group this page happens to belong to: on the coach's own space that group is their personal one. */}
+        <Item href="/programs" label="Programs" icon={LayoutGrid} />
         <Item href={`/groups/${groupId}/exercise-library`} label="Exercise library" icon={Dumbbell} />
         <Item href={`/groups/${groupId}/nutrition`} label="Nutrition" icon={Salad} />
         {!teamSport && !hiddenForCoach(navFacts, "availability") && <Item href={`/groups/${groupId}/availability`} label="Availability" icon={CalendarClock} />}

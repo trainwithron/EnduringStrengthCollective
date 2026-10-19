@@ -48,3 +48,6 @@ export function withTeamSportWords(overrides: import("@/lib/terminology").Termin
   if (!teamSport || overrides.client) return overrides;
   return { ...overrides, client: { kind: "preset", value: "athlete" } };
 }
+
+/** An organization whose groups are ALL team-sport groups (and there is at least one): a coach there is running a team, so no money numbers (MRR, income, payments) appear on their Home. */
+export const orgIsTeamOnly = (groups: { team_mode?: boolean | null }[]): boolean => groups.length > 0 && groups.every((g) => isTeamSportGroup(g.team_mode));
