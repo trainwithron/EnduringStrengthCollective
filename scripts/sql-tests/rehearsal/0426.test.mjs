@@ -55,6 +55,22 @@ export default {
       }
       h.check("organization A: A's program and the personal one, never B's", (await throughPolicy(gA)) === "SB program A,SB program personal");
 
+      // Someone else's personal space: never in this coach's set, and its program stays invisible to them either way.
+      const other = await h.user("SB Other Coach");
+      await h.asSuper();
+      const otherSpace = (await db.query(`insert into public.groups (name, group_kind, organization_id, created_by) values ('SB other personal', 'one_on_one', null, $1) returning id`, [other])).rows[0].id;
+      await db.query(`insert into public.group_memberships (group_id, profile_id, role) values ($1, $2, 'coach')`, [otherSpace, other]);
+      await db.query("alter table public.programs disable trigger programs_guard_one_on_one");
+      await db.query(`insert into public.programs (group_id, name, created_by, is_active) values ($1, 'SB other program', $2, true)`, [otherSpace, other]);
+      await db.query("alter table public.programs enable trigger programs_guard_one_on_one");
+      await h.as(coach);
+      await db.query(`select set_config('request.headers', $1, false)`, [H(gA)]);
+      const ids = (await db.query(`select public.active_org_group_ids() as id`)).rows.map((x) => x.id);
+      h.check("the set holds the named organization's groups and the caller's OWN personal space, never anyone else's", ids.includes(gA) && ids.includes(personal) && !ids.includes(otherSpace) && !ids.includes(gB), JSON.stringify(ids));
+      const seen = (await db.query(`select count(*)::int as n from public.programs where name = 'SB other program'`)).rows[0].n;
+      h.check("someone else's personal-space program stays invisible", seen === 0, String(seen));
+      await h.asSuper();
+
       await h.as(coach);
       await db.query(`select set_config('request.headers', $1, false)`, [H(gA)]);
       await h.expectError("naming A, the coach still cannot write into B", async () => {
