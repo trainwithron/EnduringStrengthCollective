@@ -9,7 +9,9 @@ export interface RequestRow {
   id: string;
   /** first name and last initial, for everyone, until the coach approves */
   name: string;
-  ageBand: "adult" | "teen" | "unknown";
+  organizationId: string;
+  /** shown as a small label only when the coach belongs to more than one organization */
+  organizationName: string | null;
   createdAt: string;
 }
 
@@ -21,7 +23,7 @@ const NEXT_STEP: Record<string, string> = {
 
 // The coach's waiting requests (people who tapped "Request to train with me" on their public page). Approve makes an ordinary client with their own one-on-one space; Decline tells the person only that the coach is not
 // taking new clients right now. Names show as first name and last initial, with no photo, until the coach approves. Nothing here shares anything about any client.
-export function ClientRequestsPanel({ organizationId, requests, supportEmail }: { organizationId: string; requests: RequestRow[]; supportEmail: string | null }) {
+export function ClientRequestsPanel({ requests, supportEmail }: { requests: RequestRow[]; supportEmail: string | null }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, { kind: "ok" | "problem"; text: string; help?: boolean }>>({});
@@ -39,7 +41,7 @@ export function ClientRequestsPanel({ organizationId, requests, supportEmail }: 
         // a closed request leaves the list; one that needs support stays waiting
         if (data.code !== "dob_mismatch") router.refresh();
       } else {
-        setAnswers((a) => ({ ...a, [r.id]: { kind: "ok", text: action === "approve" ? `${r.name} is now your client. ${NEXT_STEP[data.ageBand ?? r.ageBand] ?? NEXT_STEP.unknown}` : `Declined. ${r.name} was told only that you are not taking new clients right now.` } }));
+        setAnswers((a) => ({ ...a, [r.id]: { kind: "ok", text: action === "approve" ? `${r.name} is now your client. ${NEXT_STEP[data.ageBand] ?? NEXT_STEP.unknown}` : `Declined. ${r.name} was told only that you are not taking new clients right now.` } }));
         router.refresh();
       }
     } catch {
@@ -54,13 +56,20 @@ export function ClientRequestsPanel({ organizationId, requests, supportEmail }: 
     if (!(await confirmDialog({ message: `Decline all ${requests.length} waiting requests? Each person is told only that you are not taking new clients right now.`, confirmLabel: "Decline all", cancelLabel: "Keep them", destructive: true }))) return;
     setBusy("all");
     try {
-      const res = await fetch("/api/client-requests/answer", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "decline_all", organizationId }) });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) setBulk(data.error || "Couldn't decline them. Try again.");
-      else {
-        setBulk(`Declined ${data.declined ?? 0}.`);
-        router.refresh();
+      // one call per organization that has requests waiting
+      let declined = 0;
+      let problem: string | null = null;
+      for (const organizationId of Array.from(new Set(requests.map((r) => r.organizationId)))) {
+        const res = await fetch("/api/client-requests/answer", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "decline_all", organizationId }) });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          problem = data.error || "Couldn't decline them. Try again.";
+          break;
+        }
+        declined += data.declined ?? 0;
       }
+      setBulk(problem ? `${declined > 0 ? `Declined ${declined}. ` : ""}${problem}` : `Declined ${declined}.`);
+      router.refresh();
     } catch {
       setBulk("Couldn't decline them. Check your connection and try again.");
     } finally {
@@ -80,7 +89,7 @@ export function ClientRequestsPanel({ organizationId, requests, supportEmail }: 
             </button>
           )}
         </div>
-        <p className="font-body text-xs text-steel">Names show as first name and last initial, with no photo, until you approve. Then they are your client and you see them in full.</p>
+        <p className="font-body text-xs text-steel">Names show as first name and last initial, with no photo, until you approve. Then they are your client and you see them in full. Requests for all your organizations are here.</p>
         {bulk && (
           <p className="font-body text-xs text-chalk" role="status">
             {bulk}
@@ -96,9 +105,8 @@ export function ClientRequestsPanel({ organizationId, requests, supportEmail }: 
                   <div className="min-w-0 flex-1">
                     <p className="font-body text-sm">
                       <b>{r.name}</b>
-                      {r.ageBand === "teen" && <span className="text-steel text-xs ml-2">Under 18</span>}
+                      {r.organizationName && <span className="text-steel text-xs ml-2">{r.organizationName}</span>}
                     </p>
-                    {r.ageBand === "teen" && <p className="font-body text-xs text-steel mt-1">If you accept, a parent or guardian has to sign a consent form before they can log workouts. The app tells them and walks them through it.</p>}
                   </div>
                   <div className="flex items-center gap-4 shrink-0">
                     <button type="button" onClick={() => answer(r, "approve")} disabled={busy !== null} className="h-9 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40">

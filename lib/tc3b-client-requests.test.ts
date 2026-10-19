@@ -54,7 +54,7 @@ function fakeDb() {
   };
 }
 
-import { canRequestOnPage, requestTargetFor } from "@/lib/client-requests";
+import { canRequestOnPage, isRealCalendarDate, requestTargetFor } from "@/lib/client-requests";
 import { POST as submit } from "@/app/api/client-requests/submit/route";
 import { POST as answer } from "@/app/api/client-requests/answer/route";
 
@@ -136,6 +136,21 @@ describe("sending a request", () => {
     expect(state.rpcCalls).toEqual([{ fn: "submit_client_request", args: { p_coach: "coach-1", p_dob: "1990-01-01" } }]);
     const route = read("app/api/client-requests/submit/route.ts");
     expect(route).not.toMatch(/raw\??\.(message|token|link)/);
+  });
+
+  it("a date shaped like a date but not on the calendar is answered in plain words, never passed on to fail in the database", async () => {
+    for (const bad of ["2020-13-45", "2021-02-30", "2019-00-10", "2020-04-31"]) {
+      state.rpcCalls = [];
+      const res = await submit(post("/api/client-requests/submit", { slug: "coach-ron", dob: bad }));
+      expect(res.status, bad).toBe(400);
+      expect(await res.json(), bad).toEqual({ error: "That date of birth is not a real date.", code: "dob_invalid" });
+      expect(state.rpcCalls, bad).toHaveLength(0);
+    }
+    expect(isRealCalendarDate("2020-02-29")).toBe(true);
+    expect(isRealCalendarDate("2021-02-29")).toBe(false);
+    expect(isRealCalendarDate("2000-12-31")).toBe(true);
+    const ok = await submit(post("/api/client-requests/submit", { slug: "coach-ron", dob: "2008-02-29" }));
+    expect(ok.status).toBe(200);
   });
 
   it("a date that is not YYYY-MM-DD is dropped, not passed on", async () => {
@@ -234,6 +249,28 @@ describe("the coach's side", () => {
     expect(s).toContain("initial?.acceptsRequests ?? true");
     expect(s).toContain("accepts_requests: acceptsRequests");
     expect(read("app/(coach)/groups/[groupId]/business/booking-page/page.tsx")).toContain("accepts_requests !== false");
+  });
+  it("before approval the coach sees First L. and Approve / Decline only: nothing about age, no guardian note", () => {
+    const panel = read("components/coach/client-requests-panel.tsx");
+    expect(panel).not.toContain("Under 18");
+    expect(panel).not.toContain("r.ageBand");
+    expect(panel).not.toContain("If you accept");
+    const page = read("app/(coach)/clients/requests/page.tsx");
+    expect(page).not.toMatch(/age_band|ageBand/);
+    // what to do next, including the guardian note, is said only after Approve
+    expect(panel).toContain("NEXT_STEP[data.ageBand]");
+  });
+  it("the Requests page, the badge and the left-panel count cover ALL the coach's organizations, with the organization's name on each row when there are several", () => {
+    const page = read("app/(coach)/clients/requests/page.tsx");
+    expect(page).toContain('from("organization_memberships")');
+    expect(page).toContain("organizationName: orgs.length > 1 ? org.name : null");
+    expect(page).not.toContain("anchor.orgId");
+    expect(read("app/(coach)/clients/page.tsx")).toContain("pendingRequestCount(supabase)");
+    expect(read("app/(coach)/clients/page.tsx")).not.toContain("pendingRequestCount(supabase, anchor.orgId)");
+    expect(read("app/(coach)/groups/[groupId]/clients/page.tsx")).toContain("pendingRequestCount(supabase)");
+    expect(read("components/coach/desktop/pending-requests-line.tsx")).toContain('rpc("coach_client_request_count", { p_org: null })');
+    // Decline all waiting covers every organization that has requests
+    expect(read("components/coach/client-requests-panel.tsx")).toContain("new Set(requests.map((r) => r.organizationId))");
   });
   it("the Requests page lists only First L. (no photo, no message, no link), with Decline all waiting and a support contact for a date that needs correcting", () => {
     const panel = read("components/coach/client-requests-panel.tsx");

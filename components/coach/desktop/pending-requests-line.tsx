@@ -12,9 +12,8 @@ export function PendingRequestsLine({ groupId }: { groupId: string }) {
     (async () => {
       try {
         const supabase = createBrowserClient();
-        // the organization the coach is working in (the one this page's group belongs to)
-        const { data: g } = await supabase.from("groups").select("organization_id").eq("id", groupId).maybeSingle();
-        const { data, error } = await supabase.rpc("coach_client_request_count", { p_org: (g as { organization_id?: string | null } | null)?.organization_id ?? null });
+        // all of the coach's organizations: a request goes to the organization the public page belongs to, which may not be the open one
+        const { data, error } = await supabase.rpc("coach_client_request_count", { p_org: null });
         if (!cancelled && !error && typeof data === "number") setCount(data);
       } catch {
         // no line is better than a wrong one

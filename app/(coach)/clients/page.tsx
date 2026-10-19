@@ -90,7 +90,7 @@ export default async function CoachClientsPage() {
   const [coachList, inviteManager] = await Promise.all([loadOrgCoaches(anchor.id), authorizeInviteManager(supabase, user.id, anchor.id)]);
 
   const signIns = await signInsFor(coachList.coaches, inviteManager.ok, user.id);
-  const requestCount = await pendingRequestCount(supabase, anchor.orgId);
+  const requestCount = await pendingRequestCount(supabase);
 
   return (
     <CoachDesktopShell groupId={anchor.id} groupName={anchor.name} active="clients" coachLevel>

@@ -7,6 +7,14 @@ export function canRequestOnPage(page: { enabled: boolean | null | undefined; ac
   return page.enabled === true && page.acceptsRequests === true && !!page.organizationId;
 }
 
+/** A YYYY-MM-DD string that is a real calendar day (2020-02-30 and 2020-13-45 are not). */
+export function isRealCalendarDate(value: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!m) return false;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  return d.getUTCFullYear() === Number(m[1]) && d.getUTCMonth() === Number(m[2]) - 1 && d.getUTCDate() === Number(m[3]);
+}
+
 export interface RequestTarget {
   coachId: string;
   slug: string;

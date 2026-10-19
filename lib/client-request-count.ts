@@ -1,4 +1,4 @@
-// How many "request to be my client" requests are waiting for this coach in ONE organization (the one they are working in), read through the database function (the coach cannot read the table itself). Never throws: when the count cannot be read the Requests link
+// How many "request to train with me" requests are waiting for this coach in ALL their organizations (or one, when an organization is named), read through the database function (the coach cannot read the table itself). Never throws: when the count cannot be read the Requests link
 // still shows, just without a number.
 export async function pendingRequestCount(supabase: any, organizationId: string | null = null): Promise<number | null> {
   try {

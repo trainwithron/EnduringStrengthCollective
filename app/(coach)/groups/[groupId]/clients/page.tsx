@@ -72,7 +72,7 @@ export default async function ClientsPage(
 
   const { data: group } = await supabase
     .from("groups")
-    .select("name, team_mode, group_kind, organization_id")
+    .select("name, team_mode, group_kind")
     .eq("id", params.groupId)
     .single();
 
@@ -292,7 +292,7 @@ export default async function ClientsPage(
       )
     );
 
-    const requestCount = await pendingRequestCount(supabase, (group as { organization_id?: string | null } | null)?.organization_id ?? null);
+    const requestCount = await pendingRequestCount(supabase);
 
     return (
       <CoachMobileShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} activeOverride="roster">
