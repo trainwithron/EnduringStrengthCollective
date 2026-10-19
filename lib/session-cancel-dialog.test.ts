@@ -8,12 +8,12 @@ describe("click a booked session on the calendar to cancel it", () => {
   it("a future one-off session is cancelled with the same refund rule as the client's panel", () => {
     const src = read("components/coach/session-cancel-dialog.tsx");
     expect(src).toContain('rpc("cancel_booking_and_refund_credit"');
-    expect(src).toContain("Cancel this session? Anything already taken for it goes back to their sessions.");
+    expect(src).toContain("Anything already taken for it goes back to their sessions.");
   });
   it("a session in a recurring schedule asks: just this one, or this and the rest of the series", () => {
     const src = read("components/coach/session-cancel-dialog.tsx");
-    expect(src).toContain("Just this one");
-    expect(src).toContain("This and the rest of the series");
+    expect(src).toContain("Cancel only this one (");
+    expect(src).toContain("Cancel this one and every later one");
     expect(src).toContain('seriesAction("end_from_here")');
     expect(read("app/api/series/occurrence/route.ts")).toContain('case "end_from_here"');
   });

@@ -50,3 +50,29 @@ describe("the cancel dialog says exactly what it cancels", () => {
     expect(html).not.toContain(">Just this one<");
   });
 });
+
+describe("the Book pop-up appears at the time that was picked", () => {
+  const grid = read("components/coach/desktop/day-time-grid.tsx");
+  it("is a pop-up (a bottom sheet on a phone) the moment a time is picked, not a box at the bottom of the grid to scroll to", () => {
+    expect(grid).toContain('aria-label="Book this session"');
+    expect(grid).toContain("fixed inset-0 z-50 flex items-end sm:items-center");
+    expect(grid).not.toContain("scrollIntoView");
+    expect(grid).not.toContain('aria-label="Confirm session"');
+  });
+  it("says plainly what will happen, edits the time, length and type right there, and has one Book button", () => {
+    expect(grid).toContain("Book {client.fullName}, {dateLabel}, {pendingLabel}");
+    expect(grid).toContain("This books one session. Nothing else on the calendar is changed.");
+    expect(grid).toContain("setPendingMin(parseClockMinutes(e.target.value))");
+    expect(grid).toContain('aria-label="Session type for this booking"');
+    expect(grid.match(/onClick=\{book\}/g)?.length).toBe(1);
+  });
+  it("is green and the cancel dialog is red, so the two can never be mistaken for each other", () => {
+    expect(grid).toContain("bg-positive text-graphite");
+    const cancel = read("components/coach/session-cancel-dialog.tsx");
+    expect(cancel).toContain("text-rust");
+    expect(cancel).not.toContain("positive");
+  });
+  it("the Undo notice stays in view at the bottom of the screen", () => {
+    expect(grid).toContain("fixed bottom-4 left-1/2 -translate-x-1/2 z-40");
+  });
+});

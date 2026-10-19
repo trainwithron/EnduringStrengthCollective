@@ -185,8 +185,6 @@ export function DayTimeGrid({
     setError(null);
     setRepeating(false);
     setPendingMin(minute);
-    // On a short window the confirm box is below the time grid: bring it into view.
-    setTimeout(() => confirmRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 0);
   }
 
   function readDrag(e: React.DragEvent): DraggedClient | null {
@@ -501,55 +499,111 @@ export function DayTimeGrid({
         </div>
       </div>
 
-      {(problem || mismatch) && activeStart != null && client && (
+      {(problem || mismatch) && activeStart != null && client && pendingMin == null && (
         <div className="px-3 pt-2 space-y-0.5">
           {problem && <p className="font-body text-xs text-steel">{PLACEMENT_TEXT[problem]}</p>}
           {mismatch && <p className="font-body text-xs text-steel">{mismatch}</p>}
         </div>
       )}
 
+      {/* The moment a time is picked, a pop-up right there says exactly what will happen and has the Book button (a bottom sheet on a phone). It books ONE session and changes nothing else. It is green, so it is never mistaken for the red cancel dialog. */}
       {pendingMin != null && client && (
-        <div ref={confirmRef} className="m-3 border border-rust/40 p-3" role="group" aria-label="Confirm session">
-          <p className="font-body text-sm text-chalk">
-            {client.fullName}: {pendingLabel}
-            {typeId ? ` · ${sessionTypes.find((t) => t.id === typeId)?.name ?? ""}` : ""}
-          </p>
-          {repeating ? (
-            <div className="mt-3">
-              <SeriesScheduleForm
-                groupId={client.groupId ?? groupId}
-                athleteId={client.athleteId}
-                athleteName={client.fullName}
-                timezone={timezone}
-                initialStartIso={zonedTimeToUtc(dateKey, clockLabel(pendingMin), timezone).toISOString()}
-                defaultDurationMinutes={lengthMin}
-                onCancel={() => {
-                  setRepeating(false);
-                  setPendingMin(null);
-                  onChanged();
-                }}
-              />
-            </div>
-          ) : (
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <button type="button" disabled={assigning || !lengthOk || isHardClash(problem)} onClick={book} className="bg-rust text-graphite font-display font-bold uppercase tracking-wide px-4 py-2 disabled:opacity-40">
-                {assigning ? "Booking…" : "Book this session"}
-              </button>
-              <button type="button" disabled={assigning} onClick={() => setRepeating(true)} className="border border-steel/40 text-chalk font-body text-sm px-4 py-2 disabled:opacity-40">
-                Repeat weekly…
-              </button>
-              <button type="button" onClick={() => setPendingMin(null)} className="font-body text-sm text-steel">
-                Cancel
-              </button>
-            </div>
-          )}
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-graphite/70 sm:px-4" role="presentation" onClick={() => !assigning && !repeating && setPendingMin(null)}>
+          <div
+            ref={confirmRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Book this session"
+            className="w-full max-w-md max-h-[90vh] overflow-y-auto bg-surface border-t-4 sm:border-t border-positive sm:border-positive/60 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] rounded-t-2xl sm:rounded-none"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="font-display font-bold uppercase text-sm tracking-wide text-positive">Book this session</p>
+            <p className="font-display font-bold text-lg leading-tight text-chalk mt-2">
+              Book {client.fullName}, {dateLabel}, {pendingLabel}
+            </p>
+            {!repeating && <p className="font-body text-xs text-steel mt-1">This books one session. Nothing else on the calendar is changed.</p>}
+            {(problem || mismatch) && (
+              <div className="mt-2 space-y-0.5">
+                {problem && <p className="font-body text-xs text-rust">{PLACEMENT_TEXT[problem]}</p>}
+                {mismatch && <p className="font-body text-xs text-steel">{mismatch}</p>}
+              </div>
+            )}
+            {error && (
+              <p className="font-body text-xs text-rust mt-2" role="alert">
+                {error}
+              </p>
+            )}
+            {repeating ? (
+              <div className="mt-3">
+                <SeriesScheduleForm
+                  groupId={client.groupId ?? groupId}
+                  athleteId={client.athleteId}
+                  athleteName={client.fullName}
+                  timezone={timezone}
+                  initialStartIso={zonedTimeToUtc(dateKey, clockLabel(pendingMin), timezone).toISOString()}
+                  defaultDurationMinutes={lengthMin}
+                  onCancel={() => {
+                    setRepeating(false);
+                    setPendingMin(null);
+                    onChanged();
+                  }}
+                />
+              </div>
+            ) : (
+              <>
+                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <label className="flex items-center gap-1.5 font-body text-xs text-steel">
+                    Time
+                    <input
+                      type="time"
+                      step={300}
+                      value={clockLabel(pendingMin)}
+                      onChange={(e) => {
+                        if (/^\d{2}:\d{2}$/.test(e.target.value)) setPendingMin(parseClockMinutes(e.target.value));
+                      }}
+                      className="h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm"
+                    />
+                  </label>
+                  <label className="flex items-center gap-1.5 font-body text-xs text-steel">
+                    Length
+                    <input type="number" min={5} max={480} step={5} value={length} onChange={(e) => setLength(e.target.value)} className="w-16 h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm" />
+                    min
+                  </label>
+                  {sessionTypes.length > 0 && (
+                    <label className="flex items-center gap-1.5 font-body text-xs text-steel">
+                      Type
+                      <select value={typeId} onChange={(e) => setTypeId(e.target.value)} className="h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm" aria-label="Session type for this booking">
+                        <option value="">No type</option>
+                        {sessionTypes.map((st) => (
+                          <option key={st.id} value={st.id}>
+                            {st.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                </div>
+                <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-2">
+                  <button type="button" disabled={assigning || !lengthOk || isHardClash(problem)} onClick={book} className="min-h-12 bg-positive text-graphite font-display font-bold uppercase tracking-wide px-5 py-2 disabled:opacity-40">
+                    {assigning ? "Booking…" : "Book"}
+                  </button>
+                  <button type="button" disabled={assigning} onClick={() => setRepeating(true)} className="min-h-12 border border-steel/40 text-chalk font-body text-sm px-4 py-2 disabled:opacity-40">
+                    Repeat weekly…
+                  </button>
+                  <button type="button" onClick={() => setPendingMin(null)} className="min-h-12 font-body text-sm text-steel sm:ml-auto">
+                    Not now
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
 
       {cancelTarget && <CancelSessionDialog target={cancelTarget} onClose={() => setCancelTarget(null)} onDone={onChanged} />}
 
       {booked && (
-        <div className="px-3 py-2 m-3 border border-positive/40 bg-positive/10 flex flex-wrap items-center gap-3" role="status">
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-md px-3 py-2 border border-positive/60 bg-surface shadow-lg flex flex-wrap items-center gap-3" role="status">
           <span className="font-body text-sm text-chalk">Booked {booked.label}.</span>
           <button type="button" onClick={undo} className="font-body text-sm text-rust underline underline-offset-2">
             Undo ({booked.secondsLeft}s)
