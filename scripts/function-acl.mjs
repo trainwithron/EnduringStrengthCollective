@@ -86,6 +86,9 @@ export const ACL_REVIEWED = [
   // SPEED A (0426): the organization wall's set helper. An RLS helper, like group_in_active_org: group ids only (no names, no rows): the groups of the organization the request names (which
   // group_in_active_org already answers one id at a time) plus ONLY THE CALLER'S OWN personal spaces, never anyone else's. Ids grant nothing on their own. Reviewed by Commander (Oct 19).
   "active_org_group_ids",
+  // SPEED B (0427): RLS helpers, the set form of is_group_member / is_group_coach / is_org_admin_of_group (which are matched as is_* by prefix): each returns only the CALLER'S own group ids
+  // (their seats, their coach seats, the groups of the organizations they own or administer), read through auth.uid(). Nothing about anyone else.
+  "my_group_ids", "my_coached_group_ids", "my_admin_group_ids",
   // Release H: each checks the caller inside (owner, admin or the member themselves; signed-in only) through is_org_owner_or_admin, which this list does not recognise by name
   "close_organization", "remove_org_member", "set_org_member_role",
   // Release T1 (front desk): each looks at who is calling inside (a front-desk person of the organization, or its owner/admin/coach, through _front_desk_may_act; remove_front_desk: an owner/admin or the person themselves).

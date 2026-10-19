@@ -2842,6 +2842,25 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "179",
+  slug: "0427",
+  title: "0427 SPEED B: the read policies on the ten busiest tables ask 'member / coach / owner or admin of this group' from three sets once per query (three new functions; 15 read policies rewritten in place)",
+  warn: "This adds three functions (my_group_ids, my_coached_group_ids, my_admin_group_ids) and rewrites 15 read policies in place, replacing is_group_member(x), is_group_coach(x) and is_org_admin_of_group(x) word for word with x in the matching set. Nothing else in their text changes; is_client_private_from_org and every other check stay. The paste checks that the 15 policies and the three per-row functions are exactly the texts this matches, and stops if not.",
+  migrations: ["0427"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing looks different; Programs, the program charts and Home answer faster. No code change goes with it.",
+  undo: "do $$\ndeclare r record; q text;\nbegin\n  for r in select tablename, policyname, qual from pg_policies where schemaname = 'public' and cmd = 'SELECT' and tablename in ('programs','workouts','group_workout_exercises','group_workout_exercise_sets','athlete_sessions','session_exercises','set_logs','group_memberships','groups','workout_logs') and qual ~ 'my_(group|coached_group|admin_group)_ids\\(\\)' loop\n    q := regexp_replace(r.qual, '\\(([a-z_]+(\\.[a-z_]+)?) IN \\( SELECT my_group_ids\\(\\) AS my_group_ids\\)\\)', 'is_group_member(\\1)', 'g');\n    q := regexp_replace(q, '\\(([a-z_]+(\\.[a-z_]+)?) IN \\( SELECT my_coached_group_ids\\(\\) AS my_coached_group_ids\\)\\)', 'is_group_coach(\\1)', 'g');\n    q := regexp_replace(q, '\\(([a-z_]+(\\.[a-z_]+)?) IN \\( SELECT my_admin_group_ids\\(\\) AS my_admin_group_ids\\)\\)', 'is_org_admin_of_group(\\1)', 'g');\n    execute format('alter policy %I on public.%I using (%s)', r.policyname, r.tablename, q);\n  end loop;\nend $$;\ndrop function if exists public.my_group_ids();\ndrop function if exists public.my_coached_group_ids();\ndrop function if exists public.my_admin_group_ids();",
+  undoWhy: "Only if step 179 misbehaves. Puts the 15 read policies back on the per-row checks (the reverse of the same word-for-word swap) and drops the three functions.",
+  rows: [
+    ["0427 is not already applied (the member set is not there yet)", "not (to_regprocedure('public.my_group_ids()') is not null)"],
+    ["the 15 read policies are exactly the texts this rewrites", "(select md5(string_agg(tablename || '|' || policyname || '|' || cmd || '|' || coalesce(qual, '') || '|' || coalesce(with_check, ''), chr(10) order by tablename, policyname)) from pg_policies where schemaname = 'public' and tablename in ('programs','workouts','group_workout_exercises','group_workout_exercise_sets','athlete_sessions','session_exercises','set_logs','group_memberships','groups','workout_logs') and cmd in ('SELECT', 'ALL') and policyname <> 'org_wall_header' and (coalesce(qual, '') ~ '\\m(is_group_member|is_group_coach|is_org_admin_of_group)\\(' or coalesce(with_check, '') ~ '\\m(is_group_member|is_group_coach|is_org_admin_of_group)\\(')) = '66584b2355b8f2cc0413bc374c52a413'"],
+    ["is_group_member is exactly the text the member set matches", md5Is("is_group_member(uuid)", "4883c4ef8376c3d48bcfd5e2f20d3814")],
+    ["is_group_coach is exactly the text the coach set matches", md5Is("is_group_coach(uuid)", "efa2e330be5434af47ce88d3be81d5d4")],
+    ["is_org_admin_of_group is exactly the text the owner/admin set matches", md5Is("is_org_admin_of_group(uuid)", "142a65df511b5db2c3c328ffeec3d2dc")],
+  ],
+});
+
+STEPS.push({
   n: "170",
   slug: "0418",
   title: "0418 Release AF3: database policies from the post-ship audit (a private client stays private in posts and tags; two undecided account-deletion links decided; the guardian-consent answer limited for a coach; the health-form flag cleared when the last client seat goes)",
@@ -3675,6 +3694,7 @@ const BUNDLES = [
   { id: "release-ts3-team-sheet-save", name: "Release TS3 (saving a filled team sheet: one table, one notice kind, three functions)", steps: ["171"] },
   { id: "release-own1-owner-accepted-only", name: "Release OWN1 (ownership cannot be handed to someone who has never signed in; replaces two functions, adds one function and one trigger)", steps: ["172"] },
   { id: "release-tc3b-client-requests", name: "Release TC3 part B (Request to train with me on a coach's public page: one column, three tables, eight functions)", steps: ["174"] },
+  { id: "speed-b-member-checks-set-based", name: "SPEED B (the read policies ask member / coach / owner or admin from three sets once per query: three functions, 15 read policies rewritten in place)", steps: ["179"] },
   { id: "speed-a-org-wall-set-based", name: "SPEED A (the organization wall asks once per query, not once per row: one function, 90 policies rewritten in place)", steps: ["178"] },
   { id: "fix4-org-wall-follows-active-org", name: "FIX 4 (the organization wall follows the organization the person chose; replaces one function)", steps: ["177"] },
   { id: "fix2-first-assignee-gets-the-original", name: "FIX 2 (the first person a program is assigned to gets the original; replaces one function)", steps: ["176"] },
@@ -3929,6 +3949,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0419", "to_regclass('public.team_sheet_batches') is not null"),
     m("0420", "exists (select 1 from pg_trigger where tgname = 'organization_memberships_guard_owner_role' and not tgisinternal)"),
     m("0422", "to_regclass('public.client_requests') is not null"),
+    m("0427", "to_regprocedure('public.my_group_ids()') is not null"),
     m("0426", "to_regprocedure('public.active_org_group_ids()') is not null"),
     m("0425", "exists (select 1 from pg_proc p where p.oid = to_regprocedure('public.request_workspace_org()') and position('x-workspace-org' in p.prosrc) > 0)"),
     m("0424", "exists (select 1 from pg_proc p where p.oid = to_regprocedure('public.assign_program_to_client(uuid, uuid, uuid, text, date)') and position('c.source_program_id = src.id' in p.prosrc) > 0)"),
