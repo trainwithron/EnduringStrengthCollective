@@ -26,6 +26,7 @@ import { getActiveProgramForAthlete, getAllProgramWorkouts, getScheduledWorkouts
 import { BookSlotButton } from "@/components/athlete/book-slot-button";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
 import { MessageCoachLink } from "@/components/athlete/message-coach-link";
+import { WithdrawRequestButton } from "@/components/athlete/withdraw-request-button";
 import { MarkAttendedControl, type CreditState } from "@/components/coach/mark-attended-control";
 import { RescheduleSlotButton } from "@/components/athlete/reschedule-slot-button";
 import { RequestSlotButton } from "@/components/athlete/request-slot-button";
@@ -300,20 +301,26 @@ export default async function CoachDayDetailPage(
     }
     // Times this client has already asked for (pending requests), so the slot says "Requested" instead of offering the button again.
     const requestedTimes = new Set<number>();
+    // The request's id for each time asked for, so a request that is still waiting can be taken back.
+    const requestIdByTime = new Map<number, string>();
     // Requests at a time that is not one of the slots (asked for with "Ask for a different time") are listed on their own, so nothing the client asked for is lost.
-    const offGridRequests: { start: Date; end: Date }[] = [];
+    const offGridRequests: { id: string; start: Date; end: Date }[] = [];
     if (bookingMode === "request") {
       const { data: pendingRows } = await supabase
         .from("booking_requests")
-        .select("new_start_at, new_end_at")
+        .select("id, new_start_at, new_end_at")
         .eq("athlete_id", athleteId)
         .eq("status", "pending");
-      for (const r of pendingRows ?? []) requestedTimes.add(new Date(r.new_start_at as string).getTime());
+      for (const r of pendingRows ?? []) {
+        const t0 = new Date(r.new_start_at as string).getTime();
+        requestedTimes.add(t0);
+        requestIdByTime.set(t0, r.id as string);
+      }
       const slotStarts = new Set(slots.map((s) => s.start.getTime()));
       for (const r of pendingRows ?? []) {
         const s = new Date(r.new_start_at as string);
         const e = new Date((r.new_end_at as string | null) ?? (r.new_start_at as string));
-        if (!slotStarts.has(s.getTime()) && dayStartUtc && dayEndUtc && s >= dayStartUtc && s < dayEndUtc) offGridRequests.push({ start: s, end: e });
+        if (!slotStarts.has(s.getTime()) && dayStartUtc && dayEndUtc && s >= dayStartUtc && s < dayEndUtc) offGridRequests.push({ id: r.id as string, start: s, end: e });
       }
     }
     const backHref = `/groups/${params.groupId}/calendar`;
@@ -454,7 +461,10 @@ export default async function CoachDayDetailPage(
                     ) : isBufferBlocked ? (
                       <span className="font-body text-xs text-steel">{conflict === "taken" ? "Booked" : "Too close to another session"}</span>
                     ) : bookingMode === "request" && requestedTimes.has(start.getTime()) ? (
-                      <span className="font-body text-xs text-chalk">Requested. Waiting for your coach.</span>
+                      <span className="flex flex-wrap items-center gap-2">
+                        <span className="font-body text-xs text-chalk">Requested. Waiting for your coach.</span>
+                        {requestIdByTime.get(start.getTime()) && <WithdrawRequestButton requestId={requestIdByTime.get(start.getTime())!} />}
+                      </span>
                     ) : bookingMode === "request" ? (
                       <RequestSlotButton
                         coachId={coachMembership.profile_id}
@@ -493,8 +503,9 @@ export default async function CoachDayDetailPage(
             <div className="mt-4">
               <h3 className="font-display uppercase text-xs tracking-wide text-steel mb-1">Waiting for your coach</h3>
               {offGridRequests.map((r) => (
-                <p key={r.start.getTime()} className="font-body text-sm text-chalk">
+                <p key={r.start.getTime()} className="font-body text-sm text-chalk flex flex-wrap items-center gap-2">
                   {formatSlotTime(r.start, timezone)} to {formatSlotTime(r.end, timezone)}
+                  <WithdrawRequestButton requestId={r.id} />
                 </p>
               ))}
             </div>
