@@ -29,10 +29,9 @@ describe("the logger", () => {
     expect(card).toContain("Add weight / RPE");
     expect(card).toContain("trackedFields={gridFields}");
   });
-  it("the check on a set completes it whether or not anything is filled in", () => {
-    expect(grid).toContain("function toggleCheck(set: SetLogEntry)");
-    expect(grid).toContain('onSetChange(set.id, { status: "completed" })');
-    expect(grid).toContain('set.status === "completed" && !forced');
+  it("a set completes on weight and reps alone (reps alone with no load); there is no check to tap", () => {
+    expect(grid).not.toContain("function toggleCheck(");
+    expect(grid).toContain("isSetFilled(set as unknown as Record<string, unknown>, trackedProps, weightOptional)");
   });
   it("Complete workout completes whatever is filled in (the choice never asks for a value), and a no-load session does not ask for an effort score", () => {
     expect(complete).toContain("Complete workout");
@@ -50,6 +49,6 @@ describe("review fixes", () => {
   });
   it("a completed set with empty fields stays completed when the page loads (the revert needs the person to have changed a field this session)", () => {
     const grid = read("components/logging/exercise-set-grid.tsx");
-    expect(grid).toContain('set.status === "completed" && !forced && touched');
+    expect(grid).toContain('!allFilled && set.status === "completed" && touched');
   });
 });

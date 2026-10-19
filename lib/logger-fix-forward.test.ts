@@ -45,12 +45,12 @@ describe("the logging card fits the screen", () => {
   });
 });
 
-describe("the check never writes a weight or an RPE", () => {
-  it("tapping the check writes the set's status only", () => {
-    const toggle = grid.slice(grid.indexOf("function toggleCheck("), grid.indexOf("function markTouched("));
-    expect(toggle).toContain('save(set.id, { status: "completed", completed_at:');
-    expect(toggle).not.toContain("weight");
-    expect(toggle).not.toContain("rpe");
+describe("there is no check on a set any more (Ron: \"I hate the checkboxes in the workout logger\")", () => {
+  it("no Status row, no tap-to-complete", () => {
+    expect(grid).not.toContain("function toggleCheck(");
+    expect(grid).not.toContain("forcedIds");
+    expect(grid).not.toContain(">Status<");
+    expect(grid).not.toContain("Mark set complete");
   });
 });
 

@@ -17,7 +17,8 @@ import {
 } from "@/lib/exercise-fields";
 import { parseNumericReps } from "@/lib/program-card-visuals";
 import { isExerciseUnlocked, type PriorBest } from "@/lib/obstacle-unlock";
-import { Check, Lock, LockOpen } from "lucide-react";
+import { Lock, LockOpen } from "lucide-react";
+import { isSetFilled } from "@/lib/set-complete";
 import { InfoTip } from "@/components/shared/info-tip";
 import { MAX_REST_SECONDS, formatRest, formatRestSpan, parseRestInput, restForSet } from "@/lib/rest-time";
 
@@ -336,12 +337,10 @@ function GridCell({
   );
 }
 
-// No more manual "mark complete" checkbox — a set is done once every
-// field this exercise actually tracks has a value, and reverts to
-// pending if one gets cleared again. Ported as-is from the old per-set
-// SetRow component's own effect: with the grid now organized by metric
-// ROW instead of by set, there's no single component left that owns one
-// whole set's fields, so this renders invisibly once per set instead.
+// No checkboxes (Ron, Sep 12: "I hate the checkboxes in the workout logger"): a set is done once it has weight AND reps (reps alone for a
+// bodyweight movement; see lib/set-complete.ts), and reverts to pending if either gets cleared again. Every other field is optional and
+// never blocks. With the grid organized by metric ROW instead of by set, there's no single component that owns one whole set's fields,
+// so this renders invisibly once per set.
 function SetCompletionSync({
   set,
   trackedFields,
@@ -349,12 +348,9 @@ function SetCompletionSync({
   touched,
   weightOptional,
   prescribedRestSeconds,
-  forced,
   onChange,
 }: {
   set: SetLogEntry;
-  // The check was tapped: the set stays complete whether or not every field is filled in.
-  forced: boolean;
   trackedFields: TrackedField[];
   readOnly: boolean;
   // Bodyweight movements: reps alone complete the set (no typing 0 lbs).
@@ -370,17 +366,11 @@ function SetCompletionSync({
   const restPrescribed = prescribedRestSeconds != null;
   useEffect(() => {
     if (readOnly || set.status === "skipped") return;
-    const requiredProps = orderTrackedFields(trackedFields)
-      .filter((f) => !(weightOptional && f === "weight"))
-      // A coach-prescribed rest is not something the client logs: it is not needed to complete the set.
+    const trackedProps = orderTrackedFields(trackedFields)
+      // A coach-prescribed rest is not something the client logs: it never completes the set either.
       .filter((f) => !(restPrescribed && f === "rest"))
-      .map((f) => ACTUAL_PROP[f] as keyof SetLogEntry);
-    const allFilled =
-      requiredProps.length > 0 &&
-      requiredProps.every((prop) => {
-        const v = set[prop];
-        return v !== null && v !== undefined && v !== ("" as unknown);
-      });
+      .map((f) => ACTUAL_PROP[f]);
+    const allFilled = isSetFilled(set as unknown as Record<string, unknown>, trackedProps, weightOptional);
 
     function persist(patch: Partial<SetLogEntry>) {
       // Flip the status right away — this is what the checkmark and the
@@ -404,8 +394,8 @@ function SetCompletionSync({
     // thing and log the whole program.)
     if (allFilled && set.status !== "completed" && touched) {
       persist({ status: "completed" });
-    } else if (!allFilled && set.status === "completed" && !forced && touched) {
-      // Only when the person changed a field this session: a completed set loaded from the database (a tapped check with nothing filled in) is never flipped back on load.
+    } else if (!allFilled && set.status === "completed" && touched) {
+      // Only when the person changed a field this session: a completed set loaded from the database (one checked off before the checkboxes went) is never flipped back on load.
       persist({ status: "pending" });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -424,7 +414,6 @@ function SetCompletionSync({
     set.status,
     readOnly,
     touched,
-    forced,
   ]);
 
   return null;
@@ -451,25 +440,6 @@ export function ExerciseSetGrid({
   const { save } = useSetSave();
   // Sets the athlete has interacted with (see SetCompletionSync).
   const [touchedSetIds, setTouchedSetIds] = useState<Set<string>>(new Set());
-  const [forcedIds, setForcedIds] = useState<Set<string>>(new Set());
-  // Tapping the check completes the set (nothing has to be filled in); tapping it again undoes that.
-  function toggleCheck(set: SetLogEntry) {
-    if (readOnly || set.status === "skipped") return;
-    const done = set.status === "completed";
-    setForcedIds((prev) => {
-      const next = new Set(prev);
-      if (done) next.delete(set.id);
-      else next.add(set.id);
-      return next;
-    });
-    if (done) {
-      onSetChange(set.id, { status: "pending" });
-      save(set.id, { status: "pending" });
-    } else {
-      onSetChange(set.id, { status: "completed" });
-      save(set.id, { status: "completed", completed_at: new Date().toISOString() });
-    }
-  }
   function markTouched(...ids: string[]) {
     setTouchedSetIds((prev) => {
       if (ids.every((id) => prev.has(id))) return prev;
@@ -624,7 +594,6 @@ export function ExerciseSetGrid({
           trackedFields={trackedFields}
           readOnly={readOnly}
           touched={touchedSetIds.has(set.id)}
-          forced={forcedIds.has(set.id)}
           weightOptional={weightOptional}
           prescribedRestSeconds={(() => {
             const r = restForSet(sets, set.id);
@@ -639,10 +608,13 @@ export function ExerciseSetGrid({
           <div className="w-8 shrink-0" />
           {sets.map((set, i) => {
             const warmup = set.setType === "warmup";
+            // A done set's number turns green (this replaces the old checkbox row).
+            const done = set.status === "completed";
+            const doneMark = done ? "text-moss font-bold" : "";
             // Tap the set number to mark it a warm-up (it then never counts toward goals, records or your max) and tap again to undo.
             if (readOnly) {
               return (
-                <span key={set.id} className="w-12 shrink-0 text-center font-body text-xs text-steel">
+                <span key={set.id} data-set-done={done || undefined} className={`w-12 shrink-0 text-center font-body text-xs ${doneMark || "text-steel"}`}>
                   {warmup ? "W" : i + 1}
                 </span>
               );
@@ -652,14 +624,15 @@ export function ExerciseSetGrid({
                 key={set.id}
                 type="button"
                 aria-pressed={warmup}
-                aria-label={warmup ? `Set ${i + 1} is a warm-up. Tap to make it a working set.` : `Mark set ${i + 1} as a warm-up`}
+                data-set-done={done || undefined}
+                aria-label={`${warmup ? `Set ${i + 1} is a warm-up. Tap to make it a working set.` : `Mark set ${i + 1} as a warm-up`}${done ? " (done)" : ""}`}
                 title={warmup ? "Warm-up (tap to change)" : "Tap to mark as a warm-up"}
                 onClick={() => {
                   const next = warmup ? "working" : "warmup";
                   onSetChange(set.id, { setType: next });
                   save(set.id, { set_type: next });
                 }}
-                className={`w-12 shrink-0 min-h-11 text-center font-body text-xs ${warmup ? "text-rust font-bold" : "text-steel"}`}
+                className={`w-12 shrink-0 min-h-11 text-center font-body text-xs ${doneMark || (warmup ? "text-rust font-bold" : "text-steel")}`}
               >
                 {warmup ? "W" : i + 1}
               </button>
@@ -704,34 +677,6 @@ export function ExerciseSetGrid({
             ))}
           </div>
         ))}
-
-        <div className="flex items-center gap-1.5">
-          <span className="w-12 shrink-0 font-body text-xs text-steel truncate">Status</span>
-          <div className="w-8 shrink-0" />
-          {sets.map((set) => {
-            const isComplete = set.status === "completed";
-            const isSkipped = set.status === "skipped";
-            return (
-              <button
-                type="button"
-                key={set.id}
-                onClick={() => toggleCheck(set)}
-                disabled={readOnly || isSkipped}
-                aria-pressed={isComplete}
-                aria-label={isComplete ? "Set complete, tap to undo" : isSkipped ? "Set skipped" : "Mark set complete"}
-                className={`w-12 h-8 shrink-0 flex items-center justify-center border rounded-token-circle ${
-                  isComplete
-                    ? "bg-moss border-moss text-graphite"
-                    : isSkipped
-                    ? "border-steel/30 text-steel"
-                    : "border-steel/30 text-steel"
-                }`}
-              >
-                <Check className="w-4 h-4" strokeWidth={3} />
-              </button>
-            );
-          })}
-        </div>
       </div>
     </div>
   );
