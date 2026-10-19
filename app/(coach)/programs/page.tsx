@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Suspense } from "react";
 import { after } from "next/server";
 import { readRowsByIds } from "@/lib/read-by-ids";
 import { redirect } from "next/navigation";
@@ -13,8 +12,6 @@ import { ProgramsList } from "@/components/coach/desktop/programs-list";
 import { defaultList, type RemovedProgram } from "@/lib/programs-filter";
 import { sweepEmptyPrograms } from "@/lib/empty-sweep";
 import { SwappableTerm } from "@/components/coach/swappable-term";
-import { ProgramVisualsLoader } from "@/components/coach/desktop/program-visuals-loader";
-import type { ProgramCardVisualData } from "@/lib/program-card-data";
 import { coachedOrgs, getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
 import { CHOOSE_ORGANIZATION_PATH, getActiveAnchor } from "@/lib/active-anchor";
 import { getCoachClients } from "@/lib/coach-clients";
@@ -200,13 +197,6 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
 
   // Charts only for the first CHARTED_CARDS cards without a cover (the ones on screen; newest changed first): the rest show the plain card.
   const uncoveredProgramIds = cards.filter((c) => !c.coverImagePath).slice(0, CHARTED_CARDS).map((c) => c.id);
-  // The list shows at once; the cards' charts stream in after (SPEED, Oct 19).
-  const listWith = (visualsByProgramId: Record<string, ProgramCardVisualData>) =>
-    clientId ? (
-      <ProgramCardGrid groupId={anchor.id} programs={cards} visualsByProgramId={visualsByProgramId} />
-    ) : (
-      <ProgramsList groupId={anchor.id} programs={scoped} removed={removed} visualsByProgramId={visualsByProgramId} />
-    );
 
   return (
     <CoachDesktopShell groupId={anchor.id} groupName={anchor.name} active="programs" coachLevel>
@@ -247,9 +237,12 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
       {programsError ? (
         <UnavailableState what="your programs" />
       ) : (
-        <Suspense fallback={listWith({})}>
-          <ProgramVisualsLoader supabase={supabase} coachId={user.id} programIds={uncoveredProgramIds} render={listWith} />
-        </Suspense>
+        // The page finishes with the list; the browser asks for the charts after it has shown (SPEED, Oct 19, measured live: streaming them kept the tab loading 5 more seconds).
+        clientId ? (
+          <ProgramCardGrid groupId={anchor.id} programs={cards} visualsByProgramId={{}} chartProgramIds={uncoveredProgramIds} />
+        ) : (
+          <ProgramsList groupId={anchor.id} programs={scoped} removed={removed} visualsByProgramId={{}} chartProgramIds={uncoveredProgramIds} />
+        )
       )}
 
       {!clientId && <LearnedSection supabase={supabase} coachId={user.id} />}

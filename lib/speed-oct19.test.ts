@@ -25,10 +25,18 @@ describe("1-3 /programs", () => {
     expect(page).toContain("after(async () => {");
     expect(page).not.toContain("await sweepEmptyPrograms(supabase");
   });
-  it("the cards' charts stream in: the list shows at once with no charts, then fills in", () => {
-    expect(page).toContain("<Suspense fallback={listWith({})}>");
-    expect(page).toContain("<ProgramVisualsLoader supabase={supabase} coachId={user.id} programIds={uncoveredProgramIds} render={listWith} />");
-    expect(page).not.toContain("await computeProgramCardVisuals");
+  it("the page finishes with the list; the browser asks for the charts after it has shown (measured live: streaming them kept the tab loading 5 more seconds)", () => {
+    expect(page).not.toContain("<Suspense");
+    expect(page).not.toContain("computeProgramCardVisuals");
+    expect(page).toContain("chartProgramIds={uncoveredProgramIds}");
+    const route = read("app/api/coach/program-charts/route.ts");
+    expect(route).toContain("const MAX_CHART_PROGRAMS = 12;");
+    expect(route).toContain(".filter((id) => UUID.test(id))");
+    expect(route).toContain('if (!user) return NextResponse.json({ error: "Sign in again." }, { status: 401 });');
+    expect(route).toContain("computeProgramCardVisuals(supabase, ids, user.id)");
+    const hook = read("components/coach/desktop/program-charts-loader.tsx");
+    expect(hook).toContain("fetch(`/api/coach/program-charts?ids=${encodeURIComponent(key)}`");
+    expect(read("components/coach/desktop/program-card-grid.tsx")).toContain("const fetchedVisuals = useProgramCharts(chartProgramIds);");
   });
   it("the charts read every row (a bare in() stopped at 1,000 rows without a word)", () => {
     const data = read("lib/program-card-data.ts");

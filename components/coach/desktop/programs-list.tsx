@@ -16,11 +16,13 @@ export function ProgramsList({
   programs,
   removed,
   visualsByProgramId,
+  chartProgramIds = [],
 }: {
   groupId: string;
   programs: ProgramCardData[];
   removed: RemovedProgram[];
   visualsByProgramId: Record<string, ProgramCardVisualData>;
+  chartProgramIds?: string[];
 }) {
   const [mode, setMode] = useState<ProgramsFilterMode>("all");
   const [value, setValue] = useState<string>("");
@@ -72,7 +74,7 @@ export function ProgramsList({
           </select>
         )}
       </div>
-      {mode !== "removed" && <ProgramCardGrid groupId={groupId} programs={shown} visualsByProgramId={visualsByProgramId} />}
+      {mode !== "removed" && <ProgramCardGrid groupId={groupId} programs={shown} visualsByProgramId={visualsByProgramId} chartProgramIds={chartProgramIds} />}
       {removedShown.length > 0 && <RemovedRows rows={removedShown} />}
       {mode === "removed" && removedShown.length === 0 && <p className="font-body text-sm text-steel">Nothing removed.</p>}
       {mode === "templates" && shown.length === 0 && <p className="font-body text-sm text-steel">No templates yet. Add a slot to a day of a program to make one.</p>}

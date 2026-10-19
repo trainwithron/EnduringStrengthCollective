@@ -1,6 +1,7 @@
 "use client";
 
 import { firstName } from "@/lib/programs-filter";
+import { useProgramCharts } from "@/components/coach/desktop/program-charts-loader";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { LayoutGrid, ImagePlus } from "lucide-react";
@@ -57,12 +58,17 @@ const STORAGE_KEY = "esc-card-size-programs";
 export function ProgramCardGrid({
   groupId,
   programs,
-  visualsByProgramId = {},
+  visualsByProgramId: givenVisuals = {},
+  chartProgramIds = [],
 }: {
   groupId: string;
   programs: ProgramCardData[];
   visualsByProgramId?: Record<string, ProgramCardVisualData>;
+  // The cards whose charts are asked for after the page has shown (SPEED, Oct 19); they appear when they arrive.
+  chartProgramIds?: string[];
 }) {
+  const fetchedVisuals = useProgramCharts(chartProgramIds);
+  const visualsByProgramId = { ...givenVisuals, ...fetchedVisuals };
   const [size, setSize] = useState<CardSize>("medium");
 
   useEffect(() => {
