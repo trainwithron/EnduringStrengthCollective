@@ -50,9 +50,11 @@ describe("Complete workout is where complete, pause and resume live", () => {
     expect(page).toContain('query.resume === "1" && session.status === "abandoned"');
     expect(overview).toContain("?resume=1");
   });
-  it("the coach's phone Home button becomes Resume workout while his own workout is paused or in progress", () => {
-    expect(home).toContain('.in("status", ["in_progress", "abandoned"])');
-    expect(home).toContain('"Resume workout" : "Start workout"');
-    expect(home).toContain("?resume=1");
+  it("the coach's phone Home has no start button for his OWN workout (Ron, Oct 19); a client's paused or in-progress workout is 'Resume <name>'s workout' there", () => {
+    expect(home).not.toContain('"Resume workout" : "Start workout"');
+    expect(home).not.toContain("/my-space?view=client");
+    const section = read("components/coach/next-client-workout-section.tsx");
+    expect(section).toContain('.in("status", ["in_progress", "abandoned"])');
+    expect(section).toContain("?resume=1");
   });
 });

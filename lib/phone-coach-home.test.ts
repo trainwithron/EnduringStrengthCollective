@@ -111,12 +111,12 @@ describe("the phone coach home of a team-sport group (the Trojans: one team grou
 });
 
 describe("wiring", () => {
-  it("the coach mobile home hands a team-sport group the short home, and the generic home only nags when there is no program", () => {
+  it("the coach mobile home hands a team-sport group the short home, before anything else is read, and has no first-client nag beyond one 'Add a client' button", () => {
     const s = src("components/coach/mobile/coach-mobile-home.tsx");
     expect(s).toContain("if (isTeamSportGroup(");
     expect(s).toContain("<TeamCoachPhoneHome groupId={groupId} groupName={groupName} />");
-    expect(s.indexOf("<TeamCoachPhoneHome")).toBeLessThan(s.indexOf("const timezone = await getGroupCoachTimezone"));
-    expect(s).toContain("(programCount ?? 0) === 0");
+    expect(s.indexOf("<TeamCoachPhoneHome")).toBeLessThan(s.indexOf("const orgGroups = await groupsInOrgOfOpened"));
+    expect(s).not.toContain("programCount");
   });
 
   it("the phone Programs link is the organization's Programs page, and that page no longer sends a phone to one group (which sent it straight back)", () => {

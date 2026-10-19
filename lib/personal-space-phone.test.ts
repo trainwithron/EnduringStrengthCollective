@@ -15,25 +15,40 @@ describe("a coach's own personal space on the phone", () => {
     expect(acting).toContain("created_by === userId");
     expect(acting).toContain("return { athleteId: realUserId, realUserId, isActingAsOther: true }");
   });
-  it("the first-run card is only for a coach with no clients anywhere", () => {
-    expect(home).toContain("clientsElsewhere");
-    // never "No clients" while the organization has some in its other groups: it says how many, with a way to them
+  it("the phone Home offers 'Add a client' only to a coach with no clients anywhere in the organization (never 'No clients' while some sit in its other groups)", () => {
+    expect(home).toContain("let hasClients = (rosterRows ?? []).length > 0;");
+    expect(home).toContain("const others = orgGroupIds.filter((id) => id !== groupId);");
     expect(home).not.toContain("No clients in {groupName}.");
-    expect(home).toContain("in this organization.");
-    expect(home).toContain("See your clients");
-    expect(home).toContain("&& !clientsElsewhere &&");
+    expect(home).toContain("{hasClients ? (");
+    expect(home).toContain("Add a client");
   });
 });
 
-describe("Start workout on the coach's phone Home", () => {
-  it("is pinned at the top, always, above every other card, and never replaced by the first-run card", () => {
-    const start = home.indexOf("Start workout");
-    expect(start).toBeGreaterThan(-1);
-    expect(home).toContain('"/my-space?view=client"');
-    expect(home).toContain("href={startHref}");
-    expect(start).toBeLessThan(home.indexOf("<LateChangesPanel"));
-    expect(start).toBeLessThan(home.indexOf("Welcome. Two things get you started"));
-    expect(home.match(/Start workout/g)?.length).toBe(1);
+describe("the coach's phone Home is short", () => {
+  it("has no start button for the coach's OWN workout (his own training is the 'Coach (you)' row at the top of the Clients list), no Desktop Mode button, no clients card, no quick actions, no business tiles", () => {
+    expect(home).not.toContain("Start workout");
+    expect(home).not.toContain('"/my-space?view=client"');
+    expect(home).not.toContain("ViewModeToggle");
+    expect(home).not.toContain("Quick actions");
+    expect(home).not.toContain("SEE YOUR CLIENTS");
+    expect(home).not.toContain("clients in this organization");
+    expect(home).not.toContain("CoachHomeComplications");
+    expect(home).not.toContain("NEEDS ATTENTION");
+  });
+  it("is the title, then the cards, then ONE button, then only what needs a decision", () => {
+    const order = ["<h1", "<SessionCheckSection", "<NextClientWorkoutSection", "<LateChangesPanel"].map((s) => home.indexOf(s));
+    expect(order.every((i) => i > -1)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+  });
+  it("the title starts below the fixed Spotlight button, so it is never covered", () => {
+    expect(home).toContain('className="px-5 pt-[108px] pb-4"');
+  });
+  it("the More sheet has Programs and Desktop mode, and the bottom bar has Home, Clients, Messages, Calendar, More", () => {
+    const more = read("components/coach/mobile/coach-more-sheet.tsx");
+    expect(more).toContain('<Item href="/programs" label="Programs"');
+    expect(more).toContain('<ViewModeToggle targetMode="desktop" label="Desktop mode"');
+    const bar = read("components/athlete/bottom-tab-bar.tsx");
+    for (const label of ["Home", "Clients", "Messages", "Calendar", "More"]) expect(bar).toContain(label);
   });
   it("says who is being logged for on the coach-logs-for-a-client bar", () => {
     const bar = read("components/coach/mobile/coach-mode-bar.tsx");
@@ -41,12 +56,11 @@ describe("Start workout on the coach's phone Home", () => {
   });
 });
 
-describe("the phone Home's organization client count agrees with the Clients page", () => {
-  it("counts each active client once and leaves out the ones set aside", () => {
+describe("the phone Home's idea of 'has clients' agrees with the Clients page", () => {
+  it("clients set aside do not count", () => {
     const home = readFileSync("components/coach/mobile/coach-mobile-home.tsx", "utf8").replace(/\r\n/g, "\n");
     expect(home).toContain("fetchInactiveKeys(supabase, others)");
     expect(home).toContain("!asideKeys.has(inactiveKey(m.group_id, m.profile_id))");
-    expect(home).toContain(".map((m) => m.profile_id)).size");
     expect(home).not.toContain("countByIds");
   });
 });

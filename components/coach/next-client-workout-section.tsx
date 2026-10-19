@@ -58,7 +58,8 @@ export async function loadOpenClientWorkout(supabase: any, groupIds: string[], n
   return { sessionId: newest.id, athleteId: newest.athlete_id, groupId: newest.group_id, startedIso: newest.started_at, name: shortClientName((profile as { full_name?: string | null } | null)?.full_name) };
 }
 
-export async function NextClientWorkoutSection({ coachId, groupIds }: { coachId: string; groupIds: string[] }) {
+// `emptyLine`: on the phone Home, with no client session left today and nothing open, a quiet line says so (instead of an empty screen).
+export async function NextClientWorkoutSection({ coachId, groupIds, emptyLine = false }: { coachId: string; groupIds: string[]; emptyLine?: boolean }) {
   const supabase = await createServerClient();
   const now = new Date();
   const { data: me } = await supabase.from("profiles").select("timezone").eq("id", coachId).maybeSingle();
@@ -70,6 +71,7 @@ export async function NextClientWorkoutSection({ coachId, groupIds }: { coachId:
       <span className="block font-body text-sm">Started {nextSessionLabel(open.startedIso, timezone, now)}</span>
     </Link>
   ) : null;
+  if (!next && !open) return emptyLine ? <p className="mb-6 font-body text-sm text-steel">No sessions left today.</p> : null;
   // The same client is already named above: no second button for them.
   const showNext = next && next.athleteId !== open?.athleteId;
   if (!showNext) return resume ? <section aria-label="Next client workout" className="mb-6">{resume}</section> : null;

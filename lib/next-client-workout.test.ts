@@ -127,9 +127,11 @@ describe("the Home button reads only what it should and goes where 'Log their wo
     expect(desktop.indexOf("<NextClientWorkoutSection")).toBeGreaterThan(desktop.indexOf("<SessionCheckSection"));
     expect(desktop.indexOf("<NextClientWorkoutSection")).toBeLessThan(desktop.indexOf("<YourDayPanel"));
     const phone = read("components/coach/mobile/coach-mobile-home.tsx");
-    expect(phone.indexOf("<NextClientWorkoutSection")).toBe(phone.indexOf("<SessionCheckSection") + phone.slice(phone.indexOf("<SessionCheckSection")).indexOf("\n") + 1 + "          ".length);
-    // the coach's own Start workout is untouched
-    expect(phone).toContain('const startLabel = ownOpen ? "Resume workout" : "Start workout";');
+    expect(phone.indexOf("<NextClientWorkoutSection")).toBeGreaterThan(phone.indexOf("<SessionCheckSection"));
+    // with no client session left today and nothing open, a quiet line says so; the coach's own Start workout is gone from the phone Home
+    expect(phone).toContain("<NextClientWorkoutSection coachId={coachId} groupIds={orgGroupIds} emptyLine />");
+    expect(read("components/coach/next-client-workout-section.tsx")).toContain("No sessions left today.");
+    expect(phone).not.toContain("Start workout");
   });
 });
 

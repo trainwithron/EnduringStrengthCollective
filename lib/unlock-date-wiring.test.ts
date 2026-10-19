@@ -16,8 +16,8 @@ describe("every place that says when a locked workout opens uses the one real op
     expect(read("app/(coach)/groups/[groupId]/programs/[programId]/page.tsx")).toContain("Unlocks {formatShortDate(unlockDate(scheduledDate!, program.visibility_window))}");
     expect(read("app/(coach)/groups/[groupId]/workouts/[workoutId]/page.tsx")).toContain("unlocks on {formatShortDate(unlockDate(scheduledDate!, program.visibility_window))}");
   });
-  it("the Today page and the phone home show the date they are given, not the workout's own date", () => {
+  it("the Today page shows the date it is given, not the workout's own date (the coach's phone Home no longer shows a client's locked workout)", () => {
     expect(read("app/(coach)/groups/[groupId]/today/page.tsx")).toContain("formatShortDate(result.unlocksOn)");
-    expect(read("components/coach/mobile/coach-mobile-home.tsx")).toContain("soloUnlocksOn = result.unlocksOn");
+    expect(read("components/coach/mobile/coach-mobile-home.tsx")).not.toContain("soloUnlocksOn");
   });
 });

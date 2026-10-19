@@ -1,38 +1,24 @@
-import { readRowsByIds } from "@/lib/read-by-ids";
-import { fetchInactiveKeys, inactiveKey } from "@/lib/inactive-ids";
-import { resolveDayMacros, standingForDate } from "@/lib/macro-resolution";
-import { fetchStandingHistory } from "@/lib/standing-macros";
 import Link from "next/link";
 import { createServerClient } from "@/lib/supabase/server";
-import { getTodaysDueRoster } from "@/lib/todays-due-roster";
-import { getTodaysWorkoutId } from "@/lib/todays-workout";
-import { computeRealIncomeInRange } from "@/lib/business-metrics";
-import { loadCoachMrr } from "@/lib/coach-mrr";
-import { SwappableTerm } from "@/components/coach/swappable-term";
-import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
-import { ViewModeToggle } from "@/components/coach/view-mode-toggle";
+import { readRowsByIds } from "@/lib/read-by-ids";
+import { fetchInactiveKeys, inactiveKey } from "@/lib/inactive-ids";
 import { LateChangesPanel } from "@/components/coach/late-changes-panel";
 import { ScheduleRequestsPanel } from "@/components/coach/schedule-requests-panel";
 import { ExpiryCheckInPanel } from "@/components/coach/expiry-checkin-panel";
 import { InactiveClientsPanel } from "@/components/coach/inactive-clients-panel";
 import { ProgressLookPanel } from "@/components/coach/progress-look-panel";
-import { TodayWidget, type TodayMacros } from "@/components/athlete/today-widget";
-import { CoachHomeComplications } from "./coach-home-complications";
 import { CoachMobileShell } from "./coach-mobile-shell";
 import { SessionCheckSection } from "@/components/coach/session-check-section";
 import { NextClientWorkoutSection } from "@/components/coach/next-client-workout-section";
-import { getNeedsAttentionItems } from "@/lib/needs-attention-data";
-import { getCoachedGroups, groupsInOrgOf, groupsInOrgOfOpened } from "@/lib/coach-groups";
+import { groupsInOrgOfOpened } from "@/lib/coach-groups";
 import { isTeamSportGroup } from "@/lib/team-sport";
 import { TeamCoachPhoneHome } from "./team-coach-phone-home";
 import { homeTitle } from "@/lib/phone-home-title";
 
-// The coach mobile Home (coach_mobile_app_redesign_plan.md, locked
-// 2026-09-14) — replaces the old pattern of a coach on mobile seeing
-// their own athlete-style Day/Week/Month view with a roster list
-// appended below it. Real job, per Ron's own framing: "primarily for
-// in-person logging and minor changes." Leads with "Log a session"
-// (who's due today), not a dashboard.
+// The coach's phone Home, kept to what a coach in the gym needs (Ron, Oct 19: "look how repetitive this is"): the title, the "Did X's session happen?" cards when there are any, ONE big button for the next client's
+// workout (or "Resume ..." for one left open), and the few things that need a decision (late changes, requests) only when they exist. Nothing repeats what the bottom bar already does (Home, Clients, Messages, Calendar,
+// More): no clients card, no quick-actions block, no business tiles (those are under More > Business), no Desktop Mode button (under More), and no start button for the coach's OWN workout: that is the "Coach (you)" row
+// at the top of the Clients list.
 export async function CoachMobileHome({
   groupId,
   groupName,
@@ -46,323 +32,52 @@ export async function CoachMobileHome({
   // A team-sport group gets its own short phone home (the active program, the team, one More tools): no money, no first-client nag, no Needs attention strip.
   const { data: teamRow } = await supabase.from("groups").select("team_mode").eq("id", groupId).maybeSingle();
   if (isTeamSportGroup((teamRow as { team_mode?: boolean | null } | null)?.team_mode)) return <TeamCoachPhoneHome groupId={groupId} groupName={groupName} />;
-  const timezone = await getGroupCoachTimezone(supabase, groupId);
   // The panels below read for the whole coach; on a phone Home they stay inside this group's organization (another one appears only after switching to it).
   const orgGroups = await groupsInOrgOfOpened(supabase, coachId, groupId);
   const orgGroupIds = orgGroups.map((g) => g.id);
   // The title is the ORGANIZATION the coach is working in (Ron, Oct 19); the group this page is for sits under it when it has a name of its own. A client's own space keeps the client's name.
   const pageGroup = orgGroups.find((g) => g.id === groupId);
   const title = homeTitle(pageGroup, groupName);
-  const todayKey = dateKeyInZone(timezone);
-  const weekAgoKey = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-  const [dueRoster, { data: purchaseRows }, coachMrr, { data: rosterRows }, needsAttentionItems, { count: programCount }] =
-    await Promise.all([
-      getTodaysDueRoster(supabase, { groupId }),
-      supabase.from("credit_purchases").select("amount_cents, created_at").eq("group_id", groupId),
-      loadCoachMrr(supabase, coachId, groupId),
-      supabase.from("group_memberships").select("profile_id, profiles ( full_name )").eq("group_id", groupId).eq("role", "athlete"),
-      getNeedsAttentionItems(supabase, { coachId, groupIds: [groupId] }),
-      supabase.from("programs").select("id", { count: "exact", head: true }).eq("group_id", groupId).is("archived_at", null),
-    ]);
-
-  const incomeEvents = (purchaseRows ?? []).map((p) => ({
-    amountCents: p.amount_cents,
-    createdAtDateKey: new Date(p.created_at).toISOString().slice(0, 10),
-  }));
-  const revenueToday = computeRealIncomeInRange(incomeEvents, todayKey, todayKey);
-  const revenueWeek = computeRealIncomeInRange(incomeEvents, weekAgoKey, todayKey);
-  // The same number the Business page shows (every group this coach runs; the estimate from set rates when there are no subscriptions yet).
-  const mrr = coachMrr.value;
-
-  // The first-run card is for a workspace with no clients at all. A coach whose clients are in another group of THIS organization, looking at an empty group, is told which one this is instead.
-  let clientsElsewhere = false;
-  let clientsElsewhereCount = 0;
-  if ((rosterRows ?? []).length === 0) {
+  // Does the coach have any client at all (in this group or any other group of the organization, not set aside)? With none, Home offers one plain "Add a client" button.
+  const { data: rosterRows } = await supabase.from("group_memberships").select("profile_id").eq("group_id", groupId).eq("role", "athlete").limit(1);
+  let hasClients = (rosterRows ?? []).length > 0;
+  if (!hasClients) {
     const others = orgGroupIds.filter((id) => id !== groupId);
     if (others.length > 0) {
-      // Active clients only, each person once: the same number the Clients page calls "All" (clients set aside are its own count there).
       const [{ data: elsewhere }, asideKeys] = await Promise.all([
         readRowsByIds(others, (g) => (from, to) => supabase.from("group_memberships").select("profile_id, group_id").eq("role", "athlete").in("group_id", g).order("id").range(from, to)),
         fetchInactiveKeys(supabase, others),
       ]);
-      clientsElsewhereCount = new Set(((elsewhere ?? []) as { profile_id: string; group_id: string }[]).filter((m) => !asideKeys.has(inactiveKey(m.group_id, m.profile_id))).map((m) => m.profile_id)).size;
-      clientsElsewhere = clientsElsewhereCount > 0;
-    }
-  }
-
-  // His own workout that is paused or in progress (started in the last 36 hours): the pinned button resumes it where he left off.
-  const { data: ownOpen } = await supabase
-    .from("athlete_sessions")
-    .select("id")
-    .eq("athlete_id", coachId)
-    .in("status", ["in_progress", "abandoned"])
-    .gte("started_at", new Date(Date.now() - 36 * 3600000).toISOString())
-    .order("started_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const startHref = ownOpen ? `/sessions/${(ownOpen as { id: string }).id}?resume=1` : "/my-space?view=client";
-  const startLabel = ownOpen ? "Resume workout" : "Start workout";
-
-  const topDue = dueRoster[0] ?? null;
-  const soloAthlete =
-    !topDue && (rosterRows ?? []).length === 1 ? (rosterRows as any[])[0] : null;
-
-  // Nothing due today, but this is a 1-on-1 group (the overwhelmingly
-  // common real case here — every 1-on-1 client already lives in their
-  // own dedicated group) — resolve that one client's real next workout
-  // and today's macro target instead of a flat "nothing due" message.
-  // Ron's own words: "some people don't necessarily stick to the
-  // calendar day," so this always resolves the real next workout, never
-  // a hardcoded "tomorrow."
-  let soloNextWorkoutTitle: string | null = null;
-  let soloNextWorkoutId: string | null = null;
-  let soloStatus: "locked" | "done" | "no-program" | null = null;
-  let soloUnlocksOn: Date | null = null;
-  let soloMacros: TodayMacros | null = null;
-
-  if (soloAthlete) {
-    const athleteId = soloAthlete.profile_id as string;
-    const [result, { data: macroRow }, standingTarget] = await Promise.all([
-      getTodaysWorkoutId(supabase, { groupId, athleteId }),
-      supabase
-        .from("daily_macros")
-        .select("calories, protein_g, carbs_g, fat_g")
-        .eq("athlete_id", athleteId)
-        .eq("log_date", todayKey)
-        .maybeSingle(),
-      fetchStandingHistory(supabase, athleteId),
-    ]);
-
-    soloStatus = result.status === "ready" ? null : result.status;
-    if (result.status === "locked") {
-      soloUnlocksOn = result.unlocksOn;
-      soloNextWorkoutId = result.workoutId;
-    }
-    if (soloMacros === null) {
-      // Today's own target if one was set for the day, otherwise the standing target.
-      soloMacros = resolveDayMacros(macroRow ?? null, null, null, standingForDate(standingTarget, todayKey)).target;
-    }
-
-    if (soloNextWorkoutId) {
-      const { data: workoutRow } = await supabase
-        .from("workouts")
-        .select("title")
-        .eq("id", soloNextWorkoutId)
-        .maybeSingle();
-      soloNextWorkoutTitle = workoutRow?.title ?? null;
+      hasClients = ((elsewhere ?? []) as { profile_id: string; group_id: string }[]).some((m) => !asideKeys.has(inactiveKey(m.group_id, m.profile_id)));
     }
   }
 
   return (
-        // pb-24: the fixed bottom tabs are 64px tall; without room under the last row it sits behind them and cannot be scrolled into view.
+    // pb-24: the fixed bottom tabs are 64px tall; without room under the last row it sits behind them and cannot be scrolled into view.
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
       <CoachMobileShell groupId={groupId} groupName={groupName}>
-        {/* pt-16 (not the usual pt-8) — the fixed Spot trigger button
-            (top-3, h-10, centered) sits on top of every mobile page; a
-            long/full-width group name here (unlike "Calendar"/
-            "Messages"/"Clients" elsewhere) reaches the button's
-            horizontal position, so this header needs real vertical
-            clearance to not render underneath it. */}
-        <header className="px-5 pt-16 pb-4">
+        {/* The Spotlight button is fixed at the top centre (top-3, h-10, so it ends about 100px down) on every mobile page, and a long organization name reaches it: the title starts below it. */}
+        <header className="px-5 pt-[108px] pb-4">
           <h1 className="font-display font-bold text-3xl leading-none uppercase truncate">{title.main}</h1>
           {title.sub && <p className="font-body text-sm text-steel mt-1 truncate">{title.sub}</p>}
         </header>
 
-        {/* Pinned at the top of the coach's Home, whatever else is (or is not) on the page: the coach's own workout. It makes the coach's own space the first time and opens it as their own client app. */}
-        <div className="px-5 pb-4">
-          <Link href={startHref} className="h-14 flex items-center justify-center bg-rust text-graphite font-display uppercase text-lg font-bold">
-            {startLabel}
-          </Link>
-        </div>
-
-        <div className="px-5 pb-5 flex items-center gap-2">
-          <ViewModeToggle targetMode="desktop" label="Desktop Mode" variant="button" groupId={groupId} />
-        </div>
-
         <div className="px-5">
           <SessionCheckSection coachId={coachId} groupIds={orgGroupIds} />
-          <NextClientWorkoutSection coachId={coachId} groupIds={orgGroupIds} />
+          {hasClients ? (
+            <NextClientWorkoutSection coachId={coachId} groupIds={orgGroupIds} emptyLine />
+          ) : (
+            <Link href={`/groups/${groupId}/clients?add=1`} className="mb-6 h-14 flex items-center justify-center bg-rust text-graphite font-display uppercase text-lg font-bold">
+              Add a client
+            </Link>
+          )}
           <LateChangesPanel groupIds={orgGroupIds} />
           <ScheduleRequestsPanel groupIds={orgGroupIds} />
           <ExpiryCheckInPanel groupIds={orgGroupIds} />
           <InactiveClientsPanel groupIds={orgGroupIds} />
           <ProgressLookPanel groupIds={orgGroupIds} />
         </div>
-
-        {/* Priority 1: a workout is due right now — the single most
-            prominent thing on Home, ahead of the complications row and
-            everything else. This is almost always logging someone
-            else's in-person session for Ron. */}
-        {topDue && (
-          <section className="px-5 pb-6">
-            <Link
-              href={`/groups/${groupId}/athletes/${topDue.athleteId}/log/${topDue.workoutId}`}
-              className="block border border-rust bg-rust/10 p-5 active:bg-rust/15 transition-colors"
-            >
-              <p className="font-body text-xs text-rust uppercase tracking-wide font-bold">
-                <SwappableTerm termKey="client" form="plural" cap /> due today
-              </p>
-              <p className="font-display font-bold text-2xl leading-tight mt-1 truncate">
-                {topDue.fullName}
-              </p>
-              <p className="font-body text-sm text-steel mt-0.5 truncate">
-                {topDue.workoutTitle ?? "Workout"}
-              </p>
-              <span className="inline-block mt-4 h-11 px-5 leading-[2.75rem] bg-rust text-graphite font-body font-bold text-sm">
-                Open &rarr;
-              </span>
-            </Link>
-
-            {dueRoster.length > 1 && (
-              <div className="mt-2 space-y-2">
-                {dueRoster.slice(1).map((entry) => (
-                  <Link
-                    key={entry.athleteId}
-                    href={`/groups/${groupId}/athletes/${entry.athleteId}/log/${entry.workoutId}`}
-                    className="flex items-center justify-between gap-2 border border-steel/20 p-3 active:border-rust"
-                  >
-                    <div className="min-w-0">
-                      <p className="font-body text-sm text-chalk truncate">{entry.fullName}</p>
-                      <p className="font-body text-xs text-steel truncate">{entry.workoutTitle ?? "Workout"}</p>
-                    </div>
-                    <span className="font-body text-xs text-rust shrink-0">View &rarr;</span>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </section>
-        )}
-
-        {/* Priority 2: nothing due today. For a 1-on-1 group, show real
-            signal for that one client instead of an empty state. */}
-        {!topDue && soloAthlete && (
-          <section className="px-5 pb-6 space-y-3">
-            {soloMacros && (
-              <TodayWidget todayDate={todayKey} macros={soloMacros} habits={[]} />
-            )}
-            <div className="border border-steel/20 p-4">
-              <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
-                Nothing due today
-              </h2>
-              {soloStatus === "locked" && (
-                <>
-                  <p className="font-body text-sm text-chalk">
-                    {soloNextWorkoutTitle ?? "Next workout"}
-                  </p>
-                  <p className="font-body text-xs text-steel mt-1">
-                    Unlocks{" "}
-                    {soloUnlocksOn?.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-                  </p>
-                </>
-              )}
-              {soloStatus === "done" && (
-                <p className="font-body text-sm text-steel">
-                  {soloAthlete.profiles?.full_name ?? "This client"} is caught up — everything
-                  scheduled is already logged.
-                </p>
-              )}
-              {soloStatus === "no-program" && (
-                <p className="font-body text-sm text-steel">No program assigned yet.</p>
-              )}
-              <Link
-                href={`/groups/${groupId}/athletes/${soloAthlete.profile_id}`}
-                className="inline-block mt-3 font-body text-xs text-rust uppercase tracking-wide"
-              >
-                Go to profile &rarr;
-              </Link>
-            </div>
-          </section>
-        )}
-
-        {!topDue && !soloAthlete && (rosterRows ?? []).length === 0 && clientsElsewhere && (
-          <section className="px-5 pb-6">
-            <div className="border border-steel/20 p-4">
-              {/* An organization's main group (a community group) can have no one in it while the organization's clients live in their own one-on-one groups: say how many there are, never "no clients". */}
-              <p className="font-body text-sm text-chalk">
-                {clientsElsewhereCount} {clientsElsewhereCount === 1 ? "client" : "clients"} in this organization.
-              </p>
-              <Link href="/clients" className="inline-block mt-2 font-body text-xs text-rust uppercase tracking-wide">
-                See your clients &rarr;
-              </Link>
-            </div>
-          </section>
-        )}
-
-        {!topDue && !soloAthlete && (rosterRows ?? []).length === 0 && !clientsElsewhere && (programCount ?? 0) === 0 && (
-          <section className="px-5 pb-6">
-            <div className="border border-steel/20 p-4">
-              <p className="font-body text-sm text-chalk">Welcome. Two things get you started:</p>
-              <div className="mt-3 flex flex-col gap-2">
-                <Link
-                  href={`/groups/${groupId}/clients?add=1`}
-                  className="h-11 flex items-center justify-center bg-rust text-graphite font-display uppercase text-sm font-bold"
-                >
-                  Add your first client
-                </Link>
-                <Link
-                  href={`/groups/${groupId}/programs/new`}
-                  className="h-11 flex items-center justify-center border border-steel/40 text-chalk font-display uppercase text-sm font-bold"
-                >
-                  Build your first program
-                </Link>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {!topDue && !soloAthlete && (rosterRows ?? []).length > 0 && (
-          <section className="px-5 pb-6">
-            <p className="font-body text-sm text-steel border border-steel/20 p-4">
-              No clients due today.
-            </p>
-          </section>
-        )}
-
-        {/* Always there, so Home is never a dead end: the empty-state buttons above disappear once a coach has clients. */}
-        {((rosterRows ?? []).length > 0 || (programCount ?? 0) > 0 || clientsElsewhere) && (
-          <section className="px-5 pb-6">
-            <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">Quick actions</h2>
-            <div className="grid grid-cols-2 gap-2">
-              <Link
-                href={`/groups/${groupId}/clients?add=1`}
-                className="h-11 flex items-center justify-center bg-rust text-graphite font-display uppercase text-sm font-bold"
-              >
-                Add a client
-              </Link>
-              <Link
-                href={`/groups/${groupId}/clients`}
-                className="h-11 flex items-center justify-center border border-steel/40 text-chalk font-display uppercase text-sm font-bold"
-              >
-                Clients
-              </Link>
-              <Link
-                href="/programs"
-                className="h-11 flex items-center justify-center border border-steel/40 text-chalk font-display uppercase text-sm font-bold"
-              >
-                Programs
-              </Link>
-              <Link
-                href={`/groups/${groupId}/calendar`}
-                className="h-11 flex items-center justify-center border border-steel/40 text-chalk font-display uppercase text-sm font-bold"
-              >
-                Calendar
-              </Link>
-            </div>
-          </section>
-        )}
-
-        <section className="px-5 pb-8">
-          <CoachHomeComplications
-            groupId={groupId}
-            coachId={coachId}
-            revenueToday={revenueToday}
-            revenueWeek={revenueWeek}
-            mrr={mrr}
-            activeClientCount={(rosterRows ?? []).length}
-            needsAttentionItems={needsAttentionItems}
-          />
-        </section>
       </CoachMobileShell>
     </main>
   );
