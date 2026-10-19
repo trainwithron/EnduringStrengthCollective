@@ -3,6 +3,8 @@ import { createServerClient } from "@/lib/supabase/server";
 import { NoAccess } from "@/components/shared/no-access";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { CoachClientsList } from "@/components/coach/desktop/coach-clients-list";
+import { RequestsLink } from "@/components/coach/requests-link";
+import { pendingRequestCount } from "@/lib/client-request-count";
 import { AddClientButton } from "@/components/coach/desktop/add-client-button";
 import { SwappableTerm } from "@/components/coach/swappable-term";
 import { getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
@@ -88,6 +90,7 @@ export default async function CoachClientsPage() {
   const [coachList, inviteManager] = await Promise.all([loadOrgCoaches(anchor.id), authorizeInviteManager(supabase, user.id, anchor.id)]);
 
   const signIns = await signInsFor(coachList.coaches, inviteManager.ok, user.id);
+  const requestCount = await pendingRequestCount(supabase, anchor.orgId);
 
   return (
     <CoachDesktopShell groupId={anchor.id} groupName={anchor.name} active="clients" coachLevel>
@@ -95,7 +98,10 @@ export default async function CoachClientsPage() {
         <h1 className="font-display font-bold text-3xl uppercase leading-none">
           <SwappableTerm termKey="client" form="plural" className="capitalize" />
         </h1>
-        <AddClientButton groupId={anchor.id} groupName={anchor.name} createdBy={user.id} />
+        <div className="flex items-center gap-3">
+          <RequestsLink count={requestCount} />
+          <AddClientButton groupId={anchor.id} groupName={anchor.name} createdBy={user.id} />
+        </div>
       </div>
       <CoachesSection groupId={anchor.id} viewerId={user.id} coaches={coachList.coaches} pending={coachList.pending} canManage={inviteManager.ok} signIns={signIns} />
 

@@ -21,6 +21,8 @@ function routeFiles(rel: string): string[] {
 const NOT_A_SAVE = new Set([
   // an invited coach choosing their password on the join page, before they have a session: no pane is open to show anything
   "/api/coaches/join",
+  // a visitor asking a coach to train with them from the coach's public page: only the waiting request is written; the coach's answer is the save (client-requests/answer)
+  "/api/client-requests/submit",
   // reading a filled team sheet for the review screen: nothing is written (saving and undoing are the saves)
   "/api/team-sheet/upload",
   // a guardian's consent: emailed links and a server-only record; nothing a pane shows changes

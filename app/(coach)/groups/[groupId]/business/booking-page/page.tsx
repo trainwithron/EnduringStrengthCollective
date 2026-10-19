@@ -43,7 +43,7 @@ export default async function BookingPageSettingsPage(props: { params: Promise<{
   const [{ data: group }, { data: profile }, pageResult, typesResult, { count: windowCount }] = await Promise.all([
     supabase.from("groups").select("name").eq("id", params.groupId).single(),
     supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle(),
-    supabase.from("coach_booking_pages").select("slug, enabled, headline, intro, show_prices").eq("coach_id", user.id).maybeSingle(),
+    supabase.from("coach_booking_pages").select("slug, enabled, headline, intro, show_prices, accepts_requests").eq("coach_id", user.id).maybeSingle(),
     inOrg(
       supabase
         .from("session_types")
@@ -65,6 +65,7 @@ export default async function BookingPageSettingsPage(props: { params: Promise<{
         headline: pageResult.data.headline ?? "",
         intro: pageResult.data.intro ?? "",
         showPrices: !!pageResult.data.show_prices,
+        acceptsRequests: pageResult.data.accepts_requests !== false,
       }
     : null;
 

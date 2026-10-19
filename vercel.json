@@ -105,6 +105,10 @@
       "schedule": "30 7 * * *"
     },
     {
+      "path": "/api/cron/purge-client-request-attempts",
+      "schedule": "45 7 * * *"
+    },
+    {
       "path": "/api/cron/cron-watchdog",
       "schedule": "0 9 * * *"
     }

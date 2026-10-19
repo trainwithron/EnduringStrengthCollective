@@ -13,6 +13,8 @@ import { ClientCardGrid } from "@/components/coach/desktop/client-card-grid";
 import { UnavailableState } from "@/components/ui/unavailable-state";
 import { GroupInvitesPanel, type GroupInviteRow } from "@/components/coach/desktop/group-invites-panel";
 import { AddClientButton } from "@/components/coach/desktop/add-client-button";
+import { RequestsLink } from "@/components/coach/requests-link";
+import { pendingRequestCount } from "@/lib/client-request-count";
 import { SwappableTerm } from "@/components/coach/swappable-term";
 import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
 import { CoachRosterMobile } from "@/components/coach/mobile/coach-roster-mobile";
@@ -70,7 +72,7 @@ export default async function ClientsPage(
 
   const { data: group } = await supabase
     .from("groups")
-    .select("name, team_mode, group_kind")
+    .select("name, team_mode, group_kind, organization_id")
     .eq("id", params.groupId)
     .single();
 
@@ -290,6 +292,8 @@ export default async function ClientsPage(
       )
     );
 
+    const requestCount = await pendingRequestCount(supabase, (group as { organization_id?: string | null } | null)?.organization_id ?? null);
+
     return (
       <CoachMobileShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} activeOverride="roster">
         <div className="min-h-screen bg-graphite text-chalk font-body pb-24 px-5 pt-8">
@@ -302,7 +306,10 @@ export default async function ClientsPage(
                 {phoneClients.length} <SwappableTerm termKey="client" form={phoneClients.length === 1 ? "singular" : "plural"} />
               </p>
             </div>
-            <AddClientButton groupId={params.groupId} groupName={group?.name ?? "This group"} createdBy={user.id} defaultOpen={openAdd} />
+            <div className="flex flex-wrap items-center gap-2">
+              <RequestsLink count={requestCount} />
+              <AddClientButton groupId={params.groupId} groupName={group?.name ?? "This group"} createdBy={user.id} defaultOpen={openAdd} />
+            </div>
           </div>
           <CoachesSection groupId={params.groupId} viewerId={user.id} coaches={coachList.coaches} pending={coachList.pending} canManage={inviteManager.ok} signIns={signIns} />
           <CoachRosterMobile groupId={params.groupId} members={phoneClients} />

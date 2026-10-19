@@ -11,6 +11,8 @@ export interface BookingPageRow {
   headline: string;
   intro: string;
   showPrices: boolean;
+  /** the "Request to train with me" button on the coach's public page (on unless the coach turns it off) */
+  acceptsRequests: boolean;
 }
 
 const input = "w-full bg-surface border border-steel/30 text-chalk px-3 py-2 font-body text-sm focus:outline-none focus:border-rust";
@@ -31,6 +33,7 @@ export function BookingPageSettings({
   const [headline, setHeadline] = useState(initial?.headline ?? "");
   const [intro, setIntro] = useState(initial?.intro ?? "");
   const [showPrices, setShowPrices] = useState(initial?.showPrices ?? false);
+  const [acceptsRequests, setAcceptsRequests] = useState(initial?.acceptsRequests ?? true);
   const [saved, setSaved] = useState<BookingPageRow | null>(initial);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
@@ -39,7 +42,7 @@ export function BookingPageSettings({
   const problem = slug ? slugProblem(slug) : "Choose an address.";
   const link = saved ? `${appOriginBrowser()}/book/${saved.slug}` : null;
   const dirty =
-    !saved || saved.slug !== slug || saved.enabled !== enabled || saved.headline !== headline || saved.intro !== intro || saved.showPrices !== showPrices;
+    !saved || saved.slug !== slug || saved.enabled !== enabled || saved.headline !== headline || saved.intro !== intro || saved.showPrices !== showPrices || saved.acceptsRequests !== acceptsRequests;
 
   async function save() {
     if (problem || busy) return;
@@ -54,6 +57,7 @@ export function BookingPageSettings({
         headline: headline.trim() || null,
         intro: intro.trim() || null,
         show_prices: showPrices,
+        accepts_requests: acceptsRequests,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "coach_id" }
@@ -64,7 +68,7 @@ export function BookingPageSettings({
       setMessage({ text: taken ? "That address is taken. Try another." : "That didn't save. Try again.", error: true });
       return;
     }
-    setSaved({ slug, enabled, headline: headline.trim(), intro: intro.trim(), showPrices });
+    setSaved({ slug, enabled, headline: headline.trim(), intro: intro.trim(), showPrices, acceptsRequests });
     setMessage({ text: enabled ? "Saved. Your page is live." : "Saved. Your page is off.", error: false });
   }
 
@@ -150,6 +154,16 @@ export function BookingPageSettings({
           <span className="font-body text-sm text-chalk block">Show prices</span>
           <span className="font-body text-xs text-steel block mt-0.5">
             Off by default. Prices are for display only; nothing is charged on this page. A session type shows a price only when you set one.
+          </span>
+        </span>
+      </label>
+
+      <label className="flex items-start gap-3 cursor-pointer">
+        <input type="checkbox" checked={acceptsRequests} onChange={(e) => setAcceptsRequests(e.target.checked)} className="mt-1 accent-rust" />
+        <span>
+          <span className="font-body text-sm text-chalk block">Let people request to train with me</span>
+          <span className="font-body text-xs text-steel block mt-0.5">
+            On by default. Your public page shows a Request to train with me button. A request gives the person nothing until you approve it under Clients, Requests.
           </span>
         </span>
       </label>
