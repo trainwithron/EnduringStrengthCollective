@@ -57,6 +57,12 @@ describe("the nightly job", () => {
     expect(route).toContain('.eq("logged_by_coach", false)');
     expect(route).toContain('.in("status", ["in_progress", "abandoned"])');
   });
+  it("?dryRun=1 only reports who would be saved and changes nothing; a deleted client's session is never a candidate", () => {
+    expect(route).toContain('searchParams.get("dryRun") === "1"');
+    expect(route.indexOf("if (dryRun) return")).toBeLessThan(route.indexOf('db.rpc("complete_workout_session"'));
+    expect(route.indexOf('searchParams.get("dryRun") === "1"')).toBeLessThan(route.indexOf('supabase.rpc("close_stale_sessions"'));
+    expect(route).toContain('.not("athlete_id", "is", null)');
+  });
   it("dates the history by the last set, tells the coach in the daytime, and one failure never stops the rest", () => {
     expect(route).toContain("created_at: s.lastSetAt");
     expect(route).toContain('"client_activity"');
