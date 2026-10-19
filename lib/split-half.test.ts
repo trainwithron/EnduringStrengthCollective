@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { defaultSplitWidth, readSplitWidth, writeSplitWidth, splitPathFor, MIN_LIST_PANEL_WIDTH, MAX_LIST_PANEL_WIDTH } from "./coach-shell-panel-storage";
 import { isAllowedWorkspacePath } from "./workspace-destinations";
@@ -55,7 +55,34 @@ describe("the main page is never touched", () => {
     expect(host).not.toContain("value={{ setSlot }}");
   });
   it("the frame does not swallow the mouse while the divider is dragged", () => {
-    expect(host).toContain('pointerEvents: slot.covered ? "none" : undefined');
+    expect(host).toContain('pointerEvents: showing.covered ? "none" : undefined');
+  });
+});
+
+describe("the other side changing page never covers the half (seen live, Oct 19)", () => {
+  it("while a loading screen replaces the page, the half stays where it was; the next page brings its own slot or hides it", () => {
+    expect(host).toContain('setHeld(document.querySelector("[data-loading-fallback]") ? keep : null)');
+    expect(host).toContain("const showing = slot ?? held;");
+    // checked at once as well: the loading screen is usually already up, and a background page gets no animation frames (seen in a browser: the half vanished without it)
+    expect(host.indexOf("    check();")).toBeGreaterThan(-1);
+    expect(host.indexOf("    check();")).toBeLessThan(host.indexOf("requestAnimationFrame(check)"));
+  });
+  it("loading screens keep clear of the half, and every coach loading screen is marked as one", () => {
+    expect(host).toContain('root.style.setProperty("--split-reserved"');
+    expect(read("app/globals.css")).toContain("margin-left: var(--split-reserved, 0px);");
+    const walk = (d: string): string[] => readdirSync(d).flatMap((n) => (statSync(join(d, n)).isDirectory() ? walk(join(d, n)) : n === "loading.tsx" ? [join(d, n)] : []));
+    const files = walk(join(__dirname, "..", "app", "(coach)"));
+    expect(files.length).toBeGreaterThan(0);
+    for (const f of files) expect(readFileSync(f, "utf8"), f).toContain("data-loading-fallback");
+  });
+});
+
+describe("card grids size by the space they have, not the window (a half-width page showed one letter a line)", () => {
+  it("Clients cards, Home's needs-you strip and stat tiles, and the Programs cards", () => {
+    expect(read("components/coach/desktop/coach-clients-list.tsx")).toContain("grid-cols-[repeat(auto-fill,minmax(280px,1fr))]");
+    expect(read("components/coach/desktop/needs-you-strip.tsx")).toContain("grid-cols-[repeat(auto-fill,minmax(240px,1fr))]");
+    expect(read("components/coach/desktop/dashboard-stat-tiles.tsx")).toContain("grid-cols-[repeat(auto-fill,minmax(120px,1fr))]");
+    expect(read("components/coach/desktop/program-card-grid.tsx")).toContain("grid-cols-[repeat(auto-fill,minmax(230px,1fr))]");
   });
 });
 

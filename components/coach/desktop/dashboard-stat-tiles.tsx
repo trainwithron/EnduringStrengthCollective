@@ -44,7 +44,7 @@ export function DashboardStatTiles({
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-3">
       {localTiles.map((tile) => {
         const current = tile.values[0];
         const alternates = tile.values.slice(1);
