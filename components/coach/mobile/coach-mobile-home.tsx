@@ -24,6 +24,7 @@ import { getNeedsAttentionItems } from "@/lib/needs-attention-data";
 import { getCoachedGroups, groupsInOrgOf, groupsInOrgOfOpened } from "@/lib/coach-groups";
 import { isTeamSportGroup } from "@/lib/team-sport";
 import { TeamCoachPhoneHome } from "./team-coach-phone-home";
+import { homeTitle } from "@/lib/phone-home-title";
 
 // The coach mobile Home (coach_mobile_app_redesign_plan.md, locked
 // 2026-09-14) — replaces the old pattern of a coach on mobile seeing
@@ -46,7 +47,11 @@ export async function CoachMobileHome({
   if (isTeamSportGroup((teamRow as { team_mode?: boolean | null } | null)?.team_mode)) return <TeamCoachPhoneHome groupId={groupId} groupName={groupName} />;
   const timezone = await getGroupCoachTimezone(supabase, groupId);
   // The panels below read for the whole coach; on a phone Home they stay inside this group's organization (another one appears only after switching to it).
-  const orgGroupIds = (await groupsInOrgOfOpened(supabase, coachId, groupId)).map((g) => g.id);
+  const orgGroups = await groupsInOrgOfOpened(supabase, coachId, groupId);
+  const orgGroupIds = orgGroups.map((g) => g.id);
+  // The title is the ORGANIZATION the coach is working in (Ron, Oct 19); the group this page is for sits under it when it has a name of its own. A client's own space keeps the client's name.
+  const pageGroup = orgGroups.find((g) => g.id === groupId);
+  const title = homeTitle(pageGroup, groupName);
   const todayKey = dateKeyInZone(timezone);
   const weekAgoKey = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
@@ -155,7 +160,8 @@ export async function CoachMobileHome({
             horizontal position, so this header needs real vertical
             clearance to not render underneath it. */}
         <header className="px-5 pt-16 pb-4">
-          <h1 className="font-display font-bold text-3xl leading-none uppercase truncate">{groupName}</h1>
+          <h1 className="font-display font-bold text-3xl leading-none uppercase truncate">{title.main}</h1>
+          {title.sub && <p className="font-body text-sm text-steel mt-1 truncate">{title.sub}</p>}
         </header>
 
         {/* Pinned at the top of the coach's Home, whatever else is (or is not) on the page: the coach's own workout. It makes the coach's own space the first time and opens it as their own client app. */}
