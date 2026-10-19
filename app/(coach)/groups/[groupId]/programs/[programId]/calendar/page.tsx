@@ -450,7 +450,8 @@ export default async function ProgramCalendarPage(
                 return (
                   <Link
                     key={i}
-                    href={`/groups/${params.groupId}/workouts/${w.id}`}
+                    // A training day with sessions on offer opens the day page, which shows the workout card above the open times, so a client who trains Mon/Wed/Fri can still ask for or book a session on those days (Oct 19 audit).
+                    href={hasAvailability ? `${backHref}/calendar/${dateKey(date)}${rescheduleSuffix ? `?${rescheduleSuffix.slice(1)}` : ""}` : `/groups/${params.groupId}/workouts/${w.id}`}
                     className={cellClass}
                   >
                     {cellContent}
