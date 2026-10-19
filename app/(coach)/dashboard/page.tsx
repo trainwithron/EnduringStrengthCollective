@@ -32,7 +32,7 @@ import { LateChangesPanel } from "@/components/coach/late-changes-panel";
 import { ScheduleRequestsPanel } from "@/components/coach/schedule-requests-panel";
 import { LeavingCoachBanner } from "@/components/coach/leaving-coach-banner";
 import { TeamCoachHome } from "@/components/coach/team-coach-home";
-import { pickTileTeam } from "@/lib/team-coach";
+import { pickTileTeam, tileTeamsFor } from "@/lib/team-coach";
 import { loadMyDepartures } from "@/lib/leaving-coach";
 import { supportEmail } from "@/lib/legal";
 import { ExpiryCheckInPanel } from "@/components/coach/expiry-checkin-panel";
@@ -562,7 +562,10 @@ export default async function CoachHomePage() {
     isTeamCoach = false;
   }
   // The teams the tiles are for: only teams this coach really coaches (getCoachedGroups leaves retired seasons out), in the organization Home is showing, the one they last worked in first.
-  const tileTeams = coachedForOrg.filter((g) => g.kind === "team" && (!homeOrgId || g.orgId === homeOrgId)).map((g) => ({ id: g.id, name: g.name }));
+  // Football tiles only for a group whose team_mode is ON (a "team" kind alone is not a team sport).
+  const tileCandidates = coachedForOrg.filter((g) => g.kind === "team" && (!homeOrgId || g.orgId === homeOrgId));
+  const tileModeRows = tileCandidates.length > 0 ? await supabase.from("groups").select("id, team_mode").in("id", tileCandidates.map((g) => g.id).slice(0, 100)) : { data: [] as { id: string; team_mode: boolean | null }[], error: null };
+  const tileTeams = tileModeRows.error ? [] : tileTeamsFor(coachedForOrg, new Map(((tileModeRows.data ?? []) as { id: string; team_mode: boolean | null }[]).map((r) => [r.id, r.team_mode])), homeOrgId);
   const tileTeam = pickTileTeam(tileTeams, rememberedWorkspace);
   const departures = await loadMyDepartures(supabase, user.id);
   const myCoachedGroups = (coachedRows ?? []).map((row) => (row as any).groups as GroupRow | null).filter((g): g is GroupRow => !!g);
