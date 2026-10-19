@@ -24,7 +24,7 @@ import { TodayWidget } from "@/components/athlete/today-widget";
 import { DayMealsView } from "@/components/athlete/day-meals-view";
 import { rowToPreferences } from "@/lib/nutrition-preferences";
 import { filterPlanForClient, hidePlanRecipes } from "@/lib/plan-preference-check";
-import { computeScheduledDates } from "@/lib/program-schedule";
+import { computeScheduledDates, effectiveTrainingDays } from "@/lib/program-schedule";
 import { isHabitDueOn } from "@/lib/habits";
 import { resolveDayMacros, standingForDate } from "@/lib/macro-resolution";
 import { fetchStandingHistory } from "@/lib/standing-macros";
@@ -134,17 +134,18 @@ export default async function DayDetailPage(
         .select("id, start_date, training_days")
         .eq("id", params.programId)
         .maybeSingle();
-      if (program?.start_date && program.training_days?.length) {
+      if (program?.start_date) {
         const { data: workouts } = await supabase
           .from("workouts")
           .select("id, title, week_number, day_index, scheduled_date")
           .eq("program_id", program.id)
           .order("week_number", { ascending: true })
           .order("day_index", { ascending: true });
-        if (workouts) {
+        const laidOut = effectiveTrainingDays(program.training_days, workouts ?? []);
+        if (workouts && laidOut.days) {
           const scheduledDateByDayId = computeScheduledDates(
             program.start_date,
-            program.training_days,
+            laidOut.days,
             workouts.map((w) => ({ id: w.id, scheduledDate: w.scheduled_date }))
           );
           for (const w of workouts) {

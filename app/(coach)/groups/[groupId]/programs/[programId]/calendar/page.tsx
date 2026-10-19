@@ -4,7 +4,10 @@ import Link from "next/link";
 import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
-import { computeScheduledDates, isSameDay, isLocked } from "@/lib/program-schedule";
+import { computeScheduledDates, effectiveTrainingDays, isSameDay, isLocked } from "@/lib/program-schedule";
+import { getActivePrograms } from "@/lib/active-programs";
+import { ProgramChips } from "@/components/athlete/program-chips";
+import { BookingModeLine } from "@/components/athlete/booking-mode-line";
 import { dateKeyInZone, getGroupCoachTimezone, nowInZone } from "@/lib/timezone";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { UpcomingGroupEvents } from "@/components/group/group-event-answer";
@@ -119,7 +122,18 @@ export default async function ProgramCalendarPage(
 
   const backHref = `/groups/${params.groupId}/programs/${params.programId}`;
 
-  if (!program.start_date || !program.training_days || program.training_days.length === 0) {
+  const { data: workouts } = await supabase
+    .from("workouts")
+    .select("id, title, week_number, day_index, scheduled_date, group_workout_exercises(count)")
+    .eq("program_id", params.programId)
+    .order("week_number", { ascending: true })
+    .order("day_index", { ascending: true });
+
+  // A program with a start date but no training days is spread evenly by its busiest week (read-time only), so it still shows on the calendar.
+  const laidOut = program.start_date ? effectiveTrainingDays(program.training_days, workouts ?? []) : { days: null, guessed: false };
+  const trainingDays = laidOut.days;
+
+  if (!program.start_date || !trainingDays) {
     return (
       <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
         {isActingAsOther && (
@@ -153,16 +167,9 @@ export default async function ProgramCalendarPage(
     );
   }
 
-  const { data: workouts } = await supabase
-    .from("workouts")
-    .select("id, title, week_number, day_index, scheduled_date, group_workout_exercises(count)")
-    .eq("program_id", params.programId)
-    .order("week_number", { ascending: true })
-    .order("day_index", { ascending: true });
-
   const scheduledDateByDayId = computeScheduledDates(
     program.start_date,
-    program.training_days,
+    trainingDays,
     (workouts ?? []).map((w) => ({ id: w.id, scheduledDate: w.scheduled_date }))
   );
 
@@ -206,6 +213,15 @@ export default async function ProgramCalendarPage(
       .eq("coach_id", coachMembership.profile_id);
     hasAvailability = (count ?? 0) > 0;
   }
+
+  // How this coach takes sessions: when the coach schedules everyone, the client's calendar says so (and offers a Message button).
+  let bookingMode = "free";
+  if (viewingAsAthlete && coachMembership) {
+    const sb = await supabase.from("coach_booking_policies").select("booking_mode").eq("coach_id", coachMembership.profile_id).maybeSingle();
+    if (!sb.error) bookingMode = (sb.data?.booking_mode as string | null) ?? "coach_schedules";
+  }
+  // Every program the client has active, so the calendar can offer each one (it shows one at a time).
+  const activePrograms = viewingAsAthlete ? await getActivePrograms(supabase, params.groupId, athleteId) : [];
 
   // The client's own sessions show whether or not the coach has set up open hours, and whichever coach booked them.
   if (viewingAsAthlete) {
@@ -310,7 +326,13 @@ export default async function ProgramCalendarPage(
             {clientCreditPictureLine(buildCreditPicture({ balance: creditBalance, booked: creditBooked, toMark: 0 }), NO_SESSIONS_LINE)}
           </p>
         )}
+        {viewingAsAthlete && <ProgramChips groupId={params.groupId} programs={activePrograms.map((p) => ({ id: p.id, name: p.label?.trim() || p.name }))} currentId={params.programId} />}
+        {laidOut.guessed && (
+          <p className="font-body text-xs text-steel mt-3">Days are not set for this program, so its workouts are spread evenly across the week ({laidOut.days?.map((d) => WEEKDAY_LABELS[d]).join(", ")}).</p>
+        )}
       </header>
+
+      {viewingAsAthlete && coachMembership && bookingMode === "coach_schedules" && <BookingModeLine groupId={params.groupId} />}
 
       {viewingAsAthlete && <UpcomingGroupEvents athleteId={athleteId} timezone={timezone} />}
 

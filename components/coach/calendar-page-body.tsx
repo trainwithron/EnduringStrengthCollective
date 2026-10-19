@@ -19,6 +19,7 @@ import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
+import { BookingModeLine } from "@/components/athlete/booking-mode-line";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { computeScheduledDates } from "@/lib/program-schedule";
 import { ScheduleClientPicker } from "@/components/coach/schedule-client-picker";
@@ -447,9 +448,11 @@ export async function CoachCalendarPageBody(
     // program ahead of a shared one. (This used to ask for "the" active program, which errors when there are two and left the whole Calendar tab without workouts.)
     const activePrograms = await getActivePrograms(supabase, params.groupId, athleteId);
     const scheduledPrograms = activePrograms.filter((p) => p.startDate && p.trainingDays?.length);
-    const chosen = scheduledPrograms.find((p) => p.athleteId === athleteId) ?? scheduledPrograms[0] ?? null;
+    // A program with a start date but no training days still has a calendar (its days are spread evenly, read-time only) when nothing with its own days comes first.
+    const datedPrograms = activePrograms.filter((p) => p.startDate && !p.trainingDays?.length);
+    const chosen = scheduledPrograms.find((p) => p.athleteId === athleteId) ?? scheduledPrograms[0] ?? datedPrograms.find((p) => p.athleteId === athleteId) ?? datedPrograms[0] ?? null;
     const program = chosen ? { id: chosen.id, start_date: chosen.startDate, training_days: chosen.trainingDays } : null;
-    const programHasSchedule = !!(program?.start_date && program.training_days?.length);
+    const programHasSchedule = !!program?.start_date;
 
     if (program && programHasSchedule) {
       const suffix = searchParams.reschedule ? `?reschedule=${searchParams.reschedule}` : "";
@@ -512,6 +515,13 @@ export async function CoachCalendarPageBody(
         .gte("start_at", new Date().toISOString())
         .order("start_at", { ascending: true });
       upcomingBookings = bookingRows ?? [];
+    }
+
+    // When the coach schedules everyone, say so on the client's calendar (and offer a Message button).
+    let bookingMode = "free";
+    if (coachMembership && (!isCoach || isActingAsOther)) {
+      const sb = await supabase.from("coach_booking_policies").select("booking_mode").eq("coach_id", coachMembership.profile_id).maybeSingle();
+      if (!sb.error) bookingMode = (sb.data?.booking_mode as string | null) ?? "coach_schedules";
     }
 
     const today = dateFromKey(dateKeyInZone(displayTz));
@@ -614,6 +624,8 @@ export async function CoachCalendarPageBody(
             </p>
           )}
         </header>
+
+        {coachMembership && bookingMode === "coach_schedules" && <BookingModeLine groupId={params.groupId} />}
 
         <UpcomingGroupEvents athleteId={athleteId} timezone={displayTz} />
 

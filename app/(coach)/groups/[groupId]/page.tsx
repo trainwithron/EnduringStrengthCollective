@@ -18,6 +18,9 @@ import { WellnessCheckinPopup } from "@/components/athlete/wellness-checkin-popu
 import { shouldShowLifeImpactPrompt, pickLifeImpactPrompt } from "@/lib/life-impact-prompt";
 import type { WellnessCheckinValues } from "@/components/athlete/wellness-checkin-widget";
 import { DayCard } from "@/components/athlete/day-card";
+import { MyProgramsBlock } from "@/components/athlete/my-programs-block";
+import { homeProgramCards } from "@/lib/home-programs";
+import { readRowsByIds } from "@/lib/read-by-ids";
 import { AboutYouCard } from "@/components/athlete/about-you-card";
 import { aboutYouComplete, rowToBodyProfile } from "@/lib/client-body-profile";
 import type { WeightUnit } from "@/lib/units";
@@ -167,7 +170,7 @@ export default async function GroupHubPage(
     // that isn't actually something to train from today.
     supabase
       .from("programs")
-      .select("id, name, athlete_id, cover_image_path, workouts(count)")
+      .select("id, name, athlete_id, cover_image_path, created_at, workouts(count)")
       .eq("group_id", params.groupId)
       .eq("is_active", true)
       .or(`athlete_id.is.null,athlete_id.eq.${athleteId ?? ""}`)
@@ -330,6 +333,18 @@ export default async function GroupHubPage(
   const coachId = roster.find((m) => m.role === "coach")?.profileId;
   // In a one-on-one space a program with no client on it is the coach's template, not the client's: only programs made for the client are listed.
   const shownPrograms = (programs ?? []).filter((p: any) => (group as { group_kind?: string } | null)?.group_kind !== "one_on_one" || p.athlete_id !== null);
+  // "Your programs" on Home: every active program with where the client is up to (Week N, Day M) and how many are done, by order, so it works for programs with no dates.
+  const programWorkoutRead = athleteId && shownPrograms.length > 0
+    ? await readRowsByIds(shownPrograms.map((p: any) => p.id as string), (ids) => (from, to) => supabase.from("workouts").select("id, program_id, week_number, day_index").in("program_id", ids).order("id").range(from, to))
+    : { data: [] as any[], error: null };
+  const programDoneRead = athleteId && programWorkoutRead.data.length > 0
+    ? await readRowsByIds(programWorkoutRead.data.map((w: any) => w.id as string), (ids) => (from, to) => supabase.from("athlete_sessions").select("id, workout_id").eq("athlete_id", athleteId).eq("status", "completed").in("workout_id", ids).order("id").range(from, to))
+    : { data: [] as any[], error: null };
+  const homePrograms = homeProgramCards(
+    shownPrograms.map((p: any) => ({ id: p.id as string, name: p.name as string, created_at: p.created_at as string | null })),
+    programWorkoutRead.data,
+    new Set(programDoneRead.data.map((s: any) => s.workout_id as string))
+  );
   const uncoveredProgramIds = shownPrograms
     .filter((p: any) => !p.cover_image_path)
     .map((p: any) => p.id);
@@ -878,6 +893,7 @@ export default async function GroupHubPage(
                 mealLine={mealLine}
                 sessionsLeft={sessionsLeft}
                 ownChoice={isCoach && !isActingAsOther && athleteId === user?.id}
+                afterWorkout={isToday && !programsError && !programWorkoutRead.error && !programDoneRead.error ? <MyProgramsBlock groupId={params.groupId} programs={homePrograms} /> : null}
               />
               {isToday && weekClasses && (
                 <section aria-label="Group classes this week">
@@ -941,6 +957,8 @@ export default async function GroupHubPage(
       )}
 
       {/* Today's workout comes first; the program list is reference. */}
+      {/* On a phone's Today view the programs are right under today's workout (MyProgramsBlock); this list is for every other view. */}
+      {!(showMobileView && athleteId && view === "day" && isToday && !programsError && !programWorkoutRead.error && !programDoneRead.error) && (
       <section className="px-5 pt-6">
         <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
           Programs
@@ -962,6 +980,7 @@ export default async function GroupHubPage(
           <p className="font-body text-sm text-steel py-2">Your coach is setting up your program. It will show up here as soon as it is ready.</p>
         )}
       </section>
+      )}
 
       <RosterList
         hiddenProfileIds={[...(await pendingCoachIds(params.groupId))]}

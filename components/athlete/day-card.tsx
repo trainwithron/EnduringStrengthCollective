@@ -39,6 +39,7 @@ export function DayCard({
   mealLine = null,
   sessionsLeft = null,
   ownChoice = false,
+  afterWorkout = null,
 }: {
   groupId: string;
   athleteId: string;
@@ -63,6 +64,8 @@ export function DayCard({
   sessionsLeft?: number | null;
   // A coach looking at their OWN training: today's workout offers the same small choice as the client Log page, "Start [Day]'s workout" and "View whole program".
   ownChoice?: boolean;
+  // Shown right under the workout card(s) for the day, before nutrition and weight (the client's programs on Home).
+  afterWorkout?: React.ReactNode;
 }) {
   return (
     <div className="space-y-4">
@@ -79,6 +82,8 @@ export function DayCard({
         wellnessCheckin={isToday ? wellnessCheckin ?? null : null}
         nextLabel={nextLabel}
       />
+
+      {afterWorkout}
 
       {isToday ? (
         <>
