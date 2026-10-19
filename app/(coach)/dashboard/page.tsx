@@ -18,6 +18,7 @@ import { getCoachedGroups, LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/coach-group
 import { getActiveAnchor } from "@/lib/active-anchor";
 import { orgIsTeamOnly } from "@/lib/team-sport";
 import { SessionCheckSection } from "@/components/coach/session-check-section";
+import { NextClientWorkoutSection } from "@/components/coach/next-client-workout-section";
 import { ACTIVE_ORG_COOKIE, activeOrgId, clientCountsByOrg, decodeCookieValue, inActiveOrg, rememberedGroupForActiveOrg, rememberedOrgId } from "@/lib/active-org";
 import { getCoachDashboardData } from "@/lib/dashboard-data";
 import { PulseTabs } from "@/components/coach/desktop/pulse-tabs";
@@ -602,6 +603,8 @@ export default async function CoachHomePage() {
       </Suspense>
 
       <SessionCheckSection coachId={user.id} groupIds={allGroupIds} />
+
+      <NextClientWorkoutSection coachId={user.id} groupIds={allGroupIds} />
 
       <YourDayPanel schedule={yourDaySchedule} attention={yourDayAttention} timezone={coachTimezone} showPayments={!moneyHidden} />
 

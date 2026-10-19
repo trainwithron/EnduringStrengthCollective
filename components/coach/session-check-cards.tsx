@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { formatInTimezone } from "@/lib/format-in-timezone";
+import { sessionWhenInWords } from "@/lib/session-when-words";
 import { mirrorGoogleCalendarEvent } from "@/lib/mirror-google-calendar-event";
 import { checkAndNotifyLowSessionBalance } from "@/lib/notify-low-session-balance";
 import { BookingDateControl } from "@/components/coach/booking-date-control";
@@ -33,7 +33,7 @@ export function SessionCheckCards({ sessions, timezone }: { sessions: SessionToC
   const left = sessions.filter((s) => !gone.has(s.bookingId));
   if (left.length === 0) return null;
   const shown = showAll ? left : left.slice(0, SHOWN);
-  const when = (s: SessionToCheck) => formatInTimezone(new Date(startOverride[s.bookingId] ?? s.startIso), timezone, "dateTime");
+  const when = (s: SessionToCheck) => sessionWhenInWords(startOverride[s.bookingId] ?? s.startIso, timezone);
 
   async function yes(s: SessionToCheck) {
     setBusy(s.bookingId);
@@ -70,7 +70,7 @@ export function SessionCheckCards({ sessions, timezone }: { sessions: SessionToC
       {shown.map((s) => (
         <div key={s.bookingId} className="border border-rust/50 bg-surface p-3">
           <p className="font-body text-sm text-chalk">
-            Did <span className="font-semibold">{s.name}</span>&apos;s session ({when(s)}) happen?
+            Did <span className="font-semibold">{s.name}</span>&apos;s session {when(s)} happen?
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <button type="button" disabled={busy === s.bookingId} onClick={() => yes(s)} className="min-h-11 px-5 bg-positive text-graphite font-display font-bold uppercase tracking-wide text-sm disabled:opacity-40">

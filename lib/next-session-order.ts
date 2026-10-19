@@ -51,3 +51,21 @@ export function nextSessionLabel(startIso: string, timezone: string, now: Date =
   const day = new Intl.DateTimeFormat("en-US", { timeZone: timezone, weekday: "short", month: "short", day: "numeric" }).format(start);
   return `${day} ${time}`;
 }
+
+// The one client the coach's Home offers "Start <name>'s workout" for: the session that is next TODAY (still ahead, or begun in the last 30 minutes), the same rule that puts a client on top of the Spotlight list.
+// Null when no client session is left today.
+export function nextClientSessionToday<T extends { start_at: string }>(rows: T[], timezone: string, now: Date = new Date()): T | null {
+  const cutoff = now.getTime() - STAYS_ON_TOP_MS;
+  const today = dateKeyInZone(timezone, now);
+  let best: T | null = null;
+  let bestMs = Infinity;
+  for (const r of rows) {
+    const ms = new Date(r.start_at).getTime();
+    if (Number.isNaN(ms) || ms < cutoff || dateKeyInZone(timezone, new Date(ms)) !== today) continue;
+    if (ms < bestMs) {
+      bestMs = ms;
+      best = r;
+    }
+  }
+  return best;
+}
