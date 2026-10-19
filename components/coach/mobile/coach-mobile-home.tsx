@@ -18,6 +18,7 @@ import { ProgressLookPanel } from "@/components/coach/progress-look-panel";
 import { TodayWidget, type TodayMacros } from "@/components/athlete/today-widget";
 import { CoachHomeComplications } from "./coach-home-complications";
 import { CoachMobileShell } from "./coach-mobile-shell";
+import { SessionCheckSection } from "@/components/coach/session-check-section";
 import { getNeedsAttentionItems } from "@/lib/needs-attention-data";
 import { getCoachedGroups, groupsInOrgOf, groupsInOrgOfOpened } from "@/lib/coach-groups";
 import { isTeamSportGroup } from "@/lib/team-sport";
@@ -166,6 +167,7 @@ export async function CoachMobileHome({
         </div>
 
         <div className="px-5">
+          <SessionCheckSection coachId={coachId} groupIds={orgGroupIds} />
           <LateChangesPanel groupIds={orgGroupIds} />
           <ScheduleRequestsPanel groupIds={orgGroupIds} />
           <ExpiryCheckInPanel groupIds={orgGroupIds} />
