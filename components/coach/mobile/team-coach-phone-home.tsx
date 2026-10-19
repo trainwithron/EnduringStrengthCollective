@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 import { createServerClient } from "@/lib/supabase/server";
-import { ViewModeToggle } from "@/components/coach/view-mode-toggle";
 import { CoachMobileShell } from "./coach-mobile-shell";
 import { teamPhoneHome, type TeamPhoneProgram } from "@/lib/team-phone-home";
 
@@ -73,9 +72,6 @@ export async function TeamCoachPhoneHome({ groupId, groupName }: { groupId: stri
                 </Link>
               </li>
             ))}
-            <li className="px-4 py-2">
-              <ViewModeToggle targetMode="desktop" label="Desktop mode" groupId={groupId} />
-            </li>
           </ul>
         </details>
       </CoachMobileShell>

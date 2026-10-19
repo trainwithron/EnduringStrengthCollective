@@ -7,6 +7,8 @@ import { MY_TRAINING_COOKIES, shouldLeaveMyTraining } from "@/lib/my-training-ex
 import { DOB_OK_COOKIE, loadDobGate, mayRememberPass, maySkipGateCheck, signDobOk } from "@/lib/dob-gate";
 import { apiGateApplies, dobGatedPage, gateAction, intakeGateApplies } from "@/lib/gate-paths";
 import { SIGNED_OUT_FRAME_HTML } from "@/lib/signed-out-frame";
+import { isPhoneView, phoneCoachRedirect } from "@/lib/phone-coach-routes";
+import { PWA_STANDALONE_COOKIE, VIEW_OVERRIDE_COOKIE } from "@/lib/pwa";
 
 // Every page a client can use. A client who has not finished the health form and waiver (profiles.intake_required) reaches none of them, not just /groups: a workout link, a notification or a typed address
 // all land on the form first.
@@ -261,6 +263,30 @@ export async function updateSession(request: NextRequest) {
     response = NextResponse.next({ request });
     carried.forEach((cookie) => response.cookies.set(cookie));
     for (const name of Object.values(MY_TRAINING_COOKIES)) response.cookies.set(name, "", { path: "/", maxAge: 0 });
+  }
+
+  // One real phone app for coaches (lib/phone-coach-routes.ts): a coach page that is not one of the phone's places goes to the closest one. Page loads only (never the API), never inside a frame (the
+  // computer's workspace panes and split half show any page), and under /groups/<g> only for a person who COACHES that group; a page clients use too is left alone while the coach is acting as a client.
+  if (user && request.method === "GET" && !pathname.startsWith("/api/") && request.headers.get("sec-fetch-dest") !== "iframe") {
+    const phoneTarget = phoneCoachRedirect(pathname, request.nextUrl.search);
+    if (
+      phoneTarget &&
+      isPhoneView({ override: request.cookies.get(VIEW_OVERRIDE_COOKIE)?.value, standalone: request.cookies.get(PWA_STANDALONE_COOKIE)?.value, userAgent: request.headers.get("user-agent") }) &&
+      !(phoneTarget.shared && request.cookies.get(MY_TRAINING_COOKIES.actingAs)?.value)
+    ) {
+      let isCoach = phoneTarget.groupId === null;
+      if (!isCoach) {
+        const { data: seat } = await supabase.from("group_memberships").select("role").eq("group_id", phoneTarget.groupId).eq("profile_id", user.id).maybeSingle();
+        isCoach = (seat as { role?: string } | null)?.role === "coach";
+      }
+      if (isCoach) {
+        const phoneResponse = NextResponse.redirect(new URL(phoneTarget.to, request.url));
+        response.cookies.getAll().forEach((cookie) => {
+          phoneResponse.cookies.set(cookie);
+        });
+        return phoneResponse;
+      }
+    }
   }
 
   // Defense in depth (lib/workspace-header.ts): opening a group's page makes that group the open workspace, so every data request the page and its API calls make names the right organization.

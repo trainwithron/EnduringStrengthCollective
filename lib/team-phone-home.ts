@@ -1,4 +1,4 @@
-import { teamSportMenu, teamSportMoreMenu, type TeamMenuItem } from "@/lib/team-sport";
+import { teamSportMenu, type TeamMenuItem } from "@/lib/team-sport";
 
 // What a team-sport coach sees first on a phone (pure, so it is tested with the real row shapes): the group's active program, then Team calendar, Team feed, Athletes, Messages, Settings, and ONE "More tools" that
 // holds everything else. No money anywhere, nothing that asks the coach to add a client or build a program they already have.
@@ -33,14 +33,12 @@ export function teamPhoneHome({ groupId, program }: { groupId: string; program: 
   const menu = teamSportMenu(groupId);
   const pick = (key: string) => menu.find((m) => m.key === key)!;
   const links: TeamMenuItem[] = [pick("team-calendar"), pick("feed"), pick("members"), pick("messages"), { key: "settings", label: "Settings", href: `/groups/${groupId}/settings` }];
-  const shown = new Set(links.map((l) => l.key));
+  // Only the phone app's own places (lib/phone-coach-routes.ts): the organization's programs (the coach-level page), Nutrition and Attendance. Depth chart, Team performance, Challenges, Hall of fame,
+  // Team sheet and the exercise library are computer pages; a phone that opens one goes to the closest phone place.
   const moreLinks: TeamMenuItem[] = [
-    // the organization's programs (the coach-level page), the rest of the team menu, then the other tools
     { key: "programs", label: "All programs", href: "/programs" },
-    ...menu.filter((m) => !shown.has(m.key)),
-    ...teamSportMoreMenu(groupId),
-    { key: "exercise-library", label: "Exercise library", href: `/groups/${groupId}/exercise-library` },
     { key: "nutrition", label: "Nutrition", href: `/groups/${groupId}/nutrition` },
+    pick("attendance"),
   ];
   return {
     program: program ? { name: program.name, summary: programSummary(program.workouts), href: `/groups/${groupId}/programs/${program.id}` } : null,

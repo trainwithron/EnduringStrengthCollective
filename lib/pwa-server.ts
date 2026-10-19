@@ -1,5 +1,6 @@
 import { cookies, headers } from "next/headers";
 import { PWA_STANDALONE_COOKIE, VIEW_OVERRIDE_COOKIE, type ViewOverride } from "./pwa";
+import { isPhoneView } from "./phone-coach-routes";
 
 // Server-side read of the cookie PwaContextCookie writes client-side.
 // True only when the CURRENT request was launched from the installed
@@ -40,10 +41,12 @@ export async function getViewOverride(): Promise<ViewOverride> {
 // override, falls back to auto-detect: true once they're either on a
 // phone at all, or have installed the app. A coach at an actual
 // desktop/laptop with no override always gets the full shell.
+// The rule itself is lib/phone-coach-routes.ts isPhoneView, the same one the middleware uses to send a phone to the phone app's places.
 export async function prefersAthleteStyleView(): Promise<boolean> {
-  const override = await getViewOverride();
-  if (override) return override === "mobile";
-
-  const [standalone, mobile] = await Promise.all([isPwaStandalone(), isMobileUserAgent()]);
-  return standalone || mobile;
+  const [cookieStore, headerStore] = await Promise.all([cookies(), headers()]);
+  return isPhoneView({
+    override: cookieStore.get(VIEW_OVERRIDE_COOKIE)?.value,
+    standalone: cookieStore.get(PWA_STANDALONE_COOKIE)?.value,
+    userAgent: headerStore.get("user-agent"),
+  });
 }
