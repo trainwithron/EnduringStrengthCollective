@@ -14,6 +14,7 @@ import { buildCreditPicture, fetchBookingCounts } from "@/lib/credit-picture";
 import { chunk } from "@/lib/chunk";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { waitingOnGuardian } from "@/lib/guardian-wait";
+import { loadUnconfirmedUserIds } from "@/lib/unconfirmed-emails";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import type { CoachClientRow } from "@/lib/coach-client-filter";
 import { CoachesSection } from "@/components/coach/coaches-section";
@@ -73,6 +74,7 @@ export default async function CoachClientsPage() {
       for (const r of (data ?? []) as { athlete_id: string }[]) signedTeens.add(r.athlete_id);
     }
   }
+  const unconfirmed = await loadUnconfirmedUserIds();
   const balance = new Map((creditRows as { athlete_id: string; group_id: string; balance: number }[]).map((r) => [`${r.athlete_id}:${r.group_id}`, r.balance]));
   const tier = new Map((tierRows as { profile_id: string; group_id: string; client_tier: CoachClientRow["tier"] }[]).map((r) => [`${r.profile_id}:${r.group_id}`, r.client_tier ?? null]));
 
@@ -90,6 +92,7 @@ export default async function CoachClientsPage() {
       toBook: picture.toBook,
       owed: picture.owed,
       waitingOnGuardian: waitingOnGuardian(dobByClient.get(c.id), signedTeens.has(c.id)),
+      emailUnconfirmed: unconfirmed.has(c.id),
     };
   });
 

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ClientRowMenu } from "@/components/coach/desktop/client-row-menu";
 import { LayoutGrid, List, Search } from "lucide-react";
 import { WAITING_ON_GUARDIAN_LABEL } from "@/lib/guardian-wait";
+import { EMAIL_NOT_CONFIRMED_LABEL } from "@/lib/unconfirmed-emails-label";
 import { DEFAULT_CLIENTS_VIEW, readClientsView, writeClientsView, type ClientsView } from "@/lib/clients-view-pref";
 import { filterClients, filterCounts, FILTER_LABELS, clientKind, type ClientFilter, type CoachClientRow } from "@/lib/coach-client-filter";
 
@@ -101,6 +102,7 @@ export function ClientsListView({ rows }: { rows: CoachClientRow[] }) {
                 <Link href={`/groups/${c.groupId}/athletes/${c.id}`} className="flex flex-1 min-w-0 items-center gap-3 py-2.5 px-1 hover:bg-surface/60">
                   <span className="font-body text-sm text-chalk flex-1 min-w-0 truncate">{c.fullName}</span>
                   {c.waitingOnGuardian && <span className="font-body text-xs text-rust shrink-0">{WAITING_ON_GUARDIAN_LABEL}</span>}
+                  {c.emailUnconfirmed && <span className="font-body text-xs text-rust shrink-0">{EMAIL_NOT_CONFIRMED_LABEL}</span>}
                   <span className="font-body text-xs text-steel shrink-0 hidden sm:inline">{KIND_LABEL[clientKind(c)]}</span>
                   {c.groupKind !== "one_on_one" && <span className="font-body text-xs text-steel hidden md:inline truncate min-w-0 max-w-[22rem]">{c.groupName}</span>}
                   <span className="flex items-center justify-end gap-2 shrink-0 w-24 pr-2">
@@ -151,6 +153,7 @@ export function ClientsCardView({ rows }: { rows: CoachClientRow[] }) {
                 </span>
                 {c.groupKind !== "one_on_one" && c.groupName && <span className="block font-body text-xs text-steel truncate">{c.groupName}</span>}
                 {c.waitingOnGuardian && <span className="block font-body text-xs text-rust truncate">{WAITING_ON_GUARDIAN_LABEL}</span>}
+                {c.emailUnconfirmed && <span className="block font-body text-xs text-rust truncate">{EMAIL_NOT_CONFIRMED_LABEL}</span>}
               </span>
               <span className="flex flex-col items-end shrink-0">
                 <span title={`${c.toBook} left to schedule`} aria-label={`${c.toBook} left to schedule`} className={`font-display text-xl tabular-nums leading-none ${c.toBook > 0 ? "text-chalk" : "text-steel"}`}>

@@ -13,6 +13,8 @@ export interface CoachClientRow {
   setAside: boolean;
   // Aged 13 to 17 with no signed guardian permission yet (the Clients list says "Waiting on a guardian").
   waitingOnGuardian?: boolean;
+  // Signed up from a group link and never confirmed the email (the Clients list says "Email not confirmed").
+  emailUnconfirmed?: boolean;
   // Sessions still to schedule, and sessions already delivered beyond the balance (coach only).
   toBook: number;
   owed: number;
