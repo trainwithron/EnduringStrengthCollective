@@ -64,6 +64,7 @@ import { ClientCalendarSection } from "@/components/coach/desktop/client-calenda
 import { GuardianConsentStatus, type GuardianStateInfo } from "@/components/coach/guardian-consent-status";
 import { ageBand } from "@/lib/guardian-consent";
 import { ClientSignInPanel } from "@/components/coach/client-signin-panel";
+import { ClientNameControl } from "@/components/coach/client-name-control";
 import { CorrectClientEmail } from "@/components/coach/correct-client-email";
 import { claimStatus, isPlaceholderEmail } from "@/lib/client-claim";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -1064,6 +1065,12 @@ export default async function AthleteProfilePage(
           )}
           {parqNotice && <ParqFlagNotice athleteId={params.athleteId} coachId={user.id} flagged={parQFlaggedCount} />}
           </div>
+          {!selfView && (
+            <div data-tab="settings" className="mb-4">
+              {/* Fix how their name is spelled: on the account and the space for a client who has not signed in; for one who has, only the space's label can be made to match the name they use. */}
+              <ClientNameControl groupId={params.groupId} athleteId={params.athleteId} profileName={profile?.full_name ?? ""} spaceName={group?.name ?? ""} oneOnOne={group?.group_kind === "one_on_one"} signedIn={signInStatus === "active"} />
+            </div>
+          )}
           <div data-tab="settings">
           {!selfView && signInStatus !== "active" && (
             <>
