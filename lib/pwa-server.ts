@@ -1,6 +1,6 @@
 import { cookies, headers } from "next/headers";
 import { PWA_STANDALONE_COOKIE, VIEW_OVERRIDE_COOKIE, type ViewOverride } from "./pwa";
-import { isPhoneView } from "./phone-coach-routes";
+import { isPhoneView, isTabletUA } from "./phone-coach-routes";
 
 // Server-side read of the cookie PwaContextCookie writes client-side.
 // True only when the CURRENT request was launched from the installed
@@ -49,4 +49,9 @@ export async function prefersAthleteStyleView(): Promise<boolean> {
     standalone: cookieStore.get(PWA_STANDALONE_COOKIE)?.value,
     userAgent: headerStore.get("user-agent"),
   });
+}
+
+// A tablet chose its layout on purpose (the tablet switch), so it is never "stuck in desktop mode" (server side: the user agent only; iPadOS as a Mac is not visible here and needs no banner).
+export async function isTabletUserAgent(): Promise<boolean> {
+  return isTabletUA((await headers()).get("user-agent"));
 }

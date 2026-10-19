@@ -8,6 +8,7 @@ import { SignOutButton } from "@/components/group/sign-out-button";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
 import { isTeamSportGroup, teamSportMenu } from "@/lib/team-sport";
 import { phoneCoachRedirect } from "@/lib/phone-coach-routes";
+import { TabletLayoutSwitch } from "@/components/coach/tablet-layout-switch";
 
 // The actual nav-link content shared by two different overlay shells:
 // CoachMoreSheet (CoachDesktopShell's own narrow-width "More" fallback,
@@ -89,6 +90,8 @@ export function CoachNavLinksList({ groupId }: { groupId: string; groupName?: st
         <Item href="/programs" label="Programs" icon={LayoutGrid} />
         <Item href={`/groups/${groupId}/nutrition`} label="Nutrition" icon={Salad} />
         <Item href={`/groups/${groupId}/settings`} label="Settings" icon={Settings} />
+        {/* Only on a tablet (Ron: "tab should be able to switch between both"); a phone never sees it. */}
+        <TabletLayoutSwitch to="desktop" />
         <div className="px-5 py-1">
           <DownloadAppButton />
         </div>

@@ -42,6 +42,7 @@ import {
 import { SignOutButton } from "@/components/group/sign-out-button";
 import { ThreePeopleIcon } from "@/components/coach/desktop/three-people-icon";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
+import { TabletLayoutSwitch } from "@/components/coach/tablet-layout-switch";
 import { FeedbackButton } from "@/components/feedback/feedback-button";
 import { ClientFinder } from "@/components/coach/desktop/client-finder";
 import { HeaderNotificationBell } from "@/components/notifications/header-bell";
@@ -757,6 +758,8 @@ function CoachDesktopShellFull({
               <WorkspaceRailButton />
               <FeedbackButton variant="icon" />
               <DownloadAppButton collapsed />
+              {/* Only on a tablet: back to the phone app. A computer never sees it. */}
+              <TabletLayoutSwitch to="mobile" variant="rail" />
               <div className="w-11 flex items-center justify-center">
                 <SignOutButton />
               </div>

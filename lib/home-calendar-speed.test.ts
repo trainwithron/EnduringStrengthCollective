@@ -22,8 +22,9 @@ describe("Home loads in rounds, not one read after another", () => {
       "const supabase = await createServerClient();",
       // the coach's seats: the same cached read round 1 uses (SPEED, Oct 19)
       "const coachedTop = await getCoachedGroups(supabase, user.id);",
-      "const stuckInDesktopModeOnRealPhone = await isMobileUserAgent();",
     ]);
+    // the device check (no database): a phone in the computer layout, unless it is a tablet that chose it (the tablet switch)
+    expect(data).toContain("const stuckInDesktopModeOnRealPhone = (await isMobileUserAgent()) && !(await isTabletUserAgent());");
     // The cookie read is not a database wait, and the per-organization client counts are the one read that needs the coached groups from round 1.
     expect(data).toContain("await clientCountsByOrg(supabase, coachedForOrg)");
   });

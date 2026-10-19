@@ -148,7 +148,7 @@ describe("isPhoneView: one rule", () => {
   });
   it("the pages use the same rule as the middleware", () => {
     const pwa = read("lib/pwa-server.ts");
-    expect(pwa).toContain('import { isPhoneView } from "./phone-coach-routes";');
+    expect(pwa).toContain('import { isPhoneView, isTabletUA } from "./phone-coach-routes";');
     expect(pwa.slice(pwa.indexOf("export async function prefersAthleteStyleView"))).toContain("return isPhoneView({");
   });
 });

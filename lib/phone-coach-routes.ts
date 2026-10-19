@@ -70,3 +70,14 @@ export function phoneCoachRedirect(pathname: string, search = ""): PhoneRedirect
 
   return null;
 }
+
+/**
+ * A tablet (Ron, Oct 19: "tab should be able to switch between both"): an Android device whose browser does not say "Mobile" (a Galaxy Tab), an iPad, or (in the browser only, where touch points are
+ * known) iPadOS, which reports itself as a Mac with a touch screen. A phone is never a tablet. A tablet opens the phone app like a phone; only a tablet is offered the switch to the computer layout.
+ */
+export function isTabletUA(userAgent: string | null | undefined, maxTouchPoints?: number): boolean {
+  const ua = userAgent ?? "";
+  if (/iPad/i.test(ua)) return true;
+  if (/Android/i.test(ua) && !/Mobile/i.test(ua)) return true;
+  return /Macintosh/i.test(ua) && (maxTouchPoints ?? 0) > 1;
+}

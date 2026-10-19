@@ -4,7 +4,7 @@ import { NoAccess } from "@/components/shared/no-access";
 import { cookies } from "next/headers";
 import { loadStartInputs, parseLastGroupCookie, pickStartGroup } from "@/lib/start-group";
 import { createServerClient } from "@/lib/supabase/server";
-import { prefersAthleteStyleView, isMobileUserAgent } from "@/lib/pwa-server";
+import { prefersAthleteStyleView, isMobileUserAgent, isTabletUserAgent } from "@/lib/pwa-server";
 import { CoachHomeShell } from "@/components/coach/coach-home-shell";
 import { CoachProfileEditor } from "@/components/coach/coach-profile-editor";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
@@ -147,7 +147,8 @@ export default async function CoachHomePage() {
   // unmissable render-time notice + one-tap fix shown only when the
   // REAL device is mobile despite the override, so Ron (or anyone else
   // in this spot) sees it immediately instead of hunting for tiny text.
-  const stuckInDesktopModeOnRealPhone = await isMobileUserAgent();
+  // (A tablet in the computer layout chose it with the tablet switch: not stuck.)
+  const stuckInDesktopModeOnRealPhone = (await isMobileUserAgent()) && !(await isTabletUserAgent());
 
   // Home belongs to ONE organization at a time: the one the coach chose with the organization switcher (else their first). Everything on it, and every count, is that
   // organization's; another one appears only after switching to it.
