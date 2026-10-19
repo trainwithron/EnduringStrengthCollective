@@ -36,7 +36,8 @@ describe("One program in the library, an independent version for each person", (
     expect(page).toContain("const cards = clientId ? scoped : defaultList(scoped);");
     expect(page).toContain("<ProgramsList");
     expect(page).not.toContain("<details");
-    expect(page).toContain("countAssignedTo(");
+    // the copies are read by group in the page's one batch (SPEED, Oct 19)
+    expect(page).toContain('.not("source_program_id", "is", null).not("athlete_id", "is", null).is("archived_at", null)');
     expect(read("components/coach/desktop/program-card-grid.tsx")).toContain("Assigned to ({program.assignedCount ?? 0})");
   });
   it("assigning always copies and adds no client name; nothing calls the attach step", () => {

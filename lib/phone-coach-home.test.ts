@@ -200,7 +200,9 @@ describe("Programs on a phone", () => {
     expect(tree).toContain(`/groups/${TROJANS}/programs/new`);
     expect(tree).not.toMatch(/import|filter|upload|Templates/i);
     const page = src("app/(coach)/programs/page.tsx");
-    expect(page).toContain("if (await prefersAthleteStyleView())");
+    // read with the rest in one batch (SPEED, Oct 19)
+    expect(page).toContain("prefersAthleteStyleView(),");
+    expect(page).toContain("if (onPhone) {");
     expect(page.indexOf("<ProgramsPhoneList")).toBeLessThan(page.indexOf("<ProgramsList "));
     expect(page).toContain("<CoachMobileShell groupId={anchor.id} groupName={anchor.name} activeOverride=\"more\">");
   });

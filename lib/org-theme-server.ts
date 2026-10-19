@@ -1,4 +1,6 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
+import { getWorkspaceGroupRow } from "@/lib/workspace-group-row";
 import { createServerClient } from "@/lib/supabase/server";
 import {
   DEFAULT_ORG_THEME,
@@ -21,7 +23,10 @@ import {
 // "the" membership resolved to an arbitrary other org's colors/logo —
 // this is what made the whole app's theme (not just its data) look like
 // it belonged to a different organization.
-export async function getViewerOrgTheme(groupId?: string): Promise<OrgTheme> {
+// Read once per request (SPEED, Oct 19): the layout and a page asking for the same theme share one answer.
+export const getViewerOrgTheme = cache(readViewerOrgTheme);
+
+async function readViewerOrgTheme(groupId?: string): Promise<OrgTheme> {
   try {
     const supabase = await createServerClient();
     const {
@@ -49,18 +54,9 @@ export async function getViewerOrgTheme(groupId?: string): Promise<OrgTheme> {
     // mount, so at least the coach's most recently viewed group's org
     // themes the rest of the app instead of an arbitrary one.
     // The organization the coach CHOSE (the workspace switcher and visiting a group both remember it) themes everything, including the coach-level pages that are not under a group.
+    // The remembered workspace (the last_workspace_group cookie), read once for the layout's colors and team words together.
     if (!organizationId) {
-      const workspaceRaw = (await cookies()).get("last_workspace_group")?.value;
-      if (workspaceRaw) {
-        let workspaceGroupId = workspaceRaw;
-        try {
-          workspaceGroupId = decodeURIComponent(workspaceRaw);
-        } catch {
-          // use it as it is
-        }
-        const { data: group } = await supabase.from("groups").select("organization_id").eq("id", workspaceGroupId).maybeSingle();
-        organizationId = group?.organization_id ?? null;
-      }
+      organizationId = (await getWorkspaceGroupRow()).row?.organization_id ?? null;
     }
 
     if (!organizationId) {

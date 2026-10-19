@@ -76,13 +76,11 @@ export default async function CoachHomePage() {
     redirect("/login");
   }
 
-  const { data: coachedGroupRows } = await supabase
-    .from("group_memberships")
-    .select("group_id")
-    .eq("profile_id", user.id)
-    .eq("role", "coach");
+  // The coach's seats: the same cached read the batch below uses (SPEED, Oct 19: it was read twice). A coach whose only groups are retired seasons still has seats.
+  const coachedTop = await getCoachedGroups(supabase, user.id);
+  const firstSeatGroupId = coachedTop[0]?.id ?? (await getCoachedGroups(supabase, user.id, true))[0]?.id ?? null;
 
-  if (!coachedGroupRows || coachedGroupRows.length === 0) {
+  if (!firstSeatGroupId) {
     // A coach whose coaching access has ended (their seven days ran out, or they were let go) has no seats left but still needs to see why, and the one export they are owed.
     const ended = (await loadMyDepartures(supabase, user.id)).filter((d) => d.endedAt);
     if (ended.length > 0) {
@@ -130,7 +128,7 @@ export default async function CoachHomePage() {
     if (active) redirect(`/groups/${active.anchor.id}`);
     const lastGroupId = parseLastGroupCookie((await cookies()).get("last_group")?.value);
     const start = pickStartGroup(await loadStartInputs(supabase, user.id, lastGroupId));
-    redirect(`/groups/${start?.group_id ?? coachedGroupRows[0].group_id}`);
+    redirect(`/groups/${start?.group_id ?? firstSeatGroupId}`);
   }
 
   // Real bug from Ron's own phone, screenshot confirmed: a coach who
@@ -158,6 +156,21 @@ export default async function CoachHomePage() {
   const activeOrgCookie = (await cookies()).get(ACTIVE_ORG_COOKIE)?.value ?? null;
   // The briefing is filed under the coach's own day (their time zone, set below), which is the UTC day or a day either side of it: read that window, keep the right one once the zone is known.
   const utcTodayKey = new Date().toISOString().slice(0, 10);
+  // One read of the coach's own profile row (SPEED, Oct 19: three reads before). Has this coach already answered "What do you call your people?" (migration 0336) and what kind of coach are they?
+  // A database without those columns yet leaves the rest of Home alone: the plain read is made instead, the question is "unknown" (null) and the coach type is the usual one.
+  async function readViewerProfile() {
+    const full = await supabase.from("profiles").select("full_name, timezone, terminology_asked_at, coach_type").eq("id", user!.id).maybeSingle();
+    if (!full.error) return { profile: full.data as { full_name?: string | null; timezone?: string | null } | null, askedRead: { data: full.data, error: null }, coachType: (full.data as { coach_type?: string | null } | null)?.coach_type ?? null };
+    const basic = await supabase.from("profiles").select("full_name, timezone").eq("id", user!.id).maybeSingle();
+    return { profile: basic.data as { full_name?: string | null; timezone?: string | null } | null, askedRead: { data: null, error: full.error }, coachType: null };
+  }
+  // One read of the coach's public profile; until migration 0249 the completion message column is missing and the field is just empty.
+  async function readCoachProfile() {
+    const full = await supabase.from("coach_profiles").select("bio, photo_url, completion_message").eq("coach_id", user!.id).maybeSingle();
+    if (!full.error) return { row: full.data as { bio?: string | null; photo_url?: string | null } | null, completionMessageRow: full.data as { completion_message?: string | null } | null };
+    const basic = await supabase.from("coach_profiles").select("bio, photo_url").eq("coach_id", user!.id).maybeSingle();
+    return { row: basic.data as { bio?: string | null; photo_url?: string | null } | null, completionMessageRow: null };
+  }
   // Round 1: everything that needs only who the coach is, as one batch.
   const [
     // A coach can own/admin more than one organization (e.g. running several client orgs at once) — fetching every row here, not just
@@ -165,13 +178,8 @@ export default async function CoachHomePage() {
     // there's more than one org membership.
     { data: orgMemberships },
     coachedForOrg,
-    { data: viewerProfile },
-    { data: coachProfileRow },
-    // Has this coach already answered "What do you call your people?" (migration 0336)? Its own select, in this same batch (no extra round), so a database without the column yet leaves the rest
-    // of Home alone: an error here means unknown (null), and the card then relies on this browser's memory only.
-    askedRead,
-    // Separate on purpose: until migration 0249 is applied this select errors and the field is just empty.
-    { data: completionMessageRow },
+    { profile: viewerProfile, askedRead, coachType },
+    { row: coachProfileRow, completionMessageRow },
     // Same merge shape GroupSwitcher already uses: every group this coach coaches, plus every group in each org where they're an owner/admin.
     { data: coachedRows },
     // Per-coach tile arrangement + hover-peek defaults — a real DB row, not localStorage, so it follows a coach across devices.
@@ -182,13 +190,12 @@ export default async function CoachHomePage() {
     // Real org-level notifications (trainer-dispatch admin alerts, cascade offers, question replies) are inserted with group_id: null since they're
     // inherently org-wide, not tied to one specific group. This is the one page in the app that's already cross-group by design.
     { data: orgNotificationRows },
+    departures,
   ] = await Promise.all([
     supabase.from("organization_memberships").select("organization_id, role").eq("profile_id", user.id),
     getCoachedGroups(supabase, user.id),
-    supabase.from("profiles").select("full_name, timezone").eq("id", user.id).maybeSingle(),
-    supabase.from("coach_profiles").select("bio, photo_url").eq("coach_id", user.id).maybeSingle(),
-    supabase.from("profiles").select("terminology_asked_at").eq("id", user.id).maybeSingle(),
-    supabase.from("coach_profiles").select("completion_message").eq("coach_id", user.id).maybeSingle(),
+    readViewerProfile(),
+    readCoachProfile(),
     supabase.from("group_memberships").select("groups ( id, name, focus_tag, group_kind, organization_id, archived_at, team_mode )").eq("profile_id", user.id).eq("role", "coach"),
     supabase.from("coach_dashboard_layout").select("hidden_tiles, tile_order, tile_metric_overrides").eq("coach_id", user.id).maybeSingle(),
     supabase.from("coach_briefings").select("id, briefing_date").eq("coach_id", user.id).gte("briefing_date", addDaysToKey(utcTodayKey, -1)).lte("briefing_date", addDaysToKey(utcTodayKey, 1)),
@@ -200,6 +207,7 @@ export default async function CoachHomePage() {
       .is("read_at", null)
       .order("created_at", { ascending: false })
       .limit(20),
+    loadMyDepartures(supabase, user.id),
   ]);
 
   // More than one organization and none remembered: ask which one, rather than guessing the biggest (lib/active-anchor.ts).
@@ -224,8 +232,10 @@ export default async function CoachHomePage() {
     .map((m) => m.organization_id)
     .filter((id) => !homeOrgId || id === homeOrgId);
 
-  // Round 2: the organization's name, the groups of the organizations they administer, and today's briefing items.
-  const [{ data: org }, allGroupRows, { data: briefingItemRows }] = await Promise.all([
+  // The teams the tiles could be for (only teams this coach really coaches, in the organization Home is showing): their team_mode is read in round 2.
+  const tileCandidates = coachedForOrg.filter((g) => g.kind === "team" && (!homeOrgId || g.orgId === homeOrgId));
+  // Round 2: the organization's name, the groups of the organizations they administer, today's briefing items, and the team tiles' team_mode.
+  const [{ data: org }, allGroupRows, { data: briefingItemRows }, tileModeRows] = await Promise.all([
     primaryOrgMembership
       ? supabase.from("organizations").select("name, display_name").eq("id", primaryOrgMembership.organization_id).maybeSingle()
       : Promise.resolve({ data: null }),
@@ -242,6 +252,9 @@ export default async function CoachHomePage() {
           .in("briefing_id", todaysBriefing.map((b) => b.id))
           .order("sort_order", { ascending: true })
       : Promise.resolve({ data: null }),
+    tileCandidates.length > 0
+      ? supabase.from("groups").select("id, team_mode").in("id", tileCandidates.map((g) => g.id).slice(0, 100))
+      : Promise.resolve({ data: [] as { id: string; team_mode: boolean | null }[], error: null }),
   ]);
   for (const g of allGroupRows.data ?? []) if (!(g as GroupRow).archived_at) byId.set(g.id, g as GroupRow);
 
@@ -325,7 +338,7 @@ export default async function CoachHomePage() {
     if (teamAndSocialIds.length === 0) return [];
     const [{ data: commentRows }, { data: dismissedRows }] = await Promise.all([
       readRowsByIds(teamAndSocialIds, (g) => (from, to) =>
-        supabase.from("comments").select("post_id, group_id, author_id, created_at, body, profiles ( full_name )").in("group_id", g).order("id").range(from, to)
+        supabase.from("comments").select("post_id, group_id, author_id, created_at, body, profiles ( full_name )").in("group_id", g).gte("created_at", new Date(Date.now() - 30 * 86400000).toISOString()).order("id").range(from, to)
       ),
       supabase.from("coach_dismissed_reply_alerts").select("post_id, dismissed_at").eq("coach_id", user!.id),
     ]);
@@ -559,20 +572,11 @@ export default async function CoachHomePage() {
   // then customization last.
   // One section per organization they are leaving, each exporting THAT organization (from their own coached groups, which are read before the page is narrowed to the active organization).
   // A coach who said they coach a team gets the team tiles on top of Home (lib/team-coach.ts). A failed read just means the usual Home.
-  let isTeamCoach = false;
-  try {
-    const { data: typeRow } = await supabase.from("profiles").select("coach_type").eq("id", user.id).maybeSingle();
-    isTeamCoach = (typeRow as { coach_type?: string | null } | null)?.coach_type === "team";
-  } catch {
-    isTeamCoach = false;
-  }
+  const isTeamCoach = coachType === "team";
   // The teams the tiles are for: only teams this coach really coaches (getCoachedGroups leaves retired seasons out), in the organization Home is showing, the one they last worked in first.
   // Football tiles only for a group whose team_mode is ON (a "team" kind alone is not a team sport).
-  const tileCandidates = coachedForOrg.filter((g) => g.kind === "team" && (!homeOrgId || g.orgId === homeOrgId));
-  const tileModeRows = tileCandidates.length > 0 ? await supabase.from("groups").select("id, team_mode").in("id", tileCandidates.map((g) => g.id).slice(0, 100)) : { data: [] as { id: string; team_mode: boolean | null }[], error: null };
   const tileTeams = tileModeRows.error ? [] : tileTeamsFor(coachedForOrg, new Map(((tileModeRows.data ?? []) as { id: string; team_mode: boolean | null }[]).map((r) => [r.id, r.team_mode])), homeOrgId);
   const tileTeam = pickTileTeam(tileTeams, rememberedWorkspace);
-  const departures = await loadMyDepartures(supabase, user.id);
   const myCoachedGroups = (coachedRows ?? []).map((row) => (row as any).groups as GroupRow | null).filter((g): g is GroupRow => !!g);
   const departuresWithExport = departures.map((d) => ({ ...d, exportGroupId: myCoachedGroups.find((g) => g.organization_id === d.organizationId)?.id ?? null }));
   const content = (
@@ -603,9 +607,14 @@ export default async function CoachHomePage() {
         <NeedsYouLoader input={needsYouInput} />
       </Suspense>
 
-      <SessionCheckSection coachId={user.id} groupIds={allGroupIds} />
+      {/* Each streams in on its own (SPEED, Oct 19): the rest of Home never waits for them. */}
+      <Suspense fallback={null}>
+        <SessionCheckSection coachId={user.id} groupIds={allGroupIds} />
+      </Suspense>
 
-      <NextClientWorkoutSection coachId={user.id} groupIds={allGroupIds} />
+      <Suspense fallback={null}>
+        <NextClientWorkoutSection coachId={user.id} groupIds={allGroupIds} />
+      </Suspense>
 
       <YourDayPanel schedule={yourDaySchedule} attention={yourDayAttention} timezone={coachTimezone} showPayments={!moneyHidden} />
 

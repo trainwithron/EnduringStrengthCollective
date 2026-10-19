@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { createCrossOrgServerClient as createServerClient } from "@/lib/supabase/server";
-import { ACTING_AS_COOKIE, ACTING_AS_SELF_COOKIE } from "@/lib/acting-as";
-import { VIEW_OVERRIDE_COOKIE } from "@/lib/pwa";
+import { setMyTrainingCookies } from "@/lib/my-training-cookies";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -22,12 +21,6 @@ export async function GET(request: Request) {
   if (!membership) return NextResponse.redirect(new URL("/my-training", url));
 
   const response = NextResponse.redirect(new URL(`/groups/${groupId}`, url));
-  const secure = process.env.NODE_ENV === "production";
-  // Only a COACH needs the act-as setting (a client already sees the client app as themselves).
-  if (membership.role === "coach") {
-    response.cookies.set(ACTING_AS_COOKIE, JSON.stringify({ athleteId: user.id, groupId }), { httpOnly: true, sameSite: "lax", secure, path: "/", maxAge: 60 * 60 * 12 });
-    response.cookies.set(ACTING_AS_SELF_COOKIE, "1", { httpOnly: false, sameSite: "lax", secure, path: "/", maxAge: 60 * 60 * 12 });
-    response.cookies.set(VIEW_OVERRIDE_COOKIE, "mobile", { httpOnly: false, sameSite: "lax", secure, path: "/", maxAge: 60 * 60 * 12 });
-  }
+  setMyTrainingCookies(response, { userId: user.id, groupId, role: membership.role });
   return response;
 }

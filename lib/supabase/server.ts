@@ -61,3 +61,21 @@ export const createServerClient = cache(() => buildServerClient(false));
 // The same client without the workspace header, for pages that open ONE row the person is allowed to open (a session, a printed program, their own notifications, My training) whatever
 // organization it is in: they come from a link or a list that spans the person's organizations, not from a workspace they have open.
 export const createCrossOrgServerClient = cache(() => buildServerClient(true));
+
+// For work that runs AFTER the page is sent (next/server after()): request APIs such as cookies() may not be called there, so this client is made while the request is still open, from a copy of
+// its cookies, and never tries to write any (a session refresh is the middleware's job). Same workspace header as createServerClient. (SPEED, Oct 19: the empty-program sweep on Programs.)
+export async function createSnapshotServerClient() {
+  const cookieStore = await cookies();
+  const snapshot = cookieStore.getAll();
+  return createSupabaseServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+    global: workspaceHeaders(decodeWorkspaceCookie(cookieStore.get(LAST_WORKSPACE_GROUP_COOKIE)?.value)),
+    cookies: {
+      getAll() {
+        return snapshot;
+      },
+      setAll() {
+        // Nothing is written after the page is sent.
+      },
+    },
+  });
+}

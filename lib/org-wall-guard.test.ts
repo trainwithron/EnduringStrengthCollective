@@ -113,9 +113,10 @@ describe("the coach-level pages and pickers stand on the organization the coach 
     // every read of the coach's bookings and sessions on the calendar goes by the organization's groups (in groups of ids: lib/read-by-ids.ts)
     expect((cal.match(/readRowsByIds\(\s*orgGroupIds|readByIds\(\s*orgGroupIds/g) ?? []).length).toBeGreaterThanOrEqual(5);
   });
-  it("visiting a team or social group remembers it as the workspace, and the theme follows the workspace", () => {
+  it("visiting a team or social group remembers it as the workspace, and the theme follows the workspace (read once per request: lib/workspace-group-row.ts)", () => {
     expect(read("components/coach/coach-desktop-shell.tsx")).toContain("LAST_WORKSPACE_GROUP_COOKIE");
-    expect(read("lib/org-theme-server.ts")).toContain('get("last_workspace_group")');
+    expect(read("lib/org-theme-server.ts")).toContain("(await getWorkspaceGroupRow()).row?.organization_id");
+    expect(read("lib/workspace-group-row.ts")).toContain("get(LAST_WORKSPACE_GROUP_COOKIE)");
   });
 });
 

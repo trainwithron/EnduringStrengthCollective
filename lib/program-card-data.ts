@@ -6,6 +6,7 @@ import {
   type WeeklyVolumePoint,
   type CategorySplit,
 } from "./program-card-visuals";
+import { readRowsByIds } from "./read-by-ids";
 
 export interface ProgramCardVisualData {
   // Primary — always shown. Real, available data at plan-preview time
@@ -23,7 +24,8 @@ export interface ProgramCardVisualData {
 }
 
 // Batches every query needed to render program-card visuals for a whole
-// page of cards into a handful of `in()` calls — not one query per card.
+// page of cards — not one query per card. Every read goes in groups of ids, a page at a time (lib/read-by-ids.ts): a bare `in()` stopped silently at 1,000 rows, so a coach with
+// thousands of exercises and sets got charts cut off without a word (SPEED, Oct 19).
 // A program with zero workouts simply gets no entry in the returned map;
 // callers fall back to the plain placeholder for those.
 export async function computeProgramCardVisuals(
@@ -34,10 +36,9 @@ export async function computeProgramCardVisuals(
   const result = new Map<string, ProgramCardVisualData>();
   if (programIds.length === 0) return result;
 
-  const { data: workouts } = await supabase
-    .from("workouts")
-    .select("id, program_id, week_number")
-    .in("program_id", programIds);
+  const { data: workouts } = await readRowsByIds(programIds, (ids) => (from, to) =>
+    supabase.from("workouts").select("id, program_id, week_number").in("program_id", ids).order("id").range(from, to)
+  );
 
   if (!workouts || workouts.length === 0) return result;
 
@@ -46,12 +47,9 @@ export async function computeProgramCardVisuals(
   const programByWorkoutId = new Map(workouts.map((w) => [w.id, w.program_id as string]));
 
   const [{ data: exercises }, { data: logs }, { data: libraryRows }] = await Promise.all([
-    supabase
-      .from("group_workout_exercises")
-      .select("id, workout_id, exercise_name")
-      .in("workout_id", workoutIds),
-    supabase.from("workout_logs").select("workout_id, total_volume").in("workout_id", workoutIds),
-    supabase.from("exercise_library").select("name, category").eq("created_by", coachId),
+    readRowsByIds(workoutIds, (ids) => (from, to) => supabase.from("group_workout_exercises").select("id, workout_id, exercise_name").in("workout_id", ids).order("id").range(from, to)),
+    readRowsByIds(workoutIds, (ids) => (from, to) => supabase.from("workout_logs").select("id, workout_id, total_volume").in("workout_id", ids).order("id").range(from, to)),
+    readRowsByIds([coachId], () => (from, to) => supabase.from("exercise_library").select("id, name, category").eq("created_by", coachId).order("id").range(from, to)),
   ]);
 
   const categoryByName = new Map((libraryRows ?? []).map((r) => [r.name as string, r.category as string | null]));
@@ -60,20 +58,23 @@ export async function computeProgramCardVisuals(
 
   const [{ data: sets }, { data: completedSetLogs }] = await Promise.all([
     exerciseIds.length
-      ? supabase
-          .from("group_workout_exercise_sets")
-          .select("group_workout_exercise_id, target_weight, target_reps")
-          .in("group_workout_exercise_id", exerciseIds)
+      ? readRowsByIds(exerciseIds, (ids) => (from, to) =>
+          supabase.from("group_workout_exercise_sets").select("id, group_workout_exercise_id, target_weight, target_reps").in("group_workout_exercise_id", ids).order("id").range(from, to)
+        )
       : Promise.resolve({ data: [] as any[] }),
     // Real completed reps, for the primary (weight-free) series — joined
     // through session_exercises rather than workout_logs, since a
     // workout_log row only carries a weighted total, never a rep count.
     exerciseIds.length
-      ? supabase
-          .from("set_logs")
-          .select("reps, session_exercises!inner ( group_workout_exercise_id )")
-          .eq("status", "completed")
-          .in("session_exercises.group_workout_exercise_id", exerciseIds)
+      ? readRowsByIds(exerciseIds, (ids) => (from, to) =>
+          supabase
+            .from("set_logs")
+            .select("id, reps, session_exercises!inner ( group_workout_exercise_id )")
+            .eq("status", "completed")
+            .in("session_exercises.group_workout_exercise_id", ids)
+            .order("id")
+            .range(from, to)
+        )
       : Promise.resolve({ data: [] as any[] }),
   ]);
 
