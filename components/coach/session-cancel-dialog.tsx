@@ -55,9 +55,12 @@ export function CancelSessionDialog({ target, onClose, onDone }: { target: Cance
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-graphite/70 px-4" role="presentation" onClick={busy ? undefined : onClose}>
       <div role="dialog" aria-modal="true" aria-label="Cancel this session" className="w-full max-w-sm bg-surface border border-steel/30 p-4" onClick={(e) => e.stopPropagation()}>
-        <p className="font-display font-bold uppercase text-sm tracking-wide text-chalk">{target.name}</p>
-        <p className="font-body text-xs text-steel mt-0.5">{target.whenLabel}</p>
-        <p className="font-body text-sm text-chalk mt-3">Cancel this session? Anything already taken for it goes back to their sessions.</p>
+        <p className="font-display font-bold uppercase text-sm tracking-wide text-rust">Cancel a booked session</p>
+        <p className="font-display font-bold text-lg leading-tight text-chalk mt-2">{target.name}</p>
+        <p className="font-body text-sm text-chalk">{target.whenLabel}</p>
+        <p className="font-body text-sm text-steel mt-3">
+          This takes {target.name}&apos;s session off the calendar. It does not book anything. Anything already taken for it goes back to their sessions.
+        </p>
         {error && (
           <p className="font-body text-xs text-rust mt-2" role="alert">
             {error}
@@ -67,19 +70,19 @@ export function CancelSessionDialog({ target, onClose, onDone }: { target: Cance
           {target.seriesId ? (
             <>
               <button type="button" disabled={busy} onClick={() => seriesAction("skip")} className="min-h-11 bg-rust text-graphite font-display font-bold uppercase tracking-wide px-4 py-2 disabled:opacity-40">
-                {busy ? "Cancelling…" : "Just this one"}
+                {busy ? "Cancelling…" : `Cancel only this one (${target.whenLabel})`}
               </button>
               <button type="button" disabled={busy} onClick={() => seriesAction("end_from_here")} className="min-h-11 border border-rust text-rust font-display font-bold uppercase tracking-wide px-4 py-2 disabled:opacity-40">
-                This and the rest of the series
+                Cancel this one and every later one
               </button>
             </>
           ) : (
             <button type="button" disabled={busy} onClick={cancelSingle} className="min-h-11 bg-rust text-graphite font-display font-bold uppercase tracking-wide px-4 py-2 disabled:opacity-40">
-              {busy ? "Cancelling…" : "Cancel this session"}
+              {busy ? "Cancelling…" : `Cancel ${target.name}'s session`}
             </button>
           )}
           <button type="button" disabled={busy} onClick={onClose} className="min-h-11 font-body text-sm text-steel">
-            Keep it
+            Keep the session
           </button>
         </div>
       </div>

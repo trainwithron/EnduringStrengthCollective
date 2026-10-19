@@ -461,7 +461,8 @@ export function DayTimeGrid({
               return (
                 <div key={`s${i}`} className="absolute" style={{ top: top - halo, height: height + halo * 2, left: `${(lane / count) * 100}%`, width: `${100 / count}%` }}>
                   {bufferMinutes > 0 && <div className="absolute inset-0 border border-dashed border-blue-400/40" aria-hidden="true" />}
-                  {item.bookingId && item.startMs > Date.now() ? (
+                  {/* While a client is picked for scheduling, a booked session is NOT a button: a tap next to it (the usual way to miss a slot) must never open a cancel for someone else's session. Cancel is for when no client is picked. */}
+                  {item.bookingId && item.startMs > Date.now() && !client ? (
                     <button
                       type="button"
                       aria-label={`${item.name}, ${item.time}. Cancel this session`}
@@ -477,7 +478,7 @@ export function DayTimeGrid({
                       </span>
                     </button>
                   ) : (
-                    <div className="absolute left-0.5 right-0.5 bg-blue-500/35 border border-blue-400 px-1 overflow-hidden" style={{ top: halo, height }}>
+                    <div className="absolute left-0.5 right-0.5 bg-blue-500/35 border border-blue-400 px-1 overflow-hidden" style={{ top: halo, height }} title={item.bookingId && client ? "To cancel this session, clear the picked client first." : undefined}>
                       <span className="font-body text-[11px] leading-tight text-chalk block truncate">
                         {item.time} {item.name}
                       </span>
