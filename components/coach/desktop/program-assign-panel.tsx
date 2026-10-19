@@ -49,7 +49,7 @@ export function ProgramAssignPanel({ programId, programName, groupId, aiDraft, o
   const [error, setError] = useState<string | null>(null);
 
   async function reloadAssigned() {
-    setAssigned(await loadAssignedTo(createBrowserClient(), programId));
+    setAssigned(await loadAssignedTo(createBrowserClient(), programId, { includeSelf: true }));
   }
 
   useEffect(() => {

@@ -130,8 +130,9 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
   // the program's "Assigned to" and on the client's profile); the "One client" filter brings a client's copies in. Scoped to one client (?client=), their own programs show as before.
   const scoped = scopePrograms(all, clientId, clientGroupId);
   const cards = clientId ? scoped : defaultList(scoped);
-  const assignedCounts = clientId ? new Map<string, number>() : await countAssignedTo(supabase, scoped.filter((c) => !c.athleteId).map((c) => c.id));
-  for (const c of scoped) if (!c.athleteId) c.assignedCount = assignedCounts.get(c.id) ?? 0;
+  // "Assigned to (n)": the people holding copies, plus the person holding the program itself (the first person a program is assigned to gets the original).
+  const assignedCounts = clientId ? new Map<string, number>() : await countAssignedTo(supabase, scoped.filter((c) => !c.sourceProgramId).map((c) => c.id));
+  for (const c of scoped) if (!c.sourceProgramId) c.assignedCount = (assignedCounts.get(c.id) ?? 0) + (c.athleteId ? 1 : 0);
   // A phone gets simple cards in the mobile shell (not this desktop page squeezed): name, Active, days, tap to open.
   if (await prefersAthleteStyleView()) {
     return (

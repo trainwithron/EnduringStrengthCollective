@@ -1543,6 +1543,17 @@
   ]
  },
  {
+  "n": "176",
+  "slug": "0424",
+  "title": "0424 FIX 2: the first person a program is assigned to gets the original, later people get a copy (replaces one function)",
+  "migrations": [
+   "0424"
+  ],
+  "notApplied": [
+   "not exists (select 1 from pg_proc p where p.oid = to_regprocedure('public.assign_program_to_client(uuid, uuid, uuid, text, date)') and position('c.source_program_id = src.id' in p.prosrc) > 0)"
+  ]
+ },
+ {
   "n": "170",
   "slug": "0418",
   "title": "0418 Release AF3: database policies from the post-ship audit (a private client stays private in posts and tags; two undecided account-deletion links decided; the guardian-consent answer limited for a coach; the health-form flag cleared when the last client seat goes)",

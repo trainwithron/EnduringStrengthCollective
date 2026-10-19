@@ -49,30 +49,49 @@ describe("assigning an AI draft: the click on Assign is the approval", () => {
   });
 });
 
-describe("assigning always gives the person their own version (the library program stays)", () => {
-  it("makes a copy through the one copy step, with no client name added, and reports it was not attached", async () => {
-    const calls: { name: string; args: Record<string, unknown> }[] = [];
-    const fake = (data: unknown, error: unknown = null) => ({
-      auth: { getUser: async () => ({ data: { user: { id: "coach" } } }) },
-      rpc: async (name: string, args: Record<string, unknown>) => {
-        calls.push({ name, args });
-        return { data, error };
-      },
-    });
-    const copied = await assignProgramToClient(fake("p2") as never, { sourceProgramId: "p1", destinationGroupId: "g", athleteId: "a", startDate: "2026-12-01" });
+describe("the first person gets the original, later people get a copy (Ron: \"first person gets the original\")", () => {
+  const calls: { name: string; args: Record<string, unknown> }[] = [];
+  const fake = (data: unknown, error: unknown = null) => ({
+    rpc: (name: string, args: Record<string, unknown>) => {
+      calls.push({ name, args });
+      return { single: async () => ({ data, error }) };
+    },
+  });
+  it("asks the database step, with no client name, and passes on whether the program itself was handed over", async () => {
+    calls.length = 0;
+    const handed = await assignProgramToClient(fake({ assigned_program_id: "p1", was_attached: true }) as never, { sourceProgramId: "p1", destinationGroupId: "g", athleteId: "a", startDate: "2026-12-01" });
+    expect(handed).toEqual({ programId: "p1", attached: true });
+    expect(calls[0]).toEqual({ name: "assign_program_to_client", args: { p_program_id: "p1", p_destination_group_id: "g", p_athlete_id: "a", p_client_name: null, p_start_date: "2026-12-01" } });
+    const copied = await assignProgramToClient(fake({ assigned_program_id: "p2", was_attached: false }) as never, { sourceProgramId: "p1", destinationGroupId: "g", athleteId: "b" });
     expect(copied).toEqual({ programId: "p2", attached: false });
-    expect(calls[0]).toEqual({ name: "duplicate_program", args: { p_source_program_id: "p1", p_destination_group_id: "g", p_created_by: "coach", p_athlete_id: "a", p_client_name: null, p_start_date: "2026-12-01" } });
-    const failed = await assignProgramToClient(fake(null, { message: "nope" }) as never, { sourceProgramId: "p1", destinationGroupId: "g", athleteId: "a" });
-    expect(failed).toEqual({ error: "nope" });
+    expect(calls[1].args.p_start_date).toBeNull();
+  });
+  it("an error from the database is passed on as it is", async () => {
+    expect(await assignProgramToClient(fake(null, { message: "That client is not in that group." }) as never, { sourceProgramId: "p1", destinationGroupId: "g", athleteId: "a" })).toEqual({ error: "That client is not in that group." });
+    expect(await assignProgramToClient(fake(null) as never, { sourceProgramId: "p1", destinationGroupId: "g", athleteId: "a" })).toEqual({ error: "Couldn't assign the program." });
   });
 
-  it("the Assign panel, the client's Programs tab and the package auto-assign all copy; nothing attaches any more", () => {
+  it("the Assign panel, the client's Programs tab, the banner and Use template assign through it; the package auto-assign, Stripe and Duplicate still copy", () => {
     expect(read("components/coach/desktop/program-assign-panel.tsx")).toContain("assignProgramToClient(supabase");
     expect(read("components/coach/client-program-actions.tsx")).toContain("assignProgramToClient(supabase");
     expect(read("app/api/coach/package-assignments/route.ts")).toContain("duplicateProgram(");
     const lib = read("lib/program-duplication.ts");
-    expect(lib).toContain("duplicateProgram(supabase, { sourceProgramId, destinationGroupId, createdBy: user.id, athleteId, startDate })");
-    expect(lib).not.toContain('rpc("assign_program_to_client"');
+    expect(lib).toContain('.rpc("assign_program_to_client", {');
+    expect(lib).toContain("return { programId: row.assigned_program_id, attached: row.was_attached === true };");
+  });
+
+  it("the database step (0424): 0337 word for word plus the three conditions; no delete; the same grants", () => {
+    const sql = read("supabase/migrations/0424_first_assignee_gets_the_original.sql");
+    const old = read("supabase/migrations/0337_assign_same_org_only.sql");
+    expect(sql).toContain("(v_kind = 'one_on_one' or src.is_active = false or not exists (select 1 from public.group_memberships gm where gm.group_id = src.group_id and gm.role = 'athlete'))");
+    expect(sql).toContain("and not exists (select 1 from public.programs c where c.source_program_id = src.id and c.archived_at is null)");
+    expect(sql).toContain("and not exists (select 1 from public.workouts w join public.group_workout_exercises e on e.workout_id = w.id where w.program_id = src.id and e.is_slot)");
+    // every other 0337 line is kept as it was
+    const body = (s: string) => s.slice(s.indexOf("create or replace function"));
+    const kept = body(old).split("\n").filter((l) => !l.includes("(v_kind = 'one_on_one' or src.is_active = false)"));
+    for (const line of kept) expect(body(sql), line).toContain(line);
+    expect(sql).not.toMatch(/delete from/i);
+    expect(sql).toContain("grant execute on function public.assign_program_to_client(uuid, uuid, uuid, text, date) to authenticated, service_role;");
   });
 
   it("the database step: attach only a no-client, non-draft program that is a one-on-one template or inactive, with no history; it moves the children and activates; otherwise it copies", () => {

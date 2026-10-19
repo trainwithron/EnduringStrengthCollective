@@ -53,17 +53,24 @@ export async function duplicateProgram(
   return { programId: data as string };
 }
 
-// Assigning a program to ONE person. It ALWAYS makes that person's own independent version (an instance: own progress, own edits, no overlap with anyone else's) and the library program stays
-// as the one visible entry. The instance keeps the program's own name (no client name is added). A program that is an AI draft must be signed off first by the caller (a copy of a draft is a draft).
+// Assigning a program to ONE person (Ron, asked four times: "first person gets the original"). The FIRST person a library program goes to gets the program itself; everyone after gets their own
+// independent copy (own progress, own edits, no overlap). The database decides (public.assign_program_to_client, migration 0424): it hands the program over only when nobody has it or a copy of it yet,
+// it has no history, it is not a template with slots, and it stays inside one organization (so "Me", in the coach's personal space, which belongs to no organization, always gets a copy). The copy keeps
+// the program's own name (no client name is added). A program that is an AI draft must be signed off first by the caller.
 export async function assignProgramToClient(
   supabase: SupabaseClient,
   { sourceProgramId, destinationGroupId, athleteId, startDate }: { sourceProgramId: string; destinationGroupId: string; athleteId: string; startDate?: string }
 ): Promise<{ programId: string; attached: boolean } | { error: string }> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Sign in again to assign this program." };
-  const result = await duplicateProgram(supabase, { sourceProgramId, destinationGroupId, createdBy: user.id, athleteId, startDate });
-  if ("error" in result) return { error: result.error };
-  return { programId: result.programId, attached: false };
+  const { data, error } = await supabase
+    .rpc("assign_program_to_client", {
+      p_program_id: sourceProgramId,
+      p_destination_group_id: destinationGroupId,
+      p_athlete_id: athleteId,
+      p_client_name: null,
+      p_start_date: startDate ?? null,
+    })
+    .single();
+  const row = data as { assigned_program_id?: string | null; was_attached?: boolean | null } | null;
+  if (error || !row?.assigned_program_id) return { error: error?.message ?? "Couldn't assign the program." };
+  return { programId: row.assigned_program_id, attached: row.was_attached === true };
 }
