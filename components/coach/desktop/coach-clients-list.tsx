@@ -112,7 +112,7 @@ export function ClientsListView({ rows }: { rows: CoachClientRow[] }) {
                     </span>
                   </span>
                 </Link>
-                <ClientRowMenu groupId={c.groupId} athleteId={c.id} athleteName={c.fullName} setAside={!!c.setAside} />
+                <ClientRowMenu groupId={c.groupId} athleteId={c.id} athleteName={c.fullName} setAside={!!c.setAside} clientType={clientKind(c)} />
               </li>
             ))}
           </ul>
@@ -163,7 +163,7 @@ export function ClientsCardView({ rows }: { rows: CoachClientRow[] }) {
             </span>
           </Link>
           <div className="absolute top-0 right-0">
-            <ClientRowMenu groupId={c.groupId} athleteId={c.id} athleteName={c.fullName} setAside={!!c.setAside} />
+            <ClientRowMenu groupId={c.groupId} athleteId={c.id} athleteName={c.fullName} setAside={!!c.setAside} clientType={clientKind(c)} />
           </div>
         </li>
       ))}

@@ -5,6 +5,8 @@ import { ChevronDown, ChevronRight, Search } from "lucide-react";
 import { CalendarClientList, type CalendarClientRow } from "./calendar-client-list";
 import { useCalendarScheduling } from "./calendar-scheduling-context";
 import { inactiveKey } from "@/lib/inactive-ids";
+import { isOnlineClient, offeredForBooking } from "@/lib/client-type";
+import { useShowOnlineClients } from "@/components/coach/use-show-online-clients";
 import { ClientSchedulePanel } from "./client-schedule-panel";
 
 // The calendar's client list, at the top of the rail where the coach drags from (Ron, Oct 6): searchable, collapsible, scrolling on its own, with clients the
@@ -26,13 +28,18 @@ export function CalendarClientRail({
   const [open, setOpen] = useState(true);
   const [query, setQuery] = useState("");
   const [showSetAside, setShowSetAside] = useState(false);
+  const [showOnline, setShowOnline] = useShowOnlineClients();
   const { client: picked } = useCalendarScheduling();
 
   const aside = useMemo(() => new Set(setAsideKeys), [setAsideKeys]);
   const isAside = (c: CalendarClientRow) => aside.has(inactiveKey(c.groupId, c.profileId));
   const asideCount = clients.filter(isAside).length;
+  // Online clients are left out until asked for (Ron, Oct 19); the person picked always stays in.
+  const onlineCount = clients.filter((c) => !isAside(c) && isOnlineClient(c.tier)).length;
   const q = query.trim().toLowerCase();
-  const rows = clients.filter((c) => (showSetAside || !isAside(c) || picked?.athleteId === c.profileId) && (q === "" || c.fullName.toLowerCase().includes(q)));
+  const offered = offeredForBooking(clients, { tierOf: (c) => c.tier, isSetAside: isAside, showOnline, showSetAside, keep: (c) => picked?.athleteId === c.profileId });
+  const rows = offered.filter((c) => q === "" || c.fullName.toLowerCase().includes(q));
+  const inListCount = offeredForBooking(clients, { tierOf: (c) => c.tier, isSetAside: isAside, showOnline }).length;
 
   return (
     <section aria-label="Clients" className="mb-6">
@@ -43,7 +50,7 @@ export function CalendarClientRail({
         className="w-full flex items-center justify-between min-h-[32px] font-display uppercase text-sm tracking-wide text-steel"
       >
         <span>
-          Clients <span className="font-body normal-case text-xs">({clients.length - asideCount})</span>
+          Clients <span className="font-body normal-case text-xs">({inListCount})</span>
         </span>
         {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
       </button>
@@ -68,6 +75,11 @@ export function CalendarClientRail({
             <CalendarClientList clients={rows} selectedClientId={selectedClientId} />
           </div>
           {picked && <ClientSchedulePanel key={picked.athleteId} client={picked} timezone={timezone} sessionTypes={sessionTypes} />}
+          {onlineCount > 0 && (
+            <button type="button" aria-pressed={showOnline} onClick={() => setShowOnline(!showOnline)} className="mt-2 mr-3 font-body text-xs text-steel underline underline-offset-2">
+              {showOnline ? "Hide online clients" : `Show online clients (${onlineCount})`}
+            </button>
+          )}
           {asideCount > 0 && (
             <button type="button" onClick={() => setShowSetAside((s) => !s)} className="mt-2 font-body text-xs text-steel underline underline-offset-2">
               {showSetAside ? "Hide set-aside" : `Show set-aside (${asideCount})`}

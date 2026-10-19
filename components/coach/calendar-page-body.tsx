@@ -165,12 +165,20 @@ export async function CoachCalendarPageBody(
     const balanceByClientGroup = new Map((creditRows ?? []).map((r) => [`${r.athlete_id}:${r.group_id}`, r.balance as number]));
 
     const phoneCounts = await fetchBookingCounts(supabase, { coachId: user.id });
+    // Each client's type and whether they are set aside, for the list the coach picks from (Online and set-aside clients are left out until asked for).
+    const [phoneTierBatches, phoneAsideKeys] = await Promise.all([
+      Promise.all(chunk(clientIds, 100).map((ids) => supabase.from("group_memberships").select("profile_id, group_id, client_tier").in("profile_id", ids).eq("role", "athlete"))),
+      fetchInactiveKeys(supabase, Array.from(new Set(coachClients.map((c) => c.groupId)))),
+    ]);
+    const phoneTierByKey = new Map(phoneTierBatches.flatMap((r) => r.data ?? []).map((m: any) => [`${m.group_id}:${m.profile_id}`, (m.client_tier as ClientTierLite) ?? null]));
     const scheduleClients = coachClients.map((c) => ({
       id: c.id,
       fullName: c.fullName,
       groupId: c.groupId,
       balance: balanceByClientGroup.get(`${c.id}:${c.groupId}`) ?? 0,
       booked: phoneCounts.get(`${c.id}:${c.groupId}`)?.booked ?? 0,
+      tier: phoneTierByKey.get(`${c.groupId}:${c.id}`) ?? null,
+      setAside: phoneAsideKeys.has(inactiveKey(c.groupId, c.id)),
     }));
 
     if (!searchParams.scheduleFor) {
@@ -584,14 +592,15 @@ export async function CoachCalendarPageBody(
       );
     }
 
-    let scheduleClientsForCoach: { id: string; fullName: string; balance: number }[] = [];
+    let scheduleClientsForCoach: { id: string; fullName: string; balance: number; tier?: ClientTierLite; setAside?: boolean }[] = [];
     if (isCoach && !isActingAsOther) {
       const { data: cm } = await supabase
         .from("group_memberships")
-        .select("profile_id, profiles ( full_name )")
+        .select("profile_id, client_tier, profiles ( full_name )")
         .eq("group_id", params.groupId)
         .eq("role", "athlete");
       const ids = (cm ?? []).map((m: any) => m.profile_id);
+      const asideHere = await fetchInactiveKeys(supabase, [params.groupId]);
       const { data: cr } = await supabase
         .from("session_credits")
         .select("athlete_id, balance")
@@ -603,6 +612,8 @@ export async function CoachCalendarPageBody(
           id: m.profile_id,
           fullName: m.profiles?.full_name ?? "Unknown",
           balance: balances.get(m.profile_id) ?? 0,
+          tier: (m.client_tier as ClientTierLite) ?? null,
+          setAside: asideHere.has(inactiveKey(params.groupId, m.profile_id)),
         }))
         .sort((a, b) => a.fullName.localeCompare(b.fullName));
     }
@@ -1052,6 +1063,8 @@ export async function CoachCalendarPageBody(
 
   const balanceByClientGroup = new Map((creditRows ?? []).map((r) => [`${r.athlete_id}:${r.group_id}`, r.balance as number]));
 
+  // Each client's type (In person / Online / Group) is the tier the coach set; Online clients are left out of the list until asked for.
+  const tierByClientGroup = new Map(membershipBatches.flatMap((r) => r.data ?? []).map((m: any) => [`${m.group_id}:${m.profile_id}`, (m.client_tier as ClientTierLite) ?? null]));
   const clients = coachClients.map((c) => ({
     profileId: c.id,
     fullName: c.fullName,
@@ -1059,6 +1072,7 @@ export async function CoachCalendarPageBody(
     balance: balanceByClientGroup.get(`${c.id}:${c.groupId}`) ?? 0,
     booked: bookingCounts.get(`${c.id}:${c.groupId}`)?.booked ?? 0,
     toMark: bookingCounts.get(`${c.id}:${c.groupId}`)?.toMark ?? 0,
+    tier: tierByClientGroup.get(`${c.groupId}:${c.id}`) ?? null,
   }));
 
   // Who the coach has set aside (left out of the flags and hidden in the list until asked for), and what the app knows about each client's start: when they
