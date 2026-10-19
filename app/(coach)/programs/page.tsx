@@ -136,7 +136,8 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
   if (await prefersAthleteStyleView()) {
     return (
       <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
-        <CoachMobileShell groupId={anchor.id} groupName={anchor.name}>
+        {/* Programs lives under More on the phone, so More is lit here (not Home). */}
+        <CoachMobileShell groupId={anchor.id} groupName={anchor.name} activeOverride="more">
           <header className="px-5 pt-16 pb-3">
             <h1 className="font-display font-bold text-3xl leading-none uppercase">
               <SwappableTerm termKey="program" form="plural" className="capitalize" />

@@ -202,7 +202,7 @@ describe("Programs on a phone", () => {
     const page = src("app/(coach)/programs/page.tsx");
     expect(page).toContain("if (await prefersAthleteStyleView())");
     expect(page.indexOf("<ProgramsPhoneList")).toBeLessThan(page.indexOf("<ProgramsList "));
-    expect(page).toContain("<CoachMobileShell groupId={anchor.id} groupName={anchor.name}>");
+    expect(page).toContain("<CoachMobileShell groupId={anchor.id} groupName={anchor.name} activeOverride=\"more\">");
   });
 });
 

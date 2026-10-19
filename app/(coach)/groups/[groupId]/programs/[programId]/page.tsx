@@ -27,6 +27,8 @@ import { ProgrammingSpotterPanel } from "@/components/coach/desktop/programming-
 import { getProgramBuilderData } from "@/lib/program-builder-data";
 import { Lock } from "lucide-react";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
+import { getEffectiveAthlete } from "@/lib/acting-as";
+import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
 import { ProgramPlainView } from "@/components/shared/program-plain-view-server";
 
 export const metadata = { title: "Programs" };
@@ -84,14 +86,24 @@ export default async function ProgramDetailPage(
 
   // On a phone a program opens as a plain view (every week, pick the week and the day, log it); the builder is one tap away for the coach ("Edit program", ?edit=1). Desktop is unchanged.
   if (!searchParams.edit && (await prefersAthleteStyleView())) {
-    return (
+    // A real coach (not acting as a client) sees it inside the coach's phone app: the bottom bar (More lit: Programs lives under More) and the Spotlight button, never a dead end with only Back.
+    const coachShell = membership.role === "coach" && !(await getEffectiveAthlete(params.groupId, user.id)).isActingAsOther;
+    const view = (
       <ProgramPlainView
+        belowSpotlight={coachShell}
         groupId={params.groupId}
         programId={params.programId}
         userId={user.id}
         isCoach={membership.role === "coach"}
         program={{ name: program.name, start_date: program.start_date, training_days: program.training_days, visibility_window: program.visibility_window as VisibilityWindow | null, athlete_id: (program as { athlete_id?: string | null }).athlete_id ?? null }}
       />
+    );
+    return coachShell ? (
+      <CoachMobileShell groupId={params.groupId} groupName="" activeOverride="more">
+        {view}
+      </CoachMobileShell>
+    ) : (
+      view
     );
   }
 

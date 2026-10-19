@@ -17,6 +17,7 @@ export async function ProgramPlainView({
   backHref,
   workoutHrefBase,
   startLabel,
+  belowSpotlight = false,
 }: {
   groupId: string;
   programId: string;
@@ -27,6 +28,7 @@ export async function ProgramPlainView({
   backHref?: string;
   workoutHrefBase?: string;
   startLabel?: string;
+  belowSpotlight?: boolean;
   program: { name: string; start_date: string | null; training_days: number[] | null; visibility_window: VisibilityWindow | null; athlete_id: string | null };
 }) {
   const supabase = await createServerClient();
@@ -122,6 +124,7 @@ export async function ProgramPlainView({
       editHref={isCoach && !workoutHrefBase ? `/groups/${groupId}/programs/${programId}?edit=1` : null}
       workoutHrefBase={workoutHrefBase ?? `/groups/${groupId}/workouts`}
       startLabel={startLabel}
+      belowSpotlight={belowSpotlight}
       canEdit={isCoach && !workoutHrefBase}
       assign={canAssign ? { programId, programName: program.name, groupId, aiDraft: (draftRow as { ai_draft?: boolean } | null)?.ai_draft === true } : null}
       isCoachViewing={isCoach && !!program.athlete_id && program.athlete_id !== userId}

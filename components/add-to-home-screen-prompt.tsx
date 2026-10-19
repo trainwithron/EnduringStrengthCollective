@@ -26,6 +26,8 @@ const SIGNED_IN_PREFIXES = ["/groups", "/dashboard", "/sessions", "/partners"];
 // instead — that's a platform limitation, not something a web app can
 // route around. While the first-run guide card is on screen it does this job,
 // so the banner steps aside.
+export const SPOTLIGHT_SELECTOR = 'button[aria-label="Spotlight"]';
+
 export function AddToHomeScreenPrompt() {
   const pathname = usePathname();
   const inApp = SIGNED_IN_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
@@ -33,6 +35,16 @@ export function AddToHomeScreenPrompt() {
   const [platform, setPlatform] = useState<DevicePlatform>("desktop");
   const [hasDeferred, setHasDeferred] = useState(false);
   const [guideOn, setGuideOn] = useState(false);
+  // The coach's Spotlight button is fixed at the top centre (12 to 52px down) on every coach phone page: while it is on the page the banner starts below it, so it never covers it.
+  const [spotlightOn, setSpotlightOn] = useState(false);
+  useEffect(() => {
+    if (!visible) return;
+    const check = () => setSpotlightOn(!!document.querySelector(SPOTLIGHT_SELECTOR));
+    check();
+    const mo = new MutationObserver(check);
+    mo.observe(document.body, { childList: true, subtree: true });
+    return () => mo.disconnect();
+  }, [visible, pathname]);
 
   useEffect(() => {
     startInstallPromptCapture();
@@ -85,7 +97,8 @@ export function AddToHomeScreenPrompt() {
     <div
       role="region"
       aria-label="Add to home screen"
-      className="relative z-10 lg:hidden bg-surface border-b border-steel/30 pl-4 pr-16 py-3 flex items-start gap-3"
+      className={`relative z-10 lg:hidden bg-surface border-b border-steel/30 pl-4 pr-16 py-3 flex items-start gap-3 ${spotlightOn ? "mt-14 border-t" : ""}`}
+      data-below-spotlight={spotlightOn || undefined}
     >
       <div className="flex-1 min-w-0">
         <p className="font-body text-sm font-medium text-chalk">
