@@ -71,15 +71,15 @@ export async function POST(request: Request) {
   if (existingId) {
     const { data: spaceOrg } = await serviceRole.from("groups").select("organization_id").eq("id", groupId).maybeSingle();
     const { data: theirSpaces } = await serviceRole.from("group_memberships").select("group_id, groups ( group_kind, organization_id )").eq("profile_id", existingId).eq("role", "athlete");
-    const spaceIds = ((theirSpaces ?? []) as { group_id: string }[]).map((r) => r.group_id);
-    const { data: myCoachRows } = spaceIds.length > 0 ? await serviceRole.from("group_memberships").select("group_id").eq("profile_id", user.id).eq("role", "coach").in("group_id", spaceIds) : { data: [] as { group_id: string }[] };
-    const mine = new Set(((myCoachRows ?? []) as { group_id: string }[]).map((r) => r.group_id));
-    const candidates: ClientSpaceCandidate[] = ((theirSpaces ?? []) as any[]).map((r) => ({
-      groupId: r.group_id as string,
-      groupKind: (r.groups?.group_kind ?? "") as string,
-      organizationId: (r.groups?.organization_id ?? null) as string | null,
-      coachedByCaller: mine.has(r.group_id as string),
-    }));
+    // Only this organization's spaces, a handful at most; for each, one check that the caller coaches it.
+    const sameOrg = ((theirSpaces ?? []) as any[])
+      .filter((r) => r.group_id !== groupId && r.groups?.organization_id && r.groups.organization_id === (spaceOrg as { organization_id?: string | null } | null)?.organization_id)
+      .slice(0, 10);
+    const candidates: ClientSpaceCandidate[] = [];
+    for (const r of sameOrg) {
+      const { data: seat } = await serviceRole.from("group_memberships").select("role").eq("group_id", r.group_id).eq("profile_id", user.id).maybeSingle();
+      candidates.push({ groupId: r.group_id as string, groupKind: (r.groups?.group_kind ?? "") as string, organizationId: (r.groups?.organization_id ?? null) as string | null, coachedByCaller: seat?.role === "coach" });
+    }
     const existingSpace = pickExistingSpace(candidates, groupId, (spaceOrg as { organization_id?: string | null } | null)?.organization_id ?? null);
     if (existingSpace) {
       const result = await resendAccess({ supabase, serviceRole, coachId: user.id, groupId: existingSpace, athleteId: existingId, origin: appOrigin(request) });
