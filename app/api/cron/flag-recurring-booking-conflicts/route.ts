@@ -125,7 +125,7 @@ async function handler(request: Request) {
       body,
       link_path: `/groups/${entry.groupId}/calendar`,
     });
-    await sendCoachPush(supabase, coachId, "booking_conflicts", "Recurring sessions need a look", body, `/groups/${entry.groupId}/calendar`, { daytimeOnly: true });
+    await sendCoachPush(supabase, coachId, "bookings", "Recurring sessions need a look", body, `/groups/${entry.groupId}/calendar`, { daytimeOnly: true });
   }
 
   return NextResponse.json({ ok: true, flaggedCount });

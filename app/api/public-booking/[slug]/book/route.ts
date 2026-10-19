@@ -5,7 +5,7 @@ import { normalizeEmail } from "@/lib/public-booking";
 import { canSignProofs, checkEmailProof, checkFormToken } from "@/lib/public-booking-proof";
 import { rateLimitAllows } from "@/lib/rate-limit";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { sendPushToProfile } from "@/lib/send-push";
+import { sendCoachPush } from "@/lib/coach-notice";
 import { isEmailConfigured, sendEmail } from "@/lib/email";
 import { formatInTimezone } from "@/lib/format-in-timezone";
 import { appOrigin } from "@/lib/app-url";
@@ -67,7 +67,7 @@ export async function POST(request: Request, props: { params: Promise<{ slug: st
   // Tell the coach (a push) and, when an email sender is set up, the visitor. Both best effort: the booking already happened.
   const db = createServiceRoleClient();
   try {
-    await sendPushToProfile(db, result.coachId, "New booking", `${result.guestName} booked ${result.typeName} for ${when}.`, `/groups/${result.groupId}/calendar`);
+    await sendCoachPush(db, result.coachId, "bookings", "New booking", `${result.guestName} booked ${result.typeName} for ${when}.`, `/groups/${result.groupId}/calendar`);
   } catch {
     // Quiet.
   }

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { sendPushToProfile } from "@/lib/send-push";
+import { coachNoticeIsOff } from "@/lib/coach-notice";
+import { kindFromPushUrl } from "@/lib/coach-notice-kinds";
 import { clampPush, mayPushTo, pushPairKey } from "@/lib/push-pair";
 import { rateLimitResponse } from "@/lib/rate-limit";
 import { safePushPath } from "@/lib/push-url";
@@ -39,6 +41,10 @@ export async function POST(request: Request) {
   // One sender never pings the same person more than ten times an hour through this route. (Per sender AND recipient: a coach receives pushes from every client, so a cap on the recipient alone would starve them.)
   const limitedTarget = await rateLimitResponse("push-to", pushPairKey(user.id, profileId), 10, 3600);
   if (limitedTarget) return limitedTarget;
-  const sent = await sendPushToProfile(db, profileId, title, body, safePushPath(payload.url));
+  // The recipient's own switch for this KIND of notice (read from the page the push opens): a coach who switched messages, client activity... off is not pushed about them.
+  const url = safePushPath(payload.url);
+  const kind = kindFromPushUrl(url);
+  if (kind && (await coachNoticeIsOff(db, profileId, kind))) return NextResponse.json({ sent: 0 });
+  const sent = await sendPushToProfile(db, profileId, title, body, url);
   return NextResponse.json({ sent });
 }
