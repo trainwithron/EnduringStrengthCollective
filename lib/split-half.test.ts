@@ -77,7 +77,15 @@ describe("the half is half the window until the coach drags it, then that width 
     expect(store.get("coach-shell-split-width")).toBe("612");
     expect(readSplitWidth(1600)).toBe(612);
     writeSplitWidth(99999);
-    expect(readSplitWidth(1600)).toBe(MAX_LIST_PANEL_WIDTH);
+    expect(readSplitWidth(4000)).toBe(MAX_LIST_PANEL_WIDTH);
+  });
+  it("a width dragged on a big monitor is cut to fit a smaller window (the rail and at least 200px of the other side always stay)", () => {
+    writeSplitWidth(1500);
+    expect(readSplitWidth(3440)).toBe(1500);
+    expect(readSplitWidth(1536)).toBe(1536 - 64 - 200);
+    expect(readSplitWidth(1280)).toBe(1016);
+    // a tiny window still gets the narrowest panel, never less
+    expect(readSplitWidth(400)).toBe(MIN_LIST_PANEL_WIDTH);
   });
   it("the panel reads and writes that width", () => {
     expect(panel).toContain("setWidth(readSplitWidth(window.innerWidth));");

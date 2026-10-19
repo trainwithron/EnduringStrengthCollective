@@ -49,11 +49,16 @@ export function defaultSplitWidth(windowWidth: number): number {
   return Math.max(MIN_LIST_PANEL_WIDTH, Math.round(windowWidth / 2));
 }
 
+// The widest the half may be on THIS window, the same limit the drag uses: room for the 64px icon rail and at least 200px of the other side. A width dragged on a big monitor never swallows a laptop's screen.
+export function maxSplitWidthFor(windowWidth: number): number {
+  return Math.max(MIN_LIST_PANEL_WIDTH, windowWidth - 64 - 200);
+}
+
 export function readSplitWidth(windowWidth: number): number {
   try {
     const raw = window.localStorage.getItem(SPLIT_WIDTH_KEY);
     const parsed = raw ? parseInt(raw, 10) : NaN;
-    if (Number.isFinite(parsed)) return Math.min(MAX_LIST_PANEL_WIDTH, Math.max(MIN_LIST_PANEL_WIDTH, parsed));
+    if (Number.isFinite(parsed)) return Math.min(MAX_LIST_PANEL_WIDTH, maxSplitWidthFor(windowWidth), Math.max(MIN_LIST_PANEL_WIDTH, parsed));
   } catch {
     // Storage unavailable: half the window.
   }
