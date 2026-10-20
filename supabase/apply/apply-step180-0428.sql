@@ -26,7 +26,8 @@ $guard$;
 -- attended ... Or just after it happened, it should prompt me, did this person come in? Did they reschedule?" Every booking ends as happened, no-show or late change, and no visit ever
 -- takes two sessions.
 --   1. match_booking_for_session(session): the client's session on the coach's calendar the same day (coach's time zone) that a logged workout belongs to; links it. Internal.
---   2. complete_workout_session: a workout the coach logs settles its booking (linked at Start, or matched now) ONCE. The old "Use 1 session credit" choice is gone (the column stays).
+--   2. complete_workout_session: a workout the coach logs settles its booking (linked at Start, or matched now) ONCE. The old "Use 1 session credit" box is gone from the app (a workout
+--      started with it ticked before the update, on no session of the calendar, still takes its one session).
 --      No booking: nothing is taken; the app asks "Put this on your calendar?" (create_walk_in_booking).
 --   3. resolve_no_show(booking, charge): marks a past session a no-show; Charge uses 1 session (nothing more when it was paid at booking), Waive uses none (gives back one paid at booking).
 --   4. set_booking_no_show: true = a no-show, waived; false = back to an ordinary session, giving back only what the no-show took.
@@ -146,8 +147,8 @@ $$;
 revoke all on function public.settle_booking_internal(uuid, integer, text, uuid, uuid, uuid) from public, anon, authenticated;
 
 -- ---- 1. the booking a logged workout belongs to ---------------------------------------------------------------------------------------------
--- Same client, same group, confirmed, not a no-show, not already linked to another logged workout, on the same calendar day as the workout's start in the booking coach's time zone. Several: the logging
--- coach's own first, then the nearest start. Whatever its credit state: settling takes a session only from an unpaid one, so a session paid at booking or a late move already charged
+-- Same client, same group, confirmed, not a no-show, not already linked to another logged workout, on the same calendar day as the workout's start in the booking coach's time zone, and not
+-- starting more than an hour after the workout finished. Several: the logging coach's own first, then the nearest start. Whatever its credit state: settling takes a session only from an unpaid one, so a session paid at booking or a late move already charged
 -- is settled with nothing more taken (and is never offered as a walk-in on top).
 create or replace function public.match_booking_for_session(p_session_id uuid)
 returns uuid
@@ -182,7 +183,9 @@ begin
          or not exists (select 1 from public.athlete_sessions o where o.booking_id = b.id and o.id <> p_session_id))
     and (b.start_at at time zone coalesce(public.coach_time_zone(b.coach_id), 'America/New_York'))::date
         = (v_s.started_at at time zone coalesce(public.coach_time_zone(b.coach_id), 'America/New_York'))::date
-  order by (b.attended_at is null) desc, coalesce(b.coach_id = auth.uid(), false) desc, abs(extract(epoch from (b.start_at - v_s.started_at))), b.id
+    -- Never a session later that day (a morning workout does not use the evening session); a session up to an hour after the finish still counts (logged early).
+    and b.start_at <= coalesce(v_s.completed_at, now()) + interval '60 minutes'
+  order by coalesce(b.coach_id = auth.uid(), false) desc, abs(extract(epoch from (b.start_at - v_s.started_at))), (b.attended_at is null) desc, b.id
   limit 1
   for update of b;
 
@@ -221,6 +224,11 @@ begin
     || '    -- takes a second session. No booking: nothing is taken here; the app offers it as a walk-in (create_walk_in_booking). The old "Use 1 session credit" choice is gone.' || chr(10)
     || '    -- An imported workout (a team sheet, imported history) is never matched to the calendar.' || chr(10)
     || '    v_credit_consumed := public.settle_booking_internal(coalesce(v_session.booking_id, case when v_session.import_batch_id is null and not coalesce(v_session.is_historical, false) then public.match_booking_for_session(p_session_id) end), v_credit_cost, ''Workout logged'', auth.uid(), v_session.athlete_id, v_session.group_id);' || chr(10)
+    || '    -- Started with the old box ticked (before the app update) and on no session of the calendar: its one session, as that box promised.' || chr(10)
+    || '    if not v_credit_consumed and v_session.deduct_session_credit and (select s.booking_id from public.athlete_sessions s where s.id = p_session_id) is null then' || chr(10)
+    || '      perform public.apply_session_credit_change(v_session.athlete_id, v_session.group_id, -v_credit_cost, ''delivered'', ''Workout logged'', null, auth.uid());' || chr(10)
+    || '      v_credit_consumed := true;' || chr(10)
+    || '    end if;' || chr(10)
     || '  end if;' || chr(10)
     || chr(10)
     || '  '
@@ -337,7 +345,7 @@ $$;
 revoke all on function public.set_booking_no_show(uuid, boolean) from public, anon;
 grant execute on function public.set_booking_no_show(uuid, boolean) to authenticated, service_role;
 
--- ---- 5. resolve_late_change: a charge is a session used; a late move is ONE session --------------------------------------------------------------
+-- ---- 5. resolve_late_change: a charge is a session used, and only what the visit's one session still lacks ---------------------------------------------
 create or replace function public.resolve_late_change(p_booking_id uuid, p_charge boolean)
 returns void
 language plpgsql
@@ -351,13 +359,15 @@ declare
   v_state text;
   v_kind text;
   v_credit_state text;
+  v_status text;
+  v_take int;
 begin
   if auth.uid() is null and auth.role() is distinct from 'service_role' then
     raise exception 'not authorized';
   end if;
 
-  select athlete_id, group_id, coach_id, late_charge_state, late_change_kind, credit_state
-    into v_athlete_id, v_group_id, v_coach_id, v_state, v_kind, v_credit_state
+  select athlete_id, group_id, coach_id, late_charge_state, late_change_kind, credit_state, status
+    into v_athlete_id, v_group_id, v_coach_id, v_state, v_kind, v_credit_state, v_status
   from public.bookings where id = p_booking_id
   for update;
 
@@ -374,20 +384,18 @@ begin
   end if;
 
   if p_charge then
-    if v_kind = 'reschedule' then
-      -- ONE session for a late move (Ron, Oct 19). Unpaid: this charge is that session, so the booking is settled and nothing more is taken when it happens.
-      -- Paid when it was booked, or already settled: nothing more, recorded as a 0 entry so the charge stays this visit's one session whatever is undone later.
-      -- A second late move of a session already charged for one: nothing at all.
-      if public.booking_late_move_charged(p_booking_id) then
-        null;
-      elsif v_credit_state in ('unsettled', 'waived') then
-        perform public.apply_session_credit_change(v_athlete_id, v_group_id, -1, 'delivered', 'Late reschedule, charged by your coach', p_booking_id, auth.uid());
-        update public.bookings set credit_state = 'settled' where id = p_booking_id;
-      else
-        perform public.apply_session_credit_change(v_athlete_id, v_group_id, 0, 'delivered', 'Late reschedule, charged by your coach', p_booking_id, auth.uid());
-      end if;
+    -- The visit's ONE session (Ron, Oct 19: a late move "should only be one session"): take only what this booking has not already taken (paid when it was booked, or settled
+    -- when it happened: nothing more; given back when it was cancelled: one). Always recorded, a 0 entry when nothing more is taken, so a charged late move stays this visit's one
+    -- session whatever is undone later. A second late move of a session already charged for one: nothing at all.
+    if v_kind = 'reschedule' and public.booking_late_move_charged(p_booking_id) then
+      null;
     else
-      perform public.apply_session_credit_change(v_athlete_id, v_group_id, -1, 'delivered', 'Late cancellation, charged by your coach', p_booking_id, auth.uid());
+      v_take := greatest(0, 1 - public.booking_taken(p_booking_id));
+      perform public.apply_session_credit_change(v_athlete_id, v_group_id, -v_take, 'delivered',
+        case when v_kind = 'reschedule' then 'Late reschedule, charged by your coach' else 'Late cancellation, charged by your coach' end, p_booking_id, auth.uid());
+      if v_take > 0 and v_status = 'confirmed' then
+        update public.bookings set credit_state = 'settled' where id = p_booking_id;
+      end if;
     end if;
     update public.bookings set late_charge_state = 'charged' where id = p_booking_id;
   else
@@ -474,6 +482,10 @@ begin
   v_late := v_is_athlete_cancelling and not v_should_refund and v_state in ('prepaid', 'settled', 'unsettled');
 
   update public.bookings set status = 'cancelled' where id = p_booking_id;
+  -- FIX 3 (0428): the coach cancelling gives the session back, so a late move still waiting for Charge or Waive has nothing left to decide.
+  if not v_is_athlete_cancelling then
+    update public.bookings set late_charge_state = 'waived' where id = p_booking_id and late_charge_state = 'flagged';
+  end if;
 
   if v_late then
     -- A client cancelling inside the window is FLAGGED for the coach, who decides whether it counts (Charge or Waive). Nothing is taken

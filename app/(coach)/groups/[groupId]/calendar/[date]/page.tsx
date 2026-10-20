@@ -739,7 +739,8 @@ export default async function CoachDayDetailPage(
       <span className="font-body text-xs text-steel">Booked — {(booking.profiles as any)?.full_name ?? "Client"}</span>
       {booking.needs_coach_resolution && <RecurringConflictBadge bookingId={booking.id} />}
       {typeByBooking.has(booking.id) && <BookingTypeSelect bookingId={booking.id} types={coachTypes} current={typeByBooking.get(booking.id) ?? null} />}
-      {settlementById.has(booking.id) && start.getTime() <= Date.now() + 12 * 3600 * 1000 && (
+      {/* A no-show is settled by its own Charge or Waive (FIX 3): undo the no-show to mark it happened. */}
+      {settlementById.has(booking.id) && !booking.no_show && start.getTime() <= Date.now() + 12 * 3600 * 1000 && (
         <MarkAttendedControl
           bookingId={booking.id}
           initialAttended={settlementById.get(booking.id)!.attended_at !== null}

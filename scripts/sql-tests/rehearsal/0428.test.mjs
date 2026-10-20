@@ -15,6 +15,7 @@ export default {
       const prog = (await db.query(`insert into public.programs (group_id, name, created_by) values ($1, 'F3', $2) returning id`, [g, coach])).rows[0].id;
 
       let n = 0;
+      const ago = (mins) => new Date(Date.now() - mins * 60000).toISOString();
       const client = async (name) => {
         const id = await h.user("F3 " + name);
         await h.member(g, id);
@@ -82,11 +83,13 @@ export default {
 
       const d = await client("Di");
       const dl = await log(d, "2026-09-04T17:00:00Z", { deduct: true });
-      h.check("no booking: logging takes nothing (even with the old 'Use 1 session credit' flag set) and links nothing",
-        (await bal(d)) === 10 && dl.consumed === false && dl.linked === null);
+      h.check("no booking, started with the old 'Use 1 session credit' box ticked (before the app update): its one session, as before",
+        (await bal(d)) === 9 && dl.consumed === true && dl.linked === null);
+      const dl0 = await log(d, "2026-09-04T19:00:00Z");
+      h.check("no booking and no box: nothing taken, nothing linked", (await bal(d)) === 9 && dl0.consumed === false && dl0.linked === null);
       await booking(d, "2026-09-05T17:00:00Z");
       const dl2 = await log(d, "2026-09-04T18:00:00Z");
-      h.check("a booking on a different day is not matched", dl2.linked === null && (await bal(d)) === 10);
+      h.check("a booking on a different day is not matched", dl2.linked === null && (await bal(d)) === 9);
 
       const e = await client("Ed");
       const eb = await booking(e, "2026-09-06T17:00:00Z");
@@ -304,12 +307,23 @@ export default {
       await flag(vb6);
       await rpc(v, `select public.cancel_booking_and_refund_credit($1) as v`, [vb6]);
       h.check("a charged late move moved late again, and the client cancels while it waits: nothing back, not flagged again", (await bal(v)) === 6 && (await bk(vb6)).late_change_kind === "reschedule" && (await bk(vb6)).late_charge_state === "charged");
+      const cc = await client("Cal");
+      const ccb = await booking(cc, future(16));
+      await flag(ccb);
+      await rpc(coach, `select public.cancel_booking_and_refund_credit($1) as v`, [ccb]);
+      await h.expectErrorAs(coach, "the coach cancels a session whose late move is waiting: nothing left to decide (Charge refused)", `select public.resolve_late_change($1, true)`, [ccb], /not waiting for a decision/);
+      h.check("...and nothing taken", (await bal(cc)) === 10 && (await bk(ccb)).late_charge_state === "waived");
+      const ccb2 = await booking(cc, future(17), { credit: "prepaid" });
+      await flag(ccb2);
+      await rpc(cc, `select public.cancel_booking_and_refund_credit($1) as v`, [ccb2]);
+      h.check("a client cancels in time a paid session whose late move is waiting: their session back for now", (await bal(cc)) === 10);
+      await rpc(coach, `select public.resolve_late_change($1, true) as v`, [ccb2]);
+      h.check("...then the coach Charges the late move: exactly 1 (the moved session never happened), and the cancelled booking is not 'settled'", (await bal(cc)) === 9 && (await bk(ccb2)).credit_state === "prepaid" && (await bk(ccb2)).status === "cancelled");
       const vb4 = await booking(v, future(13), { credit: "prepaid" });
       await rpc(v, `select public.cancel_booking_and_refund_credit($1) as v`, [vb4]);
       h.check("a client cancelling in time with no late change still gets their session back", (await bal(v)) === 6);
 
       // ---- the walk-in (offered right after the workout, so these are within the last day) ----
-      const ago = (mins) => new Date(Date.now() - mins * 60000).toISOString();
       const finish = async (sessionId, at) => { await h.asSuper(); await db.query(`update public.athlete_sessions set completed_at = $2 where id = $1`, [sessionId, at]); };
       const w = await client("Wes");
       const wStart = ago(23 * 60);
@@ -361,7 +375,30 @@ export default {
       await h.expectErrorAs(coach, "an old workout cannot be added as a walk-in", `select public.create_walk_in_booking($1)`, [oldl.s], /cannot be added as a walk-in/);
       const dd = await log(old, ago(10 * 60), { deduct: true });
       await h.expectErrorAs(coach, "...nor one that already used a session the old way (the Use 1 session credit box)", `select public.create_walk_in_booking($1)`, [dd.s], /cannot be added as a walk-in/);
-      h.check("...and nothing was taken for either", (await bal(old)) === 10);
+      h.check("...and nothing more was taken for either (the box took its one)", (await bal(old)) === 9);
+
+      // ---- a morning workout never uses the evening session (the coach's day is mid-morning here: a zone where it is about 10 AM now) ----
+      const utcHour = new Date().getUTCHours();
+      const shift = ((utcHour - 10 + 36) % 24) - 12; // Etc/GMT+N is N hours behind UTC
+      await h.asSuper();
+      await db.query(`update public.profiles set timezone = $2 where id = $1`, [coach, "Etc/GMT" + (shift >= 0 ? "+" : "-") + Math.abs(shift)]);
+      const am = await client("Ami");
+      const amB = await booking(am, ago(40));
+      const pmB = await booking(am, new Date(Date.now() + 5 * 3600000).toISOString());
+      await rpc(coach, `select public.mark_booking_attended($1) as v`, [amB]);
+      const aml = await log(am, ago(30));
+      h.check("marked happened at 9:20, then the 9:30 workout logged: linked to that session, the 3 PM one untouched, exactly 1",
+        aml.linked === amB && (await bk(pmB)).attended_at === null && (await bk(pmB)).credit_state === "unsettled" && (await bal(am)) === 9, JSON.stringify({ linked: aml.linked, amB, pmB, bal: await bal(am) }));
+      const am2 = await client("Ami Two");
+      const am2B = await booking(am2, new Date(Date.now() + 6.5 * 3600000).toISOString());
+      const am2l = await log(am2, ago(30));
+      h.check("a morning walk-in does not use that client's 3 PM session", am2l.linked === null && (await bk(am2B)).attended_at === null && (await bal(am2)) === 10);
+      const soon = await client("Ami Three");
+      const soonB = await booking(soon, new Date(Date.now() + 30 * 60000).toISOString());
+      const soonl = await log(soon, ago(20));
+      h.check("a session starting within the hour after the finish (logged early) still counts", soonl.linked === soonB && (await bal(soon)) === 9);
+      await h.asSuper();
+      await db.query(`update public.profiles set timezone = 'America/Los_Angeles' where id = $1`, [coach]);
 
       // ---- an imported workout (a team sheet, imported history) is never matched to the calendar ----
       const im = await client("Ima");
