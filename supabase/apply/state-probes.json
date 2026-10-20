@@ -1587,6 +1587,17 @@
   ]
  },
  {
+  "n": "180",
+  "slug": "0428",
+  "title": "0428 FIX 3: logging settles the session on the calendar once; no-show Charge or Waive; a late move is one session; the walk-in (three new functions, two helpers, five replaced)",
+  "migrations": [
+   "0428"
+  ],
+  "notApplied": [
+   "not (to_regprocedure('public.resolve_no_show(uuid, boolean)') is not null)"
+  ]
+ },
+ {
   "n": "179",
   "slug": "0427",
   "title": "0427 SPEED B: the read policies on the ten busiest tables ask 'member / coach / owner or admin of this group' from three sets once per query (three new functions; 15 read policies rewritten in place)",

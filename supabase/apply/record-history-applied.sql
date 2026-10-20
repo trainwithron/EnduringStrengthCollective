@@ -12,6 +12,7 @@ from (
     ('2026100600419', 'team_sheet_save', '0419_team_sheet_save.sql', to_regclass('public.team_sheet_batches') is not null),
     ('2026100600420', 'transfer_ownership_accepted_only', '0420_transfer_ownership_accepted_only.sql', exists (select 1 from pg_trigger where tgname = 'organization_memberships_guard_owner_role' and not tgisinternal)),
     ('2026100600422', 'client_requests', '0422_client_requests.sql', to_regclass('public.client_requests') is not null),
+    ('2026100600428', 'log_settles_booking_and_no_show', '0428_log_settles_booking_and_no_show.sql', to_regprocedure('public.resolve_no_show(uuid, boolean)') is not null),
     ('2026100600429', 'client_sets_own_targets', '0429_client_sets_own_targets.sql', to_regprocedure('public.has_coach_macro_target(uuid, uuid)') is not null),
     ('2026100600427', 'member_checks_set_based', '0427_member_checks_set_based.sql', to_regprocedure('public.my_group_ids()') is not null),
     ('2026100600426', 'org_wall_set_based', '0426_org_wall_set_based.sql', to_regprocedure('public.active_org_group_ids()') is not null),

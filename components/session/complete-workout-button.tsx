@@ -16,6 +16,7 @@ import { announceWorkoutLog } from "@/lib/announce-workout-log";
 import { useLiftUnit } from "@/components/logging/lift-unit-context";
 import { liftUnitLabel } from "@/lib/lift-weight";
 import { parseWeightInput } from "@/lib/units";
+import { mirrorGoogleCalendarEvent } from "@/lib/mirror-google-calendar-event";
 
 // This project has no generated Supabase Database type, so a fresh RPC's
 // result falls back to an untyped shape — spelled out explicitly here
@@ -124,12 +125,14 @@ export function CompleteWorkoutButton({
     if (!walkIn) return;
     setWalkInBusy(true);
     setWalkInError(null);
-    const { error: rpcError } = await createBrowserClient().rpc("create_walk_in_booking", { p_session_id: sessionId });
+    const { data: bookingId, error: rpcError } = await createBrowserClient().rpc("create_walk_in_booking", { p_session_id: sessionId });
     setWalkInBusy(false);
     if (rpcError) {
       setWalkInError(/overlap|taken|already/i.test(rpcError.message ?? "") ? "That time overlaps another session on your calendar, so nothing was added and nothing was used." : "That didn't save. Nothing was added and nothing was used.");
       return;
     }
+    // Copied to the coach's Google calendar like every other booking the app makes.
+    if (typeof bookingId === "string") mirrorGoogleCalendarEvent(bookingId);
     finishNavigation(walkIn.navHref);
   }
 

@@ -24,6 +24,14 @@
   "file": "apply-release-tc3b-client-requests-all.sql"
  },
  {
+  "id": "fix3-no-show-walk-in",
+  "name": "FIX 3 (logging settles the session on the calendar once; no-show Charge or Waive; a late move is one session; the walk-in)",
+  "steps": [
+   "180"
+  ],
+  "file": "apply-fix3-no-show-walk-in-all.sql"
+ },
+ {
   "id": "set-my-targets-client-own-targets",
   "name": "Set my targets (a client with no target from their coach may set their own: one column, one trigger, one function, three client policies, the notice function)",
   "steps": [
