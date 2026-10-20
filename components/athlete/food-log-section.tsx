@@ -43,6 +43,7 @@ export function FoodLogSection({
   selfCoached = false,
   totalsTitle = "Logged so far today",
   planHeading,
+  isToday = true,
 }: {
   athleteId: string;
   groupId: string;
@@ -65,6 +66,8 @@ export function FoodLogSection({
   // The totals line's title and the plan's heading for the day shown ("Logged so far today" / "Logged yesterday").
   totalsTitle?: string;
   planHeading?: string;
+  // Whether the day shown is today (the day switcher can show another).
+  isToday?: boolean;
 }) {
   const planHasMeals = !!plan?.meals && Object.values(plan.meals).some((entries) => (entries ?? []).length > 0);
   const [allEntries, setAllEntries] = useState(initialEntries);
@@ -172,6 +175,7 @@ export function FoodLogSection({
         onAdded={handleAdded}
         onChanged={handleChanged}
         onDeleted={handleDeleted}
+        isToday={isToday}
       />
 
       {nutrients && (

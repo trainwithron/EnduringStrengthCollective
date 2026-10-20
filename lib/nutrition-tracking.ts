@@ -11,6 +11,7 @@ export const FOOD_TRACKING_OFF_LINE = "Your coach has turned off food tracking f
 // A coach in their own personal space is their own coach: nothing is waiting on "your coach".
 export const SELF_NO_TARGET_LINE = "No target yet. You can still track what you eat.";
 export const SELF_NO_MEAL_PLAN_LINE = "No meal plan yet.";
+export const SELF_NO_CHECKIN_LINE = "No weekly check-in yet.";
 export const noTargetLine = (coachProgramming: boolean, selfCoached = false): string =>
   coachProgramming ? (selfCoached ? SELF_NO_TARGET_LINE : NO_TARGET_LINE) : GROUP_TIER_NO_TARGET_LINE;
 

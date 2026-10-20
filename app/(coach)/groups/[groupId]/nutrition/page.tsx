@@ -41,7 +41,7 @@ import { FOOD_LOG_BASE_SELECT, FOOD_LOG_DETAIL_SELECT, entryFromRow, type FoodLo
 import { foodDayHeading, foodDayLabel, loggedTotalsTitle, shownFoodDay } from "@/lib/food-day";
 import { FoodDaySwitcher } from "@/components/athlete/food-day-switcher";
 import { getCoachClients } from "@/lib/coach-clients";
-import { FOOD_TRACKING_OFF_LINE, dailyCaloriesFromLog } from "@/lib/nutrition-tracking";
+import { FOOD_TRACKING_OFF_LINE, SELF_NO_CHECKIN_LINE, dailyCaloriesFromLog } from "@/lib/nutrition-tracking";
 import { addDaysToKey } from "@/lib/date-key";
 import { fetchFoodLogDay } from "@/lib/food-entry";
 import { AiBudgetMeter } from "@/components/coach/ai-budget-meter";
@@ -542,6 +542,7 @@ export default async function NutritionPage(
                   recents={recentFoodOptions}
                   selfCoached={selfCoached}
                   totalsTitle={loggedTotalsTitle(shownDay, todayKey)}
+                  isToday={shownIsToday}
                   planHeading={shownIsToday ? "Today's meal plan" : `Meal plan: ${foodDayLabel(shownDay, todayKey)}`}
                 />
               </>
@@ -651,8 +652,15 @@ export default async function NutritionPage(
               </div>
             ) : (
               <p className="font-body text-sm text-steel border border-steel/20 p-4">
-                Your coach hasn&apos;t run a weekly check-in yet — once they do, the result and the
-                reasoning behind it will show up here.
+                {/* A coach in their own personal space is their own coach. */}
+                {selfCoached ? (
+                  SELF_NO_CHECKIN_LINE
+                ) : (
+                  <>
+                    Your coach hasn&apos;t run a weekly check-in yet — once they do, the result and the
+                    reasoning behind it will show up here.
+                  </>
+                )}
               </p>
             )}
           </section>

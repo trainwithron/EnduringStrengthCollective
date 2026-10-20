@@ -33,6 +33,11 @@ describe("FoodLogEntries", () => {
   it("leaves planned meals ticked off from the coach's plan to the plan cards", () => {
     expect(render([planned])).not.toContain("Planned breakfast");
   });
+  it("on another day than today (the day switcher) the copy button says Copy the day before", () => {
+    const html = renderToStaticMarkup(createElement(FoodLogEntries, { athleteId: "a1", groupId: "g1", logDate: "2026-10-08", entries: [rice], onAdded() {}, onChanged() {}, onDeleted() {}, isToday: false }));
+    expect(html).toContain("Copy the day before");
+    expect(html).not.toContain("Copy yesterday");
+  });
   it("offers copy yesterday and copy to another day, with controls at least 44px tall", () => {
     const html = render([rice]);
     expect(html).toContain("Copy yesterday");

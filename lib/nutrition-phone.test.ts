@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { barcodeBasisLabel, scaleBarcodeResult, type BarcodeLookupResult } from "./open-food-facts";
 import { copyRows } from "./food-entry";
-import { noTargetLine, NO_TARGET_LINE, SELF_NO_TARGET_LINE } from "./nutrition-tracking";
+import { noTargetLine, NO_TARGET_LINE, SELF_NO_CHECKIN_LINE, SELF_NO_TARGET_LINE } from "./nutrition-tracking";
 import type { FoodLogEntry } from "@/components/athlete/meal-checkoff-list";
 
 // FIX_NUTRITION_PHONE (Oct 20): the food log on a phone. Source-level guards plus the pure pieces.
@@ -140,5 +140,12 @@ describe("a coach in their own personal space", () => {
     expect(page).toContain("const selfCoached = isActingAsOther && athleteId === user.id;");
     expect(page).toContain("selfCoached={selfCoached}");
     expect(read("components/athlete/meal-checkoff-list.tsx")).toContain("{selfCoached ? SELF_NO_MEAL_PLAN_LINE :");
+    // the weekly check-in, too
+    expect(SELF_NO_CHECKIN_LINE).toBe("No weekly check-in yet.");
+    expect(page).toContain("{selfCoached ? (\n                  SELF_NO_CHECKIN_LINE");
+  });
+  it("on another day than today the copy button says Copy the day before", () => {
+    expect(page).toContain("isToday={shownIsToday}");
+    expect(section).toContain("isToday={isToday}");
   });
 });
