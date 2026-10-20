@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { FOOD_FAVORITES_CHANGED, mapFavoriteRow, type FoodFavorite } from "@/lib/food-favorites";
 import { insertFoodLogEntry } from "@/lib/food-log-insert";
+import { defaultMealSlot } from "@/lib/food-entry";
 import type { FoodLogEntry } from "./meal-checkoff-list";
 
 // One-tap re-log of a food the client starred. The macros are the ones saved when it was starred. Private to the client; logging from here is an ordinary
@@ -52,6 +53,8 @@ export function FavoriteFoodChips({
       athleteId,
       groupId,
       logDate,
+      // into the meal for the time of day, like every other way of logging
+      mealSlot: defaultMealSlot(new Date().getHours(), new Date().getMinutes()),
       description: f.label,
       calories: f.calories,
       proteinG: f.proteinG,

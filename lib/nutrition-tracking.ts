@@ -8,7 +8,12 @@ export const GROUP_TIER_NO_TARGET_LINE = "Track what you eat. Targets are not pa
 export const COACH_CAN_SEE_LINE = "Your coach can see what you log here.";
 // What a client sees when their coach has turned food tracking off for them.
 export const FOOD_TRACKING_OFF_LINE = "Your coach has turned off food tracking for you, so there is nothing to log here. If you'd like it back, ask your coach.";
-export const noTargetLine = (coachProgramming: boolean): string => (coachProgramming ? NO_TARGET_LINE : GROUP_TIER_NO_TARGET_LINE);
+// A coach in their own personal space is their own coach: nothing is waiting on "your coach".
+export const SELF_NO_TARGET_LINE = "No target yet. You can still track what you eat.";
+export const SELF_NO_MEAL_PLAN_LINE = "No meal plan yet.";
+export const SELF_NO_CHECKIN_LINE = "No weekly check-in yet.";
+export const noTargetLine = (coachProgramming: boolean, selfCoached = false): string =>
+  coachProgramming ? (selfCoached ? SELF_NO_TARGET_LINE : NO_TARGET_LINE) : GROUP_TIER_NO_TARGET_LINE;
 
 // Shown to a coach looking at a client whose tier has no targets or meal plans: logging still works and is visible.
 export const GROUP_TIER_COACH_NOTE = "This client is on the group tier, so targets and meal plans are not part of their plan. They can still log what they eat, and you can see it here.";

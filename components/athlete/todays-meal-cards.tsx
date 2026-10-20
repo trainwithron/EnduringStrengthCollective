@@ -20,6 +20,7 @@ export function TodaysMealCards({
   emptiedMeals = [],
   entries,
   onEntryLogged,
+  heading = "Today's meal plan",
 }: {
   athleteId: string;
   groupId: string;
@@ -30,6 +31,8 @@ export function TodaysMealCards({
   emptiedMeals?: { bucket: string; mealId: string }[];
   entries: FoodLogEntry[];
   onEntryLogged: (entry: FoodLogEntry) => void;
+  // The block's own heading (another day's plan says "Yesterday's meal plan", "Meal plan for Mon, Oct 13").
+  heading?: string;
 }) {
   const [saving, setSaving] = useState<string | null>(null);
   const [modifying, setModifying] = useState<string | null>(null);
@@ -81,6 +84,7 @@ export function TodaysMealCards({
 
   return (
     <div className="border border-steel/20 p-4">
+      <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">{heading}</p>
       {hiddenCount > 0 && (
         <p role="status" className="font-body text-xs text-chalk border border-steel/30 bg-surface/40 p-2.5 mb-3">
           Your coach is updating {emptiedMeals.length > 0 ? (emptiedMeals.length === 1 ? "one meal" : `${emptiedMeals.length} meals`) : "some of your meals"} to match your food preferences. Anything that doesn&apos;t fit is hidden until then.

@@ -88,7 +88,7 @@ describe("the client side", () => {
     expect(clientPage).toContain("<NutritionPreferencesCard");
   });
   it("Today's meals hides an option that breaks their rules, and says the coach will update it", () => {
-    expect(clientPage).toContain("filterPlanForClient(savedPlanMeals");
+    expect(clientPage).toContain("filterPlanForClient(shownPlanMeals");
     expect(clientPage).toContain("hiddenCount: clientPlan.hiddenCount");
     expect(src("../../athlete/todays-meal-cards.tsx")).toContain("Your coach is updating");
     expect(src("../../athlete/todays-meal-cards.tsx")).toContain("Your coach is updating this meal.");
@@ -112,7 +112,7 @@ describe("Assistant review: fail closed, notices, banner", () => {
   });
   it("the client's pages hide every recipe when the rules cannot be read", () => {
     expect(clientPage).toContain("prefsError");
-    expect(clientPage).toContain("hidePlanRecipes(savedPlanMeals)");
+    expect(clientPage).toContain("hidePlanRecipes(shownPlanMeals)");
     expect(clientPage).toContain("filterGeneratedMealsForClient(todayMealsRaw, clientRules)");
     expect(dayPage).toContain("dayPrefsError");
     expect(dayPage).toContain("hidePlanRecipes(dayMeals)");

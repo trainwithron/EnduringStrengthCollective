@@ -55,7 +55,8 @@ describe("the hub has three tabs for the coach, and the client's page does not r
   it("the client's branch (below the coach branch) never reads the tab", () => {
     const clientBranch = hub.slice(hub.indexOf("// Athlete-facing branch"));
     expect(clientBranch.length).toBeGreaterThan(500);
-    expect(clientBranch).not.toContain("searchParams");
+    // the only thing it reads from the address is the day its food log shows (?day=)
+    expect(clientBranch.match(/searchParams\.\w+/g) ?? []).toEqual(["searchParams.day"]);
     expect(clientBranch).not.toContain("tab=");
   });
 });

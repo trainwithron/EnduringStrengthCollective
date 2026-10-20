@@ -36,6 +36,7 @@ export function FoodLogEntries({
   onAdded,
   onChanged,
   onDeleted,
+  isToday = true,
 }: {
   athleteId: string;
   groupId: string;
@@ -44,6 +45,8 @@ export function FoodLogEntries({
   onAdded: (added: FoodLogEntry[]) => void;
   onChanged: (entry: FoodLogEntry) => void;
   onDeleted: (id: string) => void;
+  // Whether the day shown is today (the day switcher can show another): the copy button then says "Copy the day before".
+  isToday?: boolean;
 }) {
   const mine = entries.filter(isFreeForm);
   const [notice, setNotice] = useState<string | null>(null);
@@ -90,6 +93,9 @@ export function FoodLogEntries({
     setNotice(`Saved "${name}". Find it under My foods and saved meals.`);
   }
 
+  // On another day than today (the day switcher), "yesterday" would be wrong: it copies the day before the day shown.
+  const dayBefore = isToday ? "yesterday" : "the day before";
+
   async function copyFromYesterday() {
     if (busy || copiedYesterday) return;
     setBusy(true);
@@ -98,7 +104,7 @@ export function FoodLogEntries({
     const yesterday = await fetchFoodLogDay(supabase, athleteId, addDaysToKey(logDate, -1));
     const rows = copyRows(yesterday, { athleteId, groupId, toDate: logDate });
     if (rows.length === 0) {
-      setNotice("Nothing was logged yesterday to copy.");
+      setNotice(`Nothing was logged ${dayBefore} to copy.`);
       setBusy(false);
       return;
     }
@@ -111,7 +117,7 @@ export function FoodLogEntries({
     onAdded(added);
     // Once is enough: pressing it again would double the day.
     setCopiedYesterday(true);
-    setNotice(`Copied ${added.length} ${added.length === 1 ? "entry" : "entries"} from yesterday.`);
+    setNotice(`Copied ${added.length} ${added.length === 1 ? "entry" : "entries"} from ${dayBefore}.`);
   }
 
   async function copyMeal(slot: MealSlot | "other", group: FoodLogEntry[]) {
@@ -140,7 +146,7 @@ export function FoodLogEntries({
     <div className="space-y-3" data-testid="food-log-entries">
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={copyFromYesterday} disabled={busy || copiedYesterday} className="min-h-[44px] px-3 border border-steel/30 text-steel font-body text-xs disabled:opacity-50">
-          {copiedYesterday ? "Copied from yesterday" : "Copy yesterday"}
+          {copiedYesterday ? `Copied from ${dayBefore}` : isToday ? "Copy yesterday" : "Copy the day before"}
         </button>
         {notice && <p className="font-body text-xs text-steel" role="status">{notice}</p>}
       </div>

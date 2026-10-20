@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { defaultMealSlot } from "@/lib/food-entry";
 import type { FoodLogEntry } from "./meal-checkoff-list";
 
 function fileToBase64(file: File): Promise<string> {
@@ -67,6 +68,8 @@ export function PhotoLogFoodButton({
 
   async function handleConfirm() {
     if (!estimate) return;
+    // into the meal for the time of day
+    const mealSlot = defaultMealSlot(new Date().getHours(), new Date().getMinutes());
     setSaving(true);
     setError(null);
     const supabase = createBrowserClient();
@@ -76,7 +79,7 @@ export function PhotoLogFoodButton({
         athlete_id: athleteId,
         group_id: groupId,
         log_date: logDate,
-        meal_slot: null,
+        meal_slot: mealSlot,
         status: "quick_log",
         description: estimate.description,
         calories: estimate.calories,
@@ -95,7 +98,7 @@ export function PhotoLogFoodButton({
     if (data) {
       onLogged({
         id: data.id,
-        mealSlot: null,
+        mealSlot,
         status: "quick_log",
         description: estimate.description,
         calories: estimate.calories,
