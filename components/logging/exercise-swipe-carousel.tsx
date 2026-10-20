@@ -231,7 +231,7 @@ export function ExerciseSwipeCarousel({
       {/* Position dots double as a drag-to-scrub quick-jump — a coach's
           day plan is usually short enough (2-6 exercises) that this
           reads as a real nav aid, not clutter. */}
-      {exercises.length === 1 && !readOnly && <div className="h-9 mb-3" aria-hidden="true" />}
+      {exercises.length === 1 && !readOnly && <div className="h-7 mb-1" aria-hidden="true" />}
       {exercises.length > 1 && (
         <div
           ref={dotsRef}
@@ -294,7 +294,8 @@ export function ExerciseSwipeCarousel({
                 Exercise {exercises.findIndex((e) => e.id === exercise.id) + 1} of {exercises.length}
               </p>
 
-              {expanded && (
+              {/* The coach's own note about this exercise always shows; the plain tip (when there is no note) only with More room. */}
+              {(expanded || coachNoteByExerciseName[exercise.exerciseName]) && (
                 <div className="mb-3">
                   <ExerciseNoteCallout coachNote={coachNoteByExerciseName[exercise.exerciseName] ?? null} />
                 </div>

@@ -18,6 +18,16 @@ const base = {
 const html = (over: Partial<Parameters<typeof SetStepper>[0]> = {}) => renderToStaticMarkup(createElement(SetStepper, { ...base, ...over }));
 
 describe("the Sets stepper", () => {
+  it("puts the card's own controls (trailing) at the right end of the same row, after Add a set", () => {
+    const out = html({ trailing: createElement("button", { type: "button" }, "Edit metrics") });
+    const row = out.slice(out.indexOf('<div class="flex flex-wrap items-center gap-x-3 gap-y-1">'));
+    const rowEnd = row.indexOf("</div></div>");
+    expect(row.indexOf('aria-label="Add a set"')).toBeGreaterThan(-1);
+    expect(row.indexOf("Edit metrics")).toBeGreaterThan(row.indexOf('aria-label="Add a set"'));
+    expect(row.indexOf("Edit metrics")).toBeLessThan(rowEnd);
+    expect(out).toContain('<div class="ml-auto flex items-center gap-3">');
+    expect(html()).not.toContain("ml-auto");
+  });
   it("is one row: Sets, a minus, the count, a plus", () => {
     const out = html();
     expect(out).toContain("Sets");

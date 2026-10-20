@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { Minus, Plus } from "lucide-react";
 
 // "Sets  [-]  4  [+]": one row to take a set off or put one on while logging. Presentational only; the exercise card owns what happens.
@@ -14,6 +15,7 @@ export function SetStepper({
   onConfirmRemove,
   onKeep,
   undo,
+  trailing,
 }: {
   count: number;
   canRemove: boolean;
@@ -28,12 +30,14 @@ export function SetStepper({
   onKeep: () => void;
   // Set for a few seconds after a logged set was removed.
   undo: { text: string; pending: boolean; onUndo: () => void } | null;
+  // More controls on the same row, at its right end (the card's Edit metrics / Add weight / RPE), so they do not take a row of their own.
+  trailing?: ReactNode;
 }) {
   const stepBtn =
     "h-10 w-10 flex items-center justify-center border border-steel/30 text-steel active:border-rust active:text-rust transition-colors disabled:opacity-30 disabled:active:border-steel/30 disabled:active:text-steel";
   return (
     <div className="mt-1">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <span className="font-body text-xs text-steel">Sets</span>
         <button type="button" onClick={onRemove} disabled={!canRemove} aria-label="Remove the last set" className={stepBtn}>
           <Minus className="w-4 h-4" aria-hidden="true" />
@@ -45,6 +49,7 @@ export function SetStepper({
           <Plus className="w-4 h-4" aria-hidden="true" />
         </button>
         {prescribedNote && <span className="font-body text-xs text-steel">{prescribedNote}</span>}
+        {trailing && <div className="ml-auto flex items-center gap-3">{trailing}</div>}
       </div>
       {confirmText && (
         <div className="mt-2 flex items-center gap-3" role="alert">

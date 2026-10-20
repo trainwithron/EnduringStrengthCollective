@@ -37,7 +37,6 @@ export function SessionLogger({
   athleteId,
   viewerId,
   canUploadVideo,
-  startedAt,
   gamificationEnabled,
   postWorkoutCards = true,
   pendingGateTask,
@@ -61,7 +60,6 @@ export function SessionLogger({
   athleteId: string;
   viewerId: string | null;
   canUploadVideo: boolean;
-  startedAt: string;
   gamificationEnabled: boolean;
   // The group's post-workout cards setting (default true when not passed).
   postWorkoutCards?: boolean;
@@ -298,10 +296,11 @@ export function SessionLogger({
   return (
     <DemoLibraryProvider value={demoLibrary ? demoBrowser : null}>
     <SetSaveProvider>
+      {/* The rest bar opens over the top of the card (absolute inside this box), so nothing under it moves when rest starts. */}
+      <div className="relative">
       {!isCompleted && (
         <RestTimerBar
           sessionId={sessionId}
-          startedAt={startedAt}
           pendingPrompt={pendingRestPrompt}
           onPromptHandled={() => setPendingRestPrompt(null)}
           pendingTask={pendingGateTask}
@@ -473,6 +472,7 @@ export function SessionLogger({
         </div>
       )}
       </section>
+      </div>
       {demoExerciseId && demoLibrary && (
         <DemoBrowserSheet exercises={exercises} library={demoLibrary} currentId={demoExerciseId} onChange={setDemoExerciseId} onClose={closeDemo} />
       )}

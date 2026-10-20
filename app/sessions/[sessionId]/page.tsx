@@ -16,6 +16,7 @@ import { isHabitDueOn } from "@/lib/habits";
 import { DEFAULT_TRACKED_FIELDS } from "@/lib/exercise-fields";
 import { CoachLoggedBadge } from "@/components/coach-logged-badge";
 import { SendToClientButton } from "@/components/session/send-to-client-button";
+import { SessionStopwatch } from "@/components/session/session-stopwatch";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import type { SessionExerciseEntry } from "@/lib/types";
 import { findCorrelatingWeightSuggestion, resolveWeightSuggestion } from "@/lib/set-suggestions";
@@ -629,13 +630,14 @@ export default async function SessionPage(
           <div className="flex items-center justify-between gap-2">
             <ExitWorkoutButton sessionId={session.id} backHref={backHref} />
             <h1 className="font-display font-bold text-lg leading-none uppercase truncate min-w-0 flex-1 text-center">{(session as any).workouts?.title ?? "Workout"}</h1>
-            {session.logged_by_coach && !isOwnSession ? (
-              <SendToClientButton athleteId={session.athlete_id} sessionId={session.id} workoutTitle={(session as any).workouts?.title ?? "Workout"} compact />
-            ) : session.logged_by_coach ? (
-              <CoachLoggedBadge />
-            ) : (
-              <span className="w-12 shrink-0" aria-hidden="true" />
-            )}
+            <div className="flex items-center gap-2 shrink-0">
+              <SessionStopwatch startedAt={session.started_at} />
+              {session.logged_by_coach && !isOwnSession ? (
+                <SendToClientButton athleteId={session.athlete_id} sessionId={session.id} workoutTitle={(session as any).workouts?.title ?? "Workout"} compact />
+              ) : session.logged_by_coach ? (
+                <CoachLoggedBadge />
+              ) : null}
+            </div>
           </div>
         ) : (
           <Link href={backHref} className="font-body text-xs text-steel uppercase tracking-wide">
@@ -674,7 +676,8 @@ export default async function SessionPage(
         initialExercises={exercises}
         lastTimeByExercise={lastTimeByExercise}
         ladderByExercise={ladderByExercise}
-        raised={isOwnSession}
+        // While the workout is live the bottom tabs are hidden (the workout has the whole screen; Back leaves it), so the Complete bar sits at the bottom.
+        raised={isOwnSession && session.status !== "in_progress"}
         finishedLine={session.status === "completed" ? "Done. Good workout." : null}
         pausedSessionId={session.status === "abandoned" ? session.id : null}
         coachMode={coachModeClient ? { homeHref: coachHomeHref, clientIsMinor: coachModeClient.isMinor } : undefined}
@@ -682,7 +685,6 @@ export default async function SessionPage(
         athleteId={session.athlete_id}
         viewerId={user.id}
         canUploadVideo={canUploadVideo}
-        startedAt={session.started_at}
         gamificationEnabled={gamificationEnabled}
         postWorkoutCards={postWorkoutCards}
         pendingGateTask={pendingGateTask}
@@ -694,9 +696,7 @@ export default async function SessionPage(
       />
       </LiftUnitProvider>
 
-      {isOwnSession && (
-        <BottomTabBar groupId={session.group_id} activeOverride="home" />
-      )}
+      {isOwnSession && session.status !== "in_progress" && <BottomTabBar groupId={session.group_id} activeOverride="home" />}
     </main>
   );
 }
