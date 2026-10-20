@@ -811,6 +811,18 @@ export default async function AthleteProfilePage(
   // The plain sentence about where their sessions stand: totals from the whole history (the list shows only the latest), booked and waiting-to-mark from the calendar.
   const profileCounts = profileBookingCounts.get(`${params.athleteId}:${params.groupId}`);
   const ledgerSums = currentPackageTotals(ledgerAll.rows as { kind: string; amount: number; balance_after: number | null }[], { prepaidAhead: profileCounts?.prepaidAhead ?? 0 });
+  // The same sentence in Billing and on the calendar tab.
+  const sessionsSentence = coachCreditSentence(
+    buildCreditPicture({
+      balance: creditsRow?.balance ?? 0,
+      booked: profileCounts?.booked ?? 0,
+      toMark: profileCounts?.toMark ?? 0,
+      bought: ledgerAll.failed ? null : ledgerSums.bought,
+      done: ledgerAll.failed ? null : ledgerSums.done,
+      carriedOver: ledgerAll.failed ? null : ledgerSums.carriedOver,
+    }),
+    profile?.full_name ?? "This client"
+  );
   const ledgerEntries: LedgerEntry[] = (ledgerRows ?? []).map((r) => ({
     id: r.id as string,
     kind: r.kind as LedgerEntry["kind"],
@@ -988,6 +1000,19 @@ export default async function AthleteProfilePage(
       <div id="client-profile-body" data-active-tab={initialTab}>
         <ClientProfileTabs groupId={params.groupId} athleteId={params.athleteId} initial={initialTab} hide={selfView ? SELF_HIDDEN_TABS : []} />
         <div data-tab="calendar" className="mb-8">
+          {/* Sessions can be added right here too (Ron, Oct 19: "it would be nice to be able to do it from the calendar also. That's where I'd be looking at it most likely"): the same
+              sentence as Billing and the same Add sessions control as the Settings tab (links still point at the Settings copy). */}
+          <div className="mb-4 flex flex-col lg:flex-row lg:items-center gap-2 lg:gap-6" data-calendar-add-sessions>
+            <p className="font-body text-sm text-chalk lg:flex-1">{sessionsSentence}</p>
+            <AssignSessionsControl
+              key={`calendar-assign-${creditsRow?.balance ?? 0}`}
+              compact
+              athleteId={params.athleteId}
+              groupId={params.groupId}
+              clientName={profile?.full_name ?? "this client"}
+              initialBalance={creditsRow?.balance ?? 0}
+            />
+          </div>
           {initialTab === "calendar" && (
             <Suspense fallback={<SectionLoading />}>
             <ClientCalendarSection
@@ -1507,19 +1532,7 @@ export default async function AthleteProfilePage(
           <section className="space-y-4">
             <div data-tab="settings">
             <SettingsGroup label="Billing">
-              <p className="font-body text-sm text-chalk mb-3">
-                {coachCreditSentence(
-                  buildCreditPicture({
-                    balance: creditsRow?.balance ?? 0,
-                    booked: profileCounts?.booked ?? 0,
-                    toMark: profileCounts?.toMark ?? 0,
-                    bought: ledgerAll.failed ? null : ledgerSums.bought,
-                    done: ledgerAll.failed ? null : ledgerSums.done,
-                    carriedOver: ledgerAll.failed ? null : ledgerSums.carriedOver,
-                  }),
-                  profile?.full_name ?? "This client"
-                )}
-              </p>
+              <p className="font-body text-sm text-chalk mb-3">{sessionsSentence}</p>
               <SessionCreditsControl
                 key={`credits-${creditsRow?.balance ?? 0}`}
                 athleteId={params.athleteId}

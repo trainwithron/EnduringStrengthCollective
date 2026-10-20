@@ -13,11 +13,14 @@ export function AssignSessionsControl({
   groupId,
   clientName,
   initialBalance,
+  compact = false,
 }: {
   athleteId: string;
   groupId: string;
   clientName: string;
   initialBalance: number;
+  // The calendar tab's copy (Ron, Oct 19): only the add row, no intro and no "set the balance" tools (those stay in the Settings tab).
+  compact?: boolean;
 }) {
   const router = useRouter();
   const [balance, setBalance] = useState(initialBalance);
@@ -138,9 +141,11 @@ export function AssignSessionsControl({
 
   return (
     <div>
-      <p className="font-body text-xs text-steel mb-2">
-        Add sessions to this client without a purchase. Their balance, the calendar and booking use them right away.
-      </p>
+      {!compact && (
+        <p className="font-body text-xs text-steel mb-2">
+          Add sessions to this client without a purchase. Their balance, the calendar and booking use them right away.
+        </p>
+      )}
       <div className="flex flex-wrap items-end gap-2">
         <label className="block">
           <span className="font-body text-xs text-steel block mb-1">Sessions</span>
@@ -172,9 +177,10 @@ export function AssignSessionsControl({
           disabled={busy || amount === ""}
           className="bg-rust text-chalk font-display font-bold uppercase tracking-wide px-4 py-2 disabled:opacity-40"
         >
-          {busy ? "Adding…" : "Assign sessions"}
+          {busy ? "Adding…" : compact ? "Add sessions" : "Assign sessions"}
         </button>
       </div>
+      {!compact && (
       <div className="mt-4 pt-3 border-t border-steel/15">
         <p className="font-body text-xs text-steel mb-2">
           Current balance: <span className="text-chalk">{balance}</span>. Set it to match what {clientName} really has.
@@ -207,6 +213,7 @@ export function AssignSessionsControl({
           </button>
         </div>
       </div>
+      )}
       {error && (
         <p className="font-body text-xs text-rust mt-2" role="alert">
           {error}
