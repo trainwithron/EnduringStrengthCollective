@@ -31,33 +31,31 @@ describe("coach desktop shell", () => {
       expect(at(m), m).toBeGreaterThan(at('label: "Coaching"'));
       expect(at(m), m).toBeLessThan(at('label: "Business"'));
     }
-    // Business holds the business tools, Pro Shop and Referrals (the Resources page), and for the platform admin only Organizations and Marketplace ranking
-    for (const m of ['label: "Booking page"', 'label: "Waiver"', 'label: "Leads"', 'label: "Session ledger"', 'label: "Organization (colors, team, plan)"', 'label: "Zapier"', 'label: "Pro shop and referrals"', 'label: "Marketplace ranking"']) {
+    // Business holds Pro Shop and Referrals (the Resources page), My website, Organization, Zapier, and for the platform admin only Organizations and Marketplace ranking.
+    // FIX 6 R2: Packages, Waiver, Leads and Session ledger are Clients tabs; Availability, Session types and Booking page are Calendar tabs.
+    for (const m of ['label: "Packages"', 'label: "Booking page"', 'label: "Waiver"', 'label: "Leads"', 'label: "Session ledger"', 'label: "Availability"', 'label: "Session types"']) expect(nav, m).not.toContain(m);
+    for (const m of ['label: "Organization (colors, team, plan)"', 'label: "Zapier"', 'label: "Pro shop and referrals"', 'label: "Marketplace ranking"']) {
       expect(at(m), m).toBeGreaterThan(at('label: "Business"'));
       expect(at(m), m).toBeLessThan(at('label: "Group"'));
     }
     expect(nav).toContain("...(isPlatformAdmin");
-    // Group holds the group's own pages (Members first). FIX 6: Group dashboard is a Home tab and Team feed a Messages tab now.
-    const groupFirst = at('label: "Members"');
-    expect(groupFirst).toBeGreaterThan(at('label: "Group"'));
-    expect(groupFirst).toBeLessThan(at('label: "Team performance"'));
-    expect(nav).not.toContain('label: "Group dashboard"');
-    expect(nav).not.toContain('label: "Team feed"');
-    expect(nav).not.toContain('label: "Overview"');
-    for (const m of ['label: "Team performance"', 'label: "Group sessions"', 'label: "Challenges"', 'label: "Hall of fame"']) {
+    // Group holds the group's own pages. FIX 6: Group dashboard is a Home tab and Team feed a Messages tab; Members and Attendance are Clients tabs; Team calendar, Group calendar and Group sessions are Calendar tabs.
+    for (const m of ['label: "Group dashboard"', 'label: "Team feed"', 'label: "Overview"', 'label: "Members"', 'label: "Attendance"', 'label: "Team calendar"', 'label: "Group calendar"', 'label: "Group sessions"']) expect(nav, m).not.toContain(m);
+    for (const m of ['label: "Team performance"', 'label: "Challenges"', 'label: "Hall of fame"']) {
       expect(at(m), m).toBeGreaterThan(at('label: "Group"'));
       expect(at(m), m).toBeLessThan(at('label: "Settings"'));
     }
-    // Settings: Account, Display Mode, Kiosk Check-In, Support, Quick Tips (FIX 6: the Support Inbox is a Messages tab for the platform admin)
-    for (const m of ['label: "Account"', 'label: "Text messages"', 'label: "Display mode"', 'label: "Kiosk check-in"', 'label: "Support"', 'label: "Quick tips"']) expect(at(m), m).toBeGreaterThan(at('label: "Settings"'));
-    expect(nav).not.toContain('label: "Support inbox"');
+    // Settings: Account, Display Mode, Text messages, Support, Quick Tips (FIX 6: the Support Inbox is a Messages tab for the platform admin, Kiosk check-in a Calendar tab, Front desk a Clients tab)
+    for (const m of ['label: "Account"', 'label: "Text messages"', 'label: "Display mode"', 'label: "Support"', 'label: "Quick tips"']) expect(at(m), m).toBeGreaterThan(at('label: "Settings"'));
+    for (const m of ['label: "Support inbox"', 'label: "Kiosk check-in"', 'label: "Front desk"']) expect(nav, m).not.toContain(m);
     // the footer keeps only the workspace switcher, Report a problem, Download app and Sign out
     expect(shell).not.toContain('title="Display Mode"');
     expect(shell).not.toContain('title="Kiosk Check-In"');
     expect(shell).toContain("<FeedbackButton");
     expect(shell).toContain("<SignOutButton");
-    // Members is no longer a rail icon of its own
-    expect(nav.indexOf('{ key: "members" as const, label: "Members"')).toBeGreaterThan(at('label: "Group"'));
+    // FIX 6 R2: the Clients, Calendar and Messages icons (and a team-sport group's Athletes and Team calendar) go to their home's first tab and are lit by the address
+    expect(shell).toContain('const LEAF_HOME: Partial<Record<string, HomeKey>> = { clients: "clients", members: "clients", calendar: "calendar", "team-calendar": "calendar", messages: "messages" };');
+    expect(shell).toContain('new Set<HomeKey>(["home", "clients", "calendar", "messages"])');
   });
   it("the business name is a menu and a coach-level page shows it as the title", () => {
     expect(shell).toContain("<WorkspaceMenu");

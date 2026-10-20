@@ -22,23 +22,17 @@ import {
   Building2,
   Layers,
   Globe,
-  Link2,
   Users2,
   UserRound,
   Home,
   MonitorPlay,
   Activity,
-  CalendarClock,
   Mail,
   Trophy,
-  Wallet,
-  Tag,
   MessageCircle,
   Zap,
-  UserPlus,
   SlidersHorizontal,
   Lightbulb,
-  UserCheck,
   Settings,
 } from "lucide-react";
 import { SignOutButton } from "@/components/group/sign-out-button";
@@ -73,7 +67,7 @@ import { EmbeddedActivityReporter } from "@/components/coach/workspace/embedded-
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { CoachSpotHub } from "@/components/coach/mobile/coach-spot-hub";
 import { PendingNoticeFlusher } from "@/components/coach/pending-notice-flusher";
-import { CLIENTS_HREF, membersHref, showsMembers } from "@/lib/coach-clients-nav";
+import { CLIENTS_HREF } from "@/lib/coach-clients-nav";
 import { useEmbedded } from "@/components/shared/embedded-context";
 
 function NavBadge({ count, collapsed }: { count: number; collapsed?: boolean }) {
@@ -165,7 +159,10 @@ function isGroup(entry: NavEntry): entry is NavGroup {
 }
 
 // FIX 6: the homes that already have their tab strip (the rest still use the old menus until their release).
-export const FOLDED_HOMES: ReadonlySet<HomeKey> = new Set<HomeKey>(["home", "messages"]);
+export const FOLDED_HOMES: ReadonlySet<HomeKey> = new Set<HomeKey>(["home", "clients", "calendar", "messages"]);
+
+// The rail's flat icons that are a home's icon (a team-sport group's Athletes and Team calendar are its Clients and Calendar).
+const LEAF_HOME: Partial<Record<string, HomeKey>> = { clients: "clients", members: "clients", calendar: "calendar", "team-calendar": "calendar", messages: "messages" };
 
 function CoachDesktopShellFull({
   groupId,
@@ -440,7 +437,7 @@ function CoachDesktopShellFull({
   const moneyHidden = moneyHiddenFor({ coachLevel: !!coachLevel, groupIsTeamSport: isTeamSportGroup(teamMode), orgTeamOnly });
 
   // FIX 6 (six homes on the computer, lib/desktop-coach-homes.ts): the home and the tab come from the address; a folded home has a strip of tabs at the top of the page instead of a menu.
-  // Folded so far: Home and Messages (release 1 of 4). The old menus still hold the rest.
+  // Folded so far: Home, Clients, Calendar and Messages (release 2 of 4). The old menus still hold the rest.
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const here = homeOfPath(pathname ?? "", searchParams ? `?${searchParams.toString()}` : "");
@@ -474,15 +471,9 @@ function CoachDesktopShellFull({
       icon: TrendingUp,
       items: [
         // (Overview is Home > Business now: FIX 6.)
-        { key: "packages", label: "Packages", href: `/groups/${groupId}/business/packages`, icon: Layers },
+        // (Packages, Waiver, Leads and Session ledger are Clients tabs; Availability, Session types and Booking page are Calendar tabs: FIX 6.)
         { key: "resources", label: "Pro shop and referrals", href: `/groups/${groupId}/resources`, icon: HeartHandshake },
         { key: "website", label: "My website", href: `/groups/${groupId}/business/website`, icon: Globe },
-        { key: "availability", label: "Availability", href: "/calendar?tab=availability", icon: CalendarClock },
-        { key: "session-types", label: "Session types", href: `/groups/${groupId}/business/session-types`, icon: Tag },
-        { key: "booking-page", label: "Booking page", href: `/groups/${groupId}/business/booking-page`, icon: Link2 },
-        { key: "waiver", label: "Waiver", href: `/groups/${groupId}/business/waiver`, icon: ClipboardList },
-        { key: "leads", label: "Leads", href: `/groups/${groupId}/business/leads`, icon: UserPlus },
-        { key: "session-ledger", label: "Session ledger", href: `/groups/${groupId}/business/session-ledger`, icon: Wallet },
         { key: "branding", label: "Organization (colors, team, plan)", href: `/groups/${groupId}/branding`, icon: Palette },
         { key: "zapier", label: "Zapier", href: `/groups/${groupId}/business/zapier`, icon: Zap },
         // Platform administration: only the platform admin sees these (their pages refuse everyone else on the server too).
@@ -499,21 +490,15 @@ function CoachDesktopShellFull({
       label: "Group",
       icon: ThreePeopleIcon as unknown as typeof LayoutGrid,
       items: [
-        ...(showsMembers(groupKind, coachLevel) ? [{ key: "members" as const, label: "Members", href: membersHref(groupId), icon: Users2 }] : []),
+        // (Members and Attendance are Clients tabs; Team calendar, Group calendar and Group sessions are Calendar tabs: FIX 6.)
         // (Group dashboard is Home > Group dashboard now: FIX 6.)
         { key: "team-performance", label: "Team performance", href: `/groups/${groupId}/team-performance`, icon: Activity },
-        ...(groupKind !== null && groupKind !== "one_on_one" ? [{ key: "attendance" as const, label: "Attendance", href: `/groups/${groupId}/attendance`, icon: ClipboardList }] : []),
         // (Team feed is Messages > Team feed now: FIX 6.)
         ...(teamMode
-          ? [
-              { key: "team" as const, label: "Depth chart", href: `/groups/${groupId}/team`, icon: ClipboardList },
-              { key: "team-calendar" as const, label: "Team calendar", href: `/groups/${groupId}/team/calendar`, icon: CalendarDays },
-            ]
+          ? [{ key: "team" as const, label: "Depth chart", href: `/groups/${groupId}/team`, icon: ClipboardList }]
           : groupKind === "team"
             ? [{ key: "team" as const, label: "Seasons", href: `/groups/${groupId}/team`, icon: ClipboardList }]
             : []),
-        { key: "group-calendar", label: "Group calendar", href: coachLevel ? "/group-calendar" : `/groups/${groupId}/group-calendar`, icon: CalendarDays },
-        { key: "group-sessions", label: "Group sessions", href: `/groups/${groupId}/group-sessions`, icon: Users2 },
         { key: "challenges", label: "Challenges", href: `/groups/${groupId}/challenges`, icon: Flag },
         { key: "records", label: "Hall of fame", href: `/groups/${groupId}/records`, icon: Trophy },
       ],
@@ -524,8 +509,7 @@ function CoachDesktopShellFull({
       items: [
         { key: "settings", label: "Account", href: `/groups/${groupId}/settings`, icon: Settings },
         { key: "display", label: "Display mode", href: `/groups/${groupId}/display`, icon: MonitorPlay, newTab: true },
-        { key: "kiosk", label: "Kiosk check-in", href: `/groups/${groupId}/kiosk/settings`, icon: UserCheck },
-        ...(onFrontDesk ? [{ key: "front-desk" as const, label: "Front desk", href: "/front-desk", icon: UserCheck, newTab: true }] : []),
+        // (Kiosk check-in is a Calendar tab and Front desk a Clients tab: FIX 6.)
         { key: "sms-settings", label: "Text messages", href: `/groups/${groupId}/business/sms-settings`, icon: MessageCircle },
         { key: "support", label: "Support", href: `/groups/${groupId}/business/support`, icon: HeartHandshake },
         { key: "quick-tips", label: "Quick tips", href: `/groups/${groupId}/quick-tips`, icon: Lightbulb },
@@ -548,7 +532,7 @@ function CoachDesktopShellFull({
     records: Trophy,
     "team-sheet": ClipboardList,
   };
-  const teamLeaves: NavLeaf[] = teamSportMenu(groupId).filter((item) => item.key !== "feed").map((item) => ({
+  const teamLeaves: NavLeaf[] = teamSportMenu(groupId).filter((item) => item.key !== "feed" && item.key !== "attendance").map((item) => ({
     key: item.key as Active,
     label: item.label,
     href: item.href,
@@ -588,6 +572,8 @@ function CoachDesktopShellFull({
   for (const entry of nav) {
     if ("items" in entry) entry.items = entry.items.filter((i) => !hiddenForCoach(navFacts, i.key));
   }
+  // A menu the folded homes emptied has no icon.
+  const shownNav = nav.filter((e) => !isGroup(e) || e.items.length > 0);
   const groupHasActiveChild = (group: NavGroup) => group.items.some((i) => i.key === active);
 
   // Concept 8 "Familiar" shell redesign — resolves this feature's own
@@ -617,15 +603,15 @@ function CoachDesktopShellFull({
     "team-performance": <TeamRailWidget groupId={groupId} />,
   };
 
-  const railIcons: RailIcon[] = nav.map((entry) => {
+  const railIcons: RailIcon[] = shownNav.map((entry) => {
     if (!isGroup(entry)) {
       return {
         key: entry.key,
         label: entry.label,
         icon: entry.icon,
         // A folded home's icon goes to its first tab and is lit by the address (FIX 6).
-        href: entry.key === "messages" && homeIsFolded("messages") ? homeHref(tabsByHome, "messages") ?? entry.href : entry.href,
-        active: entry.key === "messages" && homeIsFolded("messages") ? here?.home === "messages" : active === entry.key,
+        href: homeIsFolded(LEAF_HOME[entry.key]) ? homeHref(tabsByHome, LEAF_HOME[entry.key]!) ?? entry.href : entry.href,
+        active: homeIsFolded(LEAF_HOME[entry.key]) ? here?.home === LEAF_HOME[entry.key] : active === entry.key,
         badge: entry.badge,
         popover: flatWidgetByKey[entry.key],
       };
@@ -642,7 +628,7 @@ function CoachDesktopShellFull({
     };
   });
 
-  const activeGroup = nav.find((entry): entry is NavGroup => isGroup(entry) && groupHasActiveChild(entry));
+  const activeGroup = shownNav.find((entry): entry is NavGroup => isGroup(entry) && groupHasActiveChild(entry));
 
   // Tell the workspace host (in the coach layout, above every page) who and where this page is: while a shell is on screen the workspace is available.
   const isSharedGroup = coachLevel || groupKind === "team" || groupKind === "social";

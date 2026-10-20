@@ -54,7 +54,8 @@ describe("who lands on the front-desk screen", () => {
   });
 
   it("everyone else can still reach the screen: a Front desk link in the menu, in Settings, and on the Team page", () => {
-    expect(src("components/coach/coach-desktop-shell.tsx")).toContain('{ key: "front-desk" as const, label: "Front desk", href: "/front-desk"');
+    // FIX 6: on the computer it is a Clients tab (lib/desktop-coach-homes.ts), for a front-desk person only
+    expect(src("lib/desktop-coach-homes.ts")).toContain('f.onFrontDesk && { key: "front-desk", label: "Front desk", href: "/front-desk", newTab: true }');
     expect(src("components/coach/coach-desktop-shell.tsx")).toContain("useOnFrontDesk()");
     expect(src("components/front-desk/use-on-front-desk.ts")).toContain('.from("org_front_desk")');
     expect(src("app/(coach)/groups/[groupId]/settings/page.tsx")).toContain('href="/front-desk"');

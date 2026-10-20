@@ -149,6 +149,7 @@ const RULES: Rule[] = [
   // Calendar
   rule("/calendar", "calendar", "availability", (q) => q.get("tab") === "availability"),
   rule("/calendar", "calendar", "schedule"),
+  rule(`${G}/calendar`, "calendar", "availability", (q) => q.get("tab") === "availability"),
   rule(`${G}/calendar`, "calendar", "schedule"),
   rule(`${G}/calendar/${ID}`, "calendar", "schedule"),
   rule("/recurring-conflicts", "calendar", "schedule"),

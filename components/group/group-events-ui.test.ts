@@ -11,7 +11,6 @@ describe("group events on the screens", () => {
   const admin = read("components/coach/group-event-admin.tsx");
   const groupCal = read("app/(coach)/groups/[groupId]/group-calendar/page.tsx");
   const picker = read("app/(coach)/group-calendar/page.tsx");
-  const shell = read("components/coach/coach-desktop-shell.tsx");
 
   it("the coach's Calendar shows group events labelled with the group's name, and each hidden holding booking only once", () => {
     expect(body).toContain('.from("group_sessions")');
@@ -28,7 +27,8 @@ describe("group events on the screens", () => {
     expect(groupCal).toContain("fixedGroupId={params.groupId}");
     expect(picker).toContain("if (groups.length === 1) redirect(");
     expect(picker).toContain("Which one?");
-    expect(shell).toContain('coachLevel ? "/group-calendar" : `/groups/${groupId}/group-calendar`');
+    // FIX 6: the Group calendar is a Calendar tab (lib/desktop-coach-homes.ts)
+    expect(read("lib/desktop-coach-homes.ts")).toContain('href: f.coachLevel ? "/group-calendar" : `${g}/group-calendar`');
   });
 
   it("the form says it costs no session and uses the coach's own word for group", () => {

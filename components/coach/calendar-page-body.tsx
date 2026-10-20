@@ -1189,6 +1189,7 @@ export async function CoachCalendarPageBody(
         initialTab={searchParams.tab === "availability" ? "availability" : "schedule"}
         settingsSlot={<AvailabilityBookingSettings coachId={user.id} />}
         timeOffSlot={<AvailabilityTimeOff coachId={user.id} />}
+        hideStripOnDesktop
       >
       {/* mobile_must_fit_screen_standing_rule — this two-column layout
           (a fixed 260px "Needs attention"/"Clients" rail beside the

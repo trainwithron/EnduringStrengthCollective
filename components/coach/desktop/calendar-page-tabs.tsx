@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AvailabilityManagerDesktop } from "./availability-manager-desktop";
 
 type Tab = "schedule" | "availability";
@@ -15,6 +15,7 @@ export function CalendarPageTabs({
   sessionTypeEnabled = false,
   settingsSlot = null,
   timeOffSlot = null,
+  hideStripOnDesktop = false,
   children,
 }: {
   coachId: string;
@@ -39,13 +40,19 @@ export function CalendarPageTabs({
   // The Availability tab is the ONE place for availability: how clients book and the booking rules first (settingsSlot), then the recurring hours, then time off (timeOffSlot).
   settingsSlot?: React.ReactNode;
   timeOffSlot?: React.ReactNode;
+  // FIX 6: on a computer the shell's Calendar strip has Schedule and Availability (links: ?tab=availability), so this pair shows only below lg.
+  hideStripOnDesktop?: boolean;
   children: React.ReactNode;
 }) {
   const [tab, setTab] = useState<Tab>(initialTab ?? "schedule");
+  // The strip's links change the address, and the page comes back with the new initialTab: follow it.
+  useEffect(() => {
+    setTab(initialTab ?? "schedule");
+  }, [initialTab]);
 
   return (
     <div>
-      <div className="flex items-center gap-1 border-b border-steel/20 mb-6">
+      <div className={`flex items-center gap-1 border-b border-steel/20 mb-6 ${hideStripOnDesktop ? "lg:hidden" : ""}`}>
         <button
           type="button"
           onClick={() => setTab("schedule")}

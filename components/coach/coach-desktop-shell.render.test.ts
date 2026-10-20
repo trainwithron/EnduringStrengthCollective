@@ -4,10 +4,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 // Proof that Home's desktop rail renders: the shell is rendered the way Home renders it (coach-level) for the three kinds of coach, and the same
 // top-level entries are there every time, whichever group it is anchored on and with no remembered group at all.
+const at = vi.hoisted(() => ({ path: "/dashboard", search: "" }));
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/dashboard",
+  usePathname: () => at.path,
   useRouter: () => ({ push: () => {}, refresh: () => {}, replace: () => {} }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => new URLSearchParams(at.search),
 }));
 vi.mock("@/lib/supabase/client", () => ({
   createBrowserClient: () => ({
@@ -47,6 +48,46 @@ describe("Home's desktop rail", () => {
     expect(strip).toMatch(/aria-current="page"[^>]*>Today|>Today<\/a>/);
     expect(strip).toContain('href="/groups/g-team/business"');
     expect(strip).toContain('href="/groups/g-team/dashboard"');
+  });
+  // the rail icon with this label, lit or not
+  const railLit = (html: string, label: string) => {
+    const i = html.indexOf(`aria-label="${label}"`);
+    const tag = html.slice(html.lastIndexOf("<a", i), html.indexOf(">", i));
+    return tag.includes("bg-rust/15");
+  };
+  // the strip's tab going to this address is the lit one
+  const tabOn = (strip: string, href: string) => {
+    const i = strip.indexOf(`href="${href}"`);
+    return i >= 0 && strip.slice(strip.lastIndexOf("<a", i), strip.indexOf(">", i)).includes('aria-current="page"');
+  };
+  const page = (path: string, search: string, active: string) => {
+    at.path = path;
+    at.search = search;
+    try {
+      return renderToStaticMarkup(createElement(CoachDesktopShell, { groupId: "g-team", groupName: "Varsity", active, coachLevel: true } as never, createElement("div", null, "HOME CONTENT")));
+    } finally {
+      at.path = "/dashboard";
+      at.search = "";
+    }
+  };
+  it("FIX 6 R2: /calendar?tab=availability shows the Calendar strip with Availability lit, and the Calendar icon lit", () => {
+    const html = page("/calendar", "tab=availability", "calendar");
+    const strip = html.slice(html.indexOf("data-home-strip"), html.indexOf("HOME CONTENT"));
+    expect(html).toContain('<nav aria-label="Calendar"');
+    expect(tabOn(strip, "/calendar?tab=availability")).toBe(true);
+    expect(tabOn(strip, "/calendar")).toBe(false);
+    expect(strip).toContain('href="/group-calendar"');
+    expect(strip).toContain('href="/groups/g-team/business/booking-page"');
+    expect(railLit(html, "Calendar")).toBe(true);
+    expect(railLit(html, "Home")).toBe(false);
+  });
+  it("FIX 6 R2: /running-low lights Clients (strip: Clients, Leads, Waiver, Session ledger, Packages)", () => {
+    const html = page("/running-low", "", "clients");
+    const strip = html.slice(html.indexOf("data-home-strip"), html.indexOf("HOME CONTENT"));
+    expect(html).toContain('<nav aria-label="Clients"');
+    expect(tabOn(strip, "/clients")).toBe(true);
+    for (const p of ["leads", "waiver", "session-ledger", "packages"]) expect(strip, p).toContain(`href="/groups/g-team/business/${p}"`);
+    expect(railLit(html, "Clients")).toBe(true);
   });
   it("does not need a remembered group: nothing in the rendered rail comes from a cookie", () => {
     const a = render({ groupId: "g-team", groupName: "Varsity" });

@@ -156,6 +156,31 @@ describe("the pages that only send you somewhere else land in a home", () => {
   });
 });
 
+describe("release 2: Clients and Calendar", () => {
+  it("the pages without a tab of their own light Clients or Schedule; an old group-calendar link to Availability lights Availability", () => {
+    expect(homeOfPath("/clients/requests")).toEqual({ home: "clients", tab: "clients" });
+    expect(homeOfPath(`/groups/${G}/athletes/${ID}/history`)).toEqual({ home: "clients", tab: "clients" });
+    expect(homeOfPath(`/groups/${G}/calendar`, "?tab=availability")).toEqual({ home: "calendar", tab: "availability" });
+    expect(homeOfPath(`/groups/${G}/calendar`, "?view=week")).toEqual({ home: "calendar", tab: "schedule" });
+  });
+  it("a team-only organization's Clients and Calendar have no selling tabs", () => {
+    const t = homeTabs({ ...ordinary, moneyHidden: true });
+    expect(t.clients.map((x) => x.key)).toEqual(["clients", "members", "attendance"]);
+    expect(t.calendar.map((x) => x.key)).toEqual(["schedule", "group-calendar", "group-sessions", "kiosk"]);
+  });
+  it("the calendar page's own Schedule / Availability pair shows only below a computer's width (the strip has them there), and follows the address", () => {
+    const tabs = readFileSync(join(root, "components/coach/desktop/calendar-page-tabs.tsx"), "utf8");
+    const body = readFileSync(join(root, "components/coach/calendar-page-body.tsx"), "utf8");
+    expect(body).toMatch(/\bhideStripOnDesktop\r?\n/);
+    expect(tabs).toContain('hideStripOnDesktop ? "lg:hidden" : ""');
+    expect(tabs).toContain("setTab(initialTab ?? \"schedule\");");
+  });
+  it("the shell folds Clients and Calendar", () => {
+    const shell = readFileSync(join(root, "components/coach/coach-desktop-shell.tsx"), "utf8");
+    expect(shell).toContain('new Set<HomeKey>(["home", "clients", "calendar", "messages"])');
+  });
+});
+
 describe("the phone is not touched", () => {
   it("the phone's route rules do not read the desktop homes", () => {
     expect(readFileSync(join(root, "lib/phone-coach-routes.ts"), "utf8")).not.toContain("desktop-coach-homes");
