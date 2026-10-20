@@ -1,4 +1,4 @@
-import { evidenceSetText, type FindingEvidence } from "@/lib/session-pattern-evidence";
+import { evidenceRowText, type FindingEvidence } from "@/lib/session-pattern-evidence";
 import { formatInTimezone } from "@/lib/format-in-timezone";
 import { formatLift } from "@/lib/lift-weight";
 import type { WeightUnit } from "@/lib/units";
@@ -20,7 +20,7 @@ export function PatternEvidence({ evidence, timeZone, unit }: { evidence: Findin
             <span className={`font-body text-xs ${r.done < r.total ? "text-rust" : "text-steel"}`}>
               {r.done} of {r.total} sets
             </span>
-            <span className="basis-full font-body text-xs text-steel tabular-nums">{r.sets.map((s) => evidenceSetText(s, lift)).join(", ")}</span>
+            <span className="basis-full font-body text-xs text-steel tabular-nums">{evidenceRowText(r.sets, lift)}</span>
           </div>
         ))}
       {evidence.kind === "session_rpe" &&

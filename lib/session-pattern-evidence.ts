@@ -42,7 +42,8 @@ export interface EvidenceSet {
 
 export type FindingEvidence =
   // struggle point: the flagged slot in each recent session, its exercise, how many sets were done, and the sets themselves
-  | { kind: "slot_sets"; rows: { startedAt: string; exerciseName: string; done: number; total: number; sets: EvidenceSet[] }[] }
+  // `slotLabel`: where the slot is in the workout, in words ("the first exercise").
+  | { kind: "slot_sets"; slotLabel: string; rows: { startedAt: string; exerciseName: string; done: number; total: number; sets: EvidenceSet[] }[] }
   // RPE creep: each session's average RPE
   | { kind: "session_rpe"; rows: { startedAt: string; avgRpe: number }[] }
   // rest creep: each exercise's real rest against the programmed rest
@@ -149,12 +150,17 @@ export function buildSessionPatternFindings(sessions: PatternSession[], targetRe
         return { startedAt: s.started_at, exerciseName: ex.exercise_name, done: sets.filter((x) => x.done).length, total: sets.length, sets };
       });
     const names = Array.from(new Set(rows.map((r) => r.exerciseName)));
+    // The slot's place among the slots these sessions have (exercise_order may start at 0 or 1).
+    const orders = Array.from(new Set(slotSamples.map((x) => x.slotIndex))).sort((a, b) => a - b);
+    const rank = orders.indexOf(struggle.slotIndex);
+    const ORDINALS = ["first", "second", "third", "fourth", "fifth", "sixth"];
+    const slotLabel = rank >= 0 && rank < ORDINALS.length ? `the ${ORDINALS[rank]} exercise` : `exercise #${struggle.slotIndex}`;
     const which = names.length === 1 ? names[0] : `${names.length} different exercises`;
     findings.push({
       kind: "struggle_point",
       description: `Exercise slot #${struggle.slotIndex} (${which}) is only getting ${pct}% of its prescribed sets completed on average.`,
       numericValues: [pct, struggle.slotIndex, ...(names.length === 1 ? [] : [names.length])],
-      evidence: { kind: "slot_sets", rows },
+      evidence: { kind: "slot_sets", slotLabel, rows },
     });
   }
 
@@ -183,13 +189,60 @@ export function buildSessionPatternFindings(sessions: PatternSession[], targetRe
   return findings;
 }
 
-// One set as a coach reads it: "135 x 8", "8 reps", "30s", "-" for a set not done. Weights are stored in pounds; `toUnit` shows them in the client's unit.
+// One set as a coach reads it: "135 x 8", "8 reps", "30s", "not logged" for a set with nothing done. Weights are stored in pounds; `toUnit` shows them in the client's unit.
 export function evidenceSetText(set: EvidenceSet, toUnit: (lbs: number) => string = (lbs) => String(lbs)): string {
-  if (!set.done) return "-";
+  if (!set.done) return "not logged";
   if (set.weight != null && set.reps != null) return `${toUnit(set.weight)} x ${set.reps}`;
   if (set.reps != null) return `${set.reps} reps`;
   if (set.timeSeconds != null) return `${set.timeSeconds}s`;
   if (set.distance != null) return `${set.distance}`;
   if (set.weight != null) return toUnit(set.weight);
   return "done";
+}
+
+// A session's sets in one line: "135 x 8, 135 x 8, not logged", or just "not logged" when nothing was logged at all.
+export function evidenceRowText(sets: EvidenceSet[], toUnit?: (lbs: number) => string): string {
+  if (sets.length > 0 && sets.every((s) => !s.done)) return "not logged";
+  return sets.map((s) => evidenceSetText(s, toUnit)).join(", ");
+}
+
+// "Sep 16": the day of a session, in the coach's time zone.
+export function shortDay(iso: string, timeZone: string): string {
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone });
+}
+
+// oldest first, the way a coach reads back through the weeks
+const listDays = (rows: { startedAt: string; exerciseName: string }[], timeZone: string) => [...rows].sort((a, b) => a.startedAt.localeCompare(b.startedAt)).map((r) => `${shortDay(r.startedAt, timeZone)} ${r.exerciseName}`).join(", ");
+
+// One plain sentence for a finding, from what actually happened (the struggle point says which sessions and exercises; the others keep their own sentence).
+export function findingSentence(f: SessionPatternFinding, timeZone: string): string {
+  if (f.kind !== "struggle_point" || f.evidence?.kind !== "slot_sets") return f.description;
+  const { rows, slotLabel } = f.evidence;
+  const none = rows.filter((r) => r.done === 0);
+  const short = rows.filter((r) => r.done > 0 && r.done < r.total);
+  const parts: string[] = [];
+  if (none.length > 0) parts.push(`${slotLabel} wasn't logged in ${none.length} of the last ${rows.length} sessions (${listDays(none, timeZone)})`);
+  if (short.length > 0) parts.push(`${none.length > 0 ? "and it" : slotLabel} was cut short in ${short.length}${none.length > 0 ? "" : ` of the last ${rows.length} sessions`} (${listDays(short, timeZone)})`);
+  if (parts.length === 0) return f.description;
+  return `Worth a look: ${parts.join(" ")}.`;
+}
+
+// The note at the top of the finding screen. The note as written stands only while the findings are the same ones with the same numbers; otherwise it is built from what is
+// found now, so it never contradicts the evidence under it.
+export function patternSummary(
+  findings: SessionPatternFinding[],
+  stored: { kind: string; numericValues?: number[] }[],
+  storedText: string | null,
+  timeZone: string
+): string {
+  if (findings.length === 0) return "Looked at again with every logged set counted, nothing stands out in these sessions now.";
+  const same =
+    !!storedText &&
+    findings.length === stored.length &&
+    findings.every((f) => {
+      const s = stored.find((x) => x.kind === f.kind);
+      return !!s && JSON.stringify(s.numericValues ?? []) === JSON.stringify(f.numericValues);
+    });
+  if (same) return storedText!;
+  return findings.map((f) => findingSentence(f, timeZone)).join(" ");
 }

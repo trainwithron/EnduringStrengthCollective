@@ -3,7 +3,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { buildSessionPatternFindings, evidenceSetText, type PatternSession, type PatternSet } from "./session-pattern-evidence";
+import { buildSessionPatternFindings, evidenceRowText, evidenceSetText, patternSummary, type PatternSession, type PatternSet } from "./session-pattern-evidence";
 import { pastSetDone } from "./set-complete";
 import { PatternEvidence } from "@/components/coach/pattern-evidence";
 
@@ -64,7 +64,8 @@ describe("the struggle point", () => {
       expect(f!.evidence.rows[0]).toMatchObject({ exerciseName: "Barbell Back Squat", done: 2, total: 3 });
       // newest first
       expect(f!.evidence.rows[0].startedAt > f!.evidence.rows[4].startedAt).toBe(true);
-      expect(f!.evidence.rows[0].sets.map((s) => evidenceSetText(s))).toEqual(["135 x 8", "135 x 8", "-"]);
+      expect(f!.evidence.rows[0].sets.map((s) => evidenceSetText(s))).toEqual(["135 x 8", "135 x 8", "not logged"]);
+      expect(f!.evidence.slotLabel).toBe("the first exercise");
     }
   });
 });
@@ -108,6 +109,7 @@ describe("the evidence on the finding screen", () => {
       createElement(PatternEvidence, {
         evidence: {
           kind: "slot_sets",
+          slotLabel: "the first exercise",
           rows: [{ startedAt: "2026-10-06T23:00:00Z", exerciseName: "Barbell Back Squat", done: 2, total: 3, sets: [{ done: true, weight: 135, reps: 8, timeSeconds: null, distance: null }, { done: true, weight: 135, reps: 8, timeSeconds: null, distance: null }, { done: false, weight: null, reps: null, timeSeconds: null, distance: null }] }],
         },
         timeZone: "America/Los_Angeles",
@@ -117,13 +119,17 @@ describe("the evidence on the finding screen", () => {
     expect(html).toContain("Tue, Oct 6");
     expect(html).toContain("Barbell Back Squat");
     expect(html).toContain("2 of 3 sets");
-    expect(html).toContain("135 x 8, 135 x 8, -");
+    expect(html).toContain("135 x 8, 135 x 8, not logged");
+  });
+  it("a session with nothing logged says not logged once, not a dash per set", () => {
+    const empty = { done: false, weight: null, reps: 8, timeSeconds: null, distance: null };
+    expect(evidenceRowText([empty, empty, empty])).toBe("not logged");
   });
   it("the screen works the findings out again with every set counted, shows the evidence, and has the phone's shell and a way back", () => {
     const page = readFileSync(join(__dirname, "..", "app/sessions/[sessionId]/coach-note/page.tsx"), "utf8").replace(/\r\n/g, "\n");
     expect(page).toContain("gatherSessionPatternFindings(supabase as any, { athleteId: session.athlete_id, groupId: session.group_id, upTo: session.started_at as string })");
     expect(page).toContain("<PatternEvidence evidence={f.evidence} timeZone={tz} unit={unit} />");
-    expect(page).toContain("Looked at again with every logged set counted, nothing stands out in these sessions now.");
+    expect(page).toContain("patternSummary(");
     expect(page).toContain("<CoachMobileShell");
     expect(page).toContain("&larr; {athleteName}");
   });
@@ -131,5 +137,46 @@ describe("the evidence on the finding screen", () => {
     for (const f of ["lib/graduation-server.ts", "lib/progress-look-gather.ts", "lib/session-recap-data.ts", "lib/session-integrity-data.ts", "lib/session-pattern-evidence.ts"]) {
       expect(readFileSync(join(__dirname, "..", f), "utf8"), f).toContain("pastSetDone(");
     }
+  });
+});
+
+describe("the summary at the top never contradicts the rows under it (Johann, Oct 20)", () => {
+  // Six sessions; Sep 16 (Barbell Back Squat) and Sep 28 (Cable Lat Pulldown) had the first exercise prefilled but never logged.
+  const mk = (iso: string, name: string, logged: boolean): PatternSession => ({
+    id: iso,
+    started_at: iso,
+    duration_seconds: 3000,
+    session_exercises: [
+      { exercise_order: 1, exercise_name: name, tracked_fields: ["reps", "weight"], group_workout_exercise_id: null, set_logs: [0, 1, 2].map((o) => (logged ? set(o) : set(o, { weight: null, reps: 8 }))) },
+      { exercise_order: 2, exercise_name: "Romanian Deadlift", tracked_fields: ["reps", "weight"], group_workout_exercise_id: null, set_logs: [set(0), set(1)] },
+    ],
+  });
+  const sessions = [
+    mk("2026-09-14T23:00:00Z", "Barbell Back Squat", true),
+    mk("2026-09-16T23:00:00Z", "Barbell Back Squat", false),
+    mk("2026-09-21T23:00:00Z", "Barbell Back Squat", true),
+    mk("2026-09-28T23:00:00Z", "Cable Lat Pulldown", false),
+    mk("2026-10-01T23:00:00Z", "Barbell Back Squat", true),
+    mk("2026-10-06T23:00:00Z", "Barbell Back Squat", true),
+  ];
+  const findings = buildSessionPatternFindings(sessions, new Map(), "America/Los_Angeles");
+  const stored = [{ kind: "struggle_point", numericValues: [46, 1] }];
+  it("the numbers differ from the stored note: the summary is built from what is found now, naming the sessions and exercises", () => {
+    expect(findings.find((f) => f.kind === "struggle_point")?.numericValues[0]).toBe(67);
+    expect(patternSummary(findings, stored, "Exercise slot #1 (often the first exercise) is only getting 46% ...", "America/Los_Angeles")).toBe(
+      "Worth a look: the first exercise wasn't logged in 2 of the last 6 sessions (Sep 16 Barbell Back Squat, Sep 28 Cable Lat Pulldown)."
+    );
+  });
+  it("the same findings with the same numbers keep the note as written", () => {
+    const same = findings.map((f) => ({ kind: f.kind, numericValues: f.numericValues }));
+    expect(patternSummary(findings, same, "The note as written.", "America/Los_Angeles")).toBe("The note as written.");
+  });
+  it("nothing found now says so", () => {
+    expect(patternSummary([], stored, "old", "UTC")).toBe("Looked at again with every logged set counted, nothing stands out in these sessions now.");
+  });
+  it("the page uses it", () => {
+    const page = readFileSync(join(__dirname, "..", "app/sessions/[sessionId]/coach-note/page.tsx"), "utf8");
+    expect(page).toContain("patternSummary(findings, stored, check.synthesis_text, tz)");
+    expect(page).not.toContain("? check.synthesis_text");
   });
 });

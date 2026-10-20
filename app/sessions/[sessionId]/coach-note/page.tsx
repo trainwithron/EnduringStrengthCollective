@@ -8,6 +8,7 @@ import { AcknowledgeSessionPatternNoteButton } from "@/components/coach/acknowle
 import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
 import { PatternEvidence } from "@/components/coach/pattern-evidence";
 import { gatherSessionPatternFindings } from "@/lib/session-pattern-spotter-gather";
+import { findingSentence, patternSummary } from "@/lib/session-pattern-evidence";
 import { getGroupCoachTimezone } from "@/lib/timezone";
 import { loadLiftUnit } from "@/lib/lift-unit-server";
 
@@ -99,20 +100,15 @@ export default async function SessionPatternNotePage(props: { params: Promise<{ 
     ? await supabase.from("workouts").select("program_id").eq("id", session.workout_id).maybeSingle()
     : { data: null };
 
-  const stored = (check.detected_signals ?? []) as { kind: string; description: string }[];
+  const stored = (check.detected_signals ?? []) as { kind: string; description: string; numericValues?: number[] }[];
   // The same sessions as the note, looked at again now with every logged set counted (and with what actually happened in each one).
   const [findings, tz, unit] = await Promise.all([
     gatherSessionPatternFindings(supabase as any, { athleteId: session.athlete_id, groupId: session.group_id, upTo: session.started_at as string }),
     getGroupCoachTimezone(supabase, session.group_id),
     loadLiftUnit(supabase as any, session.athlete_id),
   ]);
-  const sameKinds = findings.length === stored.length && findings.every((f) => stored.some((s) => s.kind === f.kind));
-  // The note as written still stands when the same things are found; otherwise say what is true now.
-  const summary = findings.length === 0
-    ? "Looked at again with every logged set counted, nothing stands out in these sessions now."
-    : sameKinds
-      ? check.synthesis_text
-      : findings.map((f) => f.description).join(" ");
+  // The note as written stands only while the same findings come back with the same numbers; otherwise the summary is built from what is found now (never contradicting the rows below).
+  const summary = patternSummary(findings, stored, check.synthesis_text, tz);
 
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body px-5 pt-6 pb-28 lg:pb-10">
@@ -135,7 +131,7 @@ export default async function SessionPatternNotePage(props: { params: Promise<{ 
             <ul className="space-y-4">
               {findings.map((f, i) => (
                 <li key={i}>
-                  <p className="font-body text-sm text-chalk">{f.description}</p>
+                  <p className="font-body text-sm text-chalk">{findingSentence(f, tz)}</p>
                   {f.evidence && <PatternEvidence evidence={f.evidence} timeZone={tz} unit={unit} />}
                 </li>
               ))}
