@@ -177,7 +177,7 @@ describe("release 2: Clients and Calendar", () => {
   });
   it("the shell folds Clients and Calendar", () => {
     const shell = readFileSync(join(root, "components/coach/coach-desktop-shell.tsx"), "utf8");
-    expect(shell).toContain('new Set<HomeKey>(["home", "clients", "calendar", "messages"])');
+    expect(shell).toMatch(/new Set<HomeKey>\(\[[^\]]*"clients", "calendar"/);
   });
 });
 

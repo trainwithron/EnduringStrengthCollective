@@ -57,8 +57,9 @@ describe("TC2: the menus use it", () => {
     expect(shell).toContain("const nav: NavEntry[] = teamSport ? teamNav : ordinaryNav.filter(");
     const team = shell.slice(shell.indexOf("// The team-sport menu:"), shell.indexOf("const nav: NavEntry[] = teamSport"));
     expect(team).toContain("teamSportMenu(groupId)");
-    expect(team).toContain('label: "More"');
-    expect(team).toContain("teamSportMoreMenu(groupId)");
+    // FIX 6 R3: Challenges, Hall of fame and Team sheet (the old More menu) are Programs tabs (lib/desktop-coach-homes.ts)
+    expect(team).not.toContain('label: "More"');
+    expect(team).toContain("programsLeaf,");
     // no Business group, no Group group, no dashboard / group calendar / group sessions, no kiosk entry of its own
     expect(team).not.toContain('label: "Business"');
     expect(team).not.toContain('label: "Group"');

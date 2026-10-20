@@ -9,26 +9,18 @@ import Link from "next/link";
 import {
   LayoutGrid,
   Dumbbell,
-  Library,
   ChevronRight,
   CalendarDays,
-  MessagesSquare,
   Palette,
   TrendingUp,
   HeartHandshake,
-  Flag,
-  Salad,
-  ClipboardList,
   Building2,
-  Layers,
   Globe,
   Users2,
   UserRound,
   Home,
   MonitorPlay,
-  Activity,
   Mail,
-  Trophy,
   MessageCircle,
   Zap,
   SlidersHorizontal,
@@ -36,7 +28,6 @@ import {
   Settings,
 } from "lucide-react";
 import { SignOutButton } from "@/components/group/sign-out-button";
-import { ThreePeopleIcon } from "@/components/coach/desktop/three-people-icon";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
 import { TabletLayoutSwitch } from "@/components/coach/tablet-layout-switch";
 import { FeedbackButton } from "@/components/feedback/feedback-button";
@@ -45,7 +36,7 @@ import { HeaderNotificationBell } from "@/components/notifications/header-bell";
 import { useCoachNavFacts } from "@/components/coach/use-coach-type";
 import { useOnFrontDesk } from "@/components/front-desk/use-on-front-desk";
 import { hiddenForCoach } from "@/lib/team-coach";
-import { isTeamSportGroup, moneyHiddenFor, orgIsTeamOnly, teamSportMenu, teamSportMoreMenu, TEAM_SPORT_BUSINESS_LABEL, teamSportBusinessHref } from "@/lib/team-sport";
+import { isTeamSportGroup, moneyHiddenFor, orgIsTeamOnly, teamSportMenu, TEAM_SPORT_BUSINESS_LABEL, teamSportBusinessHref } from "@/lib/team-sport";
 import { WorkspaceMenu } from "@/components/coach/desktop/workspace-menu";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { bestEffort } from "@/lib/saved";
@@ -159,10 +150,10 @@ function isGroup(entry: NavEntry): entry is NavGroup {
 }
 
 // FIX 6: the homes that already have their tab strip (the rest still use the old menus until their release).
-export const FOLDED_HOMES: ReadonlySet<HomeKey> = new Set<HomeKey>(["home", "clients", "calendar", "messages"]);
+export const FOLDED_HOMES: ReadonlySet<HomeKey> = new Set<HomeKey>(["home", "clients", "calendar", "programs", "messages"]);
 
 // The rail's flat icons that are a home's icon (a team-sport group's Athletes and Team calendar are its Clients and Calendar).
-const LEAF_HOME: Partial<Record<string, HomeKey>> = { clients: "clients", members: "clients", calendar: "calendar", "team-calendar": "calendar", messages: "messages" };
+const LEAF_HOME: Partial<Record<string, HomeKey>> = { clients: "clients", members: "clients", calendar: "calendar", "team-calendar": "calendar", programs: "programs", messages: "messages" };
 
 function CoachDesktopShellFull({
   groupId,
@@ -437,12 +428,13 @@ function CoachDesktopShellFull({
   const moneyHidden = moneyHiddenFor({ coachLevel: !!coachLevel, groupIsTeamSport: isTeamSportGroup(teamMode), orgTeamOnly });
 
   // FIX 6 (six homes on the computer, lib/desktop-coach-homes.ts): the home and the tab come from the address; a folded home has a strip of tabs at the top of the page instead of a menu.
-  // Folded so far: Home, Clients, Calendar and Messages (release 2 of 4). The old menus still hold the rest.
+  // Folded so far: Home, Clients, Calendar, Programs and Messages (release 3 of 4). The old menus still hold the rest of Settings.
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const here = homeOfPath(pathname ?? "", searchParams ? `?${searchParams.toString()}` : "");
   const tabsByHome = homeTabs({ groupId, coachLevel: !!coachLevel, groupKind, teamMode, teamSport, moneyHidden, navFacts, isPlatformAdmin, onFrontDesk });
   const homeIsFolded = (h: HomeKey | undefined) => !!h && FOLDED_HOMES.has(h);
+  const programsLeaf: NavLeaf = { key: "programs", label: "Programs", href: ALL_PROGRAMS_HREF, icon: Dumbbell, termKey: "program", termForm: "plural" };
   const ordinaryNav: NavEntry[] = [
     // Run my day — the highest-frequency items, flat, no group/extra
     // click to reach any of them. Team Performance sits right next to
@@ -450,22 +442,13 @@ function CoachDesktopShellFull({
     // roster-wide insights page every coach can use, not just team-mode
     // groups — gating it behind a group would hide something that's
     // reachable today for anyone who isn't running a team sport.
-    // The rail is short and coach-level: Clients, Calendar, Messages, then the labeled groups.
-    // Coaching (Programs, Exercise Library, Nutrition), Business, Group (inside a team or social group) and Settings (account, display, kiosk, support, quick tips) are the labeled groups; there is no "more" menu.
+    // The rail is short and coach-level: Clients, Calendar, Programs, Messages, then the Business and Settings menus (FIX 6 R4 folds those into Settings).
     // Clients is always the coach's full list, wherever they are. A team or social group's own roster is a separate "Members" entry, shown only inside such a group.
     { key: "clients", label: "Clients", href: CLIENTS_HREF, icon: UserRound, badge: clientsUnread, termKey: "client", termForm: "plural" },
     { key: "calendar", label: "Calendar", href: "/calendar", icon: CalendarDays },
+    // FIX 6 R3: Programs is a home (Programs, Exercise library, Nutrition, Challenges, Hall of fame, Depth chart / Seasons, Team performance, Team sheet are its tabs); the Coaching and Group menus are gone.
+    programsLeaf,
     { key: "messages", label: "Messages", href: `/groups/${groupId}/messages`, icon: Mail, badge: messagesUnread },
-    {
-      label: "Coaching",
-      icon: Dumbbell,
-      items: [
-        { key: "programs", label: "Programs", href: ALL_PROGRAMS_HREF, icon: Dumbbell, termKey: "program", termForm: "plural" },
-        { key: "exercise-library", label: "Exercise library", href: `/groups/${groupId}/exercise-library`, icon: Library },
-        // One Nutrition area. Targets, meal plans, favorite meals and the calculator are tabs and sections inside it, not separate places in the rail.
-        { key: "nutrition", label: "Nutrition", href: `/groups/${groupId}/nutrition`, icon: Salad },
-      ],
-    },
     {
       label: "Business",
       icon: TrendingUp,
@@ -485,24 +468,6 @@ function CoachDesktopShellFull({
           : []),
       ],
     },
-    // The group's own tools. Members (a team or social group's own roster) and the team pages show only where they apply; nothing here is removed, only regrouped.
-    {
-      label: "Group",
-      icon: ThreePeopleIcon as unknown as typeof LayoutGrid,
-      items: [
-        // (Members and Attendance are Clients tabs; Team calendar, Group calendar and Group sessions are Calendar tabs: FIX 6.)
-        // (Group dashboard is Home > Group dashboard now: FIX 6.)
-        { key: "team-performance", label: "Team performance", href: `/groups/${groupId}/team-performance`, icon: Activity },
-        // (Team feed is Messages > Team feed now: FIX 6.)
-        ...(teamMode
-          ? [{ key: "team" as const, label: "Depth chart", href: `/groups/${groupId}/team`, icon: ClipboardList }]
-          : groupKind === "team"
-            ? [{ key: "team" as const, label: "Seasons", href: `/groups/${groupId}/team`, icon: ClipboardList }]
-            : []),
-        { key: "challenges", label: "Challenges", href: `/groups/${groupId}/challenges`, icon: Flag },
-        { key: "records", label: "Hall of fame", href: `/groups/${groupId}/records`, icon: Trophy },
-      ],
-    },
     {
       label: "Settings",
       icon: Settings,
@@ -518,38 +483,26 @@ function CoachDesktopShellFull({
     },
   ];
 
-  // The team-sport menu: Athletes, Team calendar, Attendance (the check-in kiosk is inside it), Depth chart, Team feed, Messages, Team performance, then Coaching, one More (Challenges, Hall of fame) and Settings.
+  // The team-sport menu: Athletes, Team calendar, Programs, Messages and Settings (FIX 6: Attendance is a Clients tab; Depth chart, Team performance, Challenges, Hall of fame and Team sheet are Programs tabs; Team feed is a Messages tab).
   // No Business area, no Group dashboard, no Group calendar or Group sessions; Business is one quiet link under Settings.
   const teamIcons: Record<string, typeof LayoutGrid> = {
     members: Users2,
     "team-calendar": CalendarDays,
-    attendance: ClipboardList,
-    team: ClipboardList,
-    feed: MessagesSquare,
     messages: Mail,
-    "team-performance": Activity,
-    challenges: Flag,
-    records: Trophy,
-    "team-sheet": ClipboardList,
   };
-  const teamLeaves: NavLeaf[] = teamSportMenu(groupId).filter((item) => item.key !== "feed" && item.key !== "attendance").map((item) => ({
+  const teamLeaves: NavLeaf[] = teamSportMenu(groupId).filter((item) => item.key in teamIcons).map((item) => ({
     key: item.key as Active,
     label: item.label,
     href: item.href,
     icon: teamIcons[item.key] ?? LayoutGrid,
     ...(item.key === "members" ? { badge: clientsUnread, termKey: "client" as const, termForm: "plural" as const } : {}),
-    ...(item.key === "feed" ? { badge: feedUnread } : {}),
     ...(item.key === "messages" ? { badge: messagesUnread } : {}),
   }));
   const ordinarySettings = ordinaryNav.find((e): e is NavGroup => isGroup(e) && e.label === "Settings");
   const teamNav: NavEntry[] = [
-    ...teamLeaves,
-    ...ordinaryNav.filter((e): e is NavGroup => isGroup(e) && e.label === "Coaching"),
-    {
-      label: "More",
-      icon: Layers,
-      items: teamSportMoreMenu(groupId).map((item) => ({ key: item.key as Active, label: item.label, href: item.href, icon: teamIcons[item.key] ?? LayoutGrid })),
-    },
+    ...teamLeaves.filter((l) => l.key !== "messages"),
+    programsLeaf,
+    ...teamLeaves.filter((l) => l.key === "messages"),
     {
       label: "Settings",
       icon: Settings,
@@ -600,7 +553,8 @@ function CoachDesktopShellFull({
       </div>
     ),
     calendar: <CalendarRailWidget groupId={groupId} />,
-    "team-performance": <TeamRailWidget groupId={groupId} />,
+    // FIX 6: a team-sport group's Programs icon carries the Team performance widget; otherwise Programs has none.
+    ...(teamSport ? { programs: <TeamRailWidget groupId={groupId} /> } : {}),
   };
 
   const railIcons: RailIcon[] = shownNav.map((entry) => {

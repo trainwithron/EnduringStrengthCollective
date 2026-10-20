@@ -73,8 +73,8 @@ describe("the old pages send a coach to the new tabs, and leave the client's pag
     expect(calcPage).toContain("<BottomTabBar");
     expect(calcPage).not.toContain("<CoachDesktopShell");
   });
-  it("one Nutrition item in the rail", () => {
-    expect(shell).toContain('{ key: "nutrition", label: "Nutrition", href:');
+  it("one Nutrition item: a tab of the Programs home on the computer (FIX 6)", () => {
+    expect(src("../../../lib/desktop-coach-homes.ts")).toContain('{ key: "nutrition", label: "Nutrition", href:');
     for (const old of ["Meal Plans", "Recipe Hub", '"Macro Calculator"']) expect(shell).not.toContain(old);
   });
   it("the workspace picker says Nutrition and keeps Favorite meals", () => {

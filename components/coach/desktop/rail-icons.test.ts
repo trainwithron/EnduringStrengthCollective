@@ -9,14 +9,9 @@ describe("the three look-alike rail icons are now different", () => {
   it("Clients is a single person", () => {
     expect(nav).toContain('{ key: "clients", label: "Clients", href: CLIENTS_HREF, icon: UserRound,');
   });
-  it("Group is a cluster of three people, drawn locally, not a library two-person icon", () => {
-    expect(nav).toContain('label: "Group",\n      icon: ThreePeopleIcon as unknown as typeof LayoutGrid,');
-    const svg = readFileSync(join(__dirname, "three-people-icon.tsx"), "utf8");
-    expect(svg.match(/<circle/g)?.length).toBe(3);
-  });
-  it("Programs (the rail entry and its panel tab) is a dumbbell, and the grid icon is no longer used for programs", () => {
-    expect(nav).toContain('label: "Coaching",\n      icon: Dumbbell,');
-    expect(nav).toContain('{ key: "programs", label: "Programs", href: ALL_PROGRAMS_HREF, icon: Dumbbell,');
+  it("Programs (FIX 6: the Programs home's rail icon) is a dumbbell, and the grid icon is no longer used for programs", () => {
+    expect(shell).toContain('const programsLeaf: NavLeaf = { key: "programs", label: "Programs", href: ALL_PROGRAMS_HREF, icon: Dumbbell,');
+    expect(nav).toContain("programsLeaf,");
     expect(nav).not.toMatch(/icon: LayoutGrid/);
   });
   it("the hover labels stay", () => {
@@ -25,8 +20,9 @@ describe("the three look-alike rail icons are now different", () => {
 });
 
 describe("Exercise Library does not look like Programs", () => {
-  it("is a library icon, so the dumbbell is only Programs inside the Coaching panel", () => {
-    expect(nav).toContain('label: "Exercise library", href: `/groups/${groupId}/exercise-library`, icon: Library }');
-    expect(nav.match(/icon: Dumbbell/g)?.length).toBe(2); // the Coaching rail icon and its Programs tab
+  it("FIX 6: it is a tab of the Programs home, not a rail icon, so the dumbbell is only Programs", () => {
+    expect(nav).not.toContain('label: "Exercise library"');
+    expect(shell.match(/icon: Dumbbell/g)?.length).toBe(1);
+    expect(readFileSync(join(__dirname, "..", "..", "..", "lib", "desktop-coach-homes.ts"), "utf8")).toContain('{ key: "exercise-library", label: "Exercise library", href: `${g}/exercise-library` }');
   });
 });

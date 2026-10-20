@@ -22,7 +22,7 @@ import { CoachDesktopShell } from "./coach-desktop-shell";
 const render = (props: { groupId: string; groupName: string }) =>
   renderToStaticMarkup(createElement(CoachDesktopShell, { ...props, active: "home", coachLevel: true } as never, createElement("div", null, "HOME CONTENT")));
 
-const RAIL = ["Clients", "Calendar", "Messages", "Coaching", "Business", "Settings"];
+const RAIL = ["Clients", "Calendar", "Programs", "Messages", "Business", "Settings"];
 
 describe("Home's desktop rail", () => {
   const cases: [string, { groupId: string; groupName: string }][] = [
@@ -88,6 +88,15 @@ describe("Home's desktop rail", () => {
     expect(tabOn(strip, "/clients")).toBe(true);
     for (const p of ["leads", "waiver", "session-ledger", "packages"]) expect(strip, p).toContain(`href="/groups/g-team/business/${p}"`);
     expect(railLit(html, "Clients")).toBe(true);
+  });
+  it("FIX 6 R3: the exercise library shows the Programs strip with Exercise library lit, and the Programs icon lit", () => {
+    const html = page("/groups/g-team/exercise-library", "", "exercise-library");
+    const strip = html.slice(html.indexOf("data-home-strip"), html.indexOf("HOME CONTENT"));
+    expect(html).toContain('<nav aria-label="Programs"');
+    expect(tabOn(strip, "/groups/g-team/exercise-library")).toBe(true);
+    for (const p of ["nutrition", "challenges", "records", "team-performance"]) expect(strip, p).toContain(`href="/groups/g-team/${p}"`);
+    expect(railLit(html, "Programs")).toBe(true);
+    expect(html).not.toContain('aria-label="Coaching"');
   });
   it("does not need a remembered group: nothing in the rendered rail comes from a cookie", () => {
     const a = render({ groupId: "g-team", groupName: "Varsity" });
