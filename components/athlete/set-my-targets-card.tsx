@@ -53,6 +53,7 @@ export function SetMyTargetsCard({
   showFindMaintenance,
   maintenance,
   weightLogs,
+  canSave,
 }: {
   athleteId: string;
   groupId: string;
@@ -69,6 +70,8 @@ export function SetMyTargetsCard({
   showFindMaintenance: boolean;
   maintenance: MaintenanceResult;
   weightLogs: WeightLogEntry[];
+  // The database lets them save (minor_may_write: an adult with a date of birth on their health form, or a teen with a signed guardian). Without it the calculator still shows, with no save.
+  canSave: boolean;
 }) {
   const router = useRouter();
   const [calculatorOpen, setCalculatorOpen] = useState(current == null);
@@ -119,13 +122,18 @@ export function SetMyTargetsCard({
               maintenanceNote={baselineMaintenance != null ? "From your height, age, sex and activity in About you." : null}
               hideFatLoss={hideFatLoss}
               useLabel={busy ? "Saving…" : "Save as my target"}
-              onUseMacros={(m) => void save({ calories: m.calories, proteinG: m.protein, carbsG: m.carbs, fatG: m.fats })}
+              onUseMacros={canSave ? (m) => void save({ calories: m.calories, proteinG: m.protein, carbsG: m.carbs, fatG: m.fats }) : undefined}
             />
+            {!canSave && (
+              <p className="font-body text-xs text-steel mt-3" data-cannot-save>
+                To save a target of your own, your date of birth needs to be on your health form (and, under 18, a parent or guardian needs to give permission). Ask your coach to send you the form.
+              </p>
+            )}
           </div>
         )}
       </div>
 
-      {showFindMaintenance && !dismissed && (
+      {canSave && showFindMaintenance && !dismissed && (
         <div className="border-t border-steel/15 pt-4" data-find-maintenance>
           <p className="font-body text-sm font-semibold text-chalk">Find my real maintenance</p>
           {ready ? (

@@ -432,6 +432,8 @@ export default async function NutritionPage(
       supabase.from("client_intake").select("date_of_birth").eq("athlete_id", athleteId).maybeSingle(),
     ]);
     const body = rowToBodyProfile(details as Record<string, unknown> | null, intake as Record<string, unknown> | null);
+    // The same rule the database applies to every write a client makes (minor_may_write): asked for the signed-in person themself.
+    const { data: mayWrite } = await supabase.rpc("minor_may_write", { p_user: user.id });
     const dob = readDateOfBirth(body);
     const age = dob ? ageOnDate(dob, todayKey) : null;
     const latestWeight = (weightLogs ?? []).length > 0 ? Number((weightLogs ?? [])[(weightLogs ?? []).length - 1].weight) : null;
@@ -457,6 +459,7 @@ export default async function NutritionPage(
         calorieFloor: calorieFloor({ sex: body.sex, bmr: baseline.ok ? baseline.bmr : null }),
       }),
       weightLogs: (weightLogs ?? []).map((w) => ({ id: w.id as string, loggedDate: w.logged_date as string, weight: Number(w.weight) })),
+      canSave: mayWrite === true,
     };
   }
 
