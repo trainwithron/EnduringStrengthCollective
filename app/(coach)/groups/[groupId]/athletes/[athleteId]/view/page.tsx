@@ -9,6 +9,8 @@ import { loadCalendar, loadHistory, loadHome, loadNutrition, loadPrograms } from
 import { dayStatus, programProgress, progressLine } from "@/lib/client-preview-program";
 import { formatShortDate } from "@/lib/program-schedule";
 import { ViewAsClientLabel } from "@/components/coach/desktop/view-as-client-label";
+import { ScheduleCard } from "@/components/athlete/schedule-card";
+import { loadPreviewScheduleCard } from "@/lib/schedule-card";
 
 export const metadata = { title: "View" };
 
@@ -284,8 +286,9 @@ export default async function ViewAsClientPage(props: {
       );
     }
   } else {
-    const items = await safely(() => loadCalendar(supabase, params.groupId, params.athleteId));
-    body =
+    // The Schedule card the client sees at the top of their Calendar, read only (the button is switched off).
+    const [items, schedule] = await Promise.all([safely(() => loadCalendar(supabase, params.groupId, params.athleteId)), safely(() => loadPreviewScheduleCard(supabase, params.groupId, params.athleteId))]);
+    const list =
       items === null ? (
         <Empty>{EMPTY.loadFailed}</Empty>
       ) : items.length === 0 ? (
@@ -303,6 +306,12 @@ export default async function ViewAsClientPage(props: {
           ))}
         </ul>
       );
+    body = (
+      <>
+        {schedule && <ScheduleCard available={schedule.available} href={schedule.href} preview />}
+        {list}
+      </>
+    );
   }
 
   return (

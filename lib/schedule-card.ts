@@ -1,6 +1,7 @@
 import { generateSlotsForDate, resolveBlockedRangesForDate, minimumNoticeBlockedRange, customStartOptions, type AvailabilityWindow } from "./booking-slots";
 import { fetchSessionMinutes, sessionMinutesFor } from "./availability-windows";
-import { dateKeyInZone, addDaysToKey } from "./timezone";
+import { dateKeyInZone, addDaysToKey, getGroupCoachTimezone } from "./timezone";
+import { buildCreditPicture, fetchBookingCounts } from "./credit-picture";
 
 // The Schedule card at the top of a client's Calendar (Ron, Oct 19: "something small, that says like credits available, would you like to schedule?"):
 // "4 sessions available" and one button that opens the soonest day in the next 14 with an open time, worked out exactly the way that day's page works
@@ -89,4 +90,22 @@ export async function loadScheduleCardHref(
     requestMode: input.bookingMode === "request",
   });
   return scheduleCardHref(days, input.dayBase, input.messagesHref);
+}
+
+// The coach's read-only "View as client" preview: the same card, with the same numbers, decided the same way as the client's own Calendar
+// (this group's coach, their booking mode with no row meaning "I schedule everyone", open hours). Null when the client would not see it.
+export async function loadPreviewScheduleCard(supabase: any, groupId: string, athleteId: string): Promise<{ available: number; href: string } | null> {
+  const { data: coachMembership } = await supabase.from("group_memberships").select("profile_id").eq("group_id", groupId).eq("role", "coach").limit(1).maybeSingle();
+  if (!coachMembership) return null;
+  const sb = await supabase.from("coach_booking_policies").select("booking_mode").eq("coach_id", coachMembership.profile_id).maybeSingle();
+  const bookingMode = sb.error ? "free" : ((sb.data?.booking_mode as string | null) ?? "coach_schedules");
+  const timezone = await getGroupCoachTimezone(supabase, groupId);
+  const href = await loadScheduleCardHref(supabase, { coachId: coachMembership.profile_id, timezone, bookingMode, dayBase: `/groups/${groupId}/calendar`, messagesHref: `/groups/${groupId}/messages` });
+  if (!href) return null;
+  const [{ data: creditsRow }, counts] = await Promise.all([
+    supabase.from("session_credits").select("balance").eq("athlete_id", athleteId).eq("group_id", groupId).maybeSingle(),
+    fetchBookingCounts(supabase, { athleteId, groupId }),
+  ]);
+  const picture = buildCreditPicture({ balance: creditsRow?.balance ?? 0, booked: counts.get(`${athleteId}:${groupId}`)?.booked ?? 0, toMark: 0 });
+  return { available: picture.toBook, href };
 }

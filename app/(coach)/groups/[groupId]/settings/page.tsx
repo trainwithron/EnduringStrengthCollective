@@ -1,5 +1,6 @@
 import { ChangeMyEmail } from "@/components/athlete/change-my-email";
 import { LeaveOrganizationControl } from "@/components/org/leave-organization-control";
+import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { orgIdOfGroup } from "@/lib/org-of-group";
 import { loadTeamInfo } from "@/lib/org-team";
 import { readStayingMembers } from "@/lib/org-members";
@@ -183,6 +184,15 @@ export default async function SettingsPage(
           unknown: team.failed,
         };
       }
+    }
+  }
+  // Organization colors, logo and fonts (Ron, Oct 19: "where I customize my organization colors and all of that stuff"): a link for a coach who can edit them, the same check as the branding page (a coach here, and owner or admin of this group's organization). Branding is a computer page, so not on the phone.
+  let canEditBranding = false;
+  if (isCoach && !effective.isActingAsOther && !(await prefersAthleteStyleView())) {
+    const orgIdForLook = await orgIdOfGroup(supabase, params.groupId);
+    if (orgIdForLook) {
+      const { data: lookRow } = await supabase.from("organization_memberships").select("role").eq("organization_id", orgIdForLook).eq("profile_id", user.id).maybeSingle();
+      canEditBranding = lookRow?.role === "owner" || lookRow?.role === "admin";
     }
   }
   // A client who trains in more than one space (two coaches) gets a link to pick between them.
@@ -373,6 +383,14 @@ export default async function SettingsPage(
             </Link>
             <Link href={`/groups/${params.groupId}/branding?tab=team`} className="font-body text-sm text-steel underline underline-offset-2 mt-2 inline-block">
               Manage invitations on the Team page
+            </Link>
+          </SettingsGroup>
+        )}
+
+        {canEditBranding && (
+          <SettingsGroup label="Organization look">
+            <Link href={`/groups/${params.groupId}/branding?tab=branding`} className="font-body text-sm font-bold text-rust" data-organization-look>
+              Colors, logo and fonts →
             </Link>
           </SettingsGroup>
         )}

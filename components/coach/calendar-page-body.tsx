@@ -21,6 +21,7 @@ import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
 import { BookingModeLine } from "@/components/athlete/booking-mode-line";
 import { ScheduleCard } from "@/components/athlete/schedule-card";
+import { UpcomingSessionsList } from "@/components/coach/upcoming-sessions-list";
 import { loadScheduleCardHref } from "@/lib/schedule-card";
 import { SessionCheckSection } from "@/components/coach/session-check-section";
 import { SessionCountLine } from "@/components/coach/session-count-line";
@@ -325,16 +326,7 @@ export async function CoachCalendarPageBody(
               {upcomingBookings.length === 0 ? (
                 <p className="font-body text-sm text-steel">Nothing booked in the next 5 days.</p>
               ) : (
-                <div className="divide-y divide-steel/15 border-t border-steel/15">
-                  {upcomingBookings.map((b) => (
-                    <div key={b.id} className="py-2.5 flex items-center justify-between gap-3">
-                      <span className="font-body text-sm">{b.athleteName}</span>
-                      <span className="font-body text-xs text-steel shrink-0">
-                        {formatInTimezone(new Date(b.startAt), coachTz, "dateTime")}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                <UpcomingSessionsList rows={upcomingBookings.map((b) => ({ id: b.id, name: b.athleteName, when: formatInTimezone(new Date(b.startAt), coachTz, "dateTime") }))} />
               )}
             </div>
           </CoachMobileShell>

@@ -478,7 +478,7 @@ function CoachDesktopShellFull({
         { key: "waiver", label: "Waiver", href: `/groups/${groupId}/business/waiver`, icon: ClipboardList },
         { key: "leads", label: "Leads", href: `/groups/${groupId}/business/leads`, icon: UserPlus },
         { key: "session-ledger", label: "Session ledger", href: `/groups/${groupId}/business/session-ledger`, icon: Wallet },
-        { key: "branding", label: "Organization", href: `/groups/${groupId}/branding`, icon: Palette },
+        { key: "branding", label: "Organization (colors, team, plan)", href: `/groups/${groupId}/branding`, icon: Palette },
         { key: "zapier", label: "Zapier", href: `/groups/${groupId}/business/zapier`, icon: Zap },
         // Platform administration: only the platform admin sees these (their pages refuse everyone else on the server too).
         ...(isPlatformAdmin

@@ -1,4 +1,5 @@
 import { LoadFailedPage } from "@/components/ui/load-failed-page";
+import { ChevronDown } from "lucide-react";
 import { isReadFailure } from "@/lib/read-failed";
 import Link from "next/link";
 import { inOrg, orgIdOfGroup } from "@/lib/org-of-group";
@@ -342,11 +343,18 @@ export default async function BusinessDashboardPage(
         </div>
       </div>
 
-      <div>
-        <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">
-          <SwappableTerm termKey="client" form="singular" className="capitalize" /> rates
-        </h2>
-        <p className="font-body text-xs text-steel mb-3 max-w-[70ch]">
+      {/* Ron, Oct 19: "the client rates should be collapsible." Closed by default; the summary says how many clients and how many rates are set. */}
+      <details className="group" data-client-rates>
+        <summary className="flex items-center gap-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden min-h-11">
+          <h2 className="font-display uppercase text-sm tracking-wide text-steel">
+            <SwappableTerm termKey="client" form="singular" className="capitalize" /> rates
+          </h2>
+          <span className="font-body text-xs text-steel">
+            {clients.length} <SwappableTerm termKey="client" form={clients.length === 1 ? "singular" : "plural"} /> · {clients.filter((c) => c.monthlyRate != null && c.monthlyRate > 0).length} set
+          </span>
+          <ChevronDown aria-hidden className="w-4 h-4 text-steel ml-auto transition-transform group-open:rotate-180" />
+        </summary>
+        <p className="font-body text-xs text-steel mt-2 mb-3 max-w-[70ch]">
           Set what each client actually pays to see an estimated MRR above — this is a manual stand-in
           until payments are turned on.
         </p>
@@ -368,7 +376,7 @@ export default async function BusinessDashboardPage(
             ))
           )}
         </div>
-      </div>
+      </details>
     </CoachDesktopShell>
   );
 }

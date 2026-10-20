@@ -68,12 +68,14 @@ describe("health answers are read through the database's door", () => {
   it("no screen or route reads the answers column straight from the table any more", () => {
     // The only places that mention the column: the helper itself, the intake submit (a write by the client themselves) and comments.
     const allowed = new Set(["lib/health-answers.ts", "app/api/intake/submit/route.ts", "lib/athlete-injury-flag.ts", "components/coach/par-q-answers-panel.tsx", "app/api/account/export/route.ts", "app/(coach)/groups/[groupId]/athletes/[athleteId]/page.tsx"]);
-    const offenders = [...walk("app"), ...walk("lib"), ...walk("components")].filter((f) => !allowed.has(f) && src(f).includes("par_q_answers"));
+    // Every source file is walked and read once (this walk is the slow part; doing it twice timed out under a full run).
+    const files = [...walk("app"), ...walk("lib"), ...walk("components")].map((f) => ({ f, text: src(f) }));
+    const offenders = files.filter(({ f, text }) => !allowed.has(f) && text.includes("par_q_answers")).map(({ f }) => f);
     expect(offenders, "read the answers with readHealthAnswers() / readHealthAnswersMany() (lib/health-answers.ts)").toEqual([]);
     // and nothing asks the table for every column of the intake row (it would be refused now)
-    const star = [...walk("app"), ...walk("lib"), ...walk("components")].filter((f) => /from\("client_intake"\)\s*\.select\("\*"\)/.test(src(f)));
+    const star = files.filter(({ text }) => /from\("client_intake"\)\s*\.select\("\*"\)/.test(text)).map(({ f }) => f);
     expect(star).toEqual([]);
-  });
+  }, 30000);
 
   it("the owner and the admins of an organization see 'done' or 'needs attention' and nothing more, until the owner grants more", () => {
     const sql = src("supabase/migrations/0399_health_answers_private.sql");

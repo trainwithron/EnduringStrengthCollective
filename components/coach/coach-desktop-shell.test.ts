@@ -32,7 +32,7 @@ describe("coach desktop shell", () => {
       expect(at(m), m).toBeLessThan(at('label: "Business"'));
     }
     // Business holds the business tools, Pro Shop and Referrals (the Resources page), and for the platform admin only Organizations and Marketplace ranking
-    for (const m of ['label: "Booking page"', 'label: "Waiver"', 'label: "Leads"', 'label: "Session ledger"', 'label: "Organization"', 'label: "Zapier"', 'label: "Pro shop and referrals"', 'label: "Marketplace ranking"']) {
+    for (const m of ['label: "Booking page"', 'label: "Waiver"', 'label: "Leads"', 'label: "Session ledger"', 'label: "Organization (colors, team, plan)"', 'label: "Zapier"', 'label: "Pro shop and referrals"', 'label: "Marketplace ranking"']) {
       expect(at(m), m).toBeGreaterThan(at('label: "Business"'));
       expect(at(m), m).toBeLessThan(at('label: "Group"'));
     }
