@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 
@@ -32,6 +32,10 @@ export function RequestDifferentTime({
   const [sentLabel, setSentLabel] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  // The Schedule card on the Calendar links here (#request-different-time) when there is no open time in the next 14 days: arrive with it open.
+  useEffect(() => {
+    if (window.location.hash === "#request-different-time") setOpen(true);
+  }, []);
 
   if (options.length === 0) return null;
 
@@ -76,7 +80,7 @@ export function RequestDifferentTime({
   }
 
   return (
-    <div className="mt-4 border border-steel/20 p-3">
+    <div id="request-different-time" className="mt-4 border border-steel/20 p-3 scroll-mt-20">
       <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="font-body text-sm text-rust min-h-11">
         Ask for a different time
       </button>

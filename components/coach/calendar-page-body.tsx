@@ -20,6 +20,8 @@ import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
 import { BookingModeLine } from "@/components/athlete/booking-mode-line";
+import { ScheduleCard } from "@/components/athlete/schedule-card";
+import { loadScheduleCardHref } from "@/lib/schedule-card";
 import { SessionCheckSection } from "@/components/coach/session-check-section";
 import { SessionCountLine } from "@/components/coach/session-count-line";
 import { AvailabilityBookingSettings, AvailabilityTimeOff } from "@/components/coach/desktop/availability-settings";
@@ -536,6 +538,12 @@ export async function CoachCalendarPageBody(
       if (!sb.error) bookingMode = (sb.data?.booking_mode as string | null) ?? "coach_schedules";
     }
 
+    // The Schedule card (free or request mode, with open hours): it replaces the separate sessions line here.
+    const scheduleHref = coachMembership && (!isCoach || isActingAsOther) && hasAvailability
+      ? await loadScheduleCardHref(supabase, { coachId: coachMembership.profile_id, timezone: displayTz, bookingMode, dayBase: `/groups/${params.groupId}/calendar`, messagesHref: `/groups/${params.groupId}/messages` })
+      : null;
+    const creditPicture = buildCreditPicture({ balance: creditBalance, booked: creditBooked, toMark: 0 });
+
     const today = dateFromKey(dateKeyInZone(displayTz));
     const view = searchParams.view === "week" ? "week" : "month";
     const monthParam = searchParams.month;
@@ -633,13 +641,14 @@ export async function CoachCalendarPageBody(
               ? "Your program doesn't have a start date set yet — ask your coach, and your training schedule will show up here."
               : "No program assigned yet — you'll see your training schedule here once your coach assigns one."}
           </p>
-          {coachMembership && (
+          {coachMembership && !scheduleHref && (
             <p className="font-body text-xs text-steel mt-3">
-              {clientCreditPictureLine(buildCreditPicture({ balance: creditBalance, booked: creditBooked, toMark: 0 }), NO_SESSIONS_LINE)}
+              {clientCreditPictureLine(creditPicture, NO_SESSIONS_LINE)}
             </p>
           )}
         </header>
 
+        {scheduleHref && <ScheduleCard available={creditPicture.toBook} href={scheduleHref} />}
         {coachMembership && bookingMode === "coach_schedules" && <BookingModeLine groupId={params.groupId} />}
 
         <UpcomingGroupEvents athleteId={athleteId} timezone={displayTz} />

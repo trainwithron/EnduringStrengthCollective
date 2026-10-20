@@ -8,6 +8,8 @@ import { computeScheduledDates, isSameDay, isLocked } from "@/lib/program-schedu
 import { getActivePrograms } from "@/lib/active-programs";
 import { ProgramChips } from "@/components/athlete/program-chips";
 import { BookingModeLine } from "@/components/athlete/booking-mode-line";
+import { ScheduleCard } from "@/components/athlete/schedule-card";
+import { loadScheduleCardHref } from "@/lib/schedule-card";
 import { dateKeyInZone, getGroupCoachTimezone, nowInZone } from "@/lib/timezone";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
@@ -271,6 +273,11 @@ export default async function ProgramCalendarPage(
   // every locked/unlocked day computed from it) reads a day early or late
   // for anyone not in the UTC zone.
   const timezone = await getGroupCoachTimezone(supabase, params.groupId);
+  // The Schedule card (free or request mode, with open hours): it replaces the separate sessions line in the header.
+  const scheduleHref = viewingAsAthlete && coachMembership && hasAvailability
+    ? await loadScheduleCardHref(supabase, { coachId: coachMembership.profile_id, timezone, bookingMode, dayBase: `${backHref}/calendar`, messagesHref: `/groups/${params.groupId}/messages` })
+    : null;
+  const creditPicture = buildCreditPicture({ balance: creditBalance, booked: creditBooked, toMark: 0 });
   const today = nowInZone(timezone);
   const view = searchParams.view === "week" ? "week" : "month";
   const monthParam = searchParams.month; // "YYYY-MM"
@@ -339,14 +346,15 @@ export default async function ProgramCalendarPage(
         <h1 className="font-display font-bold text-4xl leading-none mt-3 uppercase">
           {program.name}
         </h1>
-        {viewingAsAthlete && coachMembership && (
+        {viewingAsAthlete && coachMembership && !scheduleHref && (
           <p className="font-body text-xs text-steel mt-3">
-            {clientCreditPictureLine(buildCreditPicture({ balance: creditBalance, booked: creditBooked, toMark: 0 }), NO_SESSIONS_LINE)}
+            {clientCreditPictureLine(creditPicture, NO_SESSIONS_LINE)}
           </p>
         )}
         {viewingAsAthlete && <ProgramChips groupId={params.groupId} programs={activePrograms.map((p) => ({ id: p.id, name: p.label?.trim() || p.name }))} currentId={params.programId} />}
       </header>
 
+      {scheduleHref && <ScheduleCard available={creditPicture.toBook} href={scheduleHref} />}
       {viewingAsAthlete && coachMembership && bookingMode === "coach_schedules" && <BookingModeLine groupId={params.groupId} />}
 
       {viewingAsAthlete && <UpcomingGroupEvents athleteId={athleteId} timezone={timezone} />}

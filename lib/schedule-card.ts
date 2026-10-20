@@ -1,0 +1,92 @@
+import { generateSlotsForDate, resolveBlockedRangesForDate, minimumNoticeBlockedRange, customStartOptions, type AvailabilityWindow } from "./booking-slots";
+import { fetchSessionMinutes, sessionMinutesFor } from "./availability-windows";
+import { dateKeyInZone, addDaysToKey } from "./timezone";
+
+// The Schedule card at the top of a client's Calendar (Ron, Oct 19: "something small, that says like credits available, would you like to schedule?"):
+// "4 sessions available" and one button that opens the soonest day in the next 14 with an open time, worked out exactly the way that day's page works
+// out its times (the coach's hours, minus time off and the minimum notice). With no open time in 14 days, the button opens the soonest day where the
+// client can ask for a different time (request mode); with neither, it opens Messages.
+
+export const SCHEDULE_LOOKAHEAD_DAYS = 14;
+
+export type ScheduleException = Parameters<typeof resolveBlockedRangesForDate>[1][number];
+
+export function sessionsAvailableLine(available: number): string {
+  if (available <= 0) return "No sessions left";
+  return available === 1 ? "1 session available" : `${available} sessions available`;
+}
+
+// Pure. The day page parses its date as `new Date(\`${key}T00:00:00\`)`, so each day here is built the same way.
+export function soonestScheduleDays(input: {
+  windows: AvailabilityWindow[];
+  exceptions: ScheduleException[];
+  timezone: string;
+  minimumNoticeHours: number;
+  bufferMinutes: number;
+  requestMode: boolean;
+  now?: Date;
+  days?: number;
+}): { openDay: string | null; requestDay: string | null } {
+  const now = input.now ?? new Date();
+  const todayKey = dateKeyInZone(input.timezone, now);
+  const notice = minimumNoticeBlockedRange(now, input.minimumNoticeHours);
+  let requestDay: string | null = null;
+  for (let i = 0; i < (input.days ?? SCHEDULE_LOOKAHEAD_DAYS); i++) {
+    const key = addDaysToKey(todayKey, i);
+    const date = new Date(`${key}T00:00:00`);
+    const blocked = resolveBlockedRangesForDate(date, input.exceptions, input.timezone);
+    if (notice) blocked.push(notice);
+    const slots = generateSlotsForDate(date, input.windows, blocked, input.timezone).filter((s) => s.start > now);
+    if (slots.length > 0) return { openDay: key, requestDay };
+    if (input.requestMode && requestDay === null) {
+      const asks = customStartOptions({ date, windows: input.windows, blockedRanges: blocked, bookings: [], bufferMinutes: input.bufferMinutes, timezone: input.timezone }).filter((s) => s.start > now);
+      if (asks.length > 0) requestDay = key;
+    }
+  }
+  return { openDay: null, requestDay };
+}
+
+export function scheduleCardHref(days: { openDay: string | null; requestDay: string | null }, dayBase: string, messagesHref: string): string {
+  if (days.openDay) return `${dayBase}/${days.openDay}`;
+  if (days.requestDay) return `${dayBase}/${days.requestDay}#request-different-time`;
+  return messagesHref;
+}
+
+// The card shows only when the client picks their own times (free or request) and the coach has open hours. Returns null otherwise.
+export async function loadScheduleCardHref(
+  supabase: any,
+  input: { coachId: string; timezone: string; bookingMode: string; dayBase: string; messagesHref: string }
+): Promise<string | null> {
+  if (input.bookingMode !== "free" && input.bookingMode !== "request") return null;
+  const [{ data: windowRows }, { data: exceptionRows }, { data: policyRow }, sessionIndex] = await Promise.all([
+    supabase.from("coach_availability_windows").select("weekday, start_time, end_time, slot_duration_minutes").eq("coach_id", input.coachId),
+    supabase.from("coach_availability_exceptions").select("kind, start_at, end_at, weekday, start_time, end_time").eq("coach_id", input.coachId),
+    supabase.from("coach_booking_policies").select("buffer_minutes, minimum_notice_hours").eq("coach_id", input.coachId).maybeSingle(),
+    fetchSessionMinutes(supabase, [input.coachId]),
+  ]);
+  if (!windowRows || windowRows.length === 0) return null;
+  const windows: AvailabilityWindow[] = windowRows.map((w: any) => ({
+    weekday: w.weekday,
+    startTime: w.start_time,
+    endTime: w.end_time,
+    slotDurationMinutes: w.slot_duration_minutes,
+    sessionMinutes: sessionMinutesFor(sessionIndex, input.coachId, w),
+  }));
+  const exceptions: ScheduleException[] = (exceptionRows ?? []).map((e: any) => ({
+    kind: e.kind,
+    startAt: e.start_at,
+    endAt: e.end_at,
+    weekday: e.weekday,
+    startTime: e.start_time,
+    endTime: e.end_time,
+  }));
+  const days = soonestScheduleDays({
+    windows,
+    exceptions,
+    timezone: input.timezone,
+    minimumNoticeHours: policyRow?.minimum_notice_hours ?? 0,
+    bufferMinutes: policyRow?.buffer_minutes ?? 0,
+    requestMode: input.bookingMode === "request",
+  });
+  return scheduleCardHref(days, input.dayBase, input.messagesHref);
+}
