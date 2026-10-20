@@ -1,4 +1,4 @@
-import { generateClaimToken, hashClaimToken } from "@/lib/client-claim";
+import { generateClaimToken, hashClaimToken } from "@/lib/client-claim-token";
 import {
   computePublicSlots,
   guestChangeAllowed,

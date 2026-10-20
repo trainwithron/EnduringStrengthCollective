@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { isEmbeddedRequest } from "@/lib/embedded-request";
 import { createServerClient } from "@/lib/supabase/server";
 import { EmbeddedProvider } from "@/components/shared/embedded-context";
@@ -23,7 +24,12 @@ export default async function CoachAreaLayout({ children }: { children: React.Re
   return (
     <EmbeddedProvider embedded={embedded}>
       {!embedded && <OrgThemeSync />}
-      {!embedded && userId && <PendingEmailChangeBanner userId={userId} />}
+      {/* Streamed: the page does not wait for this banner's own read. */}
+      {!embedded && userId && (
+        <Suspense fallback={null}>
+          <PendingEmailChangeBanner userId={userId} />
+        </Suspense>
+      )}
       {/* SplitHalfHost keeps the left half's pages (the list panel's tiles) alive while the main page changes, the same way the workspace keeps its panes. */}
       <WorkspaceHost userId={userId}>
         <SplitHalfHost>{children}</SplitHalfHost>

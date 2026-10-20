@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import * as XLSX from "xlsx";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { ExerciseNameInput } from "@/components/coach/exercise-name-input";
 import { detectHistoryColumns, headerUnitOf, parseHistoryRows, type ParsedHistoryRow, type SkippedHistoryRow } from "@/lib/history-import-parser";
@@ -133,6 +132,8 @@ export function ExerciseHistoryUploader({
     setCsvError(null);
 
     const buffer = await file.arrayBuffer();
+    // The spreadsheet reader is loaded only when a file is read (it is large, and most visits to the history page never import anything).
+    const XLSX = await import("xlsx");
     const workbook = XLSX.read(buffer, { type: "array", codepage: 65001 });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const rows: string[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false });

@@ -1,4 +1,4 @@
-import { generateClaimToken, hashClaimToken } from "@/lib/client-claim";
+import { generateClaimToken, hashClaimToken } from "@/lib/client-claim-token";
 import { isPlaceholderEmail } from "@/lib/placeholder-email";
 import { sendEmail, isEmailConfigured } from "@/lib/email";
 import { maskEmail } from "@/lib/mask-email";

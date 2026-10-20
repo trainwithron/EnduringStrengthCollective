@@ -7,8 +7,6 @@ import { cleanImportedProgramName, PROGRAM_NAME_MAX, tidyProgramName } from "@/l
 import { readAiJson } from "@/lib/ai-fetch";
 import { isBadExerciseName, isNumericOnlyName, isPrescriptionName } from "@/lib/exercise-name-guard";
 import { addLibraryExercise } from "@/lib/library-write";
-import * as XLSX from "xlsx";
-import * as cptable from "xlsx/dist/cpexcel.full.mjs";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { saved, bestEffort } from "@/lib/saved";
 
@@ -21,7 +19,15 @@ import { saved, bestEffort } from "@/lib/saved";
 // Loading it explicitly is the officially supported fix for a bundled
 // environment — it only silences the benign warning, it changes nothing
 // about how files are decoded.
-XLSX.set_cptable(cptable);
+// Loaded only when a file is read (the reader and its tables are large, and most visits to these pages never import anything); the codepage tables are set once.
+let xlsxLoaded: Promise<typeof import("xlsx")> | null = null;
+function loadXlsx(): Promise<typeof import("xlsx")> {
+  xlsxLoaded ??= Promise.all([import("xlsx"), import("xlsx/dist/cpexcel.full.mjs")]).then(([XLSX, cptable]) => {
+    XLSX.set_cptable(cptable);
+    return XLSX;
+  });
+  return xlsxLoaded;
+}
 import {
   detectColumns,
   bestExerciseColumn,
@@ -296,6 +302,7 @@ export function ImportWizard({
     // codepage 65001 = UTF-8 — without it, xlsx defaults to a legacy
     // codepage for raw CSV bytes and mangles any non-ASCII character
     // (accents, °, etc.) into mojibake.
+    const XLSX = await loadXlsx();
     const workbook = XLSX.read(buffer, { type: "array", codepage: 65001 });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const rows: string[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false });

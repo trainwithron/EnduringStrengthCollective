@@ -21,7 +21,7 @@ import {
   sendEmailChangeMessages,
   supersedeOlder,
 } from "./email-change";
-import { hashClaimToken } from "./client-claim";
+import { hashClaimToken } from "./client-claim-token";
 
 const src = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
 const H = 3600_000;

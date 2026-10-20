@@ -2,12 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   buildClaimSms,
   claimStatus,
-  generateClaimToken,
-  hashClaimToken,
   isPlaceholderEmail,
   placeholderEmailFor,
   smsHref,
 } from "@/lib/client-claim";
+import { generateClaimToken, hashClaimToken } from "@/lib/client-claim-token";
 
 describe("placeholder emails", () => {
   it("builds an address that can never receive mail and recognizes it", () => {

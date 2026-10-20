@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { hashClaimToken } from "@/lib/client-claim";
+import { hashClaimToken } from "@/lib/client-claim-token";
 import { clientIp, rateLimitAllows } from "@/lib/rate-limit";
 
 // The public landing for a client's claim link.

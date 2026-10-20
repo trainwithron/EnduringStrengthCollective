@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { CLAIM_LINK_LIFETIME_HOURS, generateClaimToken, hashClaimToken } from "@/lib/client-claim";
+import { CLAIM_LINK_LIFETIME_HOURS } from "@/lib/client-claim";
+import { generateClaimToken, hashClaimToken } from "@/lib/client-claim-token";
 import { everSignedIn } from "@/lib/ever-signed-in";
 
 // Shared guard for the coach-side claim routes: the caller must coach the

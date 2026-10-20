@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hashClaimToken } from "@/lib/client-claim";
+import { hashClaimToken } from "@/lib/client-claim-token";
 import {
   cancelManagedBooking,
   createPublicBooking,

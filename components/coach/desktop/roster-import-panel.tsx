@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import * as XLSX from "xlsx";
 import { useRouter } from "next/navigation";
 import { useTerm } from "@/components/coach/terminology-provider";
 import { confirmDialog } from "@/components/shared/confirm-dialog";
@@ -46,6 +45,8 @@ export function RosterImportPanel({ groupId, groupName, onAdded, onClose }: { gr
   async function handleFile(file: File) {
     setError(null);
     try {
+      // The spreadsheet reader is loaded only when a file is chosen (it is large, and most visits never import anything).
+      const XLSX = await import("xlsx");
       const workbook = XLSX.read(await file.arrayBuffer(), { type: "array", codepage: 65001 });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const rows: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false });

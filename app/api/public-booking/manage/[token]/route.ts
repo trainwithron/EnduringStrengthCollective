@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cancelManagedBooking, getManagedBooking, rescheduleManagedBooking } from "@/lib/public-booking-engine";
 import { cleanParam, limitByIp, publicStore } from "@/lib/public-booking-route";
-import { hashClaimToken } from "@/lib/client-claim";
+import { hashClaimToken } from "@/lib/client-claim-token";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { sendCoachPush } from "@/lib/coach-notice";
 import { formatInTimezone, timezoneForProfiles } from "@/lib/format-in-timezone";

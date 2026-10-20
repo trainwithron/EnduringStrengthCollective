@@ -2,7 +2,7 @@
 // Nothing here ever answers a data request (the database and the API are never cached). The sets typed offline are kept by the app itself (lib/set-outbox.ts).
 // A workout page is kept only for /sessions/ and is cleared when the person signs out.
 
-const STATIC_CACHE = "esc-static-v1";
+const STATIC_CACHE = "esc-static-v2";
 const PAGE_CACHE = "esc-pages-v1";
 const MAX_PAGES = 12;
 
@@ -12,10 +12,14 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches
-      .keys()
-      .then((names) => Promise.all(names.filter((n) => n !== STATIC_CACHE && n !== PAGE_CACHE).map((n) => caches.delete(n))))
-      .then(() => self.clients.claim())
+    (async () => {
+      // A page is asked for while the worker starts up, instead of after (navigation preload): opening the app does not wait for the worker first.
+      if (self.registration.navigationPreload) await self.registration.navigationPreload.enable();
+      // Every older cache goes (esc-static-v1 included).
+      const names = await caches.keys();
+      await Promise.all(names.filter((n) => n !== STATIC_CACHE && n !== PAGE_CACHE).map((n) => caches.delete(n)));
+      await self.clients.claim();
+    })()
   );
 });
 
@@ -56,7 +60,11 @@ self.addEventListener("fetch", (event) => {
   if (req.mode === "navigate") {
     const keep = url.pathname.startsWith("/sessions/");
     event.respondWith(
-      fetch(req)
+      (async () => {
+        // The page the browser already started fetching while the worker woke up (navigation preload), else a normal fetch.
+        const pre = await event.preloadResponse;
+        return pre || (await fetch(req));
+      })()
         .then((res) => {
           if (keep && res.ok && res.type === "basic" && !res.redirected) {
             const copy = res.clone();

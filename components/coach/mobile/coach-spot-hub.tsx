@@ -4,12 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Dumbbell, Mail, MessageCircle, Sparkles, TrendingUp, Users, X } from "lucide-react";
-import { BusinessMiniDashboard } from "@/components/coach/desktop/business-mini-dashboard";
-import { AskSpotChatPanel } from "@/components/coach/ask-spot-chat-panel";
-import { QuickPaymentPanel } from "./quick-payment-panel";
-import { SpotBuilderPanel } from "./spot-builder-panel";
-import { SpotClientsGroupsPanel } from "./spot-clients-groups-panel";
-import { SpotMessagesPanel } from "./spot-messages-panel";
+import dynamic from "next/dynamic";
 import { SpotNeedsTop } from "./spot-needs-top";
 import { SPOT_LAST_OPENED_KEY, shouldFade, type SpotNeeds } from "@/lib/spot-needs";
 import { isEmbeddedWindow } from "@/components/ui/loading-watchdog";
@@ -20,6 +15,14 @@ import { getCoachedGroups, LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/coach-group
 import { ACTIVE_ORG_COOKIE, readBrowserCookie, rememberedGroupForActiveOrg } from "@/lib/active-org";
 import { hubOrgs, hubStartGroup, hubStartOrgId, pageOrgId, type HubOrg } from "@/lib/hub-orgs";
 import { isTeamSportGroup, TEAM_SPORT_HIDDEN_HUB_TILES } from "@/lib/team-sport";
+
+// The six panels behind the tiles are loaded only when one is opened (every phone page carries this hub; most never open a panel). What needs you (SpotNeedsTop) stays in the page.
+const BusinessMiniDashboard = dynamic(() => import("@/components/coach/desktop/business-mini-dashboard").then((m) => m.BusinessMiniDashboard), { ssr: false, loading: () => null });
+const AskSpotChatPanel = dynamic(() => import("@/components/coach/ask-spot-chat-panel").then((m) => m.AskSpotChatPanel), { ssr: false, loading: () => null });
+const QuickPaymentPanel = dynamic(() => import("./quick-payment-panel").then((m) => m.QuickPaymentPanel), { ssr: false, loading: () => null });
+const SpotBuilderPanel = dynamic(() => import("./spot-builder-panel").then((m) => m.SpotBuilderPanel), { ssr: false, loading: () => null });
+const SpotClientsGroupsPanel = dynamic(() => import("./spot-clients-groups-panel").then((m) => m.SpotClientsGroupsPanel), { ssr: false, loading: () => null });
+const SpotMessagesPanel = dynamic(() => import("./spot-messages-panel").then((m) => m.SpotMessagesPanel), { ssr: false, loading: () => null });
 
 type TileKey = "clients" | "messages" | "business" | "program" | "ask-spot";
 

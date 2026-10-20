@@ -1,5 +1,3 @@
-import { createHash, randomBytes } from "crypto";
-
 // Pre-signup client profiles: a coach creates a REAL account for a client
 // silently (no email is sent), builds everything for them, and later hands
 // over a single-use claim link. The pieces here are pure so they're testable.
@@ -31,14 +29,7 @@ export function validateNewPassword(password: string): string | null {
   return null;
 }
 
-// 32 random bytes, URL-safe. Only its sha256 is ever stored.
-export function generateClaimToken(): string {
-  return randomBytes(32).toString("base64url");
-}
-
-export function hashClaimToken(token: string): string {
-  return createHash("sha256").update(token, "utf8").digest("hex");
-}
+// The token itself (generateClaimToken, hashClaimToken) is in ./client-claim-token: server code only, so the pages that import this file do not ship Node's crypto.
 
 // What the coach sees per client (the short checklist state).
 // finishing_setup: the link was used (they tapped Continue) but they have not finished the
