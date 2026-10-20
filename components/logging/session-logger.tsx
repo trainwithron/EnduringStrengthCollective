@@ -55,7 +55,7 @@ export function SessionLogger({
   // Once the workout is completed this line replaces the buttons; while it is paused, Resume workout takes the place of Complete workout.
   finishedLine?: string | null;
   pausedSessionId?: string | null;
-  coachMode?: { homeHref: string; clientIsMinor: boolean };
+  coachMode?: { homeHref: string; clientIsMinor: boolean; offerWalkIn?: boolean };
   groupId: string;
   athleteId: string;
   viewerId: string | null;

@@ -60,8 +60,9 @@ export function CompleteWorkoutButton({
   disabled: boolean;
   raised?: boolean;
   // Set when a coach is logging this session FOR a client (not the client's own login): finishing goes straight back to the coach's home instead of the client's share card, and
-  // no feed post is made in the name of a client under 18.
-  coachMode?: { homeHref: string; clientIsMinor: boolean };
+  // no feed post is made in the name of a client under 18. offerWalkIn: asked "Put this on your calendar?" after a workout with no session on the calendar (never in a team-sport
+  // group, which does not use sessions).
+  coachMode?: { homeHref: string; clientIsMinor: boolean; offerWalkIn?: boolean };
   // The group's "Post-workout cards and PR notices" setting (off: no feed card, no share card).
   postWorkoutCards?: boolean;
 }) {
@@ -376,8 +377,8 @@ export function CompleteWorkoutButton({
       return;
     }
 
-    // Logged for a client with no booking linked (none at Start, and the database found none when it was finished): offer it as a walk-in.
-    if (coachMode) {
+    // Logged for a client with no booking linked (none at Start, and the database found none when it was finished): offer it as a walk-in. Not in a team-sport group (no sessions there).
+    if (coachMode?.offerWalkIn) {
       const { data: done } = await supabase.from("athlete_sessions").select("booking_id, started_at, completed_at").eq("id", sessionId).maybeSingle();
       const row = done as { booking_id: string | null; started_at: string | null; completed_at: string | null } | null;
       if (row && !row.booking_id && row.started_at) {

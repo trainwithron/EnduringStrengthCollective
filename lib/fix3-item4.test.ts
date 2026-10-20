@@ -26,8 +26,11 @@ describe("a walk-in", () => {
     expect(c).toContain('rpc("create_walk_in_booking", { p_session_id: sessionId })');
     expect(c).toContain("onClick={() => finishNavigation(walkIn.navHref)}");
   });
-  it("only in coach mode (a client's own workout is never a walk-in)", () => {
-    expect(c.indexOf("if (coachMode) {\n      const { data: done }")).toBeGreaterThan(-1);
+  it("only in coach mode (a client's own workout is never a walk-in), and never in a team-sport group (no sessions there)", () => {
+    expect(c.indexOf("if (coachMode?.offerWalkIn) {\n      const { data: done }")).toBeGreaterThan(-1);
+    const page = read("app/sessions/[sessionId]/page.tsx");
+    expect(page).toContain('supabase.from("groups").select("gamification_enabled, team_mode")');
+    expect(page).toContain("offerWalkIn: !isTeamSportGroup((groupRow as { team_mode?: boolean | null } | null)?.team_mode)");
   });
   it("an overlap says so and nothing is used", () => {
     expect(c).toContain("That time overlaps another session on your calendar, so nothing was added and nothing was used.");

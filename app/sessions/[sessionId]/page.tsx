@@ -1,3 +1,4 @@
+import { isTeamSportGroup } from "@/lib/team-sport";
 import { COACH_HOME_HREF } from "@/lib/start-group";
 import { loadPostWorkoutCards } from "@/lib/post-workout-cards";
 import { redirect } from "next/navigation";
@@ -132,7 +133,7 @@ export default async function SessionPage(
       .limit(1)
       .maybeSingle(),
     // Per-group on/off preference for the gamified-logging thread.
-    supabase.from("groups").select("gamification_enabled").eq("id", session.group_id).maybeSingle(),
+    supabase.from("groups").select("gamification_enabled, team_mode").eq("id", session.group_id).maybeSingle(),
     // Video upload/feedback visibility — RLS enforces the real boundary
     // regardless, this just decides what the UI offers.
     supabase
@@ -680,7 +681,7 @@ export default async function SessionPage(
         raised={isOwnSession && session.status !== "in_progress"}
         finishedLine={session.status === "completed" ? "Done. Good workout." : null}
         pausedSessionId={session.status === "abandoned" ? session.id : null}
-        coachMode={coachModeClient ? { homeHref: coachHomeHref, clientIsMinor: coachModeClient.isMinor } : undefined}
+        coachMode={coachModeClient ? { homeHref: coachHomeHref, clientIsMinor: coachModeClient.isMinor, offerWalkIn: !isTeamSportGroup((groupRow as { team_mode?: boolean | null } | null)?.team_mode) } : undefined}
         groupId={session.group_id}
         athleteId={session.athlete_id}
         viewerId={user.id}

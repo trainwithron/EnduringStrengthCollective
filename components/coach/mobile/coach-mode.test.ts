@@ -26,7 +26,7 @@ describe("coach mode: a coach logging a workout for a client on the phone", () =
     const page = read("app/sessions/[sessionId]/page.tsx");
     expect(page).toContain("const coachModeFor = session.logged_by_coach && !isOwnSession && viewerIsCoach;");
     expect(page).toContain("athleteIsMinor(supabase, session.athlete_id)");
-    expect(page).toContain("coachMode={coachModeClient ? { homeHref: coachHomeHref, clientIsMinor: coachModeClient.isMinor } : undefined}");
+    expect(page).toContain("coachMode={coachModeClient ? { homeHref: coachHomeHref, clientIsMinor: coachModeClient.isMinor, offerWalkIn: !isTeamSportGroup((groupRow as { team_mode?: boolean | null } | null)?.team_mode) } : undefined}");
     expect(read("components/logging/session-logger.tsx")).toContain("coachMode={coachMode}");
   });
   it("finishing shows the client's workout card (back to the coach's home only if the card cannot be made), and nothing is posted to the feed for a client under 18", () => {
