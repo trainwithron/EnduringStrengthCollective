@@ -13,6 +13,7 @@ import { SpotClientsGroupsPanel } from "./spot-clients-groups-panel";
 import { SpotMessagesPanel } from "./spot-messages-panel";
 import { SpotNeedsTop } from "./spot-needs-top";
 import { SPOT_LAST_OPENED_KEY, shouldFade, type SpotNeeds } from "@/lib/spot-needs";
+import { isEmbeddedWindow } from "@/components/ui/loading-watchdog";
 import { PushNotificationToggle } from "@/components/athlete/push-notification-toggle";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { useTerm } from "@/components/coach/terminology-provider";
@@ -93,6 +94,8 @@ export function CoachSpotHub({
       });
   }
   useEffect(() => {
+    // Never inside an embedded frame (the split half, a workspace pane): the page holding it has its own Spotlight.
+    if (isEmbeddedWindow()) return;
     // Opened by a link (Release 2): ?spot=1 (a coach page that lives in Spotlight on a phone), or a notice naming a panel (#late-changes, #schedule-requests, #expiring).
     const anchor = SPOT_OPEN_HASHES.find((h) => window.location.hash === `#${h}`) ?? null;
     if (new URLSearchParams(window.location.search).get("spot") === "1" || anchor) {
@@ -112,6 +115,9 @@ export function CoachSpotHub({
       }
       return;
     }
+    // Only where the button is actually on screen (on a computer it is mounted but hidden), and never for a hidden tab: an idle open page must not keep asking (Oct 20 outage).
+    // Opening Spotlight always reads it.
+    if (document.visibilityState !== "visible" || !triggerRef.current || triggerRef.current.getClientRects().length === 0) return;
     loadNeeds(false);
   }, []);
   // A team-sport group has no Business tile (lib/team-sport.ts). Unknown until read, which shows every tile.
