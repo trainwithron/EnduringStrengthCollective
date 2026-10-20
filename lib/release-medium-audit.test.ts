@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { groupIntoWeeks, importReadWarnings, parseImportRows, type ColumnMapping } from "@/lib/workout-import-parser";
-import { resolveQuickAddExerciseName } from "@/components/coach/desktop/day-card";
+import { resolveQuickAddExerciseName } from "@/lib/quick-add-name";
 import { insertProgramDay, saveDayOrder } from "@/lib/program-days";
 import { createGroupWithCoach } from "@/lib/create-group";
 import { addLibraryExercise } from "@/lib/library-write";
@@ -169,8 +169,11 @@ describe("M9 the logger's add-exercise and the quick add by saying it never fail
     expect(logger).toContain("Couldn't add that exercise. Try again.");
     expect(logger).toContain("existingLibraryName(typed");
     const nl = src("components/logging/quick-add-nl-button.tsx");
-    expect(nl).toContain("did not save. Check the list above and add what is missing.");
-    expect(nl).toContain("setsError");
+    // the insert now lives in lib/add-session-exercises.ts, shared with the wing-it logger
+    expect(nl).toContain("failedLine(failedExercises, draft.length)");
+    const add = src("lib/add-session-exercises.ts");
+    expect(add).toContain("did not save. Check the list above and add what is missing.");
+    expect(add).toContain("setsError");
   });
 });
 

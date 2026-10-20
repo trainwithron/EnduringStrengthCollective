@@ -17,6 +17,7 @@ import { isNoLoadExercise } from "@/lib/exercise-load";
 import { RestTimerBar, type PendingGateTask } from "@/components/session/rest-timer-bar";
 import { QuickAddNlButton } from "./quick-add-nl-button";
 import { SessionProgressStrip } from "./session-progress-strip";
+import { WingItBox } from "./wing-it-box";
 import { DemoLibraryProvider } from "./demo-library-context";
 import type { RestForSet } from "@/lib/rest-time";
 import { DemoBrowserSheet } from "./demo-browser-sheet";
@@ -45,6 +46,7 @@ export function SessionLogger({
   exerciseSwipeDirection,
   demoLibrary,
   read,
+  wingIt = false,
 }: {
   sessionId: string;
   isCompleted: boolean;
@@ -78,6 +80,8 @@ export function SessionLogger({
   exerciseSwipeDirection?: SwipeDirection | null;
   // The coach's exercise library (name and demo links) so a demo is found from an exercise's current name, including one added or swapped mid-workout.
   demoLibrary?: DemoRow[];
+  // A coach logging a client with no program (the wing-it logger): the box at the top adds what they do as they go.
+  wingIt?: boolean;
   // Today's short reading for the person resting, or null when Read is off (only ever set for the athlete's own session).
   read?: ReadForViewer | null;
 }) {
@@ -143,8 +147,12 @@ export function SessionLogger({
   // ambitious) but shouldn't be able to turn "log today's workout" into
   // an unbounded list — 8 self-added exercises is a generous ceiling that
   // still stops runaway growth.
+  // The ceiling is for a client's own workout only: a coach running a session (and a wing-it one is all added exercises) is never stopped.
   const addedCount = exercises.filter((e) => e.isAdded).length;
   const MAX_ADDED_EXERCISES = 8;
+  const atAddCap = isOwnSession && addedCount >= MAX_ADDED_EXERCISES;
+  const nextExerciseOrder = exercises.length > 0 ? Math.max(...exercises.map((e) => e.exerciseOrder)) + 1 : 0;
+  const libraryNames = useMemo(() => (demoLibrary ?? []).map((r) => r.name), [demoLibrary]);
 
   const allSetsResolved = useMemo(
     () =>
@@ -212,7 +220,7 @@ export function SessionLogger({
     // A spelling of an exercise in the coach's library is added under the library's own name.
     const typed = cleanExerciseName(newExerciseName);
     const name = typed ? existingLibraryName(typed, (demoLibrary ?? []).map((r) => r.name)) ?? typed : typed;
-    if (!name || addExerciseBusy || addedCount >= MAX_ADDED_EXERCISES) return;
+    if (!name || addExerciseBusy || atAddCap) return;
     // Never an exercise named with only numbers or with its sets and reps.
     const problem = exerciseNameProblem(name);
     if (problem) {
@@ -318,6 +326,12 @@ export function SessionLogger({
           onChosen={(direction) => setSwipeDirection(direction)}
         />
       )}
+      {wingIt && !isCompleted && (
+        <>
+          <WingItBox sessionId={sessionId} nextOrder={nextExerciseOrder} library={libraryNames} onAdded={(entries) => setExercises((prev) => [...prev, ...entries])} />
+          {exercises.length === 0 && <p className="font-body text-sm text-steel mb-2">Type or say what they&apos;re doing. Add more any time.</p>}
+        </>
+      )}
       <SessionProgressStrip exercises={exercises} activeIndex={activeExerciseIndex} />
       <div className="relative">
       {swipeDirection === "vertical" ? (
@@ -374,12 +388,12 @@ export function SessionLogger({
           className={
             swipeDirection === "vertical"
               ? "mt-2 pb-2"
-              : addMenuOpen || addingExercise || addedCount >= MAX_ADDED_EXERCISES
+              : addMenuOpen || addingExercise || atAddCap
               ? "absolute left-0 right-0 top-0 z-30 bg-graphite border border-steel/30 p-3 shadow-lg"
               : "absolute right-0 top-0 z-30"
           }
         >
-          {addedCount >= MAX_ADDED_EXERCISES ? (
+          {atAddCap ? (
             <p className="font-body text-xs text-steel">
               You&apos;ve added the max of {MAX_ADDED_EXERCISES} extra exercises for this workout.
             </p>
@@ -437,9 +451,8 @@ export function SessionLogger({
               {!isOwnSession && addMenuOpen && (
                 <QuickAddNlButton
                   sessionId={sessionId}
-                  nextExerciseOrder={
-                    exercises.length > 0 ? Math.max(...exercises.map((e) => e.exerciseOrder)) + 1 : 0
-                  }
+                  nextExerciseOrder={nextExerciseOrder}
+                  library={libraryNames}
                   onAdded={(entries) => setExercises((prev) => [...prev, ...entries])}
                 />
               )}

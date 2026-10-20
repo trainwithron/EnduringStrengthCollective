@@ -127,7 +127,7 @@ describe("where the guard is used", () => {
     expect(src("components/coach/exercise-name-input.tsx")).toContain("usableExerciseNames(suggestions)");
     expect(src("lib/program-builder-data.ts")).toContain("usableExerciseNames(");
     expect(src("app/api/ai/build-day/route.ts")).toContain("isBadExerciseName(r.name");
-    expect(src("components/coach/desktop/day-card.tsx")).toContain("usableExerciseNames(fullLibrary)");
+    expect(src("lib/quick-add-name.ts")).toContain("usableExerciseNames(fullLibrary)");
   });
 });
 

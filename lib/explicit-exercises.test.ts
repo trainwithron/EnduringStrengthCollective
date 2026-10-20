@@ -75,7 +75,7 @@ describe("a custom exercise stays a normal exercise", () => {
     expect(card).toContain('["exact", "alias"].includes(matchExercise(');
   });
   it("quick-add no longer swaps a typed name for a near match with a different implement, side or position", () => {
-    expect(read("components/coach/desktop/day-card.tsx")).toContain('match.confidence !== "fuzzy" || sameQualifiers(typedName, match.exerciseName)');
+    expect(read("lib/quick-add-name.ts")).toContain('match.confidence !== "fuzzy" || sameQualifiers(typedName, match.exerciseName)');
   });
 });
 

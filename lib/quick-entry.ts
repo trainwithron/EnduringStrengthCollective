@@ -111,3 +111,70 @@ export function quickNote(r: Pick<QuickEntryResult, "eachSide" | "rangeNote">): 
   const parts = [r.eachSide ? "Each side" : null, r.rangeNote ? "Hold " + r.rangeNote : null].filter((p): p is string => !!p);
   return parts.length > 0 ? parts.join(". ") : null;
 }
+
+// ---- the wing-it logger (a coach typing or saying what a client is doing, a line at a time) ----
+// "squat 3x5 225", "bench 3x8 at 155 lbs", "squat 3 by 5 100kg", "row 3x10 @8" (an effort), "bench 3x5 @225" (a weight: above 10 it can't be an RPE), "plank 3x60", or just a name
+// ("goblet squat": one empty set to fill in). A line it can't read is null, never a guess (the box then asks the AI and shows what it understood first).
+
+export interface WingItLine extends QuickEntryResult {
+  // The weight as typed, and its unit when one was said (null: the client's own unit).
+  weight: number | null;
+  weightUnit: "lb" | "kg" | null;
+}
+
+const NUMBER_WORDS = /\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty)\b/i;
+const WEIGHT_TAIL = /\s*(?:(at|@)\s*)?(\d+(?:\.\d+)?)\s*(lb|lbs|pounds?|kg|kgs|kilos?)?\s*$/i;
+const SMALL_RPE_TAIL = /\s*@\s*(\d+(?:\.\d+)?)\s*$/;
+
+export function parseWingItLine(raw: string): WingItLine | null {
+  let text = raw.trim().replace(/\s+/g, " ");
+  if (!text) return null;
+  const original = text;
+  text = text
+    .replace(/\s+by\s+/gi, "x")
+    .replace(/\s+sets? of\s+/gi, "x")
+    .replace(/\s*\breps?\b\.?/gi, "")
+    .trim();
+  const rewritten = text !== original;
+
+  // An effort at the end ("@8", 10 or less) is put aside while the weight is read, then given back to the quick-entry reader.
+  let rpeTail = "";
+  const small = SMALL_RPE_TAIL.exec(text);
+  if (small && Number(small[1]) <= 10) {
+    rpeTail = " @" + small[1];
+    text = text.slice(0, small.index).trim();
+  }
+
+  let weight: number | null = null;
+  let weightUnit: "lb" | "kg" | null = null;
+  const w = WEIGHT_TAIL.exec(text);
+  if (w) {
+    const rest = text.slice(0, w.index).trim();
+    const value = Number(w[2]);
+    // Only after sets x reps, and only a number that can be a weight ("@8" is an effort, kept above).
+    if (SETS_BY_REPS.test(rest) && (w[1] !== "@" || value > 10) && value > 0) {
+      weight = value;
+      weightUnit = w[3] ? (/^k/i.test(w[3]) ? "kg" : "lb") : null;
+      text = rest;
+    }
+  }
+
+  // Just a name: one empty set to fill in. Never a line with a number in words or "sets of" in it ("three sets of squats" is not an exercise called that).
+  if (!/\d/.test(original) && !rewritten && !NUMBER_WORDS.test(original)) {
+    const name = original.replace(/^[^a-z]+|[^a-z)]+$/gi, "").trim();
+    if (!name) return null;
+    return { exerciseName: name, sets: 1, reps: null, timeSeconds: null, rpe: null, eachSide: false, rangeNote: null, weight: null, weightUnit: null };
+  }
+
+  const parsed = parseQuickEntry(text + rpeTail);
+  if (!parsed) return null;
+  return { ...parsed, weight, weightUnit };
+}
+
+// What was typed or said, one exercise per line, comma or semicolon.
+export function splitWingItText(text: string): string[] {
+  return text
+    .split(/[\n,;]+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}

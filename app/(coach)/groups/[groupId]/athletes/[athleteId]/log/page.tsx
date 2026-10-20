@@ -12,6 +12,7 @@ import { ProgramPlainView } from "@/components/shared/program-plain-view-server"
 import { getTodaysSessions } from "@/lib/todays-workout";
 import { getGroupCoachTimezone, nowInZone } from "@/lib/timezone";
 import { PICK_LABEL, VIEW_PROGRAM_LABEL, buildLogChoices, exerciseCountLine, startLabel, weekdayName } from "@/lib/coach-log-choice";
+import { WingItStartButton } from "@/components/logging/wing-it-start-button";
 
 export const metadata = { title: "Log" };
 
@@ -73,17 +74,17 @@ export default async function LogForClientPage(
           <Link href={`/groups/${params.groupId}/athletes/${params.athleteId}`} className="font-body text-xs text-steel uppercase tracking-wide">
             &larr; Back to profile
           </Link>
-          <h1 className="font-display font-bold text-3xl leading-tight mt-3 uppercase">No active program yet</h1>
+          <h1 className="font-display font-bold text-3xl leading-tight mt-3 uppercase">No program yet</h1>
         </header>
-        <section className="px-5 pt-6">
-          <p className="font-body text-sm text-steel mb-4">
-            This group doesn&apos;t have an active program yet — assign one from {clientName}&apos;s profile before logging an in-person session.
-          </p>
+        {/* No program is no dead end (the wing-it logger): start an empty workout and type or say what they do as they go. */}
+        <section className="px-5 pt-6 space-y-3">
+          <p className="font-body text-sm text-steel">Log {clientName}&apos;s session as it happens: type or say each exercise as they do it.</p>
+          <WingItStartButton groupId={params.groupId} athleteId={params.athleteId} />
           <Link
             href={`/groups/${params.groupId}/athletes/${params.athleteId}`}
-            className="inline-block h-11 px-5 leading-[2.75rem] bg-rust text-graphite font-body font-bold text-sm text-center"
+            className="w-full min-h-11 flex items-center justify-center border border-steel/40 text-chalk font-body text-sm text-center px-3"
           >
-            Go to profile &rarr;
+            Assign a program
           </Link>
         </section>
       </main>
@@ -173,6 +174,11 @@ export default async function LogForClientPage(
             )}
           </li>
         ))}
+        {/* Not today's program (or none fits): the wing-it logger. */}
+        <li className="border border-steel/20 p-4" data-testid="log-choice-wing-it">
+          <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">No program today?</p>
+          <WingItStartButton groupId={params.groupId} athleteId={params.athleteId} label="Wing it" variant="secondary" />
+        </li>
       </ul>
     </main>
   );

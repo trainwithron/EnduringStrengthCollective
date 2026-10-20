@@ -4,6 +4,9 @@ import { useState } from "react";
 import { exerciseNameProblem } from "@/lib/exercise-name-guard";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { SessionExerciseEntry } from "@/lib/types";
+import { addSessionExercises, failedLine } from "@/lib/add-session-exercises";
+import { resolveQuickAddExerciseName } from "@/lib/quick-add-name";
+import { useLiftUnit } from "./lift-unit-context";
 
 interface ParsedExercise {
   exerciseName: string;
@@ -28,11 +31,16 @@ export function QuickAddNlButton({
   sessionId,
   nextExerciseOrder,
   onAdded,
+  library = [],
 }: {
   sessionId: string;
   nextExerciseOrder: number;
   onAdded: (entries: SessionExerciseEntry[]) => void;
+  // The coach's exercise library names: what the AI heard is saved under the library's own name when it is clearly that exercise.
+  library?: string[];
 }) {
+  // The AI gives the weight as said, with no unit: it is in the client's own unit, and stored in pounds.
+  const unit = useLiftUnit();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [parsing, setParsing] = useState(false);
@@ -70,80 +78,16 @@ export function QuickAddNlButton({
     }
     setSaving(true);
     try {
-      const supabase = createBrowserClient();
-      const newEntries: SessionExerciseEntry[] = [];
-      let order = nextExerciseOrder;
-      let failedExercises = 0;
-
-      for (const ex of draft) {
-        const insertPayload: Record<string, unknown> = {
-          session_id: sessionId,
-          exercise_name: ex.exerciseName,
-          exercise_order: order++,
-          is_added: true,
-        };
-        // Only override the default ['reps','weight'] tracked-field set
-        // when RPE was actually mentioned — same fields a coach would
-        // get manually adding the RPE column.
-        if (ex.rpe != null) insertPayload.tracked_fields = ["reps", "weight", "rpe"];
-
-        const { data: sessionExercise } = await supabase
-          .from("session_exercises")
-          .insert(insertPayload)
-          .select("id, exercise_name, exercise_order, is_swapped, is_added, tracked_fields")
-          .single();
-        if (!sessionExercise) {
-          failedExercises++;
-          continue;
-        }
-
-        const setRows = Array.from({ length: ex.sets }, (_, i) => ({
-          session_exercise_id: sessionExercise.id,
-          set_order: i,
-          weight: ex.weight,
-          reps: ex.reps,
-          rpe: ex.rpe,
-        }));
-        const { data: sets, error: setsError } = await supabase
-          .from("set_logs")
-          .insert(setRows)
-          .select(
-            "id, set_order, weight, reps, rpe, rir, tempo, time_seconds, height, distance, rest_seconds, pace, status"
-          );
-
-        if (setsError) failedExercises++;
-        newEntries.push({
-          id: sessionExercise.id,
-          exerciseName: sessionExercise.exercise_name,
-          exerciseOrder: sessionExercise.exercise_order,
-          isSwapped: sessionExercise.is_swapped,
-          isAdded: sessionExercise.is_added,
-          trackedFields: sessionExercise.tracked_fields,
-          videoUrl: null,
-          youtubeUrl: null,
-          notes: null,
-          sets: (sets ?? []).map((s: any) => ({
-            id: s.id,
-            setOrder: s.set_order,
-            weight: s.weight,
-            reps: s.reps,
-            rpe: s.rpe,
-            rir: s.rir,
-            tempo: s.tempo,
-            timeSeconds: s.time_seconds,
-            height: s.height,
-            distance: s.distance,
-            restSeconds: s.rest_seconds,
-            pace: s.pace,
-            status: s.status,
-          })),
-        });
-      }
-
+      // The same insert as the wing-it logger (lib/add-session-exercises.ts); a name the library clearly has is saved under the library's name, anything else as heard.
+      const drafts = draft.map((ex) => {
+        const resolved = resolveQuickAddExerciseName(ex.exerciseName, library);
+        return { exerciseName: "name" in resolved ? resolved.name : ex.exerciseName, sets: ex.sets, reps: ex.reps, weight: ex.weight, weightUnit: unit, rpe: ex.rpe };
+      });
+      const { entries: newEntries, failed: failedExercises } = await addSessionExercises(createBrowserClient(), sessionId, nextExerciseOrder, drafts);
       onAdded(newEntries);
       // Never "done" when some did not save: say how many, and keep what was typed so it can be tried again.
       if (failedExercises > 0) {
-        setError(`${failedExercises} of ${draft.length} exercise${draft.length === 1 ? "" : "s"} did not save. Check the list above and add what is missing.`);
+        setError(failedLine(failedExercises, draft.length));
         setDraft(null);
         return;
       }

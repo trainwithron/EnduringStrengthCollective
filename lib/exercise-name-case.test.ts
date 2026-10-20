@@ -36,7 +36,8 @@ describe("where it is applied", () => {
     expect(input).toContain("else onCommit?.(name);");
   });
   it("the quick-add line: a new exercise is capitalized, a library exercise keeps its own casing", () => {
-    const card = read("components/coach/desktop/day-card.tsx");
+    // the rule moved to lib/quick-add-name.ts (shared with the wing-it logger)
+    const card = read("lib/quick-add-name.ts");
     expect(card).toContain("return { name: capitalizeWords(typedName) };");
     expect(card).toContain("{ name: match.exerciseName }");
   });

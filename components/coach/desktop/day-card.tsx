@@ -1,7 +1,7 @@
 "use client";
 
 import { confirmDialog } from "@/components/shared/confirm-dialog";
-import { exerciseNameProblem, usableExerciseNames } from "@/lib/exercise-name-guard";
+import { exerciseNameProblem } from "@/lib/exercise-name-guard";
 import type { DemoRow } from "@/lib/exercise-demo";
 import { NONE_COLLAPSED, allCollapsed, toggleAll, toggleCollapsed } from "@/lib/collapse-state";
 import { ClientPreviewButton } from "@/components/coach/desktop/client-preview";
@@ -17,7 +17,8 @@ import {
   type TrackedField,
 } from "@/lib/exercise-fields";
 import { parseQuickEntry, quickNote } from "@/lib/quick-entry";
-import { matchExercise, sameQualifiers, type AliasEntry } from "@/lib/exercise-matching";
+import { resolveQuickAddExerciseName } from "@/lib/quick-add-name";
+import type { AliasEntry } from "@/lib/exercise-matching";
 import { ExerciseBuilderCard, type MovementPatternOption } from "../exercise-builder-card";
 import type { RestTempoSuggestion } from "@/lib/training-intent";
 import { TextNoteCard } from "../text-note-card";
@@ -27,34 +28,13 @@ import { formatShortDate } from "@/lib/program-schedule";
 import { GripVertical, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, StickyNote, Video } from "lucide-react";
 import { formatCompactLine } from "@/lib/compact-line";
 import { useSaveToastChannel } from "./save-toast-channel";
-import { capitalizeWords } from "@/lib/exercise-name-case";
 import { useDayLogged } from "./use-day-logged";
 import { isRestDayTitle } from "@/lib/empty-sweep";
 import { restoreDay, snapshotDays } from "@/lib/program-restore";
 import { showUndo } from "@/lib/undo-toast";
 
-// Quick-add is typed fast, so a bare "Bench" for an existing "Bench
-// Press" is common — matchExercise's fuzzy threshold is deliberately
-// conservative (avoids merging genuinely different exercises that share
-// a word, e.g. "Barbell Bench Press" vs "Barbell Overhead Press"), which
-// means a short real prefix like that doesn't cross it. This adds one
-// narrower, safe fallback specifically for quick-add: if exactly one
-// library exercise starts with what was typed, reuse it. When two or more
-// start with it, nothing is guessed and nothing half-typed is saved ("Sumo S"):
-// the coach is asked to type a little more.
-export function resolveQuickAddExerciseName(typedName: string, fullLibrary: string[]): { name: string } | { ambiguous: string[] } {
-  const library = usableExerciseNames(fullLibrary);
-  const match = matchExercise(typedName, library.map((name) => ({ name })), []);
-  // A near match is used only when it is the same movement with the same implement, side and position; what someone typed is never swapped for a different exercise.
-  if (match.exerciseName && (match.confidence !== "fuzzy" || sameQualifiers(typedName, match.exerciseName))) return { name: match.exerciseName };
-
-  const normalizedTyped = typedName.trim().toLowerCase();
-  const prefixMatches = library.filter((name) => name.toLowerCase().startsWith(normalizedTyped));
-  // A library exercise keeps its own casing; a brand-new typed name gets a capital on each word.
-  if (prefixMatches.length === 1) return { name: prefixMatches[0] };
-  if (prefixMatches.length > 1) return { ambiguous: prefixMatches.slice(0, 3) };
-  return { name: capitalizeWords(typedName) };
-}
+// The quick-add name rule lives in lib/quick-add-name.ts (the wing-it logger uses it too).
+export { resolveQuickAddExerciseName } from "@/lib/quick-add-name";
 
 export function DayCard({
   day,

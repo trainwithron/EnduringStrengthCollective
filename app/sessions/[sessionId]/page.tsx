@@ -694,6 +694,8 @@ export default async function SessionPage(
         exerciseSwipeDirection={exerciseSwipeDirection}
         demoLibrary={demoLibrary}
         read={read}
+        // A coach-logged workout with no program behind it: the wing-it box (type or say what they do as they go).
+        wingIt={session.workout_id == null && !!coachModeClient}
       />
       </LiftUnitProvider>
 
