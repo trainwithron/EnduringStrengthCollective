@@ -246,3 +246,17 @@ export function patternSummary(
   if (same) return storedText!;
   return findings.map((f) => findingSentence(f, timeZone)).join(" ");
 }
+
+// A short heading for one finding's rows, used when there are several (with one, the note above already says it).
+export function findingLabel(f: SessionPatternFinding): string {
+  switch (f.kind) {
+    case "struggle_point":
+      return `Sets missing in ${f.evidence?.kind === "slot_sets" ? f.evidence.slotLabel : "one exercise"}`;
+    case "rpe_creep":
+      return "Effort (RPE) dropping";
+    case "rest_time_creep":
+      return f.description.includes("longer") ? "Resting longer than planned" : "Resting shorter than planned";
+    case "weekday_rushing":
+      return f.evidence?.kind === "durations" ? `${f.evidence.weekday} sessions running short` : "One weekday running short";
+  }
+}

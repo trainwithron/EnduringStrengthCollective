@@ -3,7 +3,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { buildSessionPatternFindings, evidenceRowText, evidenceSetText, patternSummary, type PatternSession, type PatternSet } from "./session-pattern-evidence";
+import { buildSessionPatternFindings, evidenceRowText, evidenceSetText, findingLabel, patternSummary, type PatternSession, type PatternSet } from "./session-pattern-evidence";
 import { pastSetDone } from "./set-complete";
 import { PatternEvidence } from "@/components/coach/pattern-evidence";
 
@@ -173,6 +173,16 @@ describe("the summary at the top never contradicts the rows under it (Johann, Oc
   });
   it("nothing found now says so", () => {
     expect(patternSummary([], stored, "old", "UTC")).toBe("Looked at again with every logged set counted, nothing stands out in these sessions now.");
+  });
+  it("the sentence is said once: with one finding the rows follow it straight away; with several, each gets a short label", () => {
+    const page = readFileSync(join(__dirname, "..", "app/sessions/[sessionId]/coach-note/page.tsx"), "utf8");
+    expect(page).toContain("{findings.length > 1 && <p className=\"font-body text-sm text-chalk\">{findingLabel(f)}</p>}");
+    expect(page).not.toContain("findingSentence(");
+    const struggle = findings.find((f) => f.kind === "struggle_point")!;
+    expect(findingLabel(struggle)).toBe("Sets missing in the first exercise");
+    expect(findingLabel({ kind: "rpe_creep", description: "", numericValues: [] })).toBe("Effort (RPE) dropping");
+    expect(findingLabel({ kind: "rest_time_creep", description: "(consistently longer than programmed)", numericValues: [] })).toBe("Resting longer than planned");
+    expect(findingLabel({ kind: "weekday_rushing", description: "", numericValues: [], evidence: { kind: "durations", weekday: "Monday", overallMinutes: 40, rows: [] } })).toBe("Monday sessions running short");
   });
   it("the page uses it", () => {
     const page = readFileSync(join(__dirname, "..", "app/sessions/[sessionId]/coach-note/page.tsx"), "utf8");

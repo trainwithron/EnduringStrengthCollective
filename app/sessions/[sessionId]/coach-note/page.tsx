@@ -8,7 +8,7 @@ import { AcknowledgeSessionPatternNoteButton } from "@/components/coach/acknowle
 import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
 import { PatternEvidence } from "@/components/coach/pattern-evidence";
 import { gatherSessionPatternFindings } from "@/lib/session-pattern-spotter-gather";
-import { findingSentence, patternSummary } from "@/lib/session-pattern-evidence";
+import { findingLabel, patternSummary } from "@/lib/session-pattern-evidence";
 import { getGroupCoachTimezone } from "@/lib/timezone";
 import { loadLiftUnit } from "@/lib/lift-unit-server";
 
@@ -131,7 +131,8 @@ export default async function SessionPatternNotePage(props: { params: Promise<{ 
             <ul className="space-y-4">
               {findings.map((f, i) => (
                 <li key={i}>
-                  <p className="font-body text-sm text-chalk">{findingSentence(f, tz)}</p>
+                  {/* One finding: the note above says it, so straight to what happened. Several: a short label over each one's rows. */}
+                  {findings.length > 1 && <p className="font-body text-sm text-chalk">{findingLabel(f)}</p>}
                   {f.evidence && <PatternEvidence evidence={f.evidence} timeZone={tz} unit={unit} />}
                 </li>
               ))}
