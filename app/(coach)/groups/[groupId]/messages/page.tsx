@@ -149,7 +149,7 @@ export default async function MessagesPage(props: { params: Promise<{ groupId: s
 
     return (
       <main className="min-h-screen bg-graphite text-chalk font-body">
-        <CoachMobileShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} activeOverride="messages">
+        <CoachMobileShell groupId={params.groupId} groupName={group?.name ?? "Coaching"}>
           <div className="pb-24">
             <header className="px-5 pt-8 pb-6 border-b border-steel/20 flex items-center justify-between gap-3">
               <h1 className="font-display font-bold text-3xl uppercase leading-none">Messages</h1>

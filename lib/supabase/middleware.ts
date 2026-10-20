@@ -281,7 +281,13 @@ export async function updateSession(request: NextRequest) {
         isCoach = (seat as { role?: string } | null)?.role === "coach";
       }
       if (isCoach) {
-        const phoneResponse = NextResponse.redirect(new URL(phoneTarget.to, request.url));
+        // A team-sport group's coach keeps the team Home (Ron decided): its coach-Home redirects go to the group's page, not their own app.
+        let to = phoneTarget.to;
+        if (phoneTarget.home && phoneTarget.groupId) {
+          const { data: team } = await supabase.from("groups").select("team_mode").eq("id", phoneTarget.groupId).maybeSingle();
+          if ((team as { team_mode?: boolean | null } | null)?.team_mode === true) to = `/groups/${phoneTarget.groupId}`;
+        }
+        const phoneResponse = NextResponse.redirect(new URL(to, request.url));
         response.cookies.getAll().forEach((cookie) => {
           phoneResponse.cookies.set(cookie);
         });

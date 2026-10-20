@@ -35,7 +35,7 @@ export function YourDayPanel({
           <ul className="space-y-2">
             {schedule.map((e) => (
               <li key={e.id} className="flex items-baseline justify-between gap-3">
-                <Link href={e.href} className="min-w-0 group">
+                <Link prefetch={false} href={e.href} className="min-w-0 group">
                   <span className="font-body text-sm text-chalk group-hover:underline">{e.title}</span>
                   {e.kind === "class" && <span className="font-body text-xs text-steel ml-2">Class</span>}
                   {e.needsPayment && (
@@ -43,7 +43,7 @@ export function YourDayPanel({
                   )}
                   <span className="block font-body text-xs text-steel truncate">{e.detail}</span>
                 </Link>
-                <Link
+                <Link prefetch={false}
                   href={scheduleCalendarHref(e, timezone)}
                   aria-label={`Open the calendar for ${e.title} at ${formatInTimezone(e.startAt, timezone, "time")}`}
                   className="font-body text-xs text-steel shrink-0 tabular-nums min-h-11 min-w-11 inline-flex items-center justify-end hover:text-chalk hover:underline"
@@ -64,7 +64,7 @@ export function YourDayPanel({
           <ul className="space-y-2">
             {shown.map((a) => (
               <li key={a.id}>
-                <Link href={a.href} className="flex items-baseline gap-3 group">
+                <Link prefetch={false} href={a.href} className="flex items-baseline gap-3 group">
                   <span className="font-body text-xs text-steel w-16 shrink-0">{KIND_LABEL[a.kind]}</span>
                   <span className="min-w-0">
                     <span className="font-body text-sm text-chalk group-hover:underline">{a.text}</span>

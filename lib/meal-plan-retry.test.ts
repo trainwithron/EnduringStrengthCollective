@@ -223,7 +223,7 @@ describe("the route and the screens are wired as designed", () => {
   });
   it("the box is only on the client's own meal plan screen, and a coach acting as them does not get it", () => {
     const page = read("app/(coach)/groups/[groupId]/nutrition/page.tsx");
-    expect(page).toContain("!isActingAsOther && savedPlanMeals");
+    expect(page).toContain("!viewingOther && savedPlanMeals");
     const section = read("components/athlete/food-log-section.tsx");
     expect(section).toContain("MealPlanRetryBox");
   });

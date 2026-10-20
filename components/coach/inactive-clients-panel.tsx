@@ -201,7 +201,7 @@ export function InactiveClientsPanel({ groupIds: scopeGroupIds }: { groupIds?: s
                 {i.reasons.join(", ")}. Setting someone aside hides them from your dashboard and alerts. Nothing is deleted, and a workout, session or message from them brings them back.
               </p>
               <div className="flex flex-wrap items-center gap-2 mt-2">
-                <Link href={`/groups/${i.groupId}/messages/${i.athleteId}?draft=${encodeURIComponent(draft)}`} className={`${btn} border-rust text-rust inline-flex items-center`}>
+                <Link prefetch={false} href={`/groups/${i.groupId}/messages/${i.athleteId}?draft=${encodeURIComponent(draft)}`} className={`${btn} border-rust text-rust inline-flex items-center`}>
                   Send a door-open note
                 </Link>
                 <button type="button" disabled={busyKey === key} onClick={() => setAside(i)} className={`${btn} border-steel/30 text-chalk`}>

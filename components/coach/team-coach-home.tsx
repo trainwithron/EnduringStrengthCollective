@@ -32,7 +32,7 @@ export function TeamCoachHome({ teams, initialId }: { teams: TeamChoice[]; initi
       <ul className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
         {tiles.map((t) => (
           <li key={t.key}>
-            <Link
+            <Link prefetch={false}
               href={t.href}
               target={t.newTab ? "_blank" : undefined}
               rel={t.newTab ? "noopener noreferrer" : undefined}

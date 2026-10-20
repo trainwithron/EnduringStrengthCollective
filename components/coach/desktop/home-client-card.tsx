@@ -31,7 +31,7 @@ export interface HomeClientCardData {
 export function HomeClientCard({ client }: { client: HomeClientCardData }) {
   const status = clientActivityStatus(client.lastWorkoutAt);
   return (
-    <Link
+    <Link prefetch={false}
       href={`/groups/${client.groupId}/athletes/${client.athleteId}`}
       className="relative flex items-center gap-3 border border-steel/30 bg-surface p-3 hover:border-rust/50 transition-colors"
     >

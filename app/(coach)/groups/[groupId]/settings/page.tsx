@@ -16,6 +16,8 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { SignOutButton } from "@/components/group/sign-out-button";
+import { TabletLayoutSwitch } from "@/components/coach/tablet-layout-switch";
+import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
 import { BlockedMembersList, type BlockedMember } from "@/components/feed/blocked-members-list";
 import { loadBlockedIds } from "@/lib/blocked-members";
 import { EditDisplayName } from "@/components/athlete/edit-display-name";
@@ -276,14 +278,21 @@ export default async function SettingsPage(
   // The coach's own personal space (their own client app) belongs to no organization: the vocabulary below is an ORGANIZATION's setting (it would be saved into some organization the coach owns, arbitrarily), and "Your coaching
   // workspace" has to open the coach's Home, not the empty workspace of this personal space (Oct 19 audit).
   const inPersonalSpace = effective.isActingAsOther && (group as { organization_id?: string | null } | null)?.organization_id == null;
+  // Looking at SOMEONE ELSE (a coach acting as a client). In their own space the coach is themself (Release 2: the phone opens as the coach's own account), so their own settings show.
+  const viewingOther = effective.isActingAsOther && athleteId !== user.id;
   const coachingGroup = isCoach ? (
     <SettingsGroup label="Coaching">
-            <Link
-              href={inPersonalSpace ? "/dashboard" : `/groups/${params.groupId}/dashboard`}
-              className="font-body text-sm font-bold text-rust"
-            >
-              Coach home →
-            </Link>
+            {/* In their own space the phone IS their app (Release 2): no "Coach home"; the layout switch (tablets only) and the app download instead. */}
+            {inPersonalSpace ? (
+              <div className="space-y-2">
+                <TabletLayoutSwitch to="desktop" />
+                <DownloadAppButton />
+              </div>
+            ) : (
+              <Link href={`/groups/${params.groupId}/dashboard`} className="font-body text-sm font-bold text-rust">
+                Coach home →
+              </Link>
+            )}
             {(group as { group_kind?: string } | null)?.group_kind !== "one_on_one" && (
               <div className="mt-4 pt-4 border-t border-steel/15">
                 <TeamSportToggle groupId={params.groupId} initialEnabled={(group as { team_mode?: boolean | null } | null)?.team_mode === true} />
@@ -307,7 +316,7 @@ export default async function SettingsPage(
                 initialError={searchParams.google_calendar_error ?? null}
               />
             </div>
-            {!effective.isActingAsOther && (
+            {!viewingOther && (
               <div className="mt-4 pt-4 border-t border-steel/15">
                 <ReadDuringRestSettings
                   coachId={user.id}
@@ -329,7 +338,7 @@ export default async function SettingsPage(
     <SettingsGroup label="Notifications">
           <PushNotificationToggle variant="settings" profileId={user.id} audience={isCoach ? "coach" : "client"} />
           <PushPreferences profileId={user.id} initialStart={pushPrefs?.quiet_hours_start ?? null} initialEnd={pushPrefs?.quiet_hours_end ?? null} initialGeneric={pushPrefs?.generic_push_text === true} available={!!pushPrefs} />
-          {isCoach && !effective.isActingAsOther && <NoticeSwitches profileId={user.id} initialOff={noticesOff ?? []} available={noticesOff !== null} />}
+          {isCoach && !viewingOther && <NoticeSwitches profileId={user.id} initialOff={noticesOff ?? []} available={noticesOff !== null} />}
         </SettingsGroup>
   );
 
@@ -358,7 +367,7 @@ export default async function SettingsPage(
         <Avatar name={profile?.full_name ?? "?"} url={profile?.avatar_url ?? null} />
         <div className="flex-1">
           <EditDisplayName initialName={profile?.full_name ?? ""} profileId={athleteId} />
-          {!effective.isActingAsOther && (
+          {!viewingOther && (
             <>
               <p className="font-body text-xs text-steel mt-0.5">{user.email}</p>
               {user.email && <ChangeMyEmail currentEmail={user.email} />}
@@ -370,7 +379,7 @@ export default async function SettingsPage(
       <section className="px-5 pt-8 space-y-6">
         {isCoach ? <>{coachingGroup}{terminologyGroup}{notificationsGroup}</> : notificationsGroup}
 
-        {isCoach && !effective.isActingAsOther && (
+        {isCoach && !viewingOther && (
           <SettingsGroup label="What you coach">
             <CoachTypeSetting profileId={user.id} initial={coachTypeNow} />
           </SettingsGroup>

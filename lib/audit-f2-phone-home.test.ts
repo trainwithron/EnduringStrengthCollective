@@ -12,8 +12,8 @@ describe("the coach's MRR is one number everywhere", () => {
     expect(headlineMrr(0, 900)).toEqual({ value: 900, estimated: true });
     expect(headlineMrr(0, 0)).toEqual({ value: 0, estimated: true });
   });
-  it("the Business page reads it through the shared function (the phone Home no longer shows business numbers: they are under More > Business)", () => {
-    const phone = read("components/coach/mobile/coach-mobile-home.tsx");
+  it("the Business page reads it through the shared function (the phone shows business numbers only in Spotlight > Business)", () => {
+    const phone = read("components/coach/mobile/spot-needs-top.tsx");
     expect(phone).not.toContain("loadCoachMrr");
     expect(phone).not.toContain("computeRealMRR");
     expect(read("lib/coach-mrr.ts")).toContain("loadBusinessScope(supabase, coachId, groupId)"); // every group the coach runs in THIS organization, as Business does
@@ -21,15 +21,12 @@ describe("the coach's MRR is one number everywhere", () => {
   });
 });
 
-describe("the coach's phone Home", () => {
-  const phone = read("components/coach/mobile/coach-mobile-home.tsx");
-  it("leaves room under the last row for the fixed bottom tabs", () => {
-    expect(phone).toContain('font-body pb-24">');
-  });
-  it("speaks as a coach, not as the client app: the one big button is the next client's workout", () => {
+describe("the top of Spotlight (Release 2: the coach's phone Home is their own app; what needs the coach is in Spotlight)", () => {
+  const phone = read("components/coach/mobile/spot-needs-top.tsx");
+  it("speaks as a coach: the one big button is the next client's workout", () => {
     expect(phone).not.toContain("Start Workout");
     expect(phone).not.toContain("Log &rarr;");
-    expect(phone).toContain("<NextClientWorkoutSection");
+    expect(phone).toContain("Start {needs.next.name}&apos;s workout");
     expect(read("components/coach/next-client-workout-section.tsx")).toContain("Start {next.name}&apos;s workout");
   });
 });

@@ -24,6 +24,8 @@ import { isTeamSportGroup, TEAM_SPORT_HIDDEN_HUB_TILES } from "@/lib/team-sport"
 
 type TileKey = "clients" | "messages" | "business" | "program" | "ask-spot";
 
+export const SPOT_OPEN_HASHES = ["late-changes", "schedule-requests", "expiring"] as const;
+
 // Ron, Oct 19: "I already have a calendar button. That doesn't need to be there. Quick payment could probably be rolled into business." "I do want messages in the spotlight tab."
 export const TILES: { key: TileKey; label: string; icon: typeof Users }[] = [
   { key: "clients", label: "Clients", icon: Users },
@@ -92,9 +94,30 @@ export function CoachSpotHub({
       });
   }
   useEffect(() => {
-    // Only where the button is actually on screen (on a computer it is mounted but hidden), never inside an embedded frame (the split half, a workspace pane), and never for a hidden tab:
-    // an idle open page must not keep asking (Oct 20 outage). Opening Spotlight always reads it.
-    if (isEmbeddedWindow() || document.visibilityState !== "visible" || !triggerRef.current || triggerRef.current.getClientRects().length === 0) return;
+    // Never inside an embedded frame (the split half, a workspace pane): the page holding it has its own Spotlight.
+    if (isEmbeddedWindow()) return;
+    // Opened by a link (Release 2): ?spot=1 (a coach page that lives in Spotlight on a phone), or a notice naming a panel (#late-changes, #schedule-requests, #expiring).
+    const anchor = SPOT_OPEN_HASHES.find((h) => window.location.hash === `#${h}`) ?? null;
+    if (new URLSearchParams(window.location.search).get("spot") === "1" || anchor) {
+      setOpen(true);
+      setView("grid");
+      loadNeeds(true);
+      if (anchor) {
+        // the panel reads its own rows; look for it for a few seconds
+        let tries = 0;
+        const timer = window.setInterval(() => {
+          const el = document.querySelector(`[data-spot-anchor="${anchor}"] section`);
+          if (el || ++tries > 20) {
+            window.clearInterval(timer);
+            el?.scrollIntoView({ block: "start" });
+          }
+        }, 250);
+      }
+      return;
+    }
+    // Only where the button is actually on screen (on a computer it is mounted but hidden), and never for a hidden tab: an idle open page must not keep asking (Oct 20 outage).
+    // Opening Spotlight always reads it.
+    if (document.visibilityState !== "visible" || !triggerRef.current || triggerRef.current.getClientRects().length === 0) return;
     loadNeeds(false);
   }, []);
   // A team-sport group has no Business tile (lib/team-sport.ts). Unknown until read, which shows every tile.
@@ -121,11 +144,17 @@ export function CoachSpotHub({
   // The organization the PAGE belongs to (null on the coach's own space). Choosing another organization in the hub leaves this page for that organization's Home.
   const pageOrg = useRef<string | null>(null);
   const orgsRequested = useRef(false);
+  // A platform admin's own tools (Support inbox, Organizations) sit under Business (Release 2: they used to be in the More list).
+  const [platformAdmin, setPlatformAdmin] = useState(false);
   useEffect(() => {
-    // Only needed for the notification tile's test message.
-    createBrowserClient()
-      .auth.getUser()
-      .then(({ data }) => setProfileId(data.user?.id));
+    // Only needed for the notification tile's test message, and the admin links.
+    const supabase = createBrowserClient();
+    supabase.auth.getUser().then(async ({ data }) => {
+      setProfileId(data.user?.id);
+      if (!data.user) return;
+      const { data: me } = await supabase.from("profiles").select("is_platform_admin").eq("id", data.user.id).maybeSingle();
+      setPlatformAdmin((me as { is_platform_admin?: boolean } | null)?.is_platform_admin === true);
+    });
   }, []);
   useEffect(() => {
     // Which organizations this coach has: read the first time the hub is opened (the dropdown is only visible then), not on every page.
@@ -178,6 +207,11 @@ export function CoachSpotHub({
       document.cookie = `${ACTIVE_ORG_COOKIE}=${encodeURIComponent(next.orgId)}; path=/; max-age=${60 * 60 * 24 * 90}`;
     } catch {
       // not remembered; the hub still switched
+    }
+    // On the coach's own space (it belongs to no organization) the page stays: it reloads, and every tile then reads the organization just chosen (Release 2).
+    if (leavesPage && pageOrg.current === null) {
+      window.location.reload();
+      return;
     }
     if (leavesPage) {
       // A full page load, not a client-side navigation: the soft navigation after the switch hung on a loading skeleton in the live check (Oct 19), and a full load also brings the new organization's colors,
@@ -426,6 +460,22 @@ export function CoachSpotHub({
                     <p className="px-4 pt-4 font-body text-xs text-steel uppercase tracking-wide font-bold">Quick payment</p>
                     <QuickPaymentPanel key={activeGroupId} groupId={activeGroupId} />
                   </div>
+                  {/* The organization's own settings (colors, team, plan live on its pages) and, for a platform admin, their tools: they used to be in the phone's More list. */}
+                  <div className="border-t border-steel/20 pt-3 space-y-1" data-business-links>
+                    <a href={`/groups/${activeGroupId}/settings`} className="block min-h-11 leading-[2.75rem] font-body text-sm text-rust">
+                      Organization settings →
+                    </a>
+                    {platformAdmin && (
+                      <>
+                        <a href="/admin/support" className="block min-h-11 leading-[2.75rem] font-body text-sm text-chalk">
+                          Support inbox →
+                        </a>
+                        <a href="/admin/organizations" className="block min-h-11 leading-[2.75rem] font-body text-sm text-chalk">
+                          Organizations →
+                        </a>
+                      </>
+                    )}
+                  </div>
                 </div>
               )}
               {view === "program" && !needsOrg && (
@@ -447,6 +497,9 @@ export function CoachSpotHub({
                         <Sparkles className="w-4 h-4" />
                         Build a program with AI
                       </button>
+                      <a href="/programs" className="block min-h-11 leading-[2.75rem] mb-2 font-body text-sm text-rust" data-all-programs>
+                        All programs →
+                      </a>
                       <ProgramMiniView key={activeGroupId} groupId={activeGroupId} />
                     </>
                   )}

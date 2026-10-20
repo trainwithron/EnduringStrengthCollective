@@ -6,7 +6,6 @@ import { join } from "node:path";
 // ("Welcome. Two things get you started") instead of his own training. A coach's own personal space is now always his client app, as himself, with or without the cookie.
 const read = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
 const acting = read("lib/acting-as.ts");
-const home = read("components/coach/mobile/coach-mobile-home.tsx");
 
 describe("a coach's own personal space on the phone", () => {
   it("always resolves as himself, without the 12 hour cookie", () => {
@@ -15,41 +14,22 @@ describe("a coach's own personal space on the phone", () => {
     expect(acting).toContain("created_by === userId");
     expect(acting).toContain("return { athleteId: realUserId, realUserId, isActingAsOther: true }");
   });
-  it("the phone Home offers 'Add a client' only to a coach with no clients anywhere in the organization (never 'No clients' while some sit in its other groups)", () => {
-    expect(home).toContain("let hasClients = (rosterRows ?? []).length > 0;");
-    expect(home).toContain("const others = orgGroupIds.filter((id) => id !== groupId);");
-    expect(home).not.toContain("No clients in {groupName}.");
-    expect(home).toContain("{hasClients ? (");
-    expect(home).toContain("Add a client");
-  });
 });
 
-describe("the coach's phone Home is short", () => {
-  it("has no start button for the coach's OWN workout (his own training is the 'Coach (you)' row at the top of the Clients list), no Desktop Mode button, no clients card, no quick actions, no business tiles", () => {
-    expect(home).not.toContain("Start workout");
-    expect(home).not.toContain('"/my-space?view=client"');
-    expect(home).not.toContain("ViewModeToggle");
-    expect(home).not.toContain("Quick actions");
-    expect(home).not.toContain("SEE YOUR CLIENTS");
-    expect(home).not.toContain("clients in this organization");
-    expect(home).not.toContain("CoachHomeComplications");
-    expect(home).not.toContain("NEEDS ATTENTION");
+describe("Release 2: the phone opens as the coach's own account", () => {
+  it("a coach on a phone never gets a 'coach Home' for a group: a team-sport group keeps its team Home, any other group opens their own app", () => {
+    const page = read("app/(coach)/groups/[groupId]/page.tsx");
+    expect(page).toContain("if (isTeamSportGroup((teamRow as { team_mode?: boolean | null } | null)?.team_mode)) return <TeamCoachPhoneHome groupId={params.groupId} groupName={group.name} />;");
+    expect(page).toContain("redirect(COACH_PHONE_LANDING);");
+    expect(page).not.toContain("CoachMobileHome");
   });
-  it("is the title, then the cards, then ONE button, then only what needs a decision", () => {
-    const order = ["<h1", "<SessionCheckSection", "<NextClientWorkoutSection", "<LateChangesPanel"].map((s) => home.indexOf(s));
-    expect(order.every((i) => i > -1)).toBe(true);
-    expect([...order].sort((a, b) => a - b)).toEqual(order);
-  });
-  it("the title starts below the fixed Spotlight button, so it is never covered", () => {
-    expect(home).toContain('className="px-5 pt-[108px] pb-4"');
-  });
-  it("the More sheet has Programs and no Desktop mode (one phone app, Oct 19), and the bottom bar has Home, Clients, Messages, Calendar, More", () => {
-    const more = read("components/coach/mobile/coach-nav-links-list.tsx");
-    expect(more).toContain('<Item href="/programs" label="Programs"');
-    expect(more).not.toContain("Desktop mode");
-    expect(more).not.toContain("ViewModeToggle");
+  it("the bar on every coach page is their own app's five tabs (no coach bar, no More)", () => {
     const bar = read("components/athlete/bottom-tab-bar.tsx");
-    for (const label of ['label: "Home"', 'term("client", "plural", { cap: true })', 'label: "Messages"', 'label: "Calendar"', 'label: "More"']) expect(bar).toContain(label);
+    expect(bar).not.toContain('variant === "coach"');
+    expect(bar).not.toContain('label: "More"');
+    for (const tab of ['mySpaceHref("calendar")', 'mySpaceHref("feed")', 'mySpaceHref("nutrition")', 'mySpaceHref("settings")', "homeHref ?? mySpaceHref(null)"]) expect(bar).toContain(tab);
+    expect(read("components/coach/mobile/coach-mobile-shell.tsx")).toContain('<BottomTabBar groupId={groupId} variant="own" activeOverride={activeOverride} homeHref={homeHref} />');
+    expect(read("components/coach/coach-desktop-shell.tsx")).toContain('<BottomTabBar groupId={groupId} variant="own" activeOverride={null} />');
   });
   it("says who is being logged for on the coach-logs-for-a-client bar", () => {
     const bar = read("components/coach/mobile/coach-mode-bar.tsx");
@@ -57,11 +37,3 @@ describe("the coach's phone Home is short", () => {
   });
 });
 
-describe("the phone Home's idea of 'has clients' agrees with the Clients page", () => {
-  it("clients set aside do not count", () => {
-    const home = readFileSync("components/coach/mobile/coach-mobile-home.tsx", "utf8").replace(/\r\n/g, "\n");
-    expect(home).toContain("fetchInactiveKeys(supabase, others)");
-    expect(home).toContain("!asideKeys.has(inactiveKey(m.group_id, m.profile_id))");
-    expect(home).not.toContain("countByIds");
-  });
-});

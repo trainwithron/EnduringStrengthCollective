@@ -78,7 +78,7 @@ export function NeedsPaymentPanel({ rows }: { rows: NeedsPaymentRow[] }) {
         {visible.map((r) => (
           <li key={r.athleteId} className="py-2.5">
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-              <Link href={`/groups/${r.groupId}/athletes/${r.athleteId}`} className="font-body text-sm text-chalk flex-1 min-w-[8rem] truncate hover:underline">
+              <Link prefetch={false} href={`/groups/${r.groupId}/athletes/${r.athleteId}`} className="font-body text-sm text-chalk flex-1 min-w-[8rem] truncate hover:underline">
                 {r.name}
               </Link>
               <span className="font-body text-xs text-rust">{coachBalanceLabel(r.balance)}</span>

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { NoAccess } from "@/components/shared/no-access";
 import { cookies } from "next/headers";
-import { loadStartInputs, parseLastGroupCookie, pickStartGroup } from "@/lib/start-group";
+import { COACH_PHONE_ENTRY } from "@/lib/start-group";
 import { createServerClient } from "@/lib/supabase/server";
 import { prefersAthleteStyleView, isMobileUserAgent, isTabletUserAgent } from "@/lib/pwa-server";
 import { CoachHomeShell } from "@/components/coach/coach-home-shell";
@@ -15,7 +15,6 @@ import { OrgNotificationsPanel, type OrgNotification } from "@/components/coach/
 import { MarkAllSeenButton } from "@/components/coach/desktop/mark-all-seen-button";
 import { findThreadsNeedingReply } from "@/lib/notification-priority";
 import { getCoachedGroups, LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/coach-groups";
-import { getActiveAnchor } from "@/lib/active-anchor";
 import { orgIsTeamOnly } from "@/lib/team-sport";
 import { SessionCheckSection } from "@/components/coach/session-check-section";
 import { NextClientWorkoutSection } from "@/components/coach/next-client-workout-section";
@@ -121,14 +120,9 @@ export default async function CoachHomePage() {
   // squeezed desktop shell again instead of a loop, which is the correct
   // tradeoff (annoying beats broken).
   if (await prefersAthleteStyleView()) {
-    // A phone goes to the coach home of the organization the coach is working IN (the one they chose, or their only one), not to whichever group they joined first: the first group is often another organization's.
-    // With several organizations and none chosen it asks, on one plain screen.
-    const active = await getActiveAnchor(supabase, user.id);
-    if (active?.needsChoice) redirect("/choose-organization?next=/dashboard");
-    if (active) redirect(`/groups/${active.anchor.id}`);
-    const lastGroupId = parseLastGroupCookie((await cookies()).get("last_group")?.value);
-    const start = pickStartGroup(await loadStartInputs(supabase, user.id, lastGroupId));
-    redirect(`/groups/${start?.group_id ?? firstSeatGroupId}`);
+    // Release 2 (the phone opens as the coach's own account): the landing decision (/coach-landing: a team organization's coach keeps their team Home; everyone else opens their own app;
+    // several organizations and none chosen asks first).
+    redirect(COACH_PHONE_ENTRY);
   }
 
   // Real bug from Ron's own phone, screenshot confirmed: a coach who

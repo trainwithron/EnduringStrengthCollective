@@ -158,7 +158,7 @@ export function PulseTabs({
               <ul className="divide-y divide-steel/15 border-t border-steel/15 px-3 max-h-72 overflow-y-auto">
                 {attentionClients.map((c) => (
                   <li key={c.athleteId + c.groupId} className="py-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <Link href={`/groups/${c.groupId}/athletes/${c.athleteId}`} className="font-body text-sm text-chalk hover:text-rust flex-1 min-w-[8rem] truncate">
+                    <Link prefetch={false} href={`/groups/${c.groupId}/athletes/${c.athleteId}`} className="font-body text-sm text-chalk hover:text-rust flex-1 min-w-[8rem] truncate">
                       {c.fullName}
                     </Link>
                     <span className="font-body text-xs text-steel">{c.quietTier === "strong" ? "Quiet a while" : "Missing scheduled sessions"}</span>

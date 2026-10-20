@@ -75,13 +75,11 @@ describe("TC2: the menus use it", () => {
     expect(shell).toContain('label: "Business",');
   });
 
-  it("the phone More list drops Business, Group sessions and the booking tools for a team-sport group, and shows its menu", () => {
-    const m = src("components/coach/mobile/coach-nav-links-list.tsx");
-    expect(m).toContain("const teamSport = isTeamSportGroup(teamMode);");
-    expect(m).toContain("teamSportMenu(groupId)");
-    // the phone app offers no Business, Group sessions or booking tools to anyone now (Oct 19: one phone app); the team menu shows only its phone pages
+  it("on a phone a team-sport group's menu is its team Home (Release 2: there is no More list), and Spotlight drops Business for it", () => {
+    expect(src("lib/team-phone-home.ts")).toContain("const menu = teamSportMenu(groupId);");
+    const m = src("components/coach/mobile/coach-spot-hub.tsx");
+    expect(m).toContain("TILES.filter((tile) => !(teamSport && TEAM_SPORT_HIDDEN_HUB_TILES.includes(tile.key)))");
     for (const gone of ["Business overview", "group-sessions", "booking-page", "teamSportBusinessHref"]) expect(m, gone).not.toContain(gone);
-    expect(m).toContain("phoneCoachRedirect(m.href) === null");
   });
 
   it("the phone Spotlight hub hides the Business and Quick payment tiles for a team-sport group", () => {

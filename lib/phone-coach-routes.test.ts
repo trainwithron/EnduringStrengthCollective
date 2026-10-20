@@ -13,7 +13,6 @@ const ID = "11111111-2222-4333-8444-555555555555";
 
 // Every coach page a phone keeps as a page (route folders under app/(coach), "[x]" for a dynamic part).
 const NEVER = new Set([
-  "/calendar",
   "/clients",
   "/clients/requests",
   "/dashboard", // the page itself sends a phone to the phone Home
@@ -85,25 +84,28 @@ describe("every coach page has a place on the phone", () => {
 describe("the table", () => {
   const to = (p: string, s = "") => phoneCoachRedirect(p, s)?.to ?? null;
   it("sends the computer pages to the closest phone place, in the same group", () => {
-    expect(to("/calendar", "?tab=availability")).toBe("/calendar");
-    expect(to("/calendar")).toBeNull();
-    expect(to("/calendar", "?tab=day")).toBeNull();
-    expect(to("/group-calendar")).toBe("/calendar");
-    expect(to("/recurring-conflicts")).toBe("/calendar");
-    expect(to("/running-low")).toBe("/clients");
-    expect(to(`/groups/${G}/business`)).toBe(`/groups/${G}`);
-    expect(to(`/groups/${G}/dashboard`)).toBe(`/groups/${G}`);
-    expect(to(`/groups/${G}/coaches/${ID}`)).toBe(`/groups/${G}`);
-    expect(to(`/groups/${G}/business/booking-page`)).toBe(`/groups/${G}/calendar`);
-    expect(to(`/groups/${G}/availability`)).toBe(`/groups/${G}/calendar`);
-    expect(to(`/groups/${G}/business/session-ledger`)).toBe(`/groups/${G}/clients`);
+    // Release 2: the coach Home and the business pages open the coach's own app with Spotlight open; the calendar pages open their own Calendar. Availability and booking one client stay.
+    expect(to("/calendar", "?tab=availability")).toBeNull();
+    expect(to("/calendar", "?scheduleFor=x")).toBeNull();
+    expect(to("/calendar")).toBe("/my-space?view=client&to=calendar");
+    expect(to("/calendar", "?month=2026-11")).toBe("/my-space?view=client&to=calendar&month=2026-11");
+    expect(to("/group-calendar")).toBe("/my-space?view=client&to=calendar");
+    expect(to("/recurring-conflicts")).toBe("/my-space?view=client&to=calendar");
+    expect(to("/running-low")).toBe("/my-space?view=client&spot=1");
+    expect(to(`/groups/${G}/business`)).toBe("/my-space?view=client&spot=1");
+    expect(to(`/groups/${G}/dashboard`)).toBe("/my-space?view=client&spot=1");
+    expect(phoneCoachRedirect(`/groups/${G}/dashboard`)?.home).toBe(true);
+    expect(to(`/groups/${G}/coaches/${ID}`)).toBe("/my-space?view=client&spot=1");
+    expect(to(`/groups/${G}/business/booking-page`)).toBe("/my-space?view=client&to=calendar");
+    expect(to(`/groups/${G}/availability`)).toBe("/my-space?view=client&to=calendar");
+    expect(to(`/groups/${G}/business/session-ledger`)).toBe("/my-space?view=client&spot=1");
     expect(to(`/groups/${G}/business/sms-settings`)).toBe(`/groups/${G}/settings`);
     expect(to(`/groups/${G}/branding`)).toBe(`/groups/${G}/settings`);
     expect(to(`/groups/${G}/messages/announce`)).toBe(`/groups/${G}/messages`);
     expect(to(`/groups/${G}/team-activity`)).toBe(`/groups/${G}/feed`);
     expect(to(`/groups/${G}/challenges/${ID}`)).toBe(`/groups/${G}/feed`);
     expect(to(`/groups/${G}/games/${ID}`)).toBe(`/groups/${G}/feed`);
-    expect(to(`/groups/${G}/resources`)).toBe(`/groups/${G}`);
+    expect(to(`/groups/${G}/resources`)).toBe("/my-space?view=client&spot=1");
     expect(to(`/groups/${G}/exercise-library`)).toBe("/programs");
     expect(to(`/groups/${G}/workouts/${ID}/clients`)).toBe("/programs");
     expect(to(`/groups/${G}/tools/one-rep-max`)).toBe("/programs");
@@ -174,12 +176,6 @@ describe("the middleware sends the phone", () => {
 });
 
 describe("the phone's menus only offer the phone's places", () => {
-  it("every link in the More list stays a page on the phone", () => {
-    const list = read("components/coach/mobile/coach-nav-links-list.tsx");
-    const hrefs = [...list.matchAll(/href=(?:"([^"]+)"|\{`([^`]+)`\})/g)].map((m) => (m[1] ?? m[2]).replace("${groupId}", G));
-    expect(hrefs.length).toBeGreaterThan(3);
-    for (const h of hrefs) expect(phoneCoachRedirect(h.split("?")[0], h.includes("?") ? `?${h.split("?")[1]}` : ""), h).toBeNull();
-  });
   it("every link on the team-sport phone Home stays a page on the phone", () => {
     const home = teamPhoneHome({ groupId: G, programs: [{ id: ID, name: "P", workouts: [] }] });
     for (const l of [...home.links, ...home.moreLinks, ...home.programs.map((p) => ({ href: p.href }))]) expect(phoneCoachRedirect(l.href), l.href).toBeNull();

@@ -21,7 +21,8 @@ import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
 import { BookingModeLine } from "@/components/athlete/booking-mode-line";
 import { ScheduleCard } from "@/components/athlete/schedule-card";
-import { UpcomingSessionsList } from "@/components/coach/upcoming-sessions-list";
+import { CoachPhoneSchedule, loadScheduleClients } from "@/components/coach/mobile/coach-phone-schedule";
+import { PHONE_CALENDAR } from "@/lib/phone-coach-routes";
 import { loadScheduleCardHref } from "@/lib/schedule-card";
 import { SessionCheckSection } from "@/components/coach/session-check-section";
 import { SessionCountLine } from "@/components/coach/session-count-line";
@@ -35,6 +36,7 @@ import { getCoachClients } from "@/lib/coach-clients";
 import { coachCreditSentence } from "@/lib/credit-sentence";
 import { formatSlotTime } from "@/lib/booking-slots";
 import { getEffectiveAthlete } from "@/lib/acting-as";
+import { getActiveAnchor } from "@/lib/active-anchor";
 import { loadClientCalendar, type CalendarDay } from "@/lib/client-calendar";
 import { UndatedProgramCards } from "@/components/athlete/undated-program-cards";
 import { computeProgramCardVisuals } from "@/lib/program-card-data";
@@ -153,188 +155,18 @@ export async function CoachCalendarPageBody(
   // while acting as a client — that's the coach's own tool, not part of
   // the client's real experience.
   if (showMobileView && isCoach && !isActingAsOther) {
-    // Every client across the coach's groups (a one-on-one client lives in their own group), each with their own group so the booking
-    // and the balance are the ones kept for that client.
-    const [coachClients, { data: coachGroup }, { data: coachProfileRow }] = await Promise.all([
-      getCoachClients(supabase, user.id, params.groupId),
+    // Release 2: on a phone the Calendar tab is the coach's OWN Calendar (the organization's schedule with their own workouts on it, components/coach/mobile/coach-phone-schedule.tsx).
+    // Only booking one client (?scheduleFor=) stays here.
+    if (!searchParams.scheduleFor) {
+      redirect(PHONE_CALENDAR + (searchParams.month && /^\d{4}-\d{2}$/.test(searchParams.month) ? `&month=${searchParams.month}` : ""));
+    }
+    const [scheduleClients, { data: coachGroup }, { data: coachProfileRow }] = await Promise.all([
+      loadScheduleClients(supabase, user.id, params.groupId),
       supabase.from("groups").select("name").eq("id", params.groupId).maybeSingle(),
       supabase.from("profiles").select("timezone").eq("id", user.id).maybeSingle(),
     ]);
     const coachGroupName = coachGroup?.name ?? "Coaching";
     const coachTz = coachProfileRow?.timezone ?? DEFAULT_COACH_TIMEZONE;
-
-    const clientIds = coachClients.map((c) => c.id);
-    const creditRows = (
-      await Promise.all(chunk(clientIds, 100).map((ids) => supabase.from("session_credits").select("athlete_id, group_id, balance").in("athlete_id", ids)))
-    ).flatMap((r) => r.data ?? []);
-    const balanceByClientGroup = new Map((creditRows ?? []).map((r) => [`${r.athlete_id}:${r.group_id}`, r.balance as number]));
-
-    const phoneCounts = await fetchBookingCounts(supabase, { coachId: user.id });
-    // Each client's type and whether they are set aside, for the list the coach picks from (Online and set-aside clients are left out until asked for).
-    const [phoneTierBatches, phoneAsideKeys] = await Promise.all([
-      Promise.all(chunk(clientIds, 100).map((ids) => supabase.from("group_memberships").select("profile_id, group_id, client_tier").in("profile_id", ids).eq("role", "athlete"))),
-      fetchInactiveKeys(supabase, Array.from(new Set(coachClients.map((c) => c.groupId)))),
-    ]);
-    const phoneTierByKey = new Map(phoneTierBatches.flatMap((r) => r.data ?? []).map((m: any) => [`${m.group_id}:${m.profile_id}`, (m.client_tier as ClientTierLite) ?? null]));
-    const scheduleClients = coachClients.map((c) => ({
-      id: c.id,
-      fullName: c.fullName,
-      groupId: c.groupId,
-      balance: balanceByClientGroup.get(`${c.id}:${c.groupId}`) ?? 0,
-      booked: phoneCounts.get(`${c.id}:${c.groupId}`)?.booked ?? 0,
-      tier: phoneTierByKey.get(`${c.groupId}:${c.id}`) ?? null,
-      setAside: phoneAsideKeys.has(inactiveKey(c.groupId, c.id)),
-    }));
-
-    if (!searchParams.scheduleFor) {
-      // No client picked yet — this is the coach's own real destination
-      // for the Calendar tab (coach_mobile_app_redesign_plan.md); falling
-      // through to the athlete booking-calendar rendering further below
-      // would show a real client an "assign yourself a program" empty
-      // state that makes no sense for the coach viewing it.
-      //
-      // Real, live-confirmed gap: before a client is picked, this screen
-      // was just the dropdown + one line of helper text, then hundreds of
-      // pixels of dead space above the bottom nav. Same real data this
-      // page's own rail widget (calendar-rail-widget.tsx) already queries
-      // for "Today" — widened to the next 5 days and no longer date-
-      // gated — so the coach sees their real upcoming schedule across
-      // every client while deciding who to book, instead of a void.
-      const upcomingRangeEnd = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
-      // (The coach's groups can be more than a request's URL holds, so the ids go in groups; each group's first 10, merged by time, cut to 10.)
-      const { data: upcomingAll } = await readRowsByIds(
-        orgGroupIds,
-        (g) => (from, to) =>
-          supabase
-            .from("bookings")
-            .select("id, start_at, profiles!bookings_athlete_id_fkey ( full_name )")
-            .eq("coach_id", user.id)
-            .in("group_id", g)
-            .eq("status", "confirmed")
-            .gte("start_at", new Date().toISOString())
-            .lt("start_at", upcomingRangeEnd.toISOString())
-            .order("start_at", { ascending: true })
-            .order("id", { ascending: true })
-            .range(from, to),
-        { pageSize: 10, maxPages: 1 }
-      );
-      const upcomingBookingRows = upcomingAll.sort((a, b) => String(a.start_at).localeCompare(String(b.start_at))).slice(0, 10);
-      const upcomingBookings = (upcomingBookingRows ?? []).map((b: any) => ({
-        id: b.id,
-        startAt: b.start_at as string,
-        athleteName: b.profiles?.full_name ?? "Client",
-      }));
-
-      // The general calendar: this month, every client's sessions on their day (on the coach's clock). It is what the Calendar tab
-      // always opens; one client is chosen afterwards, never first.
-      const generalToday = dateFromKey(dateKeyInZone(coachTz));
-      const generalMonthMatch = /^(\d{4})-(\d{2})$/.exec(searchParams.month ?? "");
-      const gYear = generalMonthMatch ? Number(generalMonthMatch[1]) : generalToday.getFullYear();
-      const gMonthIndex = generalMonthMatch ? Math.min(11, Math.max(0, Number(generalMonthMatch[2]) - 1)) : generalToday.getMonth();
-      const gPrev = new Date(gYear, gMonthIndex - 1, 1);
-      const gNext = new Date(gYear, gMonthIndex + 1, 1);
-      const gKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      const gMonthStart = new Date(gYear, gMonthIndex, 1, 0, 0, 0);
-      const gMonthEnd = new Date(gYear, gMonthIndex + 1, 1, 0, 0, 0);
-      const { data: monthBookingRowsUnsorted } = await readRowsByIds(orgGroupIds, (g) => (from, to) =>
-        supabase
-          .from("bookings")
-          .select("id, start_at, profiles!bookings_athlete_id_fkey ( full_name )")
-          .eq("coach_id", user.id)
-          .in("group_id", g)
-          .eq("status", "confirmed")
-          .gte("start_at", new Date(gMonthStart.getTime() - 86400000).toISOString())
-          .lt("start_at", new Date(gMonthEnd.getTime() + 86400000).toISOString())
-          .order("start_at", { ascending: true })
-          .order("id", { ascending: true })
-          .range(from, to)
-      );
-      const monthBookingRows = monthBookingRowsUnsorted.sort((a, b) => String(a.start_at).localeCompare(String(b.start_at)));
-      const sessionsByGeneralDay = new Map<string, { time: string; name: string }[]>();
-      for (const b of (monthBookingRows ?? []) as any[]) {
-        const k = dateKeyInZone(coachTz, new Date(b.start_at));
-        const list = sessionsByGeneralDay.get(k) ?? [];
-        list.push({ time: formatInTimezone(new Date(b.start_at), coachTz, "time"), name: String(b.profiles?.full_name ?? "Client").split(" ")[0] });
-        sessionsByGeneralDay.set(k, list);
-      }
-      const gLeading = new Date(gYear, gMonthIndex, 1).getDay();
-      const gDays = new Date(gYear, gMonthIndex + 1, 0).getDate();
-      const gCells: (Date | null)[] = [
-        ...Array.from({ length: gLeading }, () => null),
-        ...Array.from({ length: gDays }, (_, i) => new Date(gYear, gMonthIndex, i + 1)),
-      ];
-      const sameDay = (a: Date, b: Date) =>
-        a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-
-      return (
-        <main className="min-h-screen bg-graphite text-chalk font-body">
-          <CoachMobileShell groupId={params.groupId} groupName={coachGroupName} activeOverride="calendar">
-            <header className="px-5 pt-8 pb-4">
-              <h1 className="font-display font-bold text-3xl leading-none uppercase">Calendar</h1>
-            </header>
-            <div className="px-5 pb-24">
-              <SessionCountLine coachId={user.id} groupIds={orgGroupIds} timezone={coachTz} view="month" year={gYear} monthIndex={gMonthIndex} weekStartKey={null} />
-              <SessionCheckSection coachId={user.id} groupIds={orgGroupIds} />
-              <ScheduleClientPicker groupId={params.groupId} clients={scheduleClients} />
-              <div className="flex items-center justify-between mt-3">
-                <Link
-                  href={`/groups/${params.groupId}/calendar?month=${gKey(gPrev)}`}
-                  className="h-11 px-3 inline-flex items-center font-body text-sm text-chalk underline underline-offset-2"
-                >
-                  &larr; {gPrev.toLocaleDateString("en-US", { month: "short" })}
-                </Link>
-                <span className="font-display font-bold uppercase text-base">{monthLabel(gYear, gMonthIndex)}</span>
-                <Link
-                  href={`/groups/${params.groupId}/calendar?month=${gKey(gNext)}`}
-                  className="h-11 px-3 inline-flex items-center font-body text-sm text-chalk underline underline-offset-2"
-                >
-                  {gNext.toLocaleDateString("en-US", { month: "short" })} &rarr;
-                </Link>
-              </div>
-              <p className="font-body text-xs text-steel mt-1">All clients. Tap a day to see its sessions and open times.</p>
-              <div className="grid grid-cols-7 gap-px bg-steel/15 mt-3 border border-steel/15">
-                {WEEKDAY_LABELS.map((label) => (
-                  <div key={label} className="bg-graphite text-center font-body text-xs text-steel uppercase tracking-wide py-1.5">
-                    {label}
-                  </div>
-                ))}
-                {gCells.map((date, i) => {
-                  if (!date) return <div key={i} className="bg-graphite min-h-[56px]" />;
-                  const isToday = sameDay(date, generalToday);
-                  const sessions = sessionsByGeneralDay.get(dateKey(date)) ?? [];
-                  return (
-                    <Link
-                      key={i}
-                      href={`/groups/${params.groupId}/calendar/${dateKey(date)}`}
-                      className={`bg-graphite min-h-[56px] p-1.5 flex flex-col ${isToday ? "ring-1 ring-inset ring-rust" : ""}`}
-                    >
-                      <span className={`font-body text-xs ${isToday ? "text-rust font-bold" : "text-steel"}`}>{date.getDate()}</span>
-                      {sessions.slice(0, 2).map((s, idx) => (
-                        <span key={idx} className="font-body text-[10px] leading-tight text-chalk mt-0.5 truncate">
-                          {s.time} {s.name}
-                        </span>
-                      ))}
-                      {sessions.length > 2 && (
-                        <span className="font-body text-[10px] leading-tight text-rust mt-0.5">+{sessions.length - 2}</span>
-                      )}
-                    </Link>
-                  );
-                })}
-              </div>
-
-              <h2 className="font-body text-xs text-steel uppercase tracking-wide mt-8 mb-2">
-                Upcoming sessions
-              </h2>
-              {upcomingBookings.length === 0 ? (
-                <p className="font-body text-sm text-steel">Nothing booked in the next 5 days.</p>
-              ) : (
-                <UpcomingSessionsList rows={upcomingBookings.map((b) => ({ id: b.id, name: b.athleteName, when: formatInTimezone(new Date(b.startAt), coachTz, "dateTime") }))} />
-              )}
-            </div>
-          </CoachMobileShell>
-        </main>
-      );
-    }
 
     const selected = scheduleClients.find((c) => c.id === searchParams.scheduleFor);
     // The client is booked in THEIR group (sessions and balances are kept per group), so move to it if we are standing in another.
@@ -450,6 +282,58 @@ export async function CoachCalendarPageBody(
         </CoachMobileShell>
       </main>
     );
+  }
+
+  // The coach's OWN Calendar (Release 2: the phone opens as the coach's own account): in their personal space (it belongs to no organization) the Calendar tab shows the schedule of the
+  // organization they are working in (one at a time, switched in Spotlight; Ron decided) with their own workouts on the same days ("You"), and their programs with no dates as cards.
+  // With no organization chosen yet it is their ordinary own calendar below.
+  if (showMobileView && isActingAsOther && athleteId === user.id && !bodyOrgId) {
+    const active = await getActiveAnchor(supabase, user.id);
+    if (active && !active.needsChoice) {
+      const orgIdsForMe = groupsInOrgOf(active.groups, active.anchor.id).map((g) => g.id);
+      const { data: meRow } = await supabase.from("profiles").select("timezone").eq("id", user.id).maybeSingle();
+      const tz = (meRow as { timezone?: string | null } | null)?.timezone || DEFAULT_COACH_TIMEZONE;
+      const todayMine = dateFromKey(dateKeyInZone(tz));
+      const mm = /^(\d{4})-(\d{2})$/.exec(searchParams.month ?? "");
+      const y = mm ? Number(mm[1]) : todayMine.getFullYear();
+      const mi = mm ? Math.min(11, Math.max(0, Number(mm[2]) - 1)) : todayMine.getMonth();
+      const monthDates = Array.from({ length: new Date(y, mi + 1, 0).getDate() }, (_, i) => new Date(y, mi, i + 1));
+      const nextDays = Array.from({ length: 5 }, (_, i) => new Date(todayMine.getFullYear(), todayMine.getMonth(), todayMine.getDate() + i));
+      const [mine, soon] = await Promise.all([
+        loadClientCalendar(supabase, { groupId: params.groupId, athleteId, timezone: tz, dates: monthDates, today: todayMine, withUndated: true }),
+        loadClientCalendar(supabase, { groupId: params.groupId, athleteId, timezone: tz, dates: nextDays, today: todayMine, withUndated: false }),
+      ]);
+      const byDay = new Map([...mine.days.entries()].map(([k, d]) => [k, d.workouts.map((w) => ({ key: w.workoutId, title: w.title, done: w.status === "done" }))]));
+      const upcomingMine = nextDays.flatMap((d) =>
+        (soon.days.get(dateKey(d))?.workouts ?? [])
+          .filter((w) => w.status === "planned")
+          .map((w) => ({ id: `you-${dateKey(d)}-${w.workoutId}`, name: `You: ${w.title}`, when: d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) }))
+      );
+      const uncoveredMine = mine.undated.filter((c) => !c.coverImagePath).map((c) => c.id);
+      const visualsMine = uncoveredMine.length > 0 ? Object.fromEntries(await computeProgramCardVisuals(supabase, uncoveredMine, user.id)) : {};
+      return (
+        <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
+          <ActingAsBanner athleteFullName={actingAsFullName ?? "Me"} groupId={params.groupId} isSelf />
+          <header className="px-5 pt-16 pb-2">
+            <h1 className="font-display font-bold text-4xl leading-none uppercase">Calendar</h1>
+          </header>
+          <UndatedProgramCards groupId={params.groupId} programs={mine.undated} visuals={visualsMine} />
+          <div className="px-5 pt-4">
+            <CoachPhoneSchedule
+              supabase={supabase}
+              userId={user.id}
+              anchorGroupId={active.anchor.id}
+              orgGroupIds={orgIdsForMe}
+              timezone={tz}
+              month={searchParams.month}
+              monthBase={`/groups/${params.groupId}/calendar`}
+              own={{ byDay, upcoming: upcomingMine }}
+            />
+          </div>
+          <BottomTabBar groupId={params.groupId} activeOverride="calendar" />
+        </main>
+      );
+    }
   }
 
   if (showMobileView) {

@@ -54,7 +54,7 @@ export default async function ClientRequestsPage() {
 
   if (await prefersAthleteStyleView()) {
     return (
-      <CoachMobileShell groupId={anchor.id} groupName={anchor.name} activeOverride="roster">
+      <CoachMobileShell groupId={anchor.id} groupName={anchor.name}>
         <div className="min-h-screen bg-graphite text-chalk font-body pb-24 px-5 pt-8">
           <h1 className="font-display font-bold text-2xl uppercase leading-none mb-2">Client requests</h1>
           <Link href={`/groups/${anchor.id}/clients`} className="font-body text-sm text-steel underline underline-offset-2">

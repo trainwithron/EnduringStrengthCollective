@@ -103,7 +103,6 @@ describe("every full-screen sheet is a dialog", () => {
       "components/coach/desktop/expanded-day-scheduler.tsx",
       "components/coach/desktop/recap-and-up-next.tsx",
       "components/coach/exercise-qr-code-button.tsx",
-      "components/coach/mobile/coach-more-sheet.tsx",
       "components/coach/mobile/spot-builder-panel.tsx",
       "components/feed/new-post-composer.tsx",
     ]) {

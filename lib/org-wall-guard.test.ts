@@ -111,7 +111,7 @@ describe("the coach-level pages and pickers stand on the organization the coach 
     expect(read("lib/business-scope.ts")).toContain("groupsInOrgOf(await getCoachedGroups(supabase, userId, true), groupId)");
     expect(read("lib/coach-mrr.ts")).toContain("loadBusinessScope(supabase, coachId, groupId)");
     expect(read("lib/assign-clients.ts")).toContain("(await groupsInOrgOfOpened(supabase, coachId, programGroupId))");
-    const cal = read("components/coach/calendar-page-body.tsx");
+    const cal = read("components/coach/calendar-page-body.tsx") + read("components/coach/mobile/coach-phone-schedule.tsx");
     // every read of the coach's bookings and sessions on the calendar goes by the organization's groups (in groups of ids: lib/read-by-ids.ts)
     expect((cal.match(/readRowsByIds\(\s*orgGroupIds|readByIds\(\s*orgGroupIds/g) ?? []).length).toBeGreaterThanOrEqual(5);
   });

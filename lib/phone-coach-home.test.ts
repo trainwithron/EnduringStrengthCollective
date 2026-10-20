@@ -165,16 +165,15 @@ describe("the weight-room screen", () => {
 });
 
 describe("wiring", () => {
-  it("the coach mobile home hands a team-sport group the short home, before anything else is read, and has no first-client nag beyond one 'Add a client' button", () => {
-    const s = src("components/coach/mobile/coach-mobile-home.tsx");
+  it("a coach on a phone: a team-sport group keeps the team Home, any other group opens the coach's own app (Release 2)", () => {
+    const s = src("app/(coach)/groups/[groupId]/page.tsx");
     expect(s).toContain("if (isTeamSportGroup(");
-    expect(s).toContain("<TeamCoachPhoneHome groupId={groupId} groupName={groupName} />");
-    expect(s.indexOf("<TeamCoachPhoneHome")).toBeLessThan(s.indexOf("const orgGroups = await groupsInOrgOfOpened"));
-    expect(s).not.toContain("programCount");
+    expect(s).toContain("<TeamCoachPhoneHome groupId={params.groupId} groupName={group.name} />");
+    expect(s.indexOf("<TeamCoachPhoneHome")).toBeLessThan(s.indexOf("redirect(COACH_PHONE_LANDING);"));
   });
 
   it("the phone Programs link is the organization's Programs page, and that page no longer sends a phone to one group (which sent it straight back)", () => {
-    expect(src("components/coach/mobile/coach-nav-links-list.tsx")).toContain('<Item href="/programs" label="Programs"');
+    expect(src("components/coach/mobile/coach-spot-hub.tsx")).toContain('<a href="/programs"');
     const p = src("app/(coach)/programs/page.tsx");
     expect(p).not.toContain("redirect(`/groups/${anchor.id}/programs`)");
     // (a phone is no longer redirected: it gets the simple cards below)
@@ -189,11 +188,11 @@ describe("wiring", () => {
     expect(h).toContain('{view === "program" && !needsOrg && (');
   });
 
-  it("Back to coach home is a clear button and goes to the organization the coach is working in", () => {
-    expect(src("components/athlete/acting-as-banner.tsx")).toContain("← Back to coach home");
-    const d = src("app/(coach)/dashboard/page.tsx");
-    expect(d).toContain("const active = await getActiveAnchor(supabase, user.id);");
-    expect(d.indexOf("getActiveAnchor(supabase, user.id)")).toBeLessThan(d.indexOf("pickStartGroup(await loadStartInputs"));
+  it("the bar's exit is a clear button: 'Back to me' on a phone (their own app), 'Back to coach home' at a computer; /dashboard on a phone makes the landing decision", () => {
+    const b = src("components/athlete/acting-as-banner.tsx");
+    expect(b).toContain('phone ? "← Back to me" : "← Back to coach home"');
+    expect(b).toContain('router.push(phone ? COACH_PHONE_LANDING : "/dashboard");');
+    expect(src("app/(coach)/dashboard/page.tsx")).toContain("redirect(COACH_PHONE_ENTRY);");
   });
 
   it("a team organization's desktop Home has no money tiles or needs-payment strip", () => {
@@ -257,7 +256,7 @@ describe("Programs on a phone", () => {
     expect(page).toContain("prefersAthleteStyleView(),");
     expect(page).toContain("if (onPhone) {");
     expect(page.indexOf("<ProgramsPhoneList")).toBeLessThan(page.indexOf("<ProgramsList "));
-    expect(page).toContain("<CoachMobileShell groupId={anchor.id} groupName={anchor.name} activeOverride=\"more\">");
+    expect(page).toContain("<CoachMobileShell groupId={anchor.id} groupName={anchor.name}>");
   });
 });
 
@@ -282,7 +281,7 @@ describe("the coach's own training on a phone: ONE row at the top of the Clients
     expect(home.links.find((l) => l.label === "Athletes")?.href).toBe(`/groups/${TROJANS}/clients?view=members`);
   });
   it("there is no second way in from the coach side: not in More tools, not on the team home, not in the phone hub", () => {
-    for (const f of ["lib/team-phone-home.ts", "components/coach/mobile/team-coach-phone-home.tsx", "components/coach/mobile/coach-spot-hub.tsx", "components/coach/mobile/coach-nav-links-list.tsx"]) {
+    for (const f of ["lib/team-phone-home.ts", "components/coach/mobile/team-coach-phone-home.tsx", "components/coach/mobile/coach-spot-hub.tsx"]) {
       expect(src(f), f).not.toMatch(/my-space|My own training/);
     }
   });

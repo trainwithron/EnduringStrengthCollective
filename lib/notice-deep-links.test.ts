@@ -34,9 +34,12 @@ describe("every place a notice is opened uses it", () => {
     expect(read("app/api/cron/notification-push/route.ts")).toContain('noticeHref(n.type, n.link_path || "/dashboard")');
   });
   it("the phone Home has the same anchors as the computer Home (/dashboard opens the phone Home on a phone)", () => {
-    const phone = read("components/coach/mobile/coach-mobile-home.tsx");
-    expect(phone).toContain('<div id="late-changes" className="scroll-mt-24">');
-    expect(phone).toContain('<div id="schedule-requests" className="scroll-mt-24">');
+    // on a phone /dashboard opens the coach's own app; the notice's hash opens Spotlight on that panel (Release 2)
+    const phone = read("components/coach/mobile/spot-needs-top.tsx");
+    expect(phone).toContain('<div data-spot-anchor="late-changes">');
+    expect(phone).toContain('<div data-spot-anchor="schedule-requests">');
+    expect(phone).toContain('<div data-spot-anchor="expiring">');
+    expect(read("components/coach/mobile/coach-spot-hub.tsx")).toContain('export const SPOT_OPEN_HASHES = ["late-changes", "schedule-requests", "expiring"] as const;');
     expect(read("app/(coach)/dashboard/page.tsx")).toContain('<div id="late-changes">');
   });
 });

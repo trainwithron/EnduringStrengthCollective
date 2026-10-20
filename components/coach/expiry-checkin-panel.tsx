@@ -278,7 +278,7 @@ export function ExpiryCheckInPanel({ groupIds: scopeGroupIds }: { groupIds?: str
                 {i.lastWorkoutAt ? `Last workout ${fmtDate(new Date(i.lastWorkoutAt))}.` : "No workout logged yet."} Maybe reach out and see how they are doing.
               </p>
               <div className="flex flex-wrap items-center gap-2 mt-2">
-                <Link
+                <Link prefetch={false}
                   href={`/groups/${i.groupId}/messages/${i.athleteId}?draft=${encodeURIComponent(draft)}`}
                   className={`${btn} border-rust text-rust inline-flex items-center`}
                 >

@@ -49,7 +49,7 @@ export function OrgNotificationsPanel({ initialNotifications }: { initialNotific
       <div className="space-y-2">
         {rows.map((n) => (
           <div key={n.id} className="flex items-start justify-between gap-3">
-            <Link
+            <Link prefetch={false}
               href={n.linkPath}
               onClick={() => dismiss(n.id)}
               className="min-w-0 flex-1 group"

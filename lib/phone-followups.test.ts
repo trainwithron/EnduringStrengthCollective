@@ -10,9 +10,9 @@ const read = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").repla
 
 describe("the phone program view is inside the coach's phone app", () => {
   const page = read("app/(coach)/groups/[groupId]/programs/[programId]/page.tsx");
-  it("a real coach (not acting as a client) gets the bottom bar with More lit and the Spotlight button", () => {
+  it("a real coach (not acting as a client) gets their own app's bar and the Spotlight button", () => {
     expect(page).toContain('const coachShell = membership.role === "coach" && !(await getEffectiveAthlete(params.groupId, user.id)).isActingAsOther;');
-    expect(page).toContain('<CoachMobileShell groupId={params.groupId} groupName="" activeOverride="more">');
+    expect(page).toContain('<CoachMobileShell groupId={params.groupId} groupName="">');
     expect(page).toContain("belowSpotlight={coachShell}");
   });
   it("a client, or a coach acting as one, keeps the plain view", () => {
@@ -24,9 +24,9 @@ describe("the phone program view is inside the coach's phone app", () => {
     expect(renderToStaticMarkup(createElement(ProgramDayPicker, { ...props, belowSpotlight: true }))).toContain('class="px-5 pt-16 pb-3"');
     expect(renderToStaticMarkup(createElement(ProgramDayPicker, props))).toContain('class="px-5 pt-8 pb-3"');
   });
-  it("Programs lights More (it lives under More), and the coach bar can light More", () => {
-    expect(read("app/(coach)/programs/page.tsx")).toContain('<CoachMobileShell groupId={anchor.id} groupName={anchor.name} activeOverride="more">');
-    expect(read("components/coach/mobile/coach-mobile-shell.tsx")).toContain('activeOverride?: "home" | "roster" | "messages" | "calendar" | "more";');
+  it("Programs is none of the five tabs, so nothing is lit (Release 2: no More)", () => {
+    expect(read("app/(coach)/programs/page.tsx")).toContain("<CoachMobileShell groupId={anchor.id} groupName={anchor.name}>");
+    expect(read("components/coach/mobile/coach-mobile-shell.tsx")).toContain('activeOverride?: "home" | "calendar" | "feed" | "nutrition" | "settings" | null;');
   });
 });
 

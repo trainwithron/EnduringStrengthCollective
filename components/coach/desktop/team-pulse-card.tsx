@@ -14,7 +14,7 @@ function pulseColor(pulse: number): string {
 // fabricated number.
 export function TeamPulseCard({ team }: { team: TeamPulseResult }) {
   return (
-    <Link
+    <Link prefetch={false}
       href={`/groups/${team.groupId}/dashboard`}
       className="flex items-center justify-between border border-steel/30 bg-surface p-4 hover:border-rust/50 transition-colors"
     >

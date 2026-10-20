@@ -30,7 +30,7 @@ describe("the client's question", () => {
     expect(html).toContain("Your daily nutrition target changed.");
   });
   it("is shown only to the client themself, only when a real change is unanswered", () => {
-    expect(athletePage).toContain("macrosEnabled && !isActingAsOther");
+    expect(athletePage).toContain("macrosEnabled && !viewingOther");
     expect(athletePage).toContain("recalcPromptFor(coachRowsOnly(standingHistory)");
     expect(athletePage).toContain("<RecalcPromptCard");
     expect(athletePage).toContain("showCalories={!youthMode}");

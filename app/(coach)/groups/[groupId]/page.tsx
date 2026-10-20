@@ -38,7 +38,9 @@ import { mealProgress, mealProgressLine } from "@/lib/meal-progress";
 import { computeProgramCardVisuals } from "@/lib/program-card-data";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
-import { CoachMobileHome } from "@/components/coach/mobile/coach-mobile-home";
+import { TeamCoachPhoneHome } from "@/components/coach/mobile/team-coach-phone-home";
+import { isTeamSportGroup } from "@/lib/team-sport";
+import { COACH_PHONE_LANDING } from "@/lib/start-group";
 import { TheSpotRail } from "@/components/coach/mobile/the-spot-rail";
 import { computeVisibleSpotWidgetOrder, type SpotWidgetKey } from "@/lib/spot-widgets";
 import { isHabitDueOn } from "@/lib/habits";
@@ -287,15 +289,12 @@ export default async function GroupHubPage(
   // discipline already applied to Feed/Calendar/Resources/Tools.
   const renderAsCoach = isActingAsOther ? false : isCoach;
 
-  // Coach on mobile, not acting as anyone — the real logging-first Home
-  // (coach_mobile_app_redesign_plan.md), not the athlete-style Day/Week/
-  // Month view a coach used to see here with a roster appended below.
-  // Short-circuits before any of the athlete-specific scheduling work
-  // below, which this branch never needs.
+  // A coach on a phone, not acting as anyone (Release 2: the phone opens as the coach's own account). A team-sport group keeps its team Home (Ron decided team-only coaches keep it);
+  // any other group (an organization's, a client's one-on-one space) sends the coach to their OWN app, never a "coach Home" titled with a client's name.
   if (isCoach && showMobileView && !isActingAsOther) {
-    // isCoach only derives true via a roster match on user?.id above, so a
-    // real user is guaranteed here even though TS can't see that far.
-    return <CoachMobileHome groupId={params.groupId} groupName={group.name} coachId={user!.id} />;
+    const { data: teamRow } = await supabase.from("groups").select("team_mode").eq("id", params.groupId).maybeSingle();
+    if (isTeamSportGroup((teamRow as { team_mode?: boolean | null } | null)?.team_mode)) return <TeamCoachPhoneHome groupId={params.groupId} groupName={group.name} />;
+    redirect(COACH_PHONE_LANDING);
   }
 
   // A desktop coach, not acting as anyone, landing on this bare group-hub

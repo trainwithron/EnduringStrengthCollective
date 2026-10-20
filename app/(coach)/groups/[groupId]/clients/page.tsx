@@ -299,7 +299,7 @@ export default async function ClientsPage(
     const selfName = (selfProfile?.full_name as string | null | undefined)?.trim() || "You";
 
     return (
-      <CoachMobileShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} activeOverride="roster">
+      <CoachMobileShell groupId={params.groupId} groupName={group?.name ?? "Coaching"}>
         <div className="min-h-screen bg-graphite text-chalk font-body pb-24 px-5 pt-8">
           <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
             <div>

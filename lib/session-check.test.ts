@@ -97,8 +97,10 @@ describe("Did this session happen?", () => {
   it("is at the top of the coach Home and Calendar, on a computer and on a phone", () => {
     expect(read("app/(coach)/dashboard/page.tsx").indexOf("<SessionCheckSection")).toBeLessThan(read("app/(coach)/dashboard/page.tsx").indexOf("<YourDayPanel"));
     const cal = read("components/coach/calendar-page-body.tsx");
-    expect(cal.match(/<SessionCheckSection/g)?.length).toBe(2);
-    expect(read("components/coach/mobile/coach-mobile-home.tsx")).toContain("<SessionCheckSection coachId={coachId} groupIds={orgGroupIds} />");
+    expect(cal.match(/<SessionCheckSection/g)?.length).toBe(1);
+    // on a phone: the coach's own Calendar (the phone schedule) and the top of Spotlight
+    expect(read("components/coach/mobile/coach-phone-schedule.tsx")).toContain("<SessionCheckSection coachId={userId} groupIds={orgGroupIds} />");
+    expect(read("components/coach/mobile/spot-needs-top.tsx")).toContain("<SessionCheckCards sessions={needs.sessionsToCheck} timezone={needs.timezone} />");
   });
   it("loads the same sessions the client panel calls 'waiting to be marked', oldest first, one organization's groups only, short names", async () => {
     const rows = [
