@@ -287,11 +287,14 @@ export async function updateSession(request: NextRequest) {
           const { data: team } = await supabase.from("groups").select("team_mode").eq("id", phoneTarget.groupId).maybeSingle();
           if ((team as { team_mode?: boolean | null } | null)?.team_mode === true) to = `/groups/${phoneTarget.groupId}`;
         }
-        const phoneResponse = NextResponse.redirect(new URL(to, request.url));
-        response.cookies.getAll().forEach((cookie) => {
-          phoneResponse.cookies.set(cookie);
-        });
-        return phoneResponse;
+        // The team Home itself stays (no redirect to the page already asked for).
+        if (to !== pathname) {
+          const phoneResponse = NextResponse.redirect(new URL(to, request.url));
+          response.cookies.getAll().forEach((cookie) => {
+            phoneResponse.cookies.set(cookie);
+          });
+          return phoneResponse;
+        }
       }
     }
   }

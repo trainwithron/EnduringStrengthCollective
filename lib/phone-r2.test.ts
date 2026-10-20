@@ -102,3 +102,17 @@ describe("their own space", () => {
     expect(() => read("components/coach/mobile/coach-mobile-home.tsx")).toThrow();
   });
 });
+
+describe("Release 2 follow-ups (Oct 20)", () => {
+  it("/dashboard on a phone goes to the landing decision in the middleware, before the page (and its loading screen) renders", () => {
+    expect(phoneCoachRedirect("/dashboard")).toEqual({ to: "/coach-landing", groupId: null, shared: false });
+  });
+  it("a group's own page sends a coach (not acting as a client) to their own app; a team-sport group's team Home stays (no redirect to itself)", () => {
+    expect(phoneCoachRedirect(`/groups/${S}`)).toEqual({ to: "/my-space?view=client", groupId: S, shared: true, home: true });
+    expect(read("lib/supabase/middleware.ts")).toContain("if (to !== pathname) {");
+  });
+  it("in their own space on a phone the separate bell is hidden (notices live in Spotlight); at a computer it stays", () => {
+    expect(read("components/group/group-hub-header.tsx")).toContain('<span className="hidden lg:inline-flex" data-bell-computer-only>');
+    expect(read("app/(coach)/groups/[groupId]/page.tsx")).toContain("bellOnComputerOnly={isActingAsOther && !!user && athleteId === user.id && (group as { organization_id?: string | null }).organization_id == null}");
+  });
+});

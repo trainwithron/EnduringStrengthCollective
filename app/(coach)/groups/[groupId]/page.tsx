@@ -834,6 +834,7 @@ export default async function GroupHubPage(
         coachId={user?.id}
         viewerId={user?.id}
         logoUrl={orgTheme.logoUrl}
+        bellOnComputerOnly={isActingAsOther && !!user && athleteId === user.id && (group as { organization_id?: string | null }).organization_id == null}
         notifications={(notificationRows ?? []).map((n: any) => ({
           id: n.id,
           type: n.type,

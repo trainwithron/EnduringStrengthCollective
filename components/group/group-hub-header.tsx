@@ -13,6 +13,8 @@ interface GroupHubHeaderProps {
   viewerId?: string;
   notifications?: NotificationEntry[];
   logoUrl?: string | null;
+  // The coach's own space: on a phone their notices live in the Spotlight button (its dot and the top of its drop-down), so this bell shows only at a computer.
+  bellOnComputerOnly?: boolean;
 }
 
 export function GroupHubHeader({
@@ -26,6 +28,7 @@ export function GroupHubHeader({
   viewerId,
   notifications,
   logoUrl,
+  bellOnComputerOnly = false,
 }: GroupHubHeaderProps) {
   return (
     <header className="px-5 pt-8 pb-6 border-b border-steel/20">
@@ -37,7 +40,13 @@ export function GroupHubHeader({
             {memberCount} {memberCount === 1 ? "member" : "members"}
           </p>
         )}
-        {notifications && viewerId && <NotificationBell initial={notifications} viewerId={viewerId} />}
+        {notifications && viewerId && (bellOnComputerOnly ? (
+          <span className="hidden lg:inline-flex" data-bell-computer-only>
+            <NotificationBell initial={notifications} viewerId={viewerId} />
+          </span>
+        ) : (
+          <NotificationBell initial={notifications} viewerId={viewerId} />
+        ))}
       </div>
       {logoUrl && (
         // eslint-disable-next-line @next/next/no-img-element -- external Supabase Storage URL, not a local asset Next can optimize.

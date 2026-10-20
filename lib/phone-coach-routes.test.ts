@@ -15,9 +15,7 @@ const ID = "11111111-2222-4333-8444-555555555555";
 const NEVER = new Set([
   "/clients",
   "/clients/requests",
-  "/dashboard", // the page itself sends a phone to the phone Home
   "/programs",
-  "/groups/[groupId]",
   "/groups/[groupId]/clients",
   "/groups/[groupId]/athletes/[athleteId]",
   "/groups/[groupId]/athletes/[athleteId]/log",

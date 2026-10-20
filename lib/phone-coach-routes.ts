@@ -14,6 +14,9 @@ export function isPhoneView({ override, standalone, userAgent }: { override: str
 // redirects the middleware sends to that group's page instead when the group is a team-sport one.
 export const PHONE_SPOTLIGHT = "/my-space?view=client&spot=1";
 export const PHONE_CALENDAR = "/my-space?view=client&to=calendar";
+// The landing decision (app/coach-landing/route.ts) and the coach's own app (lib/start-group.ts COACH_PHONE_ENTRY / COACH_PHONE_LANDING), spelled out here so this file needs no imports.
+export const PHONE_ENTRY = "/coach-landing";
+export const PHONE_OWN_APP = "/my-space?view=client";
 
 export interface PhoneRedirect {
   /** Where the phone goes instead. */
@@ -63,12 +66,17 @@ export function phoneCoachRedirect(pathname: string, search = ""): PhoneRedirect
     return { to: PHONE_CALENDAR + (month && /^\d{4}-\d{2}$/.test(month) ? `&month=${month}` : ""), groupId: null, shared: false };
   }
   if (pathname === "/running-low") return { to: PHONE_SPOTLIGHT, groupId: null, shared: false };
+  // The computer's Home. Decided here, before the page renders: the page has a loading screen, so a redirect from inside it arrives in the middle of the stream (Release 2 follow-up, Oct 20).
+  if (pathname === "/dashboard") return { to: PHONE_ENTRY, groupId: null, shared: false };
 
   const m = GROUP.exec(pathname);
   if (!m) return null;
   const g = m[1];
   const rest = m[2] ?? "";
   const base = `/groups/${g}`;
+  // A group's own page for a coach who is not acting as a client: their own app (a team-sport group keeps its team Home: the middleware leaves that page alone). Shared, so a coach looking at
+  // a client's app (or their own space) is never sent away.
+  if (rest === "") return { to: PHONE_OWN_APP, groupId: g, shared: true, home: true };
 
   for (const r of GROUP_TABLE) {
     if (!r.pattern.test(rest)) continue;
