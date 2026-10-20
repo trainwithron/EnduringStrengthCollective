@@ -9,6 +9,8 @@ const ROOT = join(__dirname, "..");
 const REVIEWED_PERMISSION_ONLY = new Set([
   // "is this person a coach at all / do they coach this group" checks, account/erasure/AI-budget plumbing, and server routes that check a caller before acting
   "app/api/ai/coach-conversation/route.ts",
+  // Delete workout: is the caller a coach of this workout's own group (one group, read from the workout itself)
+  "lib/delete-workout.ts",
   "app/api/ai/parse-workout/route.ts",
   "app/api/clients/import-roster/undo/route.ts",
   // the team page lists this coach's retired seasons, limited to the organization of the group it is on

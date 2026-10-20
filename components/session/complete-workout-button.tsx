@@ -163,28 +163,16 @@ export function CompleteWorkoutButton({
 
   // A workout started by mistake goes away completely: only while it is still in progress (never a finished one), and nothing else is touched (a booked
   // session stays booked; no session is used, because a session is only used when a workout is completed). Then it leaves the way Pause does.
-  // Records (PRs) are only written when a workout is completed (complete_workout_session), so an in-progress one has none to take back.
-  // A video recorded during it must not be kept: its file paths are read first (the rows go with the workout), and the files are removed once the
-  // workout is gone. A storage failure does not undo the delete; it is logged.
+  // Done on the server (lib/delete-workout.ts), so a video recorded during it is removed too, including one the coach recorded.
   async function handleDelete() {
     setSubmitting(true);
     setError(null);
-    const supabase = createBrowserClient();
-    const { data: exerciseRows } = await supabase.from("session_exercises").select("id").eq("session_id", sessionId);
-    const exerciseIds = (exerciseRows ?? []).map((r: { id: string }) => r.id);
-    const { data: videoRows } = exerciseIds.length > 0 ? await supabase.from("session_exercise_videos").select("video_path").in("session_exercise_id", exerciseIds) : { data: [] };
-    const videoPaths = (videoRows ?? []).map((v: { video_path: string }) => v.video_path).filter(Boolean);
-    const { data, error: deleteError } = await supabase.from("athlete_sessions").delete().eq("id", sessionId).eq("status", "in_progress").select("id");
-    if (deleteError || !data || data.length === 0) {
+    const res = await fetch("/api/workout-session/delete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId }) }).catch(() => null);
+    if (!res || !res.ok) {
       setError("This workout couldn't be deleted. Nothing was changed.");
       setSubmitting(false);
       setDeleteAsked(false);
       return;
-    }
-    if (videoPaths.length > 0) {
-      // A refused remove comes back with fewer files and no error, so the count is checked too.
-      const { data: removed, error: storageError } = await supabase.storage.from("athlete-exercise-videos").remove(videoPaths);
-      if (storageError || (removed?.length ?? 0) < videoPaths.length) console.error("Delete workout: the workout is deleted, but its videos could not all be removed from storage", videoPaths, storageError?.message ?? "not all removed");
     }
     router.push(pauseHref);
   }
