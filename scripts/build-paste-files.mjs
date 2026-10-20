@@ -2878,8 +2878,8 @@ STEPS.push({
 STEPS.push({
   n: "180",
   slug: "0428",
-  title: "0428 FIX 3: logging settles the session on the calendar once; no-show Charge or Waive; a late move is one session; the walk-in (two new functions, four helpers, six replaced)",
-  warn: "This REPLACES six functions: complete_workout_session (ONE block, the credit block at the end, read back from the live text between two exact lines, as 0231 did; everything else in it is untouched), settle_booking_internal (one check added: never on a no-show), set_booking_no_show, resolve_late_change, cancel_booking_and_refund_credit (one block added) and undo_booking_attended. It adds resolve_no_show, create_walk_in_booking and four internal helpers (match_booking_for_session, booking_taken, booking_late_move_charged, booking_put_back). The paste checks that every one of the six is exactly the text this was written against, and stops if not. Rehearsed: no visit ever takes two sessions, in any order of marks and undos.",
+  title: "0428 FIX 3: logging settles the session on the calendar once; no-show Charge or Waive; a late move is one session; the walk-in (two new functions, four helpers, seven replaced)",
+  warn: "This REPLACES seven functions: complete_workout_session (ONE block, the credit block at the end, read back from the live text between two exact lines, as 0231 did, plus one declared variable; everything else in it is untouched), settle_booking_internal (one check added: never on a no-show), guard_athlete_session_columns (keeps the calendar link made while finishing; a client cannot move a coach-logged workout's start, import mark or finish), set_booking_no_show, resolve_late_change, cancel_booking_and_refund_credit (one block added) and undo_booking_attended. It adds resolve_no_show, create_walk_in_booking and four internal helpers (match_booking_for_session, booking_taken, booking_late_move_charged, booking_put_back). The paste checks that every one of the seven is exactly the text this was written against, and stops if not. Rehearsed: no visit ever takes two sessions, in any order of marks and undos.",
   migrations: ["0428"],
   sees: "Success. No rows returned.",
   afterwards: "Safe before the FIX 3 item 4 app update: today's screens keep working (Did it happen? No still cancels; the day page's no-show switch now records a waived no-show). A workout a coach logs now settles that client's session on the calendar the same day once, even when it was not linked at Start, and the old 'Use 1 session credit' box no longer takes anything. Then the app update goes live: No-show asks Charge or Waive, and a logged workout with no session on the calendar asks 'Put this on your calendar? Uses 1 session.'",
@@ -2894,6 +2894,7 @@ STEPS.push({
     "begin",
     "  select pg_get_functiondef(p.oid) into v_def from pg_proc p where p.oid = 'public.complete_workout_session(uuid)'::regprocedure;",
     "  v_def := replace(v_def, chr(13), '');",
+    "  v_def := replace(v_def, 'v_credit_cost int;' || chr(10) || '  v_bid uuid;', 'v_credit_cost int;');",
     "  v_start := position(v_from in v_def);",
     "  v_end := position(v_to in v_def);",
     "  if v_start = 0 or v_end <= v_start then",
@@ -2918,6 +2919,7 @@ STEPS.push({
     fnFromMigration("0291", "cancel_booking_and_refund_credit"),
     fnFromMigration("0248", "undo_booking_attended"),
     fnFromMigration("0248", "settle_booking_internal"),
+    fnFromMigration("0274", "guard_athlete_session_columns"),
     "drop function if exists public.create_walk_in_booking(uuid);",
     "drop function if exists public.resolve_no_show(uuid, boolean);",
     "drop function if exists public.match_booking_for_session(uuid);",
@@ -2925,7 +2927,7 @@ STEPS.push({
     "drop function if exists public.booking_late_move_charged(uuid);",
     "drop function if exists public.booking_taken(uuid);",
   ].join(String.fromCharCode(10)),
-  undoWhy: "Only if step 180 misbehaves, and only while the FIX 3 item 4 app update is NOT live (it calls resolve_no_show and create_walk_in_booking). Puts the six functions back exactly as they were and drops the six new ones. Sessions already charged or given back stay as they are in the history.",
+  undoWhy: "Only if step 180 misbehaves, and only while the FIX 3 item 4 app update is NOT live (it calls resolve_no_show and create_walk_in_booking). Puts the seven functions back exactly as they were and drops the six new ones. Sessions already charged or given back stay as they are in the history.",
   rows: [
     ["0428 is not already applied (resolve_no_show is not there yet)", "not (to_regprocedure('public.resolve_no_show(uuid, boolean)') is not null)"],
     ["complete_workout_session is exactly the text this patches", md5Is("complete_workout_session(uuid)", "449f62e5c0bf40cc3e977d245da6bb52")],
@@ -2933,8 +2935,9 @@ STEPS.push({
     ["resolve_late_change is exactly the text this replaces", md5Is("resolve_late_change(uuid, boolean)", "f458e9d57b0e269898644bcbf5e7ddd8")],
     ["cancel_booking_and_refund_credit is exactly the text this replaces", md5Is("cancel_booking_and_refund_credit(uuid)", "a7d04dd98d255ada0986146551f86c82")],
     ["undo_booking_attended is exactly the text this replaces", md5Is("undo_booking_attended(uuid)", "aec909b45acd546b99ac619f6a7e251a")],
+    ["guard_athlete_session_columns is exactly the text this replaces", md5Is("guard_athlete_session_columns()", "d313d2a3ad0908e0b6d92aa0dacd5f4e")],
     ["settle_booking_internal is exactly the text this replaces", md5Is("settle_booking_internal(uuid, integer, text, uuid, uuid, uuid)", "57e0bcda3433f457b0377ee8b165841b")],
-    ["the functions and tables it uses exist", "to_regprocedure('public.apply_session_credit_change(uuid, uuid, integer, text, text, uuid, uuid)') is not null and to_regprocedure('public.coach_time_zone(uuid)') is not null and to_regprocedure('public.offer_freed_slot_to_waitlist(uuid, timestamptz, timestamptz)') is not null and to_regclass('public.coach_availability_windows') is not null and to_regclass('public.discovery_bookings') is not null"],
+    ["the functions and tables it uses exist", "to_regprocedure('public.apply_session_credit_change(uuid, uuid, integer, text, text, uuid, uuid)') is not null and to_regprocedure('public.coach_time_zone(uuid)') is not null and to_regprocedure('public.offer_freed_slot_to_waitlist(uuid, timestamptz, timestamptz)') is not null and to_regclass('public.coach_availability_windows') is not null and to_regclass('public.discovery_bookings') is not null and to_regclass('public.group_session_attendees') is not null and to_regclass('public.group_sessions') is not null"],
   ],
 });
 

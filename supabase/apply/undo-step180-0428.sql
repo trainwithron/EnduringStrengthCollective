@@ -1,4 +1,4 @@
--- UNDO for step 180 (0428). Only if step 180 misbehaves, and only while the FIX 3 item 4 app update is NOT live (it calls resolve_no_show and create_walk_in_booking). Puts the six functions back exactly as they were and drops the six new ones. Sessions already charged or given back stay as they are in the history.
+-- UNDO for step 180 (0428). Only if step 180 misbehaves, and only while the FIX 3 item 4 app update is NOT live (it calls resolve_no_show and create_walk_in_booking). Puts the seven functions back exactly as they were and drops the six new ones. Sessions already charged or given back stay as they are in the history.
 -- WHAT YOU SHOULD SEE: "Success. No rows returned."   Then tell Spot, and do not run the step again until Spot says why it failed.
 begin;
 do $$
@@ -11,6 +11,7 @@ declare
 begin
   select pg_get_functiondef(p.oid) into v_def from pg_proc p where p.oid = 'public.complete_workout_session(uuid)'::regprocedure;
   v_def := replace(v_def, chr(13), '');
+  v_def := replace(v_def, 'v_credit_cost int;' || chr(10) || '  v_bid uuid;', 'v_credit_cost int;');
   v_start := position(v_from in v_def);
   v_end := position(v_to in v_def);
   if v_start = 0 or v_end <= v_start then
@@ -266,6 +267,33 @@ begin
     return true;
   end if;
   return false; -- prepaid or waived: attended, nothing more to take
+end;
+$$;
+create or replace function public.guard_athlete_session_columns()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.role() in ('authenticated', 'anon') and not coalesce(public.is_group_coach(old.group_id), false) then
+    perform public.audit_blocked('athlete_sessions', old.id::text, to_jsonb(old), to_jsonb(new),
+      array['logged_by_coach', 'deduct_session_credit', 'booking_id', 'is_historical', 'session_type_id', 'athlete_id', 'group_id', 'workout_id']);
+    new.logged_by_coach := old.logged_by_coach;
+    new.deduct_session_credit := old.deduct_session_credit;
+    new.booking_id := old.booking_id;
+    new.is_historical := old.is_historical;
+    new.session_type_id := old.session_type_id;
+    new.athlete_id := old.athlete_id;
+    new.group_id := old.group_id;
+    new.workout_id := old.workout_id;
+    -- Reopening a completed session is refused and recorded (finishing a session is not a change from "completed", so it is never logged).
+    if old.status = 'completed' and new.status is distinct from old.status then
+      perform public.audit_blocked('athlete_sessions', old.id::text, to_jsonb(old), to_jsonb(new), array['status']);
+      new.status := old.status;
+    end if;
+  end if;
+  return new;
 end;
 $$;
 drop function if exists public.create_walk_in_booking(uuid);

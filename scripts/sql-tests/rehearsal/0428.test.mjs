@@ -16,6 +16,7 @@ export default {
 
       let n = 0;
       const ago = (mins) => new Date(Date.now() - mins * 60000).toISOString();
+      const future = (days) => new Date(Date.now() + days * 86400000).toISOString();
       const client = async (name) => {
         const id = await h.user("F3 " + name);
         await h.member(g, id);
@@ -193,6 +194,50 @@ export default {
       await h.expectErrorAs(q, "...nor undo one", `select public.set_booking_no_show($1, false)`, [qp], /not authorized/);
       await rpc(coach, `select public.set_booking_no_show($1, true) as v`, [qp]);
       h.check("the old switch set to no-show is a waived no-show", (await bk(qp)).no_show === true && (await bk(qp)).credit_state === "waived" && (await bal(q)) === 9);
+      const qpp = await booking(q, "2026-09-13T20:00:00Z", { credit: "prepaid" });
+      await rpc(coach, `select public.set_booking_no_show($1, true) as v`, [qpp]);
+      h.check("...on a session paid at booking (the old screen, until the app update): it stays taken, as the old switch did", (await bk(qpp)).no_show === true && (await bk(qpp)).credit_state === "prepaid" && (await bal(q)) === 8);
+
+      // ---- the client finishes a workout the coach started (Send to client) ----
+      const cf = await client("Cora");
+      const cfb = await booking(cf, "2026-09-26T19:00:00Z");
+      await h.asSuper();
+      n++;
+      const cfw = (await db.query(`insert into public.workouts (program_id, group_id, title, day_index) values ($1, $2, $3, $4) returning id`, [prog, g, "W" + n, n])).rows[0].id;
+      const cfs = (await db.query(`insert into public.athlete_sessions (workout_id, group_id, athlete_id, logged_by_coach, deduct_session_credit, started_at) values ($1, $2, $3, true, true, '2026-09-26T19:05:00Z') returning id`, [cfw, g, cf])).rows[0].id;
+      await rpc(cf, `select * from public.complete_workout_session($1)`, [cfs]);
+      h.check("the client finishes a coach-started workout with the old box ticked and a session that day: exactly 1, and the link is kept",
+        (await bal(cf)) === 9 && (await h.one(`select booking_id from public.athlete_sessions where id = $1`, [cfs])).booking_id === cfb && (await bk(cfb)).attended_at !== null, `balance ${await bal(cf)}`);
+      n++;
+      const cfw2 = (await db.query(`insert into public.workouts (program_id, group_id, title, day_index) values ($1, $2, $3, $4) returning id`, [prog, g, "W" + n, n])).rows[0].id;
+      const cfs2 = (await db.query(`insert into public.athlete_sessions (workout_id, group_id, athlete_id, logged_by_coach, deduct_session_credit, started_at) values ($1, $2, $3, true, true, '2026-09-27T19:05:00Z') returning id`, [cfw2, g, cf])).rows[0].id;
+      await rpc(cf, `select * from public.complete_workout_session($1)`, [cfs2]);
+      h.check("...with the box ticked and no session that day: its one (the old box), once", (await bal(cf)) === 8);
+      await h.as(cf);
+      await db.query(`update public.athlete_sessions set started_at = '2026-01-01T00:00:00Z', import_batch_id = gen_random_uuid(), completed_at = '2026-01-01T01:00:00Z', booking_id = null where id = $1`, [cfs]);
+      await h.asSuper();
+      const cfrow = await h.one(`select started_at, import_batch_id, completed_at, booking_id from public.athlete_sessions where id = $1`, [cfs]);
+      h.check("a client cannot move a coach-logged workout's start, mark it imported, change its finish or drop its link",
+        new Date(cfrow.started_at).toISOString() === "2026-09-26T19:05:00.000Z" && cfrow.import_batch_id === null && new Date(cfrow.completed_at).toISOString() !== "2026-01-01T01:00:00.000Z" && cfrow.booking_id === cfb, JSON.stringify(cfrow));
+      await h.asSuper();
+      n++;
+      const cfw3 = (await db.query(`insert into public.workouts (program_id, group_id, title, day_index) values ($1, $2, $3, $4) returning id`, [prog, g, "W" + n, n])).rows[0].id;
+      const cfb3 = await booking(cf, "2026-09-28T19:00:00Z");
+      const cfs3 = (await db.query(`insert into public.athlete_sessions (workout_id, group_id, athlete_id, logged_by_coach, started_at) values ($1, $2, $3, true, '2026-09-28T19:05:00Z') returning id`, [cfw3, g, cf])).rows[0].id;
+      await h.as(cf);
+      await db.query(`update public.athlete_sessions set started_at = '2026-09-29T19:05:00Z', import_batch_id = gen_random_uuid() where id = $1`, [cfs3]);
+      await rpc(cf, `select * from public.complete_workout_session($1)`, [cfs3]);
+      h.check("...so moving it to another day (or marking it imported) before finishing does not dodge its session: exactly 1", (await bal(cf)) === 7 && (await bk(cfb3)).attended_at !== null);
+
+      // ---- a cancel gives back only what the booking took ----
+      await h.asSuper();
+      const fr = await client("Fritz");
+      const frb = (await db.query(`insert into public.bookings (coach_id, athlete_id, group_id, start_at, end_at, credit_state, booked_via) values ($1, $2, $3, now() + interval '20 days', now() + interval '20 days 1 hour', 'prepaid', 'coach') returning id`, [coach, fr, g])).rows[0].id;
+      await rpc(coach, `select public.cancel_booking_and_refund_credit($1) as v`, [frb]);
+      h.check("cancelling a 'prepaid' booking that never took a session gives nothing back (no free session)", (await bal(fr)) === 10);
+      const frb2 = await booking(fr, future(21), { credit: "prepaid" });
+      await rpc(coach, `select public.cancel_booking_and_refund_credit($1) as v`, [frb2]);
+      h.check("...one that did take a session gives it back", (await bal(fr)) === 10);
 
       // ---- a late MOVE is ONE session ----
       const flag = async (id, kind = "reschedule") => {
@@ -273,7 +318,6 @@ export default {
       h.check("late cancel Charged: 1 session ('delivered')", (await bal(u)) === 9 && urow.kind === "delivered" && urow.amount === -1);
 
       // A charged late move, then cancelled: by the coach = the session back; by the client = nothing back, not flagged again.
-      const future = (days) => new Date(Date.now() + days * 86400000).toISOString();
       const v = await client("Vic");
       const vb = await booking(v, future(10));
       await flag(vb);
@@ -368,6 +412,23 @@ export default {
       const zzb = await booking(zz, zzStart); // appears after the workout was finished
       const zzid = (await rpc(coach, `select public.create_walk_in_booking($1) as id`, [zzl.s])).id;
       h.check("a session on the calendar that day after all: that one is settled, no second booking", zzid === zzb && (await bal(zz)) === 9 && (await h.one(`select count(*)::int as n from public.bookings where athlete_id = $1`, [zz])).n === 1);
+
+      const cleo = await client("Cleo");
+      await h.asSuper();
+      const gsId = (await db.query(`insert into public.group_sessions (coach_id, title, start_at, end_at, status, group_id, kind, capacity) values ($1, 'Bootcamp', $2, $3, 'scheduled', $4, 'class', 10) returning id`, [coach2, ago(14 * 60), ago(13 * 60), g])).rows[0].id;
+      await db.query(`insert into public.group_session_attendees (group_session_id, athlete_id, group_id, status) values ($1, $2, $3, 'joined')`, [gsId, cleo, g]);
+      const cll = await log(cleo, ago(14 * 60 - 5));
+      await finish(cll.s, ago(13 * 60 + 10));
+      await h.expectErrorAs(coach, "a walk-in is refused when the client was in a class at that time", `select public.create_walk_in_booking($1)`, [cll.s], /already on the calendar/);
+      h.check("...and nothing is taken", (await bal(cleo)) === 10);
+      const lk = await client("Lou");
+      const lkStart = ago(12 * 60);
+      const lkb = await booking(lk, lkStart);
+      const lk1 = await log(lk, lkStart);
+      const lk2 = await log(lk, ago(11 * 60));
+      await finish(lk2.s, ago(11 * 60 - 20));
+      await h.expectErrorAs(coach, "a walk-in is refused when that day's session is already linked to another workout", `select public.create_walk_in_booking($1)`, [lk2.s], /already on the calendar/);
+      h.check("...exactly 1 for the day", lk1.linked === lkb && lk2.linked === null && (await bal(lk)) === 9);
 
       const old = await client("Old");
       const oldl = await log(old, "2026-09-01T17:00:00Z");

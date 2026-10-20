@@ -1589,7 +1589,7 @@
  {
   "n": "180",
   "slug": "0428",
-  "title": "0428 FIX 3: logging settles the session on the calendar once; no-show Charge or Waive; a late move is one session; the walk-in (two new functions, four helpers, six replaced)",
+  "title": "0428 FIX 3: logging settles the session on the calendar once; no-show Charge or Waive; a late move is one session; the walk-in (two new functions, four helpers, seven replaced)",
   "migrations": [
    "0428"
   ],
