@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
 import { computeScheduledDates } from "@/lib/program-schedule";
+import { loadDoneAt, pickUpWhereLeftOff } from "@/lib/program-pickup";
 import { SET_ROW_SELECT, mapSetRow, DEFAULT_TRACKED_FIELDS, type TrackedField } from "@/lib/exercise-fields";
 import { loadNameProtectedIds } from "@/lib/minor-names";
 import { getGroupLeaderboardRankings, getPositionLeaderboardRankings } from "@/lib/leaderboard-data";
@@ -58,6 +59,7 @@ export default async function DisplayModePage(
     .select("id, name, start_date, training_days")
     .eq("group_id", params.groupId)
     .is("athlete_id", null)
+    .is("archived_at", null)
     .eq("is_active", true)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -66,23 +68,31 @@ export default async function DisplayModePage(
   let todaysWorkoutTitle: string | null = null;
   let todaysExercises: DisplayExercise[] = [];
 
-  if (program?.start_date && program.training_days) {
+  if (program) {
     const { data: workouts } = await supabase
       .from("workouts")
-      .select("id, title, scheduled_date")
+      .select("id, title, scheduled_date, week_number, day_index")
       .eq("program_id", program.id)
       .order("week_number", { ascending: true })
       .order("day_index", { ascending: true });
 
-    const scheduledDateByWorkoutId = computeScheduledDates(
-      program.start_date,
-      program.training_days,
-      (workouts ?? []).map((w) => ({ id: w.id, scheduledDate: w.scheduled_date }))
-    );
-    const todayKey = dateKey(new Date());
-    const todaysWorkout = (workouts ?? []).find(
-      (w) => scheduledDateByWorkoutId.get(w.id) && dateKey(scheduledDateByWorkoutId.get(w.id)!) === todayKey
-    );
+    let todaysWorkout: { id: string; title: string } | undefined;
+    if (program.start_date && program.training_days && program.training_days.length > 0) {
+      const scheduledDateByWorkoutId = computeScheduledDates(
+        program.start_date,
+        program.training_days,
+        (workouts ?? []).map((w) => ({ id: w.id, scheduledDate: w.scheduled_date }))
+      );
+      const todayKey = dateKey(new Date());
+      todaysWorkout = (workouts ?? []).find(
+        (w) => scheduledDateByWorkoutId.get(w.id) && dateKey(scheduledDateByWorkoutId.get(w.id)!) === todayKey
+      );
+    } else {
+      // A program with no dates (the coach did not put it on days): the screen shows the workout the coach is up to in it, the same pointer the program view opens on.
+      const { doneAt } = await loadDoneAt(supabase, user.id, (workouts ?? []).map((w) => w.id as string));
+      const pick = pickUpWhereLeftOff((workouts ?? []) as { id: string; title: string | null; week_number: number | null; day_index: number | null }[], doneAt);
+      if (pick.kind === "next") todaysWorkout = (workouts ?? []).find((w) => w.id === pick.workout.id);
+    }
 
     if (todaysWorkout) {
       todaysWorkoutTitle = todaysWorkout.title;

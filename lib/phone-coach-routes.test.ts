@@ -181,9 +181,10 @@ describe("the phone's menus only offer the phone's places", () => {
     for (const h of hrefs) expect(phoneCoachRedirect(h.split("?")[0], h.includes("?") ? `?${h.split("?")[1]}` : ""), h).toBeNull();
   });
   it("every link on the team-sport phone Home stays a page on the phone", () => {
-    const home = teamPhoneHome({ groupId: G, program: { id: ID, name: "P", workouts: [] } });
-    for (const l of [...home.links, ...home.moreLinks]) expect(phoneCoachRedirect(l.href), l.href).toBeNull();
-    expect(home.moreLinks.map((l) => l.label)).toEqual(["All programs", "Nutrition", "Attendance"]);
+    const home = teamPhoneHome({ groupId: G, programs: [{ id: ID, name: "P", workouts: [] }] });
+    for (const l of [...home.links, ...home.moreLinks, ...home.programs.map((p) => ({ href: p.href }))]) expect(phoneCoachRedirect(l.href), l.href).toBeNull();
+    expect(home.moreLinks.map((l) => l.label)).toEqual(["All programs", "Nutrition"]);
+    expect(home.links.map((l) => l.label)[2]).toBe("Attendance");
   });
   it("no Desktop mode anywhere in the phone app, and the switch itself is gone", () => {
     const dir = join(root, "components", "coach", "mobile");
