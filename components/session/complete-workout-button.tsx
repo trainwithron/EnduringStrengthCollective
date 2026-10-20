@@ -68,6 +68,8 @@ export function CompleteWorkoutButton({
   const [submitting, setSubmitting] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [emptyAsked, setEmptyAsked] = useState(false);
+  // "Delete workout" asks once: "Delete this workout? Nothing is saved and no session is used."
+  const [deleteAsked, setDeleteAsked] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
@@ -154,6 +156,21 @@ export function CompleteWorkoutButton({
     // A failed pause keeps the person here (the workout is still in progress), instead of leaving as if it were paused.
     if (!(await saved(supabase.from("athlete_sessions").update({ status: "abandoned" }).eq("id", sessionId).eq("status", "in_progress")))) {
       setSubmitting(false);
+      return;
+    }
+    router.push(pauseHref);
+  }
+
+  // A workout started by mistake goes away completely: only while it is still in progress (never a finished one), and nothing else is touched (a booked
+  // session stays booked; no session is used, because a session is only used when a workout is completed). Then it leaves the way Pause does.
+  async function handleDelete() {
+    setSubmitting(true);
+    setError(null);
+    const { data, error: deleteError } = await createBrowserClient().from("athlete_sessions").delete().eq("id", sessionId).eq("status", "in_progress").select("id");
+    if (deleteError || !data || data.length === 0) {
+      setError("This workout couldn't be deleted. Nothing was changed.");
+      setSubmitting(false);
+      setDeleteAsked(false);
       return;
     }
     router.push(pauseHref);
@@ -461,7 +478,30 @@ export function CompleteWorkoutButton({
         raised ? "bottom-16" : "bottom-0"
       } left-0 right-0 bg-graphite border-t border-steel/20 px-5 py-2`}
     >
-      {confirming && (
+      {confirming && deleteAsked && (
+        <div className="mb-3 p-3 border border-rust/40 bg-surface/60" data-delete-workout-confirm>
+          <p className="font-body text-sm text-chalk">Delete this workout? Nothing is saved and no session is used.</p>
+          <div className="flex flex-wrap items-center gap-3 mt-3">
+            <button
+              type="button"
+              onClick={() => void handleDelete()}
+              disabled={submitting}
+              className="h-11 px-4 border border-rust text-rust font-body text-sm font-medium disabled:opacity-40"
+            >
+              {submitting ? "Deleting…" : "Delete"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setDeleteAsked(false)}
+              disabled={submitting}
+              className="h-11 px-3 border border-steel/30 text-steel font-body text-sm"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+      {confirming && !deleteAsked && (
         <div className="mb-3 p-3 border border-rust/40 bg-surface/60">
           <p className="font-body text-sm text-chalk">
             {emptyAsked ? "No sets are logged yet. Complete anyway?" : "Complete this workout, or pause it and pick it up later."}
@@ -502,6 +542,17 @@ export function CompleteWorkoutButton({
               className="h-11 px-3 border border-steel/30 text-steel font-body text-sm"
             >
               Keep going
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEmptyAsked(false);
+                setDeleteAsked(true);
+              }}
+              disabled={submitting}
+              className="h-11 px-1 font-body text-xs text-steel underline underline-offset-2 sm:ml-auto"
+            >
+              Delete workout
             </button>
           </div>
         </div>
