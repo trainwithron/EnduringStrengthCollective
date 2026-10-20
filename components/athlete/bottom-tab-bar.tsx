@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, CalendarDays, MessagesSquare, Mail, Settings, Apple, Users, Menu } from "lucide-react";
+import { Home, CalendarDays, MessagesSquare, Settings, Apple } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { hasSocialTabAccess } from "@/lib/social-access";
 import { usePushStatus } from "@/lib/use-push-status";
-import { useTerm } from "@/components/coach/terminology-provider";
+import { mySpaceHref } from "@/lib/my-space-target";
 
 // Home/Workout merge (mobile_home_workout_tab_merge_idea.md, locked
 // 2026-09-14): Home itself is now today's workout — a hero CTA at the
@@ -18,13 +18,10 @@ import { useTerm } from "@/components/coach/terminology-provider";
 // getting promoted the same way. Final locked order: Home / Calendar /
 // Feed / Nutrition / Settings.
 //
-// Coach variant (coach_mobile_app_redesign_plan.md, locked 2026-09-14):
-// Home / Roster / Messages / Calendar / More — reuses this same
-// component with `variant="coach"` rather than a sibling component,
-// since the active-state/optimistic-highlight machinery below is
-// identical either way. "More" isn't a route (it opens a bottom sheet),
-// so it's driven by `onMoreClick` instead of an href.
-type TabKey = "home" | "feed" | "calendar" | "nutrition" | "settings" | "roster" | "messages" | "more";
+// "own" variant (Phone opens as the coach's own account, Release 2; Ron: "Is it immediately open to my account? And then the only difference will be that I have the spot button up top"): on a coach's
+// phone, every coach page (Clients, Programs, a client's profile...) carries the SAME five tabs as their own client app, each opening that tab of their own app through /my-space (lib/my-space-target.ts).
+// Clients, messages and the business side are in Spotlight. There is no coach bar and no More. A team-sport coach's team Home passes `homeHref` so Home stays the team Home.
+type TabKey = "home" | "feed" | "calendar" | "nutrition" | "settings";
 
 // The session page (`/sessions/[sessionId]`) has no groupId in its URL, so
 // it can't be matched by pathname here — it passes `activeOverride`
@@ -33,15 +30,15 @@ export function BottomTabBar({
   groupId,
   activeOverride,
   variant = "athlete",
-  onMoreClick,
+  homeHref,
 }: {
   groupId: string;
-  activeOverride?: TabKey;
-  variant?: "athlete" | "coach";
-  onMoreClick?: () => void;
+  // null: a coach page that is none of the five tabs (nothing lit).
+  activeOverride?: TabKey | null;
+  variant?: "athlete" | "own";
+  homeHref?: string;
 }) {
   const pathname = usePathname();
-  const term = useTerm();
   // A small dot on Settings while notifications could be switched on but aren't — the way to
   // reach the toggle is right there. Not shown where the device can't do push at all.
   const { state: pushState } = usePushStatus();
@@ -62,7 +59,6 @@ export function BottomTabBar({
   // client_tier check entirely rather than running both.
   const [hideFeed, setHideFeed] = useState(false);
   useEffect(() => {
-    if (variant === "coach") return;
     let cancelled = false;
     async function run() {
       const supabase = createBrowserClient();
@@ -112,20 +108,6 @@ export function BottomTabBar({
       ? "nutrition"
       : "home";
 
-  // The coach variant covers ~40 existing coach routes — rather than
-  // reimplement that whole pathname map here, every coach page that
-  // renders this bar already knows its own section (the `active` prop
-  // CoachDesktopShell already takes) and passes it in as activeOverride.
-  const resolvedActiveCoach: TabKey = pathname.startsWith(`/groups/${groupId}/clients`)
-    ? "roster"
-    : pathname.startsWith(`/groups/${groupId}/messages`)
-    ? "messages"
-    : pathname.startsWith(`/groups/${groupId}/calendar`)
-    ? "calendar"
-    : "home";
-
-  const resolvedActive = variant === "coach" ? resolvedActiveCoach : resolvedActiveAthlete;
-
   const athleteTabs: { key: TabKey; label: string; href: string; icon: typeof Home }[] = [
     { key: "home", label: "Home", href: `/groups/${groupId}`, icon: Home },
     { key: "calendar", label: "Calendar", href: `/groups/${groupId}/calendar`, icon: CalendarDays },
@@ -136,20 +118,22 @@ export function BottomTabBar({
     { key: "settings", label: "Settings", href: `/groups/${groupId}/settings`, icon: Settings },
   ];
 
-  const coachTabs: { key: TabKey; label: string; href: string | null; icon: typeof Home }[] = [
-    { key: "home", label: "Home", href: `/groups/${groupId}`, icon: Home },
-    { key: "roster", label: term("client", "plural", { cap: true }), href: `/groups/${groupId}/clients`, icon: Users },
-    { key: "messages", label: "Messages", href: `/groups/${groupId}/messages`, icon: Mail },
-    { key: "calendar", label: "Calendar", href: `/groups/${groupId}/calendar`, icon: CalendarDays },
-    { key: "more", label: "More", href: null, icon: Menu },
+  // The same five, opening the coach's OWN app from wherever they are.
+  const ownTabs: { key: TabKey; label: string; href: string; icon: typeof Home }[] = [
+    { key: "home", label: "Home", href: homeHref ?? mySpaceHref(null), icon: Home },
+    { key: "calendar", label: "Calendar", href: mySpaceHref("calendar"), icon: CalendarDays },
+    ...(hideFeed ? [] : [{ key: "feed" as const, label: "Feed", href: mySpaceHref("feed"), icon: MessagesSquare }]),
+    { key: "nutrition", label: "Nutrition", href: mySpaceHref("nutrition"), icon: Apple },
+    { key: "settings", label: "Settings", href: mySpaceHref("settings"), icon: Settings },
   ];
 
-  const tabs = variant === "coach" ? coachTabs : athleteTabs;
+  const tabs = variant === "own" ? ownTabs : athleteTabs;
+  const resolvedActive: TabKey | null = variant === "own" ? null : resolvedActiveAthlete;
 
   // A tapped tab wins over the (still-stale) pathname until the route
   // commits; `activeOverride` still wins over both, since a page that
   // declares its own tab knows better than either signal.
-  const active: TabKey = activeOverride ?? pendingTab ?? resolvedActive;
+  const active: TabKey | null = activeOverride !== undefined ? activeOverride ?? pendingTab : pendingTab ?? resolvedActive;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 h-16 bg-graphite border-t border-steel/20 flex z-20">
@@ -163,7 +147,7 @@ export function BottomTabBar({
                 className={`w-5 h-5 ${isActive ? "text-rust" : "text-steel"}`}
                 strokeWidth={2.5}
               />
-              {variant === "athlete" && tab.key === "settings" && pushState === "off" && (
+              {tab.key === "settings" && pushState === "off" && (
                 <span
                   aria-label="Notifications are off"
                   className="absolute -top-0.5 -right-1 w-2.5 h-2.5 rounded-full bg-amber border border-graphite"
@@ -179,18 +163,6 @@ export function BottomTabBar({
             </span>
           </>
         );
-        if (tab.href === null) {
-          return (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={onMoreClick}
-              className="flex-1 flex flex-col items-center justify-center gap-0.5 active:opacity-60 transition-opacity"
-            >
-              {content}
-            </button>
-          );
-        }
         return (
           <Link
             key={tab.key}

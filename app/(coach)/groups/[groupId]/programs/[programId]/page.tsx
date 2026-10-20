@@ -111,7 +111,7 @@ export default async function ProgramDetailPage(
       />
     );
     return coachShell ? (
-      <CoachMobileShell groupId={params.groupId} groupName="" activeOverride="more">
+      <CoachMobileShell groupId={params.groupId} groupName="">
         {view}
       </CoachMobileShell>
     ) : (

@@ -121,7 +121,7 @@ export default async function MessageThreadPage(
       </div>
       {/* One phone app for coaches: a coach on a phone gets the coach bar (Messages lit), Spotlight and More; a client keeps their own bar. */}
       {viewerIsCoach && showMobileView ? (
-        <CoachMobileShell groupId={params.groupId} groupName="" activeOverride="messages">
+        <CoachMobileShell groupId={params.groupId} groupName="">
           {null}
         </CoachMobileShell>
       ) : (

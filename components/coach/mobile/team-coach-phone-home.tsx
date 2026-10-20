@@ -59,7 +59,8 @@ export async function TeamCoachPhoneHome({ groupId, groupName }: { groupId: stri
 
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
-      <CoachMobileShell groupId={groupId} groupName={groupName}>
+      {/* Ron decided team-only coaches keep their team Home: the bar's Home tab stays here (the other tabs open their own app). */}
+      <CoachMobileShell groupId={groupId} groupName={groupName} activeOverride="home" homeHref={`/groups/${groupId}`}>
         <header className="px-5 pt-16 pb-4">
           <h1 className="font-display font-bold text-3xl leading-none uppercase truncate">{groupName}</h1>
         </header>

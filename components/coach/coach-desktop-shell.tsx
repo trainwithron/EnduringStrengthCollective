@@ -69,7 +69,6 @@ import { useWorkspaceRegistration } from "@/components/coach/workspace/workspace
 import { WorkspaceRailButton } from "@/components/coach/workspace/workspace-rail-button";
 import { EmbeddedActivityReporter } from "@/components/coach/workspace/embedded-activity-reporter";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
-import { CoachMoreSheet } from "@/components/coach/mobile/coach-more-sheet";
 import { CoachSpotHub } from "@/components/coach/mobile/coach-spot-hub";
 import { PendingNoticeFlusher } from "@/components/coach/pending-notice-flusher";
 import { CLIENTS_HREF, membersHref, showsMembers } from "@/lib/coach-clients-nav";
@@ -642,13 +641,7 @@ function CoachDesktopShellFull({
     return () => registerWorkspace(null);
   }, [coachId, groupId, groupName, isSharedGroup, registerWorkspace]);
 
-  // Coach mobile tab bar (coach_mobile_app_redesign_plan.md) — the three
-  // sections that are real bottom tabs light their own tab; everything
-  // else reached through this shell (Dashboard, Build, Business, Engage)
-  // is, by definition, reached through the "More" sheet, so it lights
-  // "More" instead of nothing.
-  const mobileTabOverride =
-    active === "clients" ? "roster" : active === "messages" ? "messages" : active === "calendar" ? "calendar" : "more";
+  // On a phone the bar is the coach's own app's five tabs (Release 2): a coach page is none of them, so nothing is lit.
   const sectionLabel = activeGroup?.label ?? null;
   const sectionSubLinks: SectionSubLink[] =
     activeGroup?.items.map((item) => ({
@@ -777,23 +770,10 @@ function CoachDesktopShellFull({
           />
         )}
 
-        {/* Coach mobile tab bar (coach_mobile_app_redesign_plan.md) —
-            replaces the old off-canvas drawer as the primary mobile nav;
-            "More" opens the reorganized CoachMoreSheet below instead of
-            the full legacy sidebarContent list. Desktop/tablet keeps the
-            rail + list panel above, unchanged. */}
+        {/* On a phone (Release 2): Spotlight on top, and the coach's OWN app's five tabs at the bottom. Desktop/tablet keeps the rail + list panel above, unchanged. */}
         <div className="lg:hidden">
-          {/* The Spotlight hub: the single phone entry, on every coach page. */}
           <CoachSpotHub groupId={groupId} />
-          <BottomTabBar
-            groupId={groupId}
-            variant="coach"
-            activeOverride={mobileTabOverride}
-            onMoreClick={() => setMobileNavOpen(true)}
-          />
-          {mobileNavOpen && (
-            <CoachMoreSheet groupId={groupId} groupName={groupName} onClose={() => setMobileNavOpen(false)} />
-          )}
+          <BottomTabBar groupId={groupId} variant="own" activeOverride={null} />
         </div>
 
         <main id="main-content" tabIndex={-1} className={`flex-1 min-w-0 px-4 pt-6 pb-24 md:px-10 md:pt-8 lg:pb-8 lg:mr-[var(--ws-dock,0px)] ${wide ? "" : "max-w-[1400px]"} focus:outline-none`}>
