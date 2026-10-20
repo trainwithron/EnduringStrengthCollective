@@ -47,7 +47,7 @@ export interface ReverseDietMilestoneResult {
   weeklyExpectedGainLbs: number;
 }
 
-const KCAL_PER_LB = 3500;
+export const KCAL_PER_LB = 3500;
 
 // Compares the first half of the window against the second half for both
 // series. Returns null (not a false "doesn't qualify") when either

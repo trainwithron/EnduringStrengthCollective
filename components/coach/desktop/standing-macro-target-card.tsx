@@ -53,6 +53,7 @@ export function StandingMacroTargetCard({
   clientName = "this client",
   todayKey,
   scheduled = [],
+  setByClient = false,
 }: {
   athleteId: string;
   groupId: string;
@@ -70,6 +71,8 @@ export function StandingMacroTargetCard({
   todayKey: string;
   // Targets scheduled for a LATER date (from an Apply with a later start). Saving here from today removes them, so they are listed and a save asks first.
   scheduled?: { date: string; calories: number | null }[];
+  // The target in force is one the client set themselves (Set my targets, 0429). Saving here makes it the coach's.
+  setByClient?: boolean;
 }) {
   const router = useRouter();
   const [saved, setSaved] = useState<Target | null>(initial);
@@ -173,7 +176,7 @@ export function StandingMacroTargetCard({
     <div className="border border-steel/20 bg-surface/40 p-4 mb-5">
       <div className="flex items-baseline justify-between gap-3">
         <h3 className="font-display uppercase text-sm tracking-wide">Standing target</h3>
-        <span className="font-body text-xs text-steel">{saved ? "Active" : "Not set"}</span>
+        <span className="font-body text-xs text-steel">{saved ? (setByClient ? `Set by ${clientName} themselves` : "Active") : "Not set"}</span>
       </div>
       <p className="font-body text-xs text-steel mt-1 max-w-[56ch]">
         Applies every day unless you set a different one for a date. A meal plan on a day shows its own meals, but

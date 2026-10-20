@@ -46,6 +46,10 @@ export function MacroCalculator({
   initialGoal,
   weightUnit = "lb",
   initialActivity,
+  maintenanceOverride = null,
+  maintenanceNote = null,
+  hideFatLoss = false,
+  useLabel = "Use these macros in the meal planner ↓",
 }: {
   onUseMacros?: (macros: CalculatedMacros) => void;
   // Real logged weight (body_weight_logs), when a specific client is in
@@ -59,10 +63,16 @@ export function MacroCalculator({
   // How this person sees weight (typed and shown in it; the estimate is worked out in pounds) and the activity level they gave in About you.
   weightUnit?: WeightUnit;
   initialActivity?: ActivityLevel | null;
+  // A maintenance worked out from the person's own height, age, sex and activity (Mifflin-St Jeor, or Katch-McArdle with body fat): used instead of the quick weight-based estimate.
+  maintenanceOverride?: number | null;
+  maintenanceNote?: string | null;
+  // No fat-loss goal (a client under 18, or one whose age is not known, setting their own target).
+  hideFatLoss?: boolean;
+  useLabel?: string;
 } = {}) {
   const [weight, setWeight] = useState(initialWeight != null ? String(displayWeightValue(initialWeight, weightUnit)) : weightUnit === "kg" ? "82" : "180");
   const [activity, setActivity] = useState<ActivityLevel>(initialActivity ?? "moderate");
-  const [goal, setGoal] = useState<MacroGoal>(initialGoal ?? "maintenance");
+  const [goal, setGoal] = useState<MacroGoal>(hideFatLoss && initialGoal === "fat_loss" ? "maintenance" : initialGoal ?? "maintenance");
   const [proteinPerLb, setProteinPerLb] = useState("1");
   const [split, setSplit] = useState<"high" | "balanced" | "low">("balanced");
   // Real layout feedback from Ron: this explainer used to be its own
@@ -74,7 +84,8 @@ export function MacroCalculator({
   const weightNum = weightUnit === "kg" ? kgToLb(typedWeight) : typedWeight;
   const valid = weightNum > 0;
 
-  const maintenance = valid ? estimateMaintenanceCalories(weightNum, activity) : 0;
+  const maintenance = valid ? (maintenanceOverride != null && maintenanceOverride > 0 ? maintenanceOverride : estimateMaintenanceCalories(weightNum, activity)) : 0;
+  const goals = hideFatLoss ? GOAL_OPTIONS.filter((o) => o.value !== "fat_loss") : GOAL_OPTIONS;
   const targetCalories = valid ? applyGoalAdjustment(maintenance, goal) : 0;
   const proteinG = valid
     ? Math.round(weightNum * (parseFloat(proteinPerLb) || 1))
@@ -131,7 +142,7 @@ export function MacroCalculator({
           onChange={(e) => setGoal(e.target.value as MacroGoal)}
           className="w-full min-w-0 h-10 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
         >
-          {GOAL_OPTIONS.map((o) => (
+          {goals.map((o) => (
             <option key={o.value} value={o.value}>
               {o.label}
             </option>
@@ -169,6 +180,7 @@ export function MacroCalculator({
             <p className="font-body text-xs text-steel">
               Estimated maintenance: <span className="text-chalk">{maintenance} cal/day</span>
             </p>
+            {maintenanceNote && <p className="font-body text-xs text-steel">{maintenanceNote}</p>}
             <p className="font-display text-3xl leading-none mt-1">{targetCalories}</p>
             <p className="font-body text-xs text-steel mt-1">Calories/day for this goal</p>
           </div>
@@ -201,7 +213,7 @@ export function MacroCalculator({
               }
               className="w-full h-10 bg-positive text-graphite font-body text-sm font-medium"
             >
-              Use these macros in the meal planner ↓
+              {useLabel}
             </button>
           )}
 

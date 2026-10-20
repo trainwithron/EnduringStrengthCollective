@@ -594,6 +594,7 @@ export async function ClientNutrition({
             clientName={firstName}
             todayKey={todayKey}
             scheduled={scheduledTargets}
+            setByClient={standingTarget?.set_by === "self"}
           />
           <div>
             <PhaseOfRecordCard

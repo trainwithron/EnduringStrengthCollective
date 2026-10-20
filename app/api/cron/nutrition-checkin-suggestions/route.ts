@@ -272,7 +272,8 @@ async function seedBaselines(
 ): Promise<{ made: number; skipped: string | null }> {
   const [members, standing, baselines] = await Promise.all([
     pageAll((from, to) => supabase.from("group_memberships").select("profile_id, group_id, client_tier").eq("role", "athlete").order("profile_id").order("group_id").range(from, to)),
-    pageAll((from, to) => supabase.from("client_macro_target_history").select("athlete_id, group_id").order("athlete_id").order("group_id").order("effective_from").range(from, to)),
+    // Only a COACH target counts as "has a standing target" (0429): a client who set their own still gets their coach's starting suggestion.
+    pageAll((from, to) => supabase.from("client_macro_target_history").select("athlete_id, group_id").eq("set_by", "coach").order("athlete_id").order("group_id").order("effective_from").range(from, to)),
     pageAll((from, to) => supabase.from("nutrition_checkin_suggestions").select("athlete_id, group_id").eq("kind", "baseline").order("athlete_id").order("group_id").order("generated_at").range(from, to)),
   ]);
   if (members.failed || standing.failed || baselines.failed || members.truncated || standing.truncated || baselines.truncated) {

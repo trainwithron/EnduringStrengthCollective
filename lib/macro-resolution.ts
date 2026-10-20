@@ -85,7 +85,12 @@ export const SOURCE_LABEL: Record<MacroSource, string> = {
 // numbers means the standing target was removed from that date.
 export interface StandingRow extends MacroRowLike {
   effective_from: string; // YYYY-MM-DD, the coach's own calendar day
+  // Who set it (0429): the coach (every row before Set my targets), or the client themselves. Missing = the coach.
+  set_by?: "coach" | "self";
 }
+
+// A client's own target never counts as their coach's (the recalculation question, the weekly baseline job, "Set my targets" stays offered).
+export const coachRowsOnly = (history: StandingHistory): StandingHistory => history.filter((r) => r.set_by !== "self");
 export type StandingHistory = StandingRow[]; // ascending by effective_from
 
 function addDaysKey(key: string, days: number): string {
