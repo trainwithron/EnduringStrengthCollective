@@ -67,9 +67,9 @@ describe("private lookups and forged post links", () => {
 
 describe("a page that shows one program for a client resolves it for the CLIENT", () => {
   it("the client's Calendar tab reads all their active programs, so two active programs no longer blank it", () => {
-    const body = read("components/coach/calendar-page-body.tsx");
-    expect(body).toContain("await getActivePrograms(supabase, params.groupId, athleteId)");
-    expect(body).toContain("scheduledPrograms.find((p) => p.athleteId === athleteId) ?? scheduledPrograms[0]");
+    // One calendar for every active program (lib/client-calendar.ts), read for the client the page is about.
+    expect(read("components/coach/calendar-page-body.tsx")).toContain("await loadClientCalendar(supabase, { groupId: params.groupId, athleteId, timezone: displayTz");
+    expect(read("lib/client-calendar.ts")).toContain("await loadProgramDayContexts(supabase, groupId, athleteId)");
   });
   it("the coach pages for one client use that client's program, never the newest of the group", () => {
     // The Log page lists every program THIS client follows (getActivePrograms is scoped to the client, the same list getAthleteCurrentProgram picks from).

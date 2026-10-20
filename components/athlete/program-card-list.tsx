@@ -32,14 +32,19 @@ export function ProgramCardList({
   );
 }
 
-function ProgramCard({
+// Also the cards above a client's Calendar for programs with no dates (components/athlete/undated-program-cards.tsx): there the line under the name says where they pick up.
+export function ProgramCard({
   groupId,
   program,
   visual,
+  subline,
+  className = "",
 }: {
   groupId: string;
   program: AthleteProgramCard;
   visual?: ProgramCardVisualData;
+  subline?: string;
+  className?: string;
 }) {
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
 
@@ -61,7 +66,7 @@ function ProgramCard({
   return (
     <Link
       href={`/groups/${groupId}/programs/${program.id}`}
-      className="border border-steel/20 bg-surface/40 rounded-token-lg flex flex-col overflow-hidden active:bg-surface/60 transition-colors"
+      className={`border border-steel/20 bg-surface/40 rounded-token-lg flex flex-col overflow-hidden active:bg-surface/60 transition-colors ${className}`}
     >
       <div className="relative h-24 bg-graphite shrink-0">
         {signedUrl ? (
@@ -78,7 +83,7 @@ function ProgramCard({
       <div className="p-2.5">
         <p className="font-body font-medium text-sm text-chalk truncate">{program.name}</p>
         <p className="font-body text-xs text-steel mt-0.5">
-          {program.workoutCount} {program.workoutCount === 1 ? "workout" : "workouts"}
+          {subline ?? `${program.workoutCount} ${program.workoutCount === 1 ? "workout" : "workouts"}`}
         </p>
       </div>
     </Link>

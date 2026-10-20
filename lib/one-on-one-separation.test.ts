@@ -24,7 +24,9 @@ describe("a one-on-one space has no shared program (Release AJ)", () => {
   it("every place that picks 'the program a client follows' ignores no-client programs in a one-on-one space", () => {
     expect(read("lib/active-programs.ts")).toContain(".filter((r) => !oneOnOne || r.athlete_id !== null)");
     expect(read("app/(coach)/groups/[groupId]/page.tsx")).toContain('group_kind?: string } | null)?.group_kind !== "one_on_one" || p.athlete_id !== null');
-    expect(read("components/coach/calendar-page-body.tsx")).toContain("getActivePrograms(supabase, params.groupId, athleteId)");
+    // the client's one Calendar reads every program through loadProgramDayContexts, which uses getActivePrograms
+    expect(read("lib/client-calendar.ts")).toContain("await loadProgramDayContexts(supabase, groupId, athleteId)");
+    expect(read("lib/program-day-contexts.ts")).toContain("await getActivePrograms(supabase, groupId, athleteId)");
     expect(read("app/(coach)/groups/[groupId]/athletes/[athleteId]/page.tsx")).toContain('group?.group_kind === "one_on_one" ? null : sharedProgramRaw');
     expect(read("lib/needs-attention-data.ts")).toContain('programQuery.not("athlete_id", "is", null)');
     expect(read("lib/dashboard-data.ts")).toContain("else if (!oneOnOneGroupIds.has(p.group_id))");

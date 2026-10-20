@@ -35,7 +35,9 @@ import { getCoachClients } from "@/lib/coach-clients";
 import { coachCreditSentence } from "@/lib/credit-sentence";
 import { formatSlotTime } from "@/lib/booking-slots";
 import { getEffectiveAthlete } from "@/lib/acting-as";
-import { getActivePrograms } from "@/lib/active-programs";
+import { loadClientCalendar, type CalendarDay } from "@/lib/client-calendar";
+import { UndatedProgramCards } from "@/components/athlete/undated-program-cards";
+import { computeProgramCardVisuals } from "@/lib/program-card-data";
 import { getCoachedGroups, groupsInOrgOf, groupsInOrgOfOpened } from "@/lib/coach-groups";
 import { AddGroupEvent } from "@/components/coach/add-group-event";
 import { UpcomingGroupEvents } from "@/components/group/group-event-answer";
@@ -451,26 +453,9 @@ export async function CoachCalendarPageBody(
   }
 
   if (showMobileView) {
-    // Several programs can be active at once (a main plan and a mobility plan, or a personal plan and the group's shared one). Every active program for this athlete is read, one-on-one rules
-    // included (a one-on-one space has no shared program: a program with no client on it is the coach's template), and the calendar opens the first one that has a schedule, a personal
-    // program ahead of a shared one. (This used to ask for "the" active program, which errors when there are two and left the whole Calendar tab without workouts.)
-    const activePrograms = await getActivePrograms(supabase, params.groupId, athleteId);
-    const scheduledPrograms = activePrograms.filter((p) => p.startDate && p.trainingDays?.length);
-    const chosen = scheduledPrograms.find((p) => p.athleteId === athleteId) ?? scheduledPrograms[0] ?? null;
-    const program = chosen ? { id: chosen.id, start_date: chosen.startDate, training_days: chosen.trainingDays } : null;
-    const programHasSchedule = !!(program?.start_date && program.training_days?.length);
-
-    if (program && programHasSchedule) {
-      const suffix = searchParams.reschedule ? `?reschedule=${searchParams.reschedule}` : "";
-      redirect(`/groups/${params.groupId}/programs/${program.id}/calendar${suffix}`);
-    }
-
-    // No active program, or one exists but has no schedule set yet —
-    // either way the calendar itself should still always be reachable, so
-    // this renders a real month/week grid (bookings only, no workouts
-    // plotted) rather than bouncing into that program's own calendar page
-    // and dead-ending there. A client can still browse and book a session
-    // with their coach here regardless of whether anything's assigned.
+    // The client's ONE Calendar (Ron, Oct 19: "I also want a calendar [that] is not tied to a program"): it never sends them to a program's own calendar. Every day shows their
+    // sessions with the coach, what they logged, and the workouts of EVERY active program that has dates (lib/client-calendar.ts). A program with no dates is a card above the
+    // calendar that opens the whole program where they left off. A program's own calendar is still reachable from the program itself.
     // creditsRow only needs athleteId/groupId — genuinely independent of
     // coachMembership, so it runs alongside it instead of after. Its
     // display is already gated on `coachMembership` truthy at render
@@ -584,6 +569,14 @@ export async function CoachCalendarPageBody(
     const nextWeekHref = `${basePath}?view=week&week=${dateKey(nextWeek)}${rescheduleSuffix}`;
     const weekViewHref = `${basePath}?view=week&week=${dateKey(weekStart)}${rescheduleSuffix}`;
 
+    // What each shown day holds, and the cards for programs with no dates (with the same cover, or the same generated picture, as the program cards on Home).
+    const shownDates = view === "month" ? cells.filter((d): d is Date => d !== null) : weekDays;
+    const calendar = await loadClientCalendar(supabase, { groupId: params.groupId, athleteId, timezone: displayTz, dates: shownDates, today, withUndated: true });
+    const uncovered = calendar.undated.filter((c) => !c.coverImagePath).map((c) => c.id);
+    const undatedVisuals = coachMembership && uncovered.length > 0 ? Object.fromEntries(await computeProgramCardVisuals(supabase, uncovered, coachMembership.profile_id)) : {};
+    const dayOf = (d: Date): CalendarDay => calendar.days.get(dateKey(d)) ?? { workouts: [], sessions: [] };
+    const dayHref = (d: Date) => `${basePath}/${dateKey(d)}${rescheduleSuffix ? `?${rescheduleSuffix.slice(1)}` : ""}`;
+
     function isSameDayLocal(a: Date, b: Date): boolean {
       return (
         a.getFullYear() === b.getFullYear() &&
@@ -628,11 +621,6 @@ export async function CoachCalendarPageBody(
         )}
         <header className="px-5 pt-8 pb-6 border-b border-steel/20">
           <h1 className="font-display font-bold text-4xl leading-none uppercase">Calendar</h1>
-          <p className="font-body text-sm text-steel mt-2">
-            {program
-              ? "Your program doesn't have a start date set yet — ask your coach, and your training schedule will show up here."
-              : "No program assigned yet — you'll see your training schedule here once your coach assigns one."}
-          </p>
           {coachMembership && !scheduleHref && (
             <p className="font-body text-xs text-steel mt-3">
               {clientCreditPictureLine(creditPicture, NO_SESSIONS_LINE)}
@@ -642,6 +630,7 @@ export async function CoachCalendarPageBody(
 
         {scheduleHref && <ScheduleCard available={creditPicture.toBook} href={scheduleHref} />}
         {coachMembership && bookingMode === "coach_schedules" && <BookingModeLine groupId={params.groupId} />}
+        <UndatedProgramCards groupId={params.groupId} programs={calendar.undated} visuals={undatedVisuals} />
 
         <UpcomingGroupEvents athleteId={athleteId} timezone={displayTz} />
 
@@ -722,15 +711,28 @@ export async function CoachCalendarPageBody(
                 const cellClass = `bg-graphite min-h-[64px] p-1.5 flex flex-col ${
                   isToday ? "ring-1 ring-inset ring-rust" : ""
                 }`;
+                const day = dayOf(date);
+                const lines = [
+                  ...day.sessions.map((s) => ({ key: `s-${s.id}`, text: s.time, className: "text-rust" })),
+                  ...day.workouts.map((w) => ({ key: `w-${w.workoutId}`, text: w.title, className: w.status === "done" ? "text-positive" : w.status === "locked" || w.status === "missed" ? "text-steel" : "text-chalk" })),
+                ];
                 const dayNumber = (
-                  <span className={`font-body text-xs ${isToday ? "text-rust font-bold" : "text-steel"}`}>
-                    {date.getDate()}
-                  </span>
+                  <>
+                    <span className={`font-body text-xs ${isToday ? "text-rust font-bold" : "text-steel"}`}>
+                      {date.getDate()}
+                    </span>
+                    {lines.slice(0, 2).map((l) => (
+                      <span key={l.key} className={`font-body text-[10px] leading-tight mt-0.5 truncate ${l.className}`}>
+                        {l.text}
+                      </span>
+                    ))}
+                    {lines.length > 2 && <span className="font-body text-[10px] leading-tight text-rust mt-0.5">+{lines.length - 2}</span>}
+                  </>
                 );
 
-                if (hasAvailability) {
+                if (hasAvailability || lines.length > 0) {
                   return (
-                    <Link key={i} href={`${basePath}/${dateKey(date)}${rescheduleSuffix ? `?${rescheduleSuffix.slice(1)}` : ""}`} className={cellClass}>
+                    <Link key={i} href={dayHref(date)} className={cellClass}>
                       {dayNumber}
                     </Link>
                   );
@@ -768,17 +770,35 @@ export async function CoachCalendarPageBody(
                   </div>
                 );
 
-                if (hasAvailability) {
+                const day = dayOf(date);
+                const has = day.sessions.length > 0 || day.workouts.length > 0;
+                const detail = (
+                  <div className="flex-1 min-w-0">
+                    {day.sessions.map((s) => (
+                      <p key={s.id} className="font-body text-sm text-rust">Session {s.time}</p>
+                    ))}
+                    {day.workouts.map((w) => (
+                      <p key={w.workoutId} className={`font-body text-sm truncate ${w.status === "done" ? "text-positive" : w.status === "locked" || w.status === "missed" ? "text-steel" : "text-chalk"}`}>
+                        {w.title}
+                        {w.status === "done" ? " · Done" : w.status === "locked" ? " · Locked" : ""}
+                      </p>
+                    ))}
+                    {!has && hasAvailability && <p className="font-body text-xs text-steel">See open sessions</p>}
+                  </div>
+                );
+
+                if (hasAvailability || has) {
                   return (
-                    <Link key={i} href={`${basePath}/${dateKey(date)}${rescheduleSuffix ? `?${rescheduleSuffix.slice(1)}` : ""}`} className={rowClass}>
+                    <Link key={i} href={dayHref(date)} className={rowClass}>
                       {rowInner}
-                      <p className="font-body text-xs text-steel">See open sessions</p>
+                      {detail}
                     </Link>
                   );
                 }
                 return (
                   <div key={i} className={rowClass}>
                     {rowInner}
+                    {detail}
                   </div>
                 );
               })}

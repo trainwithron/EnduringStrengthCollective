@@ -30,6 +30,8 @@ import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
 import { ProgramPlainView } from "@/components/shared/program-plain-view-server";
+import { loadDoneAt, pickUpWhereLeftOff, weekOf, weekDayLabel } from "@/lib/program-pickup";
+import { ScrollToOnLoad } from "@/components/shared/scroll-to-on-load";
 
 export const metadata = { title: "Programs" };
 
@@ -147,6 +149,10 @@ export default async function ProgramDetailPage(
     weeks.set(w.week_number, list);
   }
   const weekNumbers = Array.from(weeks.keys()).sort((a, b) => a - b);
+  // Opens where they left off, the same rule as the phone view (lib/program-pickup.ts): "Continue" on top, and the list scrolled to that week, not week 1.
+  const { doneAt } = await loadDoneAt(supabase, user.id, (workouts ?? []).map((w) => w.id as string));
+  const pick = pickUpWhereLeftOff((workouts ?? []) as { id: string; title: string | null; week_number: number | null; day_index: number | null }[], doneAt);
+  const upNext = pick.kind === "next" ? pick.workout : null;
 
   const scheduledDateByDayId =
     program.start_date && program.training_days && program.training_days.length > 0
@@ -228,8 +234,17 @@ export default async function ProgramDetailPage(
           <p className="font-body text-sm text-steel py-3">No workouts assigned yet.</p>
         )}
 
+        {upNext && (
+          <>
+            <Link href={`/groups/${params.groupId}/workouts/${upNext.id}`} className="inline-flex items-center min-h-11 px-4 mb-2 bg-rust text-graphite font-body text-sm font-medium" data-continue>
+              Continue: {weekDayLabel(upNext)} &rarr;
+            </Link>
+            {weekOf(upNext) !== weekNumbers[0] && <ScrollToOnLoad targetId={`week-${weekOf(upNext)}`} />}
+          </>
+        )}
+
         {weekNumbers.map((weekNum) => (
-          <div key={weekNum} className="pt-6 first:pt-0">
+          <div key={weekNum} id={`week-${weekNum}`} className="pt-6 first:pt-0 scroll-mt-4">
             <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
               Week {weekNum}
             </h2>

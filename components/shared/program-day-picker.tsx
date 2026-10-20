@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, ChevronRight, Dumbbell, StickyNote } from "lucide-react";
 import { ProgramAssignPanel } from "@/components/coach/desktop/program-assign-panel";
 import { agoLabel, dayCardTitle, defaultWeek, exerciseCountLabel, previewLine, programStats, weekIsComplete, type PlainDay, type PlainWeek } from "@/lib/program-plain-view";
@@ -59,6 +59,11 @@ export function ProgramDayPicker({
   belowSpotlight?: boolean;
 }) {
   const [weekNumber, setWeekNumber] = useState(() => defaultWeek(weeks, currentWeek));
+  // Opens where they left off (Ron, Oct 19: "if he's on week 14 of a 15-week program, it should drop him off at week 14, not week 1"): that week is chosen, and its chip is scrolled into the row's view.
+  const openedWeekChip = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    openedWeekChip.current?.scrollIntoView({ block: "nearest", inline: "center" });
+  }, []);
   const [open, setOpen] = useState<{ week: number; day: PlainDay } | null>(null);
   const week = weeks.find((w) => w.weekNumber === weekNumber);
   const stats = programStats(weeks);
@@ -146,6 +151,7 @@ export function ProgramDayPicker({
                     key={w.weekNumber}
                     type="button"
                     aria-current={on ? "true" : undefined}
+                    ref={w.weekNumber === defaultWeek(weeks, currentWeek) ? openedWeekChip : undefined}
                     onClick={() => setWeekNumber(w.weekNumber)}
                     className={`shrink-0 min-h-11 px-4 rounded-full font-body text-sm whitespace-nowrap flex flex-col items-center justify-center ${on ? "bg-surface text-chalk border border-steel/40" : "text-steel"}`}
                   >

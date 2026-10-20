@@ -13,7 +13,8 @@ import { generateSlotsForDate, formatSlotTime, minimumNoticeBlockedRange, slotCo
 import { expiryWindowLine } from "@/lib/expiry-checkin";
 import { creditExpiryWithHold } from "@/lib/credit-expiration";
 import { getBlockedRangesForDate } from "@/lib/availability-exceptions";
-import { zonedTimeToUtc, DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
+import { zonedTimeToUtc, DEFAULT_COACH_TIMEZONE, dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
+import { loadClientCalendar } from "@/lib/client-calendar";
 import { addDaysToDateKey } from "@/lib/series-schedule";
 import { coachCreditSentence } from "@/lib/credit-sentence";
 import { buildCreditPicture, clientCreditPictureLine, fetchBookingCounts } from "@/lib/credit-picture";
@@ -324,6 +325,11 @@ export default async function CoachDayDetailPage(
       }
     }
     const backHref = `/groups/${params.groupId}/calendar`;
+    // This day's workouts on the client's one Calendar: every dated program's workout for the day, one the coach put on this day, and anything logged (lib/client-calendar.ts).
+    const dayTz = await getGroupCoachTimezone(supabase, params.groupId);
+    const dayWorkouts = (
+      await loadClientCalendar(supabase, { groupId: params.groupId, athleteId, timezone: dayTz, dates: [date], today: new Date(`${dateKeyInZone(dayTz)}T00:00:00`), withUndated: false })
+    ).days.get(params.date)?.workouts ?? [];
 
     return (
       <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
@@ -373,6 +379,30 @@ export default async function CoachDayDetailPage(
             </p>
           )}
         </header>
+
+        {!reschedulingBooking && dayWorkouts.length > 0 && (
+          <section className="px-5 pt-6" aria-label="Workouts" data-day-workouts>
+            <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">{dayWorkouts.length === 1 ? "Workout" : "Workouts"}</h2>
+            <div className="divide-y divide-steel/15 border-y border-steel/15">
+              {dayWorkouts.map((w) =>
+                w.status === "locked" ? (
+                  <div key={w.workoutId} className="py-3 flex items-center justify-between gap-3">
+                    <span className="font-body text-sm text-steel">{w.title}</span>
+                    <span className="font-body text-xs text-steel shrink-0">Not open yet</span>
+                  </div>
+                ) : (
+                  <Link key={w.workoutId} href={`/groups/${params.groupId}/workouts/${w.workoutId}`} className="py-3 min-h-11 flex items-center justify-between gap-3">
+                    <span className="min-w-0">
+                      <span className="block font-body text-sm text-chalk truncate">{w.title}</span>
+                      <span className="block font-body text-xs text-steel truncate">{w.heading}</span>
+                    </span>
+                    <span className={`font-body text-xs shrink-0 ${w.status === "done" ? "text-positive" : "text-rust"}`}>{w.status === "done" ? "Done" : "Open \u2192"}</span>
+                  </Link>
+                )
+              )}
+            </div>
+          </section>
+        )}
 
         <section className="px-5 pt-6">
           <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
