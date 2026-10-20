@@ -138,11 +138,17 @@ export function CoachSpotHub({
   // The organization the PAGE belongs to (null on the coach's own space). Choosing another organization in the hub leaves this page for that organization's Home.
   const pageOrg = useRef<string | null>(null);
   const orgsRequested = useRef(false);
+  // A platform admin's own tools (Support inbox, Organizations) sit under Business (Release 2: they used to be in the More list).
+  const [platformAdmin, setPlatformAdmin] = useState(false);
   useEffect(() => {
-    // Only needed for the notification tile's test message.
-    createBrowserClient()
-      .auth.getUser()
-      .then(({ data }) => setProfileId(data.user?.id));
+    // Only needed for the notification tile's test message, and the admin links.
+    const supabase = createBrowserClient();
+    supabase.auth.getUser().then(async ({ data }) => {
+      setProfileId(data.user?.id);
+      if (!data.user) return;
+      const { data: me } = await supabase.from("profiles").select("is_platform_admin").eq("id", data.user.id).maybeSingle();
+      setPlatformAdmin((me as { is_platform_admin?: boolean } | null)?.is_platform_admin === true);
+    });
   }, []);
   useEffect(() => {
     // Which organizations this coach has: read the first time the hub is opened (the dropdown is only visible then), not on every page.
@@ -441,6 +447,22 @@ export function CoachSpotHub({
                     <p className="px-4 pt-4 font-body text-xs text-steel uppercase tracking-wide font-bold">Quick payment</p>
                     <QuickPaymentPanel key={activeGroupId} groupId={activeGroupId} />
                   </div>
+                  {/* The organization's own settings (colors, team, plan live on its pages) and, for a platform admin, their tools: they used to be in the phone's More list. */}
+                  <div className="border-t border-steel/20 pt-3 space-y-1" data-business-links>
+                    <a href={`/groups/${activeGroupId}/settings`} className="block min-h-11 leading-[2.75rem] font-body text-sm text-rust">
+                      Organization settings →
+                    </a>
+                    {platformAdmin && (
+                      <>
+                        <a href="/admin/support" className="block min-h-11 leading-[2.75rem] font-body text-sm text-chalk">
+                          Support inbox →
+                        </a>
+                        <a href="/admin/organizations" className="block min-h-11 leading-[2.75rem] font-body text-sm text-chalk">
+                          Organizations →
+                        </a>
+                      </>
+                    )}
+                  </div>
                 </div>
               )}
               {view === "program" && !needsOrg && (
@@ -462,6 +484,9 @@ export function CoachSpotHub({
                         <Sparkles className="w-4 h-4" />
                         Build a program with AI
                       </button>
+                      <a href="/programs" className="block min-h-11 leading-[2.75rem] mb-2 font-body text-sm text-rust" data-all-programs>
+                        All programs →
+                      </a>
                       <ProgramMiniView key={activeGroupId} groupId={activeGroupId} />
                     </>
                   )}
