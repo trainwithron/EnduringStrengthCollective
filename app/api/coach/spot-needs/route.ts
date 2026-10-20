@@ -18,13 +18,13 @@ export async function GET() {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
-  const active = await getActiveAnchor(supabase, user.id);
+  // The coach's time zone is read at the same time as the organization (they don't depend on each other).
+  const [active, { data: me }] = await Promise.all([getActiveAnchor(supabase, user.id), supabase.from("profiles").select("timezone").eq("id", user.id).maybeSingle()]);
   const empty: SpotNeeds = { needsChoice: false, groupIds: [], timezone: DEFAULT_COACH_TIMEZONE, sessionsToCheck: [], next: null, open: null, notices: [], unreadMessages: 0, count: 0, newestAt: null };
   if (!active) return NextResponse.json(empty);
   if (active.needsChoice) return NextResponse.json({ ...empty, needsChoice: true });
 
   const groupIds = groupsInOrgOf(active.groups, active.anchor.id).map((g) => g.id);
-  const { data: me } = await supabase.from("profiles").select("timezone").eq("id", user.id).maybeSingle();
   const timezone = (me as { timezone?: string | null } | null)?.timezone || DEFAULT_COACH_TIMEZONE;
   const now = new Date();
   const [sessionsToCheck, next, open, { data: noticeRows }, inbox] = await Promise.all([

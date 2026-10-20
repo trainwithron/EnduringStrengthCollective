@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Dumbbell, Mail, MessageCircle, Sparkles, TrendingUp, Users, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import { SpotNeedsTop } from "./spot-needs-top";
-import { SPOT_LAST_OPENED_KEY, shouldFade, type SpotNeeds } from "@/lib/spot-needs";
+import { SPOT_LAST_OPENED_KEY, SPOT_NEEDS_CACHE_KEY, readSpotNeedsCache, shouldFade, spotNeedsCacheEntry, type SpotNeeds } from "@/lib/spot-needs";
 import { isEmbeddedWindow } from "@/components/ui/loading-watchdog";
 import { PushNotificationToggle } from "@/components/athlete/push-notification-toggle";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -74,22 +74,47 @@ export function CoachSpotHub({
   const [needs, setNeeds] = useState<SpotNeeds | null>(null);
   const [fade, setFade] = useState(false);
   const needsRequest = useRef(0);
+  function showNeeds(data: SpotNeeds) {
+    setNeeds(data);
+    let lastOpened: string | null = null;
+    try {
+      lastOpened = window.localStorage.getItem(SPOT_LAST_OPENED_KEY);
+    } catch {
+      // no memory of the last open: anything counts as new
+    }
+    const reduced = typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    setFade(shouldFade(data.newestAt, lastOpened, reduced));
+  }
   function loadNeeds(opening: boolean) {
+    const org = readBrowserCookie(ACTIVE_ORG_COOKIE);
+    // A page opened within a minute of the last read uses that answer (opening Spotlight always reads it fresh).
+    if (!opening) {
+      let kept: SpotNeeds | null = null;
+      try {
+        kept = readSpotNeedsCache(window.sessionStorage.getItem(SPOT_NEEDS_CACHE_KEY), org, Date.now());
+      } catch {
+        // no storage: read it
+      }
+      if (kept) {
+        showNeeds(kept);
+        return;
+      }
+    }
     const request = ++needsRequest.current;
     fetch("/api/coach/spot-needs")
       .then((r) => (r.ok ? r.json() : null))
       .then((data: SpotNeeds | null) => {
         if (!data || request !== needsRequest.current) return;
-        setNeeds(data);
-        if (opening) return;
-        let lastOpened: string | null = null;
         try {
-          lastOpened = window.localStorage.getItem(SPOT_LAST_OPENED_KEY);
+          window.sessionStorage.setItem(SPOT_NEEDS_CACHE_KEY, spotNeedsCacheEntry(data, org, Date.now()));
         } catch {
-          // no memory of the last open: anything counts as new
+          // not kept: the next page reads it again
         }
-        const reduced = typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        setFade(shouldFade(data.newestAt, lastOpened, reduced));
+        if (opening) {
+          setNeeds(data);
+          return;
+        }
+        showNeeds(data);
       })
       .catch(() => {
         // the button simply shows no dot

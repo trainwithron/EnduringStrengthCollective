@@ -8,6 +8,7 @@ import { clearAllNoteDrafts } from "@/lib/note-draft";
 import { clearAllFunLineMemory } from "@/lib/fun-line-memory";
 import { unsubscribeFromPush } from "@/lib/push-client";
 import { purgeOfflinePages } from "@/lib/offline-pages";
+import { SPOT_NEEDS_CACHE_KEY } from "@/lib/spot-needs";
 
 export function SignOutButton() {
   const [signingOut, setSigningOut] = useState(false);
@@ -26,6 +27,12 @@ export function SignOutButton() {
     clearAllFunLineMemory(window.localStorage);
     // Nor the workout pages kept for opening with no signal.
     purgeOfflinePages();
+    // What needed the coach (Spotlight's dot), kept for a minute per tab: never shown to the next person on a shared phone.
+    try {
+      window.sessionStorage.removeItem(SPOT_NEEDS_CACHE_KEY);
+    } catch {
+      // nothing kept
+    }
     router.push("/login");
     router.refresh();
   }

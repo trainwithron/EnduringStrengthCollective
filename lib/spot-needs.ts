@@ -41,3 +41,26 @@ export function shouldFade(newestAt: string | null, lastOpenedAt: string | null,
 }
 
 export const SPOT_LAST_OPENED_KEY = "spot-last-opened";
+
+// Moving from page to page on a phone, the dot is not asked for again within a minute (it was asked for on every page). Opening Spotlight always asks. Kept per tab (sessionStorage),
+// for the organization it was read for, and cleared on sign-out.
+export const SPOT_NEEDS_CACHE_KEY = "spot-needs-cache-v1";
+export const SPOT_NEEDS_CACHE_MS = 60_000;
+
+export function spotNeedsCacheEntry(data: SpotNeeds, org: string | null, now: number): string {
+  return JSON.stringify({ at: now, org: org ?? null, data });
+}
+
+// The kept answer when it is under a minute old and for this organization; otherwise null (never a guess from a broken entry).
+export function readSpotNeedsCache(raw: string | null, org: string | null, now: number): SpotNeeds | null {
+  if (!raw) return null;
+  try {
+    const e = JSON.parse(raw) as { at?: unknown; org?: unknown; data?: unknown };
+    if (typeof e.at !== "number" || now - e.at < 0 || now - e.at >= SPOT_NEEDS_CACHE_MS) return null;
+    if ((e.org ?? null) !== (org ?? null)) return null;
+    const d = e.data as SpotNeeds | null;
+    return d && typeof d === "object" && typeof d.count === "number" ? d : null;
+  } catch {
+    return null;
+  }
+}

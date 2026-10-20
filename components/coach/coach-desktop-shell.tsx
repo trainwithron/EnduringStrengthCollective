@@ -92,6 +92,32 @@ type Active =
   | "admin-ranking"
   | "website";
 
+// Phone speed (B4): the desktop-only parts (the side panel with Needs attention, the chat edge tab) and the reads that only feed them (the rail's badges, the platform admin's
+// counts) wait until the screen is known to be a computer's; a phone never mounts or asks for them. Known once per page load and kept for the next page, so moving around on a
+// computer never makes the panel pop in again.
+const DESKTOP_QUERY = "(min-width: 1024px)";
+let knownDesktop: boolean | null = null;
+function useIsDesktop(): boolean | null {
+  const [isDesktop, setIsDesktop] = useState<boolean | null>(knownDesktop);
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") {
+      knownDesktop = true;
+      setIsDesktop(true);
+      return;
+    }
+    const mq = window.matchMedia(DESKTOP_QUERY);
+    const update = () => {
+      knownDesktop = mq.matches;
+      setIsDesktop(mq.matches);
+    };
+    update();
+    // A tablet turned sideways can cross the line.
+    mq.addEventListener?.("change", update);
+    return () => mq.removeEventListener?.("change", update);
+  }, []);
+  return isDesktop;
+}
+
 function CoachDesktopShellFull({
   groupId,
   groupName,
@@ -127,6 +153,7 @@ function CoachDesktopShellFull({
   // the pinned Needs Attention strip's fetch.
   const [coachId, setCoachId] = useState<string | null>(null);
   const registerWorkspace = useWorkspaceRegistration();
+  const isDesktop = useIsDesktop();
 
   // Team (position groups/depth chart) is an opt-in feature for coaches
   // running an actual team sport — most individual-training coaches never
@@ -193,6 +220,7 @@ function CoachDesktopShellFull({
   // sees this at all.
   useEffect(() => {
     let cancelled = false;
+    if (isDesktop !== true) return;
     async function run() {
       const supabase = createBrowserClient();
       const {
@@ -218,7 +246,7 @@ function CoachDesktopShellFull({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isDesktop]);
 
   // Remembers the last group this coach actually looked at, so the
   // cross-group Home dashboard (app/dashboard/page.tsx) can default its
@@ -250,6 +278,7 @@ function CoachDesktopShellFull({
   // very first load with every historical post as "unread."
   useEffect(() => {
     let cancelled = false;
+    if (isDesktop !== true) return;
     async function run() {
       const supabase = createBrowserClient();
       const {
@@ -317,7 +346,7 @@ function CoachDesktopShellFull({
     return () => {
       cancelled = true;
     };
-  }, [groupId, active]);
+  }, [groupId, active, isDesktop]);
 
   // Coach<->Athlete DM unread count — a plain unread tally, not the
   // seeded "since last seen" mechanism above (a real unread message has
@@ -331,6 +360,7 @@ function CoachDesktopShellFull({
       setMessagesUnread(0);
       return;
     }
+    if (isDesktop !== true) return;
     async function run() {
       const supabase = createBrowserClient();
       const {
@@ -349,7 +379,7 @@ function CoachDesktopShellFull({
     return () => {
       cancelled = true;
     };
-  }, [groupId, active]);
+  }, [groupId, active, isDesktop]);
 
   const navFacts = useCoachNavFacts();
   const onFrontDesk = useOnFrontDesk();
@@ -507,7 +537,7 @@ function CoachDesktopShellFull({
             </>
           }
         />
-        {coachId && (
+        {isDesktop === true && coachId && (
           <ShellListPanel
             coachId={coachId}
             groupId={groupId}
@@ -542,9 +572,11 @@ function CoachDesktopShellFull({
           anywhere but Home). Self-contained, no props needed. */}
       {/* Desktop-only edge tab: on phones the Spotlight hub is the single entry,
           so hide this one below lg (position:fixed still hides with its wrapper). */}
-      <div className="hidden lg:block">
-        <CollectiveIntelligenceChat groupId={groupId} unread={messagesUnread} />
-      </div>
+      {isDesktop === true && (
+        <div className="hidden lg:block">
+          <CollectiveIntelligenceChat groupId={groupId} unread={messagesUnread} />
+        </div>
+      )}
     </div>
     </TerminologyProvider>
   );
