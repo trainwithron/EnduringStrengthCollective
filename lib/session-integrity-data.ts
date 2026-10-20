@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { pastSetDone } from "@/lib/set-complete";
 import {
   computeExpectedMinimumSeconds,
   computeIntegrityLevel,
@@ -46,12 +47,14 @@ export async function getIntegrityRollupForGroup(
   const sessionIds = sessions.map((s: any) => s.id);
   const { data: setRows } = await supabase
     .from("set_logs")
-    .select("rest_seconds, status, session_exercises!inner ( session_id )")
+    .select("rest_seconds, reps, weight, time_seconds, distance, height, status, session_exercises!inner ( session_id, exercise_name, tracked_fields )")
     .in("session_exercises.session_id", sessionIds)
-    .eq("status", "completed");
+    .neq("status", "skipped");
 
   const restSecondsBySession = new Map<string, { restSeconds: number | null }[]>();
   for (const row of (setRows ?? []) as any[]) {
+    // the sets that were done, by the logger's own rule (lib/set-complete.ts pastSetDone)
+    if (!pastSetDone(row, row.session_exercises)) continue;
     const sessionId = row.session_exercises.session_id as string;
     const list = restSecondsBySession.get(sessionId) ?? [];
     list.push({ restSeconds: row.rest_seconds });
