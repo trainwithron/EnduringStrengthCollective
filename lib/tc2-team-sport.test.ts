@@ -34,7 +34,8 @@ describe("TC2: a team-sport group's short menu", () => {
   it("the Business area is one quiet link in Settings, and the money tiles are hidden on a phone", () => {
     expect(TEAM_SPORT_BUSINESS_LABEL).toBe("Business tools (off for teams)");
     expect(teamSportBusinessHref(G)).toBe(`/groups/${G}/business`);
-    expect(TEAM_SPORT_HIDDEN_HUB_TILES).toEqual(["business", "quick-payment"]);
+    // Quick payment is inside Business now, so hiding Business hides both.
+    expect(TEAM_SPORT_HIDDEN_HUB_TILES).toEqual(["business"]);
   });
 
   it("the word for a client is athletes in a team-sport group unless the coach chose their own word", () => {

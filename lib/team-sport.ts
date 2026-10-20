@@ -5,8 +5,8 @@ import { membersHref } from "@/lib/coach-clients-nav";
 // anyone who goes to them, this only decides what the menus and tiles show. Coach-level pages (Home, the all-clients list) are not a group's, so they keep the ordinary menus.
 export const isTeamSportGroup = (teamMode: boolean | null | undefined): boolean => teamMode === true;
 
-/** Phone Spotlight tiles that do not apply to a team-sport group: the money ones. */
-export const TEAM_SPORT_HIDDEN_HUB_TILES: readonly string[] = ["business", "quick-payment"];
+/** Phone Spotlight tiles that do not apply to a team-sport group: the money one (Business, with Quick payment inside it). */
+export const TEAM_SPORT_HIDDEN_HUB_TILES: readonly string[] = ["business"];
 
 export interface TeamMenuItem {
   key: string;

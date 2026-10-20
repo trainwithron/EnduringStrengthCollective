@@ -3,14 +3,16 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, CalendarDays, CreditCard, Dumbbell, MessageCircle, Sparkles, TrendingUp, Users, X } from "lucide-react";
+import { ArrowLeft, Dumbbell, Mail, MessageCircle, Sparkles, TrendingUp, Users, X } from "lucide-react";
 import { BusinessMiniDashboard } from "@/components/coach/desktop/business-mini-dashboard";
-import { CalendarMiniView } from "@/components/coach/desktop/calendar-mini-view";
 import { ProgramMiniView } from "@/components/coach/desktop/program-mini-view";
 import { AskSpotChatPanel } from "@/components/coach/ask-spot-chat-panel";
 import { QuickPaymentPanel } from "./quick-payment-panel";
 import { SpotBuilderPanel } from "./spot-builder-panel";
 import { SpotClientsGroupsPanel } from "./spot-clients-groups-panel";
+import { SpotMessagesPanel } from "./spot-messages-panel";
+import { SpotNeedsTop } from "./spot-needs-top";
+import { SPOT_LAST_OPENED_KEY, shouldFade, type SpotNeeds } from "@/lib/spot-needs";
 import { PushNotificationToggle } from "@/components/athlete/push-notification-toggle";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { useTerm } from "@/components/coach/terminology-provider";
@@ -19,15 +21,15 @@ import { ACTIVE_ORG_COOKIE, readBrowserCookie, rememberedGroupForActiveOrg } fro
 import { hubOrgs, hubStartGroup, hubStartOrgId, pageOrgId, type HubOrg } from "@/lib/hub-orgs";
 import { isTeamSportGroup, TEAM_SPORT_HIDDEN_HUB_TILES } from "@/lib/team-sport";
 
-type TileKey = "clients" | "business" | "calendar" | "program" | "ask-spot" | "quick-payment";
+type TileKey = "clients" | "messages" | "business" | "program" | "ask-spot";
 
-const TILES: { key: TileKey; label: string; icon: typeof Users }[] = [
+// Ron, Oct 19: "I already have a calendar button. That doesn't need to be there. Quick payment could probably be rolled into business." "I do want messages in the spotlight tab."
+export const TILES: { key: TileKey; label: string; icon: typeof Users }[] = [
   { key: "clients", label: "Clients", icon: Users },
+  { key: "messages", label: "Messages", icon: Mail },
   { key: "business", label: "Business", icon: TrendingUp },
-  { key: "calendar", label: "Calendar", icon: CalendarDays },
   { key: "program", label: "Program", icon: Dumbbell },
   { key: "ask-spot", label: "Ask Spot", icon: MessageCircle },
-  { key: "quick-payment", label: "Quick payment", icon: CreditCard },
 ];
 
 const SWIPE_DOWN_THRESHOLD = 56; // px — a short downward flick on the header closes the hub
@@ -63,7 +65,35 @@ export function CoachSpotHub({
   const [profileId, setProfileId] = useState<string | undefined>(undefined);
   // The group every tile acts on. A coach who runs more than one organization chooses the organization in the header; the tiles then use that organization's group.
   const [activeGroupId, setActiveGroupId] = useState(groupId);
-  // A team-sport group has no Business or Quick payment tile (lib/team-sport.ts). Unknown until read, which shows every tile.
+  // What needs the coach first (lib/spot-needs.ts): read when the page opens and every time Spotlight opens. It fills the top of the drop-down and the dot on the button.
+  const [needs, setNeeds] = useState<SpotNeeds | null>(null);
+  const [fade, setFade] = useState(false);
+  const needsRequest = useRef(0);
+  function loadNeeds(opening: boolean) {
+    const request = ++needsRequest.current;
+    fetch("/api/coach/spot-needs")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: SpotNeeds | null) => {
+        if (!data || request !== needsRequest.current) return;
+        setNeeds(data);
+        if (opening) return;
+        let lastOpened: string | null = null;
+        try {
+          lastOpened = window.localStorage.getItem(SPOT_LAST_OPENED_KEY);
+        } catch {
+          // no memory of the last open: anything counts as new
+        }
+        const reduced = typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        setFade(shouldFade(data.newestAt, lastOpened, reduced));
+      })
+      .catch(() => {
+        // the button simply shows no dot
+      });
+  }
+  useEffect(() => {
+    loadNeeds(false);
+  }, []);
+  // A team-sport group has no Business tile (lib/team-sport.ts). Unknown until read, which shows every tile.
   const [teamSport, setTeamSport] = useState(false);
   useEffect(() => {
     let cancelled = false;
@@ -171,6 +201,13 @@ export function CoachSpotHub({
       setView("grid");
       setBuilderOpen(false);
       setOpen(true);
+      setFade(false);
+      try {
+        window.localStorage.setItem(SPOT_LAST_OPENED_KEY, new Date().toISOString());
+      } catch {
+        // not remembered; the next new thing fades again
+      }
+      loadNeeds(true);
     }
   }
 
@@ -247,12 +284,21 @@ export function CoachSpotHub({
         onClick={toggle}
         aria-expanded={open}
         aria-controls={panelId}
-        aria-label="Spotlight"
+        aria-label={needs && needs.count > 0 ? `Spotlight, ${needs.count} waiting` : "Spotlight"}
         className={`fixed left-1/2 -translate-x-1/2 z-40 rounded-token-circle bg-graphite/90 border border-rust/50 flex items-center justify-center active:border-rust transition-colors shadow-lg ${
           compact ? "top-[calc(env(safe-area-inset-top)+1px)] h-[30px] w-[30px]" : "top-3 h-10 w-10"
         }`}
       >
         <Sparkles className={compact ? "w-4 h-4 text-rust" : "w-5 h-5 text-rust"} strokeWidth={2.25} />
+        {needs && needs.count > 0 && (
+          <span
+            data-spot-dot
+            className={`absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-rust text-graphite font-body text-[10px] font-bold leading-4 text-center ${fade ? "spot-dot-fade" : ""}`}
+            aria-label={`${needs.count} waiting`}
+          >
+            {needs.count > 9 ? "9+" : needs.count}
+          </span>
+        )}
       </button>
 
       {open && (
@@ -315,7 +361,8 @@ export function CoachSpotHub({
 
             <div className="flex-1 min-h-0 overflow-hidden">
               {view === "grid" && (
-                <div className="h-full overflow-y-auto grid grid-cols-2 gap-2 p-4">
+                <div className="h-full overflow-y-auto grid grid-cols-2 gap-2 p-4 content-start">
+                  {needs && !needs.needsChoice && <SpotNeedsTop needs={needs} onNavigated={close} />}
                   {homeHref && (
                     <a
                       href={homeHref}
@@ -344,7 +391,7 @@ export function CoachSpotHub({
                   </div>
                 </div>
               )}
-              {needsOrg && ["clients", "business", "calendar", "program", "quick-payment"].includes(view) && (
+              {needsOrg && ["clients", "messages", "business", "program"].includes(view) && (
                 <div className="h-full overflow-y-auto p-4">
                   <p className="font-body text-sm text-chalk">Which organization are you working in?</p>
                   <p className="font-body text-xs text-steel mt-1">Choose it at the top of this panel. Until then this would show your own space, not the organization.</p>
@@ -355,14 +402,19 @@ export function CoachSpotHub({
                   <SpotClientsGroupsPanel key={activeGroupId} groupId={activeGroupId} onNavigated={close} fromHub />
                 </div>
               )}
-              {view === "business" && !needsOrg && (
+              {view === "messages" && !needsOrg && (
                 <div className="h-full overflow-y-auto p-4">
-                  <BusinessMiniDashboard key={activeGroupId} groupId={activeGroupId} expanded />
+                  <SpotMessagesPanel key={activeGroupId} groupId={activeGroupId} onNavigated={close} />
                 </div>
               )}
-              {view === "calendar" && !needsOrg && (
-                <div className="h-full overflow-y-auto p-4">
-                  <CalendarMiniView key={activeGroupId} groupId={activeGroupId} />
+              {view === "business" && !needsOrg && (
+                <div className="h-full overflow-y-auto p-4 space-y-4">
+                  <BusinessMiniDashboard key={activeGroupId} groupId={activeGroupId} expanded />
+                  {/* Quick payment lives inside Business (Ron: "Quick payment could probably be rolled into business"). */}
+                  <div className="border-t border-steel/20 -mx-4">
+                    <p className="px-4 pt-4 font-body text-xs text-steel uppercase tracking-wide font-bold">Quick payment</p>
+                    <QuickPaymentPanel key={activeGroupId} groupId={activeGroupId} />
+                  </div>
                 </div>
               )}
               {view === "program" && !needsOrg && (
@@ -392,11 +444,6 @@ export function CoachSpotHub({
               {view === "ask-spot" && (
                 <div className="h-full flex flex-col">
                   <AskSpotChatPanel />
-                </div>
-              )}
-              {view === "quick-payment" && !needsOrg && (
-                <div className="h-full overflow-y-auto">
-                  <QuickPaymentPanel key={activeGroupId} groupId={activeGroupId} />
                 </div>
               )}
             </div>

@@ -322,3 +322,24 @@ body::before {
 [data-loading-fallback] {
   margin-left: var(--split-reserved, 0px);
 }
+
+/* The Spotlight button on a coach's phone (lib/spot-needs.ts): when something new arrived since it was last opened it fades gently in and out twice, then stays a dot. Never with reduced motion. */
+@keyframes spot-dot-fade {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.spot-dot-fade {
+  animation: spot-dot-fade 2s ease-in-out 2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spot-dot-fade {
+    animation: none;
+  }
+}

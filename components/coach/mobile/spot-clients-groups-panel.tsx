@@ -213,7 +213,8 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
       }
     }
     onNavigated();
-    router.push(`/groups/${targetGroupId}/dashboard`);
+    // A group row opens that group's people (Ron: the phone's Spotlight lists, never the old coach dashboard).
+    router.push(`/groups/${targetGroupId}/clients`);
   }
 
   async function handleCreateGroup() {

@@ -3,10 +3,13 @@
 import { useEffect, useState } from "react";
 import { useTerm } from "@/components/coach/terminology-provider";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { getCoachClients } from "@/lib/coach-clients";
 
 interface RosterOption {
   profileId: string;
   fullName: string;
+  // The client's own group (their one-on-one space when they have one): the payment is for that group.
+  groupId: string;
 }
 
 // Quick Payment (mobile_more_tab_condensed_widget_hub_sept30.md) — a
@@ -30,21 +33,15 @@ export function QuickPaymentPanel({ groupId }: { groupId: string }) {
   useEffect(() => {
     let cancelled = false;
     async function run() {
+      // Every client of the organization once (one-on-one clients included: each lives in their own group), the same list as the Clients tile. It used to read only the
+      // organization's main group, which has no clients when every client has a one-on-one space, so nobody could be charged.
       const supabase = createBrowserClient();
-      const { data } = await supabase
-        .from("group_memberships")
-        .select("profile_id, profiles ( full_name )")
-        .eq("group_id", groupId)
-        .eq("role", "athlete")
-        .order("profiles(full_name)", { ascending: true });
-      if (!cancelled) {
-        setRoster(
-          (data ?? []).map((r: any) => ({
-            profileId: r.profile_id,
-            fullName: r.profiles?.full_name ?? "Unknown",
-          }))
-        );
-      }
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+      const clients = await getCoachClients(supabase, user.id, groupId);
+      if (!cancelled) setRoster(clients.map((c) => ({ profileId: c.id, fullName: c.fullName, groupId: c.groupId })));
     }
     run();
     return () => {
@@ -64,7 +61,7 @@ export function QuickPaymentPanel({ groupId }: { groupId: string }) {
       const res = await fetch("/api/stripe/quick-payment-checkout", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ groupId, athleteId: selected.profileId, amountCents, description }),
+        body: JSON.stringify({ groupId: selected.groupId, athleteId: selected.profileId, amountCents, description }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Couldn't start checkout.");

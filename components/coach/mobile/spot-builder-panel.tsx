@@ -6,6 +6,7 @@ import { useTerm } from "@/components/coach/terminology-provider";
 import dynamic from "next/dynamic";
 import { X, Sparkles } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { getCoachClients } from "@/lib/coach-clients";
 import type { LibraryExercise, AliasEntry } from "@/lib/exercise-matching";
 import { PROGRESSION_RULES, parseQuickBuildInput, type ProgressionRule } from "@/lib/spot-quick-build";
 
@@ -42,6 +43,8 @@ const PROGRESSION_RULE_LIST = PROGRESSION_RULES;
 interface ClientOption {
   id: string;
   fullName: string;
+  // The client's own group (their one-on-one space when they have one): the program is made there.
+  groupId: string;
 }
 
 export function SpotBuilderPanel({
@@ -68,6 +71,7 @@ export function SpotBuilderPanel({
   const [mode, setMode] = useState<"ai" | "parse">("ai");
   const [athleteId, setAthleteId] = useState<string | null>(initialAthleteId ?? null);
   const [athleteName, setAthleteName] = useState<string | null>(initialAthleteName ?? null);
+  const [athleteGroupId, setAthleteGroupId] = useState<string | null>(null);
   const [clients, setClients] = useState<ClientOption[] | null>(null);
   const [description, setDescription] = useState("");
   const [progressionRule, setProgressionRule] = useState<ProgressionRule>("Let AI decide");
@@ -79,15 +83,13 @@ export function SpotBuilderPanel({
 
   useEffect(() => {
     if (clients !== null || initialAthleteId) return;
+    // Every client of the organization once (one-on-one clients included), the same list as the Clients tile; it used to read only the organization's main group, which can have none.
     const supabase = createBrowserClient();
-    supabase
-      .from("group_memberships")
-      .select("profile_id, profiles ( full_name )")
-      .eq("group_id", groupId)
-      .eq("role", "athlete")
-      .then(({ data }) => {
-        setClients((data ?? []).map((r: any) => ({ id: r.profile_id, fullName: r.profiles?.full_name ?? "Client" })));
-      });
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return;
+      const list = await getCoachClients(supabase, user.id, groupId);
+      setClients(list.map((c) => ({ id: c.id, fullName: c.fullName, groupId: c.groupId })));
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId]);
 
@@ -140,6 +142,7 @@ export function SpotBuilderPanel({
     if (!initialAthleteId) {
       setAthleteId(null);
       setAthleteName(null);
+      setAthleteGroupId(null);
     }
   }
 
@@ -160,6 +163,7 @@ export function SpotBuilderPanel({
               const c = (clients ?? []).find((c) => c.id === e.target.value);
               setAthleteId(c?.id ?? null);
               setAthleteName(c?.fullName ?? null);
+              setAthleteGroupId(c?.groupId ?? null);
             }}
             className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm"
           >
@@ -236,6 +240,7 @@ export function SpotBuilderPanel({
                 const c = (clients ?? []).find((c) => c.id === e.target.value);
                 setAthleteId(c?.id ?? null);
                 setAthleteName(c?.fullName ?? null);
+                setAthleteGroupId(c?.groupId ?? null);
               }}
               className="w-full h-9 mt-1 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm"
             >
@@ -324,7 +329,7 @@ export function SpotBuilderPanel({
         ) : (
           <ImportWizard
             coachId={coachId}
-            groupId={groupId}
+            groupId={athleteGroupId ?? groupId}
             athleteId={athleteId ?? undefined}
             athleteName={athleteName ?? undefined}
             initialLibrary={library}

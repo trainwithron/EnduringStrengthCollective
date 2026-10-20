@@ -55,7 +55,7 @@ describe("the hub is wired to it", () => {
   it("shows the dropdown in the header only for a coach in two or more organizations, and every tile follows the chosen group", () => {
     expect(hub).toContain("orgs.length >= 2");
     expect(hub).toContain('aria-label="Organization"');
-    for (const t of ["SpotClientsGroupsPanel", "BusinessMiniDashboard", "CalendarMiniView", "SpotBuilderPanel", "ProgramMiniView", "QuickPaymentPanel"]) {
+    for (const t of ["SpotClientsGroupsPanel", "SpotMessagesPanel", "BusinessMiniDashboard", "SpotBuilderPanel", "ProgramMiniView", "QuickPaymentPanel"]) {
       expect(hub).toMatch(new RegExp(`<${t}[^>]*groupId=\{activeGroupId\}`));
     }
     expect(hub).not.toMatch(/<(SpotClientsGroupsPanel|BusinessMiniDashboard|CalendarMiniView|ProgramMiniView|QuickPaymentPanel)[^>]*groupId=\{groupId\}/);

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { useOrgGroupIds } from "@/lib/use-org-group-ids";
 import { readRowsByIds } from "@/lib/read-by-ids";
@@ -196,12 +195,6 @@ export function BusinessMiniDashboard({ groupId, expanded = false }: { groupId: 
           </>
         )}
       </div>
-      <Link
-        href={`/groups/${groupId}/business`}
-        className="block text-center font-body text-xs text-rust border border-rust/40 py-2 hover:bg-rust/5 transition-colors"
-      >
-        Go deeper →
-      </Link>
     </div>
   );
 }
