@@ -11,10 +11,14 @@
 --   6. cancel_booking_and_refund_credit: a late move the coach charged and the client then cancels: no refund, not flagged again. A coach cancelling it gives the session back (as before).
 --   7. undo_booking_attended: gives back only what attendance took; a late-move charge stays.
 --   8. create_walk_in_booking(session): Yes on the walk-in prompt. A booking from the workout's start to the later of its finish and one session's length, its own overlap check, settled once.
--- A late charge is recognised by its ledger note (written only by resolve_late_change below): booking_late_charge_taken(booking).
+--   9. settle_booking_internal: a session marked a no-show is never marked happened (undo the no-show first).
+-- Every Undo (attended, no-show) puts the booking back to what an UNMARKED visit costs, read from its own history (booking_put_back), so undos in any order can never take
+-- two sessions for one visit or give back more than was taken. A late move the coach charged is recorded in the history (a 0 entry when nothing more was taken), so it stays
+-- the one session whatever happens after it.
 
--- ---- the late charge on a booking --------------------------------------------------------------------------------------------------------
-create or replace function public.booking_late_charge_taken(p_booking_id uuid)
+-- ---- what a booking has cost, and its late-move charge -----------------------------------------------------------------------------------------
+-- Everything this booking has actually taken: taken at booking, used, given back (a 0 'waived' entry takes nothing).
+create or replace function public.booking_taken(p_booking_id uuid)
 returns int
 language sql
 stable
@@ -23,11 +27,99 @@ set search_path = public
 as $$
   select coalesce(-sum(l.amount), 0)::int
   from public.session_credit_ledger l
-  where l.booking_id = p_booking_id
-    and l.kind = 'delivered'
-    and l.note in ('Late reschedule, charged by your coach', 'Late cancellation, charged by your coach');
+  where l.booking_id = p_booking_id and l.kind in ('booked', 'delivered', 'refund', 'adjusted');
 $$;
-revoke all on function public.booking_late_charge_taken(uuid) from public, anon, authenticated;
+revoke all on function public.booking_taken(uuid) from public, anon, authenticated;
+
+-- The coach charged a late move of this booking (written only by resolve_late_change below; a 0 entry when the booking had already been paid for).
+create or replace function public.booking_late_move_charged(p_booking_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (select 1 from public.session_credit_ledger l where l.booking_id = p_booking_id and l.kind = 'delivered' and l.note = 'Late reschedule, charged by your coach');
+$$;
+revoke all on function public.booking_late_move_charged(uuid) from public, anon, authenticated;
+
+-- Puts a booking back to what an unmarked visit costs: ONE session when the coach charged a late move of it or it was paid for when it was booked, otherwise none (left
+-- 'waived' when the coach waived it with Waive session). Gives back, or takes, only the difference from what it has actually taken. Returns the credit state it leaves.
+create or replace function public.booking_put_back(p_booking_id uuid, p_note text)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_b public.bookings%rowtype;
+  v_paid boolean;
+  v_target int;
+  v_diff int;
+  v_state text;
+begin
+  select * into v_b from public.bookings where id = p_booking_id for update;
+  if not found then
+    raise exception 'booking not found';
+  end if;
+  v_paid := exists (select 1 from public.session_credit_ledger l where l.booking_id = p_booking_id and l.kind = 'booked' and l.amount < 0);
+  v_target := case when public.booking_late_move_charged(p_booking_id) or v_paid then 1 else 0 end;
+  v_state := case
+    when v_target = 1 and v_paid then 'prepaid'
+    when v_target = 1 then 'settled'
+    when exists (select 1 from public.session_credit_ledger l where l.booking_id = p_booking_id and l.kind = 'waived' and l.note is distinct from 'No-show, not charged') then 'waived'
+    else 'unsettled'
+  end;
+  v_diff := public.booking_taken(p_booking_id) - v_target;
+  if v_diff > 0 then
+    perform public.apply_session_credit_change(v_b.athlete_id, v_b.group_id, v_diff, 'refund', p_note, p_booking_id, auth.uid());
+  elsif v_diff < 0 then
+    perform public.apply_session_credit_change(v_b.athlete_id, v_b.group_id, v_diff, 'delivered', p_note, p_booking_id, auth.uid());
+  end if;
+  update public.bookings set credit_state = v_state where id = p_booking_id;
+  return v_state;
+end;
+$$;
+revoke all on function public.booking_put_back(uuid, text) from public, anon, authenticated;
+
+-- ---- 9. settle_booking_internal: never on a no-show ----------------------------------------------------------------------------------------------
+-- The live text (0282) with one check added: a session marked a no-show is not marked happened (and so never charged as happened on top of its no-show).
+create or replace function public.settle_booking_internal(p_booking_id uuid, p_cost integer, p_note text, p_by uuid, p_expected_athlete uuid default null, p_expected_group uuid default null)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_b public.bookings%rowtype;
+begin
+  select * into v_b from public.bookings where id = p_booking_id for update;
+  if not found or v_b.status <> 'confirmed' then
+    return false;
+  end if;
+  -- A logged session may only settle a booking that is really that client's, in that group.
+  if (p_expected_athlete is not null and v_b.athlete_id <> p_expected_athlete)
+     or (p_expected_group is not null and v_b.group_id <> p_expected_group) then
+    return false;
+  end if;
+  if v_b.attended_at is not null then
+    return false; -- already settled by the other path; never charged twice
+  end if;
+  if v_b.no_show then
+    return false; -- FIX 3 (0428): a no-show is settled by its own Charge or Waive; undo the no-show to mark it happened
+  end if;
+
+  update public.bookings set attended_at = now() where id = p_booking_id;
+
+  if v_b.credit_state = 'unsettled' and coalesce(p_cost, 1) > 0 then
+    perform public.apply_session_credit_change(v_b.athlete_id, v_b.group_id, -coalesce(p_cost, 1), 'delivered', p_note, p_booking_id, p_by);
+    update public.bookings set credit_state = 'settled' where id = p_booking_id;
+    return true;
+  end if;
+  return false; -- prepaid or waived: attended, nothing more to take
+end;
+$$;
+revoke all on function public.settle_booking_internal(uuid, integer, text, uuid, uuid, uuid) from public, anon, authenticated;
 
 -- ---- 1. the booking a logged workout belongs to ---------------------------------------------------------------------------------------------
 -- Same client, same group, confirmed, not a no-show, not already linked to another logged workout, on the same calendar day as the workout's start in the booking coach's time zone. Several: the logging
@@ -103,7 +195,8 @@ begin
     || 'if v_session.logged_by_coach then' || chr(10)
     || '    -- FIX 3 (0428): the session this workout belongs to (linked at Start, or that client''s session on the calendar the same day) is settled ONCE: settle_booking_internal never' || chr(10)
     || '    -- takes a second session. No booking: nothing is taken here; the app offers it as a walk-in (create_walk_in_booking). The old "Use 1 session credit" choice is gone.' || chr(10)
-    || '    v_credit_consumed := public.settle_booking_internal(coalesce(v_session.booking_id, public.match_booking_for_session(p_session_id)), v_credit_cost, ''Workout logged'', auth.uid(), v_session.athlete_id, v_session.group_id);' || chr(10)
+    || '    -- An imported workout (a team sheet, imported history) is never matched to the calendar.' || chr(10)
+    || '    v_credit_consumed := public.settle_booking_internal(coalesce(v_session.booking_id, case when v_session.import_batch_id is null and not coalesce(v_session.is_historical, false) then public.match_booking_for_session(p_session_id) end), v_credit_cost, ''Workout logged'', auth.uid(), v_session.athlete_id, v_session.group_id);' || chr(10)
     || '  end if;' || chr(10)
     || chr(10)
     || '  '
@@ -150,7 +243,7 @@ begin
   update public.bookings set no_show = true where id = p_booking_id;
 
   -- A late move the coach already charged IS this visit's one session (Ron: "one session"): nothing more either way.
-  if v_b.late_change_kind = 'reschedule' and v_b.late_charge_state = 'charged' then
+  if public.booking_late_move_charged(p_booking_id) then
     return false;
   end if;
 
@@ -160,14 +253,15 @@ begin
       update public.bookings set credit_state = 'settled' where id = p_booking_id;
       return true;
     end if;
-    return false; -- paid when it was booked (or already settled): nothing more
+    return false; -- paid when it was booked: nothing more
   end if;
 
   if v_b.credit_state = 'unsettled' then
     perform public.apply_session_credit_change(v_b.athlete_id, v_b.group_id, 0, 'waived', 'No-show, not charged', p_booking_id, auth.uid());
     update public.bookings set credit_state = 'waived' where id = p_booking_id;
-  elsif v_b.credit_state = 'prepaid' then
-    perform public.apply_session_credit_change(v_b.athlete_id, v_b.group_id, 1, 'refund', 'No-show, not charged', p_booking_id, auth.uid());
+  elsif v_b.credit_state = 'prepaid' and public.booking_taken(p_booking_id) > 0 then
+    -- Paid when it was booked: what it actually took comes back (never more). A 'prepaid' booking that took nothing stays as it is.
+    perform public.apply_session_credit_change(v_b.athlete_id, v_b.group_id, public.booking_taken(p_booking_id), 'refund', 'No-show, not charged', p_booking_id, auth.uid());
     update public.bookings set credit_state = 'waived' where id = p_booking_id;
   end if;
   return false;
@@ -176,7 +270,7 @@ $$;
 revoke all on function public.resolve_no_show(uuid, boolean) from public, anon;
 grant execute on function public.resolve_no_show(uuid, boolean) to authenticated, service_role;
 
--- ---- 4. set_booking_no_show: true = a waived no-show; false = undo, giving back only what the no-show took ------------------------------------
+-- ---- 4. set_booking_no_show: true = a waived no-show; false = undo, back to an ordinary unmarked session (booking_put_back) ------------------------
 create or replace function public.set_booking_no_show(p_booking_id uuid, p_no_show boolean)
 returns void
 language plpgsql
@@ -185,8 +279,6 @@ set search_path = public
 as $$
 declare
   v_b public.bookings%rowtype;
-  v_taken int;
-  v_late int;
 begin
   if p_no_show then
     perform public.resolve_no_show(p_booking_id, false);
@@ -211,22 +303,10 @@ begin
     return;
   end if;
 
-  if v_b.credit_state = 'settled' then
-    -- What this booking has cost so far (delivered minus refunds, the undo_booking_attended formula), less a late-move charge, which stays.
-    v_late := public.booking_late_charge_taken(p_booking_id);
-    select coalesce(-sum(amount), 0) - v_late into v_taken
-    from public.session_credit_ledger
-    where booking_id = p_booking_id and kind in ('delivered', 'refund');
-    if v_taken > 0 then
-      perform public.apply_session_credit_change(v_b.athlete_id, v_b.group_id, v_taken, 'refund', 'Undid no-show', p_booking_id, auth.uid());
-    end if;
-    update public.bookings set no_show = false, credit_state = case when v_late > 0 then 'settled' else 'unsettled' end where id = p_booking_id;
-  elsif v_b.credit_state = 'waived'
-        and exists (select 1 from public.session_credit_ledger where booking_id = p_booking_id and note = 'No-show, not charged') then
-    -- Waived by the no-show (a session paid at booking was given back then): an ordinary unpaid session again.
-    update public.bookings set no_show = false, credit_state = 'unsettled' where id = p_booking_id;
-  else
-    update public.bookings set no_show = false where id = p_booking_id;
+  update public.bookings set no_show = false where id = p_booking_id;
+  -- Only a no-show that changed what the session cost has anything to put back (Charge on an unpaid session, Waive): a 'prepaid' one is left as it is.
+  if v_b.credit_state in ('settled', 'waived') then
+    perform public.booking_put_back(p_booking_id, 'Undid no-show');
   end if;
 end;
 $$;
@@ -272,10 +352,15 @@ begin
   if p_charge then
     if v_kind = 'reschedule' then
       -- ONE session for a late move (Ron, Oct 19). Unpaid: this charge is that session, so the booking is settled and nothing more is taken when it happens.
-      -- Paid when it was booked, or already settled: nothing more.
-      if v_credit_state in ('unsettled', 'waived') then
+      -- Paid when it was booked, or already settled: nothing more, recorded as a 0 entry so the charge stays this visit's one session whatever is undone later.
+      -- A second late move of a session already charged for one: nothing at all.
+      if public.booking_late_move_charged(p_booking_id) then
+        null;
+      elsif v_credit_state in ('unsettled', 'waived') then
         perform public.apply_session_credit_change(v_athlete_id, v_group_id, -1, 'delivered', 'Late reschedule, charged by your coach', p_booking_id, auth.uid());
         update public.bookings set credit_state = 'settled' where id = p_booking_id;
+      else
+        perform public.apply_session_credit_change(v_athlete_id, v_group_id, 0, 'delivered', 'Late reschedule, charged by your coach', p_booking_id, auth.uid());
       end if;
     else
       perform public.apply_session_credit_change(v_athlete_id, v_group_id, -1, 'delivered', 'Late cancellation, charged by your coach', p_booking_id, auth.uid());
@@ -311,8 +396,6 @@ declare
   v_should_refund boolean;
   v_late boolean := false;
   v_athlete_name text;
-  v_late_kind text;
-  v_late_state text;
 begin
   if auth.role() = 'service_role' then
     null;
@@ -320,8 +403,8 @@ begin
     raise exception 'not authorized to cancel this booking';
   end if;
 
-  select athlete_id, group_id, coach_id, status, credit_state, start_at, end_at, attended_at, late_change_kind, late_charge_state
-    into v_athlete_id, v_group_id, v_coach_id, v_status, v_state, v_start_at, v_end_at, v_attended_at, v_late_kind, v_late_state
+  select athlete_id, group_id, coach_id, status, credit_state, start_at, end_at, attended_at
+    into v_athlete_id, v_group_id, v_coach_id, v_status, v_state, v_start_at, v_end_at, v_attended_at
   from public.bookings where id = p_booking_id
   for update;
 
@@ -343,11 +426,12 @@ begin
     raise exception 'this session has already started; ask your coach';
   end if;
 
-  -- FIX 3 (0428): a late move the coach charged is this visit's one session. The client cancelling it afterwards gets nothing back and it is not flagged again.
-  -- (A coach cancelling it gives the session back below, as any coach cancellation does.)
+  -- FIX 3 (0428): a late move the coach charged is this visit's one session. The client cancelling it afterwards (even after moving it again) gets nothing back and it is
+  -- not flagged again. (A coach cancelling it gives the session back below, as any coach cancellation does.)
   if v_is_athlete_cancelling and not coalesce(public.is_group_coach(v_group_id), false)
-     and v_late_kind = 'reschedule' and v_late_state = 'charged' then
-    update public.bookings set status = 'cancelled' where id = p_booking_id;
+     and public.booking_late_move_charged(p_booking_id) then
+    -- A later late move still waiting for the coach is settled by this one: the earlier charge stands.
+    update public.bookings set status = 'cancelled', late_charge_state = case when late_charge_state = 'flagged' then 'charged' else late_charge_state end where id = p_booking_id;
     perform public.offer_freed_slot_to_waitlist(v_coach_id, v_start_at, v_end_at);
     return;
   end if;
@@ -394,7 +478,7 @@ $$;
 revoke all on function public.cancel_booking_and_refund_credit(uuid) from public, anon;
 grant execute on function public.cancel_booking_and_refund_credit(uuid) to authenticated, service_role;
 
--- ---- 7. undo_booking_attended: gives back only what attendance took ------------------------------------------------------------------------------
+-- ---- 7. undo_booking_attended: back to an ordinary unmarked session (booking_put_back) ------------------------------------------------------------
 create or replace function public.undo_booking_attended(p_booking_id uuid)
 returns boolean
 language plpgsql
@@ -403,8 +487,6 @@ set search_path = public
 as $$
 declare
   v_b public.bookings%rowtype;
-  v_taken int;
-  v_late int;
 begin
   select * into v_b from public.bookings where id = p_booking_id for update;
   if not found then
@@ -418,18 +500,10 @@ begin
   end if;
 
   if v_b.credit_state = 'settled' then
-    -- What this booking has actually cost the client so far: every delivered entry minus every refund already given
-    -- back for it (an earlier undo, a cancellation). Refunding anything more would mint credits, so a repeated
-    -- settle and undo can only ever return what is outstanding. lib/session-ledger.ts outstandingForBooking mirrors this.
-    -- FIX 3 (0428): a late-move charge is not attendance's to give back: it stays, and the booking stays settled by it.
-    v_late := public.booking_late_charge_taken(p_booking_id);
-    select coalesce(-sum(amount), 0) - v_late into v_taken
-    from public.session_credit_ledger
-    where booking_id = p_booking_id and kind in ('delivered', 'refund');
-    if v_taken > 0 then
-      perform public.apply_session_credit_change(v_b.athlete_id, v_b.group_id, v_taken, 'refund', 'Undid attended', p_booking_id, auth.uid());
-    end if;
-    update public.bookings set credit_state = case when v_late > 0 then 'settled' else 'unsettled' end, attended_at = null where id = p_booking_id;
+    -- FIX 3 (0428): back to what an unmarked visit costs, from its own history (booking_put_back): what attendance took comes back, never more, and a late-move
+    -- charge stays (the booking stays settled by it), whatever else was marked and undone before.
+    update public.bookings set attended_at = null where id = p_booking_id;
+    perform public.booking_put_back(p_booking_id, 'Undid attended');
   else
     update public.bookings set attended_at = null where id = p_booking_id;
   end if;
@@ -474,6 +548,11 @@ begin
   end if;
   if v_s.status::text <> 'completed' or v_s.started_at is null then
     raise exception 'finish the workout first';
+  end if;
+  -- Only right after a workout the coach logged here: never an imported one, one that already used a session the old way (the "Use 1 session credit" box), or an old one.
+  if v_s.import_batch_id is not null or coalesce(v_s.is_historical, false) or coalesce(v_s.deduct_session_credit, false)
+     or coalesce(v_s.completed_at, now()) < now() - interval '1 day' then
+    raise exception 'this workout cannot be added as a walk-in';
   end if;
 
   -- Already on the calendar (linked, or a same-day session found now): that session, settled once; never a second one.

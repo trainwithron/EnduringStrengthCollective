@@ -143,9 +143,38 @@ export default {
       await rpc(coach, `select public.resolve_no_show($1, false) as v`, [pb2]);
       h.check("no-show Waive on a session paid at booking: its session comes back", (await bal(p)) === 9 && (await bk(pb2)).credit_state === "waived");
       await rpc(coach, `select public.set_booking_no_show($1, false) as v`, [pb2]);
-      h.check("...Undo: an unpaid session again (net 0; it is charged if it is marked happened)", (await bal(p)) === 9 && (await bk(pb2)).credit_state === "unsettled");
+      h.check("...Undo: paid for again, as when it was booked", (await bal(p)) === 8 && (await bk(pb2)).credit_state === "prepaid");
       await rpc(coach, `select public.mark_booking_attended($1) as v`, [pb2]);
-      h.check("...then marked happened: exactly 1 for it", (await bal(p)) === 8);
+      h.check("...then marked happened: still exactly 1 for it", (await bal(p)) === 8);
+
+      // The reviewer's sequences: undos in any order never take two sessions for one visit.
+      const pr = await client("Pru");
+      const prb = await booking(pr, "2026-09-24T17:00:00Z", { credit: "prepaid" });
+      await rpc(coach, `select public.resolve_no_show($1, false) as v`, [prb]);
+      await rpc(coach, `select public.set_booking_no_show($1, false) as v`, [prb]);
+      await rpc(coach, `select public.mark_booking_attended($1) as v`, [prb]);
+      await rpc(coach, `select public.undo_booking_attended($1) as v`, [prb]);
+      await rpc(coach, `select public.mark_booking_attended($1) as v`, [prb]);
+      h.check("paid at booking: no-show Waive, Undo, happened, Undo, happened again: exactly 1", (await bal(pr)) === 9, `balance ${await bal(pr)}`);
+      const prb2 = await booking(pr, "2026-09-25T17:00:00Z", { credit: "prepaid" });
+      await rpc(coach, `select public.resolve_no_show($1, false) as v`, [prb2]);
+      await rpc(coach, `select public.set_booking_no_show($1, false) as v`, [prb2]);
+      await rpc(coach, `select public.resolve_no_show($1, true) as v`, [prb2]);
+      await rpc(coach, `select public.set_booking_no_show($1, false) as v`, [prb2]);
+      const prl = await log(pr, "2026-09-25T17:05:00Z");
+      h.check("paid at booking: no-show Waive, Undo, no-show Charge, Undo, then logged: exactly 1", (await bal(pr)) === 8 && prl.linked === prb2, `balance ${await bal(pr)}`);
+      const prb3 = await booking(pr, "2026-09-26T17:00:00Z");
+      await rpc(coach, `select public.resolve_no_show($1, false) as v`, [prb3]);
+      const marked = await rpc(coach, `select public.mark_booking_attended($1) as v`, [prb3]);
+      h.check("a no-show is not marked happened on top (undo the no-show first)", marked.v === false && (await bk(prb3)).attended_at === null);
+      await rpc(coach, `select public.set_booking_no_show($1, false) as v`, [prb3]);
+      await rpc(coach, `select public.mark_booking_attended($1) as v`, [prb3]);
+      h.check("...Undo the no-show, then happened: exactly 1 for it", (await bal(pr)) === 7 && (await bk(prb3)).credit_state === "settled");
+      const prb4 = await booking(pr, "2026-09-27T17:00:00Z");
+      await rpc(coach, `select public.waive_booking($1, 'holiday') as v`, [prb4]);
+      await rpc(coach, `select public.resolve_no_show($1, true) as v`, [prb4]);
+      await rpc(coach, `select public.set_booking_no_show($1, false) as v`, [prb4]);
+      h.check("waived by the coach, then no-show Charge, then Undo: waived again, nothing used", (await bal(pr)) === 7 && (await bk(prb4)).credit_state === "waived");
 
       const q = await client("Quinn");
       const qb = await booking(q, "2026-09-12T17:00:00Z");
@@ -179,6 +208,25 @@ export default {
       h.check("...Undo attended gives back only what attendance took (nothing); the late charge stays", (await bal(r)) === 9 && (await bk(rb)).credit_state === "settled" && (await bk(rb)).attended_at === null);
       await rpc(coach, `select public.mark_booking_attended($1) as v`, [rb]);
       h.check("...marked happened again: still exactly 1", (await bal(r)) === 9);
+
+      const r2 = await client("Rex");
+      const r2b = await booking(r2, "2026-09-28T17:00:00Z");
+      await flag(r2b);
+      await log(r2, "2026-09-28T17:05:00Z");
+      await rpc(coach, `select public.resolve_late_change($1, true) as v`, [r2b]);
+      h.check("logged, then the late move Charged: still exactly 1", (await bal(r2)) === 9);
+      await rpc(coach, `select public.undo_booking_attended($1) as v`, [r2b]);
+      h.check("...Undo attended: the late charge is the one session, nothing comes back", (await bal(r2)) === 9 && (await bk(r2b)).credit_state === "settled");
+      await rpc(coach, `select public.resolve_no_show($1, true) as v`, [r2b]);
+      h.check("...then a no-show Charge: nothing more", (await bal(r2)) === 9);
+      const r2c = await booking(r2, "2026-09-29T17:00:00Z");
+      await flag(r2c);
+      await rpc(coach, `select public.resolve_no_show($1, true) as v`, [r2c]);
+      await rpc(coach, `select public.resolve_late_change($1, true) as v`, [r2c]);
+      await rpc(coach, `select public.set_booking_no_show($1, false) as v`, [r2c]);
+      h.check("no-show Charge, late move Charge, Undo the no-show: exactly 1 (the late charge)", (await bal(r2)) === 8 && (await bk(r2c)).credit_state === "settled");
+      await rpc(coach, `select public.resolve_no_show($1, true) as v`, [r2c]);
+      h.check("...a no-show Charge again: nothing more", (await bal(r2)) === 8);
 
       const s = await client("Sol");
       const sb = await booking(s, "2026-09-15T17:00:00Z", { credit: "prepaid" });
@@ -240,56 +288,98 @@ export default {
       await rpc(coach, `select public.resolve_late_change($1, true) as v`, [vb3]);
       await rpc(v, `select public.cancel_booking_and_refund_credit($1) as v`, [vb3]);
       h.check("...the same for a session paid at booking (one session in all)", (await bal(v)) === 8);
+      const vb5 = await booking(v, future(14));
+      await flag(vb5);
+      await rpc(coach, `select public.resolve_late_change($1, true) as v`, [vb5]);
+      await flag(vb5);
+      await rpc(coach, `select public.resolve_late_change($1, true) as v`, [vb5]);
+      h.check("a charged late move moved late again and Charged again: nothing more", (await bal(v)) === 7);
+      await flag(vb5);
+      await rpc(coach, `select public.resolve_late_change($1, false) as v`, [vb5]);
+      await rpc(v, `select public.cancel_booking_and_refund_credit($1) as v`, [vb5]);
+      h.check("...moved late a third time and Waived, then the client cancels: nothing back", (await bal(v)) === 7);
+      const vb6 = await booking(v, future(15));
+      await flag(vb6);
+      await rpc(coach, `select public.resolve_late_change($1, true) as v`, [vb6]);
+      await flag(vb6);
+      await rpc(v, `select public.cancel_booking_and_refund_credit($1) as v`, [vb6]);
+      h.check("a charged late move moved late again, and the client cancels while it waits: nothing back, not flagged again", (await bal(v)) === 6 && (await bk(vb6)).late_change_kind === "reschedule" && (await bk(vb6)).late_charge_state === "charged");
       const vb4 = await booking(v, future(13), { credit: "prepaid" });
       await rpc(v, `select public.cancel_booking_and_refund_credit($1) as v`, [vb4]);
-      h.check("a client cancelling in time with no late change still gets their session back", (await bal(v)) === 8);
+      h.check("a client cancelling in time with no late change still gets their session back", (await bal(v)) === 6);
 
-      // ---- the walk-in ----
+      // ---- the walk-in (offered right after the workout, so these are within the last day) ----
+      const ago = (mins) => new Date(Date.now() - mins * 60000).toISOString();
+      const finish = async (sessionId, at) => { await h.asSuper(); await db.query(`update public.athlete_sessions set completed_at = $2 where id = $1`, [sessionId, at]); };
       const w = await client("Wes");
-      const wl = await log(w, "2026-09-22T17:00:00Z");
-      await db.query(`update public.athlete_sessions set completed_at = '2026-09-22T17:35:00Z' where id = $1`, [wl.s]);
+      const wStart = ago(23 * 60);
+      const wl = await log(w, wStart);
+      await finish(wl.s, ago(23 * 60 - 35));
       h.check("a workout with no booking: nothing taken, nothing linked (the app asks)", wl.linked === null && (await bal(w)) === 10);
       const wid = (await rpc(coach, `select public.create_walk_in_booking($1) as id`, [wl.s])).id;
       const wb = await bk(wid);
       h.check("Yes: 1 session, a booking on the coach's calendar for at least a session's length (60 minutes), linked",
         (await bal(w)) === 9 && wb.coach_id === coach && wb.credit_state === "settled" && wb.attended_at !== null
-          && new Date(wb.start_at).toISOString() === "2026-09-22T17:00:00.000Z" && new Date(wb.end_at).toISOString() === "2026-09-22T18:00:00.000Z"
+          && new Date(wb.start_at).toISOString() === wStart && new Date(wb.end_at).getTime() - new Date(wStart).getTime() === 60 * 60000
           && (await h.one(`select booking_id from public.athlete_sessions where id = $1`, [wl.s])).booking_id === wid,
         JSON.stringify({ start: wb.start_at, end: wb.end_at, bal: await bal(w) }));
       const wid2 = (await rpc(coach, `select public.create_walk_in_booking($1) as id`, [wl.s])).id;
       h.check("...Yes again (a double tap): the same booking, nothing more", wid2 === wid && (await bal(w)) === 9 && (await h.one(`select count(*)::int as n from public.bookings where athlete_id = $1`, [w])).n === 1);
 
       const x = await client("Xan");
-      const xl = await log(x, "2026-09-22T19:00:00Z");
-      await db.query(`update public.athlete_sessions set completed_at = '2026-09-22T20:30:00Z' where id = $1`, [xl.s]);
-      await db.query(`insert into public.coach_availability_windows (coach_id, weekday, start_time, end_time, session_minutes) values ($1, 2, '06:00', '20:00', 45)`, [coach]);
+      const xl = await log(x, ago(21 * 60));
+      const xEnd = ago(21 * 60 - 90);
+      await finish(xl.s, xEnd);
+      for (let d = 0; d < 7; d++) await db.query(`insert into public.coach_availability_windows (coach_id, weekday, start_time, end_time, session_minutes) values ($1, $2, '00:00', '23:59:59', 45)`, [coach, d]);
       const xid = (await rpc(coach, `select public.create_walk_in_booking($1) as id`, [xl.s])).id;
-      h.check("a workout longer than a session: the booking runs to its finish", new Date((await bk(xid)).end_at).toISOString() === "2026-09-22T20:30:00.000Z" && (await bal(x)) === 9);
+      h.check("a workout longer than a session: the booking runs to its finish", new Date((await bk(xid)).end_at).toISOString() === xEnd && (await bal(x)) === 9);
 
       const y = await client("Yas");
-      const yl = await log(y, "2026-09-22T21:00:00Z");
-      await db.query(`update public.athlete_sessions set completed_at = '2026-09-22T21:20:00Z' where id = $1`, [yl.s]);
+      const yStart = ago(18 * 60);
+      const yl = await log(y, yStart);
+      await finish(yl.s, ago(18 * 60 - 20));
       const yid = (await rpc(coach, `select public.create_walk_in_booking($1) as id`, [yl.s])).id;
-      h.check("the coach's session length for that time (45 minutes) is used", new Date((await bk(yid)).end_at).toISOString() === "2026-09-22T21:45:00.000Z" && (await bal(y)) === 9);
+      h.check("the coach's session length for that time (45 minutes) is used", new Date((await bk(yid)).end_at).getTime() - new Date(yStart).getTime() === 45 * 60000 && (await bal(y)) === 9);
 
       const z = await client("Zed");
-      const zl = await log(z, "2026-09-22T17:30:00Z");
-      await db.query(`update public.athlete_sessions set completed_at = '2026-09-22T17:50:00Z' where id = $1`, [zl.s]);
+      const zl = await log(z, ago(23 * 60 - 30));
+      await finish(zl.s, ago(23 * 60 - 50));
       await h.expectErrorAs(coach, "a walk-in over another session on the calendar is refused", `select public.create_walk_in_booking($1)`, [zl.s], /overlaps another session/);
       h.check("...and nothing is taken or made", (await bal(z)) === 10 && (await h.one(`select count(*)::int as n from public.bookings where athlete_id = $1`, [z])).n === 0);
       await h.expectErrorAs(z, "a client cannot make a walk-in", `select public.create_walk_in_booking($1)`, [zl.s], /not authorized/);
 
       const zz = await client("Zoe");
-      const zzl = await log(zz, "2026-09-23T17:00:00Z");
-      const zzb = await booking(zz, "2026-09-23T15:00:00Z"); // appears after the workout was finished
+      const zzStart = ago(16 * 60);
+      const zzl = await log(zz, zzStart);
+      const zzb = await booking(zz, zzStart); // appears after the workout was finished
       const zzid = (await rpc(coach, `select public.create_walk_in_booking($1) as id`, [zzl.s])).id;
       h.check("a session on the calendar that day after all: that one is settled, no second booking", zzid === zzb && (await bal(zz)) === 9 && (await h.one(`select count(*)::int as n from public.bookings where athlete_id = $1`, [zz])).n === 1);
 
+      const old = await client("Old");
+      const oldl = await log(old, "2026-09-01T17:00:00Z");
+      await finish(oldl.s, "2026-09-01T17:40:00Z");
+      await h.expectErrorAs(coach, "an old workout cannot be added as a walk-in", `select public.create_walk_in_booking($1)`, [oldl.s], /cannot be added as a walk-in/);
+      const dd = await log(old, ago(10 * 60), { deduct: true });
+      await h.expectErrorAs(coach, "...nor one that already used a session the old way (the Use 1 session credit box)", `select public.create_walk_in_booking($1)`, [dd.s], /cannot be added as a walk-in/);
+      h.check("...and nothing was taken for either", (await bal(old)) === 10);
+
+      // ---- an imported workout (a team sheet, imported history) is never matched to the calendar ----
+      const im = await client("Ima");
+      const imb = await booking(im, "2026-09-30T17:00:00Z");
+      await h.asSuper();
+      n++;
+      const imw = (await db.query(`insert into public.workouts (program_id, group_id, title, day_index) values ($1, $2, $3, $4) returning id`, [prog, g, "W" + n, n])).rows[0].id;
+      const ims = (await db.query(`insert into public.athlete_sessions (workout_id, group_id, athlete_id, logged_by_coach, is_historical, started_at) values ($1, $2, $3, true, true, '2026-09-30T17:00:00Z') returning id`, [imw, g, im])).rows[0].id;
+      await rpc(coach, `select * from public.complete_workout_session($1)`, [ims]);
+      h.check("an imported workout on a booked day takes nothing and links nothing", (await bal(im)) === 10 && (await h.one(`select booking_id from public.athlete_sessions where id = $1`, [ims])).booking_id === null && (await bk(imb)).attended_at === null);
+
       // ---- who can call what ----
       await h.as(coach);
-      for (const fn of ["match_booking_for_session(uuid)", "booking_late_charge_taken(uuid)"]) {
-        await h.expectError(`${fn} is not callable by a signed-in person`, () => db.query(`select public.${fn.replace("(uuid)", "")}($1)`, [h.uuid(1)]), /permission denied/);
+      for (const fn of ["match_booking_for_session", "booking_taken", "booking_late_move_charged"]) {
+        await h.expectError(`${fn} is not callable by a signed-in person`, () => db.query(`select public.${fn}($1)`, [h.uuid(1)]), /permission denied/);
       }
+      await h.expectError("booking_put_back is not callable by a signed-in person", () => db.query(`select public.booking_put_back($1, 'x')`, [h.uuid(1)]), /permission denied/);
+      await h.expectError("settle_booking_internal is still not callable by a signed-in person", () => db.query(`select public.settle_booking_internal($1, 1, 'x', $1)`, [h.uuid(1)]), /permission denied/);
       await h.asSuper();
     },
   },

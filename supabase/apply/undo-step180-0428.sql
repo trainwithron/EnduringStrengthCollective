@@ -1,4 +1,4 @@
--- UNDO for step 180 (0428). Only if step 180 misbehaves, and only while the FIX 3 item 4 app update is NOT live (it calls resolve_no_show and create_walk_in_booking). Puts the five functions back exactly as they were and drops the four new ones. Sessions already charged or given back stay as they are in the history.
+-- UNDO for step 180 (0428). Only if step 180 misbehaves, and only while the FIX 3 item 4 app update is NOT live (it calls resolve_no_show and create_walk_in_booking). Puts the six functions back exactly as they were and drops the six new ones. Sessions already charged or given back stay as they are in the history.
 -- WHAT YOU SHOULD SEE: "Success. No rows returned."   Then tell Spot, and do not run the step again until Spot says why it failed.
 begin;
 do $$
@@ -229,8 +229,49 @@ begin
   return true;
 end;
 $$;
+create or replace function public.settle_booking_internal(
+  p_booking_id uuid,
+  p_cost int,
+  p_note text,
+  p_by uuid,
+  p_expected_athlete uuid default null,
+  p_expected_group uuid default null
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_b public.bookings%rowtype;
+begin
+  select * into v_b from public.bookings where id = p_booking_id for update;
+  if not found or v_b.status <> 'confirmed' then
+    return false;
+  end if;
+  -- A logged session may only settle a booking that is really that client's, in that group.
+  if (p_expected_athlete is not null and v_b.athlete_id <> p_expected_athlete)
+     or (p_expected_group is not null and v_b.group_id <> p_expected_group) then
+    return false;
+  end if;
+  if v_b.attended_at is not null then
+    return false; -- already settled by the other path; never charged twice
+  end if;
+
+  update public.bookings set attended_at = now() where id = p_booking_id;
+
+  if v_b.credit_state = 'unsettled' and coalesce(p_cost, 1) > 0 then
+    perform public.apply_session_credit_change(v_b.athlete_id, v_b.group_id, -coalesce(p_cost, 1), 'delivered', p_note, p_booking_id, p_by);
+    update public.bookings set credit_state = 'settled' where id = p_booking_id;
+    return true;
+  end if;
+  return false; -- prepaid or waived: attended, nothing more to take
+end;
+$$;
 drop function if exists public.create_walk_in_booking(uuid);
 drop function if exists public.resolve_no_show(uuid, boolean);
 drop function if exists public.match_booking_for_session(uuid);
-drop function if exists public.booking_late_charge_taken(uuid);
+drop function if exists public.booking_put_back(uuid, text);
+drop function if exists public.booking_late_move_charged(uuid);
+drop function if exists public.booking_taken(uuid);
 commit;
