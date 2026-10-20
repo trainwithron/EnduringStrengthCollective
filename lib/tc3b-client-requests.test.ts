@@ -291,7 +291,8 @@ describe("the daily clean-up", () => {
   it("is a monitored daily job, scheduled, and added today", () => {
     expect(read("app/api/cron/purge-client-request-attempts/route.ts")).toContain('withCronRun("purge-client-request-attempts"');
     expect(read("lib/cron-jobs.ts")).toContain('{ job: "purge-client-request-attempts", path: "/api/cron/purge-client-request-attempts", maxAgeHours: DAILY }');
-    expect(read("lib/cron-jobs.ts")).toContain('"purge-client-request-attempts": new Date("2026-10-18T00:00:00Z")');
+    // judged from when it went live (18:40 UTC Oct 19), not before its first chance to run
+    expect(read("lib/cron-jobs.ts")).toContain('"purge-client-request-attempts": new Date("2026-10-19T18:40:00Z")');
     expect(read("vercel.json")).toContain('"path": "/api/cron/purge-client-request-attempts"');
   });
 });
