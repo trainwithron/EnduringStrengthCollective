@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { homeOfPath, homeTabs, homeHref, HOMES, type HomeKey } from "@/lib/desktop-coach-homes";
+import { HomeTabStrip } from "@/components/coach/desktop/home-tab-strip";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
@@ -10,7 +13,6 @@ import {
   ChevronRight,
   CalendarDays,
   MessagesSquare,
-  LayoutDashboard,
   Palette,
   TrendingUp,
   HeartHandshake,
@@ -161,6 +163,9 @@ type NavEntry = NavLeaf | NavGroup;
 function isGroup(entry: NavEntry): entry is NavGroup {
   return "items" in entry;
 }
+
+// FIX 6: the homes that already have their tab strip (the rest still use the old menus until their release).
+export const FOLDED_HOMES: ReadonlySet<HomeKey> = new Set<HomeKey>(["home", "messages"]);
 
 function CoachDesktopShellFull({
   groupId,
@@ -433,6 +438,14 @@ function CoachDesktopShellFull({
   const teamSport = isTeamSportGroup(teamMode) && !coachLevel;
   // ONE rule for the money numbers (Business tile / view, rail Business icon, income, MRR, paying clients): lib/team-sport.ts moneyHiddenFor.
   const moneyHidden = moneyHiddenFor({ coachLevel: !!coachLevel, groupIsTeamSport: isTeamSportGroup(teamMode), orgTeamOnly });
+
+  // FIX 6 (six homes on the computer, lib/desktop-coach-homes.ts): the home and the tab come from the address; a folded home has a strip of tabs at the top of the page instead of a menu.
+  // Folded so far: Home and Messages (release 1 of 4). The old menus still hold the rest.
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const here = homeOfPath(pathname ?? "", searchParams ? `?${searchParams.toString()}` : "");
+  const tabsByHome = homeTabs({ groupId, coachLevel: !!coachLevel, groupKind, teamMode, teamSport, moneyHidden, navFacts, isPlatformAdmin, onFrontDesk });
+  const homeIsFolded = (h: HomeKey | undefined) => !!h && FOLDED_HOMES.has(h);
   const ordinaryNav: NavEntry[] = [
     // Run my day — the highest-frequency items, flat, no group/extra
     // click to reach any of them. Team Performance sits right next to
@@ -460,7 +473,7 @@ function CoachDesktopShellFull({
       label: "Business",
       icon: TrendingUp,
       items: [
-        { key: "business", label: "Overview", href: `/groups/${groupId}/business`, icon: TrendingUp },
+        // (Overview is Home > Business now: FIX 6.)
         { key: "packages", label: "Packages", href: `/groups/${groupId}/business/packages`, icon: Layers },
         { key: "resources", label: "Pro shop and referrals", href: `/groups/${groupId}/resources`, icon: HeartHandshake },
         { key: "website", label: "My website", href: `/groups/${groupId}/business/website`, icon: Globe },
@@ -487,12 +500,10 @@ function CoachDesktopShellFull({
       icon: ThreePeopleIcon as unknown as typeof LayoutGrid,
       items: [
         ...(showsMembers(groupKind, coachLevel) ? [{ key: "members" as const, label: "Members", href: membersHref(groupId), icon: Users2 }] : []),
-        { key: "dashboard", label: "Group dashboard", href: `/groups/${groupId}/dashboard`, icon: LayoutDashboard },
+        // (Group dashboard is Home > Group dashboard now: FIX 6.)
         { key: "team-performance", label: "Team performance", href: `/groups/${groupId}/team-performance`, icon: Activity },
         ...(groupKind !== null && groupKind !== "one_on_one" ? [{ key: "attendance" as const, label: "Attendance", href: `/groups/${groupId}/attendance`, icon: ClipboardList }] : []),
-        ...(groupKind !== null && groupKind !== "one_on_one"
-          ? [{ key: "feed" as const, label: "Team feed", href: `/groups/${groupId}/feed`, icon: MessagesSquare, badge: feedUnread }]
-          : []),
+        // (Team feed is Messages > Team feed now: FIX 6.)
         ...(teamMode
           ? [
               { key: "team" as const, label: "Depth chart", href: `/groups/${groupId}/team`, icon: ClipboardList },
@@ -518,7 +529,7 @@ function CoachDesktopShellFull({
         { key: "sms-settings", label: "Text messages", href: `/groups/${groupId}/business/sms-settings`, icon: MessageCircle },
         { key: "support", label: "Support", href: `/groups/${groupId}/business/support`, icon: HeartHandshake },
         { key: "quick-tips", label: "Quick tips", href: `/groups/${groupId}/quick-tips`, icon: Lightbulb },
-        ...(isPlatformAdmin ? [{ key: "admin-support" as const, label: "Support inbox", href: "/admin/support", icon: HeartHandshake, badge: openSupportCount }] : []),
+        // (Support inbox is Messages > Support inbox now: FIX 6.)
       ],
     },
   ];
@@ -537,7 +548,7 @@ function CoachDesktopShellFull({
     records: Trophy,
     "team-sheet": ClipboardList,
   };
-  const teamLeaves: NavLeaf[] = teamSportMenu(groupId).map((item) => ({
+  const teamLeaves: NavLeaf[] = teamSportMenu(groupId).filter((item) => item.key !== "feed").map((item) => ({
     key: item.key as Active,
     label: item.label,
     href: item.href,
@@ -595,8 +606,13 @@ function CoachDesktopShellFull({
   const flatWidgetByKey: Partial<Record<Active, React.ReactNode>> = {
     clients: <ClientsRailWidget groupId={groupId} />,
     members: <ClientsRailWidget groupId={groupId} />,
-    messages: <MessagesRailWidget groupId={groupId} />,
-    feed: <FeedRailWidget groupId={groupId} />,
+    // FIX 6: the Feed widget stacks under Messages (Team feed is a Messages tab).
+    messages: (
+      <div className="space-y-3">
+        <MessagesRailWidget groupId={groupId} />
+        {groupKind !== null && groupKind !== "one_on_one" && <FeedRailWidget groupId={groupId} />}
+      </div>
+    ),
     calendar: <CalendarRailWidget groupId={groupId} />,
     "team-performance": <TeamRailWidget groupId={groupId} />,
   };
@@ -606,9 +622,10 @@ function CoachDesktopShellFull({
       return {
         key: entry.key,
         label: entry.label,
-        href: entry.href,
         icon: entry.icon,
-        active: active === entry.key,
+        // A folded home's icon goes to its first tab and is lit by the address (FIX 6).
+        href: entry.key === "messages" && homeIsFolded("messages") ? homeHref(tabsByHome, "messages") ?? entry.href : entry.href,
+        active: entry.key === "messages" && homeIsFolded("messages") ? here?.home === "messages" : active === entry.key,
         badge: entry.badge,
         popover: flatWidgetByKey[entry.key],
       };
@@ -620,7 +637,8 @@ function CoachDesktopShellFull({
       href: first.href,
       icon: entry.icon,
       active: groupHasActiveChild(entry),
-      popover: entry.label === "Business" ? <BusinessRailWidget groupId={groupId} /> : undefined,
+      // (The Business widget moved to the Home icon: FIX 6.)
+      popover: undefined,
     };
   });
 
@@ -736,7 +754,15 @@ function CoachDesktopShellFull({
             desktop shell. */}
         <ShellRail
           icons={[
-            { key: "home", label: "Home", href: "/dashboard", icon: Home, active: active === "home" },
+            {
+              key: "home",
+              label: "Home",
+              href: homeHref(tabsByHome, "home") ?? "/dashboard",
+              icon: Home,
+              active: homeIsFolded("home") ? here?.home === "home" : active === "home",
+              // FIX 6: the Business widget is on the Home icon (not where the money numbers are hidden).
+              popover: moneyHidden ? undefined : <BusinessRailWidget groupId={groupId} />,
+            },
             ...railIcons,
           ]}
           footer={
@@ -771,6 +797,14 @@ function CoachDesktopShellFull({
 
         <main id="main-content" tabIndex={-1} className={`flex-1 min-w-0 px-4 pt-6 pb-24 md:px-10 md:pt-8 lg:pb-8 lg:mr-[var(--ws-dock,0px)] ${wide ? "" : "max-w-[1400px]"} focus:outline-none`}>
           <PendingNoticeFlusher />
+          {here && homeIsFolded(here.home) && (
+            <HomeTabStrip
+              label={HOMES.find((h) => h.key === here.home)?.label ?? "Sections"}
+              tabs={tabsByHome[here.home]}
+              current={here.tab}
+              counts={{ clients: clientsUnread, messages: messagesUnread, feed: feedUnread, support: openSupportCount }}
+            />
+          )}
           {children}
         </main>
       </div>

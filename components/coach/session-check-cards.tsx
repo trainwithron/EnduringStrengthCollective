@@ -4,7 +4,6 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { sessionWhenInWords } from "@/lib/session-when-words";
-import { mirrorGoogleCalendarEvent } from "@/lib/mirror-google-calendar-event";
 import { checkAndNotifyLowSessionBalance } from "@/lib/notify-low-session-balance";
 import { BookingDateControl } from "@/components/coach/booking-date-control";
 import { saveSessionNote } from "@/lib/session-note";
@@ -21,12 +20,15 @@ export interface SessionToCheck {
 const SHOWN = 3;
 
 // "Did this session happen?" (Ron, Oct 19): a session whose time has passed and that nobody marked gets a card in the app, never a push and never auto-completed. Yes marks it attended (the session comes off their balance, as
-// always) and tells the client; No takes it off the calendar with nothing used; Reschedule changes its day right there. One tap each, then the card is gone. Oldest first, three at a time, with "N more".
+// always) and tells the client; No-show records it as a no-show and asks Charge (it uses 1 session) or Waive (nothing used) (FIX 3: the old "No" erased the session with no record); Reschedule changes its day right
+// there. Then the card is gone. Oldest first, three at a time, with "N more".
 export function SessionCheckCards({ sessions, timezone }: { sessions: SessionToCheck[]; timezone: string }) {
   const router = useRouter();
   const [gone, setGone] = useState<Set<string>>(new Set());
   const [showAll, setShowAll] = useState(false);
   const [moving, setMoving] = useState<string | null>(null);
+  // The card whose No-show is asking Charge or Waive.
+  const [askingNoShow, setAskingNoShow] = useState<string | null>(null);
   const [startOverride, setStartOverride] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -82,21 +84,23 @@ export function SessionCheckCards({ sessions, timezone }: { sessions: SessionToC
     router.refresh();
   }
 
-  async function no(s: SessionToCheck) {
+  // No-show: kept on the calendar as a no-show; Charge takes 1 session (or nothing more when it was paid for at booking), Waive takes none (or gives back one paid at booking).
+  async function noShow(s: SessionToCheck, charge: boolean) {
     setBusy(s.bookingId);
     setErrors((e) => ({ ...e, [s.bookingId]: "" }));
     if (!(await saveNote(s))) {
       setBusy(null);
       return;
     }
-    const { error } = await createBrowserClient().rpc("cancel_booking_and_refund_credit", { p_booking_id: s.bookingId });
+    const { error } = await createBrowserClient().rpc("resolve_no_show", { p_booking_id: s.bookingId, p_charge: charge });
     setBusy(null);
     if (error) {
       setErrors((e) => ({ ...e, [s.bookingId]: "That didn't save. Nothing was changed. Try again." }));
       return;
     }
-    mirrorGoogleCalendarEvent(s.bookingId);
+    setAskingNoShow(null);
     setGone((g) => new Set(g).add(s.bookingId));
+    if (charge) checkAndNotifyLowSessionBalance(s.athleteId, s.groupId);
     router.refresh();
   }
 
@@ -127,8 +131,14 @@ export function SessionCheckCards({ sessions, timezone }: { sessions: SessionToC
             <button type="button" disabled={busy === s.bookingId} onClick={() => yes(s)} className="min-h-11 px-5 bg-positive text-graphite font-display font-bold uppercase tracking-wide text-sm disabled:opacity-40">
               Yes
             </button>
-            <button type="button" disabled={busy === s.bookingId} onClick={() => no(s)} className="min-h-11 px-5 border border-steel/50 text-chalk font-display font-bold uppercase tracking-wide text-sm disabled:opacity-40">
-              No
+            <button
+              type="button"
+              disabled={busy === s.bookingId}
+              aria-expanded={askingNoShow === s.bookingId}
+              onClick={() => setAskingNoShow((a) => (a === s.bookingId ? null : s.bookingId))}
+              className="min-h-11 px-5 border border-steel/50 text-chalk font-display font-bold uppercase tracking-wide text-sm disabled:opacity-40"
+            >
+              No-show
             </button>
             <button
               type="button"
@@ -143,6 +153,17 @@ export function SessionCheckCards({ sessions, timezone }: { sessions: SessionToC
               Reschedule
             </button>
           </div>
+          {askingNoShow === s.bookingId && (
+            <div className="mt-2 flex flex-wrap items-center gap-2" data-no-show-choice>
+              <p className="w-full font-body text-xs text-steel">A no-show. Use 1 of {s.name}&apos;s sessions?</p>
+              <button type="button" disabled={busy === s.bookingId} onClick={() => noShow(s, true)} className="min-h-11 px-4 border border-rust text-rust font-body text-sm font-medium disabled:opacity-40">
+                Charge 1 session
+              </button>
+              <button type="button" disabled={busy === s.bookingId} onClick={() => noShow(s, false)} className="min-h-11 px-4 border border-steel/40 text-chalk font-body text-sm disabled:opacity-40">
+                Waive
+              </button>
+            </div>
+          )}
           {moving === s.bookingId && (
             <BookingDateControl
               bookingId={s.bookingId}

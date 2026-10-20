@@ -38,6 +38,16 @@ describe("Home's desktop rail", () => {
       expect(html).not.toContain("Client</span>");
     });
   }
+  it("FIX 6: /dashboard shows the Home strip (Today lit, Business, Group dashboard) at the top of the page", () => {
+    const html = render({ groupId: "g-team", groupName: "Varsity" });
+    expect(html).toContain('aria-label="Home"');
+    expect(html).toContain("data-home-strip");
+    const strip = html.slice(html.indexOf("data-home-strip"), html.indexOf("HOME CONTENT"));
+    expect(strip).toContain('href="/dashboard"');
+    expect(strip).toMatch(/aria-current="page"[^>]*>Today|>Today<\/a>/);
+    expect(strip).toContain('href="/groups/g-team/business"');
+    expect(strip).toContain('href="/groups/g-team/dashboard"');
+  });
   it("does not need a remembered group: nothing in the rendered rail comes from a cookie", () => {
     const a = render({ groupId: "g-team", groupName: "Varsity" });
     const b = render({ groupId: "g-team", groupName: "Varsity" });

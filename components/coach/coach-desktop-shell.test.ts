@@ -37,16 +37,20 @@ describe("coach desktop shell", () => {
       expect(at(m), m).toBeLessThan(at('label: "Group"'));
     }
     expect(nav).toContain("...(isPlatformAdmin");
-    // Group holds the group's own pages (Members first)
+    // Group holds the group's own pages (Members first). FIX 6: Group dashboard is a Home tab and Team feed a Messages tab now.
     const groupFirst = at('label: "Members"');
     expect(groupFirst).toBeGreaterThan(at('label: "Group"'));
-    expect(groupFirst).toBeLessThan(at('label: "Group dashboard"'));
-    for (const m of ['label: "Group dashboard"', 'label: "Team performance"', 'label: "Team feed"', 'label: "Group sessions"', 'label: "Challenges"', 'label: "Hall of fame"']) {
+    expect(groupFirst).toBeLessThan(at('label: "Team performance"'));
+    expect(nav).not.toContain('label: "Group dashboard"');
+    expect(nav).not.toContain('label: "Team feed"');
+    expect(nav).not.toContain('label: "Overview"');
+    for (const m of ['label: "Team performance"', 'label: "Group sessions"', 'label: "Challenges"', 'label: "Hall of fame"']) {
       expect(at(m), m).toBeGreaterThan(at('label: "Group"'));
       expect(at(m), m).toBeLessThan(at('label: "Settings"'));
     }
-    // Settings: Account, Display Mode, Kiosk Check-In, Support, Quick Tips, and the Support Inbox for the platform admin only
-    for (const m of ['label: "Account"', 'label: "Text messages"', 'label: "Display mode"', 'label: "Kiosk check-in"', 'label: "Support"', 'label: "Quick tips"', 'label: "Support inbox"']) expect(at(m), m).toBeGreaterThan(at('label: "Settings"'));
+    // Settings: Account, Display Mode, Kiosk Check-In, Support, Quick Tips (FIX 6: the Support Inbox is a Messages tab for the platform admin)
+    for (const m of ['label: "Account"', 'label: "Text messages"', 'label: "Display mode"', 'label: "Kiosk check-in"', 'label: "Support"', 'label: "Quick tips"']) expect(at(m), m).toBeGreaterThan(at('label: "Settings"'));
+    expect(nav).not.toContain('label: "Support inbox"');
     // the footer keeps only the workspace switcher, Report a problem, Download app and Sign out
     expect(shell).not.toContain('title="Display Mode"');
     expect(shell).not.toContain('title="Kiosk Check-In"');

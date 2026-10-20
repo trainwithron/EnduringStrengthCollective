@@ -72,7 +72,7 @@ describe("the date control", () => {
 
 describe("Did this session happen?", () => {
   const sessions = ["Mon", "Tue", "Wed", "Thu", "Fri"].map((d, i) => ({ bookingId: `b${i}`, athleteId: `a${i}`, groupId: "g", name: ["Hewan B.", "Cindie D.", "Karina R.", "Oliver B.", "Sawyer S."][i], startIso: `2026-10-${12 + i}T17:00:00.000Z` }));
-  it("one card per session, oldest first, three shown with 'N more', each with Yes / No / Reschedule", () => {
+  it("one card per session, oldest first, three shown with 'N more', each with Yes / No-show / Reschedule", () => {
     const html = renderToStaticMarkup(createElement(SessionCheckCards, { sessions, timezone: LA }));
     expect(html.match(/Did <span/g)?.length).toBe(3);
     expect(html).toContain("Hewan B.");
@@ -81,16 +81,20 @@ describe("Did this session happen?", () => {
     expect(html).not.toContain("Oliver B.");
     expect(html).toContain("2 more");
     expect(html.match(/>Yes</g)?.length).toBe(3);
-    expect(html.match(/>No</g)?.length).toBe(3);
+    expect(html.match(/>No-show</g)?.length).toBe(3);
     expect(html.match(/>Reschedule</g)?.length).toBe(3);
   });
   it("nothing to show means nothing is drawn", () => {
     expect(renderToStaticMarkup(createElement(SessionCheckCards, { sessions: [], timezone: LA }))).toBe("");
   });
-  it("Yes marks attended (as everywhere), No cancels with nothing used, Reschedule opens the date control; nothing is automatic and nothing is pushed to the coach", () => {
+  it("Yes marks attended (as everywhere), No-show asks Charge or Waive (resolve_no_show; the old cancel is gone), Reschedule opens the date control; nothing is automatic and nothing is pushed to the coach", () => {
     const src = read("components/coach/session-check-cards.tsx");
     expect(src).toContain('rpc("mark_booking_attended"');
-    expect(src).toContain('rpc("cancel_booking_and_refund_credit"');
+    expect(src).toContain('rpc("resolve_no_show", { p_booking_id: s.bookingId, p_charge: charge })');
+    expect(src).toContain("onClick={() => noShow(s, true)}");
+    expect(src).toContain("onClick={() => noShow(s, false)}");
+    expect(src).toContain("Charge 1 session");
+    expect(src).not.toContain("cancel_booking_and_refund_credit");
     expect(src).toContain("<BookingDateControl");
     expect(src).not.toMatch(/sendPush|push\/send/);
   });

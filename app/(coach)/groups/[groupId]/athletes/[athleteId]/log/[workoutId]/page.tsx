@@ -1,3 +1,4 @@
+import { getGroupCoachTimezone } from "@/lib/timezone";
 import { COACH_HOME_HREF } from "@/lib/start-group";
 import { LoadFailedPage } from "@/components/ui/load-failed-page";
 import { isReadFailure } from "@/lib/read-failed";
@@ -85,6 +86,7 @@ export default async function LogWorkoutForClientPage(
       backHref={backHref}
       loggingForName={athleteProfile?.full_name ?? "this client"}
       loggedByCoach
+      coachTimezone={await getGroupCoachTimezone(supabase, params.groupId)}
       sessionTypes={(typeRows ?? []).map((t) => ({ id: t.id, name: t.name }))}
     />
     </>

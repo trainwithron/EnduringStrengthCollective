@@ -113,6 +113,26 @@ export function CompleteWorkoutButton({
   const [rpeNudge, setRpeNudge] = useState<{ athleteId: string; groupId: string; navHref: string } | null>(null);
   const [rpeSubmitting, setRpeSubmitting] = useState(false);
 
+  // A walk-in (Ron, Oct 19: "If I do a walk-in, and I pull up their program and we do it real quick. Then it should prompt me maybe after to do you want to assign to the last hour of your
+  // calendar"): a coach finishing a client's workout that no booking was found for is asked once, "Put this on your calendar?". Yes makes a booking for the time it took (at least one session's
+  // length) and uses 1 session (create_walk_in_booking, settled once); No takes nothing.
+  const [walkIn, setWalkIn] = useState<{ startIso: string; endIso: string; navHref: string } | null>(null);
+  const [walkInBusy, setWalkInBusy] = useState(false);
+  const [walkInError, setWalkInError] = useState<string | null>(null);
+
+  async function confirmWalkIn() {
+    if (!walkIn) return;
+    setWalkInBusy(true);
+    setWalkInError(null);
+    const { error: rpcError } = await createBrowserClient().rpc("create_walk_in_booking", { p_session_id: sessionId });
+    setWalkInBusy(false);
+    if (rpcError) {
+      setWalkInError(/overlap|taken|already/i.test(rpcError.message ?? "") ? "That time overlaps another session on your calendar, so nothing was added and nothing was used." : "That didn't save. Nothing was added and nothing was used.");
+      return;
+    }
+    finishNavigation(walkIn.navHref);
+  }
+
   const { flush: flushSets } = useSetSave();
 
   function finishNavigation(navHref: string) {
@@ -353,6 +373,17 @@ export function CompleteWorkoutButton({
       return;
     }
 
+    // Logged for a client with no booking linked (none at Start, and the database found none when it was finished): offer it as a walk-in.
+    if (coachMode) {
+      const { data: done } = await supabase.from("athlete_sessions").select("booking_id, started_at, completed_at").eq("id", sessionId).maybeSingle();
+      const row = done as { booking_id: string | null; started_at: string | null; completed_at: string | null } | null;
+      if (row && !row.booking_id && row.started_at) {
+        setWalkIn({ startIso: row.started_at, endIso: row.completed_at ?? new Date().toISOString(), navHref });
+        setSubmitting(false);
+        return;
+      }
+    }
+
     finishNavigation(navHref);
   }
 
@@ -390,6 +421,30 @@ export function CompleteWorkoutButton({
     const { athleteId, groupId, navHref } = rpeNudge;
     setRpeNudge(null);
     await checkWeightThenNavigate(athleteId, groupId, navHref);
+  }
+
+  if (walkIn) {
+    const time = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+    return (
+      <div data-complete-bar data-walk-in className={`fixed ${raised ? "bottom-16" : "bottom-0"} left-0 right-0 bg-graphite border-t border-steel/20 px-5 py-3`}>
+        <p className="font-body text-sm text-chalk">
+          Put this on your calendar? {time(walkIn.startIso)} to {time(walkIn.endIso)} today. Uses 1 session.
+        </p>
+        <div className="flex flex-wrap items-center gap-3 mt-3">
+          <button type="button" onClick={() => void confirmWalkIn()} disabled={walkInBusy} className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40">
+            {walkInBusy ? "Adding…" : "Yes, add it"}
+          </button>
+          <button type="button" onClick={() => finishNavigation(walkIn.navHref)} disabled={walkInBusy} className="h-11 px-4 border border-steel/30 text-steel font-body text-sm">
+            No
+          </button>
+        </div>
+        {walkInError && (
+          <p className="font-body text-xs text-rust mt-2" role="alert">
+            {walkInError}
+          </p>
+        )}
+      </div>
+    );
   }
 
   if (rpeNudge) {
