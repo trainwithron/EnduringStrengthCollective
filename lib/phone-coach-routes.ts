@@ -9,9 +9,17 @@ export function isPhoneView({ override, standalone, userAgent }: { override: str
   return standalone === "1" || /android|iphone|ipad|ipod|mobile/i.test(userAgent ?? "");
 }
 
+// Release 2 (the phone opens as the coach's own account): the coach Home and the business pages open the coach's OWN app with Spotlight open (that is where clients, messages and the business
+// side live now); the calendar pages open their own Calendar (the organization's schedule with their own workouts on it). A team-sport group's coach keeps the team Home: `home` marks the
+// redirects the middleware sends to that group's page instead when the group is a team-sport one.
+export const PHONE_SPOTLIGHT = "/my-space?view=client&spot=1";
+export const PHONE_CALENDAR = "/my-space?view=client&to=calendar";
+
 export interface PhoneRedirect {
   /** Where the phone goes instead. */
   to: string;
+  /** A coach-Home redirect: for a team-sport group the middleware sends the team Home (/groups/<g>) instead. */
+  home?: boolean;
   /** The group in the path, when there is one: the redirect applies only to a person who COACHES that group. */
   groupId: string | null;
   /** A page clients use too: not redirected while the coach is acting as a client. */
@@ -21,16 +29,16 @@ export interface PhoneRedirect {
 const GROUP = /^\/groups\/([0-9a-f-]{36})(\/.*)?$/i;
 const ID = "[^/]+";
 
-// Pages under /groups/<g> and where they go on a phone. Targets keep the same <g>; "{a}" and "{p}" are the client and program from the path.
+// Pages under /groups/<g> and where they go on a phone. A target starting with "/my-space" is absolute; any other keeps the same <g>.
 const GROUP_TABLE: { pattern: RegExp; to: string; shared?: boolean }[] = [
-  ...["dashboard", "business", "business/packages", "business/leads", "business/website", "business/zapier", "business/waiver", "revenue-splits", `coaches/${ID}`, "team", "team-sheet", "team-sheet/upload", "team-performance"].map((p) => ({ pattern: new RegExp(`^/${p}$`), to: "" })),
-  ...["business/booking-page", "business/session-types", "availability", "group-sessions", "group-calendar"].map((p) => ({ pattern: new RegExp(`^/${p}$`), to: "/calendar" })),
-  { pattern: /^\/business\/session-ledger$/, to: "/clients" },
+  ...["dashboard", "business", "business/packages", "business/leads", "business/website", "business/zapier", "business/waiver", "revenue-splits", `coaches/${ID}`, "team", "team-sheet", "team-sheet/upload", "team-performance"].map((p) => ({ pattern: new RegExp(`^/${p}$`), to: PHONE_SPOTLIGHT })),
+  ...["business/booking-page", "business/session-types", "availability", "group-sessions", "group-calendar"].map((p) => ({ pattern: new RegExp(`^/${p}$`), to: PHONE_CALENDAR })),
+  { pattern: /^\/business\/session-ledger$/, to: PHONE_SPOTLIGHT },
   ...["business/sms-settings", "business/support", "branding"].map((p) => ({ pattern: new RegExp(`^/${p}$`), to: "/settings" })),
   { pattern: /^\/messages\/announce$/, to: "/messages" },
   { pattern: /^\/team-activity$/, to: "/feed" },
   ...["challenges", `challenges/${ID}`, "records", `games/${ID}`].map((p) => ({ pattern: new RegExp(`^/${p}$`), to: "/feed", shared: true })),
-  ...["resources", "quick-tips", "pro-shop", "referrals"].map((p) => ({ pattern: new RegExp(`^/${p}$`), to: "", shared: true })),
+  ...["resources", "quick-tips", "pro-shop", "referrals"].map((p) => ({ pattern: new RegExp(`^/${p}$`), to: PHONE_SPOTLIGHT, shared: true })),
 ];
 
 // Pages under /groups/<g> that go to the coach-level Programs page.
@@ -48,9 +56,13 @@ const TO_PROGRAMS: { pattern: RegExp; shared?: boolean }[] = [
  */
 export function phoneCoachRedirect(pathname: string, search = ""): PhoneRedirect | null {
   const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
-  if (pathname === "/calendar") return params.get("tab") === "availability" ? { to: "/calendar", groupId: null, shared: false } : null;
-  if (pathname === "/group-calendar" || pathname === "/recurring-conflicts") return { to: "/calendar", groupId: null, shared: false };
-  if (pathname === "/running-low") return { to: "/clients", groupId: null, shared: false };
+  if (pathname === "/calendar" || pathname === "/group-calendar" || pathname === "/recurring-conflicts") {
+    // Booking one client (?scheduleFor=) stays: the page takes it to that client's group.
+    if (pathname === "/calendar" && params.get("scheduleFor")) return null;
+    const month = params.get("month");
+    return { to: PHONE_CALENDAR + (month && /^\d{4}-\d{2}$/.test(month) ? `&month=${month}` : ""), groupId: null, shared: false };
+  }
+  if (pathname === "/running-low") return { to: PHONE_SPOTLIGHT, groupId: null, shared: false };
 
   const m = GROUP.exec(pathname);
   if (!m) return null;
@@ -58,7 +70,11 @@ export function phoneCoachRedirect(pathname: string, search = ""): PhoneRedirect
   const rest = m[2] ?? "";
   const base = `/groups/${g}`;
 
-  for (const r of GROUP_TABLE) if (r.pattern.test(rest)) return { to: base + r.to, groupId: g, shared: !!r.shared };
+  for (const r of GROUP_TABLE) {
+    if (!r.pattern.test(rest)) continue;
+    const absolute = r.to.startsWith("/my-space");
+    return { to: absolute ? r.to : base + r.to, groupId: g, shared: !!r.shared, ...(r.to === PHONE_SPOTLIGHT ? { home: true } : {}) };
+  }
   for (const r of TO_PROGRAMS) if (r.pattern.test(rest)) return { to: "/programs", groupId: g, shared: !!r.shared };
 
   const progressions = new RegExp(`^/programs/(${ID})/progressions$`).exec(rest);
