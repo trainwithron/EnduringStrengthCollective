@@ -7,7 +7,6 @@ import { playRestAlert } from "@/lib/rest-alert";
 import { formatRest, formatRestSpan } from "@/lib/rest-time";
 import { MIN_REST_SECONDS_FOR_GAME } from "@/lib/rest-timer-difficulty";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { SessionStopwatch } from "./session-stopwatch";
 import { SnakeMiniGame } from "./snake-mini-game";
 import { FlappyMiniGame } from "./flappy-mini-game";
 import { EndlessRunnerMiniGame } from "./endless-runner-mini-game";
@@ -57,7 +56,6 @@ interface RunningState {
 
 export function RestTimerBar({
   sessionId,
-  startedAt,
   pendingPrompt,
   onPromptHandled,
   pendingTask,
@@ -67,7 +65,6 @@ export function RestTimerBar({
   read,
 }: {
   sessionId: string;
-  startedAt: string;
   // A set just auto-completed — offer to start a rest timer, defaulting
   // to that exercise's own target rest if it has one. When isPrescribed
   // is true, the coach actually specified this rest period, so the
@@ -244,12 +241,13 @@ export function RestTimerBar({
   }
 
   const showPrompt = pendingPrompt && !running;
+  // Nothing to say: no bar at all. (The workout's stopwatch is on the header's top line.)
+  if (!showPrompt && !running && !justFinished) return null;
 
   return (
-    <div className="sticky top-0 z-10 bg-graphite border-b border-steel/20 px-5 py-1">
+    // Over the top of the card, not above it, so the sets don't move when rest starts.
+    <div className="absolute inset-x-0 top-0 z-40 bg-graphite border-b border-steel/20 px-5 py-1 shadow-lg">
       <div className="flex items-center justify-between gap-3">
-        <SessionStopwatch startedAt={startedAt} />
-
       {showPrompt && (
         <div className="flex items-center gap-1.5 min-w-0">
           <span className="font-body text-xs text-steel">Rest?</span>
@@ -288,8 +286,8 @@ export function RestTimerBar({
       )}
 
         {running && (
-          <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
-            <p className="font-display text-3xl leading-none text-rust tabular-nums">
+          <div className="flex flex-1 flex-wrap items-center justify-end gap-x-2 gap-y-2">
+            <p className="mr-auto font-display text-3xl leading-none text-rust tabular-nums">
               {formatMMSS(remaining)}
             </p>
             {running.source !== "coach" && (

@@ -632,7 +632,7 @@ export function ExerciseSetGrid({
                   onSetChange(set.id, { setType: next });
                   save(set.id, { set_type: next });
                 }}
-                className={`w-12 shrink-0 min-h-11 text-center font-body text-xs ${doneMark || (warmup ? "text-rust font-bold" : "text-steel")}`}
+                className={`w-12 shrink-0 min-h-9 text-center font-body text-xs ${doneMark || (warmup ? "text-rust font-bold" : "text-steel")}`}
               >
                 {warmup ? "W" : i + 1}
               </button>

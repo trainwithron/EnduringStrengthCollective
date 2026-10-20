@@ -37,10 +37,25 @@ describe("the card fits the screen", () => {
     expect(page).toContain('"relative px-5 pt-1 pb-1 border-b border-steel/20"');
     expect(page).toContain("font-display font-bold text-lg leading-none uppercase truncate");
   });
-  it("the rest timer is one line: the Rest? chips sit on the stopwatch row", () => {
-    const top = rest.slice(rest.indexOf("<SessionStopwatch"), rest.indexOf("{running && ("));
-    expect(top).toContain("{showPrompt && (");
-    expect(rest).toContain("px-5 py-1");
+  it("the rest timer shows only when there is something to show, one line over the top of the card; the stopwatch is on the header's top line", () => {
+    expect(rest).toContain("{showPrompt && (");
+    expect(rest).toContain("if (!showPrompt && !running && !justFinished) return null;");
+    expect(rest).toContain('"absolute inset-x-0 top-0 z-40 bg-graphite border-b border-steel/20 px-5 py-1 shadow-lg"');
+    expect(rest).toContain("flex flex-1 flex-wrap items-center justify-end gap-x-2 gap-y-2");
+    expect(rest).toContain('<p className="mr-auto font-display text-3xl');
+    expect(rest).not.toContain("<SessionStopwatch");
+    expect(rest).not.toContain("startedAt: string;");
+    expect(page).toContain("<SessionStopwatch startedAt={session.started_at} />");
+    // the coach logging for a client: stopwatch and Send to client on the same top line
+    const top = page.slice(page.indexOf('<div className="flex items-center gap-2 shrink-0">'), page.indexOf(") : (\n          <Link href={backHref}"));
+    expect(top).toContain("<SessionStopwatch");
+    expect(top).toContain("<SendToClientButton");
+    expect(page).not.toContain('<span className="w-12 shrink-0" aria-hidden="true" />');
+    expect(page).toContain("In progress is ONE slim row");
+  });
+  it("while the workout is live the bottom tabs are hidden and the Complete bar sits at the bottom", () => {
+    expect(page).toContain('{isOwnSession && session.status !== "in_progress" && <BottomTabBar');
+    expect(page).toContain('raised={isOwnSession && session.status !== "in_progress"}');
   });
   it("the notes box is one line that opens when used, and Add / Quick add sit behind one small button", () => {
     expect(note).toContain("rows={1}");

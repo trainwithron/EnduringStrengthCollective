@@ -372,7 +372,7 @@ export function ExerciseCard({
 
       {/* The demo thumbnail and "Last time" / history side by side, so one short row has both: glanceable, and a tap opens the demo sheet. */}
       {((demo && !demosHidden) || lastTime || (exercise.volumeHistory && exercise.volumeHistory.length > 0)) && (
-        <div className="flex flex-col min-[380px]:flex-row items-start gap-3 mb-2">
+        <div className="flex flex-row items-start gap-3 mb-2">
           {demo && !demosHidden && openDemo && (
             <DemoThumb title={exercise.displayName ?? (exercise.exerciseName || "Exercise")} youtubeUrl={demo.youtubeUrl} onOpen={() => openDemo(exercise.id)} />
           )}
@@ -426,58 +426,6 @@ export function ExerciseCard({
         ownNote={viewerId === athleteId}
         viewerId={viewerId}
       />
-
-      {!readOnly && (
-        <div className="relative flex items-center gap-4 whitespace-nowrap">
-          <button
-            type="button"
-            onClick={() => setFieldsOpen((v) => !v)}
-            className="font-body text-xs text-steel active:text-rust transition-colors min-h-9"
-          >
-            Edit metrics
-          </button>
-          {canAddLoad && (
-            <button type="button" onClick={() => setShowLoad(true)} className="font-body text-xs text-steel active:text-rust min-h-9">
-              Add weight / RPE
-            </button>
-          )}
-          {rowAction && <span className="ml-auto">{rowAction}</span>}
-          {fieldsOpen && (
-            <div className="absolute z-10 left-0 mt-1 bg-surface border border-steel/30 p-2 w-56">
-              {exercise.trackedFields.length > 0 && (
-                <div className="flex flex-wrap gap-1 mb-1.5">
-                  {exercise.trackedFields.map((f) => (
-                    <button
-                      key={f}
-                      type="button"
-                      onClick={() => handleRemoveField(f)}
-                      disabled={fieldsBusy}
-                      className="h-7 px-2 border border-rust/40 text-rust font-body text-xs disabled:opacity-40"
-                    >
-                      {fieldDef(f).label} &times;
-                    </button>
-                  ))}
-                </div>
-              )}
-              {untrackedFields.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {untrackedFields.map((f) => (
-                    <button
-                      key={f}
-                      type="button"
-                      onClick={() => handleAddField(f)}
-                      disabled={fieldsBusy}
-                      className="h-7 px-2 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust disabled:opacity-40"
-                    >
-                      + {fieldDef(f).label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
 
       {!readOnly && (
         <EquipmentVisual
@@ -545,6 +493,58 @@ export function ExerciseCard({
                   onUndo: handleUndoRemove,
                 }
               : null
+          }
+          // Edit metrics and Add weight / RPE sit at the right end of the Sets row (they used to take a row of their own above the sets); the fields popup opens above the row.
+          trailing={
+            <div className="relative flex items-center gap-3 whitespace-nowrap">
+              <button
+                type="button"
+                onClick={() => setFieldsOpen((v) => !v)}
+                className="font-body text-xs text-steel active:text-rust transition-colors min-h-9"
+              >
+                Edit metrics
+              </button>
+              {canAddLoad && (
+                <button type="button" onClick={() => setShowLoad(true)} className="font-body text-xs text-steel active:text-rust min-h-9">
+                  Add weight / RPE
+                </button>
+              )}
+              {rowAction && <span className="ml-auto">{rowAction}</span>}
+              {fieldsOpen && (
+                <div className="absolute z-10 right-0 bottom-full mb-1 bg-surface border border-steel/30 p-2 w-56 whitespace-normal">
+                  {exercise.trackedFields.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-1.5">
+                      {exercise.trackedFields.map((f) => (
+                        <button
+                          key={f}
+                          type="button"
+                          onClick={() => handleRemoveField(f)}
+                          disabled={fieldsBusy}
+                          className="h-7 px-2 border border-rust/40 text-rust font-body text-xs disabled:opacity-40"
+                        >
+                          {fieldDef(f).label} &times;
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {untrackedFields.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {untrackedFields.map((f) => (
+                        <button
+                          key={f}
+                          type="button"
+                          onClick={() => handleAddField(f)}
+                          disabled={fieldsBusy}
+                          className="h-7 px-2 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust disabled:opacity-40"
+                        >
+                          + {fieldDef(f).label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           }
         />
       )}

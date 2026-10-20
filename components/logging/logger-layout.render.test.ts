@@ -65,9 +65,10 @@ describe("the review fixes for the layout (Assistant, Oct 7)", () => {
     expect(swipe).toContain("transition-[height]");
     expect(swipe).toContain("motion-reduce:transition-none");
   });
-  it("on a small phone the demo stacks above Last time (side by side from 380 px), so Last time and the volume chart keep their width", () => {
-    expect(card).toContain("flex flex-col min-[380px]:flex-row");
-    expect(thumb).toContain("w-full max-w-[208px] min-[380px]:w-40");
+  it("the demo sits beside Last time on every phone (Ron, Oct 20), a little smaller below 380 px", () => {
+    expect(card).toContain('<div className="flex flex-row items-start gap-3 mb-2">');
+    expect(card).not.toContain("flex flex-col min-[380px]:flex-row");
+    expect(thumb).toContain("w-36 min-[380px]:w-40 sm:w-52");
   });
   it("the vertical list marks the exercise the athlete touches or types in as the active one (when everything fits nothing scrolls)", () => {
     expect(vertical).toContain("onFocusCapture");
