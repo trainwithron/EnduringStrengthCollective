@@ -2842,6 +2842,40 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "181",
+  slug: "0429",
+  title: "0429 Set my targets: a client whose coach has set no nutrition target may set their own (one column, one trigger, one function, three client policies; the target-changed notice skips a client's own change)",
+  warn: "This adds a set_by column to client_macro_target_history ('coach' for every existing row and every row a coach writes, 'self' for a client's own), a trigger that makes any row written for someone else a coach row, has_coach_macro_target(athlete, group) (answers only about the caller), and three policies that let a client insert, change and remove ONLY their own 'self' rows: in a group they belong to, only while minor_may_write says they may write, only while their coach has set no target, and dated yesterday to tomorrow. The coach policy is not touched. It REPLACES notify_on_target_change() with the live text plus one early return for a 'self' row; the paste checks that the live function is exactly the text this matches, and stops if not.",
+  migrations: ["0429"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes for coaches. Once the app update that goes with it is deployed, a client with no target from their coach sees Set my targets on their Nutrition page (a calculator, then Find my real maintenance from their own weigh-ins and food log). As soon as the coach sets a target, the client's card disappears and the coach's target is the one in force.",
+  undo: [
+    "drop policy if exists client_macro_target_history_self_insert on public.client_macro_target_history;",
+    "drop policy if exists client_macro_target_history_self_update on public.client_macro_target_history;",
+    "drop policy if exists client_macro_target_history_self_delete on public.client_macro_target_history;",
+    "drop function if exists public.has_coach_macro_target(uuid, uuid);",
+    "drop trigger if exists client_macro_target_history_set_by on public.client_macro_target_history;",
+    "drop function if exists public.macro_target_set_by_guard();",
+    // 0306 quotes its body with $function$, which functionFromMigration does not look for: the same slice, by hand.
+    (() => {
+      const text = readFileSync(new URL("../supabase/migrations/0306_target_change_notice.sql", import.meta.url), "utf8").replace(/\r\n/g, String.fromCharCode(10));
+      const start = text.indexOf("create or replace function public.notify_on_target_change()");
+      const end = text.indexOf("$function$;", start);
+      if (start < 0 || end < 0) throw new Error("cannot find notify_on_target_change in 0306");
+      return text.slice(start, end + "$function$;".length);
+    })(),
+    "revoke all on function public.notify_on_target_change() from public, anon, authenticated;",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 181 misbehaves. Clients can no longer write targets (the three policies and the helper go), the trigger goes, and the notice function is put back exactly as before. The set_by column stays (a client's own rows stay marked 'self'; nothing reads it without the app update).",
+  rows: [
+    ["0429 is not already applied (the helper has_coach_macro_target is not there yet; after an undo the set_by column stays and this step applies again)", "not (to_regprocedure('public.has_coach_macro_target(uuid, uuid)') is not null)"],
+    ["notify_on_target_change is exactly the text this replaces", md5Is("notify_on_target_change()", "4b242454c85aff22b234860e4a6f026f")],
+    ["the functions and tables it uses exist", "to_regprocedure('public.minor_may_write(uuid)') is not null and to_regclass('public.client_macro_targets') is not null and to_regclass('public.group_memberships') is not null"],
+    ["no client policy with these names exists yet", "not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'client_macro_target_history' and policyname like 'client_macro_target_history_self_%')"],
+  ],
+});
+
+STEPS.push({
   n: "179",
   slug: "0427",
   title: "0427 SPEED B: the read policies on the ten busiest tables ask 'member / coach / owner or admin of this group' from three sets once per query (three new functions; 15 read policies rewritten in place)",
@@ -3714,6 +3748,7 @@ const BUNDLES = [
   { id: "release-ts3-team-sheet-save", name: "Release TS3 (saving a filled team sheet: one table, one notice kind, three functions)", steps: ["171"] },
   { id: "release-own1-owner-accepted-only", name: "Release OWN1 (ownership cannot be handed to someone who has never signed in; replaces two functions, adds one function and one trigger)", steps: ["172"] },
   { id: "release-tc3b-client-requests", name: "Release TC3 part B (Request to train with me on a coach's public page: one column, three tables, eight functions)", steps: ["174"] },
+  { id: "set-my-targets-client-own-targets", name: "Set my targets (a client with no target from their coach may set their own: one column, one trigger, one function, three client policies, the notice function)", steps: ["181"] },
   { id: "speed-b-member-checks-set-based", name: "SPEED B (the read policies ask member / coach / owner or admin from three sets once per query: three functions, 15 read policies rewritten in place)", steps: ["179"] },
   { id: "speed-a-org-wall-set-based", name: "SPEED A (the organization wall asks once per query, not once per row: one function, 90 policies rewritten in place)", steps: ["178"] },
   { id: "fix4-org-wall-follows-active-org", name: "FIX 4 (the organization wall follows the organization the person chose; replaces one function)", steps: ["177"] },
@@ -3970,6 +4005,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0419", "to_regclass('public.team_sheet_batches') is not null"),
     m("0420", "exists (select 1 from pg_trigger where tgname = 'organization_memberships_guard_owner_role' and not tgisinternal)"),
     m("0422", "to_regclass('public.client_requests') is not null"),
+    m("0429", "to_regprocedure('public.has_coach_macro_target(uuid, uuid)') is not null"),
     m("0427", "to_regprocedure('public.my_group_ids()') is not null"),
     m("0426", "to_regprocedure('public.active_org_group_ids()') is not null"),
     m("0425", "exists (select 1 from pg_proc p where p.oid = to_regprocedure('public.request_workspace_org()') and position('x-workspace-org' in p.prosrc) > 0)"),

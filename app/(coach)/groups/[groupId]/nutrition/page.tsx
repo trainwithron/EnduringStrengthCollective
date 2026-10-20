@@ -12,8 +12,14 @@ import { getEffectiveAthlete } from "@/lib/acting-as";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { TrendChart } from "@/components/coach/desktop/trend-chart";
-import { resolveDayMacros, standingForDate } from "@/lib/macro-resolution";
+import { resolveDayMacros, standingForDate, coachRowsOnly } from "@/lib/macro-resolution";
 import { fetchStandingHistory } from "@/lib/standing-macros";
+import { SetMyTargetsCard } from "@/components/athlete/set-my-targets-card";
+import { estimateRealMaintenance } from "@/lib/real-maintenance";
+import { computeBaseline } from "@/lib/nutrition-baseline";
+import { readDateOfBirth, rowToBodyProfile } from "@/lib/client-body-profile";
+import { ageOnDate } from "@/lib/nutrition-profile";
+import { calorieFloor } from "@/lib/calorie-floor";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 import { FoodLogSection } from "@/components/athlete/food-log-section";
 import type { GeneratedMeal } from "@/lib/meal-engine";
@@ -281,7 +287,7 @@ export default async function NutritionPage(
       : Promise.resolve({ data: null }),
     supabase
       .from("body_weight_logs")
-      .select("logged_date, weight")
+      .select("id, logged_date, weight")
       .eq("athlete_id", athleteId)
       .eq("group_id", params.groupId)
       .gte("logged_date", thirtyDaysAgoKey)
@@ -375,7 +381,8 @@ export default async function NutritionPage(
       .eq("athlete_id", athleteId)
       .eq("group_id", params.groupId);
     if (answeredError) console.error("[nutrition] could not read earlier answers:", answeredError.message);
-    else recalcPrompt = recalcPromptFor(standingHistory, (answeredRows ?? []).map((r) => r.target_effective_from as string), todayKey);
+    // Only a change the COACH made asks "are you happy with your meal plan?" (a client's own change is their own decision).
+    else recalcPrompt = recalcPromptFor(coachRowsOnly(standingHistory), (answeredRows ?? []).map((r) => r.target_effective_from as string), todayKey);
   }
   const todayMacros = macrosEnabled
     ? resolveDayMacros(
@@ -410,6 +417,51 @@ export default async function NutritionPage(
   const calorieTrendPoints = (macroHistory ?? [])
     .filter((m: any) => m.calories != null)
     .map((m: any) => ({ date: m.log_date, value: m.calories }));
+
+  // Set my targets (0429): a client whose coach has set no target works out their own, then finds their real maintenance. Only when macros are on for them (not the group tier),
+  // the coach has not switched macros off, not in youth mode, never for a coach acting as a client (their own personal space is fine), and only while nothing from the coach is
+  // in force: no coach standing target ever, and today is not a coach's day target or a meal plan.
+  const ownStanding = standingForDate(standingHistory, todayKey);
+  const ownSpace = !isActingAsOther || athleteId === user.id;
+  const showSetMyTargets =
+    macrosEnabled && coachSetsMacros && !youthMode && ownSpace && coachRowsOnly(standingHistory).length === 0 && !todayMacroRow && !(todayMealPlan?.macros as unknown);
+  let setMyTargets: React.ComponentProps<typeof SetMyTargetsCard> | null = null;
+  if (showSetMyTargets) {
+    const [{ data: details }, { data: intake }] = await Promise.all([
+      supabase.from("athlete_profile_details").select("*").eq("athlete_id", athleteId).maybeSingle(),
+      supabase.from("client_intake").select("date_of_birth").eq("athlete_id", athleteId).maybeSingle(),
+    ]);
+    const body = rowToBodyProfile(details as Record<string, unknown> | null, intake as Record<string, unknown> | null);
+    // The same rule the database applies to every write a client makes (minor_may_write): asked for the signed-in person themself.
+    const { data: mayWrite } = await supabase.rpc("minor_may_write", { p_user: user.id });
+    const dob = readDateOfBirth(body);
+    const age = dob ? ageOnDate(dob, todayKey) : null;
+    const latestWeight = (weightLogs ?? []).length > 0 ? Number((weightLogs ?? [])[(weightLogs ?? []).length - 1].weight) : null;
+    const baseline = computeBaseline({ weightLbs: latestWeight, heightCm: body.heightCm, sex: body.sex, dateOfBirth: dob, bodyFatPct: body.bodyFatPct, activity: body.activity, phase: "maintenance", todayKey });
+    const own = ownStanding && ownStanding.set_by === "self" ? { calories: ownStanding.calories, proteinG: ownStanding.protein_g, carbsG: ownStanding.carbs_g, fatG: ownStanding.fat_g } : null;
+    setMyTargets = {
+      athleteId,
+      groupId: params.groupId,
+      todayKey,
+      current: own,
+      weightLb: latestWeight,
+      weightUnit,
+      activity: body.activity,
+      goal: null,
+      baselineMaintenance: baseline.ok ? baseline.maintenance : null,
+      // No fat-loss goal for someone under 18, or whose age is not known (nobody reviews a target a client sets for themself).
+      hideFatLoss: age == null || age < 18,
+      showFindMaintenance: own != null || caloriesEatenPoints.length > 0,
+      maintenance: estimateRealMaintenance({
+        weights: (weightLogs ?? []).map((w) => ({ date: w.logged_date as string, weight: Number(w.weight) })),
+        eatenDays: caloriesEatenPoints,
+        todayKey,
+        calorieFloor: calorieFloor({ sex: body.sex, bmr: baseline.ok ? baseline.bmr : null }),
+      }),
+      weightLogs: (weightLogs ?? []).map((w) => ({ id: w.id as string, loggedDate: w.logged_date as string, weight: Number(w.weight) })),
+      canSave: mayWrite === true,
+    };
+  }
 
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
@@ -496,8 +548,13 @@ export default async function NutritionPage(
                   </div>
                 </div>
               )
-            ) : (
+            ) : setMyTargets ? null : (
               <p className="font-body text-sm text-steel">No targets set for today yet.</p>
+            )}
+            {setMyTargets && (
+              <div className={todayMacros && (todayMacros.calories != null || todayMacros.proteinG != null) ? "mt-4 pt-4 border-t border-steel/15" : ""}>
+                <SetMyTargetsCard {...setMyTargets} />
+              </div>
             )}
           </section>
           )}

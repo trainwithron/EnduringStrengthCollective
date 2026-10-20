@@ -2,11 +2,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { StandingHistory, StandingRow } from "./macro-resolution";
 
 const HISTORY_COLUMNS = "athlete_id, group_id, effective_from, calories, protein_g, carbs_g, fat_g";
+// With who set it (0429). Read first; a database without the column yet reads without it (every row is then the coach's).
+const HISTORY_COLUMNS_WITH_SET_BY = `${HISTORY_COLUMNS}, set_by`;
 const LEGACY_COLUMNS = "athlete_id, group_id, calories, protein_g, carbs_g, fat_g, updated_at";
 
 interface HistoryDbRow {
   athlete_id: string;
   effective_from: string;
+  set_by?: string | null;
   calories: number | null;
   protein_g: number | null;
   carbs_g: number | null;
@@ -29,6 +32,7 @@ function toRow(r: HistoryDbRow): StandingRow {
     protein_g: r.protein_g,
     carbs_g: r.carbs_g,
     fat_g: r.fat_g,
+    set_by: r.set_by === "self" ? "self" : "coach",
   };
 }
 
@@ -56,13 +60,13 @@ export async function fetchStandingHistories(
   const out = new Map<string, StandingHistory>();
   if (athleteIds.length === 0) return out;
 
-  let query = supabase
-    .from("client_macro_target_history")
-    .select(HISTORY_COLUMNS)
-    .in("athlete_id", athleteIds)
-    .order("effective_from", { ascending: true });
-  if (groupId) query = query.eq("group_id", groupId);
-  const { data, error } = await query;
+  const read = (columns: string) => {
+    let query = supabase.from("client_macro_target_history").select(columns).in("athlete_id", athleteIds).order("effective_from", { ascending: true });
+    if (groupId) query = query.eq("group_id", groupId);
+    return query;
+  };
+  let { data, error } = await read(HISTORY_COLUMNS_WITH_SET_BY);
+  if (error && /set_by/.test(error.message ?? "")) ({ data, error } = await read(HISTORY_COLUMNS));
 
   if (!error && data) {
     for (const r of data as unknown as HistoryDbRow[]) {
@@ -108,11 +112,13 @@ export interface StandingTargetInput {
 // it from then on. Past days keep what they showed: each save is a new dated row, saving twice on the same day just replaces that day's row, and any row dated
 // AFTER `today` is removed (the newer decision wins). Falls back to the single-row table where the history table
 // hasn't been created yet, so saving still works either way.
+// `setBy`: "self" when a client saves their own target (Set my targets, 0429); a coach's save leaves it out (the column's default and the database's guard make it the coach's).
 export async function saveStandingTarget(
   supabase: SupabaseClient,
-  args: { athleteId: string; groupId: string; userId: string | null; target: StandingTargetInput | null; today: string }
+  args: { athleteId: string; groupId: string; userId: string | null; target: StandingTargetInput | null; today: string; setBy?: "coach" | "self" }
 ): Promise<{ ok: true } | { ok: false }> {
   const { athleteId, groupId, userId, target, today } = args;
+  const self = args.setBy === "self";
   const values = {
     calories: target?.calories ?? null,
     protein_g: target?.proteinG ?? null,
@@ -121,7 +127,7 @@ export async function saveStandingTarget(
   };
 
   const { error } = await supabase.from("client_macro_target_history").upsert(
-    { athlete_id: athleteId, group_id: groupId, effective_from: today, ...values, created_by: userId },
+    { athlete_id: athleteId, group_id: groupId, effective_from: today, ...values, created_by: userId, ...(self ? { set_by: "self" } : {}) },
     { onConflict: "athlete_id,group_id,effective_from" }
   );
   if (!error) {
@@ -139,7 +145,8 @@ export async function saveStandingTarget(
   // Only a missing history table falls back to the old single row; any other failure (a denied write,
   // a dropped connection) is a real failure and must not quietly write somewhere else.
   const missingTable = /does not exist|schema cache|PGRST205|42P01/i.test(`${error.message} ${error.code ?? ""}`);
-  if (!missingTable) return { ok: false };
+  // A client's own target is only ever saved in the history table (there is no old single row for it).
+  if (!missingTable || self) return { ok: false };
 
   // History table not there yet: keep the old single-row behaviour.
   if (target) {

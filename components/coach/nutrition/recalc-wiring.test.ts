@@ -31,7 +31,7 @@ describe("the client's question", () => {
   });
   it("is shown only to the client themself, only when a real change is unanswered", () => {
     expect(athletePage).toContain("macrosEnabled && !isActingAsOther");
-    expect(athletePage).toContain("recalcPromptFor(standingHistory");
+    expect(athletePage).toContain("recalcPromptFor(coachRowsOnly(standingHistory)");
     expect(athletePage).toContain("<RecalcPromptCard");
     expect(athletePage).toContain("showCalories={!youthMode}");
   });

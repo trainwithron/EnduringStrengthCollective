@@ -1576,6 +1576,17 @@
   ]
  },
  {
+  "n": "181",
+  "slug": "0429",
+  "title": "0429 Set my targets: a client whose coach has set no nutrition target may set their own (one column, one trigger, one function, three client policies; the target-changed notice skips a client's own change)",
+  "migrations": [
+   "0429"
+  ],
+  "notApplied": [
+   "not (to_regprocedure('public.has_coach_macro_target(uuid, uuid)') is not null)"
+  ]
+ },
+ {
   "n": "179",
   "slug": "0427",
   "title": "0427 SPEED B: the read policies on the ten busiest tables ask 'member / coach / owner or admin of this group' from three sets once per query (three new functions; 15 read policies rewritten in place)",

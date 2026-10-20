@@ -13,6 +13,7 @@ import { SpotClientsGroupsPanel } from "./spot-clients-groups-panel";
 import { SpotMessagesPanel } from "./spot-messages-panel";
 import { SpotNeedsTop } from "./spot-needs-top";
 import { SPOT_LAST_OPENED_KEY, shouldFade, type SpotNeeds } from "@/lib/spot-needs";
+import { isEmbeddedWindow } from "@/components/ui/loading-watchdog";
 import { PushNotificationToggle } from "@/components/athlete/push-notification-toggle";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { useTerm } from "@/components/coach/terminology-provider";
@@ -91,6 +92,9 @@ export function CoachSpotHub({
       });
   }
   useEffect(() => {
+    // Only where the button is actually on screen (on a computer it is mounted but hidden), never inside an embedded frame (the split half, a workspace pane), and never for a hidden tab:
+    // an idle open page must not keep asking (Oct 20 outage). Opening Spotlight always reads it.
+    if (isEmbeddedWindow() || document.visibilityState !== "visible" || !triggerRef.current || triggerRef.current.getClientRects().length === 0) return;
     loadNeeds(false);
   }, []);
   // A team-sport group has no Business tile (lib/team-sport.ts). Unknown until read, which shows every tile.
@@ -284,20 +288,27 @@ export function CoachSpotHub({
         onClick={toggle}
         aria-expanded={open}
         aria-controls={panelId}
-        aria-label={needs && needs.count > 0 ? `Spotlight, ${needs.count} waiting` : "Spotlight"}
+        // The name stays exactly "Spotlight" (the install banner finds the button by it); the count is its description.
+        aria-label="Spotlight"
+        aria-describedby={needs && needs.count > 0 ? `${panelId}-count` : undefined}
         className={`fixed left-1/2 -translate-x-1/2 z-40 rounded-token-circle bg-graphite/90 border border-rust/50 flex items-center justify-center active:border-rust transition-colors shadow-lg ${
           compact ? "top-[calc(env(safe-area-inset-top)+1px)] h-[30px] w-[30px]" : "top-3 h-10 w-10"
         }`}
       >
         <Sparkles className={compact ? "w-4 h-4 text-rust" : "w-5 h-5 text-rust"} strokeWidth={2.25} />
         {needs && needs.count > 0 && (
-          <span
-            data-spot-dot
-            className={`absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-rust text-graphite font-body text-[10px] font-bold leading-4 text-center ${fade ? "spot-dot-fade" : ""}`}
-            aria-label={`${needs.count} waiting`}
-          >
-            {needs.count > 9 ? "9+" : needs.count}
-          </span>
+          <>
+            <span
+              data-spot-dot
+              aria-hidden="true"
+              className={`absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-rust text-graphite font-body text-[10px] font-bold leading-4 text-center ${fade ? "spot-dot-fade" : ""}`}
+            >
+              {needs.count > 9 ? "9+" : needs.count}
+            </span>
+            <span id={`${panelId}-count`} className="sr-only">
+              {needs.count} waiting
+            </span>
+          </>
         )}
       </button>
 
