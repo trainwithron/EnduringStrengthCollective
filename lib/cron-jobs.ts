@@ -54,7 +54,8 @@ export const JOB_ADDED: Record<string, Date> = {
   "departing-coaches": new Date("2026-10-18T00:00:00Z"),
   "protect-wearable-tokens": new Date("2026-10-18T00:00:00Z"),
   "purge-removed-clients": new Date("2026-10-18T00:00:00Z"),
-  "purge-client-request-attempts": new Date("2026-10-18T00:00:00Z"),
+  // went live with Part B at 18:40 UTC on Oct 19, after that day's 07:45 run; its first run is 07:45 UTC on Oct 20
+  "purge-client-request-attempts": new Date("2026-10-19T18:40:00Z"),
   "low-session-digest": new Date("2026-10-19T00:00:00Z"),
 };
 export const NEW_JOB_GRACE_HOURS = 48;
