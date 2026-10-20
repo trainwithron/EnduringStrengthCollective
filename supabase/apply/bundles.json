@@ -24,6 +24,14 @@
   "file": "apply-release-tc3b-client-requests-all.sql"
  },
  {
+  "id": "set-my-targets-client-own-targets",
+  "name": "Set my targets (a client with no target from their coach may set their own: one column, one trigger, one function, three client policies, the notice function)",
+  "steps": [
+   "181"
+  ],
+  "file": "apply-set-my-targets-client-own-targets-all.sql"
+ },
+ {
   "id": "speed-b-member-checks-set-based",
   "name": "SPEED B (the read policies ask member / coach / owner or admin from three sets once per query: three functions, 15 read policies rewritten in place)",
   "steps": [
