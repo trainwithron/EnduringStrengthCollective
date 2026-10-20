@@ -37,6 +37,9 @@ import { fetchAgeAndSex, fetchNutrientLog } from "@/lib/nutrient-data";
 import { pastDaysFor, type PlanEstimate } from "@/lib/nutrient-view";
 import { NutritionYouthModeToggle } from "@/components/coach/desktop/nutrition-youth-mode-toggle";
 import { dedupeRecentFoodLogs } from "@/lib/recent-food-logs";
+import { FOOD_LOG_BASE_SELECT, FOOD_LOG_DETAIL_SELECT, entryFromRow, type FoodLogRow } from "@/lib/food-entry";
+import { foodDayHeading, foodDayLabel, loggedTotalsTitle, shownFoodDay } from "@/lib/food-day";
+import { FoodDaySwitcher } from "@/components/athlete/food-day-switcher";
 import { getCoachClients } from "@/lib/coach-clients";
 import { FOOD_TRACKING_OFF_LINE, dailyCaloriesFromLog } from "@/lib/nutrition-tracking";
 import { addDaysToKey } from "@/lib/date-key";
@@ -51,7 +54,7 @@ export const metadata = { title: "Nutrition" };
 export default async function NutritionPage(
   props: {
     params: Promise<{ groupId: string }>;
-    searchParams: Promise<{ athleteId?: string; tab?: string }>;
+    searchParams: Promise<{ athleteId?: string; tab?: string; day?: string }>;
   }
 ) {
   const params = await props.params;
@@ -242,6 +245,10 @@ export default async function NutritionPage(
     .eq("profile_id", athleteId)
     .maybeSingle();
   const trackingOn = (trackingRow as { food_tracking_enabled?: boolean | null } | null)?.food_tracking_enabled !== false;
+  // The day Today's food shows (?day=, a week either side of today; today otherwise; always today when there is no food log to switch). Today's targets, the check-in and the
+  // charts stay on today.
+  const shownDay = trackingOn ? shownFoodDay(searchParams.day, todayKey) : todayKey;
+  const shownIsToday = shownDay === todayKey;
   // The coach's "No macros for <client>" switch (read on its own, so a database without the column reads as on). With it off the page makes no promise of a meal plan or a target (Oct 19 audit).
   const { data: macrosRow } = await supabase
     .from("group_memberships")
@@ -311,15 +318,15 @@ export default async function NutritionPage(
       : Promise.resolve({ data: null }),
     // Logging is for every client, whatever their tier: these three reads are never gated.
     // Today's entries with the searched-food detail (falls back to the original columns before the database has them).
-    fetchFoodLogDay(supabase, athleteId, todayKey).then((data) => ({ data })),
-    supabase
-      .from("food_log_entries")
-      .select("description, calories, protein_g, carbs_g, fat_g, created_at")
-      .eq("athlete_id", athleteId)
-      .neq("status", "skipped")
-      .not("description", "is", null)
-      .order("created_at", { ascending: false })
-      .limit(40),
+    fetchFoodLogDay(supabase, athleteId, shownDay).then((data) => ({ data })),
+    // Recent foods keep the whole food (serving, amount, every nutrient), falling back to the original columns before the database has the detail.
+    (async () => {
+      const recent = (columns: string) =>
+        supabase.from("food_log_entries").select(columns).eq("athlete_id", athleteId).neq("status", "skipped").not("description", "is", null).order("created_at", { ascending: false }).limit(40);
+      const detail = await recent(FOOD_LOG_DETAIL_SELECT);
+      const rows = detail.error ? (await recent(FOOD_LOG_BASE_SELECT)).data : detail.data;
+      return { data: ((rows ?? []) as unknown as FoodLogRow[]).map(entryFromRow) };
+    })(),
     supabase.from("athlete_injury_status").select("is_injured").eq("athlete_id", athleteId).maybeSingle(),
     supabase
       .from("food_log_entries")
@@ -330,13 +337,22 @@ export default async function NutritionPage(
   ]);
 
   const todayFoodLog: FoodLogEntry[] = todayFoodLogRows ?? [];
+  // The shown day's plan and day target (today's are already read above).
+  const [{ data: shownMealPlan }, { data: shownMacroRow }] = shownIsToday
+    ? [{ data: todayMealPlan }, { data: todayMacroRow }]
+    : macrosEnabled
+      ? await Promise.all([
+          supabase.from("meal_plans").select("meals, macros").eq("athlete_id", athleteId).eq("log_date", shownDay).maybeSingle(),
+          supabase.from("daily_macros").select("calories, protein_g, carbs_g, fat_g").eq("athlete_id", athleteId).eq("log_date", shownDay).maybeSingle(),
+        ])
+      : [{ data: null }, { data: null }];
+  const planMealsObject = (plan: { meals?: unknown } | null | undefined) =>
+    plan?.meals && typeof plan.meals === "object" && !Array.isArray(plan.meals) ? (plan.meals as unknown as Record<string, MealEntryPayload[]>) : null;
   // A saved plan's meals are an OBJECT keyed by day type ({ daily | train | rest: [...] }), not a list; the checklist below wants a list, and handing it the
   // object throws on the client's page the day a coach saves a plan. So the checklist only gets a real list, and the saved plan is shown by TodaysMealCards (inside FoodLogSection).
-  const todayMealsRaw: GeneratedMeal[] = Array.isArray(todayMealPlan?.meals) ? (todayMealPlan?.meals as unknown as GeneratedMeal[]) : [];
-  const savedPlanMeals =
-    todayMealPlan?.meals && typeof todayMealPlan.meals === "object" && !Array.isArray(todayMealPlan.meals)
-      ? (todayMealPlan.meals as unknown as Record<string, MealEntryPayload[]>)
-      : null;
+  const todayMealsRaw: GeneratedMeal[] = Array.isArray(shownMealPlan?.meals) ? (shownMealPlan?.meals as unknown as GeneratedMeal[]) : [];
+  const savedPlanMeals = planMealsObject(todayMealPlan);
+  const shownPlanMeals = planMealsObject(shownMealPlan);
 
   // The client's own food preferences, and the saved plan with anything that breaks them left out (a missing row, or a database without the table yet, is no rules).
   // A client with NO row simply has no rules. A row that could not be READ is different: nothing can be checked, so no recipe is shown (the meals say the coach is updating them).
@@ -347,19 +363,9 @@ export default async function NutritionPage(
     ? ("unreadable" as const)
     : { allergies: clientPrefs.allergies, intolerances: clientPrefs.intolerances, dislikes: clientPrefs.dislikes, dietType: clientPrefs.dietType };
   const todayMeals = filterGeneratedMealsForClient(todayMealsRaw, clientRules);
-  const clientPlan = clientRules === "unreadable" ? hidePlanRecipes(savedPlanMeals) : filterPlanForClient(savedPlanMeals, clientRules);
+  const clientPlan = clientRules === "unreadable" ? hidePlanRecipes(shownPlanMeals) : filterPlanForClient(shownPlanMeals, clientRules);
 
-  const recentFoodOptions = dedupeRecentFoodLogs(
-    (recentFoodLogRows ?? []).map((r) => ({
-      description: r.description ?? "",
-      calories: r.calories,
-      proteinG: r.protein_g,
-      carbsG: r.carbs_g,
-      fatG: r.fat_g,
-      createdAt: r.created_at,
-    })),
-    8
-  );
+  const recentFoodOptions = dedupeRecentFoodLogs(recentFoodLogRows ?? [], 8);
 
   // "Not feeling it?": only for the client themself (a coach acting as them cannot ask on their behalf), and only when there is a saved plan to change. The state is read from the plan
   // itself (the try number is written on each rebuilt day), so a coach who assigns a new plan starts the count over.
@@ -394,6 +400,12 @@ export default async function NutritionPage(
         standingForDate(standingHistory, todayKeyForMacros)
       ).target
     : null;
+  // The target the shown day's totals are compared with.
+  const shownMacros = shownIsToday
+    ? todayMacros
+    : macrosEnabled
+      ? resolveDayMacros(shownMacroRow ?? null, (shownMealPlan?.macros as any) ?? null, (shownMealPlan?.meals as any) ?? null, standingForDate(standingHistory, shownDay)).target
+      : null;
 
   const micronutrients = macrosEnabled
     ? await computeTodaysMicronutrients(supabase, todayMeals)
@@ -402,8 +414,8 @@ export default async function NutritionPage(
   const planEstimate: PlanEstimate | null = micronutrients.hasAnyData ? { totals: micronutrients.totals, coveredIngredientCount: micronutrients.coveredIngredientCount, totalIngredientCount: micronutrients.totalIngredientCount } : null;
   const nutrientData =
     trackingOn || planEstimate
-      ? await Promise.all([fetchNutrientLog(supabase, athleteId, todayKey), fetchAgeAndSex(supabase, athleteId, todayKey)]).then(([log, who]) => ({
-          pastDays: pastDaysFor(log.entries, todayKey),
+      ? await Promise.all([fetchNutrientLog(supabase, athleteId, shownDay), fetchAgeAndSex(supabase, athleteId, todayKey)]).then(([log, who]) => ({
+          pastDays: pastDaysFor(log.entries, shownDay),
           age: who.age,
           sex: who.sex,
           planEstimate,
@@ -425,6 +437,8 @@ export default async function NutritionPage(
   // in force: no coach standing target ever, and today is not a coach's day target or a meal plan.
   const ownStanding = standingForDate(standingHistory, todayKey);
   const ownSpace = !isActingAsOther || athleteId === user.id;
+  // A coach in their own personal space is their own coach (getEffectiveAthlete: acting as themself): no "your coach" lines on their food log.
+  const selfCoached = isActingAsOther && athleteId === user.id;
   const showSetMyTargets =
     macrosEnabled && coachSetsMacros && !youthMode && ownSpace && coachRowsOnly(standingHistory).length === 0 && !todayMacroRow && !(todayMealPlan?.macros as unknown);
   let setMyTargets: React.ComponentProps<typeof SetMyTargetsCard> | null = null;
@@ -504,6 +518,40 @@ export default async function NutritionPage(
           {recalcPrompt && (
             <RecalcPromptCard athleteId={athleteId} groupId={params.groupId} effectiveFrom={recalcPrompt.effectiveFrom} calories={recalcPrompt.calories} showCalories={!youthMode} />
           )}
+          {/* On a phone the food comes first (FIX_NUTRITION_PHONE item 1): Today's food, then today's targets, the food rules and the grocery list. */}
+          <section>
+            <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
+              {shownIsToday ? <>Today&apos;s food</> : foodDayHeading(shownDay, todayKey)}
+            </h2>
+            {trackingOn ? (
+              <>
+                <FoodDaySwitcher groupId={params.groupId} shownKey={shownDay} todayKey={todayKey} />
+                <FoodLogSection
+                  // A new day is a fresh log (its own entries, plan and totals).
+                  key={shownDay}
+                  target={shownMacros}
+                  coachProgramming={macrosEnabled && coachSetsMacros}
+                  nutrients={nutrientData}
+                  plan={shownPlanMeals ? { meals: clientPlan.meals, hiddenCount: clientPlan.hiddenCount, emptiedMeals: clientPlan.emptiedMeals } : null}
+                  planRetry={shownIsToday ? planRetry : null}
+                  athleteId={athleteId}
+                  groupId={params.groupId}
+                  logDate={shownDay}
+                  meals={todayMeals}
+                  initialEntries={todayFoodLog}
+                  recents={recentFoodOptions}
+                  selfCoached={selfCoached}
+                  totalsTitle={loggedTotalsTitle(shownDay, todayKey)}
+                  planHeading={shownIsToday ? "Today's meal plan" : `Meal plan: ${foodDayLabel(shownDay, todayKey)}`}
+                />
+              </>
+            ) : (
+              <p className="font-body text-sm text-steel border border-steel/20 p-4" data-testid="tracking-off">
+                {FOOD_TRACKING_OFF_LINE}
+              </p>
+            )}
+          </section>
+
           {macrosEnabled && (
           <section className="border border-steel/20 p-4">
             <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">
@@ -562,31 +610,6 @@ export default async function NutritionPage(
           )}
 
           {macrosEnabled && <NutritionPreferencesCard athleteId={athleteId} initial={clientPrefs} />}
-
-          <section>
-            <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
-              Today&apos;s food
-            </h2>
-            {trackingOn ? (
-              <FoodLogSection
-                target={todayMacros}
-                coachProgramming={macrosEnabled && coachSetsMacros}
-                nutrients={nutrientData}
-                plan={savedPlanMeals ? { meals: clientPlan.meals, hiddenCount: clientPlan.hiddenCount, emptiedMeals: clientPlan.emptiedMeals } : null}
-                planRetry={planRetry}
-                athleteId={athleteId}
-                groupId={params.groupId}
-                logDate={todayKey}
-                meals={todayMeals}
-                initialEntries={todayFoodLog}
-                recents={recentFoodOptions}
-              />
-            ) : (
-              <p className="font-body text-sm text-steel border border-steel/20 p-4" data-testid="tracking-off">
-                {FOOD_TRACKING_OFF_LINE}
-              </p>
-            )}
-          </section>
 
           {macrosEnabled && <ClientGroceryList athleteId={athleteId} todayKey={todayKey} metric={weightUnit === "kg"} rules={clientRules} />}
 

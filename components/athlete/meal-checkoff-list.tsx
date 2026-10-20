@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { SELF_NO_MEAL_PLAN_LINE } from "@/lib/nutrition-tracking";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { GeneratedMeal } from "@/lib/meal-engine";
 import { FavoriteStar } from "./favorite-star";
@@ -39,6 +40,7 @@ export function MealCheckoffList({
   meals,
   initialEntries,
   onEntryLogged,
+  selfCoached = false,
 }: {
   athleteId: string;
   groupId: string;
@@ -50,6 +52,8 @@ export function MealCheckoffList({
   // component owns its own per-meal display state, but isn't the source
   // of truth for anything aggregated across the whole day.
   onEntryLogged?: (entry: FoodLogEntry) => void;
+  // A coach in their own personal space (their own coach): no "your coach is still setting up" line.
+  selfCoached?: boolean;
 }) {
   const [entries, setEntries] = useState(initialEntries);
   const [savingSlot, setSavingSlot] = useState<string | null>(null);
@@ -106,7 +110,7 @@ export function MealCheckoffList({
   if (meals.length === 0) {
     return (
       <p className="font-body text-sm text-steel border border-steel/20 p-4">
-        Your coach is still setting up your meal plan. It will show up here once it is ready.
+        {selfCoached ? SELF_NO_MEAL_PLAN_LINE : "Your coach is still setting up your meal plan. It will show up here once it is ready."}
       </p>
     );
   }
@@ -321,7 +325,7 @@ export function FreeTextFoodLog({
               <button
                 type="button"
                 onClick={onCancel}
-                className="font-body text-xs text-steel"
+                className="min-h-[44px] px-2 font-body text-xs text-steel"
               >
                 Cancel
               </button>
@@ -353,7 +357,7 @@ export function FreeTextFoodLog({
               type="button"
               onClick={() => setEstimate(null)}
               disabled={saving}
-              className="font-body text-xs text-steel disabled:opacity-40"
+              className="min-h-[44px] px-2 font-body text-xs text-steel disabled:opacity-40"
             >
               Try again
             </button>

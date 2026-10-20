@@ -5,16 +5,16 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import type { FoodLogEntry } from "./meal-checkoff-list";
 import { CustomFoodFormPanel } from "./custom-food-form";
 import { CUSTOM_FOOD_SELECT, customFoodEntryProblem, customFoodEntryRow, customFoodFromRow, customFoodTitle, servingsProblem, type CustomFood, type CustomFoodRow } from "@/lib/custom-food";
-import { FOOD_LOG_DETAIL_SELECT, entryFromRow, type FoodLogRow } from "@/lib/food-entry";
+import { FOOD_LOG_DETAIL_SELECT, defaultMealSlot, entryFromRow, type FoodLogRow } from "@/lib/food-entry";
 import { normalizeBarcode } from "@/lib/food-barcode";
+import { barcodeBasisLabel, scaleBarcodeResult, type BarcodeLookupResult } from "@/lib/open-food-facts";
 
 // A scan looks in the client's OWN foods first (so a bar they created is found again), then the product database; when neither knows the code the client can create the food with
 // the code already filled in and log it. Codes are compared without leading zeros (UPC-A and EAN-13 of the same product match).
 //
 // V2 #1 from calorie_tracking_ux_research_and_plan.md. Uses the native
-// BarcodeDetector API (Chrome/Android — no library needed) when
-// available; always offers manual barcode-number entry too, since
-// Safari/iOS doesn't implement BarcodeDetector as of this build. Same
+// BarcodeDetector API (Chrome/Android) when available; where it is missing (Safari on an iPhone) the camera
+// is read with the ZXing library instead, loaded only when a scan starts. Typing the number always works too. Same
 // confirm-before-save discipline as every other AI/estimated figure in
 // this app — a barcode lookup is community-sourced data, not verified.
 export function BarcodeScanButton({
@@ -35,7 +35,7 @@ export function BarcodeScanButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="w-full h-10 border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors"
+        className="w-full min-h-[44px] border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors"
       >
         Scan a barcode
       </button>
@@ -75,13 +75,7 @@ function BarcodeScanPanel({
   const [manualCode, setManualCode] = useState("");
   const [looking, setLooking] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{
-    description: string;
-    calories: number;
-    proteinG: number;
-    carbsG: number;
-    fatG: number;
-  } | null>(null);
+  const [result, setResult] = useState<BarcodeLookupResult | null>(null);
   const [saving, setSaving] = useState(false);
   // A food of the client's own that matches the code, and the code nobody knew (so the client can create the food).
   const [ownFood, setOwnFood] = useState<CustomFood | null>(null);
@@ -92,46 +86,66 @@ function BarcodeScanPanel({
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const Detector = (window as any).BarcodeDetector;
-    if (!Detector) return;
+    // No camera this browser can open at all: typing the number is the way.
+    if (!navigator.mediaDevices?.getUserMedia) return;
     setCameraSupported(true);
 
     let stream: MediaStream | null = null;
     let stopped = false;
     let rafId: number;
+    // The ZXing reader's own stop, when that path is used.
+    let stopZxing: (() => void) | null = null;
 
-    async function start() {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+    async function startNative() {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      if (stopped || !videoRef.current) return;
+      videoRef.current.srcObject = stream;
+      await videoRef.current.play();
+      const detector = new Detector({ formats: ["ean_13", "upc_a", "upc_e", "ean_8"] });
+
+      async function tick() {
         if (stopped || !videoRef.current) return;
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-        const detector = new Detector({ formats: ["ean_13", "upc_a", "upc_e", "ean_8"] });
-
-        async function tick() {
-          if (stopped || !videoRef.current) return;
-          try {
-            const codes = await detector.detect(videoRef.current);
-            if (codes.length > 0 && !stopped) {
-              stopped = true;
-              lookup(codes[0].rawValue);
-              return;
-            }
-          } catch {
-            // transient decode errors are normal mid-scan; keep trying
+        try {
+          const codes = await detector.detect(videoRef.current);
+          if (codes.length > 0 && !stopped) {
+            stopped = true;
+            lookup(codes[0].rawValue);
+            return;
           }
-          rafId = requestAnimationFrame(tick);
+        } catch {
+          // transient decode errors are normal mid-scan; keep trying
         }
         rafId = requestAnimationFrame(tick);
-      } catch {
-        setCameraError("Couldn't access the camera — you can still type the barcode below.");
       }
+      rafId = requestAnimationFrame(tick);
     }
-    start();
+
+    // Safari on an iPhone has no BarcodeDetector: the same four formats, read with ZXing (loaded only now, so nobody else downloads it).
+    async function startZxing() {
+      const [{ BrowserMultiFormatReader }, { BarcodeFormat, DecodeHintType }] = await Promise.all([import("@zxing/browser"), import("@zxing/library")]);
+      if (stopped || !videoRef.current) return;
+      const hints = new Map();
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.EAN_13, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E, BarcodeFormat.EAN_8]);
+      const reader = new BrowserMultiFormatReader(hints);
+      const controls = await reader.decodeFromConstraints({ video: { facingMode: "environment" } }, videoRef.current, (found) => {
+        if (!found || stopped) return;
+        stopped = true;
+        stopZxing?.();
+        lookup(found.getText());
+      });
+      stopZxing = () => controls.stop();
+      if (stopped) controls.stop();
+    }
+
+    (Detector ? startNative() : startZxing()).catch(() => {
+      if (!stopped) setCameraError("Couldn't start the camera. You can still type the barcode below.");
+    });
 
     return () => {
       stopped = true;
       if (rafId) cancelAnimationFrame(rafId);
       stream?.getTracks().forEach((t) => t.stop());
+      stopZxing?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -168,6 +182,7 @@ function BarcodeScanPanel({
         return;
       }
       setResult(data);
+      setServings("1");
     } finally {
       setLooking(false);
     }
@@ -185,7 +200,7 @@ function BarcodeScanPanel({
     setError(null);
     const { data, error: e } = await createBrowserClient()
       .from("food_log_entries")
-      .insert(customFoodEntryRow({ athleteId, groupId, logDate, mealSlot: null, food: ownFood, qty }))
+      .insert(customFoodEntryRow({ athleteId, groupId, logDate, mealSlot: defaultMealSlot(new Date().getHours(), new Date().getMinutes()), food: ownFood, qty }))
       .select(FOOD_LOG_DETAIL_SELECT)
       .single();
     setSaving(false);
@@ -197,7 +212,15 @@ function BarcodeScanPanel({
   }
 
   async function handleConfirm() {
-    if (!result) return;
+    if (!result || saving) return;
+    // The amount eaten: servings of the label's basis (a serving, or 100 g).
+    const scaled = scaleBarcodeResult(result, Number(servings));
+    if ("problem" in scaled) {
+      setError(scaled.problem);
+      return;
+    }
+    const food = scaled.result;
+    const mealSlot = defaultMealSlot(new Date().getHours(), new Date().getMinutes());
     setSaving(true);
     setError(null);
     const supabase = createBrowserClient();
@@ -207,13 +230,13 @@ function BarcodeScanPanel({
         athlete_id: athleteId,
         group_id: groupId,
         log_date: logDate,
-        meal_slot: null,
+        meal_slot: mealSlot,
         status: "quick_log",
-        description: result.description,
-        calories: result.calories,
-        protein_g: result.proteinG,
-        carbs_g: result.carbsG,
-        fat_g: result.fatG,
+        description: food.description,
+        calories: food.calories,
+        protein_g: food.proteinG,
+        carbs_g: food.carbsG,
+        fat_g: food.fatG,
       })
       .select("id")
       .single();
@@ -226,13 +249,13 @@ function BarcodeScanPanel({
     if (data) {
       onLogged({
         id: data.id,
-        mealSlot: null,
+        mealSlot,
         status: "quick_log",
-        description: result.description,
-        calories: result.calories,
-        proteinG: result.proteinG,
-        carbsG: result.carbsG,
-        fatG: result.fatG,
+        description: food.description,
+        calories: food.calories,
+        proteinG: food.proteinG,
+        carbsG: food.carbsG,
+        fatG: food.fatG,
       });
     }
   }
@@ -276,26 +299,37 @@ function BarcodeScanPanel({
   }
 
   if (result) {
+    const qty = Number(servings);
+    const preview = scaleBarcodeResult(result, qty);
+    const per100g = result.basis === "100g";
     return (
-      <div className="border border-rust/40 bg-rust/5 p-3">
+      <div className="border border-rust/40 bg-rust/5 p-3" data-testid="barcode-result">
         <p className="font-body text-sm text-chalk">{result.description}</p>
-        <p className="font-body text-xs text-steel mt-1">
-          {result.calories} kcal · {result.proteinG}p / {result.carbsG}c / {result.fatG}f
+        <p className="font-body text-xs text-steel mt-1 [font-variant-numeric:tabular-nums]">
+          {barcodeBasisLabel(result.basis)}: {result.calories} kcal · {result.proteinG}p / {result.carbsG}c / {result.fatG}f
         </p>
         <p className="font-body text-xs text-steel mt-1">From the product&apos;s label data — double-check against the package if it looks off.</p>
+        <div className="flex flex-wrap items-center gap-2 mt-2">
+          <input type="number" inputMode="decimal" min="0" step="any" value={servings} onChange={(e) => setServings(e.target.value)} aria-label={per100g ? "Amount in 100 g" : "Servings"} className="w-20 min-h-[44px] bg-surface border border-steel/30 px-2 font-body text-sm text-chalk" />
+          <span className="font-body text-xs text-steel">{per100g ? "x 100 g" : qty === 1 ? "serving" : "servings"}</span>
+          {"result" in preview && qty !== 1 && (
+            <span className="font-body text-xs text-chalk [font-variant-numeric:tabular-nums]">= {preview.result.calories} kcal · {preview.result.proteinG}p / {preview.result.carbsG}c / {preview.result.fatG}f</span>
+          )}
+        </div>
         <div className="flex items-center gap-2 mt-2">
           <button
             type="button"
             onClick={handleConfirm}
             disabled={saving}
-            className="h-11 px-3 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
+            className="min-h-[44px] px-3 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
           >
             {saving ? "Saving…" : "Confirm & log"}
           </button>
-          <button type="button" onClick={onCancel} disabled={saving} className="font-body text-xs text-steel disabled:opacity-40">
+          <button type="button" onClick={onCancel} disabled={saving} className="min-h-[44px] px-2 font-body text-xs text-steel disabled:opacity-40">
             Cancel
           </button>
         </div>
+        {error && <p className="font-body text-xs text-rust mt-2" role="alert">{error}</p>}
       </div>
     );
   }
@@ -341,7 +375,7 @@ function BarcodeScanPanel({
           Look up
         </button>
       </div>
-      <button type="button" onClick={onCancel} className="font-body text-xs text-steel">
+      <button type="button" onClick={onCancel} className="min-h-[44px] px-2 font-body text-xs text-steel">
         Cancel
       </button>
     </div>

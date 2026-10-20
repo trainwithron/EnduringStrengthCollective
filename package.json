@@ -16,6 +16,8 @@
     "@daily-co/daily-js": "^0.92.2",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.45.4",
+    "@zxing/browser": "0.2.1",
+    "@zxing/library": "0.23.0",
     "eslint-config-next": "15.5.25",
     "html-to-image": "^1.11.13",
     "lucide-react": "^0.446.0",

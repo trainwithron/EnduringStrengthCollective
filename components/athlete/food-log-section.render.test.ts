@@ -51,6 +51,32 @@ describe("FoodLogSection for a client with a target", () => {
   });
 });
 
+describe("FoodLogSection on a phone (FIX_NUTRITION_PHONE)", () => {
+  const recent = { key: "greek yogurt", label: "Greek yogurt", entry };
+  it("shows a recent food as a one-tap chip on the first paint (no box to open)", () => {
+    const html = renderToStaticMarkup(createElement(FoodLogSection, { ...base, initialEntries: [], recents: [recent] }));
+    expect(html).toContain(">Recent<");
+    expect(html.indexOf(">Greek yogurt<")).toBeGreaterThan(-1);
+    expect(html.indexOf(">Recent<")).toBeLessThan(html.indexOf("Log something else"));
+  });
+  it("heads the plan Today's meal plan", () => {
+    const plan = { meals: { daily: [{ mealId: "m1", title: "Breakfast", proteinTarget: 30, carbsTarget: 40, fatTarget: 10, recipes: [] }] }, hiddenCount: 0, emptiedMeals: [] };
+    const html = renderToStaticMarkup(createElement(FoodLogSection, { ...base, initialEntries: [], plan } as never));
+    expect(html).toContain("Today&#x27;s meal plan");
+  });
+  it("in the coach's own personal space it says No target yet / No meal plan yet, never 'your coach'", () => {
+    const html = renderToStaticMarkup(createElement(FoodLogSection, { ...base, initialEntries: [], selfCoached: true }));
+    expect(html).toContain("No target yet. You can still track what you eat.");
+    expect(html).toContain("No meal plan yet.");
+    expect(html).not.toContain("Your coach hasn&#x27;t");
+    expect(html).not.toContain("still setting up");
+  });
+  it("another day's totals say which day", () => {
+    const html = renderToStaticMarkup(createElement(FoodLogSection, { ...base, initialEntries: [], totalsTitle: "Logged yesterday" }));
+    expect(html).toContain("Logged yesterday");
+  });
+});
+
 // The Nutrition page used to refuse the whole client page to group-tier clients and skip the food-log reads. Logging is for everyone now; these keep it that way.
 describe("the client Nutrition page", () => {
   const src = readFileSync(join(process.cwd(), "app/(coach)/groups/[groupId]/nutrition/page.tsx"), "utf8");
@@ -60,7 +86,8 @@ describe("the client Nutrition page", () => {
   it("reads the food log for every client, not only when macros are enabled", () => {
     const foodReads = src.split("\n").filter((l) => l.includes('.from("food_log_entries")'));
     expect(foodReads.length).toBeGreaterThanOrEqual(2);
-    expect(src).toContain("fetchFoodLogDay(supabase, athleteId, todayKey)");
+    // the day Today's food shows (today unless the day switcher picked another)
+    expect(src).toContain("fetchFoodLogDay(supabase, athleteId, shownDay)");
     for (const line of foodReads) expect(line).not.toMatch(/macrosEnabled/);
     // none of the three food-log reads sits right after a "macrosEnabled ?" gate
     expect(src).not.toMatch(/macrosEnabled\s*\?\s*supabase\s*\.from\("food_log_entries"\)/);

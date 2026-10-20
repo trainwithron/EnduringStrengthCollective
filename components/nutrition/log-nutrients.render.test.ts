@@ -137,11 +137,11 @@ describe("the vitamins and minerals in one logged food", () => {
 
 describe("where it sits", () => {
   const src = (rel: string) => readFileSync(new URL(rel, import.meta.url), "utf8");
-  it("the client's food log shows it directly under the day's calories and macros, fed by the entries as they change", () => {
+  it("the client's food log shows it last, under what was logged (FIX_NUTRITION_PHONE: logging comes first on a phone), fed by the entries as they change", () => {
     const log = src("../athlete/food-log-section.tsx");
     expect(log).toContain("<LogNutrients");
     expect(log.indexOf("<LogNutrients")).toBeGreaterThan(log.indexOf('data-testid="logged-totals"'));
-    expect(log.indexOf("<LogNutrients")).toBeLessThan(log.indexOf("<TodaysMealCards"));
+    expect(log.indexOf("<LogNutrients")).toBeGreaterThan(log.indexOf("<FoodLogEntries"));
     expect(log).toContain("entries={loggedToday}");
     expect(log).toContain("allEntries.map(");
   });

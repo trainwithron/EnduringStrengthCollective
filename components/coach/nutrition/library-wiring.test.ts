@@ -55,7 +55,7 @@ describe("the coach's planner builds from the library first", () => {
 describe("the client's Today's meals shows options and logs the one they ate", () => {
   it("is the card list when a plan is saved, and logs the option's own name and macros", () => {
     expect(foodLog).toContain("<TodaysMealCards");
-    expect(clientPage).toContain("plan={savedPlanMeals ?");
+    expect(clientPage).toContain("plan={shownPlanMeals ?");
     expect(cards).toContain("I ate this");
     expect(cards).toContain("choicesFeaturedFirst(meal)");
     expect(cards).toContain("description");

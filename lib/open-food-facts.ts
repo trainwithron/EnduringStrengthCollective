@@ -3,6 +3,8 @@
 // the USDA API). Pure response-shaping logic, testable without a
 // network call; the actual fetch lives in the API route.
 
+import { servingsProblem } from "@/lib/custom-food";
+
 export interface OpenFoodFactsProduct {
   status: number;
   product?: {
@@ -20,6 +22,19 @@ export interface BarcodeLookupResult {
   carbsG: number;
   fatG: number;
   basis: "serving" | "100g";
+}
+
+// What the label numbers are per: a serving the product declares, or 100 g.
+export function barcodeBasisLabel(basis: BarcodeLookupResult["basis"]): string {
+  return basis === "serving" ? "Per serving" : "Per 100 g";
+}
+
+// The looked-up food for `qty` of its basis (2 servings, or 1.5 x 100 g), rounded like the lookup itself. A bad amount comes back as the same plain-words problem the own-food path shows.
+export function scaleBarcodeResult(result: BarcodeLookupResult, qty: number): { result: BarcodeLookupResult } | { problem: string } {
+  const problem = servingsProblem(qty);
+  if (problem) return { problem };
+  const scale = (v: number) => Math.max(0, Math.round(v * qty));
+  return { result: { ...result, calories: scale(result.calories), proteinG: scale(result.proteinG), carbsG: scale(result.carbsG), fatG: scale(result.fatG) } };
 }
 
 // Prefers OFF's own per-serving figures when the product actually
