@@ -88,11 +88,11 @@ export function ScheduleRequestCard({
         </div>
       ) : (
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Link href={`${messageBase}${encodeURIComponent(data.kind === "cancel" ? checkIn : reply)}`} className="inline-flex h-11 items-center border border-steel/40 px-4 font-body text-sm text-chalk">
+          <Link prefetch={false} href={`${messageBase}${encodeURIComponent(data.kind === "cancel" ? checkIn : reply)}`} className="inline-flex h-11 items-center border border-steel/40 px-4 font-body text-sm text-chalk">
             Message
           </Link>
           {data.kind === "cancel" && (
-            <Link href={`${messageBase}${encodeURIComponent(offer)}`} className="inline-flex h-11 items-center border border-steel/40 px-4 font-body text-sm text-chalk">
+            <Link prefetch={false} href={`${messageBase}${encodeURIComponent(offer)}`} className="inline-flex h-11 items-center border border-steel/40 px-4 font-body text-sm text-chalk">
               Offer pause or freeze
             </Link>
           )}

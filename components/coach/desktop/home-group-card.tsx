@@ -17,7 +17,7 @@ export interface HomeGroupCardData {
 // own "Dashboard" nav item already uses once inside a group.
 export function HomeGroupCard({ group }: { group: HomeGroupCardData }) {
   return (
-    <Link
+    <Link prefetch={false}
       href={`/groups/${group.id}/dashboard`}
       className="relative flex flex-col gap-1 border border-steel/30 bg-surface p-3 hover:border-rust/50 transition-colors"
     >

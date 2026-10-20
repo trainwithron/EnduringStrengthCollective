@@ -23,7 +23,7 @@ export function NeedsYouStrip({ view }: { view: NeedsYouView }) {
                 <p className="font-display uppercase text-xs tracking-wide text-steel">{title}</p>
                 <p className="font-body text-sm text-chalk">
                   {item!.profileHref ? (
-                    <Link href={item!.profileHref} className="font-medium underline-offset-2 hover:underline">
+                    <Link prefetch={false} href={item!.profileHref} className="font-medium underline-offset-2 hover:underline">
                       {item!.name}
                     </Link>
                   ) : (
@@ -31,7 +31,7 @@ export function NeedsYouStrip({ view }: { view: NeedsYouView }) {
                   )}{" "}
                   {item!.sentence}
                 </p>
-                <Link href={item!.href} className="mt-auto inline-flex items-center justify-center h-11 px-5 bg-rust text-graphite font-body text-sm font-medium self-start">
+                <Link prefetch={false} href={item!.href} className="mt-auto inline-flex items-center justify-center h-11 px-5 bg-rust text-graphite font-body text-sm font-medium self-start">
                   {item!.button}
                 </Link>
               </li>
@@ -43,7 +43,7 @@ export function NeedsYouStrip({ view }: { view: NeedsYouView }) {
             </p>
           )}
           {view.moreCount > 0 && (
-            <Link href="#needs-stack" className="inline-block font-body text-sm text-steel hover:text-chalk underline underline-offset-2 min-h-11 leading-[2.75rem]">
+            <Link prefetch={false} href="#needs-stack" className="inline-block font-body text-sm text-steel hover:text-chalk underline underline-offset-2 min-h-11 leading-[2.75rem]">
               {moreLabel(view.moreCount)}
             </Link>
           )}

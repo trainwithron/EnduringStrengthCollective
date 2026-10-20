@@ -66,7 +66,7 @@ export async function NextClientWorkoutSection({ coachId, groupIds, emptyLine = 
   const timezone = (me as { timezone?: string | null } | null)?.timezone || DEFAULT_COACH_TIMEZONE;
   const [next, open] = await Promise.all([loadNextClientToday(supabase, coachId, groupIds, timezone, now), loadOpenClientWorkout(supabase, groupIds, now)]);
   const resume = open ? (
-    <Link href={`/sessions/${open.sessionId}?resume=1`} className="block w-full min-h-16 px-4 py-3 bg-rust text-graphite text-center">
+    <Link prefetch={false} href={`/sessions/${open.sessionId}?resume=1`} className="block w-full min-h-16 px-4 py-3 bg-rust text-graphite text-center">
       <span className="block font-display uppercase text-lg font-bold leading-tight">Resume {open.name}&apos;s workout</span>
       <span className="block font-body text-sm">Started {nextSessionLabel(open.startedIso, timezone, now)}</span>
     </Link>
@@ -79,7 +79,7 @@ export async function NextClientWorkoutSection({ coachId, groupIds, emptyLine = 
   return (
     <section aria-label="Next client workout" className="mb-6 space-y-2">
       {resume}
-      <Link href={href} className="block w-full min-h-16 px-4 py-3 bg-rust text-graphite text-center">
+      <Link prefetch={false} href={href} className="block w-full min-h-16 px-4 py-3 bg-rust text-graphite text-center">
         <span className="block font-display uppercase text-lg font-bold leading-tight">Start {next.name}&apos;s workout</span>
         <span className="block font-body text-sm">{nextSessionLabel(next.startIso, timezone, now)}</span>
       </Link>

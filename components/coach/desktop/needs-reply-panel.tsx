@@ -55,7 +55,7 @@ export function NeedsReplyPanel({
       <div className="space-y-2">
         {rows.map((t) => (
           <div key={t.postId} className="flex items-start justify-between gap-3">
-            <Link
+            <Link prefetch={false}
               href={`/groups/${t.groupId}/feed?channel=${t.channel}&highlight=${t.postId}`}
               className="min-w-0 flex-1 group"
             >
