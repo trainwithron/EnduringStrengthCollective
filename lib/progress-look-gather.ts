@@ -1,5 +1,6 @@
 import { readRowsByIds, readByIds } from "@/lib/read-by-ids";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { pastSetDone } from "@/lib/set-complete";
 import { fetchInactiveKeys, inactiveKey } from "./inactive-ids";
 import {
   buildCards,
@@ -126,8 +127,8 @@ export async function gatherProgressLook(
     const { data, error } = await supabase
       .from("set_logs")
       .select(
-        `set_order, weight, reps, rpe, status,
-         session_exercises!inner ( id, exercise_name, group_workout_exercise_id, athlete_note,
+        `set_order, weight, reps, rpe, time_seconds, distance, height, status,
+         session_exercises!inner ( id, exercise_name, tracked_fields, group_workout_exercise_id, athlete_note,
            athlete_sessions!inner ( id, athlete_id, group_id, workout_id, status, completed_at ) )`
       )
       .in("session_exercises.athlete_sessions.group_id", groupIds)
@@ -184,7 +185,7 @@ export async function gatherProgressLook(
     if (mentionsPain(se.athlete_note)) painAt.set(sess.athlete_id, Math.max(painAt.get(sess.athlete_id) ?? 0, new Date(sess.completed_at).getTime()));
     const tr = se.group_workout_exercise_id ? targetReps.get(`${se.group_workout_exercise_id}:${s.set_order}`) ?? null : null;
     const target = tr ? tr.min : null;
-    if (s.status !== "completed") {
+    if (!pastSetDone(s, se)) {
       a.missed = true;
       continue;
     }

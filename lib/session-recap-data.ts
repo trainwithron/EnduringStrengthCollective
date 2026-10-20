@@ -1,4 +1,5 @@
 import { ACTUAL_PROP, orderTrackedFields, type TrackedField } from "@/lib/exercise-fields";
+import { pastSetDone } from "@/lib/set-complete";
 
 export interface RecapSetEntry {
   setOrder: number;
@@ -116,9 +117,11 @@ export async function getSessionRecap(
       : Promise.resolve({ data: [] }),
   ]);
 
+  const exerciseById = new Map<string, { tracked_fields: string[] | null; exercise_name: string }>(((sessionExercises ?? []) as any[]).map((e) => [e.id as string, e]));
   const setsByExercise = new Map<string, RecapSetEntry[]>();
   for (const row of (setRows ?? []) as any[]) {
-    if (row.status !== "completed") continue;
+    // done by the logger's own rule (an old "pending" set with its values counts)
+    if (!pastSetDone(row, exerciseById.get(row.session_exercise_id))) continue;
     const list = setsByExercise.get(row.session_exercise_id) ?? [];
     list.push({
       setOrder: row.set_order,

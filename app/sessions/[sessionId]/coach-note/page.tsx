@@ -5,6 +5,11 @@ import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createCrossOrgServerClient as createServerClient } from "@/lib/supabase/server";
 import { AcknowledgeSessionPatternNoteButton } from "@/components/coach/acknowledge-session-pattern-note-button";
+import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
+import { PatternEvidence } from "@/components/coach/pattern-evidence";
+import { gatherSessionPatternFindings } from "@/lib/session-pattern-spotter-gather";
+import { getGroupCoachTimezone } from "@/lib/timezone";
+import { loadLiftUnit } from "@/lib/lift-unit-server";
 
 export const metadata = { title: "Coach note" };
 
@@ -15,6 +20,9 @@ export const metadata = { title: "Coach note" };
 // dashboard page," not a one-time, session-specific moment). Reached
 // via the push notification/in-app notification the check route fires,
 // never linked from anywhere an athlete sees.
+// What was found shows the evidence, not just a number (Ron, Oct 20: "show me the actual sets logged that were in question, the actual exercise"): the findings are worked out again
+// here over the same sessions the note was about, with every set counted by the logger's own rule, so a note written when old "pending" sets were read as skipped is corrected,
+// not repeated. On a phone the page has the coach's usual Spotlight and bottom tabs, and a way back to the client.
 export default async function SessionPatternNotePage(props: { params: Promise<{ sessionId: string }> }) {
   const params = await props.params;
   const supabase = await createServerClient();
@@ -25,7 +33,7 @@ export default async function SessionPatternNotePage(props: { params: Promise<{ 
 
   const { data: session } = await supabase
     .from("athlete_sessions")
-    .select("id, group_id, athlete_id, workout_id, profiles ( full_name )")
+    .select("id, group_id, athlete_id, workout_id, started_at, profiles ( full_name )")
     .eq("id", params.sessionId)
     .maybeSingle();
 
@@ -57,13 +65,32 @@ export default async function SessionPatternNotePage(props: { params: Promise<{ 
     .maybeSingle();
 
   const athleteName = (session.profiles as any)?.full_name ?? "This client";
+  const { data: groupRow } = await supabase.from("groups").select("name").eq("id", session.group_id).maybeSingle();
+  const profileHref = `/groups/${session.group_id}/athletes/${session.athlete_id}`;
+  // The phone's usual coach chrome (Spotlight up top, the five tabs below); a computer reaches this page from the notification and goes back with the link at the top.
+  const phoneShell = (
+    <div className="lg:hidden">
+      <CoachMobileShell groupId={session.group_id} groupName={(groupRow?.name as string | undefined) ?? ""}>
+        {null}
+      </CoachMobileShell>
+    </div>
+  );
+  const back = (
+    <Link href={profileHref} className="inline-flex items-center min-h-11 mb-2 font-body text-sm text-steel active:text-rust">
+      &larr; {athleteName}
+    </Link>
+  );
 
   if (!check || !check.found_something) {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center max-w-[50ch]">
-          Nothing was flagged for {athleteName}&apos;s session — check the session recap for the full log.
-        </p>
+      <main className="min-h-screen bg-graphite text-chalk font-body px-5 pt-6 pb-28">
+        <div className="max-w-xl mx-auto">
+          {back}
+          <p className="font-body text-steel max-w-[50ch] mt-6">
+            Nothing was flagged for {athleteName}&apos;s session — check the session recap for the full log.
+          </p>
+        </div>
+        {phoneShell}
       </main>
     );
   }
@@ -72,11 +99,25 @@ export default async function SessionPatternNotePage(props: { params: Promise<{ 
     ? await supabase.from("workouts").select("program_id").eq("id", session.workout_id).maybeSingle()
     : { data: null };
 
-  const signals = (check.detected_signals ?? []) as { kind: string; description: string }[];
+  const stored = (check.detected_signals ?? []) as { kind: string; description: string }[];
+  // The same sessions as the note, looked at again now with every logged set counted (and with what actually happened in each one).
+  const [findings, tz, unit] = await Promise.all([
+    gatherSessionPatternFindings(supabase as any, { athleteId: session.athlete_id, groupId: session.group_id, upTo: session.started_at as string }),
+    getGroupCoachTimezone(supabase, session.group_id),
+    loadLiftUnit(supabase as any, session.athlete_id),
+  ]);
+  const sameKinds = findings.length === stored.length && findings.every((f) => stored.some((s) => s.kind === f.kind));
+  // The note as written still stands when the same things are found; otherwise say what is true now.
+  const summary = findings.length === 0
+    ? "Looked at again with every logged set counted, nothing stands out in these sessions now."
+    : sameKinds
+      ? check.synthesis_text
+      : findings.map((f) => f.description).join(" ");
 
   return (
-    <main className="min-h-screen bg-graphite text-chalk font-body px-6 py-10">
+    <main className="min-h-screen bg-graphite text-chalk font-body px-5 pt-6 pb-28 lg:pb-10">
       <div className="max-w-xl mx-auto">
+        {back}
         <p className="font-body text-xs text-rust uppercase tracking-wide font-bold mb-2">
           Session Pattern Spot
         </p>
@@ -85,17 +126,17 @@ export default async function SessionPatternNotePage(props: { params: Promise<{ 
         </h1>
 
         <div className="border border-rust/40 bg-rust/5 p-4 mb-6">
-          <p className="font-body text-sm text-chalk">{check.synthesis_text}</p>
+          <p className="font-body text-sm text-chalk">{summary}</p>
         </div>
 
-        {signals.length > 0 && (
+        {findings.length > 0 && (
           <div className="mb-8">
             <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">What was found</p>
-            <ul className="space-y-1.5">
-              {signals.map((s, i) => (
-                <li key={i} className="flex items-start gap-2">
-                  <span className="mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 bg-steel" />
-                  <span className="font-body text-sm text-steel">{s.description}</span>
+            <ul className="space-y-4">
+              {findings.map((f, i) => (
+                <li key={i}>
+                  <p className="font-body text-sm text-chalk">{f.description}</p>
+                  {f.evidence && <PatternEvidence evidence={f.evidence} timeZone={tz} unit={unit} />}
                 </li>
               ))}
             </ul>
@@ -124,6 +165,7 @@ export default async function SessionPatternNotePage(props: { params: Promise<{ 
           )}
         </div>
       </div>
+      {phoneShell}
     </main>
   );
 }
