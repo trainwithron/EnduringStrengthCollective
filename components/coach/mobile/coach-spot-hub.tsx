@@ -322,20 +322,27 @@ export function CoachSpotHub({
         onClick={toggle}
         aria-expanded={open}
         aria-controls={panelId}
-        aria-label={needs && needs.count > 0 ? `Spotlight, ${needs.count} waiting` : "Spotlight"}
+        // The name stays exactly "Spotlight" (the install banner finds the button by it); the count is its description.
+        aria-label="Spotlight"
+        aria-describedby={needs && needs.count > 0 ? `${panelId}-count` : undefined}
         className={`fixed left-1/2 -translate-x-1/2 z-40 rounded-token-circle bg-graphite/90 border border-rust/50 flex items-center justify-center active:border-rust transition-colors shadow-lg ${
           compact ? "top-[calc(env(safe-area-inset-top)+1px)] h-[30px] w-[30px]" : "top-3 h-10 w-10"
         }`}
       >
         <Sparkles className={compact ? "w-4 h-4 text-rust" : "w-5 h-5 text-rust"} strokeWidth={2.25} />
         {needs && needs.count > 0 && (
-          <span
-            data-spot-dot
-            className={`absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-rust text-graphite font-body text-[10px] font-bold leading-4 text-center ${fade ? "spot-dot-fade" : ""}`}
-            aria-label={`${needs.count} waiting`}
-          >
-            {needs.count > 9 ? "9+" : needs.count}
-          </span>
+          <>
+            <span
+              data-spot-dot
+              aria-hidden="true"
+              className={`absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-rust text-graphite font-body text-[10px] font-bold leading-4 text-center ${fade ? "spot-dot-fade" : ""}`}
+            >
+              {needs.count > 9 ? "9+" : needs.count}
+            </span>
+            <span id={`${panelId}-count`} className="sr-only">
+              {needs.count} waiting
+            </span>
+          </>
         )}
       </button>
 

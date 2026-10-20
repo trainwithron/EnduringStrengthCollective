@@ -27,7 +27,7 @@ export default async function CoachCalendarRoute(props: { searchParams: Promise<
   if (active?.needsChoice) redirect(`${CHOOSE_ORGANIZATION_PATH}?next=/calendar`);
   const anchor = active?.anchor ?? null;
   if (anchor) {
-    if (await prefersAthleteStyleView()) {
+    if ((await prefersAthleteStyleView()) && searchParams.tab !== "availability") {
       // Release 2: on a phone the calendar is the coach's own Calendar (the organization's schedule with their own workouts on it); booking one client keeps this page's path.
       if (!searchParams.scheduleFor) redirect(PHONE_CALENDAR + (searchParams.month && /^\d{4}-\d{2}$/.test(searchParams.month) ? `&month=${searchParams.month}` : ""));
       const qs = new URLSearchParams();

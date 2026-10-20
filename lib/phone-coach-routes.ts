@@ -57,8 +57,8 @@ const TO_PROGRAMS: { pattern: RegExp; shared?: boolean }[] = [
 export function phoneCoachRedirect(pathname: string, search = ""): PhoneRedirect | null {
   const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
   if (pathname === "/calendar" || pathname === "/group-calendar" || pathname === "/recurring-conflicts") {
-    // Booking one client (?scheduleFor=) stays: the page takes it to that client's group.
-    if (pathname === "/calendar" && params.get("scheduleFor")) return null;
+    // Booking one client (?scheduleFor=) stays: the page takes it to that client's group. So does Availability (?tab=availability): the one place a coach sets their hours, on a phone too.
+    if (pathname === "/calendar" && (params.get("scheduleFor") || params.get("tab") === "availability")) return null;
     const month = params.get("month");
     return { to: PHONE_CALENDAR + (month && /^\d{4}-\d{2}$/.test(month) ? `&month=${month}` : ""), groupId: null, shared: false };
   }
