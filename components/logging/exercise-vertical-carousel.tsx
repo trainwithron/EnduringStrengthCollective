@@ -216,7 +216,8 @@ export function ExerciseVerticalCarousel({
                 </button>
               </div>
 
-              {expanded && (
+              {/* The coach's own note about this exercise always shows; the plain tip (when there is no note) only with More room. */}
+              {(expanded || coachNoteByExerciseName[exercise.exerciseName]) && (
                 <div className="mb-3">
                   <ExerciseNoteCallout coachNote={coachNoteByExerciseName[exercise.exerciseName] ?? null} />
                 </div>

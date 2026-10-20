@@ -35,6 +35,7 @@ describe("less dead space in the logger", () => {
   });
   it("the coach's own note shows without More room; the plain tip still waits for More room", () => {
     expect(carousel).toContain("{(expanded || coachNoteByExerciseName[exercise.exerciseName]) && (");
+    expect(read("components/logging/exercise-vertical-carousel.tsx")).toContain("{(expanded || coachNoteByExerciseName[exercise.exerciseName]) && (");
     const callout = read("components/logging/exercise-note-callout.tsx");
     expect(callout).toContain("if (coachNote) {");
   });
