@@ -105,3 +105,11 @@ describe("Quick payment and the AI builder see every client (one-on-one clients 
     expect(b.match(/setAthleteGroupId\(c\?\.groupId \?\? null\);/g)?.length).toBe(2);
   });
 });
+
+describe("the Spotlight button keeps its name", () => {
+  it("is always named exactly 'Spotlight' (the install banner finds it by that name); the count is its description", () => {
+    expect(hub).toContain('        aria-label="Spotlight"\n        aria-describedby={needs && needs.count > 0 ? `${panelId}-count` : undefined}');
+    expect(hub).not.toContain("`Spotlight, ${needs.count} waiting`");
+    expect(read("components/add-to-home-screen-prompt.tsx")).toContain(`export const SPOTLIGHT_SELECTOR = 'button[aria-label="Spotlight"]';`);
+  });
+});
