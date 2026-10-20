@@ -118,9 +118,10 @@ export function ExerciseSwipeCarousel({
     if (!scroller) return;
     const fit = () => {
       const top = scroller.getBoundingClientRect().top + window.scrollY;
-      // The pinned Complete bar's real height (it grows with the phone's safe area), plus a little air.
+      // Everything pinned under the card, measured from the top of the Complete bar to the bottom of the screen: the bar itself (it grows with the phone's safe area) AND the tab bar under it, plus a little air.
+      // (The bar's own height alone left the tab bar out, so on a long card the Sets row or the form-video link could sit behind the bars.)
       const bar = document.querySelector("[data-complete-bar]") as HTMLElement | null;
-      const below = (bar?.offsetHeight ?? 65) + 4;
+      const below = (bar ? window.innerHeight - bar.getBoundingClientRect().top : 65) + 4;
       setMaxHeight(Math.max(260, Math.floor(window.innerHeight - top - below)));
     };
     fit();

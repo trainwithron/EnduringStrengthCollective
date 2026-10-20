@@ -28,6 +28,11 @@ describe("the card fits the screen", () => {
     expect(horizontal).toContain("overflow-x-hidden overflow-y-auto overscroll-x-auto overscroll-y-contain px-5");
     expect(vertical).toContain("max-h-[calc(100dvh-14rem)]");
   });
+  it("the room under the card is everything from the top of the Complete bar down (the bar AND the tab bar under it), not the bar's own height", () => {
+    expect(horizontal).toContain("const below = (bar ? window.innerHeight - bar.getBoundingClientRect().top : 65) + 4;");
+    expect(horizontal).not.toContain("offsetHeight ?? 65");
+    expect(horizontal).toContain("Math.floor(window.innerHeight - top - below)");
+  });
   it("the top is one slim block while a workout is in progress", () => {
     expect(page).toContain('"relative px-5 pt-1 pb-1 border-b border-steel/20"');
     expect(page).toContain("font-display font-bold text-lg leading-none uppercase truncate");
