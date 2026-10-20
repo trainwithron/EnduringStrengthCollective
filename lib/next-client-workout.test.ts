@@ -47,7 +47,7 @@ describe("a card names when the session was, in words", () => {
     const html = renderToStaticMarkup(createElement(SessionCheckCards, { sessions, timezone: LA }));
     expect(html.replace(/<!-- -->/g, "")).toContain("s session last Thursday (Oct 15, 8:00 AM) happen?");
     expect(html).toContain(">Yes<");
-    expect(html).toContain(">No<");
+    expect(html).toContain(">No-show<");
     expect(html).toContain(">Reschedule<");
   });
 });
