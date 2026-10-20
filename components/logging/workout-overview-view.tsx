@@ -22,6 +22,7 @@ export async function WorkoutOverviewView({
   athleteId,
   backHref,
   loggingForName,
+  coachTimezone,
   loggedByCoach,
   actingAs,
   sessionTypes,
@@ -32,6 +33,8 @@ export async function WorkoutOverviewView({
   athleteId: string;
   backHref: string;
   loggingForName?: string;
+  // The coach's time zone, for finding today's session this workout belongs to (FIX 3).
+  coachTimezone?: string;
   loggedByCoach?: boolean;
   actingAs?: { fullName: string; groupId: string };
   sessionTypes?: { id: string; name: string }[];
@@ -114,6 +117,7 @@ export async function WorkoutOverviewView({
             loggedByCoach={loggedByCoach}
             sessionTypes={sessionTypes}
             clientName={loggingForName}
+            coachTimezone={coachTimezone}
             exercises={exercises.map((ex) => ({
               id: ex.id,
               exerciseName: ex.exerciseName,
