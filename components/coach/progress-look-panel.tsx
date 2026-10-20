@@ -339,7 +339,7 @@ export function ProgressCardView({
           {!card.programIsPersonal && (
             <p className="font-body text-xs text-steel">
               {first || "This client"} follows a shared program, so changes here would reach everyone.{" "}
-              <Link href={`/groups/${card.groupId}/athletes/${card.athleteId}`} className="underline text-chalk">
+              <Link prefetch={false} href={`/groups/${card.groupId}/athletes/${card.athleteId}`} className="underline text-chalk">
                 Give them their own copy
               </Link>{" "}
               (Programming on their profile) to apply changes to just them.
@@ -401,13 +401,13 @@ export function ProgressCardView({
       )}
 
       <div className="mt-3 flex flex-wrap items-center gap-3 font-body text-xs">
-        <Link href={`/groups/${card.groupId}/messages/${card.athleteId}?draft=${encodeURIComponent(noteDraft)}`} className="text-rust underline">
+        <Link prefetch={false} href={`/groups/${card.groupId}/messages/${card.athleteId}?draft=${encodeURIComponent(noteDraft)}`} className="text-rust underline">
           Draft a note to {first || "them"}
         </Link>
-        <Link href={`/groups/${card.groupId}/calendar?client=${card.athleteId}&scheduleFor=${card.athleteId}`} className="text-steel underline">
+        <Link prefetch={false} href={`/groups/${card.groupId}/calendar?client=${card.athleteId}&scheduleFor=${card.athleteId}`} className="text-steel underline">
           Suggest a time
         </Link>
-        <Link href={`/groups/${card.groupId}/messages/${card.athleteId}?draft=${encodeURIComponent(helpDraft)}`} className="text-steel underline">
+        <Link prefetch={false} href={`/groups/${card.groupId}/messages/${card.athleteId}?draft=${encodeURIComponent(helpDraft)}`} className="text-steel underline">
           Ask what they need most help with
         </Link>
       </div>

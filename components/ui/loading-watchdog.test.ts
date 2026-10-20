@@ -50,8 +50,8 @@ describe("an idle open page makes no repeating requests", () => {
   });
   it("the timers left are slow and skip a hidden tab", () => {
     const auto = readFileSync(join(__dirname, "..", "coach", "desktop", "dashboard-auto-refresh.tsx"), "utf8");
-    expect(auto).toContain("const REFRESH_INTERVAL_MS = 120 * 1000;");
-    expect(auto).toContain("if (document.hidden) return;");
+    expect(auto).toContain("export const REFRESH_INTERVAL_MS = 120 * 1000;");
+    expect(auto).toContain("return !input.hidden && !input.paused && input.now - input.lastRefreshAt >= MIN_GAP_MS;");
     expect(readFileSync(join(__dirname, "..", "coach", "desktop", "floating-messages.tsx"), "utf8")).toContain('if (!first && document.visibilityState !== "visible") return;');
     expect(readFileSync(join(__dirname, "..", "messages", "use-inbox-refresh.ts"), "utf8")).toContain('if (typeof document !== "undefined" && document.visibilityState !== "visible") return;');
   });
