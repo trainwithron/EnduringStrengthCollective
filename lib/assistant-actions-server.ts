@@ -11,6 +11,9 @@ import {
   type TermParams,
 } from "./assistant-actions";
 import type { TermOverride, TerminologyOverrides } from "./terminology";
+import { type PastSessionCardFacts } from "./assistant-actions";
+import { matchClientByName, resolvePastWindow, timeRangeLabel, type NamedClient } from "./past-session-request";
+import { dateKeyInZone, getGroupCoachTimezone, nowInZone, zonedTimeToUtc } from "./timezone";
 
 // The server half of Ask Spot's action layer (docs/ASK_SPOT_ACTIONS_DESIGN.md). Three steps, and nothing happens before the second:
 //   propose  turn the coach's plain words into ONE typed action, read what the setting is right now, and return a before/after card with a signed token;
@@ -49,6 +52,20 @@ interface Before {
   term?: TermParams | null;
   // set_session_length: every window's exact length, so an undo restores each one.
   windows?: WindowLength[];
+  // add_past_session: who and when, for the card.
+  session?: PastSessionCardFacts | null;
+}
+
+// add_past_session: everything the confirm needs, fixed (and signed) when the card was shown.
+interface PastSessionToken {
+  athleteId: string;
+  groupId: string;
+  clientName: string;
+  startIso: string;
+  endIso: string;
+  timeLabel: string;
+  // The coach's own booking for that client at that time, already on the calendar: THAT one is marked came in, never a second one made.
+  existingBookingId: string | null;
 }
 
 const POLICY_COLUMN: Partial<Record<ActionId, string>> = {
@@ -139,15 +156,26 @@ interface TokenPayload extends Record<string, unknown> {
   expect?: Before;
   // For an undo of a session length: each window's previous length.
   restore?: WindowLength[];
+  // add_past_session only.
+  session?: PastSessionToken;
 }
 
-export async function proposeAction(supabase: SupabaseClient, userId: string, message: string, pageGroupId: string | null): Promise<ProposeResult | null> {
+export async function proposeAction(
+  supabase: SupabaseClient,
+  userId: string,
+  message: string,
+  pageGroupId: string | null,
+  // The coach's clients in the organization they are in (the same list Ask Spot finds people in). Needed only to put a past session on the calendar.
+  roster: NamedClient[] = [],
+  now: Date = new Date()
+): Promise<ProposeResult | null> {
   const refused = refusedSetting(message);
   if (refused) return { ok: false, message: refused };
   const req = matchAction(message);
   if (!req) return null;
   const problem = validateAction(req);
   if (problem) return { ok: false, message: problem };
+  if (req.id === "add_past_session") return proposePastSession(supabase, userId, req, roster, now);
 
   let orgId: string | null = null;
   let orgName = "";
@@ -248,10 +276,142 @@ function afterOf(req: ActionRequest): Before {
 
 export type ConfirmResult = { ok: true; message: string; undoToken: string | null; reload: boolean } | { ok: false; message: string };
 
+// ---- add_past_session (FIX 3B) ----
+// Only what the calendar already does: book_session (the calendar's own add-a-session call; a coach may book any time, and it takes no session) and then mark_booking_attended (the
+// one settle path FIX 3 uses: it takes exactly one session from an unsettled booking, nothing from one the client paid for when booking, and never a second time). When the coach
+// already has a booking for that client overlapping that time, THAT booking is marked, never a second one made.
+
+interface OverlapRow {
+  id: string;
+  start_at: string;
+  end_at: string;
+  credit_state: string | null;
+  attended_at: string | null;
+  no_show: boolean | null;
+}
+
+async function overlappingBookings(supabase: SupabaseClient, coachId: string, athleteId: string, startIso: string, endIso: string): Promise<OverlapRow[] | null> {
+  const { data, error } = await supabase
+    .from("bookings")
+    .select("id, start_at, end_at, credit_state, attended_at, no_show")
+    .eq("coach_id", coachId)
+    .eq("athlete_id", athleteId)
+    .eq("status", "confirmed")
+    .lt("start_at", endIso)
+    .gt("end_at", startIso)
+    .order("start_at", { ascending: true })
+    .limit(5);
+  if (error) return null;
+  return (data ?? []) as OverlapRow[];
+}
+
+// What is already there, in plain words when it settles the matter (already marked came in, or a no-show), else the booking to mark (or none).
+// Minutes after midnight in the coach's time zone.
+const localMinutes = (iso: string, tz: string) => {
+  const d = nowInZone(tz, new Date(iso));
+  return d.getUTCHours() * 60 + d.getUTCMinutes();
+};
+const bookingLabel = (r: { start_at: string; end_at: string }, tz: string) => timeRangeLabel(localMinutes(r.start_at, tz), localMinutes(r.end_at, tz));
+
+function readOverlap(rows: OverlapRow[], clientName: string, tz: string): { stop: string } | { booking: OverlapRow | null } {
+  const label = (r: OverlapRow) => bookingLabel(r, tz);
+  const attended = rows.find((r) => r.attended_at);
+  if (attended) return { stop: `${clientName}'s ${label(attended)} session today is already marked as came in, so nothing more was taken.` };
+  const noShow = rows.find((r) => r.no_show);
+  if (noShow) return { stop: `${clientName}'s ${label(noShow)} session today is marked as a no-show. Open it on your calendar to change that.` };
+  return { booking: rows[0] ?? null };
+}
+
+async function sessionMinutesFor(supabase: SupabaseClient, userId: string): Promise<number> {
+  const windows = await readWindows(supabase, userId);
+  const lengths = Array.from(new Set((windows ?? []).map((w) => w.minutes).filter((m): m is number => typeof m === "number" && m > 0)));
+  return lengths.length === 1 ? lengths[0] : 60;
+}
+
+const hhmm = (min: number) => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+
+async function proposePastSession(supabase: SupabaseClient, userId: string, req: ActionRequest, roster: NamedClient[], now: Date): Promise<ProposeResult> {
+  const spec = req.params.pastSession!;
+  if (roster.length === 0) return { ok: false, message: "I couldn't find your clients right now, so nothing was added. You can add the session from your calendar." };
+  const found = matchClientByName(spec.name, roster);
+  if ("none" in found) return { ok: false, message: `I couldn't find a client called "${spec.name}". Check the name, or add the session from your calendar.` };
+  if ("many" in found) return { ok: false, message: `Which one: ${found.many.map((c) => c.fullName).join(", ")}? Say it again with the full name.` };
+  const client = found.client;
+  const groups = Array.from(new Set(roster.filter((r) => r.id === client.id).map((r) => r.groupId).filter((g): g is string => !!g)));
+  if (groups.length !== 1) return { ok: false, message: `${client.fullName} is in more than one of your groups, so I won't guess which one. Add the session from their calendar.` };
+  const groupId = groups[0];
+
+  const tz = await getGroupCoachTimezone(supabase, groupId);
+  const local = nowInZone(tz, now);
+  const nowMin = local.getUTCHours() * 60 + local.getUTCMinutes();
+  const todayKey = dateKeyInZone(tz, now);
+  const resolved = resolvePastWindow(spec.window, nowMin, await sessionMinutesFor(supabase, userId));
+  if ("problem" in resolved) return { ok: false, message: resolved.problem };
+  const startIso = zonedTimeToUtc(todayKey, hhmm(resolved.startMin), tz).toISOString();
+  const endIso = new Date(zonedTimeToUtc(todayKey, hhmm(resolved.startMin), tz).getTime() + (resolved.endMin - resolved.startMin) * 60000).toISOString();
+
+  const rows = await overlappingBookings(supabase, userId, client.id, startIso, endIso);
+  if (!rows) return { ok: false, message: "I can't read your calendar right now, so nothing was added." };
+  const overlap = readOverlap(rows, client.fullName, tz);
+  if ("stop" in overlap) return { ok: false, message: overlap.stop };
+  const existing = overlap.booking;
+  // The card shows the booking that will be marked: an existing one's own times.
+  const timeLabel = existing ? bookingLabel(existing, tz) : timeRangeLabel(resolved.startMin, resolved.endMin);
+  const facts: PastSessionCardFacts = { clientName: client.fullName, timeLabel, existing: !existing ? "none" : existing.credit_state === "unsettled" ? "unmarked" : "prepaid" };
+  const d = describeAction(req, { session: facts });
+  const session: PastSessionToken = {
+    athleteId: client.id,
+    groupId,
+    clientName: client.fullName,
+    startIso: existing ? existing.start_at : startIso,
+    endIso: existing ? existing.end_at : endIso,
+    timeLabel,
+    existingBookingId: existing?.id ?? null,
+  };
+  const payload: TokenPayload = { kind: "confirm", coachId: userId, orgId: null, action: req, before: { session: facts }, session };
+  return { ok: true, card: { actionId: req.id, title: d.title, beforeText: d.beforeText, afterText: d.afterText, token: signToken("assistant-action", payload, PROPOSE_TTL), confirmLabel: "Yes" } };
+}
+
+async function confirmPastSession(supabase: SupabaseClient, userId: string, req: ActionRequest, s: PastSessionToken): Promise<ConfirmResult> {
+  const tz = await getGroupCoachTimezone(supabase, s.groupId);
+  // Read again now: a second Yes on the same card, or a booking made since, finds the booking and never makes another or takes another session.
+  const rows = await overlappingBookings(supabase, userId, s.athleteId, s.startIso, s.endIso);
+  if (!rows) return { ok: false, message: "I can't read your calendar right now, so nothing was changed." };
+  const overlap = readOverlap(rows, s.clientName, tz);
+  if ("stop" in overlap) return { ok: false, message: overlap.stop };
+
+  let bookingId = overlap.booking?.id ?? null;
+  let created = false;
+  if (!bookingId) {
+    const { data, error } = await supabase.rpc("book_session", { p_coach_id: userId, p_athlete_id: s.athleteId, p_group_id: s.groupId, p_start_at: s.startIso, p_end_at: s.endIso });
+    if (error || !data) {
+      const why = error?.message ?? "";
+      if (/just taken/.test(why)) return { ok: false, message: "You already have another session on your calendar at that time, so nothing was added. Open your calendar to sort it out." };
+      if (/training client/.test(why)) return { ok: false, message: `${s.clientName} isn't set up for sessions there, so nothing was added.` };
+      return { ok: false, message: "That didn't go through, so nothing was added. You can add it from your calendar." };
+    }
+    bookingId = data as string;
+    created = true;
+  }
+  const { data: took, error: markError } = await supabase.rpc("mark_booking_attended", { p_booking_id: bookingId });
+  if (markError) {
+    return created
+      ? { ok: false, message: `${s.clientName} is on your calendar for today ${s.timeLabel}, but I couldn't mark it as came in. Open it on your calendar and mark it there.` }
+      : { ok: false, message: "I couldn't mark that session as came in, so nothing was changed. Open it on your calendar and mark it there." };
+  }
+  await record(supabase, userId, "change", req, `${s.clientName}, today ${s.timeLabel}, came in`, { session: null }, { amount: took === true ? 1 : 0 });
+  const tail = took === true ? "1 session used." : "Nothing more taken: it was already paid for.";
+  return { ok: true, message: `Done. ${s.clientName} is on your calendar for today ${s.timeLabel}, came in. ${tail}`, undoToken: null, reload: true };
+}
+
 export async function confirmAction(supabase: SupabaseClient, userId: string, token: unknown): Promise<ConfirmResult> {
   const payload = verifyToken<TokenPayload>("assistant-action", token);
   if (!payload || payload.kind !== "confirm" || payload.coachId !== userId) return { ok: false, message: "That request expired. Ask me again and I'll show it to you." };
   const req = payload.action;
+  if (req.id === "add_past_session") {
+    if (!payload.session) return { ok: false, message: "That request expired. Ask me again and I'll show it to you." };
+    return confirmPastSession(supabase, userId, req, payload.session);
+  }
   const before = await readBefore(supabase, userId, payload.orgId, req);
   if (!before) return { ok: false, message: "I can't read that setting right now, so I haven't changed anything." };
   // The card showed one starting value. If it is not that any more (changed by hand, already confirmed, undone), the card is wrong: refuse rather than write.

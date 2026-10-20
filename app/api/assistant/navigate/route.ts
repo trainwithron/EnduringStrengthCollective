@@ -69,7 +69,8 @@ export async function POST(request: Request) {
   if (role === "coach") {
     try {
       // The page's own group only (never "the first group"), so a word change says which organization it is for and never guesses one.
-      const proposal = await proposeAction(supabase, user.id, message, pathGroup && ownGroupIds.includes(pathGroup) ? pathGroup : null);
+      // The roster (this organization's clients) is how "add Sarah to my calendar for the last hour" finds Sarah.
+      const proposal = await proposeAction(supabase, user.id, message, pathGroup && ownGroupIds.includes(pathGroup) ? pathGroup : null, roster);
       if (proposal) {
         if (!proposal.ok) return NextResponse.json({ kind: "unsure", text: proposal.message, chips: [], steps: [], intentIds: [] });
         return NextResponse.json({ kind: "action", card: proposal.card });

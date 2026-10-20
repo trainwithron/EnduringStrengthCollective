@@ -6,7 +6,10 @@
 // Only requests that are clearly commands match. A question ("how do I change the buffer?") is left to the how-to library, and an unclear request is never guessed:
 // the answer is "I can't do that yet" with the places to do it by hand.
 
-export type ActionId = "set_term" | "set_buffer" | "set_cancellation_hours" | "set_notice_hours" | "set_booking_mode" | "set_session_length";
+import { matchPastSession, PAST_SESSION_LIMITS, type PastSessionSpec } from "./past-session-request";
+
+// add_past_session (FIX 3B): "add Sarah to my calendar for the last hour" puts a session that already happened today on the calendar as came in (one session used). See lib/past-session-request.ts.
+export type ActionId = "set_term" | "set_buffer" | "set_cancellation_hours" | "set_notice_hours" | "set_booking_mode" | "set_session_length" | "add_past_session";
 
 export type BookingMode = "free" | "request" | "coach_schedules";
 
@@ -18,7 +21,7 @@ export interface TermParams {
 
 export interface ActionRequest {
   id: ActionId;
-  params: { amount?: number; mode?: BookingMode; term?: TermParams };
+  params: { amount?: number; mode?: BookingMode; term?: TermParams; pastSession?: PastSessionSpec };
 }
 
 // The same limits as components/coach/desktop/booking-policy-control.tsx and lib/availability-edit.ts.
@@ -83,6 +86,9 @@ export function matchAction(message: string): ActionRequest | null {
   const term = matchTerm(text);
   if (term) return term;
 
+  const past = matchPastSession(text);
+  if (past) return { id: "add_past_session", params: { pastSession: past } };
+
   if (!COMMAND_LEAD.test(text) && !/^(no |zero )?(buffer|gap)\b/.test(text)) return null;
 
   // "no buffer", "remove the gap" -> 0
@@ -130,6 +136,14 @@ export function validateAction(req: ActionRequest): string | null {
       return range(ACTION_LIMITS.sessionMinutes, "The session length");
     case "set_booking_mode":
       return params.mode === "free" || params.mode === "request" || params.mode === "coach_schedules" ? null : "Choose how clients book.";
+    case "add_past_session": {
+      const p = params.pastSession;
+      if (!p || !p.name.trim()) return "Say who came in.";
+      if (p.window.kind === "last" && p.window.minutes != null && (p.window.minutes < PAST_SESSION_LIMITS.minMinutes || p.window.minutes > PAST_SESSION_LIMITS.maxMinutes)) {
+        return `A session from ${PAST_SESSION_LIMITS.minMinutes} minutes to ${PAST_SESSION_LIMITS.maxMinutes / 60} hours, please.`;
+      }
+      return null;
+    }
     case "set_term": {
       const t = params.term;
       if (!t) return "Say which word you want.";
@@ -159,7 +173,17 @@ export function termDisplay(t: TermParams | null | undefined): string {
 }
 
 // The words of the before/after card. `before` is whatever the server read from the database just now (a number, a mode, or a word).
-export function describeAction(req: ActionRequest, before: { amount?: number | null; mode?: string | null; term?: TermParams | null }): { title: string; beforeText: string; afterText: string } {
+// add_past_session: who, when today, and whether that time is already on the calendar (and already paid for, when the client booked it themselves).
+export interface PastSessionCardFacts {
+  clientName: string;
+  timeLabel: string;
+  existing: "none" | "unmarked" | "prepaid";
+}
+
+export function describeAction(
+  req: ActionRequest,
+  before: { amount?: number | null; mode?: string | null; term?: TermParams | null; session?: PastSessionCardFacts | null }
+): { title: string; beforeText: string; afterText: string } {
   const a = req.params.amount ?? 0;
   switch (req.id) {
     case "set_term":
@@ -174,8 +198,18 @@ export function describeAction(req: ActionRequest, before: { amount?: number | n
       return { title: `Set the session length to ${plural(a, "minute", "minutes")} for all your hours?`, beforeText: before.amount ? plural(before.amount, "minute", "minutes") : "the same as the slot", afterText: plural(a, "minute", "minutes") };
     case "set_booking_mode":
       return { title: `Change how clients book to "${bookingModeText(req.params.mode)}"?`, beforeText: bookingModeText(before.mode), afterText: bookingModeText(req.params.mode) };
+    case "add_past_session": {
+      const s = before.session ?? { clientName: "Your client", timeLabel: "", existing: "none" as const };
+      // Paid when the client booked it themselves: marking it came in takes nothing more.
+      const uses = s.existing === "prepaid" ? "already paid when it was booked" : "uses 1 session";
+      return {
+        title: `${s.clientName}, today ${s.timeLabel}, came in, ${uses}.`,
+        beforeText: s.existing === "none" ? "Not on your calendar" : "On your calendar, not marked yet",
+        afterText: s.existing === "prepaid" ? "Came in (already paid)" : "Came in, 1 session used",
+      };
+    }
   }
 }
 
 // What the assistant says when it cannot do something yet: plainly, with where to do it by hand. Never a guess.
-export const CANNOT_YET = "I can't do that one yet. I can change your word for your people, the gap between sessions, the cancellation window, minimum notice, the session length, and how clients book.";
+export const CANNOT_YET = "I can't do that one yet. I can change your word for your people, the gap between sessions, the cancellation window, minimum notice, the session length, and how clients book, and put a session that already happened today on your calendar (\"add Sarah to my calendar for the last hour\").";
