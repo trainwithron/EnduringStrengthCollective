@@ -1,3 +1,4 @@
+import { orgIdOfGroup } from "@/lib/org-of-group";
 import { LoadFailedPage } from "@/components/ui/load-failed-page";
 import { isReadFailure } from "@/lib/read-failed";
 import Link from "next/link";
@@ -93,6 +94,8 @@ export default async function ProgramCalendarPage(
   const isActingAsOther = effective.isActingAsOther;
   const athleteId = effective.athleteId;
   const viewingAsAthlete = membership.role === "athlete" || isActingAsOther;
+  // The coach's own personal space (no organization): their Calendar is the one Calendar (the organization's schedule with their own workouts on it), not one program's (Release 2).
+  if (isActingAsOther && athleteId === user.id && !(await orgIdOfGroup(supabase, params.groupId))) redirect(`/groups/${params.groupId}/calendar`);
 
   let actingAsFullName: string | null = null;
   if (isActingAsOther) {
