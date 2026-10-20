@@ -1,3 +1,4 @@
+import { COACH_HOME_HREF } from "@/lib/start-group";
 import { loadPostWorkoutCards } from "@/lib/post-workout-cards";
 import { redirect } from "next/navigation";
 import { isReadFailure } from "@/lib/read-failed";
@@ -613,7 +614,8 @@ export default async function SessionPage(
         isMinor: await athleteIsMinor(supabase, session.athlete_id),
       }
     : null;
-  const coachHomeHref = `/groups/${session.group_id}`;
+  // Never a group's page (that was a client's one-on-one space, titled with the client's name: "SAWYER STEELE"): the coaching Home, which on a phone is the coach's own app or team Home.
+  const coachHomeHref = COACH_HOME_HREF;
   // A coach logging for a client goes Back to that client's log overview (their day), still in coach mode. The group's workout page is the coach's own template view: for most one-on-one clients it says
   // "This workout isn't available" and its Go to Home leaves coach mode (Oct 19 audit).
   const backHref = sessionBackHref({ groupId: session.group_id, athleteId: session.athlete_id, workoutId: session.workout_id, coachMode: !!coachModeClient });

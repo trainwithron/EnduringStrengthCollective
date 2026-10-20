@@ -1,3 +1,4 @@
+import { COACH_HOME_HREF } from "@/lib/start-group";
 import { LoadFailedPage } from "@/components/ui/load-failed-page";
 import { isReadFailure } from "@/lib/read-failed";
 import Link from "next/link";
@@ -67,7 +68,7 @@ export default async function LogForClientPage(
   if (programs.length === 0) {
     return (
       <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
-        <CoachModeBar groupId={params.groupId} clientName={clientName} homeHref={`/groups/${params.groupId}`} />
+        <CoachModeBar groupId={params.groupId} clientName={clientName} homeHref={COACH_HOME_HREF} />
         <header className="px-5 pt-4 pb-4 border-b border-steel/20">
           <Link href={`/groups/${params.groupId}/athletes/${params.athleteId}`} className="font-body text-xs text-steel uppercase tracking-wide">
             &larr; Back to profile
@@ -94,7 +95,7 @@ export default async function LogForClientPage(
   if (chosen) {
     return (
       <>
-        <CoachModeBar groupId={params.groupId} clientName={clientName} homeHref={`/groups/${params.groupId}`} />
+        <CoachModeBar groupId={params.groupId} clientName={clientName} homeHref={COACH_HOME_HREF} />
         <ProgramPlainView
           groupId={params.groupId}
           programId={chosen.id}
@@ -127,7 +128,7 @@ export default async function LogForClientPage(
 
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
-      <CoachModeBar groupId={params.groupId} clientName={clientName} homeHref={`/groups/${params.groupId}`} />
+      <CoachModeBar groupId={params.groupId} clientName={clientName} homeHref={COACH_HOME_HREF} />
       <header className="px-5 pt-2 pb-1">
         <Link href={`/groups/${params.groupId}/athletes/${params.athleteId}`} className="font-body text-xs text-steel uppercase tracking-wide min-h-11 inline-flex items-center">
           &larr; Back to profile

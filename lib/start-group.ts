@@ -60,6 +60,8 @@ export function pickFeedGroup<T extends { id: string; name: string }>(sharedGrou
 // A coach on a phone arrives at the landing decision (app/coach-landing/route.ts, lib/coach-landing.ts): the coach home of a team organization, the organization chooser, or their own client app (COACH_PHONE_LANDING).
 export const COACH_PHONE_ENTRY = "/coach-landing";
 export const COACH_PHONE_LANDING = "/my-space?view=client";
+// Where "Home" goes from a coach tool (the Coach mode bar while logging for a client, finishing that workout): the coaching Home. At a computer that is the dashboard; on a phone /dashboard makes the landing decision above. Never a group page: a client's one-on-one space would be titled with the client's name (Release 2, the "SAWYER STEELE" fix).
+export const COACH_HOME_HREF = "/dashboard";
 export function startPath(membership: Pick<StartMembership, "group_id" | "role"> | null, onPhone: boolean): string {
   if (!membership) return "/";
   if (membership.role !== "coach") return `/groups/${membership.group_id}`;

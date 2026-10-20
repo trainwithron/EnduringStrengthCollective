@@ -23,6 +23,8 @@ import { isTeamSportGroup, TEAM_SPORT_HIDDEN_HUB_TILES } from "@/lib/team-sport"
 
 type TileKey = "clients" | "messages" | "business" | "program" | "ask-spot";
 
+export const SPOT_OPEN_HASHES = ["late-changes", "schedule-requests", "expiring"] as const;
+
 // Ron, Oct 19: "I already have a calendar button. That doesn't need to be there. Quick payment could probably be rolled into business." "I do want messages in the spotlight tab."
 export const TILES: { key: TileKey; label: string; icon: typeof Users }[] = [
   { key: "clients", label: "Clients", icon: Users },
@@ -91,6 +93,25 @@ export function CoachSpotHub({
       });
   }
   useEffect(() => {
+    // Opened by a link (Release 2): ?spot=1 (a coach page that lives in Spotlight on a phone), or a notice naming a panel (#late-changes, #schedule-requests, #expiring).
+    const anchor = SPOT_OPEN_HASHES.find((h) => window.location.hash === `#${h}`) ?? null;
+    if (new URLSearchParams(window.location.search).get("spot") === "1" || anchor) {
+      setOpen(true);
+      setView("grid");
+      loadNeeds(true);
+      if (anchor) {
+        // the panel reads its own rows; look for it for a few seconds
+        let tries = 0;
+        const timer = window.setInterval(() => {
+          const el = document.querySelector(`[data-spot-anchor="${anchor}"] section`);
+          if (el || ++tries > 20) {
+            window.clearInterval(timer);
+            el?.scrollIntoView({ block: "start" });
+          }
+        }, 250);
+      }
+      return;
+    }
     loadNeeds(false);
   }, []);
   // A team-sport group has no Business tile (lib/team-sport.ts). Unknown until read, which shows every tile.
@@ -174,6 +195,11 @@ export function CoachSpotHub({
       document.cookie = `${ACTIVE_ORG_COOKIE}=${encodeURIComponent(next.orgId)}; path=/; max-age=${60 * 60 * 24 * 90}`;
     } catch {
       // not remembered; the hub still switched
+    }
+    // On the coach's own space (it belongs to no organization) the page stays: it reloads, and every tile then reads the organization just chosen (Release 2).
+    if (leavesPage && pageOrg.current === null) {
+      window.location.reload();
+      return;
     }
     if (leavesPage) {
       // A full page load, not a client-side navigation: the soft navigation after the switch hung on a loading skeleton in the live check (Oct 19), and a full load also brings the new organization's colors,

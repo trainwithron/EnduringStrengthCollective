@@ -1,3 +1,4 @@
+import { COACH_HOME_HREF } from "@/lib/start-group";
 import { LoadFailedPage } from "@/components/ui/load-failed-page";
 import { isReadFailure } from "@/lib/read-failed";
 import { redirect } from "next/navigation";
@@ -75,7 +76,7 @@ export default async function LogWorkoutForClientPage(
 
   return (
     <>
-    <CoachModeBar groupId={params.groupId} clientName={athleteProfile?.full_name ?? "this client"} homeHref={`/groups/${params.groupId}`} />
+    <CoachModeBar groupId={params.groupId} clientName={athleteProfile?.full_name ?? "this client"} homeHref={COACH_HOME_HREF} />
     <WorkoutOverviewView
       data={data}
       groupId={params.groupId}

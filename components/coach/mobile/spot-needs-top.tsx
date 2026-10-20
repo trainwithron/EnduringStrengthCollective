@@ -52,9 +52,16 @@ export function SpotNeedsTop({ needs, onNavigated }: { needs: SpotNeeds; onNavig
       )}
       {needs.groupIds.length > 0 && (
         <>
-          <LateChangesPanel groupIds={needs.groupIds} />
-          <ScheduleRequestsPanel groupIds={needs.groupIds} />
-          <ExpiryCheckInPanel groupIds={needs.groupIds} />
+          {/* Notice links (#late-changes, #schedule-requests, #expiring) open Spotlight on the panel they name (coach-spot-hub.tsx). */}
+          <div data-spot-anchor="late-changes">
+            <LateChangesPanel groupIds={needs.groupIds} />
+          </div>
+          <div data-spot-anchor="schedule-requests">
+            <ScheduleRequestsPanel groupIds={needs.groupIds} />
+          </div>
+          <div data-spot-anchor="expiring">
+            <ExpiryCheckInPanel groupIds={needs.groupIds} />
+          </div>
           <InactiveClientsPanel groupIds={needs.groupIds} />
           <ProgressLookPanel groupIds={needs.groupIds} />
         </>
