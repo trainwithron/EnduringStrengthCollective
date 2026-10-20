@@ -749,8 +749,9 @@ export default async function CoachDayDetailPage(
           groupId={params.groupId}
         />
       )}
+      {/* A session marked happened is not a no-show (the database refuses it): only its Undo shows; Mark no-show comes back after Undo. */}
       {start.getTime() < Date.now() ? (
-        <MarkNoShowToggle bookingId={booking.id} initialNoShow={booking.no_show ?? false} />
+        !settlementById.get(booking.id)?.attended_at && <MarkNoShowToggle bookingId={booking.id} initialNoShow={booking.no_show ?? false} />
       ) : (
         <CancelBookingButton bookingId={booking.id} viewer="coach" recurringSeriesId={booking.recurring_series_id ?? null} />
       )}

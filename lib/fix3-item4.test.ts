@@ -15,6 +15,14 @@ describe("the day page's no-show", () => {
     expect(t).toContain('rpc("set_booking_no_show", { p_booking_id: bookingId, p_no_show: false })');
     expect(t).not.toContain("p_no_show: next");
   });
+  it("is not offered on a session marked happened (only its Undo), and no Mark attended on a no-show", () => {
+    const day = read("app/(coach)/groups/[groupId]/calendar/[date]/page.tsx");
+    expect(day).toContain("!settlementById.get(booking.id)?.attended_at && <MarkNoShowToggle bookingId={booking.id} initialNoShow={booking.no_show ?? false} />");
+    expect(day).toContain("{settlementById.has(booking.id) && !booking.no_show && start.getTime() <= Date.now() + 12 * 3600 * 1000 && (");
+  });
+  it("the did-it-happen cards only ever list sessions not yet marked happened", () => {
+    expect(read("components/coach/session-check-section.tsx")).toContain('.is("attended_at", null)');
+  });
 });
 
 describe("a walk-in", () => {
