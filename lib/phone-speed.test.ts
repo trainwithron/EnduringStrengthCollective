@@ -50,7 +50,7 @@ describe("group 2", () => {
   it("B5: two components asking who this is at once share one call; a sign-out (or a refresh, a new sign-in, an account change) asks again; a token is always its own call; a failure is not kept", async () => {
     const { shareGetUser } = await import("@/lib/supabase/client");
     let calls = 0;
-    let listener: ((event: string) => void) | null = null;
+    let listener: ((event: string, session: unknown) => void) | null = null;
     let fail = false;
     const client = {
       auth: {
@@ -59,7 +59,7 @@ describe("group 2", () => {
           if (fail) return { data: { user: null }, error: { message: "offline" } };
           return { data: { user: { id: jwt ? "from-token" : "u1" } }, error: null };
         },
-        onAuthStateChange: (cb: (event: string) => void) => {
+        onAuthStateChange: (cb: (event: string, session: unknown) => void) => {
           listener = cb;
           return { data: { subscription: { unsubscribe() {} } } };
         },
@@ -72,25 +72,25 @@ describe("group 2", () => {
     expect(a).toBe(b);
     await c.auth.getUser();
     expect(calls).toBe(1);
-    listener!("INITIAL_SESSION");
+    listener!("INITIAL_SESSION", null);
     await c.auth.getUser();
     expect(calls).toBe(1);
-    listener!("SIGNED_OUT");
+    listener!("SIGNED_OUT", null);
     await c.auth.getUser();
     expect(calls).toBe(2);
-    listener!("TOKEN_REFRESHED");
+    listener!("TOKEN_REFRESHED", null);
     await c.auth.getUser();
     expect(calls).toBe(3);
     await c.auth.getUser("some.jwt");
     expect(calls).toBe(4);
-    listener!("USER_UPDATED");
+    listener!("USER_UPDATED", null);
     fail = true;
     await c.auth.getUser();
     await new Promise((r) => setTimeout(r, 0));
     fail = false;
     const after = await c.auth.getUser();
     expect(calls).toBe(6);
-    expect(after.data.user.id).toBe("u1");
+    expect(after.data.user?.id).toBe("u1");
   });
   it("B5: only the shared (not the cross-organization) client, and only in the browser", () => {
     const src = read("lib/supabase/client.ts");

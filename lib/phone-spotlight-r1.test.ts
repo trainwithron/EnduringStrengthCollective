@@ -59,7 +59,8 @@ describe("what needs the coach is at the top of the drop-down", () => {
   });
   it("the route works for the organization the coach is in, and asks nothing when it must be chosen", () => {
     const route = read("app/api/coach/spot-needs/route.ts");
-    expect(route).toContain("const active = await getActiveAnchor(supabase, user.id);");
+    // the organization and the time zone are read together (phone speed B6)
+    expect(route).toContain("const [active, { data: me }] = await Promise.all([getActiveAnchor(supabase, user.id),");
     expect(route).toContain("if (active.needsChoice) return NextResponse.json({ ...empty, needsChoice: true });");
     expect(route).toContain("const groupIds = groupsInOrgOf(active.groups, active.anchor.id).map((g) => g.id);");
     expect(route).toContain("loadSessionsToCheck(supabase, user.id, groupIds)");
