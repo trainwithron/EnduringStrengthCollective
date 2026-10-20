@@ -32,7 +32,7 @@ describe("the running-low notice opens the place sessions are added", () => {
     expect(day).toContain('detail: "Add sessions",');
     expect(day).toContain("href: addSessionsHref(p.groupId, p.athleteId),");
     const panel = read("components/coach/desktop/needs-payment-panel.tsx");
-    expect(panel).toContain("<Link href={addSessionsHref(r.groupId, r.athleteId)} className=\"font-body text-xs text-chalk underline\">");
+    expect(panel).toContain("<Link prefetch={false} href={addSessionsHref(r.groupId, r.athleteId)} className=\"font-body text-xs text-chalk underline\">");
   });
   it("the list shows 1 left or none, leaves out payment holds and set-aside clients, and every row's button goes to the same place", () => {
     const page = read("app/(coach)/running-low/page.tsx");

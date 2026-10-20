@@ -82,7 +82,7 @@ export function NeedsPaymentPanel({ rows }: { rows: NeedsPaymentRow[] }) {
                 {r.name}
               </Link>
               <span className="font-body text-xs text-rust">{coachBalanceLabel(r.balance)}</span>
-              <Link href={addSessionsHref(r.groupId, r.athleteId)} className="font-body text-xs text-chalk underline">
+              <Link prefetch={false} href={addSessionsHref(r.groupId, r.athleteId)} className="font-body text-xs text-chalk underline">
                 Add sessions
               </Link>
               <button type="button" disabled={busy === r.athleteId} onClick={() => act(r, "remind")} className="font-body text-xs text-chalk underline disabled:opacity-40">
