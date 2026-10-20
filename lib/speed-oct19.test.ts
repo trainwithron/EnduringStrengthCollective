@@ -87,7 +87,9 @@ describe("6 /my-space?view=client", () => {
   it("goes straight to the client app with the same cookies (one hop, not three)", () => {
     const route = read("app/my-space/route.ts");
     expect(route).not.toContain("/my-training/open?group=");
-    expect(route).toContain("setMyTrainingCookies(");
+    // the one-hop open lives in lib/open-own-space.ts (phone speed B7)
+    expect(read("lib/open-own-space.ts")).toContain("setMyTrainingCookies(");
+    expect(route).toContain("openOwnSpaceRedirect(");
     expect(read("app/my-training/open/route.ts")).toContain("setMyTrainingCookies(");
   });
 });

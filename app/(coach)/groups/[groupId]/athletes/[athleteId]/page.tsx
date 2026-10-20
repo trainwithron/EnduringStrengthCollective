@@ -129,6 +129,11 @@ export default async function AthleteProfilePage(
     redirect("/login");
   }
 
+  // Phone speed (B9): the client's address on the account is asked for now, alongside wave 1, instead of after it (for anyone but the coach themself it is always needed). It is only
+  // used below, once the viewer is known to coach this client; a failure still fails as it did when it was awaited there.
+  const signInUserPromise = !selfView ? createServiceRoleClient().auth.admin.getUserById(params.athleteId) : null;
+  signInUserPromise?.catch(() => {});
+
   // Wave 1 — every one of these queries depends only on `params`/
   // `user.id`, not on each other, so they run as one batch instead of
   // 23 sequential round trips. This page had grown to the worst
@@ -179,6 +184,8 @@ export default async function AthleteProfilePage(
     { data: intakeRows },
     { data: promotionRows },
     { data: parqAckRow },
+    { data: subGoalRows },
+    openAnchor,
   ] = await Promise.all([
     supabase
       .from("group_memberships")
@@ -440,6 +447,12 @@ export default async function AthleteProfilePage(
     supabase.from("pr_promotions").select("session_id, exercise_name, status, answered_at").eq("athlete_id", params.athleteId).eq("group_id", params.groupId).eq("requested_by", user.id),
     // What this coach has acknowledged of the client's health screening: the number of flagged answers they had seen (athlete_injury_flag_acknowledgements.flagged_count).
     supabase.from("athlete_injury_flag_acknowledgements").select("flagged_count, decision, acknowledged_at").eq("coach_id", user.id).eq("athlete_id", params.athleteId).maybeSingle(),
+    // Smaller goals under this client's goal (both sides see them).
+    selfView
+      ? Promise.resolve({ data: [] as any[] })
+      : supabase.from("client_sub_goals").select("id, title, target_date, proposed_by, status").eq("athlete_id", params.athleteId).eq("group_id", params.groupId).order("created_at", { ascending: true }),
+    // The coach's own profile lives in their personal space, which is in no organization: the page around it is the normal coach page of the organization they have open.
+    selfView ? getActiveAnchor(supabase, user.id) : Promise.resolve(null),
   ]);
 
   if (membership?.role !== "coach") {
@@ -499,7 +512,7 @@ export default async function AthleteProfilePage(
   // The client's address on the account: shown to the coach for a client who has signed in too (so they can see what is on file before correcting it), and used to email a not-yet-signed-in client their link.
   let signInEmailOnFile: string | null = null;
   if (signInStatus !== "active" || !selfView) {
-    const { data: signInTarget } = await createServiceRoleClient().auth.admin.getUserById(params.athleteId);
+    const { data: signInTarget } = await (signInUserPromise ?? createServiceRoleClient().auth.admin.getUserById(params.athleteId));
     const signInEmail = signInTarget?.user?.email ?? null;
     signInEmailOnFile = signInEmail && !isPlaceholderEmail(signInEmail) ? signInEmail : null;
   }
@@ -535,6 +548,7 @@ export default async function AthleteProfilePage(
     { data: clientTagAssignmentRows },
     standingHistory,
     { data: mainLiftExerciseRows },
+    seriesReads,
   ] = await Promise.all([
     activeProgram
       ? supabase.from("programs").select("training_days").eq("id", activeProgram.id).maybeSingle()
@@ -613,13 +627,45 @@ export default async function AthleteProfilePage(
           .order("exercise_name")
           .limit(1)
       : Promise.resolve({ data: null }),
+    // What is still booked ahead for each weekly schedule. If the newer columns were not there yet the first select errored and is retried here with the original columns.
+    (async () => {
+      let seriesResult = seriesFirst;
+      if (seriesResult.error) {
+        seriesResult = (await supabase
+          .from("recurring_booking_series")
+          .select("id, status, weekday, start_time, duration_minutes, occurrences_total")
+          .eq("athlete_id", params.athleteId)
+          .eq("group_id", params.groupId)
+          .order("created_at", { ascending: false })
+          .limit(20)) as unknown as typeof seriesResult;
+      }
+      const rows = (seriesResult.data ?? []) as unknown as {
+        id: string;
+        mode?: string;
+        status: string;
+        weekday: number;
+        start_time: string;
+        duration_minutes: number;
+        occurrences_total: number | null;
+      }[];
+      if (rows.length === 0) return { rows, upcomingRows: [] as unknown[], frozenRows: [] as unknown[] };
+      // The day a frozen schedule starts again (0297) is read apart from the main query so the page works before that update is applied.
+      const [{ data: upcomingRows }, { data: frozenRows }] = await Promise.all([
+        supabase
+          .from("bookings")
+          .select("id, recurring_series_id, start_at")
+          .in("recurring_series_id", rows.map((r) => r.id))
+          .eq("status", "confirmed")
+          .gt("start_at", new Date().toISOString())
+          .order("start_at", { ascending: true })
+          .limit(400),
+        supabase.from("recurring_booking_series").select("id, frozen_until").in("id", rows.map((r) => r.id)),
+      ]);
+      return { rows, upcomingRows: (upcomingRows ?? []) as unknown[], frozenRows: (frozenRows ?? []) as unknown[] };
+    })(),
   ]);
 
   const sharedPhotos = signedPhotoResults;
-  // Smaller goals under this client's goal (both sides see them).
-  const { data: subGoalRows } = selfView
-    ? { data: [] as any[] }
-    : await supabase.from("client_sub_goals").select("id, title, target_date, proposed_by, status").eq("athlete_id", params.athleteId).eq("group_id", params.groupId).order("created_at", { ascending: true });
   const subGoals: SubGoalView[] = ((subGoalRows ?? []) as any[]).map((r: any) => ({ id: r.id as string, title: r.title as string, targetDate: (r.target_date as string | null) ?? null, proposedBy: r.proposed_by as string, status: r.status as SubGoalStatus }));
   // The answers are read through the database's health_answers door (migration 0399): the client, their coach and an owner or admin the owner has granted get them; anyone else gets null and sees only whether
   // the form is done.
@@ -832,47 +878,15 @@ export default async function AthleteProfilePage(
     createdAt: r.created_at as string,
   }));
 
-  // What is still booked ahead for each weekly schedule. If the newer columns were not there yet the first select errored and is retried here with the original columns.
-  let seriesResult = seriesFirst;
-  if (seriesResult.error) {
-    seriesResult = (await supabase
-      .from("recurring_booking_series")
-      .select("id, status, weekday, start_time, duration_minutes, occurrences_total")
-      .eq("athlete_id", params.athleteId)
-      .eq("group_id", params.groupId)
-      .order("created_at", { ascending: false })
-      .limit(20)) as unknown as typeof seriesResult;
-  }
-  const seriesRows = (seriesResult.data ?? []) as unknown as {
-    id: string;
-    mode?: string;
-    status: string;
-    weekday: number;
-    start_time: string;
-    duration_minutes: number;
-    occurrences_total: number | null;
-  }[];
+  // What is still booked ahead for each weekly schedule (read in wave 2).
+  const seriesRows = seriesReads.rows;
   const upcomingBySeries = new Map<string, { bookingId: string; startIso: string }[]>();
   const frozenUntilById = new Map<string, string | null>();
-  if (seriesRows.length > 0) {
-    // The day a frozen schedule starts again (0297) is read apart from the main query so the page works before that update is applied.
-    const [{ data: upcomingRows }, { data: frozenRows }] = await Promise.all([
-      supabase
-        .from("bookings")
-        .select("id, recurring_series_id, start_at")
-        .in("recurring_series_id", seriesRows.map((r) => r.id))
-        .eq("status", "confirmed")
-        .gt("start_at", new Date().toISOString())
-        .order("start_at", { ascending: true })
-        .limit(400),
-      supabase.from("recurring_booking_series").select("id, frozen_until").in("id", seriesRows.map((r) => r.id)),
-    ]);
-    for (const f of (frozenRows ?? []) as { id: string; frozen_until: string | null }[]) frozenUntilById.set(f.id, f.frozen_until ?? null);
-    for (const b of (upcomingRows ?? []) as { id: string; recurring_series_id: string; start_at: string }[]) {
-      const list = upcomingBySeries.get(b.recurring_series_id) ?? [];
-      list.push({ bookingId: b.id, startIso: b.start_at });
-      upcomingBySeries.set(b.recurring_series_id, list);
-    }
+  for (const f of seriesReads.frozenRows as { id: string; frozen_until: string | null }[]) frozenUntilById.set(f.id, f.frozen_until ?? null);
+  for (const b of seriesReads.upcomingRows as { id: string; recurring_series_id: string; start_at: string }[]) {
+    const list = upcomingBySeries.get(b.recurring_series_id) ?? [];
+    list.push({ bookingId: b.id, startIso: b.start_at });
+    upcomingBySeries.set(b.recurring_series_id, list);
   }
   const scheduleViews: SeriesView[] = seriesRows.map((r) => ({
     frozenUntil: frozenUntilById.get(r.id) ?? null,
@@ -934,7 +948,7 @@ export default async function AthleteProfilePage(
   let shellGroupId = params.groupId;
   let shellGroupName = group?.name ?? "Coaching";
   if (selfView) {
-    const open = await getActiveAnchor(supabase, user.id);
+    const open = openAnchor;
     if (open?.anchor) {
       shellGroupId = open.anchor.id;
       shellGroupName = open.anchor.name;

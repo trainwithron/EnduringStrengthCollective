@@ -401,7 +401,10 @@ describe("TC1b: one plain coach list at the top of the Clients page", () => {
     expect(src("app/(coach)/groups/[groupId]/messages/page.tsx")).toContain("!notAccepted.has(r.profile_id)");
     expect(src("app/(coach)/groups/[groupId]/team/page.tsx")).toContain("!notAccepted.has(c.profile_id)");
     expect(src("app/(coach)/groups/[groupId]/revenue-splits/page.tsx")).toContain("!notAccepted.has(m.profile_id)");
-    expect(src("app/(coach)/groups/[groupId]/page.tsx")).toContain("hiddenProfileIds={[...(await pendingCoachIds(params.groupId))]}");
+    // read in Home's first wave (phone speed B8)
+    const home = src("app/(coach)/groups/[groupId]/page.tsx");
+    expect(home).toContain("pendingCoachIds(params.groupId),");
+    expect(home).toContain("hiddenProfileIds={[...pendingCoaches]}");
   });
 
   it("Settings has Coaches and invitations, pointing at the list and the Team page", () => {

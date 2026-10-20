@@ -108,9 +108,11 @@ describe("The coach as their own client (personal space)", () => {
     const route = read("app/my-space/route.ts");
     expect(route).toContain('rpc("ensure_personal_space")');
     expect(route).toContain("/groups/${spaceId}/athletes/${user.id}");
-    // straight into the client app with the same cookies (SPEED, Oct 19: one hop instead of three)
-    expect(route).toContain("setMyTrainingCookies(response, { userId: user.id, groupId: spaceId as string, role: (seat as { role: string }).role });");
-    expect(route).toContain("NextResponse.redirect(new URL(mySpaceTarget(spaceId as string, url.searchParams), url))");
+    // straight into the client app with the same cookies (SPEED, Oct 19: one hop instead of three), through lib/open-own-space.ts (phone speed B7: /coach-landing uses it too)
+    expect(route).toContain("openOwnSpaceRedirect(user, url, url.searchParams)");
+    const open = read("lib/open-own-space.ts");
+    expect(open).toContain("setMyTrainingCookies(response, { userId: user.id, groupId: spaceId as string, role: (seat as { role: string }).role });");
+    expect(open).toContain("NextResponse.redirect(new URL(mySpaceTarget(spaceId as string, params), url))");
     expect(read("app/my-training/page.tsx")).toContain('redirect("/my-space?view=client")');
   });
   it("on their own profile the Billing tab, the message box and the video check-in are gone", () => {
@@ -131,7 +133,8 @@ describe("The coach as their own client (personal space)", () => {
 describe("Personal space: only coaches, and no briefings for it", () => {
   it("the database refuses a non-coach, and the page and Assign to Myself say so calmly", () => {
     expect(read("supabase/migrations/0358_personal_space.sql")).toContain("Only coaches have a personal space.");
-    expect(read("app/my-space/route.ts")).toContain("Only coaches have a personal space.");
+    expect(read("lib/open-own-space.ts")).toContain("Only coaches have a personal space.");
+    expect(read("app/my-space/route.ts")).toContain("ONLY_COACHES_HTML");
     expect(read("components/coach/desktop/program-assign-panel.tsx")).toContain("Only coaches have a personal space.");
   });
   it("the daily briefing and the digest skip a group with no organization", () => {

@@ -7,7 +7,8 @@ const read = (p: string) => readFileSync(new URL(p, import.meta.url), "utf8");
 
 describe("client money prompts are hidden until Stripe is configured", () => {
   it("the re-up card on Home", () => {
-    expect(read("../app/(coach)/groups/[groupId]/page.tsx")).toMatch(/isStripeConfigured\(\)\)\s*\{\s*\n\s*try \{\s*\n\s*reupState/);
+    // phone speed B8: the re-up read is one of Home's parallel reads, and returns nothing unless Stripe is configured
+    expect(read("../app/(coach)/groups/[groupId]/page.tsx")).toContain("if (!(clientOnly && athleteId && isStripeConfigured())) return null;");
   });
   it("the Billing section in Settings", () => {
     expect(read("../app/(coach)/groups/[groupId]/settings/page.tsx")).toContain("!isCoach && isStripeConfigured() && (");

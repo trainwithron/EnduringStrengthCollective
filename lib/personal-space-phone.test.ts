@@ -19,7 +19,8 @@ describe("a coach's own personal space on the phone", () => {
 describe("Release 2: the phone opens as the coach's own account", () => {
   it("a coach on a phone never gets a 'coach Home' for a group: a team-sport group keeps its team Home, any other group opens their own app", () => {
     const page = read("app/(coach)/groups/[groupId]/page.tsx");
-    expect(page).toContain("if (isTeamSportGroup((teamRow as { team_mode?: boolean | null } | null)?.team_mode)) return <TeamCoachPhoneHome groupId={params.groupId} groupName={group.name} />;");
+    // the group's own team_mode, read with the group in the first wave (phone speed B8)
+    expect(page).toContain("if (isTeamSportGroup((group as { team_mode?: boolean | null }).team_mode)) return <TeamCoachPhoneHome groupId={params.groupId} groupName={group.name} />;");
     expect(page).toContain("redirect(COACH_PHONE_LANDING);");
     expect(page).not.toContain("CoachMobileHome");
   });

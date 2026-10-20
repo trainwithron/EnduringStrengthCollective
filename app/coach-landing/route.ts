@@ -6,6 +6,7 @@ import { ACTIVE_ORG_COOKIE, decodeCookieValue, rememberedGroupForActiveOrg } fro
 import { readRowsByIds } from "@/lib/read-by-ids";
 import { coachPhoneLanding, teamOnlyOrgs } from "@/lib/coach-landing";
 import { COACH_PHONE_LANDING } from "@/lib/start-group";
+import { openOwnSpaceRedirect } from "@/lib/open-own-space";
 
 // Where a coach on a phone goes after signing in (lib/coach-landing.ts): the coach home of a team organization, the one-screen organization chooser when they have several and have not chosen, or their own client app
 // as before. Read-only: it only decides and redirects.
@@ -32,6 +33,10 @@ export async function GET(request: Request) {
     }
   } catch {
     target = COACH_PHONE_LANDING;
+  }
+  // Their own client app: straight there in this one response (it used to bounce through /my-space first). Anything unexpected falls back to that hop.
+  if (target === COACH_PHONE_LANDING) {
+    return (await openOwnSpaceRedirect(user, url, new URLSearchParams({ view: "client" }))) ?? NextResponse.redirect(new URL(COACH_PHONE_LANDING, url));
   }
   return NextResponse.redirect(new URL(target, url));
 }

@@ -133,23 +133,28 @@ export default async function GroupHubPage(
   const athleteId = effective?.athleteId;
   const isActingAsOther = effective?.isActingAsOther ?? false;
 
-  // These four only need params.groupId or the viewer's own id — none
-  // depends on another's result — so they fire as one round trip instead
-  // of four sequential ones. This is the athlete's landing page; every
-  // visit pays for this. Notifications used to be a fifth entry here, but
-  // it now needs this group's own organization_id first (see below), so
-  // it's fetched separately once that's known.
   // The person's programs in every group they belong to, read alongside the rest (only their own Home uses it: "Your other programs").
   const myTrainingPromise = user && athleteId === user.id ? loadMyTraining(supabase, user.id).catch(() => null) : Promise.resolve(null);
 
+  // Phone speed (B8): the reads start as early as they can and are waited for as late as they can, in waves; nothing about what is read or decided changed.
+  // Wave B: everything that needs only the group or the viewer, as one round trip (the group, the roster, the programs, the notices, the coach's time zone, the
+  // organization's look, the coaches still to accept, and whether this is a phone).
+  // Notices are scoped to the CURRENT group specifically, not a blind "every notification this profile has ever received" — a coach who owns/admins more than one organization
+  // would otherwise see notifications from a completely different org's clients mixed into whichever group's page they happen to have open. Ron's own direct call on the scope
+  // question: current group/org only, not aggregated across every org he administers — "as the owner of the software, I do not need to see the notifications for every organization."
+  type NotificationRow = { id: string; type: string; body: string; link_path: string | null; read_at: string | null; created_at: string };
   const [
     { data: group, error: groupError },
     { data: memberships },
-    { data: recentLogs },
     { data: programs, error: programsError },
+    notificationRows,
+    timezone,
+    orgTheme,
+    pendingCoaches,
+    prefersPhoneView,
   ] = await Promise.all([
-    supabase.from("groups").select("id, name, description, organization_id, group_kind").eq("id", params.groupId).single(),
-    // Roster with role + most recent completed workout timestamp.
+    supabase.from("groups").select("id, name, description, organization_id, group_kind, team_mode").eq("id", params.groupId).single(),
+    // Roster with role.
     supabase
       .from("group_memberships")
       .select(
@@ -161,11 +166,6 @@ export default async function GroupHubPage(
     `
       )
       .eq("group_id", params.groupId),
-    supabase
-      .from("workout_logs")
-      .select("athlete_id, created_at")
-      .eq("group_id", params.groupId)
-      .order("created_at", { ascending: false }),
     // Only programs actually assigned to this athlete right now — the
     // group's shared active program plus this viewer's own personal one
     // if active, never a different client's personal program (RLS
@@ -179,27 +179,23 @@ export default async function GroupHubPage(
       .eq("is_active", true)
       .or(`athlete_id.is.null,athlete_id.eq.${athleteId ?? ""}`)
       .order("created_at", { ascending: false }),
+    user
+      ? supabase
+          .from("notifications")
+          .select("id, type, body, link_path, read_at, created_at")
+          .eq("profile_id", user.id)
+          .eq("group_id", params.groupId)
+          .order("created_at", { ascending: false })
+          .limit(20)
+          .then(({ data }) => (data ?? []) as NotificationRow[])
+      : Promise.resolve([] as NotificationRow[]),
+    // "Today" here means this group's coach's real wall-clock day, not the server's own UTC clock — see lib/timezone.ts. Otherwise a workout's lock state and every date-scoped
+    // lookup below could read a day early or late for anyone not in the UTC zone.
+    getGroupCoachTimezone(supabase, params.groupId),
+    getViewerOrgTheme(params.groupId),
+    pendingCoachIds(params.groupId),
+    prefersAthleteStyleView(),
   ]);
-
-  // Scoped to the CURRENT group specifically, not a blind "every
-  // notification this profile has ever received" — a coach who owns/
-  // admins more than one organization would otherwise see notifications
-  // from a completely different org's clients mixed into whichever
-  // group's page they happen to have open. Ron's own direct call on the
-  // scope question: current group/org only, not aggregated across every
-  // org he administers — "as the owner of the software, I do not need
-  // to see the notifications for every organization."
-  let notificationRows: { id: string; type: string; body: string; link_path: string | null; read_at: string | null; created_at: string }[] = [];
-  if (user) {
-    const { data } = await supabase
-      .from("notifications")
-      .select("id, type, body, link_path, read_at, created_at")
-      .eq("profile_id", user.id)
-      .eq("group_id", params.groupId)
-      .order("created_at", { ascending: false })
-      .limit(20);
-    notificationRows = data ?? [];
-  }
 
   if (groupError || !group) {
     return (
@@ -207,65 +203,17 @@ export default async function GroupHubPage(
     );
   }
 
-  const lastLogByAthlete = new Map<string, string>();
-  for (const log of recentLogs ?? []) {
-    if (!lastLogByAthlete.has(log.athlete_id)) {
-      lastLogByAthlete.set(log.athlete_id, log.created_at);
-    }
-  }
-
-  // The people in the group, asked of the database: an athlete reads only their own row and the coaches' now, so the rows on this page are not the group.
-  const memberCount = await readGroupMemberCount(supabase, params.groupId, (memberships ?? []).length);
   const roster: RosterMember[] = (memberships ?? []).map((m: any) => ({
     profileId: m.profile_id,
     fullName: (m.profiles as any)?.full_name ?? "Unknown",
     avatarUrl: (m.profiles as any)?.avatar_url ?? null,
     role: m.role,
-    lastWorkoutAt: lastLogByAthlete.get(m.profile_id) ?? null,
+    // filled in below, once the latest logs are read (wave C)
+    lastWorkoutAt: null,
     clientTier: m.client_tier ?? null,
   }));
-
-  // The coach's Featured Pro Shop cards, for the client's Home (the group's coach and the group's organization, like the Pro Shop page itself).
-  let featuredShop: ProShopLink[] = [];
-  if (user && athleteId && (!isCoachViewer(roster, user.id) || isActingAsOther)) {
-    const shopCoachId = roster.find((m) => m.role === "coach")?.profileId ?? null;
-    if (shopCoachId) {
-      const { data: shopRows } = await inOrg(
-        supabase
-          .from("pro_shop_links")
-          .select("id, title, category, description, url, image_url, discount_code, discount_description, click_count, featured, audience, audience_group_id")
-          .eq("coach_id", shopCoachId)
-          .eq("featured", true),
-        await orgIdOfGroup(supabase, params.groupId)
-      )
-        .order("created_at", { ascending: true })
-        .limit(12);
-      // Only the cards open to this client (audience, and no supplements for a client known to be under 18); at most three are shown.
-      const shelfViewer = await loadShelfViewer(supabase, { groupKind: (group as { group_kind?: string } | null)?.group_kind, athleteId, coachPreview: false });
-      featuredShop = linksForViewer(
-        (shopRows ?? []).map((r: any) => ({ ...r, audienceGroupId: r.audience_group_id ?? null })),
-        shelfViewer
-      ).slice(0, 3).map((r: any) => ({
-        id: r.id,
-        title: r.title,
-        category: r.category,
-        description: r.description,
-        url: r.url,
-        imageUrl: r.image_url,
-        discountCode: r.discount_code,
-        discountDescription: r.discount_description,
-        clickCount: r.click_count,
-        featured: !!r.featured,
-      }));
-    }
-  }
-
-  // The client's Home: the group sessions they can join in the next seven days (a handful). A client's own one-on-one space has none.
-  let weekClasses: Awaited<ReturnType<typeof loadClassCards>> | null = null;
-  if (user && athleteId === user.id && (!isCoachViewer(roster, user.id) || isActingAsOther) && (group as { group_kind?: string } | null)?.group_kind !== "one_on_one") {
-    const loaded = await loadClassCards(supabase, athleteId, params.groupId, { untilIso: new Date(Date.now() + 7 * 86400000).toISOString(), limit: 5 });
-    if (!loaded.notReady && loaded.classes.length > 0) weekClasses = loaded;
-  }
+  // The coach whose Featured Pro Shop cards show: the first coach in the roster as read (before it is sorted, as it always was).
+  const shopCoachId = roster.find((m) => m.role === "coach")?.profileId ?? null;
 
   // Coaches first, then athletes, alphabetical within each group.
   roster.sort((a, b) => {
@@ -273,7 +221,6 @@ export default async function GroupHubPage(
     return a.fullName.localeCompare(b.fullName);
   });
 
-  const myTraining = await myTrainingPromise;
   const isCoach = roster.some((m) => m.profileId === user?.id && m.role === "coach");
   // A coach on a phone — installed app or just a browser tab — sees the
   // same lightweight experience an athlete gets: logging their own
@@ -281,7 +228,7 @@ export default async function GroupHubPage(
   // coach at an actual desktop still gets the full shell (linked back to
   // from Settings). Acting as a client always wins — that's the whole
   // point of picking someone from "View as Client."
-  const showMobileView = isActingAsOther || !isCoach || await prefersAthleteStyleView();
+  const showMobileView = isActingAsOther || !isCoach || prefersPhoneView;
   // Coach-only UI controls (Invite Athlete, roster role/remove actions)
   // must reflect who the page is showing right now, not the real
   // signed-in identity — a coach impersonating a client via "View as
@@ -289,11 +236,11 @@ export default async function GroupHubPage(
   // discipline already applied to Feed/Calendar/Resources/Tools.
   const renderAsCoach = isActingAsOther ? false : isCoach;
 
+  // The redirect decisions, right after wave B (nothing below is read for a coach who is sent on).
   // A coach on a phone, not acting as anyone (Release 2: the phone opens as the coach's own account). A team-sport group keeps its team Home (Ron decided team-only coaches keep it);
   // any other group (an organization's, a client's one-on-one space) sends the coach to their OWN app, never a "coach Home" titled with a client's name.
   if (isCoach && showMobileView && !isActingAsOther) {
-    const { data: teamRow } = await supabase.from("groups").select("team_mode").eq("id", params.groupId).maybeSingle();
-    if (isTeamSportGroup((teamRow as { team_mode?: boolean | null } | null)?.team_mode)) return <TeamCoachPhoneHome groupId={params.groupId} groupName={group.name} />;
+    if (isTeamSportGroup((group as { team_mode?: boolean | null }).team_mode)) return <TeamCoachPhoneHome groupId={params.groupId} groupName={group.name} />;
     redirect(COACH_PHONE_LANDING);
   }
 
@@ -310,11 +257,6 @@ export default async function GroupHubPage(
     redirect("/dashboard");
   }
 
-  // "Today" here means this group's coach's real wall-clock day, not the
-  // server's own UTC clock — see lib/timezone.ts. Otherwise a workout's
-  // lock state and every date-scoped lookup below could read a day early
-  // or late for anyone not in the UTC zone.
-  const timezone = await getGroupCoachTimezone(supabase, params.groupId);
   const today = nowInZone(timezone);
   const todayKey = dateKeyInZone(timezone);
 
@@ -336,18 +278,104 @@ export default async function GroupHubPage(
   const coachId = roster.find((m) => m.role === "coach")?.profileId;
   // In a one-on-one space a program with no client on it is the coach's template, not the client's: only programs made for the client are listed.
   const shownPrograms = (programs ?? []).filter((p: any) => (group as { group_kind?: string } | null)?.group_kind !== "one_on_one" || p.athlete_id !== null);
-  // "Your programs" on Home: every active program with where the client is up to (Week N, Day M) and how many are done, by order, so it works for programs with no dates.
-  const programWorkoutRead = athleteId && shownPrograms.length > 0
-    ? await readRowsByIds(shownPrograms.map((p: any) => p.id as string), (ids) => (from, to) => supabase.from("workouts").select("id, program_id, title, week_number, day_index").in("program_id", ids).order("id").range(from, to))
-    : { data: [] as any[], error: null };
-  // When each workout was last completed (a finished session or a logged workout), so every program can pick up right after the one done last.
-  const programDoneRead = athleteId && programWorkoutRead.data.length > 0
-    ? await loadDoneAt(supabase, athleteId, programWorkoutRead.data.map((w: any) => w.id as string))
-    : { doneAt: new Map<string, string>(), failed: false };
-  // A workout the client left open or paused in the last 36 hours (their own, not one a coach logged for them): Home says so, with a way back in. After three days with sets logged the nightly job saves it as done.
-  const { data: openOwnSession } =
-    isToday && user && athleteId === user.id && !isCoachViewer(roster, user.id)
-      ? await supabase
+  const homeProgramInputs = shownPrograms.map((p: any) => ({ id: p.id as string, name: p.name as string, created_at: p.created_at as string | null }));
+  const uncoveredProgramIds = shownPrograms
+    .filter((p: any) => !p.cover_image_path)
+    .map((p: any) => p.id);
+  const clientOnly = !!user && !isCoach && !isActingAsOther && showMobileView;
+
+  // Wave C: every read that does not depend on another, at once. Each keeps its own soft failure.
+  const [
+    memberCount,
+    lastLogByAthlete,
+    featuredShop,
+    weekClasses,
+    myTraining,
+    programReads,
+    visualsMap,
+    openOwnSession,
+    mobileBase,
+    guide,
+    reupState,
+    scheduleCard,
+    upcomingClasses,
+    spot,
+  ] = await Promise.all([
+    // The people in the group, asked of the database: an athlete reads only their own row and the coaches' now, so the rows on this page are not the group.
+    readGroupMemberCount(supabase, params.groupId, (memberships ?? []).length),
+    // The most recent logged workout of each person the roster below shows (the coaches for a client; everyone for a coach).
+    (async () => {
+      const shownIds = roster.filter((m) => renderAsCoach || m.role === "coach").map((m) => m.profileId);
+      const latest = new Map<string, string>();
+      if (shownIds.length === 0) return latest;
+      const { data: recentLogs } = await supabase
+        .from("workout_logs")
+        .select("athlete_id, created_at")
+        .eq("group_id", params.groupId)
+        .in("athlete_id", shownIds)
+        .order("created_at", { ascending: false });
+      for (const log of recentLogs ?? []) {
+        if (!latest.has(log.athlete_id)) latest.set(log.athlete_id, log.created_at);
+      }
+      return latest;
+    })(),
+    // The coach's Featured Pro Shop cards, for the client's Home (the group's coach and the group's organization, like the Pro Shop page itself).
+    (async (): Promise<ProShopLink[]> => {
+      if (!(user && athleteId && (!isCoach || isActingAsOther)) || !shopCoachId) return [];
+      const [{ data: shopRows }, shelfViewer] = await Promise.all([
+        orgIdOfGroup(supabase, params.groupId).then((orgId) =>
+          inOrg(
+            supabase
+              .from("pro_shop_links")
+              .select("id, title, category, description, url, image_url, discount_code, discount_description, click_count, featured, audience, audience_group_id")
+              .eq("coach_id", shopCoachId)
+              .eq("featured", true),
+            orgId
+          )
+            .order("created_at", { ascending: true })
+            .limit(12)
+        ),
+        // Only the cards open to this client (audience, and no supplements for a client known to be under 18); at most three are shown.
+        loadShelfViewer(supabase, { groupKind: (group as { group_kind?: string } | null)?.group_kind, athleteId, coachPreview: false }),
+      ]);
+      return linksForViewer(
+        (shopRows ?? []).map((r: any) => ({ ...r, audienceGroupId: r.audience_group_id ?? null })),
+        shelfViewer
+      ).slice(0, 3).map((r: any) => ({
+        id: r.id,
+        title: r.title,
+        category: r.category,
+        description: r.description,
+        url: r.url,
+        imageUrl: r.image_url,
+        discountCode: r.discount_code,
+        discountDescription: r.discount_description,
+        clickCount: r.click_count,
+        featured: !!r.featured,
+      }));
+    })(),
+    // The client's Home: the group sessions they can join in the next seven days (a handful). A client's own one-on-one space has none.
+    (async (): Promise<Awaited<ReturnType<typeof loadClassCards>> | null> => {
+      if (!(user && athleteId === user.id && (!isCoach || isActingAsOther) && (group as { group_kind?: string } | null)?.group_kind !== "one_on_one")) return null;
+      const loaded = await loadClassCards(supabase, athleteId, params.groupId, { untilIso: new Date(Date.now() + 7 * 86400000).toISOString(), limit: 5 });
+      return !loaded.notReady && loaded.classes.length > 0 ? loaded : null;
+    })(),
+    myTrainingPromise,
+    // "Your programs" on Home: every active program with where the client is up to (Week N, Day M) and how many are done, by order, so it works for programs with no dates;
+    // and when each workout was last completed (a finished session or a logged workout), so every program can pick up right after the one done last.
+    (async () => {
+      const programWorkoutRead = athleteId && shownPrograms.length > 0
+        ? await readRowsByIds(shownPrograms.map((p: any) => p.id as string), (ids) => (from, to) => supabase.from("workouts").select("id, program_id, title, week_number, day_index").in("program_id", ids).order("id").range(from, to))
+        : { data: [] as any[], error: null };
+      const programDoneRead = athleteId && programWorkoutRead.data.length > 0
+        ? await loadDoneAt(supabase, athleteId, programWorkoutRead.data.map((w: any) => w.id as string))
+        : { doneAt: new Map<string, string>(), failed: false };
+      return { programWorkoutRead, programDoneRead };
+    })(),
+    coachId ? computeProgramCardVisuals(supabase, uncoveredProgramIds, coachId) : Promise.resolve(new Map()),
+    // A workout the client left open or paused in the last 36 hours (their own, not one a coach logged for them): Home says so, with a way back in. After three days with sets logged the nightly job saves it as done.
+    isToday && user && athleteId === user.id && !isCoach
+      ? supabase
           .from("athlete_sessions")
           .select("id")
           .eq("athlete_id", athleteId)
@@ -358,17 +386,188 @@ export default async function GroupHubPage(
           .order("started_at", { ascending: false })
           .limit(1)
           .maybeSingle()
-      : { data: null };
-  const homeProgramInputs = shownPrograms.map((p: any) => ({ id: p.id as string, name: p.name as string, created_at: p.created_at as string | null }));
+          .then(({ data }) => data)
+      : Promise.resolve(null),
+    // The phone-style Home's first reads: the programs' days, the workouts the coach put on single days, the habits, and whether the coach takes bookings (with the
+    // client's sessions left).
+    showMobileView && athleteId
+      ? (async () => {
+          // Workouts the coach put on single days (shown on Home with the coach's note): looked at from a month before to two months after the day being viewed.
+          const assignedFrom = new Date(targetDate);
+          assignedFrom.setDate(assignedFrom.getDate() - 35);
+          const assignedTo = new Date(targetDate);
+          assignedTo.setDate(assignedTo.getDate() + 70);
+          const [programContexts, assignedByDate, { data: habitRows }, booking] = await Promise.all([
+            loadProgramDayContexts(supabase, params.groupId, athleteId),
+            loadAssignedWorkouts(supabase, athleteId, params.groupId, dateKeyOf(assignedFrom), dateKeyOf(assignedTo)),
+            supabase
+              .from("client_habits")
+              .select("id, title, weekdays")
+              .eq("athlete_id", athleteId)
+              .eq("group_id", params.groupId)
+              .eq("active", true),
+            // Coach's booking availability — reused by Day view's rest-day link,
+            // same "additive, only if the coach has configured hours" gate as
+            // the existing per-program calendar page. The coach is the roster's.
+            (async () => {
+              if (!coachId) return { canBook: false, sessionsLeft: null as number | null };
+              const { count } = await supabase
+                .from("coach_availability_windows")
+                .select("id", { count: "exact", head: true })
+                .eq("coach_id", coachId);
+              const canBook = (count ?? 0) > 0;
+              if (!canBook) return { canBook, sessionsLeft: null as number | null };
+              // How many sessions the client has left, shown next to "Book a session". Failure just leaves it off.
+              try {
+                const { data: creditRow } = await supabase
+                  .from("session_credits")
+                  .select("balance")
+                  .eq("athlete_id", athleteId)
+                  .eq("group_id", params.groupId)
+                  .maybeSingle();
+                return { canBook, sessionsLeft: typeof creditRow?.balance === "number" ? creditRow.balance : null };
+              } catch {
+                return { canBook, sessionsLeft: null as number | null };
+              }
+            })(),
+          ]);
+          return { programContexts, assignedByDate, habitRows: habitRows ?? [], booking };
+        })()
+      : Promise.resolve(null),
+    // First-run guide eligibility. The client themselves only (not a coach, not a coach acting as
+    // them), on the phone-style Home, and only once the waiver intake is out of the way.
+    (async () => {
+      if (!clientOnly) return { eligible: false, dismissed: false };
+      const [{ data: guideProfile }, { data: guideIntake }] = await Promise.all([
+        supabase.from("profiles").select("intake_required").eq("id", user!.id).maybeSingle(),
+        supabase.from("client_intake").select("completed_at").eq("athlete_id", user!.id).maybeSingle(),
+      ]);
+      if (guideProfile?.intake_required && !guideIntake?.completed_at) return { eligible: false, dismissed: false };
+      // Read on its own so a deployment without the column yet just means "not dismissed".
+      const { data: dismissedRow, error: dismissedError } = await supabase
+        .from("profiles")
+        .select("guide_dismissed_at")
+        .eq("id", user!.id)
+        .maybeSingle();
+      return { eligible: true, dismissed: !dismissedError && !!dismissedRow?.guide_dismissed_at };
+    })(),
+    // A client whose sessions have run out gets a one-tap re-up (or "message your coach"), and a prompt on the day a session is
+    // booked. Never shown to a coach, or to a coach acting as the client. Any failure just means no card.
+    // While payments are not set up in the app (Ron collects payment outside it), the card is not shown at all.
+    (async (): Promise<Awaited<ReturnType<typeof loadReupState>>> => {
+      if (!(clientOnly && athleteId && isStripeConfigured())) return null;
+      try {
+        return await loadReupState(supabase, athleteId, params.groupId);
+      } catch {
+        return null;
+      }
+    })(),
+    // A client with a weekly schedule gets a "My schedule" card (ask to pause, freeze or cancel). Never shown to a coach, or to a coach acting as the client. Any failure
+    // (or the feature not being switched on yet) just means no card.
+    (async (): Promise<MyScheduleCardState | null> => {
+      if (!(clientOnly && athleteId)) return null;
+      try {
+        const mine = await loadMySchedule(supabase, params.groupId, athleteId);
+        const first = mine.items.find((i) => i.series.status !== "ended");
+        if (!first) return null;
+        return {
+          summary: scheduleSummary(first.series),
+          state: scheduleStateLine(first.series),
+          waiting: !!openRequest(first.requests, first.series.id),
+        };
+      } catch {
+        return null;
+      }
+    })(),
+    // Upcoming small-group sessions with this client's coach, as a link to the Classes page (the classes of this group's organization, as the Classes page lists them). Any
+    // failure (or the feature not being switched on yet) just means no link.
+    (async () => {
+      if (!clientOnly) return 0;
+      try {
+        let q = supabase
+          .from("group_sessions")
+          .select("id", { count: "exact", head: true })
+          .eq("kind", "class")
+          .eq("status", "scheduled")
+          .gte("start_at", new Date().toISOString());
+        if (group.organization_id) q = q.eq("organization_id", group.organization_id);
+        const { count } = await q;
+        return count ?? 0;
+      } catch {
+        return 0;
+      }
+    })(),
+    // "The Spot" (coach_only_widget_hub_the_spot.md) — a coach-only widget rail on top of the true-mirror View-As-Client screen. Only ever computed while genuinely acting as
+    // someone ELSE (a coach in their own space is not shown it, so it is not read either) — a real athlete, or a coach not currently impersonating anyone, pays nothing extra here.
+    (async () => {
+      const none = {
+        visible: [] as SpotWidgetKey[],
+        hidden: [] as SpotWidgetKey[],
+        credits: { balance: 0, activeSubscriptionRenewsAt: null as string | null },
+        waiver: { required: false, completed: false },
+        support: { openCount: 0, openRequests: [] as { id: string; subject: string; createdAt: string }[] },
+      };
+      if (!(isActingAsOther && athleteId && user && athleteId !== user.id)) return none;
+      const [{ data: layoutRow }, { data: creditsRow }, { data: subRow }, { data: intakeProfile }, { data: intakeRow }, { data: openRequests }] = await Promise.all([
+        supabase
+          .from("coach_dashboard_layout")
+          .select("spot_hidden_widgets, spot_widget_order")
+          .eq("coach_id", user.id)
+          .maybeSingle(),
+        supabase
+          .from("session_credits")
+          .select("balance")
+          .eq("athlete_id", athleteId)
+          .eq("group_id", params.groupId)
+          .maybeSingle(),
+        supabase
+          .from("membership_subscriptions")
+          .select("current_period_end")
+          .eq("athlete_id", athleteId)
+          .eq("group_id", params.groupId)
+          .eq("status", "active")
+          .maybeSingle(),
+        supabase.from("profiles").select("intake_required").eq("id", athleteId).maybeSingle(),
+        supabase.from("client_intake").select("completed_at").eq("athlete_id", athleteId).maybeSingle(),
+        // Coach-wide, not client-specific — this group's own organization, not every org the coach happens to belong to.
+        group.organization_id
+          ? supabase
+              .from("support_requests")
+              .select("id, subject, created_at")
+              .eq("organization_id", group.organization_id)
+              .eq("status", "open")
+              .order("created_at", { ascending: false })
+              .limit(5)
+          : Promise.resolve({ data: null }),
+      ]);
+      const hidden = (layoutRow?.spot_hidden_widgets ?? []) as SpotWidgetKey[];
+      return {
+        hidden,
+        visible: computeVisibleSpotWidgetOrder(layoutRow?.spot_widget_order ?? [], hidden),
+        credits: { balance: creditsRow?.balance ?? 0, activeSubscriptionRenewsAt: subRow?.current_period_end ?? null },
+        waiver: { required: intakeProfile?.intake_required ?? false, completed: !!intakeRow?.completed_at },
+        support: group.organization_id
+          ? {
+              openCount: (openRequests ?? []).length,
+              openRequests: ((openRequests ?? []) as { id: string; subject: string; created_at: string }[]).map((r) => ({ id: r.id, subject: r.subject, createdAt: r.created_at })),
+            }
+          : none.support,
+      };
+    })(),
+  ]);
+
+  for (const m of roster) m.lastWorkoutAt = lastLogByAthlete.get(m.profileId) ?? null;
+  const { programWorkoutRead, programDoneRead } = programReads;
   const homePrograms = homeProgramCards(homeProgramInputs, programWorkoutRead.data, programDoneRead.doneAt);
   const homePickups = programPickups(homeProgramInputs, programWorkoutRead.data, programDoneRead.doneAt);
-  const uncoveredProgramIds = shownPrograms
-    .filter((p: any) => !p.cover_image_path)
-    .map((p: any) => p.id);
-  const visualsMap = coachId
-    ? await computeProgramCardVisuals(supabase, uncoveredProgramIds, coachId)
-    : new Map();
   const visualsByProgramId = Object.fromEntries(visualsMap);
+  const guideEligible = guide.eligible;
+  const guideDismissed = guide.dismissed;
+  const spotVisibleWidgets = spot.visible;
+  const spotHiddenWidgets = spot.hidden;
+  const spotCredits = spot.credits;
+  const spotWaiver = spot.waiver;
+  const spotSupport = spot.support;
 
   let dayWorkout: DayWorkoutInfo = {
     status: "no-program",
@@ -387,13 +586,13 @@ export default async function GroupHubPage(
   let aboutYouNeeded = false;
   let wellnessCheckin: WellnessCheckinValues | null = null;
   let lifeImpactPrompt: string | null = null;
-  let canBook = false;
+  const canBook = mobileBase?.booking.canBook ?? false;
+  const sessionsLeft = mobileBase?.booking.sessionsLeft ?? null;
   let nextWorkoutText: string | null = null;
   // No workout logged yet: the wellness check-in becomes a plain card under the workout, not a full-screen block.
   let isFirstDay = false;
   let homeThreadLines: string[] = [];
   let mealLine: string | null = null;
-  let sessionsLeft: number | null = null;
   let weekDays: HomeDaySummary[] = [];
   let monthSummaryByDateKey = new Map<string, HomeDaySummary>();
   let weekRangeStart = targetDate;
@@ -406,95 +605,119 @@ export default async function GroupHubPage(
   // serve the next unlogged workout in order, no dates, no locking.
   let isUnscheduledProgram = false;
 
-  if (showMobileView && athleteId) {
-    const programContexts = await loadProgramDayContexts(supabase, params.groupId, athleteId);
+  if (mobileBase && athleteId) {
+    const { programContexts, assignedByDate, habitRows } = mobileBase;
     // Week and Month need dates to plot; they are only unavailable when NO active program has a schedule.
     isUnscheduledProgram = programContexts.length > 0 && programContexts.every((c) => c.unscheduled);
-    // Workouts the coach put on single days (shown on Home with the coach's note): looked at from a month before to two months after the day being viewed.
-    const assignedFrom = new Date(targetDate);
-    assignedFrom.setDate(assignedFrom.getDate() - 35);
-    const assignedTo = new Date(targetDate);
-    assignedTo.setDate(assignedTo.getDate() + 70);
-    const assignedByDate = await loadAssignedWorkouts(supabase, athleteId, params.groupId, dateKeyOf(assignedFrom), dateKeyOf(assignedTo));
     const workoutIdsForLogCheck = [...contextWorkoutIds(programContexts), ...[...assignedByDate.values()].map((a) => a.workoutId)];
+    const dayView = view === "day";
+    const twoYearsAgo = new Date(Date.now() - 730 * 86400000).toISOString();
 
-    const [{ data: logRows }, { data: habitRows }] = await Promise.all([
+    // Wave D: what was logged, and (for the day) the day's own reads, at once.
+    const [{ data: logRows }, dayReads] = await Promise.all([
       workoutIdsForLogCheck.length > 0
         ? supabase.from("workout_logs").select("workout_id").eq("athlete_id", athleteId).in("workout_id", workoutIdsForLogCheck)
-        : Promise.resolve({ data: [] }),
-      supabase
-        .from("client_habits")
-        .select("id, title, weekdays")
-        .eq("athlete_id", athleteId)
-        .eq("group_id", params.groupId)
-        .eq("active", true),
+        : Promise.resolve({ data: [] as { workout_id: string }[] }),
+      dayView
+        ? Promise.all([
+            isToday
+              ? supabase.from("workout_logs").select("id", { count: "exact", head: true }).eq("athlete_id", athleteId).eq("group_id", params.groupId)
+              : Promise.resolve({ count: null as number | null }),
+            // The thread above Today: confirmed goal, place in the main program, weekly streak. Any failure just leaves it out.
+            isToday
+              ? Promise.all([
+                  supabase
+                    .from("client_goals")
+                    .select("goal_type, custom_label, target_date, status")
+                    .eq("athlete_id", athleteId)
+                    .eq("group_id", params.groupId)
+                    .order("created_at", { ascending: false })
+                    .limit(1)
+                    .maybeSingle(),
+                  supabase
+                    .from("workout_logs")
+                    .select("created_at")
+                    .eq("athlete_id", athleteId)
+                    .gte("created_at", twoYearsAgo)
+                    .order("created_at", { ascending: false })
+                    .limit(800),
+                ]).catch(() => null)
+              : Promise.resolve(null),
+            Promise.all([
+              macrosEnabled
+                ? supabase
+                    .from("daily_macros")
+                    .select("calories, protein_g, carbs_g, fat_g")
+                    .eq("athlete_id", athleteId)
+                    .eq("log_date", targetDateKey)
+                    .maybeSingle()
+                : Promise.resolve({ data: null }),
+              macrosEnabled
+                ? supabase
+                    .from("meal_plans")
+                    .select("meals, macros")
+                    .eq("athlete_id", athleteId)
+                    .eq("log_date", targetDateKey)
+                    .maybeSingle()
+                : Promise.resolve({ data: null }),
+              macrosEnabled ? fetchStandingHistory(supabase, athleteId) : Promise.resolve(null),
+              supabase
+                .from("habit_logs")
+                .select("habit_id, completed_at")
+                .in("habit_id", habitRows.map((h) => h.id))
+                .eq("log_date", targetDateKey),
+            ]),
+            isToday
+              ? Promise.all([
+                  supabase
+                    .from("body_weight_logs")
+                    .select("id, logged_date, weight")
+                    .eq("athlete_id", athleteId)
+                    .eq("group_id", params.groupId)
+                    .order("logged_date", { ascending: false })
+                    .limit(7),
+                  supabase
+                    .from("wellness_checkins")
+                    .select("sleep_quality, soreness, energy")
+                    .eq("athlete_id", athleteId)
+                    .eq("log_date", todayKey)
+                    // One check-in per person per day, whichever group it was answered in; the newest counts.
+                    .order("created_at", { ascending: false })
+                    .limit(1)
+                    .maybeSingle(),
+                  // AI Assistant Slice 5 — when this athlete last answered a life-
+                  // impact reflection (not just was shown one), to drive the
+                  // occasional-cadence gate below.
+                  supabase
+                    .from("wellness_checkins")
+                    .select("log_date")
+                    .eq("athlete_id", athleteId)
+                    .eq("group_id", params.groupId)
+                    .not("life_impact_note", "is", null)
+                    .order("log_date", { ascending: false })
+                    .limit(1)
+                    .maybeSingle(),
+                  supabase.from("athlete_profile_details").select("*").eq("athlete_id", athleteId).maybeSingle(),
+                  supabase.from("client_intake").select("date_of_birth").eq("athlete_id", athleteId).maybeSingle(),
+                ])
+              : Promise.resolve(null),
+          ])
+        : Promise.resolve(null),
     ]);
     const loggedIds = new Set((logRows ?? []).map((l) => l.workout_id));
 
-    // Coach's booking availability — reused by Day view's rest-day link,
-    // same "additive, only if the coach has configured hours" gate as
-    // the existing per-program calendar page.
-    const { data: coachMembership } = await supabase
-      .from("group_memberships")
-      .select("profile_id")
-      .eq("group_id", params.groupId)
-      .eq("role", "coach")
-      .limit(1)
-      .maybeSingle();
-    if (coachMembership) {
-      const { count } = await supabase
-        .from("coach_availability_windows")
-        .select("id", { count: "exact", head: true })
-        .eq("coach_id", coachMembership.profile_id);
-      canBook = (count ?? 0) > 0;
-      if (canBook) {
-        // How many sessions the client has left, shown next to "Book a session". Failure just leaves it off.
-        try {
-          const { data: creditRow } = await supabase
-            .from("session_credits")
-            .select("balance")
-            .eq("athlete_id", athleteId)
-            .eq("group_id", params.groupId)
-            .maybeSingle();
-          sessionsLeft = typeof creditRow?.balance === "number" ? creditRow.balance : null;
-        } catch {
-          sessionsLeft = null;
-        }
-      }
-    }
-
-    if (view === "day") {
+    if (dayView && dayReads) {
+      const [priorCount, threadReads, [macroResult, mealPlanResult, standingTarget, { data: dueLogRows }], todayReads] = dayReads;
       // Today's card for each program is where they pick up (the workout right after the one done last), not the one the calendar puts on today.
       daySessions = resolveSessionsForDate(programContexts, loggedIds, targetDate, today, isToday, assignedByDate, programDoneRead.failed || programWorkoutRead.error ? undefined : { byProgram: homePickups, doneToday: (iso: string) => dateKeyInZone(timezone, new Date(iso)) === todayKey });
       dayWorkout = summarizeSessions(daySessions, emptyDayInfo(programContexts, isToday));
       if (isToday) {
-        const { count: priorWorkoutCount } = await supabase
-          .from("workout_logs")
-          .select("id", { count: "exact", head: true })
-          .eq("athlete_id", athleteId)
-          .eq("group_id", params.groupId);
-        isFirstDay = (priorWorkoutCount ?? 0) === 0;
+        isFirstDay = (priorCount.count ?? 0) === 0;
 
         // The thread above Today: confirmed goal, place in the main program, weekly streak. Any failure just leaves it out.
         try {
-          const twoYearsAgo = new Date(Date.now() - 730 * 86400000).toISOString();
-          const [{ data: goalRow }, { data: threadLogs }] = await Promise.all([
-            supabase
-              .from("client_goals")
-              .select("goal_type, custom_label, target_date, status")
-              .eq("athlete_id", athleteId)
-              .eq("group_id", params.groupId)
-              .order("created_at", { ascending: false })
-              .limit(1)
-              .maybeSingle(),
-            supabase
-              .from("workout_logs")
-              .select("created_at")
-              .eq("athlete_id", athleteId)
-              .gte("created_at", twoYearsAgo)
-              .order("created_at", { ascending: false })
-              .limit(800),
-          ]);
+          if (!threadReads) throw new Error("thread not read");
+          const [{ data: goalRow }, { data: threadLogs }] = threadReads;
           const main = programContexts[0];
           // The week shown is where they pick up (the same pointer as the program row under Today), when the program's workouts were read.
           const threadPickup = (programId: string) => {
@@ -531,31 +754,6 @@ export default async function GroupHubPage(
         nextWorkoutText = nextWorkoutLabel(findNextWorkoutDate(programContexts, loggedIds, today), today);
       }
 
-      const [macroResult, mealPlanResult, standingTarget, { data: dueLogRows }] = await Promise.all([
-        macrosEnabled
-          ? supabase
-              .from("daily_macros")
-              .select("calories, protein_g, carbs_g, fat_g")
-              .eq("athlete_id", athleteId)
-              .eq("log_date", targetDateKey)
-              .maybeSingle()
-          : Promise.resolve({ data: null }),
-        macrosEnabled
-          ? supabase
-              .from("meal_plans")
-              .select("meals, macros")
-              .eq("athlete_id", athleteId)
-              .eq("log_date", targetDateKey)
-              .maybeSingle()
-          : Promise.resolve({ data: null }),
-        macrosEnabled ? fetchStandingHistory(supabase, athleteId) : Promise.resolve(null),
-        supabase
-          .from("habit_logs")
-          .select("habit_id, completed_at")
-          .in("habit_id", (habitRows ?? []).map((h) => h.id))
-          .eq("log_date", targetDateKey),
-      ]);
-
       dayMacros = resolveDayMacros(
         macroResult.data ?? null,
         (mealPlanResult.data?.macros as any) ?? null,
@@ -582,7 +780,7 @@ export default async function GroupHubPage(
         }
       }
 
-      const dueHabitDefs = (habitRows ?? []).filter((h) => isHabitDueOn(h.weekdays, targetDate));
+      const dueHabitDefs = habitRows.filter((h) => isHabitDueOn(h.weekdays, targetDate));
       const completedIds = new Set(
         (dueLogRows ?? []).filter((l) => l.completed_at).map((l) => l.habit_id)
       );
@@ -592,39 +790,8 @@ export default async function GroupHubPage(
         completed: completedIds.has(h.id),
       }));
 
-      if (isToday) {
-        const [{ data: weightRows }, { data: wellnessRow }, { data: lastLifeImpactRow }, { data: detailsRow }, { data: intakeRow }] = await Promise.all([
-          supabase
-            .from("body_weight_logs")
-            .select("id, logged_date, weight")
-            .eq("athlete_id", athleteId)
-            .eq("group_id", params.groupId)
-            .order("logged_date", { ascending: false })
-            .limit(7),
-          supabase
-            .from("wellness_checkins")
-            .select("sleep_quality, soreness, energy")
-            .eq("athlete_id", athleteId)
-            .eq("log_date", todayKey)
-            // One check-in per person per day, whichever group it was answered in; the newest counts.
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle(),
-          // AI Assistant Slice 5 — when this athlete last answered a life-
-          // impact reflection (not just was shown one), to drive the
-          // occasional-cadence gate below.
-          supabase
-            .from("wellness_checkins")
-            .select("log_date")
-            .eq("athlete_id", athleteId)
-            .eq("group_id", params.groupId)
-            .not("life_impact_note", "is", null)
-            .order("log_date", { ascending: false })
-            .limit(1)
-            .maybeSingle(),
-          supabase.from("athlete_profile_details").select("*").eq("athlete_id", athleteId).maybeSingle(),
-          supabase.from("client_intake").select("date_of_birth").eq("athlete_id", athleteId).maybeSingle(),
-        ]);
+      if (isToday && todayReads) {
+        const [{ data: weightRows }, { data: wellnessRow }, { data: lastLifeImpactRow }, { data: detailsRow }, { data: intakeRow }] = todayReads;
         const bodyProfile = rowToBodyProfile(detailsRow as Record<string, unknown> | null, intakeRow as Record<string, unknown> | null);
         weightUnit = bodyProfile.weightUnit;
         aboutYouNeeded = !aboutYouComplete(bodyProfile, weightRows?.[0]?.weight != null ? Number(weightRows[0].weight) : null);
@@ -665,7 +832,7 @@ export default async function GroupHubPage(
             programContexts,
             loggedIds,
             today,
-            habitDefs: habitRows ?? [],
+            habitDefs: habitRows,
             assignedByDate,
           });
     } else if (!isUnscheduledProgram) {
@@ -680,140 +847,10 @@ export default async function GroupHubPage(
         programContexts,
         loggedIds,
         today,
-        habitDefs: habitRows ?? [],
-            assignedByDate,
+        habitDefs: habitRows,
+        assignedByDate,
       });
       monthSummaryByDateKey = new Map(summaries.map((s) => [s.dateKey, s]));
-    }
-  }
-
-  const orgTheme = await getViewerOrgTheme(params.groupId);
-
-  // First-run guide eligibility. The client themselves only (not a coach, not a coach acting as
-  // them), on the phone-style Home, and only once the waiver intake is out of the way.
-  let guideEligible = false;
-  let guideDismissed = false;
-  if (user && !isCoach && !isActingAsOther && showMobileView) {
-    const [{ data: guideProfile }, { data: guideIntake }] = await Promise.all([
-      supabase.from("profiles").select("intake_required").eq("id", user.id).maybeSingle(),
-      supabase.from("client_intake").select("completed_at").eq("athlete_id", user.id).maybeSingle(),
-    ]);
-    if (!guideProfile?.intake_required || guideIntake?.completed_at) {
-      guideEligible = true;
-      // Read on its own so a deployment without the column yet just means "not dismissed".
-      const { data: dismissedRow, error: dismissedError } = await supabase
-        .from("profiles")
-        .select("guide_dismissed_at")
-        .eq("id", user.id)
-        .maybeSingle();
-      guideDismissed = !dismissedError && !!dismissedRow?.guide_dismissed_at;
-    }
-  }
-
-  // A client whose sessions have run out gets a one-tap re-up (or "message your coach"), and a prompt on the day a session is
-  // booked. Never shown to a coach, or to a coach acting as the client. Any failure just means no card.
-  // While payments are not set up in the app (Ron collects payment outside it), the card is not shown at all.
-  let reupState: Awaited<ReturnType<typeof loadReupState>> = null;
-  if (user && !isCoach && !isActingAsOther && showMobileView && athleteId && isStripeConfigured()) {
-    try {
-      reupState = await loadReupState(supabase, athleteId, params.groupId);
-    } catch {
-      reupState = null;
-    }
-  }
-
-  // A client with a weekly schedule gets a "My schedule" card (ask to pause, freeze or cancel). Never shown to a coach, or to a coach acting as the client. Any failure
-  // (or the feature not being switched on yet) just means no card.
-  let scheduleCard: MyScheduleCardState | null = null;
-  if (user && !isCoach && !isActingAsOther && showMobileView && athleteId) {
-    try {
-      const mine = await loadMySchedule(supabase, params.groupId, athleteId);
-      const first = mine.items.find((i) => i.series.status !== "ended");
-      if (first) {
-        scheduleCard = {
-          summary: scheduleSummary(first.series),
-          state: scheduleStateLine(first.series),
-          waiting: !!openRequest(first.requests, first.series.id),
-        };
-      }
-    } catch {
-      scheduleCard = null;
-    }
-  }
-
-  // Upcoming small-group sessions with this client's coach, as a link to the Classes page. Any failure (or the feature not being
-  // switched on yet) just means no link.
-  let upcomingClasses = 0;
-  if (user && !isCoach && !isActingAsOther && showMobileView) {
-    try {
-      const { count } = await supabase
-        .from("group_sessions")
-        .select("id", { count: "exact", head: true })
-        .eq("kind", "class")
-        .eq("status", "scheduled")
-        .gte("start_at", new Date().toISOString());
-      upcomingClasses = count ?? 0;
-    } catch {
-      upcomingClasses = 0;
-    }
-  }
-
-  // "The Spot" (coach_only_widget_hub_the_spot.md) — a coach-only widget
-  // rail on top of the true-mirror View-As-Client screen. Only ever
-  // computed while genuinely acting as someone — a real athlete, or a
-  // coach not currently impersonating anyone, pays nothing extra here.
-  let spotVisibleWidgets: SpotWidgetKey[] = [];
-  let spotHiddenWidgets: SpotWidgetKey[] = [];
-  let spotCredits = { balance: 0, activeSubscriptionRenewsAt: null as string | null };
-  let spotWaiver = { required: false, completed: false };
-  let spotSupport: { openCount: number; openRequests: { id: string; subject: string; createdAt: string }[] } = {
-    openCount: 0,
-    openRequests: [],
-  };
-  if (isActingAsOther && athleteId && user) {
-    const [{ data: layoutRow }, { data: creditsRow }, { data: subRow }, { data: intakeProfile }, { data: intakeRow }] =
-      await Promise.all([
-        supabase
-          .from("coach_dashboard_layout")
-          .select("spot_hidden_widgets, spot_widget_order")
-          .eq("coach_id", user.id)
-          .maybeSingle(),
-        supabase
-          .from("session_credits")
-          .select("balance")
-          .eq("athlete_id", athleteId)
-          .eq("group_id", params.groupId)
-          .maybeSingle(),
-        supabase
-          .from("membership_subscriptions")
-          .select("current_period_end")
-          .eq("athlete_id", athleteId)
-          .eq("group_id", params.groupId)
-          .eq("status", "active")
-          .maybeSingle(),
-        supabase.from("profiles").select("intake_required").eq("id", athleteId).maybeSingle(),
-        supabase.from("client_intake").select("completed_at").eq("athlete_id", athleteId).maybeSingle(),
-      ]);
-
-    spotHiddenWidgets = (layoutRow?.spot_hidden_widgets ?? []) as SpotWidgetKey[];
-    spotVisibleWidgets = computeVisibleSpotWidgetOrder(layoutRow?.spot_widget_order ?? [], spotHiddenWidgets);
-    spotCredits = { balance: creditsRow?.balance ?? 0, activeSubscriptionRenewsAt: subRow?.current_period_end ?? null };
-    spotWaiver = { required: intakeProfile?.intake_required ?? false, completed: !!intakeRow?.completed_at };
-
-    // Coach-wide, not client-specific — this group's own organization,
-    // not every org the coach happens to belong to.
-    if (group.organization_id) {
-      const { data: openRequests } = await supabase
-        .from("support_requests")
-        .select("id, subject, created_at")
-        .eq("organization_id", group.organization_id)
-        .eq("status", "open")
-        .order("created_at", { ascending: false })
-        .limit(5);
-      spotSupport = {
-        openCount: (openRequests ?? []).length,
-        openRequests: (openRequests ?? []).map((r) => ({ id: r.id, subject: r.subject, createdAt: r.created_at })),
-      };
     }
   }
 
@@ -1017,7 +1054,7 @@ export default async function GroupHubPage(
       )}
 
       <RosterList
-        hiddenProfileIds={[...(await pendingCoachIds(params.groupId))]}
+        hiddenProfileIds={[...pendingCoaches]}
         members={roster}
         groupId={params.groupId}
         viewerId={user?.id}
