@@ -152,7 +152,7 @@ describe("every full-screen sheet is a dialog", () => {
     expect(hook).toContain("Discard what you have here?");
     expect(hook).toContain('action === "block"');
     expect(hook).toContain("Tab from outside the dialog pulls focus in");
-    expect(read("components/coach/mobile/spot-builder-panel.tsx")).toContain('guard: () => (library && aliases ? "ask" : "close")');
+    expect(read("components/coach/mobile/spot-builder-panel.tsx")).toContain('guard: () => (active ? "ask" : "close")');
     expect(read("components/feed/new-post-composer.tsx")).toContain('guard: () => (body.trim() || file ? "ask" : "close")');
     expect(read("components/feed/new-post-composer.tsx")).toContain('e.key === "Escape" && mentionQuery !== null');
     expect(read("components/coach/desktop/expanded-day-scheduler.tsx")).toContain('assigning ? "block"');
@@ -182,7 +182,8 @@ describe("a field's name says what the field IS, never an example of what to typ
 
   it("the names found wrong in review are fixed (an ingredient row is not named after its sample food, the Style field is not named Conjugate)", () => {
     expect(read("components/coach/mobile/spot-builder-panel.tsx")).not.toContain('aria-label="Conjugate"');
-    expect(read("components/coach/mobile/spot-builder-panel.tsx")).toContain('aria-label="Style"');
+    // (Release 3: the program box has no Style field; its one field before the box is named for what it is)
+    expect(read("components/coach/mobile/spot-builder-panel.tsx")).toContain('aria-label={term("client", "singular", { cap: true })}');
     expect(read("components/coach/desktop/recipe-hub-manager.tsx")).toContain('aria-label="Ingredient name"');
     expect(read("components/coach/desktop/recipe-hub-manager.tsx")).not.toContain('aria-label="Chicken Breast"');
   });

@@ -20,7 +20,7 @@ import type { WellnessCheckinValues } from "@/components/athlete/wellness-checki
 import { DayCard } from "@/components/athlete/day-card";
 import { MyProgramsBlock } from "@/components/athlete/my-programs-block";
 import { homeProgramCards, programPickups } from "@/lib/home-programs";
-import { loadDoneAt } from "@/lib/program-pickup";
+import { loadDoneAt, weekOf } from "@/lib/program-pickup";
 import { readRowsByIds } from "@/lib/read-by-ids";
 import { AboutYouCard } from "@/components/athlete/about-you-card";
 import { aboutYouComplete, rowToBodyProfile } from "@/lib/client-body-profile";
@@ -496,6 +496,14 @@ export default async function GroupHubPage(
               .limit(800),
           ]);
           const main = programContexts[0];
+          // The week shown is where they pick up (the same pointer as the program row under Today), when the program's workouts were read.
+          const threadPickup = (programId: string) => {
+            const pick = programWorkoutRead.error || programDoneRead.failed ? undefined : homePickups.get(programId);
+            if (!pick || pick.kind === "empty") return null;
+            const rows = (programWorkoutRead.data as { program_id: string; week_number: number | null; day_index: number | null; id: string }[]).filter((w) => w.program_id === programId);
+            const totalWeeks = rows.reduce((m, w) => Math.max(m, weekOf(w)), 1);
+            return { week: pick.kind === "next" ? weekOf(pick.workout) : weekOf(pick.lastDone), totalWeeks, complete: pick.kind === "complete" };
+          };
           homeThreadLines = buildHomeThread({
             goal: goalRow
               ? { goalType: goalRow.goal_type, customLabel: goalRow.custom_label, targetDate: goalRow.target_date, status: goalRow.status }
@@ -508,6 +516,7 @@ export default async function GroupHubPage(
                   scheduledDates: main.scheduled.map((e) => e.date),
                   totalWorkouts: main.all.length,
                   doneWorkouts: main.all.filter((w) => loggedIds.has(w.id)).length,
+                  pickup: threadPickup(main.program.id),
                 }
               : null,
             logDates: (threadLogs ?? []).map((l) => nowInZone(timezone, new Date(l.created_at))),

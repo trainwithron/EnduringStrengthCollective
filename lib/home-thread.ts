@@ -19,6 +19,9 @@ export interface ThreadProgram {
   scheduledDates: Date[]; // each workout's date (scheduled programs)
   totalWorkouts: number; // unscheduled (playlist) programs
   doneWorkouts: number;
+  // Where they pick up (lib/program-pickup.ts: the workout right after the one done last), when known: the week shown is that one, not the week the calendar dates would say
+  // (Ron: pick up where you left off; Oct 20: the header said "week 10 of 14" while the program row said "Week 4, Day 4").
+  pickup?: { week: number; totalWeeks: number; complete: boolean } | null;
 }
 
 const DAY_MS = 86400000;
@@ -54,8 +57,12 @@ export function describeProgramPosition(program: ThreadProgram | null, today: Da
   const t = startOfDay(today);
   const last = program.scheduledDates.reduce((a, b) => (b > a ? b : a));
   const totalWeeks = Math.max(1, Math.ceil(((startOfDay(last).getTime() - start.getTime()) / DAY_MS + 1) / 7));
-  if (t < start) {
+  if (t < start && (!program.pickup || (program.pickup.week === 1 && !program.pickup.complete))) {
     return `${program.name}: starts ${start.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+  }
+  if (program.pickup) {
+    if (program.pickup.complete) return `${program.name}: finished`;
+    return `${program.name}: week ${program.pickup.week} of ${Math.max(program.pickup.week, program.pickup.totalWeeks)}`;
   }
   const week = Math.floor((t.getTime() - start.getTime()) / DAY_MS / 7) + 1;
   if (week > totalWeeks) return `${program.name}: finished`;

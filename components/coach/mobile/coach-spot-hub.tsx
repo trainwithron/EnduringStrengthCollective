@@ -5,7 +5,6 @@ import type { PointerEvent as ReactPointerEvent } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Dumbbell, Mail, MessageCircle, Sparkles, TrendingUp, Users, X } from "lucide-react";
 import { BusinessMiniDashboard } from "@/components/coach/desktop/business-mini-dashboard";
-import { ProgramMiniView } from "@/components/coach/desktop/program-mini-view";
 import { AskSpotChatPanel } from "@/components/coach/ask-spot-chat-panel";
 import { QuickPaymentPanel } from "./quick-payment-panel";
 import { SpotBuilderPanel } from "./spot-builder-panel";
@@ -312,7 +311,7 @@ export function CoachSpotHub({
   const t = useTerm();
   // The tile for the people a coach coaches uses the coach's own word ("Athletes", "Players"...), in proper case as a label.
   const labelOf = (tile: { key: TileKey; label: string }) => (tile.key === "clients" ? t("client", "plural", { cap: true }) : tile.label);
-  const title = activeTile ? (view === "program" && builderOpen ? "Build with AI" : labelOf(activeTile)) : "Spotlight";
+  const title = activeTile ? (view === "program" && builderOpen ? "Build a program" : labelOf(activeTile)) : "Spotlight";
 
   return (
     <>
@@ -480,27 +479,30 @@ export function CoachSpotHub({
               )}
               {view === "program" && !needsOrg && (
                 <div className="h-full overflow-y-auto p-4">
+                  {/* Release 3: ONE box (describe it for the AI, paste one, or attach a file or photo), full screen, and the way to every program. */}
                   {builderOpen ? (
                     <SpotBuilderPanel
                       key={activeGroupId}
                       groupId={activeGroupId}
                       initialAthleteId={initialAthleteId}
                       initialAthleteName={initialAthleteName}
+                      onClose={() => setBuilderOpen(false)}
                     />
                   ) : (
                     <>
                       <button
                         type="button"
                         onClick={() => setBuilderOpen(true)}
-                        className="w-full h-11 mb-4 bg-rust text-graphite font-body text-sm font-medium flex items-center justify-center gap-2"
+                        className="w-full h-11 mb-2 bg-rust text-graphite font-body text-sm font-medium flex items-center justify-center gap-2"
+                        data-open-program-box
                       >
                         <Sparkles className="w-4 h-4" />
-                        Build a program with AI
+                        Build a program
                       </button>
+                      <p className="font-body text-xs text-steel mb-4">Describe it, paste one, or attach a file or photo. You check it before anything is made.</p>
                       <a href="/programs" className="block min-h-11 leading-[2.75rem] mb-2 font-body text-sm text-rust" data-all-programs>
                         All programs →
                       </a>
-                      <ProgramMiniView key={activeGroupId} groupId={activeGroupId} />
                     </>
                   )}
                 </div>

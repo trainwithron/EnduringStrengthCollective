@@ -100,9 +100,9 @@ describe("Quick payment and the AI builder see every client (one-on-one clients 
   });
   it("the AI builder lists them too and makes the program in the client's own group", () => {
     const b = read("components/coach/mobile/spot-builder-panel.tsx");
-    expect(b).toContain("const list = await getCoachClients(supabase, user.id, groupId);");
-    expect(b).toContain("groupId={athleteGroupId ?? groupId}");
-    expect(b.match(/setAthleteGroupId\(c\?\.groupId \?\? null\);/g)?.length).toBe(2);
+    expect(b).toContain("getCoachClients(supabase, user.id, groupId),");
+    expect(b).toContain("groupId={athleteId ? (athleteGroupId ?? groupId) : groupId}");
+    expect(b).toContain("setAthleteGroupId(c?.groupId ?? null);");
   });
 });
 

@@ -4,41 +4,15 @@ import { useEffect, useState } from "react";
 import { useDialogA11y } from "@/lib/use-dialog-a11y";
 import { useTerm } from "@/components/coach/terminology-provider";
 import dynamic from "next/dynamic";
-import { X, Sparkles } from "lucide-react";
+import { X } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { getCoachClients } from "@/lib/coach-clients";
 import type { LibraryExercise, AliasEntry } from "@/lib/exercise-matching";
-import { PROGRESSION_RULES, parseQuickBuildInput, type ProgressionRule } from "@/lib/spot-quick-build";
 
-// ImportWizard statically pulls in the xlsx parsing library (large) — the
-// Spot panel is mounted globally, so a static import here would ship
-// that weight to every coach mobile page load instead of only the rare
-// moment a coach actually reaches the full-screen builder.
+// ImportWizard statically pulls in the xlsx parsing library (large): the Spotlight hub is mounted on every coach page, so it is loaded only when the box is opened.
 const ImportWizard = dynamic(() => import("@/components/coach/desktop/import-wizard").then((m) => m.ImportWizard), {
   loading: () => <p className="font-body text-sm text-steel">Loading…</p>,
 });
-
-// the_spot_dropdown_widget_redesign_sept16.md "REVISED 2026-09-19" —
-// swipe-right panel. Reuses the already-shipped multi-week AI generator
-// pipeline (ImportWizard, /api/ai/generate-program) and the already-
-// resolved progressive compact -> expanded -> full-screen mechanic
-// verbatim (Ron: "must not be lost in the rework") — the only change
-// from the 9/16 shipped version is that arriving at this panel via
-// swipe already counts as "open", so there's no separate closed/FAB
-// stage.
-//
-// Compact-line mechanism, corrected per Ron's own direct follow-up
-// after the first pass ("if it keeps just giving me AI generations,
-// that will be annoying... we need to be able to pick which one we
-// want... just a quick button, AI or parse"): an explicit AI/Parse
-// toggle sits right on the compact line, not an implicit split between
-// two different buttons. AI mode fires straight to full generation;
-// Parse mode runs the exact same text through parseQuickBuildInput
-// (lib/spot-quick-build.ts) to prefill the structured fields for review
-// before generating — same one input either way, the coach just picks
-// which path it takes instead of the app guessing from which button
-// they happened to tap.
-const PROGRESSION_RULE_LIST = PROGRESSION_RULES;
 
 interface ClientOption {
   id: string;
@@ -47,295 +21,100 @@ interface ClientOption {
   groupId: string;
 }
 
+// Spotlight > Program on a phone (Release 3; Ron: "it should just default to one. And however you use it, it uses"): ONE box, full screen, the same box as the computer's New program
+// (ImportWizard): describe a program for the AI, paste one, or attach a file, photo or spreadsheet, and review it before anything is made. No AI/Parse switch and no compact steps.
+// A client is optional: with none the program is the coach's own, made in the organization's group (like New program on /programs) to assign later; with one it is made for that
+// client in their own group. The ?spotBuilder=<client> deep link opens it with that client chosen.
 export function SpotBuilderPanel({
   groupId,
   initialAthleteId,
   initialAthleteName,
+  onClose,
 }: {
+  // The organization's group (the hub's active group); a deep link passes the page's group.
   groupId: string;
   initialAthleteId?: string | null;
   initialAthleteName?: string | null;
+  onClose: () => void;
 }) {
   const term = useTerm();
-  const [stage, setStage] = useState<"compact" | "expanded" | "fullscreen">(initialAthleteId ? "expanded" : "compact");
-  const dialogRef = useDialogA11y<HTMLDivElement>(stage === "fullscreen", () => close(), undefined, {
-    // Escape must not throw away a generated or half-edited program (it lives inside the wizard below), so once the wizard is up it asks first; on the loading screen there is nothing to lose.
-    guard: () => (library && aliases ? "ask" : "close"),
-    askMessage: "Close the AI Program Builder? Anything you have generated or edited here will be lost.",
-  });
-  // Explicit, coach-controlled choice — not inferred from which button
-  // they tap (Ron's own correction: "just a quick button, AI or
-  // parse"). AI = fire full generation straight from the compact text;
-  // Parse = run the same text through the local heuristic parser to
-  // prefill the structured fields for review before generating.
-  const [mode, setMode] = useState<"ai" | "parse">("ai");
+  const [clients, setClients] = useState<ClientOption[] | null>(null);
   const [athleteId, setAthleteId] = useState<string | null>(initialAthleteId ?? null);
   const [athleteName, setAthleteName] = useState<string | null>(initialAthleteName ?? null);
   const [athleteGroupId, setAthleteGroupId] = useState<string | null>(null);
-  const [clients, setClients] = useState<ClientOption[] | null>(null);
-  const [description, setDescription] = useState("");
-  const [progressionRule, setProgressionRule] = useState<ProgressionRule>("Let AI decide");
-  const [weeks, setWeeks] = useState("4");
-  const [programType, setProgramType] = useState("");
   const [library, setLibrary] = useState<LibraryExercise[] | null>(null);
   const [aliases, setAliases] = useState<AliasEntry[] | null>(null);
   const [coachId, setCoachId] = useState<string | null>(null);
+  // While the box is reading something or a review is open, closing asks first (nothing generated or edited is thrown away by accident).
+  const [active, setActive] = useState(false);
+  const dialogRef = useDialogA11y<HTMLDivElement>(true, () => onClose(), undefined, {
+    guard: () => (active ? "ask" : "close"),
+    askMessage: "Close the program box? Anything you have generated or edited here will be lost.",
+  });
 
   useEffect(() => {
-    if (clients !== null || initialAthleteId) return;
-    // Every client of the organization once (one-on-one clients included), the same list as the Clients tile; it used to read only the organization's main group, which can have none.
-    const supabase = createBrowserClient();
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (!user) return;
-      const list = await getCoachClients(supabase, user.id, groupId);
-      setClients(list.map((c) => ({ id: c.id, fullName: c.fullName, groupId: c.groupId })));
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupId]);
-
-  useEffect(() => {
-    if (stage !== "fullscreen" || library !== null) return;
     const supabase = createBrowserClient();
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return;
       setCoachId(user.id);
-      const [{ data: libraryRows }, { data: aliasRows }] = await Promise.all([
+      // Every client of the organization once (one-on-one clients included), the same list as the Clients tile.
+      const [list, { data: libraryRows }, { data: aliasRows }] = await Promise.all([
+        getCoachClients(supabase, user.id, groupId),
         supabase.from("exercise_library").select("name").eq("created_by", user.id).order("name"),
         supabase.from("exercise_aliases").select("raw_name, exercise_name").eq("coach_id", user.id),
       ]);
+      const options = list.map((c) => ({ id: c.id, fullName: c.fullName, groupId: c.groupId }));
+      setClients(options);
+      if (initialAthleteId) setAthleteGroupId(options.find((c) => c.id === initialAthleteId)?.groupId ?? groupId);
       setLibrary(libraryRows ?? []);
       setAliases((aliasRows ?? []).map((a) => ({ rawName: a.raw_name, exerciseName: a.exercise_name })));
     });
-  }, [stage, library]);
+  }, [groupId, initialAthleteId]);
 
-  function composePrompt(): string {
-    const parts = [description.trim()];
-    parts.push(`${weeks || "4"} weeks.`);
-    if (progressionRule !== "Let AI decide") parts.push(`Use a ${progressionRule.toLowerCase()} progression scheme.`);
-    if (programType.trim()) parts.push(`Methodology/style: ${programType.trim()}.`);
-    if (athleteName) parts.push(`This program is for ${athleteName}.`);
-    return parts.filter(Boolean).join(" ");
-  }
-
-  // Applies the compact line's own parsed guess to the structured fields
-  // — run right before advancing to either "expanded" (so the fields
-  // are pre-filled for review) or straight to "fullscreen" (so a direct
-  // one-line generate still carries whatever the coach actually typed,
-  // e.g. "10 weeks, conjugate" isn't silently dropped just because they
-  // skipped the review step).
-  function applyParsedGuessAndAdvance(nextStage: "expanded" | "fullscreen") {
-    const guess = parseQuickBuildInput(description);
-    if (guess.weeks != null) setWeeks(String(guess.weeks));
-    if (guess.progressionRule != null) setProgressionRule(guess.progressionRule);
-    if (guess.style != null) setProgramType(guess.style);
-    setStage(nextStage);
-  }
-
-  function close() {
-    setStage("compact");
-    setDescription("");
-    setProgressionRule("Let AI decide");
-    setWeeks("4");
-    setProgramType("");
-    setLibrary(null);
-    setAliases(null);
-    if (!initialAthleteId) {
-      setAthleteId(null);
-      setAthleteName(null);
-      setAthleteGroupId(null);
-    }
-  }
-
-  const canGenerate = description.trim().length > 0 && (!!athleteId || !!initialAthleteId);
-
-  if (stage === "compact") {
-    return (
-      <div className="space-y-3">
-        <p className="font-body text-sm font-medium text-chalk flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-rust shrink-0" strokeWidth={2.25} />
-          AI Program Builder
-        </p>
-
-        {!initialAthleteId && (
-          <select aria-label="Client"
+  return (
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Build a program" className="fixed inset-0 z-50 bg-graphite overflow-y-auto" data-spot-program-box>
+      <div className="sticky top-0 z-10 bg-graphite border-b border-steel/20 px-4 py-3 flex items-center justify-between gap-3">
+        <p className="font-display font-bold text-lg uppercase leading-none">Build a program</p>
+        <button type="button" onClick={onClose} aria-label="Close" className="w-11 h-11 -mr-2 flex items-center justify-center">
+          <X className="w-5 h-5 text-steel" />
+        </button>
+      </div>
+      <div className="p-4 space-y-4">
+        <label className="block">
+          <span className="font-body text-xs text-steel uppercase tracking-wide">For</span>
+          <select
+            aria-label={term("client", "singular", { cap: true })}
             value={athleteId ?? ""}
             onChange={(e) => {
-              const c = (clients ?? []).find((c) => c.id === e.target.value);
+              const c = (clients ?? []).find((x) => x.id === e.target.value);
               setAthleteId(c?.id ?? null);
               setAthleteName(c?.fullName ?? null);
               setAthleteGroupId(c?.groupId ?? null);
             }}
-            className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm"
+            disabled={active}
+            className="mt-1 w-full h-11 bg-graphite border border-steel/30 text-chalk px-2 font-body text-base sm:text-sm disabled:opacity-60"
           >
-            <option value="">Pick a {term("client")}…</option>
+            <option value="">No {term("client")} yet (assign it later)</option>
             {(clients ?? []).map((c) => (
               <option key={c.id} value={c.id}>
                 {c.fullName}
               </option>
             ))}
           </select>
-        )}
-
-        <input aria-label="Describe the program"
-          type="text"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder='e.g. "8-week strength block, 4 days/week, conjugate"'
-          className="w-full h-10 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
-        />
-
-        <div className="flex items-center gap-2">
-          <div className="flex border border-steel/30 shrink-0">
-            <button
-              type="button"
-              onClick={() => setMode("ai")}
-              className={`h-10 px-3 font-body text-sm font-medium ${mode === "ai" ? "bg-rust text-graphite" : "text-steel"}`}
-            >
-              AI
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("parse")}
-              className={`h-10 px-3 font-body text-sm font-medium border-l border-steel/30 ${mode === "parse" ? "bg-rust text-graphite" : "text-steel"}`}
-            >
-              Parse
-            </button>
-          </div>
-          <button
-            type="button"
-            onClick={() => applyParsedGuessAndAdvance(mode === "ai" ? "fullscreen" : "expanded")}
-            disabled={!canGenerate}
-            className="flex-1 h-10 px-3 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40 disabled:bg-steel/30"
-          >
-            {mode === "ai" ? "Generate →" : "Parse →"}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (stage === "expanded") {
-    return (
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <p className="font-body text-sm font-medium text-chalk flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-rust shrink-0" strokeWidth={2.25} />
-            AI Program Builder
-          </p>
-          <button type="button" onClick={close} aria-label="Back to compact">
-            <X className="w-5 h-5 text-steel" />
-          </button>
-        </div>
-
-        {initialAthleteId ? (
-          <p className="font-body text-xs text-steel mb-3">
-            Building for <span className="text-chalk">{athleteName ?? `this ${term("client")}`}</span>
-          </p>
-        ) : (
-          <div className="mb-3">
-            <label className="font-body text-xs text-steel uppercase tracking-wide">{term("client", "singular", { cap: true })}</label>
-            <select aria-label="Client"
-              value={athleteId ?? ""}
-              onChange={(e) => {
-                const c = (clients ?? []).find((c) => c.id === e.target.value);
-                setAthleteId(c?.id ?? null);
-                setAthleteName(c?.fullName ?? null);
-                setAthleteGroupId(c?.groupId ?? null);
-              }}
-              className="w-full h-9 mt-1 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm"
-            >
-              <option value="">Pick a {term("client")}…</option>
-              {(clients ?? []).map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.fullName}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        <textarea aria-label="Describe the program"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={2}
-          placeholder='e.g. "8-week strength block, 4 days/week, squat/bench/deadlift focus"'
-          className="w-full bg-graphite border border-steel/30 text-chalk px-3 py-2 font-body text-sm focus:outline-none focus:border-rust resize-none"
-        />
-
-        <div className="grid grid-cols-3 gap-2 mt-3">
-          <div>
-            <label className="font-body text-xs text-steel uppercase tracking-wide">Progression</label>
-            <select aria-label="Progression"
-              value={progressionRule}
-              onChange={(e) => setProgressionRule(e.target.value as ProgressionRule)}
-              className="w-full h-9 mt-1 bg-graphite border border-steel/30 text-chalk px-1 font-body text-xs"
-            >
-              {PROGRESSION_RULE_LIST.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="font-body text-xs text-steel uppercase tracking-wide">Weeks</label>
-            <input aria-label="Weeks"
-              type="number"
-              min={1}
-              max={16}
-              value={weeks}
-              onChange={(e) => setWeeks(e.target.value)}
-              className="w-full h-9 mt-1 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs"
-            />
-          </div>
-          <div>
-            <label className="font-body text-xs text-steel uppercase tracking-wide">Style</label>
-            <input aria-label="Style"
-              type="text"
-              value={programType}
-              onChange={(e) => setProgramType(e.target.value)}
-              placeholder="Conjugate…"
-              className="w-full h-9 mt-1 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs"
-            />
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => setStage("fullscreen")}
-          disabled={!canGenerate}
-          className="mt-4 w-full h-10 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
-        >
-          Generate program →
-        </button>
-      </div>
-    );
-  }
-
-  // stage === "fullscreen" — true modal takeover, escaping the panel's
-  // own scroll container via fixed positioning (unaffected by which
-  // swipe panel is currently in view underneath).
-  return (
-    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="AI Program Builder" className="fixed inset-0 z-50 bg-graphite overflow-y-auto">
-      <div className="sticky top-0 z-10 bg-graphite border-b border-steel/20 px-4 py-3 flex items-center justify-between">
-        <p className="font-display font-bold text-lg uppercase leading-none">AI Program Builder</p>
-        <button type="button" onClick={close} aria-label="Close">
-          <X className="w-5 h-5 text-steel" />
-        </button>
-      </div>
-      <div className="p-4">
+        </label>
         {!library || !aliases || !coachId ? (
           <p className="font-body text-sm text-steel">Loading…</p>
         ) : (
           <ImportWizard
+            // A new box when the client changes, so a program is never made for one client in another's group.
+            key={athleteId ?? "none"}
             coachId={coachId}
-            groupId={athleteGroupId ?? groupId}
+            groupId={athleteId ? (athleteGroupId ?? groupId) : groupId}
             athleteId={athleteId ?? undefined}
             athleteName={athleteName ?? undefined}
             initialLibrary={library}
             initialAliases={aliases}
-            initialAiPrompt={composePrompt()}
-            autoGenerate
+            onActivity={setActive}
           />
         )}
       </div>
