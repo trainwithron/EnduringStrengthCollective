@@ -396,7 +396,7 @@ export default async function AthleteProfilePage(
       .limit(40),
     // The current package comes from the whole history, oldest first (the list above shows only the latest).
     pageAll((from, to) =>
-      supabase.from("session_credit_ledger").select("id, kind, amount, balance_after").eq("athlete_id", params.athleteId).eq("group_id", params.groupId).order("created_at", { ascending: true }).order("id", { ascending: true }).range(from, to)
+      supabase.from("session_credit_ledger").select("id, kind, amount, balance_after, booking_id").eq("athlete_id", params.athleteId).eq("group_id", params.groupId).order("created_at", { ascending: true }).order("id", { ascending: true }).range(from, to)
     ),
     fetchBookingCounts(supabase, { athleteId: params.athleteId, groupId: params.groupId }),
     // Weekly schedules for this client (recurring_booking_series, 0210 + 0259). If the newer columns are not there yet this errors
@@ -810,7 +810,7 @@ export default async function AthleteProfilePage(
 
   // The plain sentence about where their sessions stand: totals from the whole history (the list shows only the latest), booked and waiting-to-mark from the calendar.
   const profileCounts = profileBookingCounts.get(`${params.athleteId}:${params.groupId}`);
-  const ledgerSums = currentPackageTotals(ledgerAll.rows as { kind: string; amount: number; balance_after: number | null }[], { prepaidAhead: profileCounts?.prepaidAhead ?? 0 });
+  const ledgerSums = currentPackageTotals(ledgerAll.rows as { kind: string; amount: number; balance_after: number | null; booking_id: string | null }[], { prepaidAhead: profileCounts?.prepaidAhead ?? 0 });
   // The same sentence in Billing and on the calendar tab.
   const sessionsSentence = coachCreditSentence(
     buildCreditPicture({

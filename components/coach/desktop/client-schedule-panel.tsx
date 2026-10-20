@@ -80,7 +80,7 @@ export function ClientSchedulePanel({ client, timezone, sessionTypes }: { client
       supabase.from("session_credits").select("balance").eq("athlete_id", client.athleteId).eq("group_id", groupId).maybeSingle(),
       fetchBookingCounts(supabase, { athleteId: client.athleteId, groupId }),
       // The current package (its latest grant and what was used since), from the credit history oldest first, a page at a time. If it cannot be read the sentence leaves that part out.
-      pageAll((from, to) => supabase.from("session_credit_ledger").select("id, kind, amount, balance_after").eq("athlete_id", client.athleteId).eq("group_id", groupId).order("created_at", { ascending: true }).order("id", { ascending: true }).range(from, to)),
+      pageAll((from, to) => supabase.from("session_credit_ledger").select("id, kind, amount, balance_after, booking_id").eq("athlete_id", client.athleteId).eq("group_id", groupId).order("created_at", { ascending: true }).order("id", { ascending: true }).range(from, to)),
     ]);
     if (upRes.error) {
       setError("Couldn't load their sessions.");
@@ -93,7 +93,7 @@ export function ClientSchedulePanel({ client, timezone, sessionTypes }: { client
     if (!balanceRes.error && balanceRes.data) setBalance((balanceRes.data as { balance: number }).balance);
     const mine = countMap.get(`${client.athleteId}:${groupId}`) ?? { booked: 0, toMark: 0, prepaidAhead: 0 };
     setCounts(mine);
-    setLedger(ledgerRes.failed ? null : currentPackageTotals(ledgerRes.rows as { kind: string; amount: number; balance_after: number | null }[], { prepaidAhead: mine.prepaidAhead }));
+    setLedger(ledgerRes.failed ? null : currentPackageTotals(ledgerRes.rows as { kind: string; amount: number; balance_after: number | null; booking_id: string | null }[], { prepaidAhead: mine.prepaidAhead }));
   }, [client.athleteId, groupId]);
 
   useEffect(() => {
