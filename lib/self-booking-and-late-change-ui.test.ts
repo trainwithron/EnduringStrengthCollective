@@ -56,7 +56,7 @@ describe("the coach decides flagged changes and requests", () => {
     expect(panel).toContain("resolve_booking_request");
     for (const word of ["Charge", "Waive", "Confirm", "Decline"]) expect(panel).toContain(word);
     expect(read("../app/(coach)/dashboard/page.tsx")).toContain("<LateChangesPanel groupIds=");
-    expect(read("../components/coach/mobile/coach-mobile-home.tsx")).toContain("<LateChangesPanel groupIds=");
+    expect(read("../components/coach/mobile/spot-needs-top.tsx")).toContain("<LateChangesPanel groupIds=");
   });
   it("a client's move asks through request_booking_move in request mode", () => {
     const button = read("../components/athlete/reschedule-slot-button.tsx");

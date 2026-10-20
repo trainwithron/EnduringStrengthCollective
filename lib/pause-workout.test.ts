@@ -10,7 +10,7 @@ const complete = read("components/session/complete-workout-button.tsx");
 const logger = read("components/logging/session-logger.tsx");
 const page = read("app/sessions/[sessionId]/page.tsx");
 const overview = read("components/logging/workout-overview-view.tsx");
-const home = read("components/coach/mobile/coach-mobile-home.tsx");
+const home = read("components/coach/mobile/spot-needs-top.tsx");
 
 describe("Complete workout is where complete, pause and resume live", () => {
   it("tapping it opens the choice: Complete workout / Pause for now / Keep going", () => {

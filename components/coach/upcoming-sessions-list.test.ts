@@ -35,8 +35,8 @@ describe("coach phone Calendar: upcoming sessions fold", () => {
   it("3 or fewer: no toggle", () => {
     expect(render(rows.slice(0, 3))).not.toContain("Show all");
   });
-  it("the coach phone Calendar uses it with the same rows", () => {
-    const src = readFileSync(join(__dirname, "calendar-page-body.tsx"), "utf8");
-    expect(src).toContain('<UpcomingSessionsList rows={upcomingBookings.map((b) => ({ id: b.id, name: b.athleteName, when: formatInTimezone(new Date(b.startAt), coachTz, "dateTime") }))} />');
+  it("the coach's phone Calendar uses it (their own workouts first, then client sessions)", () => {
+    const src = readFileSync(join(__dirname, "mobile", "coach-phone-schedule.tsx"), "utf8");
+    expect(src).toContain("<UpcomingSessionsList rows={upcomingRows} />");
   });
 });

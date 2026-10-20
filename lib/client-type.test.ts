@@ -124,8 +124,9 @@ describe("everywhere clients are offered for booking uses the same rule", () => 
   it("the calendar page hands both lists each client's tier and set-aside state", () => {
     const src = read("components/coach/calendar-page-body.tsx");
     expect(src).toContain("tier: tierByClientGroup.get(");
-    expect(src).toContain("tier: phoneTierByKey.get(");
-    expect(src).toContain("setAside: phoneAsideKeys.has(");
+    const phone = read("components/coach/mobile/coach-phone-schedule.tsx");
+    expect(phone).toContain("tier: tierByKey.get(");
+    expect(phone).toContain("setAside: asideKeys.has(");
     expect(src).toContain("setAside: asideHere.has(");
   });
 });

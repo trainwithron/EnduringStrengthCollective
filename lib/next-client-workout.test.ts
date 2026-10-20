@@ -126,10 +126,9 @@ describe("the Home button reads only what it should and goes where 'Log their wo
     const desktop = read("app/(coach)/dashboard/page.tsx");
     expect(desktop.indexOf("<NextClientWorkoutSection")).toBeGreaterThan(desktop.indexOf("<SessionCheckSection"));
     expect(desktop.indexOf("<NextClientWorkoutSection")).toBeLessThan(desktop.indexOf("<YourDayPanel"));
-    const phone = read("components/coach/mobile/coach-mobile-home.tsx");
-    expect(phone.indexOf("<NextClientWorkoutSection")).toBeGreaterThan(phone.indexOf("<SessionCheckSection"));
-    // with no client session left today and nothing open, a quiet line says so; the coach's own Start workout is gone from the phone Home
-    expect(phone).toContain("<NextClientWorkoutSection coachId={coachId} groupIds={orgGroupIds} emptyLine />");
+    // on a phone it is at the top of Spotlight, under the did-it-happen cards (Release 2)
+    const phone = read("components/coach/mobile/spot-needs-top.tsx");
+    expect(phone.indexOf("Start {needs.next.name}")).toBeGreaterThan(phone.indexOf("<SessionCheckCards"));
     expect(read("components/coach/next-client-workout-section.tsx")).toContain("No sessions left today.");
     expect(phone).not.toContain("Start workout");
   });

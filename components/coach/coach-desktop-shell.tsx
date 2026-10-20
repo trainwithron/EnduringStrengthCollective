@@ -180,7 +180,6 @@ function CoachDesktopShellFull({
   wide?: boolean;
   children: React.ReactNode;
 }) {
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [feedUnread, setFeedUnread] = useState(0);
   const [clientsUnread, setClientsUnread] = useState(0);
   const [messagesUnread, setMessagesUnread] = useState(0);
@@ -421,12 +420,6 @@ function CoachDesktopShellFull({
       cancelled = true;
     };
   }, [groupId, active]);
-
-  // Close the mobile drawer on every route change (active section change)
-  // so navigating doesn't leave the overlay stuck open.
-  useEffect(() => {
-    setMobileNavOpen(false);
-  }, [active]);
 
   // Regrouped by function (Run my day / Build / Business / Engage)
   // instead of the order features happened to get built in — see the

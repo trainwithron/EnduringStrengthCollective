@@ -31,8 +31,7 @@ describe("football tiles are for team-sport groups only (team_mode ON), not for 
   });
   it("the other football surfaces already follow team_mode (menus, phone home, hub, depth chart link)", () => {
     expect(read("components/coach/coach-desktop-shell.tsx")).toContain("isTeamSportGroup(teamMode)");
-    expect(read("components/coach/mobile/coach-mobile-home.tsx")).toContain("isTeamSportGroup(");
+    expect(read("app/(coach)/groups/[groupId]/page.tsx")).toContain("isTeamSportGroup(");
     expect(read("components/coach/mobile/coach-spot-hub.tsx")).toContain("isTeamSportGroup(");
-    expect(read("components/coach/mobile/coach-nav-links-list.tsx")).toContain("isTeamSportGroup(teamMode)");
   });
 });

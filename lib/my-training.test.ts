@@ -110,7 +110,7 @@ describe("The coach as their own client (personal space)", () => {
     expect(route).toContain("/groups/${spaceId}/athletes/${user.id}");
     // straight into the client app with the same cookies (SPEED, Oct 19: one hop instead of three)
     expect(route).toContain("setMyTrainingCookies(response, { userId: user.id, groupId: spaceId as string, role: (seat as { role: string }).role });");
-    expect(route).toContain("NextResponse.redirect(new URL(`/groups/${spaceId}`, url))");
+    expect(route).toContain("NextResponse.redirect(new URL(mySpaceTarget(spaceId as string, url.searchParams), url))");
     expect(read("app/my-training/page.tsx")).toContain('redirect("/my-space?view=client")');
   });
   it("on their own profile the Billing tab, the message box and the video check-in are gone", () => {

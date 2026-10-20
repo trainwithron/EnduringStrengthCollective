@@ -18,6 +18,6 @@ describe("every place that says when a locked workout opens uses the one real op
   });
   it("the Today page shows the date it is given, not the workout's own date (the coach's phone Home no longer shows a client's locked workout)", () => {
     expect(read("app/(coach)/groups/[groupId]/today/page.tsx")).toContain("formatShortDate(result.unlocksOn)");
-    expect(read("components/coach/mobile/coach-mobile-home.tsx")).not.toContain("soloUnlocksOn");
+    expect(read("components/coach/mobile/spot-needs-top.tsx")).not.toContain("soloUnlocksOn");
   });
 });

@@ -26,7 +26,7 @@ describe("credit expiry stays human", () => {
   });
   it("the panel is on the dashboard and the phone Home, and the heads-up days are a coach setting", () => {
     expect(read("../app/(coach)/dashboard/page.tsx")).toContain("<ExpiryCheckInPanel groupIds=");
-    expect(read("../components/coach/mobile/coach-mobile-home.tsx")).toContain("<ExpiryCheckInPanel groupIds=");
+    expect(read("../components/coach/mobile/spot-needs-top.tsx")).toContain("<ExpiryCheckInPanel groupIds=");
     expect(read("../components/coach/desktop/availability-settings.tsx")).toContain("ExpiryHeadsUpControl");
   });
   it("a client is told the window where their balance is shown", () => {

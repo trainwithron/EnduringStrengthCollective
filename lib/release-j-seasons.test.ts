@@ -117,7 +117,7 @@ describe("Release J: wiring", () => {
   });
 
   it("Coach home goes to the coaching Home, not the group the coach is standing in", () => {
-    expect(src("components/athlete/acting-as-banner.tsx")).toContain('router.push("/dashboard")');
+    expect(src("components/athlete/acting-as-banner.tsx")).toContain('router.push(phone ? COACH_PHONE_LANDING : "/dashboard");');
   });
 
   it("readers of history include retired seasons; lists do not; a page opened on a retired season keeps its organization", () => {

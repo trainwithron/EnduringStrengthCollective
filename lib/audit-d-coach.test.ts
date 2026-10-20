@@ -62,7 +62,8 @@ describe("sign-in link wording and the program label control", () => {
 
 describe("the coach's own word for clients", () => {
   it("the mobile tab, hub panels and group-session text use the chosen word", () => {
-    expect(read("components/athlete/bottom-tab-bar.tsx")).toContain('term("client", "plural", { cap: true })');
+    // (Release 2: the phone bar is the coach's own app's tabs; the clients tile in Spotlight uses the word)
+    expect(read("components/coach/mobile/coach-spot-hub.tsx")).toContain('tile.key === "clients" ? t("client", "plural", { cap: true })');
     expect(read("components/coach/mobile/quick-payment-panel.tsx")).toContain('term("client", "plural")');
     expect(read("components/coach/mobile/spot-builder-panel.tsx")).toContain('Pick a {term("client")}');
     expect(read("components/coach/mobile/spot-clients-groups-panel.tsx")).toContain('term("client", "plural", { cap: true })');

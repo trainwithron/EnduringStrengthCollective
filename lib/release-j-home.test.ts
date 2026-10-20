@@ -48,7 +48,7 @@ describe("the coach's own client app", () => {
     const bar = src("components/athlete/acting-as-banner.tsx");
     expect(bar).toContain('self ? "Me" : athleteFullName');
     expect(bar).toContain("<CoachSpotHub");
-    expect(bar).toContain("Coach home");
+    expect(bar).toContain("Back to coach home");
     expect(src("app/(coach)/groups/[groupId]/page.tsx")).toContain("isActingAsOther && athleteId !== user?.id && (");
   });
 });

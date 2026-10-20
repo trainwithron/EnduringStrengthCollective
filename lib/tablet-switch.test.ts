@@ -49,8 +49,8 @@ describe("where the switch shows", () => {
     expect(sw).toContain('const label = to === "desktop" ? "Computer layout" : "Phone layout";');
     expect(sw).toContain("writeViewOverride(to);");
   });
-  it("ONE 'Computer layout' row in the phone More list, ONE 'Phone layout' button in the computer rail footer", () => {
-    const more = read("components/coach/mobile/coach-nav-links-list.tsx");
+  it("ONE 'Computer layout' row in the coach's own Settings on the phone (Release 2: there is no More list), ONE 'Phone layout' button in the computer rail footer", () => {
+    const more = read("app/(coach)/groups/[groupId]/settings/page.tsx");
     expect(more.match(/<TabletLayoutSwitch /g)?.length).toBe(1);
     expect(more).toContain('<TabletLayoutSwitch to="desktop" />');
     const shell = read("components/coach/coach-desktop-shell.tsx");
@@ -58,7 +58,8 @@ describe("where the switch shows", () => {
     expect(shell).toContain('<TabletLayoutSwitch to="mobile" variant="rail" />');
   });
   it("the phone app still has no Desktop mode anywhere", () => {
-    expect(read("components/coach/mobile/coach-nav-links-list.tsx")).not.toContain("Desktop mode");
+    expect(read("components/coach/mobile/coach-spot-hub.tsx")).not.toContain("Desktop mode");
+    expect(read("app/(coach)/groups/[groupId]/settings/page.tsx")).not.toContain("Desktop mode");
   });
   it("a tablet in the computer layout is not told it is stuck in desktop mode", () => {
     expect(read("app/(coach)/dashboard/page.tsx")).toContain("const stuckInDesktopModeOnRealPhone = (await isMobileUserAgent()) && !(await isTabletUserAgent());");

@@ -64,7 +64,8 @@ describe("counting what the grid shows", () => {
   });
   it("is the line at the top of the Calendar, on a computer and on a phone, and moves with the week and month", () => {
     const body = read("components/coach/calendar-page-body.tsx");
-    expect(body.match(/<SessionCountLine/g)?.length).toBe(2);
+    expect(body.match(/<SessionCountLine/g)?.length).toBe(1);
+    expect(read("components/coach/mobile/coach-phone-schedule.tsx")).toContain("<SessionCountLine coachId={userId} groupIds={orgGroupIds} timezone={timezone} view=\"month\" year={year} monthIndex={monthIndex} weekStartKey={null} />");
     expect(body).toContain('view={view} year={year} monthIndex={monthIndex} weekStartKey={dateKey(weekStart)}');
     expect(body.indexOf("<SessionCountLine")).toBeLessThan(body.indexOf("<SessionCheckSection"));
   });

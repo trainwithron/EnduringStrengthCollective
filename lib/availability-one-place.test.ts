@@ -49,6 +49,7 @@ describe("Availability has ONE home: Calendar > Availability", () => {
   });
   it("a phone coach asking for the tab gets the full page (the one place availability lives)", () => {
     expect(read("app/(coach)/calendar/page.tsx")).toContain('searchParams.tab !== "availability"');
+    expect(read("lib/phone-coach-routes.ts")).toContain('params.get("tab") === "availability"');
     expect(read("components/coach/calendar-page-body.tsx")).toContain('searchParams.tab !== "availability"');
   });
 });
