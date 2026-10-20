@@ -13,18 +13,17 @@ describe("the line that replaces the credit box when a booking is linked", () =>
 });
 
 describe("the start button", () => {
-  it("FIX 3: no credit box at all; the line when a booking is linked (prepaid says nothing more comes off), nothing when none is", () => {
+  it("shows the credit box ONLY when no booking is linked, and the line when one is", () => {
     expect(src).toContain("{loggedByCoach && linked && (");
-    expect(src).toContain("{bookingCreditLine(linked.startAt, clientName, linked.prepaid, coachTimezone)}");
-    expect(src).not.toContain("{loggedByCoach && !linked && (");
-    expect(src).not.toContain("Use 1 session credit\n");
-    expect(src).not.toContain('type="checkbox"');
+    expect(src).toContain("{bookingCreditLine(linked.startAt, clientName)}");
+    expect(src).toContain("{loggedByCoach && !linked && (");
+    expect(src.indexOf("{loggedByCoach && linked && (")).toBeLessThan(src.lastIndexOf("Use 1 session credit"));
   });
-  it("never asks the start to take a credit (the finished workout settles its booking once; a walk-in is offered at the end)", () => {
-    expect(src).toContain("p_deduct_session_credit: false,");
-    expect(src).toContain("deduct_session_credit: false,");
-    expect(src).not.toContain("deductCredit");
-    expect(src).not.toContain("takeCredit");
+  it("never sends a credit to be taken when a booking is linked (the booking takes its own), and the box decides only when there is none", () => {
+    expect(src).toContain("const takeCredit = !!loggedByCoach && !bookingId && deductCredit;");
+    expect(src).toContain("p_deduct_session_credit: takeCredit,");
+    expect(src).toContain("deduct_session_credit: takeCredit,");
+    expect(src).not.toContain("!!loggedByCoach && deductCredit,");
   });
   it("finds the booking before Start so the coach is told, and again at Start only if that read had not finished", () => {
     expect(src).toContain("findLinkedBooking(createBrowserClient())");
@@ -33,13 +32,11 @@ describe("the start button", () => {
 });
 
 describe("linking the client's session of the same day", () => {
-  it("looks at today on the COACH's clock, confirmed, unsettled or paid at booking, not a no-show, not attended, and takes the nearest to now", () => {
-    expect(src).toContain('.in("credit_state", ["unsettled", "prepaid"])');
-    expect(src).toContain('.eq("no_show", false)');
+  it("looks at today on the coach's clock, confirmed and not yet settled or marked, and takes the nearest to now", () => {
+    expect(src).toContain('.eq("credit_state", "unsettled")');
     expect(src).toContain('.is("attended_at", null)');
-    expect(src).toContain("const day = localDayBounds(zone, now);");
-    expect(src).toContain('.gte("start_at", day.startIso)');
-    expect(src).toContain('.lt("start_at", day.endIso)');
+    expect(src).toContain(".gte(\"start_at\", dayStart.toISOString())");
+    expect(src).toContain(".lt(\"start_at\", dayEnd.toISOString())");
     expect(src).toContain("findMatchingBookingId(candidates, now, SAME_DAY_TOLERANCE_MINUTES)");
     expect(src).not.toContain("3 * 60 * 60000");
   });
