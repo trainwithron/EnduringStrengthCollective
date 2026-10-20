@@ -22,22 +22,23 @@ describe("adding sessions from the client's calendar tab", () => {
     expect(cal).toContain("lg:flex-row");
     expect(cal).not.toContain('id="add-sessions"');
   });
-  it("the Settings copy is unchanged and still the one the links point at; Billing shows the same sentence", () => {
-    expect(page).toContain('<div data-tab="settings" id="add-sessions" className="scroll-mt-24">');
+  it("the Settings copy (in Billing, FIX 3) is the one the links point at; Billing shows the same sentence", () => {
+    expect(page).toContain('<div id="add-sessions" className="scroll-mt-24 mb-4">');
     const settings = page.slice(page.indexOf('id="add-sessions"'));
     expect(settings).toContain("key={`assign-${creditsRow?.balance ?? 0}`}");
     expect(page.match(/id="add-sessions"/g)?.length).toBe(1);
     expect(page).toContain('<p className="font-body text-sm text-chalk mb-3">{sessionsSentence}</p>');
   });
-  it("compact: only the add row (no intro, no set-balance tools), labelled Add sessions; the full one is as before", () => {
+  it("compact: only the add row (no intro), labelled Add sessions; the full one has the intro; neither has the set-balance tools (that is Billing's control, FIX 3)", () => {
     const props = { athleteId: "a", groupId: "g", clientName: "Sam", initialBalance: 3 };
     const compact = renderToStaticMarkup(createElement(AssignSessionsControl, { ...props, compact: true }));
     expect(compact).toContain("Add sessions");
     expect(compact).not.toContain("Set balance");
     expect(compact).not.toContain("without a purchase");
     const full = renderToStaticMarkup(createElement(AssignSessionsControl, props));
-    expect(full).toContain("Assign sessions");
-    expect(full).toContain("Set balance");
+    expect(full).toContain("Add sessions");
+    expect(full).not.toContain("Assign sessions");
+    expect(full).not.toContain("Set balance");
     expect(full).toContain("without a purchase");
   });
 });

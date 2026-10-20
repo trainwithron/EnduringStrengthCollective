@@ -22,7 +22,8 @@ describe("attentionFromSources", () => {
       "A trainer asked for a client",
     ]);
     expect(items[0].href).toBe("/groups/g1/feed?channel=general&highlight=p1");
-    expect(items[1].href).toBe("/groups/g1/athletes/Bo");
+    // out of sessions goes straight to Add sessions (FIX 3)
+    expect(items[1].href).toBe("/groups/g1/athletes/Bo?tab=settings#add-sessions");
   });
   it("never lists the same thing twice", () => {
     expect(attentionFromSources({ payments: [pay("Bo", 0), pay("Bo", 0)] })).toHaveLength(1);

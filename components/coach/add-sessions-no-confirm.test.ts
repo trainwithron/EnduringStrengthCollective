@@ -12,12 +12,13 @@ describe("adding sessions by hand does not ask 'are you sure'; taking them away 
     expect(src).toContain("Added one.");
     expect(src).toContain("Balance is now");
   });
-  it("the Assign sessions button adds at once, with its own result line", () => {
+  it("the Add sessions button adds at once, with its own result line", () => {
     const src = read("components/coach/assign-sessions-control.tsx");
     expect(src).not.toContain('confirmLabel: "Add sessions"');
     expect(src).toContain("Added ${n}. ${clientName} now has ${newBalance}.");
-    // setting the balance (which can lower it) still asks
-    expect(src).toContain('confirmLabel: "Set balance"');
+    // setting the balance (which can lower it) is the Billing control beside it, and still asks (FIX 3: no second copy here)
+    expect(src).not.toContain("set_session_balance");
+    expect(read("components/coach/session-credits-control.tsx")).toContain('confirmLabel: "Set balance"');
   });
   it("the profile's + adds at once with a result line; its minus still asks", () => {
     const src = read("components/coach/session-credits-control.tsx");

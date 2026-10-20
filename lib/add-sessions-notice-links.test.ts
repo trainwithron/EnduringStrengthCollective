@@ -17,9 +17,22 @@ describe("the running-low notice opens the place sessions are added", () => {
     expect(many.url).toBe(RUNNING_LOW_PATH);
     expect(RUNNING_LOW_PATH).toBe("/running-low");
   });
-  it("the profile has the anchor on the Assign sessions block", () => {
+  it("the profile has the anchor on Add sessions, inside Billing right under the sentence (FIX 3)", () => {
     const profile = read("app/(coach)/groups/[groupId]/athletes/[athleteId]/page.tsx");
-    expect(profile).toContain('<div data-tab="settings" id="add-sessions" className="scroll-mt-24">\n            <SettingsGroup label="Assign sessions">');
+    const billing = profile.slice(profile.indexOf('<SettingsGroup label="Billing">'));
+    expect(billing.indexOf("{sessionsSentence}")).toBeLessThan(billing.indexOf('<div id="add-sessions" className="scroll-mt-24 mb-4">'));
+    expect(billing.indexOf('<div id="add-sessions"')).toBeLessThan(billing.indexOf("<SessionCreditsControl"));
+    expect(profile).not.toContain('<SettingsGroup label="Assign sessions">');
+  });
+  it("every 'out of sessions' place goes straight to Add sessions, labelled so (FIX 3)", () => {
+    const needs = read("lib/needs-you-data.ts");
+    expect(needs).toContain("button: BUTTON.addSessions, href: addSessionsHref(p.groupId, p.athleteId), profileHref: clientPath(p.groupId, p.athleteId)");
+    expect(read("lib/needs-you.ts")).toContain('addSessions: "Add sessions",');
+    const day = read("lib/your-day.ts");
+    expect(day).toContain('detail: "Add sessions",');
+    expect(day).toContain("href: addSessionsHref(p.groupId, p.athleteId),");
+    const panel = read("components/coach/desktop/needs-payment-panel.tsx");
+    expect(panel).toContain("<Link href={addSessionsHref(r.groupId, r.athleteId)} className=\"font-body text-xs text-chalk underline\">");
   });
   it("the list shows 1 left or none, leaves out payment holds and set-aside clients, and every row's button goes to the same place", () => {
     const page = read("app/(coach)/running-low/page.tsx");
