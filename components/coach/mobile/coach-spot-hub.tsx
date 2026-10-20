@@ -13,6 +13,7 @@ import { SpotClientsGroupsPanel } from "./spot-clients-groups-panel";
 import { SpotMessagesPanel } from "./spot-messages-panel";
 import { SpotNeedsTop } from "./spot-needs-top";
 import { SPOT_LAST_OPENED_KEY, shouldFade, type SpotNeeds } from "@/lib/spot-needs";
+import { isEmbeddedWindow } from "@/components/ui/loading-watchdog";
 import { PushNotificationToggle } from "@/components/athlete/push-notification-toggle";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { useTerm } from "@/components/coach/terminology-provider";
@@ -91,6 +92,9 @@ export function CoachSpotHub({
       });
   }
   useEffect(() => {
+    // Only where the button is actually on screen (on a computer it is mounted but hidden), never inside an embedded frame (the split half, a workspace pane), and never for a hidden tab:
+    // an idle open page must not keep asking (Oct 20 outage). Opening Spotlight always reads it.
+    if (isEmbeddedWindow() || document.visibilityState !== "visible" || !triggerRef.current || triggerRef.current.getClientRects().length === 0) return;
     loadNeeds(false);
   }, []);
   // A team-sport group has no Business tile (lib/team-sport.ts). Unknown until read, which shows every tile.
