@@ -153,4 +153,5 @@ export const BUTTON = {
   decide: "Decide",
   checkIn: "Check in",
   sendLink: "Send link",
+  addSessions: "Add sessions",
 } as const;

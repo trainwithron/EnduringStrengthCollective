@@ -1,3 +1,4 @@
+import { addSessionsHref } from "@/lib/add-sessions-link";
 // The top of a coach's Home: what is on the schedule today, and one ranked list of what needs them, merged from the signals that used to sit in
 // separate panels (replies waiting, clients out of sessions, low readiness today, the day's insights, notices). The separate panels stay
 // below for acting on each; this is the one place to look first.
@@ -54,8 +55,9 @@ export function attentionFromSources(src: {
       id: `payment:${p.athleteId}:${p.groupId}`,
       kind: "payment",
       text: p.balance < 0 ? `${p.name} is out of sessions (owed ${Math.abs(p.balance)})` : `${p.name} is out of sessions`,
-      detail: null,
-      href: `/groups/${p.groupId}/athletes/${p.athleteId}`,
+      detail: "Add sessions",
+      // Straight to where sessions are added (FIX 3), not the top of the profile.
+      href: addSessionsHref(p.groupId, p.athleteId),
       // Having taken sessions already (negative) is more pressing than just reaching zero.
       urgency: p.balance < 0 ? 3 : 2,
       at: null,

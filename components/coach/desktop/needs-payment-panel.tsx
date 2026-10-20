@@ -5,6 +5,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { coachBalanceLabel } from "@/lib/reup";
 import type { NeedsPaymentRow } from "@/lib/dashboard-data";
+import { addSessionsHref } from "@/lib/add-sessions-link";
 
 // Clients who have run out of sessions, most owed first, with a one-tap Remind (a push to the client, at most once every 3 days)
 // and Hold (comped, on a break, pays another way: out of the count, never reminded). Shows nothing when everyone has sessions.
@@ -81,6 +82,9 @@ export function NeedsPaymentPanel({ rows }: { rows: NeedsPaymentRow[] }) {
                 {r.name}
               </Link>
               <span className="font-body text-xs text-rust">{coachBalanceLabel(r.balance)}</span>
+              <Link href={addSessionsHref(r.groupId, r.athleteId)} className="font-body text-xs text-chalk underline">
+                Add sessions
+              </Link>
               <button type="button" disabled={busy === r.athleteId} onClick={() => act(r, "remind")} className="font-body text-xs text-chalk underline disabled:opacity-40">
                 Remind
               </button>

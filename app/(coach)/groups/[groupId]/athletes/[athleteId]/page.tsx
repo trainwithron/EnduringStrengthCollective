@@ -1533,22 +1533,20 @@ export default async function AthleteProfilePage(
             <div data-tab="settings">
             <SettingsGroup label="Billing">
               <p className="font-body text-sm text-chalk mb-3">{sessionsSentence}</p>
+              {/* Add sessions sits right under the sentence (FIX 3): every "out of sessions" and "running low" link lands here (lib/add-sessions-link.ts). */}
+              <div id="add-sessions" className="scroll-mt-24 mb-4">
+                <AssignSessionsControl
+                  key={`assign-${creditsRow?.balance ?? 0}`}
+                  athleteId={params.athleteId}
+                  groupId={params.groupId}
+                  clientName={profile?.full_name ?? "this client"}
+                  initialBalance={creditsRow?.balance ?? 0}
+                />
+              </div>
               <SessionCreditsControl
                 key={`credits-${creditsRow?.balance ?? 0}`}
                 athleteId={params.athleteId}
                 groupId={params.groupId}
-                initialBalance={creditsRow?.balance ?? 0}
-              />
-            </SettingsGroup>
-            </div>
-
-            <div data-tab="settings" id="add-sessions" className="scroll-mt-24">
-            <SettingsGroup label="Assign sessions">
-              <AssignSessionsControl
-                key={`assign-${creditsRow?.balance ?? 0}`}
-                athleteId={params.athleteId}
-                groupId={params.groupId}
-                clientName={profile?.full_name ?? "this client"}
                 initialBalance={creditsRow?.balance ?? 0}
               />
             </SettingsGroup>

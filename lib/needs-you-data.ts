@@ -8,6 +8,7 @@ import { readByIds, readRowsByIds } from "@/lib/read-by-ids";
 import { DEFAULT_HEADS_UP_DAYS, expiringSoon, expiryDismissalKey, isSnoozed } from "@/lib/expiry-checkin";
 import { BUTTON, sentences, type NeedsYouItem } from "@/lib/needs-you";
 import type { QuietTier } from "@/lib/quiet-client-tier";
+import { addSessionsHref } from "@/lib/add-sessions-link";
 
 export interface NeedsYouHomeInputs {
   coachId: string;
@@ -103,7 +104,8 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
     });
   }
   for (const p of input.needsPayment) {
-    items.push({ id: `payment:${p.athleteId}:${p.groupId}`, kind: "payment", name: p.name, sentence: sentences.payment(p.balance), button: BUTTON.open, href: clientPath(p.groupId, p.athleteId), order: p.balance });
+    // Out of sessions: the button goes straight to where sessions are added (FIX 3), the name still opens the profile.
+    items.push({ id: `payment:${p.athleteId}:${p.groupId}`, kind: "payment", name: p.name, sentence: sentences.payment(p.balance), button: BUTTON.addSessions, href: addSessionsHref(p.groupId, p.athleteId), profileHref: clientPath(p.groupId, p.athleteId), order: p.balance });
   }
   for (const r of input.lowReadiness) {
     items.push({ id: `readiness:${r.athleteId}:${r.groupId}`, kind: "low_readiness", name: r.name, sentence: sentences.lowReadiness(), button: BUTTON.open, href: clientPath(r.groupId, r.athleteId), order: 0 });

@@ -1,13 +1,13 @@
 "use client";
 
-import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 
 // Gives a client a number of sessions in one step ("12", with an optional note), no purchase involved. The
 // client's balance, the calendar and booking all read the same session_credits row a purchased package fills,
-// so nothing else needs to know the sessions were assigned by hand. Adds only; nothing is deducted.
+// so nothing else needs to know the sessions were assigned by hand. Adds only; nothing is deducted. Each add is one package (FIX 3). Setting the balance to a number is the
+// Billing control beside it (session-credits-control.tsx), so it is not repeated here.
 export function AssignSessionsControl({
   athleteId,
   groupId,
@@ -19,7 +19,7 @@ export function AssignSessionsControl({
   groupId: string;
   clientName: string;
   initialBalance: number;
-  // The calendar tab's copy (Ron, Oct 19): only the add row, no intro and no "set the balance" tools (those stay in the Settings tab).
+  // The calendar tab's copy (Ron, Oct 19): only the add row, no intro.
   compact?: boolean;
 }) {
   const router = useRouter();
@@ -29,60 +29,6 @@ export function AssignSessionsControl({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  const [target, setTarget] = useState("");
-
-  // Match the balance to what the client really has (for example back to zero after ending up at -2). Recorded in the
-  // session ledger as an adjustment, with who did it.
-  async function setBalanceTo(next: number) {
-    if (!Number.isInteger(next) || next < -500 || next > 500) {
-      setError("Enter a whole number between -500 and 500.");
-      return;
-    }
-    if (next === balance) {
-      setMessage("The balance is already " + next + ".");
-      return;
-    }
-    if (!await confirmDialog({ message: `Set ${clientName}'s balance from ${balance} to ${next}? This is recorded in their session ledger.`, confirmLabel: "Set balance" })) return;
-    setBusy(true);
-    setError(null);
-    setMessage(null);
-    const supabase = createBrowserClient();
-    const { data, error: rpcError } = await supabase.rpc("set_session_balance", {
-      p_athlete_id: athleteId,
-      p_group_id: groupId,
-      p_target: next,
-      p_note: null,
-    });
-    if (rpcError) {
-      if (/could not find the function|does not exist/i.test(rpcError.message)) {
-        // Until the database function exists, change the balance by the difference (no ledger note).
-        const { data: newBalance, error: fallbackError } = await supabase.rpc("adjust_session_credits", {
-          p_athlete_id: athleteId,
-          p_group_id: groupId,
-          p_delta: next - balance,
-        });
-        setBusy(false);
-        if (fallbackError) {
-          setError("That didn't save. Nothing was changed.");
-          return;
-        }
-        setBalance(typeof newBalance === "number" ? newBalance : next);
-        setTarget("");
-        setMessage(`Balance set to ${next}.`);
-        router.refresh();
-        return;
-      }
-      setBusy(false);
-      setError("That didn't save. Nothing was changed.");
-      return;
-    }
-    setBusy(false);
-    setBalance(typeof data === "number" ? data : next);
-    setTarget("");
-    setMessage(`Balance set to ${next}.`);
-    router.refresh();
-  }
 
   async function assign() {
     const n = Number(amount);
@@ -177,43 +123,9 @@ export function AssignSessionsControl({
           disabled={busy || amount === ""}
           className="bg-rust text-chalk font-display font-bold uppercase tracking-wide px-4 py-2 disabled:opacity-40"
         >
-          {busy ? "Adding…" : compact ? "Add sessions" : "Assign sessions"}
+          {busy ? "Adding…" : "Add sessions"}
         </button>
       </div>
-      {!compact && (
-      <div className="mt-4 pt-3 border-t border-steel/15">
-        <p className="font-body text-xs text-steel mb-2">
-          Current balance: <span className="text-chalk">{balance}</span>. Set it to match what {clientName} really has.
-        </p>
-        <div className="flex flex-wrap items-center gap-2">
-          <input
-            type="number"
-            inputMode="numeric"
-            value={target}
-            onChange={(e) => setTarget(e.target.value)}
-            placeholder="e.g. 0"
-            aria-label="New balance"
-            className="w-24 bg-transparent border border-steel/30 px-3 py-2 font-body text-base text-chalk"
-          />
-          <button
-            type="button"
-            onClick={() => setBalanceTo(Number(target))}
-            disabled={busy || target === ""}
-            className="border border-steel/40 text-chalk font-body text-sm px-3 py-2 disabled:opacity-40"
-          >
-            Set balance
-          </button>
-          <button
-            type="button"
-            onClick={() => setBalanceTo(0)}
-            disabled={busy}
-            className="border border-steel/40 text-chalk font-body text-sm px-3 py-2 disabled:opacity-40"
-          >
-            Set to 0
-          </button>
-        </div>
-      </div>
-      )}
       {error && (
         <p className="font-body text-xs text-rust mt-2" role="alert">
           {error}
