@@ -175,9 +175,10 @@ describe("release 2: Clients and Calendar", () => {
     expect(tabs).toContain('hideStripOnDesktop ? "lg:hidden" : ""');
     expect(tabs).toContain("setTab(initialTab ?? \"schedule\");");
   });
-  it("the shell folds Clients and Calendar", () => {
+  it("the shell draws the strip on every page in the table (release 4: no home is left on the old menus)", () => {
     const shell = readFileSync(join(root, "components/coach/coach-desktop-shell.tsx"), "utf8");
-    expect(shell).toMatch(/new Set<HomeKey>\(\[[^\]]*"clients", "calendar"/);
+    expect(shell).toContain("{here && (");
+    expect(shell).not.toContain("FOLDED_HOMES");
   });
 });
 

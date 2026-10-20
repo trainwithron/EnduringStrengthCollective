@@ -22,8 +22,10 @@ describe("Settings: Organization look", () => {
     expect(src).toContain('const isCoach = membership?.role === "coach";');
     expect(src).toContain("let canEditBranding = false;");
   });
-  it("the Business menu item says what it holds", () => {
-    expect(read("components/coach/coach-desktop-shell.tsx")).toContain('label: "Organization (colors, team, plan)"');
+  it("Organization is a Settings tab on the computer (FIX 6), in every organization (decision 2: it is not money)", () => {
+    const homes = read("lib/desktop-coach-homes.ts");
+    expect(homes).toContain('{ key: "branding", label: "Organization", href: `${g}/branding` }');
+    expect(homes).not.toMatch(/MONEY_TABS = new Set\([^)]*"branding"/);
   });
 });
 

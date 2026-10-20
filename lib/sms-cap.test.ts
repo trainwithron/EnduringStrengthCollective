@@ -39,7 +39,8 @@ describe("Texting is not advertised", () => {
   it("it is no longer in the Business sidebar or the phone's Business list; it lives under Settings / Other as Text messages", () => {
     const shell = read("components/coach/coach-desktop-shell.tsx");
     expect(shell).not.toContain("SMS Notifications");
-    expect(shell).toContain('label: "Text messages"');
+    // FIX 6: a Settings tab on the computer
+    expect(read("lib/desktop-coach-homes.ts")).toContain('{ key: "sms-settings", label: "Text messages", href: `${g}/business/sms-settings` }');
     const phone = read("components/coach/mobile/coach-spot-hub.tsx");
     expect(phone).not.toContain("SMS notifications");
     // the phone app has no Text messages entry at all (a computer page: lib/phone-coach-routes.ts sends it to Settings on a phone)

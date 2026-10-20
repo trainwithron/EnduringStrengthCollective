@@ -47,7 +47,7 @@ describe("wiring", () => {
   });
   it("the sidebar badge is untouched", () => {
     const shell = read("components/coach/coach-desktop-shell.tsx");
-    expect(shell).toContain("badge: messagesUnread");
+    expect(shell).toContain("const homeBadge: Partial<Record<HomeKey, number>> = { clients: clientsUnread, messages: messagesUnread };");
     expect(shell).toContain("<CollectiveIntelligenceChat groupId={groupId} unread={messagesUnread} />");
   });
 });

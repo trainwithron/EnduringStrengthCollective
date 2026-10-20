@@ -52,28 +52,22 @@ describe("TC2: a team-sport group's short menu", () => {
 describe("TC2: the menus use it", () => {
   const shell = src("components/coach/coach-desktop-shell.tsx");
 
-  it("the computer menu switches to the team menu for a team-sport group, never on a coach-level page", () => {
+  it("the computer's homes switch to the team tabs for a team-sport group, never on a coach-level page (FIX 6: lib/desktop-coach-homes.ts)", () => {
     expect(shell).toContain("const teamSport = isTeamSportGroup(teamMode) && !coachLevel;");
-    expect(shell).toContain("const nav: NavEntry[] = teamSport ? teamNav : ordinaryNav.filter(");
-    const team = shell.slice(shell.indexOf("// The team-sport menu:"), shell.indexOf("const nav: NavEntry[] = teamSport"));
-    expect(team).toContain("teamSportMenu(groupId)");
-    // FIX 6 R3: Challenges, Hall of fame and Team sheet (the old More menu) are Programs tabs (lib/desktop-coach-homes.ts)
-    expect(team).not.toContain('label: "More"');
-    expect(team).toContain("programsLeaf,");
-    // no Business group, no Group group, no dashboard / group calendar / group sessions, no kiosk entry of its own
-    expect(team).not.toContain('label: "Business"');
-    expect(team).not.toContain('label: "Group"');
-    expect(team).not.toContain("group-calendar");
-    expect(team).not.toContain("group-sessions");
-    expect(team).not.toContain('"dashboard"');
-    expect(team).toContain('i.key !== "kiosk"');
-    // Business is reachable from Settings
-    expect(team).toContain("TEAM_SPORT_BUSINESS_LABEL");
-    // Athletes follows the coach's word
-    expect(team).toContain('termKey: "client" as const');
-    // the ordinary menu is unchanged for everything else
-    expect(shell).toContain('{ key: "clients", label: "Clients", href: CLIENTS_HREF');
-    expect(shell).toContain('label: "Business",');
+    expect(shell).toContain("homeTabs({ groupId, coachLevel: !!coachLevel, groupKind, teamMode, teamSport, moneyHidden, navFacts, isPlatformAdmin, onFrontDesk })");
+    const homes = src("lib/desktop-coach-homes.ts");
+    // Athletes and the team calendar first, and Athletes follows the coach's word
+    expect(homes).toContain('{ key: "members", label: "Athletes", href: membersHref(f.groupId), badge: "clients", termKey: "client" }');
+    expect(homes).toContain('f.teamSport ? { key: "team-calendar", label: "Team calendar", href: `${g}/team/calendar` }');
+    // no Group dashboard, Group calendar, Group sessions or kiosk tab of its own; Team sheet and the quiet Business link are its own
+    expect(homes).toContain('!f.teamSport && { key: "group-dashboard"');
+    expect(homes).toContain('!f.teamSport && { key: "group-calendar"');
+    expect(homes).toContain('!f.teamSport && { key: "group-sessions"');
+    expect(homes).toContain('!f.teamSport && { key: "kiosk"');
+    expect(homes).toContain('f.teamSport && { key: "team-sheet"');
+    expect(homes).toContain("f.teamSport && { key: \"business-tools\", label: TEAM_SPORT_BUSINESS_LABEL");
+    // the rail's Clients and Calendar read Athletes and Team calendar there
+    expect(shell).toContain('label: teamSport && (h.key === "clients" || h.key === "calendar") ? tabsByHome[h.key][0]?.label ?? h.label : h.label,');
   });
 
   it("on a phone a team-sport group's menu is its team Home (Release 2: there is no More list), and Spotlight drops Business for it", () => {

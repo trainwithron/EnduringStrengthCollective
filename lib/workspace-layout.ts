@@ -292,10 +292,10 @@ export interface LegacyWorkspace {
 }
 
 const LEGACY_DEST: Record<string, { page: string; label: string; section: string; path: (g: string) => string }> = {
-  roster: { page: "clients", label: "Clients", section: "Run my day", path: () => "/clients" },
-  business: { page: "business", label: "Business overview", section: "Business", path: (g) => `/groups/${g}/business` },
-  calendar: { page: "calendar", label: "Calendar", section: "Run my day", path: (g) => `/groups/${g}/calendar` },
-  program: { page: "programs", label: "Programs", section: "Programming", path: (g) => `/groups/${g}/programs` },
+  roster: { page: "clients", label: "Clients", section: "Clients", path: () => "/clients" },
+  business: { page: "business", label: "Business overview", section: "Home", path: (g) => `/groups/${g}/business` },
+  calendar: { page: "calendar", label: "Calendar", section: "Calendar", path: (g) => `/groups/${g}/calendar` },
+  program: { page: "programs", label: "Programs", section: "Programs", path: (g) => `/groups/${g}/programs` },
 };
 
 export function migrateLegacy(legacy: LegacyWorkspace, groupId: string, newId: () => string): WorkspaceLayout | null {

@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
   MIN_LIST_PANEL_WIDTH,
@@ -18,23 +17,12 @@ import { NeedsAttentionStrip } from "./needs-attention-strip";
 import { PendingRequestsLine } from "./pending-requests-line";
 import { SplitHalfSlot } from "./split-half";
 
-export interface SectionSubLink {
-  key: string;
-  label: string;
-  href: string;
-  active: boolean;
-  // Opens in a new tab (Display Mode: a screen on a wall or a TV must not replace the coach's own tab).
-  newTab?: boolean;
-}
-
 // The secondary panel (coach_desktop_shell_identity_redesign.md, items
 // 2-4): drag-to-resize (clamped 220-560px), full collapse via a small
 // edge tab that remembers the last width, and a persistent roster ⇄
 // Business-mini-dashboard toggle that survives navigating the rail
 // ("picture in picture," not a temporary popover) — plus the pinned
-// Needs Attention strip and, when the current page belongs to a
-// multi-page section, that section's own sub-links so nothing existing
-// becomes unreachable.
+// Needs Attention strip. (FIX 6: a section's other pages are the tab strip at the top of the page now, so the panel has no section links.)
 //
 // Split screen (Ron, Oct 19: "If you click Business, it should pull up the full Business page in that half, or Clients, it should pull up your full client list"): each tile shows its section's FULL
 // page below the tiles, in a frame of its own (the same frame the workspace panes use: the app's own pages only, drawn without the app's chrome, and links inside stay inside the half, so Build a program
@@ -44,15 +32,11 @@ export function ShellListPanel({
   coachId,
   groupId,
   groupName,
-  sectionLabel,
-  sectionSubLinks,
   hideMoney = false,
 }: {
   coachId: string;
   groupId: string;
   groupName: string;
-  sectionLabel: string | null;
-  sectionSubLinks: SectionSubLink[];
   /** a team-sport group, or an organization that is all team-sport groups, has no money numbers (lib/team-sport.ts, moneyHiddenFor): no Business tile, no Business view (even one pinned earlier), no income / MRR / paying-client tiles */
   hideMoney?: boolean;
 }) {
@@ -144,28 +128,6 @@ export function ShellListPanel({
       <div className="shrink-0 max-h-[45%] overflow-y-auto p-3 pb-0">
         <NeedsAttentionStrip coachId={coachId} groupId={groupId} />
         <PendingRequestsLine groupId={groupId} />
-
-        {sectionSubLinks.length > 0 && (
-          <div className="mb-3 pb-3 border-b border-steel/20">
-            <p className="font-body text-xs text-steel uppercase tracking-wide mb-1.5 px-1">
-              {sectionLabel}
-            </p>
-            <div className="space-y-0.5">
-              {sectionSubLinks.map((link) => (
-                <Link
-                  key={link.key}
-                  href={link.href}
-                  {...(link.newTab ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-                  className={`block px-2 py-1.5 font-body text-sm transition-colors ${
-                    link.active ? "text-rust bg-rust/10" : "text-steel active:text-chalk"
-                  }`}
-                >
-                  {link.label}
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
 
         <div className={`grid ${hideMoney ? "grid-cols-3" : "grid-cols-2"} gap-1 mb-2`}>
           <button

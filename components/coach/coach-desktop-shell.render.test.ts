@@ -22,7 +22,7 @@ import { CoachDesktopShell } from "./coach-desktop-shell";
 const render = (props: { groupId: string; groupName: string }) =>
   renderToStaticMarkup(createElement(CoachDesktopShell, { ...props, active: "home", coachLevel: true } as never, createElement("div", null, "HOME CONTENT")));
 
-const RAIL = ["Clients", "Calendar", "Programs", "Messages", "Business", "Settings"];
+const RAIL = ["Home", "Clients", "Calendar", "Programs", "Messages", "Settings"];
 
 describe("Home's desktop rail", () => {
   const cases: [string, { groupId: string; groupName: string }][] = [
@@ -33,7 +33,9 @@ describe("Home's desktop rail", () => {
   for (const [label, props] of cases) {
     it(`shows the full coach-level rail for ${label}`, () => {
       const html = render(props);
-      for (const item of RAIL) expect(html, item).toContain(item);
+      for (const item of RAIL) expect(html, item).toContain(`aria-label="${item}"`);
+      // FIX 6: exactly the six homes, no menus
+      for (const gone of ["Business", "Coaching", "Group", "More"]) expect(html, gone).not.toContain(`aria-label="${gone}"`);
       expect(html).toContain("HOME CONTENT");
       // the page's own group is never the page title or a client badge: Home belongs to the coach
       expect(html).not.toContain("Client</span>");
@@ -97,6 +99,14 @@ describe("Home's desktop rail", () => {
     for (const p of ["nutrition", "challenges", "records", "team-performance"]) expect(strip, p).toContain(`href="/groups/g-team/${p}"`);
     expect(railLit(html, "Programs")).toBe(true);
     expect(html).not.toContain('aria-label="Coaching"');
+  });
+  it("FIX 6 R4: the Settings page shows the Settings strip with Account lit, and the Settings icon lit; the side panel has no section links", () => {
+    const html = page("/groups/g-team/settings", "", "settings");
+    const strip = html.slice(html.indexOf("data-home-strip"), html.indexOf("HOME CONTENT"));
+    expect(html).toContain('<nav aria-label="Settings"');
+    expect(tabOn(strip, "/groups/g-team/settings")).toBe(true);
+    for (const p of ["display", "business/sms-settings", "business/support", "quick-tips", "branding", "resources", "business/website", "business/zapier"]) expect(strip, p).toContain(`href="/groups/g-team/${p}"`);
+    expect(railLit(html, "Settings")).toBe(true);
   });
   it("does not need a remembered group: nothing in the rendered rail comes from a cookie", () => {
     const a = render({ groupId: "g-team", groupName: "Varsity" });

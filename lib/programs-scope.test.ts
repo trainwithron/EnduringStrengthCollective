@@ -36,7 +36,9 @@ describe("where the scope can and cannot come from", () => {
   const groupPage = read("../app/(coach)/groups/[groupId]/programs/page.tsx");
   const section = read("../components/coach/desktop/client-programs-section.tsx");
   it("the rail's Programs item is the all-programs page, wherever the coach is standing (not the current group, which could be a client's)", () => {
-    expect(shell).toContain('{ key: "programs", label: "Programs", href: ALL_PROGRAMS_HREF');
+    // FIX 6: the Programs home's first tab, which the rail icon goes to
+    expect(read("./desktop-coach-homes.ts")).toContain('{ key: "programs", label: "Programs", href: ALL_PROGRAMS_HREF');
+    expect(shell).toContain('href: homeHref(tabsByHome, h.key) ?? "/dashboard",');
     expect(shell).not.toContain("href: `/groups/${groupId}/programs`");
   });
   it("the all-programs page lists every program of the coach's groups and scopes only from ?client=", () => {

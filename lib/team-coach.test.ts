@@ -63,7 +63,9 @@ describe("the team coach's menus", () => {
 
   it("Settings says so, and the desktop and phone menus apply it", () => {
     expect(src("components/coach/coach-type-setting.tsx")).toContain("they always stay if you have a one-on-one client or run an organization with other coaches or staff");
-    expect(src("components/coach/coach-desktop-shell.tsx")).toContain("hiddenForCoach(navFacts, i.key)");
+    // FIX 6: the computer's tabs (lib/desktop-coach-homes.ts), built with the coach's facts
+    expect(src("lib/desktop-coach-homes.ts")).toContain("!hiddenForCoach(f.navFacts, t.key)");
+    expect(src("components/coach/coach-desktop-shell.tsx")).toContain("navFacts, isPlatformAdmin, onFrontDesk });");
     const phone = src("components/coach/mobile/coach-spot-hub.tsx");
     // the phone More list no longer offers those pages at all (they are computer pages: lib/phone-coach-routes.ts), so there is nothing left there to hide
     for (const key of ["availability", "booking-page", "session-types", "session-ledger", "leads", "resources"]) expect(phone, key).not.toContain(key);

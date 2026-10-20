@@ -40,8 +40,9 @@ describe("the shell applies it itself, not page by page", () => {
     // the old per-case prop is gone
     expect(shell).not.toContain("teamSport={teamSport}");
   });
-  it("the rail's Business icon (and its income hover widget) is left out where the money is hidden", () => {
-    expect(shell).toContain('moneyHidden && "items" in e && e.label === "Business"');
+  it("the Business tab (and the income hover widget on Home) is left out where the money is hidden (FIX 6)", () => {
+    expect(shell).toContain("home: moneyHidden ? undefined : <BusinessRailWidget groupId={groupId} />,");
+    expect(read("lib/desktop-coach-homes.ts")).toContain('const MONEY_TABS = new Set(["business",');
   });
   it("the left panel ignores a Business view pinned earlier, in any group, and never renders the mini dashboard", () => {
     const panel = read("components/coach/desktop/shell-list-panel.tsx");
@@ -57,7 +58,7 @@ describe("the shell applies it itself, not page by page", () => {
 });
 
 describe("the left panel on the Trojans' page", () => {
-  const props = { coachId: "c1", groupId: "g1", groupName: "TROJANS", sectionLabel: null, sectionSubLinks: [] };
+  const props = { coachId: "c1", groupId: "g1", groupName: "TROJANS" };
   it("with the money hidden there is no Business tile, no whole-organization money tiles and no Go deeper", () => {
     const html = renderToStaticMarkup(createElement(ShellListPanel, { ...props, hideMoney: true }));
     expect(html).not.toMatch(/Business/);

@@ -17,7 +17,9 @@ describe("the coach's Calendar is a coach-level page", () => {
   });
 
   it("the rail's Calendar goes to /calendar, not to one group", () => {
-    expect(shell).toContain('href: "/calendar", icon: CalendarDays');
+    // FIX 6: the rail icon goes to the Calendar home's first tab, the Schedule at /calendar
+    expect(read("lib/desktop-coach-homes.ts")).toContain(': { key: "schedule", label: "Schedule", href: "/calendar" },');
+    expect(shell).toContain('href: homeHref(tabsByHome, h.key) ?? "/dashboard",');
   });
 
   it("old /groups/<id>/calendar links still work: a coach on a computer is sent to /calendar with their query kept; clients and phones keep the group page", () => {

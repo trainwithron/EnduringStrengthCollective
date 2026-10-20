@@ -90,3 +90,16 @@ describe("recent", () => {
     expect(many[0].id).toBe("p11");
   });
 });
+
+describe("FIX 6: the picker's section line is the page's home on the computer", () => {
+  it("every page's section is the home its address belongs to", async () => {
+    const { homeOfPath, HOMES } = await import("./desktop-coach-homes");
+    const G = "0b1f4c2e-aaaa-4bbb-8ccc-123456789abc";
+    for (const d of pageDestinations(G, true)) {
+      const [path, query] = d.path.split("?");
+      const home = homeOfPath(path, query ? `?${query}` : "")?.home;
+      expect(home, d.path).toBeDefined();
+      expect(d.section, d.path).toBe(HOMES.find((h) => h.key === home)?.label);
+    }
+  });
+});

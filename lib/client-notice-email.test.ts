@@ -77,8 +77,15 @@ describe("emailing the client", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
   it("never during the person's quiet hours (dropped, not queued)", async () => {
-    expect(await emailClientNotice(db({ email: "client@example.com", quiet: true }), "p1", "S", "T")).toBe("quiet");
-    expect(fetchMock).not.toHaveBeenCalled();
+    // quiet 0:00-23:00 in Los Angeles: pin the clock to noon there, so the test does not fail when it runs in the 11 PM hour
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-19T19:00:00Z"));
+    try {
+      expect(await emailClientNotice(db({ email: "client@example.com", quiet: true }), "p1", "S", "T")).toBe("quiet");
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
   it("nothing is sent when email is not configured", async () => {
     delete process.env.BREVO_API_KEY;
