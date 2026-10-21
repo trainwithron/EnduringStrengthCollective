@@ -59,8 +59,10 @@ describe("what happens to the AI's meal options before the coach sees them", () 
 
 describe("how it is wired", () => {
   it("the route runs every verified option through it and returns both counts; the screen explains each empty answer, including a mix", () => {
+    // the route calls the shared one-meal helper (lib/ai-meal-slot.ts, also used by the allergy rebuild), which runs the pipeline
     const route = src("app/api/ai/generate-meal-plan/route.ts");
-    expect(route).toContain("checkMealOptions(allVerified, rules,");
+    expect(route).toContain("await suggestMealSlotOptions(supabase, {");
+    expect(src("lib/ai-meal-slot.ts")).toContain("return checkMealOptions(allVerified, req.rules,");
     expect(route).toContain("droppedForPreferences, droppedForMacros });");
     const screen = src("components/coach/desktop/meal-plan-generator.tsx");
     expect(screen).toContain("None of the suggestions landed close enough to this meal's macros");

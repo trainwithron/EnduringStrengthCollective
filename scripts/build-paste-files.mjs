@@ -2842,6 +2842,29 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "182",
+  slug: "0430",
+  title: "0430 Allergy auto-rebuild: when a client adds an allergy or a food they avoid, the options of their plan that now break it are swapped automatically, with a copy kept and the coach told (one column, one function added, one replaced)",
+  warn: "This adds a source column to meal_plan_tries ('client' for every existing row and every try; 'allergy' for a system rebuild, which is try 0 and never counts as one of the client's 3 tries) and widens the try-number check to allow that. It adds apply_allergy_rebuild (server only): under the same per-client lock as a try, it keeps a copy of the days it changes, replaces ONLY their meals (days that already exist, today on, in that group; never their rationale, macros or author) and notifies the client's coaches. It REPLACES restore_meal_plan_try with the live text plus one check: an allergy rebuild cannot be put back. The paste checks that the live restore function is exactly the text this replaces, and stops if not.",
+  migrations: ["0430"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes until the app update that goes with it is deployed. Then a client who opens Nutrition with no food answers is asked once about allergies and foods they avoid, and when they save one that clashes with their assigned plan, the clashing options are swapped (library first, AI only for a meal left empty) and the coach gets a notice: \"<Name>'s peanut allergy clashed with their meal plan: 3 days rebuilt automatically.\"",
+  undo: [
+    "drop function if exists public.apply_allergy_rebuild(uuid, uuid, date, jsonb, text);",
+    fnFromMigration("0311", "restore_meal_plan_try"),
+    "revoke all on function public.restore_meal_plan_try(uuid) from public, anon;",
+    "grant execute on function public.restore_meal_plan_try(uuid) to authenticated;",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 182 misbehaves, and only while the allergy rebuild app update is NOT live (it calls apply_allergy_rebuild). The function goes and restore_meal_plan_try is put back exactly as before. The source column and the widened check stay (rows already written as allergy rebuilds stay as records).",
+  rows: [
+    ["0430 is not already applied (apply_allergy_rebuild is not there yet)", "to_regprocedure('public.apply_allergy_rebuild(uuid, uuid, date, jsonb, text)') is null"],
+    ["restore_meal_plan_try is exactly the text this replaces", md5Is("restore_meal_plan_try(uuid)", "8046c690a08a1943b1b7fec489243744")],
+    ["the table and functions it uses exist", "to_regclass('public.meal_plan_tries') is not null and to_regclass('public.meal_plans') is not null and to_regprocedure('public.meal_plan_try_number(text)') is not null and to_regprocedure('public.is_group_coach(uuid)') is not null"],
+    ["the meal_plan_try notice type is allowed", "exists (select 1 from pg_constraint where conname = 'notifications_type_check' and conrelid = 'public.notifications'::regclass and position('''meal_plan_try''' in pg_get_constraintdef(oid)) > 0)"],
+  ],
+});
+
+STEPS.push({
   n: "181",
   slug: "0429",
   title: "0429 Set my targets: a client whose coach has set no nutrition target may set their own (one column, one trigger, one function, three client policies; the target-changed notice skips a client's own change)",
@@ -3814,6 +3837,7 @@ const BUNDLES = [
   { id: "release-ts3-team-sheet-save", name: "Release TS3 (saving a filled team sheet: one table, one notice kind, three functions)", steps: ["171"] },
   { id: "release-own1-owner-accepted-only", name: "Release OWN1 (ownership cannot be handed to someone who has never signed in; replaces two functions, adds one function and one trigger)", steps: ["172"] },
   { id: "release-tc3b-client-requests", name: "Release TC3 part B (Request to train with me on a coach's public page: one column, three tables, eight functions)", steps: ["174"] },
+  { id: "allergy-auto-rebuild", name: "Allergy auto-rebuild (a client's new allergy swaps the clashing options of their plan automatically: one column, one function added, one replaced)", steps: ["182"] },
   { id: "fix3-no-show-walk-in", name: "FIX 3 (logging settles the session on the calendar once; no-show Charge or Waive; a late move is one session; the walk-in)", steps: ["180"] },
   { id: "set-my-targets-client-own-targets", name: "Set my targets (a client with no target from their coach may set their own: one column, one trigger, one function, three client policies, the notice function)", steps: ["181"] },
   { id: "speed-b-member-checks-set-based", name: "SPEED B (the read policies ask member / coach / owner or admin from three sets once per query: three functions, 15 read policies rewritten in place)", steps: ["179"] },
@@ -4074,6 +4098,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0422", "to_regclass('public.client_requests') is not null"),
     m("0428", "to_regprocedure('public.resolve_no_show(uuid, boolean)') is not null"),
     m("0429", "to_regprocedure('public.has_coach_macro_target(uuid, uuid)') is not null"),
+    m("0430", "to_regprocedure('public.apply_allergy_rebuild(uuid, uuid, date, jsonb, text)') is not null"),
     m("0427", "to_regprocedure('public.my_group_ids()') is not null"),
     m("0426", "to_regprocedure('public.active_org_group_ids()') is not null"),
     m("0425", "exists (select 1 from pg_proc p where p.oid = to_regprocedure('public.request_workspace_org()') and position('x-workspace-org' in p.prosrc) > 0)"),

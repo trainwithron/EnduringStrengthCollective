@@ -147,7 +147,8 @@ describe("second review: typed items reach the AI route, edits relabel a library
     expect(aiRoute).toContain("/^[a-z][a-z -]{1,39}$/");
     // the saved rules are read before the extras are merged in, and the prompt is built after
     expect(aiRoute.indexOf("const extraA")).toBeGreaterThan(aiRoute.indexOf("rowToPreferences("));
-    expect(aiRoute.indexOf("const extraA")).toBeLessThan(aiRoute.indexOf("rulesForPrompt(rules)"));
+    // the prompt is built in the shared helper the route calls after merging (lib/ai-meal-slot.ts)
+    expect(aiRoute.indexOf("const extraA")).toBeLessThan(aiRoute.indexOf("await suggestMealSlotOptions("));
   });
   it("changing a library-built day by hand relabels it, so the next Build the week asks", () => {
     expect(assignment).toContain("EDITED_BY_HAND_RATIONALE");

@@ -24,6 +24,14 @@
   "file": "apply-release-tc3b-client-requests-all.sql"
  },
  {
+  "id": "allergy-auto-rebuild",
+  "name": "Allergy auto-rebuild (a client's new allergy swaps the clashing options of their plan automatically: one column, one function added, one replaced)",
+  "steps": [
+   "182"
+  ],
+  "file": "apply-allergy-auto-rebuild-all.sql"
+ },
+ {
   "id": "fix3-no-show-walk-in",
   "name": "FIX 3 (logging settles the session on the calendar once; no-show Charge or Waive; a late move is one session; the walk-in)",
   "steps": [

@@ -57,14 +57,16 @@ describe("the coach side", () => {
 describe("no unsafe option is ever created", () => {
   it("the AI route reads the client's rules on the server, from the database, tells the model, and drops what breaks them", () => {
     expect(route).toContain('.from("client_nutrition_preferences").select("*").eq("athlete_id", athleteId)');
-    expect(route).toContain("rulesForPrompt(rules)");
-    // the food-rule check now lives in the shared pipeline the route calls (lib/meal-option-pipeline.ts), ahead of the macro check
-    expect(route).toContain("checkMealOptions(allVerified, rules,");
+    // the prompt and the food-rule check live in the shared one-meal helper the route calls (lib/ai-meal-slot.ts -> lib/meal-option-pipeline.ts), ahead of the macro check
+    const slot = src("../../../lib/ai-meal-slot.ts");
+    expect(slot).toContain("rulesForPrompt(req.rules)");
+    expect(slot).toContain("checkMealOptions(allVerified, req.rules,");
+    expect(route).toMatch(/\brules,\r?\n\s*\}\);/);
     expect(src("../../../lib/meal-option-pipeline.ts")).toContain("filterOptionsByRules(checked, rules)");
     expect(route).toContain("droppedForPreferences");
     // the rules are never taken from the request body
     expect(route).not.toMatch(/allergies\s*[,}]\s*=\s*await request/);
-    expect(route.indexOf("await request.json()")).toBeLessThan(route.indexOf("checkMealOptions(allVerified"));
+    expect(route.indexOf("await request.json()")).toBeLessThan(route.indexOf("await suggestMealSlotOptions("));
   });
   it("the check covers the matched food too, not only the AI's own words", () => {
     expect(src("../../../lib/meal-option-pipeline.ts")).toContain("l.matchedDescription");

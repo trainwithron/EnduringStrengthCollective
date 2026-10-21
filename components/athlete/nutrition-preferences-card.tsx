@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { FoodPreferencesEditor } from "@/components/shared/food-preferences-editor";
 import { preferencesToRow, type NutritionPreferences } from "@/lib/nutrition-preferences";
+import { runAllergyRebuild } from "@/lib/allergy-rebuild-client";
 
 // The client's own food preferences ("foods I like, foods I don't, allergies"). They edit their tastes; the rules that shape their numbers are their coach's and are shown
 // as text. Saved to the client's own row; the coach is told (fixed wording) when allergies or foods they don't like change.
@@ -37,7 +38,10 @@ export function NutritionPreferencesCard({ athleteId, initial }: { athleteId: st
       return;
     }
     setSaved(prefs);
-    setMessage("Saved. Your coach can see this.");
+    // A new allergy or food to avoid that clashes with the assigned plan: the clashing options are swapped right away (app/api/nutrition/allergy-rebuild).
+    const added = prefs.allergies.some((a) => !saved.allergies.includes(a)) || prefs.dislikes.some((d) => !saved.dislikes.includes(d)) || prefs.intolerances.some((i) => !saved.intolerances.includes(i));
+    const rebuilt = added ? await runAllergyRebuild() : null;
+    setMessage(rebuilt && rebuilt.daysChanged > 0 ? "Saved. Your meal plan was updated to leave those out." : "Saved. Your coach can see this.");
     router.refresh();
   }
 

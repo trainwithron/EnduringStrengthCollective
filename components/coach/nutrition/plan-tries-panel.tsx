@@ -14,6 +14,8 @@ export interface PlanTryView {
   dates: string[];
   requestedAt: string;
   restored: boolean;
+  // 'allergy': the app swapped the options that broke a new allergy or food they avoid (0430). Not a try, and never put back.
+  source: "client" | "allergy";
 }
 
 // When a client asked for a different meal plan ("Not feeling it?"): what they said, which try it was, which days were rebuilt, and one tap to put back the plan from before. The put-back
@@ -25,8 +27,10 @@ export function PlanTriesPanel({ clientName, tries }: { clientName: string; trie
   const [error, setError] = useState<string | null>(null);
   if (tries.length === 0) return null;
 
-  // The latest try that has not been put back: the only one that can be put back now.
-  const latestId = tries.find((t) => !t.restored)?.id ?? null;
+  // The latest change that has not been put back: the only one that can be put back now (an allergy rebuild never can, and a try older than one cannot either).
+  const latest = tries.find((t) => !t.restored) ?? null;
+  const latestId = latest && latest.source === "client" ? latest.id : null;
+  const asked = tries.some((t) => t.source === "client");
 
   async function putBack(id: string) {
     setError(null);
@@ -47,9 +51,14 @@ export function PlanTriesPanel({ clientName, tries }: { clientName: string; trie
 
   return (
     <div className="mb-4 border border-steel/20 p-3 space-y-2" aria-label="Plan change requests">
-      <p className="font-body text-sm text-chalk font-medium">{clientName} asked for a different meal plan</p>
+      <p className="font-body text-sm text-chalk font-medium">{asked ? `${clientName} asked for a different meal plan` : `${clientName}'s meal plan changed automatically`}</p>
       <ul className="space-y-2">
-        {tries.map((t) => (
+        {tries.map((t) =>
+          t.source === "allergy" ? (
+            <li key={t.id} className="font-body text-sm text-chalk" data-allergy-rebuild>
+              <span className="text-steel">Rebuilt automatically on {shortDateLabel(t.requestedAt.slice(0, 10))}:</span> {t.summary}
+            </li>
+          ) : (
           <li key={t.id} className="font-body text-sm text-chalk">
             <span className="text-steel">
               Try {t.tryNumber} of {MAX_PLAN_TRIES}, {shortDateLabel(t.requestedAt.slice(0, 10))}
@@ -65,7 +74,8 @@ export function PlanTriesPanel({ clientName, tries }: { clientName: string; trie
               </button>
             )}
           </li>
-        ))}
+          )
+        )}
       </ul>
       {message && (
         <p className="font-body text-xs text-chalk" role="status">

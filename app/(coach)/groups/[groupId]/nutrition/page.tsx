@@ -25,6 +25,7 @@ import { FoodLogSection } from "@/components/athlete/food-log-section";
 import type { GeneratedMeal } from "@/lib/meal-engine";
 import type { MealEntryPayload } from "@/lib/meal-plan-assignment";
 import { NutritionPreferencesCard } from "@/components/athlete/nutrition-preferences-card";
+import { NutritionFirstVisitPrompt } from "@/components/athlete/nutrition-first-visit-prompt";
 import { RecalcPromptCard } from "@/components/athlete/recalc-prompt-card";
 import { recalcPromptFor } from "@/lib/recalc-prompt";
 import { rowToPreferences } from "@/lib/nutrition-preferences";
@@ -515,6 +516,8 @@ export default async function NutritionPage(
       {/* Every client can track what they eat here, whatever their tier and whether or not a coach has set a target. Targets, meal plans, food rules and the weekly
           check-in are a coach-run feature and show only for clients on a tier that has them. */}
       <div className="px-5 pt-6 space-y-6">
+          {/* Asked once while they have never answered (Oct 21): allergies or foods they avoid. Blocks nothing; a clash with an assigned plan is swapped right away. */}
+          {macrosEnabled && !viewingOther && !prefsRow && !prefsError && <NutritionFirstVisitPrompt athleteId={athleteId} />}
           {recalcPrompt && (
             <RecalcPromptCard athleteId={athleteId} groupId={params.groupId} effectiveFrom={recalcPrompt.effectiveFrom} calories={recalcPrompt.calories} showCalories={!youthMode} />
           )}

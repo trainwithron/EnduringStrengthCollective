@@ -1,14 +1,12 @@
 import { safeErrorDetail } from "@/lib/safe-error";
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
-import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError } from "@/lib/anthropic-client";
+import { isAiConfigured, AiNotConfiguredError } from "@/lib/anthropic-client";
 import { AiRateLimitedError } from "@/lib/ai-usage";
-import { verifyMealOptions, type RawMealOption } from "@/lib/meal-option-verification";
 import { MEAL_SLOT_DELIVERED_FEATURE } from "@/lib/ai-refund-decision";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { rowToPreferences } from "@/lib/nutrition-preferences";
-import { rulesForPrompt } from "@/lib/plan-preference-check";
-import { checkMealOptions } from "@/lib/meal-option-pipeline";
+import { AiMealShapeError, suggestMealSlotOptions } from "@/lib/ai-meal-slot";
 
 // "The Nutrition Spot" (nutrition_spot_revamp_scoping_sept19.md,
 // retiring the old "Mix & Macros" name — AI is now the primary meal-
@@ -24,34 +22,7 @@ import { checkMealOptions } from "@/lib/meal-option-pipeline";
 // lines get matched against real USDA food data and re-computed for
 // real (lib/meal-option-verification.ts) before anything is returned —
 // an option that fails to match confidently is discarded here, not
-// shown with an unverified number.
-const SYSTEM_PROMPT = `You are a nutrition coach building three real, appetizing meal options for one meal
-slot, each landing close to the same macro target. Respond with ONLY a JSON object shaped exactly like
-this, no other text and no markdown code fence:
-
-{
-  "options": [
-    { "recipeName": string, "ingredients": string[] },
-    { "recipeName": string, "ingredients": string[] },
-    { "recipeName": string, "ingredients": string[] }
-  ]
-}
-
-Each option's "ingredients" is 3-6 lines, each "Ingredient: amount" as plain text, e.g.
-"Chicken Breast: 170g (~6.0 oz)".
-
-Rules:
-- Use real, common grocery-store ingredients and realistic gram amounts — round to numbers a coach would
-  actually tell a client (nearest 5g for most things, nearest whole unit for eggs/slices/scoops).
-- Every ingredient line MUST include an explicit gram amount ("Xg") — this is checked against real food
-  data afterward, so an amount given in only ounces/cups/servings with no gram figure cannot be verified.
-- The ingredients together should land close to the given protein/carbs/fat targets (within about 10%).
-- Respect the given diet archetype and any dietary restrictions or disliked foods exactly — never include
-  a restricted or disliked ingredient.
-- Each ingredient line is plain text only — no HTML tags, no markdown, no asterisks.
-- Prefer favorite/requested foods when they're compatible with the targets and restrictions.
-- Make the three options genuinely different from each other — vary the main protein source, the carb
-  source, or the overall dish style — not three near-duplicates with minor amount tweaks.`;
+// shown with an unverified number. The prompt and the checks live in lib/ai-meal-slot.ts (the automatic allergy rebuild uses the same ones).
 
 const VALID_SLOTS = ["breakfast", "lunch", "dinner", "snack", "any"];
 const VALID_ARCHETYPES = ["omnivore", "vegetarian", "vegan", "carnivore", "keto", "paleo"];
@@ -150,42 +121,18 @@ export async function POST(request: Request) {
       dietType: rules?.dietType ?? "omnivore",
     };
   }
-  const rulesText = rules ? rulesForPrompt(rules) : "";
-
-  const userText = `Meal slot: ${mealSlot}
-Diet archetype: ${archetype}
-Target protein: ${proteinTarget}g
-Target carbs: ${carbsTarget}g
-Target fat: ${fatTarget}g
-Dietary restrictions / dislikes: ${dietaryRestrictions || "none given"}
-Favorite foods / requests: ${favoriteFoods || "none given"}${rulesText ? `\n${rulesText}` : ""}`;
-
   try {
-    const text = await callClaude({ meta: { feature: "meal_plan_slot", userId: user.id }, system: SYSTEM_PROMPT, userText, maxTokens: 2048 });
-    const parsed = JSON.parse(extractJson(text));
-
-    const isValidOption = (o: unknown): o is RawMealOption => {
-      const r = o as Record<string, unknown>;
-      return (
-        !!r &&
-        typeof r.recipeName === "string" &&
-        Array.isArray(r.ingredients) &&
-        r.ingredients.every((i: unknown) => typeof i === "string")
-      );
-    };
-
-    if (!Array.isArray(parsed?.options) || parsed.options.length === 0 || !parsed.options.every(isValidOption)) {
-      return NextResponse.json({ error: "AI response wasn't in the expected shape — try again." }, { status: 502 });
-    }
-
-    // The real accuracy layer — every option's macros get re-computed
-    // from real matched USDA food data here, never returned on the AI's
-    // own claimed numbers. An option that can't be confidently matched
-    // is dropped rather than surfaced as pickable with an unverified
-    // number (nutrition_spot_revamp_scoping_sept19.md's own bar).
-    const allVerified = await verifyMealOptions(supabase, parsed.options as RawMealOption[]);
-    // The model is told the rules and asked for the target, and every option is ALSO checked here (lib/meal-option-pipeline.ts): food rules first, then the numbers.
-    const { options: verifiedOptions, droppedForPreferences, droppedForMacros } = checkMealOptions(allVerified, rules, { proteinG: proteinTarget, carbsG: carbsTarget, fatG: fatTarget });
+    const { options: verifiedOptions, droppedForPreferences, droppedForMacros } = await suggestMealSlotOptions(supabase, {
+      meta: { feature: "meal_plan_slot", userId: user.id },
+      mealSlot,
+      proteinTarget,
+      carbsTarget,
+      fatTarget,
+      archetype,
+      dietaryRestrictions,
+      favoriteFoods,
+      rules,
+    });
 
     // The server's own record that the AI delivered something usable, so a later "the generation failed" refund can be checked against it instead of
     // believing the browser (lib/ai-refund-decision.ts). Best effort: a failed write only means an automatic refund stays possible, never blocks the coach.
@@ -208,6 +155,9 @@ Favorite foods / requests: ${favoriteFoods || "none given"}${rulesText ? `\n${ru
     }
     if (err instanceof AiNotConfiguredError) {
       return NextResponse.json({ error: err.message }, { status: 503 });
+    }
+    if (err instanceof AiMealShapeError) {
+      return NextResponse.json({ error: err.message }, { status: 502 });
     }
     const message = safeErrorDetail(err);
     return NextResponse.json({ error: `Couldn't generate a suggestion: ${message}` }, { status: 502 });

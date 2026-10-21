@@ -13,6 +13,7 @@ import { checkinCountdown, dayNutrientBars, glanceDays, weekAverage, weightSerie
 import { fetchAgeAndSex, fetchNutrientLog } from "@/lib/nutrient-data";
 import { estimateRealMaintenance, maintenanceSentenceFor } from "@/lib/real-maintenance";
 import { dailyCaloriesFromLog } from "@/lib/nutrition-tracking";
+import { emptyMealsOf } from "@/lib/allergy-conflict-rebuild";
 import { GroceryListSection } from "@/components/coach/nutrition/grocery-list-section";
 import { FoodTrackingSwitch } from "@/components/coach/nutrition/food-tracking-switch";
 import { MacrosOffSwitch } from "@/components/coach/nutrition/macros-off-switch";
@@ -205,7 +206,7 @@ export async function ClientNutrition({
   // When the client asked for a different meal plan ("Not feeling it?"): the latest tries, newest first. A failed read (or a database without the table yet) is no tries, never a failed page.
   const { data: tryRows, error: triesError } = await supabase
     .from("meal_plan_tries")
-    .select("id, try_number, note, summary, dates, requested_at, restored_at")
+    .select("id, try_number, note, summary, dates, requested_at, restored_at, source")
     .eq("athlete_id", athleteId)
     .eq("group_id", groupId)
     .order("requested_at", { ascending: false })
@@ -221,6 +222,7 @@ export async function ClientNutrition({
         dates: (r.dates as string[] | null) ?? [],
         requestedAt: r.requested_at as string,
         restored: !!r.restored_at,
+        source: r.source === "allergy" ? ("allergy" as const) : ("client" as const),
       }));
   // The target in force today as whole numbers, when all four are set (scaling a plan needs every one).
   const scaleTarget =
@@ -535,6 +537,10 @@ export async function ClientNutrition({
     ? `Last check-in ${shortDateLabel(String(lastCheckinRow.created_at ?? "").slice(0, 10))}${lastCheckinRow.new_calories != null ? `: ${Number(lastCheckinRow.new_calories).toLocaleString("en-US")} kcal` : ""}.`
     : "No check-in yet.";
 
+  // Meals an automatic allergy rebuild could not fill (nothing safe in the library, and no AI option): the client sees "your coach will update this"; the coach is asked here.
+  const allergyDates = new Set(planTries.filter((t) => t.source === "allergy").flatMap((t) => t.dates));
+  const rebuiltEmpty = emptyMealsOf(((upcomingPlanRows ?? []) as { log_date: string; meals: unknown }[]).filter((r) => allergyDates.has(r.log_date)));
+
   const detailsFlags = [...(reviewCard ? ["Phase review due"] : []), ...(findings.length > 0 ? [findings.length === 1 ? "1 thing to look at" : `${findings.length} things to look at`] : [])];
 
   return (
@@ -753,6 +759,14 @@ export async function ClientNutrition({
               </p>
             ))}
             {flaggedAssigned.length > 4 && <p className="font-body text-xs text-steel">…and {flaggedAssigned.length - 4} more days.</p>}
+          </div>
+        )}
+        {rebuiltEmpty.length > 0 && (
+          <div role="status" className="mb-4 border border-amber-400/40 bg-amber-400/5 p-3 space-y-1" data-rebuilt-empty>
+            <p className="font-body text-sm text-amber-400 font-medium">
+              {rebuiltEmpty.length === 1 ? "1 meal" : `${rebuiltEmpty.length} meals`} had no safe option after {firstName}&apos;s allergy update. {firstName} sees &ldquo;your coach will update this&rdquo;; build {rebuiltEmpty.length === 1 ? "it" : "them"} below.
+            </p>
+            <p className="font-body text-xs text-chalk">{rebuiltEmpty.slice(0, 6).map((m) => `${shortDateLabel(m.log_date)}: ${m.title}`).join("; ")}{rebuiltEmpty.length > 6 ? "; and more" : ""}</p>
           </div>
         )}
         <NutritionTools

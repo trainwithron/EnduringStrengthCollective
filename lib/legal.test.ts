@@ -117,7 +117,8 @@ describe("the AI paragraph covers every route that calls the AI", () => {
   // read what that route sends and update the paragraph in lib/legal.ts first, then add the file here.
   const COVERED = [
     "app/api/admin/trivia/generate/route.ts",
-    "app/api/ai/generate-meal-plan/route.ts",
+    // The Nutrition Spot's one-meal suggestion: the coach's planner (app/api/ai/generate-meal-plan) and the automatic allergy rebuild (app/api/nutrition/allergy-rebuild) both call it.
+    "lib/ai-meal-slot.ts",
     "app/api/ai/generate-program/route.ts",
     // One day at a time: the same program-building data as generate-program (the coach's words, the days built so far, the exercise library, a client's injury and age context), so the same paragraph covers it.
     "app/api/ai/build-day/route.ts",
@@ -143,7 +144,7 @@ describe("the AI paragraph covers every route that calls the AI", () => {
     "lib/spotter-overarching-synthesis.ts",
   ];
   // The helper libraries those routes build their requests from: the "not sent" promise is checked here too.
-  const HELPERS = ["lib/collective-intelligence-lookups.ts", "lib/coach-briefing-gather.ts", "lib/spotter-tier1-sync.ts"];
+  const HELPERS = ["lib/collective-intelligence-lookups.ts", "lib/coach-briefing-gather.ts", "lib/spotter-tier1-sync.ts", "app/api/ai/generate-meal-plan/route.ts", "app/api/nutrition/allergy-rebuild/route.ts"];
   function walk(dir: string, out: string[]) {
     for (const name of readdirSync(dir)) {
       if (name === "node_modules" || name === ".next" || name === ".git") continue;

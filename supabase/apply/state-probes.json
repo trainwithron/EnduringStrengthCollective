@@ -1576,6 +1576,17 @@
   ]
  },
  {
+  "n": "182",
+  "slug": "0430",
+  "title": "0430 Allergy auto-rebuild: when a client adds an allergy or a food they avoid, the options of their plan that now break it are swapped automatically, with a copy kept and the coach told (one column, one function added, one replaced)",
+  "migrations": [
+   "0430"
+  ],
+  "notApplied": [
+   "to_regprocedure('public.apply_allergy_rebuild(uuid, uuid, date, jsonb, text)') is null"
+  ]
+ },
+ {
   "n": "181",
   "slug": "0429",
   "title": "0429 Set my targets: a client whose coach has set no nutrition target may set their own (one column, one trigger, one function, three client policies; the target-changed notice skips a client's own change)",
