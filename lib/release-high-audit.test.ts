@@ -107,6 +107,18 @@ describe("a FitPros import writes nothing for a day with a bad name", () => {
     expect(r.failed[0]).toContain("2026-01-05");
     expect(inserts.filter((i) => i.table === "athlete_sessions")).toHaveLength(0);
   });
+  it("every session one run writes carries the same import batch, a new one each run, so the History list offers 'Undo this import' (Oct 21: FitPros sessions had none)", async () => {
+    const { db, inserts } = fakeDb({});
+    const plan: any[] = ["2026-01-05", "2026-01-07"].map((date) => ({ date, programWorkoutId: null, exercises: [], durationSeconds: null }));
+    const first = await runFitprosImport(db, { athleteId: "a", groupId: "g", plan, existingKeys: new Set() });
+    expect(first.imported).toBe(2);
+    const firstRows = inserts.filter((i) => i.table === "athlete_sessions").map((i) => i.row);
+    expect(firstRows.map((r) => r.import_batch_id)).toEqual([first.batchId, first.batchId]);
+    expect(first.batchId).toMatch(/^[0-9a-f-]{36}$/);
+    const second = await runFitprosImport(db, { athleteId: "a", groupId: "g", plan: [{ ...plan[0], date: "2026-01-09" }], existingKeys: new Set() });
+    expect(second.batchId).not.toBe(first.batchId);
+    expect(inserts.filter((i) => i.table === "athlete_sessions").at(-1)!.row.import_batch_id).toBe(second.batchId);
+  });
 });
 
 describe("moving a client", () => {

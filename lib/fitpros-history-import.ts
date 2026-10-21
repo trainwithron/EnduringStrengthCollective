@@ -4,6 +4,7 @@
 // An import is recognised again by the second in its time stamp (lib/fitpros-history.ts), so running it twice never doubles anything and "Undo this import" removes only these sessions.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { cleanExerciseName, exerciseNameProblem } from "@/lib/exercise-name-guard";
+import { newImportBatchId } from "@/lib/exercise-history-import";
 import { importKeys, isImportMarker, markerTimestamp, resolveNamesAgainstLibrary, IMPORT_MARKER_FIRST_SECOND, type PlannedWorkout, type ProgramWorkoutInfo } from "@/lib/fitpros-history";
 
 export interface ImportProgram {
@@ -89,6 +90,8 @@ export async function listImportedSessions(supabase: SupabaseClient, groupId: st
 }
 
 export interface ImportResult {
+  // One id on every session this run wrote (like the spreadsheet import), so the History list offers "Undo this import" for it.
+  batchId: string;
   imported: number;
   skippedAlreadyThere: number;
   failed: string[];
@@ -100,7 +103,7 @@ export async function runFitprosImport(
 ): Promise<ImportResult> {
   const { athleteId, groupId, plan, existingKeys } = params;
   const keys = importKeys(plan);
-  const result: ImportResult = { imported: 0, skippedAlreadyThere: 0, failed: [] };
+  const result: ImportResult = { batchId: newImportBatchId(), imported: 0, skippedAlreadyThere: 0, failed: [] };
   for (let i = 0; i < plan.length; i++) {
     const w = plan[i];
     if (existingKeys.has(keys[i])) {
@@ -124,6 +127,7 @@ export async function runFitprosImport(
         athlete_id: athleteId,
         status: "completed",
         is_historical: true,
+        import_batch_id: result.batchId,
         started_at: started,
         completed_at: completed,
         duration_seconds: w.durationSeconds,
