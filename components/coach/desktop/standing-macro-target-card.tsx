@@ -10,6 +10,8 @@ import { applyStandingTarget, scheduledConfirmMessage, type ApplyPlan } from "@/
 import { shortDateLabel } from "@/lib/apply-from";
 import { CalorieFloorWarning } from "@/components/coach/nutrition/calorie-floor-warning";
 import { ApplyOutcomeNotice } from "@/components/coach/nutrition/apply-outcome-notice";
+import { macroAutofill, type MacroKey } from "@/lib/macro-autofill";
+import { autoFieldProps, MacroMismatchLine, WorkedOutTag } from "@/components/coach/nutrition/macro-autofill-bits";
 
 interface Target {
   calories: number | null;
@@ -18,11 +20,11 @@ interface Target {
   fatG: number | null;
 }
 
-const FIELDS: { key: keyof Target; label: string; unit: string; max: number }[] = [
-  { key: "calories", label: "Calories", unit: "kcal", max: 20000 },
-  { key: "proteinG", label: "Protein", unit: "g", max: 1500 },
-  { key: "carbsG", label: "Carbs", unit: "g", max: 3000 },
-  { key: "fatG", label: "Fat", unit: "g", max: 1500 },
+const FIELDS: { key: keyof Target; macro: MacroKey; label: string; unit: string; max: number }[] = [
+  { key: "calories", macro: "calories", label: "Calories", unit: "kcal", max: 20000 },
+  { key: "proteinG", macro: "protein", label: "Protein", unit: "g", max: 1500 },
+  { key: "carbsG", macro: "carbs", label: "Carbs", unit: "g", max: 3000 },
+  { key: "fatG", macro: "fat", label: "Fat", unit: "g", max: 1500 },
 ];
 
 function toDraft(t: Target | null): Record<keyof Target, string> {
@@ -83,12 +85,15 @@ export function StandingMacroTargetCard({
   // What the last save really did (days that still use their own target or a meal plan, and whether today changed).
   const [outcome, setOutcome] = useState<{ plan: ApplyPlan; target: Target } | null>(null);
 
-  const dirty = JSON.stringify(draft) !== JSON.stringify(toDraft(saved));
+  // The one blank of the four, worked out from the other three (lib/macro-autofill.ts); what is shown is what is saved.
+  const fill = macroAutofill({ calories: draft.calories, protein: draft.proteinG, carbs: draft.carbsG, fat: draft.fatG });
+  const filled = Object.fromEntries(FIELDS.map((f) => [f.key, autoFieldProps(f.macro, draft[f.key], fill).value])) as Record<keyof Target, string>;
+  const dirty = JSON.stringify(filled) !== JSON.stringify(toDraft(saved));
 
   function parse(): Target | string {
     const out: Target = { calories: null, proteinG: null, carbsG: null, fatG: null };
     for (const f of FIELDS) {
-      const raw = draft[f.key].trim();
+      const raw = filled[f.key].trim();
       if (raw === "") continue;
       const n = Number(raw);
       if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0 || n > f.max) {
@@ -184,30 +189,38 @@ export function StandingMacroTargetCard({
       </p>
 
       <div className="grid grid-cols-2 gap-3 mt-3">
-        {FIELDS.map((f) => (
-          <label key={f.key} className="block">
-            <span className="font-body text-xs text-steel">
-              {f.label} ({f.unit})
-            </span>
-            <input
-              type="number"
-              inputMode="numeric"
-              min={0}
-              max={f.max}
-              value={draft[f.key]}
-              onChange={(e) => {
-                setDraft((prev) => ({ ...prev, [f.key]: e.target.value }));
-                setError(null);
-                setMessage(null);
-              }}
-              className="mt-1 w-full h-11 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
-            />
-          </label>
-        ))}
+        {FIELDS.map((f) => {
+          const field = autoFieldProps(f.macro, draft[f.key], fill);
+          return (
+            <label key={f.key} className="block">
+              <span className="font-body text-xs text-steel">
+                {f.label} ({f.unit})
+                <WorkedOutTag show={field.auto} />
+              </span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={f.max}
+                value={field.value}
+                onFocus={field.onFocus}
+                onChange={(e) => {
+                  setDraft((prev) => ({ ...prev, [f.key]: e.target.value }));
+                  setError(null);
+                  setMessage(null);
+                }}
+                className={`mt-1 w-full h-11 bg-graphite border border-steel/30 px-3 font-body text-sm focus:outline-none focus:border-rust ${field.auto ? "text-steel italic" : "text-chalk"}`}
+              />
+            </label>
+          );
+        })}
+      </div>
+      <div className="mt-2">
+        <MacroMismatchLine fill={fill} />
       </div>
 
       <div className="mt-3">
-        <CalorieFloorWarning calories={draft.calories.trim() === "" ? null : Number(draft.calories)} floor={floorCalories} who={clientName} note={floorNote} />
+        <CalorieFloorWarning calories={filled.calories.trim() === "" ? null : Number(filled.calories)} floor={floorCalories} who={clientName} note={floorNote} />
       </div>
 
       <div className="flex flex-wrap items-center gap-3 mt-3">

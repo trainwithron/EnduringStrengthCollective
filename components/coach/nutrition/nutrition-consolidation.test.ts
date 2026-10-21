@@ -94,7 +94,8 @@ describe("the old pages send a coach to the new tabs, and leave the client's pag
 describe("the standing target editor warns under the floor while the coach types", () => {
   it("shows the soft floor warning from the draft number, and never blocks a save", () => {
     const standing = src("../desktop/standing-macro-target-card.tsx");
-    expect(standing).toContain("<CalorieFloorWarning calories={draft.calories.trim()");
+    // the number shown, including one worked out from protein, carbs and fat (lib/macro-autofill.ts)
+    expect(standing).toContain("<CalorieFloorWarning calories={filled.calories.trim()");
     expect(standing).not.toMatch(/floorCalories[^\n]*disabled/);
     expect(clientNutrition).toContain("floorCalories={floorCalories}");
   });

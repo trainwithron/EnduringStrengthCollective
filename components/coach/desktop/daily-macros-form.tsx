@@ -8,6 +8,8 @@ import { PROTEIN_G_PER_LB, estimateProteinFromBodyWeight, fillCarbsAndFat as com
 import { notifyPush } from "@/lib/push-notify";
 import { computeBmr, computeTdee, activityCategoryFromSteps, type BiologicalSex } from "@/lib/bmr-tdee";
 import type { MacroSuggestion } from "@/lib/nutrition-block-adjustment";
+import { macroAutofill, withAutofill } from "@/lib/macro-autofill";
+import { autoFieldProps, MacroMismatchLine, WorkedOutTag } from "@/components/coach/nutrition/macro-autofill-bits";
 
 // Goal-date-aware nutrition — feeds Smart Macro Fill its starting
 // calorie number from a real computed TDEE instead of a coach's manual
@@ -55,6 +57,9 @@ export function DailyMacrosForm({
   const [hasSavedEntry, setHasSavedEntry] = useState(initial.calories != null);
   const [suggestionDismissed, setSuggestionDismissed] = useState(false);
   const router = useRouter();
+  // The one blank of the four, worked out from the other three (lib/macro-autofill.ts); what is shown is what is saved.
+  const fill = macroAutofill({ calories, protein, carbs, fat });
+  const auto = { calories: autoFieldProps("calories", calories, fill), protein: autoFieldProps("protein", protein, fill), carbs: autoFieldProps("carbs", carbs, fill), fat: autoFieldProps("fat", fat, fill) };
 
   function applySuggestion() {
     if (!suggestion) return;
@@ -96,6 +101,7 @@ export function DailyMacrosForm({
   }
 
   async function handleSave() {
+    const filled = withAutofill({ calories, protein, carbs, fat }, fill);
     setSaving(true);
     setError(null);
     const supabase = createBrowserClient();
@@ -112,10 +118,10 @@ export function DailyMacrosForm({
         athlete_id: athleteId,
         group_id: groupId,
         log_date: date,
-        calories: calories ? Number(calories) : null,
-        protein_g: protein ? Number(protein) : null,
-        carbs_g: carbs ? Number(carbs) : null,
-        fat_g: fat ? Number(fat) : null,
+        calories: filled.calories ? Number(filled.calories) : null,
+        protein_g: filled.protein ? Number(filled.protein) : null,
+        carbs_g: filled.carbs ? Number(filled.carbs) : null,
+        fat_g: filled.fat ? Number(filled.fat) : null,
         created_by: user.id,
       },
       { onConflict: "athlete_id,log_date" }
@@ -192,13 +198,15 @@ export function DailyMacrosForm({
       <div>
         <label className="font-body text-xs text-steel uppercase tracking-wide">
           Calories
+          <WorkedOutTag show={auto.calories.auto} />
         </label>
         <input aria-label="Calories"
           type="number"
           min="0"
-          value={calories}
+          value={auto.calories.value}
+          onFocus={auto.calories.onFocus}
           onChange={(e) => setCalories(e.target.value)}
-          className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm mt-1 focus:outline-none focus:border-rust"
+          className={`w-full h-9 bg-graphite border border-steel/30 px-3 font-body text-sm mt-1 focus:outline-none focus:border-rust ${auto.calories.auto ? "text-steel italic" : "text-chalk"}`}
         />
       </div>
 
@@ -231,40 +239,48 @@ export function DailyMacrosForm({
         <div>
           <label className="font-body text-xs text-steel uppercase tracking-wide">
             Protein (g)
+            <WorkedOutTag show={auto.protein.auto} />
           </label>
           <input aria-label="Protein (g)"
             type="number"
             min="0"
-            value={protein}
+            value={auto.protein.value}
+            onFocus={auto.protein.onFocus}
             onChange={(e) => setProtein(e.target.value)}
-            className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm mt-1 focus:outline-none focus:border-rust"
+            className={`w-full h-9 bg-graphite border border-steel/30 px-3 font-body text-sm mt-1 focus:outline-none focus:border-rust ${auto.protein.auto ? "text-steel italic" : "text-chalk"}`}
           />
         </div>
         <div>
           <label className="font-body text-xs text-steel uppercase tracking-wide">
             Carbs (g)
+            <WorkedOutTag show={auto.carbs.auto} />
           </label>
           <input aria-label="Carbs (g)"
             type="number"
             min="0"
-            value={carbs}
+            value={auto.carbs.value}
+            onFocus={auto.carbs.onFocus}
             onChange={(e) => setCarbs(e.target.value)}
-            className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm mt-1 focus:outline-none focus:border-rust"
+            className={`w-full h-9 bg-graphite border border-steel/30 px-3 font-body text-sm mt-1 focus:outline-none focus:border-rust ${auto.carbs.auto ? "text-steel italic" : "text-chalk"}`}
           />
         </div>
         <div>
           <label className="font-body text-xs text-steel uppercase tracking-wide">
             Fat (g)
+            <WorkedOutTag show={auto.fat.auto} />
           </label>
           <input aria-label="Fat (g)"
             type="number"
             min="0"
-            value={fat}
+            value={auto.fat.value}
+            onFocus={auto.fat.onFocus}
             onChange={(e) => setFat(e.target.value)}
-            className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm mt-1 focus:outline-none focus:border-rust"
+            className={`w-full h-9 bg-graphite border border-steel/30 px-3 font-body text-sm mt-1 focus:outline-none focus:border-rust ${auto.fat.auto ? "text-steel italic" : "text-chalk"}`}
           />
         </div>
       </div>
+
+      <MacroMismatchLine fill={fill} />
 
       <div className="flex gap-2">
         <button

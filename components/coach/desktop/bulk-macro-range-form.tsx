@@ -3,6 +3,8 @@
 import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { macroAutofill, withAutofill } from "@/lib/macro-autofill";
+import { autoFieldProps, MacroMismatchLine, WorkedOutTag } from "@/components/coach/nutrition/macro-autofill-bits";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { PROTEIN_G_PER_LB, estimateProteinFromBodyWeight, fillCarbsAndFat } from "@/lib/macros";
 import { enumerateDateKeys } from "@/lib/date-range";
@@ -38,8 +40,13 @@ export function BulkMacroRangeForm({
   const [appliedCount, setAppliedCount] = useState<number | null>(null);
   const router = useRouter();
 
+  // The one blank of the four, worked out from the other three (lib/macro-autofill.ts); what is shown is what is saved.
+  const fill = macroAutofill({ calories, protein, carbs, fat });
+  const filled = withAutofill({ calories, protein, carbs, fat }, fill);
+  const auto = { calories: autoFieldProps("calories", calories, fill), protein: autoFieldProps("protein", protein, fill), carbs: autoFieldProps("carbs", carbs, fill), fat: autoFieldProps("fat", fat, fill) };
+
   const dateKeys = startDate && endDate ? enumerateDateKeys(startDate, endDate, MAX_RANGE_DAYS) : [];
-  const canApply = dateKeys.length > 0 && calories.trim() !== "" && !applying;
+  const canApply = dateKeys.length > 0 && filled.calories.trim() !== "" && !applying;
 
   function handleBodyWeightChange(value: string) {
     setBodyWeight(value);
@@ -83,10 +90,10 @@ export function BulkMacroRangeForm({
       athlete_id: athleteId,
       group_id: groupId,
       log_date: logDate,
-      calories: calories ? Number(calories) : null,
-      protein_g: protein ? Number(protein) : null,
-      carbs_g: carbs ? Number(carbs) : null,
-      fat_g: fat ? Number(fat) : null,
+      calories: filled.calories ? Number(filled.calories) : null,
+      protein_g: filled.protein ? Number(filled.protein) : null,
+      carbs_g: filled.carbs ? Number(filled.carbs) : null,
+      fat_g: filled.fat ? Number(filled.fat) : null,
       created_by: user.id,
     }));
 
@@ -145,13 +152,17 @@ export function BulkMacroRangeForm({
 
       <div className="space-y-2">
         <label className="flex flex-col gap-1">
-          <span className="font-body text-xs text-steel uppercase tracking-wide">Calories</span>
+          <span className="font-body text-xs text-steel uppercase tracking-wide">
+            Calories
+            <WorkedOutTag show={auto.calories.auto} />
+          </span>
           <input
             type="number"
             min="0"
-            value={calories}
+            value={auto.calories.value}
+            onFocus={auto.calories.onFocus}
             onChange={(e) => setCalories(e.target.value)}
-            className="h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust"
+            className={`h-9 bg-graphite border border-steel/30 px-2 font-body text-sm focus:outline-none focus:border-rust ${auto.calories.auto ? "text-steel italic" : "text-chalk"}`}
           />
         </label>
         <label className="flex flex-col gap-1">
@@ -168,36 +179,49 @@ export function BulkMacroRangeForm({
         </label>
         <div className="grid grid-cols-3 gap-2">
           <label className="flex flex-col gap-1">
-            <span className="font-body text-xs text-steel uppercase tracking-wide">Protein (g)</span>
+            <span className="font-body text-xs text-steel uppercase tracking-wide">
+              Protein (g)
+              <WorkedOutTag show={auto.protein.auto} />
+            </span>
             <input
               type="number"
               min="0"
-              value={protein}
+              value={auto.protein.value}
+              onFocus={auto.protein.onFocus}
               onChange={(e) => setProtein(e.target.value)}
-              className="h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust"
+              className={`h-9 bg-graphite border border-steel/30 px-2 font-body text-sm focus:outline-none focus:border-rust ${auto.protein.auto ? "text-steel italic" : "text-chalk"}`}
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="font-body text-xs text-steel uppercase tracking-wide">Carbs (g)</span>
+            <span className="font-body text-xs text-steel uppercase tracking-wide">
+              Carbs (g)
+              <WorkedOutTag show={auto.carbs.auto} />
+            </span>
             <input
               type="number"
               min="0"
-              value={carbs}
+              value={auto.carbs.value}
+              onFocus={auto.carbs.onFocus}
               onChange={(e) => setCarbs(e.target.value)}
-              className="h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust"
+              className={`h-9 bg-graphite border border-steel/30 px-2 font-body text-sm focus:outline-none focus:border-rust ${auto.carbs.auto ? "text-steel italic" : "text-chalk"}`}
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="font-body text-xs text-steel uppercase tracking-wide">Fat (g)</span>
+            <span className="font-body text-xs text-steel uppercase tracking-wide">
+              Fat (g)
+              <WorkedOutTag show={auto.fat.auto} />
+            </span>
             <input
               type="number"
               min="0"
-              value={fat}
+              value={auto.fat.value}
+              onFocus={auto.fat.onFocus}
               onChange={(e) => setFat(e.target.value)}
-              className="h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust"
+              className={`h-9 bg-graphite border border-steel/30 px-2 font-body text-sm focus:outline-none focus:border-rust ${auto.fat.auto ? "text-steel italic" : "text-chalk"}`}
             />
           </label>
         </div>
+        <MacroMismatchLine fill={fill} />
 
         <div className="flex gap-2">
           <button
