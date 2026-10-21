@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { isPhoneView, isTabletUA, phoneCoachRedirect } from "./phone-coach-routes";
+import { isPhoneView, isStaleMobileOverride, isTabletUA, phoneCoachRedirect } from "./phone-coach-routes";
 
 // Ron, Oct 19: "tab should be able to switch between both". A tablet opens the phone app like a phone, and only a tablet is offered the switch.
 const read = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
@@ -29,9 +29,13 @@ describe("what is a tablet", () => {
 
 describe("the switch is the existing view choice", () => {
   it("a tablet opens the phone app by default, and the computer layout once chosen", () => {
-    expect(isPhoneView({ override: null, standalone: null, userAgent: GALAXY_TAB })).toBe(true);
-    expect(isPhoneView({ override: "desktop", standalone: null, userAgent: GALAXY_TAB })).toBe(false);
-    expect(isPhoneView({ override: "mobile", standalone: null, userAgent: GALAXY_TAB })).toBe(true);
+    expect(isPhoneView({ override: null, userAgent: GALAXY_TAB })).toBe(true);
+    expect(isPhoneView({ override: "desktop", userAgent: GALAXY_TAB })).toBe(false);
+    expect(isPhoneView({ override: "mobile", userAgent: GALAXY_TAB })).toBe(true);
+    // the choice sticks: a tablet's (and iPadOS's, which reports a Mac) is never cleared as stale
+    expect(isStaleMobileOverride({ override: "mobile", userAgent: GALAXY_TAB })).toBe(false);
+    expect(isStaleMobileOverride({ override: "mobile", userAgent: IPAD })).toBe(false);
+    expect(isStaleMobileOverride({ override: "mobile", userAgent: IPADOS_AS_MAC })).toBe(false);
   });
   it("in the computer layout a tablet is never sent to a phone page (the middleware asks isPhoneView, which the choice wins)", () => {
     const mw = read("lib/supabase/middleware.ts");

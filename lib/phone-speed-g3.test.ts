@@ -28,12 +28,12 @@ describe("B7: straight into the coach's own app (openOwnSpaceRedirect)", () => {
     db.seat = { role: "coach" };
     db.throws = false;
   });
-  it("opens the personal space with the three act-as-yourself cookies, in one response", async () => {
+  it("opens the personal space with the two act-as-yourself cookies, in one response (no layout cookie: the device decides, Oct 21)", async () => {
     const res = await openOwnSpaceRedirect({ id: "u1" }, url, new URLSearchParams({ view: "client", to: "calendar", month: "2026-10", spot: "1" }));
     expect(res!.status).toBe(307);
     expect(new URL(res!.headers.get("location")!).pathname + new URL(res!.headers.get("location")!).search).toBe("/groups/space-1/calendar?month=2026-10&spot=1");
     const cookies = res!.headers.getSetCookie().map((c) => c.split("=")[0]);
-    expect(cookies).toHaveLength(3);
+    expect(cookies).toEqual(["acting_as_athlete", "acting_as_self"]);
   });
   it("no seat in the space: My training sorts it out", async () => {
     db.seat = null;

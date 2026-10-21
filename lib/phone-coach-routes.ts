@@ -2,11 +2,25 @@
 // any other coach page opened there (an old link, a bookmark, a notice) goes to the closest of those places instead of showing the computer page squeezed onto a phone. Plain functions,
 // no Next imports, so the middleware, the pages and the tests all use the same rule.
 
-/** Whether this request should get the phone app: the coach's own saved choice wins, else the installed app or a phone or tablet browser. The one rule (lib/pwa-server.ts uses it too). */
-export function isPhoneView({ override, standalone, userAgent }: { override: string | null | undefined; standalone: string | null | undefined; userAgent: string | null | undefined }): boolean {
+/** Whether this request should get the phone app: the coach's own saved choice wins, else a phone or tablet. The one rule (lib/pwa-server.ts uses it too). */
+// The installed app does not decide it by itself (Ron, Oct 21: "when I clicked home on my desktop app, it took me to my mobile homepage"): the app installed on a computer is a computer. On a phone
+// or tablet the user agent already says so, installed or not.
+export function isPhoneView({ override, userAgent }: { override: string | null | undefined; userAgent: string | null | undefined }): boolean {
   if (override === "desktop") return false;
   if (override === "mobile") return true;
-  return standalone === "1" || /android|iphone|ipad|ipod|mobile/i.test(userAgent ?? "");
+  return isPhoneOrTabletUA(userAgent);
+}
+
+export function isPhoneOrTabletUA(userAgent: string | null | undefined): boolean {
+  return /android|iphone|ipad|ipod|mobile/i.test(userAgent ?? "");
+}
+
+/**
+ * A "phone layout" choice left on a computer: opening My training used to set it for 12 hours (until Oct 21), which kept a computer in the phone app. Only a tablet sets it on purpose (the tablet
+ * switch), so on a Windows, Linux or ChromeOS computer it is cleared. A Mac is left alone: iPadOS reports itself as a Mac, and its switch is deliberate (the old 12-hour cookie runs out by itself).
+ */
+export function isStaleMobileOverride({ override, userAgent }: { override: string | null | undefined; userAgent: string | null | undefined }): boolean {
+  return override === "mobile" && !isPhoneOrTabletUA(userAgent) && !/Macintosh/i.test(userAgent ?? "");
 }
 
 // Release 2 (the phone opens as the coach's own account): the coach Home and the business pages open the coach's OWN app with Spotlight open (that is where clients, messages and the business

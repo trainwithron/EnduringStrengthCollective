@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
-import { isPhoneView, phoneCoachRedirect } from "./phone-coach-routes";
+import { isPhoneView, isStaleMobileOverride, phoneCoachRedirect } from "./phone-coach-routes";
 import { teamPhoneHome } from "./team-phone-home";
 
 // One real phone app for coaches (Ron, Oct 19: today's phone app is "the full desktop version with a cutesy view-desktop button"). A short fixed list of places; any other coach page opened on a phone
@@ -136,15 +136,46 @@ describe("isPhoneView: one rule", () => {
   const iphone = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148";
   const android = "Mozilla/5.0 (Linux; Android 15; SM-S938U) AppleWebKit/537.36 Chrome/130.0 Mobile Safari/537.36";
   const desktop = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0 Safari/537.36";
-  it("a phone, or the installed app, is the phone app; a computer is not", () => {
-    expect(isPhoneView({ override: null, standalone: null, userAgent: iphone })).toBe(true);
-    expect(isPhoneView({ override: null, standalone: null, userAgent: android })).toBe(true);
-    expect(isPhoneView({ override: null, standalone: null, userAgent: desktop })).toBe(false);
-    expect(isPhoneView({ override: null, standalone: "1", userAgent: desktop })).toBe(true);
+  it("a phone is the phone app, installed or not; a computer is not, installed or not (Oct 21: the app installed on a computer opened the phone Home)", () => {
+    expect(isPhoneView({ override: null, userAgent: iphone })).toBe(true);
+    expect(isPhoneView({ override: null, userAgent: android })).toBe(true);
+    expect(isPhoneView({ override: null, userAgent: desktop })).toBe(false);
+    // the installed app no longer counts by itself: no caller passes it
+    for (const f of ["lib/supabase/middleware.ts", "lib/pwa-server.ts", "components/athlete/acting-as-banner.tsx"]) expect(read(f), f).not.toMatch(/isPhoneView\(\{[^}]*standalone/);
+    for (const f of ["app/login/page.tsx", "app/confirm-email/page.tsx"]) {
+      expect(read(f), f).toContain("startPath(membership, isMobileUserAgent())");
+      expect(read(f), f).not.toContain("isStandaloneDisplay");
+    }
   });
   it("a saved choice wins both ways", () => {
-    expect(isPhoneView({ override: "desktop", standalone: "1", userAgent: iphone })).toBe(false);
-    expect(isPhoneView({ override: "mobile", standalone: null, userAgent: desktop })).toBe(true);
+    expect(isPhoneView({ override: "desktop", userAgent: iphone })).toBe(false);
+    expect(isPhoneView({ override: "mobile", userAgent: desktop })).toBe(true);
+  });
+  it("a phone-layout choice left on a Windows/Linux computer is stale; a phone's, a tablet's or a Mac's (iPadOS reports a Mac) is not", () => {
+    const linux = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/130.0 Safari/537.36";
+    const mac = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/17.0 Safari/605.1.15";
+    const tab = "Mozilla/5.0 (Linux; Android 14; SM-X520) AppleWebKit/537.36 Chrome/130.0 Safari/537.36";
+    expect(isStaleMobileOverride({ override: "mobile", userAgent: desktop })).toBe(true);
+    expect(isStaleMobileOverride({ override: "mobile", userAgent: linux })).toBe(true);
+    for (const ua of [iphone, android, tab, mac]) expect(isStaleMobileOverride({ override: "mobile", userAgent: ua }), ua).toBe(false);
+    expect(isStaleMobileOverride({ override: "desktop", userAgent: desktop })).toBe(false);
+    expect(isStaleMobileOverride({ override: null, userAgent: desktop })).toBe(false);
+  });
+  it("the middleware clears it for the request too, before the phone redirect, so /dashboard on the computer is the computer Home", () => {
+    const mw = read("lib/supabase/middleware.ts");
+    const clear = mw.indexOf('if (isStaleMobileOverride({ override: request.cookies.get(VIEW_OVERRIDE_COOKIE)?.value, userAgent: request.headers.get("user-agent") })) {');
+    expect(clear).toBeGreaterThan(0);
+    expect(clear).toBeLessThan(mw.indexOf("One real phone app for coaches"));
+    const block = mw.slice(clear, mw.indexOf("One real phone app for coaches"));
+    expect(block).toContain("request.cookies.delete(VIEW_OVERRIDE_COOKIE);");
+    expect(block).toContain('response.cookies.set(VIEW_OVERRIDE_COOKIE, "", { path: "/", maxAge: 0 });');
+    // with it cleared, a computer at /dashboard is not a phone, so it is not sent on
+    expect(isPhoneView({ override: undefined, userAgent: desktop })).toBe(false);
+    expect(phoneCoachRedirect("/dashboard")).not.toBeNull();
+  });
+  it("opening My training no longer sets the layout, and leaving it no longer clears a chosen one", () => {
+    expect(read("lib/my-training-cookies.ts")).not.toContain("VIEW_OVERRIDE_COOKIE");
+    expect(read("lib/my-training-exit.ts")).not.toContain("coach_view_override");
   });
   it("the pages use the same rule as the middleware", () => {
     const pwa = read("lib/pwa-server.ts");

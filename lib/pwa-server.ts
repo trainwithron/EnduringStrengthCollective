@@ -38,15 +38,14 @@ export async function getViewOverride(): Promise<ViewOverride> {
 // is never gated on device — a coach on a tablet who wants the full
 // desktop shell for planning, or the client-facing shell while standing
 // with a client, gets exactly that regardless of viewport. With no
-// override, falls back to auto-detect: true once they're either on a
-// phone at all, or have installed the app. A coach at an actual
+// override, falls back to auto-detect: true on a phone or tablet (the
+// installed app on a computer is a computer, Oct 21). A coach at an actual
 // desktop/laptop with no override always gets the full shell.
 // The rule itself is lib/phone-coach-routes.ts isPhoneView, the same one the middleware uses to send a phone to the phone app's places.
 export async function prefersAthleteStyleView(): Promise<boolean> {
   const [cookieStore, headerStore] = await Promise.all([cookies(), headers()]);
   return isPhoneView({
     override: cookieStore.get(VIEW_OVERRIDE_COOKIE)?.value,
-    standalone: cookieStore.get(PWA_STANDALONE_COOKIE)?.value,
     userAgent: headerStore.get("user-agent"),
   });
 }

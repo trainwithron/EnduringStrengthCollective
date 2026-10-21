@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { LegalLinks } from "@/components/legal/legal-links";
 import { friendlySignInError } from "@/lib/sign-in-errors";
-import { isStandaloneDisplay, isMobileUserAgent } from "@/lib/pwa";
+import { isMobileUserAgent } from "@/lib/pwa";
 import { loadStartInputs, parseLastGroupCookie, pickStartGroup, startPath } from "@/lib/start-group";
 import { FRONT_DESK_PATH, landsOnFrontDesk } from "@/lib/front-desk";
 
@@ -92,8 +92,8 @@ function LoginForm() {
       return;
     }
 
-    // A coach on a phone lands on their own client profile (startPath); at a computer, on the desktop Home.
-    router.push(startPath(membership, isStandaloneDisplay() || isMobileUserAgent()));
+    // A coach on a phone or tablet lands on their own client profile (startPath); at a computer, on the desktop Home (the app installed on a computer too, Oct 21).
+    router.push(startPath(membership, isMobileUserAgent()));
     router.refresh();
   }
 

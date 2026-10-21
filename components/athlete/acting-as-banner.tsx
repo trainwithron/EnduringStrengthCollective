@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import { ViewAsClientPicker } from "./view-as-client-picker";
-import { PWA_STANDALONE_COOKIE, VIEW_OVERRIDE_COOKIE, writeViewOverride } from "@/lib/pwa";
+import { VIEW_OVERRIDE_COOKIE, writeViewOverride } from "@/lib/pwa";
 import { readBrowserCookie } from "@/lib/active-org";
 import { isPhoneView } from "@/lib/phone-coach-routes";
 import { COACH_PHONE_LANDING } from "@/lib/start-group";
@@ -29,7 +29,7 @@ export function ActingAsBanner({ athleteFullName, groupId, isSelf = false }: { a
     } catch {
       // the bar then names the person, which is also correct
     }
-    setPhone(isPhoneView({ override: readBrowserCookie(VIEW_OVERRIDE_COOKIE), standalone: readBrowserCookie(PWA_STANDALONE_COOKIE), userAgent: navigator.userAgent }));
+    setPhone(isPhoneView({ override: readBrowserCookie(VIEW_OVERRIDE_COOKIE), userAgent: navigator.userAgent }));
   }, []);
 
   async function exit() {

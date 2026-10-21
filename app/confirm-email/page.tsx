@@ -8,7 +8,7 @@ import { establishSessionFromLink } from "@/lib/auth-link-client";
 import { LinkConflictNotice } from "@/components/auth/link-conflict-notice";
 import { loadStartInputs, pickStartGroup, startPath } from "@/lib/start-group";
 import { FRONT_DESK_PATH, landsOnFrontDesk } from "@/lib/front-desk";
-import { isStandaloneDisplay, isMobileUserAgent } from "@/lib/pwa";
+import { isMobileUserAgent } from "@/lib/pwa";
 import { SigningInNotice } from "@/components/auth/signing-in-notice";
 
 export default function ConfirmEmailPage() {
@@ -52,9 +52,9 @@ function ConfirmEmailStatus() {
         return;
       }
       setHasSession(true);
-      // Home, not a settings page: the desktop Home for a coach at a computer, the phone Home for a phone or the installed app.
+      // Home, not a settings page: the desktop Home for a coach at a computer, the phone Home for a phone or tablet (the app installed on a computer is a computer, Oct 21).
       const membership = pickStartGroup(await loadStartInputs(supabase, user.id));
-      router.push((await landsOnFrontDesk(supabase, user.id, membership)) ? FRONT_DESK_PATH : startPath(membership, isStandaloneDisplay() || isMobileUserAgent()));
+      router.push((await landsOnFrontDesk(supabase, user.id, membership)) ? FRONT_DESK_PATH : startPath(membership, isMobileUserAgent()));
       router.refresh();
     });
   }, [router]);
