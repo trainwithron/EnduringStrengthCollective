@@ -25,17 +25,21 @@ describe("one ClientNutrition, used by the hub and by the profile", () => {
       expect(page).not.toContain("<PhaseOfRecordCard");
     }
   });
-  it("the component holds Targets, Preferences, Meal plan and What they ate, with the calculator inside Meal plan", () => {
-    for (const id of ['id="targets"', 'id="preferences"', 'id="meal-plan"', 'id="what-they-ate"']) {
-      expect(clientNutrition).toContain(id);
-    }
+  it("the component holds, in the order a coach checks them (Oct 21): this week at a glance, Targets with the calculator inside, the weekly check-in, the meal plan, their answers", () => {
+    const ids = ['id="at-a-glance"', 'id="targets"', 'id="check-in"', 'id="meal-plan"', 'id="answers"'];
+    const at = ids.map((id) => clientNutrition.indexOf(id));
+    for (const [i, id] of ids.entries()) expect(at[i], id).toBeGreaterThan(0);
+    expect([...at].sort((a, b) => a - b)).toEqual(at);
+    expect(clientNutrition).toContain("<NutritionGlance");
     expect(clientNutrition).toContain("<NutritionTools");
     expect(clientNutrition).toContain("<StandingMacroTargetCard");
     expect(clientNutrition).toContain("<NutritionCheckinSuggestionsList");
     expect(clientNutrition).toContain("<WeeklyCheckinPanel");
     expect(clientNutrition).toContain("<PhaseOfRecordCard");
-    expect(clientNutrition).toContain("<WhatTheyAte");
-    expect(clientNutrition).toContain("#macro-calculator");
+    // the calculator lives in the standing target card only, and the old list of the week is gone
+    expect(clientNutrition).not.toContain("<WhatTheyAte");
+    expect(clientNutrition).not.toContain("#macro-calculator");
+    expect(clientNutrition).not.toContain('id="preferences"');
   });
   it("works out the day in the coach's own zone and the adherence count from real dates, not from the server's UTC day", () => {
     expect(clientNutrition).toContain("dateKeyInZone(timezone)");

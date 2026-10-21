@@ -148,7 +148,7 @@ describe("where it sits", () => {
   it("each logged food shows its own vitamins and minerals on its row", () => {
     expect(src("../athlete/food-log-entries.tsx")).toContain("<FoodNutrientPanel nutrients={entry.nutrients} />");
   });
-  it("the old standalone Vitamins and minerals section and the coach's Nutrients section are gone; the coach sees the same list inside What they ate", () => {
+  it("the old standalone Vitamins and minerals section and the coach's Nutrients section are gone; the coach sees the day's key nutrients as bars under the day they tap (Oct 21)", () => {
     const page = src("../../app/(coach)/groups/[groupId]/nutrition/page.tsx");
     expect(page).not.toContain("NutrientsSection");
     expect(page).not.toContain("<h2 className=\"font-display uppercase text-sm tracking-wide text-steel mb-2\">Vitamins and minerals</h2>");
@@ -157,9 +157,9 @@ describe("where it sits", () => {
     expect(coach).not.toContain("NutrientsSection");
     expect(coach).not.toContain('id="nutrients"');
     expect(coach).not.toContain('href="#nutrients"');
-    expect(coach).toContain("<CoachLogNutrients");
-    expect(coach.indexOf("<CoachLogNutrients")).toBeGreaterThan(coach.indexOf('id="what-they-ate"'));
-    expect(coach.indexOf("<CoachLogNutrients")).toBeLessThan(coach.indexOf('id="macro-calculator"') > 0 ? coach.indexOf('id="macro-calculator"') : coach.length);
+    expect(coach).not.toContain("<CoachLogNutrients");
+    expect(coach).toContain("nutrientsByDay[d.dateKey] = dayNutrientBars(entries, d.dateKey, age, sex);");
+    expect(src("../coach/nutrition/nutrition-glance.tsx")).toContain("<NutrientBars bars={nutrientsByDay[selected.dateKey] ?? []} logged={selected.logged} />");
   });
   it("the nutrient's own page and the panel over the log share one body", () => {
     expect(src("../../app/(coach)/groups/[groupId]/nutrition/nutrients/[key]/page.tsx")).toContain("<NutrientDetailView facts={facts} />");

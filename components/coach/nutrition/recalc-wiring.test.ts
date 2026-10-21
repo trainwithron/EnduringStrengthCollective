@@ -69,8 +69,9 @@ describe("the coach's panel", () => {
   it("sits at the top of the Preferences section and reads the client's answers", () => {
     expect(clientNutrition).toContain("<ClientAnswersPanel");
     expect(clientNutrition).toContain('.from("client_nutrition_feedback")');
-    expect(clientNutrition.indexOf("<ClientAnswersPanel")).toBeGreaterThan(clientNutrition.indexOf('title="Preferences"'));
-    expect(clientNutrition.indexOf("<ClientAnswersPanel")).toBeLessThan(clientNutrition.indexOf("<PreferencesSection"));
+    // the client's answers section (Oct 21), above their food answers
+    expect(clientNutrition.indexOf("<ClientAnswersPanel")).toBeGreaterThan(clientNutrition.indexOf('id="answers"'));
+    expect(clientNutrition.indexOf("<ClientAnswersPanel")).toBeLessThan(clientNutrition.indexOf("<ClientAnswersSection"));
   });
 });
 

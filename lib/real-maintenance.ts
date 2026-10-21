@@ -82,3 +82,11 @@ export function maintenanceSentence(r: Extract<MaintenanceResult, { ready: true 
   const what = r.flat ? "your weight held steady" : r.weeklyChangeLb < 0 ? `lost ${change} lb a week` : `gained ${change} lb a week`;
   return `You ate about ${n(r.avgIntake)} a day and ${what}, so you burn about ${n(r.maintenance)}.`;
 }
+
+// The coach's side: "Johann ate about 2,450 a day and lost 0.6 lb a week, so they burn about 2,750."
+export function maintenanceSentenceFor(r: Extract<MaintenanceResult, { ready: true }>, name: string): string {
+  const n = (x: number) => x.toLocaleString("en-US");
+  const change = Math.abs(r.weeklyChangeLb);
+  const what = r.flat ? "their weight held steady" : r.weeklyChangeLb < 0 ? `lost ${change} lb a week` : `gained ${change} lb a week`;
+  return `${name} ate about ${n(r.avgIntake)} a day and ${what}, so they burn about ${n(r.maintenance)}.`;
+}

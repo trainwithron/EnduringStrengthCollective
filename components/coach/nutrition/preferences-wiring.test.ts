@@ -16,8 +16,9 @@ const coachSection = src("./preferences-section.tsx");
 
 // Phase 3: food preferences and allergy safety, wired through every place a meal option can be made or shown.
 describe("the coach side", () => {
-  it("Preferences is a real section (not a placeholder), fed from the client's own row", () => {
-    expect(clientNutrition).toContain("<PreferencesSection");
+  it("Preferences is a real section (not a placeholder), fed from the client's own row: read-only answers with Edit (Oct 21)", () => {
+    expect(clientNutrition).toContain("<ClientAnswersSection");
+    expect(src("./client-answers-section.tsx")).toContain("<PreferencesSection");
     expect(clientNutrition).not.toContain("are coming here next");
     expect(clientNutrition).toContain('from("client_nutrition_preferences").select("*").eq("athlete_id", athleteId)');
   });

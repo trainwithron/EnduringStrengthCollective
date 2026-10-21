@@ -12,6 +12,9 @@ import { CalorieFloorWarning } from "@/components/coach/nutrition/calorie-floor-
 import { ApplyOutcomeNotice } from "@/components/coach/nutrition/apply-outcome-notice";
 import { macroAutofill, type MacroKey } from "@/lib/macro-autofill";
 import { autoFieldProps, MacroMismatchLine, WorkedOutTag } from "@/components/coach/nutrition/macro-autofill-bits";
+import { MacroCalculator, type CalculatedMacros } from "@/components/tools/macro-calculator";
+import type { MacroGoal, ActivityLevel } from "@/lib/macros";
+import type { WeightUnit } from "@/lib/units";
 
 interface Target {
   calories: number | null;
@@ -56,6 +59,7 @@ export function StandingMacroTargetCard({
   todayKey,
   scheduled = [],
   setByClient = false,
+  calculator = null,
 }: {
   athleteId: string;
   groupId: string;
@@ -75,6 +79,8 @@ export function StandingMacroTargetCard({
   scheduled?: { date: string; calories: number | null }[];
   // The target in force is one the client set themselves (Set my targets, 0429). Saving here makes it the coach's.
   setByClient?: boolean;
+  // Ron, Oct 21: "the macro calculator should be tied into the standing target ... small at the top of that ... expandable". Its numbers fill the fields below (nothing is saved until Save).
+  calculator?: { initialWeight: number | null; initialGoal: MacroGoal | null; weightUnit: WeightUnit; initialActivity: ActivityLevel | null } | null;
 }) {
   const router = useRouter();
   const [saved, setSaved] = useState<Target | null>(initial);
@@ -84,6 +90,14 @@ export function StandingMacroTargetCard({
   const [error, setError] = useState<string | null>(null);
   // What the last save really did (days that still use their own target or a meal plan, and whether today changed).
   const [outcome, setOutcome] = useState<{ plan: ApplyPlan; target: Target } | null>(null);
+  const [calcOpen, setCalcOpen] = useState(false);
+
+  function applyCalculated(m: CalculatedMacros) {
+    setDraft({ calories: String(m.calories), proteinG: String(m.protein), carbsG: String(m.carbs), fatG: String(m.fats) });
+    setCalcOpen(false);
+    setError(null);
+    setMessage("Filled in from the calculator. Look it over, then save.");
+  }
 
   // The one blank of the four, worked out from the other three (lib/macro-autofill.ts); what is shown is what is saved.
   const fill = macroAutofill({ calories: draft.calories, protein: draft.proteinG, carbs: draft.carbsG, fat: draft.fatG });
@@ -180,13 +194,34 @@ export function StandingMacroTargetCard({
   return (
     <div className="border border-steel/20 bg-surface/40 p-4 mb-5">
       <div className="flex items-baseline justify-between gap-3">
-        <h3 className="font-display uppercase text-sm tracking-wide">Standing target</h3>
+        <h3 className="font-display uppercase text-sm tracking-wide">Set the standing target</h3>
         <span className="font-body text-xs text-steel">{saved ? (setByClient ? `Set by ${clientName} themselves` : "Active") : "Not set"}</span>
       </div>
       <p className="font-body text-xs text-steel mt-1 max-w-[56ch]">
         Applies every day unless you set a different one for a date. A meal plan on a day shows its own meals, but
         a target you set for that day wins.
       </p>
+
+      {calculator && (
+        <div className="mt-3 border border-steel/20" data-target-calculator>
+          <button type="button" onClick={() => setCalcOpen((v) => !v)} aria-expanded={calcOpen} className="w-full flex items-center justify-between gap-3 h-11 px-3 text-left">
+            <span className="font-body text-sm text-chalk">Work it out with the calculator</span>
+            <span className="font-body text-xs text-steel">{calcOpen ? "▾" : "▸"}</span>
+          </button>
+          {calcOpen && (
+            <div className="px-3 pb-3 pt-3 border-t border-steel/15">
+              <MacroCalculator
+                onUseMacros={applyCalculated}
+                initialWeight={calculator.initialWeight}
+                initialGoal={calculator.initialGoal}
+                weightUnit={calculator.weightUnit}
+                initialActivity={calculator.initialActivity}
+                useLabel="Use these numbers ↓"
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 mt-3">
         {FIELDS.map((f) => {

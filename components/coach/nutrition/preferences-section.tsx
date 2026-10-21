@@ -16,6 +16,7 @@ export function PreferencesSection({
   updatedAtLabel,
   clientName,
   checkinRestrictions,
+  neverSaved = false,
 }: {
   athleteId: string;
   initial: NutritionPreferences;
@@ -25,6 +26,8 @@ export function PreferencesSection({
   clientName: string;
   // Restrictions typed into the client's last check-in, shown as a banner while the client has no food rules.
   checkinRestrictions?: string | null;
+  // Nothing saved yet (allergies never answered): Save is on with nothing changed, so a coach can record "none".
+  neverSaved?: boolean;
 }) {
   const router = useRouter();
   const [prefs, setPrefs] = useState(initial);
@@ -32,7 +35,8 @@ export function PreferencesSection({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const dirty = JSON.stringify(prefs) !== JSON.stringify(saved);
+  const [recorded, setRecorded] = useState(false);
+  const dirty = JSON.stringify(prefs) !== JSON.stringify(saved) || (neverSaved && !recorded);
 
   async function save() {
     setError(null);
@@ -57,6 +61,7 @@ export function PreferencesSection({
       return;
     }
     setSaved(prefs);
+    setRecorded(true);
     setMessage("Saved. New plans use this; plans already assigned are checked against it and flagged below if they conflict.");
     router.refresh();
   }

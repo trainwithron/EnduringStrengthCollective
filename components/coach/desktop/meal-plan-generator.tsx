@@ -11,12 +11,10 @@ import {
   matchFlexTreat,
   detectDietArchetype,
   QUICK_SWAP_NOTES,
-  type Phase,
   type MacroTargets,
   type GeneratedMeal,
   type MealOption,
 } from "@/lib/meal-engine";
-import { runCheckInEngine } from "@/lib/nutrition-checkin";
 import { computeArchetypeMacros, detectDietArchetype as detectMacroArchetype } from "@/lib/macros";
 import { filterOptionsByRules } from "@/lib/plan-preference-check";
 import type { FoodRules } from "@/lib/allergen-check";
@@ -38,7 +36,6 @@ import {
   type MealPlanRow,
   type MealRecipeChoice,
 } from "@/lib/meal-plan-assignment";
-import type { WeeklyWeightTrend } from "@/lib/weight-trend";
 import { RecipeVoteFavorite } from "./recipe-vote-favorite";
 import { AiOutputWrongButton } from "@/components/coach/ai-output-wrong-button";
 import { AiUsageMeter } from "@/components/coach/ai-usage-meter";
@@ -58,15 +55,13 @@ interface SavedPlanShape {
   meals: Record<string, unknown>;
 }
 
-export interface ImportedMacros {
-  calories: number;
-  protein: number;
-  carbs: number;
-  fats: number;
-  // A change in this value (not the numbers themselves — the coach may
-  // re-import the exact same macros twice in a row) is what re-triggers
-  // the import effect below.
-  key: number;
+// The target a plan is built from: the client's standing target (Ron, Oct 21: the planner's own check-in step was "a direct repeat of weekly check-in ... that should be condensed down").
+// Protein, carbs and fat are used as set; with calories only, they are split from the client's weight and diet the way the check-in splits them.
+export interface PlanTarget {
+  calories: number | null;
+  protein: number | null;
+  carbs: number | null;
+  fats: number | null;
 }
 
 export function MealPlanGenerator({
@@ -74,17 +69,9 @@ export function MealPlanGenerator({
   groupId,
   date,
   latestBodyWeight,
-  weightTrend,
   existingPlan,
-  importedMacros,
-  defaultAdherenceDays,
-  defaultRecoveryRating,
+  target,
   defaultDietaryRestrictions,
-  isInjured,
-  maintenanceCalories,
-  injurySurplusPct,
-  initialConsecutiveSurplusSpikes,
-  initialPhase,
   proteinGPerLb,
   foodRules,
   rulesReadable: rulesReadableProp = true,
@@ -95,26 +82,9 @@ export function MealPlanGenerator({
   groupId: string;
   date: string;
   latestBodyWeight: number | null;
-  weightTrend?: WeeklyWeightTrend | null;
   existingPlan: SavedPlanShape | null;
-  importedMacros?: ImportedMacros | null;
-  // Real data, computed the same way WeeklyCheckinPanel's own identical
-  // props are (defaultRecoveryRating from wellness_checkins,
-  // defaultAdherenceDays from food_log_entries, isInjured/maintenanceCalories/
-  // injurySurplusPct from athlete_injury_status) — all optional so a
-  // caller that doesn't pass them yet sees the same manual-entry
-  // defaults this form already had.
-  defaultAdherenceDays?: number | null;
-  defaultRecoveryRating?: number | null;
+  target: PlanTarget | null;
   defaultDietaryRestrictions?: string | null;
-  isInjured?: boolean;
-  maintenanceCalories?: number | null;
-  injurySurplusPct?: number;
-  initialConsecutiveSurplusSpikes?: number;
-  // This client's real tagged phase (mapped via milestoneTagToNutritionPhase),
-  // when one is in view — falls back to "fat_loss" otherwise, same as
-  // before this existed.
-  initialPhase?: Phase | null;
   // This client's own protein target in g per pound (their preferences); without it the platform's 1 g per pound.
   proteinGPerLb?: number;
   // This client's allergies, intolerances, dislikes and diet. An option that breaks any of them is never offered, whatever its source.
@@ -129,37 +99,12 @@ export function MealPlanGenerator({
   const router = useRouter();
   const resultsRef = useRef<HTMLDivElement>(null);
 
-  // Real logged weights fill these in when available — this week's avg
-  // for "current," last week's avg for "previous" — so the coach isn't
-  // retyping numbers already sitting in body_weight_logs. Falls back to
-  // the single latest log, then blank, when there isn't enough history.
-  const [phase, setPhase] = useState<Phase>(initialPhase ?? "fat_loss");
-  const [currentWeight, setCurrentWeight] = useState(
-    (weightTrend?.currentAvg ?? latestBodyWeight)?.toString() ?? ""
-  );
-  const [previousWeight, setPreviousWeight] = useState(weightTrend?.previousAvg?.toString() ?? "");
-  const [currentCalories, setCurrentCalories] = useState("");
-  const [adherenceDays, setAdherenceDays] = useState(
-    defaultAdherenceDays != null ? String(defaultAdherenceDays) : "7"
-  );
-  const [rateStrength, setRateStrength] = useState("4");
-  const [rateRecovery, setRateRecovery] = useState(
-    defaultRecoveryRating != null ? String(defaultRecoveryRating) : "4"
-  );
-  const [rateDigestion, setRateDigestion] = useState("5");
-  const [rateSatiety, setRateSatiety] = useState("4");
   const [mealCount, setMealCount] = useState("4");
   const [includeSnack, setIncludeSnack] = useState(true);
   const [dietaryRestrictions, setDietaryRestrictions] = useState(defaultDietaryRestrictions ?? "");
   const [favoriteFoods, setFavoriteFoods] = useState("");
   const [carbCycling, setCarbCycling] = useState(false);
   const [trainingDays, setTrainingDays] = useState("4");
-  // Hypertrophy-phase running state, carried forward across repeated
-  // runs in this same session — same field runCheckInEngine already
-  // threads through nutrition_checkins via WeeklyCheckinPanel.
-  const [consecutiveSurplusSpikes, setConsecutiveSurplusSpikes] = useState(
-    initialConsecutiveSurplusSpikes ?? 0
-  );
 
   // Results
   const [rationale, setRationale] = useState("");
@@ -236,7 +181,10 @@ export function MealPlanGenerator({
   const rulesReadable = rulesReadableProp && allergiesAsked;
   const RULES_UNREADABLE = !rulesReadableProp
     ? "Couldn't read this client's food rules, so nothing can be built. Reload the page and try again."
-    : "Allergies haven't been asked yet, so nothing can be built. Confirm above that this client has none, or enter them in Preferences.";
+    : "Allergies haven't been answered yet, so nothing can be built. Wait for the client's answer, or enter it under their answers below.";
+  const NO_TARGET = target?.calories
+    ? "Add protein, carbs and fat to the standing target, or log a weight, so the plan can be split."
+    : "Set the standing target first: the plan is built from it.";
 
   // The diet the library is filtered by: the client's own diet type when they have one, else what the restrictions text says.
   function libraryDiet(recipeArchetype: string): DietType {
@@ -277,53 +225,13 @@ export function MealPlanGenerator({
       setError("Still loading this client's history and your recipes. Try again in a moment.");
       return;
     }
-    const currW = parseFloat(currentWeight) || 0;
-    const currC = parseInt(currentCalories, 10) || 0;
-    if (!currW || !currC) {
-      setError("Enter both current weight and current daily calories.");
+    const dailyBaseline = targetMacros();
+    if (!dailyBaseline) {
+      setError(NO_TARGET);
       return;
     }
-
-    const engineResult = runCheckInEngine({
-      phase,
-      prevWeightLbs: parseFloat(previousWeight) || currW,
-      currWeightLbs: currW,
-      currentCalories: currC,
-      adherenceDays: parseInt(adherenceDays, 10) || 7,
-      recoveryRating: parseInt(rateRecovery, 10) || 4,
-      consecutiveSurplusSpikes,
-      isInjured,
-      maintenanceCalories,
-      injurySurplusPct,
-    });
-    setConsecutiveSurplusSpikes(engineResult.consecutiveSurplusSpikes);
-
-    // Two different archetype readings, deliberately kept separate: the
-    // 6-way one (meal-engine's own detectDietArchetype) drives recipe/
-    // food-suggestion matching below and is what gets saved/displayed as
-    // "archetype" — the 3-way one (lib/macros.ts, aliased on import) only
-    // ever feeds the macro-split math, matching WeeklyCheckinPanel's own
-    // identical split.
     const recipeArchetype = detectDietArchetype(dietaryRestrictions);
-    const macroSplit = computeArchetypeMacros(
-      engineResult.newCalories,
-      currW,
-      detectMacroArchetype(dietaryRestrictions),
-      proteinGPerLb
-    );
-    const dailyBaseline: MacroTargets = {
-      calories: macroSplit.resolvedCalories,
-      protein: macroSplit.proteinG,
-      carbs: macroSplit.carbsG,
-      fats: macroSplit.fatG,
-    };
-
-    setRationale(
-      engineResult.rationale +
-        (engineResult.injuryOverrideApplied
-          ? " [Injury floor applied — calories held up for recovery.]"
-          : "")
-    );
+    setRationale(`Built from ${clientName ? clientName.split(" ")[0] + "'s" : "the"} standing target: ${dailyBaseline.calories.toLocaleString("en-US")} kcal · ${dailyBaseline.protein} P · ${dailyBaseline.carbs} C · ${dailyBaseline.fats} F.`);
     setArchetype(recipeArchetype);
     setDailyMacros(dailyBaseline);
 
@@ -356,48 +264,14 @@ export function MealPlanGenerator({
     setSelections(allOptionsSelected(views.daily, views.train, views.rest));
   }
 
-  // Lets the Macro Calculator hand its numbers straight to this
-  // generator — skips the check-in math entirely and builds meal
-  // options directly from the imported calories/macros.
-  useEffect(() => {
-    if (!importedMacros) return;
-    const macros: MacroTargets = {
-      calories: importedMacros.calories,
-      protein: importedMacros.protein,
-      carbs: importedMacros.carbs,
-      fats: importedMacros.fats,
-    };
-    const arch = detectDietArchetype(dietaryRestrictions);
-
-    setArchetype(arch);
-    setDailyMacros(macros);
-    setTrainMacros(null);
-    setRestMacros(null);
-    setDayView("daily");
-    setRationale("Calories & macros imported from the Macro Calculator.");
-
-    // The client's food rules have to be readable, and the library's history loaded first; the effect runs again when it is.
-    if (!rulesReadable) {
-      setError(RULES_UNREADABLE);
-      return;
-    }
-    if (!libraryData) return;
-    const nMeals = parseInt(mealCount, 10) || 4;
-    setLeftOutForRules(0);
-    const importedMeals = libraryDay(macros, nMeals, includeSnack, selectionCtx(arch));
-    setMealsByView({ daily: importedMeals, train: [], rest: [] });
-
-    const flex = matchFlexTreat(favoriteFoods, arch);
-    setFlexTreatText(
-      flex
-        ? `Requested ${flex.treat.name} (~${flex.treat.cals} kcal). Weekly buffer: trim ~${flex.dailyTrimCalories} kcal/day on the other 6 days. Same-day swap: drop ${flex.sameDayCarbDrop}g carbs and ${flex.sameDayFatDrop}g fat that day instead, keeping protein locked in.`
-        : null
-    );
-    setSelections(allOptionsSelected(importedMeals));
-    setError(null);
-    resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [importedMacros?.key, libraryData]);
+  // The standing target as whole numbers for the plan: protein, carbs and fat as set, or (calories only) split from the latest weight and the diet, as the check-in splits them.
+  function targetMacros(): MacroTargets | null {
+    if (!target?.calories) return null;
+    if (target.protein != null && target.carbs != null && target.fats != null) return { calories: Math.round(target.calories), protein: Math.round(target.protein), carbs: Math.round(target.carbs), fats: Math.round(target.fats) };
+    if (!latestBodyWeight) return null;
+    const split = computeArchetypeMacros(target.calories, latestBodyWeight, detectMacroArchetype(dietaryRestrictions), proteinGPerLb);
+    return { calories: split.resolvedCalories, protein: split.proteinG, carbs: split.carbsG, fats: split.fatG };
+  }
 
   function activeMacros(): MacroTargets | null {
     if (dayView === "train") return trainMacros;
@@ -960,141 +834,27 @@ export function MealPlanGenerator({
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-2">
-        <label className="block">
-          <span className="font-body text-xs text-steel uppercase tracking-wide">Phase</span>
-          <select
-            value={phase}
-            onChange={(e) => setPhase(e.target.value as Phase)}
-            className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm mt-1"
-          >
-            <option value="fat_loss">Fat loss</option>
-            <option value="hypertrophy">Muscle building</option>
-            <option value="maintenance">Maintenance</option>
-            <option value="reverse_diet">Reverse diet</option>
-          </select>
-        </label>
-        <label className="block">
-          <span className="font-body text-xs text-steel uppercase tracking-wide">Meal frequency</span>
-          <select
-            value={mealCount}
-            onChange={(e) => setMealCount(e.target.value)}
-            className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm mt-1"
-          >
-            <option value="2">2 meals/day</option>
-            <option value="3">3 meals/day</option>
-            <option value="4">4 meals/day</option>
-            <option value="5">5 meals/day</option>
-            <option value="6">6 meals/day</option>
-          </select>
-        </label>
-      </div>
+      <p className="font-body text-xs text-steel bg-surface/40 p-2.5" data-plan-target>
+        {targetMacros()
+          ? `Built from the standing target: ${targetMacros()!.calories.toLocaleString("en-US")} kcal · ${targetMacros()!.protein} P · ${targetMacros()!.carbs} C · ${targetMacros()!.fats} F. Change the target above to change the plan.`
+          : NO_TARGET}
+      </p>
 
-      {weightTrend && (weightTrend.currentCount > 0 || weightTrend.previousCount > 0) && (
-        <p className="font-body text-xs text-steel bg-surface/40 p-2.5">
-          {weightTrend.currentAvg != null ? (
-            <>
-              This week: <span className="text-chalk">{weightTrend.currentAvg} lbs</span> avg (
-              {weightTrend.currentCount} log{weightTrend.currentCount === 1 ? "" : "s"})
-            </>
-          ) : (
-            "No weigh-ins logged this week yet"
-          )}
-          {weightTrend.previousAvg != null && (
-            <>
-              {" "}
-              vs <span className="text-chalk">{weightTrend.previousAvg} lbs</span> last week (
-              {weightTrend.previousCount} log{weightTrend.previousCount === 1 ? "" : "s"})
-            </>
-          )}
-          {weightTrend.deltaLbs != null && (
-            <span
-              className={
-                weightTrend.deltaLbs > 0.1
-                  ? " text-rust"
-                  : weightTrend.deltaLbs < -0.1
-                  ? " text-positive"
-                  : " text-chalk"
-              }
-            >
-              {" "}
-              — {weightTrend.deltaLbs > 0.1 ? "↑" : weightTrend.deltaLbs < -0.1 ? "↓" : "→"}{" "}
-              {weightTrend.deltaLbs === 0
-                ? "maintained"
-                : `${Math.abs(weightTrend.deltaLbs)} lbs ${weightTrend.deltaLbs > 0 ? "up" : "down"}`}
-            </span>
-          )}
-          . Fields below are auto-filled from these — adjust by hand if needed.
-        </p>
-      )}
+      <label className="block max-w-[14rem]">
+        <span className="font-body text-xs text-steel uppercase tracking-wide">Meal frequency</span>
+        <select
+          value={mealCount}
+          onChange={(e) => setMealCount(e.target.value)}
+          className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm mt-1"
+        >
+          <option value="2">2 meals/day</option>
+          <option value="3">3 meals/day</option>
+          <option value="4">4 meals/day</option>
+          <option value="5">5 meals/day</option>
+          <option value="6">6 meals/day</option>
+        </select>
+      </label>
 
-      <div className="grid grid-cols-2 gap-2">
-        <label className="block">
-          <span className="font-body text-xs text-steel uppercase tracking-wide">Current avg weight (lbs)</span>
-          <input
-            type="number"
-            value={currentWeight}
-            onChange={(e) => setCurrentWeight(e.target.value)}
-            className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm mt-1"
-          />
-        </label>
-        <label className="block">
-          <span className="font-body text-xs text-steel uppercase tracking-wide">Previous avg weight (lbs)</span>
-          <input
-            type="number"
-            value={previousWeight}
-            onChange={(e) => setPreviousWeight(e.target.value)}
-            className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm mt-1"
-          />
-        </label>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2">
-        <label className="block">
-          <span className="font-body text-xs text-steel uppercase tracking-wide">
-            Current daily calories{" "}
-            <a href="#macro-calculator" className="normal-case text-rust font-normal tracking-normal">
-              (don&apos;t know? check here)
-            </a>
-          </span>
-          <input
-            type="number"
-            value={currentCalories}
-            onChange={(e) => setCurrentCalories(e.target.value)}
-            className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm mt-1"
-          />
-        </label>
-        <label className="block">
-          <span className="font-body text-xs text-steel uppercase tracking-wide">Adherence (days/7)</span>
-          <input
-            type="number"
-            min={0}
-            max={7}
-            value={adherenceDays}
-            onChange={(e) => setAdherenceDays(e.target.value)}
-            className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm mt-1"
-          />
-        </label>
-      </div>
-
-      <div className="grid grid-cols-4 gap-2">
-        <label className="block">
-          <span className="font-body text-xs text-steel uppercase tracking-wide">Strength 1-5</span>
-          <input type="number" min={1} max={5} value={rateStrength} onChange={(e) => setRateStrength(e.target.value)} className="w-full h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs mt-1" />
-        </label>
-        <label className="block">
-          <span className="font-body text-xs text-steel uppercase tracking-wide">Recovery 1-5</span>
-          <input type="number" min={1} max={5} value={rateRecovery} onChange={(e) => setRateRecovery(e.target.value)} className="w-full h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs mt-1" />
-        </label>
-        <label className="block">
-          <span className="font-body text-xs text-steel uppercase tracking-wide">Digestion 1-5</span>
-          <input type="number" min={1} max={5} value={rateDigestion} onChange={(e) => setRateDigestion(e.target.value)} className="w-full h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs mt-1" />
-        </label>
-        <label className="block">
-          <span className="font-body text-xs text-steel uppercase tracking-wide">Satiety 1-5</span>
-          <input type="number" min={1} max={5} value={rateSatiety} onChange={(e) => setRateSatiety(e.target.value)} className="w-full h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs mt-1" />
-        </label>
-      </div>
 
       <label className="block">
         <span className="font-body text-xs text-steel uppercase tracking-wide">Dietary restrictions / diet type / disliked foods</span>
