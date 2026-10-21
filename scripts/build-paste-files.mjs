@@ -2842,6 +2842,24 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "183",
+  slug: "0431",
+  title: "0431 A coach's own passages for Read during rest (one new table: a coach adds a reference and its text, and it joins his clients' passage cycle)",
+  warn: "This adds one table, coach_read_passages (a reference up to 60 characters and its text up to 600, for one coach), with row security: the coach reads, adds, changes and removes only his own; a person in a group he coaches can read them. Nothing existing is changed.",
+  migrations: ["0431"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes until the app update that goes with it is deployed. Then Settings > Read during rest has Add a passage: what a coach adds joins each of his clients' daily passage cycle (no repeats until all are seen), and he can remove his own.",
+  undo: [
+    "drop table if exists public.coach_read_passages;",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 183 misbehaves, and only while the Add a passage app update is NOT live. It removes the table AND every passage coaches have added (the app then shows only the bundled passages).",
+  rows: [
+    ["0431 is not already applied (the coach_read_passages table is not there yet)", "to_regclass('public.coach_read_passages') is null"],
+    ["the tables it uses exist", "to_regclass('public.group_memberships') is not null and to_regclass('public.profiles') is not null"],
+  ],
+});
+
+STEPS.push({
   n: "182",
   slug: "0430",
   title: "0430 Allergy auto-rebuild: when a client adds an allergy or a food they avoid, the options of their plan that now break it are swapped automatically, with a copy kept and the coach told (one column, one function added, one replaced)",
@@ -3837,6 +3855,7 @@ const BUNDLES = [
   { id: "release-ts3-team-sheet-save", name: "Release TS3 (saving a filled team sheet: one table, one notice kind, three functions)", steps: ["171"] },
   { id: "release-own1-owner-accepted-only", name: "Release OWN1 (ownership cannot be handed to someone who has never signed in; replaces two functions, adds one function and one trigger)", steps: ["172"] },
   { id: "release-tc3b-client-requests", name: "Release TC3 part B (Request to train with me on a coach's public page: one column, three tables, eight functions)", steps: ["174"] },
+  { id: "coach-read-passages", name: "A coach's own passages for Read during rest (one new table)", steps: ["183"] },
   { id: "allergy-auto-rebuild", name: "Allergy auto-rebuild (a client's new allergy swaps the clashing options of their plan automatically: one column, one function added, one replaced)", steps: ["182"] },
   { id: "fix3-no-show-walk-in", name: "FIX 3 (logging settles the session on the calendar once; no-show Charge or Waive; a late move is one session; the walk-in)", steps: ["180"] },
   { id: "set-my-targets-client-own-targets", name: "Set my targets (a client with no target from their coach may set their own: one column, one trigger, one function, three client policies, the notice function)", steps: ["181"] },
@@ -4099,6 +4118,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0428", "to_regprocedure('public.resolve_no_show(uuid, boolean)') is not null"),
     m("0429", "to_regprocedure('public.has_coach_macro_target(uuid, uuid)') is not null"),
     m("0430", "to_regprocedure('public.apply_allergy_rebuild(uuid, uuid, date, jsonb, text)') is not null"),
+    m("0431", "to_regclass('public.coach_read_passages') is not null"),
     m("0427", "to_regprocedure('public.my_group_ids()') is not null"),
     m("0426", "to_regprocedure('public.active_org_group_ids()') is not null"),
     m("0425", "exists (select 1 from pg_proc p where p.oid = to_regprocedure('public.request_workspace_org()') and position('x-workspace-org' in p.prosrc) > 0)"),

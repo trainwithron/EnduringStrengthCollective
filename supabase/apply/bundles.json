@@ -24,6 +24,14 @@
   "file": "apply-release-tc3b-client-requests-all.sql"
  },
  {
+  "id": "coach-read-passages",
+  "name": "A coach's own passages for Read during rest (one new table)",
+  "steps": [
+   "183"
+  ],
+  "file": "apply-coach-read-passages-all.sql"
+ },
+ {
   "id": "allergy-auto-rebuild",
   "name": "Allergy auto-rebuild (a client's new allergy swaps the clashing options of their plan automatically: one column, one function added, one replaced)",
   "steps": [

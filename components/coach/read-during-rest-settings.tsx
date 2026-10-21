@@ -3,11 +3,18 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { MAX_COACH_REFERENCE, MAX_COACH_TEXT } from "@/lib/read-content/limits";
 
 export interface ReadOverrideRow {
   id: string;
   date: string;
   reference: string;
+}
+
+export interface OwnPassageRow {
+  id: string;
+  reference: string;
+  text: string;
 }
 
 // Coach settings for Read during rest. One switch turns it off for ALL of this coach's clients (then Read is hidden for them entirely, whatever their own setting says).
@@ -20,12 +27,15 @@ export function ReadDuringRestSettings({
   refs,
   initialOverrides,
   today,
+  initialOwn = null,
 }: {
   coachId: string;
   initialDefaultOn: boolean;
   refs: string[];
   initialOverrides: ReadOverrideRow[];
   today: string;
+  // The passages this coach typed in himself (coach_read_passages, 0431); null hides Add a passage (the table could not be read).
+  initialOwn?: OwnPassageRow[] | null;
 }) {
   const router = useRouter();
   const [on, setOn] = useState(initialDefaultOn);
@@ -35,6 +45,39 @@ export function ReadDuringRestSettings({
   const [date, setDate] = useState(today);
   const [reference, setReference] = useState("");
   const [adding, setAdding] = useState(false);
+  const [own, setOwn] = useState<OwnPassageRow[] | null>(initialOwn);
+  const [ownRef, setOwnRef] = useState("");
+  const [ownText, setOwnText] = useState("");
+  const [savingOwn, setSavingOwn] = useState(false);
+  // The day picker offers his own passages too.
+  const pickRefs = [...refs, ...(own ?? []).map((o) => o.reference).filter((r) => !refs.some((x) => x.toLowerCase() === r.toLowerCase()))];
+
+  // Ron, Oct 21: "If I [feel] ones on my heart, I can put it in there." What he adds joins each of his clients' cycle.
+  async function addOwn() {
+    const reference = ownRef.trim();
+    const text = ownText.trim();
+    if (!reference || !text || savingOwn) return;
+    setSavingOwn(true);
+    setError(null);
+    const { data, error: saveError } = await createBrowserClient().from("coach_read_passages").insert({ coach_id: coachId, reference, text }).select("id, reference, text").single();
+    setSavingOwn(false);
+    if (saveError || !data) {
+      setError("That passage didn't save. Try again.");
+      return;
+    }
+    setOwn((rows) => [...(rows ?? []), { id: data.id, reference: data.reference, text: data.text }]);
+    setOwnRef("");
+    setOwnText("");
+  }
+
+  async function removeOwn(row: OwnPassageRow) {
+    const { error: deleteError } = await createBrowserClient().from("coach_read_passages").delete().eq("id", row.id);
+    if (deleteError) {
+      setError("That didn't delete. Try again.");
+      return;
+    }
+    setOwn((rows) => (rows ?? []).filter((r) => r.id !== row.id));
+  }
 
   async function toggle() {
     const next = !on;
@@ -132,7 +175,7 @@ export function ReadDuringRestSettings({
               className="h-10 px-2 bg-surface border border-steel/30 font-body text-sm text-chalk max-w-full"
             >
               <option value="">Passage</option>
-              {refs.map((r) => (
+              {pickRefs.map((r) => (
                 <option key={r} value={r}>
                   {r}
                 </option>
@@ -163,6 +206,56 @@ export function ReadDuringRestSettings({
           )}
             </div>
           </details>
+
+          {own !== null && (
+            <div className="mt-4" data-own-passages>
+              <p className="font-body text-sm text-chalk">Your own passages</p>
+              <p className="font-body text-xs text-steel mt-0.5">Add a verse and it joins every client&apos;s cycle. King James first.</p>
+              {own.length > 0 && (
+                <ul className="mt-2 divide-y divide-steel/15">
+                  {own.map((row) => (
+                    <li key={row.id} className="flex items-start justify-between gap-3 py-2">
+                      <span className="font-body text-sm text-chalk min-w-0">
+                        {row.reference}
+                        <span className="block font-body text-xs text-steel line-clamp-2">{row.text}</span>
+                      </span>
+                      <button type="button" onClick={() => removeOwn(row)} className="font-body text-xs text-steel underline shrink-0 min-h-[44px] -my-3 px-1">
+                        Remove
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="mt-2 space-y-2">
+                <input
+                  type="text"
+                  value={ownRef}
+                  onChange={(e) => setOwnRef(e.target.value)}
+                  maxLength={MAX_COACH_REFERENCE}
+                  placeholder="Reference, e.g. Joshua 1:9"
+                  aria-label="Reference"
+                  className="w-full h-10 px-2 bg-surface border border-steel/30 font-body text-sm text-chalk"
+                />
+                <textarea
+                  value={ownText}
+                  onChange={(e) => setOwnText(e.target.value)}
+                  maxLength={MAX_COACH_TEXT}
+                  rows={3}
+                  placeholder="The verse, as you want it shown"
+                  aria-label="Passage text"
+                  className="w-full px-2 py-2 bg-surface border border-steel/30 font-body text-sm text-chalk"
+                />
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-body text-xs text-steel">
+                    {ownText.length} / {MAX_COACH_TEXT}
+                  </span>
+                  <button type="button" onClick={addOwn} disabled={!ownRef.trim() || !ownText.trim() || savingOwn} className="h-10 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40">
+                    {savingOwn ? "Saving…" : "Add passage"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

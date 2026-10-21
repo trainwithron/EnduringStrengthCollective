@@ -1576,6 +1576,17 @@
   ]
  },
  {
+  "n": "183",
+  "slug": "0431",
+  "title": "0431 A coach's own passages for Read during rest (one new table: a coach adds a reference and its text, and it joins his clients' passage cycle)",
+  "migrations": [
+   "0431"
+  ],
+  "notApplied": [
+   "to_regclass('public.coach_read_passages') is null"
+  ]
+ },
+ {
   "n": "182",
   "slug": "0430",
   "title": "0430 Allergy auto-rebuild: when a client adds an allergy or a food they avoid, the options of their plan that now break it are swapped automatically, with a copy kept and the coach told (one column, one function added, one replaced)",

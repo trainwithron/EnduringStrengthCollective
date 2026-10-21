@@ -28,6 +28,13 @@ export function hashString(input: string): number {
   return h >>> 0;
 }
 
+// The bundled readings plus the ones a coach typed in himself (Settings > Read during rest > Add a passage), after them in the order he added them. A coach's passage with the
+// same reference as a bundled one is left out (the bundled text is the one the cycle and a day's choice use).
+export function withCoachPassages(pack: ReadPack, own: ReadItem[]): ReadPack {
+  const extra = own.filter((o) => o.ref && o.text && !findByRef(pack, o.ref));
+  return extra.length === 0 ? pack : { ...pack, items: [...pack.items, ...extra] };
+}
+
 export function findByRef(pack: ReadPack, ref: string | null | undefined): ReadItem | null {
   if (!ref) return null;
   const wanted = ref.trim().toLowerCase().replace(/\s+/g, " ");

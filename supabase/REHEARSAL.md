@@ -196,6 +196,7 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0429 | yes | yes | 22 | 0429 a client sets their own targets until their coach sets one |
 | 0428 | yes | yes | 96 | 0428 logging settles the booking once; no-show Charge or Waive; a late move is one session; the walk-in |
 | 0430 | yes | yes | 22 | 0430 a client's new allergy swaps the clashing options of their plan automatically |
+| 0431 | yes | yes | 14 | 0431 a coach's own passages join his clients' Read cycle |
 | 0331 | yes | yes | 10 | 0331 a payment event and its sessions are recorded in one step |
 | 0329 | yes | yes | 12 | 0329 every session costs exactly 1 credit; the waitlist offer uses the coach's time zone |
 | 0330 | yes | yes | 9 | 0330 only a real coach can have a public page |

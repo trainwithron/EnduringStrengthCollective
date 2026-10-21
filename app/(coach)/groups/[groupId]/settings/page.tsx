@@ -247,11 +247,12 @@ export default async function SettingsPage(
   let readOn = true;
   let readDefaultOn = true;
   let readOverrides: { id: string; date: string; reference: string }[] = [];
+  let ownPassages: { id: string; reference: string; text: string }[] | null = null;
   if (!isCoach && !effective.isActingAsOther) {
     const { data: readRow } = await supabase.from("read_settings").select("faith_track").eq("athlete_id", user.id).maybeSingle();
     readOn = readRow?.faith_track ?? true;
   } else if (isCoach && !effective.isActingAsOther) {
-    const [{ data: prefRow }, { data: overrideRows }] = await Promise.all([
+    const [{ data: prefRow }, { data: overrideRows }, ownRead] = await Promise.all([
       supabase.from("coach_preferences").select("faith_track_default").eq("coach_id", user.id).maybeSingle(),
       supabase
         .from("read_passage_overrides")
@@ -260,7 +261,10 @@ export default async function SettingsPage(
         .gte("override_date", todayKey)
         .order("override_date", { ascending: true })
         .limit(60),
+      // His own passages (0431); before that step the read fails and Add a passage is not shown.
+      supabase.from("coach_read_passages").select("id, reference, text").eq("coach_id", user.id).order("created_at", { ascending: true }).limit(500),
     ]);
+    ownPassages = ownRead.error ? null : ((ownRead.data ?? []) as { id: string; reference: string; text: string }[]);
     readDefaultOn = (prefRow as { faith_track_default?: boolean } | null)?.faith_track_default ?? true;
     readOverrides = (overrideRows ?? []).map((r) => ({ id: r.id, date: r.override_date, reference: r.reference }));
   }
@@ -322,6 +326,7 @@ export default async function SettingsPage(
                   refs={FAITH_PACK.items.map((i) => i.ref)}
                   initialOverrides={readOverrides}
                   today={todayKey}
+                  initialOwn={ownPassages}
                 />
               </div>
             )}
