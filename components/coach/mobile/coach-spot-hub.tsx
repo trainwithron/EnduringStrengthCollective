@@ -14,7 +14,10 @@ import { useTerm } from "@/components/coach/terminology-provider";
 import { getCoachedGroups, LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/coach-groups";
 import { ACTIVE_ORG_COOKIE, readBrowserCookie, rememberedGroupForActiveOrg } from "@/lib/active-org";
 import { hubOrgs, hubStartGroup, hubStartOrgId, pageOrgId, type HubOrg } from "@/lib/hub-orgs";
-import { isTeamSportGroup, TEAM_SPORT_HIDDEN_HUB_TILES } from "@/lib/team-sport";
+import { isTeamSportGroup, orgIsTeamOnly, TEAM_SPORT_HIDDEN_HUB_TILES } from "@/lib/team-sport";
+import { isPhoneView } from "@/lib/phone-coach-routes";
+import { VIEW_OVERRIDE_COOKIE } from "@/lib/pwa";
+import type { CoachedGroup } from "@/lib/coach-groups";
 
 // The six panels behind the tiles are loaded only when one is opened (every phone page carries this hub; most never open a panel). What needs you (SpotNeedsTop) stays in the page.
 const BusinessMiniDashboard = dynamic(() => import("@/components/coach/desktop/business-mini-dashboard").then((m) => m.BusinessMiniDashboard), { ssr: false, loading: () => null });
@@ -170,6 +173,8 @@ export function CoachSpotHub({
   const [orgId, setOrgId] = useState<string | null>(null);
   // The organization the PAGE belongs to (null on the coach's own space). Choosing another organization in the hub leaves this page for that organization's Home.
   const pageOrg = useRef<string | null>(null);
+  // The coach's groups (read with the organizations), so choosing a team organization on the phone can open its team Home.
+  const coachedGroups = useRef<CoachedGroup[]>([]);
   const orgsRequested = useRef(false);
   // A platform admin's own tools (Support inbox, Organizations) sit under Business (Release 2: they used to be in the More list).
   const [platformAdmin, setPlatformAdmin] = useState(false);
@@ -197,6 +202,7 @@ export function CoachSpotHub({
           return;
         }
         const groups = await getCoachedGroups(supabase, data.user.id);
+        coachedGroups.current = groups;
         // The organization is the one the coach CHOSE (its own cookie); the last group opened only picks a group inside it.
         const rememberedId = rememberedGroupForActiveOrg(groups, readBrowserCookie(ACTIVE_ORG_COOKIE), readBrowserCookie(LAST_WORKSPACE_GROUP_COOKIE));
         const list = hubOrgs(groups, rememberedId);
@@ -235,9 +241,26 @@ export function CoachSpotHub({
     } catch {
       // not remembered; the hub still switched
     }
-    // On the coach's own space (it belongs to no organization) the page stays: it reloads, and every tile then reads the organization just chosen (Release 2).
+    // On the coach's own space (it belongs to no organization) the page stays: it reloads, and every tile then reads the organization just chosen (Release 2). On a phone a TEAM organization opens its team
+    // Home instead (Oct 21: choosing the Trojans only reloaded the coach's own Home, so their team's programs could not be seen).
     if (leavesPage && pageOrg.current === null) {
-      window.location.reload();
+      const inOrg = coachedGroups.current.filter((g) => g.orgId === next.orgId).map((g) => g.id);
+      const phone = isPhoneView({ override: readBrowserCookie(VIEW_OVERRIDE_COOKIE), userAgent: navigator.userAgent });
+      if (!phone || inOrg.length === 0) {
+        window.location.reload();
+        return;
+      }
+      void (async () => {
+        let teamHome: string | null = null;
+        try {
+          const { data, error } = await createBrowserClient().from("groups").select("id, team_mode").in("id", inOrg);
+          if (!error && (data ?? []).length === inOrg.length && orgIsTeamOnly((data ?? []) as { team_mode: boolean | null }[])) teamHome = `/groups/${next.anchorGroupId}`;
+        } catch {
+          // not known: the page reloads as before
+        }
+        if (teamHome) window.location.assign(teamHome);
+        else window.location.reload();
+      })();
       return;
     }
     if (leavesPage) {

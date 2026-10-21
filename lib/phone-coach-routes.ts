@@ -29,7 +29,8 @@ export function isStaleMobileOverride({ override, userAgent }: { override: strin
 export const PHONE_SPOTLIGHT = "/my-space?view=client&spot=1";
 export const PHONE_CALENDAR = "/my-space?view=client&to=calendar";
 // The landing decision (app/coach-landing/route.ts) and the coach's own app (lib/start-group.ts COACH_PHONE_ENTRY / COACH_PHONE_LANDING), spelled out here so this file needs no imports.
-export const PHONE_ENTRY = "/coach-landing";
+// Home on the phone while working keeps the organization chosen in Spotlight (COACH_PHONE_ENTRY_KEEP_ORG); only a fresh open starts in the home organization.
+export const PHONE_ENTRY = "/coach-landing?keep=org";
 export const PHONE_OWN_APP = "/my-space?view=client";
 
 export interface PhoneRedirect {

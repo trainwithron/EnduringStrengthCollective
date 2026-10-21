@@ -32,7 +32,7 @@ describe("Sawyer: Home from a coach tool is never a client's one-on-one space", 
       expect(s, f).not.toContain("homeHref={`/groups/${params.groupId}`}");
     }
     expect(read("app/sessions/[sessionId]/page.tsx")).toContain("const coachHomeHref = COACH_HOME_HREF;");
-    expect(read("app/(coach)/dashboard/page.tsx")).toContain("redirect(COACH_PHONE_ENTRY);");
+    expect(read("app/(coach)/dashboard/page.tsx")).toContain("redirect(COACH_PHONE_ENTRY_KEEP_ORG);");
     expect(read("app/coach-landing/route.ts")).toContain("let target = COACH_PHONE_LANDING;");
     expect(COACH_PHONE_LANDING).toBe("/my-space?view=client");
   });
@@ -67,8 +67,9 @@ describe("Spotlight", () => {
     expect(hub).toContain("{platformAdmin && (");
     expect(hub).toContain('<a href="/programs"');
   });
-  it("on their own space choosing another organization reloads the page instead of leaving it", () => {
-    expect(hub).toContain("if (leavesPage && pageOrg.current === null) {\n      window.location.reload();");
+  it("on their own space choosing another organization reloads the page instead of leaving it (on a phone, a team organization opens its team Home: lib/home-org.test.ts)", () => {
+    expect(hub).toContain("if (!phone || inOrg.length === 0) {\n        window.location.reload();");
+    expect(hub).toContain("if (teamHome) window.location.assign(teamHome);\n        else window.location.reload();");
   });
 });
 
@@ -105,7 +106,8 @@ describe("their own space", () => {
 
 describe("Release 2 follow-ups (Oct 20)", () => {
   it("/dashboard on a phone goes to the landing decision in the middleware, before the page (and its loading screen) renders", () => {
-    expect(phoneCoachRedirect("/dashboard")).toEqual({ to: "/coach-landing", groupId: null, shared: false });
+    // in the organization already chosen (Oct 21): only a fresh open starts in the home organization
+    expect(phoneCoachRedirect("/dashboard")).toEqual({ to: "/coach-landing?keep=org", groupId: null, shared: false });
   });
   it("a group's own page sends a coach (not acting as a client) to their own app; a team-sport group's team Home stays (no redirect to itself)", () => {
     expect(phoneCoachRedirect(`/groups/${S}`)).toEqual({ to: "/my-space?view=client", groupId: S, shared: true, home: true });

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { NoAccess } from "@/components/shared/no-access";
 import { cookies } from "next/headers";
-import { COACH_PHONE_ENTRY } from "@/lib/start-group";
+import { COACH_PHONE_ENTRY_KEEP_ORG } from "@/lib/start-group";
 import { createServerClient } from "@/lib/supabase/server";
 import { prefersAthleteStyleView, isMobileUserAgent, isTabletUserAgent } from "@/lib/pwa-server";
 import { CoachHomeShell } from "@/components/coach/coach-home-shell";
@@ -121,8 +121,8 @@ export default async function CoachHomePage() {
   // tradeoff (annoying beats broken).
   if (await prefersAthleteStyleView()) {
     // Release 2 (the phone opens as the coach's own account): the landing decision (/coach-landing: a team organization's coach keeps their team Home; everyone else opens their own app;
-    // several organizations and none chosen asks first).
-    redirect(COACH_PHONE_ENTRY);
+    // several organizations and none chosen asks first). In the organization already chosen (Oct 21: a switch in Spotlight sticks while working).
+    redirect(COACH_PHONE_ENTRY_KEEP_ORG);
   }
 
   // Real bug from Ron's own phone, screenshot confirmed: a coach who

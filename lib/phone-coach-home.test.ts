@@ -192,7 +192,8 @@ describe("wiring", () => {
     const b = src("components/athlete/acting-as-banner.tsx");
     expect(b).toContain('phone ? "← Back to me" : "← Back to coach home"');
     expect(b).toContain('router.push(phone ? COACH_PHONE_LANDING : "/dashboard");');
-    expect(src("app/(coach)/dashboard/page.tsx")).toContain("redirect(COACH_PHONE_ENTRY);");
+    // in the organization already chosen (Oct 21: a switch in Spotlight sticks while working)
+    expect(src("app/(coach)/dashboard/page.tsx")).toContain("redirect(COACH_PHONE_ENTRY_KEEP_ORG);");
   });
 
   it("a team organization's desktop Home has no money tiles or needs-payment strip", () => {
@@ -233,7 +234,7 @@ describe("where a coach on a phone lands", () => {
     expect(startPath({ group_id: TROJANS, role: "coach" }, false)).toBe("/dashboard");
     expect(COACH_PHONE_LANDING).toBe("/my-space?view=client");
     const r = src("app/coach-landing/route.ts");
-    expect(r).toContain("/choose-organization?next=/coach-landing");
+    expect(r).toContain("/choose-organization?next=${encodeURIComponent(COACH_PHONE_ENTRY_KEEP_ORG)}");
     expect(r).not.toMatch(/\.(insert|update|upsert|delete)\(|\.rpc\(/);
   });
 });

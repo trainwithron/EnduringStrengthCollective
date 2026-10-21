@@ -56,9 +56,9 @@ describe("B7: straight into the coach's own app (openOwnSpaceRedirect)", () => {
   it("/coach-landing uses it only for the coach's own app; the team Home and the chooser are unchanged", () => {
     const route = read("app/coach-landing/route.ts");
     expect(route).toContain("let target = COACH_PHONE_LANDING;");
-    expect(route).toContain('if (landing.to === "choose") target = "/choose-organization?next=/coach-landing";');
+    expect(route).toContain('if (landing.to === "choose") target = `/choose-organization?next=${encodeURIComponent(COACH_PHONE_ENTRY_KEEP_ORG)}`;');
     expect(route).toContain('else if (landing.to === "coach-home") target = `/groups/${landing.groupId}`;');
-    expect(route).toContain('if (target === COACH_PHONE_LANDING) {\n    return (await openOwnSpaceRedirect(user, url, new URLSearchParams({ view: "client" }))) ?? NextResponse.redirect(new URL(COACH_PHONE_LANDING, url));');
+    expect(route).toContain('target === COACH_PHONE_LANDING\n      ? (await openOwnSpaceRedirect(user, url, new URLSearchParams({ view: "client" }))) ?? NextResponse.redirect(new URL(COACH_PHONE_LANDING, url))');
     expect(read("app/my-space/route.ts")).toContain("openOwnSpaceRedirect(user, url, url.searchParams)");
   });
 });
