@@ -11,7 +11,8 @@ export interface ReadOverrideRow {
 }
 
 // Coach settings for Read during rest. One switch turns it off for ALL of this coach's clients (then Read is hidden for them entirely, whatever their own setting says).
-// Below it, the coach may choose the passage for a particular day from the bundled list; every other day each client gets a passage picked for them automatically.
+// A passage is picked for every client automatically each day (lib/read-content: each client goes through the whole list in their own order, no repeats until they have seen them all).
+// Choosing one for a particular day is optional, under one closed row (Ron, Oct 21: "I don't want to have to select it every day").
 // Only the passage references come in as props: the passage text stays out of this screen's code.
 export function ReadDuringRestSettings({
   coachId,
@@ -107,8 +108,15 @@ export function ReadDuringRestSettings({
 
       {on && (
         <div className="mt-4 pt-4 border-t border-steel/15">
-          <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">Passage for a day</p>
-          <p className="font-body text-xs text-steel mb-3">Pick the passage your clients see on a day. Any other day, each client gets one chosen for them.</p>
+          <p className="font-body text-sm text-chalk" data-passage-automatic>A passage is picked for every client automatically each day.</p>
+          <p className="font-body text-xs text-steel mt-0.5">Each client goes through the whole list in their own order, so nobody sees one again until they have seen them all.</p>
+          <details className="mt-3 border border-steel/20" data-passage-day-choice>
+            <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden flex items-center justify-between gap-3 min-h-[44px] px-3">
+              <span className="font-body text-sm text-chalk">Choose one for a specific day (optional)</span>
+              <span className="font-body text-xs text-steel">{overrides.length > 0 ? `${overrides.length} chosen` : "▾"}</span>
+            </summary>
+            <div className="px-3 pb-3 pt-3 border-t border-steel/15">
+          <p className="font-body text-xs text-steel mb-3">The passage you choose is the one all your clients see that day.</p>
           <div className="flex flex-wrap items-center gap-2">
             <input
               type="date"
@@ -123,7 +131,7 @@ export function ReadDuringRestSettings({
               aria-label="Passage"
               className="h-10 px-2 bg-surface border border-steel/30 font-body text-sm text-chalk max-w-full"
             >
-              <option value="">Choose a passage</option>
+              <option value="">Passage</option>
               {refs.map((r) => (
                 <option key={r} value={r}>
                   {r}
@@ -136,7 +144,7 @@ export function ReadDuringRestSettings({
               disabled={!date || !reference || adding}
               className="h-10 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
             >
-              {adding ? "Saving…" : "Set passage"}
+              {adding ? "Saving…" : "Use on that day"}
             </button>
           </div>
           {overrides.length > 0 && (
@@ -153,6 +161,8 @@ export function ReadDuringRestSettings({
               ))}
             </ul>
           )}
+            </div>
+          </details>
         </div>
       )}
 

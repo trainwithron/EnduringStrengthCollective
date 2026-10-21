@@ -188,7 +188,9 @@ describe("Release K1: wiring", () => {
     expect(src("app/api/feedback/route.ts")).toContain("ignoreQuiet: true");
   });
   it("the two choices are on the settings page for everyone, saved on the person's own profile", () => {
-    expect(src("app/(coach)/groups/[groupId]/settings/page.tsx")).toContain("<PushPreferences");
+    // inside the one closed Notifications row (Oct 21), which the settings page shows for everyone
+    expect(src("app/(coach)/groups/[groupId]/settings/page.tsx")).toContain("<NotificationSettings");
+    expect(src("components/shared/notification-settings.tsx")).toContain("<PushPreferences");
     const ui = src("components/athlete/push-preferences.tsx");
     expect(ui).toContain("quiet_hours_start");
     expect(ui).toContain("generic_push_text");

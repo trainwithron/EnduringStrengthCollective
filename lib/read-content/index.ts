@@ -34,11 +34,51 @@ export function findByRef(pack: ReadPack, ref: string | null | undefined): ReadI
   return pack.items.find((i) => i.ref.toLowerCase() === wanted) ?? null;
 }
 
-// The reading for one person on one day: the coach's choice for that day when it is one of the bundled readings, otherwise one picked by the date and the person, so
-// every client gets a different reading on the same day and the same reading all day. `dateKey` is the person's own calendar day ("2026-11-03").
+// The day the cycle counts from. Any fixed day works; it must never change, or everyone's place in their cycle moves.
+export const CYCLE_START = "2026-01-01";
+
+// A small seeded random number generator (mulberry32): the same seed always gives the same sequence, on every device.
+function seeded(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** This person's own fixed order of the n readings (a shuffle seeded by their id): the same order every time, a different one for each person. */
+export function viewerOrder(n: number, viewerId: string): number[] {
+  const order = Array.from({ length: n }, (_, i) => i);
+  const rand = seeded(hashString(`cycle:${viewerId}`));
+  for (let i = n - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  return order;
+}
+
+function utcDay(dateKey: string): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey);
+  return m ? Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) / 86400000 : null;
+}
+function daysSinceStart(dateKey: string): number | null {
+  const d = utcDay(dateKey);
+  return d === null ? null : Math.round(d - (utcDay(CYCLE_START) as number));
+}
+
+// The reading for one person on one day (Ron, Oct 21: "Pick one. Randomly. And it will go through a cycle."): the coach's choice for that day when it is one of the readings; otherwise
+// the next one in this person's own shuffled order, one a day, so nobody sees a reading again until they have seen them all, and different clients see different readings on the same
+// day. `dateKey` is the person's own calendar day ("2026-11-03").
 export function pickDailyItem(pack: ReadPack, dateKey: string, viewerId: string, overrideRef?: string | null): ReadItem | null {
-  if (pack.items.length === 0) return null;
+  const n = pack.items.length;
+  if (n === 0) return null;
   const chosen = findByRef(pack, overrideRef);
   if (chosen) return chosen;
-  return pack.items[hashString(`${dateKey}:${viewerId}`) % pack.items.length];
+  const day = daysSinceStart(dateKey);
+  if (day === null) return pack.items[hashString(`${dateKey}:${viewerId}`) % n];
+  const pos = ((day % n) + n) % n;
+  return pack.items[viewerOrder(n, viewerId)[pos]];
 }

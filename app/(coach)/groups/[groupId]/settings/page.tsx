@@ -5,8 +5,7 @@ import { orgIdOfGroup } from "@/lib/org-of-group";
 import { loadTeamInfo } from "@/lib/org-team";
 import { readStayingMembers } from "@/lib/org-members";
 import { CoachTypeSetting } from "@/components/coach/coach-type-setting";
-import { PushPreferences } from "@/components/athlete/push-preferences";
-import { NoticeSwitches } from "@/components/coach/notice-switches";
+import { NotificationSettings } from "@/components/shared/notification-settings";
 import { isCoachType, type CoachType } from "@/lib/coach-type";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -21,7 +20,6 @@ import { DownloadAppButton } from "@/components/coach/desktop/download-app-butto
 import { BlockedMembersList, type BlockedMember } from "@/components/feed/blocked-members-list";
 import { loadBlockedIds } from "@/lib/blocked-members";
 import { EditDisplayName } from "@/components/athlete/edit-display-name";
-import { PushNotificationToggle } from "@/components/athlete/push-notification-toggle";
 import { SmsConsentSettings } from "@/components/athlete/sms-consent-settings";
 import { isTwilioConfigured } from "@/lib/twilio";
 import { FeedbackButton } from "@/components/feedback/feedback-button";
@@ -336,9 +334,13 @@ export default async function SettingsPage(
   ) : null;
   const notificationsGroup = (
     <SettingsGroup label="Notifications">
-          <PushNotificationToggle variant="settings" profileId={user.id} audience={isCoach ? "coach" : "client"} />
-          <PushPreferences profileId={user.id} initialStart={pushPrefs?.quiet_hours_start ?? null} initialEnd={pushPrefs?.quiet_hours_end ?? null} initialGeneric={pushPrefs?.generic_push_text === true} available={!!pushPrefs} />
-          {isCoach && !viewingOther && <NoticeSwitches profileId={user.id} initialOff={noticesOff ?? []} available={noticesOff !== null} />}
+          {/* One row, closed until tapped (Ron, Oct 21: "Needs to be collapsible. That's way too big."). */}
+          <NotificationSettings
+            profileId={user.id}
+            audience={isCoach ? "coach" : "client"}
+            pushPrefs={pushPrefs}
+            notices={isCoach && !viewingOther && noticesOff !== null ? { initialOff: noticesOff } : null}
+          />
         </SettingsGroup>
   );
 

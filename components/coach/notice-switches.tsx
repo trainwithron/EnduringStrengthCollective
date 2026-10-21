@@ -6,7 +6,7 @@ import { NOTICE_KINDS } from "@/lib/coach-notice-kinds";
 
 // Settings > Notifications for a coach: ONE plain on/off switch per KIND of notice, each with a one-line example. A switch controls both the push and the notice in the app. Saved the moment it is tapped, on the
 // person's own profile (profiles.notices_off lists the kinds turned OFF). Important notices (invitations, an account closing, consent, support replies) are not on this list and always arrive.
-export function NoticeSwitches({ profileId, initialOff, available }: { profileId: string; initialOff: string[]; available: boolean }) {
+export function NoticeSwitches({ profileId, initialOff, available, onOffChange }: { profileId: string; initialOff: string[]; available: boolean; onOffChange?: (off: string[]) => void }) {
   const [off, setOff] = useState<string[]>(initialOff);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
@@ -27,6 +27,7 @@ export function NoticeSwitches({ profileId, initialOff, available }: { profileId
       setNote("Couldn't save that. It is back to what it was.");
       return;
     }
+    onOffChange?.(next);
     setNote("Saved.");
   }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FAITH_PACK, READ_PACKS, findByRef, hashString, pickDailyItem, type ReadPack } from "@/lib/read-content";
+import { FAITH_PACK, READ_PACKS, findByRef, hashString, pickDailyItem, viewerOrder, type ReadPack } from "@/lib/read-content";
 
 const tiny: ReadPack = {
   id: "t",
@@ -46,6 +46,31 @@ describe("pickDailyItem", () => {
     const refs = new Set<string>();
     for (let d = 1; d <= 28; d++) refs.add(pickDailyItem(FAITH_PACK, `2026-11-${String(d).padStart(2, "0")}`, "client-1")!.ref);
     expect(refs.size).toBeGreaterThan(10);
+  });
+
+  it("goes through a cycle (Oct 21): over any run of N days each person sees all N readings once, nobody repeats one until they have seen them all", () => {
+    const n = FAITH_PACK.items.length;
+    for (const viewer of ["client-1", "client-2"]) {
+      for (const startDay of [0, 137]) {
+        const seen = new Set<string>();
+        const start = Date.UTC(2026, 10, 3) + startDay * 86400000;
+        for (let i = 0; i < n; i++) seen.add(pickDailyItem(FAITH_PACK, new Date(start + i * 86400000).toISOString().slice(0, 10), viewer)!.ref);
+        expect(seen.size, `${viewer} from day ${startDay}`).toBe(n);
+      }
+    }
+    // the tiny pack: three days, three different readings, then the same three again in the same order
+    const days = ["2026-11-03", "2026-11-04", "2026-11-05", "2026-11-06", "2026-11-07", "2026-11-08"].map((d) => pickDailyItem(tiny, d, "viewer-1")!.ref);
+    expect(new Set(days.slice(0, 3)).size).toBe(3);
+    expect(days.slice(3)).toEqual(days.slice(0, 3));
+  });
+
+  it("each person has their own order: the same person and day always give the same reading, and orders differ between people", () => {
+    expect(viewerOrder(10, "a")).toEqual(viewerOrder(10, "a"));
+    expect([...viewerOrder(10, "a")].sort((x, y) => x - y)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    expect(viewerOrder(50, "a")).not.toEqual(viewerOrder(50, "b"));
+    expect(pickDailyItem(FAITH_PACK, "2030-02-14", "client-9")).toEqual(pickDailyItem(FAITH_PACK, "2030-02-14", "client-9"));
+    // days before the cycle's start still work
+    expect(pickDailyItem(FAITH_PACK, "2025-06-01", "client-9")).not.toBeNull();
   });
 
   it("uses the coach's choice for the day when it is a bundled reading", () => {

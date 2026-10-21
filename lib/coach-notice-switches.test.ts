@@ -68,7 +68,9 @@ describe("Settings > Notifications", () => {
   });
   it("is hidden until the database update exists, and only on a coach's own settings", () => {
     expect(renderToStaticMarkup(createElement(NoticeSwitches, { profileId: "p", initialOff: [], available: false }))).toBe("");
-    expect(read("app/(coach)/groups/[groupId]/settings/page.tsx")).toContain("{isCoach && !viewingOther && <NoticeSwitches");
+    // inside the one closed Notifications row (Oct 21): only a coach on their own settings, and only once the column can be read
+    expect(read("app/(coach)/groups/[groupId]/settings/page.tsx")).toContain("notices={isCoach && !viewingOther && noticesOff !== null ? { initialOff: noticesOff } : null}");
+    expect(read("components/shared/notification-settings.tsx")).toContain("{notices && <NoticeSwitches");
   });
   it("saves on tap to the person's own profile row", () => {
     const src = read("components/coach/notice-switches.tsx");
