@@ -25,7 +25,7 @@ export async function gatherSessionPatternFindings(
   let query = supabase
     .from("athlete_sessions")
     .select(
-      "id, started_at, duration_seconds, session_exercises ( exercise_order, exercise_name, tracked_fields, group_workout_exercise_id, set_logs ( set_order, weight, reps, rpe, rir, tempo, time_seconds, height, distance, rest_seconds, pace, status ) )"
+      "id, started_at, completed_at, duration_seconds, session_exercises ( exercise_order, exercise_name, tracked_fields, group_workout_exercise_id, set_logs ( set_order, weight, reps, rpe, rir, tempo, time_seconds, height, distance, rest_seconds, pace, status, completed_at ) )"
     )
     .eq("athlete_id", athleteId)
     .eq("group_id", groupId)

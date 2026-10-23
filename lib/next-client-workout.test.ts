@@ -43,12 +43,16 @@ describe("a card names when the session was, in words", () => {
     expect(sessionWhenInWords("2026-10-19T04:00:00Z", LA, NOW)).toBe("yesterday (Oct 18, 9:00 PM)");
   });
   it("the card says it in a sentence that cannot be read as today", () => {
+    // the card words the day from the real clock: pinned to the Monday the other cases use
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(NOW));
     const sessions = [{ bookingId: "b1", athleteId: "a1", groupId: "g", name: "Johann G.", startIso: "2026-10-15T15:00:00Z" }];
     const html = renderToStaticMarkup(createElement(SessionCheckCards, { sessions, timezone: LA }));
     expect(html.replace(/<!-- -->/g, "")).toContain("s session last Thursday (Oct 15, 8:00 AM) happen?");
     expect(html).toContain(">Yes<");
     expect(html).toContain(">No-show<");
     expect(html).toContain(">Reschedule<");
+    vi.useRealTimers();
   });
 });
 

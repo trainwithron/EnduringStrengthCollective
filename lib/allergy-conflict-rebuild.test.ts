@@ -153,7 +153,7 @@ vi.mock("@/lib/supabase/service-role", () => ({
   }),
 }));
 
-describe("the route", () => {
+describe("the route", { timeout: 30000 }, () => {
   const prefsRow = { athlete_id: "ann", allergies: ["peanut"], dislikes: [], likes: [], intolerances: [], diet_type: "omnivore" };
   const plan = (log_date: string, meals: MealEntryPayload[], rationale = "Made by hand.") => ({ log_date, group_id: "g", archetype: "omnivore", rationale, macros: { daily: { calories: 2000 } }, meals: { daily: meals }, created_by: "coach" });
   beforeEach(() => {

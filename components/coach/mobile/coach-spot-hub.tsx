@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Dumbbell, Mail, MessageCircle, Sparkles, TrendingUp, Users, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import { SpotNeedsTop } from "./spot-needs-top";
-import { SPOT_LAST_OPENED_KEY, SPOT_NEEDS_CACHE_KEY, readSpotNeedsCache, shouldFade, spotNeedsCacheEntry, type SpotNeeds } from "@/lib/spot-needs";
+import { SPOT_LAST_OPENED_KEY, SPOT_NEEDS_CACHE_KEY, readSpotNeedsCache, shouldFade, spotCount, spotNeedsCacheEntry, type SpotNeeds } from "@/lib/spot-needs";
 import { isEmbeddedWindow } from "@/components/ui/loading-watchdog";
 import { PushNotificationToggle } from "@/components/athlete/push-notification-toggle";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -457,7 +457,22 @@ export function CoachSpotHub({
             <div className="flex-1 min-h-0 overflow-hidden">
               {view === "grid" && (
                 <div className="h-full overflow-y-auto grid grid-cols-2 gap-2 p-4 content-start">
-                  {needs && !needs.needsChoice && <SpotNeedsTop needs={needs} onNavigated={close} />}
+                  {needs && !needs.needsChoice && (
+                    <SpotNeedsTop
+                      needs={needs}
+                      onNavigated={close}
+                      onNoticesCleared={() => {
+                        const cleared = { ...needs, notices: [] };
+                        // the dot and the remembered answer follow at once
+                        showNeeds({ ...cleared, count: spotCount(cleared) });
+                        try {
+                          window.sessionStorage.removeItem(SPOT_NEEDS_CACHE_KEY);
+                        } catch {
+                          // nothing remembered; the next read is fresh anyway
+                        }
+                      }}
+                    />
+                  )}
                   {homeHref && (
                     <a
                       href={homeHref}

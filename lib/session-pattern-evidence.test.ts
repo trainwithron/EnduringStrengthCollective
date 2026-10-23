@@ -110,6 +110,7 @@ describe("the evidence on the finding screen", () => {
         evidence: {
           kind: "slot_sets",
           slotLabel: "the first exercise",
+          sessions: 6,
           rows: [{ startedAt: "2026-10-06T23:00:00Z", exerciseName: "Barbell Back Squat", done: 2, total: 3, sets: [{ done: true, weight: 135, reps: 8, timeSeconds: null, distance: null }, { done: true, weight: 135, reps: 8, timeSeconds: null, distance: null }, { done: false, weight: null, reps: null, timeSeconds: null, distance: null }] }],
         },
         timeZone: "America/Los_Angeles",
@@ -141,30 +142,30 @@ describe("the evidence on the finding screen", () => {
 });
 
 describe("the summary at the top never contradicts the rows under it (Johann, Oct 20)", () => {
-  // Six sessions; Sep 16 (Barbell Back Squat) and Sep 28 (Cable Lat Pulldown) had the first exercise prefilled but never logged.
+  // Six sessions; four had the first exercise cut short (1 of 3 sets logged, the rest prefilled but never logged).
   const mk = (iso: string, name: string, logged: boolean): PatternSession => ({
     id: iso,
     started_at: iso,
     duration_seconds: 3000,
     session_exercises: [
-      { exercise_order: 1, exercise_name: name, tracked_fields: ["reps", "weight"], group_workout_exercise_id: null, set_logs: [0, 1, 2].map((o) => (logged ? set(o) : set(o, { weight: null, reps: 8 }))) },
+      { exercise_order: 1, exercise_name: name, tracked_fields: ["reps", "weight"], group_workout_exercise_id: null, set_logs: [0, 1, 2].map((o) => (logged || o === 0 ? set(o) : set(o, { weight: null, reps: 8 }))) },
       { exercise_order: 2, exercise_name: "Romanian Deadlift", tracked_fields: ["reps", "weight"], group_workout_exercise_id: null, set_logs: [set(0), set(1)] },
     ],
   });
   const sessions = [
     mk("2026-09-14T23:00:00Z", "Barbell Back Squat", true),
     mk("2026-09-16T23:00:00Z", "Barbell Back Squat", false),
-    mk("2026-09-21T23:00:00Z", "Barbell Back Squat", true),
+    mk("2026-09-21T23:00:00Z", "Barbell Back Squat", false),
     mk("2026-09-28T23:00:00Z", "Cable Lat Pulldown", false),
-    mk("2026-10-01T23:00:00Z", "Barbell Back Squat", true),
+    mk("2026-10-01T23:00:00Z", "Barbell Back Squat", false),
     mk("2026-10-06T23:00:00Z", "Barbell Back Squat", true),
   ];
   const findings = buildSessionPatternFindings(sessions, new Map(), "America/Los_Angeles");
   const stored = [{ kind: "struggle_point", numericValues: [46, 1] }];
   it("the numbers differ from the stored note: the summary is built from what is found now, naming the sessions and exercises", () => {
-    expect(findings.find((f) => f.kind === "struggle_point")?.numericValues[0]).toBe(67);
+    expect(findings.find((f) => f.kind === "struggle_point")?.numericValues[0]).toBe(56);
     expect(patternSummary(findings, stored, "Exercise slot #1 (often the first exercise) is only getting 46% ...", "America/Los_Angeles")).toBe(
-      "Worth a look: the first exercise wasn't logged in 2 of the last 6 sessions (Sep 16 Barbell Back Squat, Sep 28 Cable Lat Pulldown)."
+      "Worth a look: the first exercise was cut short in 4 of the last 6 sessions (Sep 16 Barbell Back Squat, Sep 21 Barbell Back Squat, Sep 28 Cable Lat Pulldown, Oct 1 Barbell Back Squat)."
     );
   });
   it("the same findings with the same numbers keep the note as written", () => {

@@ -115,6 +115,7 @@ describe("Release 2 follow-ups (Oct 20)", () => {
   });
   it("in their own space on a phone the separate bell is hidden (notices live in Spotlight); at a computer it stays", () => {
     expect(read("components/group/group-hub-header.tsx")).toContain('<span className="hidden lg:inline-flex" data-bell-computer-only>');
-    expect(read("app/(coach)/groups/[groupId]/page.tsx")).toContain("bellOnComputerOnly={isActingAsOther && !!user && athleteId === user.id && (group as { organization_id?: string | null }).organization_id == null}");
+    // Oct 23: on any client app a coach looks at (their own or a client's), Spotlight carries the notices
+    expect(read("app/(coach)/groups/[groupId]/page.tsx")).toContain("bellOnComputerOnly={isActingAsOther}");
   });
 });

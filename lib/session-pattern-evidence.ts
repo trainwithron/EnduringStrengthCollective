@@ -5,6 +5,7 @@
 import { detectRpeCreep, detectRestTimeCreep, detectStrugglePoint, detectWeekdayRushing } from "./session-pattern-spotter";
 import { pastSetDone } from "./set-complete";
 import { nowInZone } from "./timezone";
+import { lastSetTime, plausibleSessionSeconds } from "./session-duration";
 
 export interface PatternSet {
   set_order: number;
@@ -27,6 +28,7 @@ export interface PatternExercise {
 export interface PatternSession {
   id: string;
   started_at: string;
+  completed_at?: string | null;
   duration_seconds: number | null;
   session_exercises: PatternExercise[] | null;
 }
@@ -43,7 +45,8 @@ export interface EvidenceSet {
 export type FindingEvidence =
   // struggle point: the flagged slot in each recent session, its exercise, how many sets were done, and the sets themselves
   // `slotLabel`: where the slot is in the workout, in words ("the first exercise").
-  | { kind: "slot_sets"; slotLabel: string; rows: { startedAt: string; exerciseName: string; done: number; total: number; sets: EvidenceSet[] }[] }
+  // `rows`: only the sessions where it fell short; `sessions`: how many recent sessions had that exercise logged at all.
+  | { kind: "slot_sets"; slotLabel: string; sessions: number; rows: { startedAt: string; exerciseName: string; done: number; total: number; sets: EvidenceSet[] }[] }
   // RPE creep: each session's average RPE
   | { kind: "session_rpe"; rows: { startedAt: string; avgRpe: number }[] }
   // rest creep: each exercise's real rest against the programmed rest
@@ -129,12 +132,15 @@ export function buildSessionPatternFindings(sessions: PatternSession[], targetRe
   }
 
   // --- Signal 3: struggle point ---
+  // An exercise with NO set done was left out on purpose (Ron, Oct 23: box jumps they were not doing, bounds after a toe surgery), not a struggle: it is not counted. One with some sets
+  // done and some not is.
+  const doneCount = (ex: PatternExercise) => (ex.set_logs ?? []).filter((set) => pastSetDone(set, ex)).length;
+  const counts = (ex: PatternExercise) => (ex.set_logs ?? []).length > 0 && doneCount(ex) > 0;
   const slotSamples: { slotIndex: number; setsCompleted: number; setsPrescribed: number }[] = [];
   for (const s of sessions) {
     for (const ex of s.session_exercises ?? []) {
-      const sets = ex.set_logs ?? [];
-      if (sets.length === 0) continue;
-      slotSamples.push({ slotIndex: ex.exercise_order, setsCompleted: sets.filter((set) => pastSetDone(set, ex)).length, setsPrescribed: sets.length });
+      if (!counts(ex)) continue;
+      slotSamples.push({ slotIndex: ex.exercise_order, setsCompleted: doneCount(ex), setsPrescribed: (ex.set_logs ?? []).length });
     }
   }
   const struggle = detectStrugglePoint(slotSamples);
@@ -143,13 +149,15 @@ export function buildSessionPatternFindings(sessions: PatternSession[], targetRe
     const rows = sessions
       .slice()
       .reverse()
-      .map((s) => ({ s, ex: (s.session_exercises ?? []).find((e) => e.exercise_order === struggle.slotIndex && (e.set_logs ?? []).length > 0) }))
-      .filter((x): x is { s: PatternSession; ex: PatternExercise } => !!x.ex)
+      .map((s) => ({ s, ex: (s.session_exercises ?? []).find((e) => e.exercise_order === struggle.slotIndex && counts(e)) }))
+      // only the sessions where it fell short: a session where every set was done is not evidence of a struggle (Oct 23: "I don't know why that's showing me that")
+      .filter((x): x is { s: PatternSession; ex: PatternExercise } => !!x.ex && doneCount(x.ex) < (x.ex.set_logs ?? []).length)
       .map(({ s, ex }) => {
         const sets = [...(ex.set_logs ?? [])].sort((a, b) => a.set_order - b.set_order).map((set) => evidenceSet(set, ex));
         return { startedAt: s.started_at, exerciseName: ex.exercise_name, done: sets.filter((x) => x.done).length, total: sets.length, sets };
       });
     const names = Array.from(new Set(rows.map((r) => r.exerciseName)));
+    if (rows.length === 0) return findings.concat(rushingFinding());
     // The slot's place among the slots these sessions have (exercise_order may start at 0 or 1).
     const orders = Array.from(new Set(slotSamples.map((x) => x.slotIndex))).sort((a, b) => a - b);
     const rank = orders.indexOf(struggle.slotIndex);
@@ -160,17 +168,24 @@ export function buildSessionPatternFindings(sessions: PatternSession[], targetRe
       kind: "struggle_point",
       description: `Exercise slot #${struggle.slotIndex} (${which}) is only getting ${pct}% of its prescribed sets completed on average.`,
       numericValues: [pct, struggle.slotIndex, ...(names.length === 1 ? [] : [names.length])],
-      evidence: { kind: "slot_sets", slotLabel, rows },
+      evidence: { kind: "slot_sets", slotLabel, sessions: struggle.sampleSize, rows },
     });
   }
 
+  return findings.concat(rushingFinding());
+
   // --- Signal 4: weekday rushing ---
-  const timed = sessions.filter((s) => typeof s.duration_seconds === "number" && s.duration_seconds > 0);
-  const rushing = detectWeekdayRushing(timed.map((s) => ({ weekday: weekdayOf(s.started_at), durationSeconds: s.duration_seconds as number })));
-  if (rushing) {
+  // Each session's real length (lib/session-duration.ts): one left open and finished the next morning is not a 17-hour workout (Ron, Oct 23); it is timed by its last set, or left out.
+  function rushingFinding(): SessionPatternFinding[] {
+  const timed = sessions
+    .map((s) => ({ s, seconds: plausibleSessionSeconds({ startedAt: s.started_at, completedAt: s.completed_at, durationSeconds: s.duration_seconds, lastSetAt: lastSetTime((s.session_exercises ?? []).flatMap((e) => (e.set_logs ?? []) as { completed_at?: string | null }[])), timeZone }) }))
+    .filter((x): x is { s: PatternSession; seconds: number } => x.seconds !== null);
+  const rushing = detectWeekdayRushing(timed.map((x) => ({ weekday: weekdayOf(x.s.started_at), durationSeconds: x.seconds })));
+  if (!rushing) return [];
+  {
     const avgMin = Math.round(rushing.avgDurationSeconds / 60);
     const overallMin = Math.round(rushing.overallAvgDurationSeconds / 60);
-    findings.push({
+    return [{
       kind: "weekday_rushing",
       description: `${WEEKDAY_LABELS[rushing.weekday]} sessions average ${avgMin} min, real sessions overall average ${overallMin} min.`,
       numericValues: [avgMin, overallMin],
@@ -179,14 +194,13 @@ export function buildSessionPatternFindings(sessions: PatternSession[], targetRe
         weekday: WEEKDAY_LABELS[rushing.weekday],
         overallMinutes: overallMin,
         rows: timed
-          .filter((s) => weekdayOf(s.started_at) === rushing.weekday)
+          .filter((x) => weekdayOf(x.s.started_at) === rushing.weekday)
           .reverse()
-          .map((s) => ({ startedAt: s.started_at, minutes: Math.round((s.duration_seconds as number) / 60) })),
+          .map((x) => ({ startedAt: x.s.started_at, minutes: Math.round(x.seconds / 60) })),
       },
-    });
+    }];
   }
-
-  return findings;
+  }
 }
 
 // One set as a coach reads it: "135 x 8", "8 reps", "30s", "not logged" for a set with nothing done. Weights are stored in pounds; `toUnit` shows them in the client's unit.
@@ -217,14 +231,10 @@ const listDays = (rows: { startedAt: string; exerciseName: string }[], timeZone:
 // One plain sentence for a finding, from what actually happened (the struggle point says which sessions and exercises; the others keep their own sentence).
 export function findingSentence(f: SessionPatternFinding, timeZone: string): string {
   if (f.kind !== "struggle_point" || f.evidence?.kind !== "slot_sets") return f.description;
-  const { rows, slotLabel } = f.evidence;
-  const none = rows.filter((r) => r.done === 0);
-  const short = rows.filter((r) => r.done > 0 && r.done < r.total);
-  const parts: string[] = [];
-  if (none.length > 0) parts.push(`${slotLabel} wasn't logged in ${none.length} of the last ${rows.length} sessions (${listDays(none, timeZone)})`);
-  if (short.length > 0) parts.push(`${none.length > 0 ? "and it" : slotLabel} was cut short in ${short.length}${none.length > 0 ? "" : ` of the last ${rows.length} sessions`} (${listDays(short, timeZone)})`);
-  if (parts.length === 0) return f.description;
-  return `Worth a look: ${parts.join(" ")}.`;
+  // Every row is a session where it fell short (an exercise left out on purpose, with nothing logged, is not counted at all).
+  const { rows, slotLabel, sessions } = f.evidence;
+  if (rows.length === 0) return f.description;
+  return `Worth a look: ${slotLabel} was cut short in ${rows.length} of the last ${sessions} sessions (${listDays(rows, timeZone)}).`;
 }
 
 // The note at the top of the finding screen. The note as written stands only while the findings are the same ones with the same numbers; otherwise it is built from what is

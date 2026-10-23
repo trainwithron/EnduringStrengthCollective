@@ -55,7 +55,8 @@ describe("what needs the coach is at the top of the drop-down", () => {
   it("read when the page opens and every time Spotlight opens", () => {
     expect(hub).toContain("loadNeeds(false);");
     expect(hub).toContain("loadNeeds(true);");
-    expect(hub).toContain("{needs && !needs.needsChoice && <SpotNeedsTop needs={needs} onNavigated={close} />}");
+    expect(hub).toContain("{needs && !needs.needsChoice && (");
+    expect(hub).toMatch(/<SpotNeedsTop\s+needs=\{needs\}\s+onNavigated=\{close\}/);
   });
   it("the route works for the organization the coach is in, and asks nothing when it must be chosen", () => {
     const route = read("app/api/coach/spot-needs/route.ts");

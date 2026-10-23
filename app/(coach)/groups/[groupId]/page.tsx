@@ -880,7 +880,9 @@ export default async function GroupHubPage(
         coachId={user?.id}
         viewerId={user?.id}
         logoUrl={orgTheme.logoUrl}
-        bellOnComputerOnly={isActingAsOther && !!user && athleteId === user.id && (group as { organization_id?: string | null }).organization_id == null}
+        // A coach looking at any client app (their own or a client's) has Spotlight, which lists the same notices: on a phone the separate bell is not shown (Ron, Oct 23: "I have two
+        // different notification bells"). The computer keeps its bell.
+        bellOnComputerOnly={isActingAsOther}
         notifications={(notificationRows ?? []).map((n: any) => ({
           id: n.id,
           type: n.type,

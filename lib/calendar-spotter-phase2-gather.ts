@@ -11,6 +11,7 @@ import {
 } from "./calendar-spotter-phase2";
 import { readStayingMembers } from "./org-members";
 import { ASK_HEADLINE, FOLLOWUP_HEADLINE, scheduleGapsStage, type GapAnswerEvent } from "./schedule-gaps-question";
+import { plausibleSessionSeconds } from "./session-duration";
 
 export interface SchedulingSpotterFlag {
   checkKind: "schedule_gaps" | "recurring_gap" | "uneven_load" | "duration_mismatch";
@@ -128,7 +129,7 @@ export async function gatherSchedulingSpotterFlags(
   // --- Pattern 3: booked-vs-actual duration mismatch ---
   const { data: linkedSessionRows } = await supabase
     .from("athlete_sessions")
-    .select("duration_seconds, bookings!inner ( start_at, end_at, coach_id )")
+    .select("started_at, completed_at, duration_seconds, bookings!inner ( start_at, end_at, coach_id )")
     .eq("bookings.coach_id", coachId)
     .not("duration_seconds", "is", null);
 
@@ -137,7 +138,10 @@ export async function gatherSchedulingSpotterFlags(
       const booking = (row as any).bookings;
       if (!booking) return null;
       const bookedMinutes = (new Date(booking.end_at).getTime() - new Date(booking.start_at).getTime()) / 60000;
-      const actualMinutes = (row.duration_seconds ?? 0) / 60;
+      // A workout left open and finished hours later is not counted at its recorded length (lib/session-duration.ts, Oct 23).
+      const seconds = plausibleSessionSeconds({ startedAt: (row as any).started_at, completedAt: (row as any).completed_at, durationSeconds: row.duration_seconds });
+      if (seconds === null) return null;
+      const actualMinutes = seconds / 60;
       return { bookedMinutes, actualMinutes };
     })
     .filter((p): p is { bookedMinutes: number; actualMinutes: number } => p !== null);

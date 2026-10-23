@@ -149,7 +149,12 @@ export function NotificationBell({
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className={`absolute z-50 w-80 max-w-[85vw] max-h-[70vh] overflow-y-auto bg-surface border border-steel/30 shadow-lg ${placement === "above" ? "bottom-11 left-0" : "right-0 top-11"}`}>
+          {/* On a phone the panel spans the screen with a margin (Ron, Oct 23, on a 412px Galaxy: "the left side of the notifications are off of the screen": the bell sits left of other
+              buttons, and a 320px panel anchored to its right edge started past the screen's left edge). From the small-screen width up it opens beside the bell as before. */}
+          <div
+            className={`fixed left-3 right-3 z-50 max-h-[70vh] overflow-y-auto bg-surface border border-steel/30 shadow-lg sm:absolute sm:w-80 ${placement === "above" ? "bottom-20 sm:bottom-11 sm:left-0 sm:right-auto" : "top-16 sm:top-11 sm:right-0 sm:left-auto"}`}
+            data-notification-panel
+          >
             <div className="flex items-center justify-between px-3 py-2.5 border-b border-steel/15">
               <p className="font-display uppercase text-xs tracking-wide text-steel">
                 Notifications
