@@ -10,7 +10,7 @@ import { getActivePrograms } from "@/lib/active-programs";
 import { ProgramChips } from "@/components/athlete/program-chips";
 import { BookingModeLine } from "@/components/athlete/booking-mode-line";
 import { ScheduleCard } from "@/components/athlete/schedule-card";
-import { loadScheduleCardHref } from "@/lib/schedule-card";
+import { loadScheduleCard } from "@/lib/schedule-card";
 import { dateKeyInZone, getGroupCoachTimezone, nowInZone } from "@/lib/timezone";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
@@ -278,7 +278,7 @@ export default async function ProgramCalendarPage(
   const timezone = await getGroupCoachTimezone(supabase, params.groupId);
   // The Schedule card (free or request mode, with open hours): it replaces the separate sessions line in the header.
   const scheduleHref = viewingAsAthlete && coachMembership && hasAvailability
-    ? await loadScheduleCardHref(supabase, { coachId: coachMembership.profile_id, timezone, bookingMode, dayBase: `${backHref}/calendar`, messagesHref: `/groups/${params.groupId}/messages` })
+    ? await loadScheduleCard(supabase, { coachId: coachMembership.profile_id, timezone, bookingMode, dayBase: `${backHref}/calendar`, messagesHref: `/groups/${params.groupId}/messages` })
     : null;
   const creditPicture = buildCreditPicture({ balance: creditBalance, booked: creditBooked, toMark: 0 });
   const today = nowInZone(timezone);
@@ -357,7 +357,7 @@ export default async function ProgramCalendarPage(
         {viewingAsAthlete && <ProgramChips groupId={params.groupId} programs={activePrograms.map((p) => ({ id: p.id, name: p.label?.trim() || p.name }))} currentId={params.programId} />}
       </header>
 
-      {scheduleHref && <ScheduleCard available={creditPicture.toBook} href={scheduleHref} />}
+      {scheduleHref && <ScheduleCard available={creditPicture.toBook} href={scheduleHref.href} note={scheduleHref.note} />}
       {viewingAsAthlete && coachMembership && bookingMode === "coach_schedules" && <BookingModeLine groupId={params.groupId} />}
 
       {viewingAsAthlete && <UpcomingGroupEvents athleteId={athleteId} timezone={timezone} />}

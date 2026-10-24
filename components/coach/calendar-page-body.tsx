@@ -23,7 +23,7 @@ import { BookingModeLine } from "@/components/athlete/booking-mode-line";
 import { ScheduleCard } from "@/components/athlete/schedule-card";
 import { CoachPhoneSchedule, loadScheduleClients } from "@/components/coach/mobile/coach-phone-schedule";
 import { PHONE_CALENDAR } from "@/lib/phone-coach-routes";
-import { loadScheduleCardHref } from "@/lib/schedule-card";
+import { loadScheduleCard } from "@/lib/schedule-card";
 import { SessionCheckSection } from "@/components/coach/session-check-section";
 import { SessionCountLine } from "@/components/coach/session-count-line";
 import { AvailabilityBookingSettings, AvailabilityTimeOff } from "@/components/coach/desktop/availability-settings";
@@ -401,7 +401,7 @@ export async function CoachCalendarPageBody(
 
     // The Schedule card (free or request mode, with open hours): it replaces the separate sessions line here.
     const scheduleHref = coachMembership && (!isCoach || isActingAsOther) && hasAvailability
-      ? await loadScheduleCardHref(supabase, { coachId: coachMembership.profile_id, timezone: displayTz, bookingMode, dayBase: `/groups/${params.groupId}/calendar`, messagesHref: `/groups/${params.groupId}/messages` })
+      ? await loadScheduleCard(supabase, { coachId: coachMembership.profile_id, timezone: displayTz, bookingMode, dayBase: `/groups/${params.groupId}/calendar`, messagesHref: `/groups/${params.groupId}/messages` })
       : null;
     const creditPicture = buildCreditPicture({ balance: creditBalance, booked: creditBooked, toMark: 0 });
 
@@ -512,7 +512,7 @@ export async function CoachCalendarPageBody(
           )}
         </header>
 
-        {scheduleHref && <ScheduleCard available={creditPicture.toBook} href={scheduleHref} />}
+        {scheduleHref && <ScheduleCard available={creditPicture.toBook} href={scheduleHref.href} note={scheduleHref.note} />}
         {coachMembership && bookingMode === "coach_schedules" && <BookingModeLine groupId={params.groupId} />}
         <UndatedProgramCards groupId={params.groupId} programs={calendar.undated} visuals={undatedVisuals} />
 

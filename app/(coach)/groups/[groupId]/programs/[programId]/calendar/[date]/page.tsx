@@ -39,6 +39,7 @@ import { WaitlistJoinButton } from "@/components/athlete/waitlist-join-button";
 import { RecurringBookingButton } from "@/components/athlete/recurring-booking-button";
 import { RecurringConflictBadge } from "@/components/coach/desktop/recurring-conflict-badge";
 import { sessionBalanceLine, NO_SESSIONS_SLOT_LABEL } from "@/lib/session-credit-copy";
+import { fetchSlotReasons, fullyBookedLine, keepOffered, limitsActive, limitsFromRow } from "@/lib/session-caps";
 
 export const metadata = { title: "Calendar" };
 
@@ -452,6 +453,31 @@ export default async function DayDetailPage(
     reschedulingBooking = rb;
   }
 
+  // The coach's caps, Keep my sessions together and lunch break (migration 0432), as on the Calendar's day page: a client is offered only what the server would accept.
+  let fullyBooked: string | null = null;
+  if (coachMembership && membership.role !== "coach" && bookingMode !== "coach_schedules") {
+    const limitsRead = await supabase
+      .from("coach_booking_policies")
+      .select("max_sessions_per_week, max_sessions_per_month, keep_together, lunch_start, lunch_end")
+      .eq("coach_id", coachMembership.profile_id)
+      .maybeSingle();
+    const limits = limitsRead.error ? null : limitsFromRow(limitsRead.data as Record<string, unknown> | null);
+    if (limits && limitsActive(limits)) {
+      const open = slots.filter((s) => !bookingByTime.get(s.start.getTime()));
+      const reasons = await fetchSlotReasons(
+        supabase,
+        coachMembership.profile_id,
+        open.map((s) => ({ start: s.start, end: new Date(s.start.getTime() + s.durationMinutes * 60000) })),
+        reschedulingBooking?.id ?? null
+      );
+      if (reasons) {
+        const offered = new Set(keepOffered(open, reasons).map((s) => s.start.getTime()));
+        fullyBooked = fullyBookedLine(reasons);
+        slots = slots.filter((s) => bookingByTime.get(s.start.getTime())?.athlete_id === athleteId || offered.has(s.start.getTime()));
+      }
+    }
+  }
+
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
       {isActingAsOther && (
@@ -532,7 +558,9 @@ export default async function DayDetailPage(
           <p className="font-body text-sm text-steel py-2">
             {bookingMode === "coach_schedules"
               ? "Your coach schedules your sessions. Message them to set one up."
-              : "No open hours on this day. Message your coach to ask for a time."}
+              : fullyBooked
+                ? `${fullyBooked}. Message your coach to ask for a time.`
+                : "No open hours on this day. Message your coach to ask for a time."}
             <br />
             <MessageCoachLink groupId={params.groupId} />
           </p>

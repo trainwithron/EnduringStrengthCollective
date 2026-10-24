@@ -8,17 +8,21 @@ import { TimezoneControl } from "@/components/coach/desktop/timezone-control";
 import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { ensureDefaultPublicPage } from "@/lib/default-public-page";
 import { ConsultationLinkBlock } from "@/components/coach/desktop/consultation-link-block";
+import { SessionLimitsControl } from "@/components/coach/desktop/session-limits-control";
+import { limitsFromRow } from "@/lib/session-caps";
 
 // ONE Availability place (Calendar > Availability): how clients book first, then the booking rules, then the time zone; below the recurring hours come the time-off blocks. These used to live on a second page,
 // /groups/<id>/availability, which now sends the coach here. Each read that depends on a later database update hides its control until the column exists, as before.
 export async function AvailabilityBookingSettings({ coachId }: { coachId: string }) {
   const supabase = await createServerClient();
-  const [{ data: coachProfile, error: profileError }, { data: policyRow, error: policyError }, nudgeResult, headsUpResult, bookingModeResult] = await Promise.all([
+  const [{ data: coachProfile, error: profileError }, { data: policyRow, error: policyError }, nudgeResult, headsUpResult, bookingModeResult, limitsResult] = await Promise.all([
     supabase.from("profiles").select("timezone, full_name").eq("id", coachId).maybeSingle(),
     supabase.from("coach_booking_policies").select("cancellation_window_hours, buffer_minutes, minimum_notice_hours, credit_expiry_days").eq("coach_id", coachId).maybeSingle(),
     supabase.from("coach_booking_policies").select("reup_nudges_enabled").eq("coach_id", coachId).maybeSingle(),
     supabase.from("coach_booking_policies").select("expiry_heads_up_days").eq("coach_id", coachId).maybeSingle(),
     supabase.from("coach_booking_policies").select("booking_mode").eq("coach_id", coachId).maybeSingle(),
+    // Session caps, keep-together and lunch (0432): hidden until the columns exist.
+    supabase.from("coach_booking_policies").select("max_sessions_per_week, max_sessions_per_month, keep_together, lunch_start, lunch_end").eq("coach_id", coachId).maybeSingle(),
   ]);
   // A failed read must not show default settings as if they were the coach's own (the next edit would save those defaults over the real ones).
   if (profileError || policyError) {
@@ -40,6 +44,7 @@ export async function AvailabilityBookingSettings({ coachId }: { coachId: string
   return (
     <div>
       {bookingMode !== null && <BookingModeSelect coachId={coachId} initialMode={bookingMode} />}
+      {!limitsResult.error && <SessionLimitsControl coachId={coachId} initial={limitsFromRow(limitsResult.data as Record<string, unknown> | null)} />}
       {publicPage && <ConsultationLinkBlock coachId={coachId} slug={publicPage.slug} enabled={publicPage.enabled} acceptsRequests={publicPage.acceptsRequests} hasOpenHours={(openWindowCount ?? 0) > 0} />}
 
       <section className="mb-6" aria-labelledby="booking-rules">

@@ -16,6 +16,7 @@ from (
     ('2026100600429', 'client_sets_own_targets', '0429_client_sets_own_targets.sql', to_regprocedure('public.has_coach_macro_target(uuid, uuid)') is not null),
     ('2026100600430', 'allergy_rebuild', '0430_allergy_rebuild.sql', to_regprocedure('public.apply_allergy_rebuild(uuid, uuid, date, jsonb, text)') is not null),
     ('2026100600431', 'coach_read_passages', '0431_coach_read_passages.sql', to_regclass('public.coach_read_passages') is not null),
+    ('2026100600432', 'session_caps_keep_together', '0432_session_caps_keep_together.sql', to_regprocedure('public.client_slot_reason(uuid, timestamptz, timestamptz, uuid, boolean)') is not null),
     ('2026100600427', 'member_checks_set_based', '0427_member_checks_set_based.sql', to_regprocedure('public.my_group_ids()') is not null),
     ('2026100600426', 'org_wall_set_based', '0426_org_wall_set_based.sql', to_regprocedure('public.active_org_group_ids()') is not null),
     ('2026100600425', 'org_wall_follows_active_org', '0425_org_wall_follows_active_org.sql', exists (select 1 from pg_proc p where p.oid = to_regprocedure('public.request_workspace_org()') and position('x-workspace-org' in p.prosrc) > 0)),

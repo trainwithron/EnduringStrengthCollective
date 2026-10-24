@@ -1576,6 +1576,17 @@
   ]
  },
  {
+  "n": "184",
+  "slug": "0432",
+  "title": "0432 Session caps, Keep my sessions together and a lunch break (five columns on the booking policy, four functions, one call added to three booking functions)",
+  "migrations": [
+   "0432"
+  ],
+  "notApplied": [
+   "to_regprocedure('public.client_slot_reason(uuid, timestamptz, timestamptz, uuid, boolean)') is null"
+  ]
+ },
+ {
   "n": "183",
   "slug": "0431",
   "title": "0431 A coach's own passages for Read during rest (one new table: a coach adds a reference and its text, and it joins his clients' passage cycle)",

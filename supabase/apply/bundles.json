@@ -24,6 +24,14 @@
   "file": "apply-release-tc3b-client-requests-all.sql"
  },
  {
+  "id": "session-caps-keep-together",
+  "name": "Session caps, Keep my sessions together and a lunch break (five columns, four functions, one call added to three booking functions)",
+  "steps": [
+   "184"
+  ],
+  "file": "apply-session-caps-keep-together-all.sql"
+ },
+ {
   "id": "coach-read-passages",
   "name": "A coach's own passages for Read during rest (one new table)",
   "steps": [

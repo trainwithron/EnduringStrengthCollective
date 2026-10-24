@@ -69,7 +69,8 @@ describe("Schedule card: where it shows", () => {
   for (const p of ["components/coach/calendar-page-body.tsx", "app/(coach)/groups/[groupId]/programs/[programId]/calendar/page.tsx"]) {
     it(`${p}: the card replaces the separate sessions line, and BookingModeLine stays for coach_schedules`, () => {
       const src = read(p);
-      expect(src).toContain("<ScheduleCard available={creditPicture.toBook} href={scheduleHref} />");
+      // with the "Fully booked this week" line under it when the coach's cap is reached (Oct 23)
+      expect(src).toContain("<ScheduleCard available={creditPicture.toBook} href={scheduleHref.href} note={scheduleHref.note} />");
       expect(src).toMatch(/coachMembership && !scheduleHref && \(\n\s*<p className="font-body text-xs text-steel mt-3">\n\s*\{clientCreditPictureLine\(creditPicture, NO_SESSIONS_LINE\)\}/);
       expect(src).toContain('bookingMode === "coach_schedules" && <BookingModeLine groupId={params.groupId} />');
       expect(src).toContain("hasAvailability\n");

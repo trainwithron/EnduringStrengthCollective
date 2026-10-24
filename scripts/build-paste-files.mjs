@@ -2842,6 +2842,25 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "184",
+  slug: "0432",
+  title: "0432 Session caps, Keep my sessions together and a lunch break (five columns on the booking policy, four functions, one call added to three booking functions)",
+  warn: "This adds max_sessions_per_week, max_sessions_per_month (blank = no limit), keep_together (off) and lunch_start / lunch_end to coach_booking_policies, and five functions: coach_session_count (server only), my_session_count (signed-in: the coach's own count for their screens), client_slot_reason (server only: why a client may not have a time), assert_client_slot_offered (server only: the reason in words) and client_slot_reasons (signed-in, for a person who trains with that coach: what the screens offer). It then adds ONE call to each of book_session, reschedule_booking and check_booking_request_slot, right where they check the coach's hours; the paste checks that each holds that hours check exactly once, and stops if not. A coach booking for a client is never refused.",
+  migrations: ["0432"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes for anyone until a coach sets a cap, turns on Keep my sessions together or sets a lunch break (all off by default). Once the app update that goes with it is deployed, those are in Calendar > Availability.",
+  undo: "do $undo$\ndeclare\n  v_def text;\n  r record;\nbegin\n  for r in select * from (values\n    ('public.book_session(uuid,uuid,uuid,timestamp with time zone,timestamp with time zone)'::regprocedure, '(public.coach_time_is_open(p_coach_id, p_start_at, p_end_at) and public.assert_client_slot_offered(p_coach_id, p_start_at, p_end_at, null::uuid, true))', 'public.coach_time_is_open(p_coach_id, p_start_at, p_end_at)'),\n    ('public.reschedule_booking(uuid,timestamp with time zone,timestamp with time zone)'::regprocedure, '(public.coach_time_is_open(v_coach_id, p_new_start_at, p_new_end_at) and public.assert_client_slot_offered(v_coach_id, p_new_start_at, p_new_end_at, p_booking_id, true))', 'public.coach_time_is_open(v_coach_id, p_new_start_at, p_new_end_at)'),\n    ('public.check_booking_request_slot(uuid,uuid,timestamp with time zone,timestamp with time zone)'::regprocedure, '(public.coach_time_is_open(p_coach_id, p_start, p_end) and public.assert_client_slot_offered(p_coach_id, p_start, p_end, p_ignore_booking_id, false))', 'public.coach_time_is_open(p_coach_id, p_start, p_end)')\n  ) as t(fn, new_text, old_text) loop\n    v_def := pg_get_functiondef(r.fn);\n    if position(r.new_text in v_def) > 0 then\n      execute replace(v_def, r.new_text, r.old_text);\n    end if;\n  end loop;\nend $undo$;\ndrop function if exists public.my_session_count(timestamptz, timestamptz);\ndrop function if exists public.client_slot_reasons(uuid, timestamptz[], timestamptz[], uuid);\ndrop function if exists public.assert_client_slot_offered(uuid, timestamptz, timestamptz, uuid, boolean);\ndrop function if exists public.client_slot_reason(uuid, timestamptz, timestamptz, uuid, boolean);\ndrop function if exists public.coach_session_count(uuid, timestamptz, timestamptz, uuid);",
+  undoWhy: "Only if step 184 misbehaves, and only while the app update that goes with it is NOT live (its screens ask client_slot_reasons). The three booking functions get their hours check back exactly as it was and the four functions go. The five columns stay (nothing reads them without the functions).",
+  rows: [
+    ["0432 is not already applied (client_slot_reason is not there yet)", "to_regprocedure('public.client_slot_reason(uuid, timestamptz, timestamptz, uuid, boolean)') is null"],
+    ["book_session holds its hours check exactly once", "coalesce((select (length(d) - length(replace(d, 'public.coach_time_is_open(p_coach_id, p_start_at, p_end_at)', ''))) / length('public.coach_time_is_open(p_coach_id, p_start_at, p_end_at)') = 1 from (select pg_get_functiondef(to_regprocedure('public.book_session(uuid,uuid,uuid,timestamp with time zone,timestamp with time zone)')) as d) x), false)"],
+    ["reschedule_booking holds its hours check exactly once", "coalesce((select (length(d) - length(replace(d, 'public.coach_time_is_open(v_coach_id, p_new_start_at, p_new_end_at)', ''))) / length('public.coach_time_is_open(v_coach_id, p_new_start_at, p_new_end_at)') = 1 from (select pg_get_functiondef(to_regprocedure('public.reschedule_booking(uuid,timestamp with time zone,timestamp with time zone)')) as d) x), false)"],
+    ["check_booking_request_slot holds its hours check exactly once", "coalesce((select (length(d) - length(replace(d, 'public.coach_time_is_open(p_coach_id, p_start, p_end)', ''))) / length('public.coach_time_is_open(p_coach_id, p_start, p_end)') = 1 from (select pg_get_functiondef(to_regprocedure('public.check_booking_request_slot(uuid,uuid,timestamp with time zone,timestamp with time zone)')) as d) x), false)"],
+    ["the tables and functions it uses exist", "to_regclass('public.coach_booking_policies') is not null and to_regclass('public.coach_availability_windows') is not null and to_regclass('public.group_sessions') is not null and to_regprocedure('public.coach_time_is_open(uuid, timestamptz, timestamptz)') is not null and to_regprocedure('public.coach_time_zone(uuid)') is not null"],
+  ],
+});
+
+STEPS.push({
   n: "183",
   slug: "0431",
   title: "0431 A coach's own passages for Read during rest (one new table: a coach adds a reference and its text, and it joins his clients' passage cycle)",
@@ -3855,6 +3874,7 @@ const BUNDLES = [
   { id: "release-ts3-team-sheet-save", name: "Release TS3 (saving a filled team sheet: one table, one notice kind, three functions)", steps: ["171"] },
   { id: "release-own1-owner-accepted-only", name: "Release OWN1 (ownership cannot be handed to someone who has never signed in; replaces two functions, adds one function and one trigger)", steps: ["172"] },
   { id: "release-tc3b-client-requests", name: "Release TC3 part B (Request to train with me on a coach's public page: one column, three tables, eight functions)", steps: ["174"] },
+  { id: "session-caps-keep-together", name: "Session caps, Keep my sessions together and a lunch break (five columns, four functions, one call added to three booking functions)", steps: ["184"] },
   { id: "coach-read-passages", name: "A coach's own passages for Read during rest (one new table)", steps: ["183"] },
   { id: "allergy-auto-rebuild", name: "Allergy auto-rebuild (a client's new allergy swaps the clashing options of their plan automatically: one column, one function added, one replaced)", steps: ["182"] },
   { id: "fix3-no-show-walk-in", name: "FIX 3 (logging settles the session on the calendar once; no-show Charge or Waive; a late move is one session; the walk-in)", steps: ["180"] },
@@ -4119,6 +4139,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0429", "to_regprocedure('public.has_coach_macro_target(uuid, uuid)') is not null"),
     m("0430", "to_regprocedure('public.apply_allergy_rebuild(uuid, uuid, date, jsonb, text)') is not null"),
     m("0431", "to_regclass('public.coach_read_passages') is not null"),
+    m("0432", "to_regprocedure('public.client_slot_reason(uuid, timestamptz, timestamptz, uuid, boolean)') is not null"),
     m("0427", "to_regprocedure('public.my_group_ids()') is not null"),
     m("0426", "to_regprocedure('public.active_org_group_ids()') is not null"),
     m("0425", "exists (select 1 from pg_proc p where p.oid = to_regprocedure('public.request_workspace_org()') and position('x-workspace-org' in p.prosrc) > 0)"),

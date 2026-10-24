@@ -2,6 +2,7 @@ import { generateSlotsForDate, resolveBlockedRangesForDate, minimumNoticeBlocked
 import { fetchSessionMinutes, sessionMinutesFor } from "./availability-windows";
 import { dateKeyInZone, addDaysToKey, getGroupCoachTimezone } from "./timezone";
 import { buildCreditPicture, fetchBookingCounts } from "./credit-picture";
+import { fetchSlotReasons, fullyBookedLine, limitsActive, limitsFromRow } from "./session-caps";
 
 // The Schedule card at the top of a client's Calendar (Ron, Oct 19: "something small, that says like credits available, would you like to schedule?"):
 // "4 sessions available" and one button that opens the soonest day in the next 14 with an open time, worked out exactly the way that day's page works
@@ -27,6 +28,8 @@ export function soonestScheduleDays(input: {
   requestMode: boolean;
   now?: Date;
   days?: number;
+  // The coach's caps / keep-together / lunch (0432): only the times the server would offer count as open. Absent = every time counts, as before.
+  isOffered?: (start: Date) => boolean;
 }): { openDay: string | null; requestDay: string | null } {
   const now = input.now ?? new Date();
   const todayKey = dateKeyInZone(input.timezone, now);
@@ -37,7 +40,7 @@ export function soonestScheduleDays(input: {
     const date = new Date(`${key}T00:00:00`);
     const blocked = resolveBlockedRangesForDate(date, input.exceptions, input.timezone);
     if (notice) blocked.push(notice);
-    const slots = generateSlotsForDate(date, input.windows, blocked, input.timezone).filter((s) => s.start > now);
+    const slots = generateSlotsForDate(date, input.windows, blocked, input.timezone).filter((s) => s.start > now && (!input.isOffered || input.isOffered(s.start)));
     if (slots.length > 0) return { openDay: key, requestDay };
     if (input.requestMode && requestDay === null) {
       const asks = customStartOptions({ date, windows: input.windows, blockedRanges: blocked, bookings: [], bufferMinutes: input.bufferMinutes, timezone: input.timezone }).filter((s) => s.start > now);
@@ -58,6 +61,14 @@ export async function loadScheduleCardHref(
   supabase: any,
   input: { coachId: string; timezone: string; bookingMode: string; dayBase: string; messagesHref: string }
 ): Promise<string | null> {
+  return (await loadScheduleCard(supabase, input))?.href ?? null;
+}
+
+// The same, with the one line under it when the coach is full: "Fully booked this week" (Oct 23, the coach's caps).
+export async function loadScheduleCard(
+  supabase: any,
+  input: { coachId: string; timezone: string; bookingMode: string; dayBase: string; messagesHref: string }
+): Promise<{ href: string; note: string | null } | null> {
   if (input.bookingMode !== "free" && input.bookingMode !== "request") return null;
   const [{ data: windowRows }, { data: exceptionRows }, { data: policyRow }, sessionIndex] = await Promise.all([
     supabase.from("coach_availability_windows").select("weekday, start_time, end_time, slot_duration_minutes").eq("coach_id", input.coachId),
@@ -81,6 +92,31 @@ export async function loadScheduleCardHref(
     startTime: e.start_time,
     endTime: e.end_time,
   }));
+  // The coach's caps / keep-together / lunch: the fortnight's times are checked with the server once, and only what it would offer counts as open.
+  let isOffered: ((start: Date) => boolean) | undefined;
+  let note: string | null = null;
+  const limitsRead = await supabase.from("coach_booking_policies").select("max_sessions_per_week, max_sessions_per_month, keep_together, lunch_start, lunch_end").eq("coach_id", input.coachId).maybeSingle();
+  const limits = limitsRead.error ? null : limitsFromRow(limitsRead.data);
+  if (limits && limitsActive(limits)) {
+    const now = new Date();
+    const todayKey = dateKeyInZone(input.timezone, now);
+    const candidates: { start: Date; end: Date; key: string }[] = [];
+    for (let i = 0; i < SCHEDULE_LOOKAHEAD_DAYS; i++) {
+      const key = addDaysToKey(todayKey, i);
+      const date = new Date(`${key}T00:00:00`);
+      for (const s of generateSlotsForDate(date, windows, resolveBlockedRangesForDate(date, exceptions, input.timezone), input.timezone)) {
+        if (s.start > now) candidates.push({ start: s.start, end: new Date(s.start.getTime() + s.durationMinutes * 60000), key });
+      }
+    }
+    const reasons = await fetchSlotReasons(supabase, input.coachId, candidates);
+    if (reasons) {
+      const ok = new Set(candidates.filter((_, i) => reasons[i] == null).map((c) => c.start.getTime()));
+      isOffered = (start) => ok.has(start.getTime());
+      // This week's times all refused by a cap: say so on the card.
+      const weekEnd = addDaysToKey(todayKey, 7 - new Date(`${todayKey}T00:00:00`).getDay());
+      note = fullyBookedLine(reasons.filter((_, i) => candidates[i].key < weekEnd));
+    }
+  }
   const days = soonestScheduleDays({
     windows,
     exceptions,
@@ -88,8 +124,9 @@ export async function loadScheduleCardHref(
     minimumNoticeHours: policyRow?.minimum_notice_hours ?? 0,
     bufferMinutes: policyRow?.buffer_minutes ?? 0,
     requestMode: input.bookingMode === "request",
+    isOffered,
   });
-  return scheduleCardHref(days, input.dayBase, input.messagesHref);
+  return { href: scheduleCardHref(days, input.dayBase, input.messagesHref), note };
 }
 
 // The coach's read-only "View as client" preview: the same card, with the same numbers, decided the same way as the client's own Calendar

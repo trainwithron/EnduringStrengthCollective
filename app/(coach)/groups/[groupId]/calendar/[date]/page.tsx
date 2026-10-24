@@ -48,6 +48,7 @@ import { WaitlistJoinButton } from "@/components/athlete/waitlist-join-button";
 import { RecurringBookingButton } from "@/components/athlete/recurring-booking-button";
 import { RecurringConflictBadge } from "@/components/coach/desktop/recurring-conflict-badge";
 import { NO_SESSIONS_SLOT_LABEL, NO_SESSIONS_LINE } from "@/lib/session-credit-copy";
+import { capToneClass, fetchSlotReasons, fullyBookedLine, keepOffered, limitsActive, limitsFromRow, loadCapLines } from "@/lib/session-caps";
 
 export const metadata = { title: "Calendar" };
 
@@ -300,6 +301,31 @@ export default async function CoachDayDetailPage(
     if (bookingMode === "coach_schedules") {
       slots = slots.filter((s) => bookingByTime.get(s.start.getTime())?.athlete_id === athleteId);
     }
+    // The coach's caps, Keep my sessions together and lunch break (migration 0432): a client is offered only the times the server would accept (it decides; the screen asks it). Their own
+    // sessions stay listed. Nothing set (or before the database update) = offered as before. A coach booking is never limited.
+    let fullyBooked: string | null = null;
+    if (coachMembership && membership.role !== "coach" && bookingMode !== "coach_schedules") {
+      const limitsRead = await supabase
+        .from("coach_booking_policies")
+        .select("max_sessions_per_week, max_sessions_per_month, keep_together, lunch_start, lunch_end")
+        .eq("coach_id", coachMembership.profile_id)
+        .maybeSingle();
+      const limits = limitsRead.error ? null : limitsFromRow(limitsRead.data as Record<string, unknown> | null);
+      if (limits && limitsActive(limits)) {
+        const open = slots.filter((s) => !bookingByTime.get(s.start.getTime()));
+        const reasons = await fetchSlotReasons(
+          supabase,
+          coachMembership.profile_id,
+          open.map((s) => ({ start: s.start, end: new Date(s.start.getTime() + s.durationMinutes * 60000) })),
+          reschedulingBooking?.id ?? null
+        );
+        if (reasons) {
+          const offered = new Set(keepOffered(open, reasons).map((s) => s.start.getTime()));
+          fullyBooked = fullyBookedLine(reasons);
+          slots = slots.filter((s) => bookingByTime.get(s.start.getTime())?.athlete_id === athleteId || offered.has(s.start.getTime()));
+        }
+      }
+    }
     // Times this client has already asked for (pending requests), so the slot says "Requested" instead of offering the button again.
     const requestedTimes = new Set<number>();
     // The request's id for each time asked for, so a request that is still waiting can be taken back.
@@ -415,7 +441,9 @@ export default async function CoachDayDetailPage(
             <p className="font-body text-sm text-steel py-2">
               {bookingMode === "coach_schedules"
                 ? "Your coach schedules your sessions. Message them to set one up."
-                : "No open hours on this day. Message your coach to ask for a time."}
+                : fullyBooked
+                  ? `${fullyBooked}. Message your coach to ask for a time.`
+                  : "No open hours on this day. Message your coach to ask for a time."}
               <br />
               <MessageCoachLink groupId={params.groupId} />
             </p>
@@ -761,6 +789,21 @@ export default async function CoachDayDetailPage(
     </div>
   );
 
+  // The coach's session caps for the week and month holding this day (Calendar > Availability, Oct 23): "25 of 25 this week", amber at the cap, rust over. The coach can still book.
+  const capDow = new Date(`${params.date}T00:00:00`).getDay();
+  const capWeekStart = addDaysToDateKey(params.date, -capDow);
+  const capMonthStart = `${params.date.slice(0, 7)}-01`;
+  const capNextMonth = (() => {
+    const [cy, cm] = params.date.split("-").map(Number);
+    return cm === 12 ? `${cy + 1}-01-01` : `${cy}-${String(cm + 1).padStart(2, "0")}-01`;
+  })();
+  const capLines = await loadCapLines(supabase, user.id, {
+    weekFromIso: zonedTimeToUtc(capWeekStart, "00:00", timezone).toISOString(),
+    weekToIso: zonedTimeToUtc(addDaysToDateKey(capWeekStart, 7), "00:00", timezone).toISOString(),
+    monthFromIso: zonedTimeToUtc(capMonthStart, "00:00", timezone).toISOString(),
+    monthToIso: zonedTimeToUtc(capNextMonth, "00:00", timezone).toISOString(),
+  });
+
   // Back to the calendar with the same client still picked (the phone calendar reads scheduleFor, the desktop one client).
   const backHref = clientId
     ? `/groups/${params.groupId}/calendar?client=${clientId}&scheduleFor=${clientId}`
@@ -775,6 +818,16 @@ export default async function CoachDayDetailPage(
         <h1 className="font-display font-bold text-3xl uppercase leading-none mt-3">
           {date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
         </h1>
+        {capLines.length > 0 && (
+          <p className="font-body text-sm mt-2" data-cap-lines>
+            {capLines.map((c, i) => (
+              <span key={c.text} className={capToneClass(c.tone)}>
+                {i > 0 ? " · " : ""}
+                {c.text}
+              </span>
+            ))}
+          </p>
+        )}
         {/* The instruction to tap a time is said once, right above the grid (DayCalendar). */}
         {selectedClient && (
           <p className="font-body text-sm text-steel mt-3">
