@@ -16,8 +16,6 @@ import {
   type TrackedField,
 } from "@/lib/exercise-fields";
 import { parseNumericReps } from "@/lib/program-card-visuals";
-import { isExerciseUnlocked, type PriorBest } from "@/lib/obstacle-unlock";
-import { Lock, LockOpen } from "lucide-react";
 import { isSetFilled } from "@/lib/set-complete";
 import { InfoTip } from "@/components/shared/info-tip";
 import { MAX_REST_SECONDS, formatRest, formatRestSpan, parseRestInput, restForSet } from "@/lib/rest-time";
@@ -97,7 +95,6 @@ function GridCell({
   onChange,
   onTouched,
   setNumber,
-  locked,
   coachRest,
   coachRestMax,
 }: {
@@ -113,12 +110,6 @@ function GridCell({
   // only then may a prefilled-from-the-program set count as done.
   onTouched: () => void;
   setNumber: number;
-  // Obstacle-unlock mechanic (lib/obstacle-unlock.ts, Phase 1 of the
-  // gamified-logging thread) — only ever true for the weight cell of an
-  // exercise that hasn't cleared its goal yet. The suggested weight
-  // itself still shows (an athlete needs the real number to train), this
-  // just adds the lock badge signaling there's a goal to beat.
-  locked?: boolean;
 }) {
   const prop = ACTUAL_PROP[field] as keyof SetLogEntry;
   const value = set[prop];
@@ -162,14 +153,6 @@ function GridCell({
   const suggestionText = suggestion === null || suggestion === undefined ? null : field === "weight" && typeof suggestion === "number" ? liftCellText(suggestion, unit) : String(suggestion);
   const placeholder = field === "rest" ? "m:ss" : suggestionText ?? "—";
 
-  // What the obstacle-unlock mechanic protects — NOT the same thing as
-  // `suggestion` above, which the server deliberately nulls out the
-  // instant weight has a real value (it's a swipe-to-accept placeholder,
-  // pointless once already filled). A program's real target_weight stays
-  // present on the set regardless of fill state, which is exactly what's
-  // needed here: the lock has to keep showing over an already-pre-filled
-  // value, not just an empty one.
-  const hasGoalToProtect = field === "weight" && (set.targetWeight != null || suggestion != null);
 
   function commit(next: string | number | null) {
     // Weight is the one field the obstacle-unlock mechanic cares about —
@@ -236,14 +219,10 @@ function GridCell({
 
   // On a touch screen the swipe is the next exercise, so the grey suggested number is taken with one tap instead: the first tap on an empty cell fills it in (and does not open the keyboard), a second tap edits it.
   const touchTap = useRef(false);
+  // Set when a filled box was just focused and its number selected (so the mouseup of that same tap does not drop the selection).
+  const selectOnFocus = useRef(false);
   const tapAccepts = !readOnly && draft.trim() === "" && suggestion != null && field !== "rest";
 
-  // Decoupled from whether the cell is empty — pre-filled and swiped-in
-  // values show the overlay too, as long as this exercise's goal hasn't
-  // actually been cleared yet (a coach-set target auto-fills the exact
-  // value it's asking the athlete to hit, so "the cell has a value" was
-  // never a meaningful signal that the goal had actually been attempted).
-  const showLock = !!locked && hasGoalToProtect;
 
   if (field === "rest" && coachRest != null) {
     return (
@@ -263,7 +242,7 @@ function GridCell({
         inputMode={isNumeric ? (field === "reps" ? "numeric" : "decimal") : undefined}
         aria-label={`${def.label} for set ${setNumber}${
           suggestion != null && draft.trim() === "" ? `, suggested ${suggestionText ?? suggestion}` : ""
-        }${showLock ? " — locked, beat this to unlock it" : ""}`}
+        }`}
         placeholder={placeholder}
         value={draft}
         disabled={readOnly}
@@ -272,6 +251,22 @@ function GridCell({
           if (invalid) setInvalid(null);
         }}
         aria-invalid={invalid ? true : undefined}
+        // A box that already holds a number (a suggested one just taken, or one logged before) selects it when tapped, so typing replaces it (Ron, Oct 23: "I tap it ... and then I
+        // type the 8 again, and then it'll give me 88 reps"). Selected again on the next frame for iPhone, which places the caret after the tap.
+        onFocus={(e) => {
+          const el = e.currentTarget;
+          if (el.value === "") return;
+          selectOnFocus.current = true;
+          el.select();
+          requestAnimationFrame(() => {
+            if (document.activeElement === el) el.select();
+          });
+        }}
+        onMouseUp={(e) => {
+          // the click that focused the box would otherwise drop the selection
+          if (selectOnFocus.current) e.preventDefault();
+          selectOnFocus.current = false;
+        }}
         onBlur={handleBlur}
         {...swipe}
         onPointerDown={(e) => {
@@ -293,11 +288,7 @@ function GridCell({
           unsaved ? "border-2 border-amber-400/70 " : ""
         }${
           invalid ? "border-2 border-rust " : ""
-        }${
-          showLock
-            ? "bg-surface border-2 border-dashed border-rust/70 text-chalk/70"
-            : "bg-surface border border-steel/30 text-chalk"
-        }`}
+        }bg-surface border border-steel/30 text-chalk`}
       />
       {invalid && (
         <p
@@ -313,25 +304,6 @@ function GridCell({
           title="Not saved yet"
           className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-400 border border-graphite pointer-events-none"
         />
-      )}
-      {showLock && (
-        <>
-          {/* A real veil over the number, not just a frame around it — dims
-              it (still readable if you look, satisfying that the athlete
-              needs the real number to train by) without fully hiding it,
-              so it reads as "something to break through" rather than "a
-              badge decorating a fully-normal value." */}
-          <div
-            aria-hidden="true"
-            className="absolute inset-0 rounded-token-pill bg-rust/15 pointer-events-none"
-          />
-          <div
-            aria-hidden="true"
-            className="absolute -bottom-1.5 -right-1.5 w-5 h-5 rounded-full bg-graphite border-2 border-rust flex items-center justify-center pointer-events-none animate-[obstacle-lock-pulse_1.6s_ease-in-out_infinite]"
-          >
-            <Lock className="w-2.5 h-2.5 text-rust" strokeWidth={3} />
-          </div>
-        </>
       )}
     </div>
   );
@@ -424,8 +396,6 @@ export function ExerciseSetGrid({
   trackedFields,
   readOnly,
   onSetChange,
-  priorBest,
-  gamificationEnabled = true,
   weightOptional = false,
 }: {
   sets: SetLogEntry[];
@@ -433,8 +403,6 @@ export function ExerciseSetGrid({
   trackedFields: TrackedField[];
   readOnly: boolean;
   onSetChange: (setId: string, patch: Partial<SetLogEntry>) => void;
-  priorBest?: PriorBest;
-  gamificationEnabled?: boolean;
 }) {
   const fields = orderTrackedFields(trackedFields);
   const { save } = useSetSave();
@@ -449,43 +417,6 @@ export function ExerciseSetGrid({
     });
   }
 
-  // Obstacle-unlock (Phase 1 of the gamified-logging thread,
-  // lib/obstacle-unlock.ts) — re-derived from the exercise's real current
-  // sets on every render rather than stored as separate state, so it's
-  // always consistent with whatever's actually logged (including surviving
-  // a reload, or self-correcting if a cleared value gets edited back
-  // down). Off entirely when gamification is disabled for this group, or
-  // once any set proves the goal cleared.
-  const unlocked =
-    !gamificationEnabled ||
-    isExerciseUnlocked(
-      // a warm-up or drop set never unlocks anything (it is not a record)
-      sets.filter((s) => s.setType !== "warmup" && s.setType !== "drop").map((s) => ({
-        weight: s.weight,
-        reps: s.reps,
-        targetWeight: s.targetWeight ?? null,
-        targetReps: s.targetReps ?? null,
-        weightConfirmed: !!s.weightConfirmed,
-      })),
-      priorBest ?? { maxWeight: null, maxReps: null, maxVolume: null }
-    );
-
-  // One-shot "defeated the obstacle" feedback exactly at the moment it
-  // flips from locked to unlocked — never on the initial locked or
-  // already-unlocked render, and never again afterward for this exercise
-  // instance (matches "the unlock persists," not a repeated animation).
-  const [justUnlocked, setJustUnlocked] = useState(false);
-  const wasUnlocked = useRef(unlocked);
-  useEffect(() => {
-    if (unlocked && !wasUnlocked.current) {
-      vibrateConfirm();
-      setJustUnlocked(true);
-      const t = setTimeout(() => setJustUnlocked(false), 900);
-      wasUnlocked.current = unlocked;
-      return () => clearTimeout(t);
-    }
-    wasUnlocked.current = unlocked;
-  }, [unlocked]);
 
   // Swipe-to-fill (b): a per-row drag handle propagates set 1's current
   // value for THAT field across every other set in the row — scoped per
@@ -647,12 +578,6 @@ export function ExerciseSetGrid({
               {field === "rpe" && (
                 <InfoTip text="Rate of Perceived Exertion — how hard that set felt, 1 (easy) to 10 (max effort)." />
               )}
-              {field === "weight" && justUnlocked && (
-                <LockOpen
-                  aria-hidden="true"
-                  className="w-3 h-3 text-rust animate-[obstacle-unlock-pop_0.7s_ease-out]"
-                />
-              )}
             </span>
             <RowHandle field={field} />
             {sets.map((set, i) => (
@@ -664,7 +589,6 @@ export function ExerciseSetGrid({
                 setNumber={i + 1}
                 onTouched={() => markTouched(set.id)}
                 onChange={(patch) => onSetChange(set.id, patch)}
-                locked={field === "weight" && !unlocked}
                 coachRest={(() => {
                   const r = restForSet(sets, set.id);
                   return r && r.source === "coach" ? r.seconds : null;

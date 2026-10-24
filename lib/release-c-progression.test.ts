@@ -150,14 +150,11 @@ describe("review fixes for Release C", () => {
     expect(pickRecordSet([{ weight: 225, reps: 1 }, { weight: 185, reps: 8 }], [])).toEqual({ weight: 185, reps: 8 });
     expect(pickRecordSet([{ weight: 100, reps: 5 }], [{ weight: 100, reps: 5 }])).toBeNull();
   });
-  it("the share card shows the longest hold, counts only working sets, and the logger's unlock and prior best skip warm-ups", () => {
+  it("the share card shows the longest hold and counts only working sets (the logger's unlock and prior best are gone with the locks, Oct 23)", () => {
     const share = src("lib/shared-workout.ts");
     expect(share).toContain("holdSeconds");
     expect(share).toContain("if (!countsForProgress(row.set_type)) continue;");
-    const grid = src("components/logging/exercise-set-grid.tsx");
-    expect(grid).toContain('s.setType !== "warmup" && s.setType !== "drop"');
     const page = src("app/sessions/[sessionId]/page.tsx");
-    expect(page).toContain("countedRowsByName");
     expect(page).toContain("readLoggedSets(");
   });
   it("a set checked off with no reps does not decide the next rep goal", () => {

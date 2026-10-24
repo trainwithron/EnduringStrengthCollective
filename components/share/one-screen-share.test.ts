@@ -7,7 +7,7 @@ import { buildShareImageModel, drawShareImage, planFor, FALLBACK_THEME, SHARE_IM
 const read = (rel: string) => readFileSync(join(__dirname, "..", "..", rel), "utf8").replace(/\r\n/g, "\n");
 
 describe("the post-workout screen is ONE screen with one primary Share", () => {
-  it("the share controls have no shape or name toggles, one Share button, a quiet Back to Home and a small See full workout", () => {
+  it("the share controls have no shape or name toggles, one Share button, a quiet Back to Home and (for the owner) a small Customize card", () => {
     const src = read("components/share/share-actions.tsx");
     expect(src).not.toContain("Name on");
     expect(src).not.toContain("Name off");
@@ -15,7 +15,9 @@ describe("the post-workout screen is ONE screen with one primary Share", () => {
     expect(src).not.toContain("Picture shape");
     expect(src).toContain('"Share"');
     expect(src).toContain("Back to Home");
-    expect(src).toContain("See full workout");
+    expect(src).not.toContain("See full workout");
+    expect(src).toContain("Customize card");
+    expect(read("components/share/share-screen.tsx")).toContain('customizeHref={isOwner ? "#customize" : null}');
     expect(src).toContain("Save image");
     expect(src).toContain("Copy image");
   });

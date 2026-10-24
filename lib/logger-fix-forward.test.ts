@@ -26,7 +26,8 @@ describe("the logging card fits the screen", () => {
     expect(carousel).toContain("maxHeight: maxHeight ?? undefined");
   });
   it("a card left between two cards is put back on the nearest one when scrolling stops", () => {
-    expect(carousel).toContain("Math.round(scroller.scrollLeft / width) * width");
+    expect(carousel).toContain("const index = Math.round(scroller.scrollLeft / width);");
+    expect(carousel).toContain("const target = index * width;");
   });
   it("the set grid columns are narrow enough for three or four sets inside the card", () => {
     expect(grid).not.toContain("w-16");
@@ -64,7 +65,10 @@ describe("the swipe works with a real finger", () => {
   });
   it("the settle step waits for the scroll to end and for the finger to lift", () => {
     expect(carousel).toContain('scroller.addEventListener("scrollend", settle)');
-    expect(carousel).toContain("if (touching) return;");
+    expect(carousel).toContain("if (touching || !scroller) return;");
+    // iPhone Safari before 18 has no scrollend: the scroll events stopping (or the finger lifting) for SETTLE_AFTER_MS counts too (Oct 23)
+    expect(carousel).toContain("quiet = setTimeout(settle, SETTLE_AFTER_MS);");
+    expect(carousel).toContain('scroller.addEventListener("scroll", onScroll, { passive: true });');
     expect(carousel).not.toContain("setTimeout(() => {\n        const width");
   });
   it("a set cell does not take a touch drag away from the swipe", () => {

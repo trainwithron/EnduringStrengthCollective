@@ -40,7 +40,7 @@ export function GamificationToggle({
       <span className="font-body text-sm text-chalk">
         Gamified logging
         <span className="block font-body text-xs text-steel mt-0.5">
-          Obstacle/unlock goals and other game-like touches on the logging screen
+          Game-like touches on the logging screen
         </span>
       </span>
       <input

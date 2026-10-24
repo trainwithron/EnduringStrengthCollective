@@ -63,9 +63,8 @@ export interface SetLogEntry {
   // into the real column, so a set never silently counts as "done" just
   // because a target existed. Weight/reps already pre-fill for real (a
   // coach/athlete types a genuine weight regardless of plan), so there's
-  // no placeholder-hint use for these two — targetReps/targetWeight
-  // exist purely for the obstacle-unlock mechanic (lib/obstacle-unlock.ts)
-  // to compare an actual logged set against today's real prescribed goal.
+  // no placeholder-hint use for these two: targetReps/targetWeight
+  // compare an actual logged set against today's real prescribed goal.
   targetReps?: number | null;
   targetWeight?: number | null;
   targetRpe?: number | null;
@@ -85,8 +84,7 @@ export interface SetLogEntry {
   // True once the athlete has explicitly committed a weight value this
   // set (typed it, or accepted a suggestion) — false for a program's own
   // pre-fill, which lands in this same `weight` column but was never a
-  // real attempt. The obstacle-unlock mechanic (lib/obstacle-unlock.ts)
-  // requires this before a set's weight/reps can ever clear the goal.
+  // real attempt.
   weightConfirmed?: boolean;
   // Set on an imported set that looks jumbled or unlikely (lib/unclear-points.ts): kept as entered, left out of the numbers until the coach counts it.
   dataFlag?: "unclear" | "accepted" | null;
@@ -109,18 +107,12 @@ export interface SessionExerciseEntry {
   // — a plain, low-friction athlete-authored note on this exact exercise
   // instance, distinct from `notes` above (the coach's own program-level
   // cue). Optional/undefined on any render path that doesn't select it
-  // (e.g. the coach-builder preview), same convention as priorBest.
+  // (e.g. the coach-builder preview).
   athleteNote?: string | null;
   sets: SetLogEntry[];
   // How many sets the coach prescribed for this exercise (the program's own count), so the Sets stepper can say "Prescribed 4" when the athlete did 3.
   // Optional/undefined for an exercise with no program behind it (one the athlete added) and on any render path that does not compute it.
   prescribedSetCount?: number | null;
-  // This athlete's real all-time best (weight/reps/single-set volume) on
-  // this exact exercise name, from every other completed session — the
-  // obstacle-unlock mechanic's PR-path input (lib/obstacle-unlock.ts).
-  // Optional/undefined on any render path that doesn't compute it (the
-  // coach's own program-builder preview, etc.).
-  priorBest?: { maxWeight: number | null; maxReps: number | null; maxVolume: number | null };
   // Phase 3 of the gamified-logging thread (custom_shape_theming_idea.md)
   // — which per-set visual/animation treatment to use (barbell plate
   // math, kettlebell scaling, dumbbell number, or a generic default for
@@ -131,8 +123,7 @@ export interface SessionExerciseEntry {
   // Total tonnage (weight x reps, summed per session) on this exact
   // exercise name, across every other completed session — one point per
   // session, oldest first. lib/exercise-volume-history.ts. Optional/
-  // undefined on any render path that doesn't compute it, same convention
-  // as priorBest above.
+  // undefined on any render path that doesn't compute it.
   volumeHistory?: { sessionId: string; sessionDate: string; totalVolume: number }[];
 }
 

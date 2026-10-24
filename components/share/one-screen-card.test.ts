@@ -44,6 +44,9 @@ describe("one-screen card rules", () => {
   it("the page gives the card the visible screen and keeps the rest below it", () => {
     expect(page).toContain("h-[100dvh]");
     expect(page).toContain("env(safe-area-inset-bottom)");
-    expect(page).toContain('id="full-workout"');
+    // ONE card (Oct 23): no second summary card below; only the owner's Customize your card
+    expect(page).not.toContain('id="full-workout"');
+    expect(page).toContain('<section id="customize"');
+    expect(page).toContain("{user?.id === shared.authorId && (");
   });
 });

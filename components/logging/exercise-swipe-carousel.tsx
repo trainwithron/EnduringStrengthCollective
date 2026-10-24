@@ -8,6 +8,9 @@ import { ExerciseCard } from "./exercise-card";
 import type { RestForSet } from "@/lib/rest-time";
 import { ExerciseNoteCallout } from "./exercise-note-callout";
 
+// How long the row has to be still (no finger, no scroll) before it counts as stopped, on a phone whose browser has no scrollend.
+export const SETTLE_AFTER_MS = 140;
+
 // Replaces the old scroll-past exercise list with a snap-to-card
 // carousel (mobile_home_workout_tab_merge_idea.md /
 // swipe_card_logging_and_spotter_nudge_idea.md) — one exercise per
@@ -88,14 +91,18 @@ export function ExerciseSwipeCarousel({
   // for the row), which left a large empty dark area inside a short card (Johann, beta: "quite a bit of room at the bottom"). The height is measured, so it
   // follows the card as sets are added or removed and when the next exercise comes into view.
   const [activeHeight, setActiveHeight] = useState<number | null>(null);
-  const activeExerciseId = exercises[Math.min(activeIndex, exercises.length - 1)]?.id;
-  // After exercises are deleted the active index can point past the end: clamp it back.
+  // The card the row has come to REST on. The row takes that card's height only once a swipe has stopped: changing the row's height in the middle of a swipe (as soon as the next card was
+  // nearer) made iPhone Safari give up the snap and leave the row between two cards (Oct 23: "You can get stuck halfway"). The dots still follow the swipe live (activeIndex).
+  const [restIndex, setRestIndex] = useState(0);
+  const restExerciseId = exercises[Math.min(restIndex, exercises.length - 1)]?.id;
+  // After exercises are deleted an index can point past the end: clamp it back.
   useEffect(() => {
     if (exercises.length > 0 && activeIndex > exercises.length - 1) setActiveIndex(exercises.length - 1);
-  }, [exercises.length, activeIndex]);
+    if (exercises.length > 0 && restIndex > exercises.length - 1) setRestIndex(exercises.length - 1);
+  }, [exercises.length, activeIndex, restIndex]);
   useLayoutEffect(() => {
     const scroller = scrollerRef.current;
-    const slide = scroller?.children[activeIndex] as HTMLElement | undefined;
+    const slide = scroller?.children[restIndex] as HTMLElement | undefined;
     if (!scroller || !slide) return;
     // The row is overflow-y: hidden, but a browser still scrolls it to reveal a field focused in a neighbouring (taller) card; once the active card changes and
     // the row grows, that leftover offset would cut the top of the card off. Always show the top. The height is rounded UP so a fractional card height cannot
@@ -107,8 +114,8 @@ export function ExerciseSwipeCarousel({
     const ro = new ResizeObserver(measure);
     ro.observe(slide);
     return () => ro.disconnect();
-    // The active exercise id is a dependency so a swap or reorder (same count) re-targets the observer to the right element.
-  }, [activeIndex, activeExerciseId, exercises.length]);
+    // The resting exercise id is a dependency so a swap or reorder (same count) re-targets the observer to the right element.
+  }, [restIndex, restExerciseId, exercises.length]);
 
   // The card plus the pinned Complete bar and the "+ Add" row fit the screen: the card may be as tall as the room from the top of the carousel down to those, measured (not guessed) so a taller header or
   // a different phone still fits. A card with more in it than that scrolls inside itself; the page does not scroll.
@@ -136,31 +143,49 @@ export function ExerciseSwipeCarousel({
 
   // Safety net: when a scroll has really ENDED and no finger is down, a card is always centred. If the browser left the row between two cards (a focus jump, an interrupted swipe), it is put back on the
   // nearest one. It never runs while a finger is on the screen (a version that did pulled the card back under a slow drag).
+  // iPhone (Ron, Oct 23: "they don't auto snap into the page. You can get stuck halfway"): Safari before 18 never fires scrollend, so the end of a scroll is also found by the scroll events
+  // stopping for a moment (and by the finger lifting with no scroll after it). The row itself no longer has smooth scrolling as its default, which fought the snap on iOS.
   useEffect(() => {
     const scroller = scrollerRef.current;
     if (!scroller) return;
     let touching = false;
+    let quiet: ReturnType<typeof setTimeout> | null = null;
+    const later = () => {
+      if (quiet) clearTimeout(quiet);
+      quiet = setTimeout(settle, SETTLE_AFTER_MS);
+    };
     const down = () => {
       touching = true;
+      if (quiet) clearTimeout(quiet);
     };
     const up = () => {
       touching = false;
+      later();
     };
-    const settle = () => {
-      if (touching) return;
+    const onScroll = () => {
+      if (!touching) later();
+    };
+    function settle() {
+      if (touching || !scroller) return;
       const width = scroller.clientWidth;
       if (width <= 0) return;
-      const target = Math.round(scroller.scrollLeft / width) * width;
+      const index = Math.round(scroller.scrollLeft / width);
+      const target = index * width;
+      // Not on a card: put it on the nearest one (the scroll that makes ends in another settle). On a card: the row takes that card's height now.
       if (Math.abs(scroller.scrollLeft - target) > 2) scroller.scrollTo({ left: target, behavior: "smooth" });
-    };
+      else setRestIndex(index);
+    }
     scroller.addEventListener("touchstart", down, { passive: true });
     scroller.addEventListener("touchend", up, { passive: true });
     scroller.addEventListener("touchcancel", up, { passive: true });
+    scroller.addEventListener("scroll", onScroll, { passive: true });
     scroller.addEventListener("scrollend", settle);
     return () => {
+      if (quiet) clearTimeout(quiet);
       scroller.removeEventListener("touchstart", down);
       scroller.removeEventListener("touchend", up);
       scroller.removeEventListener("touchcancel", up);
+      scroller.removeEventListener("scroll", onScroll);
       scroller.removeEventListener("scrollend", settle);
     };
   }, []);
@@ -276,7 +301,7 @@ export function ExerciseSwipeCarousel({
       <div
         ref={scrollerRef}
         onScroll={handleScroll}
-        className="flex items-start overflow-x-auto overflow-y-hidden snap-x snap-mandatory scroll-smooth -mx-5 transition-[height] duration-200 ease-out motion-reduce:transition-none"
+        className="flex items-start overflow-x-auto overflow-y-hidden snap-x snap-mandatory -mx-5 transition-[height] duration-200 ease-out motion-reduce:transition-none"
         style={{ scrollbarWidth: "none", height: activeHeight ?? undefined, maxHeight: maxHeight ?? undefined }}
       >
         {exercises.map((exercise) => {

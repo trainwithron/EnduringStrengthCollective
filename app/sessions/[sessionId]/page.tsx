@@ -23,7 +23,6 @@ import type { SessionExerciseEntry } from "@/lib/types";
 import { findCorrelatingWeightSuggestion, resolveWeightSuggestion } from "@/lib/set-suggestions";
 import { findAthleteVisibleCoachNoteForExercise } from "@/lib/exercise-note-history";
 import { parseNumericReps } from "@/lib/program-card-visuals";
-import { computePriorBest } from "@/lib/obstacle-unlock";
 import { readLoggedSets } from "@/lib/read-logged-sets";
 import { resumeSession } from "@/lib/resume-session";
 import { countsForProgress } from "@/lib/set-types";
@@ -267,23 +266,10 @@ export default async function SessionPage(
       )
     : { data: [] as any[] };
 
-  // Obstacle-unlock mechanic (lib/obstacle-unlock.ts) — this athlete's
-  // real all-time best (weight/reps/single-set volume) per exercise name,
-  // from the exact same historical rows already fetched just above for
-  // the weight-suggestion feature (no new query) — but excluding THIS
-  // session specifically, unlike that feature's own history. A "genuine
-  // PR" can't be measured against a set logged moments ago in the same
-  // session; the weight-suggestion feature's own history query is left
-  // untouched since it's a separate, already-shipped behavior.
-  const priorBestByExerciseName = new Map<
-    string,
-    { maxWeight: number | null; maxReps: number | null; maxVolume: number | null }
-  >();
   // Exercise volume-history sparkline (lib/exercise-volume-history.ts) —
   // total tonnage per session on this exact exercise name, from the same
   // historical rows just below, excluding the current session for the
-  // identical reason priorBestByExerciseName does: a session still in
-  // progress isn't real history yet.
+  // a session still in progress isn't real history yet.
   const volumeHistoryByExerciseName = new Map<
     string,
     { sessionId: string; sessionDate: string; totalVolume: number }[]
@@ -293,8 +279,6 @@ export default async function SessionPage(
       string,
       { weight: number | null; reps: number | null; sessionId: string; completedAt: string | null }[]
     >();
-    // A warm-up or drop set from an earlier session never counts as the best to beat (the database does not call it a record either); it still counts as work done in the volume history.
-    const countedRowsByName = new Map<string, typeof rowsByName extends Map<string, infer R> ? R : never>();
     for (const row of (priorRows ?? []) as any[]) {
       if (row.session_exercises.session_id === params.sessionId) continue;
       const name = row.session_exercises.exercise_name as string;
@@ -307,14 +291,8 @@ export default async function SessionPage(
       };
       list.push(entry);
       rowsByName.set(name, list);
-      if (countsForProgress(row.set_type)) {
-        const counted = countedRowsByName.get(name) ?? [];
-        counted.push(entry);
-        countedRowsByName.set(name, counted);
-      }
     }
     for (const [name, rows] of rowsByName) {
-      priorBestByExerciseName.set(name, computePriorBest(countedRowsByName.get(name) ?? []));
       volumeHistoryByExerciseName.set(name, computeVolumeHistory(rows));
     }
   }
@@ -416,11 +394,6 @@ export default async function SessionPage(
         notes: se.group_workout_exercises?.notes ?? null,
         athleteNote: se.athlete_note ?? null,
         prescribedSetCount: se.group_workout_exercise_id ? prescribedSetCountByExercise.get(se.group_workout_exercise_id) ?? null : null,
-        priorBest: priorBestByExerciseName.get(se.exercise_name) ?? {
-          maxWeight: null,
-          maxReps: null,
-          maxVolume: null,
-        },
         volumeHistory: volumeHistoryByExerciseName.get(se.exercise_name) ?? [],
         sets: (se.set_logs ?? [])
           .slice()

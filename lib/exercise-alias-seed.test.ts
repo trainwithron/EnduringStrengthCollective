@@ -126,7 +126,8 @@ describe("the coach's name travels: saved, shown, copied", () => {
   });
   it("every lookup still uses the real exercise: history, records and last time are keyed by exercise_name", () => {
     const page = read("../app/sessions/[sessionId]/page.tsx");
-    expect(page).toContain("priorBestByExerciseName.get(se.exercise_name)");
+    // (the prior best for the logger's lock is gone with the locks, Oct 23)
+    expect(page).toContain("volumeHistoryByExerciseName.get(se.exercise_name)");
     expect(page).toContain('.in("session_exercises.exercise_name", exerciseNamesInSession)');
   });
   it("copying an exercise, a day or a week in the builder carries the name along", () => {

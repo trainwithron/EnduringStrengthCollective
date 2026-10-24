@@ -3,15 +3,12 @@ import type { Metadata } from "next";
 import { NoAccess } from "@/components/shared/no-access";
 import Link from "next/link";
 import { createServerClient } from "@/lib/supabase/server";
-import { getVolumeEquivalence } from "@/lib/volume-equivalence";
 import { getSharedWorkout } from "@/lib/shared-workout";
-import { PrListToggle } from "@/components/share/pr-list-toggle";
 import { ShareScreen } from "@/components/share/share-screen";
 import { pickSeededFunLine, type WorkoutFacts } from "@/lib/workout-fun-line";
 import { buildShareImageModel } from "@/lib/share-image";
 import { CustomizeSharePanel } from "@/components/share/customize-share-panel";
 import { BackgroundPicker } from "@/components/share/background-picker";
-import { VolumeLiftRig } from "@/components/share/volume-lift-rig";
 import { ScenicBackground } from "@/components/share/scenic-background";
 import { pickScenicBackground, SCENIC_BACKGROUNDS } from "@/lib/scenic-backgrounds";
 import { pickShareCardStyle } from "@/lib/share-card-style";
@@ -120,11 +117,6 @@ export default async function ShareWorkoutPage(
     }
   }
 
-  const volumeEquivalence =
-    shared.totalSetsCompleted != null && shared.totalSetsCompleted > 0
-      ? getVolumeEquivalence(shared.totalVolume, params.postId)
-      : null;
-
   const shareTitle =
     shared.celebratePrs.length > 0
       ? `${shared.athleteName} just hit a new PR! 🎉`
@@ -217,164 +209,20 @@ export default async function ShareWorkoutPage(
         />
       </section>
 
-      <section id="full-workout" className="min-h-screen flex items-center justify-center px-6 py-16">
-      <div className="relative w-full max-w-sm rounded-[22px] overflow-hidden border border-chalk/[0.06] bg-gradient-to-b from-[#2E2B28] to-surface shadow-[0_1px_0_rgba(237,232,224,.05)_inset,0_22px_44px_-18px_rgba(0,0,0,.65),0_2px_10px_rgba(0,0,0,.35)] before:content-[''] before:absolute before:inset-0 before:rounded-[22px] before:shadow-[0_1px_0_rgba(237,232,224,.08)_inset] before:pointer-events-none">
-        <div className="px-7 pt-7 text-center">
-          <p className="font-display uppercase text-xs tracking-[0.2em] text-rust">{shared.groupName}</p>
-          <p className="font-body text-lg mt-1">{shared.athleteName}</p>
-        </div>
-
-        <div className="px-7 pb-7">
-        <div className="mt-8 pt-[22px] pb-5 border-t border-b border-steel/20">
-          {/* Real client feedback (Johann Gorsek, live usage): a session
-              with real logged reps but no weight/RPE entered (so no
-              set_logs row ever actually reached status='completed') showed
-              "0 LBS TOTAL VOLUME · 0 SETS" instead of the "Checked in"
-              fallback that's clearly meant for exactly this case. Root
-              cause: complete_workout_session's own total_volume is
-              coalesce(sum(...), 0) — always a real number, never null — so
-              the old `totalVolume != null` check could never actually
-              route here. totalSetsCompleted is the real signal for
-              "did anything actually finish," so branch on that instead. */}
-          {shared.totalSetsCompleted != null && shared.totalSetsCompleted > 0 ? (
-            <>
-              <p className="font-display text-5xl leading-none [font-variant-numeric:tabular-nums]">
-                {Math.round(shared.totalVolume).toLocaleString()}
-              </p>
-              <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">
-                lbs total volume &middot; {shared.totalSetsCompleted} sets
-              </p>
-              {volumeEquivalence && (
-                <>
-                  <VolumeLiftRig emoji={volumeEquivalence.emoji} />
-                  <p className="font-body text-sm text-rust -mt-1">{volumeEquivalence.text}</p>
-                </>
-              )}
-              {shared.weekStreak >= 2 && (
-                <span className="inline-flex items-center gap-1.5 mt-3 px-3 py-1 bg-rust/[0.14] border border-rust/30 rounded-full font-body text-xs font-semibold text-rust">
-                  🔥 {shared.weekStreak} week streak
-                </span>
-              )}
-            </>
-          ) : (
-            <p className="font-body text-sm text-steel uppercase tracking-wide">
-              {shared.celebratePrs.length > 0 ? "New personal record" : "Checked in"}
-            </p>
-          )}
-        </div>
-
-        {shared.relativeStrengthMilestones.length > 0 && (
-          <div className="mt-6 space-y-1">
-            {shared.relativeStrengthMilestones.map((m) => (
-              <p
-                key={m.exerciseName}
-                className="font-display text-xl text-rust text-center leading-tight"
-              >
-                💪 {m.multiple}&times; bodyweight {m.exerciseName}!
-              </p>
-            ))}
-          </div>
-        )}
-
-        {shared.compoundCelebration && (
-          <p className="font-display text-lg text-rust text-center mt-6 leading-snug">
-            {shared.compoundCelebration}
-          </p>
-        )}
-
-        {shared.topLifts.length > 0 && (
-          <div className="mt-6">
-            <p className="font-body text-xs text-steel uppercase tracking-wide mb-3">
-              Top lifts today
-            </p>
-            <div className="space-y-1.5">
-              {shared.topLifts.map((lift) => (
-                <div
-                  key={lift.name}
-                  className="flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-chalk/[0.03]"
-                >
-                  <span className="font-display text-base uppercase">{lift.name}</span>
-                  <span className="font-body text-sm text-steel [font-variant-numeric:tabular-nums]">
-                    {lift.weight} lbs &times; {lift.reps}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {shared.celebratePrs.length > 0 && <PrListToggle items={shared.celebratePrs} />}
-
-        {shared.baselinePrs.length > 0 && (
-          <div className="mt-6 pt-4 border-t border-steel/20">
-            <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">
-              Establishing your baseline
-            </p>
-            <p className="font-body text-sm text-steel">
-              {shared.baselinePrs.map((p) => p.name).join(", ")} —{" "}
-              {shared.baselinePrs.length === 1 ? "this is a new one" : "these are new"}, so there&apos;s
-              no history to compare against yet. Keep logging and the real records will show up
-              here soon.
-            </p>
-            {shared.totalWorkoutCount != null && shared.celebratePrs.length === 0 && (
-              <p className="font-body text-sm text-rust mt-2">
-                💪 Workout #{shared.totalWorkoutCount} in the books
-              </p>
-            )}
-          </div>
-        )}
-
-        <p className="font-body text-xs text-steel mt-8">
-          {new Date(shared.createdAt).toLocaleDateString(undefined, {
-            month: "long",
-            day: "numeric",
-            year: "numeric",
-          })}
-        </p>
-
-        {/* Real client feedback (Johann Gorsek, live usage): "at the
-            end, I would make the choices more obvious as a user might be
-            unsure what to click next" — Share, Choose Your Background,
-            and Continue to Team Feed all read with the same low-key
-            weight before this. Share stays the one loud, filled primary
-            action; "Continue to Team Feed" — the actual next step in a
-            logged-in athlete's flow, not a customization option — is now
-            a real bordered secondary button of its own, visually
-            distinct from both Share above it and the quiet
-            customization toggles (background/lift picks) below it. */}
-        {coachCongrats && (
-          <div className="mt-6 border border-steel/30 p-4">
-            <p className="font-body text-xs text-steel uppercase tracking-wide">From {coachCongrats.coachFirstName}</p>
-            <p className="font-body text-base text-chalk mt-1.5 leading-snug">{coachCongrats.text}</p>
-          </div>
-        )}
-
-        {user && viewerIsAuthor && viewerSeesFeed && (
-          <div className="mt-6 text-center">
-            <Link href={`/groups/${shared.groupId}/feed`} className="font-body text-xs text-steel underline underline-offset-2">
+      {/* ONE card after a workout (Ron, Oct 23: "It's still giving me two post-workout cards ... I want one condensed."). The card above already carries the numbers, the top lifts,
+          the PR and the date; the second summary card is gone. The owner can still choose what the card shows, here, under it. */}
+      {user?.id === shared.authorId && (
+        <section id="customize" className="max-w-md mx-auto px-4 pb-16 space-y-4" data-share-customize>
+          <p className="font-body text-xs text-steel uppercase tracking-wide">Customize your card</p>
+          {shared.broadcastLevel === "full" && <CustomizeSharePanel postId={params.postId} candidates={shared.top5Candidates} initialSelected={shared.selectedNames} />}
+          <BackgroundPicker athleteId={shared.authorId} initialPreference={shared.preferredShareBackground} />
+          {viewerSeesFeed && (
+            <Link href={`/groups/${shared.groupId}/feed`} className="inline-block font-body text-xs text-steel underline underline-offset-2">
               Team Feed
             </Link>
-          </div>
-        )}
-
-        {user?.id === shared.authorId && shared.broadcastLevel === "full" && (
-          <CustomizeSharePanel
-            postId={params.postId}
-            candidates={shared.top5Candidates}
-            initialSelected={shared.selectedNames}
-          />
-        )}
-
-        {user?.id === shared.authorId && (
-          <BackgroundPicker athleteId={shared.authorId} initialPreference={shared.preferredShareBackground} />
-        )}
-
-        <p className="font-body text-xs text-steel mt-6 pt-4 border-t border-steel/20">
-          Trained with <span className="text-rust">{shared.groupName}</span>
-        </p>
-        </div>
-      </div>
-      </section>
+          )}
+        </section>
+      )}
     </main>
   );
 }

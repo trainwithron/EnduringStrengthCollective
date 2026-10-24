@@ -95,7 +95,7 @@ export function ShareScreen({
         funLineHidden={!ready}
         mascot={mascot}
       />
-      <ShareActions input={{ ...imageInput, funLine: line.text }} title={title} homeHref={homeHref} hold={!ready} />
+      <ShareActions input={{ ...imageInput, funLine: line.text }} title={title} homeHref={homeHref} hold={!ready} customizeHref={isOwner ? "#customize" : null} />
     </>
   );
 }

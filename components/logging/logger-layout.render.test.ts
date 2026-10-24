@@ -61,7 +61,9 @@ describe("the review fixes for the layout (Assistant, Oct 7)", () => {
   it("the swipe row always shows the top of the active card (a field focused in a neighbour cannot leave it scrolled), rounds the height UP, follows the right element and eases the change", () => {
     expect(swipe).toContain("scroller.scrollTop = 0");
     expect(swipe).toContain("Math.ceil(slide.getBoundingClientRect().height)");
-    expect(swipe).toContain("activeExerciseId");
+    // the card the row has come to rest on (Oct 23: the height changes only once a swipe has stopped, or iPhone gives up the snap)
+    expect(swipe).toContain("restExerciseId");
+    expect(swipe).toContain("else setRestIndex(index);");
     expect(swipe).toContain("transition-[height]");
     expect(swipe).toContain("motion-reduce:transition-none");
   });

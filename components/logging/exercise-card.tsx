@@ -45,7 +45,6 @@ export function ExerciseCard({
   viewerId,
   canUpload,
   onSetCompleted,
-  gamificationEnabled,
   rowAction,
 }: {
   exercise: SessionExerciseEntry;
@@ -351,17 +350,29 @@ export function ExerciseCard({
                 >
                   Swap Exercise
                 </button>
-                {exercise.isAdded && onDelete && (
+                {onDelete && (
+                  // An added exercise goes as before. A program exercise can be taken off TODAY's workout too (Ron, Oct 23: "I put box jumps in his program. We're not doing them ...
+                  // I don't have a way to remove that exercise from the workout quickly"): asked once; the program itself is not touched, and an exercise that is not in the workout is
+                  // never counted as missed.
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={async () => {
+                      if (
+                        !exercise.isAdded &&
+                        !(await confirmDialog({
+                          message: `Remove ${exercise.displayName ?? (exercise.exerciseName || "this exercise")} from today's workout? The program stays as it is.`,
+                          confirmLabel: "Remove from today",
+                        }))
+                      )
+                        return;
                       discardPendingSaves(exercise.sets.map((s) => s.id));
                       onDelete();
                     }}
                     disabled={deleting}
                     className="font-body text-xs text-rust disabled:opacity-40"
+                    data-remove-from-today={exercise.isAdded ? undefined : true}
                   >
-                    {deleting ? "Removing…" : "Remove"}
+                    {deleting ? "Removing…" : exercise.isAdded ? "Remove" : "Remove from today"}
                   </button>
                 )}
               </div>
@@ -452,8 +463,6 @@ export function ExerciseCard({
             setTimeout(() => setJustConfirmedWeightSetId(null), 800);
           }
         }}
-        priorBest={exercise.priorBest}
-        gamificationEnabled={gamificationEnabled ?? true}
       />
 
       <UnclearPointsNote

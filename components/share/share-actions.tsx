@@ -13,10 +13,13 @@ export function ShareActions({
   title,
   homeHref,
   hold = false,
+  customizeHref = null,
 }: {
   input: Omit<ShareImageInput, "showName">;
   title: string;
   homeHref: string | null;
+  // The owner's "Customize card" (which lifts it shows, its background), under the one card; nobody else gets a link.
+  customizeHref?: string | null;
   // True while the fun line is still being chosen: the picture is not drawn yet (it would be drawn twice).
   hold?: boolean;
 }) {
@@ -157,9 +160,11 @@ export function ShareActions({
             </div>
           </details>
         )}
-        <a href="#full-workout" className="font-body text-xs text-steel py-2">
-          See full workout ↓
-        </a>
+        {customizeHref && (
+          <a href={customizeHref} className="font-body text-xs text-steel py-2">
+            Customize card ↓
+          </a>
+        )}
       </div>
     </div>
   );
