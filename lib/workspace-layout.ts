@@ -346,3 +346,23 @@ export function clearWorkspaceStorage(storage: Pick<Storage, "length" | "key" | 
     // Storage blocked: nothing was saved there.
   }
 }
+
+// The frames the coach can see right now, which an automatic refresh reaches at once (a hidden one is refreshed when it is shown): the dock's open pane, every
+// card that is not minimized, and the split screen's left half when it is on screen (Oct 24: a client added on the main page never reached the Clients list
+// beside it, because that frame was never counted as seen).
+export function visiblePaneIds(layout: Pick<WorkspaceLayout, "dock" | "floating">, opts: { suspended: boolean; splitShownId: string | null }): Set<string> {
+  const ids = new Set<string>();
+  if (opts.suspended) return ids;
+  if (layout.dock.open) {
+    const active = layout.dock.panes.find((p) => p.id === layout.dock.activeId) ?? layout.dock.panes[0];
+    if (active) ids.add(active.id);
+  }
+  for (const c of layout.floating) if (!c.minimized) ids.add(c.id);
+  if (opts.splitShownId) ids.add(opts.splitShownId);
+  return ids;
+}
+
+// The id the split screen's frame for a page is registered under.
+export function splitPaneId(frameKey: string): string {
+  return `split-${frameKey}`;
+}

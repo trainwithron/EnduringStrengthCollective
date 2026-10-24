@@ -17,7 +17,7 @@ import {
 } from "@/lib/workspace-layout";
 import type { WorkspaceDestination } from "@/lib/workspace-destinations";
 import { readCardStackLayout, readLayoutMode } from "@/lib/coach-shell-panel-storage";
-import { clearWorkspaceStorage } from "@/lib/workspace-layout";
+import { clearWorkspaceStorage, visiblePaneIds } from "@/lib/workspace-layout";
 import { MUTATION_MESSAGE, REFRESH_MESSAGE, SIGNED_OUT_MESSAGE, createRefreshLimiter, debounce, installMutationReporter, paneActivity } from "@/lib/workspace-mutation";
 
 // The unified workspace's state for one coach in one browser: what is open in the right-hand panel and as floating cards (lib/workspace-layout.ts holds the rules),
@@ -48,6 +48,8 @@ interface WorkspaceApi {
   groupName: string;
   isShared: boolean;
   registerFrame: (paneId: string, el: HTMLIFrameElement | null) => void;
+  // The split screen's left half says which of its frames is on screen (null: none), so an automatic refresh reaches it like a pane the coach can see.
+  setSplitShown: (paneId: string | null) => void;
   // Closes a pane without losing work: waits for saves that are still going, and asks first if there is typed text that was never saved.
   requestClose: (paneId: string) => void;
   // Automatic refreshes are limited (3 a minute); when the limit is hit they pause and this is true, until the coach refreshes by hand.
@@ -190,16 +192,8 @@ export function WorkspaceProvider({
   }, []);
 
   // Which panes the coach can see right now. A pane that is hidden (another tab, a closed panel, a minimized card) is not refreshed; it is refreshed when it is shown.
-  const visibleIds = useMemo(() => {
-    const ids = new Set<string>();
-    if (suspended) return ids;
-    if (layout.dock.open) {
-      const active = layout.dock.panes.find((p) => p.id === layout.dock.activeId) ?? layout.dock.panes[0];
-      if (active) ids.add(active.id);
-    }
-    for (const c of layout.floating) if (!c.minimized) ids.add(c.id);
-    return ids;
-  }, [layout, suspended]);
+  const [splitShownId, setSplitShown] = useState<string | null>(null);
+  const visibleIds = useMemo(() => visiblePaneIds(layout, { suspended, splitShownId }), [layout, suspended, splitShownId]);
   const visibleRef = useRef(visibleIds);
   visibleRef.current = visibleIds;
   const stale = useRef(new Set<string>());
@@ -322,7 +316,7 @@ export function WorkspaceProvider({
   );
 
   const api = useMemo<WorkspaceApi>(
-    () => ({ ready, enabled, layout, viewportWidth: viewport.width, area, dockWidth, dispatch, openDest, pickerOpen, setPickerOpen, groupId, groupName, isShared, registerFrame, requestClose, refreshPaused, refreshNow, signedOut, suspended }),
+    () => ({ ready, enabled, layout, viewportWidth: viewport.width, area, dockWidth, dispatch, openDest, pickerOpen, setPickerOpen, groupId, groupName, isShared, registerFrame, setSplitShown, requestClose, refreshPaused, refreshNow, signedOut, suspended }),
     [ready, enabled, layout, viewport.width, area, dockWidth, openDest, pickerOpen, groupId, groupName, isShared, registerFrame, requestClose, refreshPaused, refreshNow, signedOut, suspended]
   );
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;

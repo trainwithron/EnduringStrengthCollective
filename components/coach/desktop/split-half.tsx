@@ -2,6 +2,8 @@
 
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { PaneFrame } from "@/components/coach/workspace/pane-frame";
+import { useWorkspace } from "@/components/coach/workspace/workspace-context";
+import { splitPaneId } from "@/lib/workspace-layout";
 import { useEmbedded } from "@/components/shared/embedded-context";
 import { splitPathFor, type ListPanelView } from "@/lib/coach-shell-panel-storage";
 
@@ -68,6 +70,13 @@ export function SplitHalfHost({ children }: { children: React.ReactNode }) {
     else root.style.removeProperty("--split-reserved");
   }, [showing, embedded]);
   const shownKey = showing ? frameKey(showing.view, showing.groupId) : null;
+  // The frame on screen is refreshed with the rest when something is saved (a client added on the main page shows in the Clients list here); a hidden one when it is shown again.
+  const setSplitShown = useWorkspace()?.setSplitShown;
+  useEffect(() => {
+    if (!setSplitShown) return;
+    setSplitShown(shownKey && !embedded ? splitPaneId(shownKey) : null);
+    return () => setSplitShown(null);
+  }, [setSplitShown, shownKey, embedded]);
   // One stable value: a new object on every render would make every slot report itself again, forever.
   const api = useMemo(() => ({ setSlot }), [setSlot]);
 
@@ -85,7 +94,7 @@ export function SplitHalfHost({ children }: { children: React.ReactNode }) {
               className="fixed z-20 flex flex-col"
               style={shown ? { top: showing.rect.top, left: showing.rect.left, width: showing.rect.width, height: showing.rect.height, pointerEvents: showing.covered ? "none" : undefined } : { display: "none" }}
             >
-              <PaneFrame pane={{ id: `split-${o.key}`, dest: { id: `split-${o.key}`, label: dest.label, path: dest.path, section: "Split screen" } }} hidden={!shown} />
+              <PaneFrame pane={{ id: splitPaneId(o.key), dest: { id: splitPaneId(o.key), label: dest.label, path: dest.path, section: "Split screen" } }} hidden={!shown} />
             </div>
           );
         })}
