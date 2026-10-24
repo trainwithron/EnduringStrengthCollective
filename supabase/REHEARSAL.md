@@ -198,6 +198,7 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0430 | yes | yes | 22 | 0430 a client's new allergy swaps the clashing options of their plan automatically |
 | 0431 | yes | yes | 14 | 0431 a coach's own passages join his clients' Read cycle |
 | 0432 | yes | yes | 20 | 0432 session caps, keep my sessions together, lunch break |
+| 0433 | yes | yes | 6 | 0433 undo attended: the booking's coach or an admin; anon revokes |
 | 0331 | yes | yes | 10 | 0331 a payment event and its sessions are recorded in one step |
 | 0329 | yes | yes | 12 | 0329 every session costs exactly 1 credit; the waitlist offer uses the coach's time zone |
 | 0330 | yes | yes | 9 | 0330 only a real coach can have a public page |

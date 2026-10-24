@@ -2842,6 +2842,23 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "185",
+  slug: "0433",
+  title: "0433 Audit hardening: undoing attended takes the same check as a no-show (the booking's own coach or an organization owner/admin); signed-out visitors get no rights on two tables",
+  warn: "This changes ONE condition in undo_booking_attended (who may undo an attended session, which puts the session back on the client's balance): from any coach of the group to the booking's own coach or an organization owner/admin, the same check resolve_no_show and set_booking_no_show already use. The paste checks that the live function holds the old condition exactly once, and stops if not. It also removes signed-out visitors' table rights on client_macro_target_history and coach_booking_policies (every policy on them is for signed-in people already).",
+  migrations: ["0433"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes for the coach who marked a session: they can undo it as before. Another coach of the same group can no longer undo it (an owner or admin can). No screen changes.",
+  undo: "do $undo$\ndeclare\n  v_def text := pg_get_functiondef('public.undo_booking_attended(uuid)'::regprocedure);\n  v_new text := 'not ((v_b.coach_id = auth.uid() and public.is_group_coach(v_b.group_id)) or public.is_org_admin_of_group(v_b.group_id))';\nbegin\n  if position(v_new in v_def) > 0 then\n    execute replace(v_def, v_new, 'not public.is_group_coach(v_b.group_id)');\n  end if;\nend $undo$;\ngrant select on public.client_macro_target_history to anon;\ngrant select on public.coach_booking_policies to anon;",
+  undoWhy: "Only if step 185 misbehaves. The old condition is put back and signed-out visitors get select on the two tables again, as before.",
+  rows: [
+    ["0433 is not already applied (undo_booking_attended still has the old check)", "position('is_org_admin_of_group' in coalesce(pg_get_functiondef(to_regprocedure('public.undo_booking_attended(uuid)')), '')) = 0"],
+    ["undo_booking_attended holds its coach check exactly once", "coalesce((select (length(d) - length(replace(d, 'not public.is_group_coach(v_b.group_id)', ''))) / length('not public.is_group_coach(v_b.group_id)') = 1 from (select pg_get_functiondef(to_regprocedure('public.undo_booking_attended(uuid)')) as d) x), false)"],
+    ["the tables and the admin check exist", "to_regclass('public.client_macro_target_history') is not null and to_regclass('public.coach_booking_policies') is not null and to_regprocedure('public.is_org_admin_of_group(uuid)') is not null"],
+  ],
+});
+
+STEPS.push({
   n: "184",
   slug: "0432",
   title: "0432 Session caps, Keep my sessions together and a lunch break (five columns on the booking policy, four functions, one call added to three booking functions)",
@@ -3874,6 +3891,7 @@ const BUNDLES = [
   { id: "release-ts3-team-sheet-save", name: "Release TS3 (saving a filled team sheet: one table, one notice kind, three functions)", steps: ["171"] },
   { id: "release-own1-owner-accepted-only", name: "Release OWN1 (ownership cannot be handed to someone who has never signed in; replaces two functions, adds one function and one trigger)", steps: ["172"] },
   { id: "release-tc3b-client-requests", name: "Release TC3 part B (Request to train with me on a coach's public page: one column, three tables, eight functions)", steps: ["174"] },
+  { id: "audit-oct24-undo-attended-anon", name: "Audit hardening Oct 24 (undoing attended: the booking's own coach or an owner/admin; two anon revokes)", steps: ["185"] },
   { id: "session-caps-keep-together", name: "Session caps, Keep my sessions together and a lunch break (five columns, four functions, one call added to three booking functions)", steps: ["184"] },
   { id: "coach-read-passages", name: "A coach's own passages for Read during rest (one new table)", steps: ["183"] },
   { id: "allergy-auto-rebuild", name: "Allergy auto-rebuild (a client's new allergy swaps the clashing options of their plan automatically: one column, one function added, one replaced)", steps: ["182"] },
@@ -4140,6 +4158,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0430", "to_regprocedure('public.apply_allergy_rebuild(uuid, uuid, date, jsonb, text)') is not null"),
     m("0431", "to_regclass('public.coach_read_passages') is not null"),
     m("0432", "to_regprocedure('public.client_slot_reason(uuid, timestamptz, timestamptz, uuid, boolean)') is not null"),
+    m("0433", "position('is_org_admin_of_group' in coalesce(pg_get_functiondef(to_regprocedure('public.undo_booking_attended(uuid)')), '')) > 0"),
     m("0427", "to_regprocedure('public.my_group_ids()') is not null"),
     m("0426", "to_regprocedure('public.active_org_group_ids()') is not null"),
     m("0425", "exists (select 1 from pg_proc p where p.oid = to_regprocedure('public.request_workspace_org()') and position('x-workspace-org' in p.prosrc) > 0)"),

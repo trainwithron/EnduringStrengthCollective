@@ -1576,6 +1576,17 @@
   ]
  },
  {
+  "n": "185",
+  "slug": "0433",
+  "title": "0433 Audit hardening: undoing attended takes the same check as a no-show (the booking's own coach or an organization owner/admin); signed-out visitors get no rights on two tables",
+  "migrations": [
+   "0433"
+  ],
+  "notApplied": [
+   "position('is_org_admin_of_group' in coalesce(pg_get_functiondef(to_regprocedure('public.undo_booking_attended(uuid)')), '')) = 0"
+  ]
+ },
+ {
   "n": "184",
   "slug": "0432",
   "title": "0432 Session caps, Keep my sessions together and a lunch break (five columns on the booking policy, four functions, one call added to three booking functions)",

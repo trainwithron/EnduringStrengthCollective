@@ -24,6 +24,14 @@
   "file": "apply-release-tc3b-client-requests-all.sql"
  },
  {
+  "id": "audit-oct24-undo-attended-anon",
+  "name": "Audit hardening Oct 24 (undoing attended: the booking's own coach or an owner/admin; two anon revokes)",
+  "steps": [
+   "185"
+  ],
+  "file": "apply-audit-oct24-undo-attended-anon-all.sql"
+ },
+ {
   "id": "session-caps-keep-together",
   "name": "Session caps, Keep my sessions together and a lunch break (five columns, four functions, one call added to three booking functions)",
   "steps": [
