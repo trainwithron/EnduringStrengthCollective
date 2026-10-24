@@ -28,7 +28,7 @@ describe("the health screening line", () => {
 });
 
 describe("what moved where", () => {
-  const overview = page.slice(page.indexOf('<div data-tab="overview" className="space-y-4">'), page.indexOf('<div data-tab="settings">'));
+  const overview = page.slice(page.indexOf('<div data-tab="overview" className="space-y-4">'), page.indexOf('<div data-tab="settings" id={SIGN_IN_OPTIONS_ANCHOR}'));
   it("Overview has the message box, the not-signed-in line, the Injured tag and the screening line, and not the sign-in tools or the injury toggle", () => {
     expect(overview).toContain("<OverviewMessageBox");
     expect(overview).toContain("Hasn&apos;t signed in yet.");

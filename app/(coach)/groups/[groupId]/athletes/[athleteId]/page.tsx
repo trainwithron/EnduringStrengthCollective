@@ -64,6 +64,8 @@ import { ClientCalendarSection } from "@/components/coach/desktop/client-calenda
 import { GuardianConsentStatus, type GuardianStateInfo } from "@/components/coach/guardian-consent-status";
 import { ageBand } from "@/lib/guardian-consent";
 import { ClientSignInPanel } from "@/components/coach/client-signin-panel";
+import { GetStartedCard } from "@/components/coach/get-started-card";
+import { getStartedSteps, HIDE_GET_STARTED_KEY, showGetStarted, SIGN_IN_OPTIONS_ANCHOR } from "@/lib/get-started-checklist";
 import { ClientNameControl } from "@/components/coach/client-name-control";
 import { CorrectClientEmail } from "@/components/coach/correct-client-email";
 import { claimStatus, isPlaceholderEmail } from "@/lib/client-claim";
@@ -869,6 +871,23 @@ export default async function AthleteProfilePage(
     }),
     profile?.full_name ?? "This client"
   );
+  // "Get <Name> started": each step from what is really there (lib/get-started-checklist.ts).
+  const getStarted = getStartedSteps(
+    {
+      hasProgram: !!activeProgram,
+      hasSessions: (creditsRow?.balance ?? 0) > 0 || (!ledgerAll.failed && (ledgerSums.bought ?? 0) > 0) || assignedPackageIds.length > 0,
+      onCalendar: (profileCounts?.booked ?? 0) > 0,
+      signInSent: signInStatus === "active" || !!latestInviteRow,
+    },
+    params.groupId,
+    params.athleteId
+  );
+  const getStartedShown = showGetStarted({
+    selfView,
+    loggedWorkouts: allLogs?.length ?? 0,
+    hiddenForAll: user.user_metadata?.[HIDE_GET_STARTED_KEY] === true,
+    steps: getStarted,
+  });
   const ledgerEntries: LedgerEntry[] = (ledgerRows ?? []).map((r) => ({
     id: r.id as string,
     kind: r.kind as LedgerEntry["kind"],
@@ -1022,6 +1041,8 @@ export default async function AthleteProfilePage(
         </div>
       </div>
 
+      {getStartedShown && <GetStartedCard athleteId={params.athleteId} firstName={(profile?.full_name ?? "").trim().split(/\s+/)[0] || "them"} steps={getStarted} />}
+
       <div id="client-profile-body" data-active-tab={initialTab}>
         <ClientProfileTabs groupId={params.groupId} athleteId={params.athleteId} initial={initialTab} hide={selfView ? SELF_HIDDEN_TABS : []} />
         <div data-tab="calendar" className="mb-8">
@@ -1114,7 +1135,7 @@ export default async function AthleteProfilePage(
               <ClientNameControl groupId={params.groupId} athleteId={params.athleteId} profileName={profile?.full_name ?? ""} spaceName={group?.name ?? ""} oneOnOne={group?.group_kind === "one_on_one"} signedIn={signInStatus === "active"} />
             </div>
           )}
-          <div data-tab="settings">
+          <div data-tab="settings" id={SIGN_IN_OPTIONS_ANCHOR} className="scroll-mt-24">
           {!selfView && signInStatus !== "active" && (
             <>
               <ClientSignInPanel
