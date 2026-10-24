@@ -21,6 +21,8 @@ export interface RosterMember {
   avatarUrl: string | null;
   role: MemberRole;
   lastWorkoutAt: string | null; // ISO timestamp, null = never logged
+  // On the phone Clients list: the client's next or last booked session ("Next: Tue 10 AM"), shown when they have never logged.
+  sessionLine?: string | null;
   clientTier: ClientTier;
   // Milestone Celebrations, Category 2 — which nutrition phase (if any)
   // a coach has tagged this athlete with. Optional/undefined on any

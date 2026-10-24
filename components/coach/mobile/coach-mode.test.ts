@@ -52,7 +52,8 @@ describe("coach mode: a coach logging a workout for a client on the phone", () =
     expect(read("components/coach/mobile/spot-clients-groups-panel.tsx")).toContain("Log their workout");
     const profile = read("app/(coach)/groups/[groupId]/athletes/[athleteId]/page.tsx");
     expect(profile).toContain("Log their workout");
-    expect(profile).toContain('className="lg:hidden inline-flex');
+    // the primary button under the name, on every tab (Oct 24)
+    expect(profile).toContain('className="lg:hidden mt-4 w-full min-h-12');
     // the desktop profile no longer offers it
     expect(profile).not.toContain("Log an in-person session");
   });

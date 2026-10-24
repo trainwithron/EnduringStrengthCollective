@@ -60,9 +60,9 @@ function writeSnooze(): void {
   }
 }
 
-// Shown before/over the Day-card, the first time Home loads that day —
-// a real nudge (unlike the old scrollable widget it replaces) but never
-// a hard block: a visible "Skip for today" always dismisses it, and it
+// Shown as a card at the top of Home (above the Day-card), the first time Home loads that day. It used to be a full-screen layer, which covered
+// the Spotlight button and the tab bar until it was answered or skipped (Oct 24: a coach on their own Home could not open Spotlight): now it is a card
+// in the page, never over anything. Never a hard block: a visible "Skip for today" always dismisses it, and it
 // never reappears again that day once either skipped or actually
 // submitted (skipping doesn't survive closing/reopening the app,
 // deliberately — see writeDismissed's comment). A separate, smaller
@@ -76,7 +76,6 @@ export function WellnessCheckinPopup({
   initialCheckin,
   onSaved,
   lifeImpactPrompt = null,
-  inline = false,
 }: {
   athleteId: string;
   groupId: string;
@@ -84,8 +83,6 @@ export function WellnessCheckinPopup({
   initialCheckin: WellnessCheckinValues | null;
   onSaved?: (values: WellnessCheckinValues) => void;
   lifeImpactPrompt?: string | null;
-  // A new client's first day: a plain card below their workout instead of a full-screen block in front of it.
-  inline?: boolean;
 }) {
   const [checkin, setCheckin] = useState(initialCheckin);
   const [dismissed, setDismissed] = useState(true); // default hidden until the effect below confirms it's actually needed, so SSR/hydration never briefly flashes the overlay for someone who already checked in or already dismissed it earlier today
@@ -109,63 +106,27 @@ export function WellnessCheckinPopup({
     setSnoozed(true);
   }
 
-  if (inline) {
-    return (
-      <div className="border border-steel/20 p-4">
-        <WellnessCheckinWidget
-          athleteId={athleteId}
-          groupId={groupId}
-          todayDate={todayDate}
-          initialCheckin={null}
-          onSaved={(values) => {
-            setCheckin(values);
-            onSaved?.(values);
-          }}
-          lifeImpactPrompt={lifeImpactPrompt}
-        />
-        <button type="button" onClick={handleSkip} className="w-full h-11 text-center font-body text-sm text-steel mt-1">
-          Skip for today
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Wellness check-in"
-      // overflow-y-auto + my-auto: on a short phone (or with the keyboard up) the
-      // form scrolls instead of its Save and Skip buttons ending up off-screen.
-      className="fixed inset-0 z-40 bg-graphite overflow-y-auto p-6 flex"
-    >
-      <div className="w-full max-w-sm mx-auto my-auto">
-        <WellnessCheckinWidget
-          athleteId={athleteId}
-          groupId={groupId}
-          todayDate={todayDate}
-          initialCheckin={null}
-          onSaved={(values) => {
-            setCheckin(values);
-            onSaved?.(values);
-          }}
-          lifeImpactPrompt={lifeImpactPrompt}
-        />
-        <button
-          type="button"
-          onClick={handleSkip}
-          className="w-full h-11 text-center font-body text-sm text-steel mt-2"
-        >
+    <section className="border border-steel/20 p-4" aria-label="Wellness check-in" data-wellness-card>
+      <WellnessCheckinWidget
+        athleteId={athleteId}
+        groupId={groupId}
+        todayDate={todayDate}
+        initialCheckin={null}
+        onSaved={(values) => {
+          setCheckin(values);
+          onSaved?.(values);
+        }}
+        lifeImpactPrompt={lifeImpactPrompt}
+      />
+      <div className="flex flex-wrap justify-center gap-x-6 mt-1">
+        <button type="button" onClick={handleSkip} className="h-11 font-body text-sm text-steel">
           Skip for today
         </button>
-        <button
-          type="button"
-          onClick={handleSnooze}
-          className="w-full h-11 text-center font-body text-sm text-steel"
-        >
+        <button type="button" onClick={handleSnooze} className="h-11 font-body text-sm text-steel">
           Don&apos;t ask for a week
         </button>
       </div>
-    </div>
+    </section>
   );
 }

@@ -72,8 +72,9 @@ export function CoachRosterMobile({
     return members.map((m) => ({
       member: m,
       // A client who has not signed in yet has not "gone quiet"; they are still getting started.
+      // Nor has a client the coach trains in person: booked sessions and no logs of their own.
       tier:
-        m.signInStatus && m.signInStatus !== "active"
+        (m.signInStatus && m.signInStatus !== "active") || (!m.lastWorkoutAt && m.sessionLine)
           ? ("none" as const)
           : computeQuietTier({
               lastLoggedAt: m.lastWorkoutAt ? new Date(m.lastWorkoutAt) : null,
@@ -176,7 +177,7 @@ function RosterRow({
   member: RosterMember;
   tier: QuietTier;
 }) {
-  const status = clientActivityStatus(member.lastWorkoutAt, { isNew: !!member.signInStatus && member.signInStatus !== "active" });
+  const status = clientActivityStatus(member.lastWorkoutAt, { isNew: !!member.signInStatus && member.signInStatus !== "active", sessionLine: member.sessionLine });
   return (
     <QuickViewBubble
       title={member.fullName}

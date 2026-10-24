@@ -994,6 +994,17 @@ export default async function AthleteProfilePage(
             </p>
           </div>
         </div>
+        {/* On the phone, the first thing under the name on every tab (it sits above the tabs): logging their workout, on the Log page that has Wing it.
+            The desktop profile does not offer it. */}
+        {!selfView && (
+          <Link
+            href={`/groups/${params.groupId}/athletes/${params.athleteId}/log`}
+            className="lg:hidden mt-4 w-full min-h-12 flex items-center justify-center bg-rust text-graphite font-display uppercase text-base font-bold text-center px-3"
+            data-log-their-workout
+          >
+            Log their workout
+          </Link>
+        )}
         {profileFlag && (
           <p className="font-body text-xs text-rust border border-rust/40 bg-rust/5 px-3 py-1.5 mt-3 inline-block">
             {profileFlag}
@@ -1057,13 +1068,6 @@ export default async function AthleteProfilePage(
                       <span className="hidden lg:inline-flex">
                         <ViewAsClientLink href={selfView ? "/my-space?view=client" : `/groups/${params.groupId}/athletes/${params.athleteId}/view`} />
                       </span>
-                      {/* Logging their workout is for the phone; the desktop profile does not offer it. */}
-                      <Link
-                        href={`/groups/${params.groupId}/athletes/${params.athleteId}/log`}
-                        className="lg:hidden inline-flex items-center justify-center min-h-11 sm:h-9 font-body text-xs text-chalk border border-steel/40 px-3 font-medium"
-                      >
-                        Log their workout
-                      </Link>
                     </>
                   }
                 />

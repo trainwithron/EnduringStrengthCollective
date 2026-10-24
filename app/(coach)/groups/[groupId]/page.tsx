@@ -980,7 +980,6 @@ export default async function GroupHubPage(
               {isToday && <FeaturedShopCards links={featuredShop} coachName={roster.find((m) => m.role === "coach")?.fullName ?? null} />}
               {isToday && isFirstDay && (
                 <WellnessCheckinPopup
-                  inline
                   athleteId={athleteId}
                   groupId={params.groupId}
                   todayDate={todayKey}

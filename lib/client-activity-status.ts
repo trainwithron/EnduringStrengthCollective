@@ -9,8 +9,10 @@ export function daysSinceOf(lastWorkoutAt: string | null): number {
 }
 
 // `isNew`: the client was added recently (or has not signed in yet) and has not done a first workout, so say so neutrally instead of "No logs yet".
-export function clientActivityStatus(lastWorkoutAt: string | null, opts: { isNew?: boolean } = {}): { text: string; dotClass: string } {
+// `sessionLine`: a client the coach trains in person with booked sessions ("Next: Tue 10 AM") has started, even with no logs of their own.
+export function clientActivityStatus(lastWorkoutAt: string | null, opts: { isNew?: boolean; sessionLine?: string | null } = {}): { text: string; dotClass: string } {
   if (!lastWorkoutAt) {
+    if (opts.sessionLine) return { text: opts.sessionLine, dotClass: "bg-steel" };
     if (opts.isNew) return { text: "New, hasn't started yet", dotClass: "bg-steel" };
     return { text: "No logs yet", dotClass: "bg-steel" };
   }

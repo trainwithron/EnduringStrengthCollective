@@ -374,7 +374,8 @@ describe("TC1b: one plain coach list at the top of the Clients page", () => {
     expect(page.lastIndexOf("<CoachesSection ", page.indexOf("<CoachRosterMobile "))).toBeGreaterThan(-1);
     expect(page).toContain("canManage={inviteManager.ok}");
     const roster = src("components/group/roster-list.tsx");
-    expect(roster).toContain("{!viewerIsCoach && coaches.length > 0 && (");
+    // the coach looking at it is not listed (Oct 24); with nobody else the section is not drawn
+    expect(roster).toContain("{!viewerIsCoach && staffShown.length > 0 && (");
     expect(roster).toContain('m.role === "coach" && !hidden.has(m.profileId)');
   });
 

@@ -23,6 +23,8 @@ import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { groupClientsDestination } from "@/lib/coach-clients-nav";
 import { getCoachedGroups, groupsInOrgOf, groupsInOrgOfOpened } from "@/lib/coach-groups";
 import { mergeRosterAcrossGroups, type RosterRowAcrossGroups } from "@/lib/coach-roster";
+import { clientSessionLine, sessionStartsByAthlete } from "@/lib/client-session-line";
+import { getViewerDisplayTimezone } from "@/lib/display-timezone-server";
 import type { RosterMember } from "@/lib/types";
 import { RemovedClientsPanel, type RemovedClient } from "@/components/coach/desktop/removed-clients-panel";
 import { CoachesSection } from "@/components/coach/coaches-section";
@@ -232,7 +234,9 @@ export default async function ClientsPage(
     const scopeIds = scopeGroups.map((g) => g.id);
     const kindByGroup = new Map(scopeGroups.map((g) => [g.id, g.kind]));
     // The members in groups of ids and pages, and each client's last workout from the database in ONE call (it was one call per group: 1,500 calls for 1,500 clients).
-    const [{ data: scopeMemberships }, scopeLastResult] = await Promise.all([
+    // Booked sessions (the last 180 days and the next 60) give a client the coach trains in person a real status when they never log anything themselves.
+    const sessionNow = new Date();
+    const [{ data: scopeMemberships }, scopeLastResult, scopeBookings, viewerZone] = await Promise.all([
       readRowsByIds(scopeIds, (g) => (from, to) =>
         supabase
           .from("group_memberships")
@@ -243,7 +247,21 @@ export default async function ClientsPage(
           .range(from, to)
       ),
       pageAll((from, to) => supabase.rpc("business_last_active", { p_group_ids: scopeIds }).range(from, to)),
+      readRowsByIds(scopeIds, (g) => (from, to) =>
+        supabase
+          .from("bookings")
+          .select("id, athlete_id, start_at")
+          .in("group_id", g)
+          .eq("status", "confirmed")
+          .gte("start_at", new Date(sessionNow.getTime() - 180 * 86_400_000).toISOString())
+          .lte("start_at", new Date(sessionNow.getTime() + 60 * 86_400_000).toISOString())
+          .order("id")
+          .range(from, to)
+      ),
+      getViewerDisplayTimezone(supabase, user.id),
     ]);
+    // A failed read only loses the session line; the list still shows.
+    const startsByAthlete = sessionStartsByAthlete(scopeBookings.error ? [] : (scopeBookings.data as { athlete_id: string; start_at: string }[]));
     if (scopeLastResult.failed) return <LoadFailedPage />;
     const scopeLast = new Map<string, string>();
     for (const row of scopeLastResult.rows as { athlete_id: string; last_at: string }[]) {
@@ -291,7 +309,7 @@ export default async function ClientsPage(
           },
         })
       )
-    );
+    ).map((m) => ({ ...m, sessionLine: clientSessionLine(startsByAthlete.get(m.profileId) ?? [], sessionNow, viewerZone) }));
 
     const requestCount = await pendingRequestCount(supabase);
     // The coach's own row (their personal space) leads the list, as on a computer; never counted as a client.

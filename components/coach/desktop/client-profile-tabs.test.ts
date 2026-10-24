@@ -62,8 +62,10 @@ describe("the profile page", () => {
     const programs = page.slice(page.indexOf('<div data-tab="program"'), page.indexOf('<div className="profile-grid'));
     expect(programs).toContain("<ClientProgramActions");
     expect(programs).not.toContain("Log an in-person session");
-    expect(programs).toContain("Log their workout");
-    expect(programs).toContain("/log`");
+    // Log their workout sits above the tabs on the phone, so every tab has it (Oct 24)
+    const header = page.slice(page.indexOf("<h1"), page.indexOf("<ClientProfileTabs"));
+    expect(header).toContain("Log their workout");
+    expect(header).toContain("/log`");
     expect(calendarSection).toContain("Schedule a session for");
     expect(calendarSection).toContain("scheduleFor=");
     expect(calendarSection).toContain("Log an in-person session");

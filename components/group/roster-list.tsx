@@ -17,18 +17,21 @@ export function RosterList({
 }) {
   const hidden = new Set(hiddenProfileIds);
   const coaches = members.filter((m) => m.role === "coach" && !hidden.has(m.profileId));
+  // The client's side lists their coaches, never the viewer themself: in a coach's own personal space the only "coach" is them (Oct 24: "Coaching staff: Coach Ron · 42 days quiet"),
+  // so the section is not shown there at all.
+  const staffShown = coaches.filter((m) => m.profileId !== viewerId);
   const athletes = members.filter((m) => m.role === "athlete");
   const isOnlyCoach = coaches.length === 1;
 
   return (
     <section className="px-5">
-      {!viewerIsCoach && coaches.length > 0 && (
+      {!viewerIsCoach && staffShown.length > 0 && (
         <div className="pt-6">
           <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
             Coaching staff
           </h2>
           <div className="divide-y divide-steel/15">
-            {coaches.map((m) => (
+            {staffShown.map((m) => (
               <RosterRow
                 key={m.profileId}
                 member={m}
