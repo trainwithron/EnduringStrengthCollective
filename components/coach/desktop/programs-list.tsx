@@ -7,7 +7,7 @@ import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { assignedBlockMessage, loadAssignedTo } from "@/lib/program-assigned";
 import type { ProgramCardVisualData } from "@/lib/program-card-data";
-import { applyProgramsFilter, clientOptions, firstName, newestFirst, removedFor, typeOptions, type ProgramsFilterMode, type RemovedProgram } from "@/lib/programs-filter";
+import { applyProgramsFilter, clientOptions, firstName, newestFirst, programsForTab, removedFor, tabCounts, typeOptions, type ProgramsFilterMode, type ProgramsTab, type RemovedProgram } from "@/lib/programs-filter";
 
 // The Programs page: one flat list of cards with a single "Filter by" control. No headings, no fold. A program the coach removed is still findable (under "Removed programs", and under its client in
 // "One client") with Put back and Delete, so nothing is ever lost from view.
@@ -24,16 +24,37 @@ export function ProgramsList({
   visualsByProgramId: Record<string, ProgramCardVisualData>;
   chartProgramIds?: string[];
 }) {
+  const [tab, setTab] = useState<ProgramsTab>("programs");
   const [mode, setMode] = useState<ProgramsFilterMode>("all");
   const [value, setValue] = useState<string>("");
   const clients = clientOptions([...programs, ...removed]);
   const types = typeOptions(programs);
-  const shown = newestFirst(applyProgramsFilter(programs, mode, value || null));
+  const counts = tabCounts(programs);
+  // The filters work inside the tab that is open.
+  const shown = newestFirst(applyProgramsFilter(programsForTab(programs, tab), mode, value || null));
   const removedShown = removedFor(removed, mode, value || null);
   const select = "min-h-11 bg-graphite border border-steel/40 text-chalk px-2 font-body text-sm";
 
   return (
     <div>
+      <div role="tablist" aria-label="Programs or templates" className="flex items-center gap-1 mb-4 border-b border-steel/20">
+        {(["programs", "templates"] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            role="tab"
+            aria-selected={tab === t}
+            onClick={() => {
+              setTab(t);
+              setMode("all");
+              setValue("");
+            }}
+            className={`min-h-11 px-4 -mb-px border-b-2 font-display text-sm uppercase tracking-wide ${tab === t ? "border-rust text-chalk" : "border-transparent text-steel hover:text-chalk"}`}
+          >
+            {t === "programs" ? "Programs" : "Templates"} <span className="font-body text-xs text-steel">{counts[t]}</span>
+          </button>
+        ))}
+      </div>
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <label className="font-body text-sm text-steel flex items-center gap-2">
           Filter by
@@ -49,7 +70,6 @@ export function ProgramsList({
             <option value="shared">Shared programs</option>
             <option value="client">One client</option>
             {types.length > 0 && <option value="type">Program type</option>}
-            <option value="templates">Templates</option>
             {removed.length > 0 && <option value="removed">Removed programs ({removed.length})</option>}
           </select>
         </label>
@@ -77,7 +97,7 @@ export function ProgramsList({
       {mode !== "removed" && <ProgramCardGrid groupId={groupId} programs={shown} visualsByProgramId={visualsByProgramId} chartProgramIds={chartProgramIds} />}
       {removedShown.length > 0 && <RemovedRows rows={removedShown} />}
       {mode === "removed" && removedShown.length === 0 && <p className="font-body text-sm text-steel">Nothing removed.</p>}
-      {mode === "templates" && shown.length === 0 && <p className="font-body text-sm text-steel">No templates yet. Add a slot to a day of a program to make one.</p>}
+      {tab === "templates" && mode !== "removed" && shown.length === 0 && <p className="font-body text-sm text-steel">No templates yet. Open a program and choose Make a template.</p>}
     </div>
   );
 }

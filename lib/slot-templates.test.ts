@@ -73,8 +73,9 @@ describe("templates under Programs", () => {
     expect(applyProgramsFilter(all, "templates", null).map((x) => x.id)).toEqual(["a"]);
   });
   it("the page, the filter and the card are wired", () => {
-    expect(read("components/coach/desktop/programs-list.tsx")).toContain('<option value="templates">Templates</option>');
-    expect(read("components/coach/desktop/programs-list.tsx")).toContain("No templates yet. Add a slot to a day of a program to make one.");
+    // the Templates tab (Oct 26) took the place of the filter option
+    expect(read("components/coach/desktop/programs-list.tsx")).toContain("applyProgramsFilter(programsForTab(programs, tab), mode, value || null)");
+    expect(read("components/coach/desktop/programs-list.tsx")).toContain("No templates yet. Open a program and choose Make a template.");
     expect(read("components/coach/desktop/program-card-grid.tsx")).toContain("Template, {program.slotCount}");
     expect(read("app/(coach)/programs/page.tsx")).toContain('.eq("is_slot", true)');
   });

@@ -43,6 +43,18 @@ export function defaultList<T extends FilterableProgram>(all: T[]): T[] {
   return all.filter((p) => !isClientCopy(p) || !ids.has(p.sourceProgramId as string));
 }
 
+// The library's two tabs (Ron, Oct 26: "inside the [program] library, have programs and then templates separately"): a template is a program with no client that has a slot; everything else is a program.
+export type ProgramsTab = "programs" | "templates";
+export const isTemplateProgram = (p: FilterableProgram): boolean => !p.athleteId && (p.slotCount ?? 0) > 0;
+export function programsForTab<T extends FilterableProgram>(all: T[], tab: ProgramsTab): T[] {
+  return all.filter((p) => (tab === "templates" ? isTemplateProgram(p) : !isTemplateProgram(p)));
+}
+// The counts on the tabs: what each tab shows with no filter.
+export function tabCounts<T extends FilterableProgram>(all: T[]): Record<ProgramsTab, number> {
+  const list = defaultList(all);
+  return { programs: list.filter((p) => !isTemplateProgram(p)).length, templates: list.filter(isTemplateProgram).length };
+}
+
 export function applyProgramsFilter<T extends FilterableProgram>(all: T[], mode: ProgramsFilterMode, value: string | null): T[] {
   const list = defaultList(all);
   if (mode === "removed") return [];

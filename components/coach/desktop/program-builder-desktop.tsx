@@ -314,6 +314,7 @@ export function ProgramBuilderDesktop({
             groupId={groupId}
             aiDraft={aiDraft}
             hideAssignAndDuplicate={embedded}
+            slotCount={days.reduce((n, d) => n + d.items.filter((i) => i.kind === "exercise" && !!i.slot).length, 0)}
           />
         </div>
         <ProgramAssignedClients programId={programId} groupId={groupId} athleteId={athleteId} />

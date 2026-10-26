@@ -49,7 +49,7 @@ export default async function ProgramDetailPage(
     // always landed back at the top and had to manually find and expand
     // that week themselves. `?week=N` lets the mini-view jump straight
     // to the right week already open.
-    searchParams: Promise<{ week?: string; forClient?: string; clientGroup?: string; edit?: string }>;
+    searchParams: Promise<{ week?: string; forClient?: string; clientGroup?: string; edit?: string; templateNote?: string }>;
   }
 ) {
   const params = await props.params;
@@ -132,6 +132,7 @@ export default async function ProgramDetailPage(
         requestedWeek={requestedWeek}
         forClientId={searchParams.forClient ?? null}
         clientGroupId={searchParams.clientGroup ?? null}
+        templateNote={typeof searchParams.templateNote === "string" && searchParams.templateNote.length <= 400 ? searchParams.templateNote : null}
       />
     );
   }
@@ -306,6 +307,7 @@ async function CoachProgramBuilder({
   requestedWeek,
   forClientId,
   clientGroupId,
+  templateNote = null,
 }: {
   groupId: string;
   programId: string;
@@ -313,6 +315,8 @@ async function CoachProgramBuilder({
   requestedWeek: number | null;
   forClientId: string | null;
   clientGroupId: string | null;
+  // Just made with Make a template: the line saying which exercises became slots.
+  templateNote?: string | null;
 }) {
   const supabase = await createServerClient();
   // The builder's data, the program's label/order, and the quiet question after a sign-off do not depend on each other: one batch.
@@ -365,6 +369,12 @@ async function CoachProgramBuilder({
       {assignTo && <AssignToClientBanner programId={programId} clientId={assignTo.id} clientGroupId={assignTo.groupId} firstName={assignTo.firstName} alreadyAssigned={assignTo.assigned} aiDraft={isAiDraft} />}
       {/* The "Day N of M, you've moved X lbs" strip is for the client's own view of a program, not the coach's builder. */}
       {isAiDraft && <AiDraftBanner programId={programId} programName={data.programName} />}
+      {/* Just made with Make a template: which exercises became slots, and which stayed as they are. */}
+      {templateNote && (
+        <p className="mb-4 border border-steel/25 bg-surface/40 px-3 py-2 font-body text-sm text-chalk" role="status" data-template-note>
+          Template made. {templateNote}
+        </p>
+      )}
       {askedRule && (
         <LearnedSuggestionCard
           ruleId={askedRule.id}

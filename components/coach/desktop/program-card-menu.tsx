@@ -9,6 +9,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { clampedLeft, clampedWidth } from "@/lib/viewport-clamp";
 import { duplicateProgram } from "@/lib/program-duplication";
 import { keepOrgProgramMark } from "@/lib/org-programs";
+import { makeTemplate } from "@/lib/make-template";
 import { ProgramAssignPanel } from "@/components/coach/desktop/program-assign-panel";
 import { UseTemplatePanel } from "@/components/coach/desktop/use-template-panel";
 import { assignedBlockMessage, loadAssignedTo } from "@/lib/program-assigned";
@@ -200,6 +201,29 @@ export function ProgramCardMenu({
     router.push(`/groups/${groupId}/programs/${result.programId}`);
   }
 
+  // "Make a template": a new template ("<Program> template") in the organization's library, opened in the builder with a line saying which exercises became slots.
+  async function handleMakeTemplate() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    const supabase = createBrowserClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setBusy(false);
+      return;
+    }
+    const made = await makeTemplate(supabase, { programId, programName, groupId, coachId: user.id });
+    setBusy(false);
+    if ("error" in made) {
+      setError(made.error);
+      return;
+    }
+    setView(null);
+    router.push(`/groups/${made.groupId}/programs/${made.programId}?edit=1&templateNote=${encodeURIComponent(made.summary)}`);
+  }
+
   async function handleDuplicateToGroup(destinationGroupId: string) {
     setBusy(true);
     setError(null);
@@ -371,6 +395,18 @@ export function ProgramCardMenu({
                   >
                     Duplicate…
                   </button>
+                  {/* A new template in the organization's library from this program (the program itself never changes). */}
+                  {!isTemplate && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void handleMakeTemplate()}
+                      className="w-full text-left px-3 py-2.5 font-body text-sm text-chalk hover:bg-graphite/50 disabled:opacity-40"
+                      data-make-template
+                    >
+                      Make a template
+                    </button>
+                  )}
                 </>
               )}
               {canHide && (
