@@ -1,57 +1,81 @@
-import { describe, it, expect, vi } from "vitest";
-import { coachLadders, loadCoachLadders, STARTER_LADDER_OWNER } from "./coach-ladders";
-import { planTemplate, templateSummary } from "./make-template";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
-// Oct 26 review: every starter pattern (14 patterns, 136 rungs) is owned by the starter owner, not by Ron, who owns none. Reading only the coach's own patterns turned 0 exercises into slots for him.
-const RON = "136394ed-f108-4283-bcb7-310a1ac6cbc8";
-const OTHER = "35daeb9f-9abb-4160-a7d0-8c0871e9b5ad";
-const patterns = [
-  { id: "s-squat", name: "Squat", created_by: STARTER_LADDER_OWNER },
-  { id: "s-hinge", name: "Hinge", created_by: STARTER_LADDER_OWNER },
-  { id: "x-push", name: "Horizontal Push", created_by: OTHER },
-];
-const rungs = [
-  { movement_pattern_id: "s-squat", exercise_name: "Goblet Squat", tier: "B", is_unilateral: false },
-  { movement_pattern_id: "s-hinge", exercise_name: "Romanian Deadlift", tier: "A", is_unilateral: false },
-  { movement_pattern_id: "x-push", exercise_name: "Bench Press", tier: "A", is_unilateral: false },
-];
+// Oct 26: every screen works from the coach's OWN movement patterns; the starter set (lib/starter-ladders.ts) is copied into them by "Add the starter ladders". Ron had not done that yet, so + Slot was
+// empty and Make a template would make no slots. Now a coach with no ladders gets the starter ladders as part of the click (+ Slot, Make a template); nothing is written by opening a page.
+const added = vi.fn();
+vi.mock("@/lib/starter-ladders-add", () => ({ addStarterLadders: (...args: unknown[]) => added(...args) }));
+const { loadCoachLadders, toLadderEntries } = await import("./coach-ladders");
+const read = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
 
-describe("the ladders a coach works from", () => {
-  it("a coach with no patterns of their own gets the starter set (owned by another, seed account)", () => {
-    const ladders = coachLadders(RON, patterns, rungs);
-    expect(ladders.map((l) => `${l.patternName}:${l.exerciseName}`).sort()).toEqual(["Hinge:Romanian Deadlift", "Squat:Goblet Squat"]);
-    // so Make a template makes slots for Ron
-    const plan = planTemplate([{ id: "1", name: "Goblet Squat" }, { id: "2", name: "Romanian Deadlift" }, { id: "3", name: "Bench Press" }], ladders);
-    expect(templateSummary(plan)).toBe("2 of 3 exercises became slots; Bench Press stayed as it is (not on a ladder yet).");
-  });
-  it("another coach's own patterns are never used", () => {
-    expect(coachLadders(RON, patterns, rungs).some((l) => l.patternId === "x-push")).toBe(false);
-  });
-  it("the coach's own pattern wins over a starter one with the same name", () => {
-    const mine = [...patterns, { id: "r-squat", name: "squat", created_by: RON }];
-    const mineRungs = [...rungs, { movement_pattern_id: "r-squat", exercise_name: "Front Squat", tier: "A", is_unilateral: false }];
-    const ladders = coachLadders(RON, mine, mineRungs);
-    expect(ladders.filter((l) => l.patternName.toLowerCase() === "squat").map((l) => l.exerciseName)).toEqual(["Front Squat"]);
-    expect(ladders.some((l) => l.patternId === "s-hinge")).toBe(true);
-  });
-  it("it reads the coach's and the starter owner's patterns, then their rungs; a failed read is said, never read as no ladders", async () => {
-    const calls: { table: string; col: string; vals: unknown }[] = [];
-    const db = {
+const rung = (exercise: string, pattern: string, tier: string | null, unilateral = false) => ({ exercise_name: exercise, tier, is_unilateral: unilateral, movement_pattern_id: `p-${pattern}`, movement_patterns: { name: pattern } });
+function db(reads: ({ data: unknown[] } | { error: true })[]) {
+  const calls: string[] = [];
+  return {
+    calls,
+    client: {
       from: (table: string) => ({
         select: () => ({
-          in: async (col: string, vals: unknown) => {
-            calls.push({ table, col, vals });
-            if (table === "movement_patterns") return { data: patterns, error: null };
-            return { data: rungs, error: null };
+          eq: async (col: string, val: string) => {
+            calls.push(`${table}.${col}=${val}`);
+            const next = reads.shift() ?? { data: [] };
+            return "error" in next ? { data: null, error: { message: "x" } } : { data: next.data, error: null };
           },
         }),
       }),
-    };
-    const r = await loadCoachLadders(db as never, RON);
+    },
+  };
+}
+
+beforeEach(() => added.mockReset());
+
+describe("the ladders are the coach's own", () => {
+  it("each rung is read with its pattern, class and side", () => {
+    expect(toLadderEntries([rung("Bulgarian Split Squat", "Squat", "A", true)])).toEqual([{ exerciseName: "Bulgarian Split Squat", patternId: "p-Squat", patternName: "Squat", tier: "A", unilateral: true }]);
+  });
+  it("a coach with ladders: theirs are used, nothing is added, only their own are read", async () => {
+    const d = db([{ data: [rung("Goblet Squat", "Squat", "B")] }]);
+    const r = await loadCoachLadders(d.client as never, "ron");
+    expect(r).toEqual({ ladders: [expect.objectContaining({ exerciseName: "Goblet Squat" })], addedStarters: false });
+    expect(added).not.toHaveBeenCalled();
+    expect(d.calls).toEqual(["movement_pattern_exercises.movement_patterns.created_by=ron"]);
+  });
+  it("a coach with none: the starter ladders are added for them first, then read (and the summary will say so)", async () => {
+    added.mockResolvedValue({ ok: true, line: "Added 14 ladders.", patterns: [] });
+    const d = db([{ data: [] }, { data: [rung("Goblet Squat", "Squat", "B"), rung("Romanian Deadlift", "Hinge", "A")] }]);
+    const r = await loadCoachLadders(d.client as never, "ron");
+    expect(added).toHaveBeenCalledTimes(1);
+    expect(r).toMatchObject({ addedStarters: true });
     expect("ladders" in r && r.ladders.length).toBe(2);
-    expect(calls[0]).toEqual({ table: "movement_patterns", col: "created_by", vals: [RON, STARTER_LADDER_OWNER] });
-    expect(calls[1].table).toBe("movement_pattern_exercises");
-    const failing = { from: () => ({ select: () => ({ in: vi.fn(async () => ({ data: null, error: { message: "x" } })) }) }) };
-    expect(await loadCoachLadders(failing as never, RON)).toEqual({ error: true });
+  });
+  it("a failed read or a failed add is said, never read as 'no ladders'", async () => {
+    expect(await loadCoachLadders(db([{ error: true }]).client as never, "ron")).toEqual({ error: true });
+    added.mockResolvedValue({ ok: false });
+    expect(await loadCoachLadders(db([{ data: [] }]).client as never, "ron")).toEqual({ error: true });
+  });
+  it("nothing reads another account's patterns (the seed coach's rows are test data)", () => {
+    for (const f of ["lib/coach-ladders.ts", "lib/make-template.ts", "lib/starter-ladders-add.ts", "lib/program-builder-data.ts"]) expect(read(f), f).not.toContain("11111111-1111-1111-1111-111111111111");
+  });
+});
+
+describe("one code path for the starter ladders, run only on a click", () => {
+  it("the Exercise Library button, + Slot and Make a template all use addStarterLadders", () => {
+    expect(read("components/coach/add-starter-ladders-button.tsx")).toContain("await addStarterLadders(supabase, userId)");
+    expect(read("lib/coach-ladders.ts")).toContain("const added = await addStarterLadders(supabase, coachId);");
+    const day = read("components/coach/desktop/day-card.tsx");
+    expect(day).toContain("await addStarterLadders(supabase, userData.user.id)");
+    expect(day).toContain("onClick={() => void openSlotForm()}");
+  });
+  it("+ Slot adds them only on the click, and only when the coach has no patterns; then shows them", () => {
+    const day = read("components/coach/desktop/day-card.tsx");
+    const fn = day.slice(day.indexOf("async function openSlotForm()"), day.indexOf("async function openSlotForm()") + 900);
+    expect(fn).toContain("if (slotPatterns.length > 0) {");
+    expect(fn).toContain("setSlotPatterns(result.patterns);");
+    expect(day.match(/addStarterLadders\(/g)).toHaveLength(1);
+    expect(day).toContain("patterns={slotPatterns}");
+  });
+  it("Make a template tells the coach when it added them", () => {
+    expect(read("lib/make-template.ts")).toContain('${ladderRead.addedStarters ? "Your starter movement ladders were added. " : ""}${templateSummary(plan)}');
   });
 });

@@ -24,6 +24,7 @@ import type { RestTempoSuggestion } from "@/lib/training-intent";
 import { TextNoteCard } from "../text-note-card";
 import { BulkEditDayPanel } from "./bulk-edit-day-panel";
 import { AddSlotForm, SlotCard } from "./slot-card";
+import { addStarterLadders } from "@/lib/starter-ladders-add";
 import { formatShortDate } from "@/lib/program-schedule";
 import { GripVertical, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, StickyNote, Video } from "lucide-react";
 import { formatCompactLine } from "@/lib/compact-line";
@@ -205,6 +206,33 @@ export function DayCard({
   }
 
   const [showSlotForm, setShowSlotForm] = useState(false);
+  // The patterns + Slot offers. A coach with none yet gets the starter ladders on the click (never on opening the builder), then they are shown.
+  const [slotPatterns, setSlotPatterns] = useState(movementPatterns);
+  const [slotBusy, setSlotBusy] = useState(false);
+  useEffect(() => {
+    if (movementPatterns.length > 0) setSlotPatterns(movementPatterns);
+  }, [movementPatterns]);
+  async function openSlotForm() {
+    if (showSlotForm) {
+      setShowSlotForm(false);
+      return;
+    }
+    if (slotPatterns.length > 0) {
+      setShowSlotForm(true);
+      return;
+    }
+    setSlotBusy(true);
+    const supabase = createBrowserClient();
+    const { data: userData } = await supabase.auth.getUser();
+    const result = userData.user ? await addStarterLadders(supabase, userData.user.id) : { ok: false as const };
+    setSlotBusy(false);
+    if (!result.ok) {
+      flashSaveError();
+      return;
+    }
+    setSlotPatterns(result.patterns);
+    setShowSlotForm(true);
+  }
 
   async function handleAddExercise() {
     if (addItemBusy) return;
@@ -768,7 +796,7 @@ export function DayCard({
                 workoutId={day.id}
                 groupId={groupId}
                 nextOrder={day.items.length > 0 ? Math.max(...day.items.map((i) => i.order)) + 1 : 0}
-                patterns={movementPatterns}
+                patterns={slotPatterns}
                 onAdded={(item) => {
                   onItemsChange((prev) => [...prev, item]);
                   setShowSlotForm(false);
@@ -799,11 +827,11 @@ export function DayCard({
             {canAddSlot && (
             <button
               type="button"
-              onClick={() => setShowSlotForm((v) => !v)}
-              disabled={addItemBusy}
+              onClick={() => void openSlotForm()}
+              disabled={addItemBusy || slotBusy}
               className="h-9 px-3 border border-dashed border-steel/40 text-steel font-body text-xs active:border-rust active:text-rust transition-colors disabled:opacity-40"
             >
-              + Slot
+              {slotBusy ? "Adding ladders…" : "+ Slot"}
             </button>
             )}
           </div>

@@ -101,7 +101,7 @@ export async function makeTemplate(
     return { error: "Couldn't make the template. Try again." };
   }
 
-  // The coach's ladders: their own patterns and the starter set (lib/coach-ladders.ts), their own winning on the same name.
+  // The coach's own ladders; a coach with none gets the starter ladders first (lib/coach-ladders.ts).
   const [{ data: rows, error: rowsError }, ladderRead] = await Promise.all([
     supabase.from("group_workout_exercises").select("id, exercise_name, is_slot, workouts!inner ( program_id )").eq("workouts.program_id", copy.programId),
     loadCoachLadders(supabase, coachId),
@@ -122,5 +122,5 @@ export async function makeTemplate(
       return { error: "Couldn't make the template. Try again." };
     }
   }
-  return { programId: copy.programId, groupId: libraryGroupId, summary: templateSummary(plan) };
+  return { programId: copy.programId, groupId: libraryGroupId, summary: `${ladderRead.addedStarters ? "Your starter movement ladders were added. " : ""}${templateSummary(plan)}` };
 }

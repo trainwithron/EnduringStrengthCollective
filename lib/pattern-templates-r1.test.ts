@@ -206,7 +206,8 @@ describe("a starter exercise takes the spelling the coach's library already has"
   it("with no library the starter spelling is used", () => {
     expect(planStarterAdd([]).rungs.flatMap((g) => g.rungs.map((r) => r.exercise))).toContain("Barbell Back Squat");
   });
-  it("the button reads the coach's library", () => {
-    expect(readFileSync(join(__dirname, "..", "components/coach/add-starter-ladders-button.tsx"), "utf8")).toContain('from("exercise_library")');
+  it("the button reads the coach's library (through the one starter-ladders code path, Oct 26)", () => {
+    expect(readFileSync(join(__dirname, "..", "components/coach/add-starter-ladders-button.tsx"), "utf8")).toContain("await addStarterLadders(supabase, userId)");
+    expect(readFileSync(join(__dirname, "..", "lib/starter-ladders-add.ts"), "utf8")).toContain('from("exercise_library")');
   });
 });
