@@ -54,6 +54,8 @@ export type AiFeature =
   // coach/athlete-triggered (burst-limited)
   | "program_generation"
   | "program_day"
+  // the AI Program Builder changing days already built (a preview of the changes; nothing is written by the call)
+  | "program_edit"
   | "program_chat"
   | "program_import_photo"
   | "program_import_text"
@@ -89,6 +91,7 @@ export const AI_INPUT_LIMITS: Partial<Record<AiFeature, number>> = {
   recipe_parse: 3000,
   session_nl: 2000,
   program_chat: 2000,
+  program_edit: 2000,
   ci_chat_router: 1000,
   video_checkin_summary: 3000,
   biomech_tag_suggest: 120,
@@ -116,6 +119,7 @@ const POLICY: Record<AiFeature, FeaturePolicy> = {
   program_generation: { enforce: true, monthlyCeiling: 150 },
   // The AI Program Builder, one day per call. A run is charged once as a program_generation; the days are logged here, with their own looser burst limit (a run is back-to-back calls) and a monthly ceiling.
   program_day: { enforce: true, burstLimit: 12, monthlyCeiling: 2000 },
+  program_edit: { enforce: true, burstLimit: 12, monthlyCeiling: 500 },
   program_chat: { enforce: true },
   // Reading a program from a picture, a PDF or pasted text: no credit is charged, so a monthly ceiling keeps repeated reads from being unlimited spend.
   program_import_photo: { enforce: true, monthlyCeiling: 100 },
@@ -165,6 +169,7 @@ export const FREE_TIER_USE_FEATURE: Record<FreeTierUseKind, AiFeature> = {
 export const FREE_TIER_INNER_FEATURES: ReadonlySet<AiFeature> = new Set<AiFeature>([
   "program_generation",
   "program_day",
+  "program_edit",
   "program_template",
   "program_import_photo",
   "program_import_text",

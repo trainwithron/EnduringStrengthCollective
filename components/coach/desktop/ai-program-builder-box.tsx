@@ -14,6 +14,7 @@ import { appliedLine, type AppliedRule } from "@/lib/learned-for-prompt";
 import { LikeClientSuggestion } from "@/components/coach/desktop/like-client";
 import { PastAiNotes } from "@/components/coach/desktop/past-ai-notes";
 import { fixTargetFrom, parseBuildRequest, planSlots, scopeLimitFrom } from "@/lib/ai-day-request";
+import { WHICH_WEEKS_QUESTION, isEditRequest, isYes, parseWeekRange, type PlannedDay, type WeekRange } from "@/lib/ai-week-edit";
 import type { DaySlot } from "@/lib/ai-day-slots";
 import type { BuilderDay } from "@/lib/types";
 import type { DemoRow } from "@/lib/exercise-demo";
@@ -24,7 +25,8 @@ const COULDNT = "Couldn't build that day. Try Resume, or tell it what to change.
 
 // The AI Program Builder, at the top of the builder: it builds ONE day at a time and each finished day appears in the builder in its week and day. Pause keeps everything already built; while
 // paused the coach types a correction and Resume fixes the day they point at (the last one built unless they name another) and carries on. Each new day knows the days already built and every
-// correction so far. It only fills EMPTY days; it never wipes a day the coach built.
+// correction so far. It only fills EMPTY days; it never wipes a day the coach built. Asked to CHANGE days already built ("drop the squats to 8 reps from week 2 on"), it shows every change first and
+// writes them only on Apply (lib/ai-week-edit.ts).
 export function AiProgramBuilderBox({
   programId,
   groupId,
@@ -157,14 +159,113 @@ export function AiProgramBuilderBox({
   const [programChoice, setProgramChoice] = useState<string | null>(null);
   const [importText, setImportText] = useState<string | null>(null);
 
+  // Changing days that are already built (lib/ai-week-edit.ts): the coach's words and the weeks; a preview of every change; nothing is written until Apply.
+  const [edit, setEdit] = useState<{ instruction: string; corrections: string[]; range: WeekRange | null } | null>(null);
+  const [preview, setPreview] = useState<{ lines: string[]; skipped: string[]; flags: string[]; plan: PlannedDay[] } | null>(null);
+  const [editBusy, setEditBusy] = useState<"preview" | "apply" | null>(null);
+
+  async function runPreview(next: { instruction: string; corrections: string[]; range: WeekRange }) {
+    setEdit(next);
+    setPreview(null);
+    setError(null);
+    setEditBusy("preview");
+    setLine("Working out the changes…");
+    try {
+      const res = await fetch("/api/ai/edit-weeks", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mode: "preview", programId, instruction: next.instruction, corrections: next.corrections, range: next.range }) });
+      const data = await readAiJson(res);
+      if (!res.ok) {
+        setLine(null);
+        setError((data.error as string | undefined) ?? "Couldn't work out those changes. Try saying it another way.");
+        return;
+      }
+      const lines = Array.isArray(data.lines) ? (data.lines as string[]) : [];
+      const skipped = Array.isArray(data.skipped) ? (data.skipped as string[]) : [];
+      if (lines.length === 0) {
+        setLine([typeof data.question === "string" ? data.question : "Nothing to change.", ...skipped].join(" "));
+        return;
+      }
+      setPreview({ lines, skipped, flags: Array.isArray(data.flags) ? (data.flags as string[]) : [], plan: Array.isArray(data.plan) ? (data.plan as PlannedDay[]) : [] });
+      setLine("Here is what will change. Nothing is saved until you press Apply.");
+    } catch {
+      setLine(null);
+      setError("Couldn't work out those changes. Try saying it another way.");
+    } finally {
+      setEditBusy(null);
+    }
+  }
+
+  // Starts a change, or carries one on: the answer to "Which weeks?", or a correction to the preview (which is worked out again).
+  function askEdit(said: string): boolean {
+    // A correction to the preview, or the answer to a question it asked back: worked out again with everything said so far.
+    if (edit?.range) {
+      void runPreview({ ...edit, range: edit.range, corrections: [...edit.corrections, said] });
+      return true;
+    }
+    if (edit && !edit.range) {
+      const range = parseWeekRange(said) ?? (isYes(said) ? ({ kind: "weeks", from: 2, to: null } as const) : null);
+      if (!range) {
+        setLine(WHICH_WEEKS_QUESTION);
+        return true;
+      }
+      void runPreview({ instruction: edit.instruction, corrections: isYes(said) ? edit.corrections : [...edit.corrections, said], range });
+      return true;
+    }
+    const hasBuilt = daysRef.current.some((d) => d.items.some((i) => i.kind === "exercise"));
+    if (!isEditRequest(said, hasBuilt)) return false;
+    const range = parseWeekRange(said);
+    if (!range) {
+      setEdit({ instruction: said, corrections: [], range: null });
+      setPreview(null);
+      setError(null);
+      setLine(WHICH_WEEKS_QUESTION);
+      return true;
+    }
+    void runPreview({ instruction: said, corrections: [], range });
+    return true;
+  }
+
+  function cancelEdit() {
+    setEdit(null);
+    setPreview(null);
+    setLine("Cancelled. Nothing was changed.");
+  }
+
+  async function applyEdit() {
+    if (!preview || editBusy) return;
+    setEditBusy("apply");
+    setError(null);
+    try {
+      const res = await fetch("/api/ai/edit-weeks", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mode: "apply", programId, plan: preview.plan }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError((data.error as string | undefined) ?? "Couldn't save those changes, so nothing was changed. Try Apply again.");
+        return;
+      }
+      const changed = Array.isArray(data.changedWorkoutIds) ? (data.changedWorkoutIds as string[]) : [];
+      for (const id of changed) await show(id);
+      const skipped = Array.isArray(data.skipped) ? (data.skipped as string[]) : [];
+      setEdit(null);
+      setPreview(null);
+      setLine([`Done. ${changed.length} ${changed.length === 1 ? "day" : "days"} changed.`, ...skipped].join(" "));
+    } catch {
+      setError("Couldn't save those changes, so nothing was changed. Try Apply again.");
+    } finally {
+      setEditBusy(null);
+    }
+  }
+
   function ask(skipProgramCheck = false) {
     const said = text.trim();
-    if (!said || phase === "building") return;
+    if (!said || phase === "building" || editBusy) return;
     if (!skipProgramCheck && phase !== "paused" && detectImportKind({ text: said }).kind === "pasted_program") {
       setProgramChoice(said);
       return;
     }
     setProgramChoice(null);
+    if (phase !== "paused" && askEdit(said)) {
+      setText("");
+      return;
+    }
     request.current = said;
     corrections.current = [];
     setShownRequest(said);
@@ -281,7 +382,7 @@ export function AiProgramBuilderBox({
             setProgramChoice(null);
           }}
           rows={2}
-          placeholder={phase === "paused" ? "What should it change?" : "Tell it what to build, or say: finish the week using Day 1"}
+          placeholder={phase === "paused" ? "What should it change?" : preview ? "Type a correction to the changes" : "Tell it what to build, or say: finish the week using Day 1"}
           aria-label="Tell the AI what to build"
           className="flex-1 min-w-0 bg-graphite border border-steel/30 text-chalk px-2 py-2 font-body text-base sm:text-sm focus:outline-none focus:border-rust"
         />
@@ -303,7 +404,7 @@ export function AiProgramBuilderBox({
             Resume
           </button>
         ) : (
-          <button type="button" onClick={() => ask()} disabled={!text.trim()} className="min-h-11 px-5 bg-rust text-graphite font-display font-bold uppercase tracking-wide disabled:opacity-40 sm:self-start">
+          <button type="button" onClick={() => ask()} disabled={!text.trim() || editBusy !== null} className="min-h-11 px-5 bg-rust text-graphite font-display font-bold uppercase tracking-wide disabled:opacity-40 sm:self-start">
             Ask
           </button>
         )}
@@ -352,6 +453,33 @@ export function AiProgramBuilderBox({
         <p className="font-body text-xs text-rust mt-1" role="alert">
           {error}
         </p>
+      )}
+      {edit && !preview && editBusy === null && (
+        <button type="button" onClick={cancelEdit} className="mt-1 min-h-11 font-body text-xs text-steel underline">
+          Cancel this change
+        </button>
+      )}
+      {preview && (
+        <div className="mt-2 border border-steel/25 p-3" aria-label="Changes to apply" data-edit-preview>
+          <ul className="space-y-1">
+            {preview.lines.map((l) => (
+              <li key={l} className="font-body text-sm text-chalk">
+                {l}
+              </li>
+            ))}
+          </ul>
+          {preview.skipped.length > 0 && <p className="font-body text-xs text-steel mt-2">{preview.skipped.join(". ")}.</p>}
+          {preview.flags.length > 0 && <p className="font-body text-xs text-steel mt-1">Worth a look: {preview.flags.join(" · ")}</p>}
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <button type="button" onClick={() => void applyEdit()} disabled={editBusy !== null} className="min-h-11 px-5 bg-rust text-graphite font-display font-bold uppercase tracking-wide disabled:opacity-40">
+              {editBusy === "apply" ? "Applying…" : "Apply"}
+            </button>
+            <button type="button" onClick={cancelEdit} disabled={editBusy !== null} className="min-h-11 px-4 border border-steel/40 text-chalk font-body text-sm disabled:opacity-40">
+              Cancel
+            </button>
+            <p className="font-body text-xs text-steel">Or type a correction and press Ask to see it again.</p>
+          </div>
+        </div>
       )}
       {phase === "done" && offerWeek && (
         <div className="mt-2 flex flex-wrap items-center gap-3">
