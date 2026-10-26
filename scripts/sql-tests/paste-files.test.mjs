@@ -70,6 +70,20 @@ const steps = [...stepsFile.slice(0, FIRST_NUMBERED), ...stepsFile.slice(FIRST_N
 for (const s of steps) {
   // Live today: step 13 was applied before it was fixed, so the internal functions are open to signed-in users. Reproduce that before step 24.
   if (s.n === "24") await db.exec(functionAclOpenSql());
+  if (s.n === "187") {
+    // The organization-programs backfill names the Collective's 5 programs by id: build them (an athlete-less, unarchived program each, in the Collective).
+    await db.exec(`
+      insert into public.organizations (id, slug, name, owner_id) values ('b7318b19-a17e-4412-88f1-51d68fcf026f', 'op-esc', 'Enduring Strength Co.', '00000000-0000-4000-8000-0000000000a1') on conflict (id) do nothing;
+      insert into public.groups (id, name, created_by, organization_id) values ('44444444-4444-4444-4444-444444444444', 'The Enduring Strength Collective', '00000000-0000-4000-8000-0000000000a1', 'b7318b19-a17e-4412-88f1-51d68fcf026f') on conflict (id) do nothing;
+      insert into public.programs (id, group_id, name, created_by) values
+        ('a6102694-0297-4142-b73f-e391649418be', '44444444-4444-4444-4444-444444444444', 'Glentuckey fr this time', '00000000-0000-4000-8000-0000000000a1'),
+        ('2738d78a-2b5f-4286-a249-adbedcf15459', '44444444-4444-4444-4444-444444444444', 'Maria', '00000000-0000-4000-8000-0000000000a1'),
+        ('2143be95-1aa8-42a1-98f2-42c9b2b131bc', '44444444-4444-4444-4444-444444444444', 'At Home mobility', '00000000-0000-4000-8000-0000000000a1'),
+        ('4d029d91-cbb1-4a78-9e96-4f31c9263999', '44444444-4444-4444-4444-444444444444', 'Brendan''s program', '00000000-0000-4000-8000-0000000000a1'),
+        ('a117a12b-7ca3-4765-88cc-aae150585424', '44444444-4444-4444-4444-444444444444', 'New program', '00000000-0000-4000-8000-0000000000a1')
+      on conflict (id) do nothing;
+    `);
+  }
   if (s.n === "26") {
     // The Home Team move names real ids: build the same shape (a coach who owns both organizations and coaches the group) so every row is exercised.
     await db.exec(`
@@ -448,6 +462,10 @@ for (const s of steps) {
     // verify_kiosk_pin needs a signed-in coach; the data check is that the hash exists.
     const hashed = (await db.query(`select count(*)::int as n from public.kiosk_pins where athlete_id = '00000000-0000-4000-8000-0000000000a2'`)).rows[0].n;
     check("step 06: the existing plain PIN was copied across hashed", hashed === 1);
+  }
+  if (s.n === "187") {
+    // The Collective and its 5 programs were only for this step's own checks: taken out again so the release bundles below start from the shape they expect.
+    await db.exec(`delete from public.programs where group_id = '44444444-4444-4444-4444-444444444444'; delete from public.groups where id = '44444444-4444-4444-4444-444444444444';`);
   }
 }
 // ---- release bundles: ONE paste per release ----

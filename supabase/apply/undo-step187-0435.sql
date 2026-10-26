@@ -1,4 +1,4 @@
--- UNDO for step 187 (0435). Only if step 187 misbehaves, and only while the app update that goes with it is NOT live (it reads org_program). The read rule and the assign function get their old text back and the column goes (the mark on the 9 programs is lost; they are ordinary programs of their group again, as before).
+-- UNDO for step 187 (0435). Only if step 187 misbehaves, and only while the app update that goes with it is NOT live (it reads org_program). The read rule and the assign function get their old text back and the column goes (the mark on the Collective's 5 programs is lost; they are ordinary programs of the Collective again, as before).
 -- WHAT YOU SHOULD SEE: "Success. No rows returned."   Then tell Spot, and do not run the step again until Spot says why it failed.
 begin;
 alter policy programs_select_members on public.programs using (

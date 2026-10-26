@@ -2,8 +2,8 @@
 -- but not the other way around"; "the goal of groups is to assign 1 program to a large group of people").
 -- An organization program is the organization's own: in its program library, never followed by anyone, only copied out (to a client, or to a group, where the copy is that group's program).
 -- It keeps the org's anchor group as its technical home (every program table and rule is keyed by group), and is marked:
---  * programs.org_program (default false). Backfilled ONCE, when the column is first added: the programs with no client, not archived, in a team or social group that has no clients
---    (live, Oct 26: 9 programs, the Collective's 5 among them; the 3 in groups that have clients stay those groups' programs).
+--  * programs.org_program (default false). Backfilled ONCE, when the column is first added: the 5 programs in the Collective (Enduring Strength Co.'s anchor group), by id. Every other
+--    program stays its group's, including the programs of a team with no athletes yet (it is waiting for members, not a library).
 --  * programs_select_members: a person who does not coach the group (a client) never reads an organization program (the condition is added to the part that applies to non-coaches).
 --    Checked first: the live policy must be exactly the expected text, or nothing changes.
 --  * assign_program_to_client: an organization program is never handed over to its first client (Ron chose: always copy); one condition is added to the hand-over check. Checked first:
@@ -14,14 +14,14 @@ do $col$
 begin
   if not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'org_program') then
     alter table public.programs add column org_program boolean not null default false;
-    update public.programs p
+    -- Only the organization's own programs, by name: the 5 in Enduring Strength Co.'s anchor group, the Collective (Ron: they are not the Collective's). A team with no athletes YET
+    -- (the Trojans, The Home Team) is waiting for members: its programs are that team's and stay so.
+    update public.programs
        set org_program = true
-      from public.groups g
-     where g.id = p.group_id
-       and p.athlete_id is null
-       and p.archived_at is null
-       and g.group_kind in ('team', 'social')
-       and not exists (select 1 from public.group_memberships m where m.group_id = g.id and m.role = 'athlete');
+     where id in ('a6102694-0297-4142-b73f-e391649418be', '2738d78a-2b5f-4286-a249-adbedcf15459', '2143be95-1aa8-42a1-98f2-42c9b2b131bc', '4d029d91-cbb1-4a78-9e96-4f31c9263999', 'a117a12b-7ca3-4765-88cc-aae150585424')
+       and group_id = '44444444-4444-4444-4444-444444444444'
+       and athlete_id is null
+       and archived_at is null;
   end if;
 end
 $col$;
