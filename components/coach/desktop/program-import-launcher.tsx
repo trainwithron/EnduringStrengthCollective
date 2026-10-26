@@ -21,10 +21,12 @@ export function ProgramImportLauncher({
   groupId,
   athleteId = null,
   tone = "link",
+  orgProgram = false,
 }: {
   groupId: string;
   athleteId?: string | null;
   tone?: "link" | "button";
+  orgProgram?: boolean;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [panel, setPanel] = useState<{ file: File } | null>(null);
@@ -57,7 +59,7 @@ export function ProgramImportLauncher({
           Import program
         </button>
       </div>
-      {panel && <ProgramImportPanel groupId={groupId} athleteId={athleteId} file={panel.file} onClose={() => setPanel(null)} />}
+      {panel && <ProgramImportPanel groupId={groupId} athleteId={athleteId} orgProgram={orgProgram} file={panel.file} onClose={() => setPanel(null)} />}
     </>
   );
 }
@@ -69,9 +71,11 @@ export function ProgramImportPanel({
   file = null,
   text = null,
   onClose,
+  orgProgram = false,
 }: {
   groupId: string;
   athleteId: string | null;
+  orgProgram?: boolean;
   file?: File | null;
   text?: string | null;
   onClose: () => void;
@@ -146,6 +150,7 @@ export function ProgramImportPanel({
             initialAliases={loaded.aliases}
             initialFile={file}
             initialText={text}
+            orgProgram={orgProgram}
             onActivity={(active) => {
               activeRef.current = active;
             }}

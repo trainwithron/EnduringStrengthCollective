@@ -24,6 +24,14 @@
   "file": "apply-release-tc3b-client-requests-all.sql"
  },
  {
+  "id": "org-programs",
+  "name": "Organization programs (the organization's own programs: never followed, copied to a client or a group)",
+  "steps": [
+   "187"
+  ],
+  "file": "apply-org-programs-all.sql"
+ },
+ {
   "id": "platform-demo-library",
   "name": "Platform demo library (every coach and client sees the Spotlight demos when their coach has none)",
   "steps": [

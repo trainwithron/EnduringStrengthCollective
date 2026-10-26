@@ -9,6 +9,7 @@ import { detectTrainingIntent } from "@/lib/training-intent";
 // top of the builder. Nothing is asked first. (Made when the page opens in the browser, never by a prefetch.)
 export function CreateAndOpenProgram({
   groupId,
+  orgProgram = false,
   createdBy,
   athleteId,
   athleteFirstName,
@@ -20,6 +21,8 @@ export function CreateAndOpenProgram({
   athleteFirstName: string | null;
   // Started from a client's page: the program has no client on it; the builder offers "Assign to [First]".
   forClient?: { id: string; groupId: string } | null;
+  // Made from the program library: the organization's own program (0435), never the group's it is stored in.
+  orgProgram?: boolean;
 }) {
   const router = useRouter();
   const started = useRef(false);
@@ -32,7 +35,7 @@ export function CreateAndOpenProgram({
       const name = (athleteId || forClient) && athleteFirstName ? `${athleteFirstName}'s program` : "New program";
       const { data, error: insertError } = await createBrowserClient()
         .from("programs")
-        .insert({ group_id: groupId, name, created_by: createdBy, athlete_id: athleteId, is_active: athleteId !== null, training_intent: detectTrainingIntent(name) })
+        .insert({ group_id: groupId, name, created_by: createdBy, athlete_id: athleteId, is_active: athleteId !== null, training_intent: detectTrainingIntent(name), ...(orgProgram && athleteId === null ? { org_program: true } : {}) })
         .select("id")
         .single();
       if (insertError || !data) {
@@ -42,7 +45,7 @@ export function CreateAndOpenProgram({
       }
       router.replace(`/groups/${groupId}/programs/${data.id}?edit=1${forClient ? `&forClient=${forClient.id}&clientGroup=${forClient.groupId}` : ""}`);
     })();
-  }, [groupId, createdBy, athleteId, athleteFirstName, forClient, router]);
+  }, [groupId, createdBy, athleteId, athleteFirstName, forClient, orgProgram, router]);
 
   return error ? (
     <div className="p-8">

@@ -54,6 +54,7 @@ export function ProgramBuilderDesktop({
   embedded = false,
   toolbarExtra,
   aiDraft = false,
+  orgProgram = false,
 }: {
   programId: string;
   groupId: string;
@@ -108,6 +109,8 @@ export function ProgramBuilderDesktop({
   toolbarExtra?: React.ReactNode;
   // The program is an unsigned AI draft: assigning it from here signs it off first, as the program cards do.
   aiDraft?: boolean;
+  // An organization program: Assign lists the organization's clients and its groups (lib/org-programs.ts).
+  orgProgram?: boolean;
 }) {
   // Own channel per mount — fixes a real bug (see lib/save-toast.ts's
   // createSaveToastChannel doc comment): the full-page builder and an
@@ -346,7 +349,7 @@ export function ProgramBuilderDesktop({
           )}
         </div>
         {assignOpen && (
-          <ProgramAssignPanel programId={programId} programName={name} groupId={groupId} aiDraft={aiDraft} onClose={() => setAssignOpen(false)} onChanged={() => router.refresh()} />
+          <ProgramAssignPanel programId={programId} programName={name} groupId={groupId} aiDraft={aiDraft} orgProgram={orgProgram} onClose={() => setAssignOpen(false)} onChanged={() => router.refresh()} />
         )}
         {!embedded && (
           <AiProgramBuilderBox
@@ -358,6 +361,7 @@ export function ProgramBuilderDesktop({
             demoLibrary={demoLibrary}
             exerciseTierByName={exerciseTierByName}
             onDay={handleAiDay}
+            orgProgram={orgProgram}
           />
         )}
         <div className="flex flex-wrap gap-4 mt-4">

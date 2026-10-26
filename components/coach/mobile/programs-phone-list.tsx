@@ -2,10 +2,10 @@ import Link from "next/link";
 import type { ProgramCardData } from "@/components/coach/desktop/program-card-grid";
 
 // The coach's Programs on a PHONE: one simple card per program (name, Active or Draft, how many days, who it is for), tap to open. No toolbar, no filters, no import launcher: the desktop page keeps those.
-export function ProgramsPhoneList({ programs, groupIdFor, newProgramGroupId }: { programs: ProgramCardData[]; groupIdFor: (p: ProgramCardData) => string; newProgramGroupId: string }) {
+export function ProgramsPhoneList({ programs, groupIdFor, newProgramGroupId, newProgramQuery = "?library=1" }: { programs: ProgramCardData[]; groupIdFor: (p: ProgramCardData) => string; newProgramGroupId: string; newProgramQuery?: string }) {
   return (
     <section className="px-5 pb-8">
-      <Link href={`/groups/${newProgramGroupId}/programs/new`} className="flex items-center justify-center h-12 mb-4 bg-rust text-graphite font-display uppercase text-sm font-bold">
+      <Link href={`/groups/${newProgramGroupId}/programs/new${newProgramQuery}`} className="flex items-center justify-center h-12 mb-4 bg-rust text-graphite font-display uppercase text-sm font-bold">
         New program
       </Link>
       {programs.length === 0 ? (

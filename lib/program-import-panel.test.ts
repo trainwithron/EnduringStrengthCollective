@@ -101,7 +101,7 @@ describe("program text pasted into the AI builder box", () => {
     expect(ask.indexOf("setProgramChoice(said);")).toBeLessThan(ask.indexOf("request.current = said;"));
     expect(ask).toContain('phase !== "paused"');
     // Import it opens the panel on the text; Build from it runs the normal builder
-    expect(box).toContain("<ProgramImportPanel groupId={groupId} athleteId={athleteId} text={importText}");
+    expect(box).toContain("<ProgramImportPanel groupId={groupId} athleteId={athleteId} orgProgram={orgProgram} text={importText}");
     expect(box).toContain("onClick={() => ask(true)}");
     expect(read("components/coach/desktop/import-wizard.tsx")).toContain('handleAiTextImport(initialText.trim(), "Pasted program", "Imported from pasted text (AI)")');
   });

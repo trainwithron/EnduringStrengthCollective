@@ -1576,6 +1576,17 @@
   ]
  },
  {
+  "n": "187",
+  "slug": "0435",
+  "title": "0435 Organization programs: a mark for the organization's own programs (never followed by anyone, only copied to a client or a group), its backfill, one condition in the programs read rule and one in assign_program_to_client",
+  "migrations": [
+   "0435"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'org_program')"
+  ]
+ },
+ {
   "n": "186",
   "slug": "0434",
   "title": "0434 The platform demo library: every coach and client can see the demos on a platform admin's exercises (one read function, one file-read rule)",

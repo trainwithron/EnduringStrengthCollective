@@ -120,7 +120,7 @@ export function ProgramPanelList({ groupId }: { groupId: string }) {
 
   return (
     <div>
-      <Link href={`/groups/${groupId}/programs/new`} className="flex items-center justify-center min-h-11 mb-3 bg-rust text-graphite font-body text-sm font-medium">
+      <Link href={`/groups/${groupId}/programs/new?library=1`} className="flex items-center justify-center min-h-11 mb-3 bg-rust text-graphite font-body text-sm font-medium">
         Build a program
       </Link>
 

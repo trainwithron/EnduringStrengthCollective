@@ -123,6 +123,7 @@ function CoachDesktopShellFull({
   groupName,
   active,
   coachLevel = false,
+  programLibrary = false,
   wide = false,
   children,
 }: {
@@ -132,6 +133,8 @@ function CoachDesktopShellFull({
   // Home and other coach-level pages: the page belongs to the coach, not to the group used to anchor the rail's links. The business name is shown
   // instead of the group's, and no client or group identity is badged.
   coachLevel?: boolean;
+  // An organization program's page (0435): the top reads "<organization> > Programs" (groupName carries "Programs"); the anchor group it is stored in is never named, badged or remembered.
+  programLibrary?: boolean;
   // The page uses the full width of the screen instead of the usual 1400px column (the program builder, whose days sit side by side).
   wide?: boolean;
   children: React.ReactNode;
@@ -255,7 +258,7 @@ function CoachDesktopShellFull({
   // and the server-rendered Home page needs to read it via cookies().
   // A one-on-one client group is never remembered: Home would anchor on a client. The cookie keeps the last team or social group.
   useEffect(() => {
-    if (coachLevel || groupKind === null || groupKind === "one_on_one") return;
+    if (coachLevel || programLibrary || groupKind === null || groupKind === "one_on_one") return;
     try {
       document.cookie = `last_group=${encodeURIComponent(
         JSON.stringify({ id: groupId, name: groupName })
@@ -264,7 +267,7 @@ function CoachDesktopShellFull({
     } catch {
       // Non-fatal — Home just falls back to its minimal shell.
     }
-  }, [groupId, groupName, groupKind, coachLevel]);
+  }, [groupId, groupName, groupKind, coachLevel, programLibrary]);
 
   // Organization branding (button shape, colors, fonts, logo) is now
   // applied once at the app root (app/layout.tsx) as CSS custom
@@ -483,7 +486,7 @@ function CoachDesktopShellFull({
               {groupName}
             </p>
           )}
-          {groupKind && !coachLevel && (
+          {groupKind && !coachLevel && !programLibrary && (
             <span
               className={`shrink-0 font-body text-xs uppercase tracking-wide px-1.5 py-0.5 border ${
                 groupKind === "one_on_one"

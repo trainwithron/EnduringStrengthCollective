@@ -197,9 +197,12 @@ export function ImportWizard({
   initialFile,
   initialText,
   onActivity,
+  orgProgram = false,
 }: {
   coachId: string;
   groupId: string;
+  // Imported from the program library (or from an organization program's builder): the new program is the organization's own (0435), not the group's it is stored in.
+  orgProgram?: boolean;
   // Personal-program mode (injury_pain_science_research_and_ai_gap_
   // sept15.md) — set only when reached from a specific client's
   // profile via "Build with AI for this client." Undefined for the
@@ -598,6 +601,7 @@ export function ImportWizard({
         // gap_sept15.md) — null for the plain group-level flow,
         // completely unchanged from before this pass.
         athlete_id: athleteId ?? null,
+        ...(orgProgram && !athleteId ? { org_program: true } : {}),
         name: programName || "Imported Program",
         description,
         // A program the AI built is a DRAFT: not active, not seen by any client, until the coach signs it off in the builder. Anything else (a spreadsheet, a pasted program the coach wrote) is active as before.

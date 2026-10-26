@@ -13,7 +13,7 @@ export function GettingStartedCard({ groupId }: { groupId: string }) {
     {
       title: "Build your first program",
       body: "Start from scratch or import one, then assign it to a client.",
-      href: `/groups/${groupId}/programs/new`,
+      href: `/groups/${groupId}/programs/new?library=1`,
       cta: "Build a program",
     },
     {

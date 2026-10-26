@@ -58,7 +58,7 @@ export default async function DisplayModePage(
     .from("programs")
     .select("id, name, start_date, training_days")
     .eq("group_id", params.groupId)
-    .is("athlete_id", null)
+    .is("athlete_id", null).eq("org_program", false)
     .is("archived_at", null)
     .eq("is_active", true)
     .order("created_at", { ascending: false })

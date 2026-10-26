@@ -36,7 +36,10 @@ export function AiProgramBuilderBox({
   demoLibrary,
   exerciseTierByName,
   onDay,
+  orgProgram = false,
 }: {
+  // The program being built is an organization program: a program imported from here is one too.
+  orgProgram?: boolean;
   programId: string;
   groupId: string;
   // The client this program is for, when it is a personal copy (the rules the AI learns are matched to what is known about the client).
@@ -372,7 +375,7 @@ export function AiProgramBuilderBox({
       <h2 className="font-display uppercase text-sm tracking-wide text-steel">AI Program Builder</h2>
       <p className="font-body text-xs text-steel mt-1">Saved as you go. Nothing reaches the client until you assign it.</p>
       <div className="mt-1">
-        <ProgramImportLauncher groupId={groupId} athleteId={athleteId} />
+        <ProgramImportLauncher groupId={groupId} athleteId={athleteId} orgProgram={orgProgram} />
       </div>
       <div className="mt-2 flex flex-col sm:flex-row gap-2">
         <textarea
@@ -427,7 +430,7 @@ export function AiProgramBuilderBox({
           </button>
         </div>
       )}
-      {importText !== null && <ProgramImportPanel groupId={groupId} athleteId={athleteId} text={importText} onClose={() => setImportText(null)} />}
+      {importText !== null && <ProgramImportPanel groupId={groupId} athleteId={athleteId} orgProgram={orgProgram} text={importText} onClose={() => setImportText(null)} />}
       {phase === "idle" && <TemplateSuggestion text={text} />}
       {(phase === "idle" || phase === "paused") && <LikeClientSuggestion text={text} groupId={groupId} athleteId={athleteId} onUse={(id) => { referenceId.current = id; }} />}
       {athleteId && <PastAiNotes athleteId={athleteId} groupId={groupId} />}

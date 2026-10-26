@@ -299,7 +299,7 @@ export async function getLoggingConsistency(
         .from("programs")
         .select("training_days")
         .eq("group_id", athlete.groupId)
-        .is("athlete_id", null)
+        .is("athlete_id", null).eq("org_program", false)
         .eq("is_active", true)
         .order("created_at", { ascending: false })
         .limit(1)

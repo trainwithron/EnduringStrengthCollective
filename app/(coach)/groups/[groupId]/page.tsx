@@ -177,7 +177,7 @@ export default async function GroupHubPage(
       .select("id, name, athlete_id, cover_image_path, created_at, workouts(count)")
       .eq("group_id", params.groupId)
       .eq("is_active", true)
-      .or(`athlete_id.is.null,athlete_id.eq.${athleteId ?? ""}`)
+      .or(`athlete_id.is.null,athlete_id.eq.${athleteId ?? ""}`).eq("org_program", false)
       .order("created_at", { ascending: false }),
     user
       ? supabase

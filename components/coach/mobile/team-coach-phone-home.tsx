@@ -17,7 +17,7 @@ export async function TeamCoachPhoneHome({ groupId, groupName }: { groupId: stri
     .from("programs")
     .select("id, name, label, workouts ( id, title, week_number, day_index )")
     .eq("group_id", groupId)
-    .is("athlete_id", null)
+    .is("athlete_id", null).eq("org_program", false)
     .is("archived_at", null)
     .eq("is_active", true)
     .order("sort_order", { ascending: true, nullsFirst: false })

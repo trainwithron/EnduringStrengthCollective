@@ -25,6 +25,7 @@ import { computeProgramDayProgress } from "@/lib/program-day-progress";
 import { ProgramProgressBanner } from "@/components/coach/program-progress-banner";
 import { ProgrammingSpotterPanel } from "@/components/coach/desktop/programming-spotter-panel";
 import { getProgramBuilderData } from "@/lib/program-builder-data";
+import { programPlace } from "@/lib/org-programs";
 import { Lock } from "lucide-react";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { getEffectiveAthlete } from "@/lib/acting-as";
@@ -360,7 +361,7 @@ async function CoachProgramBuilder({
   }
 
   return (
-    <CoachDesktopShell groupId={groupId} groupName={data.groupName} active="programs" wide>
+    <CoachDesktopShell groupId={groupId} groupName={programPlace({ orgProgram: data.orgProgram, athleteName: null, groupName: data.groupName })} programLibrary={data.orgProgram} active="programs" wide>
       {assignTo && <AssignToClientBanner programId={programId} clientId={assignTo.id} clientGroupId={assignTo.groupId} firstName={assignTo.firstName} alreadyAssigned={assignTo.assigned} aiDraft={isAiDraft} />}
       {/* The "Day N of M, you've moved X lbs" strip is for the client's own view of a program, not the coach's builder. */}
       {isAiDraft && <AiDraftBanner programId={programId} programName={data.programName} />}
@@ -376,6 +377,7 @@ async function CoachProgramBuilder({
         programId={programId}
         groupId={groupId}
         aiDraft={isAiDraft}
+        orgProgram={data.orgProgram}
         toolbarExtra={
           <ProgramRoleControl
             programId={programId}

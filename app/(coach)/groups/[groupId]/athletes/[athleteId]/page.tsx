@@ -222,7 +222,7 @@ export default async function AthleteProfilePage(
       .from("programs")
       .select("id, name, training_intent")
       .eq("group_id", params.groupId)
-      .is("athlete_id", null)
+      .is("athlete_id", null).eq("org_program", false)
       .eq("is_active", true)
       .order("created_at", { ascending: false })
       .limit(1)

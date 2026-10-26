@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { clampedLeft, clampedWidth } from "@/lib/viewport-clamp";
 import { duplicateProgram } from "@/lib/program-duplication";
+import { keepOrgProgramMark } from "@/lib/org-programs";
 import { ProgramAssignPanel } from "@/components/coach/desktop/program-assign-panel";
 import { UseTemplatePanel } from "@/components/coach/desktop/use-template-panel";
 import { assignedBlockMessage, loadAssignedTo } from "@/lib/program-assigned";
@@ -190,6 +191,7 @@ export function ProgramCardMenu({
       createdBy: user.id,
     });
 
+    if (!("error" in result)) await keepOrgProgramMark(supabase, programId, result.programId);
     setBusy(false);
     if ("error" in result) {
       setError(result.error);

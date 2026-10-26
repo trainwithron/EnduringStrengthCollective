@@ -62,7 +62,7 @@ export async function getActivePrograms(
       .select(columns)
       .eq("group_id", groupId)
       .eq("is_active", true)
-      .or(`athlete_id.is.null,athlete_id.eq.${athleteId}`);
+      .or(`athlete_id.is.null,athlete_id.eq.${athleteId}`).eq("org_program", false);
 
   // In a one-on-one space (a coach and one client) a program with no client on it is the coach's template, never what the client follows: only programs made for the client count.
   const [kindResult, firstResult] = await Promise.all([

@@ -24,6 +24,8 @@ import type { MovementPatternOption } from "@/components/coach/exercise-builder-
 export interface ProgramBuilderData {
   groupId: string;
   groupName: string;
+  // An organization program (0435): its pages say "Programs", never the anchor group's name, and Assign lists the organization's clients and groups.
+  orgProgram: boolean;
   // disconnected_sibling_tools_ux_audit_sept30.md's confirmed "%TM dup"
   // gap — null for a shared group program (no single athlete to resolve
   // a training max against); set for a personal per-client copy
@@ -63,7 +65,7 @@ export async function getProgramBuilderData(
   const { data: program } = await supabase
     .from("programs")
     .select(
-      "id, name, description, start_date, training_days, visibility_window, ai_sequencing_notes, training_intent, athlete_id, is_active"
+      "id, name, description, start_date, training_days, visibility_window, ai_sequencing_notes, training_intent, athlete_id, is_active, org_program"
     )
     .eq("id", programId)
     .eq("group_id", groupId)
@@ -218,6 +220,7 @@ export async function getProgramBuilderData(
   return {
     groupId,
     groupName: group?.name ?? "Coaching",
+    orgProgram: (program as { org_program?: boolean | null }).org_program === true,
     athleteId: program.athlete_id,
     // A slot may only be added to a library program that nobody follows (no client, not active).
     canAddSlot: program.athlete_id === null && program.is_active === false,

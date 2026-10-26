@@ -15,6 +15,7 @@ import { hasFlaggedMusculoskeletalConcern, type ParQAnswer } from "@/lib/athlete
 import { notifyPush } from "@/lib/push-notify";
 import { localDateKey } from "@/lib/timezone";
 import { useTerm } from "@/components/coach/terminology-provider";
+import { assignProgramToGroup, loadAssignableGroups, loadAssignedGroups, type AssignableGroup } from "@/lib/org-programs";
 
 interface PositionOption {
   id: string;
@@ -31,7 +32,9 @@ interface Target {
 
 // "Assign...": ONE panel for a program. Top: everyone who has their own version of it now, each with Remove (takes it off their profile; their history stays). Below: add people (clients, "Me",
 // a position, or everyone in the group) with a start date and one Assign button. Every person gets their OWN independent version (no overlap); the program here stays the one entry.
-export function ProgramAssignPanel({ programId, programName, groupId, aiDraft, onClose, onChanged }: { programId: string; programName: string; groupId: string; aiDraft: boolean; onClose: () => void; onChanged: () => void }) {
+// An organization program (orgProgram, 0435) lists the organization's clients and, as their own section, its groups: a group gets ONE copy that is that group's program (every member follows it,
+// with the group's feed and team sheet). The "everyone in this group" and position choices belong to a group's own program and are not offered for an organization program.
+export function ProgramAssignPanel({ programId, programName, groupId, aiDraft, orgProgram = false, onClose, onChanged }: { programId: string; programName: string; groupId: string; aiDraft: boolean; orgProgram?: boolean; onClose: () => void; onChanged: () => void }) {
   const term = useTerm();
   const [assigned, setAssigned] = useState<AssignedInstance[] | null>(null);
   const [clients, setClients] = useState<AssignClient[] | null>(null);
@@ -47,9 +50,12 @@ export function ProgramAssignPanel({ programId, programName, groupId, aiDraft, o
   const [progress, setProgress] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [orgGroups, setOrgGroups] = useState<AssignableGroup[] | null>(null);
+  const [groupCopies, setGroupCopies] = useState<{ programId: string; groupId: string; groupName: string }[]>([]);
 
   async function reloadAssigned() {
     setAssigned(await loadAssignedTo(createBrowserClient(), programId, { includeSelf: true }));
+    if (orgProgram) setGroupCopies(await loadAssignedGroups(createBrowserClient(), programId));
   }
 
   useEffect(() => {
@@ -68,6 +74,7 @@ export function ProgramAssignPanel({ programId, programName, groupId, aiDraft, o
         supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle(),
       ]);
       setClients(list);
+      if (orgProgram) setOrgGroups(await loadAssignableGroups(supabase, user.id, groupId));
       setGroupName((groupRow?.name as string | undefined) ?? "");
       setGroupIsOneOnOne((groupRow?.group_kind as string | undefined) === "one_on_one");
       setMyName(((me?.full_name as string | undefined) ?? "").trim() || "Me");
@@ -80,7 +87,7 @@ export function ProgramAssignPanel({ programId, programName, groupId, aiDraft, o
       );
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [programId, groupId]);
+  }, [programId, groupId, orgProgram]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -93,8 +100,11 @@ export function ProgramAssignPanel({ programId, programName, groupId, aiDraft, o
   const alreadyAssigned = useMemo(() => new Set((assigned ?? []).map((a) => a.athleteId)), [assigned]);
   const q = query.trim().toLowerCase();
   const shownClients = (clients ?? []).filter((c) => !q || c.fullName.toLowerCase().includes(q));
-  const shownPositions = (positions ?? []).filter((p) => !q || p.name.toLowerCase().includes(q));
-  const showGroup = !groupIsOneOnOne && groupAthleteIds.length > 0 && (!q || groupName.toLowerCase().includes(q));
+  const shownPositions = orgProgram ? [] : (positions ?? []).filter((p) => !q || p.name.toLowerCase().includes(q));
+  const showGroup = !orgProgram && !groupIsOneOnOne && groupAthleteIds.length > 0 && (!q || groupName.toLowerCase().includes(q));
+  const groupHasCopy = new Set(groupCopies.map((c) => c.groupId));
+  const shownGroups = (orgGroups ?? []).filter((g) => !q || g.name.toLowerCase().includes(q));
+  const selectedGroups = (orgGroups ?? []).filter((g) => selected.has(`g:${g.id}`) && !groupHasCopy.has(g.id));
   const showMe = !q || "me".includes(q) || myName.toLowerCase().includes(q);
 
   function toggle(key: string) {
@@ -124,7 +134,7 @@ export function ProgramAssignPanel({ programId, programName, groupId, aiDraft, o
   }
 
   const list = targets();
-  const count = list.length + (selected.has("me") ? 1 : 0);
+  const count = list.length + (selected.has("me") ? 1 : 0) + selectedGroups.length;
 
   // What is on file NOW for the people about to receive this program (age, birthdate missing, a flagged health concern): the coach is told before it goes, not only when it was built.
   const [notices, setNotices] = useState<string[]>([]);
@@ -210,6 +220,21 @@ export function ProgramAssignPanel({ programId, programName, groupId, aiDraft, o
     let ok = 0;
     const failed: string[] = [];
     let lastError: string | null = null;
+    // Each chosen group gets its own copy (that group's program).
+    let groupsOk = 0;
+    if (selectedGroups.length > 0) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      for (const g of selectedGroups) {
+        setProgress(`Assigning to ${g.name}…`);
+        const r = user ? await assignProgramToGroup(supabase, { sourceProgramId: programId, groupId: g.id, createdBy: user.id, startDate: startDate || undefined }) : { error: "You are signed out." };
+        if ("error" in r) {
+          failed.push(g.name);
+          lastError = r.error;
+        } else groupsOk++;
+      }
+    }
     for (let i = 0; i < all.length; i++) {
       const t = all[i];
       setProgress(`Assigning ${i + 1} of ${all.length}…`);
@@ -236,7 +261,8 @@ export function ProgramAssignPanel({ programId, programName, groupId, aiDraft, o
     setBusy(false);
     setProgress(null);
     setSelected(new Set());
-    setMessage(ok > 0 ? `Assigned to ${ok} ${ok === 1 ? "person" : "people"}.` : null);
+    const parts = [ok > 0 ? `${ok} ${ok === 1 ? "person" : "people"}` : null, groupsOk > 0 ? `${groupsOk} ${groupsOk === 1 ? "group" : "groups"}` : null].filter(Boolean);
+    setMessage(parts.length > 0 ? `Assigned to ${parts.join(" and ")}.` : null);
     if (failed.length > 0) setError(`Couldn't assign to ${failed.join(", ")}${lastError ? `: ${lastError}` : "."}`);
     await reloadAssigned();
     onChanged();
@@ -276,6 +302,12 @@ export function ProgramAssignPanel({ programId, programName, groupId, aiDraft, o
           )}
         </div>
 
+        {orgProgram && groupCopies.length > 0 && (
+          <p className="px-4 pt-2 font-body text-xs text-steel" data-assigned-groups>
+            Groups with their own copy: {groupCopies.map((c) => c.groupName).join(", ")}
+          </p>
+        )}
+
         <div className="px-4 pt-4 pb-4">
           <p className="font-body text-xs text-steel uppercase tracking-wide">Add</p>
           <input
@@ -314,6 +346,25 @@ export function ProgramAssignPanel({ programId, programName, groupId, aiDraft, o
                 </span>
               </label>
             ))}
+            {orgProgram && shownGroups.length > 0 && (
+              <>
+                <p className="px-3 pt-2 pb-1 font-body text-xs text-steel uppercase tracking-wide" data-assign-groups>
+                  Groups
+                </p>
+                {shownGroups.map((g) => {
+                  const has = groupHasCopy.has(g.id);
+                  return (
+                    <label key={g.id} className={`${row} ${has ? "opacity-50 cursor-default" : ""}`}>
+                      <input type="checkbox" disabled={has} checked={selected.has(`g:${g.id}`)} onChange={() => toggle(`g:${g.id}`)} />
+                      <span className="truncate">
+                        {g.name}
+                        <span className="text-steel text-xs"> · {has ? "has it" : "everyone in the group follows it"}</span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </>
+            )}
             {showGroup && (
               <label className={row}>
                 <input type="checkbox" checked={selected.has("group")} onChange={() => toggle("group")} />
@@ -322,7 +373,7 @@ export function ProgramAssignPanel({ programId, programName, groupId, aiDraft, o
                 </span>
               </label>
             )}
-            {clients !== null && shownClients.length === 0 && shownPositions.length === 0 && !showGroup && !showMe && <p className="font-body text-xs text-steel px-3 py-2">No one matches.</p>}
+            {clients !== null && shownClients.length === 0 && shownPositions.length === 0 && shownGroups.length === 0 && !showGroup && !showMe && <p className="font-body text-xs text-steel px-3 py-2">No one matches.</p>}
           </div>
 
           <label className="block mt-3 font-body text-xs text-steel">

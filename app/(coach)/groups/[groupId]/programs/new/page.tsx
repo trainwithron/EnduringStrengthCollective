@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { CreateAndOpenProgram } from "@/components/coach/create-and-open-program";
+import { newProgramIsOrgProgram } from "@/lib/org-programs";
 import { getCoachedGroups, pickAnchorGroup } from "@/lib/coach-groups";
 
 export const metadata = { title: "New" };
@@ -14,7 +15,7 @@ export const metadata = { title: "New" };
 export default async function NewProgramPage(
   props: {
     params: Promise<{ groupId: string }>;
-    searchParams: Promise<{ method?: string; athleteId?: string }>;
+    searchParams: Promise<{ method?: string; athleteId?: string; library?: string }>;
   }
 ) {
   const params = await props.params;
@@ -84,7 +85,14 @@ export default async function NewProgramPage(
 
   return (
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="programs">
-      <CreateAndOpenProgram groupId={targetGroupId} createdBy={user.id} athleteId={forClient ? null : athleteId} athleteFirstName={athleteFirstName} forClient={forClient} />
+      <CreateAndOpenProgram
+        groupId={targetGroupId}
+        createdBy={user.id}
+        athleteId={forClient ? null : athleteId}
+        athleteFirstName={athleteFirstName}
+        forClient={forClient}
+        orgProgram={newProgramIsOrgProgram({ athleteId: forClient ? null : athleteId, fromLibrary: searchParams.library === "1" || forClient !== null })}
+      />
     </CoachDesktopShell>
   );
 }

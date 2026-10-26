@@ -147,7 +147,8 @@ describe("the phone coach home of a team-sport group (the Trojans: one team grou
 
   it("reads only active team programs (not archived, not one athlete's copy), in the coach's order", () => {
     const home = src("components/coach/mobile/team-coach-phone-home.tsx");
-    expect(home).toContain('.is("athlete_id", null)\n    .is("archived_at", null)\n    .eq("is_active", true)\n    .order("sort_order", { ascending: true, nullsFirst: false })\n    .order("created_at", { ascending: false })\n    .limit(20);');
+    // never an organization program (0435)
+    expect(home).toContain('.is("athlete_id", null).eq("org_program", false)\n    .is("archived_at", null)\n    .eq("is_active", true)\n    .order("sort_order", { ascending: true, nullsFirst: false })\n    .order("created_at", { ascending: false })\n    .limit(20);');
     expect(home).not.toContain(".limit(1)");
   });
 });
@@ -155,7 +156,7 @@ describe("the phone coach home of a team-sport group (the Trojans: one team grou
 describe("the weight-room screen", () => {
   const display = src("app/(coach)/groups/[groupId]/display/page.tsx");
   it("skips archived programs", () => {
-    expect(display).toContain('.is("athlete_id", null)\n    .is("archived_at", null)');
+    expect(display).toContain('.is("athlete_id", null).eq("org_program", false)\n    .is("archived_at", null)');
   });
   it("a program with no dates shows the workout the coach is up to in it, not 'No workout scheduled today'", () => {
     expect(display).toContain("const { doneAt } = await loadDoneAt(supabase, user.id,");

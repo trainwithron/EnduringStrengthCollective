@@ -140,7 +140,8 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
   // The scoped client's name (for the label) and the place a new program for them goes.
   let scopedName: string | null = null;
   let newProgramGroupId = anchor.id;
-  let newProgramQuery = "";
+  // From the library, a new program is the organization's (0435); scoped to a client, it is that client's.
+  let newProgramQuery = "?library=1";
   // The group the client was being looked at in (the profile's own group, else their one-on-one space), whose shared programs are part of their list.
   let clientGroupId: string | null = null;
   if (clientId) {
@@ -189,7 +190,7 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
               </p>
             )}
           </header>
-          {programsError ? <UnavailableState what="your programs" /> : <ProgramsPhoneList programs={cards} groupIdFor={(p) => p.groupId ?? anchor.id} newProgramGroupId={newProgramGroupId} />}
+          {programsError ? <UnavailableState what="your programs" /> : <ProgramsPhoneList programs={cards} groupIdFor={(p) => p.groupId ?? anchor.id} newProgramGroupId={newProgramGroupId} newProgramQuery={newProgramQuery} />}
         </CoachMobileShell>
       </main>
     );

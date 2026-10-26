@@ -21,7 +21,9 @@ describe("Assign cannot run twice from a quick double click", () => {
 describe("the assigned message matches what happened", () => {
   const panel = read("components/coach/desktop/program-assign-panel.tsx");
   it("says how many people got their own version, and lists the failures", () => {
-    expect(panel).toContain("Assigned to ${ok} ${ok === 1 ? \"person\" : \"people\"}.");
+    // people and groups (an organization program can go to a group, Oct 26)
+    expect(panel).toContain("ok > 0 ? `${ok} ${ok === 1 ? \"person\" : \"people\"}` : null");
+    expect(panel).toContain("setMessage(parts.length > 0 ? `Assigned to ${parts.join(\" and \")}.` : null);");
     expect(panel).toContain("Couldn't assign to");
   });
 });

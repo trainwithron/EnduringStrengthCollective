@@ -788,7 +788,7 @@ export async function CoachCalendarPageBody(
     supabase
       .from("programs")
       .select("id, name, athlete_id, start_date, training_days")
-      .eq("group_id", params.groupId)
+      .eq("group_id", params.groupId).eq("org_program", false)
       .eq("is_active", true),
     // Clients quiet 7+ days (or never logged) — same "needs attention"
     // idea already used on the Clients page, surfaced here too since

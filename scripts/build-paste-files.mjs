@@ -2842,6 +2842,24 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "187",
+  slug: "0435",
+  title: "0435 Organization programs: a mark for the organization's own programs (never followed by anyone, only copied to a client or a group), its backfill, one condition in the programs read rule and one in assign_program_to_client",
+  warn: "This adds programs.org_program (default false) and, ONCE, marks the programs with no client, not archived, in a team or social group that has no clients (9 live programs on Oct 26, the Collective's 5 among them; the 3 in groups that have clients stay those groups' programs). It then adds ONE condition to programs_select_members (a person who does not coach the group never reads an organization program; the paste checks the live rule is exactly the expected text, and stops if not) and ONE to assign_program_to_client (an organization program is always copied to a client, never handed over; the paste checks the live function is exactly the expected one, and stops if not).",
+  migrations: ["0435"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing on screen changes until the app update that goes with it is deployed (deploy it right after). Then the organization's programs say only the organization at the top, Assign lists the organization's clients and its groups, and a client added to the Collective never gets the organization's programs.",
+  undo: "alter policy programs_select_members on public.programs using (\n  (group_id in (select public.my_group_ids()))\n  and ((athlete_id is null) or (athlete_id = (select auth.uid())) or (group_id in (select public.my_coached_group_ids())))\n  and ((group_id in (select public.my_coached_group_ids())) or ((not ai_draft) and (archived_at is null) and ((athlete_id is not null) or (not public.is_one_on_one_group(group_id)))))\n);\ndo $undo$\ndeclare\n  v_def text := pg_get_functiondef('public.assign_program_to_client(uuid, uuid, uuid, text, date)'::regprocedure);\nbegin\n  if position('and not src.ai_draft and not src.org_program' in v_def) > 0 then\n    execute replace(v_def, 'and not src.ai_draft and not src.org_program', 'and not src.ai_draft');\n  end if;\nend $undo$;\nalter table public.programs drop column if exists org_program;",
+  undoWhy: "Only if step 187 misbehaves, and only while the app update that goes with it is NOT live (it reads org_program). The read rule and the assign function get their old text back and the column goes (the mark on the 9 programs is lost; they are ordinary programs of their group again, as before).",
+  rows: [
+    ["0435 is not already applied (programs has no org_program yet)", "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'org_program')"],
+    ["programs_select_members is exactly the expected text", "coalesce((select qual from pg_policies where schemaname = 'public' and tablename = 'programs' and policyname = 'programs_select_members') = '((group_id IN ( SELECT my_group_ids() AS my_group_ids)) AND ((athlete_id IS NULL) OR (athlete_id = ( SELECT auth.uid() AS uid)) OR (group_id IN ( SELECT my_coached_group_ids() AS my_coached_group_ids))) AND ((group_id IN ( SELECT my_coached_group_ids() AS my_coached_group_ids)) OR ((NOT ai_draft) AND (archived_at IS NULL) AND ((athlete_id IS NOT NULL) OR (NOT is_one_on_one_group(group_id))))))', false)"],
+    ["assign_program_to_client is exactly the expected function (0424)", md5Is("assign_program_to_client(uuid, uuid, uuid, text, date)", "8f6b77c8a837bd090fbccc085b1d252a")],
+    ["assign_program_to_client holds its hand-over check exactly once", "coalesce((select (length(d) - length(replace(d, 'and not src.ai_draft', ''))) / length('and not src.ai_draft') = 1 from (select pg_get_functiondef(to_regprocedure('public.assign_program_to_client(uuid, uuid, uuid, text, date)')) as d) x), false)"],
+  ],
+});
+
+STEPS.push({
   n: "186",
   slug: "0434",
   title: "0434 The platform demo library: every coach and client can see the demos on a platform admin's exercises (one read function, one file-read rule)",
@@ -3908,6 +3926,7 @@ const BUNDLES = [
   { id: "release-ts3-team-sheet-save", name: "Release TS3 (saving a filled team sheet: one table, one notice kind, three functions)", steps: ["171"] },
   { id: "release-own1-owner-accepted-only", name: "Release OWN1 (ownership cannot be handed to someone who has never signed in; replaces two functions, adds one function and one trigger)", steps: ["172"] },
   { id: "release-tc3b-client-requests", name: "Release TC3 part B (Request to train with me on a coach's public page: one column, three tables, eight functions)", steps: ["174"] },
+  { id: "org-programs", name: "Organization programs (the organization's own programs: never followed, copied to a client or a group)", steps: ["187"] },
   { id: "platform-demo-library", name: "Platform demo library (every coach and client sees the Spotlight demos when their coach has none)", steps: ["186"] },
   { id: "audit-oct24-undo-attended-anon", name: "Audit hardening Oct 24 (undoing attended: the booking's own coach or an owner/admin; two anon revokes)", steps: ["185"] },
   { id: "session-caps-keep-together", name: "Session caps, Keep my sessions together and a lunch break (five columns, four functions, one call added to three booking functions)", steps: ["184"] },
@@ -4112,7 +4131,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     tbl === "group_workout_exercise_sets"
       ? `  insert into public.${tbl} select * from jsonb_populate_recordset(null::public.${tbl}, (select coalesce(jsonb_agg(x || jsonb_build_object('set_type', coalesce(x ->> 'set_type', 'working'))), '[]'::jsonb) from jsonb_array_elements(b.payload -> '${k}') x));`
       : tbl === "programs"
-      ? `  insert into public.programs select * from jsonb_populate_recordset(null::public.programs, (select coalesce(jsonb_agg(x || jsonb_build_object('ai_draft', coalesce((x ->> 'ai_draft')::boolean, false))), '[]'::jsonb) from jsonb_array_elements(b.payload -> 'programs') x));`
+      ? `  insert into public.programs select * from jsonb_populate_recordset(null::public.programs, (select coalesce(jsonb_agg(x || jsonb_build_object('ai_draft', coalesce((x ->> 'ai_draft')::boolean, false), 'org_program', coalesce((x ->> 'org_program')::boolean, false))), '[]'::jsonb) from jsonb_array_elements(b.payload -> 'programs') x));`
       : `  insert into public.${tbl} select * from jsonb_populate_recordset(null::public.${tbl}, b.payload -> '${k}');`
   );
   const sql = [
@@ -4178,6 +4197,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0432", "to_regprocedure('public.client_slot_reason(uuid, timestamptz, timestamptz, uuid, boolean)') is not null"),
     m("0433", "position('is_org_admin_of_group' in coalesce(pg_get_functiondef(to_regprocedure('public.undo_booking_attended(uuid)')), '')) > 0"),
     m("0434", "to_regprocedure('public.platform_demo_rows()') is not null"),
+    m("0435", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'org_program')"),
     m("0427", "to_regprocedure('public.my_group_ids()') is not null"),
     m("0426", "to_regprocedure('public.active_org_group_ids()') is not null"),
     m("0425", "exists (select 1 from pg_proc p where p.oid = to_regprocedure('public.request_workspace_org()') and position('x-workspace-org' in p.prosrc) > 0)"),

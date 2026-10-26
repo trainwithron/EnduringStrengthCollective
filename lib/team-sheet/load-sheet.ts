@@ -59,7 +59,7 @@ type ExerciseRow = {
 const byOrder = (a: WorkoutRow, b: WorkoutRow) => (a.week_number ?? 0) - (b.week_number ?? 0) || (a.day_index ?? 0) - (b.day_index ?? 0) || a.id.localeCompare(b.id);
 
 async function readPrograms(supabase: any, groupId: string): Promise<{ programs: ProgramRow[]; workouts: WorkoutRow[] } | { error: string }> {
-  const { data: programs, error } = await supabase.from("programs").select(SHEET_READS.programs).eq("group_id", groupId).eq("is_active", true).is("athlete_id", null).order("created_at", { ascending: true });
+  const { data: programs, error } = await supabase.from("programs").select(SHEET_READS.programs).eq("group_id", groupId).eq("is_active", true).is("athlete_id", null).eq("org_program", false).order("created_at", { ascending: true });
   if (error) return { error: "Couldn't read the programs. Try again." };
   const programRows = (programs ?? []) as ProgramRow[];
   const read = await readRowsByIds(programRows.map((p) => p.id), (ids: string[]) => (from: number, to: number) =>
@@ -131,7 +131,7 @@ export async function loadSheetModel(supabase: any, input: LoadSheetInput): Prom
       .select(SHEET_READS.exercises)
       .in("workout_id", ids)
       // the team's own exercises: an exercise written for one athlete (a per-client program) is not on the team's sheet
-      .is("athlete_id", null)
+      .is("athlete_id", null).eq("org_program", false)
       .order("exercise_order", { ascending: true })
       .order("id", { ascending: true })
       .range(from, to)

@@ -96,7 +96,7 @@ export default async function SessionRecapPage(props: { params: Promise<{ sessio
         .from("programs")
         .select("id, athlete_id")
         .eq("group_id", session.group_id)
-        .is("athlete_id", null)
+        .is("athlete_id", null).eq("org_program", false)
         .eq("is_active", true)
         .order("created_at", { ascending: false })
         .limit(1)

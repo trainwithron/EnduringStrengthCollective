@@ -112,6 +112,8 @@ export function SpotBuilderPanel({
             groupId={athleteId ? (athleteGroupId ?? groupId) : groupId}
             athleteId={athleteId ?? undefined}
             athleteName={athleteName ?? undefined}
+            // With no client, the program is made in the organization's group like New program on /programs: the organization's own.
+            orgProgram={!athleteId}
             initialLibrary={library}
             initialAliases={aliases}
             onActivity={setActive}
