@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getCoachedGroups, groupsInOrgOf, pickAnchorGroup } from "@/lib/coach-groups";
 import { duplicateProgram } from "@/lib/program-duplication";
+import { loadCoachLadders } from "@/lib/coach-ladders";
 import { canonicalKey } from "@/lib/exercise-normaliser";
 import { slotPlaceholderName, type Side, type SlotSpec, type SlotTier } from "@/lib/slot-templates";
 
@@ -100,23 +101,17 @@ export async function makeTemplate(
     return { error: "Couldn't make the template. Try again." };
   }
 
-  const [{ data: rows, error: rowsError }, { data: ladderRows, error: ladderError }] = await Promise.all([
+  // The coach's ladders: their own patterns and the starter set (lib/coach-ladders.ts), their own winning on the same name.
+  const [{ data: rows, error: rowsError }, ladderRead] = await Promise.all([
     supabase.from("group_workout_exercises").select("id, exercise_name, is_slot, workouts!inner ( program_id )").eq("workouts.program_id", copy.programId),
-    supabase.from("movement_pattern_exercises").select("exercise_name, tier, is_unilateral, movement_pattern_id, movement_patterns!inner ( name, created_by )").eq("movement_patterns.created_by", coachId),
+    loadCoachLadders(supabase, coachId),
   ]);
-  if (rowsError || ladderError) {
+  if (rowsError || "error" in ladderRead) {
     await undo();
     return { error: "Couldn't make the template. Try again." };
   }
   const exercises: TemplateExercise[] = ((rows ?? []) as { id: string; exercise_name: string; is_slot: boolean | null }[]).filter((r) => !r.is_slot).map((r) => ({ id: r.id, name: r.exercise_name }));
-  const ladders: LadderEntry[] = ((ladderRows ?? []) as any[]).map((r) => ({
-    exerciseName: r.exercise_name as string,
-    patternId: r.movement_pattern_id as string,
-    patternName: (r.movement_patterns?.name as string | undefined) ?? "Pattern",
-    tier: (r.tier as SlotTier | null) ?? null,
-    unilateral: r.is_unilateral === true,
-  }));
-  const plan = planTemplate(exercises, ladders);
+  const plan = planTemplate(exercises, ladderRead.ladders);
   for (const s of plan.slots) {
     const { error } = await supabase
       .from("group_workout_exercises")

@@ -62,8 +62,10 @@ describe("making it: a new program in the organization's library; the original n
     // all or nothing: a failed step deletes the new template again
     expect(lib.match(/await undo\(\);/g)?.length).toBeGreaterThanOrEqual(3);
   });
-  it("the coach's own ladders are read (pattern, class and side)", () => {
-    expect(lib).toContain('movement_patterns!inner ( name, created_by )").eq("movement_patterns.created_by", coachId)');
+  it("the ladders are the coach's own and the starter set (lib/coach-ladders.ts), not only patterns the coach made", () => {
+    expect(lib).toContain("loadCoachLadders(supabase, coachId),");
+    expect(lib).toContain("const plan = planTemplate(exercises, ladderRead.ladders);");
+    expect(lib).not.toContain('.eq("movement_patterns.created_by", coachId)');
   });
   it("Make a template is in the program menu (card and builder, computer and phone) for a program that is not a template, and opens the new one with the summary", () => {
     const menu = read("components/coach/desktop/program-card-menu.tsx");
