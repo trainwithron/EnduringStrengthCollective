@@ -24,6 +24,14 @@
   "file": "apply-release-tc3b-client-requests-all.sql"
  },
  {
+  "id": "platform-demo-library",
+  "name": "Platform demo library (every coach and client sees the Spotlight demos when their coach has none)",
+  "steps": [
+   "186"
+  ],
+  "file": "apply-platform-demo-library-all.sql"
+ },
+ {
   "id": "audit-oct24-undo-attended-anon",
   "name": "Audit hardening Oct 24 (undoing attended: the booking's own coach or an owner/admin; two anon revokes)",
   "steps": [

@@ -15,11 +15,14 @@ export function ExerciseMediaPicker({
   exerciseName,
   videoPath,
   youtubeUrl,
+  platformDemo = false,
   onChange,
 }: {
   exerciseName: string;
   videoPath: string | null;
   youtubeUrl: string | null;
+  // The demo showing for this exercise is the Spotlight one (the coach has none of their own): said in one line; adding their own replaces it.
+  platformDemo?: boolean;
   onChange: (patch: { videoPath?: string | null; youtubeUrl?: string | null }) => void;
 }) {
   const [uploading, setUploading] = useState(false);
@@ -156,6 +159,7 @@ export function ExerciseMediaPicker({
 
   return (
     <div className="space-y-2">
+      {platformDemo && !videoPath && !youtubeUrl && <p className="font-body text-xs text-steel" data-platform-demo>Spotlight demo. Add your own to replace it.</p>}
       {videoPath && videoSignedUrl && (
         <div className="flex items-center gap-2">
           <video

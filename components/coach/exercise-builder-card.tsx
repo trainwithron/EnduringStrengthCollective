@@ -2,7 +2,7 @@
 
 import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { badExerciseNameMessage, isBadExerciseName, splitPrescriptionName, PRESCRIPTION_MESSAGE } from "@/lib/exercise-name-guard";
-import type { DemoRow } from "@/lib/exercise-demo";
+import { platformOnly, type DemoRow } from "@/lib/exercise-demo";
 import { useEffect, useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { saved } from "@/lib/saved";
@@ -246,7 +246,10 @@ export function ExerciseBuilderCard({
     mediaOverride && mediaOverride.name === exercise.exerciseName
       ? mediaOverride.videoPath || mediaOverride.youtubeUrl
         ? { demo: { videoPath: mediaOverride.videoPath, youtubeUrl: mediaOverride.youtubeUrl, foundAs: exercise.exerciseName }, storedUnder: null }
-        : null
+        : // The coach removed their own: the Spotlight demo (if there is one) is back at once.
+          demoLibrary
+          ? builderDemoFor(platformOnly(demoLibrary), exercise.exerciseName)
+          : null
       : demoLibrary
         ? builderDemoFor(demoLibrary, exercise.exerciseName)
         : exercise.videoPath || exercise.youtubeUrl
@@ -385,10 +388,12 @@ export function ExerciseBuilderCard({
 
   function handleMediaChange(patch: { videoPath?: string | null; youtubeUrl?: string | null }) {
     onUpdate(patch);
+    // Only the coach's OWN demo is carried over (a Spotlight demo is never treated as theirs: adding a link does not keep the platform video, and Remove never touches it).
+    const own = liveDemo && !liveDemo.demo.platform ? liveDemo.demo : null;
     setMediaOverride({
       name: exercise.exerciseName,
-      videoPath: patch.videoPath !== undefined ? patch.videoPath : (liveDemo?.demo.videoPath ?? null),
-      youtubeUrl: patch.youtubeUrl !== undefined ? patch.youtubeUrl : (liveDemo?.demo.youtubeUrl ?? null),
+      videoPath: patch.videoPath !== undefined ? patch.videoPath : (own?.videoPath ?? null),
+      youtubeUrl: patch.youtubeUrl !== undefined ? patch.youtubeUrl : (own?.youtubeUrl ?? null),
     });
   }
 
@@ -1231,8 +1236,9 @@ export function ExerciseBuilderCard({
               )}
               <ExerciseMediaPicker
                 exerciseName={exercise.exerciseName}
-                videoPath={liveDemo && !liveDemo.storedUnder ? liveDemo.demo.videoPath : null}
-                youtubeUrl={liveDemo && !liveDemo.storedUnder ? liveDemo.demo.youtubeUrl : null}
+                videoPath={liveDemo && !liveDemo.storedUnder && !liveDemo.demo.platform ? liveDemo.demo.videoPath : null}
+                youtubeUrl={liveDemo && !liveDemo.storedUnder && !liveDemo.demo.platform ? liveDemo.demo.youtubeUrl : null}
+                platformDemo={!!liveDemo?.demo.platform}
                 onChange={handleMediaChange}
               />
             </div>

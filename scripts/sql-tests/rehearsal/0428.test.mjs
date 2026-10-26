@@ -422,11 +422,15 @@ export default {
       await h.expectErrorAs(coach, "a walk-in is refused when the client was in a class at that time", `select public.create_walk_in_booking($1)`, [cll.s], /already on the calendar/);
       h.check("...and nothing is taken", (await bal(cleo)) === 10);
       const lk = await client("Lou");
-      const lkStart = ago(12 * 60);
+      // The two workouts must fall on the SAME day on the coach's clock (Los Angeles): 12 and 11 hours ago straddle midnight there for one hour a day, so the first free pair of hours that
+      // does not is used (Oct 26: this check failed at 11:18 AM Los Angeles time).
+      const laDay = (iso) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+      const lkHours = [12, 8, 5, 3].find((k) => laDay(ago(k * 60)) === laDay(ago((k - 1) * 60 - 20)));
+      const lkStart = ago(lkHours * 60);
       const lkb = await booking(lk, lkStart);
       const lk1 = await log(lk, lkStart);
-      const lk2 = await log(lk, ago(11 * 60));
-      await finish(lk2.s, ago(11 * 60 - 20));
+      const lk2 = await log(lk, ago((lkHours - 1) * 60));
+      await finish(lk2.s, ago((lkHours - 1) * 60 - 20));
       await h.expectErrorAs(coach, "a walk-in is refused when that day's session is already linked to another workout", `select public.create_walk_in_booking($1)`, [lk2.s], /already on the calendar/);
       h.check("...exactly 1 for the day", lk1.linked === lkb && lk2.linked === null && (await bal(lk)) === 9);
 

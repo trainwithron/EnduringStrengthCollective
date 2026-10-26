@@ -5,6 +5,7 @@ import { getGroupCoachTimezone, nowInZone } from "@/lib/timezone";
 import { exerciseLine, type PlainDay, type PlainWeek } from "@/lib/program-plain-view";
 import { loadDoneAt, pickUpWhereLeftOff, weekOf } from "@/lib/program-pickup";
 import { demoThumbPath, findDemo, type DemoRow } from "@/lib/exercise-demo";
+import { loadPlatformDemos } from "@/lib/platform-demos";
 
 // The plain program view on a phone, for the coach, a client, and the coach's own training: every week, pick the week, tap a day, see the workout, start it. Read-only; the builder is "Edit program".
 export async function ProgramPlainView({
@@ -62,6 +63,8 @@ export async function ProgramPlainView({
     const { data: libraryRows } = await supabase.from("exercise_library").select("name, video_path, youtube_url").eq("created_by", coachId);
     for (const r of (libraryRows ?? []) as any[]) demoLibrary.push({ name: r.name, videoPath: r.video_path, youtubeUrl: r.youtube_url });
   }
+  // The Spotlight demos, after the coach's own.
+  for (const r of await loadPlatformDemos(supabase)) demoLibrary.push(r);
 
   const hasSchedule = !!program.start_date && !!program.training_days && program.training_days.length > 0;
   const scheduled = hasSchedule

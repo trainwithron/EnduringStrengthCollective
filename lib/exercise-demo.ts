@@ -9,11 +9,15 @@ import { extractYoutubeId } from "./youtube";
 //   3. a row for a movement that is known by two names (a Bulgarian split squat is a rear foot elevated split squat).
 // A row with an uploaded video wins over one with only a YouTube link; ties go to the shorter name, then alphabetically, so the choice never flips.
 // Two different movements that merely share a word are never matched ("Reverse Lunge" does not borrow the "Walking Lunge" video).
+// Two tiers (Oct 26, the platform demo library): the coach's own demos first, with every rule above; only when none of them fits, the Spotlight demos (a platform admin's, marked
+// `platform`), with the same rules. A coach adding their own demo for an exercise replaces the platform one for them and their clients; removing it brings the platform one back.
 
 export interface DemoRow {
   name: string;
   videoPath: string | null;
   youtubeUrl: string | null;
+  // A Spotlight demo (from the platform library), used only when the coach has none of their own for the exercise.
+  platform?: boolean;
 }
 
 export interface Demo {
@@ -21,6 +25,8 @@ export interface Demo {
   youtubeUrl: string | null;
   // The library name the demo was found under, when it differs from what was asked for (so the sheet can say "Demo: Rear Foot Elevated Split Squat").
   foundAs: string;
+  // The Spotlight demo, not the coach's own.
+  platform?: boolean;
 }
 
 // Movements that go by two names. Written as ordinary names; compared by canonical key, so plurals and word order do not matter.
@@ -52,11 +58,31 @@ function pick(rows: DemoRow[]): DemoRow | null {
 }
 
 export function findDemo(rows: DemoRow[], name: string): Demo | null {
+  return findInTier(rows.filter((r) => !r.platform), name) ?? findInTier(rows.filter((r) => r.platform), name);
+}
+
+// The Spotlight demos only (what an exercise falls back to when the coach removes their own). Kept per list, so the builder's per-name cache keeps working.
+const platformOnlyCache = new WeakMap<DemoRow[], DemoRow[]>();
+export function platformOnly(rows: DemoRow[]): DemoRow[] {
+  let kept = platformOnlyCache.get(rows);
+  if (!kept) {
+    kept = rows.filter((r) => r.platform);
+    platformOnlyCache.set(rows, kept);
+  }
+  return kept;
+}
+
+// The coach's own demos first, then the Spotlight ones (each list as it was read).
+export function withPlatformDemos(own: DemoRow[], platform: DemoRow[]): DemoRow[] {
+  return platform.length === 0 ? own : [...own, ...platform.map((r) => ({ ...r, platform: true }))];
+}
+
+function findInTier(rows: DemoRow[], name: string): Demo | null {
   const wanted = name.trim().toLowerCase();
   if (!wanted) return null;
   const withDemo = rows.filter(hasDemo);
   if (withDemo.length === 0) return null;
-  const toDemo = (r: DemoRow): Demo => ({ videoPath: r.videoPath, youtubeUrl: r.youtubeUrl, foundAs: r.name });
+  const toDemo = (r: DemoRow): Demo => ({ videoPath: r.videoPath, youtubeUrl: r.youtubeUrl, foundAs: r.name, ...(r.platform ? { platform: true } : {}) });
 
   const exact = pick(withDemo.filter((r) => r.name.trim().toLowerCase() === wanted));
   if (exact) return toDemo(exact);

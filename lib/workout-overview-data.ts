@@ -1,5 +1,6 @@
 import { getProgressionGoalsBatch } from "@/lib/progressions";
-import { findDemo, type DemoRow } from "@/lib/exercise-demo";
+import { findDemo, withPlatformDemos, type DemoRow } from "@/lib/exercise-demo";
+import { loadPlatformDemos } from "@/lib/platform-demos";
 import { DEFAULT_TRACKED_FIELDS, mapSetRow, SET_ROW_SELECT, type TrackedField } from "@/lib/exercise-fields";
 import { PRIOR_SETS_SELECT, suggestedWeightsFromHistory } from "@/lib/suggested-weights";
 import type { ExerciseSetTarget } from "@/lib/types";
@@ -123,7 +124,8 @@ export async function getWorkoutOverviewData(
 
   // Exercise video/YouTube is attached on the coach's shared exercise
   // library, keyed by name.
-  const demoRows: DemoRow[] = (libraryResult.data ?? []).map((row: any) => ({ name: row.name, videoPath: row.video_path, youtubeUrl: row.youtube_url }));
+  // The coach's own demos first, then the Spotlight ones.
+  const demoRows: DemoRow[] = withPlatformDemos((libraryResult.data ?? []).map((row: any) => ({ name: row.name, videoPath: row.video_path, youtubeUrl: row.youtube_url })), await loadPlatformDemos(supabase));
 
   // Progression rules are keyed by the coach's original template exercise
   // name (exercise_progressions.exercise_name), never by a per-client

@@ -31,6 +31,7 @@ import { sessionBackHref } from "@/lib/session-back-href";
 import { ExitWorkoutButton } from "@/components/session/exit-workout-button";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 import { findDemo, type DemoRow } from "@/lib/exercise-demo";
+import { loadPlatformDemos } from "@/lib/platform-demos";
 import { getReadForViewer, type ReadForViewer } from "@/lib/read-content/for-viewer";
 import { athleteIsMinor } from "@/lib/youth-block";
 import { CoachModeBar } from "@/components/coach/mobile/coach-mode-bar";
@@ -365,6 +366,8 @@ export default async function SessionPage(
       demoLibrary.push({ name: row.name, videoPath: row.video_path, youtubeUrl: row.youtube_url });
     }
   }
+  // The Spotlight demos, after the coach's own (an exercise the coach has no demo for shows the platform one).
+  for (const r of await loadPlatformDemos(supabase)) demoLibrary.push(r);
 
   const exercises: SessionExerciseEntry[] = await Promise.all(
     (sessionExercises ?? []).map(async (se: any) => {

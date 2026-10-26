@@ -3,7 +3,8 @@ import { usableExerciseNames } from "@/lib/exercise-name-guard";
 import { mergeAliases } from "@/lib/exercise-alias-seed";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DEFAULT_TRACKED_FIELDS, mapSetRow, SET_ROW_SELECT } from "./exercise-fields";
-import { findDemo, type DemoRow } from "./exercise-demo";
+import { findDemo, withPlatformDemos, type DemoRow } from "./exercise-demo";
+import { loadPlatformDemos } from "./platform-demos";
 import { computeScheduledDates, type VisibilityWindow } from "./program-schedule";
 import { getGroupCoachTimezone, nowInZone } from "./timezone";
 import { computeProgramDayProgress } from "./program-day-progress";
@@ -126,7 +127,8 @@ export async function getProgramBuilderData(
     gatherProgrammingSpotterFlags(supabase, { programId, programName: program.name, coachId }),
   ]);
 
-  const demoRows: DemoRow[] = (libraryRows ?? []).map((row: any) => ({ name: row.name, videoPath: row.video_path, youtubeUrl: row.youtube_url }));
+  // The coach's own demos first, then the Spotlight ones (the builder card says when a Spotlight demo is the one showing).
+  const demoRows: DemoRow[] = withPlatformDemos((libraryRows ?? []).map((row: any) => ({ name: row.name, videoPath: row.video_path, youtubeUrl: row.youtube_url })), await loadPlatformDemos(supabase));
   // Most-used first (counted across this program's own exercises), then A to Z, so the name box's dropdown puts the coach's usual exercises ahead of rarely used ones.
   const usage = new Map<string, number>();
   for (const w of workoutRows ?? []) {

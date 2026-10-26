@@ -2842,6 +2842,23 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "186",
+  slug: "0434",
+  title: "0434 The platform demo library: every coach and client can see the demos on a platform admin's exercises (one read function, one file-read rule)",
+  warn: "This adds platform_demo_rows() (signed-in people only: the name, uploaded video and YouTube link of each platform-admin exercise that has a demo, nothing else of those rows), is_platform_demo_object(name) (whether a stored file is one of those videos) and ONE storage rule, exercise_media_select_platform_demo: a signed-in person can read exactly those video files in the exercise-media bucket. Uploading and deleting are unchanged (only your own folder), and exercise_library's own row security is unchanged: other coaches still cannot read the platform admin's rows themselves.",
+  migrations: ["0434"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes on any screen until the app update that goes with it is deployed. Then a coach with no demo of their own for an exercise (and their clients) sees the Spotlight demo; a coach's own demo always wins.",
+  undo: "drop policy if exists exercise_media_select_platform_demo on storage.objects;\ndrop function if exists public.is_platform_demo_object(text);\ndrop function if exists public.platform_demo_rows();",
+  undoWhy: "Only if step 186 misbehaves. The rule and the two functions go; every coach sees only their own demos again, as before. Safe with the app update live (it treats a missing function as no platform demos).",
+  rows: [
+    ["0434 is not already applied", "to_regprocedure('public.platform_demo_rows()') is null and not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'exercise_media_select_platform_demo')"],
+    ["the library, the platform admin mark and the bucket exist", "to_regclass('public.exercise_library') is not null and exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'is_platform_admin') and exists (select 1 from storage.buckets where id = 'exercise-media')"],
+    ["the existing file rules are the three expected ones (read own or shared group, upload own folder, delete own folder)", "(select count(*) from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname in ('exercise_media_select_owner_or_shared_group', 'exercise_media_insert_own_folder', 'exercise_media_delete_own')) = 3"],
+  ],
+});
+
+STEPS.push({
   n: "185",
   slug: "0433",
   title: "0433 Audit hardening: undoing attended takes the same check as a no-show (the booking's own coach or an organization owner/admin); signed-out visitors get no rights on two tables",
@@ -3891,6 +3908,7 @@ const BUNDLES = [
   { id: "release-ts3-team-sheet-save", name: "Release TS3 (saving a filled team sheet: one table, one notice kind, three functions)", steps: ["171"] },
   { id: "release-own1-owner-accepted-only", name: "Release OWN1 (ownership cannot be handed to someone who has never signed in; replaces two functions, adds one function and one trigger)", steps: ["172"] },
   { id: "release-tc3b-client-requests", name: "Release TC3 part B (Request to train with me on a coach's public page: one column, three tables, eight functions)", steps: ["174"] },
+  { id: "platform-demo-library", name: "Platform demo library (every coach and client sees the Spotlight demos when their coach has none)", steps: ["186"] },
   { id: "audit-oct24-undo-attended-anon", name: "Audit hardening Oct 24 (undoing attended: the booking's own coach or an owner/admin; two anon revokes)", steps: ["185"] },
   { id: "session-caps-keep-together", name: "Session caps, Keep my sessions together and a lunch break (five columns, four functions, one call added to three booking functions)", steps: ["184"] },
   { id: "coach-read-passages", name: "A coach's own passages for Read during rest (one new table)", steps: ["183"] },
@@ -4159,6 +4177,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0431", "to_regclass('public.coach_read_passages') is not null"),
     m("0432", "to_regprocedure('public.client_slot_reason(uuid, timestamptz, timestamptz, uuid, boolean)') is not null"),
     m("0433", "position('is_org_admin_of_group' in coalesce(pg_get_functiondef(to_regprocedure('public.undo_booking_attended(uuid)')), '')) > 0"),
+    m("0434", "to_regprocedure('public.platform_demo_rows()') is not null"),
     m("0427", "to_regprocedure('public.my_group_ids()') is not null"),
     m("0426", "to_regprocedure('public.active_org_group_ids()') is not null"),
     m("0425", "exists (select 1 from pg_proc p where p.oid = to_regprocedure('public.request_workspace_org()') and position('x-workspace-org' in p.prosrc) > 0)"),

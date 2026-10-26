@@ -1576,6 +1576,17 @@
   ]
  },
  {
+  "n": "186",
+  "slug": "0434",
+  "title": "0434 The platform demo library: every coach and client can see the demos on a platform admin's exercises (one read function, one file-read rule)",
+  "migrations": [
+   "0434"
+  ],
+  "notApplied": [
+   "to_regprocedure('public.platform_demo_rows()') is null and not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'exercise_media_select_platform_demo')"
+  ]
+ },
+ {
   "n": "185",
   "slug": "0433",
   "title": "0433 Audit hardening: undoing attended takes the same check as a no-show (the booking's own coach or an organization owner/admin); signed-out visitors get no rights on two tables",
