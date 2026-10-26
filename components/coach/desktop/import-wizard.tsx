@@ -48,6 +48,7 @@ import {
   type LibraryExercise,
   type AliasEntry,
 } from "@/lib/exercise-matching";
+import { aliasRawNameFor, allMatchesChosen, libraryTwin, matchLabel, preselectUseRaw } from "@/lib/import-match-review";
 import { DEFAULT_TRACKED_FIELDS, type TrackedField } from "@/lib/exercise-fields";
 import { defaultTrainingDaysForCount } from "@/lib/program-schedule";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
@@ -87,8 +88,14 @@ interface PendingFuzzyMatch {
   score: number;
   trackedFields: TrackedField[];
   // Coach override: reject the guess, treat this exercise as its own new
-  // entry (added under the raw typed name) instead of the guessed match.
-  useRaw: boolean;
+  // entry (added under the raw typed name) instead of the guessed match. null = not chosen yet: a guess under 90% is never picked for the coach
+  // (lib/import-match-review.ts); the program is not created until every row has a choice.
+  useRaw: boolean | null;
+  // A name the coach matched in an earlier import (their saved alias), not a guess: it reads "you matched this before", and turning it down removes that alias.
+  fromAlias: boolean;
+  aliasRawName: string | null;
+  // The library exercise this typed name already IS, when there is one: turning the guess down then uses it ("Use your Barbell Bench Press"), never a second copy.
+  twin: string | null;
 }
 
 interface ImportSummary {
@@ -96,7 +103,7 @@ interface ImportSummary {
   weekCount: number;
   matchedCount: number;
   createdExercises: string[];
-  fuzzyMatches: { rawName: string; matchedTo: string; score: number }[];
+  fuzzyMatches: { rawName: string; matchedTo: string; score: number; fromAlias?: boolean }[];
   schedule: { trainingDays: number[]; startDate: string } | null;
   // Only set for an AI-generated program built for a specific flagged
   // client (injury_pain_science_research_and_ai_gap_sept15.md) — the
@@ -435,13 +442,17 @@ export function ImportWizard({
       if (match.exerciseName) {
         resolutions.set(key, { exerciseName: match.exerciseName, trackedFields });
         if (match.confidence === "fuzzy" || match.confidence === "alias") {
+          const fromAlias = match.confidence === "alias";
           fuzzyMatches.push({
             key,
             rawName: rawDisplay,
             matchedTo: match.exerciseName,
             score: match.score,
             trackedFields,
-            useRaw: false,
+            useRaw: preselectUseRaw(match.confidence, match.score),
+            fromAlias,
+            aliasRawName: fromAlias ? aliasRawNameFor(rawDisplay, initialAliases) : null,
+            twin: libraryTwin(rawDisplay, initialLibrary.map((l) => l.name).filter((n) => n !== match.exerciseName)),
           });
         }
         continue;
@@ -506,7 +517,8 @@ export function ImportWizard({
   // resolution swapped to the raw typed name and is added to the library
   // as its own exercise instead of aliased to the guess.
   async function finalizeImport(importData: PendingImport) {
-    if (finalizing) return;
+    // A guess the coach has not chosen for is never decided for them.
+    if (finalizing || !allMatchesChosen(importData.fuzzyMatches)) return;
     setFinalizing(true);
     setStatus("working");
     setStatusLabel("Creating program…");
@@ -526,11 +538,15 @@ export function ImportWizard({
     const createdExercises: string[] = [...autoNewExercises];
     const newAliases: { rawName: string; exerciseName: string }[] = [];
 
+    // The rows the coach turned down that came from their own earlier match: that alias is removed so the wrong match never comes back.
+    const aliasesToForget: string[] = [];
     for (const f of fuzzyMatches) {
       if (f.useRaw) {
         const trimmed = f.rawName.trim();
-        resolutions.set(f.key, { exerciseName: trimmed, trackedFields: f.trackedFields });
-        createdExercises.push(trimmed);
+        // The library already has it: that exercise is used, nothing new is made.
+        resolutions.set(f.key, { exerciseName: f.twin ?? trimmed, trackedFields: f.trackedFields });
+        if (!f.twin) createdExercises.push(trimmed);
+        if (f.fromAlias && f.aliasRawName) aliasesToForget.push(f.aliasRawName);
       } else {
         newAliases.push({ rawName: f.key, exerciseName: f.matchedTo });
       }
@@ -551,6 +567,10 @@ export function ImportWizard({
           { onConflict: "coach_id,raw_name" }
         );
       if (aliasError) libraryFailures++;
+    }
+    if (aliasesToForget.length > 0) {
+      const { error: forgetError } = await supabase.from("exercise_aliases").delete().eq("coach_id", coachId).in("raw_name", aliasesToForget);
+      if (forgetError) libraryFailures++;
     }
     if (libraryFailures > 0) notices.push(`${libraryFailures} new exercise${libraryFailures === 1 ? "" : "s"} or name match${libraryFailures === 1 ? "" : "es"} did not save to your library. The program uses the names as written; add them from the exercise card if you want them in your library.`);
 
@@ -699,7 +719,7 @@ export function ImportWizard({
       // exercise, same as anything else that matched nothing.
       fuzzyMatches: fuzzyMatches
         .filter((f) => !f.useRaw)
-        .map((f) => ({ rawName: f.rawName, matchedTo: f.matchedTo, score: f.score })),
+        .map((f) => ({ rawName: f.rawName, matchedTo: f.matchedTo, score: f.score, fromAlias: f.fromAlias })),
       injuryConsiderations,
       isAiSourced: importData.isAiSourced,
       creditCharged: importData.creditCharged,
@@ -1141,13 +1161,13 @@ export function ImportWizard({
           {pending.fuzzyMatches.map((f) => (
             <div key={f.key} className="border border-steel/20 p-3">
               <p className="font-body text-sm">
-                &ldquo;{f.rawName}&rdquo; <span className="text-xs text-steel">({Math.round(f.score * 100)}% match)</span>
+                &ldquo;{f.rawName}&rdquo; <span className="text-xs text-steel">({matchLabel(f)})</span>
               </p>
               <label className="flex items-center gap-2 mt-2 font-body text-xs text-chalk">
                 <input
                   type="radio"
                   name={`fuzzy-${f.key}`}
-                  checked={!f.useRaw}
+                  checked={f.useRaw === false}
                   onChange={() => toggleFuzzyOverride(f.key, false)}
                 />
                 Use the match: <span className="text-steel">{f.matchedTo}</span>
@@ -1156,19 +1176,24 @@ export function ImportWizard({
                 <input
                   type="radio"
                   name={`fuzzy-${f.key}`}
-                  checked={f.useRaw}
+                  checked={f.useRaw === true}
                   onChange={() => toggleFuzzyOverride(f.key, true)}
                 />
-                Add &ldquo;{f.rawName}&rdquo; as its own new exercise instead
+                {f.twin ? <>Use your {f.twin}</> : <>Add &ldquo;{f.rawName}&rdquo; as its own new exercise instead</>}
               </label>
             </div>
           ))}
         </div>
+        {!allMatchesChosen(pending.fuzzyMatches) && (
+          <p className="font-body text-xs text-chalk mb-2" role="status">
+            Pick one for each exercise above before creating the program.
+          </p>
+        )}
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={() => finalizeImport(pending)}
-            disabled={finalizing}
+            disabled={finalizing || !allMatchesChosen(pending.fuzzyMatches)}
             className="h-9 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
           >
             {finalizing ? "Saving…" : pending.isAiSourced ? "Save as draft" : "Create program"}
@@ -1258,7 +1283,7 @@ export function ImportWizard({
               {summary.fuzzyMatches.map((f, i) => (
                 <p key={i} className="font-body text-xs text-steel">
                   &ldquo;{f.rawName}&rdquo; &rarr; <span className="text-chalk">{f.matchedTo}</span>{" "}
-                  <span className="text-xs">({Math.round(f.score * 100)}% match)</span>
+                  <span className="text-xs">({matchLabel(f)})</span>
                 </p>
               ))}
             </div>

@@ -102,11 +102,8 @@ export function matchExercise(
   const normalizedRaw = normalizeName(rawName);
   if (!normalizedRaw) return { exerciseName: null, confidence: "none", score: 0 };
 
-  const alias = aliases.find((a) => normalizeName(a.rawName) === normalizedRaw);
-  if (alias) {
-    return { exerciseName: alias.exerciseName, confidence: "alias", score: 1 };
-  }
-
+  // An exercise that is in the library under this very name (case, spacing, hyphens and a plural aside) is that exercise, ALWAYS: a remembered match never overrides it
+  // (Oct 26: an old alias sent "Barbell Bench Press" to Barbell Overhead Press although the library has Barbell Bench Press).
   const exact = library.find((l) => normalizeName(l.name) === normalizedRaw);
   if (exact) {
     return { exerciseName: exact.name, confidence: "exact", score: 1 };
@@ -115,6 +112,11 @@ export function matchExercise(
   const variant = findLibraryVariant(rawName, library.map((l) => l.name));
   if (variant) {
     return { exerciseName: variant, confidence: "exact", score: 1 };
+  }
+
+  const alias = aliases.find((a) => normalizeName(a.rawName) === normalizedRaw);
+  if (alias) {
+    return { exerciseName: alias.exerciseName, confidence: "alias", score: 1 };
   }
 
   let best: { name: string; score: number } | null = null;
@@ -165,16 +167,17 @@ export function matchTopN(
   const results: RankedMatch[] = [];
   const seen = new Set<string>();
 
-  const alias = aliases.find((a) => normalizeName(a.rawName) === normalizedRaw);
-  if (alias) {
-    results.push({ exerciseName: alias.exerciseName, score: 1, isAlias: true });
-    seen.add(alias.exerciseName);
-  }
-
+  // The library's own exercise under this name first, then a remembered match (matchExercise has the same order).
   const exact = library.find((l) => normalizeName(l.name) === normalizedRaw) ?? library.find((l) => l.name === findLibraryVariant(rawName, library.map((x) => x.name)));
-  if (exact && !seen.has(exact.name)) {
+  if (exact) {
     results.push({ exerciseName: exact.name, score: 1, isAlias: false });
     seen.add(exact.name);
+  }
+
+  const alias = aliases.find((a) => normalizeName(a.rawName) === normalizedRaw);
+  if (alias && !seen.has(alias.exerciseName)) {
+    results.push({ exerciseName: alias.exerciseName, score: 1, isAlias: true });
+    seen.add(alias.exerciseName);
   }
 
   const ranked = library

@@ -14,7 +14,9 @@ describe("switching organization changes the look straight away", () => {
     expect(src("app/(coach)/layout.tsx")).toContain("<OrgThemeSync />");
     const sync = src("components/shared/org-theme-sync.tsx");
     expect(sync).toContain("document.documentElement.dataset.workspaceGroup");
-    expect(sync).toContain("if ((remembered && remembered !== used) || (chosen && chosen !== usedOrg)) router.refresh();");
+    // the same rule (lib/org-theme-refresh.ts), asked once per pair of cookies and after the page has started (Oct 26)
+    expect(src("lib/org-theme-refresh.ts")).toContain("(input.remembered && input.remembered !== input.usedGroup) || (input.chosen && input.chosen !== input.usedOrg)");
+    expect(sync).toContain("window.setTimeout(() => startTransition(() => router.refresh()), 0);");
     expect(sync).toContain("[pathname, router]");
   });
   it("the mobile hub's organization switch refreshes too", () => {
