@@ -170,10 +170,12 @@ async function readProgramDays(supabase: Awaited<ReturnType<typeof createServerC
     .eq("program_id", programId);
   if (error) return null;
   const workoutIds = ((rows ?? []) as { id: string }[]).map((w) => w.id);
-  // A day any client has started (or logged) is never changed. Asked 100 days at a time; a failed read means nothing is changed.
+  // A day any client has started (or logged) is never changed. Read as the server, not as the coach: a session the coach's own view does not show (another organization's header, another group)
+  // must still count as started. Only after the coach check above, read only, only these days' ids. Asked 100 days at a time; a failed read means nothing is changed.
+  const admin = createServiceRoleClient();
   const started = new Set<string>();
   for (const part of chunk(workoutIds, 100)) {
-    const { data, error: sessionError } = await supabase.from("athlete_sessions").select("workout_id").in("workout_id", part);
+    const { data, error: sessionError } = await admin.from("athlete_sessions").select("workout_id").in("workout_id", part);
     if (sessionError) return null;
     for (const s of (data ?? []) as { workout_id: string }[]) started.add(s.workout_id);
   }

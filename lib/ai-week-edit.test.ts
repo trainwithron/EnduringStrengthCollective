@@ -137,6 +137,18 @@ describe("nothing is written before Apply, and Apply writes only this program", 
     expect(box).toContain('mode: "preview"');
     expect(box.indexOf('mode: "apply"')).toBeGreaterThan(box.indexOf("async function applyEdit()"));
   });
+  it("started days are read as the server (a session hidden from the coach's own view still counts), only after the coach check, read only", () => {
+    const route = read("app/api/ai/edit-weeks/route.ts");
+    const fn = route.slice(route.indexOf("async function readProgramDays("));
+    expect(fn).toContain("const admin = createServiceRoleClient();");
+    expect(fn).toContain('await admin.from("athlete_sessions").select("workout_id").in("workout_id", part);');
+    expect(fn).not.toContain('supabase.from("athlete_sessions")');
+    // the only use of the server client in that read is this select, and it runs after "Only coaches can change programs."
+    expect(fn.match(/admin\./g)).toHaveLength(1);
+    expect(route.indexOf("readProgramDays(supabase, programId)")).toBeGreaterThan(route.indexOf("Only coaches can change programs."));
+    // a failed read still means nothing is changed
+    expect(fn).toContain("if (sessionError) return null;");
+  });
   it("a plan naming a day or exercise outside this program is refused; a day started since the preview is skipped", () => {
     const days = program();
     const plan = planWeekEdits({ changes: ronChanges, days, weeks: [2], youth: false }).days;
