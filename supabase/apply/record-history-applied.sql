@@ -20,6 +20,7 @@ from (
     ('2026100600433', 'undo_attended_own_coach_and_anon_revokes', '0433_undo_attended_own_coach_and_anon_revokes.sql', position('is_org_admin_of_group' in coalesce(pg_get_functiondef(to_regprocedure('public.undo_booking_attended(uuid)')), '')) > 0),
     ('2026100600434', 'platform_demo_library', '0434_platform_demo_library.sql', to_regprocedure('public.platform_demo_rows()') is not null),
     ('2026100600436', 'release_audit_fixes', '0436_release_audit_fixes.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'importing')),
+    ('2026100600437', 'share_card_qr_ig', '0437_share_card_qr_ig.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_booking_pages' and column_name = 'instagram_handle')),
     ('2026100600435', 'org_programs', '0435_org_programs.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'org_program')),
     ('2026100600427', 'member_checks_set_based', '0427_member_checks_set_based.sql', to_regprocedure('public.my_group_ids()') is not null),
     ('2026100600426', 'org_wall_set_based', '0426_org_wall_set_based.sql', to_regprocedure('public.active_org_group_ids()') is not null),

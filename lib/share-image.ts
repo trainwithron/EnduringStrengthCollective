@@ -2,6 +2,7 @@ import { BRAND } from "@/lib/brand";
 import { drawSpotlightMark } from "@/lib/brand-canvas";
 import { SCENIC_SKY_STOPS, type ScenicBackgroundKey } from "@/lib/scenic-backgrounds";
 import { getHumorArchetype, humorSvgMarkup } from "@/lib/humor-archetypes";
+import QRCode from "qrcode";
 
 // The post-workout card as a PICTURE people can post. Everything here draws on a plain canvas so the image is
 // self-contained (no screenshot of the page, no link, no cross-site assets) and looks the same on every phone.
@@ -35,6 +36,9 @@ export interface ShareImageInput {
   funLine?: string | null;
   // The mascot shown above the headline on some cards (key of a humor archetype, its one-line caption, the person's photo address and first name for the face).
   mascot?: { key: string; caption: string; avatarUrl: string | null; initial: string | null } | null;
+  // The coach of the group the workout was logged in (lib/share-card-coach.ts): a QR code to their public page (only while it is on and they keep the switch on) and their Instagram
+  // handle (only when set), with "Train with <first name>". Works from a picture: nothing to click. Nothing about the person who trained is added.
+  coachStrip?: { qrUrl: string | null; coachFirstName: string; handle: string | null } | null;
 }
 
 export interface ShareImageModel {
@@ -49,6 +53,7 @@ export interface ShareImageModel {
   background: ScenicBackgroundKey | null;
   funLine: string | null;
   mascot: { caption: string } | null;
+  coachStrip: { qrUrl: string | null; line: string; handle: string | null } | null;
 }
 
 const WORDMARK = BRAND.wordmark;
@@ -117,7 +122,24 @@ export function buildShareImageModel(input: ShareImageInput): ShareImageModel {
     background: input.background,
     funLine: input.funLine?.trim() ? input.funLine.trim() : null,
     mascot: input.mascot ? { caption: input.mascot.caption } : null,
+    coachStrip: coachStripOf(input.coachStrip),
   };
+}
+
+// The coach's corner of the picture, or null (then the picture is exactly as it was before it existed).
+export function coachStripOf(strip: ShareImageInput["coachStrip"]): ShareImageModel["coachStrip"] {
+  if (!strip) return null;
+  const qrUrl = strip.qrUrl?.trim() || null;
+  const handle = strip.handle?.trim().replace(/^@+/, "") || null;
+  if (!qrUrl && !handle) return null;
+  return { qrUrl, line: `Train with ${coachFirstNameOf(strip.coachFirstName)}`, handle: handle ? `@${handle}` : null };
+}
+
+// The coach's first name for "Train with ...": a leading "Coach" is a title, not a name ("Coach Ron" is Ron).
+export function coachFirstNameOf(fullName: string | null | undefined): string {
+  const words = (fullName ?? "").trim().split(/\s+/).filter(Boolean);
+  if (words.length > 1 && /^coach$/i.test(words[0])) return words[1];
+  return words[0] || "your coach";
 }
 
 // ---- drawing ----
@@ -515,7 +537,9 @@ export function drawShareImage(
   const wordWidth = ctx.measureText(WORDMARK).width;
   const markSize = 52;
   const gap = 18;
-  const startX = w / 2 - (markSize + gap + wordWidth) / 2;
+  const strip = model.coachStrip;
+  // With the coach's corner on the right, the footer sits at the left edge so the two never touch; without it, centred as always.
+  const startX = strip ? p.margin : w / 2 - (markSize + gap + wordWidth) / 2;
   // The mark's visible top (the halo) sits at the wordmark's cap height.
   drawSpotlightMark(ctx, startX, p.footerY - 30 - (21 * markSize) / 200, markSize, "dark");
   ctx.textAlign = "left";
@@ -525,12 +549,76 @@ export function drawShareImage(
   setLetterSpacing(ctx, 9);
   ctx.fillStyle = theme.steel;
   ctx.fillText(BRAND.wordmarkSub, startX + markSize + gap, p.footerY + 26);
-  ctx.textAlign = "center";
+  ctx.textAlign = strip ? "left" : "center";
   setLetterSpacing(ctx, 3);
   ctx.font = body(26);
   ctx.fillStyle = theme.steel;
-  ctx.fillText(model.dateLabel, w / 2, p.footerY + 66);
+  ctx.fillText(model.dateLabel, strip ? p.margin : w / 2, p.footerY + 66);
   setLetterSpacing(ctx, 0);
+
+  if (strip) drawCoachStrip(ctx, format, strip, theme, display, body, startX + markSize + gap + wordWidth + 28);
+}
+
+// Where the coach's corner goes: the bottom right, inside the part of a story that the story app does not cover (its bottom bar starts below the date line), clear of the top lifts
+// above it. The QR code keeps a white border (quiet zone) so it scans on any background.
+export function coachStripPlan(format: ShareImageFormat): { qrX: number; qrY: number; qrSize: number; textRight: number; lineY: number; lineSize: number; handleY: number; handleSize: number; right: number } {
+  const { width: w } = SHARE_IMAGE_SIZES[format];
+  const p = planFor(format);
+  const right = w - p.margin;
+  if (format === "story") {
+    const qrSize = 140;
+    return { qrX: right - qrSize, qrY: 1536, qrSize, textRight: right - qrSize - 24, lineY: p.footerY, lineSize: 34, handleY: p.footerY + 42, handleSize: 28, right };
+  }
+  const qrSize = 116;
+  return { qrX: right - qrSize, qrY: 948, qrSize, textRight: right - qrSize - 20, lineY: p.footerY + 10, lineSize: 28, handleY: p.footerY + 46, handleSize: 24, right };
+}
+
+/** The dark squares of a QR code for this address, as a grid (true = dark), from the same qrcode package the app's other QR codes use. */
+export function qrModules(url: string): boolean[][] {
+  const qr = QRCode.create(url, { errorCorrectionLevel: "M" });
+  const n = qr.modules.size;
+  return Array.from({ length: n }, (_, r) => Array.from({ length: n }, (_, c) => !!qr.modules.get(r, c)));
+}
+
+function drawCoachStrip(
+  ctx: DrawContext,
+  format: ShareImageFormat,
+  strip: NonNullable<ShareImageModel["coachStrip"]>,
+  theme: ShareTheme,
+  display: (size: number) => string,
+  body: (size: number) => string,
+  // Where the footer's wordmark ends: the corner's text stops before it.
+  footerRight: number
+) {
+  const c = coachStripPlan(format);
+  const textRight = strip.qrUrl ? c.textRight : c.right;
+  if (strip.qrUrl) {
+    const grid = qrModules(strip.qrUrl);
+    const quiet = 2;
+    const cell = c.qrSize / (grid.length + quiet * 2);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(c.qrX, c.qrY, c.qrSize, c.qrSize);
+    ctx.fillStyle = "#000000";
+    grid.forEach((row, r) =>
+      row.forEach((dark, col) => {
+        // A hair wider than the cell so no seam shows between squares.
+        if (dark) ctx.fillRect(c.qrX + (col + quiet) * cell, c.qrY + (r + quiet) * cell, cell + 0.5, cell + 0.5);
+      })
+    );
+  }
+  ctx.textAlign = "right";
+  const maxWidth = textRight - footerRight;
+  const line = fitText(ctx, strip.line, maxWidth, c.lineSize, 20, display);
+  ctx.font = display(line.size);
+  ctx.fillStyle = theme.chalk;
+  ctx.fillText(line.text, textRight, c.lineY);
+  if (strip.handle) {
+    const handle = fitText(ctx, strip.handle, maxWidth, c.handleSize, 18, body);
+    ctx.font = body(handle.size);
+    ctx.fillStyle = theme.rust;
+    ctx.fillText(handle.text, textRight, c.handleY);
+  }
 }
 
 // The mascot as a loaded image: the person's photo is fetched first and embedded (a picture drawn from SVG may not load anything from the web). Any failure

@@ -1576,6 +1576,17 @@
   ]
  },
  {
+  "n": "190",
+  "slug": "0437",
+  "title": "0437 Share pictures carry the coach: an Instagram handle and a QR-code switch on the coach's public page settings",
+  "migrations": [
+   "0437"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_booking_pages' and column_name = 'instagram_handle')"
+  ]
+ },
+ {
   "n": "188",
   "slug": "0436",
   "title": "0436 Release audit fixes: an import is marked while it is written; Sawyer Steele's cut-off copy gets its missing days; a client never reads an organization program's days; the team sheet never saves into one; one fixed search_path; a copy keeps each set's type",

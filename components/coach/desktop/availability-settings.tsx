@@ -8,6 +8,8 @@ import { TimezoneControl } from "@/components/coach/desktop/timezone-control";
 import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { ensureDefaultPublicPage } from "@/lib/default-public-page";
 import { ConsultationLinkBlock } from "@/components/coach/desktop/consultation-link-block";
+import { ShareCardSettings } from "@/components/coach/share-card-settings";
+import { readShareCardSettings } from "@/lib/share-card-settings";
 import { SessionLimitsControl } from "@/components/coach/desktop/session-limits-control";
 import { limitsFromRow } from "@/lib/session-caps";
 
@@ -40,12 +42,15 @@ export async function AvailabilityBookingSettings({ coachId }: { coachId: string
   // Every coach has a public page: made here, once, the first time this screen opens (no address to pick, nothing to set up). A database without the booking-page tables yet simply shows no block.
   const publicPage = await ensureDefaultPublicPage(supabase, coachId, (coachProfile as { full_name?: string | null } | null)?.full_name);
   const { count: openWindowCount } = await supabase.from("coach_availability_windows").select("id", { count: "exact", head: true }).eq("coach_id", coachId);
+  // The Instagram handle and the QR switch for clients' share pictures, with the public page they belong to (the phone reaches its public page settings here).
+  const shareCard = publicPage ? await readShareCardSettings(supabase, coachId) : null;
 
   return (
     <div>
       {bookingMode !== null && <BookingModeSelect coachId={coachId} initialMode={bookingMode} />}
       {!limitsResult.error && <SessionLimitsControl coachId={coachId} initial={limitsFromRow(limitsResult.data as Record<string, unknown> | null)} />}
       {publicPage && <ConsultationLinkBlock coachId={coachId} slug={publicPage.slug} enabled={publicPage.enabled} acceptsRequests={publicPage.acceptsRequests} hasOpenHours={(openWindowCount ?? 0) > 0} />}
+      {shareCard && <ShareCardSettings coachId={coachId} initialHandle={shareCard.handle} initialQr={shareCard.qr} />}
 
       <section className="mb-6" aria-labelledby="booking-rules">
         <h2 id="booking-rules" className="font-display uppercase text-lg tracking-wide mb-2">

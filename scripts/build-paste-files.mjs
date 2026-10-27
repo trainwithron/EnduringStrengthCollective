@@ -2843,6 +2843,27 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "190",
+  slug: "0437",
+  title: "0437 Share pictures carry the coach: an Instagram handle and a QR-code switch on the coach's public page settings",
+  warn: "This adds two settings to coach_booking_pages: instagram_handle (none until a coach sets it; 1 to 30 letters, digits, \".\" and \"_\", stored without the @) and share_card_qr (on for every coach). Nothing else changes; row security is the table's existing rule.",
+  migrations: ["0437"],
+  sees: "Success. No rows returned.",
+  afterwards: "Nothing changes on screen until the app update that goes with it is deployed (deploy it right after): then a client's share picture carries a QR code to their coach's public page, and the Instagram handle once the coach sets one.",
+  undo: [
+    "alter table public.coach_booking_pages drop constraint if exists coach_booking_pages_instagram_handle_format;",
+    "alter table public.coach_booking_pages drop column if exists share_card_qr;",
+    "alter table public.coach_booking_pages drop column if exists instagram_handle;",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 190 misbehaves, and only while the app update that goes with it is NOT live (it reads and writes these two columns). It removes the two settings, and any handle a coach saved with them.",
+  rows: [
+    ["0437 is not already applied (coach_booking_pages has no instagram_handle yet)", "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_booking_pages' and column_name = 'instagram_handle')"],
+    ["coach_booking_pages has no share_card_qr yet", "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_booking_pages' and column_name = 'share_card_qr')"],
+    ["coach_booking_pages has its one row rule, coach_booking_pages_coach_manage (0330), and no other", "(select count(*) from pg_policies where schemaname = 'public' and tablename = 'coach_booking_pages') = 1 and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_booking_pages' and policyname = 'coach_booking_pages_coach_manage')"],
+  ],
+});
+
+STEPS.push({
   n: "188",
   slug: "0436",
   title: "0436 Release audit fixes: an import is marked while it is written; Sawyer Steele's cut-off copy gets its missing days; a client never reads an organization program's days; the team sheet never saves into one; one fixed search_path; a copy keeps each set's type",
@@ -3991,6 +4012,7 @@ const BUNDLES = [
   { id: "release-ts3-team-sheet-save", name: "Release TS3 (saving a filled team sheet: one table, one notice kind, three functions)", steps: ["171"] },
   { id: "release-own1-owner-accepted-only", name: "Release OWN1 (ownership cannot be handed to someone who has never signed in; replaces two functions, adds one function and one trigger)", steps: ["172"] },
   { id: "release-tc3b-client-requests", name: "Release TC3 part B (Request to train with me on a coach's public page: one column, three tables, eight functions)", steps: ["174"] },
+  { id: "share-card-qr-ig", name: "Share pictures carry the coach (an Instagram handle and a QR code to the coach's public page)", steps: ["190"] },
   { id: "release-audit-oct26", name: "Release audit fixes Oct 26 (imports marked while written, Sawyer's copy repaired, organization programs' days closed to clients, team sheet, one search_path, copies keep set types)", steps: ["188"] },
   { id: "org-programs", name: "Organization programs (the organization's own programs: never followed, copied to a client or a group)", steps: ["187"] },
   { id: "platform-demo-library", name: "Platform demo library (every coach and client sees the Spotlight demos when their coach has none)", steps: ["186"] },
@@ -4264,6 +4286,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0433", "position('is_org_admin_of_group' in coalesce(pg_get_functiondef(to_regprocedure('public.undo_booking_attended(uuid)')), '')) > 0"),
     m("0434", "to_regprocedure('public.platform_demo_rows()') is not null"),
     m("0436", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'importing')"),
+    m("0437", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_booking_pages' and column_name = 'instagram_handle')"),
     m("0435", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'org_program')"),
     m("0427", "to_regprocedure('public.my_group_ids()') is not null"),
     m("0426", "to_regprocedure('public.active_org_group_ids()') is not null"),

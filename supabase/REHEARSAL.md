@@ -202,6 +202,7 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0434 | yes | yes | 15 | 0434 Platform demo library: demo fields and demo videos for every signed-in person, nothing else |
 | 0435 | yes | yes | 13 | 0435 Organization programs: never followed, only copied |
 | 0436 | yes | yes | 9 | 0436 Release audit fixes: organization programs' days closed to clients |
+| 0437 | yes | yes | 12 | 0437 Share pictures: Instagram handle and the QR switch |
 | 0331 | yes | yes | 10 | 0331 a payment event and its sessions are recorded in one step |
 | 0329 | yes | yes | 12 | 0329 every session costs exactly 1 credit; the waitlist offer uses the coach's time zone |
 | 0330 | yes | yes | 9 | 0330 only a real coach can have a public page |

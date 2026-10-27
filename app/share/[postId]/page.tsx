@@ -14,6 +14,7 @@ import { pickScenicBackground, SCENIC_BACKGROUNDS } from "@/lib/scenic-backgroun
 import { pickShareCardStyle } from "@/lib/share-card-style";
 import { pickHumorArchetype } from "@/lib/humor-archetypes";
 import { buildCoachCongrats, firstNameOf } from "@/lib/coach-congrats";
+import { loadShareCardCoach } from "@/lib/share-card-coach";
 
 // Deliberately public — no auth check. Every completed workout gets a
 // shareable card now, not just PRs, so a client can post it (and tag the
@@ -168,6 +169,8 @@ export default async function ShareWorkoutPage(
     totalWorkoutCount: shared.totalWorkoutCount,
     createdAt: shared.createdAt,
     background: scenicBackground?.key ?? null,
+    // The coach of this group: a QR code to their public page and their Instagram handle, when they apply (lib/share-card-coach.ts). Only on the picture people post.
+    coachStrip: await loadShareCardCoach(shared.groupId),
   };
   // The light line on the card. The default (what anyone but the client sees, and the server's first render) is picked from this workout's own numbers with a
   // repeatable seed; the client's own device replaces it with a fresh one that is not among their last 20 (components/share/share-screen.tsx).

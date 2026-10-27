@@ -8,6 +8,8 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { BookingPageSettings, type BookingPageRow } from "@/components/coach/desktop/booking-page-settings";
+import { ShareCardSettings } from "@/components/coach/share-card-settings";
+import { readShareCardSettings } from "@/lib/share-card-settings";
 import { PublicSessionTypesEditor, type PublicTypeEditRow } from "@/components/coach/desktop/public-session-types-editor";
 import { normalizeSlug, slugProblem } from "@/lib/public-booking";
 
@@ -83,6 +85,9 @@ export default async function BookingPageSettingsPage(props: { params: Promise<{
     publicVisible: !!t.public_visible,
   }));
 
+  // The share-picture settings live on the same row; shown once the page exists (and the database update that adds them is in).
+  const shareCard = initialPage ? await readShareCardSettings(supabase, user.id) : null;
+
   return (
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="booking-page">
       <div className="pb-6 border-b border-steel/20 mb-6">
@@ -112,6 +117,8 @@ export default async function BookingPageSettingsPage(props: { params: Promise<{
             <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">Your page</h2>
             <BookingPageSettings coachId={user.id} initial={initialPage} suggestedSlug={suggestedSlug} />
           </section>
+
+          {shareCard && <ShareCardSettings coachId={user.id} initialHandle={shareCard.handle} initialQr={shareCard.qr} />}
 
           <section>
             <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">Sessions people can book</h2>
