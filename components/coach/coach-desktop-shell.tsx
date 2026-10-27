@@ -14,6 +14,7 @@ import {
   Home,
   Mail,
   Settings,
+  CircleHelp,
 } from "lucide-react";
 import { SignOutButton } from "@/components/group/sign-out-button";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
@@ -531,6 +532,9 @@ function CoachDesktopShellFull({
             <>
               <WorkspaceRailButton />
               <FeedbackButton variant="icon" />
+              <Link href="/help" title="How it works" aria-label="How it works" className="w-11 h-11 flex items-center justify-center text-steel hover:text-chalk active:text-chalk">
+                <CircleHelp className="w-4 h-4" strokeWidth={2.25} />
+              </Link>
               <DownloadAppButton collapsed />
               {/* Only on a tablet: back to the phone app. A computer never sees it. */}
               <TabletLayoutSwitch to="mobile" variant="rail" />

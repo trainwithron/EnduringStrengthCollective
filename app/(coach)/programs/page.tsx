@@ -21,6 +21,7 @@ import { ProgramsPhoneList } from "@/components/coach/mobile/programs-phone-list
 import { LearnedSection } from "@/components/coach/learned-section";
 import { ConversationInviteSection } from "@/components/coach/conversation-section";
 import { ALL_PROGRAMS_HREF, clientFromSearch, groupFromSearch, scopePrograms } from "@/lib/programs-scope";
+import { periodAfter } from "@/lib/end-sentence";
 
 export const metadata = { title: "Programs" };
 
@@ -183,7 +184,7 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
             ) : null}
             {coachedOrgs(groups).length > 1 && (
               <p className="font-body text-sm text-steel mt-2">
-                Programs of <span className="text-chalk">{anchor.orgName}</span>.{" "}
+                Programs of <span className="text-chalk">{anchor.orgName}</span>{periodAfter(anchor.orgName)}{" "}
                 <Link href={`${CHOOSE_ORGANIZATION_PATH}?next=/programs`} className="text-rust underline underline-offset-2">
                   Change organization
                 </Link>
@@ -217,7 +218,7 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
         ) : null}
         {coachedOrgs(groups).length > 1 && (
           <p className="font-body text-sm text-steel mt-2">
-            Programs of <span className="text-chalk">{anchor.orgName}</span>.{" "}
+            Programs of <span className="text-chalk">{anchor.orgName}</span>{periodAfter(anchor.orgName)}{" "}
             <Link href={`${CHOOSE_ORGANIZATION_PATH}?next=/programs`} className="text-rust underline underline-offset-2">
               Change organization
             </Link>

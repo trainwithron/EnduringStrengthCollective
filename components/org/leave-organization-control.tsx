@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { confirmDialog } from "@/components/shared/confirm-dialog";
+import { periodAfter } from "@/lib/end-sentence";
 
 // A coach or admin who is not the owner can leave the organization. A coach who is the only coach of clients chooses who takes over first (migration 0391); a client who keeps their records private from the
 // organization leaves with that coach. The owner cannot leave (the database says so in plain words).
@@ -52,7 +53,7 @@ export function LeaveOrganizationControl({
 
   return (
     <div className="py-3">
-      <p className="font-body text-sm text-chalk">You are part of {organizationName}.</p>
+      <p className="font-body text-sm text-chalk">You are part of {organizationName}{periodAfter(organizationName)}</p>
       {needsHandOver && (
         <div className="mt-2">
           <label htmlFor="leave-hand-to" className="font-body text-xs text-steel">

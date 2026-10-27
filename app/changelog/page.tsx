@@ -15,7 +15,7 @@ export default function ChangelogPage() {
               <time dateTime={e.date}>{new Date(`${e.date}T12:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" })}</time> · {WHO[e.audience]}
             </p>
             <h2 className="font-display uppercase text-base tracking-wide mt-1">{e.title}</h2>
-            <p className="font-body text-sm text-chalk mt-1 max-w-[60ch]">{e.body}</p>
+            {e.body && <p className="font-body text-sm text-chalk mt-1 max-w-[60ch]">{e.body}</p>}
           </li>
         ))}
       </ol>

@@ -2,6 +2,7 @@ import { isEmailConfigured, sendEmail } from "@/lib/email";
 import { isPlaceholderEmail } from "@/lib/placeholder-email";
 import { sendPushToProfile } from "@/lib/send-push";
 import { EXPORT_LINK_DAYS, WINDOW_DAYS } from "@/lib/leaving-coach-policy";
+import { periodAfter } from "@/lib/end-sentence";
 
 // The plain transactional messages for a coach who is leaving, and for the clients of a coach whose account closed. Each is a notice in the app plus an email to the address on the account when email is set up;
 // a failure of one never stops the other, and the caller decides whether a step counts as sent. Never marketing: only what the person needs to act on.
@@ -38,7 +39,7 @@ export const tellCoachTheyAreLeaving = (db: any, a: { coachId: string; orgName: 
     profileId: a.coachId,
     type: "coach_departure_reminder",
     subject: `You are leaving ${a.orgName}`,
-    body: `You are leaving ${a.orgName}. Your clients are still with you and you can keep coaching them for ${WINDOW_DAYS} days, until ${dateWord(a.endsAt)}. Before then, choose: start your own account (your clients and everything move with you), or export everything you have. After that your coaching access ends.`,
+    body: `You are leaving ${a.orgName}${periodAfter(a.orgName)} Your clients are still with you and you can keep coaching them for ${WINDOW_DAYS} days, until ${dateWord(a.endsAt)}. Before then, choose: start your own account (your clients and everything move with you), or export everything you have. After that your coaching access ends.`,
     linkPath: "/dashboard",
     origin: a.origin,
   });

@@ -3,11 +3,29 @@
 export interface ChangelogEntry {
   date: string; // YYYY-MM-DD
   title: string;
-  body: string;
+  body?: string; // a line or two more, when the title alone does not say it
   audience: "coaches" | "clients" | "everyone";
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  { date: "2026-10-26", title: "Make a template from any program, with Programs and Templates tabs", audience: "coaches" },
+  { date: "2026-10-26", title: "Organization programs: assign to clients and to whole groups", audience: "coaches" },
+  { date: "2026-10-26", title: "Import matches you can trust: exact names win, and old matches are labelled", audience: "coaches" },
+  { date: "2026-10-26", title: "The AI builder can change later weeks of a program", audience: "coaches" },
+  { date: "2026-10-26", title: "Spotlight demo videos on exercises in the Spotlight library, until you add your own", audience: "everyone" },
+  { date: "2026-10-24", title: "Get [name] started checklist on a new client's profile", audience: "coaches" },
+  { date: "2026-10-21", title: "Your phone starts in your own organization", audience: "coaches" },
+  { date: "2026-10-21", title: "Coach nutrition revamp", audience: "coaches" },
+  { date: "2026-10-21", title: "Allergy question asked once", audience: "clients" },
+  { date: "2026-10-20", title: "Wing it logging", audience: "coaches" },
+  { date: "2026-10-20", title: "Logging during a booked time uses that session", audience: "coaches" },
+  { date: "2026-10-20", title: "Walk-in prompt", audience: "coaches" },
+  { date: "2026-10-20", title: "No-show Charge or Waive", audience: "coaches" },
+  { date: "2026-10-20", title: "Faster phone app", audience: "everyone" },
+  { date: "2026-10-20", title: "The Spotlight button on the phone", audience: "coaches" },
+  { date: "2026-10-20", title: "One calendar that people book on", audience: "everyone" },
+  { date: "2026-10-19", title: "Did-it-happen cards", audience: "coaches" },
+  { date: "2026-10-19", title: "A public page with a free consultation, made for you", audience: "coaches" },
   {
     date: "2026-10-18",
     title: "Remove a client without losing them",

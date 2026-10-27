@@ -5,6 +5,7 @@ import type { PointerEvent as ReactPointerEvent } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Dumbbell, Mail, MessageCircle, Sparkles, TrendingUp, Users, X } from "lucide-react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { SpotNeedsTop } from "./spot-needs-top";
 import { SPOT_LAST_OPENED_KEY, SPOT_NEEDS_CACHE_KEY, readSpotNeedsCache, shouldFade, spotCount, spotNeedsCacheEntry, type SpotNeeds } from "@/lib/spot-needs";
 import { isEmbeddedWindow } from "@/components/ui/loading-watchdog";
@@ -495,6 +496,15 @@ export function CoachSpotHub({
                       </button>
                     );
                   })}
+                  {/* How everything works: the help center, one tap from the coaching button. */}
+                  <Link
+                    href="/help"
+                    onClick={close}
+                    data-how-it-works
+                    className="col-span-2 min-h-11 border border-steel/20 p-3 flex items-center justify-center gap-2 active:border-rust active:bg-rust/5 transition-colors"
+                  >
+                    <span className="font-body text-sm text-chalk text-center">How it works</span>
+                  </Link>
                   {/* Shows only while notifications are off and could be turned on. */}
                   <div className="col-span-2">
                     <PushNotificationToggle variant="tile" profileId={profileId} />

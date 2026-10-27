@@ -4,7 +4,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { HELP_ARTICLES, HELP_AUDIENCES, HELP_BY_SLUG, SUPPORT_PROMISE } from "./help-articles";
+import { HELP_ARTICLES, HELP_BY_SLUG, OLD_HELP_SLUGS, SUPPORT_PROMISE, type HelpArticle } from "./help-articles";
 import { CHANGELOG } from "./changelog";
 
 const src = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
@@ -28,40 +28,91 @@ vi.mock("@/lib/supabase/service-role", () => ({
 }));
 import { forgetStatusPageReading, readHealth, readHealthForPage, type HealthReading } from "./health-check";
 
+// Every word an article shows, in order (title, summary, then each section's heading, paragraphs, bullets and closing paragraphs).
+const words = (a: HelpArticle) => [a.title, a.summary, ...a.sections.flatMap((s) => [s.heading, ...s.body, ...(s.bullets ?? []).flatMap((b) => [b.lead ?? "", b.text]), ...(s.after ?? [])])].join("\n");
+const sectionText = (slug: string, heading: string) => {
+  const s = HELP_BY_SLUG.get(slug)?.sections.find((x) => x.heading === heading);
+  return s ? [...s.body, ...(s.bullets ?? []).map((b) => (b.lead ?? "") + " " + b.text), ...(s.after ?? [])].join(" ") : "";
+};
+
 describe("the help center", () => {
-  it("has about twenty articles for both audiences, each with a unique address and real text", () => {
-    expect(HELP_ARTICLES.length).toBeGreaterThanOrEqual(15);
+  it("is eleven articles (five for clients, six for coaches), each with a unique short address and headed sections", () => {
+    const slugs = (aud: string) => HELP_ARTICLES.filter((a) => a.audience === aud).map((a) => a.slug);
+    expect(slugs("client")).toEqual(["getting-started", "log-your-workout", "food", "sessions", "your-account"]);
+    expect(slugs("coach")).toEqual(["your-phone", "clients", "programs", "logging-and-sessions", "nutrition", "business"]);
     expect(new Set(HELP_ARTICLES.map((a) => a.slug)).size).toBe(HELP_ARTICLES.length);
-    for (const aud of HELP_AUDIENCES) expect(HELP_ARTICLES.filter((a) => a.audience === aud.key).length, aud.key).toBeGreaterThanOrEqual(5);
     for (const a of HELP_ARTICLES) {
       expect(a.slug, a.slug).toMatch(/^[a-z0-9-]+$/);
-      expect(a.title.length, a.slug).toBeGreaterThan(5);
       expect(a.summary.length, a.slug).toBeGreaterThan(10);
-      expect(a.body.length, a.slug).toBeGreaterThanOrEqual(2);
-      for (const p of a.body) expect(p.length, a.slug).toBeGreaterThan(20);
+      expect(a.sections.length, a.slug).toBeGreaterThanOrEqual(3);
       expect(HELP_BY_SLUG.get(a.slug)).toBe(a);
+      for (const s of a.sections) {
+        // no empty section: a heading always has at least a paragraph or a bullet under it, and nothing in it is blank
+        expect(s.body.length + (s.bullets?.length ?? 0), a.slug + ": " + s.heading).toBeGreaterThan(0);
+        for (const p of [...s.body, ...(s.after ?? []), ...(s.bullets ?? []).map((b) => b.text)]) expect(p.trim().length, a.slug + ": " + s.heading).toBeGreaterThan(5);
+      }
+      expect(new Set(a.sections.map((s) => s.heading)).size, a.slug).toBe(a.sections.length);
+      // the draft's placeholders are written as [name] / [organization], never in angle brackets ("Settings > Workout Logging" is a menu path)
+      expect(words(a), a.slug).not.toMatch(/</);
     }
   });
 
-  it("promises nothing it cannot keep: no price, no deadline in hours or days for a reply, no legal term; money and data answers point at the policies", () => {
-    const all = HELP_ARTICLES.flatMap((a) => [a.title, a.summary, ...a.body]).concat(SUPPORT_PROMISE).join("\n");
+  it("the two wording changes from the draft are in (demos show for exercises in the Spotlight library)", () => {
+    expect(sectionText("programs", "Demo videos")).toMatch(/^An exercise can show a demo\./);
+    expect(words(HELP_BY_SLUG.get("programs")!)).not.toContain("Every exercise can show a demo");
+    expect(CHANGELOG.some((e) => e.title === "Spotlight demo videos on exercises in the Spotlight library, until you add your own")).toBe(true);
+  });
+
+  it("every one of the 21 old addresses goes to the article that now holds its answer", () => {
+    expect(OLD_HELP_SLUGS).toEqual({
+      "join-with-an-invite": "getting-started",
+      "forgot-password": "getting-started",
+      "put-the-app-on-your-phone": "getting-started",
+      "log-a-workout": "log-your-workout",
+      "log-your-food": "food",
+      "your-grocery-list": "food",
+      "book-and-cancel-sessions": "sessions",
+      "turn-notifications-on": "your-account",
+      "download-or-delete-my-data": "your-account",
+      "add-your-first-client": "clients",
+      "message-your-clients": "clients",
+      "remove-or-delete-a-client": "clients",
+      "build-and-assign-a-program": "programs",
+      "sessions-credits-and-bookings": "logging-and-sessions",
+      "set-nutrition-targets": "nutrition",
+      "see-how-clients-are-eating": "nutrition",
+      "pause-automatic-nutrition-suggestions": "nutrition",
+      "packages-and-payments": "business",
+      "payment-problems": "business",
+      "leaving-the-platform": "business",
+      "contact-support": "business",
+    });
+    expect(Object.keys(OLD_HELP_SLUGS)).toHaveLength(21);
+    for (const [from, to] of Object.entries(OLD_HELP_SLUGS)) {
+      expect(HELP_BY_SLUG.get(to), from + " -> " + to).toBeDefined();
+      expect(HELP_BY_SLUG.get(from), from + " is no longer an article").toBeUndefined();
+    }
+  });
+
+  it("promises nothing it cannot keep: no price, no deadline in hours or days for a reply, no legal term; data answers point at the policies", () => {
+    const all = HELP_ARTICLES.map(words).concat(SUPPORT_PROMISE).join("\n");
     expect(all).not.toMatch(/\$\s?\d/);
     expect(all).not.toMatch(/within \d+ (hours?|days?|minutes?)|business days|24\/7|guarantee/i);
     expect(SUPPORT_PROMISE).not.toMatch(/\d/);
-    expect(HELP_BY_SLUG.get("download-or-delete-my-data")!.body.join(" ")).toContain("Privacy page");
+    expect(sectionText("your-account", "Delete your account")).toContain("Privacy page");
   });
 
-  it("only describes things that exist: each article about a feature is there exactly while the feature's own files are", () => {
+  it("only describes things that exist: each part about a feature is there exactly while the feature's own files are", () => {
     const live = (p: string) => existsSync(join(__dirname, "..", p));
-    const pairs: [string, string][] = [
-      ["remove-or-delete-a-client", "components/coach/desktop/removed-clients-panel.tsx"],
-      ["pause-automatic-nutrition-suggestions", "components/coach/nutrition/auto-suggest-off-toggle.tsx"],
-      ["payment-problems", "components/coach/payment-problems-section.tsx"],
+    const pairs: [boolean, string][] = [
+      [sectionText("clients", "Remove, put back, delete").includes("Removed clients"), "components/coach/desktop/removed-clients-panel.tsx"],
+      [sectionText("nutrition", "Switches (under Targets > Details)").includes("No automatic suggestions"), "components/coach/nutrition/auto-suggest-off-toggle.tsx"],
+      [sectionText("business", "Payment problems").length > 0, "components/coach/payment-problems-section.tsx"],
     ];
-    for (const [slug, file] of pairs) expect(!!HELP_BY_SLUG.get(slug), `${slug} must be there if and only if ${file} is`).toBe(live(file));
-    // the support article only says you get a notice once the notices exist
+    for (const [there, file] of pairs) expect(there, "described if and only if " + file + " is there").toBe(live(file));
+    // the support section only says you get a notice once the notices exist
     const notices = live("supabase/migrations/0410_support_reply_notices.sql");
-    expect(HELP_BY_SLUG.get("contact-support")!.body.join(" ").includes("You get a notice when we reply"), "the notice sentence and the notices go together").toBe(notices);
+    expect(sectionText("business", "Support").includes("and you get a notice"), "the notice sentence and the notices go together").toBe(notices);
     // and the what's-new entries for these four features go in only with them
     const entries: [string, boolean][] = [
       ["Remove a client without losing them", live(pairs[0][1])],
@@ -69,7 +120,7 @@ describe("the help center", () => {
       ["Payment problems, in one place", live(pairs[2][1])],
       ["A notice when support replies", notices],
     ];
-    for (const [title, isLive] of entries) expect(CHANGELOG.some((e) => e.title === title), `${title}: in what's new only while the feature is live`).toBe(isLive);
+    for (const [title, isLive] of entries) expect(CHANGELOG.some((e) => e.title === title), title + ": in what's new only while the feature is live").toBe(isLive);
   });
 
   it("there is no parent-view article: a coach can no longer create a parent link (nothing renders the share button), and the help center says nothing about one", () => {
@@ -79,13 +130,39 @@ describe("the help center", () => {
     const users = [...walk("app"), ...walk("components")].filter((f) => /GuardianShareButton/.test(readFileSync(join(__dirname, "..", f), "utf8")));
     if (users.length === 0) {
       expect(HELP_BY_SLUG.get("parent-view-link"), "nothing renders the parent-link button, so the help center must not describe it").toBeUndefined();
-      expect(HELP_ARTICLES.flatMap((a) => [a.title, a.summary, ...a.body]).join(" ")).not.toMatch(/guardian a private link|A parent.s view/i);
+      expect(HELP_ARTICLES.map(words).join(" ")).not.toMatch(/guardian a private link|A parent.s view/i);
     }
   });
 
-  it("is written in plain words: no internal names", () => {
-    const all = HELP_ARTICLES.flatMap((a) => [a.title, a.summary, ...a.body]).join("\n");
-    expect(all).not.toMatch(/migration|paste|RLS|webhook|endpoint|supabase|api\/|cron|step \d/i);
+  it("is written in plain words: no internal names (Paste a list is a button)", () => {
+    const all = HELP_ARTICLES.map(words).join("\n");
+    expect(all).not.toMatch(/migration|paste(?! a list)|RLS|webhook|endpoint|supabase|api\/|cron|step \d/i);
+  });
+});
+
+describe("the help pages", () => {
+  it("an article shows each section's heading, paragraphs and bullets; an old address redirects permanently", () => {
+    const page = src("app/help/[slug]/page.tsx");
+    expect(page).toContain("if (OLD_HELP_SLUGS[slug]) permanentRedirect(\x60/help/$" + "{OLD_HELP_SLUGS[slug]}\x60);");
+    expect(page).toContain("article.sections.map((s) =>");
+    expect(page).toContain("<h2");
+    expect(page).toContain("{s.bullets && (");
+    expect(page).toContain("{b.lead && <strong");
+    // the static pages are the new articles only (an old address is answered by the redirect)
+    expect(page).toContain("HELP_ARTICLES.map((a) => ({ slug: a.slug }))");
+  });
+
+  it("How it works is one tap away: a row on the phone's Spotlight button (above the notifications card) and a button beside Feedback on the computer's rail", () => {
+    const hub = src("components/coach/mobile/coach-spot-hub.tsx");
+    const row = hub.indexOf('href="/help"');
+    expect(row).toBeGreaterThan(hub.indexOf("TILES.filter("));
+    expect(row).toBeLessThan(hub.indexOf('<PushNotificationToggle variant="tile"'));
+    expect(hub.slice(row, row + 400)).toMatch(/min-h-11[\s\S]*How it works/);
+    const shell = src("components/coach/coach-desktop-shell.tsx");
+    const feedback = shell.indexOf('<FeedbackButton variant="icon" />');
+    const help = shell.indexOf('<Link href="/help" title="How it works" aria-label="How it works"');
+    expect(help).toBeGreaterThan(feedback);
+    expect(help - feedback).toBeLessThan(80);
   });
 });
 
@@ -96,10 +173,19 @@ describe("what's new", () => {
       const e = CHANGELOG[i];
       expect(e.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       expect(e.title.length).toBeGreaterThan(5);
-      expect(e.body.length).toBeGreaterThan(30);
-      expect(`${e.title} ${e.body}`).not.toMatch(/migration|paste|RLS|webhook|supabase|cron|release [a-z]\d|step \d|vitest/i);
-      if (i > 0) expect(CHANGELOG[i - 1].date >= e.date, `${CHANGELOG[i - 1].title} before ${e.title}`).toBe(true);
+      if (e.body !== undefined) expect(e.body.length).toBeGreaterThan(30);
+      expect(e.title + " " + (e.body ?? "")).not.toMatch(/migration|paste|RLS|webhook|supabase|cron|release [a-z]\d|step \d|vitest|</i);
+      if (i > 0) expect(CHANGELOG[i - 1].date >= e.date, CHANGELOG[i - 1].title + " before " + e.title).toBe(true);
     }
+  });
+
+  it("has the Oct 19 to 26 releases, each on the day it shipped", () => {
+    const on = (date: string) => CHANGELOG.filter((e) => e.date === date).map((e) => e.title);
+    expect(on("2026-10-26")).toHaveLength(5);
+    expect(on("2026-10-24")).toEqual(["Get [name] started checklist on a new client's profile"]);
+    expect(on("2026-10-21")).toEqual(["Your phone starts in your own organization", "Coach nutrition revamp", "Allergy question asked once"]);
+    expect(on("2026-10-20")).toEqual(["Wing it logging", "Logging during a booked time uses that session", "Walk-in prompt", "No-show Charge or Waive", "Faster phone app", "The Spotlight button on the phone", "One calendar that people book on"]);
+    expect(on("2026-10-19")).toEqual(["Did-it-happen cards", "A public page with a free consultation, made for you"]);
   });
 });
 

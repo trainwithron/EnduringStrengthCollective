@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { confirmDialog } from "@/components/shared/confirm-dialog";
+import { periodAfter } from "@/lib/end-sentence";
 
 // "Keep my clients and everything: start my own account." The move itself is done by the server (app/api/coach/start-own-account), which refuses anyone who was let go or whose seven days are over.
 export function StartOwnAccountButton({ organizationId, organizationName }: { organizationId: string; organizationName: string }) {
@@ -11,7 +12,7 @@ export function StartOwnAccountButton({ organizationId, organizationName }: { or
   const [error, setError] = useState<string | null>(null);
 
   async function start() {
-    if (!(await confirmDialog({ message: `Start your own account? Your clients, their history, programs and credits, your shop links, classes and calendar move into an account you own, and it starts on the standard free trial. This ends your time with ${organizationName}.`, confirmLabel: "Start my account" }))) return;
+    if (!(await confirmDialog({ message: `Start your own account? Your clients, their history, programs and credits, your shop links, classes and calendar move into an account you own, and it starts on the standard free trial. This ends your time with ${organizationName}${periodAfter(organizationName)}`, confirmLabel: "Start my account" }))) return;
     setBusy(true);
     setError(null);
     try {
