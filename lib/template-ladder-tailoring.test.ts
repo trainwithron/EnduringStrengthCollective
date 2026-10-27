@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import type { LadderRung } from "./slot-templates";
+import { pickRung, rungIndex, type LadderRung } from "./slot-templates";
 import { buildReview, isTailored, stepRung, TAILORED_MARK, type TemplateSlot } from "./use-template";
 
 // Ron, Oct 27: "Each exercise should have a ladder that we can quickly tailor to each individual" / "I don't think it'd be easy to build the templates out in the phone". Easier / Harder on every
@@ -45,9 +45,8 @@ describe("Easier / Harder on a slot", () => {
     expect(stepRung(row.choices, "", 1, hinge)).toBeNull();
   });
   it("a level change re-picks every slot (the level's own rung), and the dropdown still lists every choice", () => {
-    expect(buildReview([slot], { hinge }, "beginner")[0].pick).toBe("Kettlebell Deadlift");
-    expect(buildReview([slot], { hinge }, "intermediate")[0].pick).toBe("Romanian Deadlift");
-    // (with four rungs, advanced lands on the third, like intermediate: pickRung's 80% of the way up)
+    expect(buildReview([slot], { hinge }, "beginner")[0].pick).toBe("Hip Hinge Drill");
+    expect(buildReview([slot], { hinge }, "intermediate")[0].pick).toBe("Kettlebell Deadlift");
     expect(buildReview([slot], { hinge }, "advanced")[0].pick).toBe("Romanian Deadlift");
     expect(buildReview([slot], { hinge }, "intermediate")[0].choices).toHaveLength(4);
   });
@@ -56,6 +55,30 @@ describe("Easier / Harder on a slot", () => {
     expect(isTailored(true, "Romanian Deadlift", "Romanian Deadlift")).toBe(false);
     expect(isTailored(false, "Kettlebell Deadlift", "Romanian Deadlift")).toBe(false);
     expect(TAILORED_MARK).toBe("changed");
+  });
+});
+
+describe("the three levels land on different rungs whenever the ladder allows (Oct 27: with four rungs Advanced landed on Intermediate's)", () => {
+  const at = (n: number) => ({ beginner: rungIndex(n, "beginner"), intermediate: rungIndex(n, "intermediate"), advanced: rungIndex(n, "advanced") });
+  it("Intermediate is the middle (the lower middle on an even count); Beginner below it and Advanced above it from three rungs up", () => {
+    expect(at(2)).toEqual({ beginner: 0, intermediate: 1, advanced: 1 });
+    expect(at(3)).toEqual({ beginner: 0, intermediate: 1, advanced: 2 });
+    expect(at(4)).toEqual({ beginner: 0, intermediate: 1, advanced: 2 });
+    expect(at(5)).toEqual({ beginner: 1, intermediate: 2, advanced: 3 });
+    expect(at(7)).toEqual({ beginner: 1, intermediate: 3, advanced: 5 });
+    expect(at(1)).toEqual({ beginner: 0, intermediate: 0, advanced: 0 });
+    for (let n = 3; n <= 20; n++) {
+      const r = at(n);
+      expect(r.beginner, String(n)).toBeLessThan(r.intermediate);
+      expect(r.intermediate, String(n)).toBeLessThan(r.advanced);
+      expect(r.advanced, String(n)).toBeLessThanOrEqual(n - 1);
+      expect(r.intermediate, String(n)).toBe(Math.floor((n - 1) / 2));
+    }
+  });
+  it("pickRung uses it", () => {
+    const four = [rung("a", 1), rung("b", 2), rung("c", 3), rung("d", 4)];
+    expect([pickRung(four, "beginner"), pickRung(four, "intermediate"), pickRung(four, "advanced"), pickRung(four)].map((r) => r?.exerciseName)).toEqual(["a", "b", "c", "b"]);
+    expect(pickRung([], "advanced")).toBeNull();
   });
 });
 

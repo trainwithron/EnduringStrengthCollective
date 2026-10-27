@@ -73,10 +73,21 @@ function sideWord(side: Side | null): string {
 
 const LEVEL_FRACTION: Record<Level, number> = { beginner: 0.2, intermediate: 0.5, advanced: 0.8 };
 
-// The rung a client's level lands on: the middle of the choices by default (Ron: it starts in the middle of the ladder and he moves it up or down from there).
+// The rung a client's level lands on: the middle of the choices by default (Ron: it starts in the middle of the ladder and he moves it up or down from there). Intermediate is the middle (the
+// lower middle on an even count); Beginner sits about a fifth of the way up and Advanced about four fifths, and each is kept at least one rung from the middle, so with three rungs or more
+// the three levels always land on different rungs (Oct 27: with four rungs Advanced used to land on Intermediate's rung). Two rungs: Beginner the bottom, Intermediate and Advanced the top.
 export function pickRung(rungs: LadderRung[], level: Level = "intermediate"): LadderRung | null {
-  if (rungs.length === 0) return null;
-  return rungs[Math.round((rungs.length - 1) * LEVEL_FRACTION[level])];
+  return rungs[rungIndex(rungs.length, level)] ?? null;
+}
+
+export function rungIndex(count: number, level: Level): number {
+  if (count <= 1) return 0;
+  if (count === 2) return level === "beginner" ? 0 : 1;
+  const last = count - 1;
+  const middle = Math.floor(last / 2);
+  if (level === "beginner") return Math.max(0, Math.min(Math.round(last * LEVEL_FRACTION.beginner), middle - 1));
+  if (level === "advanced") return Math.min(last, Math.max(Math.round(last * LEVEL_FRACTION.advanced), middle + 1));
+  return middle;
 }
 
 export const SLOT_ASSIGN_BLOCKED = "This template has slots. Choosing its exercises for a client comes next, so it can't be assigned yet.";

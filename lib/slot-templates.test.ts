@@ -52,13 +52,13 @@ describe("a slot finds its exercises on the coach's ladder", () => {
 
 describe("the level picks the rung; it starts in the middle", () => {
   const rungs = ladder("Squat").filter((r) => !r.unilateral && r.tier === "B").sort((a, b) => a.rank - b.rank) as LadderRung[];
-  it("no level means the middle of the ladder", () => {
-    expect(pickRung(rungs)).toEqual(rungs[Math.round((rungs.length - 1) * 0.5)]);
+  it("no level means the middle of the ladder (the lower middle on an even count)", () => {
+    expect(pickRung(rungs)).toEqual(rungs[Math.floor((rungs.length - 1) / 2)]);
   });
   it("beginner is lower than intermediate, which is lower than advanced", () => {
     const idx = (l: "beginner" | "intermediate" | "advanced") => rungs.indexOf(pickRung(rungs, l)!);
-    expect(idx("beginner")).toBeLessThanOrEqual(idx("intermediate"));
-    expect(idx("intermediate")).toBeLessThanOrEqual(idx("advanced"));
+    expect(idx("beginner")).toBeLessThan(idx("intermediate"));
+    expect(idx("intermediate")).toBeLessThan(idx("advanced"));
     expect(idx("beginner")).toBeLessThan(idx("advanced"));
   });
   it("an empty list picks nothing", () => {
