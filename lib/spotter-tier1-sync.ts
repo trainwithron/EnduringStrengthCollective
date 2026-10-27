@@ -71,7 +71,7 @@ export async function syncTier1ExpertReports(
 
   // --- Programming Spotter, every real active program this coach runs ---
   const { data: programRows } = await readRowsByIds(groupIds, (g) => (from, to) =>
-    supabase.from("programs").select("id, name, group_id").in("group_id", g).eq("is_active", true).order("id").range(from, to)
+    supabase.from("programs").select("id, name, group_id").in("group_id", g).eq("is_active", true).eq("org_program", false).order("id").range(from, to)
   );
   for (const program of programRows ?? []) {
     const flags = await gatherProgrammingSpotterFlags(supabase, {

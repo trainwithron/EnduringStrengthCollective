@@ -4,7 +4,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError, AiTruncatedError, AiTimeoutError } from "@/lib/anthropic-client";
 import { AiRateLimitedError, freeTierOutMessage } from "@/lib/ai-usage";
 import { checkAndSpendCoachCredits, canRunAiAction } from "@/lib/coach-credits";
-import { freeTierMeter, takeFreeTierUse } from "@/lib/free-tier-server";
+import { freeTierMeter, giveBackFreeTierUse, takeFreeTierUse } from "@/lib/free-tier-server";
 import { athleteAgeStatus, effectiveAgeStatus, UNKNOWN_AGE_BANNER_TEXT, YOUTH_PROMPT_BLOCK } from "@/lib/youth-block";
 import { resolveAiExerciseName, plainLibraryName } from "@/lib/ai-day-rules";
 import { isBadExerciseName } from "@/lib/exercise-name-guard";
@@ -21,6 +21,7 @@ import {
   previewLines,
   readAiChanges,
   readPlan,
+  spendFreeUseThenCredits,
   resolveWeeks,
   type EditDb,
   type PlanDay,
@@ -120,11 +121,12 @@ export async function POST(request: Request) {
         return { answer, plan };
       },
       hasChanges: (r) => r.plan.days.length > 0,
-      spend: async () => {
-        const free = await takeFreeTierUse(createServiceRoleClient(), user.id, "program");
-        if (!free.ok) return { ok: false, error: free.error };
-        return checkAndSpendCoachCredits(createServiceRoleClient(), user.id, "program_generation");
-      },
+      spend: () =>
+        spendFreeUseThenCredits({
+          takeFree: () => takeFreeTierUse(createServiceRoleClient(), user.id, "program"),
+          spendCredits: () => checkAndSpendCoachCredits(createServiceRoleClient(), user.id, "program_generation"),
+          giveBack: (useId) => giveBackFreeTierUse(createServiceRoleClient(), useId),
+        }),
     });
     if (!outcome.ok) return NextResponse.json({ error: outcome.error }, { status: outcome.status });
     const { answer, plan } = outcome.result;

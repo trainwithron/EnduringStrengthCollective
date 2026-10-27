@@ -1576,6 +1576,17 @@
   ]
  },
  {
+  "n": "188",
+  "slug": "0436",
+  "title": "0436 Release audit fixes: an import is marked while it is written; Sawyer Steele's cut-off copy gets its missing days; a client never reads an organization program's days; the team sheet never saves into one; one fixed search_path",
+  "migrations": [
+   "0436"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'importing')"
+  ]
+ },
+ {
   "n": "187",
   "slug": "0435",
   "title": "0435 Organization programs: a mark for the organization's own programs (never followed by anyone, only copied to a client or a group), its backfill, one condition in the programs read rule and one in assign_program_to_client",

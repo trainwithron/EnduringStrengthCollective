@@ -92,6 +92,7 @@ export async function loadMyTraining(supabase: SupabaseClient, userId: string, l
         .in("group_id", groupIds)
         .eq("is_active", true)
         .is("archived_at", null)
+        .eq("org_program", false)
         .or(`athlete_id.is.null,athlete_id.eq.${userId}`)
     : { data: [] };
   const programs = (programRows ?? []) as MyProgramInput[];

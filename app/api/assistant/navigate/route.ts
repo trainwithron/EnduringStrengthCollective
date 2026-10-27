@@ -107,7 +107,7 @@ export async function POST(request: Request) {
   const clientPrograms: Record<string, { programId: string; groupId: string }> = {};
   if (role === "coach" && roster.length > 0) {
     const [{ data: programRows }, { data: kindRows }] = await Promise.all([
-      readRowsByIds(coachGroupIds, (g) => (from, to) => supabase.from("programs").select("id, group_id, athlete_id").in("group_id", g).eq("is_active", true).order("id").range(from, to)),
+      readRowsByIds(coachGroupIds, (g) => (from, to) => supabase.from("programs").select("id, group_id, athlete_id").in("group_id", g).eq("is_active", true).eq("org_program", false).order("id").range(from, to)),
       readRowsByIds(coachGroupIds, (g) => (from, to) => supabase.from("groups").select("id, group_kind").in("id", g).order("id").range(from, to)),
     ]);
     const oneOnOneIds = new Set<string>((kindRows ?? []).filter((g: any) => g.group_kind === "one_on_one").map((g: any) => g.id as string));

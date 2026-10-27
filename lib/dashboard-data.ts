@@ -176,7 +176,7 @@ export async function getCoachDashboardData(
     readRowsByIds(allGroupIds, (g) => (from, to) =>
       supabase.from("workout_logs").select("athlete_id, group_id, created_at, new_prs").in("group_id", g).gte("created_at", new Date(now.getTime() - 3 * 86400000).toISOString()).order("id").range(from, to)
     ).then((r) => ({ data: r.data.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))) })),
-    readRowsByIds(allGroupIds, (g) => (from, to) => supabase.from("programs").select("group_id, athlete_id, training_days").in("group_id", g).eq("is_active", true).order("id").range(from, to)),
+    readRowsByIds(allGroupIds, (g) => (from, to) => supabase.from("programs").select("group_id, athlete_id, training_days").in("group_id", g).eq("is_active", true).eq("org_program", false).order("id").range(from, to)),
     readRowsByIds(allGroupIds, (g) => (from, to) =>
       supabase.from("wellness_checkins").select("athlete_id, group_id, sleep_quality, soreness, energy").in("group_id", g).eq("log_date", todayKey).order("id").range(from, to)
     ),

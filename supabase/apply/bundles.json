@@ -24,6 +24,14 @@
   "file": "apply-release-tc3b-client-requests-all.sql"
  },
  {
+  "id": "release-audit-oct26",
+  "name": "Release audit fixes Oct 26 (imports marked while written, Sawyer's copy repaired, organization programs' days closed to clients, team sheet, one search_path)",
+  "steps": [
+   "188"
+  ],
+  "file": "apply-release-audit-oct26-all.sql"
+ },
+ {
   "id": "org-programs",
   "name": "Organization programs (the organization's own programs: never followed, copied to a client or a group)",
   "steps": [

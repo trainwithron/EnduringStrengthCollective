@@ -121,7 +121,7 @@ export async function takeFreeTierUse(
   coachId: string,
   kind: FreeTierUseKind,
   ctx?: FreeTierContext
-): Promise<{ ok: true; free: boolean; used?: number } | { ok: false; error: string }> {
+): Promise<{ ok: true; free: boolean; used?: number; useId?: string } | { ok: false; error: string }> {
   if (!(await isFreeTierCoach(db, coachId, ctx))) return { ok: true, free: false };
   if (await hasPaidAiBalance(db, coachId)) return { ok: true, free: false };
   const unavailable = { ok: false as const, error: "AI is briefly unavailable. Try again in a moment." };
@@ -145,7 +145,12 @@ export async function takeFreeTierUse(
     await giveBack(db, inserted.id);
     return { ok: false, error: freeTierOutMessage() };
   }
-  return { ok: true, free: true, used: place + 1 };
+  return { ok: true, free: true, used: place + 1, useId: inserted.id };
+}
+
+// A use that was taken for an action that then did not happen (its credits could not be spent): given back, so it does not count.
+export async function giveBackFreeTierUse(db: any, useId: string): Promise<void> {
+  await giveBack(db, useId);
 }
 
 async function giveBack(db: any, id: string): Promise<void> {

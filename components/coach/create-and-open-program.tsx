@@ -7,6 +7,22 @@ import { detectTrainingIntent } from "@/lib/training-intent";
 
 // "Build program" / "New program": the program is made at once and the builder opens. The name is "[First name]'s program" for a client and "New program" in the library; it is editable at the
 // top of the builder. Nothing is asked first. (Made when the page opens in the browser, never by a prefetch.)
+// The programs started in the last few seconds, by what was asked for. If this page is mounted twice in a row (a page in a workspace pane could be drawn twice as it opened, which
+// made two "Sawyer's program" 5 ms apart on Oct 26), the second mount opens the program the first one is making instead of making another.
+const startedRecently = new Map<string, { at: number; made: Promise<string | null> }>();
+const SAME_START_MS = 5000;
+
+export function startOnce(key: string, make: () => Promise<string | null>, now: number = Date.now()): Promise<string | null> {
+  const recent = startedRecently.get(key);
+  if (recent && now - recent.at < SAME_START_MS) return recent.made;
+  const made = make().then((id) => {
+    if (id === null) startedRecently.delete(key);
+    return id;
+  });
+  startedRecently.set(key, { at: now, made });
+  return made;
+}
+
 export function CreateAndOpenProgram({
   groupId,
   orgProgram = false,
@@ -33,17 +49,20 @@ export function CreateAndOpenProgram({
     started.current = true;
     void (async () => {
       const name = (athleteId || forClient) && athleteFirstName ? `${athleteFirstName}'s program` : "New program";
-      const { data, error: insertError } = await createBrowserClient()
-        .from("programs")
-        .insert({ group_id: groupId, name, created_by: createdBy, athlete_id: athleteId, is_active: athleteId !== null, training_intent: detectTrainingIntent(name), ...(orgProgram && athleteId === null ? { org_program: true } : {}) })
-        .select("id")
-        .single();
-      if (insertError || !data) {
+      const id = await startOnce(JSON.stringify([groupId, createdBy, athleteId, forClient?.id ?? null, orgProgram]), async () => {
+        const { data, error: insertError } = await createBrowserClient()
+          .from("programs")
+          .insert({ group_id: groupId, name, created_by: createdBy, athlete_id: athleteId, is_active: athleteId !== null, training_intent: detectTrainingIntent(name), ...(orgProgram && athleteId === null ? { org_program: true } : {}) })
+          .select("id")
+          .single();
+        return insertError || !data ? null : (data.id as string);
+      });
+      if (!id) {
         setError("Couldn't start the program. Try again.");
         started.current = false;
         return;
       }
-      router.replace(`/groups/${groupId}/programs/${data.id}?edit=1${forClient ? `&forClient=${forClient.id}&clientGroup=${forClient.groupId}` : ""}`);
+      router.replace(`/groups/${groupId}/programs/${id}?edit=1${forClient ? `&forClient=${forClient.id}&clientGroup=${forClient.groupId}` : ""}`);
     })();
   }, [groupId, createdBy, athleteId, athleteFirstName, forClient, orgProgram, router]);
 

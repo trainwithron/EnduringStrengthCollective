@@ -1,5 +1,31 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+// An import is written one day at a time (components/coach/desktop/import-wizard.tsx). Until its last day is written it is marked programs.importing (0436), and nothing copies it: a copy made
+// half-way has only the days written so far (Oct 26, Sawyer's copy had 29 of 49). One that is still marked long after it started never finished (the page was closed part-way).
+export const STILL_IMPORTING = "Still importing. Try again in a moment.";
+export const IMPORT_NOT_FINISHED = "This import did not finish. Import the program again.";
+const UNFINISHED_AFTER_MS = 10 * 60 * 1000;
+
+export function importRefusalFor(row: { importing?: boolean | null; created_at?: string | null } | null, now: number = Date.now()): string | null {
+  if (row?.importing !== true) return null;
+  const started = row.created_at ? Date.parse(row.created_at) : NaN;
+  return Number.isFinite(started) && now - started > UNFINISHED_AFTER_MS ? IMPORT_NOT_FINISHED : STILL_IMPORTING;
+}
+
+export function isImportRefusal(message: string | null | undefined): boolean {
+  return message === STILL_IMPORTING || message === IMPORT_NOT_FINISHED;
+}
+
+// Why this program cannot be copied yet, or null. A failed read is not a refusal: the copy itself then answers as before.
+export async function importRefusal(supabase: SupabaseClient, programId: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.from("programs").select("importing, created_at").eq("id", programId).maybeSingle();
+    return error ? null : importRefusalFor(data as { importing?: boolean | null; created_at?: string | null } | null);
+  } catch {
+    return null;
+  }
+}
+
 export interface DuplicateProgramOptions {
   sourceProgramId: string;
   destinationGroupId: string;
@@ -38,6 +64,8 @@ export async function duplicateProgram(
   supabase: SupabaseClient,
   { sourceProgramId, destinationGroupId, createdBy, athleteId, clientName, startDate }: DuplicateProgramOptions
 ): Promise<{ programId: string } | { error: string }> {
+  const refused = await importRefusal(supabase, sourceProgramId);
+  if (refused) return { error: refused };
   const { data, error } = await supabase.rpc("duplicate_program", {
     p_source_program_id: sourceProgramId,
     p_destination_group_id: destinationGroupId,
@@ -61,6 +89,8 @@ export async function assignProgramToClient(
   supabase: SupabaseClient,
   { sourceProgramId, destinationGroupId, athleteId, startDate }: { sourceProgramId: string; destinationGroupId: string; athleteId: string; startDate?: string }
 ): Promise<{ programId: string; attached: boolean } | { error: string }> {
+  const refused = await importRefusal(supabase, sourceProgramId);
+  if (refused) return { error: refused };
   const { data, error } = await supabase
     .rpc("assign_program_to_client", {
       p_program_id: sourceProgramId,

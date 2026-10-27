@@ -85,6 +85,7 @@ export default async function ChallengesPage(
         .eq("group_id", params.groupId)
         .eq("is_active", true)
         .is("athlete_id", null)
+        .eq("org_program", false)
         .order("name"),
     ]);
 

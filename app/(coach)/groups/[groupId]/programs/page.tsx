@@ -62,6 +62,8 @@ export default async function ProgramsListPage(
     )
     .eq("group_id", params.groupId)
     .is("archived_at", null)
+    // The organization's own programs are in the program library, not this group's Programs (0435).
+    .eq("org_program", false)
     .order("is_active", { ascending: false })
     .order("created_at", { ascending: false });
 

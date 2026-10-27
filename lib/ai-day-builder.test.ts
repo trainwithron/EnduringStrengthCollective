@@ -87,7 +87,9 @@ describe("Build program and New program make the program at once", () => {
     expect(c).toContain("`${athleteFirstName}'s program`");
     expect(c).toContain('"New program"');
     expect(c).toContain("if (started.current) return;");
-    expect(c).toContain("router.replace(`/groups/${groupId}/programs/${data.id}?edit=1")
+    expect(c).toContain("router.replace(`/groups/${groupId}/programs/${id}?edit=1");
+    // and once even when the page is mounted twice in a row (two were made 5 ms apart on Oct 26)
+    expect(c).toContain("const id = await startOnce(");
   });
   it("the Programs page no longer has the Import or build with AI button (one + New program stays)", () => {
     const page = read("app/(coach)/programs/page.tsx");

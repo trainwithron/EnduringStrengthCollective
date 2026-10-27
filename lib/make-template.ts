@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getCoachedGroups, groupsInOrgOf, pickAnchorGroup } from "@/lib/coach-groups";
-import { duplicateProgram } from "@/lib/program-duplication";
+import { duplicateProgram, importRefusal, isImportRefusal } from "@/lib/program-duplication";
 import { loadCoachLadders } from "@/lib/coach-ladders";
 import { canonicalKey } from "@/lib/exercise-normaliser";
 import { slotPlaceholderName, type Side, type SlotSpec, type SlotTier } from "@/lib/slot-templates";
@@ -74,12 +74,21 @@ function joinNames(names: string[]): string {
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
 
+// Nothing in the program is on a ladder: a template with no slots would be only a switched-off copy, so nothing is made.
+export const NOTHING_TO_SLOT = "None of these exercises are on a movement ladder yet, so there is nothing to turn into slots. Add them to a ladder in the Exercise Library, or add a slot by hand.";
+
+type ExerciseRow = { id: string; exercise_name: string; is_slot: boolean | null };
+const exercisesOf = (rows: ExerciseRow[] | null): TemplateExercise[] => (rows ?? []).filter((r) => !r.is_slot).map((r) => ({ id: r.id, name: r.exercise_name }));
+
 // Making it (in the browser, as the coach). All or nothing: if a step fails, the new template is deleted again; the original is never touched.
 
 export async function makeTemplate(
   supabase: SupabaseClient,
   { programId, programName, groupId, coachId }: { programId: string; programName: string; groupId: string; coachId: string }
 ): Promise<{ programId: string; groupId: string; summary: string } | { error: string }> {
+  // An import still being written is never made into a template (lib/program-duplication.ts).
+  const refused = await importRefusal(supabase, programId);
+  if (refused) return { error: refused };
   // The organization's library: where New program puts a program (its anchor group); a program outside any organization (the coach's own training) keeps its own place.
   const coached = await getCoachedGroups(supabase, coachId);
   const here = coached.find((g) => g.id === groupId);
@@ -87,8 +96,18 @@ export async function makeTemplate(
   const libraryGroupId = anchor && anchor.kind !== "one_on_one" ? anchor.id : groupId;
   const inLibrary = !!anchor && anchor.kind !== "one_on_one";
 
+  // The coach's own ladders; a coach with none gets the starter ladders first (lib/coach-ladders.ts). Read against the program itself first: when none of its exercises is on a ladder,
+  // nothing is made.
+  const [{ data: originalRows, error: originalError }, ladderRead] = await Promise.all([
+    supabase.from("group_workout_exercises").select("id, exercise_name, is_slot, workouts!inner ( program_id )").eq("workouts.program_id", programId),
+    loadCoachLadders(supabase, coachId),
+  ]);
+  if (originalError || "error" in ladderRead) return { error: "Couldn't make the template. Try again." };
+  const added = ladderRead.addedStarters ? "Your starter movement ladders were added. " : "";
+  if (planTemplate(exercisesOf(originalRows as ExerciseRow[] | null), ladderRead.ladders).slots.length === 0) return { error: `${added}${NOTHING_TO_SLOT}` };
+
   const copy = await duplicateProgram(supabase, { sourceProgramId: programId, destinationGroupId: libraryGroupId, createdBy: coachId });
-  if ("error" in copy) return { error: "Couldn't make the template. Try again." };
+  if ("error" in copy) return { error: isImportRefusal(copy.error) ? copy.error : "Couldn't make the template. Try again." };
   const undo = async () => {
     await supabase.from("programs").delete().eq("id", copy.programId);
   };
@@ -101,17 +120,13 @@ export async function makeTemplate(
     return { error: "Couldn't make the template. Try again." };
   }
 
-  // The coach's own ladders; a coach with none gets the starter ladders first (lib/coach-ladders.ts).
-  const [{ data: rows, error: rowsError }, ladderRead] = await Promise.all([
-    supabase.from("group_workout_exercises").select("id, exercise_name, is_slot, workouts!inner ( program_id )").eq("workouts.program_id", copy.programId),
-    loadCoachLadders(supabase, coachId),
-  ]);
-  if (rowsError || "error" in ladderRead) {
+  // The same plan, on the template's own rows.
+  const { data: rows, error: rowsError } = await supabase.from("group_workout_exercises").select("id, exercise_name, is_slot, workouts!inner ( program_id )").eq("workouts.program_id", copy.programId);
+  if (rowsError) {
     await undo();
     return { error: "Couldn't make the template. Try again." };
   }
-  const exercises: TemplateExercise[] = ((rows ?? []) as { id: string; exercise_name: string; is_slot: boolean | null }[]).filter((r) => !r.is_slot).map((r) => ({ id: r.id, name: r.exercise_name }));
-  const plan = planTemplate(exercises, ladderRead.ladders);
+  const plan = planTemplate(exercisesOf(rows as ExerciseRow[] | null), ladderRead.ladders);
   for (const s of plan.slots) {
     const { error } = await supabase
       .from("group_workout_exercises")
@@ -122,5 +137,5 @@ export async function makeTemplate(
       return { error: "Couldn't make the template. Try again." };
     }
   }
-  return { programId: copy.programId, groupId: libraryGroupId, summary: `${ladderRead.addedStarters ? "Your starter movement ladders were added. " : ""}${templateSummary(plan)}` };
+  return { programId: copy.programId, groupId: libraryGroupId, summary: `${added}${templateSummary(plan)}` };
 }

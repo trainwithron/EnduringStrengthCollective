@@ -35,9 +35,10 @@ export function assignableGroupsFrom(coached: CoachedGroup[], programGroupId: st
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-// The groups that already have their own copy of this program.
+// The groups that already have their own copy of this program. A library Duplicate or a template made from it is an organization program in the anchor group, not a group's copy, so it
+// never counts (it would otherwise block assigning to that team).
 export async function loadAssignedGroups(supabase: SupabaseClient, programId: string): Promise<{ programId: string; groupId: string; groupName: string }[]> {
-  const { data } = await supabase.from("programs").select("id, group_id, groups ( name )").eq("source_program_id", programId).is("athlete_id", null).is("archived_at", null);
+  const { data } = await supabase.from("programs").select("id, group_id, groups ( name )").eq("source_program_id", programId).is("athlete_id", null).is("archived_at", null).eq("org_program", false);
   return ((data ?? []) as { id: string; group_id: string; groups?: { name?: string | null } | null }[]).map((r) => ({ programId: r.id, groupId: r.group_id, groupName: r.groups?.name ?? "Group" }));
 }
 

@@ -76,6 +76,8 @@ describe("one code path for the starter ladders, run only on a click", () => {
     expect(day).toContain("patterns={slotPatterns}");
   });
   it("Make a template tells the coach when it added them", () => {
-    expect(read("lib/make-template.ts")).toContain('${ladderRead.addedStarters ? "Your starter movement ladders were added. " : ""}${templateSummary(plan)}');
+    const mt = read("lib/make-template.ts");
+    expect(mt).toContain('const added = ladderRead.addedStarters ? "Your starter movement ladders were added. " : "";');
+    expect(mt).toContain("summary: `${added}${templateSummary(plan)}`");
   });
 });

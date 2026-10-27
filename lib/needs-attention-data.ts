@@ -130,7 +130,7 @@ export async function getNeedsAttentionItems(
 
   for (const groupId of groupIds) {
     // In a one-on-one space only a program made for the client counts; a no-client program there is the coach's template.
-    let programQuery = supabase.from("programs").select("id, start_date, training_days").eq("group_id", groupId).eq("is_active", true);
+    let programQuery = supabase.from("programs").select("id, start_date, training_days").eq("group_id", groupId).eq("is_active", true).eq("org_program", false);
     if (oneOnOneGroupIds.has(groupId)) programQuery = programQuery.not("athlete_id", "is", null);
     const { data: activeProgram } = await programQuery.order("created_at", { ascending: false }).limit(1).maybeSingle();
 

@@ -4,8 +4,11 @@
 import { readFileSync } from "node:fs";
 import { createDb, applyLiveEquivalent } from "./harness.mjs";
 import { undoSql as functionAclOpenSql, TRIGGER_SWEEP } from "../function-acl.mjs";
+import { SAWYER, SAWYER_COPY, SAWYER_COPY_DAYS, SAWYER_GROUP, SAWYER_SESSION, SAWYER_SOURCE, SAWYER_SOURCE_FP_LIVE, sawyerSourceFpSql } from "../step188-sawyer.mjs";
 
-const read = (f) => readFileSync(new URL(`../../supabase/${f}`, import.meta.url), "utf8").split(String.fromCharCode(13, 10)).join(String.fromCharCode(10)).replace(/create extension[^;]*;/gi, "");
+// A live value a seed cannot reproduce exactly (step 188's fingerprint of Sawyer's program): the seeded program's own value is put in its place.
+const SUBST = [];
+const read = (f) => SUBST.reduce((t, [a, b]) => t.split(a).join(b), readFileSync(new URL(`../../supabase/${f}`, import.meta.url), "utf8").split(String.fromCharCode(13, 10)).join(String.fromCharCode(10)).replace(/create extension[^;]*;/gi, ""));
 const db = await createDb();
 await applyLiveEquivalent(db);
 let failures = 0;
@@ -83,6 +86,50 @@ for (const s of steps) {
         ('a117a12b-7ca3-4765-88cc-aae150585424', '44444444-4444-4444-4444-444444444444', 'New program', '00000000-0000-4000-8000-0000000000a1')
       on conflict (id) do nothing;
     `);
+  }
+  if (s.n === "188") {
+    // Sawyer's cut-off copy, under the live ids and with the live counts: the program (49 days, 277 exercises, 714 sets, the last day written at 21:44:57) in the Collective, and
+    // Sawyer's copy with its first 29 days (160 exercises, 435 sets) under their live ids, and Sawyer's one logged session on week 1 day 1.
+    const perDay = [[5, 6, 5, 7, 5, 5], [5, 6, 5, 7, 5, 5], [5, 6, 5, 7, 5, 5], [5, 6, 5, 7, 5, 5], [5, 6, 5, 7, 5, 5], [5, 6, 5, 7, 6, 5], [5, 6, 5, 7, 5, 5], [6, 7, 5, 9, 7, 6, 5]];
+    const days = perDay.flatMap((ds, wi) => ds.map((n, di) => ({ week: wi + 1, day: di + 1, n })));
+    let exNo = 0;
+    const src = [];
+    const copy = [];
+    days.forEach((d, i) => {
+      const wSrc = `88000000-0000-4000-8000-${String(i).padStart(12, "0")}`;
+      const last = i === days.length - 1;
+      src.push(`insert into public.workouts (id, program_id, group_id, title, week_number, day_index, created_at) values ('${wSrc}', '${SAWYER_SOURCE}', '44444444-4444-4444-4444-444444444444', 'Day ${d.day}', ${d.week}, ${d.day}, ${last ? "'2026-10-26 21:44:57.220386+00'" : "'2026-10-26 21:44:05+00'"});`);
+      const wCopy = i < 29 ? SAWYER_COPY_DAYS[i] : null;
+      if (wCopy) copy.push(`insert into public.workouts (id, program_id, group_id, title, week_number, day_index) values ('${wCopy}', '${SAWYER_COPY}', '${SAWYER_GROUP}', 'Day ${d.day}', ${d.week}, ${d.day});`);
+      for (let o = 0; o < d.n; o++) {
+        // 435 sets on the first 160 exercises, 279 on the other 117 (714 in all).
+        const sets = exNo < 160 ? (exNo < 115 ? 3 : 2) : exNo - 160 < 45 ? 3 : 2;
+        const name = `Ex ${d.week}-${d.day}-${o}`;
+        for (const [w, g, tag] of [[wSrc, "44444444-4444-4444-4444-444444444444", "a"], ...(wCopy ? [[wCopy, SAWYER_GROUP, "b"]] : [])]) {
+          const id = `88${tag === "a" ? "1" : "2"}00000-0000-4000-8000-${String(exNo).padStart(12, "0")}`;
+          (tag === "a" ? src : copy).push(
+            `insert into public.group_workout_exercises (id, workout_id, group_id, exercise_name, exercise_order, tracked_fields) values ('${id}', '${w}', '${g}', '${name}', ${o}, array['reps', 'weight']);`,
+            `insert into public.group_workout_exercise_sets (group_workout_exercise_id, set_order, target_reps) select '${id}', n, '8' from generate_series(0, ${sets - 1}) n;`
+          );
+        }
+        exNo++;
+      }
+    });
+    await db.exec(`
+      insert into auth.users (id, email) values ('${SAWYER}', 'sawyer.188@example.com') on conflict (id) do nothing;
+      insert into public.profiles (id, full_name) values ('${SAWYER}', 'Sawyer Steele') on conflict (id) do nothing;
+      insert into public.organizations (id, slug, name, owner_id) values ('b7318b19-a17e-4412-88f1-51d68fcf026f', 's188-esc', 'Enduring Strength Co.', '00000000-0000-4000-8000-0000000000a1') on conflict (id) do nothing;
+      insert into public.groups (id, name, created_by, organization_id) values ('44444444-4444-4444-4444-444444444444', 'The Enduring Strength Collective', '136394ed-f108-4283-bcb7-310a1ac6cbc8', 'b7318b19-a17e-4412-88f1-51d68fcf026f') on conflict (id) do nothing;
+      insert into public.groups (id, name, created_by, organization_id, group_kind) values ('${SAWYER_GROUP}', 'Sawyer Steele', '136394ed-f108-4283-bcb7-310a1ac6cbc8', 'b7318b19-a17e-4412-88f1-51d68fcf026f', 'one_on_one');
+      insert into public.group_memberships (group_id, profile_id, role) values ('${SAWYER_GROUP}', '136394ed-f108-4283-bcb7-310a1ac6cbc8', 'coach'), ('${SAWYER_GROUP}', '${SAWYER}', 'athlete');
+      insert into public.programs (id, group_id, name, created_by, is_active, org_program) values ('${SAWYER_SOURCE}', '44444444-4444-4444-4444-444444444444', 'Big Sauce but still little sauce', '136394ed-f108-4283-bcb7-310a1ac6cbc8', true, true);
+      insert into public.programs (id, group_id, name, created_by, is_active, athlete_id, source_program_id) values ('${SAWYER_COPY}', '${SAWYER_GROUP}', 'Big Sauce but still little sauce', '136394ed-f108-4283-bcb7-310a1ac6cbc8', true, '${SAWYER}', '${SAWYER_SOURCE}');
+      ${src.join("\n")}
+      ${copy.join("\n")}
+      insert into public.athlete_sessions (id, workout_id, group_id, athlete_id, status) values ('${SAWYER_SESSION}', '${SAWYER_COPY_DAYS[0]}', '${SAWYER_GROUP}', '${SAWYER}', 'completed');
+    `);
+    const fp = (await db.query(`select ${sawyerSourceFpSql()} as fp`)).rows[0].fp;
+    SUBST.push([SAWYER_SOURCE_FP_LIVE, fp]);
   }
   if (s.n === "26") {
     // The Home Team move names real ids: build the same shape (a coach who owns both organizations and coaches the group) so every row is exercised.
@@ -462,6 +509,32 @@ for (const s of steps) {
     // verify_kiosk_pin needs a signed-in coach; the data check is that the hash exists.
     const hashed = (await db.query(`select count(*)::int as n from public.kiosk_pins where athlete_id = '00000000-0000-4000-8000-0000000000a2'`)).rows[0].n;
     check("step 06: the existing plain PIN was copied across hashed", hashed === 1);
+  }
+  if (s.n === "188") {
+    // After the step (applied, undone and applied again): the copy has every day, exercise and set of its program, the 29 it had are the same rows, Sawyer's session is where it was,
+    // and nothing was added to the program itself.
+    const after = (await db.query(`select
+      (select count(*)::int from public.workouts where program_id = '${SAWYER_COPY}') as days,
+      (select count(*)::int from public.group_workout_exercises g join public.workouts w on w.id = g.workout_id where w.program_id = '${SAWYER_COPY}') as ex,
+      (select count(*)::int from public.group_workout_exercise_sets s join public.group_workout_exercises g on g.id = s.group_workout_exercise_id join public.workouts w on w.id = g.workout_id where w.program_id = '${SAWYER_COPY}') as sets,
+      (select count(*)::int from public.workouts where program_id = '${SAWYER_COPY}' and id in (${SAWYER_COPY_DAYS.map((id) => `'${id}'`).join(", ")})) as kept,
+      (select workout_id::text from public.athlete_sessions where id = '${SAWYER_SESSION}') as session_workout,
+      (select count(*)::int from public.workouts where program_id = '${SAWYER_SOURCE}') as src_days,
+      (select count(*)::int from public.group_workout_exercises g join public.workouts w on w.id = g.workout_id where w.program_id = '${SAWYER_COPY}' and g.athlete_id = '${SAWYER}') as ex_sawyers,
+      (select count(*)::int from (
+         select w.week_number, w.day_index, g.exercise_order, g.exercise_name, (select count(*) from public.group_workout_exercise_sets x where x.group_workout_exercise_id = g.id) from public.workouts w join public.group_workout_exercises g on g.workout_id = w.id where w.program_id = '${SAWYER_SOURCE}'
+         except
+         select w.week_number, w.day_index, g.exercise_order, g.exercise_name, (select count(*) from public.group_workout_exercise_sets x where x.group_workout_exercise_id = g.id) from public.workouts w join public.group_workout_exercises g on g.workout_id = w.id where w.program_id = '${SAWYER_COPY}') d) as differs`)).rows[0];
+    check("step 188: Sawyer's copy has all 49 days, 277 exercises and 714 sets, exactly the program's, its 29 days are the same rows, every row is Sawyer's, the session is where it was " + JSON.stringify(after),
+      after.days === 49 && after.ex === 277 && after.sets === 714 && after.kept === 29 && after.session_workout === SAWYER_COPY_DAYS[0] && after.src_days === 49 && after.ex_sawyers === 277 && after.differs === 0);
+    // The undo stops, removing nothing, once Sawyer has logged a day it added.
+    await db.exec(`insert into public.athlete_sessions (workout_id, group_id, athlete_id, status) select id, '${SAWYER_GROUP}', '${SAWYER}', 'in_progress' from public.workouts where program_id = '${SAWYER_COPY}' and week_number = 6 and day_index = 1`);
+    const refused = await run("apply/undo-step188-0436.sql");
+    const daysNow = (await db.query(`select count(*)::int as n from public.workouts where program_id = '${SAWYER_COPY}'`)).rows[0].n;
+    check("step 188: the undo refuses (and removes nothing) once Sawyer has logged a day it added", !!refused && /NOTHING was undone/.test(refused) && daysNow === 49, refused);
+    // Only for this step's own checks: taken out again so the release bundles below start from the shape they expect.
+    await db.exec(`delete from public.athlete_sessions where group_id = '${SAWYER_GROUP}'; delete from public.programs where id in ('${SAWYER_COPY}', '${SAWYER_SOURCE}'); delete from public.group_memberships where group_id = '${SAWYER_GROUP}'; delete from public.groups where id in ('${SAWYER_GROUP}', '44444444-4444-4444-4444-444444444444');`);
+    SUBST.length = 0;
   }
   if (s.n === "187") {
     // The Collective and its 5 programs were only for this step's own checks: taken out again so the release bundles below start from the shape they expect.

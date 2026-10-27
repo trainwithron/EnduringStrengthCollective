@@ -7,6 +7,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { checkSql as functionAclCheckSql, undoSql as functionAclUndoSql, TRIGGER_SWEEP, triggerSweepUndoSql } from "./function-acl.mjs";
 import { probeSql as step23ProbeSql } from "./step23-probe.mjs";
+import { SAWYER, SAWYER_ADDED_PLACES, SAWYER_COPY, SAWYER_COPY_DAYS, SAWYER_GROUP, SAWYER_SESSION, SAWYER_SOURCE, SAWYER_SOURCE_FP_LIVE, sawyerSourceFpSql } from "./step188-sawyer.mjs";
 import { LIVE_TRANSFER_ORGANIZATION_OWNERSHIP } from "./live-bodies-0396.mjs";
 
 const root = new URL("../supabase/", import.meta.url);
@@ -2842,6 +2843,59 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "188",
+  slug: "0436",
+  title: "0436 Release audit fixes: an import is marked while it is written; Sawyer Steele's cut-off copy gets its missing days; a client never reads an organization program's days; the team sheet never saves into one; one fixed search_path",
+  warn: "This adds programs.importing (default false; the app marks an import with it while the days are being written, and nothing copies it until it is finished). It then copies into Sawyer Steele's copy of \u201cBig Sauce but still little sauce\u201d the 20 days it is missing (week 5 day 6 and weeks 6 to 8), with their exercises and sets, the way a copy is always made; nothing the copy already has is changed or deleted, and Sawyer's logged session stays on its workout. The paste checks first that the copy still has exactly its 29 days and the program is exactly what the import wrote, and afterwards that the copy has every day and exercise of the program, or nothing is kept. It also adds ONE condition to is_ai_draft_program and ONE to is_ai_draft_workout (a client never reads an organization program's days, exercises, sets, notes or progression rules; coaches read as before), and ONE to team_sheet_save (never into an organization program's workout); the paste checks each live function is exactly the expected one, and stops if not. Last, training_partners_cross_org_enabled gets an empty search_path.",
+  migrations: ["0436"],
+  sees: "Success. No rows returned.",
+  afterwards: "Sawyer's program has all 8 weeks at once (49 days). Nothing else on screen changes until the app update that goes with it is deployed (deploy it right after; it writes programs.importing).",
+  undo: [
+    "do $undo$",
+    "declare",
+    `  v_added uuid[] := (select coalesce(array_agg(w.id), '{}') from public.workouts w where w.program_id = '${SAWYER_COPY}' and (w.week_number, w.day_index) in (${SAWYER_ADDED_PLACES}) and not (w.id = any (array[${SAWYER_COPY_DAYS.map((id) => `'${id}'`).join(", ")}]::uuid[])));`,
+    "begin",
+    "  if exists (select 1 from public.athlete_sessions where workout_id = any (v_added)) or exists (select 1 from public.workout_logs where workout_id = any (v_added)) or exists (select 1 from public.workout_assignments where workout_id = any (v_added))",
+    "     or exists (select 1 from public.session_exercises se join public.group_workout_exercises g on g.id = se.group_workout_exercise_id where g.workout_id = any (v_added))",
+    "     or exists (select 1 from public.athlete_exercise_overrides o join public.group_workout_exercises g on g.id = o.group_workout_exercise_id where g.workout_id = any (v_added)) then",
+    "    raise exception 'Sawyer has logged or been given something on a day step 188 added; NOTHING was undone. Send Spot this message.';",
+    "  end if;",
+    "  delete from public.workouts where id = any (v_added);",
+    "end $undo$;",
+    "do $undo2$",
+    "declare",
+    "  v_sig text;",
+    "  v_def text;",
+    "begin",
+    "  foreach v_sig in array array['public.is_ai_draft_program(uuid)', 'public.is_ai_draft_workout(uuid)'] loop",
+    "    v_def := pg_get_functiondef(v_sig::regprocedure);",
+    "    if position('(p.ai_draft or p.org_program or p.archived_at is not null or' in v_def) > 0 then",
+    "      execute replace(v_def, '(p.ai_draft or p.org_program or p.archived_at is not null or', '(p.ai_draft or p.archived_at is not null or');",
+    "    end if;",
+    "  end loop;",
+    "  v_def := pg_get_functiondef('public.team_sheet_save(uuid, text, jsonb, boolean, uuid, boolean)'::regprocedure);",
+    "  if position('and pr.is_active and pr.athlete_id is null and not pr.org_program' in v_def) > 0 then",
+    "    execute replace(v_def, 'and pr.is_active and pr.athlete_id is null and not pr.org_program', 'and pr.is_active and pr.athlete_id is null');",
+    "  end if;",
+    "end $undo2$;",
+    "alter function public.training_partners_cross_org_enabled() reset search_path;",
+    "alter table public.programs drop column if exists importing;",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 188 misbehaves, and only while the app update that goes with it is NOT live (it writes programs.importing). It removes only the days step 188 added to Sawyer's copy (and stops, removing nothing, if Sawyer has logged anything on one of them), puts the three functions' old text back, takes the search_path off and drops the column.",
+  rows: [
+    ["0436 is not already applied (programs has no importing yet)", "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'importing')"],
+    ["Sawyer's copy is there: Sawyer's, active, not archived, made from the program", `(select count(*) from public.programs where id = '${SAWYER_COPY}' and athlete_id = '${SAWYER}' and group_id = '${SAWYER_GROUP}' and is_active and archived_at is null and source_program_id = '${SAWYER_SOURCE}') = 1`],
+    ["Sawyer's copy still has exactly its 29 days, by id (160 exercises, 435 sets)", `(select count(*) from public.workouts where program_id = '${SAWYER_COPY}') = 29 and (select count(*) from public.workouts where program_id = '${SAWYER_COPY}' and id in (${SAWYER_COPY_DAYS.map((id) => `'${id}'`).join(", ")})) = 29 and (select count(*) from public.group_workout_exercises g join public.workouts w on w.id = g.workout_id where w.program_id = '${SAWYER_COPY}') = 160 and (select count(*) from public.group_workout_exercise_sets s join public.group_workout_exercises g on g.id = s.group_workout_exercise_id join public.workouts w on w.id = g.workout_id where w.program_id = '${SAWYER_COPY}') = 435`],
+    ["the program is exactly what the import wrote (49 days, 277 exercises, 714 sets, no notes or rules, the last day at 21:44:57, every day, exercise and set unchanged)", `(select count(*) from public.workouts where program_id = '${SAWYER_SOURCE}') = 49 and (select count(*) from public.group_workout_exercises g join public.workouts w on w.id = g.workout_id where w.program_id = '${SAWYER_SOURCE}') = 277 and (select count(*) from public.group_workout_exercise_sets s join public.group_workout_exercises g on g.id = s.group_workout_exercise_id join public.workouts w on w.id = g.workout_id where w.program_id = '${SAWYER_SOURCE}') = 714 and (select count(*) from public.workout_notes n join public.workouts w on w.id = n.workout_id where w.program_id = '${SAWYER_SOURCE}') = 0 and (select count(*) from public.exercise_progressions where program_id in ('${SAWYER_SOURCE}', '${SAWYER_COPY}')) = 0 and (select max(created_at) from public.workouts where program_id = '${SAWYER_SOURCE}') = '2026-10-26 21:44:57.220386+00'::timestamptz and ${sawyerSourceFpSql()} = '${SAWYER_SOURCE_FP_LIVE}'`],
+    ["Sawyer's one logged session on the copy is on week 1 day 1", `(select count(*) from public.athlete_sessions s join public.workouts w on w.id = s.workout_id where w.program_id = '${SAWYER_COPY}') = 1 and exists (select 1 from public.athlete_sessions where id = '${SAWYER_SESSION}' and workout_id = '${SAWYER_COPY_DAYS[0]}')`],
+    ["is_ai_draft_program is exactly the expected function", md5Is("is_ai_draft_program(uuid)", "6b77132524936e6cadb7ef4758a8232c")],
+    ["is_ai_draft_workout is exactly the expected function", md5Is("is_ai_draft_workout(uuid)", "05cd3cad64ff751a2dbbafbdc807ab34")],
+    ["team_sheet_save is exactly the expected function (0419)", md5Is("team_sheet_save(uuid, text, jsonb, boolean, uuid, boolean)", "3947181f746122f948651fb2e1180cf0")],
+    ["training_partners_cross_org_enabled is there", "to_regprocedure('public.training_partners_cross_org_enabled()') is not null"],
+  ],
+});
+
+STEPS.push({
   n: "187",
   slug: "0435",
   title: "0435 Organization programs: a mark for the organization's own programs (never followed by anyone, only copied to a client or a group), its backfill, one condition in the programs read rule and one in assign_program_to_client",
@@ -3927,6 +3981,7 @@ const BUNDLES = [
   { id: "release-ts3-team-sheet-save", name: "Release TS3 (saving a filled team sheet: one table, one notice kind, three functions)", steps: ["171"] },
   { id: "release-own1-owner-accepted-only", name: "Release OWN1 (ownership cannot be handed to someone who has never signed in; replaces two functions, adds one function and one trigger)", steps: ["172"] },
   { id: "release-tc3b-client-requests", name: "Release TC3 part B (Request to train with me on a coach's public page: one column, three tables, eight functions)", steps: ["174"] },
+  { id: "release-audit-oct26", name: "Release audit fixes Oct 26 (imports marked while written, Sawyer's copy repaired, organization programs' days closed to clients, team sheet, one search_path)", steps: ["188"] },
   { id: "org-programs", name: "Organization programs (the organization's own programs: never followed, copied to a client or a group)", steps: ["187"] },
   { id: "platform-demo-library", name: "Platform demo library (every coach and client sees the Spotlight demos when their coach has none)", steps: ["186"] },
   { id: "audit-oct24-undo-attended-anon", name: "Audit hardening Oct 24 (undoing attended: the booking's own coach or an owner/admin; two anon revokes)", steps: ["185"] },
@@ -4126,13 +4181,13 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     ["coach_view_state", "coach_view_state"],
     ["programming_spotter_dismissals", "programming_spotter_dismissals"],
   ];
-  // programs.ai_draft (0324) is NOT NULL, and an older backup does not have it: a missing value is a signed-off program (false).
+  // programs.ai_draft (0324), org_program (0435) and importing (0436) are NOT NULL, and an older backup does not have them: a missing value is false (a signed-off, ordinary, finished program).
   // group_workout_exercise_sets.set_type (0385) is NOT NULL too: an older backup has none, which means an ordinary working set.
   const lines = order.map(([k, tbl]) =>
     tbl === "group_workout_exercise_sets"
       ? `  insert into public.${tbl} select * from jsonb_populate_recordset(null::public.${tbl}, (select coalesce(jsonb_agg(x || jsonb_build_object('set_type', coalesce(x ->> 'set_type', 'working'))), '[]'::jsonb) from jsonb_array_elements(b.payload -> '${k}') x));`
       : tbl === "programs"
-      ? `  insert into public.programs select * from jsonb_populate_recordset(null::public.programs, (select coalesce(jsonb_agg(x || jsonb_build_object('ai_draft', coalesce((x ->> 'ai_draft')::boolean, false), 'org_program', coalesce((x ->> 'org_program')::boolean, false))), '[]'::jsonb) from jsonb_array_elements(b.payload -> 'programs') x));`
+      ? `  insert into public.programs select * from jsonb_populate_recordset(null::public.programs, (select coalesce(jsonb_agg(x || jsonb_build_object('ai_draft', coalesce((x ->> 'ai_draft')::boolean, false), 'org_program', coalesce((x ->> 'org_program')::boolean, false), 'importing', coalesce((x ->> 'importing')::boolean, false))), '[]'::jsonb) from jsonb_array_elements(b.payload -> 'programs') x));`
       : `  insert into public.${tbl} select * from jsonb_populate_recordset(null::public.${tbl}, b.payload -> '${k}');`
   );
   const sql = [
@@ -4198,6 +4253,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0432", "to_regprocedure('public.client_slot_reason(uuid, timestamptz, timestamptz, uuid, boolean)') is not null"),
     m("0433", "position('is_org_admin_of_group' in coalesce(pg_get_functiondef(to_regprocedure('public.undo_booking_attended(uuid)')), '')) > 0"),
     m("0434", "to_regprocedure('public.platform_demo_rows()') is not null"),
+    m("0436", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'importing')"),
     m("0435", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'org_program')"),
     m("0427", "to_regprocedure('public.my_group_ids()') is not null"),
     m("0426", "to_regprocedure('public.active_org_group_ids()') is not null"),

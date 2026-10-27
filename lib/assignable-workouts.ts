@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 // The workouts a coach may put on a client's day ("assign a specific workout"). Only workouts the CLIENT can actually open: from their own program or a shared one, never an unsigned AI draft,
-// a removed program, another client's personal program, or the coach's hidden template in a one-on-one space. Offering those made the client's Today a dead link.
+// a removed program, another client's personal program, the coach's hidden template in a one-on-one space, or an organization program (0435: never followed, only copied; the client cannot read it). Offering those made the client's Today a dead link.
 export interface WorkoutOption {
   id: string;
   label: string;
@@ -12,7 +12,7 @@ interface Row {
   title: string;
   week_number: number;
   day_index: number;
-  programs: { name: string; ai_draft: boolean | null; archived_at: string | null; athlete_id: string | null } | null;
+  programs: { name: string; ai_draft: boolean | null; archived_at: string | null; athlete_id: string | null; org_program?: boolean | null } | null;
 }
 
 export function filterAssignableWorkouts(rows: Row[], athleteId: string, oneOnOne: boolean): WorkoutOption[] {
@@ -20,7 +20,7 @@ export function filterAssignableWorkouts(rows: Row[], athleteId: string, oneOnOn
     .filter((w) => {
       const p = w.programs;
       if (!p) return false;
-      if (p.ai_draft === true || p.archived_at) return false;
+      if (p.ai_draft === true || p.archived_at || p.org_program === true) return false;
       if (p.athlete_id === athleteId) return true;
       return p.athlete_id === null && !oneOnOne;
     })
@@ -34,7 +34,7 @@ export async function loadAssignableWorkouts(supabase: SupabaseClient, groupId: 
   const [{ data }, { data: group }] = await Promise.all([
     supabase
       .from("workouts")
-      .select("id, title, week_number, day_index, programs ( name, ai_draft, archived_at, athlete_id )")
+      .select("id, title, week_number, day_index, programs ( name, ai_draft, archived_at, athlete_id, org_program )")
       .eq("group_id", groupId)
       .order("week_number", { ascending: true })
       .order("day_index", { ascending: true }),

@@ -604,8 +604,10 @@ export function ImportWizard({
         ...(orgProgram && !athleteId ? { org_program: true } : {}),
         name: programName || "Imported Program",
         description,
-        // A program the AI built is a DRAFT: not active, not seen by any client, until the coach signs it off in the builder. Anything else (a spreadsheet, a pasted program the coach wrote) is active as before.
-        is_active: !importData.isAiSourced,
+        // Written one day at a time from here, so it starts switched off and marked as importing: nothing can assign, duplicate or make a template of it until the last day is written
+        // (programs.importing, 0436; a copy made half-way had only the days written so far). It is switched on below, after the last day.
+        is_active: false,
+        importing: true,
         ai_draft: importData.isAiSourced,
         start_date: startDate,
         training_days: trainingDays,
@@ -707,6 +709,13 @@ export function ImportWizard({
         }
       }
     }
+    // Every day is written: the import is finished. A program the AI built is a DRAFT: not active, not seen by any client, until the coach signs it off in the builder. Anything else
+    // (a spreadsheet, a pasted program the coach wrote) is switched on now.
+    let finished = false;
+    for (let attempt = 0; attempt < 3 && !finished; attempt++) {
+      finished = await bestEffort(supabase.from("programs").update({ importing: false, is_active: !importData.isAiSourced }).eq("id", programRow.id));
+    }
+    if (!finished) notices.push("The program was written but did not finish saving, so it can't be assigned yet. Import it again.");
     if (importData.isAiSourced && aiSnapshot.length > 0) {
       // Bookkeeping for the sign-off view: a failure here is not something the coach can retry (importing again would make a second program), so it is not announced over the finished import.
       await bestEffort(supabase.from("programs").update({ ai_snapshot: aiSnapshot }).eq("id", programRow.id));

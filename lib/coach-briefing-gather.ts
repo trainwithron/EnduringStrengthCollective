@@ -80,7 +80,7 @@ export async function gatherCandidateSignals(
       if (r.failed) throw new Error("Could not read the clients' last workouts.");
       return { data: r.rows.map((x: any) => ({ athlete_id: x.athlete_id, created_at: x.last_at })) };
     }),
-    readRowsByIds(groupIds, (g) => (from, to) => supabase.from("programs").select("group_id, athlete_id, training_days").in("group_id", g).eq("is_active", true).order("id").range(from, to)),
+    readRowsByIds(groupIds, (g) => (from, to) => supabase.from("programs").select("group_id, athlete_id, training_days").in("group_id", g).eq("is_active", true).eq("org_program", false).order("id").range(from, to)),
     readRowsByIds(groupIds, (g) => (from, to) =>
       supabase.from("wellness_checkins").select("athlete_id, sleep_quality, soreness, energy").in("group_id", g).eq("log_date", todayKey).order("id").range(from, to)
     ),

@@ -504,6 +504,19 @@ export function editUserText(input: { instruction: string; corrections: string[]
     .join("\n");
 }
 
+// The charge itself: one of the free uses (on the free tier), then the credits. When the credits cannot be spent the free use is given back: the coach was not charged, so it must not count.
+export async function spendFreeUseThenCredits(steps: {
+  takeFree: () => Promise<{ ok: true; free: boolean; useId?: string } | { ok: false; error: string }>;
+  spendCredits: () => Promise<{ ok: boolean; error?: string }>;
+  giveBack: (useId: string) => Promise<void>;
+}): Promise<{ ok: boolean; error?: string }> {
+  const free = await steps.takeFree();
+  if (!free.ok) return { ok: false, error: free.error };
+  const spent = await steps.spendCredits();
+  if (!spent.ok && free.free && free.useId) await steps.giveBack(free.useId);
+  return spent;
+}
+
 // One AI use per preview, charged like a program build: checked first (nothing is called when it cannot be paid for), spent only once a preview with changes is really back. A failed call or a preview
 // with nothing to change (or only a question) is never charged. Cancel after a preview is not given back (the use was made).
 export async function chargedPreview<T>(steps: {

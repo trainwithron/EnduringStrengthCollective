@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { loadAssignableClients, type AssignClient } from "@/lib/assign-clients";
-import { assignProgramToClient, duplicateProgram } from "@/lib/program-duplication";
+import { assignProgramToClient, duplicateProgram, isImportRefusal } from "@/lib/program-duplication";
 import { localDateKey } from "@/lib/timezone";
 import type { LadderRung, Level, Side, SlotTier } from "@/lib/slot-templates";
 import { readAiJson } from "@/lib/ai-fetch";
@@ -203,7 +203,7 @@ export function UseTemplatePanel({
       }
       setDone(madeMessage(shownName.trim()));
       onChanged();
-    } catch {
+    } catch (err) {
       if (clientHasCopy) {
         // Made and assigned; only the closing steps failed.
         setDone(madeMessage(shownName.trim()));
@@ -211,7 +211,8 @@ export function UseTemplatePanel({
       } else {
         // Nothing is kept: the half-made copy is removed again.
         if (copyId) await supabase.from("programs").delete().eq("id", copyId);
-        setError(MAKE_FAILED_MESSAGE);
+        const why = err instanceof Error ? err.message : null;
+        setError(isImportRefusal(why) ? (why as string) : MAKE_FAILED_MESSAGE);
       }
     }
     setBusy(false);

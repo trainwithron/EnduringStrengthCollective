@@ -111,7 +111,8 @@ describe("the builder code wires it all in", () => {
     expect(route).not.toMatch(/youth.*body\./);
   });
   it("the wizard saves an AI program as a draft that is NOT active, and a plain import as before", () => {
-    expect(wizard).toContain("is_active: !importData.isAiSourced,");
+    // Written switched off (and marked as importing); switched on after the last day only when it is not an AI draft (0436).
+    expect(wizard).toContain("update({ importing: false, is_active: !importData.isAiSourced })");
     expect(wizard).toContain("ai_draft: importData.isAiSourced,");
     expect(wizard).toContain('pending.isAiSourced ? "Save as draft" : "Create program"');
     expect(wizard).toContain("Nothing reaches a client until you sign it off.");
