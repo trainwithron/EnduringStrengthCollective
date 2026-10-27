@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { ALREADY_HAS_DAYS, FILL_FAILED, isAutomaticProgramName, writeImportedProgram, type WriteImportInput } from "./write-imported-program";
+import { ALREADY_HAS_DAYS, FILL_FAILED, KEEPS_NAME_LINE, isAutomaticProgramName, reviewNameBox, writeImportedProgram, type WriteImportInput } from "./write-imported-program";
 import type { ImportedWeek } from "./workout-import-parser";
 
 // Ron, Oct 27: "whenever you import a program, it should only import one, so there's not an empty one left behind". Build program makes the empty program first; an import from its builder
@@ -105,7 +105,7 @@ const opened = (name = "Sawyer's program", extra: Row = {}) => ({ id: "p-open", 
 describe("an import started in a program the coach opened", () => {
   it("fills that program when it has no days: one program, the same id, the automatic name replaced, switched on at the end", async () => {
     const { db, t } = makeDb({ programs: [opened()] });
-    const r = await writeImportedProgram(db, input({ openProgram: { id: "p-open", automaticName: true } }));
+    const r = await writeImportedProgram(db, input({ openProgram: { id: "p-open", name: "Sawyer's program", automaticName: true } }));
     expect(r).toMatchObject({ programId: "p-open", filled: true, failedWrites: 0, finished: true });
     expect(t.programs).toHaveLength(1);
     expect(t.programs[0]).toMatchObject({ id: "p-open", name: "Big Sauce", athlete_id: "sawyer", group_id: "g-sawyer", importing: false, is_active: true, start_date: "2026-10-27", training_days: [1, 3] });
@@ -116,21 +116,21 @@ describe("an import started in a program the coach opened", () => {
 
   it("a name the coach typed stays", async () => {
     const { db, t } = makeDb({ programs: [opened("Sawyer off-season")] });
-    await writeImportedProgram(db, input({ openProgram: { id: "p-open", automaticName: false } }));
+    await writeImportedProgram(db, input({ openProgram: { id: "p-open", name: "Sawyer off-season", automaticName: false } }));
     expect(t.programs).toHaveLength(1);
     expect(t.programs[0].name).toBe("Sawyer off-season");
   });
 
   it("an organization's New program stays the organization's (no client, org_program kept)", async () => {
     const { db, t } = makeDb({ programs: [opened("New program", { athlete_id: null, org_program: true, is_active: false })] });
-    await writeImportedProgram(db, input({ athleteId: null, orgProgram: true, openProgram: { id: "p-open", automaticName: true } }));
+    await writeImportedProgram(db, input({ athleteId: null, orgProgram: true, openProgram: { id: "p-open", name: "Sawyer's program", automaticName: true } }));
     expect(t.programs).toHaveLength(1);
     expect(t.programs[0]).toMatchObject({ id: "p-open", name: "Big Sauce", athlete_id: null, org_program: true });
   });
 
   it("a program that already has days is never mixed into: a new program is made, and the coach is told", async () => {
     const { db, t } = makeDb({ programs: [opened("Sawyer's program")], workouts: [{ id: "w-old", program_id: "p-open", title: "Old day" }] });
-    const r = await writeImportedProgram(db, input({ openProgram: { id: "p-open", automaticName: true } }));
+    const r = await writeImportedProgram(db, input({ openProgram: { id: "p-open", name: "Sawyer's program", automaticName: true } }));
     expect(r).toMatchObject({ filled: false });
     expect("notices" in r && r.notices).toContain(ALREADY_HAS_DAYS);
     expect(ALREADY_HAS_DAYS).toBe("This program already has days, so the import is made as a new program.");
@@ -141,7 +141,7 @@ describe("an import started in a program the coach opened", () => {
 
   it("a failed import takes back only what it wrote and leaves the opened program as it was", async () => {
     const { db, t } = makeDb({ programs: [opened()] }, 2);
-    const r = await writeImportedProgram(db, input({ openProgram: { id: "p-open", automaticName: true } }));
+    const r = await writeImportedProgram(db, input({ openProgram: { id: "p-open", name: "Sawyer's program", automaticName: true } }));
     expect(r).toEqual({ error: FILL_FAILED });
     expect(t.programs).toHaveLength(1);
     expect(t.programs[0]).toEqual(opened());
@@ -170,6 +170,27 @@ describe("the automatic name", () => {
     expect(isAutomaticProgramName("Client's program", null)).toBe(true);
     expect(isAutomaticProgramName("Sawyer's program", "Maria Guerrero")).toBe(false);
     expect(isAutomaticProgramName("Big Sauce", "Sawyer Steele")).toBe(false);
+  });
+});
+
+describe("the review screen's name box", () => {
+  it("an opened program with a typed name: its name, fixed, with the line saying why", () => {
+    expect(reviewNameBox({ id: "p-open", name: "Sawyer off-season", automaticName: false }, "Big Sauce")).toEqual({ value: "Sawyer off-season", disabled: true, line: "Fills the program you opened. Its name stays." });
+    expect(KEEPS_NAME_LINE).toBe("Fills the program you opened. Its name stays.");
+  });
+  it("an automatic name, or no opened program: the import's name, to change as today (and what is typed there becomes the name)", async () => {
+    expect(reviewNameBox({ id: "p-open", name: "Sawyer's program", automaticName: true }, "Big Sauce")).toEqual({ value: "Big Sauce", disabled: false, line: null });
+    expect(reviewNameBox(null, "Big Sauce")).toEqual({ value: "Big Sauce", disabled: false, line: null });
+    const { db, t } = makeDb({ programs: [opened()] });
+    await writeImportedProgram(db, input({ programName: "Sawyer block 1", openProgram: { id: "p-open", name: "Sawyer's program", automaticName: true } }));
+    expect(t.programs[0].name).toBe("Sawyer block 1");
+  });
+  it("the box uses it (value, disabled, the line) and the done screen names the program as it is", () => {
+    const w = readFileSync(join(__dirname, "..", "components/coach/desktop/import-wizard.tsx"), "utf8").replace(/\r\n/g, "\n");
+    expect(w).toContain("const nameBox = reviewNameBox(openProgram, pending.programName);");
+    expect(w).toContain("value={nameBox.value}\n            disabled={nameBox.disabled}");
+    expect(w).toContain("{nameBox.line}");
+    expect(w).toContain("programName: written.filled && openProgram && !openProgram.automaticName ? openProgram.name : programName");
   });
 });
 

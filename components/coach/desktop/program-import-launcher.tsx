@@ -112,7 +112,7 @@ export function ProgramImportPanel({
         coachId: userData.user.id,
         library: (library ?? []).map((r) => ({ name: r.name as string })),
         aliases: (aliasRows ?? []).map((a) => ({ rawName: a.raw_name as string, exerciseName: a.exercise_name as string })),
-        openProgram: open && !open.hasDays ? { id: open.id, automaticName: open.automaticName } : null,
+        openProgram: open && !open.hasDays ? { id: open.id, name: open.name, automaticName: open.automaticName } : null,
         hasDays: !!open?.hasDays,
       });
     })();
@@ -183,7 +183,7 @@ export function ProgramImportPanel({
 
 // The program the import was started in: whether it has days yet, and whether its name is still the automatic one. A failed read is treated as "not this program": the import then makes a
 // new program, as it did before (and the write checks the days again anyway).
-async function readOpenProgram(supabase: ReturnType<typeof createBrowserClient>, programId: string): Promise<{ id: string; hasDays: boolean; automaticName: boolean } | null> {
+async function readOpenProgram(supabase: ReturnType<typeof createBrowserClient>, programId: string): Promise<{ id: string; name: string; hasDays: boolean; automaticName: boolean } | null> {
   const [{ data: program, error }, { count, error: countError }] = await Promise.all([
     supabase.from("programs").select("id, name, athlete_id").eq("id", programId).maybeSingle(),
     supabase.from("workouts").select("id", { count: "exact", head: true }).eq("program_id", programId),
@@ -195,5 +195,5 @@ async function readOpenProgram(supabase: ReturnType<typeof createBrowserClient>,
     const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", p.athlete_id).maybeSingle();
     athleteName = (profile as { full_name?: string | null } | null)?.full_name ?? null;
   }
-  return { id: p.id, hasDays: (count ?? 0) > 0, automaticName: isAutomaticProgramName(p.name, athleteName) };
+  return { id: p.id, name: p.name, hasDays: (count ?? 0) > 0, automaticName: isAutomaticProgramName(p.name, athleteName) };
 }

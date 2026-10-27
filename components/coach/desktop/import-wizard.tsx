@@ -63,7 +63,7 @@ import { AiUsageMeter } from "@/components/coach/ai-usage-meter";
 import { detectImportKind } from "@/lib/import-input-kind";
 import { buildImportPrompt } from "@/lib/import-prompt";
 import { PROGRAM_DESCRIPTION_MAX, descriptionCounter, tidyProgramDescription } from "@/lib/program-description";
-import { writeImportedProgram, type OpenProgram } from "@/lib/write-imported-program";
+import { reviewNameBox, writeImportedProgram, type OpenProgram } from "@/lib/write-imported-program";
 
 type Status = "idle" | "working" | "reviewing" | "done" | "error";
 
@@ -627,7 +627,8 @@ export function ImportWizard({
     }
 
     setSummary({
-      programName: programName || "Imported Program",
+      // An opened program whose name the coach typed keeps it (the review said so).
+      programName: written.filled && openProgram && !openProgram.automaticName ? openProgram.name : programName || "Imported Program",
       weekCount: weeks.length,
       matchedCount: resolutions.size - createdExercises.length,
       createdExercises,
@@ -952,16 +953,23 @@ export function ImportWizard({
     // groupIntoWeeks isn't free on a long program.
     const previewWeeks = pending.isAiSourced || pending.previewFirst ? groupIntoWeeks(pending.parsed) : [];
     const readWarnings = pending.previewFirst ? [...pending.previewNotes, ...importReadWarnings(pending.parsed)] : [];
+    const nameBox = reviewNameBox(openProgram, pending.programName);
     return (
       <div className="border border-yellow-500/40 bg-surface/60 p-6 max-w-2xl">
         <label className="block mb-4">
           <span className="font-body text-xs text-steel uppercase tracking-wide">Program name</span>
           <input
-            value={pending.programName}
+            value={nameBox.value}
+            disabled={nameBox.disabled}
             maxLength={PROGRAM_NAME_MAX}
             onChange={(e) => setPending((prev) => (prev ? { ...prev, programName: e.target.value } : prev))}
-            className="mt-1 w-full min-h-11 bg-graphite border border-steel/40 text-chalk px-2 font-body text-base sm:text-sm focus:outline-none focus:border-rust"
+            className="mt-1 w-full min-h-11 bg-graphite border border-steel/40 text-chalk px-2 font-body text-base sm:text-sm focus:outline-none focus:border-rust disabled:opacity-60"
           />
+          {nameBox.line && (
+            <span className="block font-body text-xs text-steel mt-1" data-keeps-name>
+              {nameBox.line}
+            </span>
+          )}
         </label>
         <label className="block mb-4">
           <span className="font-body text-xs text-steel uppercase tracking-wide">Description (clients see this; you can change it any time)</span>

@@ -24,8 +24,17 @@ export function isAutomaticProgramName(name: string, athleteFullName: string | n
 /** The program the import was started in: filled when it has no days yet. */
 export interface OpenProgram {
   id: string;
-  // Replaced by the import's name when it is still the automatic one.
+  // Its name now. Replaced by the import's name when it is still the automatic one.
+  name: string;
   automaticName: boolean;
+}
+
+export const KEEPS_NAME_LINE = "Fills the program you opened. Its name stays.";
+
+/** The review screen's name box: the import's name, to change, unless the import fills an opened program whose name the coach typed (that name, fixed, and why), so the box never does nothing. */
+export function reviewNameBox(openProgram: OpenProgram | null | undefined, importName: string): { value: string; disabled: boolean; line: string | null } {
+  if (openProgram && !openProgram.automaticName) return { value: openProgram.name, disabled: true, line: KEEPS_NAME_LINE };
+  return { value: importName, disabled: false, line: null };
 }
 
 export interface WriteImportInput {
