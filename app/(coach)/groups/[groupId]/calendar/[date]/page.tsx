@@ -150,6 +150,9 @@ export default async function CoachDayDetailPage(
     let dayStartUtc: Date | null = null;
     let dayEndUtc: Date | null = null;
     let waitlistStatusByTime = new Map<number, "waiting" | "offered">();
+    // The coach's time zone, which the open times below are shown in. Declared here, not inside the block that reads it: the times are drawn outside that block, and there
+    // `timezone` meant the coach branch's own one further down, read before it is set (every client day with an open time crashed, Oct 6 to Oct 27).
+    let timezone = DEFAULT_COACH_TIMEZONE;
 
     if (coachMembership) {
       // Wave 1: none of these five depend on each other — coachProfile's
@@ -203,7 +206,7 @@ export default async function CoachDayDetailPage(
         (waitlistRows ?? []).map((w) => [new Date(w.slot_start_at).getTime(), w.status as "waiting" | "offered"])
       );
 
-      const timezone = coachProfile?.timezone ?? DEFAULT_COACH_TIMEZONE;
+      timezone = coachProfile?.timezone ?? DEFAULT_COACH_TIMEZONE;
       const sessionIndex = await fetchSessionMinutes(supabase, [coachMembership.profile_id]);
       const windows = (windowRows ?? []).map((w) => ({
         weekday: w.weekday,

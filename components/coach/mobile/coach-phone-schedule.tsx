@@ -167,8 +167,9 @@ export async function CoachPhoneSchedule({
             ...(own?.byDay.get(dayKey(date)) ?? []).map((w) => ({ key: w.key, text: `You: ${w.title}`, className: w.done ? "text-positive" : "text-rust" })),
             ...(sessionsByDay.get(dayKey(date)) ?? []).map((s, idx) => ({ key: `s${idx}`, text: `${s.time} ${s.name}`, className: "text-chalk" })),
           ];
+          // A day page loads when it is tapped. Prefetched, every day in view was drawn on the server at once (31 per month open, Oct 27), slowing the phone.
           return (
-            <Link key={i} href={`/groups/${anchorGroupId}/calendar/${dayKey(date)}`} className={`bg-graphite min-h-[56px] p-1.5 flex flex-col ${isToday ? "ring-1 ring-inset ring-rust" : ""}`}>
+            <Link key={i} href={`/groups/${anchorGroupId}/calendar/${dayKey(date)}`} prefetch={false} className={`bg-graphite min-h-[56px] p-1.5 flex flex-col ${isToday ? "ring-1 ring-inset ring-rust" : ""}`}>
               <span className={`font-body text-xs ${isToday ? "text-rust font-bold" : "text-steel"}`}>{date.getDate()}</span>
               {lines.slice(0, 2).map((l) => (
                 <span key={l.key} className={`font-body text-[10px] leading-tight mt-0.5 truncate ${l.className}`}>

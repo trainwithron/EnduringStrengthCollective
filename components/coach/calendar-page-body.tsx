@@ -262,6 +262,7 @@ export async function CoachCalendarPageBody(
                   <Link
                     key={i}
                     href={`/groups/${params.groupId}/calendar/${dateKey(date)}?client=${selected.id}`}
+                    prefetch={false}
                     className={`bg-graphite min-h-[56px] p-1.5 flex flex-col ${
                       isToday ? "ring-1 ring-inset ring-rust" : ""
                     }`}
@@ -459,6 +460,7 @@ export async function CoachCalendarPageBody(
     const uncovered = calendar.undated.filter((c) => !c.coverImagePath).map((c) => c.id);
     const undatedVisuals = coachMembership && uncovered.length > 0 ? Object.fromEntries(await computeProgramCardVisuals(supabase, uncovered, coachMembership.profile_id)) : {};
     const dayOf = (d: Date): CalendarDay => calendar.days.get(dateKey(d)) ?? { workouts: [], sessions: [] };
+    // Day cells link with prefetch off: a day page loads when it is tapped, not every day of the month at once on open (31 server renders per month, Oct 27).
     const dayHref = (d: Date) => `${basePath}/${dateKey(d)}${rescheduleSuffix ? `?${rescheduleSuffix.slice(1)}` : ""}`;
 
     function isSameDayLocal(a: Date, b: Date): boolean {
@@ -616,7 +618,7 @@ export async function CoachCalendarPageBody(
 
                 if (hasAvailability || lines.length > 0) {
                   return (
-                    <Link key={i} href={dayHref(date)} className={cellClass}>
+                    <Link key={i} href={dayHref(date)} prefetch={false} className={cellClass}>
                       {dayNumber}
                     </Link>
                   );
@@ -673,7 +675,7 @@ export async function CoachCalendarPageBody(
 
                 if (hasAvailability || has) {
                   return (
-                    <Link key={i} href={dayHref(date)} className={rowClass}>
+                    <Link key={i} href={dayHref(date)} prefetch={false} className={rowClass}>
                       {rowInner}
                       {detail}
                     </Link>
