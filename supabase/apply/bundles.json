@@ -24,6 +24,14 @@
   "file": "apply-release-tc3b-client-requests-all.sql"
  },
  {
+  "id": "ig-handle-on-coach-profile",
+  "name": "A coach's Instagram handle in their own Settings (moved to coach_profiles, one place)",
+  "steps": [
+   "191"
+  ],
+  "file": "apply-ig-handle-on-coach-profile-all.sql"
+ },
+ {
   "id": "share-card-qr-ig",
   "name": "Share pictures carry the coach (an Instagram handle and a QR code to the coach's public page)",
   "steps": [

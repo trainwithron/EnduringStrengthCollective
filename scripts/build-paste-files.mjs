@@ -2843,6 +2843,38 @@ STEPS.push({
 });
 
 STEPS.push({
+  n: "191",
+  slug: "0438",
+  title: "0438 A coach's Instagram handle moves to the coach's own settings (coach_profiles), so every coach can set it, with or without a public page",
+  warn: "This adds coach_profiles.instagram_handle (none until a coach sets it; 1 to 30 letters, digits, \".\" and \"_\", no @), copies any handle saved on a public page row across, and drops coach_booking_pages.instagram_handle (added by step 190) so there is one place. Until the app update that goes with it is deployed, share pictures carry no handle and the handle box under Booking page / Availability is hidden: deploy it right after.",
+  migrations: ["0438"],
+  sees: "Success. No rows returned.",
+  afterwards: "Every coach sees Instagram handle in their own Settings (computer and phone) once the app update is deployed (deploy it right after).",
+  undo: [
+    "alter table public.coach_booking_pages add column if not exists instagram_handle text;",
+    "do $undo$",
+    "begin",
+    "  if not exists (select 1 from pg_constraint where conname = 'coach_booking_pages_instagram_handle_format') then",
+    "    alter table public.coach_booking_pages add constraint coach_booking_pages_instagram_handle_format check (instagram_handle is null or instagram_handle ~ '^[A-Za-z0-9._]{1,30}$');",
+    "  end if;",
+    "  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_profiles' and column_name = 'instagram_handle') then",
+    "    execute 'update public.coach_booking_pages b set instagram_handle = p.instagram_handle from public.coach_profiles p where p.coach_id = b.coach_id and p.instagram_handle is not null';",
+    "  end if;",
+    "end $undo$;",
+    "alter table public.coach_profiles drop constraint if exists coach_profiles_instagram_handle_format;",
+    "alter table public.coach_profiles drop column if exists instagram_handle;",
+  ].join(String.fromCharCode(10)),
+  undoWhy: "Only if step 191 misbehaves, and only while the app update that goes with it is NOT live (it reads and writes coach_profiles.instagram_handle). It puts the handle back on the public page rows (a coach with no page row loses the handle they typed) and removes the new column.",
+  rows: [
+    ["0438 is not already applied (coach_profiles has no instagram_handle yet)", "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_profiles' and column_name = 'instagram_handle')"],
+    ["step 190 is in: coach_booking_pages has instagram_handle", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_booking_pages' and column_name = 'instagram_handle')"],
+    ["no handle is saved on any page row yet (nothing to copy)", "not exists (select 1 from public.coach_booking_pages b where to_jsonb(b) ->> 'instagram_handle' is not null)"],
+    ["coach_profiles is keyed by coach_id", "exists (select 1 from pg_constraint where conrelid = 'public.coach_profiles'::regclass and contype = 'p' and pg_get_constraintdef(oid) = 'PRIMARY KEY (coach_id)')"],
+    ["coach_profiles has exactly its two rules (0196): read own or a client's coach, change own", "(select count(*) from pg_policies where schemaname = 'public' and tablename = 'coach_profiles') = 2 and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_profiles' and policyname = 'coach_profiles_select_own_or_client') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_profiles' and policyname = 'coach_profiles_write_own')"],
+  ],
+});
+
+STEPS.push({
   n: "190",
   slug: "0437",
   title: "0437 Share pictures carry the coach: an Instagram handle and a QR-code switch on the coach's public page settings",
@@ -4012,6 +4044,7 @@ const BUNDLES = [
   { id: "release-ts3-team-sheet-save", name: "Release TS3 (saving a filled team sheet: one table, one notice kind, three functions)", steps: ["171"] },
   { id: "release-own1-owner-accepted-only", name: "Release OWN1 (ownership cannot be handed to someone who has never signed in; replaces two functions, adds one function and one trigger)", steps: ["172"] },
   { id: "release-tc3b-client-requests", name: "Release TC3 part B (Request to train with me on a coach's public page: one column, three tables, eight functions)", steps: ["174"] },
+  { id: "ig-handle-on-coach-profile", name: "A coach's Instagram handle in their own Settings (moved to coach_profiles, one place)", steps: ["191"] },
   { id: "share-card-qr-ig", name: "Share pictures carry the coach (an Instagram handle and a QR code to the coach's public page)", steps: ["190"] },
   { id: "release-audit-oct26", name: "Release audit fixes Oct 26 (imports marked while written, Sawyer's copy repaired, organization programs' days closed to clients, team sheet, one search_path, copies keep set types)", steps: ["188"] },
   { id: "org-programs", name: "Organization programs (the organization's own programs: never followed, copied to a client or a group)", steps: ["187"] },
@@ -4286,7 +4319,8 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0433", "position('is_org_admin_of_group' in coalesce(pg_get_functiondef(to_regprocedure('public.undo_booking_attended(uuid)')), '')) > 0"),
     m("0434", "to_regprocedure('public.platform_demo_rows()') is not null"),
     m("0436", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'importing')"),
-    m("0437", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_booking_pages' and column_name = 'instagram_handle')"),
+    m("0437", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_booking_pages' and column_name = 'share_card_qr')"),
+    m("0438", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_profiles' and column_name = 'instagram_handle')"),
     m("0435", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'org_program')"),
     m("0427", "to_regprocedure('public.my_group_ids()') is not null"),
     m("0426", "to_regprocedure('public.active_org_group_ids()') is not null"),

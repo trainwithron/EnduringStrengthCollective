@@ -170,18 +170,21 @@ describe("the Instagram handle", () => {
     expect(cleanInstagramHandle("coach-ron")).toEqual({ error: INSTAGRAM_HANDLE_RULE });
     expect(cleanInstagramHandle("a".repeat(31))).toEqual({ error: INSTAGRAM_HANDLE_RULE });
     expect(INSTAGRAM_HANDLE_RULE).toBe("Use 1 to 30 letters, numbers, periods or underscores.");
-    // the same rule as the database (0437)
-    expect(readFileSync(join(__dirname, "..", "supabase/migrations/0437_share_card_qr_ig.sql"), "utf8")).toContain("instagram_handle ~ '^[A-Za-z0-9._]{1,30}$'");
+    // the same rule as the database (0438, where the handle lives now)
+    expect(readFileSync(join(__dirname, "..", "supabase/migrations/0438_ig_handle_on_coach_profile.sql"), "utf8")).toContain("instagram_handle ~ '^[A-Za-z0-9._]{1,30}$'");
   });
 });
 
 describe("whose corner it is", () => {
-  type Seed = { page?: Record<string, unknown> | null; pageError?: boolean; site?: Record<string, unknown> | null; coach?: Record<string, unknown> | null };
+  // The handle lives in the coach's own settings (coach_profiles, 0438); the page row has the address, the switch and whether it is on.
+  type Seed = { page?: Record<string, unknown> | null; pageError?: boolean; site?: Record<string, unknown> | null; coach?: Record<string, unknown> | null; handle?: string | null; handleError?: boolean };
   function db(seed: Seed) {
     const result = (table: string) => {
       if (table === "group_memberships") return { data: seed.coach === undefined ? { profile_id: "ron", profiles: { full_name: "Coach Ron" } } : seed.coach, error: null };
-      if (table === "coach_booking_pages") return seed.pageError ? { data: null, error: { message: "column coach_booking_pages.instagram_handle does not exist" } } : { data: seed.page ?? null, error: null };
+      if (table === "coach_booking_pages") return seed.pageError ? { data: null, error: { message: "x" } } : { data: seed.page ?? null, error: null };
       if (table === "coach_sites") return { data: seed.site === undefined ? { published: true } : seed.site, error: null };
+      if (table === "coach_profiles")
+        return seed.handleError ? { data: null, error: { message: "column coach_profiles.instagram_handle does not exist" } } : { data: seed.handle === undefined ? { instagram_handle: "coach.ron" } : seed.handle === null ? null : { instagram_handle: seed.handle }, error: null };
       return { data: null, error: null };
     };
     return {
@@ -192,7 +195,7 @@ describe("whose corner it is", () => {
       },
     } as never;
   }
-  const page = (over: Record<string, unknown> = {}) => ({ slug: "coach-ron", enabled: true, instagram_handle: "coach.ron", share_card_qr: true, ...over });
+  const page = (over: Record<string, unknown> = {}) => ({ slug: "coach-ron", enabled: true, share_card_qr: true, ...over });
 
   it("the group's coach, with the code to their page while it shows and the switch is on, and their handle", async () => {
     expect(await loadShareCardCoach("g", db({ page: page() }))).toEqual({ qrUrl: RON_PAGE, coachFirstName: "Ron", handle: "coach.ron" });
@@ -201,11 +204,17 @@ describe("whose corner it is", () => {
     for (const seed of [{ page: page({ enabled: false }) }, { page: page(), site: { published: false } }, { page: page(), site: null }, { page: page({ share_card_qr: false }) }])
       expect(await loadShareCardCoach("g", db(seed))).toEqual({ qrUrl: null, coachFirstName: "Ron", handle: "coach.ron" });
   });
-  it("nothing when neither applies, when the coach has no page or there is no coach, and before the database update (a failed read)", async () => {
-    expect(await loadShareCardCoach("g", db({ page: page({ enabled: false, instagram_handle: null }) }))).toBeNull();
-    expect(await loadShareCardCoach("g", db({ page: null }))).toBeNull();
+  it("a coach with no public page at all: the handle, no code (Oct 27: 2 of the 3 coaches have no page)", async () => {
+    expect(await loadShareCardCoach("g", db({ page: null }))).toEqual({ qrUrl: null, coachFirstName: "Ron", handle: "coach.ron" });
+    expect(await loadShareCardCoach("g", db({ pageError: true }))).toEqual({ qrUrl: null, coachFirstName: "Ron", handle: "coach.ron" });
+  });
+  it("nothing when neither applies, when there is no coach, and before the database update (a failed handle read, no page)", async () => {
+    expect(await loadShareCardCoach("g", db({ page: page({ enabled: false }), handle: null }))).toBeNull();
+    expect(await loadShareCardCoach("g", db({ page: null, handle: null }))).toBeNull();
     expect(await loadShareCardCoach("g", db({ coach: null, page: page() }))).toBeNull();
-    expect(await loadShareCardCoach("g", db({ pageError: true }))).toBeNull();
+    expect(await loadShareCardCoach("g", db({ page: null, handleError: true }))).toBeNull();
+    // before the update with a page showing: the code alone
+    expect(await loadShareCardCoach("g", db({ page: page(), handleError: true }))).toEqual({ qrUrl: RON_PAGE, coachFirstName: "Ron", handle: null });
   });
 });
 
@@ -216,8 +225,10 @@ describe("where it is wired", () => {
     expect(read("components/coach/desktop/availability-settings.tsx")).toContain("{shareCard && <ShareCardSettings coachId={coachId}");
     expect(read("app/(coach)/groups/[groupId]/business/booking-page/page.tsx")).toContain("{shareCard && <ShareCardSettings coachId={user.id}");
     const settings = read("components/coach/share-card-settings.tsx");
-    expect(settings).toContain("Instagram handle");
+    expect(settings).toContain("<InstagramHandleField coachId={coachId} initialHandle={initialHandle}");
     expect(settings).toContain("Put a QR code to my public page on my clients&apos; share cards");
-    expect(settings).toContain("cleanInstagramHandle(handle)");
+    const field = read("components/coach/instagram-handle-field.tsx");
+    expect(field).toContain("Instagram handle");
+    expect(field).toContain("cleanInstagramHandle(handle)");
   });
 });

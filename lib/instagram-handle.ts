@@ -1,5 +1,8 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 // A coach's Instagram handle, as it goes on their clients' share pictures (lib/share-image.ts). Stored without the "@": 1 to 30 letters, digits, "." and "_" (Instagram's own rule; the
-// database checks the same, migration 0437). A pasted "@name" or an instagram.com/name address is cleaned to the handle.
+// database checks the same, migration 0438). A pasted "@name" or an instagram.com/name address is cleaned to the handle. It lives in ONE place, the coach's own settings row
+// (coach_profiles.instagram_handle, 0438): every coach has it, with or without a public page; only the coach changes it.
 export const INSTAGRAM_HANDLE_RULE = "Use 1 to 30 letters, numbers, periods or underscores.";
 const HANDLE = /^[A-Za-z0-9._]{1,30}$/;
 
@@ -11,4 +14,17 @@ export function cleanInstagramHandle(raw: string | null | undefined): { handle: 
   if (url) v = url[1];
   v = v.replace(/^@+/, "").replace(/\/+$/, "");
   return HANDLE.test(v) ? { handle: v } : { error: INSTAGRAM_HANDLE_RULE };
+}
+
+/** The coach's handle ({ handle: null } when none), or null when it cannot be read (before the database update adds it): then the field is not shown. */
+export async function readInstagramHandle(supabase: SupabaseClient, coachId: string): Promise<{ handle: string | null } | null> {
+  const { data, error } = await supabase.from("coach_profiles").select("instagram_handle").eq("coach_id", coachId).maybeSingle();
+  if (error) return null;
+  return { handle: ((data as { instagram_handle?: string | null } | null)?.instagram_handle ?? null) || null };
+}
+
+/** Saves (or clears, with null) the coach's own handle; the coach's settings row is made the first time. Nothing else is made or switched on. */
+export async function saveInstagramHandle(supabase: SupabaseClient, coachId: string, handle: string | null): Promise<boolean> {
+  const { error } = await supabase.from("coach_profiles").upsert({ coach_id: coachId, instagram_handle: handle, updated_at: new Date().toISOString() }, { onConflict: "coach_id" });
+  return !error;
 }

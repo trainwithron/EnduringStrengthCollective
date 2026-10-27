@@ -28,6 +28,8 @@ import { PackagePicker, type PackageOption } from "@/components/athlete/package-
 import { ManageBillingLink } from "@/components/athlete/manage-billing-link";
 import { isStripeConfigured } from "@/lib/stripe";
 import { ProfileDetailsEditor } from "@/components/athlete/profile-details-editor";
+import { InstagramHandleField } from "@/components/coach/instagram-handle-field";
+import { readInstagramHandle } from "@/lib/instagram-handle";
 import { SwipeDirectionSetting } from "@/components/athlete/swipe-direction-setting";
 import { HideDemosToggle } from "@/components/athlete/hide-demos-toggle";
 import { TerminologyChooser } from "@/components/coach/desktop/terminology-chooser";
@@ -282,6 +284,9 @@ export default async function SettingsPage(
   const inPersonalSpace = effective.isActingAsOther && (group as { organization_id?: string | null } | null)?.organization_id == null;
   // Looking at SOMEONE ELSE (a coach acting as a client). In their own space the coach is themself (Release 2: the phone opens as the coach's own account), so their own settings show.
   const viewingOther = effective.isActingAsOther && athleteId !== user.id;
+  // A coach's own Instagram handle, for their clients' share pictures (Ron, Oct 27: "a place to input ig handle individually", on the computer and the phone): every coach, with or without
+  // a public page, sets only their own. Before the database update that adds it the read fails and the field is not shown.
+  const igHandle = isCoach && !viewingOther ? await readInstagramHandle(supabase, user.id) : null;
   const coachingGroup = isCoach ? (
     <SettingsGroup label="Coaching">
             {/* In their own space the phone IS their app (Release 2): no "Coach home"; the layout switch (tablets only) and the app download instead. */}
@@ -382,6 +387,11 @@ export default async function SettingsPage(
           )}
         </div>
       </section>
+      {igHandle && (
+        <section className="px-5 pt-4 max-w-md" data-settings-instagram>
+          <InstagramHandleField coachId={user.id} initialHandle={igHandle.handle} id="settings-instagram-handle" />
+        </section>
+      )}
 
       <section className="px-5 pt-8 space-y-6">
         {isCoach ? <>{coachingGroup}{terminologyGroup}{notificationsGroup}</> : notificationsGroup}

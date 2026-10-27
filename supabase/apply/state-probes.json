@@ -1576,6 +1576,17 @@
   ]
  },
  {
+  "n": "191",
+  "slug": "0438",
+  "title": "0438 A coach's Instagram handle moves to the coach's own settings (coach_profiles), so every coach can set it, with or without a public page",
+  "migrations": [
+   "0438"
+  ],
+  "notApplied": [
+   "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_profiles' and column_name = 'instagram_handle')"
+  ]
+ },
+ {
   "n": "190",
   "slug": "0437",
   "title": "0437 Share pictures carry the coach: an Instagram handle and a QR-code switch on the coach's public page settings",
