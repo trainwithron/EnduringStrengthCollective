@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { cleanInstagramHandle, saveInstagramHandle } from "@/lib/instagram-handle";
 
 // The coach's Instagram handle, typed once and used on their clients' share pictures. The same field in Settings (computer and phone) and under Booking page / Availability: one value
 // (coach_profiles.instagram_handle), saved with Save; a pasted @name or instagram.com address is cleaned, and a bad one says what is allowed.
 export function InstagramHandleField({ coachId, initialHandle, id = "instagram-handle" }: { coachId: string; initialHandle: string | null; id?: string }) {
+  const router = useRouter();
   const [handle, setHandle] = useState(initialHandle ?? "");
   const [savedHandle, setSavedHandle] = useState(initialHandle ?? "");
   const [busy, setBusy] = useState(false);
@@ -29,6 +31,8 @@ export function InstagramHandleField({ coachId, initialHandle, id = "instagram-h
       return;
     }
     setSavedHandle(next);
+    // The page's own QR poster (Settings) shows the handle too: read it again.
+    router.refresh();
     setMessage({ text: cleaned.handle ? `Saved. @${cleaned.handle} goes on your clients' share pictures.` : "Saved. No handle on the pictures.", error: false });
   }
 

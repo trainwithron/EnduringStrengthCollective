@@ -392,6 +392,9 @@ export default async function ClientsPage(
   }
 
   // People taken out of this group (Release Z1). Read on its own, so a database without the table yet just shows none.
+  // The coach's own name, for the join poster under the group's QR code.
+  const { data: posterProfile } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
+  const posterCoachName = (posterProfile?.full_name as string | null | undefined)?.trim() || null;
   const removalRead = await supabase.from("client_removals").select("id, athlete_name, removed_at, delete_after, erasing_since, cancelled_bookings").eq("group_id", params.groupId).is("restored_at", null).is("purged_at", null).order("removed_at", { ascending: false }).limit(200);
   const removed: RemovedClient[] = removalRead.error ? [] : ((removalRead.data ?? []) as { id: string; athlete_name: string | null; removed_at: string; delete_after: string | null; erasing_since: string | null; cancelled_bookings: number | null }[]).map((r) => ({ id: r.id, name: r.athlete_name ?? "A former client", removedAt: r.removed_at, deleteAfter: r.delete_after, erasing: r.erasing_since !== null, cancelledBookings: r.cancelled_bookings ?? 0 }));
 
@@ -424,7 +427,7 @@ export default async function ClientsPage(
 
       {/* A group's invite link: one current link, tucked into a single collapsed line. Never shown for a one-on-one client's space. */}
       {(group as { group_kind?: string } | null)?.group_kind !== "one_on_one" && (
-        <GroupInvitesPanel groupId={params.groupId} groupName={group?.name ?? "this group"} invites={groupInvites} />
+        <GroupInvitesPanel groupId={params.groupId} groupName={group?.name ?? "this group"} coachName={posterCoachName} invites={groupInvites} />
       )}
 
       {rosterError ? (

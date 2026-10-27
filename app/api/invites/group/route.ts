@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { inviteExpiresAt } from "@/lib/invite-link-plan";
 
 // Cancel or extend a group invite link. The caller must coach the group the
 // link belongs to; that is checked here, not left to the browser.
 //   { action: "revoke", inviteId }  stop the link working (kept, greyed, for a week)
 //   { action: "extend", inviteId }  give a live link another 7 days
 //   { action: "create", groupId }   make the group's ONE current link (7 days) and cancel every other working link of that group
+// `neverExpires: true` on create or extend makes the link work with no end date (expires_at null; Oct 27, for a poster): it still stops the moment the coach
+// cancels it or makes a new link. Anything else keeps the 7 days.
+
 function newInviteCode(length = 10) {
   const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
   const bytes = new Uint8Array(length);
@@ -43,7 +47,7 @@ export async function POST(request: Request) {
       if (revokeError) await admin.from("group_invites").delete().in("id", ids);
     }
     const code = newInviteCode();
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const expiresAt = inviteExpiresAt(body.neverExpires);
     const { error: insertError } = await admin.from("group_invites").insert({ group_id: groupId, code, role: "athlete", created_by: user.id, expires_at: expiresAt });
     if (insertError) return NextResponse.json({ error: "Couldn't make the link. Try again." }, { status: 500 });
     return NextResponse.json({ ok: true, code, expiresAt });
@@ -72,7 +76,7 @@ export async function POST(request: Request) {
   }
 
   if (action === "extend") {
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const expiresAt = inviteExpiresAt(body.neverExpires);
     const { error } = await serviceRole.from("group_invites").update({ expires_at: expiresAt }).eq("id", inviteId);
     if (error) return NextResponse.json({ error: "Couldn't extend the link. Try again." }, { status: 500 });
     return NextResponse.json({ ok: true, expiresAt });

@@ -8,7 +8,9 @@ import { UserPlus } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { useTerm } from "@/components/coach/terminology-provider";
 import { appOriginBrowser } from "@/lib/app-url";
-import { SINGLE_LINK_NOTE } from "@/lib/invite-link-plan";
+import { linkLifetimeText, NEVER_EXPIRES_NOTE, planInviteLinks, SINGLE_LINK_NOTE } from "@/lib/invite-link-plan";
+import { inviteUrl, joinPoster } from "@/lib/qr-poster";
+import { QrPosterButton } from "@/components/coach/qr-poster-button";
 import { EmailClaimLinkButton } from "@/components/coach/email-claim-link-button";
 import { RosterImportPanel } from "@/components/coach/desktop/roster-import-panel";
 
@@ -59,6 +61,27 @@ export function AddClientButton({
   const [groupMode, setGroupMode] = useState<GroupMode>("name");
   const [link, setLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  // "Never expires" for the group's link (for a poster); the link made, and whether it never expires, for the line under it. The coach's own name goes on the poster.
+  const [neverExpires, setNeverExpires] = useState(false);
+  const [linkNeverExpires, setLinkNeverExpires] = useState(false);
+  const [coachName, setCoachName] = useState<string | null>(null);
+  // The picked group's current link, shown (with its QR code) before offering a new one: a new link replaces it, so a printed poster would stop working. undefined while it is read.
+  const [currentLink, setCurrentLink] = useState<{ url: string; neverExpires: boolean; daysLeft: number | null } | null | undefined>(undefined);
+  useEffect(() => {
+    if (!open || groupMode !== "link" || !selectedGroupId || link) return;
+    let cancelled = false;
+    setCurrentLink(undefined);
+    void (async () => {
+      const { data, error: readError } = await createBrowserClient().from("group_invites").select("id, code, created_at, expires_at, revoked_at").eq("group_id", selectedGroupId).is("revoked_at", null).order("created_at", { ascending: false }).limit(20);
+      if (cancelled) return;
+      if (readError) return setCurrentLink(null);
+      const plan = planInviteLinks(((data ?? []) as { id: string; code: string; created_at: string; expires_at: string | null; revoked_at: string | null }[]).map((r) => ({ id: r.id, code: r.code, createdAt: r.created_at, expiresAt: r.expires_at, revokedAt: r.revoked_at })));
+      setCurrentLink(plan.current ? { url: inviteUrl(appOriginBrowser(), plan.current.code), neverExpires: plan.current.neverExpires, daysLeft: plan.current.daysLeft } : null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, groupMode, selectedGroupId, link]);
   // What this coach coaches (asked at signup): a team or gym coach is shown "Add to a group" first, everyone else "Add a one-on-one client" first.
   const [groupsFirst, setGroupsFirst] = useState(false);
   // An owner or admin adding a one-on-one client can choose which coach in the organization holds them (default: themselves).
@@ -75,9 +98,10 @@ export function AddClientButton({
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return;
-      const { data } = await supabase.from("profiles").select("coach_type").eq("id", user.id).maybeSingle();
+      const { data } = await supabase.from("profiles").select("coach_type, full_name").eq("id", user.id).maybeSingle();
       const type = (data as { coach_type?: string | null } | null)?.coach_type;
       if (!cancelled) setGroupsFirst(type === "team" || type === "gym");
+      if (!cancelled) setCoachName((data as { full_name?: string | null } | null)?.full_name?.trim() || null);
       const { data: current } = await supabase.from("groups").select("organization_id, organizations ( name )").eq("id", groupId).maybeSingle();
       if (!cancelled) setOrgInfo({ checked: true, name: current?.organization_id ? ((current as { organizations?: { name?: string | null } | null }).organizations?.name ?? null) : null });
       if (!current?.organization_id) return;
@@ -221,10 +245,11 @@ export function AddClientButton({
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch("/api/invites/group", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "create", groupId: selectedGroupId }) });
+      const res = await fetch("/api/invites/group", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "create", groupId: selectedGroupId, neverExpires }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Couldn't make the link. Try again.");
-      setLink(`${appOriginBrowser()}/invite/${data.code}`);
+      setLink(inviteUrl(appOriginBrowser(), data.code));
+      setLinkNeverExpires(data.expiresAt === null);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't make the link. Try again.");
@@ -233,10 +258,10 @@ export function AddClientButton({
     }
   }
 
-  async function copy() {
-    if (!link) return;
+  async function copy(value: string | null = link) {
+    if (!value) return;
     try {
-      await navigator.clipboard.writeText(link);
+      await navigator.clipboard.writeText(value);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -420,12 +445,15 @@ export function AddClientButton({
             )
           ) : link ? (
             <div>
-              <p className="font-body text-xs text-steel mb-2">Works for 7 days.</p>
+              <p className="font-body text-xs text-steel mb-2">{linkNeverExpires ? NEVER_EXPIRES_NOTE : "Works for 7 days."}</p>
               <div className="flex items-center gap-2">
                 <input aria-label="Invite link" readOnly value={link} onFocus={(e) => e.target.select()} className="flex-1 h-11 min-w-0 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none" />
-                <button type="button" onClick={copy} className="h-11 px-3 border border-rust text-rust font-body text-xs shrink-0">
+                <button type="button" onClick={() => void copy()} className="h-11 px-3 border border-rust text-rust font-body text-xs shrink-0">
                   {copied ? "Copied" : "Copy"}
                 </button>
+              </div>
+              <div className="mt-2">
+                <QrPosterButton url={link} content={joinPoster(groups?.find((g) => g.id === selectedGroupId)?.name ?? groupName, coachName)} />
               </div>
               <button type="button" onClick={reset} className="font-body text-xs text-steel mt-3">
                 Done
@@ -433,10 +461,28 @@ export function AddClientButton({
             </div>
           ) : (
             <div>
+              {currentLink && (
+                <div className="mb-4" data-current-link>
+                  <p className="font-body text-xs text-steel mb-2">The current link {linkLifetimeText(currentLink)}.</p>
+                  <div className="flex items-center gap-2">
+                    <input aria-label="Current invite link" readOnly value={currentLink.url} onFocus={(e) => e.target.select()} className="flex-1 h-11 min-w-0 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none" />
+                    <button type="button" onClick={() => void copy(currentLink.url)} className="h-11 px-3 border border-rust text-rust font-body text-xs shrink-0">
+                      {copied ? "Copied" : "Copy"}
+                    </button>
+                  </div>
+                  <div className="mt-2">
+                    <QrPosterButton url={currentLink.url} content={joinPoster(groups?.find((g) => g.id === selectedGroupId)?.name ?? groupName, coachName)} />
+                  </div>
+                </div>
+              )}
               <p className="font-body text-xs text-steel mb-3">{SINGLE_LINK_NOTE} They join {groups?.find((g) => g.id === selectedGroupId)?.name ?? groupName} when they sign up.</p>
+              <label className="min-h-11 mb-2 inline-flex items-center gap-2 font-body text-sm text-chalk">
+                <input type="checkbox" checked={neverExpires} onChange={(e) => setNeverExpires(e.target.checked)} className="w-4 h-4 accent-rust" />
+                Never expires (for a poster)
+              </label>
               <div className="flex items-center gap-3">
                 <button type="button" onClick={makeLink} disabled={submitting || !selectedGroupId} className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40">
-                  {submitting ? "Making…" : "Make the link"}
+                  {submitting ? "Making…" : currentLink ? "New link" : "Make the link"}
                 </button>
                 <button type="button" onClick={reset} className="font-body text-xs text-steel">
                   Cancel

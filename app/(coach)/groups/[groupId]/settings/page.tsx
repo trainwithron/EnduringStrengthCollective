@@ -30,6 +30,9 @@ import { isStripeConfigured } from "@/lib/stripe";
 import { ProfileDetailsEditor } from "@/components/athlete/profile-details-editor";
 import { InstagramHandleField } from "@/components/coach/instagram-handle-field";
 import { readInstagramHandle } from "@/lib/instagram-handle";
+import { readMyPageQr, TURN_ON_PAGE_TEXT } from "@/lib/my-page-qr";
+import { myPagePoster } from "@/lib/qr-poster";
+import { QrPosterButton } from "@/components/coach/qr-poster-button";
 import { SwipeDirectionSetting } from "@/components/athlete/swipe-direction-setting";
 import { HideDemosToggle } from "@/components/athlete/hide-demos-toggle";
 import { TerminologyChooser } from "@/components/coach/desktop/terminology-chooser";
@@ -287,6 +290,8 @@ export default async function SettingsPage(
   // A coach's own Instagram handle, for their clients' share pictures (Ron, Oct 27: "a place to input ig handle individually", on the computer and the phone): every coach, with or without
   // a public page, sets only their own. Before the database update that adds it the read fails and the field is not shown.
   const igHandle = isCoach && !viewingOther ? await readInstagramHandle(supabase, user.id) : null;
+  // Beside it, "My page QR code" for a poster that opens the coach's public page (Oct 27): the code while the page is on and published, else where to turn it on. Nothing is switched on here.
+  const myPageQr = isCoach && !viewingOther ? await readMyPageQr(supabase, user.id, params.groupId) : null;
   const coachingGroup = isCoach ? (
     <SettingsGroup label="Coaching">
             {/* In their own space the phone IS their app (Release 2): no "Coach home"; the layout switch (tablets only) and the app download instead. */}
@@ -387,9 +392,21 @@ export default async function SettingsPage(
           )}
         </div>
       </section>
-      {igHandle && (
-        <section className="px-5 pt-4 max-w-md" data-settings-instagram>
-          <InstagramHandleField coachId={user.id} initialHandle={igHandle.handle} id="settings-instagram-handle" />
+      {(igHandle || myPageQr) && (
+        <section className="px-5 pt-4 max-w-md space-y-4" data-settings-instagram>
+          {igHandle && <InstagramHandleField coachId={user.id} initialHandle={igHandle.handle} id="settings-instagram-handle" />}
+          {myPageQr && (
+            <div data-my-page-qr>
+              <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">My page QR code</p>
+              {myPageQr.kind === "ready" ? (
+                <QrPosterButton url={myPageQr.url} content={myPagePoster(profile?.full_name, igHandle?.handle)} label="My page QR code" />
+              ) : (
+                <Link href={myPageQr.href} className="min-h-11 px-3 inline-flex items-center border border-steel/40 text-chalk font-body text-sm">
+                  {TURN_ON_PAGE_TEXT}
+                </Link>
+              )}
+            </div>
+          )}
         </section>
       )}
 

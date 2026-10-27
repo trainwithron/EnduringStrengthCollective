@@ -23,11 +23,11 @@ describe("one current invite link per group", () => {
     expect(planInviteLinks([], now)).toEqual({ current: null, extra: [] });
     expect(planInviteLinks([link("gone", { revokedAt: now.toISOString() }), link("ran", { expiresAt: new Date(now.getTime() - day).toISOString() })], now)).toEqual({ current: null, extra: [] });
   });
-  it("a link with no expiry is never the current one: it is flagged, to be cancelled", () => {
+  it("a link with no expiry (Never expires, Oct 27) is the current one while it is the newest; under a newer link it is flagged, to be cancelled", () => {
     const never = link("never", { expiresAt: null, createdAt: new Date(now.getTime() - 30 * day).toISOString() });
     const plan = planInviteLinks([never], now);
-    expect(plan.current).toBeNull();
-    expect(plan.extra).toEqual([{ ...never, neverExpires: true }]);
+    expect(plan.current).toEqual({ ...never, daysLeft: null, neverExpires: true });
+    expect(plan.extra).toEqual([]);
     const withNew = planInviteLinks([never, link("fresh")], now);
     expect(withNew.current?.id).toBe("fresh");
     expect(withNew.extra[0]).toMatchObject({ id: "never", neverExpires: true });
