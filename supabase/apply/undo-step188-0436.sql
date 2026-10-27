@@ -1,4 +1,4 @@
--- UNDO for step 188 (0436). Only if step 188 misbehaves, and only while the app update that goes with it is NOT live (it writes programs.importing). It removes only the days step 188 added to Sawyer's copy (and stops, removing nothing, if Sawyer has logged anything on one of them), puts the three functions' old text back, takes the search_path off and drops the column.
+-- UNDO for step 188 (0436). Only if step 188 misbehaves, and only while the app update that goes with it is NOT live (it writes programs.importing). It removes only the days step 188 added to Sawyer's copy (and stops, removing nothing, if Sawyer has logged anything on one of them), puts the four functions' old text back (duplicate_program then copies every set as a working set again), takes the search_path off and drops the column.
 -- WHAT YOU SHOULD SEE: "Success. No rows returned."   Then tell Spot, and do not run the step again until Spot says why it failed.
 begin;
 do $undo$
@@ -29,5 +29,13 @@ begin
   end if;
 end $undo2$;
 alter function public.training_partners_cross_org_enabled() reset search_path;
+do $undo3$
+declare
+  v_def text := pg_get_functiondef('public.duplicate_program(uuid, uuid, uuid, uuid, text, date)'::regprocedure);
+begin
+  if position('target_rest_seconds, target_rest_max_seconds, target_pace, set_type' in v_def) > 0 then
+    execute replace(v_def, 'target_rest_seconds, target_rest_max_seconds, target_pace, set_type', 'target_rest_seconds, target_rest_max_seconds, target_pace');
+  end if;
+end $undo3$;
 alter table public.programs drop column if exists importing;
 commit;

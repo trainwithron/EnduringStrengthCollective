@@ -1,6 +1,6 @@
--- STEP 188: 0436 Release audit fixes: an import is marked while it is written; Sawyer Steele's cut-off copy gets its missing days; a client never reads an organization program's days; the team sheet never saves into one; one fixed search_path
+-- STEP 188: 0436 Release audit fixes: an import is marked while it is written; Sawyer Steele's cut-off copy gets its missing days; a client never reads an organization program's days; the team sheet never saves into one; one fixed search_path; a copy keeps each set's type
 --
--- !! This adds programs.importing (default false; the app marks an import with it while the days are being written, and nothing copies it until it is finished). It then copies into Sawyer Steele's copy of “Big Sauce but still little sauce” the 20 days it is missing (week 5 day 6 and weeks 6 to 8), with their exercises and sets, the way a copy is always made; nothing the copy already has is changed or deleted, and Sawyer's logged session stays on its workout. The paste checks first that the copy still has exactly its 29 days and the program is exactly what the import wrote, and afterwards that the copy has every day and exercise of the program, or nothing is kept. It also adds ONE condition to is_ai_draft_program and ONE to is_ai_draft_workout (a client never reads an organization program's days, exercises, sets, notes or progression rules; coaches read as before), and ONE to team_sheet_save (never into an organization program's workout); the paste checks each live function is exactly the expected one, and stops if not. Last, training_partners_cross_org_enabled gets an empty search_path.
+-- !! This adds programs.importing (default false; the app marks an import with it while the days are being written, and nothing copies it until it is finished). It then copies into Sawyer Steele's copy of “Big Sauce but still little sauce” the 20 days it is missing (week 5 day 6 and weeks 6 to 8), with their exercises and sets, the way a copy is always made; nothing the copy already has is changed or deleted, and Sawyer's logged session stays on its workout. The paste checks first that the copy still has exactly its 29 days and the program is exactly what the import wrote, and afterwards that the copy has every day and exercise of the program, or nothing is kept. It also adds ONE condition to is_ai_draft_program and ONE to is_ai_draft_workout (a client never reads an organization program's days, exercises, sets, notes or progression rules; coaches read as before), and ONE to team_sheet_save (never into an organization program's workout); the paste checks each live function is exactly the expected one, and stops if not. training_partners_cross_org_enabled gets an empty search_path. Last, duplicate_program copies each set's type (warm-up, working, AMRAP, back-off, drop): until now every copy (Assign, Duplicate, a template, a group's copy) made every set a working set; set_type is added to its set columns, which appear exactly twice (the insert and the select); the paste checks the live function is exactly the expected one, and stops if not.
 --
 -- Run apply-precheck first (every row ok = true). Then paste THIS file and run it once.
 -- WHAT YOU SHOULD SEE: "Success. No rows returned."
@@ -35,6 +35,8 @@ $guard$;
 --     before (each rule lets a coach of the group through first). A group's copy of an organization program is not one, so its members read it as before.
 --  4. team_sheet_save never saves into an organization program's workout (one condition added to its "an active program of this group" check).
 --  5. training_partners_cross_org_enabled gets a fixed, empty search_path (the security advisor's warning; it reads nothing).
+--  6. duplicate_program copies each set's type (warm-up, working, AMRAP, back-off, drop). It did not, so every copy (Assign, Duplicate, a template, a group's copy) made every set a working
+--     set. The set columns appear exactly twice in it (the insert's list and the select's); set_type is added to both.
 
 do $col$
 begin
@@ -165,5 +167,21 @@ end
 $sheet$;
 
 alter function public.training_partners_cross_org_enabled() set search_path = '';
+
+do $dup$
+declare
+  v_def text := pg_get_functiondef('public.duplicate_program(uuid, uuid, uuid, uuid, text, date)'::regprocedure);
+  v_old constant text := 'target_rest_seconds, target_rest_max_seconds, target_pace';
+  v_new constant text := 'target_rest_seconds, target_rest_max_seconds, target_pace, set_type';
+begin
+  if position(v_new in v_def) > 0 then
+    return; -- already changed (re-run)
+  end if;
+  if (length(v_def) - length(replace(v_def, v_old, ''))) / length(v_old) <> 2 then
+    raise exception 'duplicate_program does not hold its set columns exactly twice (the insert and the select); NOTHING was changed.';
+  end if;
+  execute replace(v_def, v_old, v_new);
+end
+$dup$;
 
 commit;

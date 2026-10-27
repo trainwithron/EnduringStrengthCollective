@@ -1578,7 +1578,7 @@
  {
   "n": "188",
   "slug": "0436",
-  "title": "0436 Release audit fixes: an import is marked while it is written; Sawyer Steele's cut-off copy gets its missing days; a client never reads an organization program's days; the team sheet never saves into one; one fixed search_path",
+  "title": "0436 Release audit fixes: an import is marked while it is written; Sawyer Steele's cut-off copy gets its missing days; a client never reads an organization program's days; the team sheet never saves into one; one fixed search_path; a copy keeps each set's type",
   "migrations": [
    "0436"
   ],

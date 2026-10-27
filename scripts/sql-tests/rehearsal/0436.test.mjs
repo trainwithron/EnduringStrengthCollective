@@ -1,5 +1,5 @@
 // 0436 Release audit fixes: a client never reads an organization program's days, exercises, sets, notes or progression rules (in their own group); the coach does; a group's copy of
-// it is read as before. team_sheet_save never saves into an organization program's workout. Imports are marked while written. One fixed search_path.
+// it is read as before. team_sheet_save never saves into an organization program's workout. Imports are marked while written. One fixed search_path. A copy keeps each set's type.
 const tryQ = async (db, sql, params) => {
   try {
     return { rows: (await db.query(sql, params)).rows };
@@ -32,7 +32,16 @@ export default {
       };
       const orgP = await build(true, "RA Organization Program");
       const copyP = await build(false, "RA Team Copy");
-      Object.assign(state, { owner, client, team, orgP, copyP });
+      // A program with a warm-up set, a working set and a drop set, for the copies below.
+      const typed = (await h.one("insert into public.programs (group_id, name, created_by, is_active) values ($1, 'RA Typed Sets', $2, false) returning id", [team, owner])).id;
+      const tw = (await h.one("insert into public.workouts (program_id, group_id, title, week_number, day_index) values ($1, $2, 'Day 1', 1, 1) returning id", [typed, team])).id;
+      const te = (await h.one("insert into public.group_workout_exercises (workout_id, group_id, exercise_name, exercise_order) values ($1, $2, 'Bench Press', 0) returning id", [tw, team])).id;
+      await db.query("insert into public.group_workout_exercise_sets (group_workout_exercise_id, set_order, target_reps, set_type) values ($1, 0, '10', 'warmup'), ($1, 1, '5', 'working'), ($1, 2, '12', 'drop')", [te]);
+      // a second client, so the assign below copies (the first person gets the original itself)
+      const client2 = await h.user("RA Client Two");
+      await h.member(team, client2);
+      await h.asSuper();
+      Object.assign(state, { owner, client, client2, team, orgP, copyP, typed });
     },
     async "0436"({ db, h, state }) {
       const s = state;
@@ -65,6 +74,21 @@ export default {
       h.check("programs.importing is there, false unless an import marks it", col && col.column_default === "false" && col.is_nullable === "NO", JSON.stringify(col));
       const marked = await h.one("select count(*)::int as n from public.programs where importing");
       h.check("no existing program is marked as importing", marked.n === 0);
+
+      const types = async (programId) =>
+        (await h.rows("select s.set_type from public.group_workout_exercise_sets s join public.group_workout_exercises g on g.id = s.group_workout_exercise_id join public.workouts w on w.id = g.workout_id where w.program_id = $1 order by s.set_order", [programId])).map((r) => r.set_type).join(",");
+      await h.as(s.owner);
+      const dup = await tryQ(db, "select public.duplicate_program($1, $2, $3) as id", [s.typed, s.team, s.owner]);
+      await h.asSuper();
+      const dupId = dup.rows?.[0]?.id;
+      h.check("duplicate_program keeps each set's type (warm-up, working, drop)", !dup.error && (await types(dupId)) === "warmup,working,drop", JSON.stringify(dup));
+      // Assigning: the first client gets the program itself; the second gets a copy, through duplicate_program.
+      await h.as(s.owner);
+      const first = await tryQ(db, "select * from public.assign_program_to_client($1, $2, $3)", [dupId, s.team, s.client]);
+      const second = await tryQ(db, "select * from public.assign_program_to_client($1, $2, $3)", [dupId, s.team, s.client2]);
+      await h.asSuper();
+      const row = second.rows?.[0];
+      h.check("assign_program_to_client's copy keeps each set's type", !first.error && !second.error && row && row.was_attached === false && (await types(row.assigned_program_id)) === "warmup,working,drop", JSON.stringify({ first, second }));
 
       const sp = await h.one("select proconfig from pg_proc where oid = to_regprocedure('public.training_partners_cross_org_enabled()')");
       h.check("training_partners_cross_org_enabled has a fixed, empty search_path", JSON.stringify(sp.proconfig) === JSON.stringify(['search_path=""']), JSON.stringify(sp.proconfig));

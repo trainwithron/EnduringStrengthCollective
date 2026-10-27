@@ -1,4 +1,4 @@
--- RELEASE AUDIT FIXES OCT 26 (IMPORTS MARKED WHILE WRITTEN, SAWYER'S COPY REPAIRED, ORGANIZATION PROGRAMS' DAYS CLOSED TO CLIENTS, TEAM SHEET, ONE SEARCH_PATH): ONE paste. Steps 188 in order, all or nothing.
+-- RELEASE AUDIT FIXES OCT 26 (IMPORTS MARKED WHILE WRITTEN, SAWYER'S COPY REPAIRED, ORGANIZATION PROGRAMS' DAYS CLOSED TO CLIENTS, TEAM SHEET, ONE SEARCH_PATH, COPIES KEEP SET TYPES): ONE paste. Steps 188 in order, all or nothing.
 --
 -- Paste this whole file into the Supabase SQL editor and run it once. It replaces the separate precheck and apply files for these steps (they stay as the fallback).
 -- Every check from each step's precheck is built in as a guard in front of that step. If any check is false, the run stops with a message that names the step and the
@@ -10,7 +10,7 @@
 
 begin;
 
--- ===== Release audit fixes Oct 26 (imports marked while written, Sawyer's copy repaired, organization programs' days closed to clients, team sheet, one search_path), step 188: 0436 Release audit fixes: an import is marked while it is written; Sawyer Steele's cut-off copy gets its missing days; a client never reads an organization program's days; the team sheet never saves into one; one fixed search_path
+-- ===== Release audit fixes Oct 26 (imports marked while written, Sawyer's copy repaired, organization programs' days closed to clients, team sheet, one search_path, copies keep set types), step 188: 0436 Release audit fixes: an import is marked while it is written; Sawyer Steele's cut-off copy gets its missing days; a client never reads an organization program's days; the team sheet never saves into one; one fixed search_path; a copy keeps each set's type
 do $g188$
 declare
   failed text;
@@ -25,10 +25,12 @@ begin
       ('is_ai_draft_program is exactly the expected function', coalesce((select md5(replace(pg_get_functiondef(p.oid), chr(13), '')) = '6b77132524936e6cadb7ef4758a8232c' from pg_proc p where p.oid = to_regprocedure('public.is_ai_draft_program(uuid)')), false)),
       ('is_ai_draft_workout is exactly the expected function', coalesce((select md5(replace(pg_get_functiondef(p.oid), chr(13), '')) = '05cd3cad64ff751a2dbbafbdc807ab34' from pg_proc p where p.oid = to_regprocedure('public.is_ai_draft_workout(uuid)')), false)),
       ('team_sheet_save is exactly the expected function (0419)', coalesce((select md5(replace(pg_get_functiondef(p.oid), chr(13), '')) = '3947181f746122f948651fb2e1180cf0' from pg_proc p where p.oid = to_regprocedure('public.team_sheet_save(uuid, text, jsonb, boolean, uuid, boolean)')), false)),
-      ('training_partners_cross_org_enabled is there', to_regprocedure('public.training_partners_cross_org_enabled()') is not null)
+      ('training_partners_cross_org_enabled is there', to_regprocedure('public.training_partners_cross_org_enabled()') is not null),
+      ('duplicate_program is exactly the expected function (0367)', coalesce((select md5(replace(pg_get_functiondef(p.oid), chr(13), '')) = 'ce06626f896861df13db41beaff635b0' from pg_proc p where p.oid = to_regprocedure('public.duplicate_program(uuid, uuid, uuid, uuid, text, date)')), false)),
+      ('duplicate_program holds its set columns exactly twice (the insert and the select)', coalesce((select (length(d) - length(replace(d, 'target_rest_seconds, target_rest_max_seconds, target_pace', ''))) / length('target_rest_seconds, target_rest_max_seconds, target_pace') = 2 from (select pg_get_functiondef(to_regprocedure('public.duplicate_program(uuid, uuid, uuid, uuid, text, date)')) as d) x), false))
   ) as checks(check_name, ok) where not ok;
   if failed is not null then
-    raise exception 'Release audit fixes Oct 26 (imports marked while written, Sawyer''s copy repaired, organization programs'' days closed to clients, team sheet, one search_path), step 188 (0436) cannot run: this step looks already applied, or the database is not in the state it expects. Failed checks: %. NOTHING was changed (the whole bundle is all or nothing). If an earlier step was applied by hand, use the single-step files for the rest, and send Spot this message.', failed;
+    raise exception 'Release audit fixes Oct 26 (imports marked while written, Sawyer''s copy repaired, organization programs'' days closed to clients, team sheet, one search_path, copies keep set types), step 188 (0436) cannot run: this step looks already applied, or the database is not in the state it expects. Failed checks: %. NOTHING was changed (the whole bundle is all or nothing). If an earlier step was applied by hand, use the single-step files for the rest, and send Spot this message.', failed;
   end if;
 end
 $g188$;
@@ -50,6 +52,8 @@ $g188$;
 --     before (each rule lets a coach of the group through first). A group's copy of an organization program is not one, so its members read it as before.
 --  4. team_sheet_save never saves into an organization program's workout (one condition added to its "an active program of this group" check).
 --  5. training_partners_cross_org_enabled gets a fixed, empty search_path (the security advisor's warning; it reads nothing).
+--  6. duplicate_program copies each set's type (warm-up, working, AMRAP, back-off, drop). It did not, so every copy (Assign, Duplicate, a template, a group's copy) made every set a working
+--     set. The set columns appear exactly twice in it (the insert's list and the select's); set_type is added to both.
 
 do $col$
 begin
@@ -180,6 +184,22 @@ end
 $sheet$;
 
 alter function public.training_partners_cross_org_enabled() set search_path = '';
+
+do $dup$
+declare
+  v_def text := pg_get_functiondef('public.duplicate_program(uuid, uuid, uuid, uuid, text, date)'::regprocedure);
+  v_old constant text := 'target_rest_seconds, target_rest_max_seconds, target_pace';
+  v_new constant text := 'target_rest_seconds, target_rest_max_seconds, target_pace, set_type';
+begin
+  if position(v_new in v_def) > 0 then
+    return; -- already changed (re-run)
+  end if;
+  if (length(v_def) - length(replace(v_def, v_old, ''))) / length(v_old) <> 2 then
+    raise exception 'duplicate_program does not hold its set columns exactly twice (the insert and the select); NOTHING was changed.';
+  end if;
+  execute replace(v_def, v_old, v_new);
+end
+$dup$;
 
 commit;
 

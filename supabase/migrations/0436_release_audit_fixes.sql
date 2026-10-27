@@ -11,6 +11,8 @@
 --     before (each rule lets a coach of the group through first). A group's copy of an organization program is not one, so its members read it as before.
 --  4. team_sheet_save never saves into an organization program's workout (one condition added to its "an active program of this group" check).
 --  5. training_partners_cross_org_enabled gets a fixed, empty search_path (the security advisor's warning; it reads nothing).
+--  6. duplicate_program copies each set's type (warm-up, working, AMRAP, back-off, drop). It did not, so every copy (Assign, Duplicate, a template, a group's copy) made every set a working
+--     set. The set columns appear exactly twice in it (the insert's list and the select's); set_type is added to both.
 
 do $col$
 begin
@@ -141,3 +143,19 @@ end
 $sheet$;
 
 alter function public.training_partners_cross_org_enabled() set search_path = '';
+
+do $dup$
+declare
+  v_def text := pg_get_functiondef('public.duplicate_program(uuid, uuid, uuid, uuid, text, date)'::regprocedure);
+  v_old constant text := 'target_rest_seconds, target_rest_max_seconds, target_pace';
+  v_new constant text := 'target_rest_seconds, target_rest_max_seconds, target_pace, set_type';
+begin
+  if position(v_new in v_def) > 0 then
+    return; -- already changed (re-run)
+  end if;
+  if (length(v_def) - length(replace(v_def, v_old, ''))) / length(v_old) <> 2 then
+    raise exception 'duplicate_program does not hold its set columns exactly twice (the insert and the select); NOTHING was changed.';
+  end if;
+  execute replace(v_def, v_old, v_new);
+end
+$dup$;

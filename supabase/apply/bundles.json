@@ -25,7 +25,7 @@
  },
  {
   "id": "release-audit-oct26",
-  "name": "Release audit fixes Oct 26 (imports marked while written, Sawyer's copy repaired, organization programs' days closed to clients, team sheet, one search_path)",
+  "name": "Release audit fixes Oct 26 (imports marked while written, Sawyer's copy repaired, organization programs' days closed to clients, team sheet, one search_path, copies keep set types)",
   "steps": [
    "188"
   ],
