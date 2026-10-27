@@ -35,7 +35,7 @@ export function phoneCalendarHref(month?: string | null): string {
 }
 // The landing decision (app/coach-landing/route.ts) and the coach's own app (lib/start-group.ts COACH_PHONE_ENTRY / COACH_PHONE_LANDING), spelled out here so this file needs no imports.
 // Home on the phone while working keeps the organization chosen in Spotlight (COACH_PHONE_ENTRY_KEEP_ORG); only a fresh open starts in the home organization.
-export const PHONE_ENTRY = "/coach-landing?keep=org";
+export const PHONE_ENTRY = "/coach-landing/keep-org";
 export const PHONE_OWN_APP = "/my-space/home";
 
 export interface PhoneRedirect {

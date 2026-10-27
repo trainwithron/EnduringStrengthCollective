@@ -21,7 +21,8 @@ const { GET: place } = await import("@/app/my-space/[place]/route");
 const { GET: mySpace } = await import("@/app/my-space/route");
 const { mySpaceHref, MY_SPACE_PLACES, MY_SPACE_TABS } = await import("./my-space-target");
 const { PHONE_CALENDAR, PHONE_OWN_APP, PHONE_SPOTLIGHT, phoneCalendarHref, phoneCoachRedirect } = await import("./phone-coach-routes");
-const { COACH_PHONE_LANDING } = await import("./start-group");
+const { COACH_PHONE_ENTRY, COACH_PHONE_ENTRY_KEEP_ORG, COACH_PHONE_LANDING } = await import("./start-group");
+const { PHONE_ENTRY } = await import("./phone-coach-routes");
 
 const ORIGIN = "https://spotlightcoaching.app";
 // A soft link's request: the router's headers and its cache-busting _rsc parameter.
@@ -41,6 +42,30 @@ describe("each place in the coach's own app", () => {
     for (const p of MY_SPACE_PLACES) byPath.set(`/my-space/${p}`, p);
     expect(byPath.size).toBe(6);
     expect(new Set([mySpaceHref(null), mySpaceHref(null, { spot: true }), ...MY_SPACE_TABS.map((t) => mySpaceHref(t))]).size).toBe(6);
+  });
+
+  it("no two phone entries share a path with a different meaning (the landing that keeps the organization is /coach-landing/keep-org, not ?keep=org)", () => {
+    const entries: [string, string][] = [
+      [COACH_PHONE_ENTRY, "fresh open: start in the home organization"],
+      [COACH_PHONE_ENTRY_KEEP_ORG, "Home while working: keep the organization chosen"],
+      [PHONE_ENTRY, "Home while working: keep the organization chosen"],
+      [mySpaceHref(null), "own app: Home"],
+      [COACH_PHONE_LANDING, "own app: Home"],
+      [PHONE_OWN_APP, "own app: Home"],
+      [mySpaceHref(null, { spot: true }), "own app: Spotlight"],
+      [PHONE_SPOTLIGHT, "own app: Spotlight"],
+      [PHONE_CALENDAR, "own app: calendar"],
+      ...MY_SPACE_TABS.map((t): [string, string] => [mySpaceHref(t), `own app: ${t}`]),
+    ];
+    const meaningByPath = new Map<string, string>();
+    for (const [href, meaning] of entries) {
+      const path = new URL(href, ORIGIN).pathname;
+      expect(meaningByPath.get(path) ?? meaning, `${href} shares ${path} with "${meaningByPath.get(path)}"`).toBe(meaning);
+      meaningByPath.set(path, meaning);
+      expect(href, href).not.toMatch(/[?&](to|view|keep|spot)=/);
+    }
+    expect(COACH_PHONE_ENTRY_KEEP_ORG).toBe("/coach-landing/keep-org");
+    expect(PHONE_ENTRY).toBe(COACH_PHONE_ENTRY_KEEP_ORG);
   });
 
   for (const tab of MY_SPACE_TABS) {

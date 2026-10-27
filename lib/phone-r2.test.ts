@@ -107,7 +107,7 @@ describe("their own space", () => {
 describe("Release 2 follow-ups (Oct 20)", () => {
   it("/dashboard on a phone goes to the landing decision in the middleware, before the page (and its loading screen) renders", () => {
     // in the organization already chosen (Oct 21): only a fresh open starts in the home organization
-    expect(phoneCoachRedirect("/dashboard")).toEqual({ to: "/coach-landing?keep=org", groupId: null, shared: false });
+    expect(phoneCoachRedirect("/dashboard")).toEqual({ to: "/coach-landing/keep-org", groupId: null, shared: false });
   });
   it("a group's own page sends a coach (not acting as a client) to their own app; a team-sport group's team Home stays (no redirect to itself)", () => {
     expect(phoneCoachRedirect(`/groups/${S}`)).toEqual({ to: "/my-space/home", groupId: S, shared: true, home: true });

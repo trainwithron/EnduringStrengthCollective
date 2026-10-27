@@ -11,7 +11,7 @@ import { readHomeOrgId, setActiveOrgCookies } from "@/lib/home-org";
 
 // Where a coach on a phone goes (lib/coach-landing.ts): the coach home of a team organization, the one-screen organization chooser when they have several and none is chosen, or their own client app.
 // A fresh open of the app (signing in, the app's icon) starts in the coach's HOME organization (lib/home-org.ts) and remembers it, so the choice follows the organization: a team organization opens its team
-// Home. Home on the phone while working (/dashboard, ?keep=org) keeps the organization chosen in Spotlight instead.
+// Home. Home on the phone while working (/dashboard, which opens /coach-landing/keep-org: this same logic with ?keep=org) keeps the organization chosen in Spotlight instead.
 export async function GET(request: Request) {
   const supabase = await createServerClient();
   const {

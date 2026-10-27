@@ -94,6 +94,16 @@ describe("/coach-landing", () => {
     state.cookies = { active_org: ESC };
     expect(where(await open("?keep=org"))).toBe("/groups/own-space");
   });
+  it("/coach-landing/keep-org (its own path, Oct 27) answers exactly as ?keep=org does", async () => {
+    const keep = (await import("@/app/coach-landing/keep-org/route")).GET;
+    for (const cookies of [{ active_org: TROJANS_ORG, last_workspace_group: TROJANS }, { active_org: ESC }, {}] as Record<string, string>[]) {
+      state.cookies = cookies;
+      const viaPath = (await keep(new Request("https://spotlightcoaching.app/coach-landing/keep-org"))) as NextResponse;
+      const viaQuery = (await open("?keep=org")) as NextResponse;
+      expect(viaPath.headers.get("location"), JSON.stringify(cookies)).toBe(viaQuery.headers.get("location"));
+      expect(viaPath.cookies.getAll(), JSON.stringify(cookies)).toEqual(viaQuery.cookies.getAll());
+    }
+  });
   it("Kade (the Trojans only) is unchanged: the team Home, started in the Trojans", async () => {
     state.groups = [ronGroups[2]];
     state.modes = [{ id: TROJANS, team_mode: true }];
@@ -115,13 +125,13 @@ describe("/coach-landing", () => {
     state.cookies = {};
     const ask = await open();
     expect(where(ask)).toBe("/choose-organization");
-    expect(new URL(ask.headers.get("location")!).searchParams.get("next")).toBe("/coach-landing?keep=org");
+    expect(new URL(ask.headers.get("location")!).searchParams.get("next")).toBe("/coach-landing/keep-org");
   });
 });
 
 describe("while working on the phone", () => {
   it("Home (/dashboard) keeps the organization chosen; only a fresh open (sign-in, the app's icon) resets it", () => {
-    expect(phoneCoachRedirect("/dashboard")?.to).toBe("/coach-landing?keep=org");
+    expect(phoneCoachRedirect("/dashboard")?.to).toBe("/coach-landing/keep-org");
     expect(read("app/(coach)/dashboard/page.tsx")).toContain("redirect(COACH_PHONE_ENTRY_KEEP_ORG);");
     expect(read("lib/start-group.ts")).toContain('return onPhone ? COACH_PHONE_ENTRY : "/dashboard";');
   });
