@@ -21,7 +21,7 @@ export function HelpShell({ title, intro, children }: { title: string; intro?: s
           <h2 className="font-display uppercase text-sm tracking-wide text-steel">Still stuck?</h2>
           <p className="mt-2 text-chalk max-w-[60ch]">{SUPPORT_PROMISE}</p>
           <p className="mt-2 text-steel max-w-[60ch]">
-            Coaches: open Business, then Support, in the app. Clients: message your coach, who can reach us if they cannot sort it out.
+            Coaches: open Settings, then Support, in the app. Clients: message your coach, who can reach us if they cannot sort it out.
             {email ? (
               <>
                 {" "}

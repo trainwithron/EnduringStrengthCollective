@@ -182,7 +182,7 @@ describe("what's new", () => {
   it("has the Oct 19 to 26 releases, each on the day it shipped", () => {
     const on = (date: string) => CHANGELOG.filter((e) => e.date === date).map((e) => e.title);
     expect(on("2026-10-26")).toHaveLength(5);
-    expect(on("2026-10-24")).toEqual(["Get [name] started checklist on a new client's profile"]);
+    expect(on("2026-10-24")).toEqual(["A getting-started checklist on a new client's profile"]);
     expect(on("2026-10-21")).toEqual(["Your phone starts in your own organization", "Coach nutrition revamp", "Allergy question asked once"]);
     expect(on("2026-10-20")).toEqual(["Wing it logging", "Logging during a booked time uses that session", "Walk-in prompt", "No-show Charge or Waive", "Faster phone app", "The Spotlight button on the phone", "One calendar that people book on"]);
     expect(on("2026-10-19")).toEqual(["Did-it-happen cards", "A public page with a free consultation, made for you"]);

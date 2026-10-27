@@ -1,5 +1,5 @@
 // What changed in the app, for the people who use it (Release SP2). Newest first. Written for a coach or a client, not for a developer: what you can do now, in a sentence or two. Each release adds a line here when it ships;
-// lib/changelog.test.ts keeps the list in order and free of internal wording.
+// lib/support-pages.test.ts ("what's new") keeps the list in order and free of internal wording.
 export interface ChangelogEntry {
   date: string; // YYYY-MM-DD
   title: string;
@@ -13,7 +13,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   { date: "2026-10-26", title: "Import matches you can trust: exact names win, and old matches are labelled", audience: "coaches" },
   { date: "2026-10-26", title: "The AI builder can change later weeks of a program", audience: "coaches" },
   { date: "2026-10-26", title: "Spotlight demo videos on exercises in the Spotlight library, until you add your own", audience: "everyone" },
-  { date: "2026-10-24", title: "Get [name] started checklist on a new client's profile", audience: "coaches" },
+  { date: "2026-10-24", title: "A getting-started checklist on a new client's profile", audience: "coaches" },
   { date: "2026-10-21", title: "Your phone starts in your own organization", audience: "coaches" },
   { date: "2026-10-21", title: "Coach nutrition revamp", audience: "coaches" },
   { date: "2026-10-21", title: "Allergy question asked once", audience: "clients" },
