@@ -425,7 +425,8 @@ export function drawShareImage(
 ): void {
   const { width: w, height: h } = SHARE_IMAGE_SIZES[format];
   const withMascot = format === "story" && !!model.mascot && !!assets.mascotImage && typeof ctx.drawImage === "function";
-  const p = planFor(format, withMascot);
+  // With the coach's QR code the lift rows make room for it (planWithQr); otherwise the layout is exactly as before.
+  const p = model.coachStrip?.qrUrl ? planWithQr(format, withMascot) : planFor(format, withMascot);
   const maxText = w - p.margin * 2;
   const display = (size: number) => `700 ${size}px ${theme.fontDisplay}`;
   const body = (size: number) => `500 ${size}px ${theme.fontBody}`;
@@ -556,21 +557,30 @@ export function drawShareImage(
   ctx.fillText(model.dateLabel, strip ? p.margin : w / 2, p.footerY + 66);
   setLetterSpacing(ctx, 0);
 
-  if (strip) drawCoachStrip(ctx, format, strip, theme, display, body, startX + markSize + gap + wordWidth + 28);
+  if (strip) drawCoachStrip(ctx, format, withMascot, strip, theme, display, body, startX + markSize + gap + wordWidth + 28);
+}
+
+// The layout when the picture carries the coach's QR code: big enough to scan from another phone's screen (about 6 px a square), so the top-lift rows are a little shorter (and on a
+// post the fun line sits higher) to make room above the footer. Without the code the layout is planFor's, unchanged.
+export function planWithQr(format: ShareImageFormat, withMascot = false): Plan {
+  const p = planFor(format, withMascot);
+  if (format === "story") return withMascot ? { ...p, liftRowH: 74, liftGap: 8 } : { ...p, liftRowH: 88, liftGap: 10 };
+  return { ...p, liftRowH: 60, liftGap: 8, funY: 848 };
 }
 
 // Where the coach's corner goes: the bottom right, inside the part of a story that the story app does not cover (its bottom bar starts below the date line), clear of the top lifts
-// above it. The QR code keeps a white border (quiet zone) so it scans on any background.
-export function coachStripPlan(format: ShareImageFormat): { qrX: number; qrY: number; qrSize: number; textRight: number; lineY: number; lineSize: number; handleY: number; handleSize: number; right: number } {
+// and the fun line above it. The QR code keeps a white border (quiet zone) so it scans on any background.
+export function coachStripPlan(format: ShareImageFormat, withMascot = false): { qrX: number; qrY: number; qrSize: number; textRight: number; lineY: number; lineSize: number; handleY: number; handleSize: number; right: number } {
   const { width: w } = SHARE_IMAGE_SIZES[format];
-  const p = planFor(format);
+  const p = planWithQr(format, withMascot);
   const right = w - p.margin;
   if (format === "story") {
-    const qrSize = 140;
-    return { qrX: right - qrSize, qrY: 1536, qrSize, textRight: right - qrSize - 24, lineY: p.footerY, lineSize: 34, handleY: p.footerY + 42, handleSize: 28, right };
+    const qrSize = 200;
+    // its bottom level with the bottom of the date line
+    return { qrX: right - qrSize, qrY: p.footerY + 72 - qrSize, qrSize, textRight: right - qrSize - 24, lineY: p.footerY, lineSize: 34, handleY: p.footerY + 42, handleSize: 28, right };
   }
-  const qrSize = 116;
-  return { qrX: right - qrSize, qrY: 948, qrSize, textRight: right - qrSize - 20, lineY: p.footerY + 10, lineSize: 28, handleY: p.footerY + 46, handleSize: 24, right };
+  const qrSize = 165;
+  return { qrX: right - qrSize, qrY: 900, qrSize, textRight: right - qrSize - 20, lineY: p.footerY + 10, lineSize: 28, handleY: p.footerY + 46, handleSize: 24, right };
 }
 
 /** The dark squares of a QR code for this address, as a grid (true = dark), from the same qrcode package the app's other QR codes use. */
@@ -583,6 +593,7 @@ export function qrModules(url: string): boolean[][] {
 function drawCoachStrip(
   ctx: DrawContext,
   format: ShareImageFormat,
+  withMascot: boolean,
   strip: NonNullable<ShareImageModel["coachStrip"]>,
   theme: ShareTheme,
   display: (size: number) => string,
@@ -590,7 +601,7 @@ function drawCoachStrip(
   // Where the footer's wordmark ends: the corner's text stops before it.
   footerRight: number
 ) {
-  const c = coachStripPlan(format);
+  const c = coachStripPlan(format, withMascot);
   const textRight = strip.qrUrl ? c.textRight : c.right;
   if (strip.qrUrl) {
     const grid = qrModules(strip.qrUrl);

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import QRCode from "qrcode";
 import { describe, expect, it } from "vitest";
-import { buildShareImageModel, coachFirstNameOf, coachStripOf, coachStripPlan, drawShareImage, FALLBACK_THEME, planFor, qrModules, SHARE_IMAGE_SIZES, type DrawContext, type ShareImageFormat, type ShareImageInput } from "./share-image";
+import { buildShareImageModel, coachFirstNameOf, coachStripOf, coachStripPlan, drawShareImage, FALLBACK_THEME, planFor, planWithQr, qrModules, SHARE_IMAGE_SIZES, type DrawContext, type ShareImageFormat, type ShareImageInput } from "./share-image";
 import { cleanInstagramHandle, INSTAGRAM_HANDLE_RULE } from "./instagram-handle";
 import { loadShareCardCoach } from "./share-card-coach";
 
@@ -90,15 +90,24 @@ describe("the QR code reads as the coach's public page", () => {
     for (const format of ["story", "post"] as const) {
       const { width, height } = SHARE_IMAGE_SIZES[format];
       const c = coachStripPlan(format);
-      const p = planFor(format);
+      const p = planWithQr(format);
       const ops = draw(format, withRon());
+      // big enough to scan from another phone's screen: about 6 px a square (story about 200 px, post about 165 px)
+      expect(c.qrSize / (qrModules(RON_PAGE).length + 4), format).toBeGreaterThanOrEqual(4.9);
+      expect(c.qrSize).toBe(format === "story" ? 200 : 165);
       expect(c.qrX).toBeGreaterThanOrEqual(p.margin);
       expect(c.qrX + c.qrSize).toBeLessThanOrEqual(width - p.margin);
       expect(c.qrY + c.qrSize).toBeLessThanOrEqual(format === "story" ? p.footerY + 80 : height);
       if (format === "story") expect(c.qrY + c.qrSize).toBeLessThanOrEqual(height - 240);
-      // the lift rows end above the code
+      // the lift rows (shorter when the code is there) end above the code
       const lastLiftBottom = p.liftsStartY + 3 * p.liftRowH + 2 * p.liftGap;
       expect(c.qrY, format).toBeGreaterThan(lastLiftBottom);
+      // a story with the mascot (two lift rows, lower down) too
+      if (format === "story") {
+        const pm = planWithQr("story", true);
+        expect(coachStripPlan("story", true).qrY).toBeGreaterThan(pm.liftsStartY + 2 * pm.liftRowH + pm.liftGap);
+        expect(coachStripPlan("story", true).qrY + 200).toBeLessThanOrEqual(height - 240);
+      }
       // the fun line's last line ends above it
       expect(c.qrY, format).toBeGreaterThan(p.funY + p.funLineH + 8);
       // every text stays in the frame, and no text but the corner's own is right of the code's left edge at its height
