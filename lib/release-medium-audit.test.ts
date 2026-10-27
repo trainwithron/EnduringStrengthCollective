@@ -36,7 +36,7 @@ describe("M1 weights are read only when they are plain numbers", () => {
     expect(importReadWarnings(rows)[0]).toBe('2 weights could not be read as a plain number (for example "135-185"). They are in the exercise notes and the weight is left blank.');
     const ex = groupIntoWeeks(rows)[0].days[0].exercises;
     expect(ex[0].note).toBe("Weight: 135-185");
-    expect(src("components/coach/desktop/import-wizard.tsx")).toContain("...(ex.note ? { notes: ex.note } : {})");
+    expect(src("lib/write-imported-program.ts")).toContain("...(ex.note ? { notes: ex.note } : {})");
   });
 });
 
@@ -97,8 +97,9 @@ describe("M4 set count and a prescription in the exercise cell", () => {
 describe("M5 progression rules and library writes in the program import", () => {
   const wizard = src("components/coach/desktop/import-wizard.tsx");
   it("a rule is filed under the exercise's saved name, and failed writes are reported", () => {
-    expect(wizard).toContain("resolutions.get(normalizeName(rule.exerciseName))?.exerciseName ?? rule.exerciseName");
-    expect(wizard).toContain("The progression rules did not save");
+    const writer = src("lib/write-imported-program.ts");
+    expect(writer).toContain("input.resolutions.get(normalizeName(rule.exerciseName))?.exerciseName ?? rule.exerciseName");
+    expect(writer).toContain("The progression rules did not save");
     expect(wizard).toContain("libraryFailures++");
     expect(wizard).toContain("summary.notices.map");
   });

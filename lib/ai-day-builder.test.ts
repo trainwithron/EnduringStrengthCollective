@@ -42,7 +42,7 @@ describe("The AI Program Builder box", () => {
     expect(builder).toContain("function handleAiDay(day: BuilderDay)");
     // Import program lives inside the AI box now (above the mic and Ask), not as a link in the toolbar
     expect(builder).not.toContain("Import a program");
-    expect(read("components/coach/desktop/ai-program-builder-box.tsx")).toContain("<ProgramImportLauncher groupId={groupId} athleteId={athleteId} orgProgram={orgProgram} />");
+    expect(read("components/coach/desktop/ai-program-builder-box.tsx")).toContain("<ProgramImportLauncher groupId={groupId} athleteId={athleteId} orgProgram={orgProgram} programId={programId} />");
   });
 });
 

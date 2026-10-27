@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { ImportWizard } from "@/components/coach/desktop/import-wizard";
+import { ALREADY_HAS_DAYS, isAutomaticProgramName, type OpenProgram } from "@/lib/write-imported-program";
 
 // What the wizard accepts: a spreadsheet, a PDF, a photo, or a text file.
 export const IMPORT_FILE_ACCEPT = ".csv,.tsv,.xlsx,.xls,.pdf,.txt,.md,image/*";
@@ -13,6 +14,9 @@ interface Loaded {
   coachId: string;
   library: { name: string }[];
   aliases: { rawName: string; exerciseName: string }[];
+  // Started inside a program's builder: that program, to fill when it has no days yet; or true when it already has days (a new program is made, and the panel says so).
+  openProgram: OpenProgram | null;
+  hasDays: boolean;
 }
 
 // The program import, on the page you are already on. "Import program" opens the computer's own file picker; the chosen file then runs through the same import (reading, matching exercises to the
@@ -22,11 +26,14 @@ export function ProgramImportLauncher({
   athleteId = null,
   tone = "link",
   orgProgram = false,
+  programId = null,
 }: {
   groupId: string;
   athleteId?: string | null;
   tone?: "link" | "button";
   orgProgram?: boolean;
+  // The program whose builder this is in: an import fills it while it has no days (Ron, Oct 27), else makes a new one.
+  programId?: string | null;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [panel, setPanel] = useState<{ file: File } | null>(null);
@@ -59,7 +66,7 @@ export function ProgramImportLauncher({
           Import program
         </button>
       </div>
-      {panel && <ProgramImportPanel groupId={groupId} athleteId={athleteId} orgProgram={orgProgram} file={panel.file} onClose={() => setPanel(null)} />}
+      {panel && <ProgramImportPanel groupId={groupId} athleteId={athleteId} orgProgram={orgProgram} programId={programId} file={panel.file} onClose={() => setPanel(null)} />}
     </>
   );
 }
@@ -72,10 +79,12 @@ export function ProgramImportPanel({
   text = null,
   onClose,
   orgProgram = false,
+  programId = null,
 }: {
   groupId: string;
   athleteId: string | null;
   orgProgram?: boolean;
+  programId?: string | null;
   file?: File | null;
   text?: string | null;
   onClose: () => void;
@@ -93,21 +102,24 @@ export function ProgramImportPanel({
         if (!cancelled) setFailed(true);
         return;
       }
-      const [{ data: library }, { data: aliasRows }] = await Promise.all([
+      const [{ data: library }, { data: aliasRows }, open] = await Promise.all([
         supabase.from("exercise_library").select("name").eq("created_by", userData.user.id).order("name"),
         supabase.from("exercise_aliases").select("raw_name, exercise_name").eq("coach_id", userData.user.id),
+        programId ? readOpenProgram(supabase, programId) : Promise.resolve(null),
       ]);
       if (cancelled) return;
       setLoaded({
         coachId: userData.user.id,
         library: (library ?? []).map((r) => ({ name: r.name as string })),
         aliases: (aliasRows ?? []).map((a) => ({ rawName: a.raw_name as string, exerciseName: a.exercise_name as string })),
+        openProgram: open && !open.hasDays ? { id: open.id, automaticName: open.automaticName } : null,
+        hasDays: !!open?.hasDays,
       });
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [programId]);
 
   async function close() {
     if (activeRef.current && !(await confirmDialog({ message: LEAVE_IMPORT_MESSAGE, confirmLabel: "Leave", destructive: true }))) return;
@@ -142,6 +154,12 @@ export function ProgramImportPanel({
             Loading…
           </p>
         ) : (
+          <>
+          {loaded.hasDays && (
+            <p className="font-body text-sm text-steel mb-3" role="status" data-import-new-program>
+              {ALREADY_HAS_DAYS}
+            </p>
+          )}
           <ImportWizard
             coachId={loaded.coachId}
             groupId={groupId}
@@ -151,12 +169,31 @@ export function ProgramImportPanel({
             initialFile={file}
             initialText={text}
             orgProgram={orgProgram}
+            openProgram={loaded.openProgram}
             onActivity={(active) => {
               activeRef.current = active;
             }}
           />
+          </>
         )}
       </div>
     </div>
   );
+}
+
+// The program the import was started in: whether it has days yet, and whether its name is still the automatic one. A failed read is treated as "not this program": the import then makes a
+// new program, as it did before (and the write checks the days again anyway).
+async function readOpenProgram(supabase: ReturnType<typeof createBrowserClient>, programId: string): Promise<{ id: string; hasDays: boolean; automaticName: boolean } | null> {
+  const [{ data: program, error }, { count, error: countError }] = await Promise.all([
+    supabase.from("programs").select("id, name, athlete_id").eq("id", programId).maybeSingle(),
+    supabase.from("workouts").select("id", { count: "exact", head: true }).eq("program_id", programId),
+  ]);
+  if (error || countError || !program) return null;
+  const p = program as { id: string; name: string; athlete_id: string | null };
+  let athleteName: string | null = null;
+  if (p.athlete_id) {
+    const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", p.athlete_id).maybeSingle();
+    athleteName = (profile as { full_name?: string | null } | null)?.full_name ?? null;
+  }
+  return { id: p.id, hasDays: (count ?? 0) > 0, automaticName: isAutomaticProgramName(p.name, athleteName) };
 }

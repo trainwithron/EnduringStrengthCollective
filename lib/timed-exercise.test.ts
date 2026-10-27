@@ -117,7 +117,7 @@ describe("what the builder and the logger do with a timed exercise", () => {
   it("the import review shows the time where reps would be, and a timed exercise with no reps tracks Time instead of reps", () => {
     expect(wizard).toContain('ex.reps ?? (ex.timeSeconds != null ? `${ex.timeSeconds}s` : "?")');
     expect(wizard).toContain('DEFAULT_TRACKED_FIELDS.filter((f) => f !== "reps")');
-    expect(wizard).toContain("target_time_seconds: ex.timeSeconds");
+    expect(read("../lib/write-imported-program.ts")).toContain("target_time_seconds: ex.timeSeconds");
   });
   it("a generated program's rows are normalized too", () => {
     expect(generate).toContain("normalizeTimedRow(");

@@ -32,8 +32,9 @@ describe("where the description can be changed", () => {
     expect(wizard).toContain("maxLength={PROGRAM_DESCRIPTION_MAX}");
     expect(wizard).toContain('setPending((prev) => (prev ? { ...prev, description: "" } : prev))');
     expect(wizard).toContain("const description = tidyProgramDescription(importData.description);");
-    // the insert uses the confirmed value
-    expect(wizard).toMatch(/name: programName \|\| "Imported Program",\n\s+description,/);
+    // the write uses the confirmed value (lib/write-imported-program.ts)
+    expect(wizard).toMatch(/programName,\n\s+description,\n/);
+    expect(src("lib/write-imported-program.ts")).toContain("description: input.description,");
   });
 
   it("the program page lets the coach change it afterwards for any program, saves through saveProgramDescription, and shows Saved only when the write saved a row", () => {

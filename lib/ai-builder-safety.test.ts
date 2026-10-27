@@ -112,8 +112,10 @@ describe("the builder code wires it all in", () => {
   });
   it("the wizard saves an AI program as a draft that is NOT active, and a plain import as before", () => {
     // Written switched off (and marked as importing); switched on after the last day only when it is not an AI draft (0436).
-    expect(wizard).toContain("update({ importing: false, is_active: !importData.isAiSourced })");
-    expect(wizard).toContain("ai_draft: importData.isAiSourced,");
+    // the writing itself is lib/write-imported-program.ts (Oct 27), handed the same flag
+    expect(wizard).toContain("isAiSourced: importData.isAiSourced,");
+    expect(read("lib/write-imported-program.ts")).toContain("update({ importing: false, is_active: !input.isAiSourced })");
+    expect(read("lib/write-imported-program.ts")).toContain("ai_draft: input.isAiSourced,");
     expect(wizard).toContain('pending.isAiSourced ? "Save as draft" : "Create program"');
     expect(wizard).toContain("Nothing reaches a client until you sign it off.");
     expect(wizard).not.toContain("replace whatever they're currently on");

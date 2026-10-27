@@ -52,7 +52,6 @@ import { aliasRawNameFor, allMatchesChosen, libraryTwin, matchLabel, preselectUs
 import { DEFAULT_TRACKED_FIELDS, type TrackedField } from "@/lib/exercise-fields";
 import { defaultTrainingDaysForCount } from "@/lib/program-schedule";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
-import { detectTrainingIntent } from "@/lib/training-intent";
 import { hasFlaggedMusculoskeletalConcern } from "@/lib/athlete-injury-flag";
 import { generateDupProgram, generateDupSelfUpdatingProgram, DUP_WEEKLY_SCHEME } from "@/lib/dup-generator";
 import { generateGzclpProgram, type GzclpLiftInput, type GzclpProgressionRule } from "@/lib/gzclp-generator";
@@ -64,6 +63,7 @@ import { AiUsageMeter } from "@/components/coach/ai-usage-meter";
 import { detectImportKind } from "@/lib/import-input-kind";
 import { buildImportPrompt } from "@/lib/import-prompt";
 import { PROGRAM_DESCRIPTION_MAX, descriptionCounter, tidyProgramDescription } from "@/lib/program-description";
+import { writeImportedProgram, type OpenProgram } from "@/lib/write-imported-program";
 
 type Status = "idle" | "working" | "reviewing" | "done" | "error";
 
@@ -198,8 +198,11 @@ export function ImportWizard({
   initialText,
   onActivity,
   orgProgram = false,
+  openProgram = null,
 }: {
   coachId: string;
+  // The program whose builder the import was started in: filled when it has no days yet, instead of making a second program (lib/write-imported-program.ts).
+  openProgram?: OpenProgram | null;
   groupId: string;
   // Imported from the program library (or from an organization program's builder): the new program is the organization's own (0435), not the group's it is stored in.
   orgProgram?: boolean;
@@ -592,133 +595,35 @@ export function ImportWizard({
     const timezone = await getGroupCoachTimezone(supabase, groupId);
     const startDate = trainingDays ? dateKeyInZone(timezone) : null;
 
-    const { data: programRow, error: programError } = await supabase
-      .from("programs")
-      .insert({
-        group_id: groupId,
-        created_by: coachId,
-        // Personal-program mode (injury_pain_science_research_and_ai_
-        // gap_sept15.md) — null for the plain group-level flow,
-        // completely unchanged from before this pass.
-        athlete_id: athleteId ?? null,
-        ...(orgProgram && !athleteId ? { org_program: true } : {}),
-        name: programName || "Imported Program",
-        description,
-        // Written one day at a time from here, so it starts switched off and marked as importing: nothing can assign, duplicate or make a template of it until the last day is written
-        // (programs.importing, 0436; a copy made half-way had only the days written so far). It is switched on below, after the last day.
-        is_active: false,
-        importing: true,
-        ai_draft: importData.isAiSourced,
-        start_date: startDate,
-        training_days: trainingDays,
-        visibility_window: "day",
-        ai_sequencing_notes: sequencingNotes,
-        training_intent: detectTrainingIntent(programName || "Imported Program"),
-      })
-      .select("id")
-      .single();
-
-    if (programError || !programRow) {
+    // Into the program the coach opened when it has no days yet (lib/write-imported-program.ts), else a new program as before.
+    const written = await writeImportedProgram(supabase, {
+      groupId,
+      coachId,
+      athleteId: athleteId ?? null,
+      orgProgram,
+      programName,
+      description,
+      isAiSourced: importData.isAiSourced,
+      startDate,
+      trainingDays,
+      sequencingNotes,
+      weeks,
+      resolutions,
+      progressionRules: importData.progressionRules,
+      openProgram: openProgram ?? null,
+    });
+    if ("error" in written) {
       setStatus("error");
-      setError("Couldn't create the program — try again.");
+      setError(written.error);
       processingRef.current = false;
       setFinalizing(false);
       return;
     }
-
-    // dup_gzclp_build_spec_sept15.md §1.3 point 2 — a thin post-write
-    // step alongside finalizeImport rather than a new pipeline: only
-    // present for a GZCLP-generated program, so every other import path
-    // (CSV/photo/AI-generate/DUP) is completely unaffected.
-    if (importData.progressionRules && importData.progressionRules.length > 0) {
-      // The rule is filed under the exercise's name as it was saved (matched to the library), or it would never find its exercise.
-      const { error: ruleError } = await supabase.from("exercise_progressions").insert(
-        importData.progressionRules.map((rule) => ({
-          program_id: programRow.id,
-          group_id: groupId,
-          exercise_name: resolutions.get(normalizeName(rule.exerciseName))?.exerciseName ?? rule.exerciseName,
-          model: rule.model,
-          config: rule.config,
-          tier_label: rule.tierLabel,
-          created_by: coachId,
-        }))
-      );
-      if (ruleError) notices.push("The progression rules did not save. Open the program and set them again.");
-    }
-
-    // Finalizing an import never deactivates the client's other programs:
-    // several programs can be active at once, activation is per program.
-
-    let failedWrites = 0;
-    // What the AI wrote, kept on the draft so that when the coach signs it off the app can quietly see what they changed (see /api/ai/sign-off).
-    const aiSnapshot: { week: number; day: number; order: number; name: string; sets: number; reps: string | null }[] = [];
-    for (const week of weeks) {
-      for (let dayIndex = 0; dayIndex < week.days.length; dayIndex++) {
-        const day = week.days[dayIndex];
-        const { data: workoutRow, error: workoutError } = await supabase
-          .from("workouts")
-          .insert({
-            program_id: programRow.id,
-            group_id: groupId,
-            title: day.dayLabel,
-            week_number: week.weekNumber,
-            day_index: dayIndex + 1,
-          })
-          .select("id")
-          .single();
-        if (!workoutRow || workoutError) {
-          failedWrites += Math.max(1, day.exercises.length);
-          continue;
-        }
-
-        for (let exIndex = 0; exIndex < day.exercises.length; exIndex++) {
-          const ex = day.exercises[exIndex];
-          const resolution = resolutions.get(normalizeName(ex.exerciseName));
-          if (!resolution) continue;
-
-          const { data: exerciseRow, error: exerciseError } = await supabase
-            .from("group_workout_exercises")
-            .insert({
-              workout_id: workoutRow.id,
-              group_id: groupId,
-              exercise_name: resolution.exerciseName,
-              exercise_order: exIndex,
-              tracked_fields: resolution.trackedFields,
-              ...(ex.note ? { notes: ex.note } : {}),
-            })
-            .select("id")
-            .single();
-          if (!exerciseRow || exerciseError) {
-            failedWrites += 1;
-            continue;
-          }
-
-          const setsPayload = Array.from({ length: Math.max(1, ex.sets) }, (_, setOrder) => ({
-            group_workout_exercise_id: exerciseRow.id,
-            set_order: setOrder,
-            target_reps: ex.reps,
-            target_weight: ex.weight,
-            target_rpe: ex.rpe,
-            target_time_seconds: ex.timeSeconds,
-            target_rest_seconds: ex.restSeconds ?? null,
-          }));
-
-          const { error: setsError } = await supabase.from("group_workout_exercise_sets").insert(setsPayload);
-          if (setsError) failedWrites += 1;
-          else aiSnapshot.push({ week: week.weekNumber, day: dayIndex + 1, order: exIndex, name: resolution.exerciseName, sets: setsPayload.length, reps: ex.reps });
-        }
-      }
-    }
-    // Every day is written: the import is finished. A program the AI built is a DRAFT: not active, not seen by any client, until the coach signs it off in the builder. Anything else
-    // (a spreadsheet, a pasted program the coach wrote) is switched on now.
-    let finished = false;
-    for (let attempt = 0; attempt < 3 && !finished; attempt++) {
-      finished = await bestEffort(supabase.from("programs").update({ importing: false, is_active: !importData.isAiSourced }).eq("id", programRow.id));
-    }
-    if (!finished) notices.push("The program was written but did not finish saving, so it can't be assigned yet. Import it again.");
+    notices.push(...written.notices);
+    const { failedWrites, aiSnapshot } = written;
     if (importData.isAiSourced && aiSnapshot.length > 0) {
       // Bookkeeping for the sign-off view: a failure here is not something the coach can retry (importing again would make a second program), so it is not announced over the finished import.
-      await bestEffort(supabase.from("programs").update({ ai_snapshot: aiSnapshot }).eq("id", programRow.id));
+      await bestEffort(supabase.from("programs").update({ ai_snapshot: aiSnapshot }).eq("id", written.programId));
     }
 
     setSummary({
@@ -737,11 +642,11 @@ export function ImportWizard({
       isAiSourced: importData.isAiSourced,
       creditCharged: importData.creditCharged,
       draft: importData.isAiSourced,
-      programId: programRow.id,
+      programId: written.programId,
       failedWrites,
       notices: [...importReadWarnings(parsed), ...notices],
     });
-    setDoneHref(`/groups/${groupId}/programs/${programRow.id}`);
+    setDoneHref(`/groups/${groupId}/programs/${written.programId}`);
     setPending(null);
     setStatus("done");
     processingRef.current = false;

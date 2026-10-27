@@ -44,10 +44,11 @@ describe("1. an import is never copied while it is being written", () => {
     expect(await assignProgramToClient(done.client as never, { sourceProgramId: "p", destinationGroupId: "g", athleteId: "a" })).toEqual({ programId: "copy-2", attached: false });
   });
   it("the import is written switched off and marked, and switched on (unless it is an AI draft) only after the last day", () => {
-    const w = read("components/coach/desktop/import-wizard.tsx");
-    expect(w).toContain("        is_active: false,\n        importing: true,");
-    expect(w).not.toContain("is_active: !importData.isAiSourced,\n        ai_draft");
-    const finish = w.indexOf('update({ importing: false, is_active: !importData.isAiSourced })');
+    // the writing moved to lib/write-imported-program.ts (Oct 27: an import fills the program it was started in)
+    const w = read("lib/write-imported-program.ts");
+    expect(w).toContain("    is_active: false,\n    importing: true,");
+    expect(w).not.toContain("is_active: !input.isAiSourced,\n    ai_draft");
+    const finish = w.indexOf('update({ importing: false, is_active: !input.isAiSourced })');
     expect(finish).toBeGreaterThan(w.indexOf('from("group_workout_exercise_sets").insert(setsPayload)'));
     expect(w).toContain("The program was written but did not finish saving, so it can't be assigned yet. Import it again.");
   });
