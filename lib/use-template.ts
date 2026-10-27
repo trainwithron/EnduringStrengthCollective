@@ -43,6 +43,27 @@ export function buildReview(slots: TemplateSlot[], laddersByPatternId: Record<st
     });
 }
 
+// Easier / Harder on a slot (Ron, Oct 27: "Each exercise should have a ladder that we can quickly tailor to each individual"): one rung down or up the slot's own choices (the same pattern, side
+// and class rules as the dropdown), or null at the bottom / top. An exercise that is not one of the choices (the AI's pick, or "your request") moves to the nearest choice below / above it by
+// difficulty when the pattern's ladder knows how hard it is; otherwise null, because which way is easier cannot be known.
+export function stepRung(choices: LadderRung[], current: string | null | undefined, dir: -1 | 1, patternLadder: LadderRung[] = []): string | null {
+  if (!current) return null;
+  const at = choices.findIndex((c) => c.exerciseName === current);
+  if (at >= 0) return choices[at + dir]?.exerciseName ?? null;
+  const known = patternLadder.find((r) => r.exerciseName.trim().toLowerCase() === current.trim().toLowerCase());
+  if (!known) return null;
+  const pool = choices.filter((c) => (dir < 0 ? c.rank < known.rank : c.rank > known.rank));
+  if (pool.length === 0) return null;
+  return (dir < 0 ? pool[pool.length - 1] : pool[0]).exerciseName;
+}
+
+// A slot the coach tailored by hand (Easier, Harder or the dropdown) shows "changed": its exercise is no longer the one the level (or Pick for me) chose.
+export function isTailored(movedByHand: boolean, value: string | null | undefined, chosen: string | null | undefined): boolean {
+  return movedByHand && !!value && value !== chosen;
+}
+
+export const TAILORED_MARK = "changed";
+
 // Make is allowed only when every slot has an exercise.
 export function everySlotFilled(rows: ReviewRow[], picks: Record<string, string | null>): boolean {
   return rows.length > 0 && rows.every((r) => !!(picks[r.rowId] ?? r.pick));

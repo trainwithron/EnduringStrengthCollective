@@ -20,13 +20,14 @@ import { isPhoneView } from "@/lib/phone-coach-routes";
 import { VIEW_OVERRIDE_COOKIE } from "@/lib/pwa";
 import type { CoachedGroup } from "@/lib/coach-groups";
 
-// The six panels behind the tiles are loaded only when one is opened (every phone page carries this hub; most never open a panel). What needs you (SpotNeedsTop) stays in the page.
+// The panels behind the tiles (and the Program tile's templates) are loaded only when one is opened (every phone page carries this hub; most never open a panel). What needs you (SpotNeedsTop) stays in the page.
 const BusinessMiniDashboard = dynamic(() => import("@/components/coach/desktop/business-mini-dashboard").then((m) => m.BusinessMiniDashboard), { ssr: false, loading: () => null });
 const AskSpotChatPanel = dynamic(() => import("@/components/coach/ask-spot-chat-panel").then((m) => m.AskSpotChatPanel), { ssr: false, loading: () => null });
 const QuickPaymentPanel = dynamic(() => import("./quick-payment-panel").then((m) => m.QuickPaymentPanel), { ssr: false, loading: () => null });
 const SpotBuilderPanel = dynamic(() => import("./spot-builder-panel").then((m) => m.SpotBuilderPanel), { ssr: false, loading: () => null });
 const SpotClientsGroupsPanel = dynamic(() => import("./spot-clients-groups-panel").then((m) => m.SpotClientsGroupsPanel), { ssr: false, loading: () => null });
 const SpotMessagesPanel = dynamic(() => import("./spot-messages-panel").then((m) => m.SpotMessagesPanel), { ssr: false, loading: () => null });
+const SpotTemplates = dynamic(() => import("./spot-templates").then((m) => m.SpotTemplates), { ssr: false, loading: () => null });
 
 type TileKey = "clients" | "messages" | "business" | "program" | "ask-spot";
 
@@ -579,6 +580,8 @@ export function CoachSpotHub({
                       <a href="/programs" className="block min-h-11 leading-[2.75rem] mb-2 font-body text-sm text-rust" data-all-programs>
                         All programs →
                       </a>
+                      {/* Use a template (built on a computer): its slots filled from the ladders, tailored with Easier / Harder. */}
+                      <SpotTemplates key={activeGroupId} groupId={activeGroupId} />
                     </>
                   )}
                 </div>

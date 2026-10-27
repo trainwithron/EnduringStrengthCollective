@@ -11,7 +11,7 @@ import { readAiJson } from "@/lib/ai-fetch";
 import { LikeClientSuggestion } from "@/components/coach/desktop/like-client";
 import { PastAiNotes } from "@/components/coach/desktop/past-ai-notes";
 import { NOTHING_FITS_MESSAGE, PICK_FAILED_MESSAGE, TEMPLATE_PICK_MAX_TEXT, YOUR_REQUEST_TAG, type TemplatePick } from "@/lib/ai-from-template";
-import { LEVELS, MAKE_FAILED_MESSAGE, NO_LADDER_MESSAGE, buildReview, dayHeading, defaultProgramName, everySlotFilled, madeMessage, type TemplateSlot } from "@/lib/use-template";
+import { LEVELS, MAKE_FAILED_MESSAGE, NO_LADDER_MESSAGE, TAILORED_MARK, buildReview, dayHeading, defaultProgramName, everySlotFilled, isTailored, madeMessage, stepRung, type TemplateSlot } from "@/lib/use-template";
 
 const field = "h-11 w-full bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust";
 
@@ -44,6 +44,8 @@ export function UseTemplatePanel({
   // The chosen client's stored level (null = none yet). It pre-fills the Level, and is stored for them the first time a template is used for them.
   const [storedLevel, setStoredLevel] = useState<Level | null>(null);
   const [changed, setChanged] = useState<Record<string, string>>({});
+  // The slots the coach moved by hand (Easier, Harder or the dropdown): marked "changed" while they differ from what the level or Pick for me chose.
+  const [moved, setMoved] = useState<Record<string, true>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
@@ -116,6 +118,7 @@ export function UseTemplatePanel({
         if (stored) {
           setLevel(stored);
           setChanged({});
+          setMoved({});
         }
       });
   }
@@ -152,6 +155,7 @@ export function UseTemplatePanel({
       if (client) void fetch("/api/learning/notes", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "learn", groupId: client.destinationGroupId, athleteId: client.id, text: aiText, corrections: [] }) }).catch(() => {});
       setLevel(data.level as Level);
       setChanged(next);
+      setMoved({});
       setAiPicks(byRow);
       setAiFlags(Array.isArray(data.flags) ? (data.flags as string[]) : []);
     } catch {
@@ -159,6 +163,12 @@ export function UseTemplatePanel({
     } finally {
       setPicking(false);
     }
+  }
+
+  // One rung down (Easier) or up (Harder) the slot's ladder; the exercise changes at once.
+  function choose(rowId: string, exercise: string) {
+    setChanged((prev) => ({ ...prev, [rowId]: exercise }));
+    setMoved((prev) => ({ ...prev, [rowId]: true }));
   }
 
   async function make() {
@@ -247,6 +257,7 @@ export function UseTemplatePanel({
                     setLevel(e.target.value as Level);
                     // A new level re-picks every slot.
                     setChanged({});
+                    setMoved({});
                   }}
                   className={`${field} mt-1`}
                 >
@@ -325,33 +336,47 @@ export function UseTemplatePanel({
                 lastHeading = heading;
                 const value = picks[r.rowId] ?? "";
                 const ai = aiPicks[r.rowId];
+                const easier = stepRung(r.choices, value, -1, ladders[r.patternId] ?? []);
+                const harder = stepRung(r.choices, value, 1, ladders[r.patternId] ?? []);
+                const tailored = isTailored(!!moved[r.rowId], value, ai?.exercise ?? r.pick);
                 return (
                   <div key={r.rowId}>
                     {showHeading && <p className="font-display uppercase text-xs tracking-wide text-steel pt-3 pb-1">{heading}</p>}
                     <div className="border border-steel/20 p-2.5">
-                      <p className="font-body text-xs text-steel">{r.label}</p>
+                      <p className="font-body text-xs text-steel">
+                        {r.label}
+                        {tailored && <span className="ml-2 text-rust" data-tailored>{TAILORED_MARK}</span>}
+                      </p>
                       {r.choices.length === 0 ? (
                         <p className="font-body text-xs text-rust mt-1" role="alert">
                           {NO_LADDER_MESSAGE}
                         </p>
                       ) : (
-                        <select value={value} onChange={(e) => setChanged((prev) => ({ ...prev, [r.rowId]: e.target.value }))} aria-label={`Exercise for ${r.label}`} className={`${field} mt-1`}>
-                          {value === "" && (
-                            <option value="" disabled>
-                              Choose…
-                            </option>
-                          )}
-                          {ai?.source === "request" && ai.exercise && !r.choices.some((c) => c.exerciseName === ai.exercise) && (
-                            <option value={ai.exercise}>
-                              {ai.exercise} ({YOUR_REQUEST_TAG})
-                            </option>
-                          )}
-                          {r.choices.map((c) => (
-                            <option key={c.exerciseName} value={c.exerciseName}>
-                              {c.exerciseName}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="flex items-stretch gap-1.5 mt-1">
+                          <select value={value} onChange={(e) => choose(r.rowId, e.target.value)} aria-label={`Exercise for ${r.label}`} className={`${field} flex-1 min-w-0`}>
+                            {value === "" && (
+                              <option value="" disabled>
+                                Choose…
+                              </option>
+                            )}
+                            {ai?.source === "request" && ai.exercise && !r.choices.some((c) => c.exerciseName === ai.exercise) && (
+                              <option value={ai.exercise}>
+                                {ai.exercise} ({YOUR_REQUEST_TAG})
+                              </option>
+                            )}
+                            {r.choices.map((c) => (
+                              <option key={c.exerciseName} value={c.exerciseName}>
+                                {c.exerciseName}
+                              </option>
+                            ))}
+                          </select>
+                          <button type="button" onClick={() => easier && choose(r.rowId, easier)} disabled={!easier} aria-label={`Easier: ${r.label}`} className="min-h-11 px-2.5 border border-steel/30 font-body text-xs text-chalk disabled:opacity-30">
+                            Easier
+                          </button>
+                          <button type="button" onClick={() => harder && choose(r.rowId, harder)} disabled={!harder} aria-label={`Harder: ${r.label}`} className="min-h-11 px-2.5 border border-steel/30 font-body text-xs text-chalk disabled:opacity-30">
+                            Harder
+                          </button>
+                        </div>
                       )}
                       {ai && ai.source === "request" && value === ai.exercise && <p className="font-body text-xs text-rust mt-1">{YOUR_REQUEST_TAG}</p>}
                       {ai && (ai.source === "ai" || ai.source === "request") && value === ai.exercise && ai.reason && <p className="font-body text-xs text-steel mt-1">{ai.reason}</p>}
