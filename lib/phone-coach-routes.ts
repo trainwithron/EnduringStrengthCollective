@@ -26,12 +26,17 @@ export function isStaleMobileOverride({ override, userAgent }: { override: strin
 // Release 2 (the phone opens as the coach's own account): the coach Home and the business pages open the coach's OWN app with Spotlight open (that is where clients, messages and the business
 // side live now); the calendar pages open their own Calendar (the organization's schedule with their own workouts on it). A team-sport group's coach keeps the team Home: `home` marks the
 // redirects the middleware sends to that group's page instead when the group is a team-sport one.
-export const PHONE_SPOTLIGHT = "/my-space?view=client&spot=1";
-export const PHONE_CALENDAR = "/my-space?view=client&to=calendar";
+// Each place has its own path (lib/my-space-target.ts: the browser's router tells addresses apart by path, not by what follows the "?").
+export const PHONE_SPOTLIGHT = "/my-space/spotlight";
+export const PHONE_CALENDAR = "/my-space/calendar";
+/** The phone Calendar, on a month (YYYY-MM) when one is given. */
+export function phoneCalendarHref(month?: string | null): string {
+  return PHONE_CALENDAR + (month && /^\d{4}-\d{2}$/.test(month) ? `?month=${month}` : "");
+}
 // The landing decision (app/coach-landing/route.ts) and the coach's own app (lib/start-group.ts COACH_PHONE_ENTRY / COACH_PHONE_LANDING), spelled out here so this file needs no imports.
 // Home on the phone while working keeps the organization chosen in Spotlight (COACH_PHONE_ENTRY_KEEP_ORG); only a fresh open starts in the home organization.
 export const PHONE_ENTRY = "/coach-landing?keep=org";
-export const PHONE_OWN_APP = "/my-space?view=client";
+export const PHONE_OWN_APP = "/my-space/home";
 
 export interface PhoneRedirect {
   /** Where the phone goes instead. */
@@ -77,8 +82,7 @@ export function phoneCoachRedirect(pathname: string, search = ""): PhoneRedirect
   if (pathname === "/calendar" || pathname === "/group-calendar" || pathname === "/recurring-conflicts") {
     // Booking one client (?scheduleFor=) stays: the page takes it to that client's group. So does Availability (?tab=availability): the one place a coach sets their hours, on a phone too.
     if (pathname === "/calendar" && (params.get("scheduleFor") || params.get("tab") === "availability")) return null;
-    const month = params.get("month");
-    return { to: PHONE_CALENDAR + (month && /^\d{4}-\d{2}$/.test(month) ? `&month=${month}` : ""), groupId: null, shared: false };
+    return { to: phoneCalendarHref(params.get("month")), groupId: null, shared: false };
   }
   if (pathname === "/running-low") return { to: PHONE_SPOTLIGHT, groupId: null, shared: false };
   // The computer's Home. Decided here, before the page renders: the page has a loading screen, so a redirect from inside it arrives in the middle of the stream (Release 2 follow-up, Oct 20).

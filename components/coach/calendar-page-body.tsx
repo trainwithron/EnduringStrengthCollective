@@ -22,7 +22,7 @@ import { CancelBookingButton } from "@/components/athlete/cancel-booking-button"
 import { BookingModeLine } from "@/components/athlete/booking-mode-line";
 import { ScheduleCard } from "@/components/athlete/schedule-card";
 import { CoachPhoneSchedule, loadScheduleClients } from "@/components/coach/mobile/coach-phone-schedule";
-import { PHONE_CALENDAR } from "@/lib/phone-coach-routes";
+import { phoneCalendarHref } from "@/lib/phone-coach-routes";
 import { loadScheduleCard } from "@/lib/schedule-card";
 import { SessionCheckSection } from "@/components/coach/session-check-section";
 import { SessionCountLine } from "@/components/coach/session-count-line";
@@ -158,7 +158,7 @@ export async function CoachCalendarPageBody(
     // Release 2: on a phone the Calendar tab is the coach's OWN Calendar (the organization's schedule with their own workouts on it, components/coach/mobile/coach-phone-schedule.tsx).
     // Only booking one client (?scheduleFor=) stays here.
     if (!searchParams.scheduleFor) {
-      redirect(PHONE_CALENDAR + (searchParams.month && /^\d{4}-\d{2}$/.test(searchParams.month) ? `&month=${searchParams.month}` : ""));
+      redirect(phoneCalendarHref(searchParams.month));
     }
     const [scheduleClients, { data: coachGroup }, { data: coachProfileRow }] = await Promise.all([
       loadScheduleClients(supabase, user.id, params.groupId),

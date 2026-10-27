@@ -233,7 +233,7 @@ describe("where a coach on a phone lands", () => {
   it("sign-in sends a coach on a phone to the landing decision, a coach at a computer to the dashboard, and the landing route redirects only", () => {
     expect(startPath({ group_id: TROJANS, role: "coach" }, true)).toBe(COACH_PHONE_ENTRY);
     expect(startPath({ group_id: TROJANS, role: "coach" }, false)).toBe("/dashboard");
-    expect(COACH_PHONE_LANDING).toBe("/my-space?view=client");
+    expect(COACH_PHONE_LANDING).toBe("/my-space/home");
     const r = src("app/coach-landing/route.ts");
     expect(r).toContain("/choose-organization?next=${encodeURIComponent(COACH_PHONE_ENTRY_KEEP_ORG)}");
     expect(r).not.toMatch(/\.(insert|update|upsert|delete)\(|\.rpc\(/);
@@ -270,7 +270,7 @@ describe("the coach's own training on a phone: ONE row at the top of the Clients
     expect(page.indexOf("<CoachOwnRow")).toBeLessThan(page.indexOf("<CoachRosterMobile"));
     expect(page.indexOf("<CoachOwnRow")).toBeGreaterThan(page.indexOf("if (await prefersAthleteStyleView())"));
     const { COACH_OWN_ROW_HREF } = await import("@/components/coach/mobile/coach-own-row");
-    expect(COACH_OWN_ROW_HREF).toBe("/my-space?view=client");
+    expect(COACH_OWN_ROW_HREF).toBe("/my-space/home");
   });
   it("it reads as the coach's name with (you), and the team coach home's Athletes link leads to that same page", async () => {
     const { renderToStaticMarkup } = await import("react-dom/server");
@@ -278,7 +278,7 @@ describe("the coach's own training on a phone: ONE row at the top of the Clients
     const { CoachOwnRow } = await import("@/components/coach/mobile/coach-own-row");
     const html = renderToStaticMarkup(createElement(CoachOwnRow, { name: "Coach Ron" }));
     expect(html).toContain("Coach Ron (you)");
-    expect(html).toContain('href="/my-space?view=client"');
+    expect(html).toContain('href="/my-space/home"');
     const home = teamPhoneHome({ groupId: TROJANS, programs: [] });
     expect(home.links.find((l) => l.label === "Athletes")?.href).toBe(`/groups/${TROJANS}/clients?view=members`);
   });

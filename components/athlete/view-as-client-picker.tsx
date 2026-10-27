@@ -160,7 +160,7 @@ export function ViewAsClientPicker({ onClose }: { onClose: () => void }) {
     if (switching) return;
     setSwitching(true);
     onClose();
-    router.push("/my-space?view=client");
+    router.push("/my-space/home");
   }
 
   const filtered = (clients ?? []).filter((c) =>

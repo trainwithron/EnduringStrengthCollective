@@ -12,7 +12,7 @@ describe("where a person lands", () => {
   it("a coach on a phone opens on their own client profile; at a computer, the desktop Home", () => {
     expect(startPath(coach, true)).toBe(COACH_PHONE_ENTRY);
     expect(COACH_PHONE_ENTRY).toBe("/coach-landing");
-    expect(COACH_PHONE_LANDING).toBe("/my-space?view=client");
+    expect(COACH_PHONE_LANDING).toBe("/my-space/home");
     expect(startPath(coach, false)).toBe("/dashboard");
   });
   it("a client goes to their group whatever the device, and nobody with no group goes to the front page", () => {

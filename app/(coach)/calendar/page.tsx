@@ -4,7 +4,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { getCoachedGroups } from "@/lib/coach-groups";
 import { CHOOSE_ORGANIZATION_PATH, getActiveAnchor } from "@/lib/active-anchor";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
-import { PHONE_CALENDAR } from "@/lib/phone-coach-routes";
+import { phoneCalendarHref } from "@/lib/phone-coach-routes";
 import { loadStartInputs, parseLastGroupCookie, pickStartGroup } from "@/lib/start-group";
 import { CoachCalendarPageBody } from "@/components/coach/calendar-page-body";
 
@@ -29,7 +29,7 @@ export default async function CoachCalendarRoute(props: { searchParams: Promise<
   if (anchor) {
     if ((await prefersAthleteStyleView()) && searchParams.tab !== "availability") {
       // Release 2: on a phone the calendar is the coach's own Calendar (the organization's schedule with their own workouts on it); booking one client keeps this page's path.
-      if (!searchParams.scheduleFor) redirect(PHONE_CALENDAR + (searchParams.month && /^\d{4}-\d{2}$/.test(searchParams.month) ? `&month=${searchParams.month}` : ""));
+      if (!searchParams.scheduleFor) redirect(phoneCalendarHref(searchParams.month));
       const qs = new URLSearchParams();
       for (const [k, v] of Object.entries(searchParams)) if (typeof v === "string") qs.set(k, v);
       redirect(`/groups/${anchor.id}/calendar${qs.size > 0 ? `?${qs.toString()}` : ""}`);

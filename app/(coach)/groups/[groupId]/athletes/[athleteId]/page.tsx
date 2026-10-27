@@ -1087,7 +1087,7 @@ export default async function AthleteProfilePage(
                   extra={
                     <>
                       <span className="hidden lg:inline-flex">
-                        <ViewAsClientLink href={selfView ? "/my-space?view=client" : `/groups/${params.groupId}/athletes/${params.athleteId}/view`} />
+                        <ViewAsClientLink href={selfView ? "/my-space/home" : `/groups/${params.groupId}/athletes/${params.athleteId}/view`} />
                       </span>
                     </>
                   }

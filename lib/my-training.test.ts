@@ -64,7 +64,7 @@ describe("the pieces are wired", () => {
   it("both coach pickers go straight to My training: no 'Which group's program?' step", () => {
     for (const f of ["components/athlete/view-as-client-picker.tsx", "components/coach/mobile/spot-clients-groups-panel.tsx"]) {
       const src = read(f);
-      expect(src).toContain('router.push("/my-space?view=client")');
+      expect(src).toContain('router.push("/my-space/home")');
       expect(src).not.toContain("Which group");
       expect(src).toContain("Start your own workout");
     }
@@ -113,7 +113,7 @@ describe("The coach as their own client (personal space)", () => {
     const open = read("lib/open-own-space.ts");
     expect(open).toContain("setMyTrainingCookies(response, { userId: user.id, groupId: spaceId as string, role: (seat as { role: string }).role });");
     expect(open).toContain("NextResponse.redirect(new URL(mySpaceTarget(spaceId as string, params), url))");
-    expect(read("app/my-training/page.tsx")).toContain('redirect("/my-space?view=client")');
+    expect(read("app/my-training/page.tsx")).toContain('redirect("/my-space/home")');
   });
   it("on their own profile the Billing tab, the message box and the video check-in are gone", () => {
     expect(read("lib/client-profile-tabs.ts")).toContain('SELF_HIDDEN_TABS: ClientProfileTab[] = ["settings"]');

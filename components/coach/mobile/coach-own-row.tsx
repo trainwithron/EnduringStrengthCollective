@@ -3,7 +3,7 @@ import { initialsOf } from "@/lib/initials";
 
 // The coach's own training, as a client of themselves: one row, always first in the phone Clients list (Athletes on a team coach home). It is not a client of any organization, so it is outside the count and the
 // list below it. Tapping it opens their own client app (their personal space), which carries the Back to coach home button. This is the ONE way into it from the coach side on a phone.
-export const COACH_OWN_ROW_HREF = "/my-space?view=client";
+export const COACH_OWN_ROW_HREF = "/my-space/home";
 
 export function CoachOwnRow({ name }: { name: string }) {
   return (

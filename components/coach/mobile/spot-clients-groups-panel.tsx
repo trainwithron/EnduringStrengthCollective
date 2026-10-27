@@ -188,7 +188,7 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
     if (busy) return;
     setBusy(true);
     onNavigated();
-    router.push("/my-space?view=client");
+    router.push("/my-space/home");
   }
 
   async function switchToGroup(targetGroupId: string) {

@@ -18,8 +18,8 @@ describe("/my-space opens a tab of the coach's own app", () => {
     expect(mySpaceTarget(S, q("view=client&to=settings&spot=1"))).toBe(`/groups/${S}/settings?spot=1`);
     expect(mySpaceTarget(S, q("view=client&to=../admin"))).toBe(`/groups/${S}`);
     expect(mySpaceTarget(S, q("view=client&to=calendar&month=x&next=/evil"))).toBe(`/groups/${S}/calendar`);
-    expect(mySpaceHref("nutrition")).toBe("/my-space?view=client&to=nutrition");
-    expect(mySpaceHref(null, { spot: true })).toBe("/my-space?view=client&spot=1");
+    expect(mySpaceHref("nutrition")).toBe("/my-space/nutrition");
+    expect(mySpaceHref(null, { spot: true })).toBe("/my-space/spotlight");
   });
 });
 
@@ -34,14 +34,14 @@ describe("Sawyer: Home from a coach tool is never a client's one-on-one space", 
     expect(read("app/sessions/[sessionId]/page.tsx")).toContain("const coachHomeHref = COACH_HOME_HREF;");
     expect(read("app/(coach)/dashboard/page.tsx")).toContain("redirect(COACH_PHONE_ENTRY_KEEP_ORG);");
     expect(read("app/coach-landing/route.ts")).toContain("let target = COACH_PHONE_LANDING;");
-    expect(COACH_PHONE_LANDING).toBe("/my-space?view=client");
+    expect(COACH_PHONE_LANDING).toBe("/my-space/home");
   });
 });
 
 describe("the phone redirects", () => {
   it("coach Home and business pages open Spotlight in their own app; calendar pages open their own Calendar", () => {
-    expect(PHONE_SPOTLIGHT).toBe("/my-space?view=client&spot=1");
-    expect(PHONE_CALENDAR).toBe("/my-space?view=client&to=calendar");
+    expect(PHONE_SPOTLIGHT).toBe("/my-space/spotlight");
+    expect(PHONE_CALENDAR).toBe("/my-space/calendar");
     expect(phoneCoachRedirect(`/groups/${S}/business`)).toMatchObject({ to: PHONE_SPOTLIGHT, home: true, groupId: S });
     expect(phoneCoachRedirect(`/groups/${S}/group-calendar`)?.to).toBe(PHONE_CALENDAR);
   });
@@ -90,7 +90,7 @@ describe("their own space", () => {
     expect(read("app/(coach)/groups/[groupId]/programs/[programId]/calendar/page.tsx")).toContain("if (isActingAsOther && athleteId === user.id && !(await orgIdOfGroup(supabase, params.groupId))) redirect(`/groups/${params.groupId}/calendar`);");
   });
   it("the coach's phone calendar (no client being booked) is their own Calendar", () => {
-    expect(read("components/coach/calendar-page-body.tsx")).toContain("if (!searchParams.scheduleFor) {\n      redirect(PHONE_CALENDAR");
+    expect(read("components/coach/calendar-page-body.tsx")).toContain("if (!searchParams.scheduleFor) {\n      redirect(phoneCalendarHref(searchParams.month));");
   });
   it("Settings and Nutrition treat them as themself, not as someone viewing a client", () => {
     expect(read("app/(coach)/groups/[groupId]/settings/page.tsx")).toContain("const viewingOther = effective.isActingAsOther && athleteId !== user.id;");
@@ -110,7 +110,7 @@ describe("Release 2 follow-ups (Oct 20)", () => {
     expect(phoneCoachRedirect("/dashboard")).toEqual({ to: "/coach-landing?keep=org", groupId: null, shared: false });
   });
   it("a group's own page sends a coach (not acting as a client) to their own app; a team-sport group's team Home stays (no redirect to itself)", () => {
-    expect(phoneCoachRedirect(`/groups/${S}`)).toEqual({ to: "/my-space?view=client", groupId: S, shared: true, home: true });
+    expect(phoneCoachRedirect(`/groups/${S}`)).toEqual({ to: "/my-space/home", groupId: S, shared: true, home: true });
     expect(read("lib/supabase/middleware.ts")).toContain("if (to !== pathname) {");
   });
   it("in their own space on a phone the separate bell is hidden (notices live in Spotlight); at a computer it stays", () => {

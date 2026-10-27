@@ -10,6 +10,7 @@ const state = vi.hoisted(() => ({
   user: { id: "client-1" } as { id: string },
   acting: { athleteId: "client-1", isActingAsOther: false },
   tables: {} as Record<string, Record<string, unknown>[]>,
+  phone: false,
 }));
 
 type Row = Record<string, unknown>;
@@ -48,6 +49,7 @@ const fakeDb = () => ({
 
 vi.mock("@/lib/supabase/server", () => ({ createServerClient: async () => fakeDb() }));
 vi.mock("@/lib/acting-as", () => ({ getEffectiveAthlete: async () => state.acting }));
+vi.mock("@/lib/pwa-server", () => ({ prefersAthleteStyleView: async () => state.phone, isMobileUserAgent: async () => state.phone, getViewOverride: async () => null, isPwaStandalone: async () => false, isTabletUserAgent: async () => false }));
 vi.mock("next/navigation", () => ({
   redirect: (to: string) => {
     throw new Error(`redirect ${to}`);
@@ -174,6 +176,42 @@ const open = () => CalendarDayPage({ params: Promise.resolve({ groupId: GROUP, d
 beforeEach(() => {
   state.user = { id: "client-1" };
   state.acting = { athleteId: "client-1", isActingAsOther: false };
+});
+
+// The href of the element whose own text is `label` (a Link: its props are read, the component is not called).
+function hrefOf(node: unknown, label: string): string | null {
+  if (node == null || typeof node !== "object") return null;
+  if (Array.isArray(node)) {
+    for (const n of node) {
+      const h = hrefOf(n, label);
+      if (h) return h;
+    }
+    return null;
+  }
+  const props = (node as { props?: Record<string, unknown> }).props;
+  if (!props) return null;
+  if (typeof props.href === "string" && texts(props.children).join("").includes(label)) return props.href;
+  return hrefOf(props.children, label);
+}
+
+describe("Back to calendar from a coach's day page", () => {
+  const coachOpen = async (date: string, search: Record<string, string> = {}) => {
+    state.user = { id: COACH };
+    state.acting = { athleteId: COACH, isActingAsOther: false };
+    seed({ athlete: "client-1", coachRole: "athlete", program: "none" });
+    return CalendarDayPage({ params: Promise.resolve({ groupId: GROUP, date }), searchParams: Promise.resolve(search) } as never);
+  };
+  it("on a phone goes straight to the phone's Calendar, on the month of the day (Oct 27: it went through the group's calendar and landed on Home)", async () => {
+    state.phone = true;
+    expect(hrefOf(await coachOpen("2026-10-28"), "Back to calendar")).toBe("/my-space/calendar?month=2026-10");
+    // the month the link carried wins
+    expect(hrefOf(await coachOpen("2026-10-28", { month: "2026-11" }), "Back to calendar")).toBe("/my-space/calendar?month=2026-11");
+    state.phone = false;
+  });
+  it("on a computer is the group's calendar, as before", async () => {
+    state.phone = false;
+    expect(hrefOf(await coachOpen("2026-10-28"), "Back to calendar")).toBe(`/groups/${GROUP}/calendar`);
+  });
 });
 
 describe("the client's day page draws the coach's open times", () => {

@@ -42,6 +42,8 @@ import { VideoCallButton } from "@/components/booking/video-call-button";
 import { BookingVideoPanel } from "@/components/coach/desktop/booking-video-panel";
 import type { PackageOption } from "@/components/athlete/package-picker";
 import { getEffectiveAthlete } from "@/lib/acting-as";
+import { prefersAthleteStyleView } from "@/lib/pwa-server";
+import { phoneCalendarHref } from "@/lib/phone-coach-routes";
 import { meetsMinimumAge } from "@/lib/coppa";
 import { MarkNoShowToggle } from "@/components/coach/mark-no-show-toggle";
 import { WaitlistJoinButton } from "@/components/athlete/waitlist-join-button";
@@ -55,7 +57,7 @@ export const metadata = { title: "Calendar" };
 export default async function CoachDayDetailPage(
   props: {
     params: Promise<{ groupId: string; date: string }>;
-    searchParams: Promise<{ client?: string; reschedule?: string }>;
+    searchParams: Promise<{ client?: string; reschedule?: string; month?: string }>;
   }
 ) {
   const searchParams = await props.searchParams;
@@ -807,10 +809,13 @@ export default async function CoachDayDetailPage(
     monthToIso: zonedTimeToUtc(capNextMonth, "00:00", timezone).toISOString(),
   });
 
-  // Back to the calendar with the same client still picked (the phone calendar reads scheduleFor, the desktop one client).
+  // Back to the calendar with the same client still picked (the phone calendar reads scheduleFor, the desktop one client). On a phone, with no client picked, straight to the phone's Calendar
+  // on this day's month (or the month the link carried), not through the group's calendar and its redirects.
   const backHref = clientId
     ? `/groups/${params.groupId}/calendar?client=${clientId}&scheduleFor=${clientId}`
-    : `/groups/${params.groupId}/calendar`;
+    : (await prefersAthleteStyleView())
+      ? phoneCalendarHref(searchParams.month ?? params.date.slice(0, 7))
+      : `/groups/${params.groupId}/calendar`;
 
   return (
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="calendar">
