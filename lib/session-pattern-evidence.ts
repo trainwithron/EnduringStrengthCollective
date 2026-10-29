@@ -2,7 +2,7 @@
 // lib/session-pattern-spotter-gather.ts), so the counting is tested. A set counts as done by the logger's own rule (lib/set-complete.ts pastSetDone), never by its status alone: sets
 // logged under the old checkbox rule kept their weight and reps but stayed "pending", and were read as skipped (a coach was told a first exercise averaged 46% of its sets when every
 // set was there, Oct 20).
-import { detectRpeCreep, detectRestTimeCreep, detectStrugglePoint, detectWeekdayRushing } from "./session-pattern-spotter";
+import { MIN_REAL_SESSION_SECONDS, detectRpeCreep, detectRestTimeCreep, detectStrugglePoint, detectWeekdayRushing } from "./session-pattern-spotter";
 import { pastSetDone } from "./set-complete";
 import { nowInZone } from "./timezone";
 import { lastSetTime, plausibleSessionSeconds } from "./session-duration";
@@ -187,14 +187,14 @@ export function buildSessionPatternFindings(sessions: PatternSession[], targetRe
     const overallMin = Math.round(rushing.overallAvgDurationSeconds / 60);
     return [{
       kind: "weekday_rushing",
-      description: `${WEEKDAY_LABELS[rushing.weekday]} sessions average ${avgMin} min, real sessions overall average ${overallMin} min.`,
+      description: `${WEEKDAY_LABELS[rushing.weekday]} sessions usually run ${avgMin} min, against ${overallMin} min for sessions overall.`,
       numericValues: [avgMin, overallMin],
       evidence: {
         kind: "durations",
         weekday: WEEKDAY_LABELS[rushing.weekday],
         overallMinutes: overallMin,
         rows: timed
-          .filter((x) => weekdayOf(x.s.started_at) === rushing.weekday)
+          .filter((x) => weekdayOf(x.s.started_at) === rushing.weekday && x.seconds >= MIN_REAL_SESSION_SECONDS)
           .reverse()
           .map((x) => ({ startedAt: x.s.started_at, minutes: Math.round(x.seconds / 60) })),
       },

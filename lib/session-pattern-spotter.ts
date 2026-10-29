@@ -149,16 +149,20 @@ export interface WeekdayRushingResult {
 
 const DEFAULT_MIN_SAMPLES_PER_WEEKDAY = 3;
 const DEFAULT_RUSHING_THRESHOLD_PCT = 25;
+// A "session" under 10 minutes is a workout opened and closed by accident, not a short workout (Ron, Oct 29: Mondays 58, 61 and one 1-minute session fired a "Mondays are
+// shorter" note). Those are left out, and days are compared by their middle value (median), so one odd session can never make a pattern on its own.
+export const MIN_REAL_SESSION_SECONDS = 10 * 60;
 
 export function detectWeekdayRushing(
   samples: WeekdaySessionSample[],
   minSamplesPerWeekday: number = DEFAULT_MIN_SAMPLES_PER_WEEKDAY,
   thresholdPct: number = DEFAULT_RUSHING_THRESHOLD_PCT
 ): WeekdayRushingResult | null {
+  samples = samples.filter((s) => s.durationSeconds >= MIN_REAL_SESSION_SECONDS);
   const distinctWeekdays = new Set(samples.map((s) => s.weekday));
   if (distinctWeekdays.size < 2) return null; // nothing to compare a day against
 
-  const overallAvgDurationSeconds = average(samples.map((s) => s.durationSeconds));
+  const overallAvgDurationSeconds = median(samples.map((s) => s.durationSeconds));
   if (overallAvgDurationSeconds === 0) return null;
 
   const byWeekday = new Map<number, number[]>();
@@ -171,7 +175,7 @@ export function detectWeekdayRushing(
   let worst: WeekdayRushingResult | null = null;
   for (const [weekday, durations] of byWeekday) {
     if (durations.length < minSamplesPerWeekday) continue;
-    const avgDurationSeconds = average(durations);
+    const avgDurationSeconds = median(durations);
     const deltaPct = ((overallAvgDurationSeconds - avgDurationSeconds) / overallAvgDurationSeconds) * 100;
     if (deltaPct < thresholdPct) continue; // only a real, meaningful SHORTFALL counts as "rushing"
     if (!worst || deltaPct > worst.deltaPct) {
@@ -179,4 +183,11 @@ export function detectWeekdayRushing(
     }
   }
   return worst;
+}
+
+function median(values: number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }

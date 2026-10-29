@@ -120,4 +120,24 @@ describe("detectWeekdayRushing", () => {
     ];
     expect(detectWeekdayRushing(samples, 3, 25)).toBeNull();
   });
+
+  it("one accidental 1-minute session never makes a weekday 'shorter' (Ron, Oct 29: Mondays 58, 61 and 1 minute)", () => {
+    const samples = [
+      { weekday: 1, durationSeconds: 58 * 60 },
+      { weekday: 1, durationSeconds: 61 * 60 },
+      { weekday: 1, durationSeconds: 60 },
+      ...Array.from({ length: 6 }, () => ({ weekday: 3, durationSeconds: 60 * 60 })),
+    ];
+    expect(detectWeekdayRushing(samples)).toBeNull();
+  });
+
+  it("one short real Monday among normal ones is not a pattern (median, not average)", () => {
+    const samples = [
+      { weekday: 1, durationSeconds: 60 * 60 },
+      { weekday: 1, durationSeconds: 58 * 60 },
+      { weekday: 1, durationSeconds: 12 * 60 },
+      ...Array.from({ length: 6 }, () => ({ weekday: 3, durationSeconds: 60 * 60 })),
+    ];
+    expect(detectWeekdayRushing(samples)).toBeNull();
+  });
 });

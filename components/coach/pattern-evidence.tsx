@@ -47,7 +47,7 @@ export function PatternEvidence({ evidence, timeZone, unit }: { evidence: Findin
               <span className="font-body text-sm text-chalk tabular-nums">{r.minutes} min</span>
             </div>
           ))}
-          <p className="font-body text-xs text-steel py-1.5">All sessions average {evidence.overallMinutes} min.</p>
+          <p className="font-body text-xs text-steel py-1.5">Sessions usually run {evidence.overallMinutes} min.</p>
         </>
       )}
     </div>

@@ -98,7 +98,7 @@ describe("the other findings carry their evidence", () => {
       mk("2026-09-16T16:00:00Z", 60),
     ];
     const f = buildSessionPatternFindings(sessions, new Map(), "America/Los_Angeles").find((x) => x.kind === "weekday_rushing");
-    expect(f?.description).toBe("Monday sessions average 20 min, real sessions overall average 40 min.");
+    expect(f?.description).toBe("Monday sessions usually run 20 min, against 40 min for sessions overall.");
     if (f?.evidence?.kind === "durations") expect(f.evidence.rows.map((r) => r.minutes)).toEqual([20, 20, 20]);
   });
 });
