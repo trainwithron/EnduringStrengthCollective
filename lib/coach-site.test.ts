@@ -10,12 +10,12 @@ describe("what a coach types for their page is trimmed and limited", () => {
   it("cuts to the limits, drops empties, keeps only a first name", () => {
     const c = cleanSite({
       headline: "  Strength  ",
-      whyLines: ["a", " ", "b", "c", "d"],
+      whyLines: ["a", " ", "b", "c", "d", "e", "f", "g"],
       reviews: [{ quote: "Great", first_name: "Ann Smith" }, { quote: "", first_name: "X" }, { quote: "q2" }, { quote: "q3", first_name: "Bo" }, { quote: "q4" }],
       background: "neon",
     });
     expect(c.headline).toBe("Strength");
-    expect(c.whyLines).toEqual(["a", "b", "c"]);
+    expect(c.whyLines).toEqual(["a", "b", "c", "d", "e", "f"]);
     expect(c.reviews.map((r) => r.first_name)).toEqual(["Ann", "", "Bo"]);
     expect(c.reviews.length).toBe(3);
     expect(c.background).toBe("dark");

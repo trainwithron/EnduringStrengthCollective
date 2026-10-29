@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { SITE_BACKGROUNDS, SITE_LIMITS, cleanSite, type SiteBackground, type SiteReview } from "@/lib/coach-site";
+import { SITE_BACKGROUNDS, SITE_LIMITS, cleanSite, type SiteBackground, type SiteFact, type SiteReview } from "@/lib/coach-site";
 
 export interface WebsiteSettingsInitial {
   headline: string;
@@ -11,6 +11,11 @@ export interface WebsiteSettingsInitial {
   whyLines: string[];
   reviews: SiteReview[];
   background: SiteBackground;
+  eyebrow: string;
+  facts: SiteFact[];
+  packagesNote: string;
+  tagline: string;
+  consultNote: string;
   heroPath: string | null;
   coverPath: string | null;
   published: boolean;
@@ -37,7 +42,12 @@ export function WebsiteSettings({ coachId, slug, initial, pendingQuotes = [] }: 
   const [headline, setHeadline] = useState(initial.headline);
   const [whoIHelp, setWhoIHelp] = useState(initial.whoIHelp);
   const [whatIDo, setWhatIDo] = useState(initial.whatIDo);
-  const [why, setWhy] = useState<string[]>([0, 1, 2].map((i) => initial.whyLines[i] ?? ""));
+  const [why, setWhy] = useState<string[]>(Array.from({ length: SITE_LIMITS.whyLines }, (_, i) => initial.whyLines[i] ?? ""));
+  const [eyebrow, setEyebrow] = useState(initial.eyebrow);
+  const [facts, setFacts] = useState<SiteFact[]>(Array.from({ length: SITE_LIMITS.facts }, (_, i) => initial.facts[i] ?? { title: "", line: "" }));
+  const [packagesNote, setPackagesNote] = useState(initial.packagesNote);
+  const [tagline, setTagline] = useState(initial.tagline);
+  const [consultNote, setConsultNote] = useState(initial.consultNote);
   const [reviews, setReviews] = useState<SiteReview[]>([0, 1, 2].map((i) => initial.reviews[i] ?? { quote: "", first_name: "" }));
   const [background, setBackground] = useState<SiteBackground>(initial.background);
   const [heroPath, setHeroPath] = useState(initial.heroPath);
@@ -52,7 +62,7 @@ export function WebsiteSettings({ coachId, slug, initial, pendingQuotes = [] }: 
   async function save(next: { published?: boolean } = {}): Promise<boolean> {
     setBusy(true);
     setMessage(null);
-    const c = cleanSite({ headline, whoIHelp, whatIDo, whyLines: why, reviews, background });
+    const c = cleanSite({ headline, whoIHelp, whatIDo, whyLines: why, reviews, background, eyebrow, facts, packagesNote, tagline, consultNote });
     const { error } = await supabase.from("coach_sites").upsert(
       {
         coach_id: coachId,
@@ -62,6 +72,11 @@ export function WebsiteSettings({ coachId, slug, initial, pendingQuotes = [] }: 
         why_lines: c.whyLines,
         reviews: c.reviews,
         background: c.background,
+        eyebrow: c.eyebrow || null,
+        facts: c.facts,
+        packages_note: c.packagesNote || null,
+        tagline: c.tagline || null,
+        consult_note: c.consultNote || null,
         hero_path: heroPath,
         cover_path: coverPath,
         published: next.published ?? published,
@@ -88,7 +103,7 @@ export function WebsiteSettings({ coachId, slug, initial, pendingQuotes = [] }: 
     }
     const next = reviews.map((r, i) => (i === slot ? { quote: q.body, first_name: q.firstName } : r));
     setReviews(next);
-    const c = cleanSite({ headline, whoIHelp, whatIDo, whyLines: why, reviews: next, background });
+    const c = cleanSite({ headline, whoIHelp, whatIDo, whyLines: why, reviews: next, background, eyebrow, facts, packagesNote, tagline, consultNote });
     setBusy(true);
     const { error } = await supabase.from("coach_sites").upsert({ coach_id: coachId, reviews: c.reviews, updated_at: new Date().toISOString() }, { onConflict: "coach_id" });
     if (!error) await supabase.from("client_quotes").update({ status: "used" }).eq("id", q.id);
@@ -167,9 +182,24 @@ export function WebsiteSettings({ coachId, slug, initial, pendingQuotes = [] }: 
       </div>
 
       <label className="block">
+        <span className={label}>Line above your name</span>
+        <input value={eyebrow} maxLength={SITE_LIMITS.eyebrow} onChange={(e) => setEyebrow(e.target.value)} placeholder="Strength coach · In person and online" className={`${input} mt-1`} />
+      </label>
+
+      <label className="block">
         <span className={label}>Headline</span>
         <input value={headline} maxLength={SITE_LIMITS.headline} onChange={(e) => setHeadline(e.target.value)} placeholder="Strength and mobility specialist" className={`${input} mt-1`} />
       </label>
+
+      <div className="space-y-2">
+        <p className={label}>Quick facts under your name (up to 3)</p>
+        {facts.map((f, i) => (
+          <div key={i} className="grid grid-cols-1 sm:grid-cols-[10rem_1fr] gap-2">
+            <input value={f.title} maxLength={SITE_LIMITS.factTitle} onChange={(e) => setFacts((prev) => prev.map((x, j) => (j === i ? { ...x, title: e.target.value } : x)))} placeholder="Free consult" aria-label={`Fact ${i + 1} title`} className={input} />
+            <input value={f.line} maxLength={SITE_LIMITS.factLine} onChange={(e) => setFacts((prev) => prev.map((x, j) => (j === i ? { ...x, line: e.target.value } : x)))} placeholder="Up to 50 minutes, no cost" aria-label={`Fact ${i + 1} line`} className={input} />
+          </div>
+        ))}
+      </div>
 
       <div className="space-y-3">
         <p className={label}>About me</p>
@@ -184,11 +214,26 @@ export function WebsiteSettings({ coachId, slug, initial, pendingQuotes = [] }: 
       </div>
 
       <div className="space-y-2">
-        <p className={label}>Why pick me (up to 3 short lines)</p>
+        <p className={label}>Why pick me (up to 6 short lines)</p>
         {why.map((line, i) => (
           <input key={i} value={line} maxLength={SITE_LIMITS.whyLineLength} onChange={(e) => setWhy((prev) => prev.map((x, j) => (j === i ? e.target.value : x)))} aria-label={`Why pick me, line ${i + 1}`} className={input} />
         ))}
       </div>
+
+      <label className="block">
+        <span className={label}>Note under your packages</span>
+        <textarea value={packagesNote} maxLength={SITE_LIMITS.packagesNote} rows={2} onChange={(e) => setPackagesNote(e.target.value)} className="mt-1 w-full bg-graphite border border-steel/30 text-chalk p-3 font-body text-sm focus:outline-none focus:border-rust" />
+      </label>
+
+      <label className="block">
+        <span className={label}>Closing line</span>
+        <input value={tagline} maxLength={SITE_LIMITS.tagline} onChange={(e) => setTagline(e.target.value)} placeholder="Your slogan" className={`${input} mt-1`} />
+      </label>
+
+      <label className="block">
+        <span className={label}>About your consultation</span>
+        <input value={consultNote} maxLength={SITE_LIMITS.consultNote} onChange={(e) => setConsultNote(e.target.value)} placeholder="Your first consultation is free." className={`${input} mt-1`} />
+      </label>
 
       <div className="space-y-3">
         <p className={label}>Client reviews (up to 3)</p>

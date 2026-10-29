@@ -1,7 +1,7 @@
 // A coach's one short public page (/c/<their booking address>). What the coach types is cleaned here before it is saved and again before it is shown; the page shows only what is
 // below plus the coach's public packages and featured shop cards, never anything about a client.
 
-export const SITE_LIMITS = { headline: 120, whoIHelp: 300, whatIDo: 600, whyLines: 3, whyLineLength: 100, reviews: 3, quote: 240, firstName: 30 } as const;
+export const SITE_LIMITS = { headline: 120, whoIHelp: 300, whatIDo: 600, whyLines: 6, whyLineLength: 100, reviews: 3, quote: 240, firstName: 30, eyebrow: 60, facts: 3, factTitle: 30, factLine: 60, packagesNote: 300, tagline: 120, consultNote: 200 } as const;
 
 export type SiteBackground = "dark" | "light" | "brand";
 export const SITE_BACKGROUNDS: { value: SiteBackground; label: string }[] = [
@@ -15,6 +15,12 @@ export interface SiteReview {
   first_name: string;
 }
 
+// A short fact under the page header (Oct 28 redesign), e.g. {title: "Free consult", line: "Up to 50 min in person"}.
+export interface SiteFact {
+  title: string;
+  line: string;
+}
+
 export interface SiteContent {
   headline: string;
   whoIHelp: string;
@@ -22,6 +28,11 @@ export interface SiteContent {
   whyLines: string[];
   reviews: SiteReview[];
   background: SiteBackground;
+  eyebrow: string;
+  facts: SiteFact[];
+  packagesNote: string;
+  tagline: string;
+  consultNote: string;
 }
 
 const clamp = (text: unknown, max: number) => (typeof text === "string" ? text.trim().slice(0, max) : "");
@@ -34,6 +45,11 @@ export interface SiteInput {
   whyLines?: string[];
   reviews?: Partial<SiteReview>[];
   background?: string;
+  eyebrow?: string;
+  facts?: Partial<SiteFact>[];
+  packagesNote?: string;
+  tagline?: string;
+  consultNote?: string;
 }
 
 export function cleanSite(input: SiteInput): SiteContent {
@@ -45,6 +61,10 @@ export function cleanSite(input: SiteInput): SiteContent {
     .map((r) => ({ quote: clamp(r?.quote, SITE_LIMITS.quote), first_name: clamp(r?.first_name, SITE_LIMITS.firstName).split(/\s+/)[0] ?? "" }))
     .filter((r) => r.quote !== "")
     .slice(0, SITE_LIMITS.reviews);
+  const facts = (Array.isArray(input.facts) ? input.facts : [])
+    .map((f) => ({ title: clamp(f?.title, SITE_LIMITS.factTitle), line: clamp(f?.line, SITE_LIMITS.factLine) }))
+    .filter((f) => f.title !== "")
+    .slice(0, SITE_LIMITS.facts);
   const background: SiteBackground = input.background === "light" || input.background === "brand" ? input.background : "dark";
   return {
     headline: clamp(input.headline, SITE_LIMITS.headline),
@@ -53,10 +73,21 @@ export function cleanSite(input: SiteInput): SiteContent {
     whyLines,
     reviews,
     background,
+    eyebrow: clamp(input.eyebrow, SITE_LIMITS.eyebrow),
+    facts,
+    packagesNote: clamp(input.packagesNote, SITE_LIMITS.packagesNote),
+    tagline: clamp(input.tagline, SITE_LIMITS.tagline),
+    consultNote: clamp(input.consultNote, SITE_LIMITS.consultNote),
   };
 }
 
 // Reads the jsonb reviews column back safely (anything that is not {quote, first_name} is dropped).
+// Reads the jsonb facts column back safely.
+export function factsFromJson(value: unknown): SiteFact[] {
+  if (!Array.isArray(value)) return [];
+  return cleanSite({ facts: value as Partial<SiteFact>[] }).facts;
+}
+
 export function reviewsFromJson(value: unknown): SiteReview[] {
   if (!Array.isArray(value)) return [];
   return cleanSite({ reviews: value as Partial<SiteReview>[] }).reviews;
@@ -114,7 +145,7 @@ export function ownImagePath(path: string | null | undefined, coachId: string): 
 }
 
 export function hasSiteContent(c: SiteContent): boolean {
-  return !!(c.headline || c.whoIHelp || c.whatIDo || c.whyLines.length || c.reviews.length);
+  return !!(c.headline || c.whoIHelp || c.whatIDo || c.whyLines.length || c.reviews.length || c.eyebrow || c.facts.length || c.tagline);
 }
 
 // Which organization's branding the page wears when the coach is in several: one they OWN before one they only help run, then the oldest. Stable, so the page never changes colours

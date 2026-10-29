@@ -5,7 +5,7 @@ import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { WebsiteSettings } from "@/components/coach/desktop/website-settings";
-import { cleanSite, reviewsFromJson, type SiteBackground } from "@/lib/coach-site";
+import { cleanSite, factsFromJson, reviewsFromJson, type SiteBackground } from "@/lib/coach-site";
 
 export const metadata = { title: "Website" };
 
@@ -40,6 +40,11 @@ export default async function WebsitePage(props: { params: Promise<{ groupId: st
     whyLines: site?.why_lines ?? [],
     reviews: reviewsFromJson(site?.reviews),
     background: (site?.background as SiteBackground | undefined) ?? "dark",
+    eyebrow: site?.eyebrow ?? "",
+    facts: factsFromJson(site?.facts),
+    packagesNote: site?.packages_note ?? "",
+    tagline: site?.tagline ?? "",
+    consultNote: site?.consult_note ?? "",
   });
 
   return (
