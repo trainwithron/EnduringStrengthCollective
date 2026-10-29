@@ -80,8 +80,10 @@ export function DuplicateWeekPanel({
 }) {
   const { flashSaved, flashSaveError } = useSaveToastChannel();
   const [open, setOpen] = useState(false);
-  const [model, setModel] = useState<Model>("copy");
-  const [weeks, setWeeks] = useState("3");
+  // Ron, Oct 29: "it should default to duplicating just one week, this is complicated for no reason, maybe a plain duplicate then duplicate with progressions button".
+  // "Duplicate week" copies the week once, as is, in one click; "Duplicate with progressions" opens this panel (1 week, a progression picked).
+  const [model, setModel] = useState<Model>("linear");
+  const [weeks, setWeeks] = useState("1");
   const [linearWeightPct, setLinearWeightPct] = useState("2.5");
   const [doubleWeightBumpPct, setDoubleWeightBumpPct] = useState("5");
   const [percentTmCycle, setPercentTmCycle] = useState("");
@@ -104,8 +106,10 @@ export function DuplicateWeekPanel({
     d.items.some((i) => i.kind === "exercise" && isIntervalExercise(i.trackedFields))
   );
 
-  async function handleGenerate() {
-    const weekCount = Number(weeks);
+  const chosenModel = model;
+  async function handleGenerate(opts?: { plain?: boolean }) {
+    const model: Model = opts?.plain ? "copy" : chosenModel;
+    const weekCount = opts?.plain ? 1 : Number(weeks);
     if (!weekCount || weekCount < 1) return;
     setGenerating(true);
 
@@ -643,13 +647,24 @@ export function DuplicateWeekPanel({
 
   if (!open) {
     return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="font-body text-xs text-rust border border-rust px-3 h-8"
-      >
-        Duplicate week →
-      </button>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => void handleGenerate({ plain: true })}
+          disabled={generating}
+          className="font-body text-xs text-graphite bg-rust border border-rust px-3 h-8 disabled:opacity-40"
+        >
+          {generating ? "Copying…" : "Duplicate week"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          disabled={generating}
+          className="font-body text-xs text-rust border border-rust px-3 h-8 disabled:opacity-40"
+        >
+          Duplicate with progressions →
+        </button>
+      </div>
     );
   }
 
@@ -715,8 +730,8 @@ export function DuplicateWeekPanel({
       <div className="flex gap-1">
         {(
           athleteId
-            ? (["copy", "linear", "double", "undulating", "percent_tm"] as Model[])
-            : (["copy", "linear", "double", "undulating"] as Model[])
+            ? (["linear", "double", "undulating", "percent_tm"] as Model[])
+            : (["linear", "double", "undulating"] as Model[])
         ).map((m) => (
           <button
             key={m}
@@ -864,7 +879,7 @@ export function DuplicateWeekPanel({
       <div className="flex gap-2 pt-2">
         <button
           type="button"
-          onClick={handleGenerate}
+          onClick={() => void handleGenerate()}
           disabled={generating}
           className="h-9 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
         >

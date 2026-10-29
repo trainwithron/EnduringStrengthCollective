@@ -17,15 +17,17 @@ describe("duplicate a week without progressions", () => {
     // a set with no weight stays without one
     expect(generateCopyProgression({ weight: null, reps: 12, repMin: null, repMax: null }, { weeks: 1 })).toEqual([{ weight: null, reps: 12 }]);
   });
-  it("the panel offers it first, leaves class rep targets and interval changes out of it, and says what it copies", () => {
+  it("a one-click Duplicate week copies ONE week as is (Ron, Oct 29), the progressions panel starts at 1 week, and the copy leaves class rep targets and interval changes out of it, and says what it copies", () => {
     const panel = src("components/coach/desktop/duplicate-week-panel.tsx");
     expect(panel).toContain('type Model = "copy" | "linear" | "double" | "undulating" | "percent_tm";');
-    expect(panel).toContain('(["copy", "linear", "double", "undulating", "percent_tm"] as Model[])');
-    expect(panel).toContain('useState<Model>("copy")'); // a plain copy is the starting choice
+    expect(panel).toContain('onClick={() => void handleGenerate({ plain: true })}');
+    expect(panel).toContain('const model: Model = opts?.plain ? "copy" : chosenModel;');
+    expect(panel).toContain('const weekCount = opts?.plain ? 1 : Number(weeks);');
+    expect(panel).toContain('Duplicate with progressions');
+    expect(panel).toContain('useState("1")');
     expect(panel).toContain('results = generateCopyProgression(source, { weeks: weekCount });');
     expect(panel).toContain('amountPerWeek: model === "copy" ? 0 :');
     expect(panel).toContain('model !== "copy" && !isDistancePace && classRepsEnabled');
-    expect(panel).toContain("Nothing is progressed.");
   });
   it("the ongoing Exercise Progressions rules are not part of a duplicated week (they belong to the program, not to a week)", () => {
     const panel = src("components/coach/desktop/duplicate-week-panel.tsx");
