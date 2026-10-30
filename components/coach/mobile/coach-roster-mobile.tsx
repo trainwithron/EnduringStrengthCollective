@@ -9,6 +9,7 @@ import { clientActivityStatus } from "@/lib/client-activity-status";
 import { computeQuietTier, QUIET_TIER_LABEL, type QuietTier } from "@/lib/quiet-client-tier";
 import { initialsOf } from "@/lib/initials";
 import { QuickViewBubble } from "./quick-view-bubble";
+import { TextSignInLinkButton } from "./text-sign-in-link-button";
 import type { RosterMember } from "@/lib/types";
 
 // iOS Contacts' sticky-letter-header + right-edge scrubber, layered with
@@ -209,6 +210,9 @@ function RosterRow({
           <p className="font-body text-sm text-steel">
             {tier !== "none" ? QUIET_TIER_LABEL[tier] : status.text}
           </p>
+          {member.signInStatus && member.signInStatus !== "active" && (
+            <TextSignInLinkButton groupId={groupId} athleteId={member.profileId} clientName={member.fullName} />
+          )}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-2">
             <Link
               href={`/groups/${groupId}/athletes/${member.profileId}`}

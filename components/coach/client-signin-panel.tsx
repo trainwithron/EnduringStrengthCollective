@@ -51,8 +51,7 @@ export function ClientSignInPanel({
 
   async function createLink() {
     if (busy) return;
-    // A new link replaces the one already made, so the coach is asked first (the old one stops working).
-    if (inviteCreated && !(await confirmDialog({ message: "Make a new sign-in link? The old one stops working.", confirmLabel: "Make new link" }))) return;
+    // A new link replaces the one already made (the old one stops working). Not asked first: resending is the everyday case (Ron, Oct 29: send a link again easily, even after one was sent).
     setBusy(true);
     setError(null);
     try {

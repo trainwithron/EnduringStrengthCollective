@@ -43,10 +43,11 @@ describe("the away reply card", () => {
 });
 
 describe("sign-in link wording and the program label control", () => {
-  it("one name, 'sign-in link', and a new one asks first", () => {
+  it("one name, 'sign-in link', and a new one is made without asking (Oct 29: resending is the everyday case)", () => {
     const panel = read("components/coach/client-signin-panel.tsx");
     expect(panel).not.toMatch(/[Ii]nvite link/);
-    expect(panel).toContain("Make a new sign-in link? The old one stops working.");
+    expect(panel).not.toContain("Make a new sign-in link? The old one stops working.");
+    expect(read("components/coach/mobile/coach-roster-mobile.tsx")).toContain("<TextSignInLinkButton");
     expect(read("lib/client-claim.ts")).toContain('invite_created: "Sign-in link created"');
   });
   it("the program order is 1 to 99, in plain words when labels are off", () => {
