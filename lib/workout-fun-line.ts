@@ -1,13 +1,12 @@
 import { getVolumeEquivalence } from "./volume-equivalence";
 import { getDistanceEquivalence } from "./distance-equivalence";
 import { FAITH_LINES, GYM_JOKES } from "./gym-jokes";
-import { FAMOUS_QUOTE_LINES } from "./famous-quotes";
 import { hashSeed, seededRandom } from "./seeded-pick";
 
 // The one light line on the post-workout card. It is picked when the card is made, from three kinds that are spread out over time:
 //   stat    a quip built from THIS workout's own numbers (pounds, minutes, sets, streak, PR)
 //   equiv   "that's the weight of N grizzly bears" (a volume comparison)
-//   absurd  a clean gym joke, an absurd line, or an unattributed quote
+//   absurd  a clean gym joke or an absurd line (Ron, Oct 29: jokes, funny comparisons and the absurd; the straight quotes came off the card)
 // A short, small or empty session gets an ENCOURAGING line instead (kind "encourage"), never a joke at its expense.
 //
 // Fresh, not stable: nothing here is seeded by the workout. The caller remembers the client's recent lines (`recent`, up to RECENT_WINDOW) and a line in that
@@ -105,34 +104,34 @@ export const STAT_QUIPS: Template[] = [
   {
     key: "per-minute",
     needs: (f) => poundsPerMinute(f) != null,
-    text: (f) => `That's about ${num(poundsPerMinute(f) as number)} pounds moved every minute you were in there. ⚡`,
+    text: (f) => `${num(poundsPerMinute(f) as number)} pounds a minute. Forklifts are getting nervous. 🚜`,
   },
   {
     key: "sets-promises",
     needs: (f) => good(f.totalSets) && f.totalSets >= 3,
-    text: (f) => `${f.totalSets} sets, ${f.totalSets} promises kept. 🤝`,
+    text: (f) => `${f.totalSets} sets. Somewhere, gravity is reviewing the footage. 🎥`,
   },
   {
     key: "sets-down",
     needs: (f) => good(f.totalSets) && f.totalSets >= 5,
-    text: (f) => `${f.totalSets} sets down and not one excuse left standing. ✅`,
+    text: (f) => `${f.totalSets} sets. The weights would like the rest of the day off. 😮‍💨`,
   },
   {
     key: "volume-floor",
     needs: (f) => volumeOk(f, 2000),
-    text: (f) => `${num(f.totalVolume as number)} pounds moved today. The floor felt every one. 🏋️`,
+    text: (f) => `${num(f.totalVolume as number)} pounds picked up and put right back where they were. Peak productivity. 📈`,
   },
   {
     key: "time-and-pounds",
     needs: (f) => volumeOk(f, 2000) && durationOk(f),
-    text: (f) => `${durationInWords(f.durationSeconds as number)}, ${num(f.totalVolume as number)} pounds. Time well spent. ⏱️`,
+    text: (f) => `${num(f.totalVolume as number)} pounds in ${durationInWords(f.durationSeconds as number)}. Movers charge extra for that. 📦`,
   },
   // Always-kind lines tied to a milestone this workout actually reached.
-  { key: "streak-cheat-code", needs: (f) => f.weekStreak >= 2, text: (f) => `${f.weekStreak} weeks in a row. Consistency is the cheat code. 🔥` },
-  { key: "streak-calendar", needs: (f) => f.weekStreak >= 2, text: (f) => `${f.weekStreak} straight weeks of showing up. Your calendar approves. 📅` },
-  { key: "pr-retired", needs: (f) => f.prCount >= 1, text: () => "A new PR. The old number just retired. 🏆" },
+  { key: "streak-cheat-code", needs: (f) => f.weekStreak >= 2, text: (f) => `${f.weekStreak} weeks in a row. The squat rack has started saving a spot. 🔥` },
+  { key: "streak-calendar", needs: (f) => f.weekStreak >= 2, text: (f) => `${f.weekStreak} straight weeks. The front desk is legally required to know that name now. 📅` },
+  { key: "pr-retired", needs: (f) => f.prCount >= 1, text: () => "New PR. The old record has been asked to clear out its desk. 📦" },
   { key: "pr-notified", needs: (f) => f.prCount >= 1, text: () => "New personal record. The barbell has been notified. 🏆" },
-  { key: "workout-count", needs: (f) => good(f.totalWorkoutCount) && f.totalWorkoutCount >= 10, text: (f) => `Workout #${f.totalWorkoutCount}. That is a lot of promises kept. 📈` },
+  { key: "workout-count", needs: (f) => good(f.totalWorkoutCount) && f.totalWorkoutCount >= 10, text: (f) => `Workout #${f.totalWorkoutCount}. The weights have started a fan club. 📈` },
 ];
 
 // The milestone lines (streak, PR, workout count) are kind for any session, small or not.
@@ -148,17 +147,8 @@ export const ENCOURAGING_LINES: string[] = [
   "Every session is a vote for the person you are becoming. 🗳️",
 ];
 
-// Short, unattributed lines about training in general.
-export const QUOTES: string[] = [
-  "Strength is built one set at a time. 🧱",
-  "You do not have to be extreme, just consistent. 🔁",
-  "Progress is quiet until it is obvious. 📈",
-  "The work you do when no one is watching is the work that shows. 🌙",
-  "Be patient with the process and ruthless with the habit. ⏳",
-];
-
 // The absurd bank. This is where the vetted batch of lines is loaded (plain strings, clean and kind, no real people or trademarks, 110 characters or fewer). Gym
-// jokes and quotes are in it now; more lines only make a repeat rarer.
+// jokes are in it now; more lines only make a repeat rarer.
 // Ron's own lines (his jokes, puns and parodies, approved word for word). They are the one place a named person, a first-person line or a skipped-leg-day joke is allowed, so
 // the tests that ban those in the rest of the bank list these by exact text. Keep them as Ron wrote them; the Franklin Roosevelt line is deliberately straight.
 export const RON_LINES: string[] = [
@@ -174,13 +164,15 @@ export const RON_LINES: string[] = [
   "The only thing we have to fear is fear itself. - Franklin D. Roosevelt",
 ];
 
-export const ABSURD_LINES: string[] = [...GYM_JOKES, ...QUOTES, ...FAMOUS_QUOTE_LINES, ...RON_LINES];
+export const ABSURD_LINES: string[] = [...GYM_JOKES, ...RON_LINES];
 
 const FITS = (s: string) => s.length <= MAX_FUN_LINE_CHARS;
 
 // How many different volume comparisons to offer from one workout's pounds (each a different unit), and how many "if those pounds were miles" lines join them (2 of 12:
 // about one in six of the comparisons).
-const EQUIV_VARIANTS = 10;
+const EQUIV_VARIANTS = 4;
+// Pop culture (Snorlax, the Hulk, Captain America's shield) is what clients loved: up to this many of the comparisons are characters, the rest objects and animals.
+const POP_VARIANTS = 8;
 const MILES_VARIANTS = 2;
 
 // Every line this workout could show, with its kind and stable id. Exposed so a test can render every template at edge values.
@@ -206,6 +198,13 @@ export function funLinePool(f: WorkoutFacts, opts: PoolOptions = {}): FunLine[] 
 
   if (volumeOk(f)) {
     const seen = new Set<string>();
+    for (let i = 0; i < POP_VARIANTS; i++) {
+      const eq = getVolumeEquivalence(f.totalVolume, `pop-${i}`, { popOnly: true });
+      if (eq && !seen.has(eq.id) && FITS(eq.text)) {
+        seen.add(eq.id);
+        out.push({ id: eq.id, kind: "equiv", text: eq.text });
+      }
+    }
     for (let i = 0; i < EQUIV_VARIANTS; i++) {
       const eq = getVolumeEquivalence(f.totalVolume, `variant-${i}`);
       if (eq && !seen.has(eq.id) && FITS(eq.text)) {
@@ -251,7 +250,8 @@ export function pickFreshFunLine(f: WorkoutFacts, recent: RecentLine[], rand: ()
   const fresh = pool.filter((l) => !blocked.has(l.id));
   if (fresh.length > 0) {
     const kinds = Array.from(new Set(fresh.map((l) => l.kind)));
-    const weight = (k: FunKind) => 1 / (1 + window.filter((r) => r.kind === k).length);
+    // Comparisons are the main event (Ron, Oct 29: "more so than the jokes, it needs to have a good comparison"): twice as likely as a stat or a joke.
+    const weight = (k: FunKind) => (k === "equiv" ? 2 : 1) / (1 + window.filter((r) => r.kind === k).length);
     const total = kinds.reduce((a, k) => a + weight(k), 0);
     let roll = rand() * total;
     let kind = kinds[kinds.length - 1];

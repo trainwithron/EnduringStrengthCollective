@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { CLAIM_LINK_LIFETIME_HOURS, validateClaimEmail, validateNewPassword } from "./client-claim";
 
 describe("claim link lifetime", () => {
-  it("is 48 hours", () => {
-    expect(CLAIM_LINK_LIFETIME_HOURS).toBe(48);
+  it("works until they sign in (ten years: the column needs a date)", () => {
+    expect(CLAIM_LINK_LIFETIME_HOURS).toBe(24 * 365 * 10);
   });
 });
 

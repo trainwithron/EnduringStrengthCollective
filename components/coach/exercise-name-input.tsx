@@ -20,6 +20,8 @@ export function ExerciseNameInput({
   aliases = [],
   tierByName,
   demoLibrary,
+  onPick,
+  autoFocus,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -35,6 +37,9 @@ export function ExerciseNameInput({
   tierByName?: Record<string, "A" | "B" | "C" | null>;
   // The coach's library with its demo links: each row of the list shows a tiny picture of that exercise's demo, so similar names (a row, a press) can be told apart. Optional.
   demoLibrary?: DemoRow[];
+  // Called (after onCommit) only when a row of the list is tapped, never on Enter or leaving the box: the workout logger swaps or adds the exercise on that one tap.
+  onPick?: (name: string) => void;
+  autoFocus?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
@@ -88,6 +93,7 @@ export function ExerciseNameInput({
     onChange(alias ?? name);
     if (alias) onCommit?.(name, alias);
     else onCommit?.(name);
+    onPick?.(name);
     setOpen(false);
     setActive(-1);
   }
@@ -118,6 +124,7 @@ export function ExerciseNameInput({
         aria-autocomplete="list"
         aria-activedescendant={showDropdown && active >= 0 ? optionId(active) : undefined}
         autoComplete="off"
+        autoFocus={autoFocus}
         value={value}
         onChange={(e) => {
           onChange(e.target.value);

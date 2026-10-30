@@ -57,11 +57,11 @@ describe("the card fits the screen", () => {
     expect(page).toContain('{isOwnSession && session.status !== "in_progress" && <BottomTabBar');
     expect(page).toContain('raised={isOwnSession && session.status !== "in_progress"}');
   });
-  it("the notes box is one line that opens when used, and Add / Quick add sit behind one small button", () => {
+  it("the notes box is one line that opens when used, and one small '+ Add exercise' button opens the library search (Quick add inside it)", () => {
     expect(note).toContain("rows={1}");
     expect(note).toContain("focus:min-h-[96px]");
-    expect(logger).toContain("+ Add");
-    expect(logger).toContain("addMenuOpen");
+    expect(logger).toContain("+ Add exercise");
+    expect(logger).toContain("onClick={() => setAddingExercise(true)}");
   });
   it("the next-exercise strip steps aside on a short screen", () => {
     expect(strip).toContain("[@media(max-height:760px)]:hidden");

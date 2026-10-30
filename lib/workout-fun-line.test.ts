@@ -173,7 +173,7 @@ describe("kindness: a small, short or empty session is never joked about", () =>
     // The Roosevelt quote is kept straight: nothing is added to it or changed.
     expect(RON_LINES).toContain("The only thing we have to fear is fear itself. - Franklin D. Roosevelt");
   });
-  it("the famous-quote bank: every quote is sourced, fits the card with its attribution, is not duplicated, and none is a known misattribution", () => {
+  it("the famous-quote bank: every quote is sourced, fits with its attribution, is not duplicated, none is a known misattribution, and none is on the card", () => {
     expect(FAMOUS_QUOTES.length).toBeGreaterThanOrEqual(90);
     const lines = new Set<string>();
     for (const quote of FAMOUS_QUOTES) {
@@ -182,8 +182,8 @@ describe("kindness: a small, short or empty session is never joked about", () =>
       expect(line.length, line).toBeLessThanOrEqual(110);
       expect(lines.has(line), line).toBe(false);
       lines.add(line);
-      expect(ABSURD_LINES, line).toContain(line);
-      expect(funLinePool(typical).map((l) => l.text), line).toContain(line);
+      // Off the card since Oct 29 (Ron wants jokes and absurd comparisons there, not straight quotes); the bank itself stays sourced for anywhere else it is used.
+      expect(ABSURD_LINES, line).not.toContain(line);
       expect(quote.text, line).not.toMatch(/[\u2018\u2019\u201c\u201d\u2013\u2014]/);
     }
     // Well-known lines that are commonly misattributed: they must never be added under the famous name.

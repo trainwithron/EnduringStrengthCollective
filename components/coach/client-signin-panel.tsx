@@ -65,7 +65,7 @@ export function ClientSignInPanel({
       if (!res.ok) throw new Error(data.error || "Couldn't create the link.");
       setLink(data.link);
       setLinkStatus("invite_created");
-      setDetail({ state: "live", daysLeft: 2, createdAt: new Date().toISOString() });
+      setDetail({ state: "live", daysLeft: null, createdAt: new Date().toISOString() });
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't create the link.");
@@ -153,9 +153,6 @@ export function ClientSignInPanel({
       {detail && detail.state !== "claimed" && (
         <p className="font-body text-sm text-chalk mt-3">
           {CLAIM_LINK_STATE_LABEL[detail.state]}
-          {detail.state === "live" && detail.daysLeft != null
-            ? `, ${detail.daysLeft} ${detail.daysLeft === 1 ? "day" : "days"} left`
-            : ""}
           {detail.createdAt && detail.state !== "not_sent"
             ? ` · made ${new Date(detail.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
             : ""}
@@ -178,7 +175,7 @@ export function ClientSignInPanel({
       {link ? (
         <div className="mt-4">
           <p className="font-body text-xs text-steel mb-1.5">
-            One-time link — works once and expires in 48 hours. Creating a new one cancels this one.
+            One-time link — works until they sign in. Creating a new one cancels this one.
           </p>
           <div className="flex items-center gap-2">
             <input aria-label="Sign-in link"

@@ -2,8 +2,9 @@
 // worth posting, not to be a precise converter. Seeded by the post's own id so a given workout's card always shows the same one (stable across reloads and screenshots),
 // while different workouts land on different units and phrasing.
 //
-// Deliberately no real named individuals (a specific athlete's or celebrity's weight is the one tasteless version of this joke) and no trademarks or characters: objects,
-// animals and generic things. Every unit has a `source` (where its weight comes from) and a test requires one.
+// Deliberately no real named individuals (a specific athlete's or celebrity's weight is the one tasteless version of this joke). Fictional characters and their gear ARE in,
+// by their official listed weight (Ron, Oct 29: "some of the stuff my clients loved was, you lifted the weight of 26 Snorlaxes, or 19 Hulks, or 97 of Captain America's shield":
+// pop culture is the comparison people post). Only the name is used, never a logo or picture. Every unit has a `source` (where its weight comes from) and a test requires one.
 import { seededPick } from "./seeded-pick";
 import { countPhrase } from "./number-words";
 
@@ -14,9 +15,57 @@ export interface ReferenceObject {
   emoji: string;
   // Where the weight comes from. Typical or average values are rounded; the number is a fun comparison, not a measurement.
   source: string;
+  // A pop-culture character or prop: the post-workout card shows these most of the time.
+  pop?: boolean;
 }
 
 const REFERENCE_OBJECTS_UNSORTED: ReferenceObject[] = [
+  // Pop culture, by the official listed weight
+  { name: "a Jigglypuff", pluralName: "Jigglypuffs", weightLbs: 12.1, emoji: "🎤", source: "Pokédex: 5.5 kg (12.1 lb)", pop: true },
+  { name: "a Captain America shield", pluralName: "Captain America shields", weightLbs: 12, emoji: "🛡️", source: "Marvel: the shield weighs 12 lb", pop: true },
+  { name: "a Pikachu", pluralName: "Pikachus", weightLbs: 13.2, emoji: "⚡", source: "Pokédex: 6.0 kg (13.2 lb)", pop: true },
+  { name: "a Bulbasaur", pluralName: "Bulbasaurs", weightLbs: 15.2, emoji: "🌱", source: "Pokédex: 6.9 kg (15.2 lb)", pop: true },
+  { name: "a Thor's hammer", pluralName: "Thor's hammers", weightLbs: 42.3, emoji: "🔨", source: "Marvel handbook: Mjolnir weighs 42.3 lb", pop: true },
+  { name: "a Gengar", pluralName: "Gengars", weightLbs: 89.3, emoji: "👻", source: "Pokédex: 40.5 kg (89.3 lb)", pop: true },
+  { name: "a Charizard", pluralName: "Charizards", weightLbs: 199.5, emoji: "🔥", source: "Pokédex: 90.5 kg (199.5 lb)", pop: true },
+  { name: "a Machamp", pluralName: "Machamps", weightLbs: 286.6, emoji: "💪", source: "Pokédex: 130 kg (286.6 lb)", pop: true },
+  { name: "a Wolverine", pluralName: "Wolverines", weightLbs: 300, emoji: "🗡️", source: "Marvel handbook: 300 lb with the adamantium skeleton", pop: true },
+  { name: "an Onix", pluralName: "Onixes", weightLbs: 463, emoji: "🪨", source: "Pokédex: 210 kg (463 lb)", pop: true },
+  { name: "a Gyarados", pluralName: "Gyarados", weightLbs: 518.1, emoji: "🐉", source: "Pokédex: 235 kg (518.1 lb)", pop: true },
+  { name: "a Wailord", pluralName: "Wailords", weightLbs: 877.4, emoji: "🐳", source: "Pokédex: 398 kg (877.4 lb)", pop: true },
+  { name: "a Thanos", pluralName: "Thanoses", weightLbs: 985, emoji: "🧤", source: "Marvel handbook: Thanos 985 lb", pop: true },
+  { name: "a Snorlax", pluralName: "Snorlaxes", weightLbs: 1014.1, emoji: "😴", source: "Pokédex: 460 kg (1,014.1 lb)", pop: true },
+  { name: "a Hulk", pluralName: "Hulks", weightLbs: 1040, emoji: "💚", source: "Marvel handbook: the Hulk 1,040 lb", pop: true },
+  { name: "a Groudon", pluralName: "Groudons", weightLbs: 2094.4, emoji: "🌋", source: "Pokédex: 950 kg (2,094.4 lb)", pop: true },
+  { name: "a Meowth", pluralName: "Meowths", weightLbs: 9.3, emoji: "😼", source: "Pokédex: 4.2 kg (9.3 lb)", pop: true },
+  { name: "a Mew", pluralName: "Mews", weightLbs: 8.8, emoji: "🩷", source: "Pokédex: 4.0 kg (8.8 lb)", pop: true },
+  { name: "an Eevee", pluralName: "Eevees", weightLbs: 14.3, emoji: "🦊", source: "Pokédex: 6.5 kg (14.3 lb)", pop: true },
+  { name: "a Charmander", pluralName: "Charmanders", weightLbs: 18.7, emoji: "🦎", source: "Pokédex: 8.5 kg (18.7 lb)", pop: true },
+  { name: "a Squirtle", pluralName: "Squirtles", weightLbs: 19.8, emoji: "🐢", source: "Pokédex: 9.0 kg (19.8 lb)", pop: true },
+  { name: "a Psyduck", pluralName: "Psyducks", weightLbs: 43.2, emoji: "🦆", source: "Pokédex: 19.6 kg (43.2 lb)", pop: true },
+  { name: "a Lucario", pluralName: "Lucarios", weightLbs: 119, emoji: "🥋", source: "Pokédex: 54.0 kg (119.0 lb)", pop: true },
+  { name: "a Mewtwo", pluralName: "Mewtwos", weightLbs: 269, emoji: "🧠", source: "Pokédex: 122.0 kg (269.0 lb)", pop: true },
+  { name: "a Rayquaza", pluralName: "Rayquazas", weightLbs: 455.3, emoji: "🐲", source: "Pokédex: 206.5 kg (455.3 lb)", pop: true },
+  { name: "a Dragonite", pluralName: "Dragonites", weightLbs: 463, emoji: "🐉", source: "Pokédex: 210.0 kg (463.0 lb)", pop: true },
+  { name: "a Lapras", pluralName: "Lapras", weightLbs: 485, emoji: "🌊", source: "Pokédex: 220.0 kg (485.0 lb)", pop: true },
+  { name: "a Celesteela", pluralName: "Celesteelas", weightLbs: 2204.4, emoji: "🚀", source: "Pokédex: 999.9 kg (2,204.4 lb)", pop: true },
+  { name: "a Spider-Man", pluralName: "Spider-Men", weightLbs: 167, emoji: "🕷️", source: "Marvel handbook: Peter Parker 167 lb", pop: true },
+  { name: "a Black Panther", pluralName: "Black Panthers", weightLbs: 200, emoji: "🐾", source: "Marvel handbook: T'Challa 200 lb", pop: true },
+  { name: "a Captain America", pluralName: "Captain Americas", weightLbs: 220, emoji: "⭐", source: "Marvel handbook: Steve Rogers 220 lb", pop: true },
+  { name: "a Colossus", pluralName: "Colossuses", weightLbs: 500, emoji: "🔩", source: "Marvel handbook: Colossus in steel form 500 lb", pop: true },
+  { name: "a Thor", pluralName: "Thors", weightLbs: 640, emoji: "⚡", source: "Marvel handbook: Thor 640 lb", pop: true },
+  { name: "a Juggernaut", pluralName: "Juggernauts", weightLbs: 1900, emoji: "🪖", source: "Marvel handbook: the Juggernaut 1,900 lb", pop: true },
+  { name: "a Batman", pluralName: "Batmen", weightLbs: 210, emoji: "🦇", source: "DC: Bruce Wayne 210 lb", pop: true },
+  { name: "a Superman", pluralName: "Supermen", weightLbs: 235, emoji: "🦸", source: "DC: Clark Kent 235 lb", pop: true },
+  { name: "a Yoda", pluralName: "Yodas", weightLbs: 28.7, emoji: "🟢", source: "Wookieepedia: Yoda 13 kg (28.7 lb)", pop: true },
+  { name: "a BB-8", pluralName: "BB-8s", weightLbs: 39.7, emoji: "🟠", source: "Wookieepedia: BB-8 18 kg (39.7 lb)", pop: true },
+  { name: "an R2-D2", pluralName: "R2-D2s", weightLbs: 70.5, emoji: "🤖", source: "Wookieepedia: R2-D2 32 kg (70.5 lb)", pop: true },
+  { name: "a C-3PO", pluralName: "C-3POs", weightLbs: 165, emoji: "🤖", source: "Wookieepedia: C-3PO 75 kg (165 lb)", pop: true },
+  { name: "a Wookiee", pluralName: "Wookiees", weightLbs: 247, emoji: "🐻", source: "Wookieepedia: Chewbacca 112 kg (247 lb)", pop: true },
+  { name: "a Darth Vader", pluralName: "Darth Vaders", weightLbs: 265, emoji: "🖤", source: "Wookieepedia: Darth Vader 120 kg (265 lb)", pop: true },
+  { name: "a Jabba the Hutt", pluralName: "Jabba the Hutts", weightLbs: 2994, emoji: "🐌", source: "Wookieepedia: Jabba 1,358 kg (2,994 lb)", pop: true },
+  { name: "a Sonic the Hedgehog", pluralName: "Sonic the Hedgehogs", weightLbs: 77, emoji: "💨", source: "Sonic official profile: 35 kg (77 lb)", pop: true },
+  { name: "a DeLorean", pluralName: "DeLoreans", weightLbs: 2712, emoji: "⏱️", source: "DMC-12 (the time machine car) curb weight about 2,712 lb", pop: true },
   // Tiny
   { name: "a jellybean", pluralName: "jellybeans", weightLbs: 0.0025, emoji: "🍬", source: "a Jelly Belly bean is about 1.1 g" },
   { name: "a newborn kangaroo joey", pluralName: "newborn kangaroo joeys", weightLbs: 0.002, emoji: "🦘", source: "a newborn red kangaroo is about 1 g (0.03 oz, as in lib/transformation-joke-bank.ts)" },
@@ -73,12 +122,17 @@ const NEAR_ONE = 0.9;
 const NEAR_ONE_TOP = 1.15;
 const MAX_COUNT = 5_000_000;
 
+// Absurd, not informative (Ron, Oct 29: the old lines were "not funny equivalencies ... not absurd"). Each reads with a count ("38 grizzly bears") and with "about one school bus".
 const PHRASE_TEMPLATES: ((label: string, singular: string, emoji: string) => string)[] = [
-  (label, _s, emoji) => `That's the weight of ${label}. ${emoji}`,
-  (label, _s, emoji) => `Talk about heavy lifting — that's ${label} right there. ${emoji}`,
-  (label, _s, emoji) => `Well, that's a lot of gains: ${label} worth, to be exact. ${emoji}`,
-  (label, singular, emoji) => `Somewhere, ${singular} is filing a complaint. ${emoji}`,
-  (label, _s, emoji) => `No bones about it — you just moved ${label}. ${emoji}`,
+  // The plain one is the one clients loved ("you lifted the weight of 26 Snorlaxes"), so it comes up most.
+  (label, _s, emoji) => `You lifted the weight of ${label}. ${emoji}`,
+  (label, _s, emoji) => `You lifted the weight of ${label}. ${emoji}`,
+  (label, _s, emoji) => `You lifted the weight of ${label}. ${emoji}`,
+  (label, _s, emoji) => `That's ${label}. Please do not try this with the real thing. ${emoji}`,
+  (label, _s, emoji) => `You moved ${label} today. A moving company would like your number. ${emoji}`,
+  (label, singular, emoji) => `That's ${label}. Somewhere, ${singular} is filing a complaint. ${emoji}`,
+  (label, _s, emoji) => `That's ${label}, and not one thank-you. Rude. ${emoji}`,
+  (label, _s, emoji) => `That's ${label}. Nobody needed to know, but now everyone does. ${emoji}`,
   (label, _s, emoji) => `Plot twist: you just out-lifted ${label}. ${emoji}`,
 ];
 
@@ -92,15 +146,17 @@ export interface VolumeEquivalence {
   text: string; // the fully composed, ready-to-render sentence
 }
 
-export function getVolumeEquivalence(totalVolumeLbs: number, seed: string): VolumeEquivalence | null {
+// `popOnly`: only the pop-culture units (null when none fits these pounds).
+export function getVolumeEquivalence(totalVolumeLbs: number, seed: string, opts: { popOnly?: boolean } = {}): VolumeEquivalence | null {
   if (!totalVolumeLbs || totalVolumeLbs <= 0 || !Number.isFinite(totalVolumeLbs)) return null;
 
-  const inRange = REFERENCE_OBJECTS.filter((ref) => {
+  const inRange = REFERENCE_OBJECTS.filter((ref) => !opts.popOnly || ref.pop).filter((ref) => {
     const ratio = totalVolumeLbs / ref.weightLbs;
     return (ratio >= MIN_COUNT && ratio <= MAX_COUNT) || (ratio >= NEAR_ONE && ratio <= NEAR_ONE_TOP);
   });
 
   // Nothing landed in the legible range (a volume smaller than the lightest thing or enormously large): the single unit whose count is closest to one.
+  if (inRange.length === 0 && opts.popOnly) return null;
   const candidates =
     inRange.length > 0
       ? inRange

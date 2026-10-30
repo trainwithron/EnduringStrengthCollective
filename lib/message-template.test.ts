@@ -7,12 +7,12 @@ const read = (rel: string) => readFileSync(join(__dirname, "..", rel), "utf8").r
 
 describe("the default sign-in email", () => {
   const m = renderTemplate(DEFAULT_CLAIM_TEMPLATE, { firstName: "Max", coachName: "Ron Arnold", link: "https://spotlightcoaching.app/claim/abc" });
-  it("is the approved wording: from the coach's name, with the link, the 48 hour note and an ignore line", () => {
+  it("is the approved wording: from the coach's name, with the link, the works-until-you-sign-in note and an ignore line", () => {
     expect(m.subject).toBe("Ron Arnold invited you to Spotlight Coaching");
     expect(m.text).toContain("Hi Max,");
     expect(m.text).toContain("Ron Arnold set up your training in Spotlight Coaching.");
     expect(m.text).toContain("https://spotlightcoaching.app/claim/abc");
-    expect(m.text).toContain("expires in 48 hours");
+    expect(m.text).toContain("works until you sign in");
     expect(m.text).toContain("If you weren't expecting this, you can ignore this email.");
   });
   it("still reads well with no names", () => {

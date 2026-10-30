@@ -1,5 +1,3 @@
-import { CLAIM_LINK_LIFETIME_HOURS } from "@/lib/client-claim";
-
 // The wording of the email that carries a client's sign-in link. The app supplies a default; a coach can write their own. Plain text only, with three placeholders:
 //   {first_name}  the client's first name     {coach_name}  the coach's name     {link}  the sign-in link (REQUIRED in the body, so a message can never go out without it)
 export const PLACEHOLDERS = ["{first_name}", "{coach_name}", "{link}"] as const;
@@ -14,7 +12,7 @@ export const DEFAULT_CLAIM_BODY = [
   "",
   "{link}",
   "",
-  `The link works once and expires in ${CLAIM_LINK_LIFETIME_HOURS} hours. If you weren't expecting this, you can ignore this email.`,
+  "The link is just for you and works until you sign in. If you weren't expecting this, you can ignore this email.",
 ].join("\n");
 
 export interface MessageTemplate {

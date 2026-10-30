@@ -5,9 +5,10 @@
 // The placeholder address helpers live in ./placeholder-email (no server-only imports, so the edge middleware can use them too).
 export { PLACEHOLDER_EMAIL_DOMAIN, placeholderEmailFor, isPlaceholderEmail } from "./placeholder-email";
 
-// A claim link is a full account credential sent by text message, so it is short-lived.
-// A new one is a single tap for the coach.
-export const CLAIM_LINK_LIFETIME_HOURS = 48;
+// A claim link works until the client signs in with it (Ron, Oct 29: "there's no reason for it to expire until after they sign in ... I've gotten so many texts saying,
+// hey, can you resend me that sign-in link? It's expired"). It still works only once, stops the moment the coach makes a new one or cancels it, and is never made for an
+// account that has been signed in to. The column needs a date, so it is ten years out.
+export const CLAIM_LINK_LIFETIME_HOURS = 24 * 365 * 10;
 
 export const MIN_PASSWORD_LENGTH = 6;
 

@@ -23,6 +23,8 @@ import type { RestForSet } from "@/lib/rest-time";
 import { DemoBrowserSheet } from "./demo-browser-sheet";
 import type { DemoRow } from "@/lib/exercise-demo";
 import type { ReadForViewer } from "@/lib/read-content/for-viewer";
+import { ExerciseNameInput } from "@/components/coach/exercise-name-input";
+import { fetchExerciseHistory } from "@/lib/exercise-history-fetch";
 
 export function SessionLogger({
   sessionId,
@@ -86,6 +88,9 @@ export function SessionLogger({
   read?: ReadForViewer | null;
 }) {
   const [exercises, setExercises] = useState(initialExercises);
+  // "Last time" for an exercise swapped in or added during this workout (the page only knew the names it started with).
+  const [lastTimeAdded, setLastTimeAdded] = useState<Record<string, { weight: number; reps: number }>>({});
+  const lastTimes = useMemo(() => ({ ...lastTimeByExercise, ...lastTimeAdded }), [lastTimeByExercise, lastTimeAdded]);
   // The one demo sheet for the workout: which exercise it is showing (null = closed). Closing it brings the workout back to the exercise it ended on.
   const [demoExerciseId, setDemoExerciseId] = useState<string | null>(null);
   const closeDemo = useCallback(() => {
@@ -137,7 +142,6 @@ export function SessionLogger({
     setPendingRestPrompt({ defaultSeconds: typed ?? 90, isPrescribed: typed != null, source: typed != null ? "typed" : undefined });
   }
   const [addingExercise, setAddingExercise] = useState(false);
-  const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [newExerciseName, setNewExerciseName] = useState("");
   const [addExerciseBusy, setAddExerciseBusy] = useState(false);
   const [addNameProblem, setAddNameProblem] = useState<string | null>(null);
@@ -152,7 +156,7 @@ export function SessionLogger({
   const MAX_ADDED_EXERCISES = 8;
   const atAddCap = isOwnSession && addedCount >= MAX_ADDED_EXERCISES;
   const nextExerciseOrder = exercises.length > 0 ? Math.max(...exercises.map((e) => e.exerciseOrder)) + 1 : 0;
-  const libraryNames = useMemo(() => (demoLibrary ?? []).map((r) => r.name), [demoLibrary]);
+  const libraryNames = useMemo(() => Array.from(new Set((demoLibrary ?? []).map((r) => r.name))), [demoLibrary]);
 
   const allSetsResolved = useMemo(
     () =>
@@ -194,8 +198,37 @@ export function SessionLogger({
     updateExercise(exerciseId, (ex) => ({ ...ex, sets: ex.sets.filter((s) => s.id !== setId) }));
   }
 
+  // History under the exercise's new name: "Last time", the volume sparkline, and last time's weight offered (as a swipeable suggestion, never filled in) in the sets not logged yet.
+  async function loadHistory(exerciseId: string, name: string) {
+    const history = await fetchExerciseHistory(createBrowserClient(), { athleteId, exerciseName: name, excludeSessionId: sessionId });
+    const lastTime = history.lastTime;
+    if (lastTime) setLastTimeAdded((prev) => ({ ...prev, [name]: lastTime }));
+    updateExercise(exerciseId, (ex) =>
+      ex.exerciseName !== name
+        ? ex
+        : {
+            ...ex,
+            volumeHistory: history.volumeHistory,
+            sets: lastTime ? ex.sets.map((s) => (s.weight == null && s.suggestedWeight == null ? { ...s, suggestedWeight: lastTime.weight } : s)) : ex.sets,
+          }
+    );
+  }
+
   function handleRenamed(exerciseId: string, name: string) {
-    updateExercise(exerciseId, (ex) => ({ ...ex, exerciseName: name, displayName: null, isSwapped: true }));
+    // The old exercise's history and suggested weights do not belong to the new one.
+    updateExercise(exerciseId, (ex) => ({
+      ...ex,
+      exerciseName: name,
+      displayName: null, isSwapped: true,
+      volumeHistory: [],
+      sets: ex.sets.map((s) => (s.weight == null ? { ...s, suggestedWeight: null } : s)),
+    }));
+    loadHistory(exerciseId, name);
+  }
+
+  function handleExercisesAdded(entries: SessionExerciseEntry[]) {
+    setExercises((prev) => [...prev, ...entries]);
+    for (const e of entries) loadHistory(e.id, e.exerciseName);
   }
 
   function handleTrackedFieldsChange(exerciseId: string, fields: SessionExerciseEntry["trackedFields"]) {
@@ -216,9 +249,9 @@ export function SessionLogger({
     }
   }
 
-  async function handleAddExercise() {
+  async function handleAddExercise(picked?: string) {
     // A spelling of an exercise in the coach's library is added under the library's own name.
-    const typed = cleanExerciseName(newExerciseName);
+    const typed = cleanExerciseName(picked ?? newExerciseName);
     const name = typed ? existingLibraryName(typed, (demoLibrary ?? []).map((r) => r.name)) ?? typed : typed;
     if (!name || addExerciseBusy || atAddCap) return;
     // Never an exercise named with only numbers or with its sets and reps.
@@ -292,6 +325,7 @@ export function SessionLogger({
           })),
         },
       ]);
+      loadHistory(sessionExercise.id, sessionExercise.exercise_name);
       setNewExerciseName("");
       setAddingExercise(false);
     } catch {
@@ -328,7 +362,7 @@ export function SessionLogger({
       )}
       {wingIt && !isCompleted && (
         <>
-          <WingItBox sessionId={sessionId} nextOrder={nextExerciseOrder} library={libraryNames} onAdded={(entries) => setExercises((prev) => [...prev, ...entries])} />
+          <WingItBox sessionId={sessionId} nextOrder={nextExerciseOrder} library={libraryNames} onAdded={handleExercisesAdded} />
           {exercises.length === 0 && <p className="font-body text-sm text-steel mb-2">Type or say what they&apos;re doing. Add more any time.</p>}
         </>
       )}
@@ -337,7 +371,7 @@ export function SessionLogger({
       {swipeDirection === "vertical" ? (
         <ExerciseVerticalCarousel
           exercises={exercises}
-          lastTimeByExercise={lastTimeByExercise}
+          lastTimeByExercise={lastTimes}
           ladderByExercise={ladderByExercise}
           coachNoteByExerciseName={coachNoteByExerciseName ?? {}}
           readOnly={isCompleted}
@@ -360,7 +394,7 @@ export function SessionLogger({
       ) : (
         <ExerciseSwipeCarousel
           exercises={exercises}
-          lastTimeByExercise={lastTimeByExercise}
+          lastTimeByExercise={lastTimes}
           ladderByExercise={ladderByExercise}
           coachNoteByExerciseName={coachNoteByExerciseName ?? {}}
           readOnly={isCompleted}
@@ -382,13 +416,14 @@ export function SessionLogger({
         />
       )}
 
-      {/* Swiping sideways: "+ Add" sits on the dots row (right edge) so the card keeps the room; its menu opens over the top of the card. Scrolling down: it stays under the list as before. */}
+      {/* "+ Add exercise" (Ron, Oct 29: "Need an add ... button inside of the workout logger"): one tap opens the same library search as the program builder and Swap; tapping a
+          match adds it. Swiping sideways it sits on the dots row (right edge) and the box opens over the top of the card; scrolling down it stays under the list. */}
       {!isCompleted && (
         <div
           className={
             swipeDirection === "vertical"
               ? "mt-2 pb-2"
-              : addMenuOpen || addingExercise || atAddCap
+              : addingExercise || atAddCap
               ? "absolute left-0 right-0 top-0 z-30 bg-graphite border border-steel/30 p-3 shadow-lg"
               : "absolute right-0 top-0 z-30"
           }
@@ -398,65 +433,62 @@ export function SessionLogger({
               You&apos;ve added the max of {MAX_ADDED_EXERCISES} extra exercises for this workout.
             </p>
           ) : addingExercise ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <input
-                type="text"
-                autoFocus
-                value={newExerciseName}
-                onChange={(e) => {
-                  setNewExerciseName(e.target.value);
-                  setAddNameProblem(null);
-                }}
-                placeholder="Exercise name"
-                aria-label="Exercise name"
-                className="flex-1 h-11 bg-surface border border-steel/30 text-chalk px-3 font-body focus:outline-none focus:border-rust"
-              />
-              <button
-                type="button"
-                onClick={handleAddExercise}
-                disabled={addExerciseBusy}
-                className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
-              >
-                Add
-              </button>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <ExerciseNameInput
+                    value={newExerciseName}
+                    onChange={(v) => {
+                      setNewExerciseName(v);
+                      setAddNameProblem(null);
+                    }}
+                    onCommit={(v) => setNewExerciseName(v)}
+                    onPick={(v) => handleAddExercise(v)}
+                    suggestions={libraryNames}
+                    demoLibrary={demoLibrary}
+                    autoFocus
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleAddExercise()}
+                  disabled={addExerciseBusy || !newExerciseName.trim()}
+                  className="min-h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
+                >
+                  {addExerciseBusy ? "Adding…" : "Add"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddingExercise(false);
+                    setNewExerciseName("");
+                    setAddNameProblem(null);
+                  }}
+                  disabled={addExerciseBusy}
+                  className="min-h-11 px-1 font-body text-xs text-steel disabled:opacity-40"
+                >
+                  Cancel
+                </button>
+              </div>
               {addNameProblem && (
-                <p className="basis-full font-body text-xs text-rust" role="alert">
+                <p className="font-body text-xs text-rust" role="alert">
                   {addNameProblem}
                 </p>
               )}
+              {/* Coach mobile app's NL quick-add (coach_mobile_app_redesign_plan.md) — a coach driving someone else's in-person session only; an athlete logging their
+                  own session keeps the library search above. */}
+              {!isOwnSession && (
+                <QuickAddNlButton sessionId={sessionId} nextExerciseOrder={nextExerciseOrder} library={libraryNames} onAdded={handleExercisesAdded} />
+              )}
             </div>
           ) : (
-            <div className="space-y-2">
-              <button
-                type="button"
-                onClick={() => setAddMenuOpen((v) => !v)}
-                aria-expanded={addMenuOpen}
-                className="h-7 px-3 border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors"
-              >
-                + Add
-              </button>
-              {addMenuOpen && (
-                <button
-                  type="button"
-                  onClick={() => setAddingExercise(true)}
-                  className="block w-full h-11 border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors"
-                >
-                  + Add exercise
-                </button>
-              )}
-              {/* Coach mobile app's NL quick-add (coach_mobile_app_
-                  redesign_plan.md) — a coach driving someone else's
-                  in-person session only; an athlete logging their own
-                  session keeps the plain manual add above. */}
-              {!isOwnSession && addMenuOpen && (
-                <QuickAddNlButton
-                  sessionId={sessionId}
-                  nextExerciseOrder={nextExerciseOrder}
-                  library={libraryNames}
-                  onAdded={(entries) => setExercises((prev) => [...prev, ...entries])}
-                />
-              )}
-            </div>
+            <button
+              type="button"
+              onClick={() => setAddingExercise(true)}
+              className="h-7 px-3 border border-rust/60 text-rust font-body text-xs font-medium active:bg-rust active:text-graphite transition-colors"
+            >
+              + Add exercise
+            </button>
           )}
         </div>
       )}

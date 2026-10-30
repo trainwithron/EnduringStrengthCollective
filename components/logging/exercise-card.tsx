@@ -26,6 +26,10 @@ import { EquipmentVisual } from "./equipment-visual";
 import { ExerciseVolumeHistory } from "./exercise-volume-history";
 import { findLoadRatio } from "@/lib/equipment-load-ratio-gather";
 import { convertWeightAcrossVariants } from "@/lib/equipment-load-ratio";
+import { ExerciseNameInput } from "@/components/coach/exercise-name-input";
+import { existingLibraryName } from "@/lib/exercise-search";
+import { capitalizeWords } from "@/lib/exercise-name-case";
+import { cleanExerciseName, exerciseNameProblem } from "@/lib/exercise-name-guard";
 
 export function ExerciseCard({
   exercise,
@@ -82,6 +86,8 @@ export function ExerciseCard({
   const [nameDraft, setNameDraft] = useState(exercise.exerciseName);
   const [swapBusy, setSwapBusy] = useState(false);
   const [swapError, setSwapError] = useState<string | null>(null);
+  // The Swap box searches the same library as the program builder (Ron, Oct 29: "a smart exercise name parser and not just a crude name replacement"): one tap on a match swaps.
+  const libraryNames = Array.from(new Set((demoLibrary ?? []).map((r) => r.name)));
   // Guards handleAddSet against a real race: it computes set_order off the
   // `exercise.sets` closure, stale until the parent re-renders with the new
   // array. A fast double-tap on "+ set" mid-workout would otherwise insert
@@ -109,8 +115,15 @@ export function ExerciseCard({
   const [justConfirmedWeightSetId, setJustConfirmedWeightSetId] = useState<string | null>(null);
 
   async function applySwap(name: string) {
+    if (swapBusy) return;
     if (!name || name === exercise.exerciseName) {
       setSwapping(false);
+      return;
+    }
+    // Never an exercise named with only numbers or with its sets and reps.
+    const problem = exerciseNameProblem(name);
+    if (problem) {
+      setSwapError(problem);
       return;
     }
     setSwapBusy(true);
@@ -303,23 +316,44 @@ export function ExerciseCard({
     <div>
       <div className="flex items-center justify-between gap-3 mb-1">
         {swapping ? (
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
+            <p className="font-body text-xs text-steel mb-1">Swap {exercise.displayName ?? exercise.exerciseName} for:</p>
             <div className="flex items-center gap-2">
-              <input aria-label="Exercise name"
-                type="text"
-                autoFocus
-                value={nameDraft}
-                onChange={(e) => setNameDraft(e.target.value)}
-                disabled={swapBusy}
-                className="flex-1 h-11 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust disabled:opacity-60"
-              />
+              <div className="flex-1 min-w-0">
+                <ExerciseNameInput
+                  value={nameDraft}
+                  onChange={(v) => {
+                    setNameDraft(v);
+                    setSwapError(null);
+                  }}
+                  onCommit={(v) => setNameDraft(v)}
+                  onPick={(v) => applySwap(v)}
+                  suggestions={libraryNames}
+                  demoLibrary={demoLibrary ?? undefined}
+                  autoFocus
+                />
+              </div>
               <button
                 type="button"
-                onClick={() => applySwap(nameDraft.trim())}
-                disabled={swapBusy}
-                className="font-body text-xs text-rust disabled:opacity-40"
+                onClick={() => {
+                  const typed = cleanExerciseName(nameDraft);
+                  applySwap(typed ? existingLibraryName(typed, libraryNames) ?? capitalizeWords(typed) : "");
+                }}
+                disabled={swapBusy || !nameDraft.trim()}
+                className="min-h-11 px-2 font-body text-xs text-rust disabled:opacity-40"
               >
-                {swapBusy ? "Saving…" : "Save"}
+                {swapBusy ? "Saving…" : "Swap"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSwapping(false);
+                  setSwapError(null);
+                }}
+                disabled={swapBusy}
+                className="min-h-11 px-1 font-body text-xs text-steel disabled:opacity-40"
+              >
+                Cancel
               </button>
             </div>
             {swapError && (
@@ -343,7 +377,8 @@ export function ExerciseCard({
                 <button
                   type="button"
                   onClick={() => {
-                    setNameDraft(exercise.exerciseName);
+                    setNameDraft("");
+                    setSwapError(null);
                     setSwapping(true);
                   }}
                   className="font-body text-xs text-steel"
