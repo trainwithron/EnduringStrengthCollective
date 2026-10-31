@@ -23,6 +23,8 @@ const NOT_A_SAVE = new Set([
   "/api/coaches/join",
   // a visitor asking a coach to train with them from the coach's public page: only the waiting request is written; the coach's answer is the save (client-requests/answer)
   "/api/client-requests/submit",
+  // the same request from a visitor making their account in the same step (no session yet, so no pane is open)
+  "/api/client-requests/signup",
   // reading a filled team sheet for the review screen: nothing is written (saving and undoing are the saves)
   "/api/team-sheet/upload",
   // a guardian's consent: emailed links and a server-only record; nothing a pane shows changes
