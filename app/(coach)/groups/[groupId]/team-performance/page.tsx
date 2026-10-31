@@ -220,8 +220,8 @@ export default async function TeamPerformancePage(
 
   return (
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="team-performance">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-6">
-        <div className="lg:col-span-2">
+      <div className="grid grid-cols-1 @4xl:grid-cols-3 gap-3 mb-6">
+        <div className="@4xl:col-span-2">
           <DashboardHero flag={heroData.heroFlag} emptyState={heroData.heroEmptyState} />
         </div>
         <div className="space-y-3">
@@ -286,7 +286,7 @@ export default async function TeamPerformancePage(
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-6 mb-8">
+      <div className="grid grid-cols-1 @3xl:grid-cols-2 gap-6 mb-8">
         <div className="border border-steel/20 p-4">
           <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">
             Weekly Activity (last 8 weeks)

@@ -28,7 +28,7 @@ export function HistoryImportPicker({ athleteId, groupId, athleteName }: { athle
   }
 
   return (
-    <div className="mt-8 max-w-3xl">
+    <div className="mt-8 max-w-3xl @5xl:max-w-5xl">
       <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="min-h-11 bg-rust text-graphite font-display font-bold uppercase tracking-wide px-5">
         Import
       </button>

@@ -305,8 +305,9 @@ export default async function CoachDashboardPage(
           scopeAll) view. Only show it inline when the coach has
           explicitly asked for the cross-group picture, which the
           shell's single-group strip can't provide. */}
-      {scopeAll && <NeedsAttentionPanel coachId={user.id} items={needsAttentionItems} />}
-
+      {/* With room (@4xl): the activity feed on the left, the cross-group panel and the suggestion settings on the right. Narrower, the same order as always (display: contents + order). Layout audit #10. */}
+      <div className="flex flex-col @4xl:grid @4xl:grid-cols-[minmax(0,1fr)_22rem] @4xl:gap-8 @4xl:items-start">
+      <div className="order-2 min-w-0 @4xl:col-start-1 @4xl:row-start-1">
       <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
         Recent activity
       </h2>
@@ -335,7 +336,7 @@ export default async function CoachDashboardPage(
           />
         </div>
       ) : (
-        <div className="divide-y divide-steel/15 max-w-2xl border border-steel/15">
+        <div className="divide-y divide-steel/15 max-w-2xl @4xl:max-w-none border border-steel/15">
           {recentActivity.map((entry) =>
             entry.kind === "post" ? (
               <div key={`post-${entry.post.id}`} className="relative">
@@ -368,6 +369,10 @@ export default async function CoachDashboardPage(
           )}
         </div>
       )}
+      </div>
+
+      <div className="contents @4xl:block @4xl:col-start-2 @4xl:row-start-1 @4xl:space-y-8 min-w-0">
+      {scopeAll && <div className="order-1"><NeedsAttentionPanel coachId={user.id} items={needsAttentionItems} /></div>}
 
       {/* Moved off the top of the page and made collapsible
           (live_walkthrough_round2_findings.md) — this is a standing,
@@ -377,7 +382,7 @@ export default async function CoachDashboardPage(
           only the very first time, before any real preference row
           exists yet — the one moment a coach actually needs to see it
           unprompted; collapsed on every visit after that. */}
-      <div className="mt-8 max-w-2xl">
+      <div className="order-3 mt-8 max-w-2xl @4xl:mt-0 @4xl:max-w-none">
         <RosterSection
           title="Suggestion Settings"
           summary={
@@ -396,6 +401,8 @@ export default async function CoachDashboardPage(
             initialLeadWeekday={suggestionLeadWeekday}
           />
         </RosterSection>
+      </div>
+      </div>
       </div>
     </CoachDesktopShell>
   );

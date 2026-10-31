@@ -190,7 +190,7 @@ export function PulseTabs({
             {sortedClients.length === 0 ? (
               <p className="font-body text-sm text-steel">No 1-on-1 {t("client", "plural")} yet.</p>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 @5xl:!grid-cols-1 gap-3">
                 {sortedClients.map((c) => (
                   <HomeClientCard key={c.athleteId} client={c} />
                 ))}
@@ -200,7 +200,7 @@ export function PulseTabs({
         ) : (
           <div className="space-y-3">
             {teamPulses.length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 @5xl:!grid-cols-1 gap-3">
                 {teamPulses.map((team) => (
                   <TeamPulseCard key={team.groupId} team={team} />
                 ))}
@@ -219,7 +219,7 @@ export function PulseTabs({
               {sortedGroups.length === 0 ? (
                 <p className="font-body text-sm text-steel">No groups yet.</p>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 @5xl:!grid-cols-1 gap-3">
                   {sortedGroups.map((g) => (
                     <HomeGroupCard key={g.id} group={g} />
                   ))}

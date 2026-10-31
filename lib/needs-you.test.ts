@@ -281,7 +281,10 @@ describe("Home is wired as designed", () => {
   const page = readFileSync(join(__dirname, "..", "app/(coach)/dashboard/page.tsx"), "utf8").replace(/\r\n/g, "\n");
   it("the strip sits above everything else and the stack below keeps all its panels", () => {
     expect(page.indexOf("<NeedsYouLoader")).toBeGreaterThan(-1);
-    expect(page.indexOf("<NeedsYouLoader")).toBeLessThan(page.indexOf("<YourDayPanel"));
+    // Narrower, the strip comes first (order-1, before Your day at order-4); with room it heads the Needs you column of Home's three (layout audit, Oct 31).
+    expect(page).toMatch(/<div className="order-1">\s*<Suspense fallback=\{<NeedsYouLoading \/>\}>\s*<NeedsYouLoader/);
+    expect(page).toMatch(/<div className="order-4">\s*<YourDayPanel/);
+    expect(page).toContain('<div className="contents @5xl:block @5xl:min-w-0" data-home-needs>');
     for (const p of ["<OrgNotificationsPanel", "<NeedsReplyPanel", "<LateChangesPanel", "<ScheduleRequestsPanel", "<ExpiryCheckInPanel", "<InactiveClientsPanel", "<ProgressLookPanel", "<NeedsPaymentPanel"]) {
       expect(page.indexOf(p)).toBeGreaterThan(page.indexOf('id="needs-stack"'));
     }

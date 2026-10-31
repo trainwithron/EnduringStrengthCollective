@@ -47,8 +47,8 @@ describe("the desktop Clients page for a team organization with ZERO athletes", 
 describe("desktop Home for a team organization", () => {
   const page = read("app/(coach)/dashboard/page.tsx");
   it("drops the 1-on-1 / athlete / group pulse tabs, the athlete counts, the 'invite your first client' lines and the getting-started card", () => {
-    expect(page).toContain("{!moneyHidden && (\n        <div className=\"mb-6\">\n          <PulseTabs");
-    expect(page).toContain("{!moneyHidden && (\n      <DashboardTileGrid");
+    expect(page).toContain("{!moneyHidden && (\n        <div className=\"mb-6 order-5\">\n          <PulseTabs");
+    expect(page).toContain("{!moneyHidden && (\n      <div className=\"order-7\">\n      <DashboardTileGrid");
     expect(page).toContain("{!moneyHidden && clientCards.length === 0");
   });
   it("keeps the team tiles, the coach profile card and Your day", () => {

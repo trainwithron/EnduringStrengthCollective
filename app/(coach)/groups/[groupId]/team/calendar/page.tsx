@@ -99,7 +99,7 @@ export default async function TeamCalendarPage(
   const upcomingGames = games.filter((g) => g.event_date >= todayKey).slice(0, 5);
 
   const content = (
-    <div className="max-w-3xl">
+    <div className="max-w-3xl @5xl:max-w-none">
       <div className="pb-6 border-b border-steel/20 mb-6 flex items-center justify-between">
         <div>
           <h1 className="font-display font-bold text-3xl uppercase leading-none">Team Calendar</h1>
@@ -110,12 +110,15 @@ export default async function TeamCalendarPage(
         {isCoach && <TeamGameForm groupId={params.groupId} createdBy={user.id} />}
       </div>
 
+      {/* With room (@5xl): the month wide on the left, the practice schedule and upcoming games in a rail on the right. Narrower, one column in the same order (layout audit #15). */}
+      <div className="@5xl:grid @5xl:grid-cols-[minmax(0,1fr)_22rem] @5xl:gap-x-8 @5xl:items-start">
       {isCoach && (
-        <div className="mb-8">
+        <div className="mb-8 @5xl:col-start-2 @5xl:row-start-1 min-w-0">
           <TeamPracticeScheduleForm groupId={params.groupId} createdBy={user.id} initialSchedules={schedules} />
         </div>
       )}
 
+      <div className="@5xl:col-start-1 @5xl:row-start-1 @5xl:row-span-2 min-w-0">
       <div className="flex items-center justify-between mb-3">
         <Link href={prevHref} className="font-body text-xs text-steel">
           &larr; Prev
@@ -165,8 +168,9 @@ export default async function TeamCalendarPage(
           );
         })}
       </div>
+      </div>
 
-      <div>
+      <div className="@5xl:col-start-2 @5xl:row-start-2 min-w-0">
         <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">Upcoming games</h2>
         {upcomingGames.length === 0 ? (
           <p className="font-body text-sm text-steel">No upcoming games scheduled.</p>
@@ -188,6 +192,7 @@ export default async function TeamCalendarPage(
             ))}
           </div>
         )}
+      </div>
       </div>
     </div>
   );

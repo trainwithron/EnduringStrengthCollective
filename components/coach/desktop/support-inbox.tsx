@@ -26,6 +26,8 @@ export function SupportInbox({
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Which request the right pane shows when the page area has room for two panes.
+  const [selectedId, setSelectedId] = useState<string | null>(initialRequests[0]?.id ?? null);
 
   async function handleSubmit() {
     const trimmedSubject = subject.trim();
@@ -90,6 +92,7 @@ ${trimmedBody}`,
       },
       ...prev,
     ]);
+    setSelectedId(request.id);
     setSubject("");
     setBody("");
     setComposing(false);
@@ -97,7 +100,7 @@ ${trimmedBody}`,
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-2xl @4xl:max-w-none space-y-6">
       {composing ? (
         <div className="border border-steel/20 p-4 space-y-3">
           <input aria-label="Subject"
@@ -147,21 +150,44 @@ ${trimmedBody}`,
         </button>
       )}
 
-      <div className="space-y-4">
-        {requests.length === 0 && (
-          <p className="font-body text-sm text-steel">No support requests yet.</p>
+      {/* With room (@4xl), a two-pane inbox: the requests by subject on the left, the chosen one on the right. Narrower, every thread open, stacked, as before (layout audit #16).
+          Each thread is rendered once either way, so a reply or a status change stays put when the window is resized. */}
+      <div className="@4xl:grid @4xl:grid-cols-[18rem_minmax(0,1fr)] @4xl:gap-6 @4xl:items-start">
+        {requests.length > 0 && (
+          <ul className="hidden @4xl:block border border-steel/20 divide-y divide-steel/15" aria-label="Support requests">
+            {requests.map((r) => {
+              return (
+                <li key={r.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedId(r.id)}
+                    aria-current={r.id === selectedId ? "true" : undefined}
+                    className={`w-full text-left px-3 py-2.5 min-h-11 ${r.id === selectedId ? "bg-rust/10" : "hover:bg-surface"}`}
+                  >
+                    <span className={`block font-body text-sm truncate ${r.id === selectedId ? "text-rust" : "text-chalk"}`}>{r.subject}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
         )}
-        {requests.map((r) => (
-          <SupportThread
-            key={r.id}
-            requestId={r.id}
-            subject={r.subject}
-            status={r.status}
-            messages={r.messages}
-            viewerId={coachId}
-            canManage={true}
-          />
-        ))}
+        <div className="space-y-4 min-w-0">
+          {requests.length === 0 && (
+            <p className="font-body text-sm text-steel">No support requests yet.</p>
+          )}
+          {requests.map((r) => (
+            <div key={r.id} className={r.id === selectedId ? "" : "@4xl:hidden"}>
+              <SupportThread
+                requestId={r.id}
+                subject={r.subject}
+                status={r.status}
+                messages={r.messages}
+                viewerId={coachId}
+                canManage={true}
+              />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

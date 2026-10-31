@@ -67,7 +67,7 @@ export default async function CoachProfilePage(props: { params: Promise<{ groupI
 
   return (
     <CoachDesktopShell groupId={groupId} groupName={group?.name ?? "Group"} active="clients">
-      <div className="max-w-2xl space-y-6">
+      <div className="max-w-2xl @4xl:max-w-4xl space-y-6">
         <p className="font-body text-sm">
           <Link href={`/groups/${groupId}/clients`} className="text-steel underline underline-offset-2">
             Back to the Coaches list

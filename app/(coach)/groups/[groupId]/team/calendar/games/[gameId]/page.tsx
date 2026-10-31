@@ -86,8 +86,9 @@ export default async function GameDetailPage(
   });
   const backHref = `/groups/${params.groupId}/team/calendar`;
 
+  // On a coach's wide page area the stat table uses the full width (no sideways scroll in 768px); the score and the stat fields stay a readable width (layout audit #19).
   const content = (
-    <div className="max-w-3xl">
+    <div className="max-w-3xl @3xl:max-w-none">
       <Link href={backHref} className="font-body text-xs text-steel uppercase tracking-wide">
         &larr; Back to calendar
       </Link>
@@ -101,6 +102,7 @@ export default async function GameDetailPage(
         </p>
       </div>
 
+      <div className="max-w-3xl">
       {isCoach ? (
         <TeamGameScoreForm
           gameId={game.id}
@@ -117,6 +119,7 @@ export default async function GameDetailPage(
       )}
 
       {isCoach && <StatFieldManager groupId={params.groupId} initialFields={fields} />}
+      </div>
 
       <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">Stats</h2>
       <GameStatGrid

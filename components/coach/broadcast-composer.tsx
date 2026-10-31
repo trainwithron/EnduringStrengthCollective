@@ -162,7 +162,7 @@ export function BroadcastComposer({
   const canReview = template.trim().length > 0 && recipients.length > 0 && !tooLong;
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-2xl @4xl:max-w-4xl space-y-6">
       <div>
         <div className="flex items-center justify-between mb-1">
           <label className="font-body text-xs text-steel uppercase tracking-wide">Message</label>

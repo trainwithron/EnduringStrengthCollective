@@ -41,7 +41,7 @@ export function HistoryImportAccessToggle({
   }
 
   return (
-    <div className="border border-steel/20 bg-surface/40 p-4 max-w-2xl">
+    <div className="border border-steel/20 bg-surface/40 p-4 max-w-2xl @4xl:max-w-4xl">
       <label className="flex items-start gap-3 cursor-pointer">
         <input type="checkbox" checked={enabled} onChange={toggle} disabled={saving} className="mt-1" />
         <span className="font-body text-sm text-chalk">
