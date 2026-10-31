@@ -197,8 +197,65 @@ export function BrandingForm({
     window.location.reload();
   }
 
+  // The same preview twice: in its own section on a narrow page, and beside the form, always open, when the page area has room (layout audit #13).
+  const previewBox = (
+    <div
+      className="p-6 border border-steel/20 flex flex-col items-center justify-center gap-3"
+      style={{ backgroundColor }}
+    >
+      <p
+        className="text-2xl font-bold uppercase leading-none"
+        style={{ fontFamily: `"${fontDisplay}", sans-serif`, color: textColor }}
+      >
+        Sample heading
+      </p>
+      <p className="text-sm" style={{ fontFamily: `"${fontBody}", sans-serif`, color: textColor }}>
+        This is what your body text looks like.
+      </p>
+      <button
+        type="button"
+        className="h-10 px-5 text-sm font-medium"
+        style={{
+          backgroundColor: accentColor,
+          color: backgroundColor,
+          fontFamily: `"${fontBody}", sans-serif`,
+          borderRadius: BUTTON_SHAPE_RADIUS[buttonShape],
+        }}
+      >
+        Save changes
+      </button>
+
+      {(() => {
+        const scale = radiusScaleFor(buttonShape);
+        return (
+          <div className="flex items-center gap-3 mt-1">
+            <div
+              className="px-3 py-2 text-xs border"
+              style={{ borderColor: `${textColor}33`, borderRadius: scale.lg, color: textColor }}
+            >
+              Card
+            </div>
+            <span
+              className="px-2 py-1 text-xs uppercase border"
+              style={{ borderColor: accentColor, color: accentColor, borderRadius: scale.pill }}
+            >
+              Badge
+            </span>
+            <input aria-label="Sample input (preview)"
+              readOnly
+              value="Input"
+              className="w-20 h-8 text-xs px-2 border bg-transparent"
+              style={{ borderColor: `${textColor}33`, color: textColor, borderRadius: scale.sm }}
+            />
+          </div>
+        );
+      })()}
+    </div>
+  );
+
   return (
-    <div className="max-w-lg space-y-3">
+    <div className="max-w-lg @4xl:max-w-none @4xl:grid @4xl:grid-cols-[minmax(0,32rem)_minmax(0,1fr)] @4xl:gap-8 @4xl:items-start">
+    <div className="space-y-3 min-w-0">
       <Section title="Logo & app icon" defaultOpen>
         <div className="space-y-4">
           <OrgImageUpload
@@ -399,60 +456,9 @@ export function BrandingForm({
         </div>
       </Section>
 
-      <Section title="Preview">
-        <div
-          className="p-6 border border-steel/20 flex flex-col items-center justify-center gap-3"
-          style={{ backgroundColor }}
-        >
-          <p
-            className="text-2xl font-bold uppercase leading-none"
-            style={{ fontFamily: `"${fontDisplay}", sans-serif`, color: textColor }}
-          >
-            Sample heading
-          </p>
-          <p className="text-sm" style={{ fontFamily: `"${fontBody}", sans-serif`, color: textColor }}>
-            This is what your body text looks like.
-          </p>
-          <button
-            type="button"
-            className="h-10 px-5 text-sm font-medium"
-            style={{
-              backgroundColor: accentColor,
-              color: backgroundColor,
-              fontFamily: `"${fontBody}", sans-serif`,
-              borderRadius: BUTTON_SHAPE_RADIUS[buttonShape],
-            }}
-          >
-            Save changes
-          </button>
-
-          {(() => {
-            const scale = radiusScaleFor(buttonShape);
-            return (
-              <div className="flex items-center gap-3 mt-1">
-                <div
-                  className="px-3 py-2 text-xs border"
-                  style={{ borderColor: `${textColor}33`, borderRadius: scale.lg, color: textColor }}
-                >
-                  Card
-                </div>
-                <span
-                  className="px-2 py-1 text-xs uppercase border"
-                  style={{ borderColor: accentColor, color: accentColor, borderRadius: scale.pill }}
-                >
-                  Badge
-                </span>
-                <input aria-label="Sample input (preview)"
-                  readOnly
-                  value="Input"
-                  className="w-20 h-8 text-xs px-2 border bg-transparent"
-                  style={{ borderColor: `${textColor}33`, color: textColor, borderRadius: scale.sm }}
-                />
-              </div>
-            );
-          })()}
-        </div>
-      </Section>
+      <div className="@4xl:hidden">
+        <Section title="Preview">{previewBox}</Section>
+      </div>
 
       <div className="flex items-center gap-3 pt-1">
         <button
@@ -471,6 +477,11 @@ export function BrandingForm({
         This changes the look of the whole app for your organization — the coach desktop dashboard
         and the mobile app your clients use both share this identity.
       </p>
+    </div>
+    <div className="hidden @4xl:block @4xl:sticky @4xl:top-6 min-w-0" data-branding-preview-beside>
+      <p className="font-display uppercase text-sm tracking-wide mb-2">Preview</p>
+      {previewBox}
+    </div>
     </div>
   );
 }
