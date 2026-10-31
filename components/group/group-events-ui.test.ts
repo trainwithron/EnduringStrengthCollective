@@ -24,7 +24,8 @@ describe("group events on the screens", () => {
   it("the Group calendar is one group only, with a fixed group in the form, and the picker never guesses a group", () => {
     expect(groupCal).toContain('.eq("kind", "event")');
     expect(groupCal).toContain('.eq("group_id", params.groupId)');
-    expect(groupCal).toContain("fixedGroupId={params.groupId}");
+    expect(read("components/coach/desktop/group-calendar-board.tsx")).toContain("fixedGroupId={groupId}");
+    expect(groupCal).toContain("groupId={params.groupId}");
     expect(picker).toContain("if (groups.length === 1) redirect(");
     expect(picker).toContain("Which one?");
     // FIX 6: the Group calendar is a Calendar tab (lib/desktop-coach-homes.ts)

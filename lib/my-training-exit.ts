@@ -8,7 +8,7 @@ export const MY_TRAINING_COOKIES = {
 
 const TOP_LEVEL_COACH_PAGES = /^\/(dashboard|programs|calendar|clients|group-calendar)(\/|$)/;
 // Pages under a group that only a coach uses (a client's own pages, such as their program or calendar, are not here).
-const GROUP_COACH_PAGES = /^\/groups\/[0-9a-f-]{36}\/(dashboard|business|clients|athletes|packages|availability|group-sessions|revenue-splits|branding)(\/|$)/i;
+const GROUP_COACH_PAGES = /^\/groups\/[0-9a-f-]{36}\/(dashboard|business|clients|athletes|packages|availability|group-sessions|group-calendar|revenue-splits|branding)(\/|$)/i;
 
 export function isCoachOnlyPath(pathname: string): boolean {
   return TOP_LEVEL_COACH_PAGES.test(pathname) || GROUP_COACH_PAGES.test(pathname);

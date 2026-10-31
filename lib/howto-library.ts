@@ -200,10 +200,10 @@ export const HOWTOS: HowTo[] = [
       "capacity", "waiting list", "waitlist", "add a group class", "schedule a class", "small group training",
     ],
     steps: [
-      { text: "Open Group Sessions.", href: "/groups/{groupId}/group-sessions", linkLabel: "Group Sessions" },
-      { text: "Under New group session, give it a name, pick the day, time and length, and set the number of spots. The time is blocked in your calendar." },
+      { text: "Open the Group calendar.", href: "/groups/{groupId}/group-calendar?show=sessions", linkLabel: "Group calendar" },
+      { text: "Under New, pick Group session, give it a name, pick the day, time and length, and set the number of spots. The time is blocked in your calendar." },
       { text: "Your clients see it on their Group sessions page and join with one tap. A client who joins uses one session. When it is full, the next people wait and move in when someone leaves." },
-      { text: "On the group session you can add or remove people, change the spots, mark who attended, or cancel it (everyone is told and any session used is returned)." },
+      { text: "Open the group session on the list: you can add or remove people, change the spots, mark who attended, or cancel it (everyone is told and any session used is returned)." },
     ],
     note: "A client you add yourself is not charged until you mark them attended.",
   },

@@ -1178,20 +1178,8 @@ export async function CoachCalendarPageBody(
         settingsSlot={<AvailabilityBookingSettings coachId={user.id} />}
         hideStripOnDesktop
       >
-      {/* The schedule's notices sit with the schedule only, so the Availability tab opens on the hours (layout audit, Oct 31). */}
-      {calendarSpotterFindings.length > 0 && (
-        <div className="mb-6">
-          <CalendarSpotterPanel findings={calendarSpotterFindings} groupId={params.groupId} timezone={bookingTz} />
-        </div>
-      )}
-
-      <SchedulingSpotterPanel flags={schedulingSpotterFlags} availabilityHref={`${basePath}?tab=availability`} />
-
+      {/* The schedule's notices sit with the schedule only, so the Availability tab opens on the hours; they live in the right rail, not above the grid (layout audit, Oct 31). */}
       <SessionCountLine coachId={user.id} groupIds={orgGroupIds} timezone={timezone} view={view} year={year} monthIndex={monthIndex} weekStartKey={dateKey(weekStart)} />
-
-      <SessionCheckSection coachId={user.id} groupIds={orgGroupIds} />
-
-      <AddGroupEvent groups={eventGroups} timezone={bookingTz} />
 
       {/* mobile_must_fit_screen_standing_rule — this two-column layout
           (a fixed 260px "Needs attention"/"Clients" rail beside the
@@ -1212,7 +1200,8 @@ export async function CoachCalendarPageBody(
           return c ? { athleteId: c.profileId, fullName: c.fullName, balance: c.balance, groupId: c.groupId } : null;
         })()}
       >
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-8 items-start">
+      {/* The rail sits beside the grid only when the page itself is wide enough (1024px), so the split panel never squeezes the month to 32px a day. */}
+      <div className="grid grid-cols-1 @5xl:grid-cols-[minmax(0,1fr)_320px] gap-8 items-start">
         <div className="min-w-0">
           <div className="flex items-center gap-1 mb-4">
             <Link
@@ -1313,6 +1302,12 @@ export async function CoachCalendarPageBody(
             sessionTypes={sessionTypes}
           />
           <CalendarAttentionChip items={attentionItems} />
+          <div className="mt-6 space-y-4">
+            {calendarSpotterFindings.length > 0 && <CalendarSpotterPanel findings={calendarSpotterFindings} groupId={params.groupId} timezone={bookingTz} />}
+            <SchedulingSpotterPanel flags={schedulingSpotterFlags} availabilityHref={`${basePath}?tab=availability`} />
+            <SessionCheckSection coachId={user.id} groupIds={orgGroupIds} />
+            <AddGroupEvent groups={eventGroups} timezone={bookingTz} />
+          </div>
         </div>
       </div>
       </CalendarSchedulingProvider>

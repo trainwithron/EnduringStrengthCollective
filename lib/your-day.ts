@@ -161,7 +161,7 @@ export function buildSchedule(coachId: string, bookings: BookingSource[], classe
       detail: c.waitlisted > 0 ? `${spots}, ${c.waitlisted} waiting` : spots,
       startAt: c.startAt,
       endAt: c.endAt,
-      href: `/groups/${c.groupId}/group-sessions`,
+      href: `/groups/${c.groupId}/group-calendar?show=sessions&id=${c.id}`,
       needsPayment: false,
     });
   }

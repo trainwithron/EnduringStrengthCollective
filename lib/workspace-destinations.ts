@@ -42,7 +42,7 @@ const PAGES: PageDef[] = [
   { key: "availability", label: "Availability", section: "Calendar", path: "calendar?tab=availability", keywords: ["hours", "open", "schedule"] },
   { key: "session-types", label: "Session types", section: "Calendar", path: "business/session-types", keywords: ["online", "in person"] },
   { key: "booking-page", label: "Booking page", section: "Calendar", path: "business/booking-page", keywords: ["public", "link", "book"] },
-  { key: "group-sessions", label: "Group sessions", section: "Calendar", path: "group-sessions", keywords: ["classes"] },
+  { key: "group-sessions", label: "Group calendar", section: "Calendar", path: "group-calendar", keywords: ["group sessions", "classes", "group events"] },
   { key: "leads", label: "Leads", section: "Clients", path: "business/leads", keywords: ["prospects", "inquiries"] },
   { key: "session-ledger", label: "Session ledger", section: "Clients", path: "business/session-ledger", keywords: ["credits", "balance"] },
   { key: "waiver", label: "Waiver", section: "Clients", path: "business/waiver", keywords: ["intake", "parq"] },

@@ -69,9 +69,10 @@ describe("today's menus all have a place", () => {
     `${g}/business`, `${g}/business/packages`, `${g}/resources`, `${g}/business/website`, "/calendar?tab=availability", `${g}/business/session-types`, `${g}/business/booking-page`,
     `${g}/business/waiver`, `${g}/business/leads`, `${g}/business/session-ledger`, `${g}/branding`, `${g}/business/zapier`, "/admin/organizations", "/admin/marketplace-ranking",
     `${g}/clients?view=members`, `${g}/dashboard`, `${g}/team-performance`, `${g}/attendance`, `${g}/feed`, `${g}/team`, `${g}/team/calendar`, `${g}/group-calendar`, "/group-calendar",
-    `${g}/group-sessions`, `${g}/challenges`, `${g}/records`, `${g}/settings`, `${g}/display`, `${g}/kiosk/settings`, "/front-desk", `${g}/business/sms-settings`, `${g}/business/support`,
+    `${g}/challenges`, `${g}/records`, `${g}/settings`, `${g}/display`, `${g}/kiosk/settings`, "/front-desk", `${g}/business/sms-settings`, `${g}/business/support`,
     `${g}/quick-tips`, "/admin/support", `${g}/team-sheet`, "/dashboard",
   ];
+  // Group sessions are on the Group calendar since Oct 31 (one page); the old address redirects there and has no tab of its own.
   it("each is a tab in exactly one home (for a coach who sees everything)", () => {
     const tabs = [...HOMES.flatMap((h) => homeTabs(everything)[h.key].map((t) => ({ ...t, home: h.key }))), ...homeTabs({ ...everything, coachLevel: true }).calendar.map((t) => ({ ...t, home: "calendar" as HomeKey })), ...homeTabs({ ...everything, teamSport: true }).programs.map((t) => ({ ...t, home: "programs" as HomeKey }))];
     for (const href of OLD) {
@@ -96,7 +97,7 @@ describe("who sees which tab (the old menus' rules, moved word for word)", () =>
     expect(keys(f, "programs")).toEqual(expect.arrayContaining(["team", "team-sheet"]));
     expect(keys(f, "settings")).toContain("business-tools");
     for (const k of ["group-dashboard"]) expect(keys(f, "home")).not.toContain(k);
-    for (const k of ["group-calendar", "group-sessions", "kiosk"]) expect(keys(f, "calendar")).not.toContain(k);
+    for (const k of ["group-calendar", "kiosk"]) expect(keys(f, "calendar")).not.toContain(k);
   });
   it("a team-only coach (no one-on-one clients, no organization with others): Leads, Session ledger, Availability, Session types, Booking page, Pro shop and My website are left out", () => {
     const f = { ...ordinary, navFacts: { coachType: "team" as const, hasOneOnOneClients: false, runsOrgWithOthers: false } };
@@ -166,7 +167,7 @@ describe("release 2: Clients and Calendar", () => {
   it("a team-only organization's Clients and Calendar have no selling tabs", () => {
     const t = homeTabs({ ...ordinary, moneyHidden: true });
     expect(t.clients.map((x) => x.key)).toEqual(["clients", "members", "attendance"]);
-    expect(t.calendar.map((x) => x.key)).toEqual(["schedule", "group-calendar", "group-sessions", "kiosk"]);
+    expect(t.calendar.map((x) => x.key)).toEqual(["schedule", "group-calendar", "kiosk"]);
   });
   it("the calendar page's own Schedule / Availability pair shows only below a computer's width (the strip has them there), and follows the address", () => {
     const tabs = readFileSync(join(root, "components/coach/desktop/calendar-page-tabs.tsx"), "utf8");

@@ -73,7 +73,6 @@ export function homeTabs(f: HomeFacts): Record<HomeKey, HomeTab[]> {
       { key: "availability", label: "Availability", href: "/calendar?tab=availability" },
       !f.teamSport && { key: "group-calendar", label: "Group calendar", href: f.coachLevel ? "/group-calendar" : `${g}/group-calendar` },
       !f.teamSport && f.teamMode && { key: "team-calendar", label: "Team calendar", href: `${g}/team/calendar` },
-      !f.teamSport && { key: "group-sessions", label: "Group sessions", href: `${g}/group-sessions` },
       { key: "booking-page", label: "Booking page", href: `${g}/business/booking-page` },
       { key: "session-types", label: "Session types", href: `${g}/business/session-types` },
       !f.teamSport && { key: "kiosk", label: "Kiosk check-in", href: `${g}/kiosk/settings` },
@@ -158,7 +157,8 @@ const RULES: Rule[] = [
   rule(`${G}/group-calendar`, "calendar", "group-calendar"),
   rule(`${G}/team/calendar`, "calendar", "team-calendar"),
   rule(`${G}/team/calendar/games/${ID}`, "calendar", "team-calendar"),
-  rule(`${G}/group-sessions`, "calendar", "group-sessions"),
+  // Group sessions are on the Group calendar (one page since Oct 31); the old address redirects there.
+  rule(`${G}/group-sessions`, "calendar", "group-calendar"),
   rule(`${G}/business/booking-page`, "calendar", "booking-page"),
   rule(`${G}/business/session-types`, "calendar", "session-types"),
   rule(`${G}/kiosk/settings`, "calendar", "kiosk"),
