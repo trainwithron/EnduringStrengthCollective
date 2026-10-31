@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { buildClaimSms, smsHref } from "@/lib/client-claim";
+import { canShare, phoneSmsHref, shareText } from "@/lib/text-from-phone";
 
 // One tap from the phone's client list (Ron, Oct 29: "I need to be able to easily send invite links even if they've been sent before ... from mobile"): makes a fresh sign-in link
 // (the earlier one stops working, which is fine: this IS the resend) and opens the texting app with the message and link filled in. If the phone does not open it by itself,
@@ -11,6 +12,8 @@ export function TextSignInLinkButton({ groupId, athleteId, clientName }: { group
   const [body, setBody] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sharable, setSharable] = useState(false);
+  useEffect(() => setSharable(canShare()), []);
   const first = clientName.trim().split(" ")[0] ?? "";
 
   async function send() {
@@ -27,7 +30,7 @@ export function TextSignInLinkButton({ groupId, athleteId, clientName }: { group
       if (!res.ok || typeof data.link !== "string") throw new Error(data.error || "Couldn't make the link. Try again.");
       const text = buildClaimSms(data.link, first);
       setBody(text);
-      window.location.href = smsHref(text);
+      window.location.href = phoneSmsHref(text);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't make the link. Try again.");
     } finally {
@@ -53,9 +56,21 @@ export function TextSignInLinkButton({ groupId, athleteId, clientName }: { group
       </button>
       {body && (
         <div className="flex items-center gap-3">
-          <a href={smsHref(body)} className="font-body text-sm text-rust min-h-11 inline-flex items-center">
+          <a
+            href={smsHref(body)}
+            onClick={(e) => {
+              e.preventDefault();
+              window.location.href = phoneSmsHref(body);
+            }}
+            className="font-body text-sm text-rust min-h-11 inline-flex items-center"
+          >
             Open my texts
           </a>
+          {sharable && (
+            <button type="button" onClick={() => void shareText(body)} className="font-body text-sm text-rust min-h-11">
+              Share
+            </button>
+          )}
           <button type="button" onClick={copy} className="font-body text-sm text-steel min-h-11">
             {copied ? "Copied" : "Copy message"}
           </button>
