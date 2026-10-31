@@ -159,7 +159,7 @@ export function WebsiteSettings({ coachId, slug, initial, pendingQuotes = [] }: 
   const coverUrl = urlOf(coverPath);
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-2xl @5xl:max-w-none space-y-6">
       <div className="flex flex-wrap items-center gap-3 border border-steel/20 p-4">
         <label className="flex items-center gap-3 min-h-11 font-body text-sm text-chalk cursor-pointer">
           <input type="checkbox" checked={published} onChange={togglePublish} disabled={busy} className="w-5 h-5 accent-[#D2703B]" />
@@ -181,6 +181,9 @@ export function WebsiteSettings({ coachId, slug, initial, pendingQuotes = [] }: 
         )}
       </div>
 
+      {/* With room (@5xl), the words on the left and reviews, pictures and background on the right; narrower, one column in the same order (layout audit #9). */}
+      <div className="space-y-6 @5xl:space-y-0 @5xl:grid @5xl:grid-cols-2 @5xl:gap-10 @5xl:items-start">
+      <div className="space-y-6 min-w-0">
       <label className="block">
         <span className={label}>Line above your name</span>
         <input value={eyebrow} maxLength={SITE_LIMITS.eyebrow} onChange={(e) => setEyebrow(e.target.value)} placeholder="Strength coach · In person and online" className={`${input} mt-1`} />
@@ -234,7 +237,9 @@ export function WebsiteSettings({ coachId, slug, initial, pendingQuotes = [] }: 
         <span className={label}>About your consultation</span>
         <input value={consultNote} maxLength={SITE_LIMITS.consultNote} onChange={(e) => setConsultNote(e.target.value)} placeholder="Your first consultation is free." className={`${input} mt-1`} />
       </label>
+      </div>
 
+      <div className="space-y-6 min-w-0">
       <div className="space-y-3">
         <p className={label}>Client reviews (up to 3)</p>
         <p className="font-body text-xs text-steel">Add 2-3 short quotes, like ones from your Google reviews, with a first name.</p>
@@ -306,8 +311,11 @@ export function WebsiteSettings({ coachId, slug, initial, pendingQuotes = [] }: 
           ))}
         </div>
       </div>
+      </div>
+      </div>
 
-      <div className="flex items-center gap-3">
+      {/* On a computer the Save bar stays on screen at the bottom while the coach scrolls (below lg the coach's tab bar sits there, so it stays in place). */}
+      <div className="flex items-center gap-3 lg:sticky lg:bottom-0 lg:z-10 lg:bg-graphite lg:py-3 lg:border-t lg:border-steel/20">
         <button type="button" onClick={() => void save()} disabled={busy} className="h-11 px-6 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40">
           {busy ? "Saving…" : "Save"}
         </button>
