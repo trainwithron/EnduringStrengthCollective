@@ -22,6 +22,7 @@ import {
   offsetFromMinute,
   parseClockMinutes,
   placementProblem,
+  clashText,
   PLACEMENT_TEXT,
   PX_PER_MINUTE,
   SNAP_CHOICES,
@@ -534,7 +535,7 @@ export function DayTimeGrid({
             {!repeating && <p className="font-body text-xs text-steel mt-1">This books one session. Nothing else on the calendar is changed.</p>}
             {(problem || mismatch) && (
               <div className="mt-2 space-y-0.5">
-                {problem && <p className="font-body text-xs text-rust">{PLACEMENT_TEXT[problem]}</p>}
+                {problem && pendingMin != null && <p className="font-body text-xs text-rust">{clashText({ problem, startMin: pendingMin, endMin: pendingMin + lengthMin, sessions: sessionSpans, bufferMin: bufferMinutes, clientName: client.fullName })}</p>}
                 {mismatch && <p className="font-body text-xs text-steel">{mismatch}</p>}
               </div>
             )}

@@ -133,6 +133,29 @@ export function isHardClash(problem: PlacementProblem): boolean {
   return problem === "taken" || problem === "buffer";
 }
 
+// The one session a clash is about, named (Ron, Oct 31: "this needs to be very specific so i know what to fix"): who, and from when to when. `sameClient` and the same start say
+// it is the session that was just booked for this client (the box stays open after a repeat is booked), not someone else in the way.
+export function clashText(input: {
+  problem: PlacementProblem;
+  startMin: number;
+  endMin: number;
+  sessions: (Span & { name?: string | null })[];
+  bufferMin: number;
+  clientName?: string | null;
+}): string | null {
+  const { problem, startMin, endMin, sessions, bufferMin, clientName } = input;
+  if (problem !== "taken" && problem !== "buffer") return problem ? PLACEMENT_TEXT[problem] : null;
+  const pad = problem === "buffer" ? bufferMin : 0;
+  const hit = sessions.find((s) => startMin < s.endMin && endMin > s.startMin) ?? sessions.find((s) => startMin < s.endMin + pad && endMin > s.startMin - pad);
+  if (!hit) return PLACEMENT_TEXT[problem];
+  const who = hit.name?.trim() || "another client";
+  const when = `${clockLabel12(hit.startMin)} to ${clockLabel12(hit.endMin)}`;
+  if (clientName && hit.name === clientName && hit.startMin === startMin) return `This is the session just booked for ${who}, ${when}. Nothing to fix.`;
+  return problem === "taken"
+    ? `This overlaps ${who}'s session, ${when}. Pick another time, or move ${who}'s session first.`
+    : `This is within your ${bufferMin}-minute gap of ${who}'s session, ${when}. Pick another time, or move ${who}'s session first.`;
+}
+
 export const PLACEMENT_TEXT: Record<Exclude<PlacementProblem, null>, string> = {
   taken: "This overlaps another session, so pick another time.",
   buffer: "This is closer to another session than your gap, so pick another time.",
