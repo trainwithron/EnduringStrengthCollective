@@ -113,17 +113,22 @@ export default async function BookingPageSettingsPage(props: { params: Promise<{
             </div>
           )}
 
-          <section>
-            <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">Your page</h2>
-            <BookingPageSettings coachId={user.id} initial={initialPage} suggestedSlug={suggestedSlug} />
-          </section>
+          {/* Two columns when the page is wide enough (layout audit, Oct 31): the page and its share picture on the left, what people can book on the right. */}
+          <div className="grid grid-cols-1 gap-10 items-start @4xl:grid-cols-2">
+            <div className="min-w-0 space-y-10">
+              <section>
+                <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">Your page</h2>
+                <BookingPageSettings coachId={user.id} initial={initialPage} suggestedSlug={suggestedSlug} />
+              </section>
 
-          {shareCard && <ShareCardSettings coachId={user.id} initialHandle={shareCard.handle} initialQr={shareCard.qr} />}
+              {shareCard && <ShareCardSettings coachId={user.id} initialHandle={shareCard.handle} initialQr={shareCard.qr} />}
+            </div>
 
-          <section>
-            <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">Sessions people can book</h2>
-            <PublicSessionTypesEditor initialTypes={types} organizationId={typesOrgId} />
-          </section>
+            <section className="min-w-0">
+              <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">Sessions people can book</h2>
+              <PublicSessionTypesEditor initialTypes={types} organizationId={typesOrgId} />
+            </section>
+          </div>
         </div>
       )}
     </CoachDesktopShell>

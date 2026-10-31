@@ -847,22 +847,9 @@ export default async function CoachDayDetailPage(
         )}
       </div>
 
-      {selectedClient && assignableWorkouts.length > 0 && (
-        <div className="mb-6 max-w-lg">
-          <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
-            Assign a workout to this day
-          </h2>
-          <div className="divide-y divide-steel/15 border border-steel/20">
-            {assignableWorkouts.map((w) => (
-              <div key={w.id} className="py-2.5 px-3 flex items-center justify-between gap-3">
-                <span className="font-body text-sm text-chalk truncate">{w.title}</span>
-                <AssignWorkoutToDateButton workoutId={w.id} dateKey={params.date} alreadyHere={w.alreadyHere} />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
+      {/* The hour grid on the left; the open slots, sessions and to-dos beside it when the page is wide enough (layout audit, Oct 31). */}
+      <div className="grid grid-cols-1 gap-8 items-start @4xl:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
+      <div className="min-w-0">
       {/* Tap a time on the day to add a session, an event or time off: one sheet, set to that exact time. */}
       <DayCalendar
         coachId={user.id}
@@ -887,6 +874,24 @@ export default async function CoachDayDetailPage(
           .map((w) => ({ startMs: zonedTimeToUtc(params.date, w.startTime, timezone).getTime(), endMs: zonedTimeToUtc(params.date, w.endTime, timezone).getTime() }))}
         busyRanges={(bookingRows ?? []).map((b: any) => ({ startMs: new Date(b.start_at).getTime(), endMs: new Date(b.end_at).getTime() }))}
       />
+      </div>
+
+      <div className="min-w-0">
+      {selectedClient && assignableWorkouts.length > 0 && (
+        <div className="mb-6 max-w-lg">
+          <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
+            Assign a workout to this day
+          </h2>
+          <div className="divide-y divide-steel/15 border border-steel/20">
+            {assignableWorkouts.map((w) => (
+              <div key={w.id} className="py-2.5 px-3 flex items-center justify-between gap-3">
+                <span className="font-body text-sm text-chalk truncate">{w.title}</span>
+                <AssignWorkoutToDateButton workoutId={w.id} dateKey={params.date} alreadyHere={w.alreadyHere} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <AddDayEventForm coachId={user.id} dateKey={params.date} organizationId={pageOrgId} />
 
@@ -978,6 +983,8 @@ export default async function CoachDayDetailPage(
           </div>
         </div>
       )}
+      </div>
+      </div>
     </CoachDesktopShell>
   );
 }
