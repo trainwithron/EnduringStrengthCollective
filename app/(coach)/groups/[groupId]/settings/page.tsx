@@ -363,7 +363,7 @@ export default async function SettingsPage(
   // A coach (not acting as a client) gets the same coach shell as every other coach page (sidebar on a desktop, the coach tabs on a phone), not the phone client page.
   const coachDesktop = isCoach && !effective.isActingAsOther;
   const page = (
-    <main className={`bg-graphite text-chalk font-body ${coachDesktop ? "max-w-3xl pb-10" : "min-h-screen pb-24"}`}>
+    <main className={`bg-graphite text-chalk font-body ${coachDesktop ? "max-w-3xl @3xl:max-w-6xl pb-10" : "min-h-screen pb-24"}`}>
       {effective.isActingAsOther && (
         <ActingAsBanner athleteFullName={actingAsFullName ?? "Client"} groupId={params.groupId} />
       )}
@@ -411,7 +411,8 @@ export default async function SettingsPage(
         </section>
       )}
 
-      <section className="px-5 pt-8 space-y-6">
+      {/* With room (a coach's page area, @3xl), the groups flow in two balanced columns; help, feedback, more and sign out sit in one row underneath. On a phone and for a client, one column as before. */}
+      <section className="px-5 pt-8 space-y-6 @3xl:space-y-0 @3xl:columns-2 @3xl:gap-10 [&>*]:break-inside-avoid @3xl:[&>*]:mb-6">
         {isCoach ? <>{coachingGroup}{terminologyGroup}{notificationsGroup}</> : notificationsGroup}
 
         {isCoach && !viewingOther && (
@@ -545,7 +546,9 @@ export default async function SettingsPage(
             <BlockedMembersList initial={blockedMembers} />
           </SettingsGroup>
         )}
+      </section>
 
+      <section className="px-5 pt-6 space-y-6 @3xl:space-y-0 @3xl:flex @3xl:flex-wrap @3xl:items-start @3xl:gap-x-12 @3xl:gap-y-4 @3xl:mx-5 @3xl:px-0 @3xl:mt-2 @3xl:border-t @3xl:border-steel/20">
         <SettingsGroup label="Help">
           <Link href="/help" className="block font-body text-sm text-chalk">
             Help articles, what&apos;s new and app status →
@@ -589,7 +592,7 @@ export default async function SettingsPage(
           </p>
         )}
 
-        <div className="pt-2 pb-4">
+        <div className="pt-2 pb-4 @3xl:pt-0 @3xl:self-center">
           <SignOutButton />
         </div>
       </section>
