@@ -344,7 +344,20 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
       )}
 
       <div>
-        <p className="font-body text-xs text-steel uppercase tracking-wide mb-1.5">{term("client", "plural", { cap: true })}</p>
+        {/* Add a client is always one tap away here, not only for a coach with none (Ron, Oct 31: "Should be able to add a new client from here"). It opens the Clients page with the Add form open. */}
+        <div className="flex items-center justify-between gap-2 mb-1.5">
+          <p className="font-body text-xs text-steel uppercase tracking-wide">{term("client", "plural", { cap: true })}</p>
+          <button
+            type="button"
+            onClick={() => {
+              onNavigated();
+              router.push(`/groups/${clientAnchorGroup ?? groupId}/clients?add=1`);
+            }}
+            className="h-9 px-3 border border-rust/60 text-rust font-body text-sm active:bg-rust/10"
+          >
+            + Add {term("client")}
+          </button>
+        </div>
         <input aria-label={`Search ${term("client", "plural")}`}
           type="text"
           value={query}
@@ -356,19 +369,6 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
           {clients === null && <p className="font-body text-sm text-steel px-1 py-2">Loading…</p>}
           {clients !== null && filteredClients.length === 0 && (
             <p className="font-body text-sm text-steel px-1 py-2">{query.trim() ? "No match." : `No ${term("client", "plural")} to show.`}</p>
-          )}
-          {/* A coach with no clients at all (a new coach) is offered the way to add one right here (Oct 19 audit: no Add button on their first phone screen). */}
-          {clients !== null && clients.length === 0 && !query.trim() && (
-            <button
-              type="button"
-              onClick={() => {
-                onNavigated();
-                router.push(`/groups/${clientAnchorGroup ?? groupId}/clients?add=1`);
-              }}
-              className="w-full h-11 bg-rust text-graphite font-display uppercase text-sm font-bold"
-            >
-              Add a {term("client")}
-            </button>
           )}
           {filteredClients.map((c) => {
             return (

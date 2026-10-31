@@ -16,10 +16,10 @@ describe("a client facing a day with nothing to book", () => {
 });
 
 describe("a coach with no clients on the phone", () => {
-  it("the Clients tile offers 'Add a client' when there is no client at all (not merely none shown)", () => {
+  it("the Clients tile always offers + Add client beside the heading, with clients or without (Ron, Oct 31)", () => {
     const panel = read("components/coach/mobile/spot-clients-groups-panel.tsx");
-    expect(panel).toContain("{clients !== null && clients.length === 0 && !query.trim() && (");
     expect(panel).toContain("/clients?add=1");
-    expect(panel).toContain("Add a {term(\"client\")}");
+    expect(panel).toContain("+ Add {term(\"client\")}");
+    expect(panel).not.toContain("{clients !== null && clients.length === 0 && !query.trim() && (");
   });
 });
