@@ -24,7 +24,7 @@ export function YourDayPanel({
 }) {
   const { shown, hidden } = rankAttention(attention, 6);
   return (
-    <section aria-labelledby="your-day-heading" className="mb-6 grid gap-4 md:grid-cols-2">
+    <section aria-labelledby="your-day-heading" className="mb-6 grid gap-4 md:grid-cols-2 @5xl:!grid-cols-1">
       <div className="border border-steel/20 bg-surface p-4">
         <h2 id="your-day-heading" className="font-display uppercase text-sm tracking-wide text-steel mb-3">
           Your day

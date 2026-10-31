@@ -598,20 +598,34 @@ export default async function CoachHomePage() {
         <GettingStartedCard groupId={(allGroups.find((g) => g.group_kind !== "one_on_one") ?? allGroups[0]).id} />
       )}
 
-      <Suspense fallback={<NeedsYouLoading />}>
-        <NeedsYouLoader input={needsYouInput} />
-      </Suspense>
-
+      {/* With room (the page area at @5xl), three columns: Now (sessions, the next workout, your day), Needs you (the strip and the stack it opens), and Pulse and stats.
+          Narrower, the same blocks stack in the same order as always: each column is display: contents there and `order` keeps that order (layout audit #7). */}
+      <div className="flex flex-col @5xl:grid @5xl:grid-cols-3 @5xl:gap-x-6 @5xl:items-start" data-home-columns>
+      <div className="contents @5xl:block @5xl:min-w-0" data-home-now>
       {/* Each streams in on its own (SPEED, Oct 19): the rest of Home never waits for them. */}
+      <div className="order-2">
       <Suspense fallback={null}>
         <SessionCheckSection coachId={user.id} groupIds={allGroupIds} />
       </Suspense>
+      </div>
 
+      <div className="order-3">
       <Suspense fallback={null}>
         <NextClientWorkoutSection coachId={user.id} groupIds={allGroupIds} />
       </Suspense>
+      </div>
 
+      <div className="order-4">
       <YourDayPanel schedule={yourDaySchedule} attention={yourDayAttention} timezone={coachTimezone} showPayments={!moneyHidden} />
+      </div>
+      </div>
+
+      <div className="contents @5xl:block @5xl:min-w-0" data-home-needs>
+      <div className="order-1">
+      <Suspense fallback={<NeedsYouLoading />}>
+        <NeedsYouLoader input={needsYouInput} />
+      </Suspense>
+      </div>
 
       {/* Replaces the old team-mode-only Team Pulse side column
           (home_dashboard_merge_and_pulse_tabs_redesign.md) — every
@@ -620,20 +634,8 @@ export default async function CoachHomePage() {
           separate "Roster" tile lower on this page (same data,
           collapsed-and-buried) was removed rather than showing the same
           clients/groups twice on one page. */}
-      {/* A team organization has its team tiles above; the 1-on-1 / athlete / group pulse tabs, the athlete counts and the "invite your first client" lines are for coaches who sell to clients. */}
-      {!moneyHidden && (
-        <div className="mb-6">
-          <PulseTabs
-            clientCards={clientCards}
-            teamPulses={dashboardData.teamPulses}
-            teamCards={teamCards}
-            socialCards={socialCards}
-          />
-        </div>
-      )}
-
       {/* The stack below is what the strip's "N more" opens; the strip's buttons also jump to the panel that handles the request. Nothing in it changed. */}
-      <div id="needs-stack">
+      <div id="needs-stack" className="order-6">
         <OrgNotificationsPanel initialNotifications={orgNotifications} />
 
         <NeedsReplyPanel coachId={user.id} threads={needsReplyThreads} />
@@ -651,8 +653,23 @@ export default async function CoachHomePage() {
         <ProgressLookPanel groupIds={allGroupIds} />
         {!moneyHidden && <NeedsPaymentPanel rows={dashboardData.needsPayment} />}
       </div>
+      </div>
+
+      <div className="contents @5xl:block @5xl:min-w-0" data-home-pulse>
+      {/* A team organization has its team tiles above; the 1-on-1 / athlete / group pulse tabs, the athlete counts and the "invite your first client" lines are for coaches who sell to clients. */}
+      {!moneyHidden && (
+        <div className="mb-6 order-5">
+          <PulseTabs
+            clientCards={clientCards}
+            teamPulses={dashboardData.teamPulses}
+            teamCards={teamCards}
+            socialCards={socialCards}
+          />
+        </div>
+      )}
 
       {!moneyHidden && (
+      <div className="order-7">
       <DashboardTileGrid
         initialOrder={(layoutRow?.tile_order as string[] | undefined) ?? []}
         initialHidden={(layoutRow?.hidden_tiles as string[] | undefined) ?? []}
@@ -671,7 +688,10 @@ export default async function CoachHomePage() {
           },
         ]}
       />
+      </div>
       )}
+      </div>
+      </div>
     </>
   );
 
