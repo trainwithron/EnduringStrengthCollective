@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { buildClaimSms, smsHref } from "@/lib/client-claim";
-import { canShare, phoneSmsHref, shareText } from "@/lib/text-from-phone";
+import { buildClaimSms } from "@/lib/client-claim";
+import { canShare, shareText } from "@/lib/share-sheet";
 
 // One tap from the phone's client list (Ron, Oct 29: "I need to be able to easily send invite links even if they've been sent before ... from mobile"): makes a fresh sign-in link
-// (the earlier one stops working, which is fine: this IS the resend) and opens the texting app with the message and link filled in. If the phone does not open it by itself,
-// the same message is one more tap below, with Copy next to it.
+// (the earlier one stops working, which is fine: this IS the resend) and opens the phone's share sheet with the message and link, where Copy, texts and every other app are
+// (Ron, Oct 31: a Share link button, not a separate Text one). If the sheet does not open by itself, Share and Copy are one more tap below.
 export function TextSignInLinkButton({ groupId, athleteId, clientName }: { groupId: string; athleteId: string; clientName: string }) {
   const [busy, setBusy] = useState(false);
   const [body, setBody] = useState<string | null>(null);
@@ -16,7 +16,7 @@ export function TextSignInLinkButton({ groupId, athleteId, clientName }: { group
   useEffect(() => setSharable(canShare()), []);
   const first = clientName.trim().split(" ")[0] ?? "";
 
-  async function send() {
+  async function makeAndShare() {
     if (busy) return;
     setBusy(true);
     setError(null);
@@ -30,7 +30,7 @@ export function TextSignInLinkButton({ groupId, athleteId, clientName }: { group
       if (!res.ok || typeof data.link !== "string") throw new Error(data.error || "Couldn't make the link. Try again.");
       const text = buildClaimSms(data.link, first);
       setBody(text);
-      window.location.href = phoneSmsHref(text);
+      void shareText(text);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't make the link. Try again.");
     } finally {
@@ -51,21 +51,11 @@ export function TextSignInLinkButton({ groupId, athleteId, clientName }: { group
 
   return (
     <div className="space-y-2">
-      <button type="button" onClick={send} disabled={busy} className="w-full min-h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-50">
-        {busy ? "Making the link…" : body ? "Text a new sign-in link" : "Text sign-in link"}
+      <button type="button" onClick={makeAndShare} disabled={busy} className="w-full min-h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-50">
+        {busy ? "Making the link…" : body ? "Share a new sign-in link" : "Share sign-in link"}
       </button>
       {body && (
         <div className="flex items-center gap-3">
-          <a
-            href={smsHref(body)}
-            onClick={(e) => {
-              e.preventDefault();
-              window.location.href = phoneSmsHref(body);
-            }}
-            className="font-body text-sm text-rust min-h-11 inline-flex items-center"
-          >
-            Open my texts
-          </a>
           {sharable && (
             <button type="button" onClick={() => void shareText(body)} className="font-body text-sm text-rust min-h-11">
               Share

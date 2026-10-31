@@ -37,7 +37,8 @@ describe("the buttons", () => {
     expect(panel).toContain("maskedEmail && !justSaved");
     expect(panel).toContain("Saved. Email the sign-in link now?");
     expect(panel).toContain("Copy");
-    expect(panel).toContain("Text it from my phone");
+    expect(panel).toContain("Share link");
+    expect(panel).not.toContain("Text it from my phone");
   });
   it("the Add client screen offers it when the client was added with an email", () => {
     const add = read("components/coach/desktop/add-client-button.tsx");

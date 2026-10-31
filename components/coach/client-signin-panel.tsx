@@ -4,8 +4,8 @@ import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Circle } from "lucide-react";
-import { buildClaimSms, CLAIM_STATUS_LABEL, smsHref, type ClaimStatus } from "@/lib/client-claim";
-import { canShare, phoneSmsHref, shareText } from "@/lib/text-from-phone";
+import { buildClaimSms, CLAIM_STATUS_LABEL, type ClaimStatus } from "@/lib/client-claim";
+import { canShare, shareText } from "@/lib/share-sheet";
 import { CLAIM_LINK_STATE_LABEL, type ClaimLinkDetail } from "@/lib/invite-state";
 import { EmailClaimLinkButton } from "@/components/coach/email-claim-link-button";
 import { EmailMessageEditor } from "@/components/coach/email-message-editor";
@@ -39,7 +39,8 @@ export function ClientSignInPanel({
   const [busy, setBusy] = useState(false);
   const [detail, setDetail] = useState<ClaimLinkDetail | undefined>(linkDetail);
   const [copied, setCopied] = useState(false);
-  // The phone's share sheet, offered next to Text when this phone has one (checked after the page loads, so it renders the same on the server).
+  // Share link opens the phone's share sheet (texts, WhatsApp, Copy...) when this device has one (checked after the page loads, so it renders the same on the server).
+  // No separate Text button: the share sheet already has it (Ron, Oct 31: "Text from phone is redundant").
   const [sharable, setSharable] = useState(false);
   useEffect(() => setSharable(canShare()), []);
   const [error, setError] = useState<string | null>(null);
@@ -195,23 +196,15 @@ export function ClientSignInPanel({
               {copied ? "Copied" : "Copy"}
             </button>
           </div>
-          <div className="flex flex-wrap items-center gap-3 mt-2">
-            <a
-              href={smsHref(buildClaimSms(link, firstName, coachFirstName))}
-              onClick={(e) => {
-                e.preventDefault();
-                window.location.href = phoneSmsHref(buildClaimSms(link, firstName, coachFirstName));
-              }}
-              className="inline-flex items-center justify-center h-11 px-4 bg-rust text-graphite font-body text-sm font-medium"
+          {sharable && (
+            <button
+              type="button"
+              onClick={() => void shareText(buildClaimSms(link, firstName, coachFirstName))}
+              className="mt-2 h-11 px-4 bg-rust text-graphite font-body text-sm font-medium"
             >
-              Text it from my phone
-            </a>
-            {sharable && (
-              <button type="button" onClick={() => void shareText(buildClaimSms(link, firstName, coachFirstName))} className="h-11 px-4 border border-rust text-rust font-body text-sm">
-                Share
-              </button>
-            )}
-          </div>
+              Share link
+            </button>
+          )}
         </div>
       ) : (
         <button

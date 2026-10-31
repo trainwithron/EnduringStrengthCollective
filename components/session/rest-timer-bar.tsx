@@ -241,11 +241,25 @@ export function RestTimerBar({
   }
 
   const showPrompt = pendingPrompt && !running;
-  // Nothing to say: no bar at all. (The workout's stopwatch is on the header's top line.)
-  if (!showPrompt && !running && !justFinished) return null;
+  // Always on screen: a rest can be started any time, not only when a set is ticked (Ron, Oct 31: he fills all the sets in up front once the weight is agreed, and still
+  // needs the timer between them). The prompt and the countdown open over it, so nothing moves.
+  const restRow = (
+    <div className="flex items-center gap-1.5 px-5 py-1 border-b border-steel/20">
+      <span className="font-body text-xs text-steel">Rest</span>
+      {PRESETS.map((seconds) => (
+        <button key={seconds} type="button" onClick={() => startPreset(seconds)} className="h-8 px-2.5 font-body text-xs border border-steel/30 text-steel">
+          {seconds}s
+        </button>
+      ))}
+    </div>
+  );
+  // Nothing running: just the row. (The workout's stopwatch is on the header's top line.)
+  if (!showPrompt && !running && !justFinished) return restRow;
 
   return (
-    // Over the top of the card, not above it, so the sets don't move when rest starts.
+    <>
+    {restRow}
+    {/* Over the top of the card, not above it, so the sets don't move when rest starts. */}
     <div className="absolute inset-x-0 top-0 z-40 bg-graphite border-b border-steel/20 px-5 py-1 shadow-lg">
       <div className="flex items-center justify-between gap-3">
       {showPrompt && (
@@ -436,6 +450,7 @@ export function RestTimerBar({
       )}
 
     </div>
+    </>
   );
 }
 

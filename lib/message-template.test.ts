@@ -69,10 +69,10 @@ describe("where it is wired", () => {
     expect(api).toContain("validateTemplate({ subject: body.subject, body: body.body })");
     expect(api).toContain("export async function DELETE");
   });
-  it("the sign-in panel offers Edit this message with the chips, a back-to-default button, and keeps Copy and Text", () => {
+  it("the sign-in panel offers Edit this message with the chips, a back-to-default button, and keeps Copy and Share link", () => {
     const panel = read("components/coach/client-signin-panel.tsx");
     expect(panel).toContain("<EmailMessageEditor />");
-    expect(panel).toContain("Text it from my phone");
+    expect(panel).toContain("Share link");
     const ed = read("components/coach/email-message-editor.tsx");
     expect(ed).toContain("Edit this message");
     expect(ed).toContain("Back to the default");

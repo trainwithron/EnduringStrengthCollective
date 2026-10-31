@@ -4,8 +4,6 @@ import {
   claimStatus,
   isPlaceholderEmail,
   placeholderEmailFor,
-  smsHref,
-  smsPlatformOf,
 } from "@/lib/client-claim";
 import { generateClaimToken, hashClaimToken } from "@/lib/client-claim-token";
 
@@ -51,18 +49,10 @@ describe("claimStatus", () => {
 });
 
 describe("claim text message", () => {
-  it("greets by first name and carries the link; sms href is encoded", () => {
+  it("greets by first name and carries the link", () => {
     const body = buildClaimSms("https://app.example/claim/abc", "Sawyer", "Ron");
     expect(body).toContain("Hi Sawyer!");
     expect(body).toContain("https://app.example/claim/abc");
     expect(body.endsWith("— Ron")).toBe(true);
-    // Android (Samsung Messages) needs the standard form; iPhones get their own (Oct 31: Ron's Samsung could not send the old one).
-    expect(smsHref(body).startsWith("sms:?body=")).toBe(true);
-    expect(smsHref("a b&c")).toBe("sms:?body=a%20b%26c");
-    expect(smsHref("a b&c", "ios")).toBe("sms:&body=a%20b%26c");
-    expect(smsPlatformOf("Mozilla/5.0 (Linux; Android 16; SM-S948U) AppleWebKit/537.36 Chrome/141 Mobile Safari/537.36")).toBe("other");
-    expect(smsPlatformOf("Mozilla/5.0 (iPhone; CPU iPhone OS 19_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148")).toBe("ios");
-    expect(smsPlatformOf("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15", 5)).toBe("ios");
-    expect(smsPlatformOf("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15", 0)).toBe("other");
   });
 });

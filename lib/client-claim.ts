@@ -72,15 +72,3 @@ export function buildClaimSms(link: string, clientFirstName: string, coachFirstN
   return `${hi}Your training is all set up. Tap this link to sign in and start: ${link}${from}`;
 }
 
-// The texting app with the message filled in (no number: the coach picks the recipient). Android's apps (Samsung Messages among them) need the standard
-// `sms:?body=`; the old `sms:?&body=` form only suited iPhones and left Ron's Samsung unable to send (Oct 31). iPhones keep `sms:&body=`.
-export type SmsPlatform = "ios" | "other";
-
-export function smsHref(body: string, platform: SmsPlatform = "other"): string {
-  return platform === "ios" ? `sms:&body=${encodeURIComponent(body)}` : `sms:?body=${encodeURIComponent(body)}`;
-}
-
-// An iPhone or iPad (an iPad says "Macintosh" but has a touch screen).
-export function smsPlatformOf(userAgent: string, maxTouchPoints = 0): SmsPlatform {
-  return /iPhone|iPad|iPod/i.test(userAgent) || (/Macintosh/i.test(userAgent) && maxTouchPoints > 1) ? "ios" : "other";
-}
