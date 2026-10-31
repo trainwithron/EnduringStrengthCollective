@@ -10,7 +10,7 @@
 //   * Network calls from the browser: this site, Supabase (data, storage and realtime websockets) and Daily (video calls).
 //     Everything else (Stripe, Twilio, Brevo, Anthropic, Google, Oura...) is called from the server, not the browser.
 //   * Frames: YouTube (exercise videos) and Daily (video calls) only. Nobody may frame this site (frame-ancestors 'none'), EXCEPT the coach's own pages
-//     (/groups/..., /clients, /dashboard), which the site itself may frame so the workspace can show one coach page inside another (frame-ancestors 'self',
+//     (/groups/..., /clients, /dashboard) and the public page (/c/..., shown beside the My website editor), which the site itself may frame so the workspace can show one page inside another (frame-ancestors 'self',
 //     X-Frame-Options SAMEORIGIN, and 'self' added to frame-src). Another site can still never frame any page.
 //   * Forms may only post to this site; no plugins; no <base> tricks.
 // The camera and microphone are deliberately NOT mentioned in Permissions-Policy: listing them as (self) would also stop the

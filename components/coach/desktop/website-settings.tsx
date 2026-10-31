@@ -55,6 +55,10 @@ export function WebsiteSettings({ coachId, slug, initial, pendingQuotes = [] }: 
   const [published, setPublished] = useState(initial.published);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
+  // The live preview beside the editor (Ron, Oct 31): the coach's own page in a frame, reloaded after each save. Only with room for both (@5xl).
+  const [showPreview, setShowPreview] = useState(true);
+  const [previewKey, setPreviewKey] = useState(0);
+  const previewing = !!slug && showPreview;
 
   const supabase = createBrowserClient();
   const urlOf = (path: string | null) => (path ? supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl : null);
@@ -90,6 +94,7 @@ export function WebsiteSettings({ coachId, slug, initial, pendingQuotes = [] }: 
       return false;
     }
     setMessage({ text: "Saved.", error: false });
+    setPreviewKey((k) => k + 1);
     return true;
   }
 
@@ -114,6 +119,7 @@ export function WebsiteSettings({ coachId, slug, initial, pendingQuotes = [] }: 
     }
     setQuotes((prev) => prev.filter((x) => x.id !== q.id));
     setMessage({ text: "Added to your page.", error: false });
+    setPreviewKey((k) => k + 1);
   }
 
   async function dismissQuote(q: PendingQuote) {
@@ -159,7 +165,8 @@ export function WebsiteSettings({ coachId, slug, initial, pendingQuotes = [] }: 
   const coverUrl = urlOf(coverPath);
 
   return (
-    <div className="max-w-2xl @5xl:max-w-none space-y-6">
+    <div className={previewing ? "@5xl:grid @5xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] @5xl:gap-8 @5xl:items-start" : ""}>
+    <div className="max-w-2xl @5xl:max-w-none space-y-6 min-w-0">
       <div className="flex flex-wrap items-center gap-3 border border-steel/20 p-4">
         <label className="flex items-center gap-3 min-h-11 font-body text-sm text-chalk cursor-pointer">
           <input type="checkbox" checked={published} onChange={togglePublish} disabled={busy} className="w-5 h-5 accent-[#D2703B]" />
@@ -175,14 +182,17 @@ export function WebsiteSettings({ coachId, slug, initial, pendingQuotes = [] }: 
                 Open the public page
               </a>
             )}
+            <button type="button" onClick={() => setShowPreview((v) => !v)} aria-pressed={showPreview} className="hidden @5xl:inline-flex items-center min-h-11 font-body text-sm text-steel underline">
+              {showPreview ? "Hide the preview" : "Show the preview beside"}
+            </button>
           </>
         ) : (
           <p className="font-body text-xs text-steel">Your website uses your booking page address. Turn on your booking page to get one.</p>
         )}
       </div>
 
-      {/* With room (@5xl), the words on the left and reviews, pictures and background on the right; narrower, one column in the same order (layout audit #9). */}
-      <div className="space-y-6 @5xl:space-y-0 @5xl:grid @5xl:grid-cols-2 @5xl:gap-10 @5xl:items-start">
+      {/* With room (@5xl), the words on the left and reviews, pictures and background on the right; narrower, or with the preview open beside, one column in the same order (layout audit #9). */}
+      <div className={previewing ? "space-y-6" : "space-y-6 @5xl:space-y-0 @5xl:grid @5xl:grid-cols-2 @5xl:gap-10 @5xl:items-start"}>
       <div className="space-y-6 min-w-0">
       <label className="block">
         <span className={label}>Line above your name</span>
@@ -325,6 +335,13 @@ export function WebsiteSettings({ coachId, slug, initial, pendingQuotes = [] }: 
           </p>
         )}
       </div>
+    </div>
+    {previewing && (
+      <aside className="hidden @5xl:block sticky top-4" aria-label="Preview of your website">
+        <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">Preview: what you last saved</p>
+        <iframe key={previewKey} src={`/c/${slug}?preview=1`} title="Preview of your website" className="w-full h-[calc(100vh-8rem)] border border-steel/20 bg-white" />
+      </aside>
+    )}
     </div>
   );
 }

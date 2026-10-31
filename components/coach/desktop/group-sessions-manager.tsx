@@ -118,7 +118,7 @@ export function GroupSessionForm({ groupId, timezone, nowIso }: { groupId: strin
         <input className={`${input} w-full`} value={place} onChange={(e) => setPlace(e.target.value)} maxLength={200} />
       </label>
       <p className="font-body text-xs text-steel">
-        Times are in your time zone ({timezone.replace("_", " ")}). The time is blocked in your calendar. {term("client", "plural", { cap: true })} join with one tap; a {term("client")}
+        Times are in your time zone ({timezone.replace("_", " ")}). The time is blocked in your calendar. {term("client", "plural", { cap: true })} join with one tap; a {term("client")}{" "}
         who joins uses one session. When it is full, the next people go on a waiting list.
       </p>
       {message && (

@@ -22,7 +22,8 @@ const nextConfig = {
         }),
       },
       // The coach's own pages may be shown inside the workspace (framed by this site only): see security-headers.mjs. Listed after the rule above so these values win.
-      ...["/groups/:path*", "/clients", "/dashboard"].map((source) => ({
+      // The public page (/c/...) too, so My website can show it beside the editor (Ron, Oct 31). Still this site only: no other site can frame it.
+      ...["/groups/:path*", "/clients", "/dashboard", "/c/:path*"].map((source) => ({
         source,
         headers: buildSecurityHeaders({
           isProd: process.env.NODE_ENV === "production",
