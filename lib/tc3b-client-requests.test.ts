@@ -12,11 +12,20 @@ const state = vi.hoisted(() => ({
   switchError: null as unknown,
   org: "org-1" as string | null,
   real: true,
+  // making an account on the request page (step 196)
+  signUpAnswer: { data: { user: { id: "new-1", identities: [{}] }, session: null }, error: null } as { data: { user: { id: string; identities?: unknown[] } | null; session: unknown }; error: { message: string } | null },
+  signUpCalls: 0,
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
   createServerClient: async () => ({
-    auth: { getUser: async () => ({ data: { user: state.user } }) },
+    auth: {
+      getUser: async () => ({ data: { user: state.user } }),
+      signUp: async () => {
+        state.signUpCalls++;
+        return state.signUpAnswer;
+      },
+    },
     rpc: async (fn: string, args: Record<string, unknown>) => {
       state.rpcCalls.push({ fn, args });
       return state.rpcAnswer;
@@ -49,14 +58,19 @@ function fakeDb() {
     },
   };
   return {
-    from: () => chain,
-    rpc: async (fn: string) => (fn === "client_request_org" ? { data: state.org, error: null } : { data: null, error: null }),
+    from: () => ({ ...chain, upsert: async () => ({ error: null }) }),
+    rpc: async (fn: string, args?: Record<string, unknown>) => {
+      if (fn === "client_request_org") return { data: state.org, error: null };
+      state.rpcCalls.push({ fn, args: args ?? {} });
+      return fn === "submit_client_request_at_signup" ? state.rpcAnswer : { data: null, error: null };
+    },
   };
 }
 
 import { canRequestOnPage, isRealCalendarDate, requestTargetFor } from "@/lib/client-requests";
 import { POST as submit } from "@/app/api/client-requests/submit/route";
 import { POST as answer } from "@/app/api/client-requests/answer/route";
+import { POST as signupAndRequest } from "@/app/api/client-requests/signup/route";
 
 const read = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
 const post = (url: string, body: unknown) => new Request(`http://localhost${url}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
@@ -71,6 +85,71 @@ beforeEach(() => {
   state.switchError = null;
   state.org = "org-1";
   state.real = true;
+  state.signUpAnswer = { data: { user: { id: "new-1", identities: [{}] }, session: null }, error: null };
+  state.signUpCalls = 0;
+});
+
+describe("a new person makes an account and sends the request together (Ron, Oct 31: the coach must hear before the email is confirmed)", () => {
+  const body = { slug: "coach-ron", name: "Adrian Rubio", email: "A@Example.com ", password: "password123", dob: "1995-04-02" };
+  it("makes the account, then files the request for THAT account only, through the server-only function", async () => {
+    const res = await signupAndRequest(post("/api/client-requests/signup", body));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, confirmed: false });
+    expect(state.signUpCalls).toBe(1);
+    expect(state.rpcCalls).toEqual([{ fn: "submit_client_request_at_signup", args: { p_requester: "new-1", p_coach: "coach-1", p_dob: "1995-04-02" } }]);
+  });
+  it("an email that already has an account files nothing and says to sign in", async () => {
+    state.signUpAnswer = { data: { user: { id: "fake", identities: [] }, session: null }, error: null };
+    const res = await signupAndRequest(post("/api/client-requests/signup", body));
+    expect(res.status).toBe(409);
+    expect((await res.json()).code).toBe("has_account");
+    expect(state.rpcCalls).toEqual([]);
+  });
+  it("a refused password says why, and nothing is filed", async () => {
+    state.signUpAnswer = { data: { user: null, session: null }, error: { message: "Password should be at least 6 characters." } };
+    const res = await signupAndRequest(post("/api/client-requests/signup", body));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe("Password should be at least 6 characters.");
+    expect(state.rpcCalls).toEqual([]);
+  });
+  it("needs a name and a real date of birth before any account is made", async () => {
+    expect((await signupAndRequest(post("/api/client-requests/signup", { ...body, name: " " }))).status).toBe(400);
+    expect((await signupAndRequest(post("/api/client-requests/signup", { ...body, dob: "" }))).status).toBe(400);
+    expect((await signupAndRequest(post("/api/client-requests/signup", { ...body, dob: "2020-13-45" }))).status).toBe(400);
+    expect(state.signUpCalls).toBe(0);
+  });
+  it("a page not taking requests makes no account", async () => {
+    state.switchRow = { accepts_requests: false };
+    expect((await signupAndRequest(post("/api/client-requests/signup", body))).status).toBe(404);
+    expect(state.signUpCalls).toBe(0);
+  });
+  it("the database's refusal comes through in its words; the account stays made", async () => {
+    state.rpcAnswer = { data: { ok: false, code: "under_13", message: "Coaching here is for ages 13 and up." }, error: null };
+    const res = await signupAndRequest(post("/api/client-requests/signup", body));
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "under_13", accountMade: true });
+  });
+  it("is limited by pace", async () => {
+    state.limited = true;
+    expect((await signupAndRequest(post("/api/client-requests/signup", body))).status).toBe(429);
+    expect(state.signUpCalls).toBe(0);
+  });
+  it("the database step: the core is not callable by a signed-in person, the sign-up path is the server's only and only for a fresh unconfirmed account, and the coach's list says who has not confirmed", () => {
+    const sql = read("supabase/migrations/0441_client_request_at_signup.sql");
+    expect(sql).toContain("revoke all on function public.client_request_submit_core(uuid, uuid, date) from public, anon, authenticated;");
+    expect(sql).toContain("revoke all on function public.submit_client_request_at_signup(uuid, uuid, date) from public, anon, authenticated;");
+    expect(sql).toContain("u.created_at > now() - interval '15 minutes' and u.email_confirmed_at is null and u.last_sign_in_at is null");
+    expect(sql).toContain("return public.client_request_submit_core(auth.uid(), p_coach, p_dob);");
+    expect(sql).toContain("email_confirmed boolean");
+    expect(read("components/coach/client-requests-panel.tsx")).toContain("Hasn&apos;t confirmed their email yet.");
+  });
+  it("the page sends the whole form in one go and, after the confirmation link, says Sent instead of offering Send again", () => {
+    const flow = read("components/client-request/request-flow.tsx");
+    expect(flow).toContain('fetch("/api/client-requests/signup"');
+    expect(flow).toContain("JSON.stringify({ slug, name, email: email.trim().toLowerCase(), password, dob })");
+    expect(flow).toContain('.from("client_requests").select("id").eq("coach_id", coachId).eq("status", "pending")');
+    expect(flow).toContain("can see your request now.");
+  });
 });
 
 describe("when the Request to train with me button is offered", () => {

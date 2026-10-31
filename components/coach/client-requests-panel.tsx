@@ -13,6 +13,8 @@ export interface RequestRow {
   /** shown as a small label only when the coach belongs to more than one organization */
   organizationName: string | null;
   createdAt: string;
+  /** false while they have not opened the confirmation email yet: the request still came through (made with the account), they sign in once they confirm */
+  emailConfirmed: boolean;
 }
 
 const NEXT_STEP: Record<string, string> = {
@@ -107,6 +109,7 @@ export function ClientRequestsPanel({ requests, supportEmail }: { requests: Requ
                       <b>{r.name}</b>
                       {r.organizationName && <span className="text-steel text-xs ml-2">{r.organizationName}</span>}
                     </p>
+                    {!r.emailConfirmed && <p className="font-body text-xs text-steel mt-0.5">Hasn&apos;t confirmed their email yet. They can sign in once they do.</p>}
                   </div>
                   <div className="flex items-center gap-4 shrink-0">
                     <button type="button" onClick={() => answer(r, "approve")} disabled={busy !== null} className="h-9 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40">

@@ -26,7 +26,7 @@ export default async function RequestToTrainPage(props: { params: Promise<{ slug
   }
   return (
     <main className="min-h-screen flex items-center justify-center px-6 py-10">
-      <RequestFlow slug={target.slug} coachName={target.coachName} />
+      <RequestFlow slug={target.slug} coachName={target.coachName} coachId={target.coachId} />
     </main>
   );
 }

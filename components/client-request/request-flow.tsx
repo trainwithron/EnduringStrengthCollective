@@ -7,14 +7,15 @@ import { saved } from "@/lib/saved";
 import { LegalAcceptance } from "@/components/legal/legal-acceptance";
 import { LegalLinks } from "@/components/legal/legal-links";
 import { flushLegalConsent, rememberLegalConsent } from "@/lib/legal-client";
-import { friendlySignInError, friendlySignUpError } from "@/lib/sign-in-errors";
+import { friendlySignInError } from "@/lib/sign-in-errors";
 
 type Mode = "signup" | "login";
-type Phase = "checking" | "guest" | "authed" | "awaiting-confirmation" | "sent" | "stopped";
+type Phase = "checking" | "guest" | "authed" | "awaiting-confirmation" | "sent" | "sent-unconfirmed" | "stopped";
 
-// "Request to train with me" from a coach's public page. A visitor makes an account or signs in (then lands back here, because the confirmation email returns to this same page), taps ONE button, and is told it was sent.
+// "Request to train with me" from a coach's public page. A NEW visitor fills in one form (name, email, password, date of birth) and the account and the request are made together, so the coach
+// hears at once, before the email is confirmed (Ron, Oct 31: a new client at the gym never found the confirmation email, so the request never went). Someone with an account signs in and taps ONE button.
 // Nothing here joins anything: the request waits for the coach. A new account made here is a plain account (no intake is asked until the coach approves). The date of birth is asked only when none is on file yet.
-export function RequestFlow({ slug, coachName }: { slug: string; coachName: string }) {
+export function RequestFlow({ slug, coachName, coachId }: { slug: string; coachName: string; coachId: string }) {
   const [phase, setPhase] = useState<Phase>("checking");
   const [mode, setMode] = useState<Mode>("signup");
   const [fullName, setFullName] = useState("");
@@ -41,6 +42,13 @@ export function RequestFlow({ slug, coachName }: { slug: string; coachName: stri
         setPhase("guest");
         return;
       }
+    }
+    // already asked (the request was sent when the account was made, and the confirmation link brings them back here): say so, not Send again
+    const { data: waiting } = await supabase.from("client_requests").select("id").eq("coach_id", coachId).eq("status", "pending").limit(1).maybeSingle();
+    if (waiting) {
+      setPhase("sent");
+      void flushLegalConsent();
+      return;
     }
     // a date of birth already on file is not asked again
     const [intake, details] = await Promise.all([
@@ -81,23 +89,37 @@ export function RequestFlow({ slug, coachName }: { slug: string; coachName: stri
         setSubmitting(false);
         return;
       }
+      if (!dob) {
+        setError("Please enter your date of birth.");
+        setSubmitting(false);
+        return;
+      }
       rememberLegalConsent();
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email: email.trim().toLowerCase(),
-        password,
-        options: { data: { full_name: name }, emailRedirectTo: `${window.location.origin}${here}` },
-      });
-      if (signUpError) {
-        setError(friendlySignUpError(signUpError.message));
-        setSubmitting(false);
-        return;
+      try {
+        const res = await fetch("/api/client-requests/signup", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ slug, name, email: email.trim().toLowerCase(), password, dob }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          if (data.confirmed) void flushLegalConsent();
+          setPhase(data.confirmed ? "sent" : "sent-unconfirmed");
+        } else if (data.code === "has_account") {
+          setMode("login");
+          setError(data.error);
+        } else if (["under_13", "not_taking", "already_client", "declined_recently", "own_page", "coach_full"].includes(data.code)) {
+          setStopped(data.error);
+          setPhase("stopped");
+        } else if (data.accountMade) {
+          setError(data.error);
+          setPhase("awaiting-confirmation");
+        } else {
+          setError(data.error || "We couldn't create the account. Check your email and password and try again.");
+        }
+      } catch {
+        setError("Couldn't send. Check your connection and try again.");
       }
-      if (data.session && data.user) {
-        await startAuthed(supabase, data.user.id, data.user.email, name);
-        setSubmitting(false);
-        return;
-      }
-      setPhase("awaiting-confirmation");
       setSubmitting(false);
       return;
     }
@@ -167,6 +189,32 @@ export function RequestFlow({ slug, coachName }: { slug: string; coachName: stri
       <div className="w-full max-w-sm text-center" role="status">
         <h1 className="font-display uppercase text-2xl font-bold">Sent</h1>
         <p className="font-body text-steel text-sm mt-3">{first} will get back to you.</p>
+        {back}
+      </div>
+    );
+  }
+
+  if (phase === "sent-unconfirmed") {
+    return (
+      <div className="w-full max-w-sm text-center" role="status">
+        <h1 className="font-display uppercase text-2xl font-bold">Sent</h1>
+        <p className="font-body text-steel text-sm mt-3">{first} can see your request now.</p>
+        <p className="font-body text-steel text-sm mt-3">
+          We also emailed a link to <span className="text-chalk">{email}</span>. Open it to confirm your email, so you can sign in once {first} says yes. It comes from Spotlight Coaching; check spam too.
+        </p>
+        {resendNote && (
+          <p className="font-body text-sm text-chalk mt-3" role="status">
+            {resendNote}
+          </p>
+        )}
+        {error && (
+          <p className="font-body text-sm text-rust mt-3" role="alert">
+            {error}
+          </p>
+        )}
+        <button type="button" onClick={handleResend} disabled={submitting} className="w-full h-11 mt-5 border border-steel/40 text-chalk font-display uppercase text-sm font-bold disabled:opacity-40">
+          {submitting ? "Sending…" : "Send the email again"}
+        </button>
         {back}
       </div>
     );
@@ -292,6 +340,15 @@ export function RequestFlow({ slug, coachName }: { slug: string; coachName: stri
           </label>
           <input id="req-password" type="password" autoComplete={mode === "signup" ? "new-password" : "current-password"} required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} className="w-full h-11 mt-1 bg-surface border border-steel/30 text-chalk px-3 font-body focus:outline-none focus:border-rust" />
         </div>
+        {mode === "signup" && (
+          <div>
+            <label htmlFor="req-signup-dob" className="font-body text-xs text-steel uppercase tracking-wide">
+              Your date of birth
+            </label>
+            <input id="req-signup-dob" type="date" required value={dob} onChange={(e) => setDob(e.target.value)} className="w-full h-11 mt-1 bg-surface border border-steel/30 text-chalk px-3 font-body focus:outline-none focus:border-rust" />
+            <p className="font-body text-xs text-steel mt-1">Coaching here is for ages 13 and up. Under 18 needs a parent or guardian to sign a consent form once you are accepted.</p>
+          </div>
+        )}
         {mode === "signup" && <LegalAcceptance checked={legalAccepted} onChange={setLegalAccepted} />}
         {error && (
           <p className="font-body text-sm text-rust" role="alert">
@@ -299,7 +356,7 @@ export function RequestFlow({ slug, coachName }: { slug: string; coachName: stri
           </p>
         )}
         <button type="submit" disabled={submitting} className="w-full h-12 bg-rust text-graphite font-display uppercase text-lg font-bold disabled:opacity-40">
-          {submitting ? (mode === "signup" ? "Creating account…" : "Signing in…") : mode === "signup" ? "Create account" : "Sign in"}
+          {submitting ? (mode === "signup" ? "Sending…" : "Signing in…") : mode === "signup" ? "Create account and send request" : "Sign in"}
         </button>
         <LegalLinks className="mt-2" />
       </form>

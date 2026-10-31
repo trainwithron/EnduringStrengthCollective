@@ -34,12 +34,14 @@ export default async function ClientRequestsPage() {
   const failed = !!memberRes.error || perOrg.some((p) => !!p.res.error);
   const rows: RequestRow[] = perOrg
     .flatMap(({ org, res }) =>
-      ((res.data ?? []) as { id: string; display_name: string; created_at: string }[]).map((r) => ({
+      ((res.data ?? []) as { id: string; display_name: string; created_at: string; email_confirmed?: boolean | null }[]).map((r) => ({
         id: r.id,
         name: r.display_name,
         organizationId: org.id,
         organizationName: orgs.length > 1 ? org.name : null,
         createdAt: r.created_at,
+        // before step 196 the list has no such column: shown as confirmed (no note), as before
+        emailConfirmed: r.email_confirmed !== false,
       }))
     )
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
