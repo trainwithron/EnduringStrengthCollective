@@ -14,7 +14,6 @@ export function CalendarPageTabs({
   sessionTypes = [],
   sessionTypeEnabled = false,
   settingsSlot = null,
-  timeOffSlot = null,
   hideStripOnDesktop = false,
   children,
 }: {
@@ -28,7 +27,7 @@ export function CalendarPageTabs({
     sessionMinutes?: number | null;
     sessionTypeId?: string | null;
   }[];
-  // The same three numbers as the Availability page: how often a start is offered, how long a session lasts, and the gap between sessions.
+  // The two numbers for all the hours: how long a session lasts and the gap after it (the coach's buffer).
   sessionLengthEnabled?: boolean;
   initialBufferMinutes?: number;
   // The coach's own session types, and whether a window of hours can carry one (until the database update is applied the choice is hidden).
@@ -37,9 +36,9 @@ export function CalendarPageTabs({
   // Lets a deep link (e.g. the Scheduling Spot's "Edit" action) land
   // straight on Availability instead of always defaulting to Schedule.
   initialTab?: Tab;
-  // The Availability tab is the ONE place for availability: how clients book and the booking rules first (settingsSlot), then the recurring hours, then time off (timeOffSlot).
+  // The Availability tab is the ONE place for availability: the weekly hours first, then (settingsSlot, two columns) how clients book and the booking rules,
+  // and the time zone, public page and time off.
   settingsSlot?: React.ReactNode;
-  timeOffSlot?: React.ReactNode;
   // FIX 6: on a computer the shell's Calendar strip has Schedule and Availability (links: ?tab=availability), so this pair shows only below lg.
   hideStripOnDesktop?: boolean;
   children: React.ReactNode;
@@ -80,8 +79,8 @@ export function CalendarPageTabs({
       {tab === "schedule" ? (
         children
       ) : (
-        <div>
-          {settingsSlot}
+        // Columns from the width the page has (layout audit, Oct 31): one on a phone, hours beside the settings at 768px, three columns from 1152px.
+        <div className="grid grid-cols-1 gap-8 items-start @3xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] @6xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)_minmax(0,1fr)]">
           <AvailabilityManagerDesktop
             coachId={coachId}
             initialWindows={initialWindows.map((w) => ({ ...w, sessionMinutes: w.sessionMinutes ?? null, sessionTypeId: w.sessionTypeId ?? null }))}
@@ -90,7 +89,7 @@ export function CalendarPageTabs({
             sessionTypes={sessionTypes}
             sessionTypeEnabled={sessionTypeEnabled}
           />
-          {timeOffSlot}
+          <div className="grid grid-cols-1 gap-8 items-start min-w-0 @6xl:contents">{settingsSlot}</div>
         </div>
       )}
     </div>

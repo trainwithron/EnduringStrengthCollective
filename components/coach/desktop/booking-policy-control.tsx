@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 
+// The gap between sessions is set with the weekly hours (Calendar > Availability), next to the session length, so the two can never disagree; it is not here.
 type Values = {
   cancellationHours: number;
-  bufferMinutes: number;
   minimumNoticeHours: number;
   creditExpiryDays: number;
 };
@@ -13,7 +13,6 @@ type Values = {
 // Limits so a typo (an extra zero) cannot lock clients out or expire their sessions.
 const LIMITS = {
   cancellationHours: { max: 720, label: "Cancellation window" },
-  bufferMinutes: { max: 240, label: "Buffer" },
   minimumNoticeHours: { max: 720, label: "Minimum notice" },
   creditExpiryDays: { max: 3650, label: "Session expiration" },
 } as const;
@@ -21,13 +20,11 @@ const LIMITS = {
 export function BookingPolicyControl({
   coachId,
   initialCancellationHours,
-  initialBufferMinutes,
   initialMinimumNoticeHours,
   initialCreditExpiryDays,
 }: {
   coachId: string;
   initialCancellationHours: number;
-  initialBufferMinutes: number;
   initialMinimumNoticeHours: number;
   initialCreditExpiryDays: number;
 }) {
@@ -35,13 +32,11 @@ export function BookingPolicyControl({
   // "24" used to save "2" first, which for the expiry setting would have briefly told the nightly job to expire sessions after 2 days.
   const [saved, setSaved] = useState<Values>({
     cancellationHours: initialCancellationHours,
-    bufferMinutes: initialBufferMinutes,
     minimumNoticeHours: initialMinimumNoticeHours,
     creditExpiryDays: initialCreditExpiryDays,
   });
   const [draft, setDraft] = useState<Record<keyof Values, string>>({
     cancellationHours: String(initialCancellationHours),
-    bufferMinutes: String(initialBufferMinutes),
     minimumNoticeHours: String(initialMinimumNoticeHours),
     creditExpiryDays: String(initialCreditExpiryDays),
   });
@@ -67,7 +62,6 @@ export function BookingPolicyControl({
       {
         coach_id: coachId,
         cancellation_window_hours: next.cancellationHours,
-        buffer_minutes: next.bufferMinutes,
         minimum_notice_hours: next.minimumNoticeHours,
         credit_expiry_days: next.creditExpiryDays,
       },
@@ -111,18 +105,6 @@ export function BookingPolicyControl({
         <div className="flex items-center gap-2">
           {field("cancellationHours", "Hours before the session")}
           <span className="font-body text-sm text-steel">hours before the session</span>
-        </div>
-      </div>
-
-      <div className="border-t border-steel/15 pt-4">
-        <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">Buffer between sessions</p>
-        <p className="font-body text-xs text-steel mb-2">
-          Blocks a client from booking a session that starts too close to another one already on your
-          calendar — real recovery/travel time between sessions.
-        </p>
-        <div className="flex items-center gap-2">
-          {field("bufferMinutes", "Minutes before and after each session")}
-          <span className="font-body text-sm text-steel">minutes before and after each session</span>
         </div>
       </div>
 

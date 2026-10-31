@@ -1,34 +1,55 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
 
-const read = (p: string) => readFileSync(new URL(p, import.meta.url), "utf8");
+vi.mock("@/lib/supabase/client", () => ({ createBrowserClient: () => ({}) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
 
-describe("the hours editor shows the three numbers together", () => {
-  const src = read("./availability-manager-desktop.tsx");
-  it("slot step, session length and the gap are unmistakably separate, labelled fields with a live preview and a warning", () => {
-    expect(src).toContain("Slot every (min)");
-    expect(src).toContain("Session length (min)");
-    expect(src).toContain("Gap between sessions (min)");
-    expect(src).toContain("How often a start time is offered");
-    expect(src).toContain("How long the session lasts");
-    expect(src).toContain("previewSessionTimes(");
-    expect(src).toContain("timingWarning(");
-    expect(src).toContain("timingHint(");
+import { AvailabilityManagerDesktop } from "./availability-manager-desktop";
+
+const read = (p: string) => readFileSync(new URL(p, import.meta.url), "utf8").replace(/\r\n/g, "\n");
+
+// Ron, Oct 31: 55-minute sessions with a 5-minute gap still drifted 5 minutes through the day. Two numbers now: session length and the gap after it; a
+// start is offered every session + gap minutes.
+describe("the hours editor has two numbers, not three", () => {
+  const ron = [
+    { id: "w1", weekday: 1, startTime: "08:00:00", endTime: "12:00:00", slotDurationMinutes: 60, sessionMinutes: 55 },
+    { id: "w2", weekday: 2, startTime: "08:00:00", endTime: "12:00:00", slotDurationMinutes: 60, sessionMinutes: 55 },
+  ];
+  it("shows the session length and the gap, and the starts they make, on the hour", () => {
+    const html = renderToStaticMarkup(createElement(AvailabilityManagerDesktop, { coachId: "c", initialWindows: ron, sessionLengthEnabled: true, initialBufferMinutes: 5 }));
+    expect(html).toContain("Session length (minutes)");
+    expect(html).toContain("Gap between sessions (minutes)");
+    expect(html).toContain('value="55"');
+    expect(html).toContain('value="5"');
+    expect(html).toContain("A session starts every 60 minutes: 8:00–8:55 AM, 9:00–9:55, 10:00–10:55, 11:00–11:55.");
+    expect(html).toContain("4 sessions");
+    expect(html).not.toContain("line them all up");
   });
-  it("the same block is in the add form and in the edit row, so the gap is where hours are edited", () => {
-    expect((src.match(/<WindowTimingFields/g) ?? []).length).toBe(2);
+  it("says so when older hours are set up with numbers that shift the starts, and Save lines them up", () => {
+    const drifting = [{ id: "w1", weekday: 1, startTime: "08:00:00", endTime: "12:00:00", slotDurationMinutes: 55, sessionMinutes: null }];
+    const html = renderToStaticMarkup(createElement(AvailabilityManagerDesktop, { coachId: "c", initialWindows: drifting, sessionLengthEnabled: true, initialBufferMinutes: 5 }));
+    expect(html).toContain("Press Save to line them all up.");
   });
-  it("the gap is the coach's buffer: saved at once to the same setting as Booking rules, and the two fields stay in step", () => {
-    expect(src).toContain('from("coach_booking_policies").upsert({ coach_id: coachId, buffer_minutes: n }');
-    expect(read("../../../components/coach/desktop/availability-settings.tsx")).toContain("key={`policy-${policyRow?.buffer_minutes ?? 0}`}");
+  it("one row per day, Monday first, each with its own Add hours; a day with none reads Closed", () => {
+    const html = renderToStaticMarkup(createElement(AvailabilityManagerDesktop, { coachId: "c", initialWindows: ron, sessionLengthEnabled: true, initialBufferMinutes: 5 }));
+    expect(html.indexOf(">Mon<")).toBeLessThan(html.indexOf(">Sun<"));
+    expect(html.match(/aria-label="Add [A-Za-z]+ hours"/g)?.length).toBe(7);
+    expect(html.match(/>Closed</g)?.length).toBe(5);
+  });
+  it("every window is saved with a start step of session + gap, and the gap is the coach's buffer", () => {
+    const src = read("./availability-manager-desktop.tsx");
+    expect(src).toContain("slot_duration_minutes: stepFor(session, gap),");
+    expect(src.match(/\.\.\.timingColumns\(timing\.session, timing\.gap\),/g)?.length).toBe(3);
+    expect(src).toContain('.update(timingColumns(session, gap)).eq("coach_id", coachId)');
+    expect(src).toContain('from("coach_booking_policies").upsert({ coach_id: coachId, buffer_minutes: gap }');
     expect(read("../../../components/coach/calendar-page-body.tsx")).toContain("initialBufferMinutes={gapPolicy?.buffer_minutes ?? 0}");
-  });
-  it("a warning never stops the coach from saving", () => {
-    expect(src).not.toMatch(/timingWarning\([^)]*\)[^;]*disabled/);
-    expect(read("../../../lib/availability-edit.ts")).toContain("never a block");
-  });
-  it("the Calendar page's Availability tab shows the same three numbers", () => {
     expect(read("./calendar-page-tabs.tsx")).toContain("initialBufferMinutes={initialBufferMinutes}");
-    expect(read("../../../components/coach/calendar-page-body.tsx")).toContain("initialBufferMinutes={gapPolicy?.buffer_minutes ?? 0}");
+  });
+  it("the gap lives only with the hours: Booking rules no longer has its own buffer field (two fields could disagree)", () => {
+    const rules = read("./booking-policy-control.tsx");
+    expect(rules).not.toContain("Buffer between sessions");
+    expect(rules).not.toContain("buffer_minutes");
   });
 });

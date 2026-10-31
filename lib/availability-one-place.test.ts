@@ -32,19 +32,18 @@ describe("Availability has ONE home: Calendar > Availability", () => {
     }
     expect(offenders).toEqual([]);
   });
-  it("the Calendar's Availability tab carries every control the old page had, in this order: how clients book, booking rules, time zone, recurring hours, time off", () => {
+  it("the Calendar's Availability tab carries every control the old page had: the weekly hours first, then how clients book and the booking rules, then the time zone, public page and time off", () => {
     const settings = read("components/coach/desktop/availability-settings.tsx");
     const order = ["<BookingModeSelect", "<BookingPolicyControl", "<ExpiryHeadsUpControl", "<ReupNudgeToggle", "<TimezoneControl"].map((x) => settings.indexOf(x));
     expect(order.every((i) => i >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     expect(settings).toContain("<AvailabilityExceptionsManager");
+    expect(settings.indexOf("<TimezoneControl")).toBeLessThan(settings.indexOf("<AvailabilityTimeOff coachId={coachId} />"));
     const tabs = read("components/coach/desktop/calendar-page-tabs.tsx");
-    expect(tabs.indexOf("{settingsSlot}")).toBeLessThan(tabs.indexOf("<AvailabilityManagerDesktop"));
-    expect(tabs.indexOf("<AvailabilityManagerDesktop")).toBeLessThan(tabs.indexOf("{timeOffSlot}"));
+    expect(tabs.indexOf("<AvailabilityManagerDesktop")).toBeLessThan(tabs.indexOf("{settingsSlot}"));
     expect(tabs).toContain("sessionTypeEnabled={sessionTypeEnabled}");
     const body = read("components/coach/calendar-page-body.tsx");
     expect(body).toContain("settingsSlot={<AvailabilityBookingSettings coachId={user.id} />}");
-    expect(body).toContain("timeOffSlot={<AvailabilityTimeOff coachId={user.id} />}");
     expect(body).toContain("Let clients book:");
   });
   it("a phone coach asking for the tab gets the full page (the one place availability lives)", () => {
@@ -72,16 +71,12 @@ describe("How clients book: three large choices, the current one visibly selecte
 
 describe("session length is typed, not picked", () => {
   const src = read("components/coach/desktop/availability-manager-desktop.tsx");
-  it("one number field and Save for all your hours; no chips, no 'Same as the slot' button", () => {
-    expect(src).toContain("Session length (minutes)");
-    expect(src).toContain("minutes > 240");
+  it("one number field for the session length and one for the gap, with Save, for all your hours; no chips", () => {
+    expect(src.match(/Session length \(minutes\)/g)?.length).toBe(1);
+    expect(src.match(/Gap between sessions \(minutes\)/g)?.length).toBe(1);
+    expect(read("lib/availability-edit.ts")).toContain("sessionMinutes > 240");
     expect(src).not.toContain("const PRESETS");
-    expect(src).not.toContain("Same as the slot");
-    expect(src).not.toContain("Other session length in minutes");
-  });
-  it("the Add window form has ONE input for the slot step and ONE for the session length (empty = same as the slot)", () => {
     expect(src).not.toContain("StepPresets");
-    expect(src).toContain("Empty = the same as the slot.");
-    expect(src.match(/Slot every \(min\)/g)?.length).toBe(1);
+    expect(src).not.toContain("Same as the slot");
   });
 });

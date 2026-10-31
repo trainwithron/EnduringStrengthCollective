@@ -21,21 +21,18 @@ const types = [
 const read = (p: string) => readFileSync(new URL(p, import.meta.url), "utf8");
 
 describe("session types on hours", () => {
-  it("each window can be given one of the coach's own types, shown on its row, and 'Any' is the default", () => {
+  it("each window shows its type on its row; the add and edit boxes offer the coach's own types with 'Any' as the default", () => {
     const html = renderToStaticMarkup(createElement(AvailabilityManagerDesktop, { coachId: "c", initialWindows: windows, sessionTypes: types, sessionTypeEnabled: true }));
-    expect(html).toContain("Session type (optional)");
-    expect(html).toContain(">Any</option>");
-    expect(html).toContain("Online");
-    expect(html).toContain("In person");
     expect(html).toContain("· Online");
-  });
-  it("hidden until the database update is applied, or when the coach has no types yet", () => {
-    expect(renderToStaticMarkup(createElement(AvailabilityManagerDesktop, { coachId: "c", initialWindows: windows, sessionTypes: types, sessionTypeEnabled: false }))).not.toContain("Session type (optional)");
-    expect(renderToStaticMarkup(createElement(AvailabilityManagerDesktop, { coachId: "c", initialWindows: windows, sessionTypes: [], sessionTypeEnabled: true }))).not.toContain("Session type (optional)");
+    const src = read("./availability-manager-desktop.tsx");
+    expect(src).toContain("Session type (optional)");
+    expect(src).toContain("<option value=\"\">Any</option>");
+    expect(src).toContain("const showTypes = sessionTypeEnabled && sessionTypes.length > 0;");
+    expect(src).toContain("{showTypes && <SessionTypeSelect");
   });
   it("the tag is saved on add, edit and copy, and read back with the window", () => {
     const src = read("./availability-manager-desktop.tsx");
-    expect(src).toContain("session_type_id: typeInput");
+    expect(src).toContain("session_type_id: draft.sessionTypeId }");
     expect(src).toContain("session_type_id: draft.sessionTypeId ?? null");
     expect(src).toContain("session_type_id: w.sessionTypeId");
     expect(src).toContain('(sessionTypeEnabled ? ", session_type_id" : "")');

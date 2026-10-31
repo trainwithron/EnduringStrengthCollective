@@ -26,7 +26,7 @@ import { phoneCalendarHref } from "@/lib/phone-coach-routes";
 import { loadScheduleCard } from "@/lib/schedule-card";
 import { SessionCheckSection } from "@/components/coach/session-check-section";
 import { SessionCountLine } from "@/components/coach/session-count-line";
-import { AvailabilityBookingSettings, AvailabilityTimeOff } from "@/components/coach/desktop/availability-settings";
+import { AvailabilityBookingSettings } from "@/components/coach/desktop/availability-settings";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { computeScheduledDates } from "@/lib/program-schedule";
 import { ScheduleClientPicker } from "@/components/coach/schedule-client-picker";
@@ -1167,6 +1167,18 @@ export async function CoachCalendarPageBody(
         </p>
       </div>
 
+      <CalendarPageTabs
+        coachId={user.id}
+        initialWindows={windowsWithTypes}
+        sessionTypes={sessionTypes.map((s) => ({ id: s.id, name: s.name }))}
+        sessionTypeEnabled={windowTypeRows != null}
+        sessionLengthEnabled={!sessionProbe.error}
+        initialBufferMinutes={gapPolicy?.buffer_minutes ?? 0}
+        initialTab={searchParams.tab === "availability" ? "availability" : "schedule"}
+        settingsSlot={<AvailabilityBookingSettings coachId={user.id} />}
+        hideStripOnDesktop
+      >
+      {/* The schedule's notices sit with the schedule only, so the Availability tab opens on the hours (layout audit, Oct 31). */}
       {calendarSpotterFindings.length > 0 && (
         <div className="mb-6">
           <CalendarSpotterPanel findings={calendarSpotterFindings} groupId={params.groupId} timezone={bookingTz} />
@@ -1181,18 +1193,6 @@ export async function CoachCalendarPageBody(
 
       <AddGroupEvent groups={eventGroups} timezone={bookingTz} />
 
-      <CalendarPageTabs
-        coachId={user.id}
-        initialWindows={windowsWithTypes}
-        sessionTypes={sessionTypes.map((s) => ({ id: s.id, name: s.name }))}
-        sessionTypeEnabled={windowTypeRows != null}
-        sessionLengthEnabled={!sessionProbe.error}
-        initialBufferMinutes={gapPolicy?.buffer_minutes ?? 0}
-        initialTab={searchParams.tab === "availability" ? "availability" : "schedule"}
-        settingsSlot={<AvailabilityBookingSettings coachId={user.id} />}
-        timeOffSlot={<AvailabilityTimeOff coachId={user.id} />}
-        hideStripOnDesktop
-      >
       {/* mobile_must_fit_screen_standing_rule — this two-column layout
           (a fixed 260px "Needs attention"/"Clients" rail beside the
           grid) is desktop-shaped and never had a narrow-viewport

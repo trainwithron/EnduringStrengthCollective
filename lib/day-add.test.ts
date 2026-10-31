@@ -54,8 +54,8 @@ describe("tap a time on the coach's day, then add something there", () => {
     expect(page).not.toContain("Tap a time on the day to add a session, an event or time off.");
     expect(read("components/coach/desktop/day-calendar.tsx").match(/Tap a time to add a session, an event or time off./g)?.length).toBe(1);
   });
-  it("a new availability window defaults to a slot every 30 minutes", () => {
+  it("a new availability window defaults to a slot every 30 minutes on the old phone editor; the desktop hours use the coach's two numbers", () => {
     expect(read("components/coach/availability-manager.tsx")).toContain('useState("30")');
-    expect(read("components/coach/desktop/availability-manager-desktop.tsx")).toContain('useState("30")');
+    expect(read("components/coach/desktop/availability-manager-desktop.tsx")).toContain("...timingColumns(timing.session, timing.gap),");
   });
 });

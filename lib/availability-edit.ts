@@ -139,3 +139,43 @@ export function timingHint(input: { stepMinutes: number; sessionMinutes?: number
   const length = input.sessionMinutes && input.sessionMinutes > 0 ? input.sessionMinutes : input.stepMinutes;
   return `Slot every ${input.stepMinutes}, session ${length}, gap ${input.gapMinutes}`;
 }
+
+// ---- Two numbers, not three (Ron, Oct 31: 55-minute sessions with a 5-minute gap still drifted 5 minutes through the day) ----
+// The coach types how long a session lasts and the gap after it; a new start is offered every session + gap minutes, so the day lines up on its own.
+// Every window of hours shares the same two numbers; the gap is the coach's buffer (coach_booking_policies.buffer_minutes).
+export function stepFor(sessionMinutes: number, gapMinutes: number): number {
+  return sessionMinutes + gapMinutes;
+}
+
+// How many sessions fit in one window of hours.
+export function sessionCount(window: { startTime: string; endTime: string }, sessionMinutes: number, gapMinutes: number): number {
+  const length = timeToMinutes(window.endTime) - timeToMinutes(window.startTime);
+  if (!Number.isInteger(sessionMinutes) || sessionMinutes < 1 || length < sessionMinutes) return 0;
+  return Math.floor((length - sessionMinutes) / stepFor(sessionMinutes, gapMinutes)) + 1;
+}
+
+// The two numbers the coach's hours use now: the most common session length (60 with no hours yet), their buffer as the gap, and whether some window is
+// set up differently (an older window whose start step is not session + gap, which is what made the day drift).
+export function currentTiming(windows: { slotDurationMinutes: number; sessionMinutes?: number | null }[], bufferMinutes: number): { session: number; gap: number; mixed: boolean } {
+  const gap = Number.isInteger(bufferMinutes) && bufferMinutes >= 0 ? bufferMinutes : 0;
+  if (windows.length === 0) return { session: 60, gap, mixed: false };
+  const lengthOf = (w: { slotDurationMinutes: number; sessionMinutes?: number | null }) => (w.sessionMinutes && w.sessionMinutes > 0 ? w.sessionMinutes : w.slotDurationMinutes);
+  const tally = new Map<number, number>();
+  for (const w of windows) tally.set(lengthOf(w), (tally.get(lengthOf(w)) ?? 0) + 1);
+  const session = [...tally.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0][0];
+  const mixed = windows.some((w) => lengthOf(w) !== session || w.slotDurationMinutes !== stepFor(session, gap));
+  return { session, gap, mixed };
+}
+
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+// The first thing wrong with the two numbers for these hours, or null.
+export function timingProblem(sessionMinutes: number, gapMinutes: number, windows: { weekday: number; startTime: string; endTime: string }[]): string | null {
+  if (!Number.isInteger(sessionMinutes) || sessionMinutes < MIN_SLOT_MINUTES || sessionMinutes > 240) return "Session length must be a whole number from 5 to 240 minutes.";
+  if (!Number.isInteger(gapMinutes) || gapMinutes < 0 || gapMinutes > 240) return "The gap must be a whole number from 0 to 240 minutes.";
+  const short = windows.filter((w) => timeToMinutes(w.endTime) - timeToMinutes(w.startTime) < sessionMinutes);
+  if (short.length > 0) {
+    return `${short.map((w) => `${DAY_NAMES[w.weekday]} ${w.startTime.slice(0, 5)}–${w.endTime.slice(0, 5)}`).join(", ")} is shorter than one ${sessionMinutes}-minute session. Make those hours longer first.`;
+  }
+  return null;
+}

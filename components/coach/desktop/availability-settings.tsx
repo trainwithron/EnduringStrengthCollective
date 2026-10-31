@@ -13,8 +13,9 @@ import { readShareCardSettings } from "@/lib/share-card-settings";
 import { SessionLimitsControl } from "@/components/coach/desktop/session-limits-control";
 import { limitsFromRow } from "@/lib/session-caps";
 
-// ONE Availability place (Calendar > Availability): how clients book first, then the booking rules, then the time zone; below the recurring hours come the time-off blocks. These used to live on a second page,
-// /groups/<id>/availability, which now sends the coach here. Each read that depends on a later database update hides its control until the column exists, as before.
+// ONE Availability place (Calendar > Availability). Beside the weekly hours this gives two columns (layout audit, Oct 31): how clients book and the booking
+// rules; then the time zone, the public page and the time off. These used to live on a second page, /groups/<id>/availability, which now sends the coach
+// here. Each read that depends on a later database update hides its control until the column exists, as before.
 export async function AvailabilityBookingSettings({ coachId }: { coachId: string }) {
   const supabase = await createServerClient();
   const [{ data: coachProfile, error: profileError }, { data: policyRow, error: policyError }, nudgeResult, headsUpResult, bookingModeResult, limitsResult] = await Promise.all([
@@ -46,35 +47,38 @@ export async function AvailabilityBookingSettings({ coachId }: { coachId: string
   const shareCard = publicPage ? await readShareCardSettings(supabase, coachId) : null;
 
   return (
-    <div>
+    <>
+    <div className="min-w-0">
       {bookingMode !== null && <BookingModeSelect coachId={coachId} initialMode={bookingMode} />}
       {!limitsResult.error && <SessionLimitsControl coachId={coachId} initial={limitsFromRow(limitsResult.data as Record<string, unknown> | null)} />}
-      {publicPage && <ConsultationLinkBlock coachId={coachId} slug={publicPage.slug} enabled={publicPage.enabled} acceptsRequests={publicPage.acceptsRequests} hasOpenHours={(openWindowCount ?? 0) > 0} />}
-      {shareCard && <ShareCardSettings coachId={coachId} initialHandle={shareCard.handle} initialQr={shareCard.qr} />}
 
       <section className="mb-6" aria-labelledby="booking-rules">
         <h2 id="booking-rules" className="font-display uppercase text-lg tracking-wide mb-2">
           Booking rules
         </h2>
         <BookingPolicyControl
-          key={`policy-${policyRow?.buffer_minutes ?? 0}`}
           coachId={coachId}
           initialCancellationHours={policyRow?.cancellation_window_hours ?? 24}
-          initialBufferMinutes={policyRow?.buffer_minutes ?? 0}
           initialMinimumNoticeHours={policyRow?.minimum_notice_hours ?? 0}
           initialCreditExpiryDays={policyRow?.credit_expiry_days ?? 0}
         />
         {expiryHeadsUpDays !== null && <ExpiryHeadsUpControl coachId={coachId} initialDays={expiryHeadsUpDays} />}
         {reupNudgesEnabled !== null && <ReupNudgeToggle coachId={coachId} initialEnabled={reupNudgesEnabled} />}
       </section>
+    </div>
 
+    <div className="min-w-0">
       {!coachProfile?.timezone && (
         <p className="font-body text-sm text-rust border border-rust/40 bg-rust/5 p-3 mb-4 max-w-md" role="status">
           Set your time zone below. Until you do, clients cannot send you a booking request, and your hours are read in Eastern time.
         </p>
       )}
       <TimezoneControl initialTimezone={coachProfile?.timezone ?? null} />
+      {publicPage && <ConsultationLinkBlock coachId={coachId} slug={publicPage.slug} enabled={publicPage.enabled} acceptsRequests={publicPage.acceptsRequests} hasOpenHours={(openWindowCount ?? 0) > 0} />}
+      {shareCard && <ShareCardSettings coachId={coachId} initialHandle={shareCard.handle} initialQr={shareCard.qr} />}
+      <AvailabilityTimeOff coachId={coachId} />
     </div>
+    </>
   );
 }
 

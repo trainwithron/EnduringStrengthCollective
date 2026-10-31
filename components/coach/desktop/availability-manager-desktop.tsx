@@ -1,133 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { Copy, Pencil, Trash2 } from "lucide-react";
+import { Copy, Pencil, Plus, Trash2 } from "lucide-react";
 import type { AvailabilityWindowRow } from "../availability-manager";
-import { copyTargets, isSessionRuleError, previewSessionTimes, timeToMinutes, timingHint, timingWarning, validateWindow, type WindowDraft } from "@/lib/availability-edit";
+import { copyTargets, currentTiming, isSessionRuleError, previewSessionTimes, sessionCount, stepFor, timingProblem, validateWindow } from "@/lib/availability-edit";
 
 const RULE_PENDING = "A session longer than the time between starts needs a database update that has not been applied yet. Nothing was changed.";
 
-// The three numbers, unmistakable (Ron, Oct 6): how often a start is offered, how long a session lasts, and the gap left between sessions, with a live
-// preview of the times they make and a warning (never a block) when they fight each other. The gap is the coach's buffer for all their hours: it is saved
-// at once and is the same setting as "Buffer between sessions" under the booking rules.
-function WindowTimingFields({
-  startTime,
-  endTime,
-  step,
-  session,
-  gap,
-  sessionEnabled,
-  gapEnabled,
-  onStep,
-  onSession,
-  onGapChange,
-  onGapCommit,
-  gapBusy,
-  gapError,
-}: {
-  startTime: string;
-  endTime: string;
-  step: number;
-  session: number | null;
-  gap: string;
-  sessionEnabled: boolean;
-  gapEnabled: boolean;
-  onStep: (n: number) => void;
-  onSession: (n: number | null) => void;
-  onGapChange: (v: string) => void;
-  onGapCommit: () => void;
-  gapBusy: boolean;
-  gapError: string | null;
-}) {
-  const gapNumber = gapEnabled && gap.trim() !== "" && Number.isInteger(Number(gap)) ? Number(gap) : 0;
-  const preview = previewSessionTimes({ startTime, endTime, stepMinutes: step, sessionMinutes: sessionEnabled ? session : null });
-  const warning = timingWarning({ stepMinutes: step, sessionMinutes: sessionEnabled ? session : null, gapMinutes: gapNumber });
-  return (
-    <div className="basis-full space-y-2">
-      <div className="flex flex-wrap gap-3">
-        <label className="flex flex-col gap-1">
-          <span className="font-body text-xs text-steel uppercase tracking-wide">Slot every (min)</span>
-          <input type="number" min={5} value={Number.isFinite(step) ? step : ""} onChange={(e) => onStep(Number(e.target.value))} className={`${inputCls} w-24`} />
-          <span className="font-body text-[11px] text-steel max-w-[9rem]">How often a start time is offered</span>
-        </label>
-        {sessionEnabled && (
-          <label className="flex flex-col gap-1">
-            <span className="font-body text-xs text-steel uppercase tracking-wide">Session length (min)</span>
-            <input
-              type="number"
-              min={5}
-              value={session ?? ""}
-              placeholder="Same as slot"
-              onChange={(e) => onSession(e.target.value === "" ? null : Number(e.target.value))}
-              className={`${inputCls} w-24`}
-            />
-            <span className="font-body text-[11px] text-steel max-w-[9rem]">How long the session lasts. Empty = the same as the slot.</span>
-          </label>
-        )}
-        {gapEnabled && (
-          <label className="flex flex-col gap-1">
-            <span className="font-body text-xs text-steel uppercase tracking-wide">Gap between sessions (min)</span>
-            <input
-              type="number"
-              min={0}
-              max={240}
-              value={gap}
-              onChange={(e) => onGapChange(e.target.value)}
-              onBlur={onGapCommit}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  onGapCommit();
-                }
-              }}
-              disabled={gapBusy}
-              className={`${inputCls} w-24`}
-            />
-            <span className="font-body text-[11px] text-steel max-w-[9rem]">Rest left between sessions (your buffer, for all your hours)</span>
-          </label>
-        )}
-      </div>
-      <p className="font-body text-xs text-steel">
-        {timingHint({ stepMinutes: step, sessionMinutes: sessionEnabled ? session : null, gapMinutes: gapNumber })}
-        {preview ? ` = ${preview}` : ""}
-      </p>
-      {warning && (
-        <p className="font-body text-xs text-rust" role="status">
-          {warning}
-        </p>
-      )}
-      {gapError && (
-        <p className="font-body text-xs text-rust" role="alert">
-          {gapError}
-        </p>
-      )}
-    </div>
-  );
-}
-
-// Which kind of session these hours are for (optional): the coach's own session types (Online, In person, Weight room, Practice, Game, or their own). A session
-// booked inside tagged hours carries the type. Leave it as "Any" and nothing changes.
-function SessionTypeSelect({ types, value, onChange }: { types: { id: string; name: string }[]; value: string; onChange: (v: string) => void }) {
-  return (
-    <label className="basis-full flex flex-col gap-1">
-      <span className="font-body text-xs text-steel uppercase tracking-wide">Session type (optional)</span>
-      <select value={value} onChange={(e) => onChange(e.target.value)} className={inputCls}>
-        <option value="">Any</option>
-        {types.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.name}
-          </option>
-        ))}
-      </select>
-      <span className="font-body text-[11px] text-steel">Sessions booked inside these hours are tagged with it. Add types under Business &gt; Session types.</span>
-    </label>
-  );
-}
-
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+// The week as a coach reads it: Monday first.
+const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
 const sortWindows = (list: AvailabilityWindowRow[]) =>
   [...list].sort((a, b) => a.weekday - b.weekday || a.startTime.localeCompare(b.startTime));
@@ -143,11 +28,30 @@ const toRow = (d: any): AvailabilityWindowRow => ({
 });
 
 const inputCls = "h-9 px-2 bg-surface border border-steel/30 text-chalk font-body text-xs";
+const iconBtn = "w-8 h-8 inline-flex items-center justify-center text-steel hover:text-chalk transition-colors";
 
-// The coach's recurring weekly hours: add, change (day, start, end, minutes per session), copy to other days, delete. Changing hours never touches a
-// session that is already booked; it only changes which times can be booked next.
-// The session length is separate from how often slots start (a 55-minute session in 60-minute slots leaves a 5-minute gap). It needs the 0283 database
-// update: until that is applied `sessionLengthEnabled` is false and the page works exactly as before.
+// Which kind of session these hours are for (optional): the coach's own session types. A session booked inside tagged hours carries the type. "Any" changes nothing.
+function SessionTypeSelect({ types, value, onChange }: { types: { id: string; name: string }[]; value: string; onChange: (v: string) => void }) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="font-body text-xs text-steel uppercase tracking-wide">Session type (optional)</span>
+      <select value={value} onChange={(e) => onChange(e.target.value)} className={inputCls}>
+        <option value="">Any</option>
+        {types.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+type HoursDraft = { startTime: string; endTime: string; sessionTypeId: string | null };
+
+// The coach's weekly hours, one row per day (Ron, Oct 31: two numbers, not three). Two numbers apply to all of them: how long a session lasts and the gap
+// after it. A start is offered every session + gap minutes, so a 55-minute session with a 5-minute gap starts on the hour all day and never drifts.
+// Each day's hours are added, changed, copied to other days and deleted on that day's row. Changing hours never touches a session that is already booked.
 export function AvailabilityManagerDesktop({
   coachId,
   initialWindows,
@@ -159,179 +63,191 @@ export function AvailabilityManagerDesktop({
   coachId: string;
   initialWindows: AvailabilityWindowRow[];
   sessionLengthEnabled?: boolean;
-  // The coach's gap between sessions (their buffer). When given, the gap is shown and edited next to the slot step and the session length.
+  // The coach's gap between sessions (their buffer, coach_booking_policies.buffer_minutes).
   initialBufferMinutes?: number;
   // The coach's own session types and whether windows can carry one (migration 0289). Until then the select is hidden and nothing changes.
   sessionTypes?: { id: string; name: string }[];
   sessionTypeEnabled?: boolean;
 }) {
-  const typeNameById = new Map(sessionTypes.map((s) => [s.id, s.name]));
-  const gapEnabled = initialBufferMinutes !== undefined;
-  const [gap, setGap] = useState(String(initialBufferMinutes ?? 0));
-  const [gapBusy, setGapBusy] = useState(false);
-  const [gapError, setGapError] = useState<string | null>(null);
   const router = useRouter();
-  // Follows the booking rules' own field when that one is changed.
-  useEffect(() => {
-    if (initialBufferMinutes !== undefined) setGap(String(initialBufferMinutes));
-  }, [initialBufferMinutes]);
+  const typeNameById = new Map(sessionTypes.map((s) => [s.id, s.name]));
+  const showTypes = sessionTypeEnabled && sessionTypes.length > 0;
+  const COLS =
+    "id, weekday, start_time, end_time, slot_duration_minutes" + (sessionLengthEnabled ? ", session_minutes" : "") + (sessionTypeEnabled ? ", session_type_id" : "");
 
-  async function commitGap() {
-    if (!gapEnabled) return;
-    const n = Number(gap);
-    if (gap.trim() === "" || !Number.isInteger(n) || n < 0 || n > 240) {
-      setGapError("The gap must be a whole number from 0 to 240 minutes.");
+  const [windows, setWindows] = useState(initialWindows);
+  const start = currentTiming(initialWindows, initialBufferMinutes ?? 0);
+  // What is saved, and what is being typed.
+  const [timing, setTiming] = useState({ session: start.session, gap: start.gap });
+  const [sessionInput, setSessionInput] = useState(String(start.session));
+  const [gapInput, setGapInput] = useState(String(start.gap));
+  const [timingBusy, setTimingBusy] = useState(false);
+  const [timingError, setTimingError] = useState<string | null>(null);
+  const [timingSaved, setTimingSaved] = useState(false);
+
+  // One open editor at a time: adding hours to a day, changing one window, or copying one window to other days.
+  const [addingDay, setAddingDay] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [copyingId, setCopyingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<HoursDraft>({ startTime: "17:00", endTime: "20:00", sessionTypeId: null });
+  const [copyDays, setCopyDays] = useState<number[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [rowError, setRowError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const step = stepFor(timing.session, timing.gap);
+  const mixed = windows.length > 0 && currentTiming(windows, timing.gap).mixed;
+  const typedSession = Number(sessionInput);
+  const typedGap = gapInput.trim() === "" ? 0 : Number(gapInput);
+  const timingChanged = typedSession !== timing.session || typedGap !== timing.gap;
+  const sample = windows[0] ?? { startTime: "08:00", endTime: "12:00" };
+  const preview = Number.isInteger(typedSession) && typedSession > 0 && Number.isInteger(typedGap) && typedGap >= 0
+    ? previewSessionTimes({ startTime: sample.startTime, endTime: sample.endTime, stepMinutes: stepFor(typedSession, typedGap), sessionMinutes: typedSession, count: 4 })
+    : "";
+
+  // The columns every window gets from the two numbers.
+  const timingColumns = (session: number, gap: number) => ({
+    slot_duration_minutes: stepFor(session, gap),
+    ...(sessionLengthEnabled ? { session_minutes: session } : {}),
+  });
+
+  function closeEditors() {
+    setAddingDay(null);
+    setEditingId(null);
+    setCopyingId(null);
+    setRowError(null);
+  }
+
+  async function saveTiming() {
+    const session = typedSession;
+    const gap = typedGap;
+    const problem = timingProblem(session, gap, windows);
+    if (problem) {
+      setTimingError(problem);
       return;
     }
-    if (n === initialBufferMinutes) {
-      setGapError(null);
-      return;
+    setTimingBusy(true);
+    setTimingError(null);
+    setTimingSaved(false);
+    const supabase = createBrowserClient();
+    if (windows.length > 0) {
+      const { error } = await supabase.from("coach_availability_windows").update(timingColumns(session, gap)).eq("coach_id", coachId);
+      if (error) {
+        setTimingBusy(false);
+        setTimingError(isSessionRuleError(error.message) ? RULE_PENDING : "That didn't save. Nothing was changed. Try again.");
+        return;
+      }
     }
-    setGapBusy(true);
-    setGapError(null);
-    const { error: saveError } = await createBrowserClient().from("coach_booking_policies").upsert({ coach_id: coachId, buffer_minutes: n }, { onConflict: "coach_id" });
-    setGapBusy(false);
-    if (saveError) {
-      setGapError("That didn't save. Nothing was changed. Try again.");
-      return;
+    if (gap !== timing.gap) {
+      const { error } = await supabase.from("coach_booking_policies").upsert({ coach_id: coachId, buffer_minutes: gap }, { onConflict: "coach_id" });
+      if (error) {
+        setTimingBusy(false);
+        setTimingError("Your session length saved, but the gap didn't. Try Save again.");
+        setTiming({ session, gap: timing.gap });
+        setWindows((prev) => prev.map((w) => ({ ...w, slotDurationMinutes: stepFor(session, gap), sessionMinutes: session })));
+        return;
+      }
     }
+    setTimingBusy(false);
+    setTiming({ session, gap });
+    setWindows((prev) => prev.map((w) => ({ ...w, slotDurationMinutes: stepFor(session, gap), sessionMinutes: session })));
+    setTimingSaved(true);
     router.refresh();
   }
 
-  const COLS =
-    "id, weekday, start_time, end_time, slot_duration_minutes" + (sessionLengthEnabled ? ", session_minutes" : "") + (sessionTypeEnabled ? ", session_type_id" : "");
-  const [windows, setWindows] = useState(initialWindows);
-  const [weekday, setWeekday] = useState("1");
-  const [startTime, setStartTime] = useState("17:00");
-  const [endTime, setEndTime] = useState("20:00");
-  const [slotDuration, setSlotDuration] = useState("30");
-  const [sessionInput, setSessionInput] = useState("");
-  const [typeInput, setTypeInput] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [draft, setDraft] = useState<WindowDraft | null>(null);
-  const [rowError, setRowError] = useState<string | null>(null);
-  const [copyingId, setCopyingId] = useState<string | null>(null);
-  const [copyDays, setCopyDays] = useState<number[]>([]);
-  const [rowBusy, setRowBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
-
-  async function handleAdd() {
-    setError(null);
-    const problem = validateWindow(
-      { weekday: Number(weekday), startTime, endTime, slotMinutes: Number(slotDuration), sessionMinutes: sessionLengthEnabled && sessionInput.trim() ? Number(sessionInput) : null },
-      windows.map((w) => ({ id: w.id, weekday: w.weekday, startTime: w.startTime, endTime: w.endTime }))
-    );
-    if (problem) {
-      setError(problem);
-      return;
-    }
-    setSubmitting(true);
-    const supabase = createBrowserClient();
-    const { data, error: insertError } = await supabase
-      .from("coach_availability_windows")
-      .insert({
-        coach_id: coachId,
-        weekday: Number(weekday),
-        start_time: startTime,
-        end_time: endTime,
-        slot_duration_minutes: Number(slotDuration),
-        ...(sessionLengthEnabled && sessionInput.trim() ? { session_minutes: Number(sessionInput) } : {}),
-        ...(sessionTypeEnabled && typeInput ? { session_type_id: typeInput } : {}),
-      })
-      .select(COLS)
-      .single();
-
-    if (data) {
-      setWindows((prev) => sortWindows([...prev, toRow(data)]));
-    } else if (insertError) {
-      setError(isSessionRuleError(insertError.message) ? RULE_PENDING : "Couldn't save that window.");
-    }
-    setSubmitting(false);
-  }
-
-  async function handleDelete(id: string) {
-    const supabase = createBrowserClient();
-    const { error: deleteError } = await supabase.from("coach_availability_windows").delete().eq("id", id);
-    if (deleteError) {
-      setRowError("Couldn't delete that window. Nothing was changed.");
-      return;
-    }
-    setWindows((prev) => prev.filter((w) => w.id !== id));
-    if (editingId === id) setEditingId(null);
-    if (copyingId === id) setCopyingId(null);
-  }
-
-  function startEdit(w: AvailabilityWindowRow) {
-    setRowError(null);
-    setCopyingId(null);
+  function startAdd(day: number) {
+    closeEditors();
     setNotice(null);
-    setEditingId(w.id);
-    setDraft({ weekday: w.weekday, startTime: w.startTime.slice(0, 5), endTime: w.endTime.slice(0, 5), slotMinutes: w.slotDurationMinutes, sessionMinutes: w.sessionMinutes ?? null, sessionTypeId: w.sessionTypeId ?? null });
+    // A second window on a day starts where the last one ends.
+    const last = windows.filter((w) => w.weekday === day).pop();
+    setDraft(last ? { startTime: last.endTime.slice(0, 5), endTime: last.endTime.slice(0, 5) < "20:00" ? "20:00" : "23:00", sessionTypeId: null } : { startTime: "17:00", endTime: "20:00", sessionTypeId: null });
+    setAddingDay(day);
   }
 
-  async function saveEdit() {
-    if (!editingId || !draft) return;
-    const problem = validateWindow(
-      draft,
-      windows.map((w) => ({ id: w.id, weekday: w.weekday, startTime: w.startTime, endTime: w.endTime })),
-      editingId
-    );
+  const others = () => windows.map((w) => ({ id: w.id, weekday: w.weekday, startTime: w.startTime, endTime: w.endTime }));
+
+  async function saveAdd() {
+    if (addingDay === null) return;
+    const problem = validateWindow({ weekday: addingDay, startTime: draft.startTime, endTime: draft.endTime, slotMinutes: step, sessionMinutes: timing.session }, others());
     if (problem) {
       setRowError(problem);
       return;
     }
-    setRowBusy(true);
+    setBusy(true);
     setRowError(null);
-    const supabase = createBrowserClient();
-    const { data, error: updateError } = await supabase
+    const { data, error } = await createBrowserClient()
       .from("coach_availability_windows")
-      .update({
-        weekday: draft.weekday,
+      .insert({
+        coach_id: coachId,
+        weekday: addingDay,
         start_time: draft.startTime,
         end_time: draft.endTime,
-        slot_duration_minutes: draft.slotMinutes,
-        ...(sessionLengthEnabled ? { session_minutes: draft.sessionMinutes ?? null } : {}),
-        ...(sessionTypeEnabled ? { session_type_id: draft.sessionTypeId ?? null } : {}),
+        ...timingColumns(timing.session, timing.gap),
+        ...(sessionTypeEnabled && draft.sessionTypeId ? { session_type_id: draft.sessionTypeId } : {}),
       })
-      .eq("id", editingId)
       .select(COLS)
       .single();
-    setRowBusy(false);
-    if (updateError || !data) {
-      setRowError(isSessionRuleError(updateError?.message) ? RULE_PENDING : "That didn't save. Nothing was changed. Try again.");
+    setBusy(false);
+    if (error || !data) {
+      setRowError(isSessionRuleError(error?.message) ? RULE_PENDING : "Couldn't save those hours. Nothing was changed. Try again.");
       return;
     }
-    setWindows((prev) => sortWindows(prev.map((w) => (w.id === editingId ? toRow(data) : w))));
+    setWindows((prev) => sortWindows([...prev, toRow(data)]));
+    setAddingDay(null);
+  }
+
+  function startEdit(w: AvailabilityWindowRow) {
+    closeEditors();
+    setNotice(null);
+    setDraft({ startTime: w.startTime.slice(0, 5), endTime: w.endTime.slice(0, 5), sessionTypeId: w.sessionTypeId ?? null });
+    setEditingId(w.id);
+  }
+
+  async function saveEdit(w: AvailabilityWindowRow) {
+    const problem = validateWindow({ weekday: w.weekday, startTime: draft.startTime, endTime: draft.endTime, slotMinutes: step, sessionMinutes: timing.session }, others(), w.id);
+    if (problem) {
+      setRowError(problem);
+      return;
+    }
+    setBusy(true);
+    setRowError(null);
+    const { data, error } = await createBrowserClient()
+      .from("coach_availability_windows")
+      .update({
+        start_time: draft.startTime,
+        end_time: draft.endTime,
+        ...timingColumns(timing.session, timing.gap),
+        ...(sessionTypeEnabled ? { session_type_id: draft.sessionTypeId ?? null } : {}),
+      })
+      .eq("id", w.id)
+      .select(COLS)
+      .single();
+    setBusy(false);
+    if (error || !data) {
+      setRowError(isSessionRuleError(error?.message) ? RULE_PENDING : "That didn't save. Nothing was changed. Try again.");
+      return;
+    }
+    setWindows((prev) => sortWindows(prev.map((x) => (x.id === w.id ? toRow(data) : x))));
     setEditingId(null);
-    setDraft(null);
     setNotice("Hours updated. Sessions that are already booked stay as they are.");
   }
 
   function startCopy(w: AvailabilityWindowRow) {
-    setRowError(null);
-    setEditingId(null);
+    closeEditors();
     setNotice(null);
-    setCopyingId(w.id);
     setCopyDays([]);
+    setCopyingId(w.id);
   }
 
   async function saveCopy(w: AvailabilityWindowRow) {
-    const { create, skipped } = copyTargets(
-      { weekday: w.weekday, startTime: w.startTime, endTime: w.endTime },
-      copyDays,
-      windows.map((x) => ({ id: x.id, weekday: x.weekday, startTime: x.startTime, endTime: x.endTime }))
-    );
+    const { create, skipped } = copyTargets({ weekday: w.weekday, startTime: w.startTime, endTime: w.endTime }, copyDays, others());
     if (create.length === 0) {
       setRowError(skipped.length > 0 ? "Those days already have overlapping hours." : "Pick at least one day.");
       return;
     }
-    setRowBusy(true);
+    setBusy(true);
     setRowError(null);
-    const supabase = createBrowserClient();
-    const { data, error: insertError } = await supabase
+    const { data, error } = await createBrowserClient()
       .from("coach_availability_windows")
       .insert(
         create.map((day) => ({
@@ -339,377 +255,234 @@ export function AvailabilityManagerDesktop({
           weekday: day,
           start_time: w.startTime,
           end_time: w.endTime,
-          slot_duration_minutes: w.slotDurationMinutes,
-          ...(sessionLengthEnabled && w.sessionMinutes ? { session_minutes: w.sessionMinutes } : {}),
+          ...timingColumns(timing.session, timing.gap),
           ...(sessionTypeEnabled && w.sessionTypeId ? { session_type_id: w.sessionTypeId } : {}),
         }))
       )
       .select(COLS);
-    setRowBusy(false);
-    if (insertError || !data) {
+    setBusy(false);
+    if (error || !data) {
       setRowError("That didn't save. Nothing was changed. Try again.");
       return;
     }
     setWindows((prev) => sortWindows([...prev, ...data.map(toRow)]));
     setCopyingId(null);
     setNotice(
-      `Copied to ${create.map((d) => SHORT[d]).join(", ")}.` +
-        (skipped.length > 0 ? ` Skipped ${skipped.map((d) => SHORT[d]).join(", ")}: those days already have overlapping hours.` : "")
+      `Copied to ${create.map((d) => SHORT[d]).join(", ")}.` + (skipped.length > 0 ? ` Skipped ${skipped.map((d) => SHORT[d]).join(", ")}: those days already have overlapping hours.` : "")
     );
   }
 
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 lg:gap-10 items-start">
-      <div>
-        <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">
-          Recurring hours
-        </h2>
-        {sessionLengthEnabled && windows.length > 0 && (
-          <SessionLengthForAll
-            coachId={coachId}
-            current={Array.from(new Set(windows.map((w) => w.sessionMinutes ?? null)))}
-            windows={windows}
-            onChanged={(minutes) => setWindows((prev) => prev.map((w) => ({ ...w, sessionMinutes: minutes })))}
-          />
-        )}
-        {notice && (
-          <p className="font-body text-xs text-chalk border border-steel/30 bg-surface p-2 mb-3" role="status">
-            {notice}
-          </p>
-        )}
-        {rowError && !editingId && !copyingId && (
-          <p className="font-body text-xs text-rust mb-3" role="alert">
-            {rowError}
-          </p>
-        )}
-        {windows.length === 0 ? (
-          <p className="font-body text-sm text-steel py-3">
-            No recurring hours set yet — add one on the right.
-          </p>
-        ) : (
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="border-b border-steel/20">
-                <th className="text-left font-body text-xs text-steel uppercase tracking-wide font-medium py-2">
-                  Day
-                </th>
-                <th className="text-left font-body text-xs text-steel uppercase tracking-wide font-medium py-2">
-                  Time
-                </th>
-                <th className="text-left font-body text-xs text-steel uppercase tracking-wide font-medium py-2">
-                  Session length
-                </th>
-                <th className="py-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {windows.map((w) => {
-                const editing = editingId === w.id && draft;
-                return (
-                  <tr key={w.id} className="border-b border-steel/15 align-top">
-                    {editing ? (
-                      <td colSpan={4} className="py-3">
-                        <div className="flex flex-wrap items-end gap-3">
-                          <label className="flex flex-col gap-1">
-                            <span className="font-body text-xs text-steel uppercase tracking-wide">Day</span>
-                            <select value={draft.weekday} onChange={(e) => setDraft({ ...draft, weekday: Number(e.target.value) })} className={inputCls}>
-                              {WEEKDAYS.map((label, i) => (
-                                <option key={i} value={i}>
-                                  {label}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                          <label className="flex flex-col gap-1">
-                            <span className="font-body text-xs text-steel uppercase tracking-wide">Start</span>
-                            <input type="time" value={draft.startTime} onChange={(e) => setDraft({ ...draft, startTime: e.target.value })} className={inputCls} />
-                          </label>
-                          <label className="flex flex-col gap-1">
-                            <span className="font-body text-xs text-steel uppercase tracking-wide">End</span>
-                            <input type="time" value={draft.endTime} onChange={(e) => setDraft({ ...draft, endTime: e.target.value })} className={inputCls} />
-                          </label>
-                          <WindowTimingFields
-                            startTime={draft.startTime}
-                            endTime={draft.endTime}
-                            step={draft.slotMinutes}
-                            session={draft.sessionMinutes ?? null}
-                            gap={gap}
-                            sessionEnabled={sessionLengthEnabled}
-                            gapEnabled={gapEnabled}
-                            onStep={(n) => setDraft({ ...draft, slotMinutes: n })}
-                            onSession={(n) => setDraft({ ...draft, sessionMinutes: n })}
-                            onGapChange={setGap}
-                            onGapCommit={commitGap}
-                            gapBusy={gapBusy}
-                            gapError={gapError}
-                          />
-                          {sessionTypeEnabled && sessionTypes.length > 0 && (
-                            <SessionTypeSelect types={sessionTypes} value={draft.sessionTypeId ?? ""} onChange={(v) => setDraft({ ...draft, sessionTypeId: v || null })} />
-                          )}
-                          <button type="button" onClick={saveEdit} disabled={rowBusy} className="h-9 px-4 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40">
-                            Save
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingId(null);
-                              setRowError(null);
-                            }}
-                            className="h-9 px-3 border border-steel/30 text-steel font-body text-xs"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                        {rowError && (
-                          <p className="font-body text-xs text-rust mt-2" role="alert">
-                            {rowError}
-                          </p>
-                        )}
-                      </td>
-                    ) : (
-                      <>
-                        <td className="py-3 font-body text-sm">{WEEKDAYS[w.weekday]}</td>
-                        <td className="py-3 font-body text-sm text-steel">
-                          {w.startTime.slice(0, 5)}–{w.endTime.slice(0, 5)}
-                        </td>
-                        <td className="py-3 font-body text-sm text-steel">
-                          {w.sessionMinutes && w.sessionMinutes !== w.slotDurationMinutes
-                            ? `${w.sessionMinutes} min, a slot every ${w.slotDurationMinutes} min`
-                            : `${w.slotDurationMinutes} min`}
-                          {w.sessionTypeId && typeNameById.get(w.sessionTypeId) ? ` · ${typeNameById.get(w.sessionTypeId)}` : ""}
-                        </td>
-                        <td className="py-3 text-right whitespace-nowrap">
-                          <button
-                            type="button"
-                            onClick={() => startEdit(w)}
-                            aria-label={`Edit ${WEEKDAYS[w.weekday]} hours`}
-                            title="Edit"
-                            className="w-8 h-8 inline-flex items-center justify-center text-steel hover:text-chalk transition-colors"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => startCopy(w)}
-                            aria-label={`Copy ${WEEKDAYS[w.weekday]} hours to other days`}
-                            title="Copy to other days"
-                            className="w-8 h-8 inline-flex items-center justify-center text-steel hover:text-chalk transition-colors"
-                          >
-                            <Copy className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(w.id)}
-                            aria-label="Delete window"
-                            title="Delete"
-                            className="w-8 h-8 inline-flex items-center justify-center text-steel active:text-rust transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </>
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-        {copyingId && (() => {
-          const w = windows.find((x) => x.id === copyingId);
-          if (!w) return null;
-          return (
-            <div className="mt-3 border border-steel/30 bg-surface p-3">
-              <p className="font-body text-sm text-chalk mb-2">
-                Copy {WEEKDAYS[w.weekday]} {w.startTime.slice(0, 5)}–{w.endTime.slice(0, 5)} ({w.slotDurationMinutes} min) to:
-              </p>
-              <div className="flex flex-wrap gap-2 mb-3">
-                {SHORT.map((label, d) => {
-                  if (d === w.weekday) return null;
-                  const on = copyDays.includes(d);
-                  return (
-                    <button
-                      key={d}
-                      type="button"
-                      aria-pressed={on}
-                      onClick={() => setCopyDays((prev) => (on ? prev.filter((x) => x !== d) : [...prev, d]))}
-                      className={`h-9 px-3 border font-body text-xs ${on ? "border-rust bg-rust/10 text-chalk" : "border-steel/30 text-steel"}`}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="flex items-center gap-2">
-                <button type="button" onClick={() => saveCopy(w)} disabled={rowBusy || copyDays.length === 0} className="h-9 px-4 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40">
-                  Copy
-                </button>
-                <button type="button" onClick={() => { setCopyingId(null); setRowError(null); }} className="h-9 px-3 border border-steel/30 text-steel font-body text-xs">
-                  Cancel
-                </button>
-              </div>
-              {rowError && (
-                <p className="font-body text-xs text-rust mt-2" role="alert">
-                  {rowError}
-                </p>
-              )}
-            </div>
-          );
-        })()}
-      </div>
-
-      <div className="border border-steel/20 p-4 space-y-3">
-        <p className="font-display uppercase text-xs tracking-wide text-steel">
-          Add recurring window
-        </p>
-        <label className="flex flex-col gap-1">
-          <span className="font-body text-xs text-steel uppercase tracking-wide">Day</span>
-          <select
-            value={weekday}
-            onChange={(e) => setWeekday(e.target.value)}
-            className={inputCls}
-          >
-            {WEEKDAYS.map((label, i) => (
-              <option key={i} value={i}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="font-body text-xs text-steel uppercase tracking-wide">Start</span>
-          <input
-            type="time"
-            value={startTime}
-            onChange={(e) => setStartTime(e.target.value)}
-            className={inputCls}
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="font-body text-xs text-steel uppercase tracking-wide">End</span>
-          <input
-            type="time"
-            value={endTime}
-            onChange={(e) => setEndTime(e.target.value)}
-            className={inputCls}
-          />
-        </label>
-        <WindowTimingFields
-          startTime={startTime}
-          endTime={endTime}
-          step={Number(slotDuration)}
-          session={sessionInput.trim() ? Number(sessionInput) : null}
-          gap={gap}
-          sessionEnabled={sessionLengthEnabled}
-          gapEnabled={gapEnabled}
-          onStep={(n) => setSlotDuration(String(n))}
-          onSession={(n) => setSessionInput(n == null ? "" : String(n))}
-          onGapChange={setGap}
-          onGapCommit={commitGap}
-          gapBusy={gapBusy}
-          gapError={gapError}
-        />
-        {sessionTypeEnabled && sessionTypes.length > 0 && <SessionTypeSelect types={sessionTypes} value={typeInput} onChange={setTypeInput} />}
-        <button
-          type="button"
-          onClick={handleAdd}
-          disabled={submitting}
-          className="w-full h-9 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
-        >
-          Add
-        </button>
-        {error && <p className="font-body text-xs text-rust">{error}</p>}
-      </div>
-    </div>
-  );
-}
-
-// One control for the common case: "my sessions are 55 minutes" for every window at once. Type the length and Save; empty keeps the slot step as the length. A window can still differ (edit its row).
-function SessionLengthForAll({
-  coachId,
-  current,
-  windows,
-  onChanged,
-}: {
-  coachId: string;
-  current: (number | null)[];
-  windows: AvailabilityWindowRow[];
-  onChanged: (minutes: number | null) => void;
-}) {
-  const single = current.length === 1 ? current[0] : null;
-  const [value, setValue] = useState(single != null ? String(single) : "");
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
-
-  async function save() {
-    const typed = value.trim();
-    const minutes = typed === "" ? null : Number(typed);
-    if (minutes != null && (!Number.isInteger(minutes) || minutes < 5 || minutes > 240)) {
-      setErr("Session length must be a whole number from 5 to 240 minutes.");
-      return;
-    }
-    // A session may be longer than the time between starts, but it has to fit inside each window: say which window is the problem instead of failing the whole change.
-    const tooShort = minutes == null ? [] : windows.filter((w) => timeToMinutes(w.endTime) - timeToMinutes(w.startTime) < minutes);
-    if (tooShort.length > 0) {
-      setErr(
-        `${tooShort.map((w) => `${WEEKDAYS[w.weekday]} ${w.startTime.slice(0, 5)}–${w.endTime.slice(0, 5)} is shorter than ${minutes} minutes`).join("; ")}. Make that window longer (edit its row) first, then set the length.`
-      );
-      return;
-    }
-    setBusy(true);
-    setErr(null);
-    setSaved(false);
-    const supabase = createBrowserClient();
-    const { error } = await supabase.from("coach_availability_windows").update({ session_minutes: minutes }).eq("coach_id", coachId);
-    setBusy(false);
+  async function handleDelete(id: string) {
+    closeEditors();
+    const { error } = await createBrowserClient().from("coach_availability_windows").delete().eq("id", id);
     if (error) {
-      setErr(isSessionRuleError(error.message) ? RULE_PENDING : "That didn't save. Nothing was changed. Try again.");
+      setNotice("Couldn't delete those hours. Nothing was changed.");
       return;
     }
-    setSaved(true);
-    onChanged(minutes);
+    setWindows((prev) => prev.filter((w) => w.id !== id));
   }
 
+  const timeFields = (
+    <>
+      <label className="flex flex-col gap-1">
+        <span className="font-body text-xs text-steel uppercase tracking-wide">From</span>
+        <input type="time" value={draft.startTime} onChange={(e) => setDraft({ ...draft, startTime: e.target.value })} className={inputCls} />
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className="font-body text-xs text-steel uppercase tracking-wide">To</span>
+        <input type="time" value={draft.endTime} onChange={(e) => setDraft({ ...draft, endTime: e.target.value })} className={inputCls} />
+      </label>
+      {showTypes && <SessionTypeSelect types={sessionTypes} value={draft.sessionTypeId ?? ""} onChange={(v) => setDraft({ ...draft, sessionTypeId: v || null })} />}
+    </>
+  );
+
+  const editorButtons = (label: string, onSave: () => void) => (
+    <div className="flex items-center gap-2">
+      <button type="button" onClick={onSave} disabled={busy} className="h-9 px-4 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40">
+        {busy ? "Saving…" : label}
+      </button>
+      <button type="button" onClick={closeEditors} className="h-9 px-3 border border-steel/30 text-steel font-body text-xs">
+        Cancel
+      </button>
+    </div>
+  );
+
+  const errorLine = rowError && (
+    <p className="basis-full font-body text-xs text-rust" role="alert">
+      {rowError}
+    </p>
+  );
+
   return (
-    <div className="border border-steel/20 p-3 mb-3">
-      <label className="block">
-        <span className="font-body text-xs text-steel uppercase tracking-wide">Session length (minutes)</span>
-        <span className="mt-2 flex flex-wrap items-center gap-2">
-          <input
-            type="number"
-            min={5}
-            max={240}
-            value={value}
-            onChange={(e) => {
-              setValue(e.target.value);
-              setSaved(false);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                void save();
-              }
-            }}
-            className={`${inputCls} w-24`}
-          />
-          <button type="button" disabled={busy} onClick={save} className="h-9 px-4 border border-steel/40 text-chalk font-body text-sm disabled:opacity-40">
-            {busy ? "Saving…" : "Save"}
+    <section aria-labelledby="weekly-hours" className="min-w-0">
+      <h2 id="weekly-hours" className="font-display uppercase text-lg tracking-wide mb-3">
+        Weekly hours
+      </h2>
+
+      <div className="border border-steel/20 bg-surface/40 p-4 mb-4">
+        <div className="flex flex-wrap items-end gap-4">
+          <label className="flex flex-col gap-1">
+            <span className="font-body text-xs text-steel uppercase tracking-wide">Session length (minutes)</span>
+            <input
+              type="number"
+              min={5}
+              max={240}
+              value={sessionInput}
+              onChange={(e) => {
+                setSessionInput(e.target.value);
+                setTimingSaved(false);
+              }}
+              className={`${inputCls} w-24`}
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="font-body text-xs text-steel uppercase tracking-wide">Gap between sessions (minutes)</span>
+            <input
+              type="number"
+              min={0}
+              max={240}
+              value={gapInput}
+              onChange={(e) => {
+                setGapInput(e.target.value);
+                setTimingSaved(false);
+              }}
+              className={`${inputCls} w-24`}
+            />
+          </label>
+          <button
+            type="button"
+            onClick={saveTiming}
+            disabled={timingBusy || (!timingChanged && !mixed)}
+            className="h-9 px-4 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
+          >
+            {timingBusy ? "Saving…" : "Save"}
           </button>
-          {saved && (
+          {timingSaved && (
             <span className="font-body text-xs text-positive" role="status">
               Saved
             </span>
           )}
-        </span>
-      </label>
-      <p className="font-body text-xs text-steel mt-2">Applies to all your hours. Slots keep starting on your slot step; each booking lasts this long. A 55-minute session in 60-minute slots leaves a 5-minute gap.</p>
-      {current.length > 1 && <p className="font-body text-xs text-steel mt-1">Your windows currently differ; saving a length sets it on all of them.</p>}
-      {err && (
-        <p className="font-body text-xs text-rust mt-2" role="alert">
-          {err}
+        </div>
+        <p className="font-body text-xs text-steel mt-3">
+          {Number.isInteger(typedSession) && typedSession > 0 && Number.isInteger(typedGap) && typedGap >= 0
+            ? `A session starts every ${stepFor(typedSession, typedGap)} minutes${preview ? `: ${preview}` : ""}${preview.endsWith("…") ? "" : "."}`
+            : "Type a session length and a gap."}{" "}
+          Applies to all your hours.
+        </p>
+        {mixed && !timingChanged && (
+          <p className="font-body text-xs text-amber mt-2" role="status">
+            Some of your hours were set up with different numbers, which shifts their start times. Press Save to line them all up.
+          </p>
+        )}
+        {timingError && (
+          <p className="font-body text-xs text-rust mt-2" role="alert">
+            {timingError}
+          </p>
+        )}
+      </div>
+
+      {notice && (
+        <p className="font-body text-xs text-chalk border border-steel/30 bg-surface p-2 mb-3" role="status">
+          {notice}
         </p>
       )}
-    </div>
+
+      <ul className="border-t border-steel/20">
+        {WEEK_ORDER.map((day) => {
+          const dayWindows = windows.filter((w) => w.weekday === day);
+          return (
+            <li key={day} className="border-b border-steel/15 py-2 grid grid-cols-[3.5rem_minmax(0,1fr)] gap-x-3 items-start">
+              <p className={`font-body text-sm pt-2 ${dayWindows.length > 0 ? "text-chalk" : "text-steel"}`}>{SHORT[day]}</p>
+              <div className="min-w-0 space-y-1">
+                {dayWindows.length === 0 && addingDay !== day && <p className="font-body text-xs text-steel pt-2.5">Closed</p>}
+                {dayWindows.map((w) => {
+                  const count = sessionCount(w, timing.session, timing.gap);
+                  const typeName = w.sessionTypeId ? typeNameById.get(w.sessionTypeId) : null;
+                  if (editingId === w.id) {
+                    return (
+                      <div key={w.id} className="flex flex-wrap items-end gap-3 py-1">
+                        {timeFields}
+                        {editorButtons("Save", () => saveEdit(w))}
+                        {errorLine}
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={w.id}>
+                      <div className="flex items-center gap-2 min-h-9">
+                        <p className="font-body text-sm text-chalk tabular-nums">
+                          {w.startTime.slice(0, 5)}–{w.endTime.slice(0, 5)}
+                        </p>
+                        <p className="font-body text-xs text-steel truncate">
+                          {count} {count === 1 ? "session" : "sessions"}
+                          {typeName ? ` · ${typeName}` : ""}
+                        </p>
+                        <span className="ml-auto shrink-0 whitespace-nowrap">
+                          <button type="button" onClick={() => startEdit(w)} aria-label={`Edit ${WEEKDAYS[w.weekday]} hours`} title="Edit" className={iconBtn}>
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button type="button" onClick={() => startCopy(w)} aria-label={`Copy ${WEEKDAYS[w.weekday]} hours to other days`} title="Copy to other days" className={iconBtn}>
+                            <Copy className="w-4 h-4" />
+                          </button>
+                          <button type="button" onClick={() => handleDelete(w.id)} aria-label="Delete window" title="Delete" className={`${iconBtn} active:text-rust`}>
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </span>
+                      </div>
+                      {copyingId === w.id && (
+                        <div className="border border-steel/30 bg-surface p-3 my-1">
+                          <p className="font-body text-xs text-chalk mb-2">
+                            Copy {w.startTime.slice(0, 5)}–{w.endTime.slice(0, 5)} to:
+                          </p>
+                          <div className="flex flex-wrap gap-1.5 mb-3">
+                            {WEEK_ORDER.filter((d) => d !== w.weekday).map((d) => {
+                              const on = copyDays.includes(d);
+                              return (
+                                <button
+                                  key={d}
+                                  type="button"
+                                  aria-pressed={on}
+                                  onClick={() => setCopyDays((prev) => (on ? prev.filter((x) => x !== d) : [...prev, d]))}
+                                  className={`h-9 px-3 border font-body text-xs ${on ? "border-rust bg-rust/10 text-chalk" : "border-steel/30 text-steel"}`}
+                                >
+                                  {SHORT[d]}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {editorButtons("Copy", () => saveCopy(w))}
+                          {rowError && (
+                            <p className="font-body text-xs text-rust mt-2" role="alert">
+                              {rowError}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {addingDay === day ? (
+                  <div className="flex flex-wrap items-end gap-3 py-1">
+                    {timeFields}
+                    {editorButtons("Add", saveAdd)}
+                    {errorLine}
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => startAdd(day)}
+                    aria-label={`Add ${WEEKDAYS[day]} hours`}
+                    className="h-8 inline-flex items-center gap-1 font-body text-xs text-rust"
+                  >
+                    <Plus className="w-3.5 h-3.5" aria-hidden />
+                    Add hours
+                  </button>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
