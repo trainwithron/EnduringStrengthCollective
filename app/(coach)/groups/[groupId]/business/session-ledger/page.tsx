@@ -2,13 +2,13 @@ import { readRowsByIds } from "@/lib/read-by-ids";
 import { pageAll } from "@/lib/page-all";
 import { LoadFailedPage } from "@/components/ui/load-failed-page";
 import { isReadFailure } from "@/lib/read-failed";
-import Link from "next/link";
 import { LoadFailed } from "@/components/ui/load-failed";
 import { redirectOneOnOneToAnchor } from "@/lib/coach-wide-redirect";
 import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
+import { SessionLedgerRows } from "@/components/coach/session-ledger-rows";
 
 export const metadata = { title: "Session ledger" };
 
@@ -178,32 +178,7 @@ export default async function SessionLedgerPage(
             <span>Group</span>
             <span className="text-right">Sessions left</span>
           </div>
-          {rows.map((r) => (
-            <Link
-              key={`${r.athleteId}::${r.groupId}`}
-              href={`/groups/${r.groupId}/athletes/${r.athleteId}`}
-              className="grid grid-cols-[1fr_180px_140px_120px] gap-3 py-2.5 font-body text-sm hover:bg-surface/40"
-            >
-              <span className="truncate">{r.athleteName}</span>
-              <span className="text-steel truncate">{r.trainerName}</span>
-              <span className="text-steel truncate">{r.groupName}</span>
-              <span
-                className={`text-right font-medium ${
-                  r.balance === null
-                    ? "text-steel"
-                    : r.balance === 0
-                      ? "text-rust"
-                      : r.balance <= 1
-                        ? "text-rust"
-                        : r.balance <= 3
-                          ? "text-yellow-500"
-                          : "text-chalk"
-                }`}
-              >
-                {r.balance === null ? "No package" : r.balance}
-              </span>
-            </Link>
-          ))}
+          <SessionLedgerRows rows={rows} />
         </div>
       )}
     </CoachDesktopShell>
