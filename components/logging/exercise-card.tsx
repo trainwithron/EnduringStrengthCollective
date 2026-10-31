@@ -314,7 +314,7 @@ export function ExerciseCard({
 
   return (
     <div>
-      <div className="flex items-center justify-between gap-3 mb-1">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-1">
         {swapping ? (
           <div className="flex-1 min-w-0">
             <p className="font-body text-xs text-steel mb-1">Swap {exercise.displayName ?? exercise.exerciseName} for:</p>
@@ -364,6 +364,7 @@ export function ExerciseCard({
           </div>
         ) : (
           <>
+            {/* A long name keeps one line and Swap / Remove drop under it, rather than the name squeezed onto three (Ron, Oct 31). */}
             <h2 className="font-body font-medium text-[15px]">
               {exercise.displayName ?? (exercise.exerciseName || "Untitled exercise")}
               {exercise.isSwapped && (

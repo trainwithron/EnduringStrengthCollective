@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 // Real gap Ron hit live: mid-way through logging a client's in-person
 // session, ran out of time. The client can already resume/finish it
@@ -31,6 +31,12 @@ export function SendToClientButton({
 }) {
   const [status, setStatus] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  // The compact note floats over the logger, so it clears itself (Ron, Oct 31: it stayed on screen over "+ Add exercise").
+  useEffect(() => {
+    if (!compact || !status) return;
+    const t = setTimeout(() => setStatus(null), 5000);
+    return () => clearTimeout(t);
+  }, [compact, status]);
 
   async function handleSend() {
     setSending(true);
@@ -67,7 +73,7 @@ export function SendToClientButton({
           📲 Send to client
         </button>
         {status && (
-          <p className="absolute right-5 top-full z-20 mt-1 bg-graphite border border-steel/30 px-2 py-1 font-body text-xs text-steel" role="status">
+          <p className="absolute right-5 top-full z-40 mt-1 max-w-[16rem] bg-graphite border border-steel/30 px-2 py-1 font-body text-xs text-steel" role="status">
             {status}
           </p>
         )}
