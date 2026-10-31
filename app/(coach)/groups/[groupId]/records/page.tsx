@@ -87,12 +87,13 @@ function RecordsList({ records }: { records: RecordRow[] }) {
       </p>
     );
   }
+  // In a coach's page area with room, a grid of cards (two, then three across); on a phone, one column as before (layout audit #18).
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 @3xl:space-y-0 @3xl:grid @3xl:grid-cols-2 @5xl:grid-cols-3 @3xl:gap-3 @3xl:items-start">
       {records.map((r) => (
         <div key={r.exerciseName} className="border border-steel/20 p-4">
           <div className="flex items-center justify-between">
-            <h3 className="font-body text-sm font-medium">{r.exerciseName}</h3>
+            <h3 className="font-body text-sm font-medium min-w-0 break-words">{r.exerciseName}</h3>
             <p className="font-display text-lg leading-none text-rust">{r.value} lb</p>
           </div>
           <p className="font-body text-xs text-steel mt-1">
@@ -159,7 +160,7 @@ export default async function RecordsPage(props: { params: Promise<{ groupId: st
             workout is completed.
           </p>
         </div>
-        <div className="max-w-[640px]">
+        <div className="max-w-[640px] @3xl:max-w-none">
           <RecordsList records={records} />
         </div>
       </CoachDesktopShell>
