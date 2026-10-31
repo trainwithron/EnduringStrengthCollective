@@ -7,7 +7,7 @@ import { saved } from "@/lib/saved";
 import { LegalAcceptance } from "@/components/legal/legal-acceptance";
 import { LegalLinks } from "@/components/legal/legal-links";
 import { flushLegalConsent, rememberLegalConsent } from "@/lib/legal-client";
-import { friendlySignInError } from "@/lib/sign-in-errors";
+import { friendlySignInError, friendlySignUpError } from "@/lib/sign-in-errors";
 
 type Mode = "signup" | "login";
 type Phase = "checking" | "guest" | "authed" | "awaiting-confirmation";
@@ -220,13 +220,7 @@ export function InviteJoinFlow({
       });
 
       if (signUpError) {
-        setError(
-          /already registered|already exists/i.test(signUpError.message)
-            ? "That email already has an account. Tap 'I have an account' to sign in."
-            : /rate limit|too many/i.test(signUpError.message)
-            ? "Too many tries. Wait a few minutes and try again."
-            : "We couldn't create the account. Check your email and password and try again."
-        );
+        setError(friendlySignUpError(signUpError.message));
         setSubmitting(false);
         return;
       }
