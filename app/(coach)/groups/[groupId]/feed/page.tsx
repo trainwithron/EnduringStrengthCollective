@@ -243,14 +243,17 @@ export default async function FeedPage(
           <h1 className="font-display font-bold text-3xl uppercase leading-none">Team Feed</h1>
         </div>
 
-        <div className="max-w-[640px]">
-          <div className="flex items-center justify-between">
+        {/* With room (@4xl): the feed on the left, reported posts and the leaderboard on the right. Narrower, one 640px column in the same order as always (layout audit #14). */}
+        <div className="max-w-[640px] @4xl:max-w-none @4xl:grid @4xl:grid-cols-[minmax(0,40rem)_minmax(0,22rem)] @4xl:gap-x-8 @4xl:items-start">
+          <div className="flex items-center justify-between @4xl:col-start-1 @4xl:row-start-1">
             <ChannelTabs basePath={`/groups/${params.groupId}/feed`} active={channel} />
             <ClearChannelButton groupId={params.groupId} channel={channel} />
           </div>
-          <div className="pt-6">
+          <div className="pt-6 @4xl:pt-0 @4xl:col-start-2 @4xl:row-start-1 @4xl:row-span-2 min-w-0">
             <ReportedContentPanel groupId={params.groupId} />
             {leaderboardCard}
+          </div>
+          <div className="@4xl:pt-6 @4xl:col-start-1 @4xl:row-start-2 min-w-0">
             <PostComposerDesktop
               groupId={params.groupId}
               defaultChannel={channel}
