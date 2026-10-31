@@ -37,7 +37,7 @@ describe("the program builder uses the full width", () => {
   it("the shell takes a wide option and the builder page uses it", () => {
     const shell = read("components/coach/coach-desktop-shell.tsx");
     expect(shell).toContain("wide = false");
-    expect(shell).toContain('${wide ? "" : "max-w-[1400px]"}');
+    expect(shell).toContain('{wide ? "" : "mx-auto w-full max-w-[1400px]"}');
     expect(read("app/(coach)/groups/[groupId]/programs/[programId]/page.tsx")).toContain('active="programs" wide>');
   });
   it("a week's days share the width equally (at least 300px, at most 420px) inside the pan row, and + Day is narrow", () => {

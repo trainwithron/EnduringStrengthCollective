@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import containerQueries from "@tailwindcss/container-queries";
 
 export default {
   content: [
@@ -63,5 +64,6 @@ export default {
       },
     },
   },
-  plugins: [],
+  // @container on the coach page area, so pages pick their columns from the width they have (the split panel can take half the window).
+  plugins: [containerQueries],
 } satisfies Config;

@@ -559,7 +559,9 @@ function CoachDesktopShellFull({
           <BottomTabBar groupId={groupId} variant="own" activeOverride={null} />
         </div>
 
-        <main id="main-content" tabIndex={-1} className={`flex-1 min-w-0 px-4 pt-6 pb-24 md:px-10 md:pt-8 lg:pb-8 lg:mr-[var(--ws-dock,0px)] ${wide ? "" : "max-w-[1400px]"} focus:outline-none`}>
+        {/* The page area is a size container: pages switch to two or three columns on the width THEY have (@3xl:, @5xl:), so the split panel never squeezes a two-column page. Capped pages sit centred, not pinned to the left edge (layout audit, Oct 31). */}
+        <main id="main-content" tabIndex={-1} className="@container flex-1 min-w-0 px-4 pt-6 pb-24 md:px-10 md:pt-8 lg:pb-8 lg:mr-[var(--ws-dock,0px)] focus:outline-none">
+          <div className={wide ? "" : "mx-auto w-full max-w-[1400px]"}>
           <PendingNoticeFlusher />
           {here && (
             <HomeTabStrip
@@ -570,6 +572,7 @@ function CoachDesktopShellFull({
             />
           )}
           {children}
+          </div>
         </main>
       </div>
       {/* Mounted once here so it's reachable from every one of this
