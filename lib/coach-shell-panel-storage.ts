@@ -77,7 +77,8 @@ export function writeSplitWidth(width: number): void {
 export function splitPathFor(view: ListPanelView, groupId: string): { path: string; label: string } {
   if (view === "business") return { path: `/groups/${groupId}/business`, label: "Business" };
   if (view === "calendar") return { path: `/groups/${groupId}/calendar`, label: "Calendar" };
-  if (view === "program") return { path: `/groups/${groupId}/programs`, label: "Programs" };
+  // All of the coach's programs, not one group's (Ron, Oct 31: "when i click programs the sidebar should default to my programs list").
+  if (view === "program") return { path: "/programs", label: "Programs" };
   return { path: "/clients", label: "Clients" };
 }
 

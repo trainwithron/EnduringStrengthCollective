@@ -79,7 +79,7 @@ export function isAllowedWorkspacePath(path: string): boolean {
     return false;
   }
   if (parsed.origin !== "http://workspace.invalid" || parsed.pathname !== first) return false;
-  return first === "/dashboard" || first === "/clients" || /^\/groups\/[0-9a-fA-F-]{8,40}(\/|$)/.test(first);
+  return first === "/dashboard" || first === "/clients" || first === "/programs" || /^\/groups\/[0-9a-fA-F-]{8,40}(\/|$)/.test(first);
 }
 
 // The pages offered for one group. `isShared` is true inside a team or social group (the group-only pages are then offered).

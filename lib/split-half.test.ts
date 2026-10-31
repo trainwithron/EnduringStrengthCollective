@@ -15,7 +15,7 @@ describe("each tile shows its full page", () => {
     expect(splitPathFor("roster", g).path).toBe("/clients");
     expect(splitPathFor("business", g).path).toBe(`/groups/${g}/business`);
     expect(splitPathFor("calendar", g).path).toBe(`/groups/${g}/calendar`);
-    expect(splitPathFor("program", g).path).toBe(`/groups/${g}/programs`);
+    expect(splitPathFor("program", g).path).toBe("/programs");
     for (const v of ["roster", "business", "calendar", "program"] as const) expect(isAllowedWorkspacePath(splitPathFor(v, g).path)).toBe(true);
   });
   it("in the same frame the workspace panes use (the app's own pages, no top-window navigation, links stay inside)", () => {
