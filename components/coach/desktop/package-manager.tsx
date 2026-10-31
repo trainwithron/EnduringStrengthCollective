@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { useState } from "react";
 import { Trash2 } from "lucide-react";
 import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { ShelfPlacementControls } from "@/components/coach/desktop/shelf-placement-controls";
@@ -104,6 +104,8 @@ export function PackageManager({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rowError, setRowError] = useState<string | null>(null);
   const [placementOpenId, setPlacementOpenId] = useState<string | null>(null);
+  // The add form shows only after "Add a package".
+  const [adding, setAdding] = useState(false);
 
   // What the form would save.
   const perCents = Math.round(Number(perSession) * 100);
@@ -230,9 +232,18 @@ export function PackageManager({
 
   return (
     <div className="space-y-10">
+      {/* The coach's packages as cards, with the add form behind one button (layout audit #8): the page opens on what they sell, not on an empty form. */}
       <section>
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <h2 className="font-display uppercase text-sm tracking-wide text-chalk">Your packages</h2>
+          <button type="button" onClick={() => setAdding((a) => !a)} aria-expanded={adding} className={adding ? "min-h-11 px-4 border border-steel/40 text-chalk font-body text-sm" : "min-h-11 px-4 bg-rust text-graphite font-body text-sm font-medium"}>
+            {adding ? "Close" : "Add a package"}
+          </button>
+        </div>
+        {adding && (
+        <div className="mb-8 pb-8 border-b border-steel/20" data-add-package>
         <h2 className="font-display uppercase text-sm tracking-wide text-chalk mb-3">What are you selling?</h2>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5" role="group" aria-label="Kind of package">
+        <div className="grid grid-cols-2 @3xl:grid-cols-4 gap-2.5" role="group" aria-label="Kind of package">
           {KINDS.map((k) => (
             <button
               key={k}
@@ -247,7 +258,7 @@ export function PackageManager({
           ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] gap-6 mt-5 items-start">
+        <div className="grid grid-cols-1 @3xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] gap-6 mt-5 items-start">
           <div className="border border-steel/20 p-5 space-y-4">
             <label className="flex flex-col gap-1.5">
               <span className={labelCls}>Name</span>
@@ -404,31 +415,30 @@ export function PackageManager({
             <p className="font-body text-xs text-steel mt-2.5">Buy buttons appear once payments are on. Until then you assign packages to clients yourself.</p>
           </div>
         </div>
-      </section>
-
-      <section>
-        <h2 className="font-display uppercase text-sm tracking-wide text-chalk mb-3">Your packages</h2>
+        </div>
+        )}
         {rowError && (
           <p className="font-body text-sm text-rust mb-3" role="alert">
             {rowError}
           </p>
         )}
         {active.length === 0 ? (
-          <p className="font-body text-sm text-steel py-3">No packages yet. Pick what you&apos;re selling above and save it.</p>
+          <p className="font-body text-sm text-steel py-3">No packages yet. Choose Add a package to make one.</p>
         ) : (
-          <div className="border-y border-steel/20 divide-y divide-steel/15">
+          <div className="grid grid-cols-1 @3xl:grid-cols-2 @5xl:grid-cols-3 gap-3 items-start">
             {active.map((p) => (
-              <Fragment key={p.id}>
-                <div className="grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-x-4 gap-y-1 items-center py-3">
+              <div key={p.id} className={`border border-steel/20 bg-surface/40 p-4 flex flex-col gap-3 min-w-0 ${placementOpenId === p.id ? "@3xl:col-span-2 @5xl:col-span-3" : ""}`} data-package-card>
+                <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="font-body text-sm text-chalk truncate">{p.name}</p>
-                    <p className="font-body text-xs text-steel truncate">{detailLine(p, linkablePrograms, accessGroups)}</p>
+                    <p className="font-body text-sm text-chalk font-medium break-words">{p.name}</p>
+                    <p className="font-body text-xs text-steel mt-0.5">{detailLine(p, linkablePrograms, accessGroups)}</p>
                   </div>
                   <span className="font-body text-sm text-chalk font-medium tabular-nums whitespace-nowrap text-right">
                     {dollars(packagePriceCents(p))}
                     <span className="text-steel font-normal">{p.billingType === "subscription" ? " / month" : " once"}</span>
                   </span>
-                  <div className="col-span-2 sm:col-span-1 flex items-center gap-3">
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
                     <button
                       type="button"
                       onClick={() => handleTogglePublic(p)}
@@ -451,19 +461,18 @@ export function PackageManager({
                         Copy link
                       </button>
                     )}
-                  </div>
                   <button
                     type="button"
                     onClick={() => handleDeactivate(p.id)}
                     disabled={busyId === p.id}
                     aria-label={`Deactivate ${p.name}`}
-                    className="hidden sm:inline-flex w-9 h-9 items-center justify-center text-steel hover:text-rust transition-colors disabled:opacity-40"
+                    className="hidden sm:inline-flex ml-auto w-9 h-9 items-center justify-center text-steel hover:text-rust transition-colors disabled:opacity-40"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
                 {placementOpenId === p.id && (
-                  <div className="pb-3">
+                  <div>
                     <ShelfPlacementControls
                       target="package"
                       id={p.id}
@@ -484,7 +493,7 @@ export function PackageManager({
                     </button>
                   </div>
                 )}
-              </Fragment>
+              </div>
             ))}
           </div>
         )}
