@@ -274,7 +274,7 @@ export function ExerciseHistoryUploader({
   );
 
   return (
-    <div className="space-y-8 max-w-2xl">
+    <div className="space-y-8 max-w-2xl @4xl:max-w-4xl">
       {parts.quick !== false && (
       <div className="border border-steel/20 bg-surface/40 p-6">
         <h3 className="font-display uppercase text-sm tracking-wide mb-1">Quick entry</h3>

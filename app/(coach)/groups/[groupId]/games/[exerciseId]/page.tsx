@@ -71,7 +71,7 @@ export default async function GameLeaderboardPage(
   const backHref = `/groups/${params.groupId}/exercise-library`;
 
   const content = (
-    <div className="max-w-2xl">
+    <div className="max-w-2xl @4xl:max-w-4xl">
       <Link href={backHref} className="font-body text-xs text-steel uppercase tracking-wide">
         &larr; Back to Exercise Library
       </Link>

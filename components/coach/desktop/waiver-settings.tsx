@@ -36,7 +36,7 @@ export function WaiverSettings({
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-2xl @4xl:max-w-4xl space-y-6">
       <div className="border border-rust/40 bg-rust/5 p-3">
         <p className="font-body text-xs text-chalk">
           This is a real starting template, not legal advice — have it reviewed by an attorney for

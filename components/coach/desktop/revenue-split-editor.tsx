@@ -102,7 +102,7 @@ export function RevenueSplitEditor({
   const totalSharePct = coaches.reduce((sum, c) => sum + (parseFloat(shares[c.profileId]) || 0), 0);
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6 max-w-2xl @4xl:max-w-4xl">
       <div className="border border-steel/20 p-4 max-w-xs">
         <p className="font-display text-2xl leading-none">{formatSplitCents(result.remainderCents)}</p>
         <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Monthly rates entered, to split</p>

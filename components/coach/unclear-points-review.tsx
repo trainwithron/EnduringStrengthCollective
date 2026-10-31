@@ -93,7 +93,7 @@ export function UnclearPointsReview({ athleteId, groupId, initial }: { athleteId
   const open = points.filter((p) => p.flag === "unclear").length;
 
   return (
-    <section className="border border-steel/20 p-4 mt-8 max-w-3xl" aria-labelledby="unclear-points-heading">
+    <section className="border border-steel/20 p-4 mt-8 max-w-3xl @5xl:max-w-5xl" aria-labelledby="unclear-points-heading">
       <h2 id="unclear-points-heading" className="font-display uppercase text-sm tracking-wide text-steel">
         Unclear data points
       </h2>

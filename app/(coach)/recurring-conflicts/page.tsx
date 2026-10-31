@@ -58,7 +58,7 @@ export default async function RecurringConflictsPage() {
       {conflicts.length === 0 ? (
         <p className="font-body text-sm text-steel border border-steel/20 p-4">Nothing to resolve right now.</p>
       ) : (
-        <ul className="divide-y divide-steel/15 border-y border-steel/15 max-w-2xl" data-recurring-conflicts>
+        <ul className="divide-y divide-steel/15 border-y border-steel/15 max-w-2xl @4xl:max-w-4xl" data-recurring-conflicts>
           {conflicts.map((b) => (
             <li key={b.id} className="flex items-center justify-between gap-3 py-3 px-1">
               <span className="min-w-0">

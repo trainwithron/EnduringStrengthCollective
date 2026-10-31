@@ -165,7 +165,7 @@ export default async function WorkoutClientsPage(
 
   return (
     <CoachDesktopShell groupId={params.groupId} groupName={(groupRow as { name?: string } | null)?.name ?? "Coaching"} active="programs">
-    <main className="max-w-3xl pb-10">
+    <main className="max-w-3xl @5xl:max-w-5xl pb-10">
       <header className="pb-6 border-b border-steel/20">
         <Link
           href={`/groups/${params.groupId}/workouts/${params.workoutId}`}

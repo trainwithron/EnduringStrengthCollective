@@ -85,7 +85,7 @@ export function SessionTypeManager({ initialTypes, teamMode = false , organizati
   }
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-2xl @4xl:max-w-4xl">
       <p className="font-body text-sm text-steel mb-4 max-w-[60ch]">
         Every session you log spends exactly 1 credit, whatever its type. Create a type here to tell kinds of sessions
         apart (Online, In person, Practice, Game...). A type can be given to a window of hours on Availability, and sessions
