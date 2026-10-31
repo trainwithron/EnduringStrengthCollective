@@ -56,9 +56,9 @@ export default async function RunningLowPage() {
       {low.length === 0 ? (
         <p className="font-body text-sm text-steel border border-steel/20 p-4">No one is running low right now.</p>
       ) : (
-        <ul className="divide-y divide-steel/15 border-y border-steel/15 max-w-2xl" data-running-low>
+        <ul className="grid grid-cols-1 gap-x-10 @3xl:grid-cols-2 border-t border-steel/15" data-running-low>
           {low.map(({ c, credit }) => (
-            <li key={`${c.id}:${c.groupId}`} className="flex items-center justify-between gap-3 py-3 px-1">
+            <li key={`${c.id}:${c.groupId}`} className="flex items-center justify-between gap-3 py-3 px-1 border-b border-steel/15">
               <span className="min-w-0">
                 <span className="block font-body text-base text-chalk break-words">{c.fullName}</span>
                 <span className="block font-body text-xs text-steel">{credit!.balance <= 0 ? "Out of sessions" : "1 session left"}</span>
