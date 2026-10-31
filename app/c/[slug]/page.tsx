@@ -1,3 +1,4 @@
+import { rowPriceCents, kindOf, PACKAGE_KIND_LABEL, CHECKIN_LABEL } from "@/lib/package-price";
 import { readRowsByIds } from "@/lib/read-by-ids";
 import { pageAll } from "@/lib/page-all";
 import { googleFontsHref } from "@/lib/google-fonts";
@@ -55,7 +56,7 @@ async function load(slugParam: string, preview: boolean) {
   const orgGroupIdList = orgGroupRows.map((g) => g.id as string);
   const [{ data: packages }, { data: shop }] = await Promise.all([
     readRowsByIds(orgGroupIdList, (g) => (from, to) =>
-      db.from("coach_packages").select("id, name, sessions_per_week, billing_type, sessions_granted, rate_cents").eq("coach_id", page.coach_id).in("group_id", g).eq("is_active", true).eq("is_public", true).order("id").range(from, to)
+      db.from("coach_packages").select("id, name, sessions_per_week, billing_type, sessions_granted, rate_cents, price_cents, kind, checkin_weeks, default_program_id, group_access_group_id").eq("coach_id", page.coach_id).in("group_id", g).eq("is_active", true).eq("is_public", true).order("id").range(from, to)
     ).then((r) => ({ data: r.data.sort((a: any, b: any) => (a.sessions_per_week ?? 0) - (b.sessions_per_week ?? 0)).slice(0, 6) })),
     org
       ? db.from("pro_shop_links").select("id, title, description, url, image_url").eq("coach_id", page.coach_id).eq("organization_id", org.id).eq("show_on_public", true).eq("audience", "everyone").order("sort_order", { ascending: true }).limit(3)
@@ -99,7 +100,7 @@ async function load(slugParam: string, preview: boolean) {
     canBook,
     canRequest,
     showPrices: !!page.show_prices,
-    packages: (packages ?? []) as { id: string; name: string; sessions_per_week: number; billing_type: string; sessions_granted: number; rate_cents: number }[],
+    packages: (packages ?? []) as { id: string; name: string; sessions_per_week: number; billing_type: string; sessions_granted: number; rate_cents: number; price_cents: number | null; kind: string | null; checkin_weeks: number | null; default_program_id: string | null; group_access_group_id: string | null }[],
     shop: (shop ?? [])
       .map((s) => ({ id: s.id as string, title: s.title as string, description: (s.description as string | null) ?? null, url: safeWebUrl(s.url as string), image: safeWebUrl(s.image_url as string | null) }))
       .filter((s) => s.url),
@@ -160,7 +161,15 @@ export default async function CoachSitePage(props: { params: Promise<{ slug: str
     </Link>
   ) : null;
   const hasButtons = !!(bookButton || requestButton);
-  const priceOf = (p: (typeof d.packages)[number]) => ({ main: dollars(p.rate_cents * p.sessions_granted), unit: p.billing_type === "subscription" ? "a month" : "one time" });
+  // The short line under a package's name: what it is (a team, a program, coaching with its check-ins) or, for sessions, how many a week.
+  const packageLine = (p: (typeof d.packages)[number]) => {
+    const kind = kindOf({ kind: p.kind, defaultProgramId: p.default_program_id, groupAccessGroupId: p.group_access_group_id });
+    const billed = p.billing_type === "subscription" ? "monthly" : "one time";
+    if (kind === "coaching") return `${PACKAGE_KIND_LABEL.coaching}${p.checkin_weeks ? ` · check-ins ${CHECKIN_LABEL[p.checkin_weeks].toLowerCase()}` : ""} · ${billed}`;
+    if (kind === "team" || kind === "program") return `${PACKAGE_KIND_LABEL[kind]} · ${billed}`;
+    return p.sessions_per_week > 0 ? `${p.sessions_per_week}x a week · ${billed}` : billed;
+  };
+  const priceOf = (p: (typeof d.packages)[number]) => ({ main: dollars(rowPriceCents(p)), unit: p.billing_type === "subscription" ? "a month" : "one time" });
 
   return (
     <main className={`min-h-screen ${hasButtons ? "pb-24 sm:pb-0" : ""}`} style={{ background: c.bg, color: c.text, fontFamily: `'${d.fontBody}', system-ui, sans-serif` }}>
@@ -372,7 +381,7 @@ export default async function CoachSitePage(props: { params: Promise<{ slug: str
                         {p.name}
                       </h3>
                       <p className="text-sm" style={{ color: c.muted }}>
-                        {p.sessions_per_week}x a week &middot; {p.billing_type === "subscription" ? "monthly" : "one time"}
+                        {packageLine(p)}
                       </p>
                       {d.showPrices && (
                         <p className="mt-auto pt-3 text-4xl tabular-nums" style={{ ...heading, color: c.accent }}>

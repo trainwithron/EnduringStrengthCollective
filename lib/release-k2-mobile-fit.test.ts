@@ -37,8 +37,8 @@ describe("Release K2: fits a phone", () => {
     expect(list).toContain('className="flex flex-wrap items-center gap-3 mb-4"');
     expect(list).toContain("w-full sm:h-10 sm:w-64");
   });
-  it("the packages table scrolls inside its own box", () => {
-    expect(src("components/coach/desktop/package-manager.tsx")).toContain('<div className="overflow-x-auto">');
+  it("the packages list fits a phone (rows, not a wide table: name and price, then the buttons on their own line)", () => {
+    expect(src("components/coach/desktop/package-manager.tsx")).toContain("grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1fr)_auto_auto_auto]");
   });
   it("the small buttons a thumb has to hit are at least 44px", () => {
     for (const f of ["components/feed/clear-channel-button.tsx", "components/feed/feed-settings-button.tsx"]) expect(src(f), f).toContain("w-11 h-11");

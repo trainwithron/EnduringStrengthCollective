@@ -1,3 +1,4 @@
+import { rowPriceCents } from "@/lib/package-price";
 import { chooseReupPackage, formatPackagePrice, type ReupPackageOption } from "@/lib/reup";
 import { isStripeConfigured } from "@/lib/stripe";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
@@ -51,12 +52,12 @@ export async function loadReupState(supabase: any, athleteId: string, groupId: s
   if (candidateIds.length > 0) {
     const { data: pkgRows } = await supabase
       .from("coach_packages")
-      .select("id, name, rate_cents, sessions_granted, billing_type, is_active")
+      .select("id, name, rate_cents, sessions_granted, price_cents, billing_type, is_active")
       .in("id", candidateIds);
     const options: ReupPackageOption[] = ((pkgRows ?? []) as any[]).map((r) => ({
       id: r.id,
       name: r.name,
-      priceCents: r.rate_cents * r.sessions_granted,
+      priceCents: rowPriceCents(r),
       sessionsGranted: r.sessions_granted,
       billingType: r.billing_type,
       isActive: r.is_active,

@@ -456,7 +456,9 @@ export async function POST(request: Request) {
           // Only a settled payment puts sessions on the account (a bank debit is unpaid at checkout and arrives with its own later event).
           if (session.payment_status !== "paid") break;
           const credits = Number(session.metadata?.credits ?? 0);
-          if (credits <= 0) break;
+          // A team, program or coaching package (0440) grants no sessions but is still a purchase of a package: it is recorded, and its program copy and group access below still happen.
+          // Anything else with no sessions is not one of these purchases.
+          if (!Number.isInteger(credits) || credits < 0 || (credits === 0 && !coachPackageId)) break;
 
           // Checked BEFORE inserting this event's own row — "any prior
           // purchase of this exact package by this athlete" is what
@@ -486,7 +488,7 @@ export async function POST(request: Request) {
           });
           if (grantOnceError) throw grantOnceError;
           // The coach is told, once: a repeat of an event that was already handled returns false and tells nobody again.
-          if (granted === true) await notifyPaymentReceived(supabase, { groupId, athleteId, amountCents: session.amount_total ?? 0, what: `${credits} session${credits === 1 ? "" : "s"}` });
+          if (granted === true) await notifyPaymentReceived(supabase, { groupId, athleteId, amountCents: session.amount_total ?? 0, what: credits > 0 ? `${credits} session${credits === 1 ? "" : "s"}` : "a package" });
           // Everything below is safe to run again on a retry (the transfers, the program copy, the group access and the outside notice each check themselves).
 
           const stripeFeeCents = await getRealStripeFeeCents(stripe, session.payment_intent);

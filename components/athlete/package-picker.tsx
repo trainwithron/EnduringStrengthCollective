@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { NO_PACKAGES_LINE } from "@/lib/session-credit-copy";
+import { packagePriceCents } from "@/lib/package-price";
 
 export interface PackageOption {
   id: string;
@@ -10,6 +11,8 @@ export interface PackageOption {
   billingType: "subscription" | "one_time";
   sessionsGranted: number;
   rateCents: number;
+  // The package's own price (a team, program or coaching package, 0440); null means rate x sessions.
+  priceCents?: number | null;
 }
 
 function formatDollars(cents: number): string {
@@ -50,13 +53,13 @@ export function PackagePicker({ packages }: { packages: PackageOption[] }) {
   return (
     <div className="space-y-3">
       {packages.map((pkg) => {
-        const total = pkg.rateCents * pkg.sessionsGranted;
+        const total = packagePriceCents(pkg);
         return (
           <div key={pkg.id} className="border border-steel/20 p-3.5 flex items-center justify-between gap-4">
             <div className="min-w-0">
               <p className="font-body text-sm font-medium">{pkg.name}</p>
               <p className="font-body text-xs text-steel mt-0.5">
-                {pkg.sessionsPerWeek}x/week &middot; {formatDollars(pkg.rateCents)}/session &middot;{" "}
+                {pkg.priceCents ? null : <>{pkg.sessionsPerWeek}x/week &middot; {formatDollars(pkg.rateCents)}/session &middot;{" "}</>}
                 {pkg.billingType === "subscription" ? "Recurring" : "One-time"}
               </p>
             </div>

@@ -66,8 +66,8 @@ describe("the printed program", () => {
 });
 
 describe("packages and Business", () => {
-  it("the packages form does not quote a price before a package is named", () => {
-    expect(read("components/coach/desktop/package-manager.tsx")).toContain('{previewTotal && name.trim() !== "" && (');
+  it("the packages form does not quote a price before one is set (the preview card shows $— until then)", () => {
+    expect(read("components/coach/desktop/package-manager.tsx")).toContain('{previewCents > 0 ? dollars(previewCents) : "$—"}');
   });
   it("Business no longer repeats Home's 'Right now' nudge and uses the packages page's words", () => {
     const biz = read("app/(coach)/groups/[groupId]/business/page.tsx");

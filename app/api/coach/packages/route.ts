@@ -1,3 +1,4 @@
+import { packagePriceCents } from "@/lib/package-price";
 import { safeErrorDetail } from "@/lib/safe-error";
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
@@ -33,6 +34,8 @@ async function requireCoachOfGroup(groupId: string) {
   return { userId: user.id } as const;
 }
 
+const KINDS = ["team", "program", "coaching", "sessions"];
+
 export async function POST(request: Request) {
   if (!isStripeConfigured()) {
     return NextResponse.json(
@@ -43,18 +46,25 @@ export async function POST(request: Request) {
 
   const body = await request.json();
   const { groupId, name, sessionsPerWeek, billingType, sessionsGranted, rateCents, isPublic, defaultProgramId, groupAccessGroupId } = body;
+  // The package builder (0440): the kind, one plain price, and for coaching how often check-ins are. A team, program or coaching package grants no sessions.
+  const kind = KINDS.includes(body.kind) ? (body.kind as string) : null;
+  const priceCents = Number.isInteger(body.priceCents) && body.priceCents > 0 ? (body.priceCents as number) : null;
+  const checkinWeeks = [1, 2, 4].includes(body.checkinWeeks) ? (body.checkinWeeks as number) : null;
 
   if (
     !groupId ||
     typeof name !== "string" ||
     !name.trim() ||
     !Number.isInteger(sessionsPerWeek) ||
-    sessionsPerWeek <= 0 ||
+    sessionsPerWeek < 0 ||
     (billingType !== "subscription" && billingType !== "one_time") ||
     !Number.isInteger(sessionsGranted) ||
-    sessionsGranted <= 0 ||
+    sessionsGranted < 0 ||
     !Number.isInteger(rateCents) ||
-    rateCents <= 0
+    rateCents <= 0 ||
+    (priceCents == null && sessionsGranted <= 0) ||
+    (kind === "team" && !groupAccessGroupId) ||
+    (kind === "program" && !defaultProgramId)
   ) {
     return NextResponse.json({ error: "Missing or invalid package fields." }, { status: 400 });
   }
@@ -84,13 +94,13 @@ export async function POST(request: Request) {
       coach_id: authCheck.userId,
       group_id: groupId,
       name: name.trim(),
-      sessions_per_week: sessionsPerWeek,
-      billing_type: billingType,
+      sessions_per_week: sessionsPerWeek, billing_type: billingType,
       sessions_granted: sessionsGranted,
       rate_cents: rateCents,
       is_public: isPublic === true,
       default_program_id: defaultProgramId ?? null,
       group_access_group_id: groupAccessGroupId ?? null,
+      ...(kind ? { kind } : {}), ...(priceCents ? { price_cents: priceCents } : {}), ...(checkinWeeks ? { checkin_weeks: checkinWeeks } : {}),
     })
     .select("id")
     .single();
@@ -101,7 +111,7 @@ export async function POST(request: Request) {
 
   try {
     const stripe = getStripeClient();
-    const totalCents = rateCents * sessionsGranted;
+    const totalCents = packagePriceCents({ priceCents, rateCents, sessionsGranted });
 
     const product = await stripe.products.create({
       name: name.trim(),
@@ -209,7 +219,7 @@ export async function PATCH(request: Request) {
       const price = await stripe.prices.create({
         product: product.id,
         currency: "usd",
-        unit_amount: finalRate * finalSessions,
+        unit_amount: packagePriceCents({ priceCents: existing.price_cents ?? null, rateCents: finalRate, sessionsGranted: finalSessions }),
         recurring: finalBillingType === "subscription" ? { interval: "month" } : undefined,
       });
       updates.stripe_product_id = product.id;

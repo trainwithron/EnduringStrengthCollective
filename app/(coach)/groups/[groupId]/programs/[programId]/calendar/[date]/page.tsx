@@ -366,7 +366,7 @@ export default async function DayDetailPage(
 
       const { data: packageRows } = await supabase
         .from("coach_packages")
-        .select("id, name, sessions_per_week, billing_type, sessions_granted, rate_cents")
+        .select("id, name, sessions_per_week, billing_type, sessions_granted, rate_cents, price_cents")
         .eq("group_id", params.groupId)
         .eq("is_active", true)
         .order("sessions_per_week", { ascending: true });
@@ -377,6 +377,7 @@ export default async function DayDetailPage(
         billingType: p.billing_type as "subscription" | "one_time",
         sessionsGranted: p.sessions_granted,
         rateCents: p.rate_cents,
+        priceCents: p.price_cents ?? null,
       }));
     }
   }
