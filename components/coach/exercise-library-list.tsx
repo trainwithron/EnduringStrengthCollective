@@ -1,7 +1,7 @@
 "use client";
 
 import { confirmDialog } from "@/components/shared/confirm-dialog";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { existingLibraryName } from "@/lib/exercise-search";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -86,6 +86,16 @@ export function ExerciseLibraryList({
   const [categoryAutoSuggested, setCategoryAutoSuggested] = useState(true);
   const [equipmentAutoSuggested, setEquipmentAutoSuggested] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Wide enough (the page area at 56rem, @4xl) for the editor to sit beside the list instead of inside it.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [twoPane, setTwoPane] = useState(false);
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver((entries) => setTwoPane((entries[0]?.contentRect.width ?? 0) >= 896));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const [submitting, setSubmitting] = useState(false);
   const [alreadyThere, setAlreadyThere] = useState<string | null>(null);
   const [nameProblem, setNameProblem] = useState<string | null>(null);
@@ -375,8 +385,104 @@ export function ExerciseLibraryList({
   );
   const filterSelect = "h-10 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust";
 
+  // The editor for one exercise. On a wide page it opens in a panel beside the list; on a narrow one, inside the list under the exercise (layout audit #17). One copy either way.
+  function editorFor(ex: LibraryExerciseRow) {
+    const exTags = tagsByExercise[ex.name] ?? [];
+    const breakdown =
+      exTags.length > 0
+        ? generateBiomechBreakdown(
+            exTags.map((t) => ({
+              ...biomechVocabulary.find((v) => v.id === t.tagId)!,
+              role: t.role,
+            }))
+          )
+        : null;
+    return (
+      <div className="space-y-4">
+      <div>
+        <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">
+          Description / instructions
+        </p>
+        <textarea aria-label="How it is done"
+          defaultValue={ex.description ?? ""}
+          onBlur={(e) => handleDescriptionChange(ex.id, e.target.value)}
+          placeholder="How it's done, rules, setup — shown to any coach browsing this exercise."
+          rows={3}
+          className="w-full bg-surface border border-steel/30 text-chalk px-3 py-2 font-body text-sm focus:outline-none focus:border-rust"
+        />
+      </div>
+      <ExerciseMediaPicker
+        exerciseName={ex.name}
+        videoPath={ex.videoPath}
+        youtubeUrl={ex.youtubeUrl}
+        onChange={(patch) =>
+          setExercises((prev) =>
+            prev.map((e) => (e.id === ex.id ? { ...e, ...patch } : e))
+          )
+        }
+      />
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <p className="font-body text-xs text-steel uppercase tracking-wide">
+            Biomechanical tags
+          </p>
+          <button
+            type="button"
+            onClick={() => handleSuggestTags(ex.name, ex.name)}
+            disabled={suggestingKey === ex.name}
+            className="font-body text-xs text-rust uppercase tracking-wide disabled:opacity-40"
+          >
+            {suggestingKey === ex.name ? "Asking AI…" : "✨ Suggest tags (AI)"}
+          </button>
+        </div>
+        <p className="font-body text-xs text-steel mb-2">
+          {breakdown?.summary ?? "No biomechanical tags added yet."}
+        </p>
+        {suggestionError && (
+          <p className="font-body text-xs text-rust mb-2">{suggestionError}</p>
+        )}
+        {(pendingSuggestions[ex.name]?.length ?? 0) > 0 && (
+          <div className="border border-rust/30 bg-rust/5 px-3 py-2 mb-2">
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="font-body text-xs text-steel">
+                AI suggests — click to accept, or ignore:
+              </p>
+              <button
+                type="button"
+                onClick={() => acceptAllSuggestedTags(ex.name)}
+                className="font-body text-xs text-rust uppercase tracking-wide font-bold"
+              >
+                Accept all
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {pendingSuggestions[ex.name]!.map((s) => (
+                <button
+                  key={s.tagId}
+                  type="button"
+                  onClick={() => acceptSuggestedTag(ex.name, s.tagId, s.role)}
+                  className="h-6 px-2 border border-steel/30 text-chalk font-body text-xs active:border-rust active:text-rust"
+                >
+                  {s.label} · {s.role === "prime_mover" ? "Prime mover" : "Stabilizer"}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        <BiomechTagPicker
+          vocabulary={biomechVocabulary}
+          selected={exTags}
+          onToggle={(tagId) => toggleExistingTag(ex.name, tagId)}
+          onRoleChange={(tagId, role) => setExistingTagRole(ex.name, tagId, role)}
+        />
+      </div>
+      </div>
+    );
+  }
+  const editing = twoPane && expandedId ? exercises.find((e) => e.id === expandedId) ?? null : null;
+
   return (
-    <div>
+    <div ref={rootRef}>
       <div className="flex flex-wrap items-center gap-3 mb-3">
         <label className="font-body text-xs text-steel flex items-center gap-2">
           Pattern
@@ -547,7 +653,8 @@ export function ExerciseLibraryList({
       {visible.length === 0 ? (
         <p className="font-body text-sm text-steel py-6">{onlyWithoutVideo && !search.trim() && !filtersActive(filters) ? "Every exercise has a video." : filtersActive(filters) || onlyWithoutVideo ? "No exercises match. Clear a filter." : "No exercises match."}</p>
       ) : (
-        <div className="space-y-6">
+        <div className={editing ? "grid grid-cols-[minmax(0,1fr)_minmax(0,28rem)] gap-8 items-start" : ""}>
+        <div className="space-y-6 min-w-0">
           {grouped.map((group) => (
             <div key={group.category}>
               <h3 className="font-display uppercase text-xs tracking-wide text-steel mb-2">
@@ -647,93 +754,25 @@ export function ExerciseLibraryList({
                       </button>
                     </div>
 
-                    {expandedId === ex.id && (
-                      <div className="mt-3 max-w-2xl space-y-4">
-                        <div>
-                          <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">
-                            Description / instructions
-                          </p>
-                          <textarea aria-label="How it is done"
-                            defaultValue={ex.description ?? ""}
-                            onBlur={(e) => handleDescriptionChange(ex.id, e.target.value)}
-                            placeholder="How it's done, rules, setup — shown to any coach browsing this exercise."
-                            rows={3}
-                            className="w-full bg-surface border border-steel/30 text-chalk px-3 py-2 font-body text-sm focus:outline-none focus:border-rust"
-                          />
-                        </div>
-                        <ExerciseMediaPicker
-                          exerciseName={ex.name}
-                          videoPath={ex.videoPath}
-                          youtubeUrl={ex.youtubeUrl}
-                          onChange={(patch) =>
-                            setExercises((prev) =>
-                              prev.map((e) => (e.id === ex.id ? { ...e, ...patch } : e))
-                            )
-                          }
-                        />
-                        <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <p className="font-body text-xs text-steel uppercase tracking-wide">
-                              Biomechanical tags
-                            </p>
-                            <button
-                              type="button"
-                              onClick={() => handleSuggestTags(ex.name, ex.name)}
-                              disabled={suggestingKey === ex.name}
-                              className="font-body text-xs text-rust uppercase tracking-wide disabled:opacity-40"
-                            >
-                              {suggestingKey === ex.name ? "Asking AI…" : "✨ Suggest tags (AI)"}
-                            </button>
-                          </div>
-                          <p className="font-body text-xs text-steel mb-2">
-                            {breakdown?.summary ?? "No biomechanical tags added yet."}
-                          </p>
-                          {suggestionError && (
-                            <p className="font-body text-xs text-rust mb-2">{suggestionError}</p>
-                          )}
-                          {(pendingSuggestions[ex.name]?.length ?? 0) > 0 && (
-                            <div className="border border-rust/30 bg-rust/5 px-3 py-2 mb-2">
-                              <div className="flex items-center justify-between mb-1.5">
-                                <p className="font-body text-xs text-steel">
-                                  AI suggests — click to accept, or ignore:
-                                </p>
-                                <button
-                                  type="button"
-                                  onClick={() => acceptAllSuggestedTags(ex.name)}
-                                  className="font-body text-xs text-rust uppercase tracking-wide font-bold"
-                                >
-                                  Accept all
-                                </button>
-                              </div>
-                              <div className="flex flex-wrap gap-1.5">
-                                {pendingSuggestions[ex.name]!.map((s) => (
-                                  <button
-                                    key={s.tagId}
-                                    type="button"
-                                    onClick={() => acceptSuggestedTag(ex.name, s.tagId, s.role)}
-                                    className="h-6 px-2 border border-steel/30 text-chalk font-body text-xs active:border-rust active:text-rust"
-                                  >
-                                    {s.label} · {s.role === "prime_mover" ? "Prime mover" : "Stabilizer"}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          <BiomechTagPicker
-                            vocabulary={biomechVocabulary}
-                            selected={exTags}
-                            onToggle={(tagId) => toggleExistingTag(ex.name, tagId)}
-                            onRoleChange={(tagId, role) => setExistingTagRole(ex.name, tagId, role)}
-                          />
-                        </div>
-                      </div>
-                    )}
+                    {expandedId === ex.id && !twoPane && <div className="mt-3 max-w-2xl">{editorFor(ex)}</div>}
                   </div>
                   );
                 })}
               </div>
             </div>
           ))}
+        </div>
+        {editing && (
+          <aside className="sticky top-6 border border-steel/20 bg-surface/40 p-4 min-w-0" aria-label={`Edit ${editing.name}`}>
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <p className="font-body font-medium text-[15px] break-words">{editing.name}</p>
+              <button type="button" onClick={() => setExpandedId(null)} className="font-body text-xs text-rust shrink-0">
+                Close
+              </button>
+            </div>
+            <div key={editing.id}>{editorFor(editing)}</div>
+          </aside>
+        )}
         </div>
       )}
     </div>
