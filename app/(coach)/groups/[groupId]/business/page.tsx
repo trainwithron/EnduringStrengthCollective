@@ -313,7 +313,8 @@ export default async function BusinessDashboardPage(
           <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">
             <SwappableTerm termKey="client" form="singular" className="capitalize" /> growth (last 6 months)
           </h2>
-          <div className="flex items-end gap-3 h-28">
+          {/* At least the old height, growing when a month's label wraps: a fixed height pushed the tallest bar's number up onto the heading (Nov 2 walk-through). */}
+          <div className="flex items-end gap-3 min-h-28">
             {growth.map((g) => (
               <div key={g.monthLabel} className="flex-1 flex flex-col items-center gap-1.5">
                 <span className="font-body text-xs text-chalk">{g.count}</span>

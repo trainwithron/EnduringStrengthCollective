@@ -674,8 +674,9 @@ export function ExerciseLibraryList({
                       : null;
                   return (
                   <div key={ex.id} className="py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 min-w-0">
+                    {/* Where the page area is narrow (the split screen open), the name takes its own line and the controls wrap under it; squeezed into one line, names broke a word per line and ran into the badges (Nov 2 walk-through). */}
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                      <div className="basis-full @2xl:basis-0 flex-1 min-w-0">
                         <span className="font-body font-medium text-[15px]">{ex.name}</span>
                         {tagChip({ pattern: ex.pattern ?? null, unilateral: !!ex.unilateral, tier: ex.tier }) && (
                           <p className="font-body text-xs text-steel">{tagChip({ pattern: ex.pattern ?? null, unilateral: !!ex.unilateral, tier: ex.tier })}</p>

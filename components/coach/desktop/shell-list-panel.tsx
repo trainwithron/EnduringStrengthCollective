@@ -16,6 +16,7 @@ import {
 import { NeedsAttentionStrip } from "./needs-attention-strip";
 import { PendingRequestsLine } from "./pending-requests-line";
 import { SplitHalfSlot } from "./split-half";
+import { SwappableTerm } from "@/components/coach/swappable-term";
 
 // The secondary panel (coach_desktop_shell_identity_redesign.md, items
 // 2-4): drag-to-resize (clamped 220-560px), full collapse via a small
@@ -137,7 +138,8 @@ export function ShellListPanel({
               view === "roster" ? "border-rust text-rust bg-rust/10" : "border-steel/30 text-steel"
             }`}
           >
-            Clients
+            {/* The coach's own word (Settings > Organization > Labels), like the rest of the page: Members, Athletes... */}
+            <SwappableTerm termKey="client" form="plural" cap />
           </button>
           {!hideMoney && (
           <button
