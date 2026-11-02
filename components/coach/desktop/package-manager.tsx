@@ -42,7 +42,8 @@ export interface LinkableProgramOption {
   name: string;
 }
 
-type SoldAs = "single" | "pack" | "weekly";
+// How in-person coaching is sold (Ron, Nov 2: "Package or subscription, no need for 1 session i can make a package if i need to").
+type SoldAs = "pack" | "weekly";
 
 const dollars = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: cents % 100 === 0 ? 0 : 2, maximumFractionDigits: 2 })}`;
 
@@ -50,12 +51,13 @@ const KIND_BLURB: Record<PackageKind, string> = {
   team: "Join a group that runs one program together, week by week, with leaderboards.",
   program: "Their own copy of a program to run on their own.",
   coaching: "A program built for them, with check-ins and messages.",
-  sessions: "Sessions with you, one at a time, in a pack, or every week.",
+  sessions: "Sessions with you, as a package or a subscription.",
 };
 const KINDS: PackageKind[] = ["team", "program", "coaching", "sessions"];
 
 const labelCls = "font-body text-xs text-steel uppercase tracking-wide";
-const inputCls = "h-10 px-2.5 bg-surface border border-steel/30 text-chalk font-body text-sm w-full focus:outline-none focus:border-rust";
+// A dim hint, so an example price is never read as one already typed in.
+const inputCls = "h-10 px-2.5 bg-surface border border-steel/30 text-chalk font-body text-sm w-full placeholder:text-steel focus:outline-none focus:border-rust";
 const segCls = (on: boolean) => `min-h-9 px-3 border font-body text-sm ${on ? "border-rust text-rust bg-rust/10" : "border-steel/30 text-steel"}`;
 
 // What a saved package is, in one line for the list.
@@ -66,12 +68,13 @@ function detailLine(p: CoachPackageRow, programs: LinkableProgramOption[], group
   if (kind === "coaching") return `${PACKAGE_KIND_LABEL.coaching}${p.checkinWeeks ? ` · check-ins ${CHECKIN_LABEL[p.checkinWeeks].toLowerCase()}` : ""}`;
   const per = `${dollars(p.rateCents)} a session`;
   if (p.billingType === "subscription") return `In-person · ${p.sessionsPerWeek}x a week · ${per}`;
-  return `In-person · ${p.sessionsGranted === 1 ? "one session" : `pack of ${p.sessionsGranted}`} · ${per}`;
+  return `In-person · ${p.sessionsGranted === 1 ? "one session" : `package of ${p.sessionsGranted}`} · ${per}`;
 }
 
 // The package builder (Ron, Oct 31: "the package builder needs a revamp"; mockup approved the same day). The first question is what is being sold, and each kind asks only for what it
-// needs: a training team (the buyer joins the group and runs its program with everyone), an online program (their own copy), online coaching (check-ins), or in-person sessions (one, a
-// pack, or every week, priced per session). One plain price for the first three; sessions work out their own. A live card shows how it reads on the public page.
+// needs: a training team (the buyer joins the group and runs its program with everyone), a program (their own copy), online coaching (check-ins), or in-person coaching (a package of
+// sessions or a weekly subscription, priced per session). One plain price for the first three; sessions work out their own. Every kind is sold as a package (paid once) or a
+// subscription (every month). A live card shows how it reads on the public page.
 export function PackageManager({
   groupId,
   initialPackages,
@@ -112,17 +115,13 @@ export function PackageManager({
   const n = Math.max(1, Math.floor(Number(count) || 1));
   const flatCents = Math.round(Number(price) * 100);
   const sessionsShape =
-    soldAs === "single"
-      ? { billingType: "one_time" as const, sessionsGranted: 1, sessionsPerWeek: 1, total: perCents }
-      : soldAs === "pack"
+    soldAs === "pack"
       ? { billingType: "one_time" as const, sessionsGranted: n, sessionsPerWeek: 1, total: perCents * n }
       : { billingType: "subscription" as const, sessionsGranted: n * 4, sessionsPerWeek: n, total: perCents * n * 4 };
   const previewCents = kind === "sessions" ? sessionsShape.total : flatCents;
   const previewUnit =
     kind === "sessions"
-      ? soldAs === "single"
-        ? "a session"
-        : soldAs === "pack"
+      ? soldAs === "pack"
         ? `for ${n} sessions`
         : "a month"
       : billingType === "subscription"
@@ -135,7 +134,7 @@ export function PackageManager({
       ? [`Their own copy of ${linkablePrograms.find((p) => p.id === programId)?.name ?? "the program"}`, "Every workout in the app", "Start any time"]
       : kind === "coaching"
       ? ["A program built for them", `Check-ins ${CHECKIN_LABEL[checkinWeeks].toLowerCase()}`, "Messages any time"]
-      : [soldAs === "weekly" ? `${n} sessions a week with you` : soldAs === "pack" ? `${n} sessions with you` : "One session with you", "Their program and every workout in the app"];
+      : [soldAs === "weekly" ? `${n} sessions a week with you` : `${n} sessions with you`, "Their program and every workout in the app"];
 
   function pickKind(k: PackageKind) {
     setKind(k);
@@ -330,9 +329,8 @@ export function PackageManager({
                   <div className="flex flex-wrap gap-1.5">
                     {(
                       [
-                        ["single", "One session"],
-                        ["pack", "A pack"],
-                        ["weekly", "Every week"],
+                        ["pack", "Package"],
+                        ["weekly", "Subscription"],
                       ] as [SoldAs, string][]
                     ).map(([v, l]) => (
                       <button key={v} type="button" onClick={() => setSoldAs(v)} aria-pressed={soldAs === v} className={segCls(soldAs === v)}>
@@ -344,37 +342,41 @@ export function PackageManager({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <label className="flex flex-col gap-1.5">
                     <span className={labelCls}>Price per session ($)</span>
-                    <input type="number" min={1} step={1} inputMode="decimal" value={perSession} onChange={(e) => setPerSession(e.target.value)} placeholder="100" className={inputCls} />
+                    <input type="number" min={1} step={1} inputMode="decimal" value={perSession} onChange={(e) => setPerSession(e.target.value)} placeholder="e.g. 100" className={inputCls} />
                   </label>
-                  {soldAs !== "single" && (
-                    <label className="flex flex-col gap-1.5">
-                      <span className={labelCls}>{soldAs === "pack" ? "Sessions in the pack" : "Sessions a week"}</span>
-                      <input type="number" min={1} step={1} value={count} onChange={(e) => setCount(e.target.value)} className={inputCls} />
-                    </label>
-                  )}
+                  <label className="flex flex-col gap-1.5">
+                    <span className={labelCls}>{soldAs === "pack" ? "Sessions in the package" : "Sessions a week"}</span>
+                    <input type="number" min={1} step={1} value={count} onChange={(e) => setCount(e.target.value)} className={inputCls} />
+                  </label>
                 </div>
                 {perCents > 0 && (
                   <p className="font-body text-xs text-steel tabular-nums">
-                    {soldAs === "single"
-                      ? "Paid one session at a time."
-                      : soldAs === "pack"
-                      ? `${n} × ${dollars(perCents)} = ${dollars(perCents * n)}, paid once. Each session uses one from the pack.`
+                    {soldAs === "pack"
+                      ? `${n} × ${dollars(perCents)} = ${dollars(perCents * n)}, paid once. Each session uses one from the package.`
                       : `${n} a week × ${dollars(perCents)} × 4 weeks = ${dollars(perCents * n * 4)} a month (${n * 4} sessions).`}
                   </p>
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <label className="flex flex-col gap-1.5">
-                  <span className={labelCls}>Price ($)</span>
-                  <input type="number" min={1} step={1} inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder={kind === "coaching" ? "200" : "99"} className={inputCls} />
-                </label>
-                <label className="flex flex-col gap-1.5">
-                  <span className={labelCls}>Charged</span>
-                  <select value={billingType} onChange={(e) => setBillingType(e.target.value as "subscription" | "one_time")} className={inputCls}>
-                    <option value="subscription">Every month</option>
-                    <option value="one_time">One time</option>
-                  </select>
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <span className={labelCls}>How it&apos;s sold</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(
+                      [
+                        ["one_time", "Package"],
+                        ["subscription", "Subscription"],
+                      ] as ["one_time" | "subscription", string][]
+                    ).map(([v, l]) => (
+                      <button key={v} type="button" onClick={() => setBillingType(v)} aria-pressed={billingType === v} className={segCls(billingType === v)}>
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <label className="flex flex-col gap-1.5 sm:max-w-[50%]">
+                  <span className={labelCls}>{billingType === "subscription" ? "Price a month ($)" : "Price ($)"}</span>
+                  <input type="number" min={1} step={1} inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder={kind === "coaching" ? "e.g. 200" : "e.g. 99"} className={inputCls} />
                 </label>
               </div>
             )}

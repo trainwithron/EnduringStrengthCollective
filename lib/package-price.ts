@@ -18,11 +18,12 @@ export function rowPriceCents(r: { price_cents?: number | null; rate_cents: numb
 
 export type PackageKind = "team" | "program" | "coaching" | "sessions";
 
+// Ron's names (Nov 2): "training team, program, online coaching, in person coaching".
 export const PACKAGE_KIND_LABEL: Record<PackageKind, string> = {
   team: "Training team",
-  program: "Online program",
+  program: "Program",
   coaching: "Online coaching",
-  sessions: "In-person sessions",
+  sessions: "In-person coaching",
 };
 
 // A package's kind: the one the coach chose, or (for a package made before kinds existed) read from what it has attached.
