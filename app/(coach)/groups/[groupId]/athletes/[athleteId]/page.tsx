@@ -45,6 +45,8 @@ import { getViewerDisplayTimezone } from "@/lib/display-timezone-server";
 import type { LedgerEntry } from "@/lib/session-ledger";
 import { GoalConfirmationControl } from "@/components/coach/goal-confirmation-control";
 import { SubGoalsSection } from "@/components/shared/sub-goals-section";
+import { GoalSheetSection } from "@/components/shared/goal-sheet-section";
+import { GOAL_SHEET_COLUMNS, type GoalSheetRow } from "@/lib/goal-sheet";
 import type { SubGoalStatus, SubGoalView } from "@/lib/sub-goals";
 import { GoalWaitingOnClient } from "@/components/coach/goal-waiting-on-client";
 import { GoalProposalForm } from "@/components/athlete/goal-proposal-form";
@@ -187,6 +189,7 @@ export default async function AthleteProfilePage(
     { data: promotionRows },
     { data: parqAckRow },
     { data: subGoalRows },
+    { data: goalSheetRow },
     openAnchor,
   ] = await Promise.all([
     supabase
@@ -453,6 +456,10 @@ export default async function AthleteProfilePage(
     selfView
       ? Promise.resolve({ data: [] as any[] })
       : supabase.from("client_sub_goals").select("id, title, target_date, proposed_by, status").eq("athlete_id", params.athleteId).eq("group_id", params.groupId).order("created_at", { ascending: true }),
+    // Their goal sheet (Ron, Nov 2): the coach reads it, fills it in with them, or sends it.
+    selfView
+      ? Promise.resolve({ data: null })
+      : supabase.from("client_goal_sheets").select(GOAL_SHEET_COLUMNS).eq("athlete_id", params.athleteId).eq("group_id", params.groupId).maybeSingle(),
     // The coach's own profile lives in their personal space, which is in no organization: the page around it is the normal coach page of the organization they have open.
     selfView ? getActiveAnchor(supabase, user.id) : Promise.resolve(null),
   ]);
@@ -1551,6 +1558,16 @@ export default async function AthleteProfilePage(
               items={subGoals}
               heading="Goals"
               mainGoalForm={latestGoalRow?.status !== "proposed" ? <GoalProposalForm athleteId={params.athleteId} groupId={params.groupId} suggestedBy={user.id} /> : undefined}
+            />
+          )}
+          {!selfView && user && (
+            <GoalSheetSection
+              groupId={params.groupId}
+              athleteId={params.athleteId}
+              sheet={(goalSheetRow as GoalSheetRow | null) ?? null}
+              viewer="coach"
+              clientFirstName={(profile?.full_name ?? "").trim().split(/\s+/)[0] || undefined}
+              timeZone={displayZone}
             />
           )}
           {latestGoalRow?.status === "proposed" && latestGoalRow.created_by === params.athleteId && (

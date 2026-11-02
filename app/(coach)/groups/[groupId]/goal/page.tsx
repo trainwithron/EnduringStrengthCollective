@@ -10,6 +10,8 @@ import { GoalAnswerControl } from "@/components/athlete/goal-answer-control";
 import { GOAL_TYPE_LABELS } from "@/lib/goal-types";
 import { inOwnPersonalSpace } from "@/lib/personal-space";
 import { SubGoalsSection } from "@/components/shared/sub-goals-section";
+import { GoalSheetSection } from "@/components/shared/goal-sheet-section";
+import { GOAL_SHEET_COLUMNS, type GoalSheetRow } from "@/lib/goal-sheet";
 import type { SubGoalStatus, SubGoalView } from "@/lib/sub-goals";
 import type { GoalType } from "@/lib/goal-reversal";
 
@@ -57,6 +59,9 @@ export default async function GoalPage(props: { params: Promise<{ groupId: strin
     .eq("group_id", params.groupId)
     .order("created_at", { ascending: true });
   const subGoals: SubGoalView[] = ((subGoalRows ?? []) as any[]).map((r: any) => ({ id: r.id as string, title: r.title as string, targetDate: (r.target_date as string | null) ?? null, proposedBy: r.proposed_by as string, status: r.status as SubGoalStatus }));
+
+  // The goal sheet (before step 197 there is no such table: read as none, and the section shows empty)
+  const { data: goalSheetRow } = await supabase.from("client_goal_sheets").select(GOAL_SHEET_COLUMNS).eq("athlete_id", user.id).eq("group_id", params.groupId).maybeSingle();
 
   const current = (goals ?? [])[0] ?? null;
   // A goal their coach suggested and the client has not answered yet.
@@ -115,6 +120,8 @@ export default async function GoalPage(props: { params: Promise<{ groupId: strin
       )}
 
       <SubGoalsSection groupId={params.groupId} athleteId={user.id} viewerId={user.id} otherName="your coach" items={subGoals} />
+
+      <GoalSheetSection groupId={params.groupId} athleteId={user.id} sheet={(goalSheetRow as GoalSheetRow | null) ?? null} viewer="client" />
 
       <div className="border border-steel/20 p-4 mb-6">
         <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">
