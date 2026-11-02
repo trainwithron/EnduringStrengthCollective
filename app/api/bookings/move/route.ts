@@ -2,10 +2,14 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { authorizeCoachCall, isResponse } from "@/lib/series-route";
 import { planBookingMove } from "@/lib/booking-move";
+import { sendPushToProfile } from "@/lib/send-push";
+import { formatInTimezone, timezoneForProfiles } from "@/lib/format-in-timezone";
+import { emailClientNotice, movedEmail } from "@/lib/client-notice-email";
 
 // The coach moves ONE session to another day, keeping its time of day: { bookingId, newDateKey: "YYYY-MM-DD" } (the day on the coach's own clock). It stays the SAME booking: the row's start and end change and nothing else
 // (its credit state is untouched, so a session waiting to be marked is still waiting, and nothing is taken or given back). A session in a weekly schedule leaves its old slot on the schedule's skipped list, so the daily
 // top-up does not book that slot again. Past days are allowed (a correction); a session already marked attended or not charged is refused. Only a coach of that session's group can do this.
+// The calendar's Reschedule (Ron, Nov 2) also sends newTime ("HH:MM", the coach's clock) and notify: true, so the client is told the new time (a phone alert, or an email when no phone was reached).
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const bookingId = typeof body?.bookingId === "string" ? body.bookingId : null;
@@ -24,7 +28,7 @@ export async function POST(request: Request) {
 
   const b = booking as { id: string; coach_id: string; athlete_id: string; group_id: string; start_at: string; end_at: string; status: string; attended_at: string | null; credit_state: string; no_show: boolean | null; recurring_series_id: string | null };
   const context = await call.store.coachContext(b.coach_id);
-  const plan = planBookingMove({ booking: { startAt: b.start_at, endAt: b.end_at, status: b.status, attendedAt: b.attended_at, creditState: b.credit_state, noShow: b.no_show }, newDateKey: body?.newDateKey, timezone: context.timezone });
+  const plan = planBookingMove({ booking: { startAt: b.start_at, endAt: b.end_at, status: b.status, attendedAt: b.attended_at, creditState: b.credit_state, noShow: b.no_show }, newDateKey: body?.newDateKey, newTime: body?.newTime, timezone: context.timezone });
   if (!plan.ok || !plan.startIso || !plan.endIso) return NextResponse.json({ error: plan.message ?? "That day can't be used." }, { status: 422 });
   if (plan.startIso === new Date(b.start_at).toISOString()) return NextResponse.json({ ok: true, unchanged: true, startIso: plan.startIso });
 
@@ -56,5 +60,20 @@ export async function POST(request: Request) {
     }
   }
   await call.store.mirror(b.id);
+  if (body?.notify === true && future) {
+    try {
+      const { data: coach } = await db.from("profiles").select("full_name").eq("id", b.coach_id).maybeSingle();
+      const coachName = (coach as { full_name?: string | null } | null)?.full_name ?? null;
+      const when = formatInTimezone(plan.startIso, await timezoneForProfiles(db, [b.athlete_id, b.coach_id]), "dateTime");
+      const first = (coachName ?? "").trim().split(/\s+/)[0] || "your coach";
+      const sent = await sendPushToProfile(db, b.athlete_id, "Session moved", `Your session with ${first} is now ${when}.`, `/groups/${b.group_id}/calendar`).catch(() => 0);
+      if (sent === 0) {
+        const mail = movedEmail({ coachName, when, groupId: b.group_id });
+        await emailClientNotice(db, b.athlete_id, mail.subject, mail.text).catch(() => "failed");
+      }
+    } catch {
+      // The move is done; a notice that did not go out never undoes it.
+    }
+  }
   return NextResponse.json({ ok: true, startIso: plan.startIso });
 }

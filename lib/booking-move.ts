@@ -39,18 +39,26 @@ export function dateKeyInRange(newDateKey: string, timezone: string, now: Date =
   return newDateKey >= addDaysToKey(today, -730) && newDateKey <= addDaysToKey(today, 730);
 }
 
+/** "HH:MM" on a 24-hour clock, 00:00 to 23:59. */
+export function isClockTime(value: unknown): value is string {
+  return typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
+// `newTime` (the calendar's Reschedule, Ron Nov 2) also changes the time of day, on the coach's clock; without it the time stays.
 export function planBookingMove(input: {
   booking: { startAt: string; endAt: string; status: string; attendedAt: string | null; creditState: string; noShow?: boolean | null };
   newDateKey: unknown;
+  newTime?: unknown;
   timezone: string;
   now?: Date;
 }): MovePlan {
   const { booking, newDateKey, timezone } = input;
   if (!isDateKey(newDateKey)) return { ok: false, message: "That is not a real date." };
+  if (input.newTime !== undefined && input.newTime !== null && !isClockTime(input.newTime)) return { ok: false, message: "That is not a real time." };
   if (!dateKeyInRange(newDateKey, timezone, input.now)) return { ok: false, message: "Pick a date within two years of today." };
   if (booking.status !== "confirmed") return { ok: false, message: "That session is not on the calendar any more." };
   if (booking.attendedAt || booking.creditState === "settled" || booking.creditState === "waived") return { ok: false, message: "That session was already marked." };
-  const startIso = startOnDateKeepingTime(booking.startAt, newDateKey, timezone);
+  const startIso = isClockTime(input.newTime) ? zonedTimeToUtc(newDateKey, input.newTime, timezone).toISOString() : startOnDateKeepingTime(booking.startAt, newDateKey, timezone);
   const duration = new Date(booking.endAt).getTime() - new Date(booking.startAt).getTime();
   return { ok: true, startIso, endIso: new Date(new Date(startIso).getTime() + duration).toISOString() };
 }

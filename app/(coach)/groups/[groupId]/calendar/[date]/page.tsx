@@ -35,6 +35,7 @@ import { RequestDifferentTime } from "@/components/athlete/request-different-tim
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { DayCalendar } from "@/components/coach/desktop/day-calendar";
+import { SessionMenuTarget } from "@/components/coach/session-menu";
 import { getCoachClients } from "@/lib/coach-clients";
 import { CalendarPurchasePrompt } from "@/components/athlete/calendar-purchase-prompt";
 import { isStripeConfigured } from "@/lib/stripe";
@@ -770,7 +771,14 @@ export default async function CoachDayDetailPage(
   // One booked session: who, then the controls that settle or change it. Used for sessions on a slot and for ones off the slots.
   const renderBooked = (booking: any, start: Date) => (
     <div className="flex flex-wrap items-center gap-2 min-w-0">
-      <span className="font-body text-xs text-steel">Booked — {(booking.profiles as any)?.full_name ?? "Client"}</span>
+      {/* Press and hold (or right-click) for Reschedule, Duplicate and Remove (Ron, Nov 2). */}
+      <SessionMenuTarget
+        session={{ bookingId: booking.id, seriesId: booking.recurring_series_id ?? null, name: (booking.profiles as any)?.full_name ?? "Client", startMs: start.getTime(), endMs: new Date(booking.end_at).getTime() }}
+        timezone={timezone}
+        className="font-body text-xs text-steel"
+      >
+        Booked — {(booking.profiles as any)?.full_name ?? "Client"}
+      </SessionMenuTarget>
       {booking.needs_coach_resolution && <RecurringConflictBadge bookingId={booking.id} />}
       {typeByBooking.has(booking.id) && <BookingTypeSelect bookingId={booking.id} types={coachTypes} current={typeByBooking.get(booking.id) ?? null} />}
       {/* A no-show is settled by its own Charge or Waive (FIX 3): undo the no-show to mark it happened. */}
@@ -866,6 +874,7 @@ export default async function CoachDayDetailPage(
           start: new Date(b.start_at),
           end: new Date(b.end_at),
           label: b.profiles?.full_name ?? "Client",
+          seriesId: b.recurring_series_id ?? null,
         }))}
         events={(dayEventRows ?? []).map((e) => ({ id: e.id, time: e.event_time, title: e.title }))}
         blocked={blockedRanges.map((b, i) => ({ id: `blocked-${i}`, start: b.start, end: b.end, label: "Blocked" }))}

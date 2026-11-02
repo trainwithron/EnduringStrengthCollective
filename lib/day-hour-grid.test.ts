@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+// The session menu on each block reads the router.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
 import { blockBox, DayHourGrid } from "@/components/coach/desktop/day-hour-grid";
 
 const LA = "America/Los_Angeles";

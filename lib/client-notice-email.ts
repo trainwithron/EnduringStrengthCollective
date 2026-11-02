@@ -32,6 +32,14 @@ export function confirmationEmail(opts: { coachName: string | null | undefined; 
   };
 }
 
+/** A session the coach moved to a new day or time (the calendar's Reschedule). */
+export function movedEmail(opts: { coachName: string | null | undefined; when: string; groupId: string }): { subject: string; text: string } {
+  return {
+    subject: `Session moved: ${opts.when}`,
+    text: `Your session with ${firstName(opts.coachName)} is now ${opts.when}.\n\n${calendarLine(opts.groupId)}${ALERTS_LINE}\n`,
+  };
+}
+
 export type EmailOutcome = "sent" | "quiet" | "no_address" | "not_configured" | "failed";
 
 /** Emails the client the notice when allowed. Used only AFTER a phone alert reached no one. */

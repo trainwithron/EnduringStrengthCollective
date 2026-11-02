@@ -12,6 +12,7 @@ import type { TypeLite } from "@/lib/session-type-default";
 import { CLIENT_DRAG_MIME, type DraggedClient } from "./draggable-client-name";
 import { DayTimeGrid } from "./day-time-grid";
 import { useCalendarScheduling } from "./calendar-scheduling-context";
+import { useSessionMenu } from "@/components/coach/session-menu";
 
 export interface CalendarEventEntry {
   id: string;
@@ -102,6 +103,8 @@ export function CalendarGrid({
   defaultTypeByClient?: Record<string, string | null>;
 }) {
   const router = useRouter();
+  // Right-click (or press and hold) a client's session for Reschedule, Duplicate and Remove (Ron, Nov 2).
+  const sessionMenu = useSessionMenu(timezone, () => router.refresh());
   const { client, setClient } = useCalendarScheduling();
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   // The open day: a click, a tap or a drop opens it in place as a time grid, below the calendar. A day opened with no client shows what is on it and asks who.
@@ -175,6 +178,7 @@ export function CalendarGrid({
 
   return (
     <div>
+      {sessionMenu.node}
       <div className="grid grid-cols-[repeat(7,minmax(0,1fr))] gap-px bg-steel/15 border border-steel/15">
       {headerLabels.map((label, i) => (
         <div
@@ -254,7 +258,13 @@ export function CalendarGrid({
                 ))}
 
                 {bookingsShown.map((b, idx) => (
-                  <span key={`b-${idx}`} className="font-body text-xs text-chalk leading-tight">
+                  <span
+                    key={`b-${idx}`}
+                    className="font-body text-xs text-chalk leading-tight"
+                    {...(b.bookingId && b.startMs != null && b.endMs != null
+                      ? sessionMenu.handlersFor({ bookingId: b.bookingId, seriesId: b.seriesId ?? null, name: b.name, startMs: b.startMs, endMs: b.endMs })
+                      : {})}
+                  >
                     {b.time} &middot; {b.name}
                   </span>
                 ))}

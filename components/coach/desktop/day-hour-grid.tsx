@@ -1,5 +1,8 @@
 "use client";
 
+import { useSessionMenu } from "@/components/coach/session-menu";
+import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
+
 // Real hour-by-hour visual overview of one day — availability windows as
 // shaded bands, confirmed bookings and custom events positioned by their
 // actual time and (for bookings) duration. Read-only: this is the "see my
@@ -22,6 +25,8 @@ export interface GridBooking {
   start: Date;
   end: Date;
   label: string;
+  // The weekly schedule it belongs to, for Remove on the session menu (which asks "only this one or every later one").
+  seriesId?: string | null;
 }
 
 export interface GridBlocked {
@@ -93,6 +98,8 @@ export function DayHourGrid({
   onPickTime?: (time: string) => void;
 }) {
   const timedEvents = events.filter((e): e is GridEvent & { time: string } => e.time != null);
+  // Right-click (or press and hold) a session for Reschedule, Duplicate and Remove (Ron, Nov 2).
+  const sessionMenu = useSessionMenu(timeZone ?? DEFAULT_COACH_TIMEZONE);
 
   const allMinutes = [
     ...windows.flatMap((w) => [timeStrToMinutes(w.startTime), timeStrToMinutes(w.endTime)]),
@@ -124,6 +131,7 @@ export function DayHourGrid({
 
   return (
     <div className="flex border border-steel/20 mb-6 max-w-2xl" style={{ paddingTop: GRID_EDGE_PX, paddingBottom: GRID_EDGE_PX }}>
+      {sessionMenu.node}
       <div className="w-14 shrink-0 border-r border-steel/20 relative" style={{ height: gridHeight }}>
         {hourMarks.map((min) => (
           <div
@@ -193,7 +201,8 @@ export function DayHourGrid({
             <div
               key={b.id}
               className="absolute left-1 right-1 bg-rust/80 text-graphite px-2 py-0.5 overflow-hidden"
-              style={blockBox(start, end, rangeStart)}
+              {...sessionMenu.handlersFor({ bookingId: b.id, seriesId: b.seriesId ?? null, name: b.label, startMs: b.start.getTime(), endMs: b.end.getTime() })}
+              style={{ ...blockBox(start, end, rangeStart), WebkitTouchCallout: "none", userSelect: "none" }}
               onClick={(e) => e.stopPropagation()}
             >
               <p className="font-body text-xs font-medium leading-tight truncate">

@@ -31,6 +31,7 @@ import {
 import { typeMismatchWarning, type TypeLite } from "@/lib/session-type-default";
 import { addPending, removePending } from "@/lib/pending-booking-notices";
 import { CLIENT_DRAG_MIME, type DraggedClient } from "./draggable-client-name";
+import { useSessionMenu } from "@/components/coach/session-menu";
 import type { CalendarEventEntry } from "./calendar-grid";
 
 const UNDO_SECONDS = 8;
@@ -325,6 +326,8 @@ export function DayTimeGrid({
   }
 
   const [cancelTarget, setCancelTarget] = useState<CancelTarget | null>(null);
+  // Right-click (or press and hold) a session for Reschedule, Duplicate and Remove (Ron, Nov 2).
+  const sessionMenu = useSessionMenu(timezone, onChanged);
   const pendingLabel = pendingMin != null ? `${clockLabel12(pendingMin)} to ${clockLabel12(pendingMin + lengthMin)}` : "";
 
   return (
@@ -480,14 +483,20 @@ export function DayTimeGrid({
                         setCancelTarget({ bookingId: item.bookingId!, seriesId: item.seriesId, name: item.name, whenLabel: formatInTimezone(new Date(item.startMs), timezone, "dateTime") });
                       }}
                       className="absolute left-0.5 right-0.5 bg-blue-500/35 border border-blue-400 px-1 overflow-hidden text-left cursor-pointer hover:bg-blue-500/50 focus-visible:outline focus-visible:outline-1 focus-visible:outline-rust"
-                      style={{ top: halo, height }}
+                      {...sessionMenu.handlersFor({ bookingId: item.bookingId, seriesId: item.seriesId, name: item.name, startMs: item.startMs, endMs: item.startMs + (item.endMin - item.startMin) * 60000 })}
+                      style={{ top: halo, height, WebkitTouchCallout: "none", userSelect: "none" }}
                     >
                       <span className="font-body text-[11px] leading-tight text-chalk block truncate">
                         {item.time} {item.name}
                       </span>
                     </button>
                   ) : (
-                    <div className="absolute left-0.5 right-0.5 bg-blue-500/35 border border-blue-400 px-1 overflow-hidden" style={{ top: halo, height }} title={item.bookingId && client ? "To cancel this session, clear the picked client first." : undefined}>
+                    <div
+                      className="absolute left-0.5 right-0.5 bg-blue-500/35 border border-blue-400 px-1 overflow-hidden"
+                      {...(item.bookingId ? sessionMenu.handlersFor({ bookingId: item.bookingId, seriesId: item.seriesId, name: item.name, startMs: item.startMs, endMs: item.startMs + (item.endMin - item.startMin) * 60000 }) : {})}
+                      style={{ top: halo, height, WebkitTouchCallout: "none", userSelect: "none" }}
+                      title={item.bookingId && client ? "To cancel this session, clear the picked client first." : undefined}
+                    >
                       <span className="font-body text-[11px] leading-tight text-chalk block truncate">
                         {item.time} {item.name}
                       </span>
@@ -612,6 +621,7 @@ export function DayTimeGrid({
       )}
 
       {cancelTarget && <CancelSessionDialog target={cancelTarget} onClose={() => setCancelTarget(null)} onDone={onChanged} />}
+      {sessionMenu.node}
 
       {booked && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-md px-3 py-2 border border-positive/60 bg-surface shadow-lg flex flex-wrap items-center gap-3" role="status">
