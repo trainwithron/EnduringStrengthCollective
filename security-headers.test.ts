@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { buildSecurityHeaders } from "./security-headers.mjs";
 
@@ -73,10 +73,19 @@ describe("security headers", () => {
 
   it("the public page may be framed by this site only, so My website can show it beside the editor", () => {
     const config = readFileSync("next.config.mjs", "utf8");
-    expect(config).toContain('["/groups/:path*", "/clients", "/dashboard", "/c/:path*"].map((source) => ({');
+    expect(config).toContain("...EMBEDDABLE_PATHS.map((source) => ({");
+    expect(config).toContain('"/c/:path*"');
     const editor = readFileSync("components/coach/desktop/website-settings.tsx", "utf8");
     expect(editor).toContain("src={`/c/${slug}?preview=1`}");
     expect(editor).toContain("setPreviewKey((k) => k + 1);");
+  });
+
+  it("every coach page can be shown in the workspace and the split screen (the Program tile's /programs was refused, Nov 2)", () => {
+    const config = readFileSync("next.config.mjs", "utf8");
+    const listed = /EMBEDDABLE_PATHS = \[([^\]]*)\]/.exec(config)?.[1] ?? "";
+    const folders = readdirSync("app/(coach)", { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
+    expect(folders).toContain("programs");
+    for (const f of folders) expect(listed, f).toContain(`"/${f}/:path*"`);
   });
 
   it("Google Fonts still load", () => {

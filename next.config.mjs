@@ -1,5 +1,8 @@
 import { buildSecurityHeaders } from "./security-headers.mjs";
 
+// The pages this site may show inside its own frames (the workspace panes and the split screen): every coach page, and the public page.
+const EMBEDDABLE_PATHS = ["/groups/:path*", "/clients/:path*", "/dashboard/:path*", "/calendar/:path*", "/group-calendar/:path*", "/programs/:path*", "/recurring-conflicts/:path*", "/running-low/:path*", "/c/:path*"];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
@@ -23,7 +26,8 @@ const nextConfig = {
       },
       // The coach's own pages may be shown inside the workspace (framed by this site only): see security-headers.mjs. Listed after the rule above so these values win.
       // The public page (/c/...) too, so My website can show it beside the editor (Ron, Oct 31). Still this site only: no other site can frame it.
-      ...["/groups/:path*", "/clients", "/dashboard", "/c/:path*"].map((source) => ({
+      // Every coach page outside a group too (Nov 2: the split screen's Program tile opens /programs, which was missing here, so the browser refused to show it). security-headers.test.ts checks each app/(coach) folder is listed.
+      ...EMBEDDABLE_PATHS.map((source) => ({
         source,
         headers: buildSecurityHeaders({
           isProd: process.env.NODE_ENV === "production",
