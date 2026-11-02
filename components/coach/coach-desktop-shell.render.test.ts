@@ -105,7 +105,10 @@ describe("Home's desktop rail", () => {
     const strip = html.slice(html.indexOf("data-home-strip"), html.indexOf("HOME CONTENT"));
     expect(html).toContain('<nav aria-label="Settings"');
     expect(tabOn(strip, "/groups/g-team/settings")).toBe(true);
-    for (const p of ["display", "business/sms-settings", "business/support", "quick-tips", "branding", "resources", "business/website", "business/zapier"]) expect(strip, p).toContain(`href="/groups/g-team/${p}"`);
+    // Five tabs (Ron, Nov 2): each group opens its first page; the Account group's pages are picked in the row under the strip.
+    for (const p of ["settings", "branding", "business/website", "business/support"]) expect(strip, p).toContain(`href="/groups/g-team/${p}"`);
+    const sub = html.slice(html.indexOf("data-home-substrip"), html.indexOf("HOME CONTENT"));
+    for (const p of ["display", "business/sms-settings", "business/zapier"]) expect(sub, p).toContain(`href="/groups/g-team/${p}"`);
     expect(railLit(html, "Settings")).toBe(true);
   });
   it("does not need a remembered group: nothing in the rendered rail comes from a cookie", () => {

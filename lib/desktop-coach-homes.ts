@@ -27,7 +27,35 @@ export interface HomeTab {
   badge?: "clients" | "messages" | "feed" | "support";
   // A label the coach can reword ("Clients" -> "Athletes").
   termKey?: "client" | "program";
+  // Tabs next to each other with the same group show as ONE tab in the strip, and a row of buttons under it picks the page (Settings, Ron Nov 2: 11 tabs condensed to 5).
+  group?: { key: string; label: string };
 }
+
+export interface StripEntry {
+  key: string;
+  label: string;
+  href: string;
+  // The pages of a group; a plain tab has just itself.
+  tabs: HomeTab[];
+}
+
+/** The strip's tabs: each run of tabs with the same group becomes one entry (opening its first page), a tab without one stays as it is. */
+export function stripEntries(tabs: HomeTab[]): StripEntry[] {
+  const out: StripEntry[] = [];
+  for (const t of tabs) {
+    const last = out[out.length - 1];
+    if (t.group && last && last.key === `group:${t.group.key}`) last.tabs.push(t);
+    else if (t.group) out.push({ key: `group:${t.group.key}`, label: t.group.label, href: t.href, tabs: [t] });
+    else out.push({ key: t.key, label: t.label, href: t.href, tabs: [t] });
+  }
+  return out;
+}
+
+const ACCOUNT = { key: "account", label: "Account" };
+const ORGANIZATION = { key: "organization", label: "Organization" };
+const WEBSITE_SHOP = { key: "website-shop", label: "Website & shop" };
+const HELP = { key: "help", label: "Help" };
+const ADMIN = { key: "admin", label: "Admin" };
 
 export interface HomeFacts {
   groupId: string;
@@ -92,19 +120,20 @@ export function homeTabs(f: HomeFacts): Record<HomeKey, HomeTab[]> {
       inGroup && { key: "feed", label: "Team feed", href: `${g}/feed`, badge: "feed" },
       f.isPlatformAdmin && { key: "admin-support", label: "Support inbox", href: "/admin/support", badge: "support" },
     ],
+    // Five tabs (Ron, Nov 2): Account, Organization, Website & shop, Help, and Admin for the platform admin; each group's pages are picked under the strip.
     settings: [
-      { key: "settings", label: "Account", href: `${g}/settings` },
-      { key: "display", label: "Display mode", href: `${g}/display`, newTab: true },
-      { key: "sms-settings", label: "Text messages", href: `${g}/business/sms-settings` },
-      { key: "support", label: "Support", href: `${g}/business/support` },
-      { key: "quick-tips", label: "Quick tips", href: `${g}/quick-tips` },
-      { key: "branding", label: "Organization", href: `${g}/branding` },
-      { key: "resources", label: "Pro shop and referrals", href: `${g}/resources` },
-      { key: "website", label: "My website", href: `${g}/business/website` },
-      { key: "zapier", label: "Zapier", href: `${g}/business/zapier` },
+      { key: "settings", label: "Account", href: `${g}/settings`, group: ACCOUNT },
+      { key: "display", label: "Display mode", href: `${g}/display`, newTab: true, group: ACCOUNT },
+      { key: "sms-settings", label: "Text messages", href: `${g}/business/sms-settings`, group: ACCOUNT },
+      { key: "zapier", label: "Zapier", href: `${g}/business/zapier`, group: ACCOUNT },
+      { key: "branding", label: "Organization", href: `${g}/branding`, group: ORGANIZATION },
+      { key: "website", label: "My website", href: `${g}/business/website`, group: WEBSITE_SHOP },
+      { key: "resources", label: "Pro shop and referrals", href: `${g}/resources`, group: WEBSITE_SHOP },
+      { key: "support", label: "Support", href: `${g}/business/support`, group: HELP },
+      { key: "quick-tips", label: "Quick tips", href: `${g}/quick-tips`, group: HELP },
       f.teamSport && { key: "business-tools", label: TEAM_SPORT_BUSINESS_LABEL, href: teamSportBusinessHref(f.groupId) },
-      f.isPlatformAdmin && { key: "admin-organizations", label: "Organizations", href: "/admin/organizations" },
-      f.isPlatformAdmin && { key: "admin-ranking", label: "Marketplace ranking", href: "/admin/marketplace-ranking" },
+      f.isPlatformAdmin && { key: "admin-organizations", label: "Organizations", href: "/admin/organizations", group: ADMIN },
+      f.isPlatformAdmin && { key: "admin-ranking", label: "Marketplace ranking", href: "/admin/marketplace-ranking", group: ADMIN },
     ],
   };
   const out = {} as Record<HomeKey, HomeTab[]>;

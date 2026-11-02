@@ -31,9 +31,9 @@ describe("coach desktop shell", () => {
     expect(shell).toContain("<FeedbackButton");
     expect(shell).toContain("<SignOutButton");
   });
-  it("FIX 6: the Settings home holds Account, Display mode, Text messages, Support, Quick tips, Organization, Pro shop and referrals, My website, Zapier (and the team-sport Business link, and the admin pages)", () => {
+  it("the Settings home holds Account, Display mode, Text messages, Zapier, Organization, My website, Pro shop and referrals, Support, Quick tips (grouped into five tabs, Ron Nov 2; and the team-sport Business link, and the admin pages)", () => {
     const settings = homesLib.slice(homesLib.indexOf("    settings: ["), homesLib.indexOf("  };\n  const out"));
-    const order = ["Account", "Display mode", "Text messages", "Support", "Quick tips", "Organization", "Pro shop and referrals", "My website", "Zapier", "TEAM_SPORT_BUSINESS_LABEL", "Organizations", "Marketplace ranking"];
+    const order = ["Account", "Display mode", "Text messages", "Zapier", "Organization", "My website", "Pro shop and referrals", "Support", "Quick tips", "TEAM_SPORT_BUSINESS_LABEL", "Organizations", "Marketplace ranking"];
     let last = -1;
     for (const m of order) {
       const at = settings.indexOf(m);
@@ -69,7 +69,7 @@ describe("client finder wording", () => {
 
 describe("Display Mode opens in a new tab", () => {
   it("the Settings tab marks it newTab and the strip adds target=_blank", () => {
-    expect(homesLib).toContain('{ key: "display", label: "Display mode", href: `${g}/display`, newTab: true }');
+    expect(homesLib).toContain('{ key: "display", label: "Display mode", href: `${g}/display`, newTab: true, group: ACCOUNT }');
     const strip = readFileSync(new URL("./desktop/home-tab-strip.tsx", import.meta.url), "utf8");
     expect(strip).toContain('target: "_blank", rel: "noopener noreferrer"');
   });

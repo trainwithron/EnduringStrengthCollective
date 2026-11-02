@@ -24,7 +24,7 @@ describe("Settings: Organization look", () => {
   });
   it("Organization is a Settings tab on the computer (FIX 6), in every organization (decision 2: it is not money)", () => {
     const homes = read("lib/desktop-coach-homes.ts");
-    expect(homes).toContain('{ key: "branding", label: "Organization", href: `${g}/branding` }');
+    expect(homes).toContain('{ key: "branding", label: "Organization", href: `${g}/branding`, group: ORGANIZATION }');
     expect(homes).not.toMatch(/MONEY_TABS = new Set\([^)]*"branding"/);
   });
 });
