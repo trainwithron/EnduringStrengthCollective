@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ShopCard, ShopGrid } from "@/components/shared/shop-card";
 import { safeWebUrl } from "@/lib/coach-site";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { saved } from "@/lib/saved";
-import { Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { ShelfPlacementControls } from "@/components/coach/desktop/shelf-placement-controls";
 import { isAudience, type Audience } from "@/lib/shelf";
 
@@ -53,6 +53,64 @@ export function ProShopManager({ initialLinks, organizationId, groups = [] }: { 
   const [uploadingImage, setUploadingImage] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The link being changed (Ron, Nov 2: edit, not just delete): the same form, filled in, saves over it.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+
+  function resetForm() {
+    setEditingId(null);
+    setTitle("");
+    setCategory(CATEGORIES[0].value);
+    setDescription("");
+    setUrl("");
+    setDiscountCode("");
+    setDiscountDescription("");
+    setImageUrl(null);
+  }
+
+  function startEdit(l: ProShopLink) {
+    setError(null);
+    setEditingId(l.id);
+    setTitle(l.title);
+    setCategory(l.category);
+    setDescription(l.description ?? "");
+    setUrl(l.url);
+    setDiscountCode(l.discountCode ?? "");
+    setDiscountDescription(l.discountDescription ?? "");
+    setImageUrl(l.imageUrl);
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  async function handleSaveEdit(id: string) {
+    setSaving(true);
+    setError(null);
+    const supabase = createBrowserClient();
+    const fields = {
+      title: title.trim(),
+      category,
+      description: description.trim() || null,
+      url: url.trim(),
+      image_url: imageUrl,
+      discount_code: discountCode.trim() || null,
+      discount_description: discountDescription.trim() || null,
+    };
+    // .select: a row the coach cannot change updates nothing without an error, so check one came back.
+    const { data: updated, error: updateError } = await supabase.from("pro_shop_links").update(fields).eq("id", id).select("id");
+    setSaving(false);
+    if (updateError || !updated?.length) {
+      setError("That didn't save. Nothing was changed. Try again.");
+      return;
+    }
+    setLinks((prev) =>
+      prev.map((l) =>
+        l.id === id
+          ? { ...l, title: fields.title, category, description: fields.description, url: fields.url, imageUrl, discountCode: fields.discount_code, discountDescription: fields.discount_description }
+          : l
+      )
+    );
+    resetForm();
+    router.refresh();
+  }
 
   async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -94,6 +152,7 @@ export function ProShopManager({ initialLinks, organizationId, groups = [] }: { 
 
   async function handleAdd() {
     if (!title.trim() || !url.trim()) return;
+    if (editingId) return handleSaveEdit(editingId);
     setSaving(true);
     setError(null);
     const supabase = createBrowserClient();
@@ -173,6 +232,7 @@ export function ProShopManager({ initialLinks, organizationId, groups = [] }: { 
     const supabase = createBrowserClient();
     if (!(await saved(supabase.from("pro_shop_links").delete().eq("id", id)))) return;
     setLinks((prev) => prev.filter((l) => l.id !== id));
+    if (editingId === id) resetForm();
     router.refresh();
   }
 
@@ -239,22 +299,32 @@ export function ProShopManager({ initialLinks, organizationId, groups = [] }: { 
                   />
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => handleDelete(l.id)}
-                className="text-steel active:text-rust shrink-0"
-                aria-label={`Delete ${l.title}`}
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => startEdit(l)}
+                  className="w-9 h-9 inline-flex items-center justify-center text-steel hover:text-chalk active:text-chalk"
+                  aria-label={`Edit ${l.title}`}
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDelete(l.id)}
+                  className="w-9 h-9 inline-flex items-center justify-center text-steel active:text-rust"
+                  aria-label={`Delete ${l.title}`}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           ))
         )}
       </div>
       </div>
 
-      <div className="border border-steel/20 p-4 space-y-2.5">
-        <h3 className="font-body text-xs text-steel uppercase tracking-wide mb-1">Add Pro Shop link</h3>
+      <div ref={formRef} className={`border p-4 space-y-2.5 scroll-mt-4 ${editingId ? "border-rust" : "border-steel/20"}`}>
+        <h3 className="font-body text-xs text-steel uppercase tracking-wide mb-1">{editingId ? "Edit Pro Shop link" : "Add Pro Shop link"}</h3>
         <input aria-label="Title"
           type="text"
           value={title}
@@ -267,7 +337,7 @@ export function ProShopManager({ initialLinks, organizationId, groups = [] }: { 
           onChange={(e) => setCategory(e.target.value)}
           className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm"
         >
-          {CATEGORIES.map((c) => (
+          {(CATEGORIES.some((c) => c.value === category) ? CATEGORIES : [...CATEGORIES, { value: category, label: category }]).map((c) => (
             <option key={c.value} value={c.value}>
               {c.label}
             </option>
@@ -328,8 +398,13 @@ export function ProShopManager({ initialLinks, organizationId, groups = [] }: { 
           disabled={saving || !title.trim() || !url.trim()}
           className="w-full h-9 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
         >
-          {saving ? "Adding…" : "Add"}
+          {editingId ? (saving ? "Saving…" : "Save") : saving ? "Adding…" : "Add"}
         </button>
+        {editingId && (
+          <button type="button" onClick={resetForm} disabled={saving} className="w-full h-9 border border-steel/30 text-chalk font-body text-sm disabled:opacity-40">
+            Cancel
+          </button>
+        )}
       </div>
     </div>
   );

@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { saved } from "@/lib/saved";
-import { Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 
 export interface ReferralPartner {
   id: string;
@@ -36,9 +36,66 @@ export function ReferralDirectoryManager({ initialPartners, organizationId }: { 
   const [discountCode, setDiscountCode] = useState("");
   const [discountDescription, setDiscountDescription] = useState("");
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // The partner being changed (Ron, Nov 2: "edit this instead of just delete"): the same form, filled in, saves over it.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+
+  function resetForm() {
+    setEditingId(null);
+    setName("");
+    setSpecialty(SPECIALTIES[0]);
+    setDescription("");
+    setBookingUrl("");
+    setDiscountCode("");
+    setDiscountDescription("");
+  }
+
+  function startEdit(p: ReferralPartner) {
+    setError(null);
+    setEditingId(p.id);
+    setName(p.name);
+    setSpecialty(p.specialty);
+    setDescription(p.description ?? "");
+    setBookingUrl(p.bookingUrl ?? "");
+    setDiscountCode(p.discountCode ?? "");
+    setDiscountDescription(p.discountDescription ?? "");
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  async function handleSaveEdit(id: string) {
+    setSaving(true);
+    setError(null);
+    const supabase = createBrowserClient();
+    const fields = {
+      name: name.trim(),
+      specialty,
+      description: description.trim() || null,
+      booking_url: bookingUrl.trim() || null,
+      discount_code: discountCode.trim() || null,
+      discount_description: discountDescription.trim() || null,
+    };
+    // .select: a row the coach cannot change updates nothing without an error, so check one came back.
+    const { data: updated, error: updateError } = await supabase.from("referral_partners").update(fields).eq("id", id).select("id");
+    setSaving(false);
+    if (updateError || !updated?.length) {
+      setError("That didn't save. Nothing was changed. Try again.");
+      return;
+    }
+    setPartners((prev) =>
+      prev.map((p) =>
+        p.id === id
+          ? { ...p, name: fields.name, specialty, description: fields.description, bookingUrl: fields.booking_url, discountCode: fields.discount_code, discountDescription: fields.discount_description }
+          : p
+      )
+    );
+    resetForm();
+    router.refresh();
+  }
 
   async function handleAdd() {
     if (!name.trim()) return;
+    if (editingId) return handleSaveEdit(editingId);
     setSaving(true);
     const supabase = createBrowserClient();
     const {
@@ -91,6 +148,7 @@ export function ReferralDirectoryManager({ initialPartners, organizationId }: { 
     const supabase = createBrowserClient();
     if (!(await saved(supabase.from("referral_partners").delete().eq("id", id)))) return;
     setPartners((prev) => prev.filter((p) => p.id !== id));
+    if (editingId === id) resetForm();
     router.refresh();
   }
 
@@ -114,22 +172,32 @@ export function ReferralDirectoryManager({ initialPartners, organizationId }: { 
                   {p.clickCount} click{p.clickCount === 1 ? "" : "s"}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => handleDelete(p.id)}
-                className="text-steel active:text-rust shrink-0"
-                aria-label={`Delete ${p.name}`}
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => startEdit(p)}
+                  className="w-9 h-9 inline-flex items-center justify-center text-steel hover:text-chalk active:text-chalk"
+                  aria-label={`Edit ${p.name}`}
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDelete(p.id)}
+                  className="w-9 h-9 inline-flex items-center justify-center text-steel active:text-rust"
+                  aria-label={`Delete ${p.name}`}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           ))
         )}
       </div>
 
-      <div className="border border-steel/20 p-4 space-y-2.5">
+      <div ref={formRef} className={`border p-4 space-y-2.5 scroll-mt-4 ${editingId ? "border-rust" : "border-steel/20"}`}>
         <h3 className="font-body text-xs text-steel uppercase tracking-wide mb-1">
-          Add referral partner
+          {editingId ? "Edit referral partner" : "Add referral partner"}
         </h3>
         <input aria-label="Name"
           type="text"
@@ -143,7 +211,7 @@ export function ReferralDirectoryManager({ initialPartners, organizationId }: { 
           onChange={(e) => setSpecialty(e.target.value)}
           className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm"
         >
-          {SPECIALTIES.map((s) => (
+          {(SPECIALTIES.includes(specialty) ? SPECIALTIES : [...SPECIALTIES, specialty]).map((s) => (
             <option key={s} value={s}>
               {s}
             </option>
@@ -177,14 +245,24 @@ export function ReferralDirectoryManager({ initialPartners, organizationId }: { 
           placeholder="e.g. 15% off first massage"
           className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm"
         />
+        {error && (
+          <p className="font-body text-xs text-rust" role="alert">
+            {error}
+          </p>
+        )}
         <button
           type="button"
           onClick={handleAdd}
           disabled={saving || !name.trim()}
           className="w-full h-9 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
         >
-          {saving ? "Adding…" : "Add"}
+          {editingId ? (saving ? "Saving…" : "Save") : saving ? "Adding…" : "Add"}
         </button>
+        {editingId && (
+          <button type="button" onClick={resetForm} disabled={saving} className="w-full h-9 border border-steel/30 text-chalk font-body text-sm disabled:opacity-40">
+            Cancel
+          </button>
+        )}
       </div>
     </div>
   );
