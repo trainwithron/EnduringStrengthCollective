@@ -65,14 +65,31 @@ export default async function RevenueSplitsPage(
     );
   }
 
-  const { data: memberRows } = await supabase
-    .from("organization_memberships")
-    .select("profile_id, role, revenue_share_pct, stripe_connect_status, profiles ( full_name )")
-    .eq("organization_id", orgMembership.organization_id)
-    .order("role", { ascending: true });
+  // Total estimated revenue for this org: client monthly rates across
+  // every group this org owns, plus active/completed challenge entry
+  // fees for coaches in this org.
+  // Every group of the organization a page at a time, and the rates in groups of ids and pages (a gym with 1,500 clients has 1,500 groups: past the URL limit and the 1,000-row cap of one request).
+  const loadMonthlyRateCents = async () => {
+    const { rows: orgGroups } = await pageAll((from, to) => supabase.from("groups").select("id").eq("organization_id", orgMembership.organization_id).order("id").range(from, to));
+    const orgGroupIds = orgGroups.map((g) => g.id as string);
+    const { data: rateRows } = await readRowsByIds(orgGroupIds, (g) => (from, to) =>
+      supabase.from("client_billing_rates").select("monthly_rate").in("group_id", g).order("membership_id").range(from, to)
+    );
+    return (rateRows ?? []).reduce((sum, r) => sum + Math.round((r.monthly_rate ?? 0) * 100), 0);
+  };
 
-  // Someone who has not accepted their invitation yet is not a working coach: no share is set for them here.
-  const notAccepted = await pendingCoachIds(params.groupId);
+  // The independent reads together (Nov 2: they ran one after another). Challenges are read for the organization and kept to its working coaches below.
+  const [{ data: memberRows }, notAccepted, monthlyRateCents, { data: orgChallengeRows }] = await Promise.all([
+    supabase
+      .from("organization_memberships")
+      .select("profile_id, role, revenue_share_pct, stripe_connect_status, profiles ( full_name )")
+      .eq("organization_id", orgMembership.organization_id)
+      .order("role", { ascending: true }),
+    // Someone who has not accepted their invitation yet is not a working coach: no share is set for them here.
+    pendingCoachIds(params.groupId),
+    loadMonthlyRateCents(),
+    supabase.from("challenges").select("id, coach_id, entry_fee_cents").eq("organization_id", orgMembership.organization_id).neq("status", "draft"),
+  ]);
   const coaches: (CoachShare & { stripeConnectStatus: string })[] = (memberRows ?? []).filter((m) => !notAccepted.has(m.profile_id)).map((m) => ({
     profileId: m.profile_id,
     fullName: (m.profiles as any)?.full_name ?? "Unknown",
@@ -81,25 +98,8 @@ export default async function RevenueSplitsPage(
     stripeConnectStatus: m.stripe_connect_status ?? "not_connected",
   }));
 
-  // Total estimated revenue for this org: client monthly rates across
-  // every group this org owns, plus active/completed challenge entry
-  // fees for coaches in this org.
-  // Every group of the organization a page at a time, and the rates in groups of ids and pages (a gym with 1,500 clients has 1,500 groups: past the URL limit and the 1,000-row cap of one request).
-  const { rows: orgGroups } = await pageAll((from, to) => supabase.from("groups").select("id").eq("organization_id", orgMembership.organization_id).order("id").range(from, to));
-  const orgGroupIds = orgGroups.map((g) => g.id as string);
-
-  const { data: rateRows } = await readRowsByIds(orgGroupIds, (g) => (from, to) =>
-    supabase.from("client_billing_rates").select("monthly_rate").in("group_id", g).order("membership_id").range(from, to)
-  );
-  const monthlyRateCents = (rateRows ?? []).reduce((sum, r) => sum + Math.round((r.monthly_rate ?? 0) * 100), 0);
-
-  const coachIds = coaches.map((c) => c.profileId);
-  const { data: challengeRows } = await supabase
-    .from("challenges")
-    .select("id, entry_fee_cents")
-    .eq("organization_id", orgMembership.organization_id)
-    .in("coach_id", coachIds.length > 0 ? coachIds : ["00000000-0000-0000-0000-000000000000"])
-    .neq("status", "draft");
+  const coachIds = new Set(coaches.map((c) => c.profileId));
+  const challengeRows = (orgChallengeRows ?? []).filter((c) => coachIds.has(c.coach_id as string));
 
   let challengeRevenueCents = 0;
   if (challengeRows && challengeRows.length > 0) {

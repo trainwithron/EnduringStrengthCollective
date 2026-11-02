@@ -49,28 +49,17 @@ export default async function TeamPerformancePage(
     );
   }
 
-  const { data: group } = await supabase
-    .from("groups")
-    .select("name")
-    .eq("id", params.groupId)
-    .single();
+  // The reads run in three waves of independent requests, not nine one after another (Nov 2: the page took about a second warm and nearly three cold).
+  const [{ data: group }, { data: memberRows }] = await Promise.all([
+    supabase.from("groups").select("name").eq("id", params.groupId).single(),
+    supabase.from("group_memberships").select("profile_id, profiles ( full_name )").eq("group_id", params.groupId).eq("role", "athlete"),
+  ]);
 
   // Bento/hero visual identity extension (coach_dashboard_redesign_
   // scoping.md) — full treatment: the same hero + Team Pulse as Home,
   // scoped to just this one group's roster (this page is already
   // per-group, unlike Home/Business which span the coach's whole book).
   const thisGroupForHero = [{ id: params.groupId, name: group?.name ?? "Group" }];
-  const heroData = await getCoachDashboardData(supabase, {
-    coachId: user.id,
-    teamGroups: thisGroupForHero,
-    allGroups: thisGroupForHero,
-  });
-
-  const { data: memberRows } = await supabase
-    .from("group_memberships")
-    .select("profile_id, profiles ( full_name )")
-    .eq("group_id", params.groupId)
-    .eq("role", "athlete");
   const roster = (memberRows ?? []).map((m: any) => ({
     athleteId: m.profile_id,
     fullName: m.profiles?.full_name ?? "Unknown",
@@ -86,15 +75,48 @@ export default async function TeamPerformancePage(
   const thirtyDaysAgoKey = dateKey(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 29));
   const eightWeeksAgoKey = dateKey(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 55));
 
+  const safeAthleteIds = athleteIds.length > 0 ? athleteIds : ["00000000-0000-0000-0000-000000000000"];
+
   // Scoped to the roster's own athlete ids — a coach's own logged
   // workout (e.g. testing a program) shouldn't count toward "the team's"
   // activity, and must match exactly what the roster list below shows.
-  const { data: logRows } = await supabase
-    .from("workout_logs")
-    .select("athlete_id, total_volume, new_prs, created_at")
-    .eq("group_id", params.groupId)
-    .in("athlete_id", athleteIds.length > 0 ? athleteIds : ["00000000-0000-0000-0000-000000000000"])
-    .gte("created_at", eightWeeksAgoKey);
+  // Post-session RPE (half_finished_ideas_full_audit.md #18) — the
+  // flagship training-load signal, scoped to the same 7-day window as
+  // "active this week" rather than the 30-day readiness window, since
+  // sRPE is meant to read as "how hard has training felt lately," not a
+  // long-run trend.
+  const [heroData, { data: logRows }, { data: wellnessRows }, { data: rpeRows }, { data: habitRows }] = await Promise.all([
+    getCoachDashboardData(supabase, {
+      coachId: user.id,
+      teamGroups: thisGroupForHero,
+      allGroups: thisGroupForHero,
+    }),
+    supabase
+      .from("workout_logs")
+      .select("athlete_id, total_volume, new_prs, created_at")
+      .eq("group_id", params.groupId)
+      .in("athlete_id", safeAthleteIds)
+      .gte("created_at", eightWeeksAgoKey),
+    supabase
+      .from("wellness_checkins")
+      .select("athlete_id, log_date, sleep_quality, soreness, energy")
+      .eq("group_id", params.groupId)
+      .in("athlete_id", safeAthleteIds)
+      .gte("log_date", thirtyDaysAgoKey),
+    supabase
+      .from("athlete_sessions")
+      .select("athlete_id, session_rpe")
+      .eq("group_id", params.groupId)
+      .in("athlete_id", safeAthleteIds)
+      .not("session_rpe", "is", null)
+      .gte("completed_at", weekStartKey),
+    supabase
+      .from("client_habits")
+      .select("id, athlete_id, weekdays")
+      .eq("group_id", params.groupId)
+      .in("athlete_id", safeAthleteIds)
+      .eq("active", true),
+  ]);
 
   const lastActiveByAthlete = new Map<string, string>();
   const workoutsThisWeekByAthlete = new Map<string, number>();
@@ -125,14 +147,6 @@ export default async function TeamPerformancePage(
   );
   const maxWeeklyCount = Math.max(1, ...weeklyActivity.map((b) => b.count));
 
-  const safeAthleteIds = athleteIds.length > 0 ? athleteIds : ["00000000-0000-0000-0000-000000000000"];
-
-  const { data: wellnessRows } = await supabase
-    .from("wellness_checkins")
-    .select("athlete_id, log_date, sleep_quality, soreness, energy")
-    .eq("group_id", params.groupId)
-    .in("athlete_id", safeAthleteIds)
-    .gte("log_date", thirtyDaysAgoKey);
   const readinessTrend = computeDailyAverageReadiness(
     (wellnessRows ?? []).map((r) => ({
       logDate: r.log_date,
@@ -159,18 +173,6 @@ export default async function TeamPerformancePage(
     ])
   );
 
-  // Post-session RPE (half_finished_ideas_full_audit.md #18) — the
-  // flagship training-load signal, scoped to the same 7-day window as
-  // "active this week" rather than the 30-day readiness window, since
-  // sRPE is meant to read as "how hard has training felt lately," not a
-  // long-run trend.
-  const { data: rpeRows } = await supabase
-    .from("athlete_sessions")
-    .select("athlete_id, session_rpe")
-    .eq("group_id", params.groupId)
-    .in("athlete_id", safeAthleteIds)
-    .not("session_rpe", "is", null)
-    .gte("completed_at", weekStartKey);
   const avgSessionRpeThisWeek = computeAverageSessionRpe((rpeRows ?? []).map((r) => r.session_rpe as number));
   const rpeByAthlete = new Map<string, number[]>();
   for (const r of rpeRows ?? []) {
@@ -179,12 +181,6 @@ export default async function TeamPerformancePage(
     rpeByAthlete.set(r.athlete_id, arr);
   }
 
-  const { data: habitRows } = await supabase
-    .from("client_habits")
-    .select("id, athlete_id, weekdays")
-    .eq("group_id", params.groupId)
-    .in("athlete_id", safeAthleteIds)
-    .eq("active", true);
   const activeHabits = habitRows ?? [];
   const last7Dates = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(weekStart);

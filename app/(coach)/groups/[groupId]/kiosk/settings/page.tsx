@@ -42,18 +42,12 @@ export default async function KioskSettingsPage(
     );
   }
 
-  const { data: group } = await supabase
-    .from("groups")
-    .select("name")
-    .eq("id", params.groupId)
-    .maybeSingle();
-
-  const { data: memberships } = await supabase
-    .from("group_memberships")
-    .select("profile_id, profiles ( full_name )")
-    .eq("group_id", params.groupId)
-    .eq("role", "athlete");
-  const pinStatus = await loadKioskPinStatus(supabase, params.groupId);
+  // Independent reads, together (Nov 2: they ran one after another).
+  const [{ data: group }, { data: memberships }, pinStatus] = await Promise.all([
+    supabase.from("groups").select("name").eq("id", params.groupId).maybeSingle(),
+    supabase.from("group_memberships").select("profile_id, profiles ( full_name )").eq("group_id", params.groupId).eq("role", "athlete"),
+    loadKioskPinStatus(supabase, params.groupId),
+  ]);
 
   const roster = (memberships ?? [])
     .map((m: any) => ({
