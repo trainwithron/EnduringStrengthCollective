@@ -377,10 +377,12 @@ describe("the daily clean-up", () => {
 });
 
 describe("the paths that must be open or closed", () => {
-  it("the coach's public page is public already; no request route is public (each one needs a signed-in person)", () => {
+  it("the coach's public page is public already; only the sign-up request route is public (it makes the account itself), every other one needs a signed-in person", () => {
     const mw = read("lib/supabase/middleware.ts");
     expect(mw).toContain('pathname.startsWith("/c/")');
-    expect(mw).not.toContain("client-requests");
+    // live check, Nov 2: without this line the login gate sent the sign-up POST to /login
+    expect(mw).toContain('pathname.startsWith("/api/client-requests/signup")');
+    expect(mw.match(/client-requests/g)).toHaveLength(1);
     for (const f of ["app/api/client-requests/submit/route.ts", "app/api/client-requests/answer/route.ts"]) expect(read(f), f).toContain("auth.getUser()");
   });
   it("a signed-in person who has not accepted the terms is not bounced off the coach's page", () => {

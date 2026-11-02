@@ -126,6 +126,8 @@ export async function updateSession(request: NextRequest) {
     // A coach invitation's join page and the POST that finishes it are opened before anyone has a session; the link's signature is the credential (lib/coach-join-link.ts).
     pathname.startsWith("/join-coach/") ||
     pathname.startsWith("/api/coaches/join") ||
+    // A visitor on a coach's "Request to train" page makes their account and sends the request in one POST, before they have a session; the route rate-limits and checks itself.
+    pathname.startsWith("/api/client-requests/signup") ||
     // A client's single-use claim link (and its expired-link page) is opened
     // before they have any session; the token itself is the credential.
     pathname.startsWith("/claim/") ||
