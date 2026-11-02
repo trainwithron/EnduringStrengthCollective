@@ -31,7 +31,26 @@ import { ALL_BRAND_FONTS, googleFontsHref } from "@/lib/google-fonts";
 
 export const metadata = { title: "Branding" };
 
-type OrgTab = "team" | "branding" | "workout-card" | "tags" | "dispatch" | "terminology" | "credits" | "plan";
+// Four tabs, each holding two related parts (Ron, Nov 2: "these tabs could be condensed down"). An old link to one of the eight former tabs opens the tab that now holds it.
+type OrgTab = "team" | "branding" | "labels" | "billing";
+const OLD_TAB_HOME: Record<string, OrgTab> = {
+  team: "team",
+  dispatch: "team",
+  branding: "branding",
+  "workout-card": "branding",
+  labels: "labels",
+  tags: "labels",
+  terminology: "labels",
+  billing: "billing",
+  plan: "billing",
+  credits: "billing",
+};
+const ORG_TABS: { key: OrgTab; label: string }[] = [
+  { key: "team", label: "Team" },
+  { key: "branding", label: "Branding" },
+  { key: "labels", label: "Labels" },
+  { key: "billing", label: "Billing" },
+];
 
 export default async function BrandingPage(
   props: {
@@ -42,22 +61,7 @@ export default async function BrandingPage(
   const params = await props.params;
   await redirectOneOnOneToAnchor(params.groupId, "branding");
   const searchParams = await props.searchParams;
-  const tab: OrgTab =
-    searchParams.tab === "branding"
-      ? "branding"
-      : searchParams.tab === "workout-card"
-        ? "workout-card"
-        : searchParams.tab === "tags"
-          ? "tags"
-          : searchParams.tab === "dispatch"
-            ? "dispatch"
-            : searchParams.tab === "terminology"
-              ? "terminology"
-              : searchParams.tab === "credits"
-                ? "credits"
-                : searchParams.tab === "plan"
-                  ? "plan"
-                  : "team";
+  const tab: OrgTab = OLD_TAB_HOME[searchParams.tab ?? ""] ?? "team";
   const supabase = await createServerClient();
   const {
     data: { user },
@@ -209,7 +213,7 @@ export default async function BrandingPage(
     .maybeSingle();
   const showPlanTab = isBillingEnforced() || viewerProfile?.is_platform_admin === true;
   const planSummary =
-    showPlanTab && tab === "plan" && org
+    showPlanTab && tab === "billing" && org
       ? await getOrgBillingSummary(supabase, orgMembership.organization_id, org.created_at)
       : null;
 
@@ -226,74 +230,17 @@ export default async function BrandingPage(
       </div>
 
       <div className="flex gap-2 mb-6 overflow-x-auto">
-        <Link
-          href={`${basePath}?tab=team`}
-          className={`h-9 px-4 flex items-center shrink-0 whitespace-nowrap font-body text-sm border ${
-            tab === "team" ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
-          }`}
-        >
-          Team
-        </Link>
-        <Link
-          href={`${basePath}?tab=branding`}
-          className={`h-9 px-4 flex items-center shrink-0 whitespace-nowrap font-body text-sm border ${
-            tab === "branding" ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
-          }`}
-        >
-          Branding
-        </Link>
-        <Link
-          href={`${basePath}?tab=workout-card`}
-          className={`h-9 px-4 flex items-center shrink-0 whitespace-nowrap font-body text-sm border ${
-            tab === "workout-card" ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
-          }`}
-        >
-          Workout Card
-        </Link>
-        <Link
-          href={`${basePath}?tab=tags`}
-          className={`h-9 px-4 flex items-center shrink-0 whitespace-nowrap font-body text-sm border ${
-            tab === "tags" ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
-          }`}
-        >
-          Tags
-        </Link>
-        {isOwnerOrAdmin && (
+        {ORG_TABS.map((t) => (
           <Link
-            href={`${basePath}?tab=dispatch`}
+            key={t.key}
+            href={`${basePath}?tab=${t.key}`}
             className={`h-9 px-4 flex items-center shrink-0 whitespace-nowrap font-body text-sm border ${
-              tab === "dispatch" ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
+              tab === t.key ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
             }`}
           >
-            Coach Dispatch
+            {t.label}
           </Link>
-        )}
-        <Link
-          href={`${basePath}?tab=terminology`}
-          className={`h-9 px-4 flex items-center shrink-0 whitespace-nowrap font-body text-sm border ${
-            tab === "terminology" ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
-          }`}
-        >
-          What You Call Things
-        </Link>
-        <Link
-          href={`${basePath}?tab=credits`}
-          className={`h-9 px-4 flex items-center shrink-0 whitespace-nowrap font-body text-sm border ${
-            tab === "credits" ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
-          }`}
-        >
-          Credits
-        </Link>
-        {showPlanTab && (
-          <Link
-            href={`${basePath}?tab=plan`}
-            className={`h-9 px-4 flex items-center shrink-0 whitespace-nowrap font-body text-sm border ${
-              tab === "plan" ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
-            }`}
-          >
-            Plan &amp; Billing
-          </Link>
-        )}
+        ))}
       </div>
 
       {tab === "team" ? (
@@ -369,49 +316,60 @@ export default async function BrandingPage(
               View Revenue Splits →
             </Link>
           </p>
+
+          {isOwnerOrAdmin && (
+            <OrgSection title="Coach Dispatch">
+              <DispatchSettings
+                organizationId={orgMembership.organization_id}
+                orgSlug={org?.slug ?? ""}
+                initialTtlMinutes={org?.dispatch_ttl_minutes ?? 20}
+              />
+            </OrgSection>
+          )}
         </div>
-      ) : tab === "tags" ? (
-        isOwnerOrAdmin ? (
-          <ClientTagManager organizationId={orgMembership.organization_id} coachId={user.id} initialTags={clientTags} />
-        ) : (
-          <p className="font-body text-sm text-steel">
-            Only owners and admins can manage client tags.
-          </p>
-        )
-      ) : tab === "dispatch" ? (
-        isOwnerOrAdmin ? (
-          <DispatchSettings
-            organizationId={orgMembership.organization_id}
-            orgSlug={org?.slug ?? ""}
-            initialTtlMinutes={org?.dispatch_ttl_minutes ?? 20}
-          />
-        ) : (
-          <p className="font-body text-sm text-steel">
-            Only owners and admins can manage coach dispatch.
-          </p>
-        )
-      ) : tab === "terminology" ? (
-        <TerminologySettingsPanel />
-      ) : tab === "plan" ? (
-        planSummary ? (
-          <PlanBillingPanel summary={planSummary} isOwner={isOwner} orgName={org?.name ?? "Organization"} />
-        ) : (
-          <p className="font-body text-sm text-steel">Plan &amp; Billing isn&apos;t available yet.</p>
-        )
-      ) : tab === "credits" ? (
-        <CoachCreditsPanel
-          purchaseAvailable={isStripeConfigured() && !!process.env.STRIPE_PRICE_COACH_CREDIT_PACK}
-          groupId={params.groupId}
-          balance={coachCreditBalance}
-          unlimited={coachCreditsUnlimited}
-          liftOffActive={liftOffActive}
-        />
+      ) : tab === "labels" ? (
+        <div>
+          <OrgSection title="Tags" first>
+            {isOwnerOrAdmin ? (
+              <ClientTagManager organizationId={orgMembership.organization_id} coachId={user.id} initialTags={clientTags} />
+            ) : (
+              <p className="font-body text-sm text-steel">
+                Only owners and admins can manage client tags.
+              </p>
+            )}
+          </OrgSection>
+          <OrgSection title="What You Call Things">
+            <TerminologySettingsPanel />
+          </OrgSection>
+        </div>
+      ) : tab === "billing" ? (
+        <div>
+          {showPlanTab && (
+            <OrgSection title="Plan & Billing" first>
+              {planSummary ? (
+                <PlanBillingPanel summary={planSummary} isOwner={isOwner} orgName={org?.name ?? "Organization"} />
+              ) : (
+                <p className="font-body text-sm text-steel">Plan &amp; Billing isn&apos;t available yet.</p>
+              )}
+            </OrgSection>
+          )}
+          <OrgSection title="Credits" first={!showPlanTab}>
+            <CoachCreditsPanel
+              purchaseAvailable={isStripeConfigured() && !!process.env.STRIPE_PRICE_COACH_CREDIT_PACK}
+              groupId={params.groupId}
+              balance={coachCreditBalance}
+              unlimited={coachCreditsUnlimited}
+              liftOffActive={liftOffActive}
+            />
+          </OrgSection>
+        </div>
       ) : !isOwner ? (
         <p className="font-body text-sm text-steel">
           Only {org?.name ?? "the organization"}&apos;s owner can change branding.
         </p>
-      ) : tab === "branding" ? (
-        <>
+      ) : (
+        <div>
+        <OrgSection title="Branding" first>
         {/* The layout loads only the fonts a page shows; here a coach compares every one of them, so this page asks for the full set. */}
         {/* eslint-disable-next-line @next/next/no-page-custom-font */}
         <link rel="stylesheet" href={googleFontsHref(ALL_BRAND_FONTS)} precedence="default" />
@@ -427,14 +385,26 @@ export default async function BrandingPage(
           initialAppIconUrl={org?.app_icon_url ?? null}
           initialZipCode={org?.zip_code ?? null}
         />
-        </>
-      ) : (
-        <WorkoutCardBackgroundSettings
-          organizationId={orgMembership.organization_id}
-          initialMode={(org?.workout_card_background_mode as "default_rotation" | "custom") ?? "default_rotation"}
-          initialUrl={org?.workout_card_background_url ?? null}
-        />
+        </OrgSection>
+        <OrgSection title="Workout Card">
+          <WorkoutCardBackgroundSettings
+            organizationId={orgMembership.organization_id}
+            initialMode={(org?.workout_card_background_mode as "default_rotation" | "custom") ?? "default_rotation"}
+            initialUrl={org?.workout_card_background_url ?? null}
+          />
+        </OrgSection>
+        </div>
       )}
     </CoachDesktopShell>
+  );
+}
+
+// One of the two parts of a tab: a heading, and a rule above it when it is not the first.
+function OrgSection({ title, first, children }: { title: string; first?: boolean; children: React.ReactNode }) {
+  return (
+    <section className={first ? "" : "mt-10 pt-8 border-t border-steel/20"} aria-label={title}>
+      <h2 className="font-display font-bold text-xl uppercase leading-none mb-4">{title}</h2>
+      {children}
+    </section>
   );
 }
