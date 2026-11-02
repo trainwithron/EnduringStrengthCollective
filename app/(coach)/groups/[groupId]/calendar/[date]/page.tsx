@@ -36,6 +36,8 @@ import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { DayCalendar } from "@/components/coach/desktop/day-calendar";
 import { SessionMenuTarget } from "@/components/coach/session-menu";
+import { DaySwipeNav } from "@/components/shared/day-swipe-nav";
+import { daySwipeHrefs } from "@/lib/day-swipe";
 import { getCoachClients } from "@/lib/coach-clients";
 import { CalendarPurchasePrompt } from "@/components/athlete/calendar-purchase-prompt";
 import { isStripeConfigured } from "@/lib/stripe";
@@ -63,6 +65,8 @@ export default async function CoachDayDetailPage(
 ) {
   const searchParams = await props.searchParams;
   const params = await props.params;
+  // Swipe left or right on a phone for the next or previous day (Ron, Nov 2), keeping the picked client or the session being rescheduled.
+  const swipe = daySwipeHrefs(params.groupId, params.date, { client: searchParams.client, reschedule: searchParams.reschedule });
   const supabase = await createServerClient();
   const {
     data: { user },
@@ -369,6 +373,7 @@ export default async function CoachDayDetailPage(
         {effective.isActingAsOther && (
           <ActingAsBanner athleteFullName={actingAsFullName ?? "Client"} groupId={params.groupId} />
         )}
+        <DaySwipeNav prevHref={swipe.prev} nextHref={swipe.next} />
         <header className="px-5 pt-8 pb-6 border-b border-steel/20">
           <Link href={backHref} className="font-body text-xs text-steel uppercase tracking-wide">
             &larr; Back to calendar
@@ -828,6 +833,7 @@ export default async function CoachDayDetailPage(
 
   return (
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="calendar">
+      <DaySwipeNav prevHref={swipe.prev} nextHref={swipe.next} />
       <div className="pb-6 border-b border-steel/20 mb-6">
         <Link href={backHref} className="font-body text-xs text-steel uppercase tracking-wide">
           &larr; Back to calendar
