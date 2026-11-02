@@ -5,6 +5,8 @@ import { Search, Delete } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { SignOutButton } from "@/components/group/sign-out-button";
 import { FRONT_DESK_MIN_QUERY, checkInMessage, type FrontDeskMatch } from "@/lib/front-desk";
+import { cardScanMessage } from "@/lib/checkin-cards";
+import { useCardScanner } from "@/components/shared/use-card-scanner";
 
 type View = { mode: "search" } | { mode: "pin"; client: FrontDeskMatch } | { mode: "confirmed"; name: string; at: string };
 
@@ -18,7 +20,35 @@ export function FrontDeskScreen({ organizationId, organizationName }: { organiza
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
   const latest = useRef(0);
+
+  function confirmed(name: string, at: string) {
+    setView({ mode: "confirmed", name, at });
+    setTimeout(() => {
+      setView({ mode: "search" });
+      setQuery("");
+      setMatches([]);
+    }, 2500);
+  }
+
+  // A key card scanned at the tablet (step 198): its client is checked in with no name or code to type. Whatever the scanner typed into the name box is cleared.
+  useCardScanner(async (code) => {
+    setQuery("");
+    setScanError(null);
+    try {
+      const { data, error: rpcError } = await createBrowserClient().rpc("card_check_in", { p_org: organizationId, p_code: code });
+      const result = data as { result?: string; checked_in_at?: string; name?: string } | null;
+      if (rpcError || !result || result.result !== "ok") {
+        setView({ mode: "search" });
+        setScanError(cardScanMessage(result?.result ?? "error"));
+        return;
+      }
+      confirmed(result.name ?? "Client", result.checked_in_at ?? new Date().toISOString());
+    } catch {
+      setScanError(cardScanMessage("error"));
+    }
+  }, view.mode !== "confirmed");
 
   useEffect(() => {
     const q = query.trim();
@@ -70,13 +100,8 @@ export function FrontDeskScreen({ organizationId, organizationName }: { organiza
         setSubmitting(false);
         return;
       }
-      setView({ mode: "confirmed", name: client.display_name ?? "Client", at: result.checked_in_at ?? new Date().toISOString() });
       setSubmitting(false);
-      setTimeout(() => {
-        setView({ mode: "search" });
-        setQuery("");
-        setMatches([]);
-      }, 2500);
+      confirmed(client.display_name ?? "Client", result.checked_in_at ?? new Date().toISOString());
     } catch {
       setError(checkInMessage("error"));
       setPin("");
@@ -165,14 +190,22 @@ export function FrontDeskScreen({ organizationId, organizationName }: { organiza
   return (
     <main className="min-h-screen bg-graphite text-chalk px-6 py-10">
       <h1 className="font-display font-bold text-3xl uppercase text-center mb-1">{organizationName}</h1>
-      <p className="font-body text-sm text-steel text-center mb-8">Type your name to check in</p>
+      <p className="font-body text-sm text-steel text-center mb-8">Scan your card, or type your name to check in</p>
+      {scanError && (
+        <p className="font-body text-sm text-rust text-center mb-4 max-w-md mx-auto" role="alert">
+          {scanError}
+        </p>
+      )}
 
       <div className="max-w-md mx-auto mb-6 relative">
         <Search className="w-5 h-5 text-steel absolute left-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
         <input
           type="text"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setScanError(null);
+            setQuery(e.target.value);
+          }}
           aria-label="Your name"
           placeholder="Your name…"
           autoFocus

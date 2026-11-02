@@ -18,6 +18,6 @@ describe("the slow pages read in waves, not one at a time", () => {
     expect(src).toContain("const challengeRows = (orgChallengeRows ?? []).filter((c) => coachIds.has(c.coach_id as string));");
   });
   it("Kiosk settings: group, roster and PIN status together", () => {
-    expect(read("app/(coach)/groups/[groupId]/kiosk/settings/page.tsx")).toContain("const [{ data: group }, { data: memberships }, pinStatus] = await Promise.all([");
+    expect(read("app/(coach)/groups/[groupId]/kiosk/settings/page.tsx")).toContain("const [{ data: group }, { data: modeRow, error: modeError }, { data: memberships }, pinStatus] = await Promise.all([");
   });
 });

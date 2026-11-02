@@ -51,7 +51,7 @@ export default async function KioskPage(
 
   const { data: group } = await supabase
     .from("groups")
-    .select("name")
+    .select("name, organization_id")
     .eq("id", params.groupId)
     .maybeSingle();
 
@@ -77,6 +77,7 @@ export default async function KioskPage(
       groupId={params.groupId}
       groupName={group?.name ?? "Check In"}
       roster={roster}
+      organizationId={(group?.organization_id as string | null) ?? null}
     />
   );
 }

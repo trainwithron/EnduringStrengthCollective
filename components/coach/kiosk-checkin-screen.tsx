@@ -3,6 +3,9 @@
 import { useMemo, useState } from "react";
 import { Search, Delete } from "lucide-react";
 import { FRONT_DESK_MIN_QUERY } from "@/lib/front-desk";
+import { createBrowserClient } from "@/lib/supabase/client";
+import { cardScanMessage } from "@/lib/checkin-cards";
+import { useCardScanner } from "@/components/shared/use-card-scanner";
 
 interface RosterEntry {
   athleteId: string;
@@ -21,16 +24,38 @@ export function KioskCheckinScreen({
   groupId,
   groupName,
   roster,
+  organizationId = null,
 }: {
   groupId: string;
   groupName: string;
   roster: RosterEntry[];
+  // The group's organization: with it, a scanned key card checks its client in (step 198), kept to this group.
+  organizationId?: string | null;
 }) {
   const [view, setView] = useState<View>({ mode: "list" });
   const [query, setQuery] = useState("");
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+
+  useCardScanner(async (code) => {
+    setQuery("");
+    setScanError(null);
+    try {
+      const { data, error: rpcError } = await createBrowserClient().rpc("card_check_in", { p_org: organizationId, p_code: code, p_group: groupId });
+      const result = data as { result?: string; checked_in_at?: string; name?: string } | null;
+      if (rpcError || !result || result.result !== "ok") {
+        setView({ mode: "list" });
+        setScanError(cardScanMessage(result?.result ?? "error"));
+        return;
+      }
+      setView({ mode: "confirmed", name: result.name ?? "Checked in", at: result.checked_in_at ?? new Date().toISOString() });
+      setTimeout(() => setView({ mode: "list" }), 2500);
+    } catch {
+      setScanError(cardScanMessage("error"));
+    }
+  }, !!organizationId && view.mode !== "confirmed");
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -175,14 +200,22 @@ export function KioskCheckinScreen({
   return (
     <main className="min-h-screen bg-graphite text-chalk px-6 py-10">
       <h1 className="font-display font-bold text-3xl uppercase text-center mb-1">{groupName}</h1>
-      <p className="font-body text-sm text-steel text-center mb-8">Tap your name to check in</p>
+      <p className="font-body text-sm text-steel text-center mb-8">{organizationId ? "Scan your card, or tap your name to check in" : "Tap your name to check in"}</p>
+      {scanError && (
+        <p className="font-body text-sm text-rust text-center mb-4 max-w-md mx-auto" role="alert">
+          {scanError}
+        </p>
+      )}
 
       <div className="max-w-md mx-auto mb-6 relative">
         <Search className="w-5 h-5 text-steel absolute left-3 top-1/2 -translate-y-1/2" />
         <input aria-label="Search your name"
           type="text"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setScanError(null);
+            setQuery(e.target.value);
+          }}
           placeholder="Search your name…"
           className="w-full h-14 bg-surface border border-steel/30 pl-11 pr-4 font-body text-lg text-chalk focus:outline-none focus:border-rust"
         />
