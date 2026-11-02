@@ -96,7 +96,10 @@ describe("Home's desktop rail", () => {
     const strip = html.slice(html.indexOf("data-home-strip"), html.indexOf("HOME CONTENT"));
     expect(html).toContain('<nav aria-label="Programs"');
     expect(tabOn(strip, "/groups/g-team/exercise-library")).toBe(true);
-    for (const p of ["nutrition", "challenges", "records", "team-performance"]) expect(strip, p).toContain(`href="/groups/g-team/${p}"`);
+    for (const p of ["challenges", "records", "team-performance"]) expect(strip, p).toContain(`href="/groups/g-team/${p}"`);
+    // Nutrition has its own icon (Ron, Nov 2), not a Programs tab
+    expect(strip).not.toContain('href="/groups/g-team/nutrition"');
+    expect(html).toContain('aria-label="Nutrition"');
     expect(railLit(html, "Programs")).toBe(true);
     expect(html).not.toContain('aria-label="Coaching"');
   });

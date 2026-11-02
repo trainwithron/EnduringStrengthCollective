@@ -7,13 +7,15 @@ import { TEAM_SPORT_BUSINESS_LABEL, teamSportBusinessHref } from "@/lib/team-spo
 // page, chosen by the address. Every page keeps its file and its address and no redirect is added: this file only says which home and which tab an address belongs to, and which tabs each
 // home shows for this coach in this group (the hiding rules moved word for word from the old menus). Pure, so the route table is tested against every page on disk. The phone is not touched.
 
-export type HomeKey = "home" | "clients" | "calendar" | "programs" | "messages" | "settings";
+// Nutrition has its own icon under Programs (Ron, Nov 2: "i wouldnt hate having a dedicated nutrition button on the left under programs").
+export type HomeKey = "home" | "clients" | "calendar" | "programs" | "nutrition" | "messages" | "settings";
 
 export const HOMES: { key: HomeKey; label: string }[] = [
   { key: "home", label: "Home" },
   { key: "clients", label: "Clients" },
   { key: "calendar", label: "Calendar" },
   { key: "programs", label: "Programs" },
+  { key: "nutrition", label: "Nutrition" },
   { key: "messages", label: "Messages" },
   { key: "settings", label: "Settings" },
 ];
@@ -108,13 +110,13 @@ export function homeTabs(f: HomeFacts): Record<HomeKey, HomeTab[]> {
     programs: [
       { key: "programs", label: "Programs", href: ALL_PROGRAMS_HREF, termKey: "program" },
       { key: "exercise-library", label: "Exercise library", href: `${g}/exercise-library` },
-      { key: "nutrition", label: "Nutrition", href: `${g}/nutrition` },
       { key: "challenges", label: "Challenges", href: `${g}/challenges` },
       { key: "records", label: "Hall of fame", href: `${g}/records` },
       f.teamMode ? { key: "team", label: "Depth chart", href: `${g}/team` } : f.groupKind === "team" && { key: "team", label: "Seasons", href: `${g}/team` },
       { key: "team-performance", label: "Team performance", href: `${g}/team-performance` },
       f.teamSport && { key: "team-sheet", label: "Team sheet", href: `${g}/team-sheet` },
     ],
+    nutrition: [{ key: "nutrition", label: "Nutrition", href: `${g}/nutrition` }],
     messages: [
       { key: "messages", label: "Messages", href: `${g}/messages`, badge: "messages" },
       inGroup && { key: "feed", label: "Team feed", href: `${g}/feed`, badge: "feed" },
@@ -203,10 +205,11 @@ const RULES: Rule[] = [
   rule(`${G}/games/${ID}`, "programs", "exercise-library"),
   rule(`${G}/tools/one-rep-max`, "programs", "exercise-library"),
   rule(`${G}/movement-patterns`, "programs", "exercise-library"),
-  rule(`${G}/nutrition`, "programs", "nutrition"),
-  rule(`${G}/nutrition/nutrients/${ID}`, "programs", "nutrition"),
-  rule(`${G}/recipes`, "programs", "nutrition"),
-  rule(`${G}/tools/macro-calculator`, "programs", "nutrition"),
+  // Nutrition
+  rule(`${G}/nutrition`, "nutrition", "nutrition"),
+  rule(`${G}/nutrition/nutrients/${ID}`, "nutrition", "nutrition"),
+  rule(`${G}/recipes`, "nutrition", "nutrition"),
+  rule(`${G}/tools/macro-calculator`, "nutrition", "nutrition"),
   rule(`${G}/challenges`, "programs", "challenges"),
   rule(`${G}/challenges/${ID}`, "programs", "challenges"),
   rule(`${G}/records`, "programs", "records"),

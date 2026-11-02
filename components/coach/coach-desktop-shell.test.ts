@@ -16,7 +16,7 @@ describe("coach desktop shell", () => {
   it("FIX 6: the rail is exactly the six homes, in order, and there are no menus", () => {
     expect(shell).toContain("const railIcons: RailIcon[] = HOMES.map((h) => ({");
     expect(shell).toContain("icons={railIcons}");
-    expect(homesLib).toMatch(/export const HOMES[^=]*= \[\n  \{ key: "home", label: "Home" \},\n  \{ key: "clients", label: "Clients" \},\n  \{ key: "calendar", label: "Calendar" \},\n  \{ key: "programs", label: "Programs" \},\n  \{ key: "messages", label: "Messages" \},\n  \{ key: "settings", label: "Settings" \},\n\];/);
+    expect(homesLib).toMatch(/export const HOMES[^=]*= \[\n  \{ key: "home", label: "Home" \},\n  \{ key: "clients", label: "Clients" \},\n  \{ key: "calendar", label: "Calendar" \},\n  \{ key: "programs", label: "Programs" \},\n  \{ key: "nutrition", label: "Nutrition" \},\n  \{ key: "messages", label: "Messages" \},\n  \{ key: "settings", label: "Settings" \},\n\];/);
     for (const gone of ["ordinaryNav", "teamNav", "NavGroup", "FOLDED_HOMES", "sectionSubLinks", "More tools", 'label: "Coaching"', 'label: "Business"', 'label: "Group"']) expect(shell, gone).not.toContain(gone);
     // each icon goes to its home's first tab and is lit by the address (or, on a page outside the table, by the page's own key)
     expect(shell).toContain('href: homeHref(tabsByHome, h.key) ?? "/dashboard",');

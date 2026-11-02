@@ -7,7 +7,7 @@ const shell = readFileSync(join(__dirname, "..", "coach-desktop-shell.tsx"), "ut
 // FIX 6: the rail is the six homes; each has its own icon, and the look-alikes stay apart.
 describe("the rail icons", () => {
   it("one icon per home: Home, a single person for Clients (a group of people for a team-sport group's Athletes), a calendar, a dumbbell for Programs, mail, a gear", () => {
-    expect(shell).toContain("const HOME_ICON: Record<HomeKey, RailIcon[\"icon\"]> = { home: Home, clients: teamSport ? Users2 : UserRound, calendar: CalendarDays, programs: Dumbbell, messages: Mail, settings: Settings };");
+    expect(shell).toContain("const HOME_ICON: Record<HomeKey, RailIcon[\"icon\"]> = { home: Home, clients: teamSport ? Users2 : UserRound, calendar: CalendarDays, programs: Dumbbell, nutrition: Apple, messages: Mail, settings: Settings };");
   });
   it("the dumbbell is only Programs, and the grid icon is gone", () => {
     expect(shell.match(/\bDumbbell\b/g)?.length).toBe(2); // the import and the Programs icon

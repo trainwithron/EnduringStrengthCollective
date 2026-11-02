@@ -6,6 +6,7 @@ import { homeOfPath, homeTabs, homeHref, HOMES, type HomeKey } from "@/lib/deskt
 import { HomeTabStrip } from "@/components/coach/desktop/home-tab-strip";
 import Link from "next/link";
 import {
+  Apple,
   Dumbbell,
   ChevronRight,
   CalendarDays,
@@ -404,7 +405,7 @@ function CoachDesktopShellFull({
 
   // Hover rail widgets (hover_expand_rail_widgets_idea.md, decided per icon by Ron; FIX 6 decision 6): Business on Home (not where the money numbers are hidden), Clients, Calendar,
   // Messages with the Team feed under it, and Team performance on Programs in a team-sport group only. Settings has none.
-  const HOME_ICON: Record<HomeKey, RailIcon["icon"]> = { home: Home, clients: teamSport ? Users2 : UserRound, calendar: CalendarDays, programs: Dumbbell, messages: Mail, settings: Settings };
+  const HOME_ICON: Record<HomeKey, RailIcon["icon"]> = { home: Home, clients: teamSport ? Users2 : UserRound, calendar: CalendarDays, programs: Dumbbell, nutrition: Apple, messages: Mail, settings: Settings };
   const homeWidget: Partial<Record<HomeKey, React.ReactNode>> = {
     home: moneyHidden ? undefined : <BusinessRailWidget groupId={groupId} />,
     clients: <ClientsRailWidget groupId={groupId} />,

@@ -136,8 +136,8 @@ describe("the pages that only send you somewhere else land in a home", () => {
     const targets: [string, HomeKey][] = [
       ["/calendar?tab=availability", "calendar"],
       [`${g}/exercise-library`, "programs"],
-      [`${g}/nutrition?tab=favorites`, "programs"],
-      [`${g}/nutrition?tab=calculator`, "programs"],
+      [`${g}/nutrition?tab=favorites`, "nutrition"],
+      [`${g}/nutrition?tab=calculator`, "nutrition"],
       [`${g}/resources?tab=shop`, "settings"],
       [`${g}/resources?tab=referrals`, "settings"],
       [`${g}/feed?channel=general`, "messages"],
