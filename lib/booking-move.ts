@@ -13,6 +13,27 @@ export function weekKeysMondayFirst(dateKey: string): string[] {
   return Array.from({ length: 7 }, (_, i) => addDaysToKey(monday, i));
 }
 
+/** A moment as "HH:MM" on the coach's clock (24-hour), for the time picker. */
+export function clockTimeInZone(iso: string, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(iso));
+  const hh = parts.find((p) => p.type === "hour")?.value ?? "00";
+  const mm = parts.find((p) => p.type === "minute")?.value ?? "00";
+  return `${hh === "24" ? "00" : hh}:${mm}`;
+}
+
+/** "14:30" -> "2:30 PM". */
+export function hhmmLabel(hhmm: string): string {
+  const [h, m] = hhmm.split(":").map(Number);
+  return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+}
+
+/** Every quarter hour of the day, plus the session's own time when it is not on a quarter hour, in order. */
+export function quarterHourTimes(current: string): string[] {
+  const out = Array.from({ length: 96 }, (_, i) => `${String(Math.floor(i / 4)).padStart(2, "0")}:${String((i % 4) * 15).padStart(2, "0")}`);
+  if (!out.includes(current)) out.push(current);
+  return out.sort();
+}
+
 export function isDateKey(value: unknown): value is string {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const [y, m, d] = value.split("-").map(Number);

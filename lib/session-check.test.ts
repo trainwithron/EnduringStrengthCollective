@@ -6,7 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => {}, refresh: () => {}, replace: () => {} }), usePathname: () => "/dashboard", useSearchParams: () => new URLSearchParams() }));
 vi.mock("@/lib/supabase/client", () => ({ createBrowserClient: () => ({}) }));
 
-import { isDateKey, planBookingMove, startOnDateKeepingTime, weekKeysMondayFirst } from "@/lib/booking-move";
+import { clockTimeInZone, hhmmLabel, isDateKey, planBookingMove, quarterHourTimes, startOnDateKeepingTime, weekKeysMondayFirst } from "@/lib/booking-move";
 import { clientMayBePushedAt, completedSessionPush } from "@/lib/completed-session-push";
 import { SessionCheckCards } from "@/components/coach/session-check-cards";
 import { BookingDateControl } from "@/components/coach/booking-date-control";
@@ -61,6 +61,18 @@ describe("the date control", () => {
     expect(html.match(/aria-pressed="true"/g)?.length).toBe(1);
     for (const letter of ["M", "T", "W", "F", "S"]) expect(html).toContain(`<span>${letter}</span>`);
     expect(html).toContain("Monday, Oct 12");
+  });
+  it("picking a day opens a time dropdown set to the session's own time, and Move sends the day and the time (Ron, Nov 3)", () => {
+    expect(clockTimeInZone("2026-11-03T14:00:00.000Z", LA)).toBe("06:00");
+    expect(hhmmLabel("06:00")).toBe("6:00 AM");
+    expect(hhmmLabel("13:45")).toBe("1:45 PM");
+    expect(hhmmLabel("00:15")).toBe("12:15 AM");
+    expect(quarterHourTimes("06:00")).toHaveLength(96);
+    expect(quarterHourTimes("06:10")).toContain("06:10");
+    const src = read("components/coach/booking-date-control.tsx");
+    expect(src).toContain("onClick={() => pick(key)}");
+    expect(src).toContain("body: JSON.stringify({ bookingId, newDateKey: pickedKey, newTime: time })");
+    expect(src).toContain('aria-label="Time of this session"');
   });
   it("is reached by tapping the date in the Waiting to be marked list, and the list is read again after a move", () => {
     const panel = read("components/coach/desktop/client-schedule-panel.tsx");
