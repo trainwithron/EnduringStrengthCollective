@@ -11,5 +11,5 @@ export const WAITING_ON_GUARDIAN_LABEL = "Waiting on a guardian";
 /** The note the coach gets when a teen reaches the permission step (one per week per coach at most; lib/minor-consent-notice.ts words the under-13 one). */
 export function guardianWaitNoticeBody(childName: string | null | undefined): string {
   const who = childName?.trim() || "A client";
-  return `${who} is under 18 and needs a parent or guardian's OK before starting. They are asked for it on their screen; you can send it again from their profile.`;
+  return `${who} is under 18 and needs a parent or guardian's OK before starting. If you've talked with their parent, tick that on their profile and they can start right away.`;
 }

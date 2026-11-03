@@ -13,6 +13,10 @@ export interface GuardianStateInfo {
   expires_at?: string | null;
   signed_at?: string | null;
   withdrawn_at?: string | null;
+  // The coach ticked "I've talked with their parent or guardian" (step 199) instead of a signed permission.
+  coach_confirmed?: boolean;
+  confirmed_at?: string | null;
+  confirmed_by_name?: string | null;
 }
 
 const when = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" }) : "");
@@ -43,6 +47,22 @@ export function GuardianConsentStatus({ athleteId, info }: { athleteId: string; 
     setBusy(false);
   }
 
+  // The coach's own word (Ron, Nov 3: "I talk to parents before they train with me"): ticked, the client can start at once; unticked, they are stopped again.
+  async function setConfirmed(confirmed: boolean) {
+    if (busy) return;
+    setBusy(true);
+    setNote(null);
+    try {
+      const res = await fetch("/api/guardian-consent/coach-confirm", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ athleteId, confirmed }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) setNote(d.error ?? "Couldn't do that. Try again.");
+      else router.refresh();
+    } catch {
+      setNote("Couldn't do that. Try again.");
+    }
+    setBusy(false);
+  }
+
   async function voidIt() {
     if (!(await confirmDialog({ message: "Cancel this permission? The client is stopped again until a parent or guardian signs. The record of it is kept.", confirmLabel: "Cancel the permission", destructive: true }))) return;
     await post("/api/guardian-consent/void", "Cancelled.");
@@ -60,7 +80,20 @@ export function GuardianConsentStatus({ athleteId, info }: { athleteId: string; 
   return (
     <div>
       <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">Parent or guardian permission (under 18)</p>
-      {state === "signed" && (
+      {state === "signed" && info?.coach_confirmed && (
+        <>
+          <label className="flex items-start gap-2 font-body text-sm cursor-pointer">
+            <input type="checkbox" checked onChange={() => void setConfirmed(false)} disabled={busy} className="mt-0.5 w-4 h-4 accent-[#D2703B]" />
+            <span>
+              I&apos;ve talked with their parent or guardian, and they&apos;re OK with it.
+              <span className="block font-body text-xs text-steel mt-0.5">
+                Ticked by {info.confirmed_by_name ?? "a coach"} on {when(info.confirmed_at)}. Untick it to stop them again.
+              </span>
+            </span>
+          </label>
+        </>
+      )}
+      {state === "signed" && !info?.coach_confirmed && (
         <>
           <p className="font-body text-sm">
             Signed by {info?.guardian_name} ({info?.relationship}), {info?.guardian_email}, on {when(info?.signed_at)}.
@@ -86,6 +119,15 @@ export function GuardianConsentStatus({ athleteId, info }: { athleteId: string; 
         <p className="font-body text-sm text-rust">The permission was taken back on {when(info?.withdrawn_at)}. This client is stopped until it is given again.</p>
       )}
       {state === "none" && <p className="font-body text-sm text-rust">Not asked yet. This client is stopped at a permission screen where they give a parent or guardian&apos;s email. Nothing else is collected until it is signed.</p>}
+      {state !== "signed" && (
+        <label className="mt-3 flex items-start gap-2 font-body text-sm cursor-pointer" data-guardian-checkbox>
+          <input type="checkbox" checked={false} onChange={() => void setConfirmed(true)} disabled={busy} className="mt-0.5 w-4 h-4 accent-[#D2703B]" />
+          <span>
+            I&apos;ve talked with their parent or guardian, and they&apos;re OK with it.
+            <span className="block font-body text-xs text-steel mt-0.5">Ticking this lets them start right away, with no email needed.</span>
+          </span>
+        </label>
+      )}
       {(state === "pending" || state === "expired" || state === "withdrawn") && info?.guardian_email && (
         <button type="button" onClick={() => post("/api/guardian-consent/resend", "Sent again.")} disabled={busy} className="mt-2 font-body text-xs text-rust underline disabled:opacity-40">
           Resend

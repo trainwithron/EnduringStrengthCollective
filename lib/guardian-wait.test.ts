@@ -20,7 +20,7 @@ describe("who is waiting on a guardian", () => {
   });
   it("the words", () => {
     expect(WAITING_ON_GUARDIAN_LABEL).toBe("Waiting on a guardian");
-    expect(guardianWaitNoticeBody("Sawyer S.")).toBe("Sawyer S. is under 18 and needs a parent or guardian's OK before starting. They are asked for it on their screen; you can send it again from their profile.");
+    expect(guardianWaitNoticeBody("Sawyer S.")).toBe("Sawyer S. is under 18 and needs a parent or guardian's OK before starting. If you've talked with their parent, tick that on their profile and they can start right away.");
     expect(guardianWaitNoticeBody(null)).toContain("A client is under 18");
   });
 });
@@ -43,7 +43,7 @@ describe("the coach's notice", () => {
   const route = read("app/api/intake/minor-consent-notice/route.ts");
   it("is sent for a teen only while no guardian has signed, and keeps the once-a-week limit per coach", () => {
     expect(route).toContain('.eq("status", "signed")');
-    expect(route).toContain("teenWaiting = !signed;");
+    expect(route).toContain("teenWaiting = !signed && !ticked;");
     expect(route).toContain("if (!under13 && !teenWaiting) {");
     expect(route).toContain("weekAgo");
     expect(route).toContain('under13 ? consentNoticeBody(childName) : guardianWaitNoticeBody(childName)');

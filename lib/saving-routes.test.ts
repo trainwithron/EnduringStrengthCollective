@@ -29,6 +29,7 @@ const NOT_A_SAVE = new Set([
   "/api/team-sheet/upload",
   // a guardian's consent: emailed links and a server-only record; nothing a pane shows changes
   "/api/guardian-consent/request",
+  "/api/guardian-consent/coach-confirm",
   "/api/guardian-consent/resend",
   "/api/guardian-consent/void",
   "/api/guardian-consent/sign",

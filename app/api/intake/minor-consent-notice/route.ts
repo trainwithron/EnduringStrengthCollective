@@ -30,8 +30,12 @@ export async function POST() {
   let teenWaiting = false;
   if (!under13 && ageBand(dob) === "teen") {
     // Only while no guardian has signed (read here with the server's own access; the table is not readable from a browser).
-    const { data: signed } = await admin.from("guardian_consents").select("id").eq("athlete_id", user.id).eq("status", "signed").limit(1).maybeSingle();
-    teenWaiting = !signed;
+    const [{ data: signed }, { data: ticked }] = await Promise.all([
+      admin.from("guardian_consents").select("id").eq("athlete_id", user.id).eq("status", "signed").limit(1).maybeSingle(),
+      // or their coach ticked that they talked with the parent (step 199)
+      admin.from("guardian_coach_confirmations").select("athlete_id").eq("athlete_id", user.id).maybeSingle(),
+    ]);
+    teenWaiting = !signed && !ticked;
   }
   if (!under13 && !teenWaiting) {
     return NextResponse.json({ ok: true, notified: 0 });

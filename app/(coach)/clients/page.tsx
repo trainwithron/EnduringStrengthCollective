@@ -72,8 +72,12 @@ export default async function CoachClientsPage() {
     // Read with the server's own access (the table is not readable from a browser), for this coach's own clients only.
     const admin = createServiceRoleClient();
     for (const ids of chunk(teenIds, 100)) {
-      const { data } = await admin.from("guardian_consents").select("athlete_id").eq("status", "signed").in("athlete_id", ids);
-      for (const r of (data ?? []) as { athlete_id: string }[]) signedTeens.add(r.athlete_id);
+      // a signed permission, or the coach's tick that they talked with the parent (step 199; a database without it just has none)
+      const [{ data }, { data: ticked }] = await Promise.all([
+        admin.from("guardian_consents").select("athlete_id").eq("status", "signed").in("athlete_id", ids),
+        admin.from("guardian_coach_confirmations").select("athlete_id").in("athlete_id", ids),
+      ]);
+      for (const r of [...(data ?? []), ...(ticked ?? [])] as { athlete_id: string }[]) signedTeens.add(r.athlete_id);
     }
   }
   const unconfirmed = await loadUnconfirmedUserIds();
