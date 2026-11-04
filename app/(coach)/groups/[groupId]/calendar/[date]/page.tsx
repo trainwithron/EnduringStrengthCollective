@@ -53,6 +53,7 @@ import { WaitlistJoinButton } from "@/components/athlete/waitlist-join-button";
 import { RecurringBookingButton } from "@/components/athlete/recurring-booking-button";
 import { RecurringConflictBadge } from "@/components/coach/desktop/recurring-conflict-badge";
 import { NO_SESSIONS_SLOT_LABEL, NO_SESSIONS_LINE } from "@/lib/session-credit-copy";
+import { coachBusyRanges, onlyOpenSlots, withBusy } from "@/lib/coach-busy";
 import { capToneClass, fetchSlotReasons, fullyBookedLine, keepOffered, limitsActive, limitsFromRow, loadCapLines } from "@/lib/session-caps";
 
 export const metadata = { title: "Calendar" };
@@ -246,7 +247,7 @@ export default async function CoachDayDetailPage(
       const minimumNoticeHours = policyRow?.minimum_notice_hours ?? 0;
 
       // Wave 2: both need timezone from wave 1, but not each other.
-      const [blockedRangesFromExceptions, { data: bookingRows }] = await Promise.all([
+      const [blockedRangesFromExceptions, { data: bookingRows }, busyRanges] = await Promise.all([
         getBlockedRangesForDate(supabase, coachMembership.profile_id, date, timezone),
         readRowsByIds(await orgGroupIdsOf(supabase, user.id, params.groupId), (g) => (from, to) =>
           supabase
@@ -262,6 +263,8 @@ export default async function CoachDayDetailPage(
             .order("id")
             .range(from, to)
         ).then((r) => ({ data: r.data.sort((a, b) => String(a.start_at).localeCompare(String(b.start_at))) })),
+        // every other session of the coach's that day (a client cannot read them), times only
+        coachBusyRanges(coachMembership.profile_id, zonedDayStart.toISOString(), zonedDayEnd.toISOString()),
       ]);
 
       // acuity_replacement_gap_audit_sept16.md — a too-soon slot is
@@ -274,11 +277,14 @@ export default async function CoachDayDetailPage(
 
       slots = generateSlotsForDate(date, windows, blockedRanges, timezone);
       bookingsForDay = bookingRows ?? [];
-      bufferBlockingBookings = bookingsForDay.map((b) => ({
-        id: b.id as string,
-        start: new Date(b.start_at as string),
-        end: new Date(b.end_at as string),
-      }));
+      bufferBlockingBookings = withBusy(
+        bookingsForDay.map((b) => ({
+          id: b.id as string,
+          start: new Date(b.start_at as string),
+          end: new Date(b.end_at as string),
+        })),
+        busyRanges
+      );
       resolvedBufferMinutes = bufferMinutes;
       customStarts = customStartOptions({
         date,
@@ -312,6 +318,14 @@ export default async function CoachDayDetailPage(
     if (bookingMode === "coach_schedules") {
       slots = slots.filter((s) => bookingByTime.get(s.start.getTime())?.athlete_id === athleteId);
     }
+    // Only the open times (Ron, Nov 3): a time taken by any other session of the coach's, or too close to one, is left off the list; the client's own sessions stay.
+    slots = onlyOpenSlots(
+      slots,
+      bufferBlockingBookings,
+      new Set(bookingsForDay.filter((b) => b.athlete_id === athleteId).map((b) => new Date(b.start_at).getTime())),
+      reschedulingBooking?.id ?? null,
+      resolvedBufferMinutes
+    );
     // The coach's caps, Keep my sessions together and lunch break (migration 0432): a client is offered only the times the server would accept (it decides; the screen asks it). Their own
     // sessions stay listed. Nothing set (or before the database update) = offered as before. A coach booking is never limited.
     let fullyBooked: string | null = null;

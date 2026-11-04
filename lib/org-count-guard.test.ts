@@ -18,6 +18,9 @@ const REVIEWED = new Set([
   // moving one session: the clash check must see EVERY session and discovery call of the coach in every organization (a coach cannot be in two places), times only, nothing shown
   "app/api/bookings/move/route.ts::bookings",
   "app/api/bookings/move/route.ts::discovery_bookings",
+  // a client's day page offers only the open times: every session and discovery call of the coach in every organization takes its time, start and end only, nothing shown (Ron, Nov 3)
+  "lib/coach-busy.ts::bookings",
+  "lib/coach-busy.ts::discovery_bookings",
   "app/api/discovery-availability/[coachId]/route.ts::bookings",
   "app/api/stripe/webhook/route.ts::revenue_split_transfers",
   "lib/series-store.ts::bookings",

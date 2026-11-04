@@ -20,6 +20,7 @@ import { WithdrawRequestButton } from "@/components/athlete/withdraw-request-but
 import { insideWindowHours } from "@/lib/cancel-window";
 import { RescheduleSlotButton } from "@/components/athlete/reschedule-slot-button";
 import { RequestSlotButton } from "@/components/athlete/request-slot-button";
+import { coachBusyRanges, onlyOpenSlots, withBusy } from "@/lib/coach-busy";
 import { RequestDifferentTime } from "@/components/athlete/request-different-time";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
@@ -317,11 +318,16 @@ export default async function DayDetailPage(
     );
 
     bookingsForDay = bookingRows ?? [];
-    bufferBlockingBookings = bookingsForDay.map((b) => ({
-      id: b.id as string,
-      start: new Date(b.start_at as string),
-      end: new Date(b.end_at as string),
-    }));
+    // A client cannot read the coach's other sessions; their times are read on the server so a taken time is not offered (Ron, Nov 3).
+    const busyRanges = viewingAsAthlete ? await coachBusyRanges(coachMembership.profile_id, zonedDayStart.toISOString(), zonedDayEnd.toISOString()) : [];
+    bufferBlockingBookings = withBusy(
+      bookingsForDay.map((b) => ({
+        id: b.id as string,
+        start: new Date(b.start_at as string),
+        end: new Date(b.end_at as string),
+      })),
+      busyRanges
+    );
     customStarts = customStartOptions({
       date,
       windows,
@@ -452,6 +458,17 @@ export default async function DayDetailPage(
       .eq("status", "confirmed")
       .maybeSingle();
     reschedulingBooking = rb;
+  }
+
+  // Only the open times, as on the Calendar's day page (Ron, Nov 3): a taken time is left off; the client's own sessions stay.
+  if (viewingAsAthlete) {
+    slots = onlyOpenSlots(
+      slots,
+      bufferBlockingBookings,
+      new Set(bookingsForDay.filter((b) => b.athlete_id === athleteId).map((b) => new Date(b.start_at).getTime())),
+      reschedulingBooking?.id ?? null,
+      resolvedBufferMinutes
+    );
   }
 
   // The coach's caps, Keep my sessions together and lunch break (migration 0432), as on the Calendar's day page: a client is offered only what the server would accept.
