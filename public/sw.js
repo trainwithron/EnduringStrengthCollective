@@ -80,12 +80,13 @@ self.addEventListener("fetch", (event) => {
   }
 });
 
-// Only ever open a path inside this app, never another address.
+// Only ever open a path inside this app, never another address. The part after # is kept: it is what opens the panel a notice is about (#late-changes opens the requests to confirm;
+// without it a booking request's notice only opened Home, Ron, Nov 5).
 function samePath(url) {
   try {
     const parsed = new URL(url || "/", self.location.origin);
     if (parsed.origin !== self.location.origin) return "/";
-    return parsed.pathname + parsed.search;
+    return parsed.pathname + parsed.search + parsed.hash;
   } catch {
     return "/";
   }
