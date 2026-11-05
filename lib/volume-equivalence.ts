@@ -65,6 +65,8 @@ const REFERENCE_OBJECTS_UNSORTED: ReferenceObject[] = [
   { name: "a Darth Vader", pluralName: "Darth Vaders", weightLbs: 265, emoji: "🖤", source: "Wookieepedia: Darth Vader 120 kg (265 lb)", pop: true },
   { name: "a Jabba the Hutt", pluralName: "Jabba the Hutts", weightLbs: 2994, emoji: "🐌", source: "Wookieepedia: Jabba 1,358 kg (2,994 lb)", pop: true },
   { name: "a Sonic the Hedgehog", pluralName: "Sonic the Hedgehogs", weightLbs: 77, emoji: "💨", source: "Sonic official profile: 35 kg (77 lb)", pop: true },
+  // Zebras (Ron, Nov 5: "I want a comparison of how many zebras we lift"): an animal, but shown as often as the pop-culture ones.
+  { name: "a zebra", pluralName: "zebras", weightLbs: 600, emoji: "🦓", source: "a plains zebra is about 385-850 lb (600 used)", pop: true },
   { name: "a DeLorean", pluralName: "DeLoreans", weightLbs: 2712, emoji: "⏱️", source: "DMC-12 (the time machine car) curb weight about 2,712 lb", pop: true },
   // Tiny
   { name: "a jellybean", pluralName: "jellybeans", weightLbs: 0.0025, emoji: "🍬", source: "a Jelly Belly bean is about 1.1 g" },

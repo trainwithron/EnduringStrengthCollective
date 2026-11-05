@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getVolumeEquivalence } from "./volume-equivalence";
+import { getVolumeEquivalence, REFERENCE_OBJECTS } from "./volume-equivalence";
 
 describe("getVolumeEquivalence", () => {
   it("returns the identical result for the same volume and seed (determinism)", () => {
@@ -59,5 +59,15 @@ describe("getVolumeEquivalence", () => {
     const bareName = result.count === 1 ? result.singular.replace(/^(a|an)\s+/i, "") : result.plural;
     expect(result.text).toContain(bareName);
     expect(result.text).toContain(result.emoji);
+  });
+});
+
+describe("zebras on the post-workout card (Ron, Nov 5)", () => {
+  it("a workout heavy enough counts zebras, among the comparisons the card shows most", () => {
+    const zebra = REFERENCE_OBJECTS.find((r) => r.pluralName === "zebras");
+    expect(zebra?.pop).toBe(true);
+    const seeds = Array.from({ length: 400 }, (_, i) => `z-${i}`);
+    const hit = seeds.map((s) => getVolumeEquivalence(12000, s, { popOnly: true })).find((e) => e?.plural === "zebras");
+    expect(hit?.text).toContain("20 zebras");
   });
 });
