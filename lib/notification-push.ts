@@ -34,3 +34,36 @@ const TITLES: Record<PushedByJob, string> = {
 export function pushTitleFor(type: string): string {
   return (TITLES as Record<string, string>)[type] ?? "New notification";
 }
+
+// Confirm and Decline on the booking request's notification itself (Ron, Nov 5). The phone has to say who and when to be answered from there, so such a notice shows the database's own line
+// ("Oliver B. asked for a session on Thu Nov 5, 9:00 AM."); with private lock screens on, none of this is shown and there are no buttons (sendPushToProfile).
+
+/** The request a booking-request notice is about: written in the same database call, so the same moment, coach and group. Null unless exactly one is still waiting. */
+export async function waitingRequestFor(db: any, n: { profile_id: string; group_id: string | null; created_at: string }): Promise<string | null> {
+  if (!n.group_id || !n.created_at) return null;
+  const { data, error } = await db.from("booking_requests").select("id").eq("coach_id", n.profile_id).eq("group_id", n.group_id).eq("created_at", n.created_at).eq("status", "pending").limit(2);
+  if (error || !Array.isArray(data) || data.length !== 1) return null;
+  return (data[0] as { id: string }).id;
+}
+
+/** The notice's line for the phone, without the closing "Confirm or decline." (the buttons say it). */
+export function answerableBody(body: string | null | undefined): string {
+  const text = (body ?? "").replace(/\s*Confirm or decline\.?\s*$/i, "").trim();
+  return text || "A client asked for a session.";
+}
+
+/** What the phone shows after Confirm or Decline was pressed on the notification. */
+export function requestAnswerLine(result: string): string {
+  switch (result) {
+    case "confirmed":
+      return "Confirmed. Your client has been told.";
+    case "declined":
+      return "Declined. Your client has been told.";
+    case "slot_taken":
+      return "That time was taken first, so it was declined and your client told.";
+    case "already":
+      return "That request was already answered.";
+    default:
+      return "That request was closed: the session changed or the time passed.";
+  }
+}

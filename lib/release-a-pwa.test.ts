@@ -89,7 +89,9 @@ describe("the app keeps working with a bad or no signal", () => {
     const sw = src("public/sw.js");
     expect(sw).toContain('url.pathname.startsWith("/sessions/")');
     expect(sw).toContain('"/offline.html"');
-    expect(sw).not.toContain("/api/");
+    // the one call to the app's API is Confirm or Decline pressed on a notification (Ron, Nov 5): a save sent, never a cached answer
+    expect(sw.replace('fetch("/api/bookings/request-answer"', "")).not.toContain("/api/");
+    expect(sw.match(/caches?.(open|match|put)[^;]*api/)).toBeNull();
     expect(sw).not.toContain("supabase");
     expect(src("components/group/sign-out-button.tsx")).toContain("purgeOfflinePages()");
     expect(src("lib/supabase/middleware.ts")).toContain('pathname === "/offline.html"');

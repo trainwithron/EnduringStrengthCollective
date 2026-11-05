@@ -100,28 +100,58 @@ self.addEventListener("push", (event) => {
     // Non-JSON payload — fall back to the default text above.
   }
 
+  // A booking request can be answered from the notification itself (Ron, Nov 5): Confirm and Decline buttons where the phone shows them (Android); tapping the notification still opens the requests.
+  const requestId = typeof data.requestId === "string" ? data.requestId : null;
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,
       icon: "/icon-192.png",
       badge: "/brand/spotlight-badge-72.png",
-      data: { url: samePath(data.url) },
+      data: { url: samePath(data.url), requestId },
+      ...(requestId ? { actions: [{ action: "confirm", title: "Confirm" }, { action: "decline", title: "Decline" }] } : {}),
     })
   );
 });
 
+function openApp(url) {
+  return self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+    for (const client of clients) {
+      if (client.url.includes(self.location.origin) && "focus" in client) {
+        client.navigate(url);
+        return client.focus();
+      }
+    }
+    if (self.clients.openWindow) return self.clients.openWindow(url);
+  });
+}
+
+// Confirm or Decline pressed on the notification: saved with the coach's own sign-in, then a short notice says what happened. Signed out, or anything that did not save: the requests open instead.
+async function answerRequest(requestId, confirm, url) {
+  try {
+    const res = await fetch("/api/bookings/request-answer", {
+      method: "POST",
+      credentials: "include",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ requestId, confirm }),
+    });
+    const out = await res.json().catch(() => ({}));
+    if (res.ok && typeof out.line === "string") {
+      await self.registration.showNotification(out.line, { icon: "/icon-192.png", badge: "/brand/spotlight-badge-72.png", tag: "answer-" + requestId, data: { url } });
+      return;
+    }
+  } catch {
+    // no signal: open the app below
+  }
+  return openApp(url);
+}
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = samePath(event.notification.data?.url);
-  event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
-      for (const client of clients) {
-        if (client.url.includes(self.location.origin) && "focus" in client) {
-          client.navigate(url);
-          return client.focus();
-        }
-      }
-      if (self.clients.openWindow) return self.clients.openWindow(url);
-    })
-  );
+  const data = event.notification.data || {};
+  const url = samePath(data.url);
+  if ((event.action === "confirm" || event.action === "decline") && data.requestId) {
+    event.waitUntil(answerRequest(data.requestId, event.action === "confirm", url));
+    return;
+  }
+  event.waitUntil(openApp(url));
 });

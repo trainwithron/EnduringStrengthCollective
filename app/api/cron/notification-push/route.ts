@@ -3,7 +3,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { sendPushToProfile } from "@/lib/send-push";
 import { withCronRun } from "@/lib/cron-monitor";
 import { runPool } from "@/lib/run-pool";
-import { PUSHED_BY_JOB, pushBodyFor, pushTitleFor, STALE_PUSH_HOURS } from "@/lib/notification-push";
+import { answerableBody, PUSHED_BY_JOB, pushBodyFor, pushTitleFor, STALE_PUSH_HOURS, waitingRequestFor } from "@/lib/notification-push";
 import { isQuietNow, readPushPrefs } from "@/lib/push-prefs";
 import { noticeHref } from "@/lib/notice-links";
 
@@ -46,13 +46,22 @@ async function handler(request: Request) {
   if (ids.length === 0) return NextResponse.json({ claimed: 0, sent: 0, deferred: candidates.length });
 
   // Claim them: only the rows this call marks are sent by it, so two overlapping runs never send the same notice.
-  const { data: claimed, error: claimError } = await db.from("notifications").update({ pushed_at: now }).in("id", ids).is("pushed_at", null).select("id, profile_id, type, body, link_path");
+  const { data: claimed, error: claimError } = await db.from("notifications").update({ pushed_at: now }).in("id", ids).is("pushed_at", null).select("id, profile_id, group_id, type, body, link_path, created_at");
   if (claimError) return NextResponse.json({ error: "Could not claim the notices." }, { status: 500 });
 
   let sent = 0;
-  type Claimed = { id: string; profile_id: string; type: string; body: string; link_path: string };
+  type Claimed = { id: string; profile_id: string; group_id: string | null; type: string; body: string; link_path: string; created_at: string };
   const run = await runPool((claimed ?? []) as Claimed[], AT_ONCE, async (n) => {
-    sent += await sendPushToProfile(db, n.profile_id, pushTitleFor(n.type), pushBodyFor(n.type), noticeHref(n.type, n.link_path || "/dashboard"));
+    // A booking request carries Confirm and Decline on the notification itself (Ron, Nov 5); tapping it still opens the requests.
+    const requestId = n.type === "booking_request" ? await waitingRequestFor(db, n).catch(() => null) : null;
+    sent += await sendPushToProfile(
+      db,
+      n.profile_id,
+      pushTitleFor(n.type),
+      requestId ? answerableBody(n.body) : pushBodyFor(n.type),
+      noticeHref(n.type, n.link_path || "/dashboard"),
+      requestId ? { answer: { requestId } } : {}
+    );
   }, { deadlineMs: 90_000 });
   if (run.failed.length > 0) console.error(`notification-push: ${run.failed.length} pushes failed`);
 

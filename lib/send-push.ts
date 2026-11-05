@@ -18,7 +18,8 @@ export async function sendPushToProfile(
   title: string,
   body: string,
   url: string,
-  opts: { ignoreQuiet?: boolean } = {}
+  // answer: a booking request that can be confirmed or declined from the notification (Ron, Nov 5); never with private lock screens on
+  opts: { ignoreQuiet?: boolean; answer?: { requestId: string } } = {}
 ): Promise<number> {
   const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
   const privateKey = process.env.VAPID_PRIVATE_KEY;
@@ -42,7 +43,7 @@ export async function sendPushToProfile(
     try {
       await webpush.sendNotification(
         { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth_key } },
-        JSON.stringify({ title: shown.title, body: shown.body, url: safePushPath(url) })
+        JSON.stringify({ title: shown.title, body: shown.body, url: safePushPath(url), ...(opts.answer && !prefs.generic ? { requestId: opts.answer.requestId } : {}) })
       );
       sent += 1;
     } catch (err: any) {
