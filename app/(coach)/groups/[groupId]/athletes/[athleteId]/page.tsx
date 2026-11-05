@@ -673,6 +673,8 @@ export default async function AthleteProfilePage(
       return { rows, upcomingRows: (upcomingRows ?? []) as unknown[], frozenRows: (frozenRows ?? []) as unknown[] };
     })(),
   ]);
+  // A teen not yet let in (no signed permission and no coach tick): the checkbox is shown first, above the tabs.
+  const guardianWaiting = isTeen && !!guardianStateRow && (guardianStateRow as GuardianStateInfo).state !== "signed";
 
   const sharedPhotos = signedPhotoResults;
   const subGoals: SubGoalView[] = ((subGoalRows ?? []) as any[]).map((r: any) => ({ id: r.id as string, title: r.title as string, targetDate: (r.target_date as string | null) ?? null, proposedBy: r.proposed_by as string, status: r.status as SubGoalStatus }));
@@ -1049,6 +1051,13 @@ export default async function AthleteProfilePage(
       </div>
 
       {getStartedShown && <GetStartedCard athleteId={params.athleteId} firstName={(profile?.full_name ?? "").trim().split(/\s+/)[0] || "them"} steps={getStarted} />}
+
+      {/* A teen still waiting on a parent: the checkbox comes first, on every tab (Ron, Nov 5: "I'm not seeing a place to allow Sawyer access to the app"). */}
+      {guardianWaiting && (
+        <section className="mb-6 rounded-lg border border-rust/40 p-4" data-guardian-waiting>
+          <GuardianConsentStatus athleteId={params.athleteId} info={guardianStateRow as GuardianStateInfo} />
+        </section>
+      )}
 
       <div id="client-profile-body" data-active-tab={initialTab}>
         <ClientProfileTabs groupId={params.groupId} athleteId={params.athleteId} initial={initialTab} hide={selfView ? SELF_HIDDEN_TABS : []} />
@@ -1481,7 +1490,7 @@ export default async function AthleteProfilePage(
               <p className="font-body text-sm text-rust">Spotlight Coaching is for people 13 and older, so this client is stopped at the start and nothing more is collected. No consent from a parent lets them in.</p>
             </section>
           )}
-          {isTeen && (
+          {isTeen && !guardianWaiting && (
             <section>
               <GuardianConsentStatus athleteId={params.athleteId} info={(guardianStateRow as GuardianStateInfo | null) ?? null} />
             </section>
