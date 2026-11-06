@@ -11,11 +11,19 @@ export const TAB_LABELS: Record<LeaderboardTab, string> = {
   prs: "Most PRs",
 };
 
+// The unit after the number; "1 workout", "1 PR" (seen live as "1 workouts", Nov 6).
 export const SCORE_LABEL: Record<LeaderboardTab, string> = {
   workouts: "workouts",
   volume: "lbs",
   prs: "PRs",
 };
+
+export function scoreUnit(label: string, n: number): string {
+  if (n !== 1) return label;
+  if (label === "workouts") return "workout";
+  if (label === "PRs") return "PR";
+  return label;
+}
 
 export function LeaderboardRows({
   entries,
@@ -40,7 +48,7 @@ export function LeaderboardRows({
             {entry.profileId === viewerId && <span className="text-rust"> (you)</span>}
           </span>
           <span className="font-body text-xs text-steel">
-            {Math.round(entry.score).toLocaleString()} {scoreLabel}
+            {Math.round(entry.score).toLocaleString()} {scoreUnit(scoreLabel, Math.round(entry.score))}
           </span>
         </div>
       ))}

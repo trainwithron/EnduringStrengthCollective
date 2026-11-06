@@ -356,7 +356,7 @@ export function PublicBookingFlow({ slug, page }: { slug: string; page: PublicPa
                             autoComplete="one-time-code"
                             placeholder="6-digit code"
                             value={code}
-                            onChange={(e) => setCode(e.target.value.replace(/D/g, "").slice(0, 6))}
+                            onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
                             aria-label="6-digit code"
                           />
                           <button

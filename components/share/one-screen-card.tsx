@@ -128,7 +128,7 @@ export function OneScreenCard({
               {model.lifts.map((lift) => (
                 <div
                   key={lift.name}
-                  className="flex items-center justify-between gap-2 px-3 py-[clamp(4px,1dvh,9px)] rounded-lg bg-chalk/[0.06] last:[@media(max-height:700px)]:hidden [&:nth-child(2)]:[@media(max-height:600px)]:hidden"
+                  className="flex items-center justify-between gap-2 px-3 py-[clamp(4px,1dvh,9px)] rounded-lg bg-chalk/[0.06] [&:not(:only-child)]:last:[@media(max-height:700px)]:hidden [&:nth-child(2)]:[@media(max-height:600px)]:hidden"
                 >
                   <span className="font-display uppercase text-[clamp(13px,2.1dvh,17px)] truncate">{lift.name}</span>
                   <span className="font-body text-[clamp(11px,1.8dvh,14px)] text-chalk/80 shrink-0 [font-variant-numeric:tabular-nums]">

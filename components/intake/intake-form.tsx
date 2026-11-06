@@ -95,7 +95,7 @@ export function IntakeForm({
     );
 
     if (upsertError) {
-      setDobError(upsertError.message);
+      setDobError(upsertError.code === "42501" || /birthday can't be changed here/i.test(upsertError.message ?? "") ? "Your birthday can't be changed here. Ask your coach to contact support." : "We couldn't save that. Check your connection and try again."); // same words as the Birthday screen, never the database's
       setDobSubmitting(false);
       return;
     }

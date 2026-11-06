@@ -42,7 +42,7 @@ export function ProfileDetailsEditor({
       emergency_contact_phone: next.emergencyContactPhone || null,
       updated_at: new Date().toISOString(),
     });
-    if (upsertError) setError(upsertError.message);
+    if (upsertError) setError("Couldn't save that. Check your connection and try again."); // never the database's own words (audit, Nov 6)
     setSaving(false);
   }
 
