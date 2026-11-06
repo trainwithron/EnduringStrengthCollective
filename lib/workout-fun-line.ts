@@ -170,9 +170,9 @@ const FITS = (s: string) => s.length <= MAX_FUN_LINE_CHARS;
 
 // How many different volume comparisons to offer from one workout's pounds (each a different unit), and how many "if those pounds were miles" lines join them (2 of 12:
 // about one in six of the comparisons).
-const EQUIV_VARIANTS = 4;
+const EQUIV_VARIANTS = 12;
 // Pop culture (Snorlax, the Hulk, Captain America's shield) is what clients loved: up to this many of the comparisons are characters, the rest objects and animals.
-const POP_VARIANTS = 8;
+const POP_VARIANTS = 40;
 const MILES_VARIANTS = 2;
 
 // Every line this workout could show, with its kind and stable id. Exposed so a test can render every template at edge values.
@@ -241,8 +241,12 @@ function randomOf<T>(items: T[], rand: () => number): T {
 // all-used fallback below, which prefers the line seen longest ago, so `recent` is oldest-first). `avoid` adds ids to skip (the line on screen when the client taps
 // "Another one"). The kind with the fewest recent lines is the most likely, so the kinds spread out. Always returns a line.
 export function pickFreshFunLine(f: WorkoutFacts, recent: RecentLine[], rand: () => number = Math.random, avoid: string[] = [], opts: PoolOptions = {}): FunLine {
-  const pool = funLinePool(f, opts);
-  if (pool.length === 0) return NICE_WORK; // never empty today (the absurd bank is always there), but a pick must not crash if it ever is
+  const all = funLinePool(f, opts);
+  if (all.length === 0) return NICE_WORK; // never empty today (the absurd bank is always there), but a pick must not crash if it ever is
+  // A comparison every time the workout has one (Ron, Nov 6: the card's line "still isn't what I want"; Oct 29: "it needs to have a good comparison").
+  // Stats and jokes are only for a workout with no weight to compare, or too little to say.
+  const comparisons = all.filter((l) => l.kind === "equiv");
+  const pool = comparisons.length > 0 ? comparisons : all;
   const window = recent.slice(-RECENT_WINDOW);
   const recentIds = new Set(window.map((r) => r.id));
   const blocked = new Set([...recentIds, ...avoid]);

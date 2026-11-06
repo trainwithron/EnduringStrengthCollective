@@ -235,13 +235,17 @@ describe("fresh, never repeating inside the window", () => {
       }
     }
   });
-  it("spreads across the kinds", () => {
-    const picks = simulate(typical, 90, "spread");
-    const count = (k: string) => picks.filter((p) => p.kind === k).length;
-    const counts = [count("stat"), count("equiv"), count("absurd")];
-    for (const c of counts) expect(c).toBeGreaterThan(10);
-    // No kind takes over: the biggest share is less than about twice the smallest.
-    expect(Math.max(...counts)).toBeLessThan(Math.min(...counts) * 2.2);
+  it("a workout with weight to compare always gets a comparison (Ron, Nov 6), and they vary", () => {
+    const picks = simulate(typical, 60, "spread");
+    expect(picks.every((p) => p.kind === "equiv")).toBe(true);
+    expect(new Set(picks.slice(0, 10).map((p) => p.id)).size).toBe(10);
+    expect(rerollFunLine(typical, [], picks[0].id, seededRandom("r")).kind).toBe("equiv");
+  });
+  it("a workout with nothing to compare still gets a stat, a joke or an encouraging line", () => {
+    const noVolume = { ...typical, totalVolume: null };
+    const picks = simulate(noVolume, 30, "nv");
+    expect(picks.some((p) => p.kind === "equiv")).toBe(false);
+    expect(new Set(picks.map((p) => p.kind)).size).toBeGreaterThan(1);
   });
   it("the same workout facts do not always give the same line (it is fresh, not seeded by the workout)", () => {
     const seen = new Set<string>();
