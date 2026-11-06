@@ -124,18 +124,10 @@ const NEAR_ONE = 0.9;
 const NEAR_ONE_TOP = 1.15;
 const MAX_COUNT = 5_000_000;
 
-// Absurd, not informative (Ron, Oct 29: the old lines were "not funny equivalencies ... not absurd"). Each reads with a count ("38 grizzly bears") and with "about one school bus".
+// Plain only (Ron, Nov 6: "I don't like the funny endings because they're not funny"; "out-lifted" read as stronger than, not the weight of).
+// The line clients loved: "you lifted the weight of 26 Snorlaxes".
 const PHRASE_TEMPLATES: ((label: string, singular: string, emoji: string) => string)[] = [
-  // The plain one is the one clients loved ("you lifted the weight of 26 Snorlaxes"), so it comes up most.
   (label, _s, emoji) => `You lifted the weight of ${label}. ${emoji}`,
-  (label, _s, emoji) => `You lifted the weight of ${label}. ${emoji}`,
-  (label, _s, emoji) => `You lifted the weight of ${label}. ${emoji}`,
-  (label, _s, emoji) => `That's ${label}. Please do not try this with the real thing. ${emoji}`,
-  (label, _s, emoji) => `You moved ${label} today. A moving company would like your number. ${emoji}`,
-  (label, singular, emoji) => `That's ${label}. Somewhere, ${singular} is filing a complaint. ${emoji}`,
-  (label, _s, emoji) => `That's ${label}, and not one thank-you. Rude. ${emoji}`,
-  (label, _s, emoji) => `That's ${label}. Nobody needed to know, but now everyone does. ${emoji}`,
-  (label, _s, emoji) => `Plot twist: you just out-lifted ${label}. ${emoji}`,
 ];
 
 export interface VolumeEquivalence {
