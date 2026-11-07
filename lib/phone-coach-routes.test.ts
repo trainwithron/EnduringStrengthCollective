@@ -90,6 +90,8 @@ describe("the table", () => {
     expect(to("/group-calendar")).toBe("/my-space/calendar");
     expect(to("/recurring-conflicts")).toBe("/my-space/calendar");
     expect(to("/running-low")).toBe("/my-space/spotlight");
+    expect(to("/dashboard")).toBe("/coach-landing/keep-org");
+    expect(to("/dashboard", "?spot=1")).toBe("/my-space/spotlight");
     expect(to(`/groups/${G}/business`)).toBe("/my-space/spotlight");
     expect(to(`/groups/${G}/dashboard`)).toBe("/my-space/spotlight");
     expect(phoneCoachRedirect(`/groups/${G}/dashboard`)?.home).toBe(true);

@@ -38,14 +38,14 @@ async function handler(request: Request) {
   // One entry per (coach, organization).
   const groupIdsByCoach = new Map<string, string[]>();
   const teamSocialGroupIdsByCoach = new Map<string, string[]>();
-  const entryInfo = new Map<string, { coachId: string; orgName: string | null }>();
+  const entryInfo = new Map<string, { coachId: string; orgId: string; orgName: string | null }>();
   const orgCountByCoach = new Map<string, Set<string>>();
   for (const row of coachRows) {
     const g = (row as any).groups;
     // A personal space belongs to no organization and has no clients: it is not part of the digest.
     if (!g?.organization_id) continue;
     const key = `${row.profile_id}|${g?.organization_id ?? "none"}`;
-    entryInfo.set(key, { coachId: row.profile_id, orgName: g?.organizations?.name ?? null });
+    entryInfo.set(key, { coachId: row.profile_id, orgId: g.organization_id, orgName: g?.organizations?.name ?? null });
     orgCountByCoach.set(row.profile_id, (orgCountByCoach.get(row.profile_id) ?? new Set<string>()).add(g?.organization_id ?? "none"));
     groupIdsByCoach.set(key, [...(groupIdsByCoach.get(key) ?? []), row.group_id]);
     const kind = g?.group_kind;
@@ -68,7 +68,7 @@ async function handler(request: Request) {
   const results: { coachId: string; sent: boolean; summary?: string }[] = [];
 
   const processEntry = async ([entryKey, groupIds]: [string, string[]]): Promise<void> => {
-    const { coachId, orgName } = entryInfo.get(entryKey)!;
+    const { coachId, orgId, orgName } = entryInfo.get(entryKey)!;
     const parts: string[] = [];
 
     // "What's New" — the same coach_view_state comparison the desktop
@@ -137,7 +137,9 @@ async function handler(request: Request) {
     const summary = parts.join(" · ");
     // A coach who runs several organizations gets each one's digest labeled with its name.
     const title = (orgCountByCoach.get(coachId)?.size ?? 1) > 1 && orgName ? `${orgName}: since you last checked` : "Your business, since you last checked";
-    const sent = await sendCoachPush(supabase, coachId, "briefing", title, summary, "/dashboard");
+    // Tapping it opens this organization (not whichever was open last), on Home; a phone opens Spotlight, where clients and posts are (Ron, Nov 7: on the phone it landed on his own Home).
+    const link = `/choose-organization/select?${new URLSearchParams({ org: orgId, next: "/dashboard?spot=1" })}`;
+    const sent = await sendCoachPush(supabase, coachId, "briefing", title, summary, link);
     results.push({ coachId, sent: sent > 0, summary });
   };
   const run = await runPool([...groupIdsByCoach.entries()], COACHES_AT_ONCE, processEntry, { deadlineMs: TIME_BUDGET_MS });

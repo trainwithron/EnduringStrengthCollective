@@ -86,7 +86,8 @@ export function phoneCoachRedirect(pathname: string, search = ""): PhoneRedirect
   }
   if (pathname === "/running-low") return { to: PHONE_SPOTLIGHT, groupId: null, shared: false };
   // The computer's Home. Decided here, before the page renders: the page has a loading screen, so a redirect from inside it arrives in the middle of the stream (Release 2 follow-up, Oct 20).
-  if (pathname === "/dashboard") return { to: PHONE_ENTRY, groupId: null, shared: false };
+  // A notice about clients and posts (?spot=1, the daily digest) opens Spotlight, where they live on the phone; plain Home stays the coach's own app.
+  if (pathname === "/dashboard") return { to: params.get("spot") === "1" ? PHONE_SPOTLIGHT : PHONE_ENTRY, groupId: null, shared: false };
 
   const m = GROUP.exec(pathname);
   if (!m) return null;
