@@ -148,6 +148,7 @@ export default async function GroupHubPage(
     { data: memberships },
     { data: programs, error: programsError },
     notificationRows,
+    unreadMessages,
     timezone,
     orgTheme,
     pendingCoaches,
@@ -189,6 +190,15 @@ export default async function GroupHubPage(
           .limit(20)
           .then(({ data }) => (data ?? []) as NotificationRow[])
       : Promise.resolve([] as NotificationRow[]),
+    user
+      ? supabase
+          .from("direct_messages")
+          .select("id", { count: "exact", head: true })
+          .eq("recipient_id", user.id)
+          .eq("group_id", params.groupId)
+          .is("read_at", null)
+          .then(({ count }) => count ?? 0)
+      : Promise.resolve(0),
     // "Today" here means this group's coach's real wall-clock day, not the server's own UTC clock — see lib/timezone.ts. Otherwise a workout's lock state and every date-scoped
     // lookup below could read a day early or late for anyone not in the UTC zone.
     getGroupCoachTimezone(supabase, params.groupId),
@@ -883,6 +893,8 @@ export default async function GroupHubPage(
         // A coach looking at any client app (their own or a client's) has Spotlight, which lists the same notices: on a phone the separate bell is not shown (Ron, Oct 23: "I have two
         // different notification bells"). The computer keeps its bell.
         bellOnComputerOnly={isActingAsOther}
+        messagesHref={!isCoach && !isActingAsOther ? `/groups/${params.groupId}/messages` : undefined}
+        unreadMessages={unreadMessages}
         notifications={(notificationRows ?? []).map((n: any) => ({
           id: n.id,
           type: n.type,
@@ -918,12 +930,6 @@ export default async function GroupHubPage(
               {isToday && <OtherProgramsCard programs={myTraining?.mine ?? []} />}
               {isToday && !isCoach && !isActingAsOther && athleteId && <ReviewPromptSection groupId={params.groupId} athleteId={athleteId} />}
               {scheduleCard && <MyScheduleCard groupId={params.groupId} state={scheduleCard} />}
-              {isToday && !isCoach && !isActingAsOther && (
-                // The one place a client reaches their coach: it was three taps deep (Settings, More, Messages).
-                <Link href={`/groups/${params.groupId}/messages`} className="block font-body text-sm text-chalk underline underline-offset-2">
-                  Message your coach
-                </Link>
-              )}
               {upcomingClasses > 0 && (
                 <Link href={`/groups/${params.groupId}/classes`} className="block border border-steel/30 bg-surface/40 px-4 py-3 font-body text-sm text-chalk">
                   Group sessions: {upcomingClasses} coming up &rarr;

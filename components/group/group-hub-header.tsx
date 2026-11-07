@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { MessageCircle } from "lucide-react";
 import { AddClientButton } from "@/components/coach/desktop/add-client-button";
 import { NotificationBell, type NotificationEntry } from "@/components/athlete/notification-bell";
 
@@ -15,6 +17,9 @@ interface GroupHubHeaderProps {
   logoUrl?: string | null;
   // The coach's own space: on a phone their notices live in the Spotlight button (its dot and the top of its drop-down), so this bell shows only at a computer.
   bellOnComputerOnly?: boolean;
+  // A client's way to their coach, on every Home view (Ron, Nov 7: the only link was a small line of text partway down Today).
+  messagesHref?: string;
+  unreadMessages?: number;
 }
 
 export function GroupHubHeader({
@@ -29,6 +34,8 @@ export function GroupHubHeader({
   notifications,
   logoUrl,
   bellOnComputerOnly = false,
+  messagesHref,
+  unreadMessages = 0,
 }: GroupHubHeaderProps) {
   return (
     <header className="px-5 pt-8 pb-6 border-b border-steel/20">
@@ -40,13 +47,30 @@ export function GroupHubHeader({
             {memberCount} {memberCount === 1 ? "member" : "members"}
           </p>
         )}
-        {notifications && viewerId && (bellOnComputerOnly ? (
-          <span className="hidden lg:inline-flex" data-bell-computer-only>
+        <div className="flex items-center gap-2">
+          {messagesHref && (
+            <Link
+              href={messagesHref}
+              aria-label={`Messages${unreadMessages > 0 ? ` (${unreadMessages} unread)` : ""}`}
+              className="relative inline-flex items-center gap-1.5 h-11 px-3 border border-steel/40 text-chalk font-body text-sm"
+            >
+              <MessageCircle className="w-5 h-5" aria-hidden="true" />
+              Messages
+              {unreadMessages > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1 rounded-full bg-rust text-graphite font-body text-xs font-semibold flex items-center justify-center">
+                  {unreadMessages > 9 ? "9+" : unreadMessages}
+                </span>
+              )}
+            </Link>
+          )}
+          {notifications && viewerId && (bellOnComputerOnly ? (
+            <span className="hidden lg:inline-flex" data-bell-computer-only>
+              <NotificationBell initial={notifications} viewerId={viewerId} />
+            </span>
+          ) : (
             <NotificationBell initial={notifications} viewerId={viewerId} />
-          </span>
-        ) : (
-          <NotificationBell initial={notifications} viewerId={viewerId} />
-        ))}
+          ))}
+        </div>
       </div>
       {logoUrl && (
         // eslint-disable-next-line @next/next/no-img-element -- external Supabase Storage URL, not a local asset Next can optimize.
