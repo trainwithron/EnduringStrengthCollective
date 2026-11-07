@@ -476,8 +476,8 @@ export function SessionLogger({
                 </p>
               )}
               {/* Coach mobile app's NL quick-add (coach_mobile_app_redesign_plan.md) — a coach driving someone else's in-person session only; an athlete logging their
-                  own session keeps the library search above. */}
-              {!isOwnSession && (
+                  own session keeps the library search above. A Wing it workout already has its own type-or-say box at the top, so it is not offered twice. */}
+              {!isOwnSession && !wingIt && (
                 <QuickAddNlButton sessionId={sessionId} nextExerciseOrder={nextExerciseOrder} library={libraryNames} onAdded={handleExercisesAdded} />
               )}
             </div>
@@ -485,7 +485,7 @@ export function SessionLogger({
             <button
               type="button"
               onClick={() => setAddingExercise(true)}
-              className="h-7 px-3 border border-rust/60 text-rust font-body text-xs font-medium active:bg-rust active:text-graphite transition-colors"
+              className="min-h-11 px-3 border border-rust/60 text-rust font-body text-xs font-medium active:bg-rust active:text-graphite transition-colors"
             >
               + Add exercise
             </button>

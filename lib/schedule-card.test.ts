@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { sessionsAvailableLine, soonestScheduleDays, scheduleCardHref, loadScheduleCardHref } from "./schedule-card";
+import { clientSessionsLine, sessionsAvailableLine, soonestScheduleDays, scheduleCardHref, loadScheduleCardHref } from "./schedule-card";
 import { ScheduleCard } from "@/components/athlete/schedule-card";
 
 // Ron, Oct 19: "something small, that says like credits available, would you like to schedule? ... I just want it to look good in the calendar".
@@ -19,6 +19,12 @@ describe("Schedule card: the sentence", () => {
     expect(sessionsAvailableLine(4)).toBe("4 sessions available");
     expect(sessionsAvailableLine(1)).toBe("1 session available");
     expect(sessionsAvailableLine(0)).toBe("No sessions left");
+  });
+  it("the day header and the month header word the balance the same way as the card", () => {
+    expect(clientSessionsLine({ left: 5, booked: 1, toBook: 4 }, "NONE")).toBe("4 sessions available");
+    expect(clientSessionsLine({ left: 0, booked: 0, toBook: 0 }, "NONE")).toBe("NONE");
+    expect(clientSessionsLine({ left: 0, booked: 2, toBook: 0 }, "NONE")).toBe("No sessions left");
+    expect(read("app/(coach)/groups/[groupId]/calendar/[date]/page.tsx")).toContain("clientSessionsLine(buildCreditPicture(");
   });
   it("the card is one line and a Schedule button (shown at 0 too)", () => {
     const html = renderToStaticMarkup(createElement(ScheduleCard, { available: 0, href: "/groups/g/calendar/2026-10-21" }));
@@ -71,7 +77,7 @@ describe("Schedule card: where it shows", () => {
       const src = read(p);
       // with the "Fully booked this week" line under it when the coach's cap is reached (Oct 23)
       expect(src).toContain("<ScheduleCard available={creditPicture.toBook} href={scheduleHref.href} note={scheduleHref.note} />");
-      expect(src).toMatch(/coachMembership && !scheduleHref && \(\n\s*<p className="font-body text-xs text-steel mt-3">\n\s*\{clientCreditPictureLine\(creditPicture, NO_SESSIONS_LINE\)\}/);
+      expect(src).toMatch(/coachMembership && !scheduleHref && \(\n\s*<p className="font-body text-xs text-steel mt-3">\n\s*\{(clientCreditPictureLine|clientSessionsLine)\(creditPicture, NO_SESSIONS_LINE\)\}/);
       expect(src).toContain('bookingMode === "coach_schedules" && <BookingModeLine groupId={params.groupId} />');
       expect(src).toContain("hasAvailability\n");
     });

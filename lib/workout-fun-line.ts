@@ -179,13 +179,18 @@ const MILES_VARIANTS = 2;
 // `faith`: the client's faith setting (on by default). Off, the Bible lines are not in the pool at all, so they cannot appear on that client's card or its public link.
 export interface PoolOptions {
   faith?: boolean;
+  // The client lifts in kilograms: the lines that print a number of pounds are left out (the card itself says kg). The comparisons stay; they name no unit.
+  kg?: boolean;
 }
+// The stat lines that print the workout's pounds.
+const POUNDS_KEYS = new Set(["money-rate", "per-minute", "volume-floor", "time-and-pounds"]);
 export function funLinePool(f: WorkoutFacts, opts: PoolOptions = {}): FunLine[] {
   const out: FunLine[] = [];
   const small = isSmallSession(f);
 
   for (const t of STAT_QUIPS) {
     if (small && !MILESTONE_KEYS.has(t.key)) continue;
+    if (opts.kg && POUNDS_KEYS.has(t.key)) continue;
     if (!t.needs(f)) continue;
     const text = t.text(f);
     if (FITS(text)) out.push({ id: `stat:${t.key}`, kind: "stat", text });
@@ -212,7 +217,7 @@ export function funLinePool(f: WorkoutFacts, opts: PoolOptions = {}): FunLine[] 
         out.push({ id: eq.id, kind: "equiv", text: eq.text });
       }
     }
-    for (let i = 0; i < MILES_VARIANTS; i++) {
+    for (let i = 0; i < (opts.kg ? 0 : MILES_VARIANTS); i++) {
       const miles = getDistanceEquivalence(f.totalVolume, `miles-${i}`);
       if (miles && !seen.has(miles.id) && FITS(miles.text)) {
         seen.add(miles.id);

@@ -247,7 +247,7 @@ export function RestTimerBar({
     <div className="flex items-center gap-1.5 px-5 py-1 border-b border-steel/20">
       <span className="font-body text-xs text-steel">Rest</span>
       {PRESETS.map((seconds) => (
-        <button key={seconds} type="button" onClick={() => startPreset(seconds)} className="h-8 px-2.5 font-body text-xs border border-steel/30 text-steel">
+        <button key={seconds} type="button" onClick={() => startPreset(seconds)} className="h-11 px-3 font-body text-xs border border-steel/30 text-steel">
           {seconds}s
         </button>
       ))}
@@ -270,7 +270,7 @@ export function RestTimerBar({
               key={seconds}
               type="button"
               onClick={() => startPreset(seconds)}
-              className={`h-9 px-2.5 font-body text-xs border ${
+              className={`h-11 px-3 font-body text-xs border ${
                 seconds === pendingPrompt!.defaultSeconds
                   ? "bg-rust border-rust text-graphite"
                   : "border-steel/30 text-steel"
@@ -283,7 +283,7 @@ export function RestTimerBar({
             <button
               type="button"
               onClick={() => startPreset(pendingPrompt!.defaultSeconds)}
-              className="h-9 px-2.5 font-body text-xs border bg-rust border-rust text-graphite"
+              className="h-11 px-3 font-body text-xs border bg-rust border-rust text-graphite"
             >
               {pendingPrompt!.defaultSeconds}s
             </button>
@@ -292,7 +292,7 @@ export function RestTimerBar({
             type="button"
             onClick={onPromptHandled}
             aria-label="Dismiss rest timer prompt"
-            className="ml-auto font-body text-xs text-steel"
+            className="ml-auto w-11 h-11 shrink-0 flex items-center justify-center font-body text-xs text-steel"
           >
             ✕
           </button>
@@ -308,7 +308,7 @@ export function RestTimerBar({
               <button
                 type="button"
                 onClick={addFifteen}
-                className="h-9 px-2.5 border border-steel/30 text-steel font-body text-xs"
+                className="h-11 px-3 border border-steel/30 text-steel font-body text-xs"
               >
                 +15s
               </button>
@@ -316,7 +316,7 @@ export function RestTimerBar({
             <button
               type="button"
               onClick={skip}
-              className="h-9 px-2.5 border border-steel/30 text-steel font-body text-xs"
+              className="h-11 px-3 border border-steel/30 text-steel font-body text-xs"
             >
               Skip
             </button>
@@ -345,7 +345,7 @@ export function RestTimerBar({
                   <button
                     type="button"
                     onClick={() => setGateOpen((v) => !v)}
-                    className="h-9 px-2.5 border border-steel/30 text-steel font-body text-xs"
+                    className="h-11 px-3 border border-steel/30 text-steel font-body text-xs"
                   >
                     🔒 Unlock
                   </button>
@@ -371,7 +371,7 @@ export function RestTimerBar({
                           setPickerOpen(false);
                           setReadOpen(false);
                         }}
-                        className="w-full text-left px-3 py-1.5 font-body text-xs text-chalk active:text-rust"
+                        className="w-full min-h-11 text-left px-3 font-body text-xs text-chalk active:text-rust"
                       >
                         {GAME_LABELS[key]}
                       </button>
@@ -388,7 +388,7 @@ export function RestTimerBar({
                         type="button"
                         onClick={handleCompleteHabit}
                         disabled={habitSaving}
-                        className="w-full h-9 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
+                        className="w-full h-11 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
                       >
                         {habitSaving ? "Saving…" : `Mark done: ${pendingTask.title}`}
                       </button>

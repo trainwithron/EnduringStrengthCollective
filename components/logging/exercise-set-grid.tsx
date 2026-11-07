@@ -4,7 +4,7 @@ import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useEffect, useRef, useState } from "react";
 import { useSetSave } from "./set-save-context";
 import { useLiftUnit } from "./lift-unit-context";
-import { liftCellText, liftDisplayValue, liftStoredFromInput } from "@/lib/lift-weight";
+import { liftCellText, liftDisplayValue, liftStoredFromInput, liftUnitLabel } from "@/lib/lift-weight";
 import { validateSetFieldInput, type SetFieldValidation } from "@/lib/set-field-validation";
 import type { SetLogEntry } from "@/lib/types";
 import {
@@ -94,6 +94,7 @@ function GridCell({
   readOnly,
   onChange,
   onTouched,
+  onInvalid,
   setNumber,
   coachRest,
   coachRestMax,
@@ -109,6 +110,8 @@ function GridCell({
   // The athlete interacted with this set (focused/blurred/swiped a cell) —
   // only then may a prefilled-from-the-program set count as done.
   onTouched: () => void;
+  // The reason a value can't be saved (or null once it can): shown under the whole grid, where the scroll box can't cut it off.
+  onInvalid: (message: string | null) => void;
   setNumber: number;
 }) {
   const prop = ACTUAL_PROP[field] as keyof SetLogEntry;
@@ -129,7 +132,17 @@ function GridCell({
   const [draft, setDraft] = useState(shown(value));
   // A value that can't be saved (RPE 89, 5.5 reps) stays on screen with the
   // reason, instead of silently reverting or being saved as nonsense.
-  const [invalid, setInvalid] = useState<string | null>(null);
+  const [invalid, setInvalidState] = useState<string | null>(null);
+  function setInvalid(message: string | null) {
+    setInvalidState(message);
+    onInvalid(message);
+  }
+  // A cell that goes away (its set removed) takes its message with it.
+  useEffect(
+    () => () => onInvalid(null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
   const def = fieldDef(field);
   const isNumeric = (def.kind === "number" || field === "reps") && field !== "rest"; // logged reps is always a real integer
 
@@ -240,7 +253,7 @@ function GridCell({
       <input
         type={isNumeric ? "number" : "text"}
         inputMode={isNumeric ? (field === "reps" ? "numeric" : "decimal") : undefined}
-        aria-label={`${def.label} for set ${setNumber}${
+        aria-label={`${field === "weight" ? `Weight (${liftUnitLabel(unit)})` : def.label} for set ${setNumber}${
           suggestion != null && draft.trim() === "" ? `, suggested ${suggestionText ?? suggestion}` : ""
         }`}
         placeholder={placeholder}
@@ -290,14 +303,6 @@ function GridCell({
           invalid ? "border-2 border-rust " : ""
         }bg-surface border border-steel/30 text-chalk`}
       />
-      {invalid && (
-        <p
-          role="alert"
-          className="absolute top-full left-1/2 -translate-x-1/2 mt-0.5 z-20 w-max max-w-[10rem] bg-graphite border border-rust px-2 py-1 font-body text-xs text-chalk text-center"
-        >
-          {invalid}
-        </p>
-      )}
       {unsaved && (
         <span
           aria-hidden="true"
@@ -318,6 +323,7 @@ function SetCompletionSync({
   trackedFields,
   readOnly,
   touched,
+  arrivedOnly,
   weightOptional,
   prescribedRestSeconds,
   onChange,
@@ -332,7 +338,9 @@ function SetCompletionSync({
   prescribedRestSeconds: number | null;
   // Whether the athlete has interacted with this set this session.
   touched: boolean;
-  onChange: (patch: Partial<SetLogEntry>) => void;
+  // Touched only because the coach typed it in (Wing it / Quick add), not by a tap here: completing it then starts no rest.
+  arrivedOnly: boolean;
+  onChange: (patch: Partial<SetLogEntry>, arrived?: boolean) => void;
 }) {
   const { save } = useSetSave();
   const restPrescribed = prescribedRestSeconds != null;
@@ -351,7 +359,7 @@ function SetCompletionSync({
       // A rest the client typed is never overwritten: only an empty one takes the prescribed rest.
       const withRest: Partial<SetLogEntry> =
         patch.status === "completed" && prescribedRestSeconds != null && set.restSeconds == null ? { ...patch, restSeconds: prescribedRestSeconds } : patch;
-      onChange(withRest);
+      onChange(withRest, arrivedOnly);
       const payload: Record<string, unknown> = { ...patch };
       if (patch.status === "completed") {
         payload.completed_at = new Date().toISOString();
@@ -397,17 +405,45 @@ export function ExerciseSetGrid({
   readOnly,
   onSetChange,
   weightOptional = false,
+  arrivedDone = false,
 }: {
   sets: SetLogEntry[];
   weightOptional?: boolean;
   trackedFields: TrackedField[];
   readOnly: boolean;
-  onSetChange: (setId: string, patch: Partial<SetLogEntry>) => void;
+  // `arrived` is true when a set completed only because it arrived filled in (see arrivedDone).
+  onSetChange: (setId: string, patch: Partial<SetLogEntry>, arrived?: boolean) => void;
+  // Sets the coach typed in (Wing it / Quick add) are what was done: they count as done once filled, with no tap on each one.
+  arrivedDone?: boolean;
 }) {
   const fields = orderTrackedFields(trackedFields);
   const { save } = useSetSave();
+  // The weight row is labelled with the person's own unit (kg or lb), never a fixed "lb".
+  const unit = useLiftUnit();
+  const rowLabel = (f: TrackedField) => (f === "weight" ? liftUnitLabel(unit) : fieldDef(f).label);
   // Sets the athlete has interacted with (see SetCompletionSync).
   const [touchedSetIds, setTouchedSetIds] = useState<Set<string>>(new Set());
+  // Why a typed value can't be saved, per cell ("setId:field"): shown under the grid, where nothing cuts it off.
+  const [invalidByCell, setInvalidByCell] = useState<Record<string, string>>({});
+  function setCellInvalid(key: string, message: string | null) {
+    setInvalidByCell((prev) => {
+      if ((prev[key] ?? null) === message) return prev;
+      const next = { ...prev };
+      if (message) next[key] = message;
+      else delete next[key];
+      return next;
+    });
+  }
+  const invalidLines = sets.flatMap((set, i) =>
+    fields.flatMap((f) => {
+      const m = invalidByCell[`${set.id}:${f}`];
+      return m ? [`Set ${i + 1}: ${m}`] : [];
+    })
+  );
+  // Four sets to a row: a fifth set wraps onto another row instead of running off a phone screen (where the grid scrolled sideways and fought the swipe to the next exercise).
+  const SETS_PER_ROW = 4;
+  const chunks: { start: number; sets: SetLogEntry[] }[] = [];
+  for (let i = 0; i < sets.length; i += SETS_PER_ROW) chunks.push({ start: i, sets: sets.slice(i, i + SETS_PER_ROW) });
   function markTouched(...ids: string[]) {
     setTouchedSetIds((prev) => {
       if (ids.every((id) => prev.has(id))) return prev;
@@ -436,7 +472,7 @@ export function ExerciseSetGrid({
     if (
       overwrites > 0 &&
       !await confirmDialog({
-        message: `Replace the ${fieldDef(field).label} you already entered on ${overwrites} other ${overwrites === 1 ? "set" : "sets"} with set 1's value?`,
+        message: `Replace the ${field === "weight" ? "weight" : fieldDef(field).label} you already entered on ${overwrites} other ${overwrites === 1 ? "set" : "sets"} with set 1's value?`,
         confirmLabel: "Replace",
       })
     ) {
@@ -469,7 +505,7 @@ export function ExerciseSetGrid({
     return (
       <button
         type="button"
-        aria-label={`Fill every set's ${fieldDef(field).label} with set 1's value — tap, or drag from here`}
+        aria-label={`Fill every set's ${rowLabel(field)} with set 1's value — tap, or drag from here`}
         title="Tap, or drag from here, to fill every set"
         onPointerDown={(e) => {
           dragStartX.current = e.clientX;
@@ -517,36 +553,47 @@ export function ExerciseSetGrid({
   }
 
   return (
-    <div className="overflow-x-auto -mx-1 px-1">
+    <div>
       {sets.map((set) => (
         <SetCompletionSync
           key={set.id}
           set={set}
           trackedFields={trackedFields}
           readOnly={readOnly}
-          touched={touchedSetIds.has(set.id)}
+          touched={arrivedDone || touchedSetIds.has(set.id)}
+          arrivedOnly={arrivedDone && !touchedSetIds.has(set.id)}
           weightOptional={weightOptional}
           prescribedRestSeconds={(() => {
             const r = restForSet(sets, set.id);
             return r?.source === "coach" ? r.seconds : null;
           })()}
-          onChange={(patch) => onSetChange(set.id, patch)}
+          onChange={(patch, arrived) => onSetChange(set.id, patch, arrived)}
         />
       ))}
-      <div className="inline-flex flex-col gap-1 min-w-full">
-        <div className="flex items-center gap-1.5">
+      <div className="flex flex-col gap-2">
+      {chunks.map((chunk) => (
+      <div key={chunk.start} className="flex flex-col gap-1">
+        <div className="flex items-center gap-1">
           <div className="w-12 shrink-0" />
           <div className="w-8 shrink-0" />
-          {sets.map((set, i) => {
+          {chunk.sets.map((set, j) => {
+            const i = chunk.start + j;
             const warmup = set.setType === "warmup";
-            // A done set's number turns green (this replaces the old checkbox row).
+            // A done set's number turns green with a tick beside it (this replaces the old checkbox row), so it reads as done without knowing the colour code.
             const done = set.status === "completed";
             const doneMark = done ? "text-moss font-bold" : "";
+            const label = (
+              <>
+                {warmup ? "W" : i + 1}
+                {done && <span aria-hidden="true"> &#10003;</span>}
+              </>
+            );
             // Tap the set number to mark it a warm-up (it then never counts toward goals, records or your max) and tap again to undo.
             if (readOnly) {
               return (
                 <span key={set.id} data-set-done={done || undefined} className={`w-12 shrink-0 text-center font-body text-xs ${doneMark || "text-steel"}`}>
-                  {warmup ? "W" : i + 1}
+                  {label}
+                  {done && <span className="sr-only"> (done)</span>}
                 </span>
               );
             }
@@ -563,31 +610,33 @@ export function ExerciseSetGrid({
                   onSetChange(set.id, { setType: next });
                   save(set.id, { set_type: next });
                 }}
-                className={`w-12 shrink-0 min-h-9 text-center font-body text-xs ${doneMark || (warmup ? "text-rust font-bold" : "text-steel")}`}
+                className={`w-12 shrink-0 min-h-11 text-center font-body text-xs ${doneMark || (warmup ? "text-rust font-bold" : "text-steel")}`}
               >
-                {warmup ? "W" : i + 1}
+                {label}
               </button>
             );
           })}
         </div>
 
         {fields.map((field) => (
-          <div key={field} className="flex items-center gap-1.5">
+          <div key={field} className="flex items-center gap-1">
             <span className="w-12 shrink-0 font-body text-xs text-steel truncate flex items-center gap-1">
-              {fieldDef(field).label}
+              {rowLabel(field)}
               {field === "rpe" && (
                 <InfoTip text="Rate of Perceived Exertion — how hard that set felt, 1 (easy) to 10 (max effort)." />
               )}
             </span>
-            <RowHandle field={field} />
-            {sets.map((set, i) => (
+            {/* The fill-the-row handle copies set 1, so it sits only on the first row of sets. */}
+            {chunk.start === 0 ? <RowHandle field={field} /> : <div className="w-8 shrink-0" />}
+            {chunk.sets.map((set, j) => (
               <GridCell
                 key={set.id}
                 set={set}
                 field={field}
                 readOnly={readOnly}
-                setNumber={i + 1}
+                setNumber={chunk.start + j + 1}
                 onTouched={() => markTouched(set.id)}
+                onInvalid={(message) => setCellInvalid(`${set.id}:${field}`, message)}
                 onChange={(patch) => onSetChange(set.id, patch)}
                 coachRest={(() => {
                   const r = restForSet(sets, set.id);
@@ -602,6 +651,17 @@ export function ExerciseSetGrid({
           </div>
         ))}
       </div>
+      ))}
+      </div>
+      {invalidLines.length > 0 && (
+        <div role="alert" className="mt-1.5 space-y-0.5">
+          {invalidLines.map((line) => (
+            <p key={line} className="font-body text-xs text-rust">
+              {line}
+            </p>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

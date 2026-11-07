@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { saved } from "@/lib/saved";
 import { Check } from "lucide-react";
+import { formatLift } from "@/lib/lift-weight";
+import type { WeightUnit } from "@/lib/units";
 
 export interface ShareCandidateLift {
   name: string;
@@ -16,10 +18,12 @@ export function CustomizeSharePanel({
   postId,
   candidates,
   initialSelected,
+  weightUnit = "lb",
 }: {
   postId: string;
   candidates: ShareCandidateLift[];
   initialSelected: string[];
+  weightUnit?: WeightUnit;
 }) {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set(initialSelected));
@@ -56,9 +60,9 @@ export function CustomizeSharePanel({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="font-body text-xs text-steel uppercase tracking-wide"
+        className="min-h-11 flex items-center font-body text-xs text-steel uppercase tracking-wide"
       >
-        {open ? "Done customizing" : "Customize what's shown →"}
+        {open ? "Done" : "Pick the lifts shown →"}
       </button>
 
       {open && (
@@ -73,7 +77,7 @@ export function CustomizeSharePanel({
                 key={c.name}
                 type="button"
                 onClick={() => toggle(c.name)}
-                className="w-full flex items-center justify-between py-1.5"
+                className="w-full flex items-center justify-between py-2.5"
               >
                 <span className="flex items-center gap-2">
                   <span
@@ -86,7 +90,7 @@ export function CustomizeSharePanel({
                   <span className="font-display text-sm uppercase">{c.name}</span>
                 </span>
                 <span className="font-body text-xs text-steel">
-                  {c.weight} lbs &times; {c.reps}
+                  {formatLift(c.weight, weightUnit)} &times; {c.reps}
                 </span>
               </button>
             );
@@ -95,7 +99,7 @@ export function CustomizeSharePanel({
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="w-full h-9 mt-2 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
+            className="w-full h-11 mt-2 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
           >
             {saving ? "Saving…" : "Save selection"}
           </button>

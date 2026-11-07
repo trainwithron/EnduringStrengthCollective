@@ -152,10 +152,11 @@ export default async function LogForClientPage(
                 </p>
               </>
             )}
-            {c.kind === "done" && (
-              <p className="font-body text-sm text-chalk mt-2">
-                Today&apos;s workout is logged{c.title ? `: ${c.title}` : ""}.
-              </p>
+            {/* A tap opens that day (its View workout button shows what was logged). */}
+            {c.kind === "done" && c.workoutId && (
+              <Link href={`${logBase}/${c.workoutId}`} className="mt-2 min-h-11 flex items-center font-body text-sm text-chalk underline underline-offset-2">
+                Today&apos;s workout is logged{c.title ? `: ${c.title}` : ""}. View it &rarr;
+              </Link>
             )}
             {c.kind === "pick" ? (
               <Link

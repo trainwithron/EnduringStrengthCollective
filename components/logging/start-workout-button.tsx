@@ -167,7 +167,7 @@ export function StartWorkoutButton({
       rpcError?.code === "PGRST202" || /could not find the function/i.test(rpcError?.message ?? "");
     if (!functionMissing) {
       setStarting(false);
-      setError("Couldn't start the workout — check your connection and try again.");
+      setError("Couldn't start the workout. Check your signal and try again.");
       return;
     }
 
@@ -187,7 +187,7 @@ export function StartWorkoutButton({
 
     if (sessionError || !session) {
       setStarting(false);
-      setError("Couldn't start the workout — check your connection and try again.");
+      setError("Couldn't start the workout. Check your signal and try again.");
       return;
     }
 

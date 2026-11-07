@@ -58,7 +58,7 @@ export function WingItStartButton({
     });
     if (rpcError || !sessionId) {
       setStarting(false);
-      setError("Couldn't start the workout — check your connection and try again.");
+      setError("Couldn't start the workout. Check your signal and try again.");
       return;
     }
     router.push(`/sessions/${sessionId}`);

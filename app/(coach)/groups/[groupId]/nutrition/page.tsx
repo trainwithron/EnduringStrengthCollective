@@ -486,7 +486,10 @@ export default async function NutritionPage(
         <ActingAsBanner athleteFullName={actingAsFullName ?? "Client"} groupId={params.groupId} />
       )}
       <header className="px-5 pt-8 pb-6 border-b border-steel/20">
-        <h1 className="font-display font-bold text-4xl leading-none uppercase">Nutrition</h1>
+        <Link href={`/groups/${params.groupId}`} className="inline-flex items-center min-h-11 font-body text-xs text-steel uppercase tracking-wide">
+          &larr; Home
+        </Link>
+        <h1 className="font-display font-bold text-3xl leading-none uppercase mt-3">Nutrition</h1>
       </header>
 
       {/* coach_em_up_finley_funston_transcript.md — real client-safety

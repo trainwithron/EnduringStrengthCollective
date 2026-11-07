@@ -79,7 +79,7 @@ export function SwipeDirectionDiscovery({
       .eq("id", athleteId);
     if (updateError) {
       setSaving(null);
-      setError("Couldn't save — check your connection and try again.");
+      setError("Couldn't save. Check your signal and try again.");
       return;
     }
     onChosen(direction);

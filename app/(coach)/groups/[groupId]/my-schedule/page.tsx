@@ -43,8 +43,8 @@ export default async function MySchedulePage(props: { params: Promise<{ groupId:
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-28 px-5 pt-8">
       {effective.isActingAsOther && <ActingAsBanner athleteFullName={actingAsName ?? "Client"} groupId={params.groupId} />}
-      <Link href={`/groups/${params.groupId}`} className="font-body text-xs text-steel mb-4 inline-block">
-        ← Back to Home
+      <Link href={`/groups/${params.groupId}`} className="font-body text-xs text-steel mb-4 inline-flex items-center min-h-11 -mt-3">
+        ← Home
       </Link>
       <h1 className="font-display font-bold text-2xl uppercase mb-1">My schedule</h1>
       {data.items.length === 0 ? (

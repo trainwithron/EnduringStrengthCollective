@@ -75,20 +75,20 @@ export function ReportAndBlockMenu({
   return (
     <div className="font-body text-xs">
       {!open ? (
-        <button type="button" onClick={() => setOpen(true)} aria-label={`More options for this ${noun}`} aria-expanded="false" className="min-h-8 px-1 text-steel underline underline-offset-2">
+        <button type="button" onClick={() => setOpen(true)} aria-label={`More options for this ${noun}`} aria-expanded="false" className="min-h-11 px-1 text-steel underline underline-offset-2">
           More
         </button>
       ) : (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           {!reporting && (
             <>
-              <button type="button" onClick={() => setReporting(true)} className="min-h-8 text-steel underline underline-offset-2">
+              <button type="button" onClick={() => setReporting(true)} className="min-h-11 px-2 text-steel underline underline-offset-2">
                 Report this {noun}
               </button>
-              <button type="button" onClick={() => void block()} disabled={busy} className="min-h-8 text-steel underline underline-offset-2 disabled:opacity-40">
+              <button type="button" onClick={() => void block()} disabled={busy} className="min-h-11 px-2 text-steel underline underline-offset-2 disabled:opacity-40">
                 Block {firstNameOf(authorName)}
               </button>
-              <button type="button" onClick={() => setOpen(false)} className="min-h-8 text-steel">
+              <button type="button" onClick={() => setOpen(false)} className="min-h-11 px-2 text-steel">
                 Close
               </button>
             </>
@@ -104,10 +104,10 @@ export function ReportAndBlockMenu({
                 className="w-full bg-graphite border border-steel/30 text-chalk px-2 py-1.5 text-sm"
               />
               <div className="flex items-center gap-3">
-                <button type="button" onClick={() => void sendReport()} disabled={busy || !reason.trim()} className="min-h-8 text-rust underline underline-offset-2 disabled:opacity-40">
+                <button type="button" onClick={() => void sendReport()} disabled={busy || !reason.trim()} className="min-h-11 px-2 text-rust underline underline-offset-2 disabled:opacity-40">
                   Send report
                 </button>
-                <button type="button" onClick={() => setReporting(false)} className="min-h-8 text-steel">
+                <button type="button" onClick={() => setReporting(false)} className="min-h-11 px-2 text-steel">
                   Cancel
                 </button>
               </div>

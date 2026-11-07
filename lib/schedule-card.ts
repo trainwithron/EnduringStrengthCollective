@@ -18,6 +18,13 @@ export function sessionsAvailableLine(available: number): string {
   return available === 1 ? "1 session available" : `${available} sessions available`;
 }
 
+// The client's balance, worded the same on the Calendar's card and on a day's header: what they can still book ("4 sessions available"), or the neutral
+// no-sessions line when nothing is on the account yet.
+export function clientSessionsLine(p: { left: number; booked: number; toBook: number }, noSessionsLine: string): string {
+  if (p.left === 0 && p.booked === 0) return noSessionsLine;
+  return sessionsAvailableLine(p.toBook);
+}
+
 // Pure. The day page parses its date as `new Date(\`${key}T00:00:00\`)`, so each day here is built the same way.
 export function soonestScheduleDays(input: {
   windows: AvailabilityWindow[];

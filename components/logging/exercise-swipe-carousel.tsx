@@ -256,11 +256,11 @@ export function ExerciseSwipeCarousel({
       {/* Position dots double as a drag-to-scrub quick-jump — a coach's
           day plan is usually short enough (2-6 exercises) that this
           reads as a real nav aid, not clutter. */}
-      {exercises.length === 1 && !readOnly && <div className="h-7 mb-1" aria-hidden="true" />}
+      {exercises.length === 1 && !readOnly && <div className="h-11 mb-1" aria-hidden="true" />}
       {exercises.length > 1 && (
         <div
           ref={dotsRef}
-          className="flex items-center justify-center gap-1.5 mb-1 min-h-7 touch-none"
+          className="flex items-center justify-center gap-1.5 mb-1 min-h-11 touch-none"
           onPointerDown={(e) => {
             scrubIndexRef.current = null;
             try {

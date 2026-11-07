@@ -40,7 +40,7 @@ describe("the card fits the screen", () => {
   it("the rest timer is always one slim row (start a rest any time); the prompt and countdown open over the top of the card; the stopwatch is on the header's top line", () => {
     expect(rest).toContain("{showPrompt && (");
     expect(rest).toContain("if (!showPrompt && !running && !justFinished) return restRow;");
-    expect(rest).toContain("onClick={() => startPreset(seconds)} className=\"h-8 px-2.5");
+    expect(rest).toContain("onClick={() => startPreset(seconds)} className=\"h-11 px-3");
     expect(rest).toContain('"absolute inset-x-0 top-0 z-40 bg-graphite border-b border-steel/20 px-5 py-1 shadow-lg"');
     expect(rest).toContain("flex flex-1 flex-wrap items-center justify-end gap-x-2 gap-y-2");
     expect(rest).toContain('<p className="mr-auto font-display text-3xl');

@@ -72,8 +72,8 @@ export default async function VideoCheckinsPage(props: { params: Promise<{ group
         <ActingAsBanner athleteFullName={actingAsFullName ?? "Client"} groupId={params.groupId} />
       )}
       <header className="px-5 pt-8 pb-6 border-b border-steel/20">
-        <Link href={`/groups/${params.groupId}`} className="font-body text-xs text-steel uppercase tracking-wide">
-          &larr; Back to group
+        <Link href={`/groups/${params.groupId}`} className="inline-flex items-center min-h-11 font-body text-xs text-steel uppercase tracking-wide">
+          &larr; Home
         </Link>
         <h1 className="font-display font-bold text-3xl uppercase leading-none mt-3">Video Check-ins</h1>
       </header>

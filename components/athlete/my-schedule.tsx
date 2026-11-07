@@ -21,6 +21,16 @@ import {
   type SeriesForUi,
 } from "@/lib/schedule-request-ui";
 
+// The database's refusals that are already written for the client ("choose today or a later date") are shown as a sentence; anything else
+// (a permission or technical message) never reaches the client: they read the same line the booking buttons use.
+const PLAIN_REFUSALS = [/^choose /, /^this schedule /, /^this request /, /^your coach /, /^a freeze /, /^the day you start/, /^only a freeze/, /^please keep/, /^you have sent/, /^you already have/];
+export const SCHEDULE_REQUEST_FALLBACK = "That didn't send. Nothing was changed. Try again.";
+export function scheduleRequestError(message: string | null | undefined): string {
+  const m = (message ?? "").trim();
+  if (!PLAIN_REFUSALS.some((r) => r.test(m))) return SCHEDULE_REQUEST_FALLBACK;
+  return m.charAt(0).toUpperCase() + m.slice(1).replace(/\.?$/, ".");
+}
+
 export interface ScheduleItem {
   series: SeriesForUi;
   nextSessionLabel: string | null;
@@ -58,7 +68,7 @@ function ScheduleCard({ groupId, item, canRequest }: { groupId: string; item: Sc
     const supabase = createBrowserClient();
     const { error: e } = await supabase.rpc("withdraw_schedule_request", { p_request_id: r.id });
     setBusy(false);
-    if (e) setError(e.message);
+    if (e) setError(scheduleRequestError(e.message));
     else router.refresh();
   }
 
@@ -148,7 +158,7 @@ function RequestSheet({ kind, series, onClose, onSent }: { kind: RequestKind; se
       p_note: note.trim() || null,
     });
     setBusy(false);
-    if (e) setError(e.message);
+    if (e) setError(scheduleRequestError(e.message));
     else onSent();
   }
 

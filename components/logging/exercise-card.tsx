@@ -30,6 +30,8 @@ import { ExerciseNameInput } from "@/components/coach/exercise-name-input";
 import { existingLibraryName } from "@/lib/exercise-search";
 import { capitalizeWords } from "@/lib/exercise-name-case";
 import { cleanExerciseName, exerciseNameProblem } from "@/lib/exercise-name-guard";
+import { formatLift } from "@/lib/lift-weight";
+import { useLiftUnit } from "./lift-unit-context";
 
 export function ExerciseCard({
   exercise,
@@ -77,6 +79,10 @@ export function ExerciseCard({
   const demoLibrary = useDemoLibrary();
   const openDemo = useOpenDemo();
   const demosHidden = useDemosHidden();
+  // Weights show in the person's own unit (stored in pounds; a kilogram client sees kilograms).
+  const unit = useLiftUnit();
+  // A metric's name in the Edit metrics chips and questions: the weight row is called Weight, not "lb".
+  const metricName = (f: TrackedField) => (f === "weight" ? "Weight" : fieldDef(f).label);
   const demo = demoLibrary
     ? findDemo(demoLibrary, exercise.exerciseName)
     : exercise.videoUrl || exercise.youtubeUrl
@@ -140,7 +146,7 @@ export function ExerciseCard({
     // a failed write would show the new exercise name while the database
     // still has the old one, with no way to tell the two apart.
     if (error) {
-      setSwapError("Couldn't swap — check your connection and try again.");
+      setSwapError("Couldn't swap. Check your signal and try again.");
       return;
     }
     onRenamed(name);
@@ -278,7 +284,7 @@ export function ExerciseCard({
     if (
       filled > 0 &&
       !await confirmDialog(
-        `Remove ${fieldDef(field).label}? This clears the ${fieldDef(field).label} you've already entered on ${filled} ${filled === 1 ? "set" : "sets"}.`
+        `Remove ${metricName(field)}? This clears the ${metricName(field).toLowerCase()} you've already entered on ${filled} ${filled === 1 ? "set" : "sets"}.`
       )
     ) {
       return;
@@ -382,9 +388,9 @@ export function ExerciseCard({
                     setSwapError(null);
                     setSwapping(true);
                   }}
-                  className="font-body text-xs text-steel"
+                  className="min-h-11 px-2 -mx-2 font-body text-xs text-steel"
                 >
-                  Swap Exercise
+                  Swap exercise
                 </button>
                 {onDelete && (
                   // An added exercise goes as before. A program exercise can be taken off TODAY's workout too (Ron, Oct 23: "I put box jumps in his program. We're not doing them ...
@@ -405,7 +411,7 @@ export function ExerciseCard({
                       onDelete();
                     }}
                     disabled={deleting}
-                    className="font-body text-xs text-rust disabled:opacity-40"
+                    className="min-h-11 px-2 -mx-2 font-body text-xs text-rust disabled:opacity-40"
                     data-remove-from-today={exercise.isAdded ? undefined : true}
                   >
                     {deleting ? "Removing…" : exercise.isAdded ? "Remove" : "Remove from today"}
@@ -434,7 +440,7 @@ export function ExerciseCard({
           <div className="min-w-0 flex-1">
             {lastTime && (
               <p className="font-body text-xs text-steel mb-1">
-                Last time: {lastTime.weight} &times; {lastTime.reps}
+                Last time: {formatLift(lastTime.weight, unit)} &times; {lastTime.reps}
               </p>
             )}
             {exercise.volumeHistory && <ExerciseVolumeHistory history={exercise.volumeHistory} />}
@@ -450,7 +456,7 @@ export function ExerciseCard({
               type="button"
               onClick={() => applySwap(name)}
               disabled={swapBusy || name === exercise.exerciseName}
-              className={`h-7 px-2.5 border font-body text-xs transition-colors ${
+              className={`min-h-11 px-2.5 border font-body text-xs transition-colors ${
                 name === exercise.exerciseName
                   ? "bg-rust border-rust text-graphite"
                   : "border-steel/30 text-steel active:border-rust active:text-rust"
@@ -487,11 +493,14 @@ export function ExerciseCard({
         trackedFields={gridFields}
         readOnly={readOnly}
         weightOptional={classifyEquipmentType(exercise.exerciseName) === "bodyweight"}
-        onSetChange={(setId, patch) => {
+        // An exercise added during the workout (typed into Wing it or Quick add) holds what was done: its filled-in sets count as done straight away.
+        arrivedDone={!!exercise.isAdded}
+        onSetChange={(setId, patch, arrived) => {
           const set = exercise.sets.find((s) => s.id === setId);
           const wasCompleted = set?.status === "completed";
           onSetChange(setId, patch);
-          if (patch.status === "completed" && !wasCompleted && set) {
+          // A set that is done because it was typed in already happened: no rest timer for it.
+          if (patch.status === "completed" && !wasCompleted && set && !arrived) {
             onSetCompleted?.({ ...set, ...patch }, restForSet(exercise.sets, setId));
           }
           if ("weight" in patch && patch.weight != null) {
@@ -545,12 +554,12 @@ export function ExerciseCard({
               <button
                 type="button"
                 onClick={() => setFieldsOpen((v) => !v)}
-                className="font-body text-xs text-steel active:text-rust transition-colors min-h-9"
+                className="font-body text-xs text-steel active:text-rust transition-colors min-h-11"
               >
                 Edit metrics
               </button>
               {canAddLoad && (
-                <button type="button" onClick={() => setShowLoad(true)} className="font-body text-xs text-steel active:text-rust min-h-9">
+                <button type="button" onClick={() => setShowLoad(true)} className="font-body text-xs text-steel active:text-rust min-h-11">
                   Add weight / RPE
                 </button>
               )}
@@ -565,9 +574,9 @@ export function ExerciseCard({
                           type="button"
                           onClick={() => handleRemoveField(f)}
                           disabled={fieldsBusy}
-                          className="h-7 px-2 border border-rust/40 text-rust font-body text-xs disabled:opacity-40"
+                          className="min-h-11 px-2 border border-rust/40 text-rust font-body text-xs disabled:opacity-40"
                         >
-                          {fieldDef(f).label} &times;
+                          {metricName(f)} &times;
                         </button>
                       ))}
                     </div>
@@ -580,9 +589,9 @@ export function ExerciseCard({
                           type="button"
                           onClick={() => handleAddField(f)}
                           disabled={fieldsBusy}
-                          className="h-7 px-2 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust disabled:opacity-40"
+                          className="min-h-11 px-2 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust disabled:opacity-40"
                         >
-                          + {fieldDef(f).label}
+                          + {metricName(f)}
                         </button>
                       ))}
                     </div>

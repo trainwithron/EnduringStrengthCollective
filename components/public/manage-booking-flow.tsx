@@ -38,6 +38,8 @@ export function ManageBookingFlow({
   const [slots, setSlots] = useState<Slot[] | null>(null);
   const [dateKey, setDateKey] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Separate from slots: a failed load hides "Loading times…" and the error stays alone; "Change the time" tries again.
+  const [loadingSlots, setLoadingSlots] = useState(false);
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
 
   async function act(body: unknown) {
@@ -61,9 +63,11 @@ export function ManageBookingFlow({
   async function startMove() {
     setMode("move");
     setMessage(null);
-    if (slots) return;
+    if (slots || loadingSlots) return;
+    setLoadingSlots(true);
     const res = await fetch(`/api/public-booking/manage/${token}/slots`).catch(() => null);
     const data = res ? await res.json().catch(() => ({})) : {};
+    setLoadingSlots(false);
     if (!res || !res.ok) {
       setMessage({ text: data.error ?? "We couldn't load the times.", error: true });
       return;
@@ -93,7 +97,7 @@ export function ManageBookingFlow({
 
       {!cancelled && canChange && mode === "view" && (
         <div className="flex flex-wrap gap-3 mt-6">
-          <button type="button" onClick={startMove} className="border border-steel/40 text-chalk font-body text-sm px-4 py-2.5">
+          <button type="button" onClick={startMove} className="min-h-11 border border-steel/40 text-chalk font-body text-sm px-4 py-2.5">
             Change the time
           </button>
           <button
@@ -102,7 +106,7 @@ export function ManageBookingFlow({
             onClick={async () => {
               if (await confirmDialog("Cancel this session?")) act({ action: "cancel" });
             }}
-            className="border border-rust text-rust font-body text-sm px-4 py-2.5 disabled:opacity-40"
+            className="min-h-11 border border-rust text-rust font-body text-sm px-4 py-2.5 disabled:opacity-40"
           >
             Cancel session
           </button>
@@ -112,7 +116,7 @@ export function ManageBookingFlow({
       {mode === "move" && (
         <section className="mt-6" aria-label="Pick a new time">
           <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">New day and time</h2>
-          {slots === null && <p className="font-body text-sm text-steel">Loading times…</p>}
+          {loadingSlots && <p className="font-body text-sm text-steel">Loading times…</p>}
           {slots && days.length === 0 && <p className="font-body text-sm text-steel">No other times are open right now.</p>}
           {days.length > 0 && (
             <>
@@ -143,7 +147,7 @@ export function ManageBookingFlow({
                     onClick={async () => {
                       if (await confirmDialog({ message: `Move your session to ${formatInTimezone(new Date(s.startIso), timezone, "dateTime")}?`, confirmLabel: "Move it" })) act({ action: "reschedule", startIso: s.startIso });
                     }}
-                    className="border border-steel/30 px-2 py-2 font-body text-sm text-chalk disabled:opacity-40"
+                    className="min-h-11 border border-steel/30 px-2 py-2 font-body text-sm text-chalk disabled:opacity-40"
                   >
                     {formatInTimezone(new Date(s.startIso), timezone, "time")}
                   </button>
@@ -151,7 +155,7 @@ export function ManageBookingFlow({
               </div>
             </>
           )}
-          <button type="button" onClick={() => setMode("view")} className="font-body text-sm text-steel underline mt-4">
+          <button type="button" onClick={() => setMode("view")} className="min-h-11 px-1 -mx-1 font-body text-sm text-steel underline mt-2">
             Back
           </button>
         </section>

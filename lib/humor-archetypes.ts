@@ -13,6 +13,7 @@ import { seededPick } from "./seeded-pick";
 export interface HumorArchetype {
   key: string;
   // The one line shown under the picture. There is no second line: an earlier developer description there reached a client's screen.
+  // The mascot is picked from the post id alone, so a caption must fit ANY workout: never a PR, a lift or a number the workout may not have had.
   caption: string;
   // A 150x170 viewBox, matching every archetype below.
   bodyPaths: string; // raw <path>/<circle>/<ellipse>/<rect> children as an SVG fragment string
@@ -91,7 +92,7 @@ export const HUMOR_ARCHETYPES: HumorArchetype[] = [
   },
   {
     key: "barbarian",
-    caption: "Barbarian PR",
+    caption: "Barbarian Mode",
     faceHole: { cx: 75, cy: 34.6, r: 21 },
     bodyPaths: `
       <ellipse cx="75" cy="150" rx="54" ry="13" fill="#0f0e0d" opacity=".4"/>
@@ -106,7 +107,7 @@ export const HUMOR_ARCHETYPES: HumorArchetype[] = [
   },
   {
     key: "knight",
-    caption: "Knight of the Deadlift",
+    caption: "Knight of the Iron",
     faceHole: { cx: 75, cy: 26, r: 26 },
     bodyPaths: `
       <ellipse cx="75" cy="150" rx="50" ry="13" fill="#0f0e0d" opacity=".4"/>

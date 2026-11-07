@@ -854,6 +854,9 @@ export default async function GroupHubPage(
     }
   }
 
+  // The phone's program list (MyProgramsBlock) needs every program read to have worked; otherwise the plain list below says the programs could not be loaded.
+  const programsBlockReady = !programsError && !programWorkoutRead.error && !programDoneRead.failed;
+
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
       {isActingAsOther && (
@@ -915,16 +918,19 @@ export default async function GroupHubPage(
               {isToday && <HomeThread lines={homeThreadLines} />}
               {isToday && aboutYouNeeded && !isCoach && !isActingAsOther && <AboutYouCard groupId={params.groupId} athleteId={athleteId} />}
               {reupState && <ReupCard state={reupState} />}
-              {isToday && <OtherProgramsCard programs={myTraining?.mine ?? []} />}
+              {/* Programs from the person's OTHER groups: this group's own program is listed under today's workout, so it is not repeated here.
+                  A removable one (a coach's own personal copy) stays, because this card holds its only "Remove from my profile" menu. */}
+              {isToday && <OtherProgramsCard programs={(myTraining?.mine ?? []).filter((p) => p.groupId !== params.groupId || p.canRemove)} />}
               {isToday && !isCoach && !isActingAsOther && athleteId && <ReviewPromptSection groupId={params.groupId} athleteId={athleteId} />}
               {scheduleCard && <MyScheduleCard groupId={params.groupId} state={scheduleCard} />}
               {isToday && !isCoach && !isActingAsOther && (
                 // The one place a client reaches their coach: it was three taps deep (Settings, More, Messages).
-                <Link href={`/groups/${params.groupId}/messages`} className="block font-body text-sm text-chalk underline underline-offset-2">
+                <Link href={`/groups/${params.groupId}/messages`} className="inline-flex items-center min-h-11 font-body text-sm text-chalk underline underline-offset-2">
                   Message your coach
                 </Link>
               )}
-              {upcomingClasses > 0 && (
+              {/* One block for group sessions: when the week's list renders below, this short link is not shown as well. */}
+              {upcomingClasses > 0 && !(isToday && weekClasses) && (
                 <Link href={`/groups/${params.groupId}/classes`} className="block border border-steel/30 bg-surface/40 px-4 py-3 font-body text-sm text-chalk">
                   Group sessions: {upcomingClasses} coming up &rarr;
                 </Link>
@@ -966,11 +972,11 @@ export default async function GroupHubPage(
                 mealLine={mealLine}
                 sessionsLeft={sessionsLeft}
                 ownChoice={isCoach && !isActingAsOther && athleteId === user?.id}
-                afterWorkout={isToday && !programsError && !programWorkoutRead.error && !programDoneRead.failed ? <MyProgramsBlock groupId={params.groupId} programs={homePrograms} /> : null}
+                afterWorkout={programsBlockReady && homePrograms.length > 0 ? <MyProgramsBlock groupId={params.groupId} programs={homePrograms} /> : null}
               />
               {isToday && weekClasses && (
-                <section aria-label="Group classes this week">
-                  <h2 className="font-body text-xs uppercase tracking-wide text-steel mb-2">Group classes this week</h2>
+                <section aria-label="Group sessions this week">
+                  <h2 className="font-body text-xs uppercase tracking-wide text-steel mb-2">Group sessions this week</h2>
                   <ClassesList classes={weekClasses.classes} balance={weekClasses.balance} timezone={timezone} nowIso={weekClasses.nowIso} />
                   <Link href={`/groups/${params.groupId}/classes`} className="inline-block mt-2 font-body text-xs text-rust min-h-11 leading-[44px]">
                     See all group sessions
@@ -1025,12 +1031,19 @@ export default async function GroupHubPage(
               nextHref={`/groups/${params.groupId}?view=month&date=${dateKeyOf(new Date(monthYear, monthIndex + 1, 1))}`}
             />
           )}
+
+          {/* Week and Month: the same program list as Day view, under the grid, so programs look the same whichever day is open. */}
+          {view !== "day" && programsBlockReady && homePrograms.length > 0 && (
+            <div className="mt-6">
+              <MyProgramsBlock groupId={params.groupId} programs={homePrograms} />
+            </div>
+          )}
         </section>
       )}
 
       {/* Today's workout comes first; the program list is reference. */}
-      {/* On a phone's Today view the programs are right under today's workout (MyProgramsBlock); this list is for every other view. */}
-      {!(showMobileView && athleteId && view === "day" && isToday && !programsError && !programWorkoutRead.error && !programDoneRead.failed) && (
+      {/* On a phone the programs are listed in the section above (MyProgramsBlock, one look in every view); this list is for the computer, and the fallback when the reads failed. */}
+      {!(showMobileView && athleteId && programsBlockReady) && (
       <section className="px-5 pt-6">
         <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
           Programs

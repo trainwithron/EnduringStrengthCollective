@@ -144,7 +144,7 @@ export function CancelBookingButton({
           type="button"
           onClick={handleCancelSeries}
           disabled={cancellingSeries}
-          className="font-body text-xs text-rust disabled:opacity-40"
+          className="min-h-11 px-2 font-body text-xs text-rust disabled:opacity-40"
         >
           {cancellingSeries ? "Cancelling series…" : "Cancel entire series"}
         </button>

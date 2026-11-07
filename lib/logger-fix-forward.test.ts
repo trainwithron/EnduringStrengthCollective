@@ -35,7 +35,7 @@ describe("the logging card fits the screen", () => {
   });
   it("Add sits on the dots row when swiping sideways, and the page has no bottom padding to scroll through while a workout is in progress", () => {
     expect(logger).toContain('"absolute right-0 top-0 z-30"');
-    expect(page).toContain('"pb-16" : "pb-32"');
+    expect(page).toContain('"pb-16" : isOwnSession && session.status === "abandoned" ? "pb-40" : "pb-32"');
   });
   it("the in-progress header is one slim row", () => {
     expect(page).toContain("In progress is ONE slim row");

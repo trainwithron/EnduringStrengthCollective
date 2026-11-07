@@ -117,8 +117,21 @@ export default async function TodayPage(
       {effective.isActingAsOther && (
         <ActingAsBanner athleteFullName={actingAsFullName ?? "Client"} groupId={params.groupId} />
       )}
-      <div className="flex-1 flex items-center justify-center px-6">
+      <header className="px-5 pt-8 pb-4">
+        <h1 className="font-display font-bold text-3xl leading-none uppercase">Today</h1>
+      </header>
+      <div className="flex-1 flex flex-col items-center justify-center px-6">
         <p className="font-body text-steel text-center max-w-[40ch]">{message}</p>
+        {/* Never a dead end: the next step is a tap away. */}
+        {isCoach && !effective.isActingAsOther ? (
+          <Link href={`/groups/${params.groupId}`} className="mt-3 inline-flex items-center min-h-11 font-body text-sm text-rust">
+            &larr; Home
+          </Link>
+        ) : (
+          <Link href={`/groups/${params.groupId}/messages`} className="mt-3 inline-flex items-center min-h-11 font-body text-sm text-chalk underline underline-offset-2">
+            Message your coach
+          </Link>
+        )}
       </div>
       <BottomTabBar groupId={params.groupId} />
     </main>

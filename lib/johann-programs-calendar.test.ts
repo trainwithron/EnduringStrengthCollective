@@ -85,11 +85,12 @@ describe("Johann: both programs show on Home", () => {
     expect(html).toContain("3 of 4 done");
     expect(renderToStaticMarkup(createElement(MyProgramsBlock, { groupId: "g1", programs: [] }))).toContain("Your coach is setting up your program");
   });
-  it("Home puts the block right under the workout card(s), above nutrition and weight, and the old bottom list only stays for other views", () => {
+  it("Home puts the block right under the workout card(s) on every day, under the grid in Week and Month, and the old bottom list only stays for the computer", () => {
     const home = read("app/(coach)/groups/[groupId]/page.tsx");
-    expect(home).toContain("afterWorkout={isToday && !programsError");
+    expect(home).toContain("afterWorkout={programsBlockReady && homePrograms.length > 0");
     expect(home).toContain("<MyProgramsBlock groupId={params.groupId} programs={homePrograms} />");
-    expect(home).toContain('view === "day" && isToday && !programsError');
+    expect(home).toContain('view !== "day" && programsBlockReady && homePrograms.length > 0');
+    expect(home).toContain("{!(showMobileView && athleteId && programsBlockReady) && (");
     const card = read("components/athlete/day-card.tsx");
     expect(card.indexOf("<WorkoutSection")).toBeLessThan(card.indexOf("{afterWorkout}"));
     expect(card.indexOf("{afterWorkout}")).toBeLessThan(card.indexOf("<TodayWidget"));

@@ -43,7 +43,7 @@ export function SwipeDirectionSetting({
             type="button"
             onClick={() => choose(option)}
             disabled={saving}
-            className={`flex-1 h-9 font-body text-xs font-medium border transition-colors disabled:opacity-60 ${
+            className={`flex-1 min-h-11 font-body text-xs font-medium border transition-colors disabled:opacity-60 ${
               direction === option
                 ? "bg-rust text-graphite border-rust"
                 : "border-steel/30 text-steel active:border-rust active:text-rust"

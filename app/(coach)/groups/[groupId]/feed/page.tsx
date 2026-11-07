@@ -288,9 +288,9 @@ export default async function FeedPage(
       <header className="px-5 pt-8 pb-4 border-b border-steel/20">
         <Link
           href={`/groups/${params.groupId}`}
-          className="font-body text-xs text-steel uppercase tracking-wide"
+          className="inline-flex items-center min-h-11 font-body text-xs text-steel uppercase tracking-wide"
         >
-          &larr; Back to group
+          &larr; Home
         </Link>
         <div className="flex items-center justify-between mt-3">
           <h1 className="font-display font-bold text-3xl uppercase leading-none">

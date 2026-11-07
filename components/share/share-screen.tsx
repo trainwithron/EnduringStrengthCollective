@@ -67,7 +67,7 @@ export function ShareScreen({
       setReady(true);
       return;
     }
-    const fresh = pickFreshFunLine(facts, memory.recent, Math.random, [], { faith: faithOn });
+    const fresh = pickFreshFunLine(facts, memory.recent, Math.random, [], { faith: faithOn, kg: imageInput.weightUnit === "kg" });
     writeFunMemory(storage, viewerId, rememberLine(memory, postId, fresh));
     setLine(fresh);
     setReady(true);
@@ -79,7 +79,7 @@ export function ShareScreen({
     if (!viewerId) return;
     const storage = deviceStorage();
     const memory = readFunMemory(storage, viewerId);
-    const next = rerollFunLine(facts, memory.recent, line.id, Math.random, { faith: faithOn });
+    const next = rerollFunLine(facts, memory.recent, line.id, Math.random, { faith: faithOn, kg: imageInput.weightUnit === "kg" });
     writeFunMemory(storage, viewerId, rememberLine(memory, postId, next));
     setLine(next);
   }

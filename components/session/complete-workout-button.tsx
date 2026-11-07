@@ -140,7 +140,9 @@ export function CompleteWorkoutButton({
   const { flush: flushSets } = useSetSave();
 
   function finishNavigation(navHref: string) {
-    router.push(navHref);
+    // A coach stays on this workout's own page (now finished): it reloads in place, still in coach mode.
+    if (navHref === `/sessions/${sessionId}`) router.refresh();
+    else router.push(navHref);
   }
 
   async function handleLogWeight() {
@@ -220,10 +222,15 @@ export function CompleteWorkoutButton({
     // just take them to the card it already has.
     const { data: existingSession } = await supabase
       .from("athlete_sessions")
-      .select("status, group_id")
+      .select("status, group_id, athlete_id")
       .eq("id", sessionId)
       .maybeSingle();
     if (existingSession?.status === "completed") {
+      // A coach stays in coach mode, on this finished workout (its page has the card link), the same as the first time.
+      if (coachMode) {
+        finishNavigation(`/sessions/${sessionId}`);
+        return;
+      }
       const { data: existingLog } = await supabase
         .from("workout_logs")
         .select("id")
@@ -237,7 +244,23 @@ export function CompleteWorkoutButton({
             .eq("post_type", "workout_summary")
             .maybeSingle()
         : { data: null };
-      finishNavigation(existingPost ? `/share/${existingPost.id}` : coachMode ? coachMode.homeHref : `/groups/${existingSession.group_id}`);
+      if (existingPost) {
+        finishNavigation(`/share/${existingPost.id}`);
+        return;
+      }
+      // No feed post (a client who keeps workouts off the feed, or a one-on-one client): the same signed card link the first tap would have made.
+      const card = existingLog
+        ? await announceWorkoutLog(supabase, {
+            workoutLogId: existingLog.id,
+            athleteId: existingSession.athlete_id,
+            groupId: existingSession.group_id,
+            broadcastLevel: "private",
+            hasPrs: false,
+            skipPost: true,
+            skipLink: !postWorkoutCards,
+          })
+        : { href: null };
+      finishNavigation(card.href ?? `/groups/${existingSession.group_id}`);
       return;
     }
 
@@ -361,10 +384,11 @@ export function CompleteWorkoutButton({
       skipLink: !cardsOn,
     });
 
-    // Every completed workout gets a celebratory, shareable card instead of silently landing back on the group hub.
+    // Every completed workout gets a celebratory, shareable card instead of silently landing back on the group hub. A coach logging for a client stays in coach mode on this
+    // finished workout's own page instead (its "View workout card" link opens the card; Back goes to the client's log), not on the public card outside coach mode.
     let navHref = `/groups/${result.group_id}`;
-    if (announced.href) navHref = announced.href;
-    else if (coachMode) navHref = coachMode.homeHref;
+    if (coachMode) navHref = `/sessions/${sessionId}`;
+    else if (announced.href) navHref = announced.href;
 
     // RPE comes first (own-session only, same reasoning as the weight
     // nudge below — it's the athlete's own subjective read on the session

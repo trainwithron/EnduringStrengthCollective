@@ -27,6 +27,8 @@ export function ShareActions({
   const showName = true;
   const [blob, setBlob] = useState<Blob | null>(null);
   const [failed, setFailed] = useState(false);
+  // Counts the client's "Try again" taps after a failed picture: each one runs the drawing again.
+  const [attempt, setAttempt] = useState(0);
   const [note, setNote] = useState<string | null>(null);
   const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -47,9 +49,9 @@ export function ShareActions({
     return () => {
       cancelled = true;
     };
-    // The input is fixed for this page; the fun line is what changes the picture.
+    // The input is fixed for this page; the fun line is what changes the picture (and a Try again tap draws it again).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [input.funLine, hold]);
+  }, [input.funLine, hold, attempt]);
 
   const file = useMemo(
     () => (blob ? new File([blob], `workout-${format}.png`, { type: "image/png" }) : null),
@@ -113,57 +115,65 @@ export function ShareActions({
 
   return (
     <div className="shrink-0 space-y-1.5">
+      {/* Square, like every other primary button in the app (the Complete workout bar, Save selection below). A failed picture keeps the button live as Try again. */}
       <button
         type="button"
-        onClick={share}
-        disabled={!ready}
-        className="w-full h-12 flex items-center justify-center gap-2 bg-rust text-graphite font-display uppercase text-sm font-bold active:bg-rust/80 transition-colors rounded-[14px] disabled:opacity-60 shadow-[0_8px_18px_-8px_rgba(210,112,59,.55)]"
+        onClick={failed ? () => setAttempt((a) => a + 1) : share}
+        disabled={!ready && !failed}
+        className="w-full h-12 flex items-center justify-center gap-2 bg-rust text-graphite font-display uppercase text-sm font-bold active:bg-rust/80 transition-colors disabled:opacity-60"
       >
         <Share2 className="w-4 h-4" />
-        {failed ? "Could not make the picture" : ready ? "Share" : "Making your picture…"}
+        {failed ? "Try again" : ready ? "Share" : "Making your picture…"}
       </button>
 
-      <div className="flex items-center justify-between min-h-[28px]" aria-live="polite">
-        {homeHref ? (
-          <a href={homeHref} className="font-body text-xs text-steel underline underline-offset-2 py-2">
-            Back to Home
-          </a>
-        ) : (
-          <span />
-        )}
+      {/* One row, always 44 px tall: a note about a save or copy takes the whole row for a few seconds (it never wraps beside the links and shrinks the card above). */}
+      <div className={`flex items-center min-h-11 ${note ? "justify-center" : "justify-between"}`} aria-live="polite">
         {note ? (
-          <span className="font-body text-xs text-rust">{note}</span>
+          <span className="font-body text-xs text-rust text-center">{note}</span>
         ) : (
-          <details className="relative">
-            <summary className="font-body text-xs text-steel py-2 cursor-pointer list-none">Save or copy</summary>
-            <div className="absolute right-0 bottom-full mb-1 z-10 w-40 border border-steel/30 bg-graphite">
-              <button
-                type="button"
-                onClick={save}
-                disabled={!ready}
-                className="w-full h-11 flex items-center gap-2 px-3 text-chalk font-body text-sm disabled:opacity-50"
-              >
-                <Download className="w-4 h-4" />
-                Save image
-              </button>
-              {caps.copyImage && (
-                <button
-                  type="button"
-                  onClick={copy}
-                  disabled={!ready}
-                  className="w-full h-11 flex items-center gap-2 px-3 text-chalk font-body text-sm border-t border-steel/20 disabled:opacity-50"
-                >
-                  <Copy className="w-4 h-4" />
-                  Copy image
-                </button>
-              )}
-            </div>
-          </details>
-        )}
-        {customizeHref && (
-          <a href={customizeHref} className="font-body text-xs text-steel py-2">
-            Customize card ↓
-          </a>
+          <>
+            {homeHref ? (
+              <a href={homeHref} className="min-h-11 flex items-center font-body text-xs text-steel underline underline-offset-2">
+                Back to Home
+              </a>
+            ) : (
+              <span />
+            )}
+            {failed ? (
+              <span className="font-body text-xs text-rust text-center">The picture didn&apos;t load. Tap to try again.</span>
+            ) : (
+              <details className="relative">
+                <summary className="min-h-11 flex items-center font-body text-xs text-steel cursor-pointer list-none">Save or copy</summary>
+                <div className="absolute right-0 bottom-full mb-1 z-10 w-40 border border-steel/30 bg-graphite">
+                  <button
+                    type="button"
+                    onClick={save}
+                    disabled={!ready}
+                    className="w-full h-11 flex items-center gap-2 px-3 text-chalk font-body text-sm disabled:opacity-50"
+                  >
+                    <Download className="w-4 h-4" />
+                    Save image
+                  </button>
+                  {caps.copyImage && (
+                    <button
+                      type="button"
+                      onClick={copy}
+                      disabled={!ready}
+                      className="w-full h-11 flex items-center gap-2 px-3 text-chalk font-body text-sm border-t border-steel/20 disabled:opacity-50"
+                    >
+                      <Copy className="w-4 h-4" />
+                      Copy image
+                    </button>
+                  )}
+                </div>
+              </details>
+            )}
+            {customizeHref && (
+              <a href={customizeHref} className="min-h-11 flex items-center font-body text-xs text-steel">
+                Customize card ↓
+              </a>
+            )}
+          </>
         )}
       </div>
     </div>

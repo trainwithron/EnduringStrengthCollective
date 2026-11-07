@@ -369,14 +369,14 @@ function CommentLine({
         <span className="text-chalk">{renderWithMentions(comment.body)}</span>
       </p>
       <div className="flex items-center gap-3 mt-0.5">
-        <button onClick={onReply} className="font-body text-xs text-steel">
+        <button onClick={onReply} className="min-h-11 px-2 inline-flex items-center font-body text-xs text-steel">
           Reply
         </button>
         {onDelete && (
           <button
             onClick={onDelete}
             disabled={deleting}
-            className="font-body text-xs text-steel flex items-center gap-1 disabled:opacity-50"
+            className="min-h-11 px-2 inline-flex items-center font-body text-xs text-steel gap-1 disabled:opacity-50"
           >
             <Trash2 className="w-3 h-3" />
             {deleting ? "Deleting…" : "Delete"}

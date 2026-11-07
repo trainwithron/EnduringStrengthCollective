@@ -45,7 +45,7 @@ export function BookSlotButton({
     });
 
     if (bookError) {
-      setError(bookError.message.includes("no session credits") ? CANT_BOOK_NO_SESSIONS : bookingRefusalMessage(bookError.message, "Couldn't book that slot. Nothing was changed. Try again."));
+      setError(bookError.message.includes("no session credits") ? CANT_BOOK_NO_SESSIONS : bookingRefusalMessage(bookError.message, "Couldn't book that time. Nothing was changed. Try again."));
       setSubmitting(false);
       router.refresh();
       return;

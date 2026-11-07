@@ -176,6 +176,7 @@ function LoginForm() {
             Create your coaching account
           </Link>
         </p>
+        <p className="font-body text-sm text-steel text-center mt-2">Client? Ask your coach for their link, or open the invite they sent you.</p>
         <LegalLinks className="mt-6" />
       </div>
     </main>

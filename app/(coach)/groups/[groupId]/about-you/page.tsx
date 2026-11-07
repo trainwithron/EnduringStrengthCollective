@@ -40,8 +40,8 @@ export default async function AboutYouPage(props: { params: Promise<{ groupId: s
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-28">
       <header className="px-5 pt-8 pb-6 border-b border-steel/20">
-        <Link href={`/groups/${params.groupId}`} className="font-body text-xs text-steel uppercase tracking-wide">
-          &larr; Back
+        <Link href={`/groups/${params.groupId}`} className="inline-flex items-center min-h-11 -my-3 px-2 -ml-2 font-body text-xs text-steel uppercase tracking-wide">
+          &larr; Home
         </Link>
         <h1 className="font-display font-bold text-3xl leading-none mt-3 uppercase">About you</h1>
         <p className="font-body text-sm text-steel mt-2 max-w-[60ch]">

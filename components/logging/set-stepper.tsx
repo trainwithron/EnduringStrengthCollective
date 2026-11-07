@@ -54,10 +54,10 @@ export function SetStepper({
       {confirmText && (
         <div className="mt-2 flex items-center gap-3" role="alert">
           <p className="font-body text-xs text-chalk">{confirmText}</p>
-          <button type="button" onClick={onConfirmRemove} className="font-body text-xs text-rust">
+          <button type="button" onClick={onConfirmRemove} className="min-h-11 px-2 -mx-2 font-body text-xs text-rust">
             Remove
           </button>
-          <button type="button" onClick={onKeep} className="font-body text-xs text-steel">
+          <button type="button" onClick={onKeep} className="min-h-11 px-2 -mx-2 font-body text-xs text-steel">
             Keep
           </button>
         </div>
@@ -65,7 +65,7 @@ export function SetStepper({
       {undo && !confirmText && (
         <div className="mt-2 flex items-center gap-3" role="status">
           <p className="font-body text-xs text-steel">{undo.text}</p>
-          <button type="button" onClick={undo.onUndo} disabled={undo.pending} className="font-body text-xs text-rust disabled:opacity-40">
+          <button type="button" onClick={undo.onUndo} disabled={undo.pending} className="min-h-11 px-2 -mx-2 font-body text-xs text-rust disabled:opacity-40">
             {undo.pending ? "Removing…" : "Undo"}
           </button>
         </div>

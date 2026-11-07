@@ -36,7 +36,7 @@ export default async function ClassesPage(props: { params: Promise<{ groupId: st
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
       <div className="px-5 pt-8 max-w-xl mx-auto">
-        <Link href={`/groups/${params.groupId}`} className="font-body text-xs text-steel uppercase tracking-wide">
+        <Link href={`/groups/${params.groupId}`} className="inline-flex items-center min-h-11 font-body text-xs text-steel uppercase tracking-wide">
           &larr; Home
         </Link>
         <h1 className="font-display font-bold text-3xl uppercase leading-none mt-3">Group sessions</h1>

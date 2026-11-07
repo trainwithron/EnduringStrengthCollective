@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Lock } from "lucide-react";
+import { Lock, Check } from "lucide-react";
 import type { HomeDaySummary } from "./home-week-view";
 
 const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
@@ -42,11 +42,11 @@ export function HomeMonthView({
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <Link href={prevHref} className="font-body text-xs text-rust uppercase tracking-wide">
+        <Link href={prevHref} className="inline-flex items-center min-h-11 font-body text-xs text-rust uppercase tracking-wide">
           &larr; Prev
         </Link>
         <h2 className="font-display uppercase text-sm tracking-wide text-steel">{monthLabel}</h2>
-        <Link href={nextHref} className="font-body text-xs text-rust uppercase tracking-wide">
+        <Link href={nextHref} className="inline-flex items-center min-h-11 font-body text-xs text-rust uppercase tracking-wide">
           Next &rarr;
         </Link>
       </div>
@@ -75,25 +75,27 @@ export function HomeMonthView({
               <span className={`font-body text-xs ${isToday ? "text-rust font-bold" : "text-steel"}`}>
                 {date.getDate()}
               </span>
-              {summary?.workout.title && (
-                <span
-                  className={`font-body text-xs leading-tight mt-0.5 truncate flex items-center gap-0.5 ${
-                    summary.workout.status === "locked" ? "text-steel" : "text-chalk"
-                  }`}
-                >
-                  {summary.workout.status === "locked" && <Lock className="w-2 h-2 shrink-0" />}
-                  {summary.workout.title}
-                  {(summary.sessionCount ?? 0) > 1 && <span className="text-steel shrink-0">+{(summary.sessionCount ?? 0) - 1}</span>}
+              {/* A 45px-wide cell has no room for a title or numbers: one mark says what the day is, and tapping it opens the day's full card. */}
+              {summary?.workout.status === "done" && (
+                <span className="mt-1 flex items-center gap-0.5 text-positive" aria-label="Done">
+                  <Check className="w-3.5 h-3.5 shrink-0" strokeWidth={3} />
+                  {(summary.sessionCount ?? 0) > 1 && <span className="font-body text-xs">+{(summary.sessionCount ?? 0) - 1}</span>}
                 </span>
               )}
-              {summary?.workout.status === "done" && (
-                <span className="font-body text-xs text-positive mt-0.5">Done</span>
+              {summary?.workout.status === "locked" && (
+                <span className="mt-1 flex items-center text-steel" aria-label="Locked">
+                  <Lock className="w-3 h-3 shrink-0" />
+                </span>
               )}
-              {summary && (summary.macroCalories != null || summary.habitsDue > 0) && (
-                <span className="font-body text-[8px] text-steel mt-0.5 truncate">
-                  {summary.macroCalories != null ? `${summary.macroCalories}cal` : ""}
-                  {summary.macroCalories != null && summary.habitsDue > 0 ? " " : ""}
-                  {summary.habitsDue > 0 ? `${summary.habitsCompleted}/${summary.habitsDue}h` : ""}
+              {summary?.workout.status === "planned" && (
+                <span className="mt-1 flex items-center gap-0.5 text-chalk" aria-label="Planned">
+                  <span className="w-2 h-2 rounded-full bg-chalk shrink-0" />
+                  {(summary.sessionCount ?? 0) > 1 && <span className="font-body text-xs text-steel">+{(summary.sessionCount ?? 0) - 1}</span>}
+                </span>
+              )}
+              {summary?.workout.status === "missed" && (
+                <span className="mt-1 flex items-center text-steel" aria-label="Not logged">
+                  <span className="w-2 h-2 rounded-full border border-steel shrink-0" />
                 </span>
               )}
             </Link>

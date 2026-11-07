@@ -17,7 +17,7 @@ import { zonedTimeToUtc, DEFAULT_COACH_TIMEZONE, dateKeyInZone, getGroupCoachTim
 import { loadClientCalendar } from "@/lib/client-calendar";
 import { addDaysToDateKey } from "@/lib/series-schedule";
 import { coachCreditSentence } from "@/lib/credit-sentence";
-import { buildCreditPicture, clientCreditPictureLine, fetchBookingCounts } from "@/lib/credit-picture";
+import { buildCreditPicture, fetchBookingCounts } from "@/lib/credit-picture";
 import { AssignSlotButton } from "@/components/coach/desktop/assign-slot-button";
 import { AssignOtherTime } from "@/components/coach/desktop/assign-other-time";
 import { BookingTypeSelect } from "@/components/coach/desktop/booking-type-select";
@@ -52,7 +52,8 @@ import { MarkNoShowToggle } from "@/components/coach/mark-no-show-toggle";
 import { WaitlistJoinButton } from "@/components/athlete/waitlist-join-button";
 import { RecurringBookingButton } from "@/components/athlete/recurring-booking-button";
 import { RecurringConflictBadge } from "@/components/coach/desktop/recurring-conflict-badge";
-import { NO_SESSIONS_SLOT_LABEL, NO_SESSIONS_LINE } from "@/lib/session-credit-copy";
+import { NO_SESSIONS_LINE } from "@/lib/session-credit-copy";
+import { clientSessionsLine } from "@/lib/schedule-card";
 import { coachBusyRanges, onlyOpenSlots, withBusy } from "@/lib/coach-busy";
 import { capToneClass, fetchSlotReasons, fullyBookedLine, keepOffered, limitsActive, limitsFromRow, loadCapLines } from "@/lib/session-caps";
 
@@ -77,7 +78,12 @@ export default async function CoachDayDetailPage(
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(params.date)) {
     return (
-      <NoAccess>Invalid date.</NoAccess>
+      <main className="min-h-screen bg-graphite text-chalk flex flex-col items-center justify-center gap-5 px-6">
+        <p className="font-body text-steel text-center max-w-[40ch]">That link doesn&apos;t point to a day. Open your calendar instead.</p>
+        <Link href={`/groups/${params.groupId}/calendar`} className="inline-flex items-center justify-center h-11 px-6 bg-rust text-graphite font-display font-bold uppercase tracking-wide">
+          Open your calendar
+        </Link>
+      </main>
     );
   }
 
@@ -375,7 +381,11 @@ export default async function CoachDayDetailPage(
         if (!slotStarts.has(s.getTime()) && dayStartUtc && dayEndUtc && s >= dayStartUtc && s < dayEndUtc) offGridRequests.push({ id: r.id as string, start: s, end: e });
       }
     }
-    const backHref = `/groups/${params.groupId}/calendar`;
+    const calendarHref = `/groups/${params.groupId}/calendar`;
+    // While a session is being moved, Back keeps the move alive: the month opens on this day's month with the session still being rescheduled.
+    const backHref = reschedulingBooking ? `${calendarHref}?month=${params.date.slice(0, 7)}&reschedule=${reschedulingBooking.id}` : calendarHref;
+    // In request mode, a day whose regular times are all taken still has the "Ask for a different time" form under the list.
+    const askBelow = bookingMode === "request" && !reschedulingBooking && customStarts.length > 0;
     // This day's workouts on the client's one Calendar: every dated program's workout for the day, one the coach put on this day, and anything logged (lib/client-calendar.ts).
     const dayTz = await getGroupCoachTimezone(supabase, params.groupId);
     const dayWorkouts = (
@@ -389,7 +399,7 @@ export default async function CoachDayDetailPage(
         )}
         <DaySwipeNav prevHref={swipe.prev} nextHref={swipe.next} />
         <header className="px-5 pt-8 pb-6 border-b border-steel/20">
-          <Link href={backHref} className="font-body text-xs text-steel uppercase tracking-wide">
+          <Link href={backHref} className="inline-flex items-center min-h-11 -mt-3 font-body text-xs text-steel uppercase tracking-wide">
             &larr; Back to calendar
           </Link>
           <h1 className="font-display font-bold text-3xl leading-none mt-3 uppercase">
@@ -398,7 +408,7 @@ export default async function CoachDayDetailPage(
           {coachMembership && (
             <div className="mt-3">
               <p className="font-body text-xs text-steel">
-                {clientCreditPictureLine(buildCreditPicture({ balance: creditBalance, booked: creditBooked, toMark: 0 }), NO_SESSIONS_LINE)}
+                {clientSessionsLine(buildCreditPicture({ balance: creditBalance, booked: creditBooked, toMark: 0 }), NO_SESSIONS_LINE)}
                 {creditBalance > 0 && creditExpiresAt && (
                   <span className="text-steel">
                     {" "}
@@ -410,9 +420,14 @@ export default async function CoachDayDetailPage(
               {expiryWindowLine(creditExpiryDaysForNote) && (
                 <p className="font-body text-xs text-steel mt-1">{expiryWindowLine(creditExpiryDaysForNote)}</p>
               )}
-              {creditBalance <= 0 && !reschedulingBooking && isStripeConfigured() && (
+              {/* With no sessions on the account: the packages to buy (or the membership's renewal), else one Message button, so nobody is told "message them" with no way to. */}
+              {creditBalance <= 0 && !reschedulingBooking && bookingMode !== "coach_schedules" && (
                 <div className="mt-2">
-                  <CalendarPurchasePrompt activeSubscription={activeSubscription} packages={availablePackages} />
+                  {isStripeConfigured() && (activeSubscription || availablePackages.length > 0) ? (
+                    <CalendarPurchasePrompt activeSubscription={activeSubscription} packages={availablePackages} />
+                  ) : (
+                    <MessageCoachLink groupId={params.groupId} />
+                  )}
                 </div>
               )}
             </div>
@@ -462,19 +477,29 @@ export default async function CoachDayDetailPage(
           </h2>
 
           {!coachMembership ? (
-            <p className="font-body text-sm text-steel py-2">No coach found for this group.</p>
+            <p className="font-body text-sm text-steel py-2">Your coach hasn&apos;t set up scheduling yet.</p>
           ) : slots.length === 0 ? (
             <p className="font-body text-sm text-steel py-2">
               {bookingMode === "coach_schedules"
                 ? "Your coach schedules your sessions. Message them to set one up."
-                : fullyBooked
-                  ? `${fullyBooked}. Message your coach to ask for a time.`
-                  : "No open hours on this day. Message your coach to ask for a time."}
-              <br />
-              <MessageCoachLink groupId={params.groupId} />
+                : askBelow
+                  ? "The regular times are taken today. Ask for a different time below."
+                  : fullyBooked
+                    ? `${fullyBooked}. Message your coach to ask for a time.`
+                    : "No open hours on this day. Message your coach to ask for a time."}
+              {!askBelow && (
+                <>
+                  <br />
+                  <MessageCoachLink groupId={params.groupId} />
+                </>
+              )}
             </p>
           ) : (
             <div className="divide-y divide-steel/15">
+              {/* Said once above the list, not on every time (free mode, nothing on the account). */}
+              {bookingMode === "free" && creditBalance <= 0 && !reschedulingBooking && slots.some((s) => !bookingByTime.get(s.start.getTime())) && (
+                <p className="font-body text-xs text-steel pb-2">These times open up for you once there are sessions on your account.</p>
+              )}
               {slots.map(({ start, durationMinutes }) => {
                 const iso = start.toISOString();
                 const booking = bookingByTime.get(start.getTime());
@@ -525,7 +550,8 @@ export default async function CoachDayDetailPage(
                           {start.getTime() > Date.now() ? (
                             <CancelBookingButton
                               bookingId={booking.id}
-                              rescheduleHref={`${backHref}/${params.date}?reschedule=${booking.id}`}
+                              rescheduleHref={bookingMode === "coach_schedules" ? undefined : `${calendarHref}/${params.date}?reschedule=${booking.id}`}
+                              messageHref={bookingMode === "coach_schedules" ? `/groups/${params.groupId}/messages` : undefined}
                               recurringSeriesId={booking.recurring_series_id}
                             />
                           ) : (
@@ -574,9 +600,7 @@ export default async function CoachDayDetailPage(
                           durationMinutes={durationMinutes}
                         />
                       </div>
-                    ) : (
-                      <span className="font-body text-xs text-steel">{NO_SESSIONS_SLOT_LABEL}</span>
-                    )}
+                    ) : null}
                   </div>
                 );
               })}
@@ -849,7 +873,7 @@ export default async function CoachDayDetailPage(
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="calendar">
       <DaySwipeNav prevHref={swipe.prev} nextHref={swipe.next} />
       <div className="pb-6 border-b border-steel/20 mb-6">
-        <Link href={backHref} className="font-body text-xs text-steel uppercase tracking-wide">
+        <Link href={backHref} className="inline-flex items-center min-h-11 -mt-3 font-body text-xs text-steel uppercase tracking-wide">
           &larr; Back to calendar
         </Link>
         <h1 className="font-display font-bold text-3xl uppercase leading-none mt-3">

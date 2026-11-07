@@ -9,7 +9,7 @@ const RULES: [RegExp, string][] = [
   [/you can (book|move) this directly/, "Your coach's booking setting changed. Reload and try again."],
   [/time has already passed/, "That time has already passed."],
   [/outside your coach/, "That time is outside your coach's hours."],
-  [/just taken/, "That slot was just taken. Try another."],
+  [/just taken/, "That time was just taken. Try another."],
   [/no session credits/, "You have no sessions left to book with."],
   [/already asked/, "You already asked to move this session. Your coach has not answered yet."],
   [/3 requests waiting/, "You already have 3 requests waiting for your coach."],

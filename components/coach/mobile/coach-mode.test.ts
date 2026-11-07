@@ -29,16 +29,18 @@ describe("coach mode: a coach logging a workout for a client on the phone", () =
     expect(page).toContain("coachMode={coachModeClient ? { homeHref: coachHomeHref, clientIsMinor: coachModeClient.isMinor, offerWalkIn: !isTeamSportGroup((groupRow as { team_mode?: boolean | null } | null)?.team_mode) } : undefined}");
     expect(read("components/logging/session-logger.tsx")).toContain("coachMode={coachMode}");
   });
-  it("finishing shows the client's workout card (back to the coach's home only if the card cannot be made), and nothing is posted to the feed for a client under 18", () => {
+  it("finishing keeps a coach in coach mode on the finished workout (its page links the card), shows a client their card, and posts nothing to the feed for a client under 18", () => {
     const btn = read("components/session/complete-workout-button.tsx");
-    expect(btn).toContain("if (announced.href) navHref = announced.href;");
-    expect(btn).toContain("else if (coachMode) navHref = coachMode.homeHref;");
+    expect(btn).toContain("if (coachMode) navHref = `/sessions/${sessionId}`;");
+    expect(btn).toContain("else if (announced.href) navHref = announced.href;");
     // a coach logging for a client under 18 posts nothing to the feed but still gets the card (the rule itself is in lib/announce-workout-log.ts)
     expect(btn).toContain("skipPost: !cardsOn || !!coachMode?.clientIsMinor,");
     // the card is skipped only when the group has cards switched off, never because a coach logged it
     expect(btn).toContain("skipLink: !cardsOn,");
     expect(btn).toContain("const cardsOn = postWorkoutCards;");
-    expect(btn).toContain("finishNavigation(existingPost ?");
+    expect(btn).toContain("finishNavigation(`/share/${existingPost.id}`);");
+    // a second tap after a lost reply, with no feed post, still gets the signed card link
+    expect(btn).toContain("finishNavigation(card.href ?? `/groups/${existingSession.group_id}`);");
   });
   it("it never uses the act-as cookie, which would write as the client", () => {
     for (const rel of ["components/coach/mobile/coach-mode-bar.tsx", "app/(coach)/groups/[groupId]/athletes/[athleteId]/log/[workoutId]/page.tsx"]) {

@@ -42,7 +42,7 @@ export function SignOutButton() {
       type="button"
       onClick={handleSignOut}
       disabled={signingOut}
-      className="font-body text-xs text-steel uppercase tracking-wide disabled:opacity-40"
+      className="inline-flex items-center min-h-11 px-2 font-body text-xs text-steel uppercase tracking-wide disabled:opacity-40"
     >
       {signingOut ? "Signing out…" : "Sign out"}
     </button>

@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import type { FeedPost } from "@/lib/types";
+import { displayWeightValue, weightUnitLabel, type WeightUnit } from "@/lib/units";
 import { ReactionButton } from "./reaction-button";
 import { CommentPreview } from "./comment-preview";
 import { InlineCommentSection } from "./inline-comment-section";
@@ -11,6 +12,9 @@ import { WorkoutCardExpanded } from "./workout-card-expanded";
 import { PinPostButton } from "./pin-post-button";
 import { DeletePostButton } from "./delete-post-button";
 import { Dumbbell, Pin } from "lucide-react";
+
+// The viewer's weight unit, provided once by FeedList so every workout card prints kg for a kg client. Volume is stored in pounds.
+export const FeedWeightUnitContext = createContext<WeightUnit>("lb");
 
 export function WorkoutSummaryCard({
   post,
@@ -38,7 +42,8 @@ export function WorkoutSummaryCard({
     }
   }, [hasPrs]);
 
-  const volume = post.workoutSummary?.totalVolume ?? 0;
+  const weightUnit = useContext(FeedWeightUnitContext);
+  const volume = displayWeightValue(post.workoutSummary?.totalVolume ?? 0, weightUnit);
 
   return (
     <article
@@ -90,7 +95,7 @@ export function WorkoutSummaryCard({
             <div>
               <p className="font-display text-3xl leading-none">
                 {Math.round(volume).toLocaleString()}
-                <span className="font-body text-sm text-steel ml-1">lbs volume</span>
+                <span className="font-body text-sm text-steel ml-1">{weightUnitLabel(weightUnit)} volume</span>
               </p>
               <p className="font-body text-xs text-steel mt-1">
                 {post.workoutSummary?.totalSetsCompleted ?? 0} sets completed

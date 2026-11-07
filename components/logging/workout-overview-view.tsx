@@ -50,7 +50,8 @@ export async function WorkoutOverviewView({
 
   return (
     <LiftUnitProvider unit={liftUnit}>
-    <main className="min-h-screen bg-graphite text-chalk font-body pb-28">
+    {/* Room under the last exercise for the fixed Start bar (with a session type picker it is about 150px tall), plus the tab bar under it on the athlete's own page. */}
+    <main className={`min-h-screen bg-graphite text-chalk font-body ${showTabBar ? "pb-56" : "pb-44"}`}>
       <RefreshOnBfcacheRestore />
       {actingAs && <ActingAsBanner athleteFullName={actingAs.fullName} groupId={actingAs.groupId} />}
       <header className="px-5 pt-8 pb-6 border-b border-steel/20">

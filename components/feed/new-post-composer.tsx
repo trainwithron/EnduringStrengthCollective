@@ -210,6 +210,19 @@ export function NewPostComposer({
             <Camera className="w-4 h-4" />
             {file ? file.name.slice(0, 20) : "Add photo or video"}
           </button>
+          {file && (
+            <button
+              type="button"
+              onClick={() => {
+                setFile(null);
+                if (fileInput.current) fileInput.current.value = "";
+              }}
+              aria-label="Remove photo or video"
+              className="w-11 h-11 flex items-center justify-center border border-steel/30 text-steel active:border-rust active:text-rust transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
           <input
             ref={fileInput}
             type="file"

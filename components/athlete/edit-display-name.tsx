@@ -81,7 +81,7 @@ export function EditDisplayName({ initialName, profileId }: { initialName: strin
             setEditing(false);
           }}
           disabled={saving}
-          className="font-body text-xs text-steel"
+          className="min-h-11 font-body text-xs text-steel"
         >
           Cancel
         </button>

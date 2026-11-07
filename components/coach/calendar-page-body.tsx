@@ -23,7 +23,7 @@ import { BookingModeLine } from "@/components/athlete/booking-mode-line";
 import { ScheduleCard } from "@/components/athlete/schedule-card";
 import { CoachPhoneSchedule, loadScheduleClients } from "@/components/coach/mobile/coach-phone-schedule";
 import { phoneCalendarHref } from "@/lib/phone-coach-routes";
-import { loadScheduleCard } from "@/lib/schedule-card";
+import { clientSessionsLine, loadScheduleCard } from "@/lib/schedule-card";
 import { SessionCheckSection } from "@/components/coach/session-check-section";
 import { SessionCountLine } from "@/components/coach/session-count-line";
 import { AvailabilityBookingSettings } from "@/components/coach/desktop/availability-settings";
@@ -49,7 +49,7 @@ import { CalendarSpotterPanel } from "@/components/coach/desktop/calendar-spotte
 import { gatherSchedulingSpotterFlags } from "@/lib/calendar-spotter-phase2-gather";
 import { SchedulingSpotterPanel } from "@/components/coach/desktop/scheduling-spotter-panel";
 import { NO_SESSIONS_LINE } from "@/lib/session-credit-copy";
-import { buildCreditPicture, clientCreditPictureLine, fetchBookingCounts } from "@/lib/credit-picture";
+import { buildCreditPicture, fetchBookingCounts } from "@/lib/credit-picture";
 
 const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
@@ -364,7 +364,7 @@ export async function CoachCalendarPageBody(
     const creditBooked = (await fetchBookingCounts(supabase, { athleteId, groupId: params.groupId })).get(`${athleteId}:${params.groupId}`)?.booked ?? 0;
 
     let hasAvailability = false;
-    let upcomingBookings: { id: string; start_at: string }[] = [];
+    let upcomingBookings: { id: string; start_at: string; recurring_series_id: string | null }[] = [];
     let displayTz = DEFAULT_COACH_TIMEZONE;
 
     if (coachMembership) {
@@ -384,7 +384,7 @@ export async function CoachCalendarPageBody(
     {
       const { data: bookingRows } = await supabase
         .from("bookings")
-        .select("id, start_at")
+        .select("id, start_at, recurring_series_id")
         .eq("athlete_id", athleteId)
         .eq("group_id", params.groupId)
         .eq("status", "confirmed")
@@ -426,7 +426,9 @@ export async function CoachCalendarPageBody(
     ];
 
     const basePath = `/groups/${params.groupId}/calendar`;
-    const rescheduleSuffix = searchParams.reschedule ? `&reschedule=${searchParams.reschedule}` : "";
+    // Only one of this client's own upcoming sessions can be moved: anything else in ?reschedule= is ignored.
+    const movingBooking = searchParams.reschedule ? upcomingBookings.find((b) => b.id === searchParams.reschedule) ?? null : null;
+    const rescheduleSuffix = movingBooking ? `&reschedule=${movingBooking.id}` : "";
     const prevMonth = new Date(year, monthIndex - 1, 1);
     const nextMonth = new Date(year, monthIndex + 1, 1);
     const prevHref = `${basePath}?month=${prevMonth.getFullYear()}-${String(
@@ -509,10 +511,24 @@ export async function CoachCalendarPageBody(
           <h1 className="font-display font-bold text-4xl leading-none uppercase">Calendar</h1>
           {coachMembership && !scheduleHref && (
             <p className="font-body text-xs text-steel mt-3">
-              {clientCreditPictureLine(creditPicture, NO_SESSIONS_LINE)}
+              {clientSessionsLine(creditPicture, NO_SESSIONS_LINE)}
             </p>
           )}
         </header>
+
+        {/* A session is being moved (?reschedule= from the day page): say so here, so a day tapped from this month keeps the move going. */}
+        {movingBooking && (
+          <div className="mx-5 mt-4 border border-rust/40 px-3 py-2 flex flex-wrap items-center justify-between gap-x-3">
+            <p className="font-body text-sm text-chalk">
+              Moving your{" "}
+              {new Date(movingBooking.start_at).toLocaleDateString("en-US", { timeZone: displayTz, weekday: "short", month: "short", day: "numeric" })}{" "}
+              session: pick a day
+            </p>
+            <Link href={`${basePath}?month=${year}-${String(monthIndex + 1).padStart(2, "0")}`} className="min-h-11 inline-flex items-center font-body text-xs text-rust uppercase tracking-wide">
+              Stop moving
+            </Link>
+          </div>
+        )}
 
         {scheduleHref && <ScheduleCard available={creditPicture.toBook} href={scheduleHref.href} note={scheduleHref.note} />}
         {coachMembership && bookingMode === "coach_schedules" && <BookingModeLine groupId={params.groupId} />}
@@ -535,7 +551,9 @@ export async function CoachCalendarPageBody(
                     </span>
                     <CancelBookingButton
                       bookingId={b.id}
-                      rescheduleHref={`${basePath}/${dateKeyInZone(displayTz, start)}?reschedule=${b.id}`}
+                      rescheduleHref={bookingMode === "coach_schedules" ? undefined : `${basePath}/${dateKeyInZone(displayTz, start)}?reschedule=${b.id}`}
+                      messageHref={bookingMode === "coach_schedules" ? `/groups/${params.groupId}/messages` : undefined}
+                      recurringSeriesId={b.recurring_series_id}
                     />
                   </div>
                 );
@@ -547,7 +565,7 @@ export async function CoachCalendarPageBody(
         <div className="flex items-center gap-1 px-5 pt-6">
           <Link
             href={monthViewHref}
-            className={`h-8 px-3 flex items-center font-body text-xs border ${
+            className={`min-h-11 px-3 flex items-center font-body text-xs border ${
               view === "month"
                 ? "bg-rust text-graphite border-rust"
                 : "border-steel/30 text-steel active:border-rust active:text-rust"
@@ -557,7 +575,7 @@ export async function CoachCalendarPageBody(
           </Link>
           <Link
             href={weekViewHref}
-            className={`h-8 px-3 flex items-center font-body text-xs border ${
+            className={`min-h-11 px-3 flex items-center font-body text-xs border ${
               view === "week"
                 ? "bg-rust text-graphite border-rust"
                 : "border-steel/30 text-steel active:border-rust active:text-rust"
@@ -570,13 +588,13 @@ export async function CoachCalendarPageBody(
         {view === "month" ? (
           <>
             <div className="flex items-center justify-between px-5 pt-4">
-              <Link href={prevHref} className="font-body text-xs text-rust uppercase tracking-wide">
+              <Link href={prevHref} className="h-11 px-3 inline-flex items-center font-body text-xs text-rust uppercase tracking-wide">
                 &larr; Prev
               </Link>
               <h2 className="font-display uppercase text-sm tracking-wide text-steel">
                 {monthLabel(year, monthIndex)}
               </h2>
-              <Link href={nextHref} className="font-body text-xs text-rust uppercase tracking-wide">
+              <Link href={nextHref} className="h-11 px-3 inline-flex items-center font-body text-xs text-rust uppercase tracking-wide">
                 Next &rarr;
               </Link>
             </div>
@@ -634,13 +652,13 @@ export async function CoachCalendarPageBody(
         ) : (
           <>
             <div className="flex items-center justify-between px-5 pt-4">
-              <Link href={prevWeekHref} className="font-body text-xs text-rust uppercase tracking-wide">
+              <Link href={prevWeekHref} className="h-11 px-3 inline-flex items-center font-body text-xs text-rust uppercase tracking-wide">
                 &larr; Prev
               </Link>
               <h2 className="font-display uppercase text-sm tracking-wide text-steel">
                 {weekLabel(weekStart, weekDays[6])}
               </h2>
-              <Link href={nextWeekHref} className="font-body text-xs text-rust uppercase tracking-wide">
+              <Link href={nextWeekHref} className="h-11 px-3 inline-flex items-center font-body text-xs text-rust uppercase tracking-wide">
                 Next &rarr;
               </Link>
             </div>

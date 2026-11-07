@@ -37,6 +37,16 @@ export function TrendChart({
 
   return (
     <div>
+      {/* The top and bottom axis numbers are HTML, not SVG text: the SVG is scaled down to a phone's width, which would shrink a 10px label to about 6px. */}
+      <div className="relative">
+      <span className="absolute left-[5%] top-0 font-body text-xs text-steel leading-none">
+        {shown(maxValue)}
+        {unit}
+      </span>
+      <span className="absolute left-[5%] bottom-0 font-body text-xs text-steel leading-none">
+        {shown(minValue)}
+        {unit}
+      </span>
       <svg
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         className="w-full h-auto"
@@ -64,15 +74,8 @@ export function TrendChart({
         {plotted.map((p, i) => (
           <circle key={i} cx={p.x} cy={p.y} r={i === plotted.length - 1 ? 3.5 : 2.5} fill="#D2703B" />
         ))}
-        <text x={PADDING} y={12} fontSize="10" fill="#8A8168" fontFamily="Inter, sans-serif">
-          {shown(maxValue)}
-          {unit}
-        </text>
-        <text x={PADDING} y={HEIGHT - PADDING + 16} fontSize="10" fill="#8A8168" fontFamily="Inter, sans-serif">
-          {shown(minValue)}
-          {unit}
-        </text>
       </svg>
+      </div>
       <div className="flex items-center justify-between font-body text-xs text-steel mt-1">
         <span>{new Date(first.date + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
         <span className={delta === 0 ? "" : delta > 0 ? "text-positive" : "text-rust"}>

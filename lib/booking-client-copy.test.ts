@@ -11,7 +11,7 @@ describe("a refused booking says what is actually wrong", () => {
     expect(bookingRefusalMessage("this session has already started; ask your coach")).toBe("That session has already started. Ask your coach.");
     expect(bookingRefusalMessage("your coach confirms moves: ask for the new time instead")).toBe("Your coach confirms moves. Ask for the new time instead.");
     expect(bookingRefusalMessage("that time is outside your coach's hours")).toBe("That time is outside your coach's hours.");
-    expect(bookingRefusalMessage("that slot was just taken")).toBe("That slot was just taken. Try another.");
+    expect(bookingRefusalMessage("that slot was just taken")).toBe("That time was just taken. Try another.");
     expect(bookingRefusalMessage("you already asked to move this session; your coach has not answered yet")).toContain("already asked");
     expect(bookingRefusalMessage("your coach confirms new sessions: send a request instead")).toBe("Your coach confirms new sessions. Send a request instead.");
     expect(bookingRefusalMessage("you can book this directly")).toBe("Your coach's booking setting changed. Reload and try again.");

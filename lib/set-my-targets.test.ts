@@ -118,7 +118,8 @@ describe("a client the database will not let write", () => {
     const card = read("components/athlete/set-my-targets-card.tsx");
     expect(card).toContain("onUseMacros={canSave ? (m) => void save(");
     expect(card).toContain("{canSave && showFindMaintenance && !dismissed && (");
-    expect(card).toContain("To save a target of your own, your date of birth needs to be on your health form");
+    expect(card).toContain("To save a target of your own, add your birthday in");
+    expect(card).toContain("href={`/groups/${groupId}/settings`}");
     expect(page).toContain('const { data: mayWrite } = await supabase.rpc("minor_may_write", { p_user: user.id });');
     expect(page).toContain("canSave: mayWrite === true,");
   });

@@ -135,6 +135,9 @@ export default async function CoachSitePage(props: { params: Promise<{ slug: str
           <p className="text-sm mt-2" style={{ color: "#5F5B52" }}>
             The link may be wrong, or the page isn&apos;t published yet.
           </p>
+          <Link href="/" className="inline-flex items-center justify-center h-11 px-6 mt-5 text-sm font-semibold" style={{ background: "#1C1B1A", color: "#F7F6F3" }}>
+            Go to Home
+          </Link>
         </div>
       </main>
     );
@@ -161,6 +164,8 @@ export default async function CoachSitePage(props: { params: Promise<{ slug: str
     </Link>
   ) : null;
   const hasButtons = !!(bookButton || requestButton);
+  // With no Book button on the page, step 1 cannot say "pick a time on my calendar": it says what the Request button does.
+  const howItWorks = d.canBook ? HOW_IT_WORKS : [REQUEST_STEP, ...HOW_IT_WORKS.slice(1)];
   // The short line under a package's name: what it is (a team, a program, coaching with its check-ins) or, for sessions, how many a week.
   const packageLine = (p: (typeof d.packages)[number]) => {
     const kind = kindOf({ kind: p.kind, defaultProgramId: p.default_program_id, groupAccessGroupId: p.group_access_group_id });
@@ -209,7 +214,8 @@ export default async function CoachSitePage(props: { params: Promise<{ slug: str
               {c2.eyebrow}
             </p>
           )}
-          <h1 className="text-6xl sm:text-8xl font-bold uppercase leading-[0.95] mt-2 break-words" style={heading}>
+          {/* Fluid on a phone so a long name shrinks to fit instead of being split mid-word. */}
+          <h1 className="text-[clamp(2.25rem,12vw,4.5rem)] sm:text-8xl font-bold uppercase leading-[0.95] mt-2" style={heading}>
             {nameWords.join(" ")}
             {nameLast && (
               <>
@@ -290,7 +296,7 @@ export default async function CoachSitePage(props: { params: Promise<{ slug: str
               How it <span style={{ color: c.accent }}>works</span>
             </h2>
             <ol className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              {HOW_IT_WORKS.map(([title, body], i) => (
+              {howItWorks.map(([title, body], i) => (
                 <li key={title} className="pt-4" style={{ borderTop: `3px solid ${c.accent}` }}>
                   <p className="text-sm tracking-widest uppercase" style={{ ...heading, color: c.accent }}>
                     Step {i + 1}
@@ -506,6 +512,8 @@ const HOW_IT_WORKS: [string, string][] = [
   ["Get your program", "I build your plan and it shows up in the app on your phone, ready to start."],
   ["Train and check in", "Log each workout, send me questions, and I adjust as you go."],
 ];
+// Step 1 when the page has "Request to train with me" but no "Book a consultation".
+const REQUEST_STEP: [string, string] = ["Send a request", "Tap Request to train with me. I'll see it and reply."];
 const IN_THE_APP: [string, string][] = [
   ["Today's workout", "Sets, reps and weights ready when you walk in, with demo videos."],
   ["Log as you go", "Tap through your sets. Your progress and personal records track themselves."],

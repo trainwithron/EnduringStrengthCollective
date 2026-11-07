@@ -35,7 +35,7 @@ export function DeleteAccountButton() {
       <button
         type="button"
         onClick={() => setConfirming(true)}
-        className="font-body text-sm text-rust"
+        className="min-h-11 font-body text-sm text-rust"
       >
         Delete my account
       </button>

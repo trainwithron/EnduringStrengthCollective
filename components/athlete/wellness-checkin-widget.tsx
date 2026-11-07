@@ -151,7 +151,7 @@ export function WellnessCheckinWidget({
               setDraft(saved);
               setEditing(true);
             }}
-            className="font-body text-xs text-rust"
+            className="inline-flex items-center min-h-11 px-2 font-body text-xs text-rust"
           >
             Edit
           </button>
@@ -169,7 +169,7 @@ export function WellnessCheckinWidget({
                     aria-label={`${field.label}: ${n} of 5${n === 1 ? ` (${field.lowLabel})` : n === 5 ? ` (${field.highLabel})` : ""}`}
                     aria-pressed={draft[field.key] === (field.flipped ? sorenessStored(n) : n)}
                     onClick={() => setDraft((prev) => ({ ...prev, [field.key]: field.flipped ? sorenessStored(n) : n }))}
-                    className={`flex-1 h-9 border font-body text-sm ${
+                    className={`flex-1 h-11 border font-body text-sm ${
                       draft[field.key] === (field.flipped ? sorenessStored(n) : n)
                         ? "bg-rust border-rust text-graphite"
                         : "border-steel/30 text-chalk"
@@ -210,7 +210,7 @@ export function WellnessCheckinWidget({
             type="button"
             onClick={handleSave}
             disabled={!complete}
-            className="w-full h-10 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
+            className="w-full h-11 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
           >
             Save
           </button>

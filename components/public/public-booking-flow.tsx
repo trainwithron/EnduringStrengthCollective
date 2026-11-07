@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { looksLikeEmail } from "@/lib/email-shape";
 import { formatInTimezone } from "@/lib/format-in-timezone";
+import { zoneLabel } from "@/lib/display-timezone";
 import type { PublicPageView } from "@/lib/public-booking-engine";
 
 interface Slot {
@@ -32,7 +33,8 @@ const field = "w-full bg-transparent border border-steel/40 px-3 py-2.5 font-bod
 
 // A coach's public booking page. Pick a session, a day and a time (all from the coach's real calendar), enter a name and email,
 // done: no account needed. The visitor gets a private link to change or cancel.
-export function PublicBookingFlow({ slug, page }: { slug: string; page: PublicPageView }) {
+// logoUrl / orgName: the organization's logo chip from the coach's public page (optional).
+export function PublicBookingFlow({ slug, page, logoUrl = null, orgName = null }: { slug: string; page: PublicPageView; logoUrl?: string | null; orgName?: string | null }) {
   const types = page.sessionTypes;
   const [typeId, setTypeId] = useState<string | null>(types.length === 1 ? types[0].id : null);
   const [slots, setSlots] = useState<Slot[] | null>(null);
@@ -55,18 +57,31 @@ export function PublicBookingFlow({ slug, page }: { slug: string; page: PublicPa
   const [codeSent, setCodeSent] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [verifyNote, setVerifyNote] = useState<string | null>(null);
+  // A failed send or a wrong code reads as an error (rust, announced), not as a routine note like "We sent a code".
+  const [verifyNoteIsError, setVerifyNoteIsError] = useState(false);
+  const [formTokenError, setFormTokenError] = useState(false);
   const [verifyBusy, setVerifyBusy] = useState(false);
 
   const type = types.find((t) => t.id === typeId) ?? null;
   const cleanEmail = email.trim().toLowerCase();
   const emailVerified = emailProof !== null && emailProof.email === cleanEmail;
 
+  // The form token is fetched once more if the first try fails; if that fails too, the visitor is told to reload.
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/public-booking/${slug}/form-token`)
-      .then((r) => r.json())
-      .then((d) => !cancelled && typeof d.formToken === "string" && setFormToken(d.formToken))
-      .catch(() => {});
+    const load = (triesLeft: number) =>
+      fetch(`/api/public-booking/${slug}/form-token`)
+        .then((r) => r.json())
+        .then((d) => {
+          if (typeof d.formToken !== "string") throw new Error("no form token");
+          if (!cancelled) setFormToken(d.formToken);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          if (triesLeft > 0) load(triesLeft - 1);
+          else setFormTokenError(true);
+        });
+    load(1);
     return () => {
       cancelled = true;
     };
@@ -76,6 +91,7 @@ export function PublicBookingFlow({ slug, page }: { slug: string; page: PublicPa
     if (!formToken || verifyBusy) return;
     setVerifyBusy(true);
     setVerifyNote(null);
+    setVerifyNoteIsError(true);
     try {
       const res = await fetch(`/api/public-booking/${slug}/verify-email/send`, {
         method: "POST",
@@ -89,6 +105,7 @@ export function PublicBookingFlow({ slug, page }: { slug: string; page: PublicPa
       }
       setCodeSent(cleanEmail);
       setCode("");
+      setVerifyNoteIsError(false);
       setVerifyNote(`We sent a 6-digit code to ${cleanEmail}. Check spam too.`);
     } catch {
       setVerifyNote("We couldn't send the code. Check your connection and try again.");
@@ -101,6 +118,7 @@ export function PublicBookingFlow({ slug, page }: { slug: string; page: PublicPa
     if (verifyBusy) return;
     setVerifyBusy(true);
     setVerifyNote(null);
+    setVerifyNoteIsError(true);
     try {
       const res = await fetch(`/api/public-booking/${slug}/verify-email/confirm`, {
         method: "POST",
@@ -214,10 +232,10 @@ export function PublicBookingFlow({ slug, page }: { slug: string; page: PublicPa
           </p>
           <p className="font-body text-xs text-steel mt-2 break-all select-all">{booked.manageUrl}</p>
           <div className="flex flex-wrap gap-3 mt-3">
-            <button type="button" onClick={() => copy(booked.manageUrl)} className="border border-steel/40 text-chalk font-body text-sm px-4 py-2">
+            <button type="button" onClick={() => copy(booked.manageUrl)} className="min-h-11 border border-steel/40 text-chalk font-body text-sm px-4 py-2">
               {copied ? "Copied" : "Copy link"}
             </button>
-            <a href={booked.manageUrl} className="bg-rust text-graphite font-display font-bold uppercase tracking-wide px-4 py-2">
+            <a href={booked.manageUrl} className="min-h-11 inline-flex items-center bg-rust text-graphite font-display font-bold uppercase tracking-wide px-4 py-2">
               Change or cancel
             </a>
           </div>
@@ -228,16 +246,23 @@ export function PublicBookingFlow({ slug, page }: { slug: string; page: PublicPa
 
   return (
     <div className="max-w-lg mx-auto px-5 py-10">
+      {logoUrl && (
+        <div className="inline-flex items-center gap-2.5 py-2 pl-2.5 pr-3.5 mb-4" style={{ background: "#F2EEE6" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- public Supabase Storage URL. */}
+          <img src={logoUrl} alt={orgName ?? ""} className="h-8 w-auto" />
+          {orgName && <span className="font-display font-semibold uppercase tracking-wider text-sm text-[#111111]">{orgName}</span>}
+        </div>
+      )}
       <p className="font-display uppercase text-sm tracking-wide text-steel">{page.coachName}</p>
-      <h1 className="font-display font-bold text-3xl uppercase leading-none mt-2">{page.headline || "Book a session"}</h1>
+      <h1 className="font-display font-bold text-3xl uppercase leading-none mt-2">{page.headline || "Book a consultation"}</h1>
       {page.intro && <p className="font-body text-base text-steel mt-3 whitespace-pre-line">{page.intro}</p>}
 
       {types.length === 0 ? (
-        <p className="font-body text-sm text-steel mt-8">No sessions are available to book online right now.</p>
+        <p className="font-body text-sm text-steel mt-8">No consultations are available to book online right now.</p>
       ) : (
         <>
-          <section className="mt-8" aria-label="Choose a session">
-            <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">1. Session</h2>
+          <section className="mt-8" aria-label="Choose a consultation">
+            <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">1. Consultation</h2>
             <div className="space-y-2">
               {types.map((t) => (
                 <button
@@ -302,13 +327,13 @@ export function PublicBookingFlow({ slug, page }: { slug: string; page: PublicPa
                         type="button"
                         aria-pressed={startIso === s.startIso}
                         onClick={() => setStartIso(s.startIso)}
-                        className={`border px-2 py-2 font-body text-sm ${startIso === s.startIso ? "border-rust bg-rust text-graphite" : "border-steel/30 text-chalk"}`}
+                        className={`min-h-11 border px-2 py-2 font-body text-sm ${startIso === s.startIso ? "border-rust bg-rust text-graphite" : "border-steel/30 text-chalk"}`}
                       >
                         {formatInTimezone(new Date(s.startIso), timezone, "time")}
                       </button>
                     ))}
                   </div>
-                  <p className="font-body text-xs text-steel mt-2">Times are in the coach&apos;s time zone ({timezone.replace("_", " ")}).</p>
+                  <p className="font-body text-xs text-steel mt-2">Times are in the coach&apos;s time zone ({zoneLabel(timezone)}).</p>
                   {error && !startIso && (
                     <p className="font-body text-sm text-rust mt-3" role="alert">
                       {error}
@@ -344,10 +369,15 @@ export function PublicBookingFlow({ slug, page }: { slug: string; page: PublicPa
                         type="button"
                         onClick={sendCode}
                         disabled={verifyBusy || !formToken || !looksLikeEmail(cleanEmail)}
-                        className="border border-steel/40 text-chalk font-body text-sm px-4 py-2 disabled:opacity-40"
+                        className="min-h-11 border border-steel/40 text-chalk font-body text-sm px-4 py-2 disabled:opacity-40"
                       >
                         {verifyBusy && !codeSent ? "Sending…" : codeSent === cleanEmail ? "Send the code again" : "Email me a code to confirm"}
                       </button>
+                      {formTokenError && !formToken && (
+                        <p className="font-body text-xs text-rust mt-2" role="alert">
+                          We couldn&apos;t start the form. Reload the page.
+                        </p>
+                      )}
                       {codeSent === cleanEmail && (
                         <div className="flex gap-2 mt-3">
                           <input
@@ -370,7 +400,7 @@ export function PublicBookingFlow({ slug, page }: { slug: string; page: PublicPa
                         </div>
                       )}
                       {verifyNote && (
-                        <p className="font-body text-xs text-steel mt-2" role="status">
+                        <p className={`font-body text-xs mt-2 ${verifyNoteIsError ? "text-rust" : "text-steel"}`} role={verifyNoteIsError ? "alert" : "status"}>
                           {verifyNote}
                         </p>
                       )}
@@ -403,10 +433,10 @@ export function PublicBookingFlow({ slug, page }: { slug: string; page: PublicPa
                 disabled={busy || !emailVerified}
                 className="mt-4 w-full bg-rust text-graphite font-display font-bold uppercase tracking-wide px-4 py-3 disabled:opacity-40"
               >
-                {busy ? "Booking…" : "Book this session"}
+                {busy ? "Booking…" : "Book this consultation"}
               </button>
               <p className="font-body text-xs text-steel mt-3">
-                By booking you agree to be contacted about this session. You&apos;ll get a private link to change or cancel.
+                By booking you agree to be contacted about this consultation. You&apos;ll get a private link to change or cancel.
               </p>
             </form>
           )}

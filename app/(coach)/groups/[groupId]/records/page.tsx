@@ -177,8 +177,8 @@ export default async function RecordsPage(props: { params: Promise<{ groupId: st
     <main className="min-h-screen bg-graphite text-chalk font-body pb-28">
       {isActingAsOther && <ActingAsBanner athleteFullName={actingAsFullName ?? "Client"} groupId={params.groupId} />}
       <header className="px-5 pt-8 pb-6 border-b border-steel/20">
-        <Link href={`/groups/${params.groupId}`} className="font-body text-xs text-steel uppercase tracking-wide">
-          &larr; Back to group
+        <Link href={`/groups/${params.groupId}`} className="inline-flex items-center min-h-11 font-body text-xs text-steel uppercase tracking-wide">
+          &larr; Home
         </Link>
         <h1 className="font-display font-bold text-3xl uppercase leading-none mt-3">Hall of Fame</h1>
       </header>

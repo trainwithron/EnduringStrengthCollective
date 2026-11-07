@@ -59,15 +59,15 @@ export function GuardianRequestPanel({ state, guardianEmail, requestedAt, coachN
             {when ? ` on ${when}` : ""}. Waiting for them to sign.
           </p>
           <div className="flex flex-wrap items-center gap-4">
-            <button type="button" onClick={() => router.refresh()} className="font-body text-xs text-steel uppercase tracking-wide underline">
+            <button type="button" onClick={() => router.refresh()} className="inline-flex items-center min-h-11 px-2 font-body text-xs text-steel uppercase tracking-wide underline">
               Check again
             </button>
             {guardianEmail && (
-              <button type="button" onClick={() => send(guardianEmail)} disabled={busy} className="font-body text-xs text-steel uppercase tracking-wide underline disabled:opacity-40">
+              <button type="button" onClick={() => send(guardianEmail)} disabled={busy} className="inline-flex items-center min-h-11 px-2 font-body text-xs text-steel uppercase tracking-wide underline disabled:opacity-40">
                 Send it again
               </button>
             )}
-            <button type="button" onClick={() => setAsking(true)} className="font-body text-xs text-steel uppercase tracking-wide underline">
+            <button type="button" onClick={() => setAsking(true)} className="inline-flex items-center min-h-11 px-2 font-body text-xs text-steel uppercase tracking-wide underline">
               Use a different email
             </button>
           </div>
@@ -100,7 +100,7 @@ export function GuardianRequestPanel({ state, guardianEmail, requestedAt, coachN
             {busy ? "Sending…" : "Send the request"}
           </button>
           {state === "pending" && (
-            <button type="button" onClick={() => setAsking(false)} className="font-body text-xs text-steel underline">
+            <button type="button" onClick={() => setAsking(false)} className="inline-flex items-center min-h-11 px-2 font-body text-xs text-steel underline">
               Cancel
             </button>
           )}

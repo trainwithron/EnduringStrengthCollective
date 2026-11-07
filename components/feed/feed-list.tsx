@@ -7,6 +7,8 @@ import { PostCard } from "./post-card";
 import { BLOCKED_EVENT, withoutBlocked } from "@/lib/content-moderation";
 import { fetchProtectedIds } from "@/lib/name-protection-client";
 import { protectAuthor } from "@/lib/post-name-protection";
+import { FeedWeightUnitContext } from "./workout-summary-card";
+import { asWeightUnit, type WeightUnit } from "@/lib/units";
 
 export function FeedList({
   groupId,
@@ -38,6 +40,24 @@ export function FeedList({
     window.addEventListener(BLOCKED_EVENT, on);
     return () => window.removeEventListener(BLOCKED_EVENT, on);
   }, []);
+
+  // Workout cards show weights in the viewer's own unit (the same setting the Nutrition page reads), not always pounds.
+  const [weightUnit, setWeightUnit] = useState<WeightUnit>("lb");
+  useEffect(() => {
+    if (!viewerId) return;
+    let cancelled = false;
+    createBrowserClient()
+      .from("athlete_profile_details")
+      .select("weight_unit")
+      .eq("athlete_id", viewerId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled) setWeightUnit(asWeightUnit(data?.weight_unit));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [viewerId]);
 
   useEffect(() => {
     if (!highlightPostId) return;
@@ -176,14 +196,20 @@ export function FeedList({
   }, [groupId, viewerId, channel]);
 
   if (visiblePosts.length === 0) {
+    // Only a coach can post on Announcements, so a client is not told to "share something" there.
     return (
       <p className="font-body text-sm text-steel px-5 py-10">
-        No posts yet. Finish a workout or share something to get the feed going.
+        {channel === "announcements"
+          ? "Nothing from your coach yet."
+          : channel === "team_chat"
+            ? "No messages yet. Say hi."
+            : "No posts yet. Finish a workout or share something to get the feed going."}
       </p>
     );
   }
 
   return (
+    <FeedWeightUnitContext.Provider value={weightUnit}>
     <div className="divide-y divide-steel/15">
       {visiblePosts.map((post) => (
         <div
@@ -199,5 +225,6 @@ export function FeedList({
         </div>
       ))}
     </div>
+    </FeedWeightUnitContext.Provider>
   );
 }

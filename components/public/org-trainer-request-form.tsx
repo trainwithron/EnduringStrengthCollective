@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { zonedTimeToUtc } from "@/lib/timezone";
 import { COMMON_TIMEZONES } from "@/components/coach/desktop/timezone-control";
 
@@ -37,6 +38,8 @@ export function OrgTrainerRequestForm({ organizationId, orgName }: { organizatio
   const [result, setResult] = useState<{ message: string } | null>(null);
 
   const canSubmit = name.trim() && email.trim() && date && time && goalType;
+  const field = "w-full h-11 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust";
+  const label = "font-body text-xs text-steel uppercase tracking-wide block mb-1";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -81,6 +84,9 @@ export function OrgTrainerRequestForm({ organizationId, orgName }: { organizatio
         <p className="font-display uppercase text-xs tracking-[0.2em] text-rust">{orgName}</p>
         <h1 className="font-display font-bold text-2xl uppercase leading-tight mt-2">Request sent!</h1>
         <p className="font-body text-sm text-steel mt-4">{result.message}</p>
+        <Link href="/" className="inline-flex items-center justify-center h-11 px-6 mt-5 bg-rust text-graphite font-body text-sm font-medium">
+          Go to Home
+        </Link>
       </div>
     );
   }
@@ -96,92 +102,84 @@ export function OrgTrainerRequestForm({ organizationId, orgName }: { organizatio
         the right coach.
       </p>
 
-      <form onSubmit={handleSubmit} className="mt-8 space-y-3">
-        <input aria-label="Your name"
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Your name"
-          required
-          className="w-full h-11 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
-        />
-        <input aria-label="Email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Email"
-          required
-          className="w-full h-11 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
-        />
-        <input aria-label="Phone (optional)"
-          type="tel"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          placeholder="Phone (optional)"
-          className="w-full h-11 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
-        />
+      <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+        <div>
+          <label htmlFor="org-req-name" className={label}>
+            Your name
+          </label>
+          <input id="org-req-name" type="text" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" required className={field} />
+        </div>
+        <div>
+          <label htmlFor="org-req-email" className={label}>
+            Email
+          </label>
+          <input id="org-req-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required className={field} />
+        </div>
+        <div>
+          <label htmlFor="org-req-phone" className={label}>
+            Phone (optional)
+          </label>
+          <input id="org-req-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" className={field} />
+        </div>
 
         <div className="flex gap-2">
-          <input aria-label="Preferred date"
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            required
-            className="flex-1 h-11 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
-          />
-          <input aria-label="Preferred time"
-            type="time"
-            value={time}
-            onChange={(e) => setTime(e.target.value)}
-            required
-            className="flex-1 h-11 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
-          />
+          <div className="flex-1 min-w-0">
+            <label htmlFor="org-req-date" className={label}>
+              Preferred date
+            </label>
+            <input id="org-req-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required className={field} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <label htmlFor="org-req-time" className={label}>
+              Preferred time
+            </label>
+            <input id="org-req-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} required className={field} />
+          </div>
         </div>
-        <select aria-label="Time zone"
-          value={timezone}
-          onChange={(e) => setTimezone(e.target.value)}
-          className="w-full h-11 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
-        >
-          {!COMMON_TIMEZONES.some((t) => t.value === timezone) && <option value={timezone}>{timezone}</option>}
-          {COMMON_TIMEZONES.map((t) => (
-            <option key={t.value} value={t.value}>
-              {t.label}
-            </option>
-          ))}
-        </select>
+        <div>
+          <label htmlFor="org-req-tz" className={label}>
+            Time zone
+          </label>
+          <select id="org-req-tz" value={timezone} onChange={(e) => setTimezone(e.target.value)} className={field}>
+            {!COMMON_TIMEZONES.some((t) => t.value === timezone) && <option value={timezone}>{timezone}</option>}
+            {COMMON_TIMEZONES.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        </div>
 
-        <select aria-label="Goal"
-          value={goalType}
-          onChange={(e) => setGoalType(e.target.value)}
-          required
-          className="w-full h-11 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
-        >
-          <option value="" disabled>
-            What&apos;s your goal?
-          </option>
-          {GOAL_OPTIONS.map((g) => (
-            <option key={g.value} value={g.value}>
-              {g.label}
+        <div>
+          <label htmlFor="org-req-goal" className={label}>
+            Your goal
+          </label>
+          <select id="org-req-goal" value={goalType} onChange={(e) => setGoalType(e.target.value)} required className={field}>
+            <option value="" disabled>
+              Pick one
             </option>
-          ))}
-        </select>
+            {GOAL_OPTIONS.map((g) => (
+              <option key={g.value} value={g.value}>
+                {g.label}
+              </option>
+            ))}
+          </select>
+        </div>
         {goalType === "custom" && (
-          <input aria-label="Tell us more"
-            type="text"
-            value={goalCustomLabel}
-            onChange={(e) => setGoalCustomLabel(e.target.value)}
-            placeholder="Tell us more"
-            className="w-full h-11 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
-          />
+          <div>
+            <label htmlFor="org-req-goal-more" className={label}>
+              Tell us more
+            </label>
+            <input id="org-req-goal-more" type="text" value={goalCustomLabel} onChange={(e) => setGoalCustomLabel(e.target.value)} className={field} />
+          </div>
         )}
 
-        <textarea aria-label="Anything else we should know? (optional)"
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder="Anything else we should know? (optional)"
-          rows={3}
-          className="w-full bg-surface border border-steel/30 text-chalk px-3 py-2 font-body text-sm focus:outline-none focus:border-rust"
-        />
+        <div>
+          <label htmlFor="org-req-message" className={label}>
+            Anything else we should know? (optional)
+          </label>
+          <textarea id="org-req-message" value={message} onChange={(e) => setMessage(e.target.value)} rows={3} className="w-full bg-surface border border-steel/30 text-chalk px-3 py-2 font-body text-sm focus:outline-none focus:border-rust" />
+        </div>
 
         {error && (
           <p className="font-body text-xs text-rust text-center" role="alert">
@@ -196,6 +194,7 @@ export function OrgTrainerRequestForm({ organizationId, orgName }: { organizatio
         >
           {submitting ? "Sending…" : "Request a coach"}
         </button>
+        {!canSubmit && <p className="font-body text-xs text-steel text-center">Fill in your name, email, a date and time, and a goal to send it.</p>}
       </form>
     </div>
   );

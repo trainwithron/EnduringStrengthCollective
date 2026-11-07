@@ -67,7 +67,7 @@ export function SendToClientButton({
           type="button"
           onClick={handleSend}
           disabled={sending}
-          className="h-7 px-2 border border-steel/30 text-steel font-body text-xs disabled:opacity-40 whitespace-nowrap"
+          className="min-h-11 px-2 border border-steel/30 text-steel font-body text-xs disabled:opacity-40 whitespace-nowrap"
           title="Send a push notification with a direct link so the client can finish logging this session themselves"
         >
           📲 Send to client

@@ -1,4 +1,7 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { brandChipFor } from "@/lib/coach-site";
 import { PublicBookingFlow } from "@/components/public/public-booking-flow";
 import { getPublicPage } from "@/lib/public-booking-engine";
 import { publicStore, cleanParam } from "@/lib/public-booking-route";
@@ -41,14 +44,22 @@ export default async function BookPage(props: { params: Promise<{ coachId: strin
         <div className="max-w-sm text-center">
           <h1 className="font-display font-bold text-2xl uppercase">This booking page isn&apos;t available</h1>
           <p className="font-body text-sm text-steel mt-3">The link may be wrong, or the coach hasn&apos;t switched online booking on yet.</p>
+          <Link href="/" className="inline-flex items-center justify-center h-11 px-6 mt-5 bg-rust text-graphite font-body text-sm font-medium">
+            Go to Home
+          </Link>
         </div>
       </main>
     );
   }
 
+  // The organization's logo chip, the same as on the coach's public page.
+  const db = createServiceRoleClient();
+  const { data: pageRow } = await db.from("coach_booking_pages").select("coach_id").eq("slug", found.slug).maybeSingle();
+  const brand = pageRow?.coach_id ? await brandChipFor(db, pageRow.coach_id as string) : { logoUrl: null, orgName: null };
+
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body">
-      <PublicBookingFlow slug={found.slug} page={found.view} />
+      <PublicBookingFlow slug={found.slug} page={found.view} logoUrl={brand.logoUrl} orgName={brand.orgName} />
     </main>
   );
 }

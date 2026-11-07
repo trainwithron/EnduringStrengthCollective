@@ -203,7 +203,7 @@ export function IntakeForm({
         <button
           type="button"
           onClick={() => router.refresh()}
-          className="font-body text-xs text-steel uppercase tracking-wide underline"
+          className="inline-flex items-center min-h-11 px-2 font-body text-xs text-steel uppercase tracking-wide underline"
         >
           Check again
         </button>

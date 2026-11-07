@@ -118,14 +118,14 @@ export function AboutYouForm({ athleteId, groupId, initial }: { athleteId: strin
     <form onSubmit={save} className="space-y-6">
       <div>
         <span className={labelClass}>Units</span>
-        <div className="flex gap-2" role="group" aria-label="Units">
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Units">
           {(["lb", "kg"] as const).map((u) => (
             <button
               key={u}
               type="button"
               onClick={() => switchUnit(u)}
               aria-pressed={unit === u}
-              className={`h-10 px-4 border font-body text-sm ${unit === u ? "border-rust text-chalk" : "border-steel/30 text-steel"}`}
+              className={`min-h-11 px-4 py-2 border font-body text-sm ${unit === u ? "border-rust text-chalk" : "border-steel/30 text-steel"}`}
             >
               {u === "lb" ? "Pounds, feet and inches" : "Kilograms, centimetres"}
             </button>
@@ -232,7 +232,7 @@ export function AboutYouForm({ athleteId, groupId, initial }: { athleteId: strin
         <button type="submit" disabled={busy} className="h-12 px-6 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40">
           {busy ? "Saving…" : "Save"}
         </button>
-        <Link href={`/groups/${groupId}`} className="font-body text-sm text-steel underline underline-offset-2">
+        <Link href={`/groups/${groupId}`} className="inline-flex items-center min-h-11 px-2 font-body text-sm text-steel underline underline-offset-2">
           Skip for now
         </Link>
       </div>

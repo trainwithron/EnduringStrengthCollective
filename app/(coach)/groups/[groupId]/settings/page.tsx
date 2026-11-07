@@ -371,18 +371,17 @@ export default async function SettingsPage(
         {!coachDesktop && (
           <Link
             href={`/groups/${params.groupId}`}
-            className="font-body text-xs text-steel uppercase tracking-wide"
+            className="inline-flex items-center min-h-11 font-body text-xs text-steel uppercase tracking-wide"
           >
-            &larr; Back to group
+            &larr; Home
           </Link>
         )}
-        <h1 className={`font-display font-bold text-4xl leading-none uppercase ${coachDesktop ? "" : "mt-3"}`}>
+        <h1 className={`font-display font-bold text-3xl leading-none uppercase ${coachDesktop ? "" : "mt-3"}`}>
           Settings
         </h1>
       </header>
 
       <section className="px-5 pt-6 flex items-center gap-3">
-        <Avatar name={profile?.full_name ?? "?"} url={profile?.avatar_url ?? null} />
         <div className="flex-1">
           <EditDisplayName initialName={profile?.full_name ?? ""} profileId={athleteId} />
           {!viewingOther && (
@@ -608,23 +607,5 @@ export default async function SettingsPage(
     </CoachDesktopShell>
   ) : (
     page
-  );
-}
-
-function Avatar({ name, url }: { name: string; url: string | null }) {
-  const initials = name
-    .split(" ")
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-  if (url) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={url} alt="" className="w-14 h-14 rounded-full object-cover shrink-0" />;
-  }
-  return (
-    <div className="w-14 h-14 rounded-full bg-surface border border-steel/30 flex items-center justify-center shrink-0">
-      <span className="font-display text-lg">{initials}</span>
-    </div>
   );
 }

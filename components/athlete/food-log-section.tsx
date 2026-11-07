@@ -122,7 +122,7 @@ export function FoodLogSection({
           {withTarget ? of(target?.fatG) : ""}f
         </p>
         {!withTarget && <p className="font-body text-xs text-steel mt-2">{noTargetLine(coachProgramming, selfCoached)}</p>}
-        <p className="font-body text-xs text-steel mt-1">{COACH_CAN_SEE_LINE}</p>
+        {!selfCoached && <p className="font-body text-xs text-steel mt-1">{COACH_CAN_SEE_LINE}</p>}
       </div>
 
       {planHasMeals ? (

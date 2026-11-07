@@ -123,7 +123,7 @@ export function TodayWidget({
               key={h.id}
               type="button"
               onClick={() => toggle(h.id, h.completed)}
-              className="w-full flex items-center gap-2 text-left"
+              className="w-full min-h-11 py-1 flex items-center gap-2 text-left"
             >
               <span
                 className={`w-5 h-5 shrink-0 border flex items-center justify-center ${

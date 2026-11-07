@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 
 // acuity_replacement_gap_audit_sept16.md — waitlists, specific-slot
 // only, soft priority (per Ron's own confirmed answer). Once the
@@ -52,6 +53,7 @@ export function WaitlistJoinButton({
   }
 
   async function handleLeave() {
+    if (!await confirmDialog({ message: "Leave the waitlist for this time?", confirmLabel: "Leave", cancelLabel: "Stay on it" })) return;
     setSubmitting(true);
     setError(null);
     const supabase = createBrowserClient();
@@ -79,7 +81,7 @@ export function WaitlistJoinButton({
           type="button"
           onClick={handleLeave}
           disabled={submitting}
-          className="font-body text-xs text-rust disabled:opacity-40"
+          className="min-h-11 px-2 font-body text-xs text-rust disabled:opacity-40"
         >
           {submitting ? "…" : "Leave"}
         </button>

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { rateLimitResponse } from "@/lib/rate-limit";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { emailClientNotice } from "@/lib/client-notice-email";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -45,5 +47,18 @@ export async function POST(request: Request) {
   const out = data as { ok?: boolean; group_id?: string; age_band?: string; code?: string; message?: string } | null;
   // a request the coach cannot take (they left the organization, the person is under 13, or the date of birth on file needs support to correct) is not approved
   if (out && out.ok === false) return NextResponse.json({ ok: false, code: out.code ?? "closed", error: out.message ?? "That request was closed." }, { status: 200 });
+  // One transactional email telling the person they were accepted and where to sign in (the request form's Sent screen promises it). A failed email never fails the approval;
+  // emailClientNotice skips the person's quiet hours and placeholder addresses.
+  try {
+    const db = createServiceRoleClient();
+    const { data: req } = await db.from("client_requests").select("requester_id").eq("id", id).maybeSingle();
+    const coachName = ((await db.from("profiles").select("full_name").eq("id", user.id).maybeSingle()).data?.full_name ?? "").trim() || "Your coach";
+    if (req?.requester_id) {
+      await emailClientNotice(db, req.requester_id as string, `${coachName} accepted your request`, `${coachName} accepted your request to train. Sign in at https://spotlightcoaching.app/login and the app will take you through a short health form.
+`).catch(() => null);
+    }
+  } catch {
+    // the approval stands without the email
+  }
   return NextResponse.json({ ok: true, groupId: out?.group_id ?? null, ageBand: out?.age_band ?? "unknown" });
 }

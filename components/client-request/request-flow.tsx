@@ -15,7 +15,8 @@ type Phase = "checking" | "guest" | "authed" | "awaiting-confirmation" | "sent" 
 // "Request to train with me" from a coach's public page. A NEW visitor fills in one form (name, email, password, date of birth) and the account and the request are made together, so the coach
 // hears at once, before the email is confirmed (Ron, Oct 31: a new client at the gym never found the confirmation email, so the request never went). Someone with an account signs in and taps ONE button.
 // Nothing here joins anything: the request waits for the coach. A new account made here is a plain account (no intake is asked until the coach approves). The date of birth is asked only when none is on file yet.
-export function RequestFlow({ slug, coachName, coachId }: { slug: string; coachName: string; coachId: string }) {
+// logoUrl / orgName: the organization's logo chip from the coach's public page, so the form looks like the page it came from (optional; the page passes them when it has them).
+export function RequestFlow({ slug, coachName, coachId, logoUrl = null, orgName = null }: { slug: string; coachName: string; coachId: string; logoUrl?: string | null; orgName?: string | null }) {
   const [phase, setPhase] = useState<Phase>("checking");
   const [mode, setMode] = useState<Mode>("signup");
   const [fullName, setFullName] = useState("");
@@ -106,8 +107,9 @@ export function RequestFlow({ slug, coachName, coachId }: { slug: string; coachN
           if (data.confirmed) void flushLegalConsent();
           setPhase(data.confirmed ? "sent" : "sent-unconfirmed");
         } else if (data.code === "has_account") {
+          // the toggle is switched for them, so the message says what to do on the screen they now see
           setMode("login");
-          setError(data.error);
+          setError("That email already has an account. Enter its password below and tap Sign in.");
         } else if (["under_13", "not_taking", "already_client", "declined_recently", "own_page", "coach_full"].includes(data.code)) {
           setStopped(data.error);
           setPhase("stopped");
@@ -175,21 +177,57 @@ export function RequestFlow({ slug, coachName, coachId }: { slug: string; coachN
     </Link>
   );
 
+  // A quiet way back to the coach's page from the form itself (the result screens get the big button).
+  const backLink = (
+    <Link href={`/c/${slug}`} className="inline-flex items-center justify-center min-h-11 px-2 mx-auto mt-2 font-body text-sm text-steel underline">
+      &larr; Back to {first}&apos;s page
+    </Link>
+  );
+
   const header = (
     <div className="text-center mb-6">
+      {logoUrl && (
+        <div className="inline-flex items-center gap-2.5 py-2 pl-2.5 pr-3.5 mb-4" style={{ background: "#F2EEE6" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- public Supabase Storage URL. */}
+          <img src={logoUrl} alt={orgName ?? ""} className="h-8 w-auto" />
+          {orgName && <span className="font-display font-semibold uppercase tracking-wider text-sm text-[#111111]">{orgName}</span>}
+        </div>
+      )}
       <h1 className="font-display uppercase text-2xl font-bold">Request to train with {coachName}</h1>
       <p className="font-body text-steel text-sm mt-2">{first} will see your request and decide. You are not added to anything until then.</p>
     </div>
   );
 
-  if (phase === "checking") return null;
+  // What happens after the coach says yes: said on both Sent screens, so nobody is left wondering how to get in.
+  const nextStep = (
+    <p className="font-body text-steel text-sm mt-3">
+      When {first} accepts, we&apos;ll email you. Then sign in at <span className="text-chalk">spotlightcoaching.app/login</span> and the app takes you through a short health form.
+    </p>
+  );
+
+  if (phase === "checking") {
+    return (
+      <div className="w-full max-w-sm">
+        {header}
+        <p className="font-body text-steel text-sm text-center" role="status">
+          Loading…
+        </p>
+      </div>
+    );
+  }
 
   if (phase === "sent") {
     return (
       <div className="w-full max-w-sm text-center" role="status">
         <h1 className="font-display uppercase text-2xl font-bold">Sent</h1>
         <p className="font-body text-steel text-sm mt-3">{first} will get back to you.</p>
+        {nextStep}
         {back}
+        {!authedEmail && (
+          <Link href="/login" className="flex items-center justify-center min-h-11 px-2 mx-auto mt-2 font-body text-sm text-steel underline">
+            Sign in
+          </Link>
+        )}
       </div>
     );
   }
@@ -202,6 +240,7 @@ export function RequestFlow({ slug, coachName, coachId }: { slug: string; coachN
         <p className="font-body text-steel text-sm mt-3">
           We also emailed a link to <span className="text-chalk">{email}</span>. Open it to confirm your email, so you can sign in once {first} says yes. It comes from Spotlight Coaching; check spam too.
         </p>
+        {nextStep}
         {resendNote && (
           <p className="font-body text-sm text-chalk mt-3" role="status">
             {resendNote}
@@ -258,7 +297,7 @@ export function RequestFlow({ slug, coachName, coachId }: { slug: string; coachN
               setMode("login");
               setPhase("guest");
             }}
-            className="font-body text-sm text-steel underline"
+            className="inline-flex items-center justify-center min-h-11 px-2 font-body text-sm text-steel underline"
           >
             Already confirmed? Sign in
           </button>
@@ -300,10 +339,11 @@ export function RequestFlow({ slug, coachName, coachId }: { slug: string; coachN
             setMode("login");
             setPhase("guest");
           }}
-          className="block mx-auto mt-4 font-body text-sm text-steel underline"
+          className="flex items-center justify-center min-h-11 px-2 mx-auto mt-2 font-body text-sm text-steel underline"
         >
           Not you? Use a different account
         </button>
+        <div className="flex">{backLink}</div>
       </form>
     );
   }
@@ -360,6 +400,7 @@ export function RequestFlow({ slug, coachName, coachId }: { slug: string; coachN
         </button>
         <LegalLinks className="mt-2" />
       </form>
+      <div className="flex">{backLink}</div>
     </div>
   );
 }

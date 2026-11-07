@@ -599,7 +599,8 @@ export default async function SessionPage(
   const backHref = sessionBackHref({ groupId: session.group_id, athleteId: session.athlete_id, workoutId: session.workout_id, coachMode: !!coachModeClient });
 
   return (
-    <main className={`min-h-screen overflow-x-clip bg-graphite text-chalk font-body ${session.status === "in_progress" ? "pb-16" : "pb-32"}`}>
+    // A paused workout of your own stacks the Resume bar on the tab bar (about 156px), so it gets more room under the last card.
+    <main className={`min-h-screen overflow-x-clip bg-graphite text-chalk font-body ${session.status === "in_progress" ? "pb-16" : isOwnSession && session.status === "abandoned" ? "pb-40" : "pb-32"}`}>
       {coachModeClient && <CoachModeBar groupId={session.group_id} clientName={coachModeClient.name} homeHref={coachHomeHref} />}
       <header className={session.status === "in_progress" ? "relative px-5 pt-1 pb-1 border-b border-steel/20" : "px-5 pt-8 pb-6 border-b border-steel/20"}>
         {/* In progress is ONE slim row (Back, the day, who logged it) so the exercise card keeps the screen; a finished or paused workout keeps the roomier header. */}

@@ -12,6 +12,7 @@ import {
   formatDuration,
   wrapLines,
   planFor,
+  funFirstBaseline,
   renderShareImageBlob,
   type DrawContext,
   type ShareImageFormat,
@@ -90,6 +91,13 @@ describe("the picture model", () => {
     expect(m.stats[0].value).toBe("12,450");
     expect(m.lifts).toHaveLength(3);
     expect(m.lifts[0]).toEqual({ name: "Back Squat", detail: "315 lbs × 5" });
+  });
+
+  it("shows kilograms for a client who lifts in kilograms (weights are stored in pounds)", () => {
+    const m = buildShareImageModel({ ...base, weightUnit: "kg" });
+    expect(m.stats[0]).toEqual({ value: "5,647", label: "KG LIFTED" });
+    expect(m.lifts[0]).toEqual({ name: "Back Squat", detail: "142.9 kg × 5" });
+    expect(m.lifts.map((l) => l.detail).join(" ")).not.toMatch(/lbs/);
   });
 
   it("uses the first name only, and none at all when the name is switched off", () => {
@@ -247,20 +255,20 @@ describe.each<ShareImageFormat>(["story", "post"])("%s picture fits its frame", 
     }
   });
 
-  it("draws the fun line in at most two lines, inside the frame, clear of the lifts and the footer", () => {
+  it("draws the fun line in at most three lines on a story (two on a post), inside the frame, clear of the lifts and the footer", () => {
     const drawn = render({ funLine: "A very long fun line that goes on and on about how much was lifted today and how nice that was to see, honestly. 🏋️" });
     const p = planFor(format);
     const fun = drawn.filter((d) => d.size === p.funSize);
     expect(fun.length).toBeGreaterThanOrEqual(1);
-    expect(fun.length).toBeLessThanOrEqual(2);
+    expect(fun.length).toBeLessThanOrEqual(format === "story" ? 3 : 2);
     for (const d of fun) {
       const [left, right] = bounds(d);
       expect(left).toBeGreaterThanOrEqual(0);
       expect(right).toBeLessThanOrEqual(width);
     }
     const lastRowBottom = p.liftsStartY + 2 * (p.liftRowH + p.liftGap) + p.liftRowH;
-    const funTop = p.funY - p.funSize * 0.72;
-    const funBottom = p.funY + (fun.length - 1) * p.funLineH + p.funSize * 0.08;
+    const funTop = fun[0].y - p.funSize * 0.72;
+    const funBottom = fun[fun.length - 1].y + p.funSize * 0.08;
     if (format === "post") {
       expect(funTop).toBeGreaterThan(lastRowBottom);
       expect(funBottom).toBeLessThan(p.footerY - 40 * 0.72);
@@ -269,6 +277,24 @@ describe.each<ShareImageFormat>(["story", "post"])("%s picture fits its frame", 
     } else {
       expect(funBottom).toBeLessThan(p.liftsTitleY - p.statLabelSize * 0.72);
       expect(funTop).toBeGreaterThan(p.chipY);
+    }
+  });
+
+  it("keeps the fun line well below the streak chip on a story, with one, two or three lines, with or without a mascot", () => {
+    if (format !== "story") return;
+    // The drawing starts the fun line where funFirstBaseline says.
+    const drawn = render({ funLine: "A very long fun line that goes on and on about how much was lifted today and how nice that was to see, honestly. 🏋️" });
+    const fun = drawn.filter((d) => d.size === planFor("story").funSize);
+    expect(fun[0].y).toBe(funFirstBaseline(planFor("story"), fun.length));
+    expect(render({ funLine: "Nice work." }).filter((d) => d.size === planFor("story").funSize)[0].y).toBe(planFor("story").funY);
+    for (const withMascot of [false, true]) {
+      const p = planFor("story", withMascot);
+      for (const count of [1, 2, 3]) {
+        const first = funFirstBaseline(p, count);
+        expect(first - p.funSize * 0.72 - p.chipY, `mascot ${withMascot}, ${count} lines`).toBeGreaterThanOrEqual(30);
+        const lastBottom = first + (count - 1) * p.funLineH + p.funSize * 0.08;
+        expect(lastBottom, `mascot ${withMascot}, ${count} lines`).toBeLessThan(p.liftsTitleY - p.statLabelSize * 0.72);
+      }
     }
   });
 

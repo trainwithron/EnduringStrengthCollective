@@ -15,6 +15,9 @@ import { pickShareCardStyle } from "@/lib/share-card-style";
 import { pickHumorArchetype } from "@/lib/humor-archetypes";
 import { buildCoachCongrats, firstNameOf } from "@/lib/coach-congrats";
 import { loadShareCardCoach } from "@/lib/share-card-coach";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { loadLiftUnit } from "@/lib/lift-unit-server";
+import { formatVolume } from "@/lib/lift-weight";
 
 // Deliberately public — no auth check. Every completed workout gets a
 // shareable card now, not just PRs, so a client can post it (and tag the
@@ -41,7 +44,7 @@ export async function generateMetadata(
   // exact bug the on-page branch was fixed for, just left live here too.
   const description =
     shared.totalSetsCompleted != null && shared.totalSetsCompleted > 0
-      ? `${Math.round(shared.totalVolume).toLocaleString()} lbs total volume — training with ${shared.groupName}.`
+      ? `${formatVolume(shared.totalVolume, await loadLiftUnit(createServiceRoleClient(), shared.authorId))} total volume — training with ${shared.groupName}.`
       : `Training with ${shared.groupName}.`;
 
   return {
@@ -171,6 +174,8 @@ export default async function ShareWorkoutPage(
     background: scenicBackground?.key ?? null,
     // The coach of this group: a QR code to their public page and their Instagram handle, when they apply (lib/share-card-coach.ts). Only on the picture people post.
     coachStrip: await loadShareCardCoach(shared.groupId),
+    // The unit the client lifts in (their About you setting): a kilogram lifter's card says kilograms. Read with the service role like the rest of this public page (lib/shared-workout.ts).
+    weightUnit: await loadLiftUnit(createServiceRoleClient(), shared.authorId),
   };
   // The light line on the card. The default (what anyone but the client sees, and the server's first render) is picked from this workout's own numbers with a
   // repeatable seed; the client's own device replaces it with a fresh one that is not among their last 20 (components/share/share-screen.tsx).
@@ -182,7 +187,7 @@ export default async function ShareWorkoutPage(
     prCount: shared.celebratePrs.length,
     totalWorkoutCount: shared.totalWorkoutCount,
   };
-  const defaultFunLine = pickSeededFunLine(funFacts, params.postId, { faith: shared.authorFaithOn });
+  const defaultFunLine = pickSeededFunLine(funFacts, params.postId, { faith: shared.authorFaithOn, kg: imageInput.weightUnit === "kg" });
   const screenModel = buildShareImageModel({ ...imageInput, showName: true });
   const screenBackground = useOrgCustomImage ? (
     // eslint-disable-next-line @next/next/no-img-element -- external Supabase Storage URL
@@ -216,14 +221,17 @@ export default async function ShareWorkoutPage(
           the PR and the date; the second summary card is gone. The owner can still choose what the card shows, here, under it. */}
       {user?.id === shared.authorId && (
         <section id="customize" className="max-w-md mx-auto px-4 pb-16 space-y-4" data-share-customize>
-          <p className="font-body text-xs text-steel uppercase tracking-wide">Customize your card</p>
-          {shared.broadcastLevel === "full" && <CustomizeSharePanel postId={params.postId} candidates={shared.top5Candidates} initialSelected={shared.selectedNames} />}
+          <p className="font-body text-xs text-steel uppercase tracking-wide">Your card</p>
+          {shared.broadcastLevel === "full" && <CustomizeSharePanel postId={params.postId} candidates={shared.top5Candidates} initialSelected={shared.selectedNames} weightUnit={imageInput.weightUnit} />}
           <BackgroundPicker athleteId={shared.authorId} initialPreference={shared.preferredShareBackground} />
           {viewerSeesFeed && (
-            <Link href={`/groups/${shared.groupId}/feed`} className="inline-block font-body text-xs text-steel underline underline-offset-2">
+            <Link href={`/groups/${shared.groupId}/feed`} className="min-h-11 flex items-center font-body text-xs text-steel underline underline-offset-2">
               Team Feed
             </Link>
           )}
+          <a href="#top" className="min-h-11 flex items-center font-body text-xs text-steel underline underline-offset-2">
+            ↑ Back to card
+          </a>
         </section>
       )}
     </main>

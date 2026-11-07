@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { toBlob } from "html-to-image";
 import { getVolumeEquivalence } from "@/lib/volume-equivalence";
 import { pickGymJoke } from "@/lib/gym-jokes";
+import { displayWeightValue, weightUnitLabel } from "@/lib/units";
+import { FeedWeightUnitContext } from "./workout-summary-card";
 
 interface SharedWorkoutData {
   groupName: string;
@@ -26,6 +28,8 @@ interface SharedWorkoutData {
 }
 
 export function WorkoutCardExpanded({ postId }: { postId: string }) {
+  // The client's unit (their About you setting): a kilogram lifter's card says kilograms. Stored weights are pounds.
+  const weightUnit = useContext(FeedWeightUnitContext);
   const [data, setData] = useState<SharedWorkoutData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [capturing, setCapturing] = useState(false);
@@ -106,10 +110,10 @@ export function WorkoutCardExpanded({ postId }: { postId: string }) {
         {data.totalVolume != null && (
           <div className="mt-5 pb-4 border-b border-steel/20">
             <p className="font-display text-4xl leading-none">
-              {Math.round(data.totalVolume).toLocaleString()}
+              {Math.round(displayWeightValue(data.totalVolume, weightUnit)).toLocaleString()}
             </p>
             <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">
-              lbs total volume &middot; {data.totalSetsCompleted} sets
+              {weightUnitLabel(weightUnit)} total volume &middot; {data.totalSetsCompleted} sets
             </p>
             {volumeEquivalence && (
               <p className="font-body text-sm text-rust mt-2">{volumeEquivalence.text}</p>
@@ -148,7 +152,7 @@ export function WorkoutCardExpanded({ postId }: { postId: string }) {
                 <div key={lift.name} className="flex items-center justify-between">
                   <span className="font-display text-sm uppercase">{lift.name}</span>
                   <span className="font-body text-xs text-steel">
-                    {lift.weight} lbs &times; {lift.reps}
+                    {displayWeightValue(lift.weight, weightUnit)} {weightUnitLabel(weightUnit)} &times; {lift.reps}
                   </span>
                 </div>
               ))}
@@ -164,7 +168,7 @@ export function WorkoutCardExpanded({ postId }: { postId: string }) {
             <div className="space-y-1">
               {data.celebratePrs.map((pr) => (
                 <p key={pr.name} className="font-body text-sm">
-                  {pr.name}: {pr.weight} lbs &times; {pr.reps} (est. 1RM {pr.oneRepMax})
+                  {pr.name}: {displayWeightValue(pr.weight, weightUnit)} {weightUnitLabel(weightUnit)} &times; {pr.reps} (est. 1RM {displayWeightValue(pr.oneRepMax, weightUnit)})
                 </p>
               ))}
             </div>

@@ -46,7 +46,7 @@ export function RequestSlotButton({
           : /outside your coach/.test(msg)
           ? "That time is outside your coach's hours."
           : /just taken/.test(msg)
-          ? "That slot was just taken. Try another."
+          ? "That time was just taken. Try another."
           : "That didn't send. Nothing was changed. Try again."
       );
       router.refresh();

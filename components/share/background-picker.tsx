@@ -43,9 +43,9 @@ export function BackgroundPicker({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="font-body text-xs text-steel uppercase tracking-wide"
+        className="min-h-11 flex items-center font-body text-xs text-steel uppercase tracking-wide"
       >
-        {open ? "Done choosing background" : "Choose your background →"}
+        {open ? "Done" : "Pick a background →"}
       </button>
 
       {open && (

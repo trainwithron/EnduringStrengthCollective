@@ -11,7 +11,7 @@ const logger = read("components/logging/session-logger.tsx");
 
 describe("less dead space in the logger", () => {
   it("a one-exercise day's spacer is the dots row's height, not taller", () => {
-    expect(carousel).toContain('<div className="h-7 mb-1" aria-hidden="true" />');
+    expect(carousel).toContain('<div className="h-11 mb-1" aria-hidden="true" />');
     expect(carousel).not.toContain("h-9 mb-3");
   });
   it("Edit metrics and Add weight / RPE ride on the Sets row (after the grid), and their popup opens above it", () => {
@@ -24,9 +24,9 @@ describe("less dead space in the logger", () => {
     expect(card).toContain("{rowAction && <span");
     expect(card).toContain("absolute z-10 right-0 bottom-full mb-1");
   });
-  it("the set-number cell is shorter; the cells you type in stay 44 px", () => {
-    expect(grid).toContain("w-12 shrink-0 min-h-9 text-center");
-    expect(grid).not.toContain("w-12 shrink-0 min-h-11 text-center");
+  it("the set-number cell is a full 44 px tap target, like the cells you type in", () => {
+    expect(grid).toContain("w-12 shrink-0 min-h-11 text-center");
+    expect(grid).not.toContain("w-12 shrink-0 min-h-9 text-center");
   });
   it("the rest bar, the save banner and the cards share one box, so the bar can open over the card", () => {
     const box = logger.slice(logger.indexOf("<SetSaveProvider>"), logger.indexOf("</SetSaveProvider>"));

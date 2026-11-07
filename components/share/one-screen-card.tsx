@@ -146,7 +146,8 @@ export function OneScreenCard({
         </div>
       </div>
 
-      {/* A short screen has no room for another row, so the button is a round icon in the bottom corner (beside the date); a taller screen gets the labelled one under the line. */}
+      {/* A short screen has no room for another row, so the button is a small pill in the bottom corner (beside the date), with the icon and a visible word so it is never a bare
+          refresh glyph (kept narrow, about 86 px, so it clears the centred Spotlight wordmark on a 360 px phone); a taller screen gets the labelled one under the line. */}
       {onShuffle && model.funLine && (
         <button
           type="button"
@@ -154,9 +155,10 @@ export function OneScreenCard({
           data-testid="share-fun-shuffle-icon"
           aria-label="Another one"
           title="Another one"
-          className={`[@media(min-height:700px)]:hidden [@media(max-height:520px)]:hidden absolute right-2 bottom-2 w-11 h-11 flex items-center justify-center rounded-full border border-steel/30 bg-graphite/60 text-steel active:text-chalk ${funLineHidden ? "invisible" : ""}`}
+          className={`[@media(min-height:700px)]:hidden [@media(max-height:520px)]:hidden absolute right-2 bottom-2 min-w-11 h-11 px-2 flex items-center justify-center gap-1 rounded-full border border-steel/30 bg-graphite/60 text-steel active:text-chalk ${funLineHidden ? "invisible" : ""}`}
         >
-          <RefreshCw size={16} aria-hidden="true" />
+          <RefreshCw size={14} aria-hidden="true" />
+          <span className="font-body text-[11px] uppercase tracking-wide">Another</span>
         </button>
       )}
     </div>

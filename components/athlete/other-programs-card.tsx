@@ -9,7 +9,7 @@ export function OtherProgramsCard({ programs }: { programs: MyProgramRow[] }) {
   if (programs.length === 0) return null;
   return (
     <section className="border border-steel/30 bg-surface/40 px-4 py-3">
-      <p className="font-body text-xs text-steel uppercase tracking-wide">Your programs</p>
+      <p className="font-body text-xs text-steel uppercase tracking-wide">Your other programs</p>
       <ul className="mt-1 divide-y divide-steel/15">
         {programs.map((p) => (
           <li key={p.programId} className="flex items-center gap-1">

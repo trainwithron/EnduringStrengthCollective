@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { requestTargetFor } from "@/lib/client-requests";
+import { brandChipFor } from "@/lib/coach-site";
 import { RequestFlow } from "@/components/client-request/request-flow";
 
 export const metadata = { title: "Request to train", robots: { index: false, follow: false } };
@@ -24,9 +25,11 @@ export default async function RequestToTrainPage(props: { params: Promise<{ slug
       </main>
     );
   }
+  // The organization's logo chip, the same as on the coach's public page, so the form looks like the page it came from.
+  const brand = await brandChipFor(createServiceRoleClient(), target.coachId);
   return (
     <main className="min-h-screen flex items-center justify-center px-6 py-10">
-      <RequestFlow slug={target.slug} coachName={target.coachName} coachId={target.coachId} />
+      <RequestFlow slug={target.slug} coachName={target.coachName} coachId={target.coachId} logoUrl={brand.logoUrl} orgName={brand.orgName} />
     </main>
   );
 }

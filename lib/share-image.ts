@@ -3,6 +3,8 @@ import { drawSpotlightMark } from "@/lib/brand-canvas";
 import { SCENIC_SKY_STOPS, type ScenicBackgroundKey } from "@/lib/scenic-backgrounds";
 import { getHumorArchetype, humorSvgMarkup } from "@/lib/humor-archetypes";
 import QRCode from "qrcode";
+import { lbToKg, type WeightUnit } from "@/lib/units";
+import { formatLift } from "@/lib/lift-weight";
 
 // The post-workout card as a PICTURE people can post. Everything here draws on a plain canvas so the image is
 // self-contained (no screenshot of the page, no link, no cross-site assets) and looks the same on every phone.
@@ -39,6 +41,8 @@ export interface ShareImageInput {
   // The coach of the group the workout was logged in (lib/share-card-coach.ts): a QR code to their public page (only while it is on and they keep the switch on) and their Instagram
   // handle (only when set), with "Train with <first name>". Works from a picture: nothing to click. Nothing about the person who trained is added.
   coachStrip?: { qrUrl: string | null; coachFirstName: string; handle: string | null } | null;
+  // The unit the person lifts in (their About you setting). Weights arrive in pounds, as stored; a kilogram lifter sees kilograms. Missing means pounds.
+  weightUnit?: WeightUnit;
 }
 
 export interface ShareImageModel {
@@ -93,7 +97,11 @@ export function buildShareImageModel(input: ShareImageInput): ShareImageModel {
   const hasPr = input.prCount > 0;
 
   const stats: { value: string; label: string }[] = [];
-  if (didWork) stats.push({ value: Math.round(input.totalVolume as number).toLocaleString("en-US"), label: "LBS LIFTED" });
+  const kg = input.weightUnit === "kg";
+  if (didWork) {
+    const volume = kg ? lbToKg(input.totalVolume as number) : (input.totalVolume as number);
+    stats.push({ value: Math.round(volume).toLocaleString("en-US"), label: kg ? "KG LIFTED" : "LBS LIFTED" });
+  }
   if (hasPr) stats.push({ value: String(input.prCount), label: input.prCount === 1 ? "NEW PR" : "NEW PRS" });
   if (input.durationSeconds != null) stats.push(formatDuration(input.durationSeconds));
   if (stats.length < 3 && didWork) stats.push({ value: String(input.totalSets), label: input.totalSets === 1 ? "SET" : "SETS" });
@@ -105,7 +113,7 @@ export function buildShareImageModel(input: ShareImageInput): ShareImageModel {
   else if (input.totalWorkoutCount != null && input.totalWorkoutCount >= 2) chip = `WORKOUT #${input.totalWorkoutCount}`;
 
   const lifts = didWork
-    ? input.topLifts.slice(0, 3).map((l) => ({ name: l.name, detail: `${l.weight} lbs × ${l.reps}` }))
+    ? input.topLifts.slice(0, 3).map((l) => ({ name: l.name, detail: kg ? `${formatLift(l.weight, "kg")} × ${l.reps}` : `${l.weight} lbs × ${l.reps}` }))
     : [];
 
   return {
@@ -291,6 +299,11 @@ interface Plan {
   mascotH: number;
   mascotCaptionY: number;
   maxLifts: number;
+}
+
+/** Baseline of the first fun-line line: a three-line fun line moves up half a line so it still clears TOP LIFTS. */
+export function funFirstBaseline(p: Plan, lineCount: number): number {
+  return lineCount === 3 ? p.funY - p.funLineH / 2 : p.funY;
 }
 
 export function planFor(format: ShareImageFormat, withMascot = false): Plan {
@@ -493,12 +506,15 @@ export function drawShareImage(
     setLetterSpacing(ctx, 0);
   }
 
-  // One light line (a volume comparison or a joke), centred, at most two lines
+  // One light line (a volume comparison or a joke), centred: up to three lines on a story (the same as the card on screen, so a punch line is never cut short), two on a post
   if (model.funLine) {
     ctx.textAlign = "center";
     ctx.font = body(p.funSize);
     ctx.fillStyle = theme.chalk;
-    wrapLines(ctx, model.funLine, maxText, 2).forEach((line, i) => ctx.fillText(line, w / 2, p.funY + i * p.funLineH));
+    const funLines = wrapLines(ctx, model.funLine, maxText, format === "story" ? 3 : 2);
+    // A three-line fun line starts half a line higher so it sits centred between the chip and TOP LIFTS; one or two lines keep the usual spot, well clear of the chip.
+    const funTopY = funFirstBaseline(p, funLines.length);
+    funLines.forEach((line, i) => ctx.fillText(line, w / 2, funTopY + i * p.funLineH));
   }
 
   // Top lifts

@@ -157,3 +157,18 @@ export function pickBrandOrg<T extends { id: string; created_at: string | null }
     .sort((a, b) => Number(roleOf.get(b.id) === "owner") - Number(roleOf.get(a.id) === "owner") || String(a.created_at ?? "").localeCompare(String(b.created_at ?? "")) || a.id.localeCompare(b.id));
   return ranked[0] ?? null;
 }
+
+// The organization logo and name for a coach's public pages (the request form and the booking page), picked the same way as on the coach's public page. Nothing when there is no logo or the lookup fails.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function brandChipFor(db: any, coachId: string): Promise<{ logoUrl: string | null; orgName: string | null }> {
+  try {
+    const { data: membership } = await db.from("organization_memberships").select("organization_id, role").eq("profile_id", coachId).in("role", ["owner", "admin"]).limit(5);
+    const orgIds = ((membership ?? []) as { organization_id: string }[]).map((m) => m.organization_id);
+    if (orgIds.length === 0) return { logoUrl: null, orgName: null };
+    const { data: orgRows } = await db.from("organizations").select("id, created_at, name, logo_url").in("id", orgIds);
+    const org = pickBrandOrg((membership ?? []) as { organization_id: string; role: string }[], (orgRows ?? []) as { id: string; created_at: string | null; name: string | null; logo_url: string | null }[]);
+    return { logoUrl: safeWebUrl(org?.logo_url), orgName: org?.name ?? null };
+  } catch {
+    return { logoUrl: null, orgName: null };
+  }
+}

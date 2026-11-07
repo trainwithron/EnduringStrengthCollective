@@ -116,10 +116,13 @@ export function RosterRow({
         <p className="font-body font-medium text-[15px] truncate">
           {member.fullName}
         </p>
-        <div className="flex items-center gap-1.5 mt-0.5">
-          <span className={`w-1.5 h-1.5 rounded-full ${status.dotClass}`} />
-          <span className="font-body text-xs text-steel">{status.text}</span>
-        </div>
+        {/* A coach's own workout-log recency means nothing to a client ("42 days quiet" reads as "your coach has gone quiet"), so the dot is only for athletes. */}
+        {optimisticRole !== "coach" && (
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <span className={`w-1.5 h-1.5 rounded-full ${status.dotClass}`} />
+            <span className="font-body text-xs text-steel">{status.text}</span>
+          </div>
+        )}
       </div>
     </>
   );

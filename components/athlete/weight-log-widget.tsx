@@ -102,14 +102,14 @@ export function WeightLogWidget({
       <div className="flex items-center gap-3 mt-2">
         <Link
           href={`/groups/${groupId}/transformation/new?milestone=${newMilestone.id}`}
-          className="font-body text-xs text-rust font-medium"
+          className="inline-flex items-center min-h-11 font-body text-xs text-rust font-medium"
         >
           Create a card →
         </Link>
         <button
           type="button"
           onClick={() => setNewMilestone(null)}
-          className="font-body text-xs text-steel"
+          className="inline-flex items-center min-h-11 font-body text-xs text-steel"
         >
           Not now
         </button>
@@ -182,7 +182,7 @@ export function WeightLogWidget({
         <button
           type="button"
           onClick={() => setExpanded(false)}
-          className="font-body text-xs text-steel"
+          className="inline-flex items-center min-h-11 font-body text-xs text-steel"
         >
           Close
         </button>

@@ -64,6 +64,9 @@ export function QuickAddNlButton({
         return;
       }
       setDraft(data.exercises);
+    } catch {
+      // A dropped connection says so, instead of the button quietly going back to how it was.
+      setError("That didn't go through. Check your signal and try again.");
     } finally {
       setParsing(false);
     }
@@ -133,15 +136,15 @@ export function QuickAddNlButton({
             disabled={saving}
             className="h-11 px-4 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
           >
-            {saving ? "Adding…" : "Confirm & add"}
+            {saving ? "Adding…" : "Yes, add them"}
           </button>
           <button
             type="button"
             onClick={() => setDraft(null)}
             disabled={saving}
-            className="font-body text-xs text-steel disabled:opacity-40"
+            className="min-h-11 px-2 font-body text-xs text-steel disabled:opacity-40"
           >
-            Try again
+            Not these
           </button>
         </div>
       </div>
@@ -166,7 +169,7 @@ export function QuickAddNlButton({
           disabled={parsing || !text.trim()}
           className="h-11 px-4 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
         >
-          {parsing ? "Parsing…" : "Parse"}
+          {parsing ? "Reading…" : "Read it"}
         </button>
         <button
           type="button"
@@ -175,7 +178,7 @@ export function QuickAddNlButton({
             setText("");
             setError(null);
           }}
-          className="font-body text-xs text-steel"
+          className="min-h-11 px-2 font-body text-xs text-steel"
         >
           Cancel
         </button>

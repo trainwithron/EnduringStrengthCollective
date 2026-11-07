@@ -64,7 +64,7 @@ export function ReactionButton({
       <button
         type="button"
         onClick={toggle}
-        className={`flex items-center gap-1.5 h-9 px-3 border transition-colors ${
+        className={`flex items-center gap-1.5 h-11 px-3 border transition-colors ${
           reacted
             ? "border-rust text-rust bg-rust/10"
             : "border-steel/30 text-steel active:border-rust active:text-rust"

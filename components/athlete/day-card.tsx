@@ -149,7 +149,7 @@ function WorkoutSection({
         {finished[0].workoutId && (
           <Link
             href={`/groups/${groupId}/workouts/${finished[0].workoutId}`}
-            className="font-body text-xs text-steel underline underline-offset-2 shrink-0"
+            className="inline-flex items-center min-h-11 font-body text-xs text-steel underline underline-offset-2 shrink-0"
           >
             View
           </Link>
@@ -195,7 +195,7 @@ function WorkoutSection({
                           ? "w-full h-11 flex items-center justify-center bg-rust text-graphite font-display uppercase text-sm font-bold"
                           : isToday
                           ? "w-full h-11 flex items-center justify-center border border-rust text-rust font-display uppercase text-sm font-bold"
-                          : "font-body text-sm text-rust"
+                          : "inline-flex items-center min-h-11 font-body text-sm text-rust"
                       }
                     >
                       {isToday ? (ownChoice ? startLabel(weekdayOfDate(dateKey)) : "Start workout") : "View planned workout"}
@@ -273,7 +273,7 @@ function WorkoutSection({
         {canBook && (
           <Link
             href={`/groups/${groupId}/calendar/${dateKey}`}
-            className="font-body text-sm text-rust mt-3 inline-block"
+            className="font-body text-sm text-rust mt-3 inline-flex items-center min-h-11"
           >
             Book a session with your coach &rarr;
           </Link>
@@ -299,7 +299,7 @@ function WorkoutSection({
         {workout.status === "done" && workout.workoutId && (
           <Link
             href={`/groups/${groupId}/workouts/${workout.workoutId}`}
-            className="font-body text-sm text-positive"
+            className="inline-flex items-center min-h-11 font-body text-sm text-positive"
           >
             Completed — view workout
           </Link>
@@ -321,7 +321,7 @@ function WorkoutSection({
             className={
               isPrimary
                 ? "w-full h-11 flex items-center justify-center bg-rust text-graphite font-display uppercase text-sm font-bold"
-                : "font-body text-sm text-rust"
+                : "inline-flex items-center min-h-11 font-body text-sm text-rust"
             }
           >
             {isToday ? (ownChoice ? startLabel(weekdayOfDate(dateKey)) : "Start workout") : "View planned workout"}

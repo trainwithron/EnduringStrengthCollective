@@ -21,14 +21,14 @@ export function AboutYouCard({ groupId, athleteId }: { groupId: string; athleteI
       <div>
         <p className="font-body text-sm text-chalk">Tell your coach about you</p>
         <p className="font-body text-xs text-steel mt-0.5">Height, weight and activity, a minute. It lets them set a starting target.</p>
-        <Link href={`/groups/${groupId}/about-you`} className="inline-block mt-2 font-body text-sm text-rust underline underline-offset-2">
+        <Link href={`/groups/${groupId}/about-you`} className="inline-flex items-center min-h-11 mt-2 font-body text-sm text-rust underline underline-offset-2">
           Fill it in
         </Link>
       </div>
       <button
         type="button"
         aria-label="Hide this for now"
-        className="font-body text-sm text-steel px-2"
+        className="inline-flex items-center min-h-11 font-body text-sm text-steel px-2"
         onClick={() => {
           try {
             window.localStorage.setItem(key, "1");

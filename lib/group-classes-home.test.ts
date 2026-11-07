@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-// "Group classes this week" on the client's Home: the next seven days of the group's sessions, a handful, hidden when there are none, never for a one-on-one space, only for the person's own Home
+// "Group sessions this week" on the client's Home: the next seven days of the group's sessions, a handful, hidden when there are none, never for a one-on-one space, only for the person's own Home
 // (joining uses the signed-in person). The Group sessions page and the Home share one loader.
 const root = join(__dirname, "..");
 const read = (p: string) => readFileSync(join(root, p), "utf8").replace(/\r\n/g, "\n");
@@ -18,7 +18,7 @@ describe("group classes on the client Home", () => {
   });
   it("is hidden when there is nothing to show, and uses the approved heading", () => {
     expect(hub).toContain("loaded.classes.length > 0");
-    expect(hub).toContain("Group classes this week");
+    expect(hub).toContain("Group sessions this week");
   });
   it("the Group sessions page and the Home use the same loader", () => {
     expect(page).toContain("loadClassCards(");

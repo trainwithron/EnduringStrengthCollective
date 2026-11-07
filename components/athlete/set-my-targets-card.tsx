@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MacroCalculator } from "@/components/tools/macro-calculator";
 import { WeightLogWidget, type WeightLogEntry } from "@/components/athlete/weight-log-widget";
@@ -64,13 +65,13 @@ export function SetMyTargetsCard({
   weightUnit: WeightUnit;
   activity: ActivityLevel | null;
   goal: MacroGoal | null;
-  // Mifflin-St Jeor / Katch-McArdle from About you, when height, date of birth and activity are on file.
+  // Mifflin-St Jeor / Katch-McArdle from About you, when height, birthday and activity are on file.
   baselineMaintenance: number | null;
   hideFatLoss: boolean;
   showFindMaintenance: boolean;
   maintenance: MaintenanceResult;
   weightLogs: WeightLogEntry[];
-  // The database lets them save (minor_may_write: an adult with a date of birth on their health form, or a teen with a signed guardian). Without it the calculator still shows, with no save.
+  // The database lets them save (minor_may_write: an adult with a birthday on file in Settings › Profile or on their health form, or a teen with a signed guardian). Without it the calculator still shows, with no save.
   canSave: boolean;
 }) {
   const router = useRouter();
@@ -126,7 +127,11 @@ export function SetMyTargetsCard({
             />
             {!canSave && (
               <p className="font-body text-xs text-steel mt-3" data-cannot-save>
-                To save a target of your own, your date of birth needs to be on your health form (and, under 18, a parent or guardian needs to give permission). Ask your coach to send you the form.
+                To save a target of your own, add your birthday in{" "}
+                <Link href={`/groups/${groupId}/settings`} className="text-rust underline underline-offset-2">
+                  Settings › Profile
+                </Link>{" "}
+                first (under 18, a parent or guardian also needs to give permission).
               </p>
             )}
           </div>

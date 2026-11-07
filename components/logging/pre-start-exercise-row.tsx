@@ -48,7 +48,7 @@ export function PreStartExerciseRow({
     );
     setBusy(false);
     if (upsertError) {
-      setError("Couldn't swap — check your connection and try again.");
+      setError("Couldn't swap. Check your signal and try again.");
       return;
     }
     setSwapping(false);
@@ -73,7 +73,7 @@ export function PreStartExerciseRow({
           )}
           {lastTime && (
             <p className="font-body text-xs text-steel mt-0.5">
-              Last: {formatLift(lastTime.weight, unit)} &times; {lastTime.reps}
+              Last time: {formatLift(lastTime.weight, unit)} &times; {lastTime.reps}
             </p>
           )}
           {goal && (goal.weight != null || goal.reps != null) && (

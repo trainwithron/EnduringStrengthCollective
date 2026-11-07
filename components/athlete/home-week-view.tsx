@@ -38,11 +38,11 @@ export function HomeWeekView({
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <Link href={prevHref} className="font-body text-xs text-rust uppercase tracking-wide">
+        <Link href={prevHref} className="inline-flex items-center min-h-11 font-body text-xs text-rust uppercase tracking-wide">
           &larr; Prev
         </Link>
         <h2 className="font-display uppercase text-sm tracking-wide text-steel">{weekLabel}</h2>
-        <Link href={nextHref} className="font-body text-xs text-rust uppercase tracking-wide">
+        <Link href={nextHref} className="inline-flex items-center min-h-11 font-body text-xs text-rust uppercase tracking-wide">
           Next &rarr;
         </Link>
       </div>
@@ -68,8 +68,9 @@ export function HomeWeekView({
                 <p className="font-body text-sm font-medium flex items-center gap-1.5 truncate">
                   {day.workout.status === "locked" && <Lock className="w-3 h-3 shrink-0 text-steel" />}
                   {day.workout.status === "done" && <Check className="w-3 h-3 shrink-0 text-positive" />}
-                  {day.workout.title ?? (day.workout.status === "rest" ? "Rest day" : "—")}
+                  {day.workout.title ?? (day.workout.status === "rest" ? "Rest day" : day.workout.status === "no-program" ? "Nothing planned" : "—")}
                   {(day.sessionCount ?? 0) > 1 && <span className="text-steel"> +{(day.sessionCount ?? 0) - 1}</span>}
+                  {day.workout.status === "missed" && <span className="text-steel font-normal shrink-0"> · Not logged</span>}
                 </p>
                 <p className="font-body text-xs text-steel mt-0.5">
                   {day.macroCalories != null ? `${day.macroCalories} kcal` : ""}
