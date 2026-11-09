@@ -23,6 +23,7 @@ import { homeProgramCards, programPickups } from "@/lib/home-programs";
 import { loadDoneAt, weekOf } from "@/lib/program-pickup";
 import { readRowsByIds } from "@/lib/read-by-ids";
 import { AboutYouCard } from "@/components/athlete/about-you-card";
+import { GoalSheetPromptCard } from "@/components/athlete/goal-sheet-prompt-card";
 import { aboutYouComplete, rowToBodyProfile } from "@/lib/client-body-profile";
 import type { WeightUnit } from "@/lib/units";
 import { HomeWeekView, type HomeDaySummary } from "@/components/athlete/home-week-view";
@@ -584,6 +585,8 @@ export default async function GroupHubPage(
   // How this client likes to see weight, and whether they still owe the calculator's inputs (a one-time card).
   let weightUnit: WeightUnit = "lb";
   let aboutYouNeeded = false;
+  // No goal sheet filled in yet (by the client or by a coach with them): Home asks for it first. A failed read leaves it out.
+  let goalSheetNeeded = false;
   let wellnessCheckin: WellnessCheckinValues | null = null;
   let lifeImpactPrompt: string | null = null;
   const canBook = mobileBase?.booking.canBook ?? false;
@@ -791,6 +794,10 @@ export default async function GroupHubPage(
       }));
 
       if (isToday && todayReads) {
+        if (!isCoach && !isActingAsOther) {
+          const { data: sheetRow, error: sheetError } = await supabase.from("client_goal_sheets").select("filled_at").eq("athlete_id", athleteId).eq("group_id", params.groupId).maybeSingle();
+          goalSheetNeeded = !sheetError && !sheetRow?.filled_at;
+        }
         const [{ data: weightRows }, { data: wellnessRow }, { data: lastLifeImpactRow }, { data: detailsRow }, { data: intakeRow }] = todayReads;
         const bodyProfile = rowToBodyProfile(detailsRow as Record<string, unknown> | null, intakeRow as Record<string, unknown> | null);
         weightUnit = bodyProfile.weightUnit;
@@ -916,6 +923,7 @@ export default async function GroupHubPage(
           {view === "day" && (
             <div className="space-y-4">
               {isToday && <HomeThread lines={homeThreadLines} />}
+              {isToday && goalSheetNeeded && <GoalSheetPromptCard groupId={params.groupId} athleteId={athleteId} />}
               {isToday && aboutYouNeeded && !isCoach && !isActingAsOther && <AboutYouCard groupId={params.groupId} athleteId={athleteId} />}
               {reupState && <ReupCard state={reupState} />}
               {/* Programs from the person's OTHER groups: this group's own program is listed under today's workout, so it is not repeated here.

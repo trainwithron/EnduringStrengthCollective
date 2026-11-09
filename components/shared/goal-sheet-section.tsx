@@ -110,7 +110,7 @@ export function GoalSheetSection({
         : null;
 
   return (
-    <section aria-label={GOAL_SHEET_HEADING} className="border border-steel/20 p-4 mb-6">
+    <section id="goal-sheet" aria-label={GOAL_SHEET_HEADING} className="border border-steel/20 p-4 mb-6 scroll-mt-4">
       <h2 className="font-display uppercase text-sm tracking-wide text-steel">{GOAL_SHEET_HEADING}</h2>
       {status && <p className={`font-body text-sm mt-1 ${viewer === "client" ? "text-rust" : "text-steel"}`}>{status}</p>}
 
