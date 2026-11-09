@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { CoachLoggedBadge } from "@/components/coach-logged-badge";
 import { believableDurationSeconds, formatDuration } from "@/lib/share-image";
+import { FixWorkoutTime } from "@/components/coach/fix-workout-time";
+import { looksTooLong } from "@/lib/workout-time-fix";
 
 // One completed workout in a client's Logged workouts list: a short, landscape version of the post-workout card (Ron, Nov 9: "just some stats so coaches can get a quick
 // reference of what the workout was and how the client did"). A stat with no real number is left out, never shown as 0.
@@ -72,6 +74,7 @@ export function LoggedWorkoutCard({
           Recap &amp; Up Next &rarr;
         </Link>
       )}
+      {sessionId && looksTooLong(durationSeconds) && <FixWorkoutTime sessionId={sessionId} />}
     </div>
   );
 }

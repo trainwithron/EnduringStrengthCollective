@@ -17,6 +17,8 @@ import { useLiftUnit } from "@/components/logging/lift-unit-context";
 import { liftUnitLabel } from "@/lib/lift-weight";
 import { parseWeightInput } from "@/lib/units";
 import { mirrorGoogleCalendarEvent } from "@/lib/mirror-google-calendar-event";
+import { DEFAULT_FIX_MINUTES, looksTooLong, saveFixedTime, validFixMinutes } from "@/lib/workout-time-fix";
+import { durationInWords } from "@/lib/workout-fun-line";
 
 // This project has no generated Supabase Database type, so a fresh RPC's
 // result falls back to an untyped shape — spelled out explicitly here
@@ -70,6 +72,10 @@ export function CompleteWorkoutButton({
   const [submitting, setSubmitting] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [emptyAsked, setEmptyAsked] = useState(false);
+  // Over 90 minutes, Complete first asks whether that is the real length (Ron, Nov 9: a timer left running). Null: not asking.
+  const [longRunSeconds, setLongRunSeconds] = useState<number | null>(null);
+  const [fixMinutes, setFixMinutes] = useState(String(DEFAULT_FIX_MINUTES));
+  const [fixMinutesError, setFixMinutesError] = useState<string | null>(null);
   // "Delete workout" asks once: "Delete this workout? Nothing is saved and no session is used."
   const [deleteAsked, setDeleteAsked] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -203,7 +209,31 @@ export function CompleteWorkoutButton({
     router.push(pauseHref);
   }
 
-  async function handleComplete() {
+  // Asks about a long workout, then finishes. A failed read just finishes: the time can still be fixed from the workout's card.
+  async function startComplete() {
+    setSubmitting(true);
+    const { data } = await createBrowserClient().from("athlete_sessions").select("status, started_at").eq("id", sessionId).maybeSingle();
+    const seconds = data?.status === "in_progress" && data.started_at ? (Date.now() - new Date(data.started_at as string).getTime()) / 1000 : null;
+    setSubmitting(false);
+    if (looksTooLong(seconds)) {
+      setFixMinutesError(null);
+      setLongRunSeconds(seconds);
+      return;
+    }
+    void handleComplete();
+  }
+
+  function finishWithTypedTime() {
+    const minutes = validFixMinutes(fixMinutes);
+    if (minutes == null) {
+      setFixMinutesError("Enter the minutes, from 1 to 600.");
+      return;
+    }
+    setLongRunSeconds(null);
+    void handleComplete(minutes);
+  }
+
+  async function handleComplete(fixMinutes?: number) {
     setSubmitting(true);
     setError(null);
     const supabase = createBrowserClient();
@@ -277,6 +307,9 @@ export function CompleteWorkoutButton({
       setSubmitting(false);
       return;
     }
+
+    // Saved before anything else reads the time (the card is built from it).
+    if (fixMinutes != null) await saveFixedTime(sessionId, fixMinutes);
 
     if (result.credit_consumed) {
       checkAndNotifyLowSessionBalance(result.athlete_id, result.group_id);
@@ -562,6 +595,44 @@ export function CompleteWorkoutButton({
         raised ? "bottom-16" : "bottom-0"
       } left-0 right-0 bg-graphite border-t border-steel/20 px-5 py-2`}
     >
+      {longRunSeconds != null && (
+        <div className="mb-3 p-3 border border-rust/40 bg-surface/60" data-long-workout-check>
+          <p className="font-body text-sm text-chalk">This workout has been running {durationInWords(longRunSeconds)}. Is that right?</p>
+          <div className="flex flex-wrap items-center gap-2 mt-3">
+            <button
+              type="button"
+              onClick={() => {
+                setLongRunSeconds(null);
+                void handleComplete();
+              }}
+              className="h-11 px-4 border border-steel/30 text-chalk font-body text-sm"
+            >
+              Yes, that&apos;s right
+            </button>
+            <label className="font-body text-xs text-steel flex items-center gap-2">
+              It was
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={600}
+                value={fixMinutes}
+                onChange={(e) => setFixMinutes(e.target.value)}
+                aria-label="Minutes the workout took" className="w-20 h-11 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust"
+              />
+              minutes
+            </label>
+            <button type="button" onClick={finishWithTypedTime} className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium">
+              Use this time
+            </button>
+          </div>
+          {fixMinutesError && (
+            <p className="font-body text-xs text-rust mt-2" role="alert">
+              {fixMinutesError}
+            </p>
+          )}
+        </div>
+      )}
       {confirming && deleteAsked && (
         <div className="mb-3 p-3 border border-rust/40 bg-surface/60" data-delete-workout-confirm>
           <p className="font-body text-sm text-chalk">Delete this workout? Nothing is saved and no session is used.</p>
@@ -601,7 +672,7 @@ export function CompleteWorkoutButton({
                 }
                 setConfirming(false);
                 setEmptyAsked(false);
-                handleComplete();
+                void startComplete();
               }}
               disabled={submitting}
               className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"

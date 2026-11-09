@@ -1,7 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { LoggedWorkoutCard } from "./logged-workout-card";
+
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
 
 const base = { title: "Day 1", dateLabel: "11/2/2026", sessionId: "s1", loggedByCoach: false, volume: 10022, sets: 13, durationSeconds: 3900, prs: [] as string[], exerciseNames: ["Squat", "Bench"] };
 const html = (over = {}) => renderToStaticMarkup(createElement(LoggedWorkoutCard, { ...base, ...over }));
