@@ -1,7 +1,7 @@
 "use client";
 
 import { confirmDialog } from "@/components/shared/confirm-dialog";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { existingLibraryName } from "@/lib/exercise-search";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -86,16 +86,6 @@ export function ExerciseLibraryList({
   const [categoryAutoSuggested, setCategoryAutoSuggested] = useState(true);
   const [equipmentAutoSuggested, setEquipmentAutoSuggested] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  // Wide enough (the page area at 56rem, @4xl) for the editor to sit beside the list instead of inside it.
-  const rootRef = useRef<HTMLDivElement>(null);
-  const [twoPane, setTwoPane] = useState(false);
-  useEffect(() => {
-    const el = rootRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver((entries) => setTwoPane((entries[0]?.contentRect.width ?? 0) >= 896));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
   const [submitting, setSubmitting] = useState(false);
   const [alreadyThere, setAlreadyThere] = useState<string | null>(null);
   const [nameProblem, setNameProblem] = useState<string | null>(null);
@@ -385,7 +375,7 @@ export function ExerciseLibraryList({
   );
   const filterSelect = "h-10 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust";
 
-  // The editor for one exercise. On a wide page it opens in a panel beside the list; on a narrow one, inside the list under the exercise (layout audit #17). One copy either way.
+  // The editor for one exercise, always right under the exercise that was opened (Ron, Nov 9: the side panel beside the list opened off the screen).
   function editorFor(ex: LibraryExerciseRow) {
     const exTags = tagsByExercise[ex.name] ?? [];
     const breakdown =
@@ -479,10 +469,9 @@ export function ExerciseLibraryList({
       </div>
     );
   }
-  const editing = twoPane && expandedId ? exercises.find((e) => e.id === expandedId) ?? null : null;
 
   return (
-    <div ref={rootRef}>
+    <div>
       <div className="flex flex-wrap items-center gap-3 mb-3">
         <label className="font-body text-xs text-steel flex items-center gap-2">
           Pattern
@@ -653,7 +642,6 @@ export function ExerciseLibraryList({
       {visible.length === 0 ? (
         <p className="font-body text-sm text-steel py-6">{onlyWithoutVideo && !search.trim() && !filtersActive(filters) ? "Every exercise has a video." : filtersActive(filters) || onlyWithoutVideo ? "No exercises match. Clear a filter." : "No exercises match."}</p>
       ) : (
-        <div className={editing ? "grid grid-cols-[minmax(0,1fr)_minmax(0,28rem)] gap-8 items-start" : ""}>
         <div className="space-y-6 min-w-0">
           {grouped.map((group) => (
             <div key={group.category}>
@@ -755,25 +743,13 @@ export function ExerciseLibraryList({
                       </button>
                     </div>
 
-                    {expandedId === ex.id && !twoPane && <div className="mt-3 max-w-2xl">{editorFor(ex)}</div>}
+                    {expandedId === ex.id && <div className="mt-3 max-w-2xl">{editorFor(ex)}</div>}
                   </div>
                   );
                 })}
               </div>
             </div>
           ))}
-        </div>
-        {editing && (
-          <aside className="sticky top-6 border border-steel/20 bg-surface/40 p-4 min-w-0" aria-label={`Edit ${editing.name}`}>
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <p className="font-body font-medium text-[15px] break-words">{editing.name}</p>
-              <button type="button" onClick={() => setExpandedId(null)} className="font-body text-xs text-rust shrink-0">
-                Close
-              </button>
-            </div>
-            <div key={editing.id}>{editorFor(editing)}</div>
-          </aside>
-        )}
         </div>
       )}
     </div>
