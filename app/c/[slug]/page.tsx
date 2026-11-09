@@ -82,7 +82,9 @@ async function load(slugParam: string, preview: boolean) {
     accentColor: org?.accent_color ?? DEFAULT_ORG_THEME.accentColor,
   };
   const publicUrl = (path: string | null) => (path ? db.storage.from("coach-profile-photos").getPublicUrl(path).data.publicUrl : null);
-  const canBook = !!page.enabled && canSignProofs() && isEmailConfigured();
+  // Book only when there is something to book (Ron, Nov 9: "Book a consultation" opened a page saying none were available, because no consultation type was set up).
+  const { count: bookableTypes } = await db.from("session_types").select("id", { count: "exact", head: true }).eq("coach_id", page.coach_id).eq("public_visible", true);
+  const canBook = !!page.enabled && canSignProofs() && isEmailConfigured() && (bookableTypes ?? 0) > 0;
   // "Request to train with me": only when the coach's page is on, the coach left the request switch on, and a request has an organization to go to (the same check the request itself makes).
   const canRequest = (await requestTargetFor(db, slug)) !== null;
   return {
