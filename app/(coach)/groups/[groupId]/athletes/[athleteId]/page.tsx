@@ -80,7 +80,7 @@ import { ParQAnswersPanel, ParQHiddenNotice } from "@/components/coach/par-q-ans
 import { WaiverStatusLine } from "@/components/coach/waiver-status-line";
 import { RosterSection } from "@/components/coach/desktop/roster-section";
 import { isUnder13 } from "@/lib/coppa";
-import { CoachLoggedBadge } from "@/components/coach-logged-badge";
+import { LoggedWorkoutCard } from "@/components/coach/logged-workout-card";
 import { TrendChart } from "@/components/coach/desktop/trend-chart";
 import { isHabitDueOn, computeCompliancePct } from "@/lib/habits";
 import { computeQuietTier } from "@/lib/quiet-client-tier";
@@ -237,7 +237,7 @@ export default async function AthleteProfilePage(
     supabase
       .from("workout_logs")
       .select(
-        "id, session_id, total_volume, total_sets_completed, new_prs, created_at, logged_by_coach, workouts ( title, week_number, day_index )"
+        "id, session_id, total_volume, total_sets_completed, total_duration_seconds, new_prs, created_at, logged_by_coach, workouts ( title, week_number, day_index )"
       )
       .eq("athlete_id", params.athleteId)
       .eq("group_id", params.groupId)
@@ -1778,7 +1778,7 @@ export default async function AthleteProfilePage(
           {loggedList.length === 0 ? (
             <p className="font-body text-sm text-steel py-2">{searching ? "No workouts match that search." : "No completed workouts yet."}</p>
           ) : (
-            <div className="divide-y divide-steel/15">
+            <div>
               {loggedList.map(({ key, date, imported, log }) =>
                 imported ? (
                   <div key={key} className="py-3">
@@ -1798,36 +1798,18 @@ export default async function AthleteProfilePage(
                     </Link>
                   </div>
                 ) : log ? (
-                <div key={key} className="py-3">
-                  <Link
-                    href={log.session_id ? `/sessions/${log.session_id}` : "#"}
-                    className="block hover:bg-surface/40 transition-colors"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-body font-medium text-[15px] flex items-center gap-2">
-                        {log.workouts?.title ?? "Workout"}
-                        {log.logged_by_coach && <CoachLoggedBadge />}
-                      </span>
-                      <span className="font-body text-xs text-steel shrink-0">
-                        {new Date(log.created_at).toLocaleDateString("en-US", { timeZone: displayZone })}
-                      </span>
-                    </div>
-                    <p className="font-body text-xs text-steel mt-0.5">
-                      {log.total_sets_completed} sets &middot;{" "}
-                      {Math.round(log.total_volume ?? 0).toLocaleString()} lbs volume
-                      {log.new_prs?.length > 0 && (
-                        <span className="text-rust"> &middot; PR: {log.new_prs.join(", ")}</span>
-                      )}
-                    </p>
-                  </Link>
-                  {log.session_id && (
-                    <Link
-                      href={`/sessions/${log.session_id}/recap`}
-                      className="font-body text-xs text-rust mt-1 inline-block"
-                    >
-                      Recap &amp; Up Next &rarr;
-                    </Link>
-                  )}
+                <div key={key} className="py-1.5">
+                  <LoggedWorkoutCard
+                    title={log.workouts?.title ?? "Workout"}
+                    dateLabel={new Date(log.created_at).toLocaleDateString("en-US", { timeZone: displayZone })}
+                    sessionId={log.session_id ?? null}
+                    loggedByCoach={!!log.logged_by_coach}
+                    volume={log.total_volume ?? null}
+                    sets={log.total_sets_completed ?? null}
+                    durationSeconds={log.total_duration_seconds ?? null}
+                    prs={log.new_prs ?? []}
+                    exerciseNames={log.session_id ? [...new Set(namesBySession.get(log.session_id) ?? [])] : []}
+                  />
                 </div>
                 ) : null
               )}
