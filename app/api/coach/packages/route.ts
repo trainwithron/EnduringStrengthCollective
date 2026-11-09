@@ -37,13 +37,6 @@ async function requireCoachOfGroup(groupId: string) {
 const KINDS = ["team", "program", "coaching", "sessions"];
 
 export async function POST(request: Request) {
-  if (!isStripeConfigured()) {
-    return NextResponse.json(
-      { error: "Payments aren't set up yet." },
-      { status: 503 }
-    );
-  }
-
   const body = await request.json();
   const { groupId, name, sessionsPerWeek, billingType, sessionsGranted, rateCents, isPublic, defaultProgramId, groupAccessGroupId } = body;
   // The package builder (0440): the kind, one plain price, and for coaching how often check-ins are. A team, program or coaching package grants no sessions.
@@ -108,6 +101,9 @@ export async function POST(request: Request) {
   if (insertError || !pkg) {
     return NextResponse.json({ error: "Couldn't create the package." }, { status: 502 });
   }
+
+  // Before payments are on a package is still a real package, assigned to clients by hand (Ron, Nov 9: Save package did nothing). It has no Stripe price, so it cannot be bought: checkout refuses it.
+  if (!isStripeConfigured()) return NextResponse.json({ packageId: pkg.id });
 
   try {
     const stripe = getStripeClient();
@@ -191,7 +187,7 @@ export async function PATCH(request: Request) {
   // STRIPE_SECRET_KEY configured (unlike POST, which always needs Stripe
   // since every package needs a real Price to be sellable at all).
   const needsStripe =
-    priceAffectingChange || (name != null && existing.stripe_product_id) || (isActive === false && existing.stripe_price_id);
+    (priceAffectingChange && existing.stripe_product_id) || (name != null && existing.stripe_product_id) || (isActive === false && existing.stripe_price_id);
   if (needsStripe && !isStripeConfigured()) {
     return NextResponse.json({ error: "Payments aren't configured yet." }, { status: 503 });
   }

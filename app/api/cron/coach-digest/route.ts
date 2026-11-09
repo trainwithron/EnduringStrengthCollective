@@ -38,6 +38,7 @@ async function handler(request: Request) {
   // One entry per (coach, organization).
   const groupIdsByCoach = new Map<string, string[]>();
   const teamSocialGroupIdsByCoach = new Map<string, string[]>();
+  const oneOnOneGroupIdsByCoach = new Map<string, string[]>();
   const entryInfo = new Map<string, { coachId: string; orgName: string | null }>();
   const orgCountByCoach = new Map<string, Set<string>>();
   for (const row of coachRows) {
@@ -49,6 +50,7 @@ async function handler(request: Request) {
     orgCountByCoach.set(row.profile_id, (orgCountByCoach.get(row.profile_id) ?? new Set<string>()).add(g?.organization_id ?? "none"));
     groupIdsByCoach.set(key, [...(groupIdsByCoach.get(key) ?? []), row.group_id]);
     const kind = g?.group_kind;
+    if (kind === "one_on_one") oneOnOneGroupIdsByCoach.set(key, [...(oneOnOneGroupIdsByCoach.get(key) ?? []), row.group_id]);
     if (kind === "team" || kind === "social" || !kind) {
       teamSocialGroupIdsByCoach.set(key, [...(teamSocialGroupIdsByCoach.get(key) ?? []), row.group_id]);
     }
@@ -71,22 +73,29 @@ async function handler(request: Request) {
     const { coachId, orgName } = entryInfo.get(entryKey)!;
     const parts: string[] = [];
 
-    // "What's New" — the same coach_view_state comparison the desktop
-    // sidebar badges already compute, run headlessly and WITHOUT marking
-    // anything seen (the desktop badge still does that itself).
-    // The database counts the new posts and the distinct active clients since this coach last looked, in the groups they have visited (no read of every post and workout ever logged).
-    let newPostCount = 0;
-    let activeAthleteCount = 0;
-    const { data: activityRows, error: activityError } = await supabase.rpc("coach_digest_activity", { p_coach: coachId, p_group_ids: groupIds });
-    if (activityError) console.error("coach-digest: could not count new activity:", activityError.message);
-    const activity = Array.isArray(activityRows) ? activityRows[0] : activityRows;
-    newPostCount = Number(activity?.new_posts ?? 0);
-    activeAthleteCount = Number(activity?.active_athletes ?? 0);
-    if (newPostCount > 0 || activeAthleteCount > 0) {
-      const bits: string[] = [];
-      if (newPostCount > 0) bits.push(`${newPostCount} new post${newPostCount === 1 ? "" : "s"}`);
-      if (activeAthleteCount > 0) bits.push(`${activeAthleteCount} client${activeAthleteCount === 1 ? "" : "s"} active`);
-      parts.push(bits.join(", "));
+    // A one-on-one client's cards live in their private space, which no feed shows, so counting them as "new posts" pointed at nothing (Ron, Nov 9). They are counted as the last day's
+    // workouts and the notice opens Client workouts. "New posts" is only what a group feed really shows.
+    let hasClientWorkouts = false;
+    const oneOnOneIds = oneOnOneGroupIdsByCoach.get(entryKey) ?? [];
+    if (oneOnOneIds.length > 0) {
+      const sinceDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data: workoutRows } = await readRowsByIds(oneOnOneIds, (g) => (from, to) =>
+        supabase.from("workout_logs").select("athlete_id").in("group_id", g).neq("athlete_id", coachId).gte("created_at", sinceDayAgo).order("id").range(from, to)
+      );
+      const count = (workoutRows ?? []).length;
+      const people = new Set((workoutRows ?? []).map((w) => w.athlete_id)).size;
+      if (count > 0) {
+        hasClientWorkouts = true;
+        parts.push(`${count} client workout${count === 1 ? "" : "s"} by ${people} ${people === 1 ? "person" : "people"}`);
+      }
+    }
+    const groupFeedIds = teamSocialGroupIdsByCoach.get(entryKey) ?? [];
+    if (groupFeedIds.length > 0) {
+      const { data: activityRows, error: activityError } = await supabase.rpc("coach_digest_activity", { p_coach: coachId, p_group_ids: groupFeedIds });
+      if (activityError) console.error("coach-digest: could not count new activity:", activityError.message);
+      const activity = Array.isArray(activityRows) ? activityRows[0] : activityRows;
+      const newPostCount = Number(activity?.new_posts ?? 0);
+      if (newPostCount > 0) parts.push(`${newPostCount} new group post${newPostCount === 1 ? "" : "s"}`);
     }
 
     // Stale reply-needed threads — same helper the Home dashboard's
@@ -136,8 +145,8 @@ async function handler(request: Request) {
 
     const summary = parts.join(" · ");
     // A coach who runs several organizations gets each one's digest labeled with its name.
-    const title = (orgCountByCoach.get(coachId)?.size ?? 1) > 1 && orgName ? `${orgName}: since you last checked` : "Your business, since you last checked";
-    const sent = await sendCoachPush(supabase, coachId, "briefing", title, summary, "/dashboard");
+    const title = (orgCountByCoach.get(coachId)?.size ?? 1) > 1 && orgName ? `${orgName}: your last 24 hours` : "Your business, last 24 hours";
+    const sent = await sendCoachPush(supabase, coachId, "briefing", title, summary, hasClientWorkouts ? "/my-space/feed?view=clients" : "/dashboard");
     results.push({ coachId, sent: sent > 0, summary });
   };
   const run = await runPool([...groupIdsByCoach.entries()], COACHES_AT_ONCE, processEntry, { deadlineMs: TIME_BUDGET_MS });

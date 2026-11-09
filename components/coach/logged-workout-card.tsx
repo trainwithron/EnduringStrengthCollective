@@ -5,6 +5,8 @@ import { believableDurationSeconds, formatDuration } from "@/lib/share-image";
 // One completed workout in a client's Logged workouts list: a short, landscape version of the post-workout card (Ron, Nov 9: "just some stats so coaches can get a quick
 // reference of what the workout was and how the client did"). A stat with no real number is left out, never shown as 0.
 export function LoggedWorkoutCard({
+  clientName,
+  clientHref,
   title,
   dateLabel,
   sessionId,
@@ -15,6 +17,8 @@ export function LoggedWorkoutCard({
   prs,
   exerciseNames,
 }: {
+  clientName?: string; // the Client workouts list says whose workout it is
+  clientHref?: string;
   title: string;
   dateLabel: string;
   sessionId: string | null;
@@ -35,6 +39,11 @@ export function LoggedWorkoutCard({
 
   return (
     <div className="border border-steel/20 bg-chalk/[0.03]">
+      {clientName && clientHref && (
+        <Link href={clientHref} className="flex items-center min-h-11 px-4 border-b border-steel/15 font-body text-sm font-medium text-chalk">
+          {clientName}
+        </Link>
+      )}
       <Link href={sessionId ? `/sessions/${sessionId}` : "#"} className="block px-4 py-3 hover:bg-surface/40 transition-colors">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="min-w-0">

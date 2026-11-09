@@ -10,6 +10,7 @@ export function mySpaceTarget(spaceId: string, params: URLSearchParams): string 
   const month = params.get("month");
   if (month && /^\d{4}-\d{2}$/.test(month)) next.set("month", month);
   if (params.get("spot") === "1") next.set("spot", "1");
+  if (params.get("feedView") === "clients" && to === "feed") next.set("view", "clients"); // the daily update opens Client workouts
   const q = next.toString();
   return `/groups/${spaceId}${tab}${q ? `?${q}` : ""}`;
 }
@@ -31,6 +32,7 @@ export function placeParams(place: MySpacePlace, search: URLSearchParams): URLSe
   if (place === "spotlight" || search.get("spot") === "1") q.set("spot", "1");
   const month = search.get("month");
   if (month && /^\d{4}-\d{2}$/.test(month)) q.set("month", month);
+  if (place === "feed" && search.get("view") === "clients") q.set("feedView", "clients"); // "view" on this query already means which app
   return q;
 }
 

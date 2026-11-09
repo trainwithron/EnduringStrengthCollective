@@ -24,6 +24,8 @@ import { getCoachedGroups, LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/coach-group
 import { ACTIVE_ORG_COOKIE, decodeCookieValue, rememberedGroupForActiveOrg } from "@/lib/active-org";
 import { pickFeedGroup } from "@/lib/start-group";
 import { FeedGroupPicker } from "@/components/feed/feed-group-picker";
+import { FeedViewSwitch, ClientWorkoutsList } from "@/components/feed/client-workouts-view";
+import { clientWorkoutsLimit, loadClientWorkouts, showClientWorkouts } from "@/lib/client-workouts";
 import type { FeedChannel, FeedPost } from "@/lib/types";
 
 export const metadata = { title: "Feed" };
@@ -74,7 +76,7 @@ const POST_SELECT = `
 export default async function FeedPage(
   props: {
     params: Promise<{ groupId: string }>;
-    searchParams: Promise<{ channel?: string; highlight?: string; group?: string }>;
+    searchParams: Promise<{ channel?: string; highlight?: string; group?: string; view?: string; limit?: string }>;
   }
 ) {
   const searchParams = await props.searchParams;
@@ -151,6 +153,46 @@ export default async function FeedPage(
   // instead of the desktop composer built for running a business. Acting
   // as a client always wins, same rule as the Home page.
   const showMobileView = isActingAsOther || !isCoach || await prefersAthleteStyleView();
+
+  // A coach (in their own phone app or at a desktop, not acting as a client) has Client workouts at the top of this tab, and it is what the tab opens on.
+  const coachSeesClients = !!user && (selfView || (isCoach && !isActingAsOther));
+  const feedBase = `/groups/${params.groupId}/feed`;
+  if (user && coachSeesClients && showClientWorkouts(searchParams)) {
+    const limit = clientWorkoutsLimit(searchParams.limit);
+    const [{ workouts, hasMore }, { data: zoneRow }] = await Promise.all([
+      loadClientWorkouts(supabase, user.id, limit),
+      supabase.from("profiles").select("timezone").eq("id", user.id).maybeSingle(),
+    ]);
+    const list = <ClientWorkoutsList workouts={workouts} hasMore={hasMore} limit={limit} basePath={feedBase} timeZone={zoneRow?.timezone ?? undefined} />;
+    if (isCoach && !showMobileView) {
+      return (
+        <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="feed">
+          <div className="max-w-[720px]">
+            <h1 className="font-display font-bold text-3xl uppercase leading-none mb-5">Feed</h1>
+            <div className="mb-5">
+              <FeedViewSwitch basePath={feedBase} active="clients" />
+            </div>
+            {list}
+          </div>
+        </CoachDesktopShell>
+      );
+    }
+    return (
+      <main className="min-h-screen bg-graphite text-chalk font-body pb-28">
+        <header className="px-5 pt-8 pb-4">
+          <Link href={`/groups/${params.groupId}`} className="inline-flex items-center min-h-11 font-body text-xs text-steel uppercase tracking-wide">
+            &larr; Home
+          </Link>
+          <h1 className="font-display font-bold text-3xl uppercase leading-none mt-3">Feed</h1>
+        </header>
+        <div className="px-5 mb-4">
+          <FeedViewSwitch basePath={feedBase} active="clients" />
+        </div>
+        <div className="px-5">{list}</div>
+        {isCoach && !isActingAsOther ? <CoachMobileShell groupId={params.groupId} groupName={group?.name ?? ""}>{null}</CoachMobileShell> : <BottomTabBar groupId={params.groupId} activeOverride="feed" />}
+      </main>
+    );
+  }
 
   const channel: FeedChannel = VALID_CHANNELS.includes(searchParams.channel as FeedChannel)
     ? (searchParams.channel as FeedChannel)
@@ -241,6 +283,9 @@ export default async function FeedPage(
       >
         <div className="pb-6 border-b border-steel/20 mb-6">
           <h1 className="font-display font-bold text-3xl uppercase leading-none">Team Feed</h1>
+          <div className="max-w-[720px] mt-5">
+            <FeedViewSwitch basePath={feedBase} active="group" />
+          </div>
         </div>
 
         {/* With room (@4xl): the feed on the left, reported posts and the leaderboard on the right. Narrower, one 640px column in the same order as always (layout audit #14). */}
@@ -302,6 +347,12 @@ export default async function FeedPage(
           </div>
         </div>
       </header>
+
+      {coachSeesClients && (
+        <div className="px-5 pt-4">
+          <FeedViewSwitch basePath={feedBase} active="group" />
+        </div>
+      )}
 
       {selfView && feedChoices.length > 0 && <FeedGroupPicker spaceId={params.groupId} choices={feedChoices} selectedId={feedGroupId} />}
       {noSharedGroup && (

@@ -175,7 +175,7 @@ describe("assistant, bell, notifications page and digest stay in one organizatio
   it("the daily digest is one push per coach PER organization, labeled when the coach runs several", () => {
     const digest = read2("app/api/cron/coach-digest/route.ts");
     expect(digest).toContain("`${row.profile_id}|${g?.organization_id ?? \"none\"}`");
-    expect(digest).toContain("since you last checked");
+    expect(digest).toContain("your last 24 hours");
     expect(digest).toContain("orgCountByCoach");
   });
 });
