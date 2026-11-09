@@ -1094,6 +1094,7 @@ export default async function AthleteProfilePage(
           <ClientProgramsSection
             groupId={params.groupId}
             athleteId={params.athleteId}
+            timeZone={displayZone}
             actions={
               <div className="mb-4">
                 <ClientProgramActions

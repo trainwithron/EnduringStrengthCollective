@@ -6,14 +6,15 @@ import { ClientProgramRow } from "@/components/coach/client-program-row";
 import { RemovedPrograms } from "@/components/coach/removed-programs";
 import { TrainingLevelControl } from "@/components/coach/training-level-control";
 import type { Level } from "@/lib/slot-templates";
+import { programCardStats } from "@/lib/program-card-stats";
 
 // The Programs tab of one client's profile: the programs made for this client (their own copies), the active one first, each opening the builder. Assigning one
 // is the "Assign program" button above the list.
-export async function ClientProgramsSection({ groupId, athleteId, actions }: { groupId: string; athleteId: string; actions?: ReactNode }) {
+export async function ClientProgramsSection({ groupId, athleteId, actions, timeZone }: { groupId: string; athleteId: string; actions?: ReactNode; timeZone?: string }) {
   const supabase = await createServerClient();
   const { data } = await supabase
     .from("programs")
-    .select("id, name, is_active, ai_draft, created_at, profiles!programs_athlete_id_fkey ( full_name )")
+    .select("id, name, is_active, ai_draft, created_at, profiles!programs_athlete_id_fkey ( full_name ), workouts ( id, week_number )")
     .eq("group_id", groupId)
     .eq("athlete_id", athleteId)
     .is("archived_at", null)
@@ -30,7 +31,10 @@ export async function ClientProgramsSection({ groupId, athleteId, actions }: { g
     .order("archived_at", { ascending: false })
     .limit(50);
   const removed = (removedData ?? []) as { id: string; name: string }[];
-  const programs = (data ?? []) as unknown as { id: string; name: string; is_active: boolean; ai_draft?: boolean; created_at: string; profiles?: { full_name?: string | null } | null }[];
+  const programs = (data ?? []) as unknown as { id: string; name: string; is_active: boolean; ai_draft?: boolean; created_at: string; profiles?: { full_name?: string | null } | null; workouts?: { id: string; week_number: number | null }[] | null }[];
+  // The card's numbers (Ron, Nov 9: the program shows as a card too): how long it is, how much of it this client has finished, and when they last trained on it.
+  const { data: logRows } = await supabase.from("workout_logs").select("workout_id, created_at").eq("group_id", groupId).eq("athlete_id", athleteId).not("workout_id", "is", null).limit(5000);
+  const statsFor = (p: (typeof programs)[number]) => programCardStats(p.workouts ?? [], (logRows ?? []) as { workout_id: string; created_at: string }[], timeZone);
   // A client with no program of their own follows the group's shared active program: show it, labelled, instead of "none".
   // In a one-on-one space there is no shared program: a program with no client on it is the coach's own template, not something this client follows (and the word group does not apply).
   const { data: kindRow } = await supabase.from("groups").select("group_kind").eq("id", groupId).maybeSingle();
@@ -71,9 +75,9 @@ export async function ClientProgramsSection({ groupId, athleteId, actions }: { g
       {programs.length === 0 ? (
         shared ? null : <p className="font-body text-sm text-steel">No program made for them yet. Use Assign program above.</p>
       ) : (
-        <ul className="divide-y divide-steel/15 border-y border-steel/15">
+        <ul className="space-y-3">
           {programs.map((p) => (
-            <ClientProgramRow key={p.id} groupId={groupId} program={p} clientName={p.profiles?.full_name ?? ""} />
+            <ClientProgramRow key={p.id} groupId={groupId} program={p} clientName={p.profiles?.full_name ?? ""} stats={statsFor(p)} />
           ))}
         </ul>
       )}
