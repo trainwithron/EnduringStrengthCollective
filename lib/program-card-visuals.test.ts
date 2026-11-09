@@ -47,18 +47,21 @@ describe("computeWeeklyVolumeSeries", () => {
 
 describe("bucketCategorySplit", () => {
   it("applies the confirmed mapping (Push/Pull->Upper, Legs->Lower, rest->Conditioning)", () => {
-    const split = bucketCategorySplit({ Push: 5, Pull: 4, Legs: 9, Core: 1, Cardio: 1 });
+    const split = bucketCategorySplit({ Push: 5, Pull: 4, Legs: 9, Core: 1, Cardio: 1 })!;
     // upper=9, lower=9, conditioning=2, total=20
     expect(split).toEqual({ upper: 45, lower: 45, conditioning: 10 });
   });
 
   it("sums to exactly 100 despite rounding", () => {
-    const split = bucketCategorySplit({ Push: 1, Legs: 1, Cardio: 1 });
+    const split = bucketCategorySplit({ Push: 1, Legs: 1, Cardio: 1 })!;
     expect(split.upper + split.lower + split.conditioning).toBe(100);
   });
 
   it("falls back to 100% conditioning with no categorized exercises", () => {
-    expect(bucketCategorySplit({})).toEqual({ upper: 0, lower: 0, conditioning: 100 });
+    expect(bucketCategorySplit({})).toBeNull();
+    // Fewer than half of the program's exercises have a category: no bar rather than a misleading one.
+    expect(bucketCategorySplit({ Push: 2 }, 10)).toBeNull();
+    expect(bucketCategorySplit({ Push: 3, Legs: 2 }, 10)).toEqual({ upper: 60, lower: 40, conditioning: 0 });
   });
 });
 

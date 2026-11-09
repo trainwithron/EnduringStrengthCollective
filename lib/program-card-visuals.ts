@@ -68,7 +68,9 @@ export interface CategorySplit {
 const UPPER_CATEGORIES = new Set(["Push", "Pull"]);
 const LOWER_CATEGORIES = new Set(["Legs"]);
 
-export function bucketCategorySplit(categoryCounts: Record<string, number>): CategorySplit {
+// Null when the split would not be true (Ron, Nov 9: every card read "Cond. 100%"): no exercise has a category, or fewer than half of the program's exercises do
+// (`totalExercises`, when known). The card then shows no bar instead of a made-up one.
+export function bucketCategorySplit(categoryCounts: Record<string, number>, totalExercises?: number): CategorySplit | null {
   let upper = 0;
   let lower = 0;
   let conditioning = 0;
@@ -80,11 +82,8 @@ export function bucketCategorySplit(categoryCounts: Record<string, number>): Cat
   }
 
   const total = upper + lower + conditioning;
-  if (total === 0) {
-    // No categorized exercises at all — falls back to a single
-    // Conditioning bucket rather than dividing by zero.
-    return { upper: 0, lower: 0, conditioning: 100 };
-  }
+  if (total === 0) return null;
+  if (typeof totalExercises === "number" && total * 2 < totalExercises) return null;
 
   // Round to whole percentages while keeping the three values summing to
   // exactly 100 — give any rounding remainder to the largest bucket

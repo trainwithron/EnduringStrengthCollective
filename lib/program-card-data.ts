@@ -20,7 +20,7 @@ export interface ProgramCardVisualData {
   // array) when this program has no real weight data at all yet, so the
   // component can skip drawing a flat, meaningless line.
   weightSeries: WeeklyVolumePoint[] | null;
-  categorySplit: CategorySplit;
+  categorySplit: CategorySplit | null;
 }
 
 // Batches every query needed to render program-card visuals for a whole
@@ -138,9 +138,11 @@ export async function computeProgramCardVisuals(
 
   // Category counts per program, from this coach's own exercise_library.
   const categoryCountsByProgram = new Map<string, Record<string, number>>();
+  const exerciseCountByProgram = new Map<string, number>();
   for (const e of exercises ?? []) {
     const programId = programByWorkoutId.get(e.workout_id);
     if (!programId) continue;
+    exerciseCountByProgram.set(programId, (exerciseCountByProgram.get(programId) ?? 0) + 1);
     const category = categoryByName.get(e.exercise_name);
     if (!category) continue;
     const counts = categoryCountsByProgram.get(programId) ?? {};
@@ -176,7 +178,7 @@ export async function computeProgramCardVisuals(
         ? computeWeeklyVolumeSeries(plannedVolume ?? new Map(), actualVolume ?? new Map(), weekCount)
         : null;
 
-    const categorySplit = bucketCategorySplit(categoryCountsByProgram.get(programId) ?? {});
+    const categorySplit = bucketCategorySplit(categoryCountsByProgram.get(programId) ?? {}, exerciseCountByProgram.get(programId) ?? 0);
     result.set(programId, { repsSeries, weightSeries, categorySplit });
   }
 

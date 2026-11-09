@@ -30,7 +30,7 @@ export function ProgramCardVisual({
 }: {
   repsSeries: WeeklyVolumePoint[];
   weightSeries: WeeklyVolumePoint[] | null;
-  categorySplit: CategorySplit;
+  categorySplit: CategorySplit | null;
 }) {
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
 
@@ -143,18 +143,20 @@ export function ProgramCardVisual({
         )}
       </div>
 
-      <div>
-        <div className="flex h-1 overflow-hidden bg-surface">
-          <span style={{ width: `${categorySplit.upper}%`, backgroundColor: RUST }} />
-          <span style={{ width: `${categorySplit.lower}%`, backgroundColor: MOSS }} />
-          <span style={{ width: `${categorySplit.conditioning}%`, backgroundColor: BLUE }} />
+      {categorySplit && (
+        <div>
+          <div className="flex h-1 overflow-hidden bg-surface">
+            <span style={{ width: `${categorySplit.upper}%`, backgroundColor: RUST }} />
+            <span style={{ width: `${categorySplit.lower}%`, backgroundColor: MOSS }} />
+            <span style={{ width: `${categorySplit.conditioning}%`, backgroundColor: BLUE }} />
+          </div>
+          <div className="flex gap-2 mt-1 font-body text-xs text-steel leading-none flex-wrap">
+            <span>Upper {categorySplit.upper}%</span>
+            <span>Lower {categorySplit.lower}%</span>
+            <span>Cond. {categorySplit.conditioning}%</span>
+          </div>
         </div>
-        <div className="flex gap-2 mt-1 font-body text-xs text-steel leading-none flex-wrap">
-          <span>Upper {categorySplit.upper}%</span>
-          <span>Lower {categorySplit.lower}%</span>
-          <span>Cond. {categorySplit.conditioning}%</span>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
