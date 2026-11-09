@@ -70,10 +70,11 @@ export function resolveMyTraining(
 // Reads what the rule needs as the signed-in person (they read their own memberships and the programs row security lets them see).
 export async function loadMyTraining(supabase: SupabaseClient, userId: string, lastGroupId?: string | null) {
   const [{ data: rows }, { data: recent }] = await Promise.all([
-    supabase.from("group_memberships").select("group_id, role, joined_at, groups ( name, group_kind )").eq("profile_id", userId),
+    supabase.from("group_memberships").select("group_id, role, joined_at, membership_type, groups ( name, group_kind )").eq("profile_id", userId),
     supabase.from("workout_logs").select("group_id").eq("athlete_id", userId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
-  const memberships: MyMembershipRow[] = (rows ?? []).map((r) => {
+  // A seat in a shared group joined for its feed (social-only, step 202) is not where the person trains: its programs are not theirs.
+  const memberships: MyMembershipRow[] = (rows ?? []).filter((r) => (r as { membership_type?: string | null }).membership_type !== "social_only").map((r) => {
     const g = (r as unknown as { groups: { name: string | null; group_kind: string | null } | { name: string | null; group_kind: string | null }[] | null }).groups;
     const one = Array.isArray(g) ? g[0] : g;
     return {

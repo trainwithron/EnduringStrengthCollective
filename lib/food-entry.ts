@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { FoodLogEntry } from "@/components/athlete/meal-checkoff-list";
 import { macrosOf, scaleNutrients, per100gFromSnapshot, MAX_AMOUNT_G, type NutrientMap } from "@/lib/food-serving";
+import { liveFoodSource } from "@/lib/imported-food";
 
 // Writing, changing, copying and removing food log entries for the food search (and, from phase 2, custom foods and saved meals). Every write is the signed-in client's own
 // (row security: a client writes only their own log); the pure builders are tested without a database.
@@ -156,9 +157,10 @@ export function copyRows(entries: FoodLogEntry[], opts: { athleteId: string; gro
         carbs_g: e.carbsG,
         fat_g: e.fatG,
       };
-      // The searched-food detail goes along only when the entry has it, so copying an entry logged the old way writes exactly the old columns.
+      // The searched-food detail goes along only when the entry has it, so copying an entry logged the old way writes exactly the old columns. A copy of imported history
+      // is logged now, so it does not keep the import mark.
       const detail: Record<string, unknown> = {
-        food_source: e.foodSource,
+        food_source: liveFoodSource(e.foodSource),
         fdc_id: e.fdcId,
         amount_g: e.amountG,
         serving_label: e.servingLabel,

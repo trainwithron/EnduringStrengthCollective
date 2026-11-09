@@ -7,6 +7,7 @@ import { asWeightUnit } from "@/lib/units";
 import { WhatTheyAte } from "@/components/coach/nutrition/what-they-ate";
 import { GROUP_TIER_COACH_NOTE } from "@/lib/nutrition-tracking";
 import { FoodTrackingSwitch } from "@/components/coach/nutrition/food-tracking-switch";
+import { NOT_IMPORTED } from "@/lib/imported-food";
 
 // What a coach sees for a client whose tier has no targets or meal plans (the group tier): the client still logs what they eat, and the coach can see it. The rest of the
 // Nutrition area (targets, preferences, meal plan, calculator) is the coach-run programming that this tier does not include.
@@ -20,7 +21,9 @@ export async function ClientFoodLogOnly({ athleteId, groupId, clientName }: { at
       .from("food_log_entries")
       .select("log_date, meal_slot, status, description, calories, protein_g, carbs_g, fat_g")
       .eq("athlete_id", athleteId)
-      .gte("log_date", weekStartKey),
+      .gte("log_date", weekStartKey)
+      // The week counts the days they logged: history brought in from another app is not logging.
+      .or(NOT_IMPORTED),
     supabase.from("body_weight_logs").select("logged_date, weight").eq("athlete_id", athleteId).eq("group_id", groupId).order("logged_date", { ascending: false }).limit(60),
     supabase.from("athlete_profile_details").select("weight_unit").eq("athlete_id", athleteId).maybeSingle(),
   ]);

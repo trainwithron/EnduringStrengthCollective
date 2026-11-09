@@ -20,6 +20,8 @@ export async function loadYourCoaches(supabase: any, userId: string): Promise<{ 
           .select(`id, group_id, groups ( ${columns}, organizations ( name ) )`)
           .eq("profile_id", userId)
           .eq("role", "athlete")
+          // a seat in a shared group joined for its feed is not another coach's space
+          .eq("membership_type", "training")
           .order("id")
           .range(from, to),
       { maxPages: 5 }

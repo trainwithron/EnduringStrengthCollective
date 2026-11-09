@@ -7,6 +7,7 @@
 
 import type { FoodLogEntry } from "@/components/athlete/meal-checkoff-list";
 import { servingText } from "@/lib/food-serving";
+import { isImportedFood } from "@/lib/imported-food";
 
 export interface RecentFoodLogOption {
   // The description, case- and space-insensitive: one chip per food.
@@ -23,7 +24,8 @@ export function dedupeRecentFoodLogs(entries: FoodLogEntry[], limit: number = RE
   const seen = new Set<string>();
   const result: RecentFoodLogOption[] = [];
   for (const entry of entries) {
-    if (entry.status === "skipped" || !entry.description) continue;
+    // History brought in from another app is not offered as a recent food (the page's read leaves it out too).
+    if (entry.status === "skipped" || !entry.description || isImportedFood(entry)) continue;
     const key = entry.description.trim().toLowerCase();
     if (!key || seen.has(key)) continue;
     seen.add(key);

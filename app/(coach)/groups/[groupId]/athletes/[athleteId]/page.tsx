@@ -25,6 +25,7 @@ import { calorieSeriesWithStanding, standingForDate } from "@/lib/macro-resoluti
 import { fetchStandingHistory } from "@/lib/standing-macros";
 import { ClientNutrition } from "@/components/coach/nutrition/client-nutrition";
 import { ClientFoodLogOnly } from "@/components/coach/nutrition/client-food-log-only";
+import { NutritionHistoryUploader } from "@/components/coach/nutrition/nutrition-history-uploader";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { SectionLoading } from "@/components/coach/desktop/section-loading";
@@ -1882,6 +1883,8 @@ export default async function AthleteProfilePage(
             initialSurplusPct={injuryStatusRow?.surplus_pct ?? 0}
           />
         </div>
+        {/* A client's food diary from another app, brought in as history only (never counted as days logged). */}
+        {!selfView && <NutritionHistoryUploader athleteId={params.athleteId} groupId={params.groupId} clientName={profile?.full_name ?? "Client"} />}
         <Suspense fallback={<SectionLoading />}>
           {macrosEnabled ? (
             <ClientNutrition

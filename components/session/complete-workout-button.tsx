@@ -272,6 +272,7 @@ export function CompleteWorkoutButton({
             .select("id")
             .eq("workout_log_id", existingLog.id)
             .eq("post_type", "workout_summary")
+            .eq("group_id", existingSession.group_id)
             .maybeSingle()
         : { data: null };
       if (existingPost) {
@@ -415,6 +416,8 @@ export function CompleteWorkoutButton({
       // No feed card and no share card when the group has them switched off.
       skipPost: !cardsOn || !!coachMode?.clientIsMinor,
       skipLink: !cardsOn,
+      // A shared group the client shares with follows its own card setting; a coach logging for a client under 18 posts nowhere.
+      skipSharedGroups: !!coachMode?.clientIsMinor,
     });
 
     // Every completed workout gets a celebratory, shareable card instead of silently landing back on the group hub. A coach logging for a client stays in coach mode on this

@@ -54,8 +54,9 @@ describe("inside Today's food (items 2 and 3)", () => {
 
 describe("recents keep the whole food (item 4)", () => {
   it("the page reads the detail columns (falling back to the original ones) and a tap copies the whole food into the meal for the time of day", () => {
-    expect(page).toContain("const detail = await recent(FOOD_LOG_DETAIL_SELECT);");
-    expect(page).toContain("(await recent(FOOD_LOG_BASE_SELECT)).data");
+    // (the detail read also leaves out history imported from another app: lib/imported-food.ts)
+    expect(page).toContain("const detail = await recent(FOOD_LOG_DETAIL_SELECT, true);");
+    expect(page).toContain("(await recent(FOOD_LOG_BASE_SELECT, false)).data");
     expect(page).toContain(".map(entryFromRow)");
     const chips = read("components/athlete/recent-food-chips.tsx");
     expect(chips).toContain("copyRows([option.entry], { athleteId, groupId, toDate: logDate, mealSlot: defaultMealSlot(now.getHours(), now.getMinutes()) })");

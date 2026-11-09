@@ -40,6 +40,8 @@ import { TerminologyChooser } from "@/components/coach/desktop/terminology-choos
 import { SettingsGroup } from "@/components/shared/settings-group";
 import { ExportDataButton } from "@/components/athlete/export-data-button";
 import { FeedBroadcastSettings } from "@/components/athlete/feed-broadcast-settings";
+import { SharedGroupSettings } from "@/components/athlete/shared-group-settings";
+import { loadMySharedGroups } from "@/lib/shared-group-join";
 import { resolveShowName } from "@/lib/share-name";
 import { ageStatusFromDob } from "@/lib/youth-block";
 import { ShowNameOnShareToggle } from "@/components/athlete/show-name-on-share-toggle";
@@ -204,9 +206,15 @@ export default async function SettingsPage(
   // A client who trains in more than one space (two coaches) gets a link to pick between them.
   let trainsWithSeveralCoaches = false;
   if (!isCoach && !effective.isActingAsOther) {
-    const { count: spaceCount } = await (await createCrossOrgServerClient()).from("group_memberships").select("id", { count: "exact", head: true }).eq("profile_id", user.id).eq("role", "athlete");
+    // A seat in a shared group (joined from Home, social-only) is not a second coach.
+    const { count: spaceCount } = await (await createCrossOrgServerClient()).from("group_memberships").select("id", { count: "exact", head: true }).eq("profile_id", user.id).eq("role", "athlete").eq("membership_type", "training");
     trainsWithSeveralCoaches = (spaceCount ?? 0) > 1;
   }
+  // The organization's shared group this one-on-one client joined from Home (step 202): share my workouts on/off, and leave. Empty before that step.
+  const mySharedGroups =
+    !isCoach && !effective.isActingAsOther && (group as { group_kind?: string } | null)?.group_kind === "one_on_one"
+      ? await loadMySharedGroups(supabase, user.id, (group as { organization_id?: string | null } | null)?.organization_id ?? null)
+      : [];
   // On an organization's front desk (0400): a link to the check-in screen for people who land somewhere else. Read on its own, so a database without the table yet just shows no link.
   const { data: deskRows } = await supabase.from("org_front_desk").select("organization_id").eq("profile_id", user.id).limit(1);
   const onFrontDesk = (deskRows ?? []).length > 0;
@@ -536,6 +544,12 @@ export default async function SettingsPage(
             />
           </SettingsGroup>
         )}
+
+        {mySharedGroups.map((g) => (
+          <SettingsGroup key={g.groupId} label="Your group">
+            <SharedGroupSettings groupId={g.groupId} groupName={g.groupName} initialShares={g.sharesWorkouts} allowShare={g.allowShare} />
+          </SettingsGroup>
+        ))}
 
         {!isCoach && showNameAvailable && ageStatusFromDob(ownDob) === "adult" && (
           <SettingsGroup label="Sharing your workout picture">

@@ -26,6 +26,7 @@ import { pickFeedGroup } from "@/lib/start-group";
 import { FeedGroupPicker } from "@/components/feed/feed-group-picker";
 import { FeedViewSwitch, ClientWorkoutsList } from "@/components/feed/client-workouts-view";
 import { clientWorkoutsLimit, loadClientWorkouts, showClientWorkouts } from "@/lib/client-workouts";
+import { sharedFeedGroupFor } from "@/lib/shared-group-join";
 import type { FeedChannel, FeedPost } from "@/lib/types";
 
 export const metadata = { title: "Feed" };
@@ -97,7 +98,7 @@ export default async function FeedPage(
       .eq("profile_id", user?.id ?? "")
       .maybeSingle(),
     user ? getEffectiveAthlete(params.groupId, user.id) : Promise.resolve(null),
-    supabase.from("groups").select("name, group_kind").eq("id", params.groupId).maybeSingle(),
+    supabase.from("groups").select("name, group_kind, organization_id").eq("id", params.groupId).maybeSingle(),
   ]);
 
   const isCoach = membership?.role === "coach";
@@ -140,12 +141,11 @@ export default async function FeedPage(
   }
   if (selfView) {
     // handled below: the personal space is a one-on-one space, which would otherwise send the coach back to Home
-  } else if (isActingAsOther) {
-    if (isOneOnOneGroup) {
-      redirect(`/groups/${params.groupId}`);
-    }
-  } else if (membership?.role === "athlete" && isOneOnOneGroup) {
-    redirect(`/groups/${params.groupId}`);
+  } else if ((isActingAsOther || membership?.role === "athlete") && isOneOnOneGroup) {
+    // A one-on-one client who joined their organization's shared group (step 202) reads that group's feed from their own space, the same way; anyone else in a one-on-one space goes Home.
+    const joinedGroupId = athleteId ? await sharedFeedGroupFor(supabase, athleteId, (group as { organization_id?: string | null } | null)?.organization_id ?? null) : null;
+    if (joinedGroupId) feedGroupId = joinedGroupId;
+    else redirect(`/groups/${params.groupId}`);
   }
 
   // A coach opening the installed home-screen app gets the same mobile

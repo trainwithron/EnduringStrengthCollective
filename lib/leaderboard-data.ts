@@ -42,6 +42,17 @@ export async function getGroupLeaderboardRankings(
     prCountByAthlete.set(id, (prCountByAthlete.get(id) ?? 0) + (log.new_prs?.length ?? 0));
   }
 
+  // A client who joined this group from their own one-on-one space and shares their workouts here (step 202) counts with the workouts they shared: the cards on this group's feed whose workout was
+  // logged in their own space. A client who joined but keeps their workouts private has no such cards, so they are not on the board. The same sharing-level rule applies.
+  for (const shared of await readSharedWorkoutCards(supabase, groupId)) {
+    const id = shared.athleteId;
+    if (!onSharedBoards(shared.broadcastLevel)) continue;
+    rawNameByAthlete.set(id, shared.fullName);
+    workoutCountByAthlete.set(id, (workoutCountByAthlete.get(id) ?? 0) + 1);
+    volumeByAthlete.set(id, (volumeByAthlete.get(id) ?? 0) + shared.totalVolume);
+    prCountByAthlete.set(id, (prCountByAthlete.get(id) ?? 0) + shared.prCount);
+  }
+
   // The names are shortened for everyone on the board who is not a confirmed adult, whether or not they are still a member.
   const protectedIds = await protect([...rawNameByAthlete.keys()]);
   for (const [id, raw] of rawNameByAthlete) nameByAthlete.set(id, shownName(raw, id, protectedIds));
@@ -59,6 +70,47 @@ export async function getGroupLeaderboardRankings(
     volumeRanking: rankLeaderboard(buildEntries(volumeByAthlete)),
     prsRanking: rankLeaderboard(buildEntries(prCountByAthlete)),
   };
+}
+
+export interface SharedWorkoutCard {
+  athleteId: string;
+  fullName: string | null;
+  broadcastLevel: string | null;
+  totalVolume: number;
+  prCount: number;
+}
+
+// The workout cards on this group's feed for workouts logged in another group (a client's own one-on-one space), each workout once, only when the card's author is the one who did the workout.
+// The members read those workouts through the shared-card rule (step 202); before it, or for a card that is not readable, the workout is simply missing and nothing is counted.
+export function sharedWorkoutCardsFromPosts(groupId: string, rows: any[]): SharedWorkoutCard[] {
+  const seen = new Set<string>();
+  const out: SharedWorkoutCard[] = [];
+  for (const row of rows ?? []) {
+    const log = Array.isArray(row?.workout_logs) ? row.workout_logs[0] : row?.workout_logs;
+    if (!log || !row.workout_log_id || seen.has(row.workout_log_id)) continue;
+    if (log.athlete_id !== row.author_id || !log.group_id || log.group_id === groupId) continue;
+    seen.add(row.workout_log_id);
+    const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+    out.push({
+      athleteId: row.author_id,
+      fullName: profile?.full_name ?? null,
+      broadcastLevel: profile?.feed_broadcast_level ?? null,
+      totalVolume: log.total_volume ?? 0,
+      prCount: log.new_prs?.length ?? 0,
+    });
+  }
+  return out;
+}
+
+async function readSharedWorkoutCards(supabase: SupabaseClient, groupId: string): Promise<SharedWorkoutCard[]> {
+  const { data, error } = await supabase
+    .from("posts")
+    .select("author_id, workout_log_id, workout_logs ( athlete_id, group_id, total_volume, new_prs ), profiles!posts_author_id_fkey ( full_name, feed_broadcast_level )")
+    .eq("group_id", groupId)
+    .eq("post_type", "workout_summary")
+    .not("workout_log_id", "is", null);
+  if (error) return [];
+  return sharedWorkoutCardsFromPosts(groupId, data ?? []);
 }
 
 // Position-grouped version of the same rankings, for team_mode groups —

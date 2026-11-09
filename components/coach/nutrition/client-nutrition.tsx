@@ -13,6 +13,7 @@ import { checkinCountdown, dayNutrientBars, glanceDays, weekAverage, weightSerie
 import { fetchAgeAndSex, fetchNutrientLog } from "@/lib/nutrient-data";
 import { estimateRealMaintenance, maintenanceSentenceFor } from "@/lib/real-maintenance";
 import { dailyCaloriesFromLog } from "@/lib/nutrition-tracking";
+import { NOT_IMPORTED } from "@/lib/imported-food";
 import { emptyMealsOf } from "@/lib/allergy-conflict-rebuild";
 import { GroceryListSection } from "@/components/coach/nutrition/grocery-list-section";
 import { FoodTrackingSwitch } from "@/components/coach/nutrition/food-tracking-switch";
@@ -163,12 +164,14 @@ export async function ClientNutrition({
       .eq("group_id", groupId)
       .eq("status", "pending")
       .order("generated_at", { ascending: false }),
+    // The 7-day food view counts the days they logged (the check-in's default and the protein check): history brought in from another app is not logging.
     supabase
       .from("food_log_entries")
       .select("log_date, meal_slot, status, description, calories, protein_g, carbs_g, fat_g")
       .eq("athlete_id", athleteId)
       .gte("log_date", weekStartKey)
-      .lte("log_date", todayKey),
+      .lte("log_date", todayKey)
+      .or(NOT_IMPORTED),
     // Meal plans assigned in the last 7 days: a day's target is the client's own target, else the plan assigned to it, else the standing target (the order the client sees).
     supabase.from("meal_plans").select("log_date, macros, meals").eq("athlete_id", athleteId).gte("log_date", weekStartKey).lte("log_date", todayKey),
     // The client's food preferences and protein rules (one row per CLIENT; a missing row, or a database without the table yet, is the defaults).
@@ -458,7 +461,7 @@ export async function ClientNutrition({
   if (phasePlan && reviewIsDue(phasePlan, todayKey)) {
     const lastReviewedOn = phasePlan.lastReviewedAt ? phasePlan.lastReviewedAt.slice(0, 10) : null;
     const windowStart = reviewWindowStart(phasePlan.startedOn, lastReviewedOn, todayKey);
-    const { data: loggedRows } = await supabase.from("food_log_entries").select("log_date").eq("athlete_id", athleteId).neq("status", "skipped").gte("log_date", windowStart).lte("log_date", todayKey);
+    const { data: loggedRows } = await supabase.from("food_log_entries").select("log_date").eq("athlete_id", athleteId).neq("status", "skipped").gte("log_date", windowStart).lte("log_date", todayKey).or(NOT_IMPORTED);
     const review = buildPhaseReview({
       phase: phasePlan.phase,
       startedOn: phasePlan.startedOn,

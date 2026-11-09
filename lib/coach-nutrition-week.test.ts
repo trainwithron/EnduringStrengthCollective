@@ -117,6 +117,7 @@ function fakeDb(tables: Record<string, unknown[]>, failing: string[] | Record<st
         eq: () => q,
         gte: () => q,
         lte: () => q,
+        or: () => q,
         order: () => q,
         limit: () => q,
         range: (a: number, b: number) => ((range = [a, b]), q),

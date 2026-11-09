@@ -3,6 +3,7 @@ import type { MealSlot } from "@/lib/food-entry";
 import { trimDescription } from "@/lib/food-entry";
 import { entryTooBigProblem } from "@/lib/food-validation";
 import type { NutrientMap } from "@/lib/food-serving";
+import { liveFoodSource } from "@/lib/imported-food";
 
 // A saved meal: a named group of foods the client logs again in one tap, at any number of servings. Each food is saved with its amount and the numbers FOR that amount, so logging
 // the meal needs no lookup and an unchanged USDA record cannot shift an old meal.
@@ -46,7 +47,8 @@ export function itemsFromEntries(entries: FoodLogEntry[]): SavedMealItem[] {
       carbsG: e.carbsG ?? 0,
       fatG: e.fatG ?? 0,
       nutrients: e.nutrients ?? null,
-      foodSource: e.foodSource ?? null,
+      // A food from imported history saved into a meal is really logged each time the meal is used: it does not keep the import mark.
+      foodSource: liveFoodSource(e.foodSource),
       fdcId: e.fdcId ?? null,
     }));
 }

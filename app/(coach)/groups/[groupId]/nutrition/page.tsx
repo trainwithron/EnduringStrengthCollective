@@ -45,6 +45,7 @@ import { getCoachClients } from "@/lib/coach-clients";
 import { FOOD_TRACKING_OFF_LINE, SELF_NO_CHECKIN_LINE, dailyCaloriesFromLog } from "@/lib/nutrition-tracking";
 import { addDaysToKey } from "@/lib/date-key";
 import { fetchFoodLogDay } from "@/lib/food-entry";
+import { NOT_IMPORTED } from "@/lib/imported-food";
 import { AiBudgetMeter } from "@/components/coach/ai-budget-meter";
 import { retryState as retryStateFor, type RetryState } from "@/lib/meal-plan-retry";
 import { ClientGroceryList } from "@/components/athlete/client-grocery-list";
@@ -321,11 +322,15 @@ export default async function NutritionPage(
     // Today's entries with the searched-food detail (falls back to the original columns before the database has them).
     fetchFoodLogDay(supabase, athleteId, shownDay).then((data) => ({ data })),
     // Recent foods keep the whole food (serving, amount, every nutrient), falling back to the original columns before the database has the detail.
+    // History a coach brought in from another app is not a recent food to log again (it would fill the chips the moment it is imported).
     (async () => {
-      const recent = (columns: string) =>
-        supabase.from("food_log_entries").select(columns).eq("athlete_id", athleteId).neq("status", "skipped").not("description", "is", null).order("created_at", { ascending: false }).limit(40);
-      const detail = await recent(FOOD_LOG_DETAIL_SELECT);
-      const rows = detail.error ? (await recent(FOOD_LOG_BASE_SELECT)).data : detail.data;
+      // (The original columns have no food_source, and nothing was imported before it existed, so only the detail read is filtered.)
+      const recent = (columns: string, liveOnly: boolean) => {
+        const q = supabase.from("food_log_entries").select(columns).eq("athlete_id", athleteId).neq("status", "skipped").not("description", "is", null);
+        return (liveOnly ? q.or(NOT_IMPORTED) : q).order("created_at", { ascending: false }).limit(40);
+      };
+      const detail = await recent(FOOD_LOG_DETAIL_SELECT, true);
+      const rows = detail.error ? (await recent(FOOD_LOG_BASE_SELECT, false)).data : detail.data;
       return { data: ((rows ?? []) as unknown as FoodLogRow[]).map(entryFromRow) };
     })(),
     supabase.from("athlete_injury_status").select("is_injured").eq("athlete_id", athleteId).maybeSingle(),

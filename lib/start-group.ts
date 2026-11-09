@@ -12,6 +12,8 @@ export interface StartMembership {
   role: string;
   joined_at: string | null;
   group_kind: string | null;
+  // 'social_only': a seat in a shared group joined for its feed (step 202), never where a client trains, so never where they land while they have a training seat.
+  membership_type?: string | null;
 }
 
 export interface StartInputs {
@@ -40,11 +42,13 @@ export function pickStartGroup({ memberships, lastGroupId, recentActivityGroupId
     return lastSolo ?? [...coachGroups].sort(byJoined)[0];
   }
 
-  const recent = recentActivityGroupId ? memberships.find((m) => m.group_id === recentActivityGroupId) : undefined;
+  const training = memberships.filter((m) => m.membership_type !== "social_only");
+  const pool = training.length > 0 ? training : memberships;
+  const recent = recentActivityGroupId ? pool.find((m) => m.group_id === recentActivityGroupId) : undefined;
   if (recent) return recent;
-  const last = lastGroupId ? memberships.find((m) => m.group_id === lastGroupId) : undefined;
+  const last = lastGroupId ? pool.find((m) => m.group_id === lastGroupId) : undefined;
   if (last) return last;
-  return [...memberships].sort((a, b) => -byJoined(a, b))[0];
+  return [...pool].sort((a, b) => -byJoined(a, b))[0];
 }
 
 // Which group's feed a coach looks at from their own client app: the one the address names if it is one of their shared (team or social) groups, else the group they were last working in if it is shared, else the
@@ -76,7 +80,7 @@ export async function loadStartInputs(
   userId: string,
   lastGroupId?: string | null
 ): Promise<StartInputs> {
-  const read = (columns: string) => (supabase as any).from("group_memberships").select(`group_id, role, joined_at, groups ( ${columns} )`).eq("profile_id", userId) as PromiseLike<{ data: any[] | null; error: unknown }>;
+  const read = (columns: string) => (supabase as any).from("group_memberships").select(`group_id, role, joined_at, membership_type, groups ( ${columns} )`).eq("profile_id", userId) as PromiseLike<{ data: any[] | null; error: unknown }>;
   // A retired group (a past season) is not where anyone lands. A database without that column yet is read as before.
   let first = await read("group_kind, archived_at");
   if (first.error) first = await read("group_kind");
@@ -101,6 +105,7 @@ export async function loadStartInputs(
         role: r.role as string,
         joined_at: (r.joined_at as string | null) ?? null,
         group_kind: one?.group_kind ?? null,
+        membership_type: (r.membership_type as string | null | undefined) ?? null,
       } as StartMembership,
     };
   });

@@ -11,6 +11,7 @@ import { pageAll } from "@/lib/page-all";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 import { addDaysToKey } from "@/lib/date-key";
 import { summarizeAdherence } from "@/lib/food-log-adherence";
+import { NOT_IMPORTED } from "@/lib/imported-food";
 import { readDateOfBirth, rowToBodyProfile } from "@/lib/client-body-profile";
 import { rowToPhasePlan } from "@/lib/phase-plan";
 import { chooseBaselinePhase, computeBaseline } from "@/lib/nutrition-baseline";
@@ -153,13 +154,14 @@ async function handler(request: Request) {
       supabase.from("client_intake").select("date_of_birth").eq("athlete_id", athleteId).maybeSingle(),
       // The client's own protein target (a missing row, or a database without the table yet, just means the platform default).
       supabase.from("client_nutrition_preferences").select("protein_g_per_lb").eq("athlete_id", athleteId).maybeSingle(),
-      // The meals they logged in the last 7 days: the real adherence.
+      // The meals they logged in the last 7 days: the real adherence. History a coach brought in from another app is not logging (lib/imported-food.ts).
       supabase
         .from("food_log_entries")
         .select("log_date, status")
         .eq("athlete_id", athleteId)
         .gte("log_date", addDaysToKey(todayKey, -6))
-        .lte("log_date", todayKey),
+        .lte("log_date", todayKey)
+        .or(NOT_IMPORTED),
     ]);
 
     const trend = computeWeeklyWeightTrend(

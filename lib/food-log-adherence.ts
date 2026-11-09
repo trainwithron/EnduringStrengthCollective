@@ -1,4 +1,5 @@
 import { addDaysToKey } from "@/lib/date-key";
+import { isImportedFood } from "@/lib/imported-food";
 
 // Real adherence-days computation from food_log_entries. A day counts as adherent if the client logged anything that day other than a skip: the point is whether they
 // engaged, not whether every gram was exact ("one coffee counts as a logged day": a signal of engagement, not of accuracy).
@@ -19,9 +20,10 @@ export function computeAdherenceDays(entryDateKeys: string[], todayKey: string, 
   return new Set(entryDateKeys.filter((k) => window.has(k))).size;
 }
 
-// The dates of the entries that count: anything not skipped.
-export function loggedDateKeys(entries: { log_date: string; status?: string | null }[]): string[] {
-  return entries.filter((e) => e.status !== "skipped" && !!e.log_date).map((e) => e.log_date.slice(0, 10));
+// The dates of the entries that count: anything not skipped, and never history a coach brought in from another app (the reads leave it out; this holds even for a read that
+// does not).
+export function loggedDateKeys(entries: { log_date: string; status?: string | null; food_source?: string | null }[]): string[] {
+  return entries.filter((e) => e.status !== "skipped" && !!e.log_date && !isImportedFood(e)).map((e) => e.log_date.slice(0, 10));
 }
 
 export interface AdherenceSummary {
@@ -32,7 +34,7 @@ export interface AdherenceSummary {
   line: string;
 }
 
-export function summarizeAdherence(entries: { log_date: string; status?: string | null }[], todayKey: string, firstName = "They", windowDays = ADHERENCE_WINDOW_DAYS): AdherenceSummary {
+export function summarizeAdherence(entries: { log_date: string; status?: string | null; food_source?: string | null }[], todayKey: string, firstName = "They", windowDays = ADHERENCE_WINDOW_DAYS): AdherenceSummary {
   const daysLogged = computeAdherenceDays(loggedDateKeys(entries), todayKey, windowDays);
   const heldForLowLogging = daysLogged < MIN_ADHERENT_DAYS;
   const line = heldForLowLogging

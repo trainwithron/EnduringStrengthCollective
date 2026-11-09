@@ -3,6 +3,7 @@ import { readByIds } from "@/lib/read-by-ids";
 import { standingForDate, type StandingHistory, type StandingRow } from "@/lib/macro-resolution";
 import { loadNameProtectedIds, type ProtectIds } from "@/lib/minor-names";
 import { addDaysToKey } from "@/lib/date-key";
+import { NOT_IMPORTED } from "@/lib/imported-food";
 
 // "This week" on the coach's Nutrition page (Release B3): one row per client, the last seven days at a glance. What they are meant to eat (their standing target), what they actually logged (the days they logged,
 // the average calories and protein of those days), where that sits against the target, and how their weight moved. The coach sees who is on track, who is off, and who logged nothing, and opens the one that needs them.
@@ -175,8 +176,9 @@ export async function loadNutritionWeek(supabase: SupabaseClient, clients: WeekC
   const flagsMissing = !!probe.error && TABLE_MISSING.has((probe.error as { code?: string }).code ?? "");
   let flagsUnreadable = !!probe.error && !flagsMissing;
 
+  // The food read is the client logging in the app: history a coach brought in from another app is left out (lib/imported-food.ts).
   const [food, weights, memberships, units, flags, histories, legacy, protectedIds] = await Promise.all([
-    readByIds(ids, (g) => (a, b) => supabase.from("food_log_entries").select("id, athlete_id, log_date, status, calories, protein_g").in("athlete_id", g).gte("log_date", from).lte("log_date", todayKey).order("id").range(a, b)),
+    readByIds(ids, (g) => (a, b) => supabase.from("food_log_entries").select("id, athlete_id, log_date, status, calories, protein_g").in("athlete_id", g).gte("log_date", from).lte("log_date", todayKey).or(NOT_IMPORTED).order("id").range(a, b)),
     readByIds(ids, (g) => (a, b) => supabase.from("body_weight_logs").select("id, athlete_id, logged_date, weight").in("athlete_id", g).gte("logged_date", from).lte("logged_date", todayKey).order("id").range(a, b)),
     readByIds(ids, (g) => (a, b) => supabase.from("group_memberships").select("id, profile_id, group_id, food_tracking_enabled, coach_sets_macros").in("profile_id", g).eq("role", "athlete").order("id").range(a, b)),
     readByIds(ids, (g) => (a, b) => supabase.from("athlete_profile_details").select("athlete_id, weight_unit").in("athlete_id", g).order("athlete_id").range(a, b)),

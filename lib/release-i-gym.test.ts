@@ -120,8 +120,10 @@ describe("your coaches", () => {
   it("lists every space the person trains in with who coaches it, sorted by organization", async () => {
     const db = fakeDb({
       group_memberships: [
-        { id: "a", group_id: "g1", profile_id: "me", role: "athlete", groups: { id: "g1", name: "Zed space", group_kind: "one_on_one", organizations: { name: "Zed Gym" } } },
-        { id: "b", group_id: "g2", profile_id: "me", role: "athlete", groups: { id: "g2", name: "Morning team", group_kind: "team", organizations: { name: "Alpha Club" } } },
+        { id: "a", group_id: "g1", profile_id: "me", role: "athlete", membership_type: "training", groups: { id: "g1", name: "Zed space", group_kind: "one_on_one", organizations: { name: "Zed Gym" } } },
+        { id: "b", group_id: "g2", profile_id: "me", role: "athlete", membership_type: "training", groups: { id: "g2", name: "Morning team", group_kind: "team", organizations: { name: "Alpha Club" } } },
+        // a shared group joined for its feed (social-only) is not another coach's space
+        { id: "e", group_id: "g3", profile_id: "me", role: "athlete", membership_type: "social_only", groups: { id: "g3", name: "Zed Collective", group_kind: "team", organizations: { name: "Zed Gym" } } },
         { id: "c", group_id: "g1", profile_id: "z", role: "coach", profiles: { full_name: "Zed Coach" } },
         { id: "d", group_id: "g2", profile_id: "a", role: "coach", profiles: { full_name: "Alpha Coach" } },
       ],

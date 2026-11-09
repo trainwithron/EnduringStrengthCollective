@@ -80,6 +80,9 @@ import { ReviewPromptSection } from "@/components/athlete/review-prompt-section"
 import type { TodayMacros, TodayHabit } from "@/components/athlete/today-widget";
 import type { WeightLogEntry } from "@/components/athlete/weight-log-widget";
 import { readGroupMemberCount } from "@/lib/group-roster-reads";
+import { SharedGroupJoinCard } from "@/components/athlete/shared-group-join-card";
+import { loadSharedGroupOffer, type SharedGroupOffer } from "@/lib/shared-group-join";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 export const metadata = { title: "Home" };
 
@@ -587,6 +590,8 @@ export default async function GroupHubPage(
   let aboutYouNeeded = false;
   // No goal sheet filled in yet (by the client or by a coach with them): Home asks for it first. A failed read leaves it out.
   let goalSheetNeeded = false;
+  // Once the goal sheet is done: the offer to join the organization's shared group (never two prompts at once). Only for the client themselves, in their one-on-one space.
+  let sharedGroupOffer: SharedGroupOffer | null = null;
   let wellnessCheckin: WellnessCheckinValues | null = null;
   let lifeImpactPrompt: string | null = null;
   const canBook = mobileBase?.booking.canBook ?? false;
@@ -797,6 +802,9 @@ export default async function GroupHubPage(
         if (!isCoach && !isActingAsOther) {
           const { data: sheetRow, error: sheetError } = await supabase.from("client_goal_sheets").select("filled_at").eq("athlete_id", athleteId).eq("group_id", params.groupId).maybeSingle();
           goalSheetNeeded = !sheetError && !sheetRow?.filled_at;
+          if (!sheetError && !goalSheetNeeded && user && athleteId === user.id && (group as { group_kind?: string }).group_kind === "one_on_one") {
+            sharedGroupOffer = await loadSharedGroupOffer(createServiceRoleClient(), user.id, params.groupId).catch(() => null);
+          }
         }
         const [{ data: weightRows }, { data: wellnessRow }, { data: lastLifeImpactRow }, { data: detailsRow }, { data: intakeRow }] = todayReads;
         const bodyProfile = rowToBodyProfile(detailsRow as Record<string, unknown> | null, intakeRow as Record<string, unknown> | null);
@@ -924,6 +932,16 @@ export default async function GroupHubPage(
             <div className="space-y-4">
               {isToday && <HomeThread lines={homeThreadLines} />}
               {isToday && goalSheetNeeded && <GoalSheetPromptCard groupId={params.groupId} athleteId={athleteId} />}
+              {isToday && !goalSheetNeeded && sharedGroupOffer && (
+                <SharedGroupJoinCard
+                  spaceGroupId={params.groupId}
+                  athleteId={athleteId}
+                  groupId={sharedGroupOffer.groupId}
+                  groupName={sharedGroupOffer.groupName}
+                  coachName={sharedGroupOffer.coachName}
+                  allowShare={sharedGroupOffer.allowShare}
+                />
+              )}
               {isToday && aboutYouNeeded && !isCoach && !isActingAsOther && <AboutYouCard groupId={params.groupId} athleteId={athleteId} />}
               {reupState && <ReupCard state={reupState} />}
               {/* Programs from the person's OTHER groups: this group's own program is listed under today's workout, so it is not repeated here.
