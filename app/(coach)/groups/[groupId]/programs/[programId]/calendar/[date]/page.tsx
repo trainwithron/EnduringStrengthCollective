@@ -34,6 +34,7 @@ import { resolveDayMacros, standingForDate } from "@/lib/macro-resolution";
 import { fetchStandingHistory } from "@/lib/standing-macros";
 import { CalendarPurchasePrompt } from "@/components/athlete/calendar-purchase-prompt";
 import { isStripeConfigured } from "@/lib/stripe";
+import { payeeReadyForGroup } from "@/lib/connect-payee";
 import type { PackageOption } from "@/components/athlete/package-picker";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { WaitlistJoinButton } from "@/components/athlete/waitlist-join-button";
@@ -385,6 +386,8 @@ export default async function DayDetailPage(
         rateCents: p.rate_cents,
         priceCents: p.price_cents ?? null,
       }));
+      // Buy buttons only when the coach's own Stripe can take the payment.
+      if (availablePackages.length > 0 && !(await payeeReadyForGroup(params.groupId))) availablePackages = [];
     }
   }
 

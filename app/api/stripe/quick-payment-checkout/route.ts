@@ -4,6 +4,8 @@ import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getStripeClient, isStripeConfigured } from "@/lib/stripe";
 import { appOrigin } from "@/lib/app-url";
+import { connectedCustomerId, feePercentForOrg, getPayeeForGroup, PAYEE_NOT_READY_FOR_COACH } from "@/lib/connect-payee";
+import { platformFeeCents } from "@/lib/platform-fee";
 
 // Quick Payment (mobile_more_tab_condensed_widget_hub_sept30.md) — a
 // coach-initiated one-off charge to a specific client. Deliberately the
@@ -68,37 +70,23 @@ export async function POST(request: Request) {
     const stripe = getStripeClient();
     const serviceRole = createServiceRoleClient();
 
-    // Reuse the client's existing Stripe Customer across every group/org
-    // they're in — same lookup-or-create pattern as the package checkout
-    // route, just keyed by the coach-selected athleteId instead of the
-    // caller's own id.
-    const { data: existingCustomer } = await serviceRole
-      .from("stripe_customers")
-      .select("stripe_customer_id")
-      .eq("profile_id", athleteId)
-      .maybeSingle();
-
-    let stripeCustomerId = existingCustomer?.stripe_customer_id ?? null;
-
-    if (!stripeCustomerId) {
-      const { data: authUser } = await serviceRole.auth.admin.getUserById(athleteId);
-      const customer = await stripe.customers.create({
-        email: authUser?.user?.email ?? undefined,
-        metadata: { profile_id: athleteId },
-      });
-      stripeCustomerId = customer.id;
-      await serviceRole
-        .from("stripe_customers")
-        .insert({ profile_id: athleteId, stripe_customer_id: stripeCustomerId });
+    // A direct charge on the organization's own Stripe account, like every client payment.
+    const payee = await getPayeeForGroup(serviceRole, groupId);
+    if (!payee.ready || !payee.accountId || !payee.organizationId) {
+      return NextResponse.json({ error: PAYEE_NOT_READY_FOR_COACH }, { status: 409 });
     }
+    const feePercent = await feePercentForOrg(serviceRole, payee.organizationId);
+    const stripeCustomerId = await connectedCustomerId(serviceRole, stripe, athleteId, payee.accountId);
 
     const origin = appOrigin(request);
     const trimmedDescription =
       typeof description === "string" ? description.trim().slice(0, 200) : "";
 
-    const session = await stripe.checkout.sessions.create({
+    const session = await stripe.checkout.sessions.create(
+      {
       customer: stripeCustomerId,
       mode: "payment",
+      payment_intent_data: { application_fee_amount: platformFeeCents(Math.round(amountCents), feePercent) },
       line_items: [
         {
           price_data: {
@@ -118,7 +106,9 @@ export async function POST(request: Request) {
         group_id: groupId,
         description: trimmedDescription,
       },
-    });
+      },
+      { stripeAccount: payee.accountId }
+    );
 
     if (!session.url) {
       return NextResponse.json({ error: "Couldn't create a checkout session." }, { status: 502 });

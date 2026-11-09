@@ -5,57 +5,25 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { computeRevenueSplit, formatSplitCents, type CoachShare } from "@/lib/revenue-splits";
 
-const CONNECT_STATUS_LABEL: Record<string, string> = {
-  not_connected: "Not connected",
-  pending: "Pending",
-  enabled: "Active",
-  restricted: "Action needed",
-};
-
 export function RevenueSplitEditor({
   organizationId,
-  groupId,
-  currentUserId,
   totalRevenueCents,
   coaches,
   isOwner,
 }: {
   organizationId: string;
-  groupId: string;
-  currentUserId: string;
   totalRevenueCents: number;
-  coaches: (CoachShare & { stripeConnectStatus: string })[];
+  coaches: CoachShare[];
   isOwner: boolean;
 }) {
   const router = useRouter();
   const [shares, setShares] = useState<Record<string, string>>(
     Object.fromEntries(coaches.map((c) => [c.profileId, c.revenueSharePct.toString()]))
   );
-  const [connecting, setConnecting] = useState(false);
   // What is saved for each person, so a refused share can go back to it.
   const [savedShares, setSavedShares] = useState<Record<string, string>>(shares);
-  const [connectError, setConnectError] = useState<string | null>(null);
 
-  async function handleConnectStripe() {
-    setConnecting(true);
-    setConnectError(null);
-    try {
-      const res = await fetch("/api/stripe/connect/onboard", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ organizationId, groupId }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Couldn't start Stripe onboarding.");
-      window.location.href = data.url;
-    } catch (err) {
-      setConnectError(err instanceof Error ? err.message : "Couldn't start Stripe onboarding.");
-      setConnecting(false);
-    }
-  }
-
-  // No percentage platform fee: only the real Stripe fee and a flat per-payment fee come off, and that happens when a
-  // payment is processed. This preview splits the whole monthly figure.
+  // A display only: this divides the whole monthly figure for the owner to pay out themselves.
   const result = computeRevenueSplit(
     totalRevenueCents,
     0,
@@ -107,7 +75,7 @@ export function RevenueSplitEditor({
         <p className="font-display text-2xl leading-none">{formatSplitCents(result.remainderCents)}</p>
         <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Monthly rates entered, to split</p>
         <p className="font-body text-xs text-steel mt-2">
-          Added up from each client&apos;s monthly rate. Real payments split what is left after the card fee.
+          Added up from each client&apos;s monthly rate.
         </p>
       </div>
 
@@ -118,7 +86,6 @@ export function RevenueSplitEditor({
         <div className="divide-y divide-steel/15">
           {result.coachShares.map((share) => {
             const coach = coaches.find((c) => c.profileId === share.profileId);
-            const status = coach?.stripeConnectStatus ?? "not_connected";
             return (
               <div key={share.profileId} className="py-2.5 flex items-center justify-between gap-4">
                 <span className="font-body text-sm">
@@ -140,24 +107,6 @@ export function RevenueSplitEditor({
                   <span className="font-body text-sm w-20 text-right">
                     {formatSplitCents(share.amountCents)}
                   </span>
-                  {share.profileId === currentUserId ? (
-                    status === "enabled" ? (
-                      <span className="font-body text-xs text-positive w-28 text-right">Stripe connected</span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleConnectStripe}
-                        disabled={connecting}
-                        className="font-body text-xs text-rust underline decoration-dotted disabled:opacity-40 w-28 text-right"
-                      >
-                        {connecting ? "Redirecting…" : "Connect Stripe"}
-                      </button>
-                    )
-                  ) : (
-                    <span className="font-body text-xs text-steel w-28 text-right">
-                      {CONNECT_STATUS_LABEL[status] ?? status}
-                    </span>
-                  )}
                 </div>
               </div>
             );
@@ -176,17 +125,9 @@ export function RevenueSplitEditor({
       {!isOwner && (
         <p className="font-body text-xs text-steel">Only the organization owner can edit these splits.</p>
       )}
-      {connectError && (
-        <p className="font-body text-xs text-rust" role="alert">
-          {connectError}
-        </p>
-      )}
-
       <p className="font-body text-xs text-steel max-w-[65ch]">
-        Once a coach&apos;s Stripe connection shows &ldquo;Stripe connected,&rdquo; their share of every
-        real payment is transferred to their own Stripe account automatically when it comes in. A coach
-        who hasn&apos;t connected yet simply isn&apos;t paid out until they do — nothing blocks the
-        payment itself.
+        Spotlight does not pay coaches. Every client payment goes to your organization&apos;s own Stripe
+        account. These numbers show what each coach earned, for the owner to pay out themselves.
       </p>
     </div>
   );

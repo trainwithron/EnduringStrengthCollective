@@ -4,6 +4,9 @@ import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getStripeClient, isStripeConfigured } from "@/lib/stripe";
 import { appOrigin } from "@/lib/app-url";
+import { connectedCustomerId, ensurePackagePrice, feePercentForOrg, getPayeeForGroup, PAYEE_NOT_READY_FOR_CLIENT, type PackageForPrice } from "@/lib/connect-payee";
+import { platformFeeCents } from "@/lib/platform-fee";
+import { packagePriceCents } from "@/lib/package-price";
 
 export async function POST(request: Request) {
   const supabase = await createServerClient();
@@ -29,10 +32,10 @@ export async function POST(request: Request) {
   // that isn't genuinely offered in a group they belong to.
   const { data: pkg } = await supabase
     .from("coach_packages")
-    .select("id, group_id, billing_type, sessions_granted, stripe_price_id, is_active")
+    .select("*")
     .eq("id", packageId)
     .maybeSingle();
-  if (!pkg || !pkg.is_active || !pkg.stripe_price_id) {
+  if (!pkg || !pkg.is_active) {
     return NextResponse.json({ error: "This package isn't available." }, { status: 404 });
   }
 
@@ -58,36 +61,22 @@ export async function POST(request: Request) {
     const stripe = getStripeClient();
     const serviceRole = createServiceRoleClient();
 
-    // Reuse this person's existing Stripe Customer across every
-    // group/org they're in — created lazily on their first checkout.
-    const { data: existingCustomer } = await serviceRole
-      .from("stripe_customers")
-      .select("stripe_customer_id")
-      .eq("profile_id", user.id)
-      .maybeSingle();
-
-    let stripeCustomerId = existingCustomer?.stripe_customer_id ?? null;
-
-    if (!stripeCustomerId) {
-      // profiles has no email column — auth.users does, and only the
-      // service-role client can read it.
-      const { data: authUser } = await serviceRole.auth.admin.getUserById(user.id);
-      const customer = await stripe.customers.create({
-        email: authUser?.user?.email ?? undefined,
-        metadata: { profile_id: user.id },
-      });
-      stripeCustomerId = customer.id;
-      await serviceRole
-        .from("stripe_customers")
-        .insert({ profile_id: user.id, stripe_customer_id: stripeCustomerId });
+    // Every client payment is a direct charge on the organization's own Stripe account. Nothing is charged until that account is ready.
+    const payee = await getPayeeForGroup(serviceRole, groupId);
+    if (!payee.ready || !payee.accountId || !payee.organizationId) {
+      return NextResponse.json({ error: PAYEE_NOT_READY_FOR_CLIENT }, { status: 409 });
     }
+    const feePercent = await feePercentForOrg(serviceRole, payee.organizationId);
+    const stripePriceId = await ensurePackagePrice(serviceRole, stripe, pkg as PackageForPrice, payee.accountId);
+    const stripeCustomerId = await connectedCustomerId(serviceRole, stripe, user.id, payee.accountId);
 
     const origin = appOrigin(request);
 
-    const session = await stripe.checkout.sessions.create({
+    const session = await stripe.checkout.sessions.create(
+      {
       customer: stripeCustomerId,
       mode: kind === "credits" ? "payment" : "subscription",
-      line_items: [{ price: pkg.stripe_price_id, quantity: 1 }],
+      line_items: [{ price: stripePriceId, quantity: 1 }],
       success_url: `${origin}/groups/${groupId}/billing/success?kind=${kind}`,
       cancel_url: `${origin}/groups/${groupId}/billing/canceled`,
       metadata:
@@ -104,9 +93,15 @@ export async function POST(request: Request) {
       // carry it through to the customer.subscription.* events later.
       subscription_data:
         kind === "subscription"
-          ? { metadata: { athlete_id: user.id, group_id: groupId, coach_package_id: pkg.id, credits: String(pkg.sessions_granted) } }
+          ? { application_fee_percent: feePercent, metadata: { athlete_id: user.id, group_id: groupId, coach_package_id: pkg.id, credits: String(pkg.sessions_granted) } }
           : undefined,
-    });
+      payment_intent_data:
+        kind === "credits"
+          ? { application_fee_amount: platformFeeCents(packagePriceCents({ priceCents: pkg.price_cents, rateCents: pkg.rate_cents, sessionsGranted: pkg.sessions_granted }), feePercent) }
+          : undefined,
+      },
+      { stripeAccount: payee.accountId }
+    );
 
     if (!session.url) {
       return NextResponse.json({ error: "Couldn't create a checkout session." }, { status: 502 });

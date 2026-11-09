@@ -429,7 +429,7 @@ describe("how it is wired", () => {
   it("the webhook hands the four events to it and nothing else about money changes", () => {
     const route = src("app/api/stripe/webhook/route.ts");
     for (const t of ["invoice.payment_failed", "charge.refunded", "charge.dispute.created", "charge.dispute.closed"]) expect(route).toContain(`case "${t}":`);
-    expect(route).toContain("handlePaymentProblemEvent(event, { db: supabase, stripe })");
+    expect(route).toContain("handlePaymentProblemEvent(event, { db: supabase, stripe: eventStripe })");
     const lib = src("lib/payment-events.ts");
     // it records and notifies: it never touches balances, sessions, subscriptions or Stripe objects
     expect(lib).not.toMatch(/session_credits|credit_purchases|apply_session_credit|membership_subscriptions|transfers\.|refunds\.create|subscriptions\.(update|cancel)/);

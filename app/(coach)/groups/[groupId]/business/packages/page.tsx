@@ -9,6 +9,10 @@ import { createServerClient } from "@/lib/supabase/server";
 import { getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { isStripeConfigured } from "@/lib/stripe";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { connectStatusFromAccount, feePercentForOrg, getOrgConnect, type ConnectStatus } from "@/lib/connect-payee";
+import { getStripeClient } from "@/lib/stripe";
+import { StripeConnectPanel } from "@/components/coach/desktop/stripe-connect-panel";
 import { PackageManager, type CoachPackageRow, type LinkableProgramOption } from "@/components/coach/desktop/package-manager";
 
 export const metadata = { title: "Packages" };
@@ -44,9 +48,33 @@ export default async function PackagesPage(
 
   const { data: group } = await supabase
     .from("groups")
-    .select("name")
+    .select("name, organization_id")
     .eq("id", params.groupId)
     .single();
+
+  // Whether clients can pay this organization. A coach coming back from Stripe sees the answer at once (Stripe's own notice can arrive a little later).
+  let connectStatus: ConnectStatus = "not_connected";
+  let feePercent: number | null = null;
+  let isOrgOwner = false;
+  if (isStripeConfigured() && group?.organization_id) {
+    const admin = createServiceRoleClient();
+    const connect = await getOrgConnect(admin, group.organization_id);
+    connectStatus = connect.status;
+    if (connect.status === "pending" && connect.accountId) {
+      try {
+        const live = connectStatusFromAccount(await getStripeClient().accounts.retrieve(connect.accountId));
+        if (live === "ready") {
+          connectStatus = live;
+          await admin.from("org_connect_accounts").update({ status: live, updated_at: new Date().toISOString() }).eq("organization_id", group.organization_id);
+        }
+      } catch {
+        // the stored status stands
+      }
+    }
+    feePercent = await feePercentForOrg(admin, group.organization_id).catch(() => null);
+    const { data: orgRole } = await supabase.from("organization_memberships").select("role").eq("organization_id", group.organization_id).eq("profile_id", user.id).maybeSingle();
+    isOrgOwner = orgRole?.role === "owner";
+  }
 
   // Every package this coach made in this organization, wherever they were standing when they made it (some were made inside a one-on-one client's group,
   // which is no longer where this page opens). Each keeps its own group, which is what editing it must name.
@@ -112,11 +140,13 @@ export default async function PackagesPage(
       <div className="pb-6 border-b border-steel/20 mb-6">
         <h1 className="font-display font-bold text-3xl uppercase leading-none">Packages</h1>
         <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">
-          {isStripeConfigured()
+          {isStripeConfigured() && connectStatus === "ready"
             ? "Define what you actually sell — a client sees these on their Billing page."
             : "Packages are for assigning to clients by hand until payments are turned on."}
         </p>
       </div>
+
+      {isStripeConfigured() && group?.organization_id && <StripeConnectPanel groupId={params.groupId} status={connectStatus} isOwner={isOrgOwner} feePercent={feePercent} />}
 
       <PackageManager groupId={params.groupId} initialPackages={packages} linkablePrograms={linkablePrograms} accessGroups={accessGroups} siteLinkBase={siteLinkBase} />
     </CoachDesktopShell>

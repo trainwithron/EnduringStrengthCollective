@@ -36,9 +36,8 @@ describe("the ten writes whose failure used to look like success now tell the tr
 
 describe("the Stripe webhook throws on a failed write so Stripe sends the event again", () => {
   const hook = src("app/api/stripe/webhook/route.ts");
-  it("the plan started by checkout, the saved transfer id and the connected-account status", () => {
+  it("the plan started by checkout and the connected-account status", () => {
     expect(hook).toContain("if (liftOffStartError) throw liftOffStartError;");
-    expect(hook).toContain("if (transferSaveError) throw transferSaveError;");
     expect(hook).toContain("if (connectStatusError) throw connectStatusError;");
     expect(hook).toContain("Webhook handler failed");
   });

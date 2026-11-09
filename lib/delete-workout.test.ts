@@ -66,7 +66,7 @@ describe("Delete workout: the choice", () => {
     expect(ask).toContain("onClick={() => setDeleteAsked(false)}");
   });
   it("sends only the session id to the server, then leaves the way Pause does; a refusal says so and stays", () => {
-    const del = complete.slice(complete.indexOf("async function handleDelete()"), complete.indexOf("async function handleComplete()"));
+    const del = complete.slice(complete.indexOf("async function handleDelete()"), complete.indexOf("async function startComplete()"));
     expect(del).toContain('fetch("/api/workout-session/delete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId }) })');
     expect(del).toContain("router.push(pauseHref)");
     expect(del).toContain("This workout couldn't be deleted. Nothing was changed.");

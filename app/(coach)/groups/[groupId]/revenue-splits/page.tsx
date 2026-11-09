@@ -82,7 +82,7 @@ export default async function RevenueSplitsPage(
   const [{ data: memberRows }, notAccepted, monthlyRateCents, { data: orgChallengeRows }] = await Promise.all([
     supabase
       .from("organization_memberships")
-      .select("profile_id, role, revenue_share_pct, stripe_connect_status, profiles ( full_name )")
+      .select("profile_id, role, revenue_share_pct, profiles ( full_name )")
       .eq("organization_id", orgMembership.organization_id)
       .order("role", { ascending: true }),
     // Someone who has not accepted their invitation yet is not a working coach: no share is set for them here.
@@ -90,12 +90,11 @@ export default async function RevenueSplitsPage(
     loadMonthlyRateCents(),
     supabase.from("challenges").select("id, coach_id, entry_fee_cents").eq("organization_id", orgMembership.organization_id).neq("status", "draft"),
   ]);
-  const coaches: (CoachShare & { stripeConnectStatus: string })[] = (memberRows ?? []).filter((m) => !notAccepted.has(m.profile_id)).map((m) => ({
+  const coaches: CoachShare[] = (memberRows ?? []).filter((m) => !notAccepted.has(m.profile_id)).map((m) => ({
     profileId: m.profile_id,
     fullName: (m.profiles as any)?.full_name ?? "Unknown",
     role: m.role,
     revenueSharePct: m.revenue_share_pct,
-    stripeConnectStatus: m.stripe_connect_status ?? "not_connected",
   }));
 
   const coachIds = new Set(coaches.map((c) => c.profileId));
@@ -125,9 +124,8 @@ export default async function RevenueSplitsPage(
       <div className="pb-6 border-b border-steel/20 mb-6">
         <h1 className="font-display font-bold text-3xl uppercase leading-none">Revenue Splits</h1>
         <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">
-          How estimated revenue would divide between the platform and each coach in your
-          organization. Built to plug straight into Stripe Connect transfers later — no payment
-          processor is connected yet.
+          What each coach in your organization earned, worked out from your own percentages, for
+          the owner to pay out. Spotlight does not divide or send this money.
         </p>
         <p className="font-body text-xs text-steel mt-1 max-w-[70ch]">
           {seesWholeOrg
@@ -137,8 +135,6 @@ export default async function RevenueSplitsPage(
       </div>
       <RevenueSplitEditor
         organizationId={orgMembership.organization_id}
-        groupId={params.groupId}
-        currentUserId={user.id}
         totalRevenueCents={totalRevenueCents}
         coaches={coaches}
         isOwner={isOwner}

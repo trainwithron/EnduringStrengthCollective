@@ -1,4 +1,3 @@
-import { packagePriceCents } from "@/lib/package-price";
 import { safeErrorDetail } from "@/lib/safe-error";
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
@@ -7,10 +6,11 @@ import { getStripeClient, isStripeConfigured } from "@/lib/stripe";
 import { programBelongsToCoach } from "@/lib/package-program-access";
 import { groupBelongsToCoach } from "@/lib/package-group-access";
 
-// Package create/edit/delete has a real Stripe side effect (a Product +
-// Price per package), so this can't be a plain client-side
+// Package edit/delete can touch Stripe, so this can't be a plain client-side
 // supabase.from("coach_packages").insert() the way most coach-config
 // tables work — it needs a server route that holds the Stripe secret key.
+// A package's Product and Price live on the payee's own Stripe account and
+// are made at checkout, the first time someone buys (lib/connect-payee.ts).
 // The authenticated createServerClient() does the ownership check;
 // createServiceRoleClient() does the actual DB write (same split already
 // used by app/api/stripe/checkout/route.ts).
@@ -75,9 +75,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "That group is not one of yours." }, { status: 400 });
   }
 
-  // Insert first (without Stripe ids) to get a stable id before creating
-  // the Stripe objects — avoids an orphaned Stripe Product/Price if the
-  // DB insert itself fails. Defaults to private (is_public: false) —
+  // Defaults to private (is_public: false) —
   // matches the coach's own primary workflow (custom pricing assigned
   // per client) as the safer failure mode; a coach opts a package into
   // being an open menu explicitly.
@@ -102,39 +100,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Couldn't create the package." }, { status: 502 });
   }
 
-  // Before payments are on a package is still a real package, assigned to clients by hand (Ron, Nov 9: Save package did nothing). It has no Stripe price, so it cannot be bought: checkout refuses it.
-  if (!isStripeConfigured()) return NextResponse.json({ packageId: pkg.id });
-
-  try {
-    const stripe = getStripeClient();
-    const totalCents = packagePriceCents({ priceCents, rateCents, sessionsGranted });
-
-    const product = await stripe.products.create({
-      name: name.trim(),
-      metadata: { coach_id: authCheck.userId, group_id: groupId, coach_package_id: pkg.id },
-    });
-    const price = await stripe.prices.create({
-      product: product.id,
-      currency: "usd",
-      unit_amount: totalCents,
-      recurring: billingType === "subscription" ? { interval: "month" } : undefined,
-    });
-
-    // The ids must be saved: a package without them cannot be bought. A failed save takes the catch below (the row is deactivated and the coach is told), not a success answer.
-    const { error: priceSaveError } = await serviceRole
-      .from("coach_packages")
-      .update({ stripe_product_id: product.id, stripe_price_id: price.id })
-      .eq("id", pkg.id);
-    if (priceSaveError) throw priceSaveError;
-
-    return NextResponse.json({ packageId: pkg.id });
-  } catch (err) {
-    // The DB row exists but Stripe setup failed — deactivate it rather
-    // than leave a package with no price that could otherwise be bought.
-    await serviceRole.from("coach_packages").update({ is_active: false }).eq("id", pkg.id);
-    const message = safeErrorDetail(err);
-    return NextResponse.json({ error: `Couldn't set up billing for this package: ${message}` }, { status: 502 });
-  }
+  // Saving never touches Stripe: a package is real before payments are on or before the coach has connected (Ron, Nov 9), and can be assigned to clients by hand. Its price is made at checkout.
+  return NextResponse.json({ packageId: pkg.id });
 }
 
 export async function PATCH(request: Request) {
@@ -184,8 +151,7 @@ export async function PATCH(request: Request) {
   // Stripe is only actually touched for a price/name-affecting change or
   // a deactivation that archives a Price — a pure isPublic/isActive-true
   // toggle never needs it, so those keep working even with no
-  // STRIPE_SECRET_KEY configured (unlike POST, which always needs Stripe
-  // since every package needs a real Price to be sellable at all).
+  // STRIPE_SECRET_KEY configured (like POST, which never needs Stripe).
   const needsStripe =
     (priceAffectingChange && existing.stripe_product_id) || (name != null && existing.stripe_product_id) || (isActive === false && existing.stripe_price_id);
   if (needsStripe && !isStripeConfigured()) {
@@ -194,38 +160,22 @@ export async function PATCH(request: Request) {
 
   try {
     const stripe = needsStripe ? getStripeClient() : null;
+    // Where this package's Stripe objects live: its coach's account, or the platform for one made before direct charges.
+    const onAccount = existing.stripe_account_id ? { stripeAccount: existing.stripe_account_id as string } : undefined;
 
     if (stripe && priceAffectingChange && existing.stripe_product_id) {
-      // Prices are immutable — archive the old one and mint a fresh
-      // Product+Price rather than trying to mutate an amount in place.
-      // Existing purchasers/subscribers keep referencing the old Price
-      // until they resubscribe; that's expected, not a bug.
+      // Prices can't be changed. The old one is archived and a new one is made at the next checkout; existing subscribers stay on the old one.
       if (existing.stripe_price_id) {
-        await stripe.prices.update(existing.stripe_price_id, { active: false });
+        await stripe.prices.update(existing.stripe_price_id, { active: false }, onAccount);
       }
-      const finalName = (name ?? existing.name).trim();
-      const finalRate = rateCents ?? existing.rate_cents;
-      const finalSessions = sessionsGranted ?? existing.sessions_granted;
-      const finalBillingType = billingType ?? existing.billing_type;
-
-      const product = await stripe.products.create({
-        name: finalName,
-        metadata: { coach_id: authCheck.userId, group_id: groupId, coach_package_id: packageId },
-      });
-      const price = await stripe.prices.create({
-        product: product.id,
-        currency: "usd",
-        unit_amount: packagePriceCents({ priceCents: existing.price_cents ?? null, rateCents: finalRate, sessionsGranted: finalSessions }),
-        recurring: finalBillingType === "subscription" ? { interval: "month" } : undefined,
-      });
-      updates.stripe_product_id = product.id;
-      updates.stripe_price_id = price.id;
+      updates.stripe_product_id = null;
+      updates.stripe_price_id = null;
     } else if (stripe && name != null && existing.stripe_product_id) {
-      await stripe.products.update(existing.stripe_product_id, { name: name.trim() });
+      await stripe.products.update(existing.stripe_product_id, { name: name.trim() }, onAccount);
     }
 
     if (stripe && isActive === false && existing.stripe_price_id && !priceAffectingChange) {
-      await stripe.prices.update(existing.stripe_price_id, { active: false });
+      await stripe.prices.update(existing.stripe_price_id, { active: false }, onAccount);
     }
 
     const { error: updateError } = await serviceRole.from("coach_packages").update(updates).eq("id", packageId);
@@ -250,7 +200,7 @@ export async function DELETE(request: Request) {
   const serviceRole = createServiceRoleClient();
   const { data: existing } = await serviceRole
     .from("coach_packages")
-    .select("stripe_price_id")
+    .select("*")
     .eq("id", packageId)
     .eq("group_id", groupId)
     .maybeSingle();
@@ -270,7 +220,7 @@ export async function DELETE(request: Request) {
 
   if (isStripeConfigured() && existing.stripe_price_id) {
     try {
-      await getStripeClient().prices.update(existing.stripe_price_id, { active: false });
+      await getStripeClient().prices.update(existing.stripe_price_id, { active: false }, existing.stripe_account_id ? { stripeAccount: existing.stripe_account_id as string } : undefined);
     } catch {
       // Best-effort — the package is already deactivated on our side,
       // which is what actually stops it from being sold; a stale active

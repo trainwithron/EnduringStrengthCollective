@@ -22,7 +22,6 @@ const REVIEWED = new Set([
   "lib/coach-busy.ts::bookings",
   "lib/coach-busy.ts::discovery_bookings",
   "app/api/discovery-availability/[coachId]/route.ts::bookings",
-  "app/api/stripe/webhook/route.ts::revenue_split_transfers",
   "lib/series-store.ts::bookings",
   "app/admin/support/page.tsx::support_requests",
   // the coach's own busy times across everything they teach (times only, no client names), and an organization-wide load figure keyed by organization

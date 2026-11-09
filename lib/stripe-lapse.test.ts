@@ -43,10 +43,6 @@ describe("the payment webhook", () => {
     const dispatch = read("lib/webhook-dispatch.ts");
     expect(dispatch).toContain('.eq("payload->>eventKey", params.dedupeKey)');
   });
-  it("a revenue-split transfer that stopped before it was saved is made on the retry, with an idempotency key so it can never be paid twice", () => {
-    expect(hook).toContain("idempotencyKey: `split-${eventId}-${share.profileId}`");
-    expect(hook).toContain("if (earlier?.stripe_transfer_id) continue;");
-  });
   it("a retried payment never copies the linked program twice", () => {
     expect(hook).toContain("athleteHasCopyOfProgram(supabase");
     expect(hook).toContain('.neq("stripe_event_id", event.id)');

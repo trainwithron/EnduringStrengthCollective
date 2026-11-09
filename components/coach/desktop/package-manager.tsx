@@ -414,7 +414,7 @@ export function PackageManager({
                 ))}
               </ul>
             </div>
-            <p className="font-body text-xs text-steel mt-2.5">Buy buttons appear once payments are on. Until then you assign packages to clients yourself.</p>
+            <p className="font-body text-xs text-steel mt-2.5">Buy buttons appear once your Stripe is ready. Until then you assign packages to clients yourself.</p>
           </div>
         </div>
         </div>

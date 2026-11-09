@@ -1,13 +1,9 @@
 import { notifyPaymentReceived } from "@/lib/notify-payment";
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { getStripeClient, isStripeConfigured } from "@/lib/stripe";
-import {
-  computeRevenueSplit,
-  computePlatformDeduction,
-  computeUntaggedFallbackShares,
-  type CoachShare,
-} from "@/lib/revenue-splits";
+import { getConnectedStripeClient, getStripeClient, isStripeConfigured } from "@/lib/stripe";
+import { connectStatusFromAccount, constructEventFromSecrets, eventAccountMatchesGroup, feePercentForOrg, getPayeeForGroup, isPlatformOnlyPurchase } from "@/lib/connect-payee";
+import { platformFeeCents } from "@/lib/platform-fee";
 import { duplicateProgram } from "@/lib/program-duplication";
 import { athleteHasCopyOfProgram, programBelongsToCoach } from "@/lib/package-program-access";
 import { endsGroupAccess, storedSubscriptionStatus } from "@/lib/subscription-status";
@@ -106,230 +102,15 @@ async function dispatchPackagePurchasedEvent(
   });
 }
 
-// platform_flat_fee_revenue_split_scoping_sept19.md — the real Stripe
-// processing fee for a specific charge, read from its own
-// balance_transaction (never estimated). Re-retrieves the source object
-// with a fresh expand rather than trusting whatever shape the webhook
-// payload itself carried — checkout sessions never expand payment_intent
-// by default, and invoice/payment-intent field shapes have drifted
-// across Stripe API versions (see the current_period_end/subscription
-// comments elsewhere in this file), so one retrieve-and-expand call is
-// more robust than branching on several possible payload shapes.
-// A payment with genuinely no payment intent (e.g. a $0 charge) has no
-// real card-processing fee to deduct, so this returns 0 rather than
-// throwing — but an actual Stripe API failure during the lookup still
-// throws, since silently defaulting to $0 there would recreate the
-// exact silent-absorption bug this feature exists to close.
-//
-// Bounded retry, confirmed necessary by a real live test against
-// Stripe's own test-mode API (not a hypothetical): a charge's
-// balance_transaction can still be null for a couple of seconds right
-// after the charge succeeds, even though checkout.session.completed/
-// invoice.paid have already fired by then. Three short attempts covers
-// this without risking the webhook handler hanging.
-async function getRealStripeFeeCents(
-  stripe: Stripe,
-  paymentIntentRef: string | Stripe.PaymentIntent | null | undefined
-): Promise<number> {
-  const paymentIntentId = typeof paymentIntentRef === "string" ? paymentIntentRef : paymentIntentRef?.id;
-  if (!paymentIntentId) return 0;
-
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, {
-      expand: ["latest_charge.balance_transaction"],
-    });
-    const charge = paymentIntent.latest_charge;
-    if (charge && typeof charge !== "string") {
-      const balanceTransaction = charge.balance_transaction;
-      if (balanceTransaction && typeof balanceTransaction !== "string") {
-        return balanceTransaction.fee ?? 0;
-      }
-    }
-    if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 1500));
-  }
-  return 0;
-}
-
-// Same real-fee lookup as getRealStripeFeeCents, but for a recurring
-// invoice rather than a one-time checkout session. Invoices in this
-// Stripe API version carry no direct payment_intent field of their own
-// (removed in favor of the paginated invoice.payments list) — expand
-// that list, take its (only, for this app's single-payment-per-invoice
-// model) entry, and hand its payment_intent reference off to the same
-// balance_transaction lookup used above.
-async function getRealStripeFeeCentsForInvoice(stripe: Stripe, invoiceId: string): Promise<number> {
-  const invoice = await stripe.invoices.retrieve(invoiceId, {
-    expand: ["payments.data.payment.payment_intent"],
-  });
-  const paymentIntentRef = (invoice as any).payments?.data?.[0]?.payment?.payment_intent as
-    | string
-    | Stripe.PaymentIntent
-    | undefined;
-  return getRealStripeFeeCents(stripe, paymentIntentRef);
-}
-
-// Splits a payment's proceeds across the org's coaches per the existing
-// platform_fee_pct/revenue_share_pct model (lib/revenue-splits.ts —
-// unchanged math, just wired to real transfers here) and moves each
-// coach's cut to their connected Stripe account. A coach who hasn't
-// finished Connect onboarding yet (no enabled connected account) is
-// silently skipped rather than blocking the whole payment — their share
-// simply isn't transferred until they connect, same as how a package
-// with is_active=false just doesn't appear rather than erroring.
-//
-// The platform's own flat deduction (real Stripe fee + $0.10, see
-// computePlatformDeduction) is taken off grossAmountCents FIRST, and
-// computeRevenueSplit runs on what's left — the org/coach split was
-// silently operating on the gross charge before this, absorbing
-// Stripe's real fee out of the org's own platform_fee_pct bucket with
-// zero tracking. Recorded once per event in platform_fee_ledger,
-// independent of how many (if any) coaches end up receiving a transfer.
-async function createRevenueSplitTransfers(
-  supabase: SupabaseClient,
-  stripe: Stripe,
-  eventId: string,
-  groupId: string,
-  athleteId: string,
-  grossAmountCents: number,
-  stripeProcessingFeeCents: number
-) {
-  const { data: group } = await supabase.from("groups").select("organization_id").eq("id", groupId).maybeSingle();
-  if (!group?.organization_id) return;
-  const organizationId = group.organization_id;
-
-  const { data: org } = await supabase.from("organizations").select("id").eq("id", organizationId).maybeSingle();
-  if (!org) return;
-
-  const deduction = computePlatformDeduction(grossAmountCents, stripeProcessingFeeCents);
-  const { error: ledgerError } = await supabase.from("platform_fee_ledger").insert({
-    stripe_event_id: eventId,
-    organization_id: organizationId,
-    gross_amount_cents: deduction.grossAmountCents,
-    stripe_processing_fee_cents: deduction.stripeProcessingFeeCents,
-    platform_flat_fee_cents: deduction.platformFlatFeeCents,
-    net_amount_cents: deduction.netAmountCents,
-  });
-  // Unique violation = this event's ledger row was already recorded on a
-  // prior attempt — fall through and keep going rather than returning
-  // early, since a prior attempt may have failed partway through the
-  // coach-transfer loop below (each transfer has its own idempotency
-  // guard via revenue_split_transfers' own unique constraint).
-  if (ledgerError && ledgerError.code !== "23505") throw ledgerError;
-
-  const { data: memberRows } = await supabase
-    .from("organization_memberships")
-    .select("profile_id, role, revenue_share_pct, stripe_connect_account_id, stripe_connect_status, profiles ( full_name )")
-    .eq("organization_id", organizationId);
-  if (!memberRows || memberRows.length === 0) return;
-
-  const connectByProfile = new Map(memberRows.map((m) => [m.profile_id, m]));
-
-  async function applyShares(shares: { profileId: string; amountCents: number }[]) {
-    for (const share of shares) {
-      if (share.amountCents <= 0) continue;
-      const member = connectByProfile.get(share.profileId);
-      if (!member || member.stripe_connect_status !== "enabled" || !member.stripe_connect_account_id) continue;
-
-      const { error: insertError } = await supabase.from("revenue_split_transfers").insert({
-        stripe_event_id: eventId,
-        coach_id: share.profileId,
-        organization_id: organizationId,
-        amount_cents: share.amountCents,
-      });
-      if (insertError) {
-        if (insertError.code !== "23505") throw insertError;
-        // Started on an earlier attempt. If its transfer was made there is nothing to do; if the attempt stopped before the transfer was saved, it is made now (the idempotency
-        // key below means Stripe hands back the same transfer if it did go through, never a second one).
-        const { data: earlier } = await supabase
-          .from("revenue_split_transfers")
-          .select("stripe_transfer_id")
-          .eq("stripe_event_id", eventId)
-          .eq("coach_id", share.profileId)
-          .maybeSingle();
-        if (earlier?.stripe_transfer_id) continue;
-      }
-
-      // Stripe forgets an idempotency key after a day. If this event is being handled again later and the transfer was already made, it is found by its transfer group instead of being paid a second time.
-      const existingTransfers = await stripe.transfers.list({ transfer_group: eventId, destination: member.stripe_connect_account_id, limit: 10 });
-      const existingTransfer = existingTransfers.data.find((t) => t.amount === share.amountCents && !t.reversed);
-      const transfer =
-        existingTransfer ??
-        (await stripe.transfers.create(
-          {
-            amount: share.amountCents,
-            currency: "usd",
-            destination: member.stripe_connect_account_id,
-            transfer_group: eventId,
-          },
-          { idempotencyKey: `split-${eventId}-${share.profileId}` }
-        ));
-      // The transfer is already made. If remembering it fails, the failure is thrown so the event is sent again; the retry finds this transfer through the same idempotency key (never a second payout).
-      const { error: transferSaveError } = await supabase
-        .from("revenue_split_transfers")
-        .update({ stripe_transfer_id: transfer.id })
-        .eq("stripe_event_id", eventId)
-        .eq("coach_id", share.profileId);
-      if (transferSaveError) throw transferSaveError;
-    }
-  }
-
-  // organizational_only_group_kind_idea_sept16.md — revenue-split
-  // selectivity gate. No org-wide split at all until an org owner has
-  // deliberately flagged one real tag as the "pay-split-eligible"
-  // signal; until then this behaves exactly as it always has. Once a
-  // gating tag exists, a client who doesn't carry it was never sourced
-  // by the org owner — skip the org-wide percentage split entirely and
-  // give 100% of the net to whichever coach(es) actually run this
-  // specific group, instead of cutting every org member in.
-  const { data: gatingTag } = await supabase
-    .from("client_tags")
-    .select("id")
-    .eq("organization_id", organizationId)
-    .eq("gates_revenue_split", true)
-    .maybeSingle();
-
-  if (gatingTag) {
-    const { data: assignment } = await supabase
-      .from("client_tag_assignments")
-      .select("id")
-      .eq("tag_id", gatingTag.id)
-      .eq("athlete_id", athleteId)
-      .maybeSingle();
-
-    if (!assignment) {
-      const { data: groupCoachRows } = await supabase
-        .from("group_memberships")
-        .select("profile_id, profiles ( full_name )")
-        .eq("group_id", groupId)
-        .eq("role", "coach");
-      const groupCoaches = (groupCoachRows ?? []).map((c) => ({
-        profileId: c.profile_id,
-        fullName: (c.profiles as any)?.full_name ?? "Unknown",
-      }));
-      await applyShares(computeUntaggedFallbackShares(deduction.netAmountCents, groupCoaches));
-      return;
-    }
-  }
-
-  const coaches: CoachShare[] = memberRows.map((m) => ({
-    profileId: m.profile_id,
-    fullName: (m.profiles as any)?.full_name ?? "Unknown",
-    role: m.role,
-    revenueSharePct: m.revenue_share_pct,
-  }));
-  // The platform's take is only the real Stripe fee plus the flat fee, both already removed in `deduction`. There is no
-  // percentage fee, so the org-level platform_fee_pct is not applied (0).
-  const split = computeRevenueSplit(deduction.netAmountCents, 0, coaches);
-  await applyShares(split.coachShares);
-}
-
 // The only unauthenticated route in this app — Stripe calls this
 // directly, with no user session. Its "auth" is the signature check
 // below, over the exact raw request bytes (not the parsed JSON body,
 // which is why this can't go through the usual request.json() path
 // every other route uses).
 export async function POST(request: Request) {
-  if (!isStripeConfigured() || !process.env.STRIPE_WEBHOOK_SECRET) {
+  // Two endpoints can point here: the platform's own events and Connect events (from each coach's account). Each has its own signing secret.
+  const webhookSecrets = [process.env.STRIPE_WEBHOOK_SECRET, process.env.STRIPE_CONNECT_WEBHOOK_SECRET].filter((v): v is string => !!v);
+  if (!isStripeConfigured() || webhookSecrets.length === 0) {
     return NextResponse.json({ error: "Stripe isn't configured." }, { status: 503 });
   }
 
@@ -343,13 +124,16 @@ export async function POST(request: Request) {
 
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(body, signature, process.env.STRIPE_WEBHOOK_SECRET);
+    event = constructEventFromSecrets(stripe, body, signature, webhookSecrets);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: `Invalid signature: ${message}` }, { status: 400 });
   }
 
   const supabase = createServiceRoleClient();
+  // Set on an event from a coach's connected account: anything looked up for it must be read on that account. Empty on the platform's own events (a coach paying Spotlight, and payments made before direct charges).
+  const connectedAccount = event.account ?? null;
+  const eventStripe = connectedAccount ? getConnectedStripeClient(connectedAccount) : stripe;
 
   try {
     switch (event.type) {
@@ -367,6 +151,9 @@ export async function POST(request: Request) {
         // matching the exact same split already used for the client-
         // billing membership_subscriptions flow below.
         const purchaseKind = session.metadata?.purchase_kind;
+
+        // A coach paying Spotlight only ever happens on the platform's own account.
+        if (connectedAccount && isPlatformOnlyPurchase(purchaseKind)) break;
 
         // A coach's paid AI top-up: adds to the organization's budget for the month. Only a settled payment counts, and the dollars come from the pack matching what was paid.
         if (purchaseKind === "ai_topup") {
@@ -428,6 +215,7 @@ export async function POST(request: Request) {
           const quickAthleteId = session.metadata?.athlete_id;
           const quickGroupId = session.metadata?.group_id;
           if (!coachId || !quickAthleteId || !quickGroupId) break;
+          if (!(await eventAccountMatchesGroup(supabase, connectedAccount, quickGroupId))) break;
 
           const { error: insertError } = await supabase.from("coach_quick_payments").insert({
             stripe_event_id: event.id,
@@ -451,6 +239,7 @@ export async function POST(request: Request) {
         const groupId = session.metadata?.group_id;
         const coachPackageId = session.metadata?.coach_package_id ?? null;
         if (!athleteId || !groupId) break;
+        if (!(await eventAccountMatchesGroup(supabase, connectedAccount, groupId))) break;
 
         if (session.mode === "payment") {
           // Only a settled payment puts sessions on the account (a bank debit is unpaid at checkout and arrives with its own later event).
@@ -489,18 +278,8 @@ export async function POST(request: Request) {
           if (grantOnceError) throw grantOnceError;
           // The coach is told, once: a repeat of an event that was already handled returns false and tells nobody again.
           if (granted === true) await notifyPaymentReceived(supabase, { groupId, athleteId, amountCents: session.amount_total ?? 0, what: credits > 0 ? `${credits} session${credits === 1 ? "" : "s"}` : "a package" });
-          // Everything below is safe to run again on a retry (the transfers, the program copy, the group access and the outside notice each check themselves).
+          // Everything below is safe to run again on a retry (the program copy, the group access and the outside notice each check themselves).
 
-          const stripeFeeCents = await getRealStripeFeeCents(stripe, session.payment_intent);
-          await createRevenueSplitTransfers(
-            supabase,
-            stripe,
-            event.id,
-            groupId,
-            athleteId,
-            session.amount_total ?? 0,
-            stripeFeeCents
-          );
           await assignLinkedProgramIfFirstEnrollment(supabase, {
             coachPackageId,
             athleteId,
@@ -572,6 +351,27 @@ export async function POST(request: Request) {
       // tracking above never grants recurring credits on its own.
       // Invoices don't inherit subscription metadata automatically, so
       // the subscription itself has to be fetched to read it.
+      // Each renewal is charged at the rate of the organization's plan at that moment (1% or 5%), not the rate on the day they subscribed. Never fails the event: Stripe holds an invoice while this endpoint answers with an
+      // error, and a client's renewal must not wait on Spotlight's fee.
+      case "invoice.created": {
+        const invoice = event.data.object as Stripe.Invoice;
+        if (!connectedAccount || invoice.status !== "draft" || invoice.billing_reason !== "subscription_cycle") break;
+        try {
+          const subscriptionRef = invoice.parent?.subscription_details?.subscription;
+          const subscriptionId = typeof subscriptionRef === "string" ? subscriptionRef : subscriptionRef?.id;
+          if (!subscriptionId) break;
+          const groupId = (await eventStripe.subscriptions.retrieve(subscriptionId)).metadata?.group_id;
+          if (!groupId) break;
+          const payee = await getPayeeForGroup(supabase, groupId);
+          if (payee.accountId !== connectedAccount || !payee.organizationId) break;
+          const feeCents = platformFeeCents(invoice.amount_due ?? 0, await feePercentForOrg(supabase, payee.organizationId));
+          await eventStripe.invoices.update(invoice.id!, { application_fee_amount: feeCents });
+        } catch (err) {
+          console.error("stripe webhook: could not set this renewal's fee; it keeps the subscription's rate", err instanceof Error ? err.message : err);
+        }
+        break;
+      }
+
       case "invoice.paid": {
         const invoice = event.data.object as Stripe.Invoice;
         // Newer Stripe API versions moved the subscription reference off
@@ -582,7 +382,8 @@ export async function POST(request: Request) {
         const subscriptionId = typeof subscriptionRef === "string" ? subscriptionRef : subscriptionRef?.id;
         if (!subscriptionId) break;
 
-        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+        const subscription = await eventStripe.subscriptions.retrieve(subscriptionId);
+        if (connectedAccount && isPlatformOnlyPurchase(subscription.metadata?.purchase_kind)) break;
 
         // Lift Off's own recurring grant — every cycle including the
         // first, same idempotent-insert-then-RPC shape as the
@@ -605,6 +406,7 @@ export async function POST(request: Request) {
         const groupId = subscription.metadata?.group_id;
         const coachPackageId = subscription.metadata?.coach_package_id ?? null;
         if (!athleteId || !groupId || !coachPackageId) break;
+        if (!(await eventAccountMatchesGroup(supabase, connectedAccount, groupId))) break;
 
         const { data: pkg } = await supabase
           .from("coach_packages")
@@ -633,16 +435,6 @@ export async function POST(request: Request) {
         // A paid invoice gives back the group access a lapse took away (a no-op for someone who already has it).
         await grantGroupAccessLogged(supabase, coachPackageId, athleteId);
 
-        const invoiceStripeFeeCents = await getRealStripeFeeCentsForInvoice(stripe, invoice.id!);
-        await createRevenueSplitTransfers(
-          supabase,
-          stripe,
-          event.id,
-          groupId,
-          athleteId,
-          invoice.amount_paid ?? 0,
-          invoiceStripeFeeCents
-        );
         await dispatchPackagePurchasedEvent(supabase, {
           groupId,
           coachPackageId,
@@ -660,26 +452,18 @@ export async function POST(request: Request) {
       case "charge.refunded":
       case "charge.dispute.created":
       case "charge.dispute.closed": {
-        await handlePaymentProblemEvent(event, { db: supabase, stripe });
+        // Refunds and disputes happen on the coach's own account and are read there. The coach handles them in Stripe. Spotlight moves no money.
+        await handlePaymentProblemEvent(event, { db: supabase, stripe: eventStripe });
         break;
       }
 
-      // A coach's Connect Express onboarding status changed — reflects
-      // charges_enabled/payouts_enabled so the revenue-split transfer
-      // logic above knows whether this coach can actually receive a
-      // transfer yet, and so the UI can show a real status instead of
-      // just "connected or not."
+      // An organization's Stripe account changed: whether clients can pay it depends on this.
       case "account.updated": {
         const account = event.data.object as Stripe.Account;
-        const status = account.details_submitted
-          ? account.charges_enabled && account.payouts_enabled
-            ? "enabled"
-            : "restricted"
-          : "pending";
         const { error: connectStatusError } = await supabase
-          .from("organization_memberships")
-          .update({ stripe_connect_status: status })
-          .eq("stripe_connect_account_id", account.id);
+          .from("org_connect_accounts")
+          .update({ status: connectStatusFromAccount(account), updated_at: new Date().toISOString() })
+          .eq("stripe_account_id", account.id);
         if (connectStatusError) throw connectStatusError;
         break;
       }
@@ -696,6 +480,7 @@ export async function POST(request: Request) {
       case "customer.subscription.paused":
       case "customer.subscription.resumed": {
         const subscription = event.data.object as Stripe.Subscription;
+        if (connectedAccount && isPlatformOnlyPurchase(subscription.metadata?.purchase_kind)) break;
 
         if (subscription.metadata?.purchase_kind === "coach_lift_off") {
           const coachId = subscription.metadata?.coach_id;
@@ -726,6 +511,7 @@ export async function POST(request: Request) {
         const athleteId = subscription.metadata?.athlete_id;
         const groupId = subscription.metadata?.group_id;
         if (!athleteId || !groupId) break;
+        if (!(await eventAccountMatchesGroup(supabase, connectedAccount, groupId))) break;
 
         // Was an unchecked cast — Stripe's real Status type is wider
         // than our column ever supported (trialing, unpaid,

@@ -134,7 +134,4 @@ describe("the builder routes", () => {
     expect(gen).toContain("const athleteIds = namedRows.map");
     expect(src("lib/collective-intelligence-lookups.ts")).toContain("Math.min(365, Math.max(1,");
   });
-  it("a transfer already made for a Stripe event is found by its group before another is created", () => {
-    expect(src("app/api/stripe/webhook/route.ts")).toContain("stripe.transfers.list({ transfer_group: eventId");
-  });
 });

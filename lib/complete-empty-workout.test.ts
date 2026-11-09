@@ -16,7 +16,7 @@ describe("Complete with no sets logged asks once more", () => {
     expect(button).toContain('"No sets are logged yet. Complete anyway?"');
     expect(button).toContain('emptyAsked ? "Complete anyway" : "Complete workout"');
     // the question comes before anything is finished
-    expect(button.indexOf("setEmptyAsked(true);")).toBeLessThan(button.indexOf("handleComplete();"));
+    expect(button.indexOf("setEmptyAsked(true);")).toBeLessThan(button.indexOf("void startComplete();"));
   });
   it("Keep going closes the question, and a workout with sets completes in one tap as before", () => {
     expect(button).toContain("setConfirming(false);\n                setEmptyAsked(false);\n              }}");

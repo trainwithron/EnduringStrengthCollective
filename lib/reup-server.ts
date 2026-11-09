@@ -1,6 +1,7 @@
 import { rowPriceCents } from "@/lib/package-price";
 import { chooseReupPackage, formatPackagePrice, type ReupPackageOption } from "@/lib/reup";
 import { isStripeConfigured } from "@/lib/stripe";
+import { payeeReadyForGroup } from "@/lib/connect-payee";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 import { formatInTimezone } from "@/lib/format-in-timezone";
 
@@ -11,7 +12,7 @@ import { formatInTimezone } from "@/lib/format-in-timezone";
 export interface ReupState {
   groupId: string;
   package: { id: string; name: string; priceLabel: string; sessions: number; recurring: boolean } | null;
-  // True when payments are switched on for the platform. Otherwise the client is told to message their coach.
+  // True when payments are switched on and this coach's own Stripe is ready. Otherwise the client is told to message their coach.
   canPay: boolean;
   // A confirmed session in the next day, in the coach's time zone, e.g. "today at 6:00 AM".
   nextSessionLabel: string | null;
@@ -84,7 +85,7 @@ export async function loadReupState(supabase: any, athleteId: string, groupId: s
           recurring: chosen.billingType === "subscription",
         }
       : null,
-    canPay: isStripeConfigured(),
+    canPay: isStripeConfigured() && (await payeeReadyForGroup(groupId)),
     nextSessionLabel,
   };
 }

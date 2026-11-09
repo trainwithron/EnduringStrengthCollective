@@ -11,10 +11,10 @@ describe("the money settings on a membership are the server's", () => {
     expect(sql).toContain("grant update (role, revenue_share_pct) on public.organization_memberships to authenticated;");
     expect(sql).toContain("These shares add up to more than 100%. Lower one to save.");
   });
-  it("the only code that writes the connected account is the Connect route, with the service role", () => {
+  it("the only code that writes the organization's connected account is the Connect route, with the service role", () => {
     const route = read("app/api/stripe/connect/onboard/route.ts");
     expect(route).toContain("createServiceRoleClient");
-    expect(route).toContain("stripe_connect_account_id: accountId");
+    expect(route).toContain("stripe_account_id: accountId");
   });
   it("the share editor saves when the box is left and holds each box at what the others leave of 100 (no error message)", () => {
     const ed = read("components/coach/desktop/revenue-split-editor.tsx");

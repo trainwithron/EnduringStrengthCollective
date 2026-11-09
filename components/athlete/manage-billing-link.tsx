@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-export function ManageBillingLink() {
+export function ManageBillingLink({ groupId }: { groupId: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -11,7 +11,7 @@ export function ManageBillingLink() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/stripe/portal", { method: "POST" });
+      const res = await fetch("/api/stripe/portal", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ groupId }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Couldn't open billing portal.");
       window.location.href = data.url;

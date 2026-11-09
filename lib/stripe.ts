@@ -23,3 +23,11 @@ export function getStripeClient(): Stripe {
   }
   return stripeClient;
 }
+
+// A client acting as one connected account: every call it makes carries that account's Stripe-Account header. For reading a coach's own objects when one of their events arrives.
+export function getConnectedStripeClient(stripeAccount: string): Stripe {
+  if (!process.env.STRIPE_SECRET_KEY) {
+    throw new Error("STRIPE_SECRET_KEY is not set.");
+  }
+  return new Stripe(process.env.STRIPE_SECRET_KEY, { stripeAccount });
+}

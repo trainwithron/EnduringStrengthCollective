@@ -14,6 +14,28 @@ export interface OrgBillingSummary {
   exemptReason: string | null;
 }
 
+export const ORG_BILLING_COLUMNS = "billing_exempt, exempt_reason, trial_ends_at, subscription_status, current_period_end, org_addon, org_addon_until, past_due_since";
+
+export function billingRowFrom(billing: {
+  billing_exempt: boolean;
+  trial_ends_at: string | null;
+  subscription_status: string | null;
+  current_period_end: string | null;
+  org_addon: boolean;
+  org_addon_until: string | null;
+  past_due_since: string | null;
+}): OrgBillingRow {
+  return {
+    billingExempt: billing.billing_exempt,
+    trialEndsAt: billing.trial_ends_at,
+    subscriptionStatus: (billing.subscription_status as SubscriptionStatus | null) ?? null,
+    currentPeriodEnd: billing.current_period_end,
+    orgAddon: billing.org_addon,
+    orgAddonUntil: billing.org_addon_until,
+    pastDueSince: billing.past_due_since,
+  };
+}
+
 // Everything the Plan & Billing tab shows, read under the caller's own
 // session (RLS lets org members read their org's billing row; the two
 // count functions authorize the same way). A missing row is a normal
@@ -26,26 +48,14 @@ export async function getOrgBillingSummary(
   const [{ data: billing }, clientsRes, seatsRes] = await Promise.all([
     supabase
       .from("organization_billing")
-      .select(
-        "billing_exempt, exempt_reason, trial_ends_at, subscription_status, current_period_end, org_addon, org_addon_until, past_due_since"
-      )
+      .select(ORG_BILLING_COLUMNS)
       .eq("organization_id", organizationId)
       .maybeSingle(),
     supabase.rpc("org_billable_clients", { p_org_id: organizationId }),
     supabase.rpc("org_coach_seats", { p_org_id: organizationId }),
   ]);
 
-  const row: OrgBillingRow | null = billing
-    ? {
-        billingExempt: billing.billing_exempt,
-        trialEndsAt: billing.trial_ends_at,
-        subscriptionStatus: (billing.subscription_status as SubscriptionStatus | null) ?? null,
-        currentPeriodEnd: billing.current_period_end,
-        orgAddon: billing.org_addon,
-        orgAddonUntil: billing.org_addon_until,
-        pastDueSince: billing.past_due_since,
-      }
-    : null;
+  const row: OrgBillingRow | null = billing ? billingRowFrom(billing) : null;
 
   const entitlements = deriveOrgEntitlements(row, new Date(orgCreatedAt), new Date(), isBillingEnforced());
 

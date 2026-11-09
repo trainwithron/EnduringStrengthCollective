@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/timezone", () => ({ dateKeyInZone: () => "2026-10-05", getGroupCoachTimezone: async () => "America/New_York" }));
 vi.mock("@/lib/stripe", () => ({ isStripeConfigured: () => true }));
+vi.mock("@/lib/connect-payee", () => ({ payeeReadyForGroup: async () => true }));
 
 import { loadReupState } from "./reup-server";
 

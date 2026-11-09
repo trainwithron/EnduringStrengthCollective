@@ -2,9 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   computeRevenueSplit,
   formatSplitCents,
-  computePlatformDeduction,
-  computeUntaggedFallbackShares,
-  PLATFORM_FLAT_FEE_CENTS,
 } from "./revenue-splits";
 
 describe("computeRevenueSplit", () => {
@@ -60,73 +57,5 @@ describe("formatSplitCents", () => {
   it("formats cents as a dollar string", () => {
     expect(formatSplitCents(90000)).toBe("$900");
     expect(formatSplitCents(5000)).toBe("$50");
-  });
-});
-
-describe("computePlatformDeduction", () => {
-  it("subtracts the real Stripe fee plus a flat dime from the gross amount", () => {
-    // $100 charge, a real Stripe fee of $3.20 (320 cents) -> $3.20 + $0.10 = $3.30 deducted.
-    const result = computePlatformDeduction(10000, 320);
-    expect(result.stripeProcessingFeeCents).toBe(320);
-    expect(result.platformFlatFeeCents).toBe(PLATFORM_FLAT_FEE_CENTS);
-    expect(result.totalDeductionCents).toBe(330);
-    expect(result.netAmountCents).toBe(9670);
-  });
-
-  it("still deducts the flat dime even when the Stripe fee is 0 (e.g. a fee lookup that found nothing)", () => {
-    const result = computePlatformDeduction(5000, 0);
-    expect(result.totalDeductionCents).toBe(10);
-    expect(result.netAmountCents).toBe(4990);
-  });
-
-  it("clamps the net amount at 0 rather than going negative on a tiny charge", () => {
-    const result = computePlatformDeduction(5, 50);
-    expect(result.totalDeductionCents).toBe(60);
-    expect(result.netAmountCents).toBe(0);
-  });
-
-  it("handles a genuinely zero-amount transaction cleanly", () => {
-    const result = computePlatformDeduction(0, 0);
-    expect(result.netAmountCents).toBe(0);
-  });
-});
-
-describe("computeUntaggedFallbackShares", () => {
-  it("gives 100% to a single group coach", () => {
-    const result = computeUntaggedFallbackShares(9000, [{ profileId: "c1", fullName: "Coach A" }]);
-    expect(result).toEqual([{ profileId: "c1", fullName: "Coach A", amountCents: 9000 }]);
-  });
-
-  it("splits evenly across multiple coaches on the same group", () => {
-    const result = computeUntaggedFallbackShares(10000, [
-      { profileId: "c1", fullName: "Coach A" },
-      { profileId: "c2", fullName: "Coach B" },
-    ]);
-    expect(result).toEqual([
-      { profileId: "c1", fullName: "Coach A", amountCents: 5000 },
-      { profileId: "c2", fullName: "Coach B", amountCents: 5000 },
-    ]);
-  });
-
-  it("hands any leftover cent from integer division to the earlier coaches, never dropping it", () => {
-    const result = computeUntaggedFallbackShares(10001, [
-      { profileId: "c1", fullName: "Coach A" },
-      { profileId: "c2", fullName: "Coach B" },
-      { profileId: "c3", fullName: "Coach C" },
-    ]);
-    const total = result.reduce((sum, r) => sum + r.amountCents, 0);
-    expect(total).toBe(10001);
-    expect(result[0].amountCents).toBe(3334);
-    expect(result[1].amountCents).toBe(3334);
-    expect(result[2].amountCents).toBe(3333);
-  });
-
-  it("returns [] when the group has no coaches at all", () => {
-    expect(computeUntaggedFallbackShares(5000, [])).toEqual([]);
-  });
-
-  it("handles a zero net amount cleanly", () => {
-    const result = computeUntaggedFallbackShares(0, [{ profileId: "c1", fullName: "Coach A" }]);
-    expect(result).toEqual([{ profileId: "c1", fullName: "Coach A", amountCents: 0 }]);
   });
 });

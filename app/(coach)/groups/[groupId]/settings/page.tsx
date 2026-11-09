@@ -27,6 +27,7 @@ import { WearablePlaceholder } from "@/components/athlete/wearable-placeholder";
 import { PackagePicker, type PackageOption } from "@/components/athlete/package-picker";
 import { ManageBillingLink } from "@/components/athlete/manage-billing-link";
 import { isStripeConfigured } from "@/lib/stripe";
+import { payeeReadyForGroup } from "@/lib/connect-payee";
 import { ProfileDetailsEditor } from "@/components/athlete/profile-details-editor";
 import { InstagramHandleField } from "@/components/coach/instagram-handle-field";
 import { readInstagramHandle } from "@/lib/instagram-handle";
@@ -246,6 +247,8 @@ export default async function SettingsPage(
       rateCents: p.rate_cents,
       priceCents: p.price_cents ?? null,
     }));
+    // Buy buttons only when the coach's own Stripe can take the payment.
+    if (packages.length > 0 && isStripeConfigured() && !(await payeeReadyForGroup(params.groupId))) packages = [];
   }
 
   // Read during rest. A client's own switch is theirs alone (never read or changed while a coach is acting as them); a coach's settings are the coach's own.
@@ -563,7 +566,7 @@ export default async function SettingsPage(
           <SettingsGroup label="Billing">
             <PackagePicker packages={packages} />
             <div className="mt-3">
-              <ManageBillingLink />
+              <ManageBillingLink groupId={params.groupId} />
             </div>
           </SettingsGroup>
         )}

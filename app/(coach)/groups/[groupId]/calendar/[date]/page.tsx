@@ -41,6 +41,7 @@ import { daySwipeHrefs } from "@/lib/day-swipe";
 import { getCoachClients } from "@/lib/coach-clients";
 import { CalendarPurchasePrompt } from "@/components/athlete/calendar-purchase-prompt";
 import { isStripeConfigured } from "@/lib/stripe";
+import { payeeReadyForGroup } from "@/lib/connect-payee";
 import { VideoCallButton } from "@/components/booking/video-call-button";
 import { BookingVideoPanel } from "@/components/coach/desktop/booking-video-panel";
 import type { PackageOption } from "@/components/athlete/package-picker";
@@ -243,6 +244,8 @@ export default async function CoachDayDetailPage(
         rateCents: p.rate_cents,
         priceCents: p.price_cents ?? null,
       }));
+      // Buy buttons only when the coach's own Stripe can take the payment.
+      if (availablePackages.length > 0 && !(await payeeReadyForGroup(params.groupId))) availablePackages = [];
 
       const zonedDayStart = zonedTimeToUtc(params.date, "00:00", timezone);
       // The next local midnight, not +24 hours: a day with a clock change is 23 or 25 hours long.

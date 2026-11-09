@@ -134,7 +134,7 @@ describe("review follow-ups: the check that watches the AI, and a bar that resta
     }
   });
   it("the Stripe routes stop when the ids they just created could not be saved", () => {
-    expect(src("app/api/coach/packages/route.ts")).toContain("if (priceSaveError) throw priceSaveError;");
+    expect(src("lib/connect-payee.ts")).toContain("if (priceSaveError) throw priceSaveError;");
     expect(src("app/api/stripe/connect/onboard/route.ts")).toContain("if (saveError) {");
   });
 });
