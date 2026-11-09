@@ -89,7 +89,7 @@ export function homeTabs(f: HomeFacts): Record<HomeKey, HomeTab[]> {
       f.teamSport
         ? { key: "members", label: "Athletes", href: membersHref(f.groupId), badge: "clients", termKey: "client" }
         : { key: "clients", label: "Clients", href: CLIENTS_HREF, badge: "clients", termKey: "client" },
-      !f.teamSport && showsMembers(f.groupKind, f.coachLevel) && { key: "members", label: "Members", href: membersHref(f.groupId) },
+      !f.teamSport && showsMembers(f.groupKind, f.coachLevel) && { key: "members", label: "Group roster", href: membersHref(f.groupId) },
       { key: "leads", label: "Leads", href: `${g}/business/leads` },
       inGroup && { key: "attendance", label: "Attendance", href: `${g}/attendance` },
       f.onFrontDesk && { key: "front-desk", label: "Front desk", href: "/front-desk", newTab: true },
