@@ -66,7 +66,7 @@ describe("the public page and the setup screen", () => {
   });
   it("has no Buy button (a visitor has no account); the one call to action is Book a consultation, only when booking is on", () => {
     expect(page).toContain("Book a consultation");
-    expect(page).toContain("const canBook = !!page.enabled && canSignProofs() && isEmailConfigured();");
+    expect(page).toContain("const canBook = !!page.enabled && canSignProofs() && isEmailConfigured() && (bookableTypes ?? 0) > 0;");
     expect(page).not.toMatch(/>\s*Buy\b/);
   });
   it("is a public address, and unpublished by default", () => {
