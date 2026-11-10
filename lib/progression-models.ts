@@ -58,6 +58,8 @@ export function generateLinearProgression(
 export interface DoubleProgressionOptions {
   weeks: number;
   weightBumpPct: number;
+  // For an exercise with no rep range of its own: the range is its prescribed reps up to this many more ("+3 over, then add weight").
+  repsAbovePrescribed?: number;
 }
 
 // Adds one rep per week while under the rep-range ceiling; once it hits
@@ -71,7 +73,10 @@ export function generateDoubleProgression(
   const results: ProgressionResultWeek[] = [];
   let weight = source.weight;
   let reps = source.reps;
-  const { repMin, repMax } = source;
+  const above = Math.floor(options.repsAbovePrescribed ?? 0);
+  const ownRange = source.repMin != null && source.repMax != null;
+  const repMin = ownRange ? source.repMin : above > 0 && source.reps != null ? source.reps : null;
+  const repMax = ownRange ? source.repMax : repMin != null ? repMin + above : null;
   const hasRange = repMin != null && repMax != null;
 
   for (let i = 0; i < options.weeks; i++) {

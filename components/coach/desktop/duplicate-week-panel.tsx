@@ -86,6 +86,7 @@ export function DuplicateWeekPanel({
   const [weeks, setWeeks] = useState("1");
   const [linearWeightPct, setLinearWeightPct] = useState("2.5");
   const [doubleWeightBumpPct, setDoubleWeightBumpPct] = useState("5");
+  const [doubleRepsAbove, setDoubleRepsAbove] = useState("3");
   const [percentTmCycle, setPercentTmCycle] = useState("");
   const [wave, setWave] = useState<UndulatingWaveStep[]>(DEFAULT_UNDULATING_WAVE);
   const [intervalAxis, setIntervalAxis] = useState<IntervalAxis>("rounds");
@@ -293,6 +294,7 @@ export function DuplicateWeekPanel({
             results = generateDoubleProgression(source, {
               weeks: weekCount,
               weightBumpPct: Number(doubleWeightBumpPct) || 0,
+              repsAbovePrescribed: Number(doubleRepsAbove) || 0,
             });
           } else if (model === "percent_tm") {
             const trainingMax = !isDistancePace ? trainingMaxByExercise.get(item.exerciseName) : undefined;
@@ -791,18 +793,30 @@ export function DuplicateWeekPanel({
       )}
 
       {model === "double" && (
-        <label className="flex items-center gap-2">
-          <span className="font-body text-xs text-steel w-40">Weight bump on reset (%)</span>
-          <input
-            type="number"
-            value={doubleWeightBumpPct}
-            onChange={(e) => setDoubleWeightBumpPct(e.target.value)}
-            className="w-20 h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs"
-          />
-          <span className="font-body text-xs text-steel">
-            (needs a rep range set on each exercise)
-          </span>
-        </label>
+        <div className="space-y-2">
+          <label className="flex items-center gap-2">
+            <span className="font-body text-xs text-steel w-40">Reps over prescribed (+)</span>
+            <input
+              type="number"
+              min={0}
+              value={doubleRepsAbove}
+              onChange={(e) => setDoubleRepsAbove(e.target.value)}
+              className="w-20 h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs"
+            />
+          </label>
+          <label className="flex items-center gap-2">
+            <span className="font-body text-xs text-steel w-40">Weight bump on reset (%)</span>
+            <input
+              type="number"
+              value={doubleWeightBumpPct}
+              onChange={(e) => setDoubleWeightBumpPct(e.target.value)}
+              className="w-20 h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs"
+            />
+          </label>
+          <p className="font-body text-xs text-steel">
+            Each week adds 1 rep, up to {Number(doubleRepsAbove) > 0 ? `+${Math.floor(Number(doubleRepsAbove))}` : "the top"} over the prescribed reps; then the weight goes up and reps go back to the prescribed number. An exercise with its own rep range uses that range instead.
+          </p>
+        </div>
       )}
 
       {model === "percent_tm" && (

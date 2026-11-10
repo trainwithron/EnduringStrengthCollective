@@ -74,6 +74,23 @@ describe("generateDoubleProgression", () => {
     expect(result.map((r) => r.weight)).toEqual([100, 100, 105, 105]);
   });
 
+  it("with no rep range, climbs to +N over the prescribed reps, then resets and bumps weight", () => {
+    const result = generateDoubleProgression(
+      { weight: 100, reps: 8, repMin: null, repMax: null },
+      { weeks: 5, weightBumpPct: 5, repsAbovePrescribed: 3 }
+    );
+    expect(result.map((r) => r.reps)).toEqual([9, 10, 11, 8, 9]);
+    expect(result.map((r) => r.weight)).toEqual([100, 100, 100, 105, 105]);
+  });
+
+  it("an exercise's own rep range wins over +N", () => {
+    const result = generateDoubleProgression(
+      { weight: 100, reps: 8, repMin: 8, repMax: 9 },
+      { weeks: 2, weightBumpPct: 5, repsAbovePrescribed: 3 }
+    );
+    expect(result.map((r) => r.reps)).toEqual([9, 8]);
+  });
+
   it("does nothing (carries forward unchanged) without a real rep range", () => {
     const result = generateDoubleProgression(
       { weight: 100, reps: 8, repMin: null, repMax: null },
