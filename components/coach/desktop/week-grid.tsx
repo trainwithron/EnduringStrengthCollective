@@ -6,7 +6,7 @@ import type { DemoRow } from "@/lib/exercise-demo";
 import { NONE_COLLAPSED, allCollapsed, toggleAll, toggleCollapsed } from "@/lib/collapse-state";
 import { ClientPreviewButton } from "@/components/coach/desktop/client-preview";
 import { useEffect, useState } from "react";
-import { readCompact, toggleDay, toggleWeek, writeCompact } from "@/lib/compact-days";
+import { readCompactOr, toggleDay, toggleWeek, writeCompact } from "@/lib/compact-days";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { BuilderDay, BuilderExercise } from "@/lib/types";
 import { DayCard } from "./day-card";
@@ -77,10 +77,13 @@ export function WeekGrid({
   const [compactIds, setCompactIdsState] = useState<ReadonlySet<string>>(new Set());
   useEffect(() => {
     try {
-      setCompactIdsState(readCompact(window.localStorage, programId, weekNumber));
+      const phone = window.matchMedia("(max-width: 1023px)").matches;
+      setCompactIdsState(readCompactOr(window.localStorage, programId, weekNumber, phone ? days.map((d) => d.id) : []));
     } catch {
       // No storage: nothing remembered.
     }
+    // Read once per week: a day added later is not made compact by itself.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [programId, weekNumber]);
   // Compact days with an exercise open as an editor get a normal-width column, since the editor is built for it.
   const [editingCompactIds, setEditingCompactIds] = useState<ReadonlySet<string>>(new Set());

@@ -44,6 +44,16 @@ export function readCompact(storage: Pick<Storage, "getItem"> | null, programId:
   }
 }
 
+// The same, but a week the coach has never switched starts with `fallback` (every day, on a phone, where the full view is too tall to read).
+export function readCompactOr(storage: Pick<Storage, "getItem"> | null, programId: string, weekNumber: number, fallback: Iterable<string>): Set<string> {
+  try {
+    const raw = storage?.getItem(compactKey(programId, weekNumber));
+    return raw == null ? new Set(fallback) : parseCompact(raw);
+  } catch {
+    return new Set(fallback);
+  }
+}
+
 export function writeCompact(storage: Pick<Storage, "setItem"> | null, programId: string, weekNumber: number, ids: Set<string>): void {
   try {
     storage?.setItem(compactKey(programId, weekNumber), serializeCompact(ids));

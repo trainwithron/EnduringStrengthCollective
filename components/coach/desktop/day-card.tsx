@@ -26,7 +26,7 @@ import { BulkEditDayPanel } from "./bulk-edit-day-panel";
 import { AddSlotForm, SlotCard } from "./slot-card";
 import { addStarterLadders } from "@/lib/starter-ladders-add";
 import { formatShortDate } from "@/lib/program-schedule";
-import { GripVertical, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, StickyNote, Video } from "lucide-react";
+import { GripVertical, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, MoreHorizontal, StickyNote, Video } from "lucide-react";
 import { formatCompactLine } from "@/lib/compact-line";
 import { useSaveToastChannel } from "./save-toast-channel";
 import { useDayLogged } from "./use-day-logged";
@@ -100,6 +100,8 @@ export function DayCard({
   const { flashSaved, flashSaveError } = useSaveToastChannel();
   const dayLogged = useDayLogged(day.id, !!athleteId && !collapsed);
   const [titleDraft, setTitleDraft] = useState(day.title);
+  // On a phone the day's actions sit behind "⋯" so the header is one row; a computer always shows them.
+  const [actionsOpen, setActionsOpen] = useState(false);
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -540,8 +542,8 @@ export function DayCard({
 
   return (
     <div className="border border-steel/20 bg-surface/40 rounded-token-lg flex flex-col">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 py-3 border-b border-steel/20 bg-surface">
-        <GripVertical className="w-4 h-4 text-steel shrink-0 cursor-grab" aria-hidden="true" />
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-1.5 sm:px-4 sm:py-3 border-b border-steel/20 bg-surface">
+        <GripVertical className="hidden sm:block w-4 h-4 text-steel shrink-0 cursor-grab" aria-hidden="true" />
         {(onMoveEarlier || onMoveLater) && (
           <div className="flex items-center shrink-0" role="group" aria-label="Move this day">
             <button type="button" onClick={onMoveEarlier} disabled={!onMoveEarlier} aria-label="Move day earlier" className="w-8 h-8 flex items-center justify-center text-steel disabled:opacity-30">
@@ -570,6 +572,16 @@ export function DayCard({
         <span className="font-body text-xs text-steel shrink-0">
           {itemCount} {itemCount === 1 ? "exercise" : "exercises"}
         </span>
+        <button
+          type="button"
+          onClick={() => setActionsOpen((v) => !v)}
+          aria-expanded={actionsOpen}
+          aria-label={actionsOpen ? "Hide day actions" : "Day actions"}
+          className={`sm:hidden w-11 h-11 flex items-center justify-center shrink-0 ${actionsOpen ? "text-rust" : "text-steel"}`}
+        >
+          <MoreHorizontal className="w-5 h-5" />
+        </button>
+        <div className={`${actionsOpen ? "flex" : "hidden"} order-last basis-full flex-wrap items-center gap-x-4 sm:contents`}>
         {exerciseIds.length > 0 && (
           <button
             type="button"
@@ -593,7 +605,7 @@ export function DayCard({
         <ClientPreviewButton days={[day]} heading={day.title || `Day ${day.dayIndex + 1}`} label="Preview" demoLibrary={demoLibrary} />
         <Link
           href={`/groups/${groupId}/workouts/${day.id}/clients`}
-          className="font-body text-xs text-steel active:text-rust transition-colors shrink-0"
+          className="inline-flex items-center font-body text-xs text-steel active:text-rust transition-colors shrink-0 min-h-11 sm:min-h-0 px-1"
         >
           Clients
         </Link>
@@ -601,15 +613,16 @@ export function DayCard({
           type="button"
           onClick={handleDeleteDay}
           disabled={busy}
-          className="font-body text-xs text-steel active:text-rust transition-colors shrink-0 disabled:opacity-40"
+          className="font-body text-xs text-steel active:text-rust transition-colors shrink-0 min-h-11 sm:min-h-0 px-1 disabled:opacity-40"
         >
           Delete
         </button>
+        </div>
         <button
           type="button"
           onClick={onToggleCollapse}
           aria-label={collapsed ? "Expand day" : "Collapse day"}
-          className="w-6 h-6 flex items-center justify-center text-steel active:text-rust transition-colors shrink-0"
+          className="w-11 h-11 sm:w-6 sm:h-6 flex items-center justify-center text-steel active:text-rust transition-colors shrink-0"
         >
           {collapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
         </button>
