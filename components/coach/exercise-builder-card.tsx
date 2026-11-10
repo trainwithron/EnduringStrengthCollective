@@ -32,7 +32,7 @@ import {
 } from "@/lib/exercise-fields";
 import { ChevronDown, ChevronUp, Copy, GripVertical, Trash2 } from "lucide-react";
 import { useSaveToastChannel } from "./desktop/save-toast-channel";
-import { CARDIO_PRESETS, type CardioPreset } from "@/lib/cardio-presets";
+import { CARDIO_PRESETS, isConditioningExercise, type CardioPreset } from "@/lib/cardio-presets";
 import type { RestTempoSuggestion } from "@/lib/training-intent";
 import { loggedText, type LoggedValues } from "@/lib/day-logged";
 import { restoreExercise, snapshotExerciseOverrides } from "@/lib/program-restore";
@@ -982,6 +982,28 @@ export function ExerciseBuilderCard({
                   {rung.exerciseName}
                 </button>
               ))}
+            </div>
+          )}
+
+          {isConditioningExercise(exercise.exerciseName) && !(exercise.trackedFields.includes("time") && exercise.trackedFields.includes("rest")) && (
+            <div className="mb-2 border border-steel/30 p-2.5">
+              <p className="font-body text-xs text-steel mb-2">Conditioning: pick the energy system to train. It sets work, rest and rounds; edit them after.</p>
+              <div className="flex flex-wrap gap-2">
+                {CARDIO_PRESETS.map((p) => (
+                  <button
+                    key={p.key}
+                    type="button"
+                    onClick={() => applyCardioPreset(p)}
+                    disabled={presetBusy}
+                    className="min-h-11 sm:min-h-9 px-3 border border-steel/30 text-chalk font-body text-xs text-left active:border-rust disabled:opacity-40"
+                  >
+                    <span className="block">{p.label}</span>
+                    <span className="block text-steel">
+                      {p.workSeconds}s / {p.restSeconds}s × {p.rounds}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 

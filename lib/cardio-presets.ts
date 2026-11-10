@@ -10,6 +10,14 @@ export interface CardioPreset {
   rounds: number;
 }
 
+// Machines and conditioning work that are trained by energy system, not reps and pounds. Narrower than the "Cardio/Mobility" category (which also holds
+// stretches and carries), and whole words only, so "crunch" is not a run and "bent-over row" is not a rower. Running stays with Runner mode.
+const CONDITIONING = /\b(assault|air ?dyne|echo bike|air bike|fan bike|bike|cycl(e|ing)|spin|rower|row erg|rowing machine|indoor row|ski ?erg|erg|elliptical|stair ?(climber|master|mill)|versa ?climber|jump rope|skipping|battle ropes?|burpees?|sled (push|pull|drag)|prowler|shuttles?|conditioning|intervals?|swim(ming)?)\b/i;
+
+export function isConditioningExercise(name: string | null | undefined): boolean {
+  return !!name && CONDITIONING.test(name);
+}
+
 export const CARDIO_PRESETS: CardioPreset[] = [
   { key: "alacticPower", label: "Alactic Power", workSeconds: 9, restSeconds: 55, rounds: 8 },
   { key: "alacticCapacity", label: "Alactic Capacity", workSeconds: 17, restSeconds: 35, rounds: 10 },
