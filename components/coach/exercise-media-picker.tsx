@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { friendlyDbError } from "@/lib/exercise-name-guard";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { extractYoutubeId } from "@/lib/youtube";
-import { demoContentType, demoExtension, demoFileProblem, readVideoSeconds } from "@/lib/exercise-demo-upload";
+import { demoContentType, demoExtension } from "@/lib/exercise-demo-upload";
+import { prepareDemo } from "@/lib/demo-convert";
 
 // Video is attached to the shared exercise_library row (keyed by name),
 // same upsert-by-name mechanism used to grow the library elsewhere — so
@@ -47,21 +48,22 @@ export function ExerciseMediaPicker({
   }, [videoPath]);
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+    const picked = e.target.files?.[0];
     e.target.value = "";
     const name = exerciseName.trim();
-    if (!file || !name) return;
-
-    // The same rules as the phone's Add exercise demo: up to 30 seconds, 4K included (Ron, Nov 12).
-    const problem = demoFileProblem(file, await readVideoSeconds(file));
-    if (problem) {
-      setError(problem);
-      return;
-    }
-    const contentType = demoContentType(file)!;
+    if (!picked || !name) return;
 
     setUploading(true);
     setError(null);
+    // The same rules as the phone's Add exercise demo (Ron, Nov 12): up to 30 seconds, and a 4K video is made 1080p before it uploads.
+    const prepared = await prepareDemo(picked, { mute: false, onProgress: () => {} });
+    if (!prepared.ok) {
+      setError(prepared.error);
+      setUploading(false);
+      return;
+    }
+    const file = prepared.file;
+    const contentType = demoContentType(file)!;
     const supabase = createBrowserClient();
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) {

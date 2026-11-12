@@ -34,3 +34,21 @@ describe("adding an exercise demo from a phone", () => {
     expect(read("components/coach/add-exercise-demo.tsx")).toContain('accept="video/*"');
   });
 });
+
+describe("a demo is made 1080p on the phone, and can be muted (Ron, Nov 12)", () => {
+  it("4K comes down to 1080p on its long side, portrait stays portrait, 1080p and smaller stay as they are", async () => {
+    const { demoTargetSize } = await import("./demo-convert");
+    expect(demoTargetSize(3840, 2160)).toEqual({ width: 1920 });
+    expect(demoTargetSize(2160, 3840)).toEqual({ height: 1920 });
+    expect(demoTargetSize(1920, 1080)).toBeNull();
+    expect(demoTargetSize(1080, 1920)).toBeNull();
+  });
+  it("the sound is kept unless Mute is ticked, and the computer upload follows the same rules", () => {
+    const c = read("lib/demo-convert.ts");
+    expect(c).toContain("audio: mute ? { discard: true } : {}");
+    const ui = read("components/coach/add-exercise-demo.tsx");
+    expect(ui).toContain("Mute this video");
+    expect(ui).toContain("prepareDemo(picked, { mute, onProgress: setProgress })");
+    expect(read("components/coach/exercise-media-picker.tsx")).toContain("prepareDemo(picked");
+  });
+});

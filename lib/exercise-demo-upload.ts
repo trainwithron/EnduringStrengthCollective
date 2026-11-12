@@ -34,26 +34,6 @@ export function demoFileProblem(file: { type: string; name: string; size: number
   return null;
 }
 
-/** The video's length in seconds, read in the browser; null when the browser can't tell. */
-export function readVideoSeconds(file: Blob): Promise<number | null> {
-  return new Promise((resolve) => {
-    const url = URL.createObjectURL(file);
-    const video = document.createElement("video");
-    let settled = false;
-    const finish = (value: number | null) => {
-      if (settled) return;
-      settled = true;
-      URL.revokeObjectURL(url);
-      resolve(value);
-    };
-    video.preload = "metadata";
-    video.onloadedmetadata = () => finish(Number.isFinite(video.duration) ? video.duration : null);
-    video.onerror = () => finish(null);
-    setTimeout(() => finish(null), 8000);
-    video.src = url;
-  });
-}
-
 /**
  * Uploads one video to storage in 6 MB pieces, reporting progress (0 to 1). If the signal drops, it keeps retrying, and trying the same video again later carries on from the last piece
  * that arrived instead of starting over (Supabase's resumable upload; 6 MB is the piece size it requires).

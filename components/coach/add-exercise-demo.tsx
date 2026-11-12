@@ -8,7 +8,8 @@ import { addLibraryExercise } from "@/lib/library-write";
 import { classifyExerciseCategory } from "@/lib/exercise-category-classifier";
 import { classifyEquipmentType, type EquipmentType } from "@/lib/equipment-classifier";
 import { friendlyDbError } from "@/lib/exercise-name-guard";
-import { demoContentType, demoExtension, demoFileProblem, readVideoSeconds, uploadDemo } from "@/lib/exercise-demo-upload";
+import { demoContentType, demoExtension, uploadDemo } from "@/lib/exercise-demo-upload";
+import { prepareDemo } from "@/lib/demo-convert";
 import type { LibraryExerciseRow } from "./exercise-library-list";
 
 // The big "Add exercise demo" button at the top of the library (Ron, Nov 12: "a very easily visible button to add an exercise demo to the existing library or create new exercises on
@@ -29,6 +30,9 @@ export function AddExerciseDemo({
   const [chosen, setChosen] = useState<LibraryExerciseRow | null>(null);
   const [adding, setAdding] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
+  // "Making it 1080p" (on the phone, before the upload) or "Uploading".
+  const [stage, setStage] = useState<"convert" | "upload">("upload");
+  const [mute, setMute] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [doneName, setDoneName] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -38,6 +42,7 @@ export function AddExerciseDemo({
     setChosen(null);
     setProgress(null);
     setError(null);
+    setMute(false);
   }
 
   const q = query.trim().toLowerCase();
@@ -76,14 +81,21 @@ export function AddExerciseDemo({
   }
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+    const picked = e.target.files?.[0];
     e.target.value = "";
-    if (!file || !chosen) return;
-    const problem = demoFileProblem(file, await readVideoSeconds(file));
-    if (problem) return setError(problem);
-    const contentType = demoContentType(file)!;
+    if (!picked || !chosen) return;
 
     setError(null);
+    setStage("convert");
+    setProgress(0);
+    const prepared = await prepareDemo(picked, { mute, onProgress: setProgress });
+    if (!prepared.ok) {
+      setProgress(null);
+      return setError(prepared.error);
+    }
+    const file = prepared.file;
+    const contentType = demoContentType(file)!;
+    setStage("upload");
     setProgress(0);
     const supabase = createBrowserClient();
     const { data: sessionData } = await supabase.auth.getSession();
@@ -225,17 +237,23 @@ export function AddExerciseDemo({
               <div className="h-2 bg-graphite overflow-hidden">
                 <div className="h-full bg-rust transition-[width]" style={{ width: `${Math.round((progress ?? 0) * 100)}%` }} />
               </div>
-              <p className="font-body text-xs text-steel mt-1">Uploading… {Math.round((progress ?? 0) * 100)}%. Keep this page open; a 4K video can take a minute or two.</p>
+              <p className="font-body text-xs text-steel mt-1">
+                {stage === "convert" ? "Making it 1080p" : "Uploading"}… {Math.round((progress ?? 0) * 100)}%. Keep this page open.
+              </p>
             </div>
           ) : (
             <>
+              <label className="flex items-center gap-3 min-h-11 font-body text-sm text-chalk">
+                <input type="checkbox" checked={mute} onChange={(e) => setMute(e.target.checked)} className="w-5 h-5 accent-rust" />
+                Mute this video
+              </label>
               {/* No `capture`: the phone then offers both its camera and its gallery. */}
               <button type="button" onClick={() => fileRef.current?.click()} className="w-full h-12 bg-rust text-graphite font-body text-sm font-medium flex items-center justify-center gap-2">
                 <Video className="w-4 h-4" aria-hidden />
                 Record or choose video
               </button>
               <input ref={fileRef} type="file" accept="video/*" onChange={(e) => void handleFile(e)} className="sr-only" aria-label="Demo video" tabIndex={-1} />
-              <p className="font-body text-xs text-steel">Up to 30 seconds. 4K is fine.</p>
+              <p className="font-body text-xs text-steel">Up to 30 seconds. 4K is fine: it is made 1080p on your phone first, so it uploads and plays faster.</p>
             </>
           )}
         </>
