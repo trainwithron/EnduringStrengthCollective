@@ -460,12 +460,21 @@ export function ExerciseLibraryList({
             </div>
           </div>
         )}
-        <BiomechTagPicker
-          vocabulary={biomechVocabulary}
-          selected={exTags}
-          onToggle={(tagId) => toggleExistingTag(ex.name, tagId)}
-          onRoleChange={(tagId, role) => setExistingTagRole(ex.name, tagId, role)}
-        />
+        {/* The full list of tags folds away (Ron, Nov 12): closed until the coach opens it; the sentence above already says what is chosen. */}
+        <details className="group" data-biomech-picker>
+          <summary className="min-h-11 flex items-center gap-2 font-body text-sm text-chalk cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
+            <span aria-hidden="true" className="text-steel transition-transform group-open:rotate-90">▸</span>
+            {exTags.length > 0 ? `Edit tags (${exTags.length} chosen)` : "Choose tags"}
+          </summary>
+          <div className="mt-2">
+            <BiomechTagPicker
+              vocabulary={biomechVocabulary}
+              selected={exTags}
+              onToggle={(tagId) => toggleExistingTag(ex.name, tagId)}
+              onRoleChange={(tagId, role) => setExistingTagRole(ex.name, tagId, role)}
+            />
+          </div>
+        </details>
       </div>
       </div>
     );
@@ -680,7 +689,7 @@ export function ExerciseLibraryList({
                           <p className="font-body text-xs text-steel truncate">{ex.description}</p>
                         )}
                         {breakdown && (
-                          <p className="font-body text-xs text-steel truncate">{breakdown.summary}</p>
+                          <p className="font-body text-xs text-steel" data-biomech-summary>{breakdown.summary}</p>
                         )}
                       </div>
                       {ex.tier && (
