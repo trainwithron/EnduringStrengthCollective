@@ -7,6 +7,7 @@ import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { saved } from "@/lib/saved";
 import { ExerciseMediaPicker } from "./exercise-media-picker";
+import { AddExerciseDemo } from "./add-exercise-demo";
 import { AutoCategorizeButton } from "./auto-categorize-button";
 import { classifyExerciseCategory } from "@/lib/exercise-category-classifier";
 import { classifyEquipmentType, type EquipmentType } from "@/lib/equipment-classifier";
@@ -472,6 +473,12 @@ export function ExerciseLibraryList({
 
   return (
     <div>
+      <AddExerciseDemo
+        coachId={coachId}
+        exercises={exercises}
+        onExerciseAdded={(row) => setExercises((prev) => (prev.some((e) => e.id === row.id) ? prev : [...prev, row]))}
+        onVideoSaved={(id, videoPath) => setExercises((prev) => prev.map((e) => (e.id === id ? { ...e, videoPath } : e)))}
+      />
       <div className="flex flex-wrap items-center gap-3 mb-3">
         <label className="font-body text-xs text-steel flex items-center gap-2">
           Pattern

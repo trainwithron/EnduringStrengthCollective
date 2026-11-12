@@ -577,9 +577,15 @@ export function CoachSpotHub({
                         Build a program
                       </button>
                       <p className="font-body text-xs text-steel mb-4">Describe it, paste one, or attach a file or photo. You check it before anything is made.</p>
-                      <a href="/programs" className="block min-h-11 leading-[2.75rem] mb-2 font-body text-sm text-rust" data-all-programs>
-                        All programs →
-                      </a>
+                      {/* Exercise library beside All programs (Ron, Nov 12): where demos are added from the phone. */}
+                      <div className="flex items-center justify-between gap-4 mb-2">
+                        <a href="/programs" className="min-h-11 leading-[2.75rem] font-body text-sm text-rust" data-all-programs>
+                          All programs →
+                        </a>
+                        <a href={`/groups/${activeGroupId}/exercise-library`} className="min-h-11 leading-[2.75rem] font-body text-sm text-rust" data-exercise-library>
+                          Exercise library →
+                        </a>
+                      </div>
                       {/* Use a template (built on a computer): its slots filled from the ladders, tailored with Easier / Harder. */}
                       <SpotTemplates key={activeGroupId} groupId={activeGroupId} />
                     </>

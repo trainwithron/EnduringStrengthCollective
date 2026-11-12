@@ -66,7 +66,6 @@ const GROUP_TABLE: { pattern: RegExp; to: string; shared?: boolean }[] = [
 
 // Pages under /groups/<g> that go to the coach-level Programs page.
 const TO_PROGRAMS: { pattern: RegExp; shared?: boolean }[] = [
-  { pattern: /^\/exercise-library$/ },
   { pattern: /^\/movement-patterns$/ },
   { pattern: new RegExp(`^/workouts/${ID}/clients$`) },
   { pattern: /^\/programs\/import$/ },

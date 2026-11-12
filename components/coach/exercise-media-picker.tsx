@@ -4,9 +4,7 @@ import { useEffect, useState } from "react";
 import { friendlyDbError } from "@/lib/exercise-name-guard";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { extractYoutubeId } from "@/lib/youtube";
-
-const ALLOWED_TYPES = ["video/mp4", "video/quicktime", "video/webm"];
-const MAX_BYTES = 100 * 1024 * 1024;
+import { demoContentType, demoExtension, demoFileProblem, readVideoSeconds } from "@/lib/exercise-demo-upload";
 
 // Video is attached to the shared exercise_library row (keyed by name),
 // same upsert-by-name mechanism used to grow the library elsewhere — so
@@ -54,14 +52,13 @@ export function ExerciseMediaPicker({
     const name = exerciseName.trim();
     if (!file || !name) return;
 
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      setError("Use an MP4, MOV, or WebM video.");
+    // The same rules as the phone's Add exercise demo: up to 30 seconds, 4K included (Ron, Nov 12).
+    const problem = demoFileProblem(file, await readVideoSeconds(file));
+    if (problem) {
+      setError(problem);
       return;
     }
-    if (file.size > MAX_BYTES) {
-      setError("Video must be under 100MB.");
-      return;
-    }
+    const contentType = demoContentType(file)!;
 
     setUploading(true);
     setError(null);
@@ -72,12 +69,12 @@ export function ExerciseMediaPicker({
       return;
     }
 
-    const ext = file.name.split(".").pop() || "mp4";
+    const ext = demoExtension(contentType);
     const path = `${userData.user.id}/${crypto.randomUUID()}.${ext}`;
 
     const { error: uploadError } = await supabase.storage
       .from("exercise-media")
-      .upload(path, file);
+      .upload(path, file, { contentType });
 
     if (uploadError) {
       setError(uploadError.message);

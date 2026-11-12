@@ -13,7 +13,7 @@ const read = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
 describe("a phone coach's Programs is the simple cards, from every link", () => {
   it("no phone link goes to the desktop group programs page, and that page sends a phone to /programs", () => {
     // (Programs is in Spotlight > Program on the phone: "All programs".)
-    expect(read("components/coach/mobile/coach-spot-hub.tsx")).toContain('<a href="/programs" className="block min-h-11 leading-[2.75rem] mb-2 font-body text-sm text-rust" data-all-programs>');
+    expect(read("components/coach/mobile/coach-spot-hub.tsx")).toContain('<a href="/programs" className="min-h-11 leading-[2.75rem] font-body text-sm text-rust" data-all-programs>');
     expect(read("components/shared/program-plain-view-server.tsx")).toContain('isCoach ? "/programs"');
     const group = read("app/(coach)/groups/[groupId]/programs/page.tsx");
     expect(group).toContain('if (await prefersAthleteStyleView()) redirect("/programs");');

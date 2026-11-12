@@ -16,6 +16,8 @@ const NEVER = new Set([
   "/clients",
   "/clients/requests",
   "/programs",
+  // Opens on the phone (Ron, Nov 12): Spotlight > Program > Exercise library, where demos recorded on the phone are added.
+  "/groups/[groupId]/exercise-library",
   "/groups/[groupId]/clients",
   "/groups/[groupId]/athletes/[athleteId]",
   "/groups/[groupId]/athletes/[athleteId]/log",
@@ -104,7 +106,7 @@ describe("the table", () => {
     expect(to(`/groups/${G}/challenges/${ID}`)).toBe(`/groups/${G}/feed`);
     expect(to(`/groups/${G}/games/${ID}`)).toBe(`/groups/${G}/feed`);
     expect(to(`/groups/${G}/resources`)).toBe("/my-space/spotlight");
-    expect(to(`/groups/${G}/exercise-library`)).toBe("/programs");
+    expect(to(`/groups/${G}/exercise-library`)).toBeNull();
     expect(to(`/groups/${G}/workouts/${ID}/clients`)).toBe("/programs");
     expect(to(`/groups/${G}/tools/one-rep-max`)).toBe("/programs");
     expect(to(`/groups/${G}/programs/${ID}/progressions`)).toBe(`/groups/${G}/programs/${ID}`);
