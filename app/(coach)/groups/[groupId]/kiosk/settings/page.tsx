@@ -117,7 +117,14 @@ export default async function KioskSettingsPage(
           The client list could not be read. Reload to try again.
         </p>
       ) : (
-        <KioskPinManager key={mode} initialRoster={roster} organizationId={cardsReady ? organizationId : null} showGroup={mode === "front_desk"} />
+        <KioskPinManager
+          key={mode}
+          initialRoster={roster}
+          organizationId={cardsReady ? organizationId : null}
+          showGroup={mode === "front_desk"}
+          // A group with no one in it directly (one-on-one clients each have their own space): the way to list them all is the front-desk choice above (Ron, Nov 12).
+          emptyNote={mode === "group" && cardsReady && organizationId ? `No one is in this group itself. To list every client in ${orgName}, pick Everyone (front desk) above.` : undefined}
+        />
       )}
     </CoachDesktopShell>
   );

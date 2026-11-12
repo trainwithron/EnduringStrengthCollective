@@ -22,7 +22,7 @@ export interface KioskRosterEntry {
 // same "don't show it unless asked" discipline as every other
 // reveal-on-demand control in this app.
 // With an organization, each row also links the client's key card: press Link card, scan the card (or type its number) and press Enter.
-export function KioskPinManager({ initialRoster, organizationId = null, showGroup = false }: { initialRoster: KioskRosterEntry[]; organizationId?: string | null; showGroup?: boolean }) {
+export function KioskPinManager({ initialRoster, organizationId = null, showGroup = false, emptyNote }: { initialRoster: KioskRosterEntry[]; organizationId?: string | null; showGroup?: boolean; emptyNote?: string }) {
   const [roster, setRoster] = useState(initialRoster);
   // A PIN is stored hashed and cannot be read back. The one you generate is shown here until you leave the page, so
   // you can tell the athlete; after that only "PIN set" shows and Reset makes a new one.
@@ -178,7 +178,7 @@ export function KioskPinManager({ initialRoster, organizationId = null, showGrou
             </div>
           );
         })}
-        {roster.length === 0 && <p className="font-body text-sm text-steel px-4 py-6 text-center">No athletes in this group yet.</p>}
+        {roster.length === 0 && <p className="font-body text-sm text-steel px-4 py-6 text-center">{emptyNote ?? "No athletes in this group yet."}</p>}
         {roster.length > 0 && shown.length === 0 && <p className="font-body text-sm text-steel px-4 py-6 text-center">No one by that name.</p>}
       </div>
     </div>
