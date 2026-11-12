@@ -1224,6 +1224,7 @@ export function ExerciseBuilderCard({
                   workoutId={workoutId}
                   groupId={groupId}
                   exerciseName={exercise.exerciseName}
+                  progressionSlot={exercise.progressionSlot ?? ""}
                   setIds={exercise.sets.map((s) => s.id)}
                   onSaved={(lo, hi) => {
                     setRepMinDraft(lo == null ? "" : String(lo));

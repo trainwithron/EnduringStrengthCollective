@@ -126,7 +126,8 @@ describe("review fixes for Release C3", () => {
   });
   it("GZCLP T1 and waves from a training max go through the same safety rules", () => {
     const p = src("lib/progressions.ts");
-    expect(p).toContain("await guardedFromHistory(r.performanceName, { weight: target.weight, reps: target.reps, reason: target.reason })");
-    expect(p).toContain("await guardedFromHistory(r.performanceName, target)");
+    // (with the rule's own slot days, so a lift's T2 day is never read as the last time its T1 was done)
+    expect(p).toContain("await guardedFromHistory(r.performanceName, { weight: target.weight, reps: target.reps, reason: target.reason }, r.slotWorkoutIds)");
+    expect(p).toContain("await guardedFromHistory(r.performanceName, target, r.slotWorkoutIds)");
   });
 });

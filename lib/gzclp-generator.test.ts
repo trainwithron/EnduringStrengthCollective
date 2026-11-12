@@ -38,13 +38,35 @@ describe("generateGzclpProgram", () => {
     expect(t2Row).toMatchObject({ sets: 3, reps: "10" });
   });
 
-  it("gives every lift exactly one progression rule (T1, since each plays T1 on one of its two weekly slots)", () => {
+  it("gives every lift a T1 rule for its T1 days and a separate T2 rule for its T2 days", () => {
     const { progressionRules } = generateGzclpProgram({ lifts: [squat, bench, ohp, deadlift], weeksToGenerate: 1 });
-    expect(progressionRules).toHaveLength(4);
-    expect(progressionRules.every((r) => r.model === "gzclp_t1" && r.tierLabel === "T1")).toBe(true);
-    expect(progressionRules.map((r) => r.exerciseName).sort()).toEqual(
-      ["Back Squat", "Bench Press", "Deadlift", "Overhead Press"].sort()
-    );
+    expect(progressionRules).toHaveLength(8);
+    const t1 = progressionRules.filter((r) => r.slot === "T1");
+    const t2 = progressionRules.filter((r) => r.slot === "T2");
+    expect(t1.every((r) => r.model === "gzclp_t1" && r.tierLabel === "T1")).toBe(true);
+    expect(t2.every((r) => r.model === "double_progression" && r.tierLabel === "T2")).toBe(true);
+    const lifts = ["Back Squat", "Bench Press", "Deadlift", "Overhead Press"];
+    expect(t1.map((r) => r.exerciseName).sort()).toEqual(lifts);
+    expect(t2.map((r) => r.exerciseName).sort()).toEqual(lifts);
+  });
+
+  it("the T2 rule is GZCLP's fixed 3x10, adding the T2 increment once every set reaches 10", () => {
+    const { progressionRules } = generateGzclpProgram({ lifts: [squat, bench, ohp, deadlift], weeksToGenerate: 1, t2WeightIncrement: 10 });
+    const squatT2 = progressionRules.find((r) => r.exerciseName === "Back Squat" && r.slot === "T2");
+    expect(squatT2?.config).toEqual({ repRangeLow: 10, repRangeHigh: 10, weightIncrement: 10, unit: "lbs" });
+  });
+
+  it("marks every row with its slot, so each day follows the rule for its role", () => {
+    const { rows } = generateGzclpProgram({
+      lifts: [squat, bench, ohp, deadlift],
+      weeksToGenerate: 2,
+      t3: [{ exerciseName: "Lat Pulldown", startingWeight: 100, dayIndex: 0 }],
+    });
+    const slotOf = (day: string, name: string) => rows.find((r) => r.week === "2" && r.day === day && r.exerciseName === name)?.progressionSlot;
+    expect(slotOf("Day 1", "Back Squat")).toBe("T1");
+    expect(slotOf("Day 3", "Back Squat")).toBe("T2");
+    expect(slotOf("Day 1", "Lat Pulldown")).toBe("T3");
+    expect(rows.every((r) => r.progressionSlot === "T1" || r.progressionSlot === "T2" || r.progressionSlot === "T3")).toBe(true);
   });
 
   it("seeds each T1 rule's config from the real starting weight, not a guess", () => {
@@ -69,6 +91,7 @@ describe("generateGzclpProgram", () => {
       tierLabel: "T3",
       config: { repRangeLow: 15, repRangeHigh: 25 },
     });
-    expect(progressionRules).toHaveLength(5); // 4 T1 lifts + 1 T3 accessory
+    expect(t3Rule?.slot).toBe("T3");
+    expect(progressionRules).toHaveLength(9); // 4 T1 rules + 4 T2 rules + 1 T3 accessory
   });
 });

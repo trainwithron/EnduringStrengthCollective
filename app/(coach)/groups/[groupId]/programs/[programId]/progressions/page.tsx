@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { ProgressionRow } from "@/components/coach/progression-row";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
+import { NO_SLOT, progressionKey } from "@/lib/progressions";
 
 export const metadata = { title: "Progressions" };
 
@@ -58,20 +59,26 @@ export default async function ProgressionsPage(
 
   const { data: exerciseRows } = await supabase
     .from("group_workout_exercises")
-    .select("exercise_name, workouts!inner ( program_id )")
+    .select("exercise_name, progression_slot, workouts!inner ( program_id )")
     .eq("workouts.program_id", params.programId);
 
-  const exerciseNames = Array.from(
-    new Set((exerciseRows ?? []).map((r: any) => r.exercise_name as string))
-  ).sort((a, b) => a.localeCompare(b));
+  // One row per exercise and place in the program: a GZCLP lift shows its T1 rule and its T2 rule on separate rows; every other exercise has one row, as before.
+  const exerciseSlots = Array.from(
+    new Map(
+      (exerciseRows ?? []).map((r: any) => {
+        const slot = (r.progression_slot as string | null) ?? NO_SLOT;
+        return [progressionKey(r.exercise_name, slot), { name: r.exercise_name as string, slot }] as const;
+      })
+    ).values()
+  ).sort((a, b) => a.name.localeCompare(b.name) || a.slot.localeCompare(b.slot));
 
   const { data: existingProgressions } = await supabase
     .from("exercise_progressions")
-    .select("id, exercise_name, model, config")
+    .select("id, exercise_name, slot, model, config")
     .eq("program_id", params.programId);
 
   const progressionByExercise = new Map(
-    (existingProgressions ?? []).map((p: any) => [p.exercise_name, p])
+    (existingProgressions ?? []).map((p: any) => [progressionKey(p.exercise_name, p.slot), p])
   );
 
   const { data: groupRow } = await supabase.from("groups").select("name").eq("id", params.groupId).maybeSingle();
@@ -109,19 +116,20 @@ export default async function ProgressionsPage(
       </header>
 
       <section className="pt-6">
-        {exerciseNames.length === 0 ? (
+        {exerciseSlots.length === 0 ? (
           <p className="font-body text-sm text-steel py-6">
             No exercises in this program yet — add workouts first.
           </p>
         ) : (
           <div className="divide-y divide-steel/15">
-            {exerciseNames.map((name) => (
+            {exerciseSlots.map(({ name, slot }) => (
               <ProgressionRow
-                key={name}
+                key={progressionKey(name, slot)}
                 groupId={params.groupId}
                 programId={params.programId}
                 exerciseName={name}
-                existing={progressionByExercise.get(name) ?? null}
+                slot={slot}
+                existing={progressionByExercise.get(progressionKey(name, slot)) ?? null}
               />
             ))}
           </div>

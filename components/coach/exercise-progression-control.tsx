@@ -6,10 +6,12 @@ import { DEFAULT_DOUBLE, clearDouble, describeDouble, saveDouble, validateDouble
 import type { DoubleProgressionConfig } from "@/lib/progressions";
 
 // One exercise's own double progression, in its Edit details: the same rule and rep range the program-wide Progression choice writes, so a single exercise can differ from the rest.
+// A lift with its own place in the program (a GZCLP T1, T2 or T3) reads and writes the rule for that place: its other days keep their own rule.
 export function ExerciseProgressionControl({
   workoutId,
   groupId,
   exerciseName,
+  progressionSlot = "",
   setIds,
   onSaved,
   onFlashSaved,
@@ -18,6 +20,7 @@ export function ExerciseProgressionControl({
   workoutId: string;
   groupId: string;
   exerciseName: string;
+  progressionSlot?: string;
   setIds: string[];
   onSaved: (low: number | null, high: number | null) => void;
   onFlashSaved: () => void;
@@ -43,7 +46,7 @@ export function ExerciseProgressionControl({
         setModel(null);
         return;
       }
-      const { data: rule } = await supabase.from("exercise_progressions").select("model, config").eq("program_id", pid).eq("exercise_name", exerciseName).maybeSingle();
+      const { data: rule } = await supabase.from("exercise_progressions").select("model, config").eq("program_id", pid).eq("exercise_name", exerciseName).eq("slot", progressionSlot).maybeSingle();
       if (cancelled) return;
       const r = rule as { model: string; config: DoubleProgressionConfig } | null;
       setModel(r?.model ?? null);
@@ -56,7 +59,7 @@ export function ExerciseProgressionControl({
     return () => {
       cancelled = true;
     };
-  }, [workoutId, exerciseName]);
+  }, [workoutId, exerciseName, progressionSlot]);
 
   const settings = { low: Number(low), high: Number(high), increment: Number(increment) };
   const problem = validateDouble(settings);
@@ -72,7 +75,7 @@ export function ExerciseProgressionControl({
       setError("You need to sign in again.");
       return;
     }
-    const err = await saveDouble(supabase, { programId, groupId, userId: userData.user.id, names: [exerciseName], setIds, settings });
+    const err = await saveDouble(supabase, { programId, groupId, userId: userData.user.id, names: [exerciseName], setIds, settings, slot: progressionSlot });
     setBusy(false);
     if (err) {
       setError(err);
@@ -88,7 +91,7 @@ export function ExerciseProgressionControl({
     if (busy || !programId) return;
     setBusy(true);
     setError(null);
-    const err = await clearDouble(createBrowserClient(), { programId, names: [exerciseName] });
+    const err = await clearDouble(createBrowserClient(), { programId, names: [exerciseName], slot: progressionSlot });
     setBusy(false);
     if (err) {
       setError(err);
@@ -103,7 +106,7 @@ export function ExerciseProgressionControl({
   const other = model != null && model !== "double_progression";
   return (
     <div className="font-body text-xs text-steel space-y-1.5">
-      <p className="uppercase tracking-wide">Progression for this exercise: {model === "double_progression" ? "Double progression" : other ? "another type (set on the Progression page)" : "none"}</p>
+      <p className="uppercase tracking-wide">Progression for this exercise{progressionSlot ? ` (${progressionSlot} days)` : ""}: {model === "double_progression" ? "Double progression" : other ? "another type (set on the Progression page)" : "none"}</p>
       {!other && (
         <>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">

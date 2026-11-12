@@ -47,7 +47,9 @@ export function ProgramProgressionPanel({
     setError(null);
     setMessage(null);
     if (names.length === 0) {
-      setError("Add some exercises first.");
+      // A program of only tier lifts (GZCLP T1, T2, T3) has nothing for the program-wide choice: each lift follows its own tier rule.
+      const tiered = days.some((d) => d.items.some((i) => i.kind === "exercise" && !!i.progressionSlot));
+      setError(tiered ? "Every exercise here follows its own tier rule (T1, T2, T3). Change those on each exercise or on the Exercise Progressions page." : "Add some exercises first.");
       return;
     }
     const supabase = createBrowserClient();
@@ -60,7 +62,7 @@ export function ProgramProgressionPanel({
         flashSaveError(err);
         return;
       }
-      setRules((r) => r.filter((x) => x.model !== "double_progression" || !names.includes(x.exercise_name)));
+      setRules((r) => r.filter((x) => x.model !== "double_progression" || !names.includes(x.exercise_name) || !!x.slot));
       setMessage("Saved. No progression on this program.");
       flashSaved();
       return;
@@ -69,7 +71,7 @@ export function ProgramProgressionPanel({
       setError(problem);
       return;
     }
-    const other = rules.filter((r) => names.includes(r.exercise_name) && r.model !== "double_progression").length;
+    const other = rules.filter((r) => names.includes(r.exercise_name) && !r.slot && r.model !== "double_progression").length;
     if (other > 0 && !(await confirmDialog({ message: `${other} exercise${other === 1 ? " has" : "s have"} another type of progression. Replace ${other === 1 ? "it" : "them"} with double progression?`, confirmLabel: "Replace" }))) return;
     setBusy(true);
     const { data: userData } = await supabase.auth.getUser();
@@ -86,7 +88,7 @@ export function ProgramProgressionPanel({
       return;
     }
     setRules((r) => [
-      ...r.filter((x) => !names.includes(x.exercise_name)),
+      ...r.filter((x) => !names.includes(x.exercise_name) || !!x.slot),
       ...names.map((exercise_name) => ({ exercise_name, model: "double_progression", config: { repRangeLow: settings.low, repRangeHigh: settings.high, weightIncrement: settings.increment, unit: "lbs" } })),
     ]);
     onDaysChange(withRange(days, settings.low, settings.high));

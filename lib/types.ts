@@ -177,6 +177,8 @@ export interface BuilderExercise {
   tier: "A" | "B" | "C" | null;
   // A template slot ("Hinge, unilateral, class A") instead of a real exercise: set only on a slot, and the exerciseName is then a placeholder. Choosing the real exercise happens when the template is assigned.
   slot?: { side: "bilateral" | "unilateral" | null; tier: "A" | "B" | "C" | null } | null;
+  // The exercise's place in the program for its progression rule (group_workout_exercises.progression_slot: "T1", "T2", "T3" in GZCLP; "" or left out = the name's rule, as before).
+  progressionSlot?: string;
 }
 
 export interface BuilderNote {

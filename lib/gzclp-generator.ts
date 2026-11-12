@@ -55,6 +55,10 @@ export interface GzclpProgressionRule {
   // point in import-wizard.tsx can reuse this same shape for its own
   // wave_from_training_max rules ("DUP") without a separate type.
   tierLabel: string;
+  // The slot the rule is for (exercise_progressions.slot): only the rows
+  // with the same progressionSlot follow it. Left out = every occurrence
+  // of the name (DUP Path B's rules).
+  slot?: string;
 }
 
 export interface GzclpGeneratorResult {
@@ -105,6 +109,7 @@ export function generateGzclpProgram({
         rpe: null,
         rest: null,
         timeSeconds: null,
+        progressionSlot: "T1",
       });
       rows.push({
         week: String(week),
@@ -116,6 +121,7 @@ export function generateGzclpProgram({
         rpe: null,
         rest: null,
         timeSeconds: null,
+        progressionSlot: "T2",
       });
       const accessory = t3.find((a) => a.dayIndex === dayIndex);
       if (accessory) {
@@ -129,58 +135,60 @@ export function generateGzclpProgram({
           rpe: null,
           rest: null,
           timeSeconds: null,
+          progressionSlot: "T3",
         });
       }
     });
   }
 
-  // One progression rule per exercise NAME, not per (day, role) slot —
-  // a lift with the same name only ever gets one exercise_progressions
-  // row per program (unique(program_id, exercise_name)), which is
-  // correct: e.g. "Back Squat" is T1 on Day 1 and T2 on Day 3 of the
-  // SAME program, and both roles' math is driven by the one rule.
+  // One progression rule per (exercise name, slot): "Back Squat" is T1 on
+  // Day 1 and T2 on Day 3 of the SAME program, so it gets a T1 rule (the
+  // AMRAP stage cascade) for its T1 days and a separate T2 rule for its T2
+  // days. Every row above carries its slot (progressionSlot), and the goal
+  // engine counts each rule's occurrences and history over its own slot's
+  // days only (exercise_progressions unique per program, name and slot).
   const progressionRules: GzclpProgressionRule[] = [];
   const seen = new Set<string>();
-  for (const [t1Lift, t2Lift] of dayPairs) {
-    if (!seen.has(t1Lift.exerciseName)) {
-      seen.add(t1Lift.exerciseName);
-      progressionRules.push({
-        exerciseName: t1Lift.exerciseName,
-        model: "gzclp_t1",
-        config: {
-          startingWeight: t1Lift.t1StartingWeight,
-          weightIncrement,
-          unit: "lbs",
-          deloadPercent,
-        },
-        tierLabel: "T1",
-      });
-    }
+  const add = (rule: GzclpProgressionRule) => {
+    const key = `${rule.slot}::${rule.exerciseName}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    progressionRules.push(rule);
+  };
+  for (const [t1Lift] of dayPairs) {
+    add({
+      exerciseName: t1Lift.exerciseName,
+      model: "gzclp_t1",
+      config: {
+        startingWeight: t1Lift.t1StartingWeight,
+        weightIncrement,
+        unit: "lbs",
+        deloadPercent,
+      },
+      tierLabel: "T1",
+      slot: "T1",
+    });
   }
-  // Real, honest v1 limitation, discovered while implementing (not
-  // previously flagged in the spec): in the canonical 4-lift pairing
-  // above, every one of the 4 lifts plays T1 on exactly one of its two
-  // weekly occurrences — so by the time this point is reached, all 4
-  // names are already `seen` via the T1 loop. `exercise_progressions`
-  // is unique per (program_id, exercise_name), so a lift can only carry
-  // ONE dynamic rule per program; T1's autoregulated cascade is the one
-  // that matters most (the weight actually depends on real performance,
-  // where T2's doesn't move much), so it wins. T2 occurrences for these
-  // 4 lifts use the static week-1 weight from the shell with no dynamic
-  // update in v1 — same as any non-progression-linked exercise today,
-  // not a crash or silent wrong number. `t2WeightIncrement` is accepted
-  // but currently unused for this reason; kept in the signature so a v2
-  // that splits T1/T2 by day (not just by name) can wire it in without
-  // an API change.
-  void t2WeightIncrement;
+  // GZCLP T2: a fixed 3x10, the weight goes up once every set reaches 10
+  // (double progression with a 10-10 range, lib/progressions.test.ts).
+  // Week 1's T2 weight is the coach's own number in the shell; from the
+  // lift's second T2 day on, the goal comes from its last T2 day.
+  for (const [, t2Lift] of dayPairs) {
+    add({
+      exerciseName: t2Lift.exerciseName,
+      model: "double_progression",
+      config: { repRangeLow: T2_REPS, repRangeHigh: T2_REPS, weightIncrement: t2WeightIncrement, unit: "lbs" },
+      tierLabel: "T2",
+      slot: "T2",
+    });
+  }
   for (const accessory of t3) {
-    if (seen.has(accessory.exerciseName)) continue;
-    seen.add(accessory.exerciseName);
-    progressionRules.push({
+    add({
       exerciseName: accessory.exerciseName,
       model: "double_progression",
       config: { repRangeLow: 15, repRangeHigh: 25, weightIncrement: 5, unit: "lbs" },
       tierLabel: "T3",
+      slot: "T3",
     });
   }
 

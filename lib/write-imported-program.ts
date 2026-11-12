@@ -141,6 +141,8 @@ export async function writeImportedProgram(supabase: SupabaseClient, input: Writ
           model: rule.model,
           config: rule.config,
           tier_label: rule.tierLabel,
+          // A GZCLP lift's T1 and T2 rules: each followed only by the exercises saved with the same progression_slot below.
+          ...(rule.slot ? { slot: rule.slot } : {}),
           created_by: input.coachId,
         }))
       )
@@ -181,6 +183,7 @@ export async function writeImportedProgram(supabase: SupabaseClient, input: Writ
             exercise_order: exIndex,
             tracked_fields: resolution.trackedFields,
             ...(ex.note ? { notes: ex.note } : {}),
+            ...(ex.progressionSlot ? { progression_slot: ex.progressionSlot } : {}),
           })
           .select("id")
           .single();

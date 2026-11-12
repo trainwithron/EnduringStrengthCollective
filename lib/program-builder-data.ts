@@ -99,7 +99,7 @@ export async function getProgramBuilderData(
         `
       id, title, week_number, day_index, scheduled_date,
       group_workout_exercises (
-        id, exercise_name, display_name, exercise_order, movement_pattern_id, tracked_fields, notes, is_slot, slot_side, slot_tier,
+        id, exercise_name, display_name, exercise_order, movement_pattern_id, tracked_fields, notes, is_slot, slot_side, slot_tier, progression_slot,
         group_workout_exercise_sets ( ${SET_ROW_SELECT} )
       ),
       workout_notes ( id, body, position )
@@ -176,6 +176,7 @@ export async function getProgramBuilderData(
         youtubeUrl: media?.youtubeUrl ?? null,
         tier: tierByName.get(ex.exercise_name) ?? null,
         slot: ex.is_slot ? { side: ex.slot_side ?? null, tier: ex.slot_tier ?? null } : null,
+        progressionSlot: (ex.progression_slot as string | null) ?? "",
         sets: (ex.group_workout_exercise_sets ?? [])
           .slice()
           .sort((a: any, b: any) => a.set_order - b.set_order)
@@ -251,7 +252,7 @@ export async function getProgramBuilderData(
 export const BUILDER_ONE_WORKOUT_SELECT = `
       id, title, week_number, day_index, scheduled_date,
       group_workout_exercises (
-        id, exercise_name, display_name, exercise_order, movement_pattern_id, tracked_fields, notes, is_slot, slot_side, slot_tier,
+        id, exercise_name, display_name, exercise_order, movement_pattern_id, tracked_fields, notes, is_slot, slot_side, slot_tier, progression_slot,
         group_workout_exercise_sets ( ${SET_ROW_SELECT} )
       ),
       workout_notes ( id, body, position )
@@ -273,6 +274,7 @@ export function mapWorkoutRowToBuilderDay(w: any, demoRows: DemoRow[], tierByNam
       youtubeUrl: media?.youtubeUrl ?? null,
       tier: tierByName.get(ex.exercise_name) ?? null,
       slot: ex.is_slot ? { side: ex.slot_side ?? null, tier: ex.slot_tier ?? null } : null,
+      progressionSlot: (ex.progression_slot as string | null) ?? "",
       sets: (ex.group_workout_exercise_sets ?? [])
         .slice()
         .sort((a: any, b: any) => a.set_order - b.set_order)

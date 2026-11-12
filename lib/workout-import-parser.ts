@@ -135,6 +135,8 @@ export interface ParsedImportRow {
   weightNote?: string | null;
   // The set count was more than the limit and was cut to it.
   setsCapped?: boolean;
+  // The exercise's place in a generated program ("T1", "T2", "T3" in GZCLP): its progression rule is the one for this name AND this slot. Left out for every other import.
+  progressionSlot?: string;
 }
 
 export const MAX_IMPORT_SETS = 20;
@@ -271,7 +273,8 @@ export function mergeIdenticalSetRows(rows: ParsedImportRow[]): ParsedImportRow[
       prev.weight === row.weight &&
       prev.rpe === row.rpe &&
       prev.rest === row.rest &&
-      prev.timeSeconds === row.timeSeconds;
+      prev.timeSeconds === row.timeSeconds &&
+      prev.progressionSlot === row.progressionSlot;
 
     if (canMerge) {
       prev.sets += 1;
@@ -325,6 +328,8 @@ export interface ImportedExercise {
   rpe: number | null;
   timeSeconds: number | null;
   restSeconds?: number | null;
+  // Saved as group_workout_exercises.progression_slot (see ParsedImportRow).
+  progressionSlot?: string;
 }
 
 export interface ImportedDay {
@@ -367,6 +372,7 @@ export function groupIntoWeeks(rows: ParsedImportRow[]): ImportedWeek[] {
       restSeconds: parseRestSeconds(row.rest),
       ...(row.weightNote ? { note: `Weight: ${row.weightNote}` } : {}),
       ...(row.setsCapped ? { setsCapped: true } : {}),
+      ...(row.progressionSlot ? { progressionSlot: row.progressionSlot } : {}),
     });
   }
 

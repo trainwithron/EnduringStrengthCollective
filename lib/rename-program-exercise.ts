@@ -14,18 +14,32 @@ export async function renameProgramExercise(
   const { error } = await supabase.from("group_workout_exercises").update({ exercise_name: name, display_name: displayName }).eq("id", exerciseId);
   if (error) return { error: "Couldn't rename that exercise. Try again.", name };
 
-  if (oldName !== name) await moveProgression(supabase, { workoutId, oldName, newName: name });
+  if (oldName !== name) {
+    // The rule that moves is the one for this exercise's place in the program (a GZCLP lift's T1 rule when its T1 day is renamed); "" for every other exercise.
+    const { data: row } = await supabase.from("group_workout_exercises").select("progression_slot").eq("id", exerciseId).maybeSingle();
+    const slot = (row as { progression_slot?: string | null } | null)?.progression_slot ?? "";
+    await moveProgression(supabase, { workoutId, oldName, newName: name, slot });
+  }
   return { error: null, name };
 }
 
-// The rule follows the exercise only when no other day of the program still uses the old name, and never over a rule the new name already has.
-export async function moveProgression(supabase: SupabaseClient, { workoutId, oldName, newName }: { workoutId: string; oldName: string; newName: string }): Promise<void> {
+// The rule follows the exercise only when no other day of the program still uses the old name in the same place, and never over a rule the new name already has there.
+export async function moveProgression(
+  supabase: SupabaseClient,
+  { workoutId, oldName, newName, slot = "" }: { workoutId: string; oldName: string; newName: string; slot?: string }
+): Promise<void> {
   const { data: w } = await supabase.from("workouts").select("program_id").eq("id", workoutId).maybeSingle();
   const programId = (w as { program_id?: string } | null)?.program_id;
   if (!programId) return;
-  const { data: stillUsed } = await supabase.from("group_workout_exercises").select("id, workouts!inner ( program_id )").eq("workouts.program_id", programId).eq("exercise_name", oldName).limit(1);
+  const { data: stillUsed } = await supabase
+    .from("group_workout_exercises")
+    .select("id, workouts!inner ( program_id )")
+    .eq("workouts.program_id", programId)
+    .eq("exercise_name", oldName)
+    .eq("progression_slot", slot)
+    .limit(1);
   if ((stillUsed ?? []).length > 0) return;
-  const { data: already } = await supabase.from("exercise_progressions").select("id").eq("program_id", programId).eq("exercise_name", newName).limit(1);
+  const { data: already } = await supabase.from("exercise_progressions").select("id").eq("program_id", programId).eq("exercise_name", newName).eq("slot", slot).limit(1);
   if ((already ?? []).length > 0) return;
-  await supabase.from("exercise_progressions").update({ exercise_name: newName }).eq("program_id", programId).eq("exercise_name", oldName);
+  await supabase.from("exercise_progressions").update({ exercise_name: newName }).eq("program_id", programId).eq("exercise_name", oldName).eq("slot", slot);
 }

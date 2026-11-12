@@ -163,6 +163,8 @@ export function DuplicateWeekPanel({
       trackedFields: TrackedField[];
       notes: string | null;
       tier: "A" | "B" | "C" | null;
+      // The exercise's place for its progression rule (a GZCLP T1/T2/T3 lift), copied onto the new weeks so they follow the same rule.
+      progressionSlot: string;
       setOrder: number;
       isDistancePace: boolean;
       otherTargets: {
@@ -338,6 +340,7 @@ export function DuplicateWeekPanel({
             trackedFields: item.trackedFields,
             notes: item.notes,
             tier: item.tier,
+            progressionSlot: item.progressionSlot ?? "",
             setOrder: set.setOrder,
             isDistancePace,
             otherTargets: {
@@ -547,6 +550,7 @@ export function DuplicateWeekPanel({
               movement_pattern_id: first.movementPatternId,
               tracked_fields: first.trackedFields,
               notes: first.notes,
+              ...(first.progressionSlot ? { progression_slot: first.progressionSlot } : {}),
             })
             .select("id")
             .single();
@@ -617,6 +621,7 @@ export function DuplicateWeekPanel({
             videoPath: null,
             youtubeUrl: null,
             tier: first.tier,
+            progressionSlot: first.progressionSlot,
             sets: (setsData ?? []).map(mapSetRow),
           });
         }

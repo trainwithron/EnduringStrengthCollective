@@ -48,9 +48,9 @@ describe("program-wide double progression", () => {
     expect(err).toBeNull();
     const up = calls.find((c) => c.op === "upsert")!;
     expect(up.table).toBe("exercise_progressions");
-    expect(up.opts).toEqual({ onConflict: "program_id,exercise_name" });
+    expect(up.opts).toEqual({ onConflict: "program_id,exercise_name,slot" });
     expect((up.payload as any[]).map((r) => r.exercise_name)).toEqual(["Bench", "Row", "Squat"]);
-    expect((up.payload as any[])[0]).toMatchObject({ program_id: "p", group_id: "g", model: "double_progression", created_by: "u", config: { repRangeLow: 8, repRangeHigh: 12, weightIncrement: 5, unit: "lbs" } });
+    expect((up.payload as any[])[0]).toMatchObject({ program_id: "p", group_id: "g", slot: "", model: "double_progression", created_by: "u", config: { repRangeLow: 8, repRangeHigh: 12, weightIncrement: 5, unit: "lbs" } });
     const upd = calls.find((c) => c.op === "update")!;
     expect(upd.table).toBe("group_workout_exercise_sets");
     expect(upd.payload).toEqual({ rep_min: 8, rep_max: 12 });
@@ -65,7 +65,21 @@ describe("program-wide double progression", () => {
     const { calls, db } = fakeDb();
     await clearDouble(db, { programId: "p", names: ["Bench"] });
     const del = calls.find((c) => c.op === "delete")!;
-    expect(del.filters).toEqual([["eq", "program_id", "p"], ["eq", "model", "double_progression"], ["in", "exercise_name", ["Bench"]]]);
+    expect(del.filters).toEqual([["eq", "program_id", "p"], ["eq", "model", "double_progression"], ["eq", "slot", ""], ["in", "exercise_name", ["Bench"]]]);
+  });
+  it("a GZCLP tier lift keeps its own tier rule: the program-wide choice skips it, and its own control writes and removes only its slot's rule", async () => {
+    const tiered = { ...ex("t1", "Back Squat", ["s7"]), progressionSlot: "T1" };
+    const withTier: BuilderDay[] = [{ ...days[0], items: [...days[0].items, tiered] }, days[1]];
+    expect(exerciseNamesOf(withTier)).toEqual(["Bench", "Row", "Squat"]);
+    expect(setIdsOf(withTier)).not.toContain("s7");
+    expect((withRange(withTier, 8, 12)[0].items[4] as any).sets[0].repMin).toBeNull();
+    const { calls, db } = fakeDb();
+    await saveDouble(db, { programId: "p", groupId: "g", userId: "u", names: ["Back Squat"], setIds: ["s7"], settings: DEFAULT_DOUBLE, slot: "T2" });
+    expect((calls.find((c) => c.op === "upsert")!.payload as any[])[0]).toMatchObject({ exercise_name: "Back Squat", slot: "T2" });
+    await clearDouble(db, { programId: "p", names: ["Back Squat"], slot: "T2" });
+    expect(calls.find((c) => c.op === "delete")!.filters).toContainEqual(["eq", "slot", "T2"]);
+    // a tier rule is not read as the program-wide choice
+    expect(readProgramProgression(["Back Squat"], [{ exercise_name: "Back Squat", slot: "T2", model: "double_progression", config: doubleConfig(DEFAULT_DOUBLE) }])).toEqual({ kind: "none" });
   });
   it("reads what the program's rules say as a whole", () => {
     const rule = (name: string, model = "double_progression", lo = 8) => ({ exercise_name: name, model, config: doubleConfig({ low: lo, high: 12, increment: 5 }) });

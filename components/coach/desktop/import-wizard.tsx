@@ -768,7 +768,7 @@ export function ImportWizard({
     prepareImport(
       rows,
       `${gzclpWeeks}-Week GZCLP`,
-      `GZCLP-style tier programming, ${gzclpWeeks} weeks — Week 1 T1 weights set at ${gzclpStartPercent}% of ${athleteName ?? "this client"}'s current training max; T1 auto-progresses through the real 5x3+/6x2+/10x1+ stage cascade from week 2 on.`,
+      `GZCLP-style tier programming, ${gzclpWeeks} weeks — Week 1 T1 weights set at ${gzclpStartPercent}% of ${athleteName ?? "this client"}'s current training max; T1 auto-progresses through the real 5x3+/6x2+/10x1+ stage cascade from week 2 on, and each lift's T2 days follow their own 3x10 rule.`,
       null,
       null,
       progressionRules

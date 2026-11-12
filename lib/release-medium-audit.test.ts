@@ -116,7 +116,8 @@ describe("M6 and M7 renaming an exercise on a program day", () => {
           maybeSingle: () => Promise.resolve({ data: { program_id: "p1" } }),
           update: (patch: any) => {
             (table === "exercise_progressions" ? state.updates : state.renames).push({ table, patch });
-            return { eq: () => ({ eq: () => Promise.resolve({ error: null }), then: (r: any) => Promise.resolve({ error: null }).then(r) }) };
+            const done: any = { eq: () => done, then: (r: any) => Promise.resolve({ error: null }).then(r) };
+            return done;
           },
         };
         return chain;

@@ -335,7 +335,7 @@ async function CoachProgramBuilder({
       .eq("asked_for_program_id", programId)
       .gte("created_at", new Date(Date.now() - 7 * 86400000).toISOString())
       .maybeSingle(),
-    supabase.from("exercise_progressions").select("exercise_name, model, config").eq("program_id", programId),
+    supabase.from("exercise_progressions").select("exercise_name, slot, model, config").eq("program_id", programId),
   ]);
   const isAiDraft = (roleRow as { ai_draft?: boolean } | null)?.ai_draft === true;
   const roleInfo = {

@@ -85,6 +85,7 @@ export async function restoreExercise(supabase: Db, args: { groupId: string; wor
     tracked_fields: ex.trackedFields,
     notes: ex.notes,
     ...(ex.slot ? { is_slot: true, slot_side: ex.slot.side, slot_tier: ex.slot.tier } : {}),
+    ...(ex.progressionSlot ? { progression_slot: ex.progressionSlot } : {}),
   });
   if (error) return null;
   let restored = ex;

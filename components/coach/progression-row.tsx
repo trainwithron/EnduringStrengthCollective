@@ -63,11 +63,14 @@ export function ProgressionRow({
   groupId,
   programId,
   exerciseName,
+  slot = "",
   existing,
 }: {
   groupId: string;
   programId: string;
   exerciseName: string;
+  // The exercise's place in the program (a GZCLP "T1"/"T2"/"T3"): this row's rule is only for the days with that place. "" = every day with this exercise, as before.
+  slot?: string;
   existing: ExistingProgression | null;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -141,11 +144,12 @@ export function ProgressionRow({
         program_id: programId,
         group_id: groupId,
         exercise_name: exerciseName,
+        slot,
         model,
         config,
         created_by: userData.user.id,
       },
-      { onConflict: "program_id,exercise_name" }
+      { onConflict: "program_id,exercise_name,slot" }
     );
 
     if (upsertError) {
@@ -186,7 +190,10 @@ export function ProgressionRow({
         onClick={() => setExpanded((v) => !v)}
         className="w-full flex items-center justify-between text-left"
       >
-        <span className="font-body font-medium text-[15px]">{exerciseName}</span>
+        <span className="font-body font-medium text-[15px]">
+          {exerciseName}
+          {slot && <span className="text-steel"> · {slot} days</span>}
+        </span>
         <span className="font-body text-xs text-steel">{summarize(existing)}</span>
       </button>
 

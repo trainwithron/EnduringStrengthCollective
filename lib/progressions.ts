@@ -17,10 +17,20 @@ import { applyContractGuards, consecutiveMisses, daysBetween, usualGapDays, type
 
 import { readLoggedSets } from "@/lib/read-logged-sets";
 
+// A rule is for an exercise's place in the program (its slot: "T1", "T2", "T3" in GZCLP), not only its name: a lift that is T1 on one day and T2 on another has a rule for each, and each counts only
+// the occurrences with its own slot. "" is every occurrence of the name (every program made before slots, and every program a coach builds by hand).
+export const NO_SLOT = "";
+
+// The key of one (exercise name, slot) pair, for maps.
+export function progressionKey(exerciseName: string, slot: string | null | undefined): string {
+  return JSON.stringify([exerciseName, slot ?? NO_SLOT]);
+}
+
 // The recent sessions of each named exercise, most recent first, with the heaviest counted weight of each and when it was done: what the safety rules need for the models that do not read the last session
 // themselves (GZCLP T1 and waves from a training max).
 interface RecentSession {
   sessionId: string;
+  workoutId: string | null;
   lastDone: string | null;
   maxWeight: number;
 }
@@ -33,7 +43,7 @@ async function loadRecentHistory(supabase: any, athleteId: string, names: string
       weight, set_type, completed_at,
       session_exercises!inner (
         exercise_name, session_id,
-        athlete_sessions!inner ( athlete_id )
+        athlete_sessions!inner ( athlete_id, workout_id )
       )
     `,
     (q) =>
@@ -49,9 +59,10 @@ async function loadRecentHistory(supabase: any, athleteId: string, names: string
     if (!countsForProgress(row.set_type) || !(row.weight > 0)) continue;
     const name = row.session_exercises.exercise_name as string;
     const sessionId = row.session_exercises.session_id as string;
+    const workoutId = (row.session_exercises.athlete_sessions?.workout_id as string | undefined) ?? null;
     const key = `${name}::${sessionId}`;
     const existing = bySession.get(key);
-    if (!existing) bySession.set(key, { name, sessionId, lastDone: row.completed_at ?? null, maxWeight: row.weight });
+    if (!existing) bySession.set(key, { name, sessionId, workoutId, lastDone: row.completed_at ?? null, maxWeight: row.weight });
     else {
       if (row.weight > existing.maxWeight) existing.maxWeight = row.weight;
       if (row.completed_at && (!existing.lastDone || row.completed_at > existing.lastDone)) existing.lastDone = row.completed_at;
@@ -59,7 +70,7 @@ async function loadRecentHistory(supabase: any, athleteId: string, names: string
   }
   for (const s of bySession.values()) {
     const list = out.get(s.name) ?? [];
-    list.push({ sessionId: s.sessionId, lastDone: s.lastDone, maxWeight: s.maxWeight });
+    list.push({ sessionId: s.sessionId, workoutId: s.workoutId, lastDone: s.lastDone, maxWeight: s.maxWeight });
     out.set(s.name, list);
   }
   for (const list of out.values()) list.sort((a, b) => String(b.lastDone ?? "").localeCompare(String(a.lastDone ?? "")));
@@ -283,6 +294,12 @@ export function resolveProgressionTarget({
 
 // Batched sibling of getProgressionGoal below — resolves every exercise
 // slot in a workout in 3 total queries instead of up to 3 per exercise.
+// Each exercise's rule is the one for its name AND its progression slot
+// (group_workout_exercises.progression_slot), and its occurrences are only
+// the program's exercises with that same name and slot, so a GZCLP lift's
+// T1 days and T2 days each follow their own rule and their own history.
+// Logged sets are tied to an occurrence by the workout (day) they were
+// logged in, so a slot's history is the sessions of its own days.
 // A workout page with 8 exercises previously fired ~24 sequential-per-
 // branch queries just to compute progression goals; this fires 3 total,
 // regardless of exercise count. Produces byte-identical results to calling
@@ -300,7 +317,8 @@ export async function getProgressionGoalsBatch(
     programId: string;
     athleteId: string;
     currentWorkoutId: string;
-    exercises: { slotId: string; exerciseName: string; loggedExerciseName?: string }[];
+    // slotId: the exercise's group_workout_exercises id. progressionSlot: its progression_slot; left out, it is read from that row.
+    exercises: { slotId: string; exerciseName: string; loggedExerciseName?: string; progressionSlot?: string | null }[];
   }
 ): Promise<Map<string, ProgressionTarget>> {
   const result = new Map<string, ProgressionTarget>();
@@ -310,39 +328,50 @@ export async function getProgressionGoalsBatch(
 
   const { data: rules } = await supabase
     .from("exercise_progressions")
-    .select("exercise_name, model, config")
+    .select("exercise_name, slot, model, config")
     .eq("program_id", programId)
     .in("exercise_name", templateNames);
 
-  const ruleByName = new Map<string, { model: ProgressionModel; config: ProgressionConfig }>(
-    (rules ?? []).map((r: any) => [r.exercise_name, { model: r.model, config: r.config }])
+  const ruleByKey = new Map<string, { model: ProgressionModel; config: ProgressionConfig }>(
+    (rules ?? []).map((r: any) => [progressionKey(r.exercise_name, r.slot), { model: r.model, config: r.config }])
   );
 
-  const namesWithRules = exercises.filter((e) => ruleByName.has(e.exerciseName));
-  if (namesWithRules.length === 0) return result;
+  const namesWithAnyRule = new Set<string>((rules ?? []).map((r: any) => r.exercise_name as string));
+  const candidates = exercises.filter((e) => namesWithAnyRule.has(e.exerciseName));
+  if (candidates.length === 0) return result;
 
-  const uniqueNamesWithRules = Array.from(new Set(namesWithRules.map((e) => e.exerciseName)));
+  const uniqueNamesWithRules = Array.from(new Set(candidates.map((e) => e.exerciseName)));
 
   const { data: occurrenceRows } = await supabase
     .from("group_workout_exercises")
-    .select("exercise_name, workout_id, workouts!inner ( id, week_number, day_index, program_id )")
+    .select("id, exercise_name, progression_slot, workout_id, workouts!inner ( id, week_number, day_index, program_id )")
     .in("exercise_name", uniqueNamesWithRules)
     .eq("workouts.program_id", programId);
 
-  const occurrencesByName = new Map<
+  // Each exercise's slot: the one given, else its own program row's (slotId is the group_workout_exercises id), else none.
+  const slotByRowId = new Map<string, string>(((occurrenceRows ?? []) as any[]).map((row) => [row.id as string, (row.progression_slot as string | null) ?? NO_SLOT]));
+  const keyOf = (e: { exerciseName: string; progressionSlot?: string | null }) => progressionKey(e.exerciseName, e.progressionSlot);
+  const namesWithRules = candidates
+    .map((e) => ({ ...e, progressionSlot: e.progressionSlot ?? slotByRowId.get(e.slotId) ?? NO_SLOT }))
+    .filter((e) => ruleByKey.has(keyOf(e)));
+  if (namesWithRules.length === 0) return result;
+
+  // Occurrences per (name, slot): a T1 day never counts as an occurrence of the T2 rule, or the other way round.
+  const occurrencesByKey = new Map<
     string,
     { workoutId: string; weekNumber: number; dayIndex: number }[]
   >();
   for (const row of (occurrenceRows ?? []) as any[]) {
-    const list = occurrencesByName.get(row.exercise_name) ?? [];
+    const key = progressionKey(row.exercise_name, row.progression_slot);
+    const list = occurrencesByKey.get(key) ?? [];
     list.push({
       workoutId: row.workout_id,
       weekNumber: row.workouts.week_number,
       dayIndex: row.workouts.day_index,
     });
-    occurrencesByName.set(row.exercise_name, list);
+    occurrencesByKey.set(key, list);
   }
-  for (const list of occurrencesByName.values()) {
+  for (const list of occurrencesByKey.values()) {
     list.sort((a, b) => a.weekNumber - b.weekNumber || a.dayIndex - b.dayIndex);
   }
 
@@ -373,6 +402,8 @@ export async function getProgressionGoalsBatch(
     config: GzclpT1Config;
     occurrenceIndex: number;
     priorWorkoutIds: string[]; // occurrences 1..occurrenceIndex-1, in order
+    // The days of this rule's slot, when it has one: the safety rules then read only those days' sessions (a lift's T2 day is not the last time its T1 was done).
+    slotWorkoutIds: Set<string> | null;
   }
   const resolvedT1: ResolvedT1[] = [];
   const t1NeededWorkoutIds = new Set<string>();
@@ -387,17 +418,19 @@ export async function getProgressionGoalsBatch(
     performanceName: string;
     config: WaveConfig;
     occurrenceIndex: number;
+    slotWorkoutIds: Set<string> | null;
   }
   const resolvedWaveFromTM: ResolvedWaveFromTM[] = [];
   const waveFromTMNeededNames = new Set<string>();
 
   for (const ex of namesWithRules) {
-    const rule = ruleByName.get(ex.exerciseName)!;
-    const occurrences = occurrencesByName.get(ex.exerciseName) ?? [];
+    const rule = ruleByKey.get(keyOf(ex))!;
+    const occurrences = occurrencesByKey.get(keyOf(ex)) ?? [];
     const occurrenceIndex = occurrences.findIndex((o) => o.workoutId === currentWorkoutId) + 1;
     if (occurrenceIndex < 1) continue;
 
     const performanceName = ex.loggedExerciseName ?? ex.exerciseName;
+    const slotWorkoutIds = (ex.progressionSlot ?? NO_SLOT) === NO_SLOT ? null : new Set(occurrences.map((o) => o.workoutId));
 
     if (rule.model === "gzclp_t1") {
       const priorWorkoutIds = occurrences.slice(0, occurrenceIndex - 1).map((o) => o.workoutId);
@@ -409,6 +442,7 @@ export async function getProgressionGoalsBatch(
         config: rule.config as GzclpT1Config,
         occurrenceIndex,
         priorWorkoutIds,
+        slotWorkoutIds,
       });
       continue;
     }
@@ -420,6 +454,7 @@ export async function getProgressionGoalsBatch(
         performanceName,
         config: rule.config as WaveConfig,
         occurrenceIndex,
+        slotWorkoutIds,
       });
       continue;
     }
@@ -462,8 +497,9 @@ export async function getProgressionGoalsBatch(
     athleteId,
     Array.from(new Set([...resolvedT1.map((r) => r.performanceName), ...resolvedWaveFromTM.map((r) => r.performanceName)]))
   );
-  const guardedFromHistory = async (name: string, rule: ProgressionTarget): Promise<ProgressionTarget> => {
-    const sessions = recentHistory.get(name) ?? [];
+  const guardedFromHistory = async (name: string, rule: ProgressionTarget, slotWorkoutIds: Set<string> | null = null): Promise<ProgressionTarget> => {
+    const all = recentHistory.get(name) ?? [];
+    const sessions = slotWorkoutIds ? all.filter((s) => s.workoutId != null && slotWorkoutIds.has(s.workoutId)) : all;
     if (sessions.length === 0) return rule;
     return applyContractGuards({
       target: rule,
@@ -532,7 +568,7 @@ export async function getProgressionGoalsBatch(
         occurrenceIndex: r.occurrenceIndex,
         history,
       });
-      result.set(r.slotId, await guardedFromHistory(r.performanceName, { weight: target.weight, reps: target.reps, reason: target.reason }));
+      result.set(r.slotId, await guardedFromHistory(r.performanceName, { weight: target.weight, reps: target.reps, reason: target.reason }, r.slotWorkoutIds));
     }
   }
 
@@ -564,7 +600,7 @@ export async function getProgressionGoalsBatch(
         previousOccurrenceLog: null,
       });
       if (target.weight != null || target.reps != null) {
-        result.set(r.slotId, await guardedFromHistory(r.performanceName, target));
+        result.set(r.slotId, await guardedFromHistory(r.performanceName, target, r.slotWorkoutIds));
       }
     }
   }
