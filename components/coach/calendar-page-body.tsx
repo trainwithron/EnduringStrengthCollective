@@ -16,7 +16,7 @@ import { chunk } from "@/lib/chunk";
 import { fetchInactiveKeys, inactiveKey } from "@/lib/inactive-ids";
 import { defaultSessionTypeId, lastTypeByClient, type ClientTierLite } from "@/lib/session-type-default";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
-import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
+import { ActingAsBanner } from "@/components/athlete/acting-as-bar";
 import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
 import { BookingModeLine } from "@/components/athlete/booking-mode-line";

@@ -5,7 +5,7 @@ import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
-import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
+import { ActingAsBanner } from "@/components/athlete/acting-as-bar";
 import { MacroCalculator } from "@/components/tools/macro-calculator";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 

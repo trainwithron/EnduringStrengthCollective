@@ -15,7 +15,7 @@ import { dateKeyInZone, getGroupCoachTimezone, nowInZone } from "@/lib/timezone"
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
 import { UpcomingGroupEvents } from "@/components/group/group-event-answer";
-import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
+import { ActingAsBanner } from "@/components/athlete/acting-as-bar";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
 import { insideWindowHours } from "@/lib/cancel-window";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";

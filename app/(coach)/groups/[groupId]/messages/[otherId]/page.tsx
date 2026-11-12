@@ -5,7 +5,7 @@ import { redirect, notFound } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
-import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
+import { ActingAsBanner } from "@/components/athlete/acting-as-bar";
 import { DirectMessageThread } from "@/components/messages/direct-message-thread";
 import { CoachProfilePopup } from "@/components/shared/coach-profile-popup";
 import { getEffectiveAthlete } from "@/lib/acting-as";

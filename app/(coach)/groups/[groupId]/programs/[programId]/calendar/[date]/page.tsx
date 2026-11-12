@@ -23,7 +23,7 @@ import { RequestSlotButton } from "@/components/athlete/request-slot-button";
 import { coachBusyRanges, onlyOpenSlots, withBusy } from "@/lib/coach-busy";
 import { RequestDifferentTime } from "@/components/athlete/request-different-time";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
-import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
+import { ActingAsBanner } from "@/components/athlete/acting-as-bar";
 import { TodayWidget } from "@/components/athlete/today-widget";
 import { DayMealsView } from "@/components/athlete/day-meals-view";
 import { rowToPreferences } from "@/lib/nutrition-preferences";

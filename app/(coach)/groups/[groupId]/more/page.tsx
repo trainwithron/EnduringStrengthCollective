@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { createServerClient } from "@/lib/supabase/server";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
-import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
+import { ActingAsBanner } from "@/components/athlete/acting-as-bar";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { buildMoreSections } from "@/lib/more-links";
 import { inOwnPersonalSpace } from "@/lib/personal-space";

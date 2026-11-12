@@ -24,7 +24,14 @@ export async function getGroupLeaderboardRankings(
   // Says which of the members on the board are not confirmed adults (lib/minor-names.ts, looked up on the server for the ids actually shown): they are shown as first name and last initial.
   protect: ProtectIds
 ): Promise<GroupLeaderboardRankings> {
-  const { data: logs } = await supabase.from("workout_logs").select("athlete_id, total_volume, new_prs, profiles ( full_name, feed_broadcast_level )").eq("group_id", groupId);
+  // Only the people in the group now are on its board (Ron's group showed "#1 Unknown": a test account that left in September still had a workout there, and its name can no longer be read).
+  // The roster is the narrow read every member can make; if it can't be read, a workout whose person can't be named is left off instead.
+  const [{ data: logs }, roster] = await Promise.all([
+    supabase.from("workout_logs").select("athlete_id, total_volume, new_prs, profiles ( full_name, feed_broadcast_level )").eq("group_id", groupId),
+    readPositionRoster(supabase, groupId),
+  ]);
+  const inGroup = roster ? new Set(roster.map((r) => r.profileId)) : null;
+  const counts = (id: string, profile: unknown) => (inGroup ? inGroup.has(id) : profile != null);
 
   const workoutCountByAthlete = new Map<string, number>();
   const volumeByAthlete = new Map<string, number>();
@@ -34,6 +41,7 @@ export async function getGroupLeaderboardRankings(
 
   for (const log of logs ?? []) {
     const id = log.athlete_id;
+    if (!counts(id, log.profiles)) continue;
     // A client who keeps their activity private, or shares only that they checked in, is not ranked (their numbers are not for the board).
     if (!onSharedBoards((log.profiles as any)?.feed_broadcast_level)) continue;
     rawNameByAthlete.set(id, (log.profiles as any)?.full_name ?? null);
@@ -46,6 +54,7 @@ export async function getGroupLeaderboardRankings(
   // logged in their own space. A client who joined but keeps their workouts private has no such cards, so they are not on the board. The same sharing-level rule applies.
   for (const shared of await readSharedWorkoutCards(supabase, groupId)) {
     const id = shared.athleteId;
+    if (!counts(id, shared.fullName)) continue;
     if (!onSharedBoards(shared.broadcastLevel)) continue;
     rawNameByAthlete.set(id, shared.fullName);
     workoutCountByAthlete.set(id, (workoutCountByAthlete.get(id) ?? 0) + 1);

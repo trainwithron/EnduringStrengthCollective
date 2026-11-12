@@ -6,7 +6,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { getWorkoutOverviewData } from "@/lib/workout-overview-data";
 import { WorkoutOverviewView } from "@/components/logging/workout-overview-view";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
-import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
+import { ActingAsBanner } from "@/components/athlete/acting-as-bar";
 import { computeScheduledDates, formatShortDate, isLocked, unlockDate } from "@/lib/program-schedule";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { dateKeyInZone, getGroupCoachTimezone, nowInZone } from "@/lib/timezone";

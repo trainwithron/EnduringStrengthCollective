@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { getEffectiveAthlete } from "@/lib/acting-as";
-import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
+import { ActingAsBanner } from "@/components/athlete/acting-as-bar";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { NutrientDetailView } from "@/components/nutrition/nutrient-detail-view";

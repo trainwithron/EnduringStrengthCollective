@@ -33,7 +33,7 @@ import { RescheduleSlotButton } from "@/components/athlete/reschedule-slot-butto
 import { RequestSlotButton } from "@/components/athlete/request-slot-button";
 import { RequestDifferentTime } from "@/components/athlete/request-different-time";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
-import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
+import { ActingAsBanner } from "@/components/athlete/acting-as-bar";
 import { DayCalendar } from "@/components/coach/desktop/day-calendar";
 import { SessionMenuTarget } from "@/components/coach/session-menu";
 import { DaySwipeNav } from "@/components/shared/day-swipe-nav";

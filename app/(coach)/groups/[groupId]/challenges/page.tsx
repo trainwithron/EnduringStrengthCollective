@@ -8,7 +8,7 @@ import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ChallengeCreator } from "@/components/coach/desktop/challenge-creator";
 import { estimatedRevenueCents, formatCents } from "@/lib/challenges";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
-import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
+import { ActingAsBanner } from "@/components/athlete/acting-as-bar";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 
 export const metadata = { title: "Challenges" };

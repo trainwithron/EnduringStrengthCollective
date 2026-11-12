@@ -11,7 +11,7 @@ import { FeedSettingsButton } from "@/components/feed/feed-settings-button";
 import { ClearChannelButton } from "@/components/feed/clear-channel-button";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
-import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
+import { ActingAsBanner } from "@/components/athlete/acting-as-bar";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { LiveGroupLeaderboard } from "@/components/leaderboard/live-group-leaderboard";
 import { getGroupLeaderboardRankings, getPositionLeaderboardRankings } from "@/lib/leaderboard-data";

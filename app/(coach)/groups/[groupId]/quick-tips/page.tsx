@@ -8,7 +8,7 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { getEffectiveAthlete } from "@/lib/acting-as";
-import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
+import { ActingAsBanner } from "@/components/athlete/acting-as-bar";
 import { ATHLETE_QUICK_TIPS, COACH_QUICK_TIPS, type QuickTip } from "@/lib/quick-tips-content";
 import { Lightbulb } from "lucide-react";
 

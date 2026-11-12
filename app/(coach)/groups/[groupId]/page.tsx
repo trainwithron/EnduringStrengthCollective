@@ -38,7 +38,7 @@ import { buildHomeThread } from "@/lib/home-thread";
 import { mealProgress, mealProgressLine } from "@/lib/meal-progress";
 import { computeProgramCardVisuals } from "@/lib/program-card-data";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
-import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
+import { ActingAsBanner } from "@/components/athlete/acting-as-bar";
 import { TeamCoachPhoneHome } from "@/components/coach/mobile/team-coach-phone-home";
 import { isTeamSportGroup } from "@/lib/team-sport";
 import { COACH_PHONE_LANDING } from "@/lib/start-group";

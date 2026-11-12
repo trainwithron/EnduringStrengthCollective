@@ -2,7 +2,7 @@ import Link from "next/link";
 import { StartWorkoutButton } from "@/components/logging/start-workout-button";
 import { PreStartExerciseRow } from "@/components/logging/pre-start-exercise-row";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
-import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
+import { ActingAsBanner } from "@/components/athlete/acting-as-bar";
 import { RefreshOnBfcacheRestore } from "@/components/logging/refresh-on-bfcache-restore";
 import { renderNoteBody } from "@/lib/text-note-format";
 import { createServerClient } from "@/lib/supabase/server";

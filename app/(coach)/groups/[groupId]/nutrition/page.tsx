@@ -9,7 +9,7 @@ import { ClientFoodLogOnly } from "@/components/coach/nutrition/client-food-log-
 import { FavoriteMealsTab } from "@/components/coach/nutrition/favorite-meals-tab";
 import { MacroCalculator } from "@/components/tools/macro-calculator";
 import { getEffectiveAthlete } from "@/lib/acting-as";
-import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
+import { ActingAsBanner } from "@/components/athlete/acting-as-bar";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { TrendChart } from "@/components/coach/desktop/trend-chart";
 import { resolveDayMacros, standingForDate, coachRowsOnly } from "@/lib/macro-resolution";

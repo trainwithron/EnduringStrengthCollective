@@ -15,7 +15,7 @@ import { ReferralDirectoryList } from "@/components/athlete/referral-directory-l
 import { ProShopManager, type ProShopLink } from "@/components/coach/desktop/pro-shop-manager";
 import { ProShopList } from "@/components/athlete/pro-shop-list";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
-import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
+import { ActingAsBanner } from "@/components/athlete/acting-as-bar";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
 import { linksForViewer } from "@/lib/shelf";
