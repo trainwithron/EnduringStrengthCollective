@@ -27,4 +27,10 @@ describe("Nov 12 bugs (Ron)", () => {
       expect(read(f), f).not.toContain('from "@/components/athlete/acting-as-banner"');
     }
   });
+  it("an organization name that ends in a period (Enduring Strength Co.) does not get a second one in the kiosk choice", () => {
+    expect(read("components/coach/desktop/kiosk-mode-switch.tsx")).toContain("${orgName.replace(/\\.+$/, \"\")}. They scan");
+    const strip = (n: string) => n.replace(/\.+$/, "");
+    expect(`Every client in ${strip("Enduring Strength Co.")}.`).toBe("Every client in Enduring Strength Co.");
+    expect(`Every client in ${strip("Coast2Coast Fitness")}.`).toBe("Every client in Coast2Coast Fitness.");
+  });
 });

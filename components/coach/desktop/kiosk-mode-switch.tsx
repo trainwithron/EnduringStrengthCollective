@@ -30,7 +30,7 @@ export function KioskModeSwitch({ groupId, groupName, orgName, initialMode }: { 
 
   const options: { value: KioskMode; title: string; body: string }[] = [
     { value: "group", title: "One group or class", body: `A team practice or a class. People tap their name from ${groupName}'s list.` },
-    { value: "front_desk", title: "Everyone (front desk)", body: `Every client in ${orgName}. They scan their card or type their name. Works at the door even with nobody at the desk.` },
+    { value: "front_desk", title: "Everyone (front desk)", body: `Every client in ${orgName.replace(/\.+$/, "")}. They scan their card or type their name. Works at the door even with nobody at the desk.` },
   ];
   return (
     <section className="mb-8" aria-labelledby="kiosk-mode-title">
