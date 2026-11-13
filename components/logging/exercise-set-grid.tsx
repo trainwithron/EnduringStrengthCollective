@@ -440,10 +440,6 @@ export function ExerciseSetGrid({
       return m ? [`Set ${i + 1}: ${m}`] : [];
     })
   );
-  // Four sets to a row: a fifth set wraps onto another row instead of running off a phone screen (where the grid scrolled sideways and fought the swipe to the next exercise).
-  const SETS_PER_ROW = 4;
-  const chunks: { start: number; sets: SetLogEntry[] }[] = [];
-  for (let i = 0; i < sets.length; i += SETS_PER_ROW) chunks.push({ start: i, sets: sets.slice(i, i + SETS_PER_ROW) });
   function markTouched(...ids: string[]) {
     setTouchedSetIds((prev) => {
       if (ids.every((id) => prev.has(id))) return prev;
@@ -570,88 +566,92 @@ export function ExerciseSetGrid({
           onChange={(patch, arrived) => onSetChange(set.id, patch, arrived)}
         />
       ))}
-      <div className="flex flex-col gap-2">
-      {chunks.map((chunk) => (
-      <div key={chunk.start} className="flex flex-col gap-1">
-        <div className="flex items-center gap-1">
-          <div className="w-12 shrink-0" />
-          <div className="w-8 shrink-0" />
-          {chunk.sets.map((set, j) => {
-            const i = chunk.start + j;
-            const warmup = set.setType === "warmup";
-            // A done set's number turns green with a tick beside it (this replaces the old checkbox row), so it reads as done without knowing the colour code.
-            const done = set.status === "completed";
-            const doneMark = done ? "text-moss font-bold" : "";
-            const label = (
-              <>
-                {warmup ? "W" : i + 1}
-                {done && <span aria-hidden="true"> &#10003;</span>}
-              </>
-            );
-            // Tap the set number to mark it a warm-up (it then never counts toward goals, records or your max) and tap again to undo.
-            if (readOnly) {
-              return (
-                <span key={set.id} data-set-done={done || undefined} className={`w-12 shrink-0 text-center font-body text-xs ${doneMark || "text-steel"}`}>
-                  {label}
-                  {done && <span className="sr-only"> (done)</span>}
-                </span>
-              );
-            }
-            return (
-              <button
-                key={set.id}
-                type="button"
-                aria-pressed={warmup}
-                data-set-done={done || undefined}
-                aria-label={`${warmup ? `Set ${i + 1} is a warm-up. Tap to make it a working set.` : `Mark set ${i + 1} as a warm-up`}${done ? " (done)" : ""}`}
-                title={warmup ? "Warm-up (tap to change)" : "Tap to mark as a warm-up"}
-                onClick={() => {
-                  const next = warmup ? "working" : "warmup";
-                  onSetChange(set.id, { setType: next });
-                  save(set.id, { set_type: next });
-                }}
-                className={`w-12 shrink-0 min-h-11 text-center font-body text-xs ${doneMark || (warmup ? "text-rust font-bold" : "text-steel")}`}
-              >
-                {label}
-              </button>
-            );
-          })}
+      {/* Every set in one line (Ron, Nov 12: a fifth set wrapping onto a second row "needs to scroll"). The names of the rows and the fill handles stay put on the left; the sets scroll
+          sideways beside them. The scroll stays inside the grid (overscroll contained), so swiping the sets never flips to the next exercise; a swipe anywhere else on the card still does. */}
+      <div className="flex items-start gap-1">
+        <div className="flex flex-col gap-1 shrink-0">
+          <div className="h-11" />
+          {fields.map((field) => (
+            <div key={field} className="h-11 flex items-center gap-1">
+              <span className="w-12 shrink-0 font-body text-xs text-steel truncate flex items-center gap-1">
+                {rowLabel(field)}
+                {field === "rpe" && (
+                  <InfoTip text="Rate of Perceived Exertion — how hard that set felt, 1 (easy) to 10 (max effort)." />
+                )}
+              </span>
+              <RowHandle field={field} />
+            </div>
+          ))}
         </div>
-
-        {fields.map((field) => (
-          <div key={field} className="flex items-center gap-1">
-            <span className="w-12 shrink-0 font-body text-xs text-steel truncate flex items-center gap-1">
-              {rowLabel(field)}
-              {field === "rpe" && (
-                <InfoTip text="Rate of Perceived Exertion — how hard that set felt, 1 (easy) to 10 (max effort)." />
-              )}
-            </span>
-            {/* The fill-the-row handle copies set 1, so it sits only on the first row of sets. */}
-            {chunk.start === 0 ? <RowHandle field={field} /> : <div className="w-8 shrink-0" />}
-            {chunk.sets.map((set, j) => (
-              <GridCell
-                key={set.id}
-                set={set}
-                field={field}
-                readOnly={readOnly}
-                setNumber={chunk.start + j + 1}
-                onTouched={() => markTouched(set.id)}
-                onInvalid={(message) => setCellInvalid(`${set.id}:${field}`, message)}
-                onChange={(patch) => onSetChange(set.id, patch)}
-                coachRest={(() => {
-                  const r = restForSet(sets, set.id);
-                  return r && r.source === "coach" ? r.seconds : null;
-                })()}
-                coachRestMax={(() => {
-                  const r = restForSet(sets, set.id);
-                  return r && r.source === "coach" ? r.maxSeconds ?? null : null;
-                })()}
-              />
+        <div className="min-w-0 flex-1 overflow-x-auto overscroll-x-contain" data-set-scroll>
+          <div className="flex flex-col gap-1 w-max pr-1">
+            <div className="h-11 flex items-center gap-1">
+              {sets.map((set, i) => {
+                const warmup = set.setType === "warmup";
+                // A done set's number turns green with a tick beside it (this replaces the old checkbox row), so it reads as done without knowing the colour code.
+                const done = set.status === "completed";
+                const doneMark = done ? "text-moss font-bold" : "";
+                const label = (
+                  <>
+                    {warmup ? "W" : i + 1}
+                    {done && <span aria-hidden="true"> &#10003;</span>}
+                  </>
+                );
+                // Tap the set number to mark it a warm-up (it then never counts toward goals, records or your max) and tap again to undo.
+                if (readOnly) {
+                  return (
+                    <span key={set.id} data-set-done={done || undefined} className={`w-12 shrink-0 text-center font-body text-xs ${doneMark || "text-steel"}`}>
+                      {label}
+                      {done && <span className="sr-only"> (done)</span>}
+                    </span>
+                  );
+                }
+                return (
+                  <button
+                    key={set.id}
+                    type="button"
+                    aria-pressed={warmup}
+                    data-set-done={done || undefined}
+                    aria-label={`${warmup ? `Set ${i + 1} is a warm-up. Tap to make it a working set.` : `Mark set ${i + 1} as a warm-up`}${done ? " (done)" : ""}`}
+                    title={warmup ? "Warm-up (tap to change)" : "Tap to mark as a warm-up"}
+                    onClick={() => {
+                      const next = warmup ? "working" : "warmup";
+                      onSetChange(set.id, { setType: next });
+                      save(set.id, { set_type: next });
+                    }}
+                    className={`w-12 shrink-0 min-h-11 text-center font-body text-xs ${doneMark || (warmup ? "text-rust font-bold" : "text-steel")}`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+            {fields.map((field) => (
+              <div key={field} className="h-11 flex items-center gap-1">
+                {sets.map((set, j) => (
+                  <GridCell
+                    key={set.id}
+                    set={set}
+                    field={field}
+                    readOnly={readOnly}
+                    setNumber={j + 1}
+                    onTouched={() => markTouched(set.id)}
+                    onInvalid={(message) => setCellInvalid(`${set.id}:${field}`, message)}
+                    onChange={(patch) => onSetChange(set.id, patch)}
+                    coachRest={(() => {
+                      const r = restForSet(sets, set.id);
+                      return r && r.source === "coach" ? r.seconds : null;
+                    })()}
+                    coachRestMax={(() => {
+                      const r = restForSet(sets, set.id);
+                      return r && r.source === "coach" ? r.maxSeconds ?? null : null;
+                    })()}
+                  />
+                ))}
+              </div>
             ))}
           </div>
-        ))}
-      </div>
-      ))}
+        </div>
       </div>
       {invalidLines.length > 0 && (
         <div role="alert" className="mt-1.5 space-y-0.5">

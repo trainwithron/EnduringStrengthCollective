@@ -18,9 +18,12 @@ describe("workout logger fixes (Nov 6)", () => {
     expect(grid).toContain('{done && <span aria-hidden="true"> &#10003;</span>}');
   });
 
-  it("sets wrap four to a row, and a cell's error shows under the grid instead of inside the scroll box", () => {
-    expect(grid).toContain("const SETS_PER_ROW = 4;");
-    expect(grid).not.toContain("overflow-x-auto -mx-1 px-1");
+  // Ron, Nov 12: a fifth set wrapping onto a second row "needs to scroll". Every set is on one line that scrolls sideways inside the grid (contained, so it never flips to the next
+  // exercise), with the row names and fill handles fixed on the left.
+  it("sets stay on one line that scrolls sideways, and a cell's error shows under the grid instead of inside the scroll box", () => {
+    expect(grid).not.toContain("SETS_PER_ROW");
+    expect(grid).toContain('className="min-w-0 flex-1 overflow-x-auto overscroll-x-contain" data-set-scroll');
+    expect(grid).toContain("{sets.map((set, i) => {");
     expect(grid).toContain("onInvalid={(message) => setCellInvalid(");
   });
 
