@@ -3,6 +3,7 @@ import { Play } from "lucide-react";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { scanRows } from "@/lib/gym-machines";
 import { loadScanOrg } from "@/lib/scan-org";
+import { loadSharedDemos, scanDemo } from "@/lib/machine-catalog-scan";
 
 export const metadata = { title: "Scan" };
 
@@ -29,8 +30,10 @@ export default async function ScanMachinePage(props: { params: Promise<{ machine
   const { data: machine } = await serviceRole.from("gym_machines").select("id, name, created_by, organization_id").eq("id", machineId).maybeSingle();
   if (!machine) return <Message text="This QR code isn't valid anymore." />;
 
-  const { data: links } = await serviceRole.from("gym_machine_exercises").select("exercise_id, position").eq("machine_id", machine.id);
-  const linkRows = (links ?? []) as { exercise_id: string; position: number }[];
+  // With the shared machine list (step 208) each exercise also carries the shared one it came from; before that step the plain columns are read.
+  let linkRead = await serviceRole.from("gym_machine_exercises").select("exercise_id, position, catalog_item_id").eq("machine_id", machine.id);
+  if (linkRead.error) linkRead = (await serviceRole.from("gym_machine_exercises").select("exercise_id, position").eq("machine_id", machine.id)) as typeof linkRead;
+  const linkRows = (linkRead.data ?? []) as { exercise_id: string; position: number; catalog_item_id?: string | null }[];
   const { data: exerciseRows } =
     linkRows.length > 0
       ? await serviceRole.from("exercise_library").select("id, name, video_path, youtube_url").in("id", linkRows.map((l) => l.exercise_id))
@@ -41,12 +44,16 @@ export default async function ScanMachinePage(props: { params: Promise<{ machine
   const org = await loadScanOrg(serviceRole, machine.created_by, machine.organization_id);
   const orgDisplayName = org?.name ?? "this gym";
 
-  // An uploaded demo's first frame as the row's picture (the video bucket is private: short-lived signed links).
-  const videoPaths = rows.map((r) => r.video_path).filter((p): p is string => !!p);
+  // A machine added from the shared machine list shows the list's demos (read live), else the coach's own. An uploaded demo's first frame is the row's picture (both video buckets are
+  // private: short-lived signed links).
+  const shared = await loadSharedDemos(serviceRole, rows.map((r) => r.catalogItemId));
+  const demos = new Map(rows.map((r) => [r.id, scanDemo(shared.get(r.catalogItemId ?? ""), r)]));
   const signed = new Map<string, string>();
-  if (videoPaths.length > 0) {
-    const { data } = await serviceRole.storage.from("exercise-media").createSignedUrls(videoPaths, 3600);
-    for (const d of data ?? []) if (d.path && d.signedUrl) signed.set(d.path, d.signedUrl);
+  for (const bucket of ["exercise-media", "machine-demos"] as const) {
+    const paths = [...demos.values()].flatMap((d) => (d?.kind === "video" && d.bucket === bucket ? [d.path] : []));
+    if (paths.length === 0) continue;
+    const { data } = await serviceRole.storage.from(bucket).createSignedUrls(paths, 3600);
+    for (const d of data ?? []) if (d.path && d.signedUrl) signed.set(`${bucket}/${d.path}`, d.signedUrl);
   }
 
   return (
@@ -68,10 +75,11 @@ export default async function ScanMachinePage(props: { params: Promise<{ machine
             </p>
             <ul className="mt-6 space-y-3" data-machine-exercises>
               {rows.map((r) => {
-                const video = r.video_path ? signed.get(r.video_path) : undefined;
+                const demo = demos.get(r.id);
+                const video = demo?.kind === "video" ? signed.get(`${demo.bucket}/${demo.path}`) : undefined;
                 return (
                   <li key={r.id}>
-                    <Link href={`/scan/${r.id}`} className="flex items-center gap-3 min-h-16 p-2 bg-surface border border-steel/20 active:border-rust">
+                    <Link href={r.catalogItemId ? `/scan/${r.id}?machine=${machine.id}` : `/scan/${r.id}`} className="flex items-center gap-3 min-h-16 p-2 bg-surface border border-steel/20 active:border-rust">
                       {video ? (
                         <video src={`${video}#t=0.1`} preload="metadata" muted playsInline aria-hidden="true" className="w-20 h-14 object-cover bg-graphite shrink-0" />
                       ) : (

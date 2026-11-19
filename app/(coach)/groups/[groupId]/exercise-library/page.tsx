@@ -130,19 +130,26 @@ export default async function ExerciseLibraryPage(
   }
 
   // The coach's machines, each with the exercises on it in order (Ron, Nov 19). Before the database update that adds them (step 206) the read fails and the Machines tab is not shown.
+  // With the shared machine list (step 208) each also carries the shared machine it came from; before that step the plain columns are read.
   let initialMachines: MachineRow[] | null = null;
-  const machineRead = await supabase.from("gym_machines").select("id, name").eq("created_by", user.id).order("created_at");
+  let machineRead = await supabase.from("gym_machines").select("id, name, catalog_machine_id").eq("created_by", user.id).order("created_at");
+  const linked = !machineRead.error;
+  if (machineRead.error) machineRead = (await supabase.from("gym_machines").select("id, name").eq("created_by", user.id).order("created_at")) as typeof machineRead;
   if (!machineRead.error) {
     const machineIds = ((machineRead.data ?? []) as { id: string }[]).map((m) => m.id);
-    const linkRead = machineIds.length > 0 ? await supabase.from("gym_machine_exercises").select("machine_id, exercise_id, position").in("machine_id", machineIds) : { data: [], error: null };
+    const linkRead =
+      machineIds.length > 0
+        ? await supabase.from("gym_machine_exercises").select(linked ? "machine_id, exercise_id, position, catalog_item_id" : "machine_id, exercise_id, position").in("machine_id", machineIds)
+        : { data: [], error: null };
     if (!linkRead.error) {
       initialMachines = machinesFromRows(
-        (machineRead.data ?? []) as { id: string; name: string }[],
-        (linkRead.data ?? []) as { machine_id: string; exercise_id: string; position: number }[],
+        (machineRead.data ?? []) as { id: string; name: string; catalog_machine_id?: string | null }[],
+        (linkRead.data ?? []) as unknown as { machine_id: string; exercise_id: string; position: number; catalog_item_id?: string | null }[],
         new Set(exercises.map((e) => e.id)),
       );
     }
   }
+  const { data: me } = await supabase.from("profiles").select("is_platform_admin").eq("id", user.id).maybeSingle();
 
   return (
     <CoachDesktopShell
@@ -169,6 +176,7 @@ export default async function ExerciseLibraryPage(
         biomechVocabulary={biomechVocabulary}
         initialBiomechTagsByExercise={initialBiomechTagsByExercise}
         initialMachines={initialMachines}
+        isAdmin={!!(me as { is_platform_admin?: boolean } | null)?.is_platform_admin}
         orgId={(group as { organization_id?: string | null } | null)?.organization_id ?? null}
       />
     </CoachDesktopShell>

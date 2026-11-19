@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Play, X } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { saved } from "@/lib/saved";
@@ -12,6 +12,9 @@ import { cleanMachineName, machineScanPath, type MachineRow } from "@/lib/gym-ma
 import { ExercisePickOrAdd } from "./exercise-pick-or-add";
 import { ScanQrCodeButton } from "./exercise-qr-code-button";
 import type { LibraryExerciseRow } from "./exercise-library-list";
+import { MachineCatalogSection, useMachineCatalog } from "./machine-catalog-section";
+import { useSignedVideoUrls } from "./use-signed-video-urls";
+import { MACHINE_DEMOS_BUCKET, catalogDemo, type CatalogItem } from "@/lib/machine-catalog";
 
 // Machines in the exercise library (Ron, Nov 19: "on a machine I could put a QR code and it'll show you all of the exercise variations for that machine ... Viking press, unilateral Viking
 // press, shrugs ... Z press"; "i need to obiously be able to add excercises by machine in the excercise library also"). Add a machine by name, open it, add exercises from the library (or a
@@ -21,8 +24,11 @@ export function GymMachinesPanel({
   orgId = null,
   initialMachines,
   exercises,
+  isAdmin = false,
 }: {
   coachId: string;
+  // The platform admin (Ron): their additions to the shared machine list go on it at once, and they review everyone else's.
+  isAdmin?: boolean;
   // The workspace's organization: the gym shown on the machine's QR page (null in a coach's own space).
   orgId?: string | null;
   initialMachines: MachineRow[];
@@ -34,6 +40,9 @@ export function GymMachinesPanel({
   const [newName, setNewName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The shared machine list (migration 0453); null before that database step, and then only the coach's own machines show.
+  const { catalog, reload } = useMachineCatalog();
+  const catalogItems = new Map<string, CatalogItem>((catalog ?? []).flatMap((m) => m.items.map((i) => [i.id, i] as [string, CatalogItem])));
 
   async function addMachine(e: React.FormEvent) {
     e.preventDefault();
@@ -56,6 +65,24 @@ export function GymMachinesPanel({
         Put a QR code on a machine. Scanning it lists every exercise done on that machine, and each one opens its own demo and logging.
       </p>
 
+      {catalog && (
+        <MachineCatalogSection
+          coachId={coachId}
+          orgId={orgId}
+          isAdmin={isAdmin}
+          catalog={catalog}
+          reload={reload}
+          machines={machines}
+          library={library}
+          onAdded={(machine, rows) => {
+            setLibrary((prev) => [...prev, ...rows]);
+            setMachines((prev) => [...prev, machine]);
+            setOpenId(machine.id);
+          }}
+        />
+      )}
+
+      <h2 className="font-display font-bold uppercase text-base">Your machines</h2>
       <form onSubmit={addMachine} className="flex flex-wrap items-center gap-2">
         <input
           aria-label="Machine name"
@@ -102,6 +129,7 @@ export function GymMachinesPanel({
                   coachId={coachId}
                   machine={m}
                   library={library}
+                  catalogItems={catalogItems}
                   onLibraryAdd={(row) => setLibrary((prev) => [...prev, row])}
                   onChange={(next) => setMachines((prev) => prev.map((x) => (x.id === next.id ? next : x)))}
                   onDeleted={() => {
@@ -122,6 +150,7 @@ function MachineEditor({
   coachId,
   machine,
   library,
+  catalogItems,
   onLibraryAdd,
   onChange,
   onDeleted,
@@ -129,6 +158,8 @@ function MachineEditor({
   coachId: string;
   machine: MachineRow;
   library: LibraryExerciseRow[];
+  // The shared list's exercises by id: a machine added from the list shows their demos (read live), else the coach's own.
+  catalogItems: Map<string, CatalogItem>;
   onLibraryAdd: (row: LibraryExerciseRow) => void;
   onChange: (next: MachineRow) => void;
   onDeleted: () => void;
@@ -140,7 +171,12 @@ function MachineEditor({
   const [error, setError] = useState<string | null>(null);
   const byId = new Map(library.map((e) => [e.id, e]));
   const rows = machine.exerciseIds.map((id) => byId.get(id)).filter((e): e is LibraryExerciseRow => !!e);
-  const videoUrls = useSignedVideoUrls(rows.map((r) => r.videoPath).filter((p): p is string => !!p));
+  const sharedDemo = (row: LibraryExerciseRow) => catalogDemo(catalogItems.get(machine.catalogItemByExercise?.[row.id] ?? ""));
+  const videoUrls = useSignedVideoUrls(rows.filter((r) => !sharedDemo(r)).map((r) => r.videoPath).filter((p): p is string => !!p));
+  const sharedVideoUrls = useSignedVideoUrls(
+    rows.map((r) => sharedDemo(r)).flatMap((d) => (d?.kind === "video" ? [d.path] : [])),
+    MACHINE_DEMOS_BUCKET,
+  );
 
   async function rename() {
     const cleaned = cleanMachineName(name);
@@ -225,6 +261,11 @@ function MachineEditor({
           {error}
         </p>
       )}
+      {machine.catalogMachineId && (
+        <p className="font-body text-xs text-steel" data-linked-machine>
+          From the shared machine list: its demos come from the list, so a new or better video shows here on its own.
+        </p>
+      )}
 
       {rows.length === 0 ? (
         <p className="font-body text-sm text-steel">No exercises on this machine yet.</p>
@@ -232,7 +273,11 @@ function MachineEditor({
         <ol className="space-y-2">
           {rows.map((row) => (
             <li key={row.id} className="flex items-center gap-3 border border-steel/15 bg-surface/40 p-2">
-              <DemoThumb videoUrl={row.videoPath ? (videoUrls[row.videoPath] ?? null) : null} youtubeThumb={demoThumbPath(row.youtubeUrl)} />
+              {(() => {
+                const shared = sharedDemo(row);
+                if (shared) return <DemoThumb videoUrl={shared.kind === "video" ? (sharedVideoUrls[shared.path] ?? null) : null} youtubeThumb={shared.kind === "youtube" ? demoThumbPath(shared.url) : null} />;
+                return <DemoThumb videoUrl={row.videoPath ? (videoUrls[row.videoPath] ?? null) : null} youtubeThumb={demoThumbPath(row.youtubeUrl)} />;
+              })()}
               <span className="flex-1 min-w-0 font-body text-sm text-chalk break-words">{row.name}</span>
               <button
                 type="button"
@@ -293,25 +338,3 @@ function DemoThumb({ videoUrl, youtubeThumb }: { videoUrl: string | null; youtub
   );
 }
 
-// Signed links for the uploaded demo videos shown (the bucket is private), one batch per set of videos.
-function useSignedVideoUrls(paths: string[]): Record<string, string> {
-  const [urls, setUrls] = useState<Record<string, string>>({});
-  const key = [...paths].sort().join("|");
-  useEffect(() => {
-    const missing = paths.filter((p) => !urls[p]);
-    if (missing.length === 0) return;
-    let cancelled = false;
-    void createBrowserClient()
-      .storage.from("exercise-media")
-      .createSignedUrls(missing, 3600)
-      .then(({ data }) => {
-        if (cancelled || !data) return;
-        setUrls((prev) => ({ ...prev, ...Object.fromEntries(data.filter((d) => d.signedUrl && d.path).map((d) => [d.path as string, d.signedUrl as string])) }));
-      });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
-  return urls;
-}

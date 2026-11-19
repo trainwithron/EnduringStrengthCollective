@@ -31,6 +31,7 @@ export function ExerciseLibraryTabs({
   initialBiomechTagsByExercise,
   initialMachines = null,
   orgId = null,
+  isAdmin = false,
 }: {
   groupId: string;
   coachId: string;
@@ -43,6 +44,8 @@ export function ExerciseLibraryTabs({
   initialMachines?: MachineRow[] | null;
   // The organization of the workspace the library is open in (null in a coach's own space): printed QR codes and new machines carry it.
   orgId?: string | null;
+  // The platform admin (Ron): the shared machine list's additions and reviews.
+  isAdmin?: boolean;
 }) {
   const [tab, setTab] = useState<Tab>("exercises");
 
@@ -149,7 +152,7 @@ export function ExerciseLibraryTabs({
           ranksByPattern={Object.fromEntries(initialPatterns.map((p) => [p.name, p.ladder.map((l) => l.rank ?? 0)]))}
         />
       )}
-      {tab === "machines" && initialMachines && <GymMachinesPanel coachId={coachId} orgId={orgId} initialMachines={initialMachines} exercises={initialExercises} />}
+      {tab === "machines" && initialMachines && <GymMachinesPanel coachId={coachId} orgId={orgId} initialMachines={initialMachines} exercises={initialExercises} isAdmin={isAdmin} />}
       {tab === "one-rep-max" && <OneRepMaxCalculator />}
     </div>
   );

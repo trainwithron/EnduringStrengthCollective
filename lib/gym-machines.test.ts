@@ -31,7 +31,7 @@ describe("machines: the pure parts", () => {
       ],
       new Set(["viking", "shrug", "other"]),
     );
-    expect(m).toEqual({ id: "m1", name: "Viking press", exerciseIds: ["viking", "shrug"], nextPos: 6 });
+    expect(m).toEqual({ id: "m1", name: "Viking press", exerciseIds: ["viking", "shrug"], nextPos: 6, catalogMachineId: null, catalogItemByExercise: {} });
   });
   it("the public list is in the machine's order, only exercises that still exist", () => {
     const rows = scanRows(
@@ -69,7 +69,7 @@ describe("machines: the screens", () => {
   it("the library's Machines tab shows only once the database has machines (before step 206 the read fails and it is hidden)", () => {
     const tabs = read("components/coach/exercise-library-tabs.tsx");
     expect(tabs).toContain("{initialMachines && (");
-    expect(tabs).toContain('{tab === "machines" && initialMachines && <GymMachinesPanel coachId={coachId} orgId={orgId} initialMachines={initialMachines} exercises={initialExercises} />}');
+    expect(tabs).toContain('{tab === "machines" && initialMachines && <GymMachinesPanel coachId={coachId} orgId={orgId} initialMachines={initialMachines} exercises={initialExercises} isAdmin={isAdmin} />}');
     const page = read("app/(coach)/groups/[groupId]/exercise-library/page.tsx");
     expect(page).toContain('.from("gym_machines").select("id, name").eq("created_by", user.id)');
     expect(page).toContain("initialMachines={initialMachines}");
@@ -93,7 +93,8 @@ describe("machines: the screens", () => {
   });
   it("the public page: each exercise is a big row opening its own scan page; an unknown machine says the code is not valid", () => {
     const page = read("app/scan/machine/[machineId]/page.tsx");
-    expect(page).toContain('<Link href={`/scan/${r.id}`} className="flex items-center gap-3 min-h-16');
+    // from the shared machine list (step 208): ?machine= so the exercise's page shows the list's demo
+    expect(page).toContain('<Link href={r.catalogItemId ? `/scan/${r.id}?machine=${machine.id}` : `/scan/${r.id}`} className="flex items-center gap-3 min-h-16');
     expect(page).toContain('if (!machine) return <Message text="This QR code isn\'t valid anymore." />;');
     expect(page).toContain("No exercises on this machine yet.");
     expect(page).toContain("createServiceRoleClient()");
@@ -108,7 +109,7 @@ describe("machines: the gym and honest saves (review, Nov 19)", () => {
     expect(read("supabase/apply/apply-step206-0451.sql")).toContain("as machine_has_its_gym,");
     const panel = read("components/coach/gym-machines-panel.tsx");
     expect(panel).toContain('.from("gym_machines").insert({ created_by: coachId, organization_id: orgId, name: cleaned.name })');
-    expect(read("components/coach/exercise-library-tabs.tsx")).toContain("<GymMachinesPanel coachId={coachId} orgId={orgId} initialMachines={initialMachines} exercises={initialExercises} />");
+    expect(read("components/coach/exercise-library-tabs.tsx")).toContain("<GymMachinesPanel coachId={coachId} orgId={orgId} initialMachines={initialMachines} exercises={initialExercises} isAdmin={isAdmin} />");
   });
   it("rename, delete and taking an exercise off only say done when the row really changed (0 rows is a failure)", () => {
     const panel = read("components/coach/gym-machines-panel.tsx");
