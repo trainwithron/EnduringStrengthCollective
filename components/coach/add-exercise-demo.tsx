@@ -3,14 +3,11 @@
 import { useRef, useState } from "react";
 import { Video } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { existingLibraryName } from "@/lib/exercise-search";
-import { addLibraryExercise } from "@/lib/library-write";
-import { classifyExerciseCategory } from "@/lib/exercise-category-classifier";
-import { classifyEquipmentType, type EquipmentType } from "@/lib/equipment-classifier";
 import { friendlyDbError } from "@/lib/exercise-name-guard";
 import { demoContentType, demoExtension, uploadDemo } from "@/lib/exercise-demo-upload";
 import { prepareDemo } from "@/lib/demo-convert";
 import type { LibraryExerciseRow } from "./exercise-library-list";
+import { ExercisePickOrAdd } from "./exercise-pick-or-add";
 
 // The big "Add exercise demo" button at the top of the library (Ron, Nov 12: "a very easily visible button to add an exercise demo to the existing library or create new exercises on
 // the fly"). Pick an exercise or type a new one, then record or pick a video on the phone. A new exercise needs only its name here; tags can be added later from the list.
@@ -26,9 +23,7 @@ export function AddExerciseDemo({
   onVideoSaved: (id: string, videoPath: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
   const [chosen, setChosen] = useState<LibraryExerciseRow | null>(null);
-  const [adding, setAdding] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
   // "Making it 1080p" (on the phone, before the upload) or "Uploading".
   const [stage, setStage] = useState<"convert" | "upload">("upload");
@@ -38,46 +33,10 @@ export function AddExerciseDemo({
   const fileRef = useRef<HTMLInputElement>(null);
 
   function reset() {
-    setQuery("");
     setChosen(null);
     setProgress(null);
     setError(null);
     setMute(false);
-  }
-
-  const q = query.trim().toLowerCase();
-  const matches = q
-    ? exercises
-        .filter((e) => e.name.toLowerCase().includes(q))
-        .sort((a, b) => Number(!!(a.videoPath || a.youtubeUrl)) - Number(!!(b.videoPath || b.youtubeUrl)) || a.name.localeCompare(b.name))
-        .slice(0, 8)
-    : [];
-  const exact = q ? existingLibraryName(query.trim(), exercises.map((e) => e.name)) : null;
-
-  async function addNew() {
-    const name = query.trim();
-    setAdding(true);
-    setError(null);
-    const supabase = createBrowserClient();
-    const added = await addLibraryExercise(supabase, {
-      userId: coachId,
-      name,
-      existingNames: exercises.map((e) => e.name),
-      fields: { category: classifyExerciseCategory(name), equipment_type: classifyEquipmentType(name) },
-      select: "id, name, video_path, youtube_url, category, equipment_type, description",
-    });
-    setAdding(false);
-    if (!added.ok) return setError(added.error);
-    if (added.alreadyThere) {
-      const there = exercises.find((e) => e.name === added.name);
-      if (there) setChosen(there);
-      return;
-    }
-    const r = added.row as { id: string; name: string; video_path: string | null; youtube_url: string | null; category: string | null; equipment_type: EquipmentType | null; description: string | null } | null;
-    if (!r) return setError("Couldn't add that to your library. Try again.");
-    const row: LibraryExerciseRow = { id: r.id, name: r.name, videoPath: r.video_path, youtubeUrl: r.youtube_url, tier: null, category: r.category, equipmentType: r.equipment_type, description: r.description };
-    onExerciseAdded(row);
-    setChosen(row);
   }
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -176,46 +135,7 @@ export function AddExerciseDemo({
       </div>
 
       {!chosen ? (
-        <>
-          <input
-            aria-label="Which exercise"
-            type="text"
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setError(null);
-            }}
-            placeholder="Which exercise? Type to search or add"
-            autoFocus
-            className="w-full h-12 bg-graphite border border-steel/30 text-chalk px-3 font-body text-base focus:outline-none focus:border-rust"
-          />
-          {matches.length > 0 && (
-            <ul className="divide-y divide-steel/15 border border-steel/20">
-              {matches.map((ex) => (
-                <li key={ex.id}>
-                  <button type="button" onClick={() => setChosen(ex)} className="w-full min-h-12 px-3 flex items-center justify-between gap-3 text-left">
-                    <span className="font-body text-sm text-chalk">{ex.name}</span>
-                    {ex.videoPath || ex.youtubeUrl ? (
-                      <span className="font-body text-xs text-steel shrink-0">Has a demo</span>
-                    ) : (
-                      <span className="font-body text-xs text-amber-400 shrink-0">No demo yet</span>
-                    )}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          {q && !exact && (
-            <button
-              type="button"
-              onClick={() => void addNew()}
-              disabled={adding}
-              className="w-full min-h-12 px-3 border border-dashed border-rust/60 text-rust font-body text-sm text-left disabled:opacity-40"
-            >
-              {adding ? "Adding…" : `+ Add “${query.trim()}” as a new exercise`}
-            </button>
-          )}
-        </>
+        <ExercisePickOrAdd coachId={coachId} exercises={exercises} onPick={setChosen} onExerciseAdded={onExerciseAdded} demoFirst />
       ) : (
         <>
           <div className="flex items-center justify-between gap-3">

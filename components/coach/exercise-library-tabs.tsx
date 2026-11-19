@@ -9,6 +9,8 @@ import { AddStarterLaddersButton } from "./add-starter-ladders-button";
 import { SortMyExercises } from "./sort-my-exercises";
 import type { ExercisePlane, MovementPlane } from "./movement-pattern-row";
 import { OneRepMaxCalculator } from "@/components/tools/one-rep-max-calculator";
+import { GymMachinesPanel } from "./gym-machines-panel";
+import type { MachineRow } from "@/lib/gym-machines";
 
 interface PatternWithLadder {
   id: string;
@@ -17,7 +19,7 @@ interface PatternWithLadder {
   ladder: { key: string; exerciseName: string; tier: "A" | "B" | "C" | null; unilateral?: boolean; rank?: number; plane?: ExercisePlane }[];
 }
 
-type Tab = "exercises" | "patterns" | "sort" | "one-rep-max";
+type Tab = "exercises" | "patterns" | "sort" | "machines" | "one-rep-max";
 
 export function ExerciseLibraryTabs({
   groupId,
@@ -27,6 +29,7 @@ export function ExerciseLibraryTabs({
   exerciseLibrary,
   biomechVocabulary,
   initialBiomechTagsByExercise,
+  initialMachines = null,
 }: {
   groupId: string;
   coachId: string;
@@ -35,12 +38,14 @@ export function ExerciseLibraryTabs({
   exerciseLibrary: string[];
   biomechVocabulary: BiomechTagOption[];
   initialBiomechTagsByExercise: Record<string, BiomechTagSelection[]>;
+  // The coach's machines; null before the database update that adds them (the tab is not shown).
+  initialMachines?: MachineRow[] | null;
 }) {
   const [tab, setTab] = useState<Tab>("exercises");
 
   return (
     <div>
-      {/* Four tabs do not fit a phone's width: the row scrolls sideways instead of pushing the page wider. */}
+      {/* The tabs do not fit a phone's width: the row scrolls sideways instead of pushing the page wider. */}
       <div className="flex items-center gap-1 border-b border-steel/20 mb-6 overflow-x-auto" role="tablist">
         <button
           type="button"
@@ -81,6 +86,21 @@ export function ExerciseLibraryTabs({
         >
           Sort my exercises
         </button>
+        {initialMachines && (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "machines"}
+            onClick={() => setTab("machines")}
+            className={`h-11 px-4 shrink-0 whitespace-nowrap font-body text-sm border-b-2 transition-colors ${
+              tab === "machines"
+                ? "border-rust text-chalk"
+                : "border-transparent text-steel active:text-chalk"
+            }`}
+          >
+            Machines
+          </button>
+        )}
         <button
           type="button"
           role="tab"
@@ -125,6 +145,7 @@ export function ExerciseLibraryTabs({
           ranksByPattern={Object.fromEntries(initialPatterns.map((p) => [p.name, p.ladder.map((l) => l.rank ?? 0)]))}
         />
       )}
+      {tab === "machines" && initialMachines && <GymMachinesPanel coachId={coachId} initialMachines={initialMachines} exercises={initialExercises} />}
       {tab === "one-rep-max" && <OneRepMaxCalculator />}
     </div>
   );

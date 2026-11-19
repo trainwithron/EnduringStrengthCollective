@@ -86,7 +86,8 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/c/") ||
     // equipment_qr_decal_scoping_sept19.md — a walk-in scanning a gym's
     // equipment decal has no account and no session, same gotcha as
-    // /book/ above.
+    // /book/ above. Covers a machine's QR code too (/scan/machine/<id>,
+    // every exercise done on that machine).
     pathname.startsWith("/scan/") ||
     // org_calendar_spotter_trainer_dispatch_scoping_sept19.md — a
     // prospect requesting a trainer, and later answering a trainer's

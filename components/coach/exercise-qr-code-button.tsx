@@ -11,13 +11,19 @@ import { appOriginBrowser } from "@/lib/app-url";
 // stable URL (/scan/[exerciseId]) — no per-org/per-print state to track,
 // so client-side generation on open is all this needs, no new API route.
 export function ExerciseQrCodeButton({ exerciseId, exerciseName }: { exerciseId: string; exerciseName: string }) {
+  return <ScanQrCodeButton path={`/scan/${exerciseId}`} name={exerciseName} what="exercise" />;
+}
+
+// The same QR code, for any scan page: an exercise (/scan/<id>) or a machine (/scan/machine/<id>, every exercise done on it; Ron, Nov 19). With `label`, the button shows its word
+// next to the icon and is a full 44px tap target (a machine's own button); without, the small icon of an exercise row.
+export function ScanQrCodeButton({ path, name, what, label }: { path: string; name: string; what: "exercise" | "machine"; label?: string }) {
   const [open, setOpen] = useState(false);
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [scanUrl, setScanUrl] = useState("");
   const dialogRef = useDialogA11y<HTMLDivElement>(open, () => setOpen(false));
 
   async function handleOpen() {
-    const url = `${appOriginBrowser()}/scan/${exerciseId}`;
+    const url = `${appOriginBrowser()}${path}`;
     setScanUrl(url);
     setOpen(true);
     if (!dataUrl) {
@@ -31,15 +37,16 @@ export function ExerciseQrCodeButton({ exerciseId, exerciseName }: { exerciseId:
       <button
         type="button"
         onClick={handleOpen}
-        aria-label={`Get QR code for ${exerciseName}`}
-        className="w-8 h-8 flex items-center justify-center text-steel active:text-rust transition-colors"
+        aria-label={`Get QR code for ${name}`}
+        className={label ? "min-h-11 px-3 inline-flex items-center gap-2 border border-steel/40 text-chalk font-body text-sm active:border-rust" : "w-8 h-8 flex items-center justify-center text-steel active:text-rust transition-colors"}
       >
-        <QrCode className="w-4 h-4" />
+        <QrCode className="w-4 h-4" aria-hidden={label ? true : undefined} />
+        {label}
       </button>
 
       {open && (
         <div
-          ref={dialogRef} role="dialog" aria-modal="true" aria-label="QR code for this exercise"
+          ref={dialogRef} role="dialog" aria-modal="true" aria-label={`QR code for this ${what}`}
           className="fixed inset-0 z-50 bg-graphite/80 flex items-center justify-center px-6"
           onClick={() => setOpen(false)}
         >
@@ -47,7 +54,7 @@ export function ExerciseQrCodeButton({ exerciseId, exerciseName }: { exerciseId:
             className="bg-surface border border-steel/20 p-6 max-w-xs w-full text-center"
             onClick={(e) => e.stopPropagation()}
           >
-            <p className="font-display uppercase text-sm tracking-wide mb-3">{exerciseName}</p>
+            <p className="font-display uppercase text-sm tracking-wide mb-3">{name}</p>
             {dataUrl ? (
               // eslint-disable-next-line @next/next/no-img-element -- locally generated data URL, not an external image
               <img src={dataUrl} alt={`QR code linking to ${scanUrl}`} className="w-full aspect-square" />
@@ -61,7 +68,7 @@ export function ExerciseQrCodeButton({ exerciseId, exerciseName }: { exerciseId:
               {dataUrl && (
                 <a
                   href={dataUrl}
-                  download={`${exerciseName.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-qr.png`}
+                  download={`${name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-qr.png`}
                   className="flex-1 h-9 flex items-center justify-center bg-rust text-graphite font-body text-xs font-medium"
                 >
                   Download

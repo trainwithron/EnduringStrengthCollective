@@ -6,6 +6,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ExerciseLibraryTabs } from "@/components/coach/exercise-library-tabs";
 import type { EquipmentType } from "@/lib/equipment-classifier";
+import { machinesFromRows, type MachineRow } from "@/lib/gym-machines";
 
 export const metadata = { title: "Exercise library" };
 
@@ -128,6 +129,21 @@ export default async function ExerciseLibraryPage(
     initialBiomechTagsByExercise[row.exercise_name] = list;
   }
 
+  // The coach's machines, each with the exercises on it in order (Ron, Nov 19). Before the database update that adds them (step 206) the read fails and the Machines tab is not shown.
+  let initialMachines: MachineRow[] | null = null;
+  const machineRead = await supabase.from("gym_machines").select("id, name").eq("created_by", user.id).order("created_at");
+  if (!machineRead.error) {
+    const machineIds = ((machineRead.data ?? []) as { id: string }[]).map((m) => m.id);
+    const linkRead = machineIds.length > 0 ? await supabase.from("gym_machine_exercises").select("machine_id, exercise_id, position").in("machine_id", machineIds) : { data: [], error: null };
+    if (!linkRead.error) {
+      initialMachines = machinesFromRows(
+        (machineRead.data ?? []) as { id: string; name: string }[],
+        (linkRead.data ?? []) as { machine_id: string; exercise_id: string; position: number }[],
+        new Set(exercises.map((e) => e.id)),
+      );
+    }
+  }
+
   return (
     <CoachDesktopShell
       groupId={params.groupId}
@@ -152,6 +168,7 @@ export default async function ExerciseLibraryPage(
         exerciseLibrary={exerciseLibrary}
         biomechVocabulary={biomechVocabulary}
         initialBiomechTagsByExercise={initialBiomechTagsByExercise}
+        initialMachines={initialMachines}
       />
     </CoachDesktopShell>
   );

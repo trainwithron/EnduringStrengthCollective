@@ -32,7 +32,8 @@ describe("Release K2: fits a phone", () => {
   it("the exercise library's tabs scroll sideways and its toolbar wraps instead of running off the screen", () => {
     expect(src("components/coach/exercise-library-tabs.tsx")).toContain("overflow-x-auto");
     expect(src("components/coach/exercise-library-tabs.tsx")).toContain("shrink-0 whitespace-nowrap");
-    expect((src("components/coach/exercise-library-tabs.tsx").match(/role="tab"/g) ?? []).length).toBe(4);
+    // All Exercises, Movement Patterns, Sort my exercises, Machines (Nov 19), 1RM Calculator: the row still scrolls sideways on a phone.
+    expect((src("components/coach/exercise-library-tabs.tsx").match(/role="tab"/g) ?? []).length).toBe(5);
     const list = src("components/coach/exercise-library-list.tsx");
     expect(list).toContain('className="flex flex-wrap items-center gap-3 mb-4"');
     expect(list).toContain("w-full sm:h-10 sm:w-64");
