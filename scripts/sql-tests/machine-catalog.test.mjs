@@ -13,6 +13,7 @@ const undo = file("apply/undo-step208-0453.sql");
 const RON = "11111111-1111-1111-1111-111111111111";
 const COACH = "22222222-2222-2222-2222-222222222222";
 const OTHER = "33333333-3333-3333-3333-333333333333";
+const ATHLETE = "44444444-4444-4444-4444-444444444444";
 const SHRUG = "aaaaaaaa-0000-0000-0000-000000000001";
 
 const db = new PGlite({ extensions: { pgcrypto } });
@@ -24,7 +25,10 @@ await db.exec(`
   grant execute on function auth.uid() to anon, authenticated;
   grant usage on schema public to anon, authenticated;
   create table public.profiles (id uuid primary key, is_platform_admin boolean not null default false);
-  insert into public.profiles values ('${RON}', true), ('${COACH}', false), ('${OTHER}', false);
+  insert into public.profiles values ('${RON}', true), ('${COACH}', false), ('${OTHER}', false), ('${ATHLETE}', false);
+  create table public.group_memberships (group_id uuid not null, profile_id uuid not null references public.profiles(id), role text not null);
+  insert into public.group_memberships values ('99999999-0000-0000-0000-000000000001', '${RON}', 'coach'), ('99999999-0000-0000-0000-000000000001', '${COACH}', 'coach'),
+    ('99999999-0000-0000-0000-000000000002', '${OTHER}', 'coach'), ('99999999-0000-0000-0000-000000000001', '${ATHLETE}', 'athlete');
   grant select on public.profiles to authenticated;
   create function public.is_platform_admin() returns boolean language sql stable security definer set search_path = public as $$ select coalesce((select is_platform_admin from public.profiles where id = auth.uid()), false); $$;
   create table public.organizations (id uuid primary key default gen_random_uuid());
@@ -35,7 +39,7 @@ await db.exec(`
   create policy exercise_catalog_read on public.exercise_catalog for select using (true);
   grant select on public.exercise_catalog to authenticated;
   insert into public.exercise_catalog (id, name) values ('${SHRUG}', 'Dumbbell Shrug');
-  create table public.exercise_library (id uuid primary key default gen_random_uuid(), created_by uuid not null references public.profiles(id), name text not null, catalog_id uuid references public.exercise_catalog(id), video_path text, youtube_url text);
+  create table public.exercise_library (id uuid primary key default gen_random_uuid(), created_by uuid not null references public.profiles(id), name text not null, created_at timestamptz not null default now(), catalog_id uuid references public.exercise_catalog(id), video_path text, youtube_url text, category text check (category is null or category in ('Push', 'Pull', 'Legs', 'Core', 'Cardio/Mobility', 'Plyometric/Sprint', 'Other/Custom')), unique (created_by, name));
   alter table public.exercise_library enable row level security;
   create policy exercise_library_own on public.exercise_library for all to authenticated using (created_by = auth.uid()) with check (created_by = auth.uid());
   grant select, insert, update, delete on public.exercise_library to authenticated;
@@ -125,19 +129,55 @@ assert.equal((await as(COACH, `select status, review_note from public.catalog_re
 const ok = (await as(COACH, `insert into public.catalog_requests (kind, item_id, video_path, rights_confirmed) values ('demo', '${item}', '${COACH}/a.mp4', true) returning id`)).rows[0].id;
 const yt = (await as(OTHER, `insert into public.catalog_requests (kind, item_id, youtube_url, rights_confirmed) values ('demo', '${item}', 'https://www.youtube.com/watch?v=abc', true) returning id`)).rows[0].id;
 await as(RON, `select public.review_catalog_request('${ok}', true, null)`);
-await as(RON, `select public.review_catalog_request('${yt}', true, null)`);
-const demo = (await db.query(`select video_path, youtube_url from public.catalog_machine_exercises where id = '${item}'`)).rows[0];
-assert.deepEqual([demo.video_path, demo.youtube_url], [`${COACH}/a.mp4`, "https://www.youtube.com/watch?v=abc"]);
+const demoNow = async () => {
+  const d = (await db.query(`select video_path, youtube_url from public.catalog_machine_exercises where id = '${item}'`)).rows[0];
+  return [d.video_path, d.youtube_url];
+};
+assert.deepEqual(await demoNow(), [`${COACH}/a.mp4`, null]);
 assert.equal(await n(OTHER, `select count(*)::int n from storage.objects where name = '${COACH}/a.mp4'`), 1);
 assert.equal(await n(null, `select count(*)::int n from storage.objects where bucket_id = 'machine-demos'`), 0);
+// an approved demo replaces the one there: a YouTube link over the filmed video shows (the video goes private again), and a video over a link
+await as(RON, `select public.review_catalog_request('${yt}', true, null)`);
+assert.deepEqual(await demoNow(), [null, "https://www.youtube.com/watch?v=abc"]);
+assert.equal(await n(OTHER, `select count(*)::int n from storage.objects where name = '${COACH}/a.mp4'`), 0);
+const back = (await as(COACH, `insert into public.catalog_requests (kind, item_id, video_path, rights_confirmed) values ('demo', '${item}', '${COACH}/a.mp4', true) returning id`)).rows[0].id;
+await as(RON, `select public.review_catalog_request('${back}', true, null)`);
+assert.deepEqual(await demoNow(), [`${COACH}/a.mp4`, null]);
+
+// only someone who coaches a group sends a request or uploads a demo video: an athlete (who may be a minor) never does
+await fails(ATHLETE, `insert into public.catalog_requests (kind, brand, model, exercises) values ('machine', 'Bolt', 'Belt Squat', '[{"name": "Belt Squat"}]')`);
+await fails(ATHLETE, `insert into public.catalog_requests (kind, item_id, youtube_url, rights_confirmed) values ('demo', '${item}', 'https://youtu.be/abcdefghijk', true)`);
+await fails(ATHLETE, `insert into storage.objects (bucket_id, name) values ('machine-demos', '${ATHLETE}/a.mp4')`);
+assert.equal(await n(ATHLETE, `select count(*)::int n from public.catalog_machines`), 2);
 
 // a coach's machine linked to the shared list; removing it from the list leaves the coach's machine
 const gym = (await as(COACH, `insert into public.gym_machines (created_by, name, catalog_machine_id) select '${COACH}', 'Bolt Viking Press', id from public.catalog_machines where brand = 'Bolt' returning id`)).rows[0].id;
 const lib = (await as(COACH, `insert into public.exercise_library (created_by, name) values ('${COACH}', 'Viking Press') returning id`)).rows[0].id;
 await as(COACH, `insert into public.gym_machine_exercises (machine_id, exercise_id, position, catalog_item_id) values ('${gym}', '${lib}', 0, '${item}')`);
+
+// exercises Ron approves for that machine later reach every gym that added it, in the list's order after the gym's own: the coach's row with that name is reused, else one is
+// added; exercises already on the list before (Shrug, Z Press, which this gym left off) are not pushed on; approving the same again adds nothing twice
+const landmine = (await as(COACH, `insert into public.exercise_library (created_by, name) values ('${COACH}', 'landmine press') returning id`)).rows[0].id;
+const gym2 = (await as(OTHER, `insert into public.gym_machines (created_by, name, catalog_machine_id) select '${OTHER}', 'Viking', id from public.catalog_machines where brand = 'Bolt' returning id`)).rows[0].id;
+const more = (await as(OTHER, `insert into public.catalog_requests (kind, brand, model, exercises) values ('machine', 'Bolt', 'Viking Press', '[{"name": "Viking Shrug"}, {"name": "Landmine Press"}, {"name": "Z Press"}]') returning id`)).rows[0].id;
+await as(RON, `select public.review_catalog_request('${more}', true, null)`);
+const gymRows = async (id) =>
+  (await db.query(`select l.name, g.position, g.catalog_item_id is not null linked, g.exercise_id from public.gym_machine_exercises g join public.exercise_library l on l.id = g.exercise_id where g.machine_id = '${id}' order by g.position`)).rows;
+const coachGym = await gymRows(gym);
+assert.deepEqual(coachGym.map((r) => [r.name, r.position, r.linked]), [["Viking Press", 0, true], ["Viking Shrug", 1, true], ["landmine press", 2, true]]);
+assert.equal(coachGym[2].exercise_id, landmine);
+assert.equal((await db.query(`select catalog_id is not null c from public.exercise_library where created_by = '${COACH}' and name = 'Viking Shrug'`)).rows[0].c, true);
+assert.deepEqual((await gymRows(gym2)).map((r) => [r.name, r.position]), [["Viking Shrug", 0], ["Landmine Press", 1]]);
+assert.equal(await n(OTHER, `select count(*)::int n from public.exercise_library where created_by = '${OTHER}'`), 2);
+const twice = (await as(COACH, `insert into public.catalog_requests (kind, brand, model, exercises) values ('machine', 'Bolt', 'Viking Press', '[{"name": "Viking Shrug"}]') returning id`)).rows[0].id;
+await as(RON, `select public.review_catalog_request('${twice}', true, null)`);
+assert.equal((await gymRows(gym)).length, 3);
+// and the other gym still has its two
+assert.equal((await gymRows(gym2)).length, 2);
+
 await as(RON, `delete from public.catalog_machines where brand = 'Bolt'`);
 assert.equal((await db.query(`select catalog_machine_id from public.gym_machines where id = '${gym}'`)).rows[0].catalog_machine_id, null);
-assert.equal((await db.query(`select count(*)::int n from public.gym_machine_exercises where machine_id = '${gym}' and catalog_item_id is null`)).rows[0].n, 1);
+assert.equal((await db.query(`select count(*)::int n from public.gym_machine_exercises where machine_id = '${gym}' and catalog_item_id is null`)).rows[0].n, 3);
 
 // at most 50 waiting requests a coach
 await db.exec(`insert into public.catalog_requests (submitted_by, kind, brand, model, exercises) select '${OTHER}', 'machine', 'B', 'M' || g, '[{"name": "X"}]' from generate_series(1, 50) g`);
@@ -147,7 +187,7 @@ await fails(OTHER, `insert into public.catalog_requests (kind, brand, model, exe
 await db.exec(undo);
 assert.equal((await db.query(`select to_regclass('public.catalog_machines') is null and to_regclass('public.catalog_requests') is null gone`)).rows[0].gone, true);
 assert.equal((await db.query(`select count(*)::int n from information_schema.columns where table_name = 'gym_machines' and column_name = 'catalog_machine_id'`)).rows[0].n, 0);
-assert.equal((await db.query(`select count(*)::int n from public.gym_machine_exercises`)).rows[0].n, 1);
+assert.equal((await db.query(`select count(*)::int n from public.gym_machine_exercises`)).rows[0].n, 5);
 assert.equal((await db.query(`select count(*)::int n from pg_policies where schemaname = 'storage' and policyname like 'machine_demos%'`)).rows[0].n, 0);
 await db.exec(paste); // and it can be applied again after the undo
 assert.ok(Object.values(await checkRow()).every((v) => v === true));

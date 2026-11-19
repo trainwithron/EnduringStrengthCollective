@@ -2,10 +2,10 @@
 -- someone wants to add it to the public... send a request and I could approve or deny it depending on the video quality"; "I was hoping that my video demos would populate for
 -- everyone. Especially on the specialty equipment").
 -- 1. catalog_machines: a machine on the shared list (a brand and a model, for example Bolt + Viking Press). Every signed-in person reads it; only the platform admin changes it.
--- 2. catalog_machine_exercises: the exercises done on it, in order, each an exercise_catalog entry, each with one demo (a filmed video in the machine-demos bucket and/or a YouTube
---    link; the filmed video is shown when there are both). Read and changed like catalog_machines.
+-- 2. catalog_machine_exercises: the exercises done on it, in order, each an exercise_catalog entry, each with one demo (a filmed video in the machine-demos bucket or a YouTube
+--    link; an approved demo replaces the one there; were there ever both, the filmed video is shown). Read and changed like catalog_machines.
 -- 3. catalog_requests: what a coach sends Ron: a new machine (brand, model, exercises) or a demo for one exercise on a shared machine. Only the coach who sent it and the platform
---    admin read it; a coach can only send (pending, unreviewed); nobody changes it but review_catalog_request(), which checks the platform admin on the server.
+--    admin read it; only someone who coaches a group sends one (never an athlete), pending and unreviewed; nobody changes it but review_catalog_request(), which checks the platform admin on the server.
 --    A demo request needs the tick "I filmed this video and have the right to share it". At most 50 waiting requests a coach.
 -- 4. review_catalog_request(id, approve, note): the platform admin approves (it goes on the shared list) or denies (nothing goes public), with an optional note the coach sees.
 -- 5. gym_machines.catalog_machine_id and gym_machine_exercises.catalog_item_id: a coach's machine added from the shared list stays LINKED to it, so its demos are read from the
@@ -101,12 +101,25 @@ create policy "catalog_machine_exercises_read" on public.catalog_machine_exercis
 drop policy if exists "catalog_machine_exercises_admin_write" on public.catalog_machine_exercises;
 create policy "catalog_machine_exercises_admin_write" on public.catalog_machine_exercises for all to authenticated using (public.is_platform_admin()) with check (public.is_platform_admin());
 
+-- Whether the signed-in person coaches a group: only coaches send requests and upload demo videos (an athlete, who may be a minor, never does).
+create or replace function public.is_any_group_coach()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (select 1 from public.group_memberships where profile_id = (select auth.uid()) and role = 'coach')
+$$;
+revoke all on function public.is_any_group_coach() from public, anon;
+grant execute on function public.is_any_group_coach() to authenticated;
+
 drop policy if exists "catalog_requests_read_own_or_admin" on public.catalog_requests;
 create policy "catalog_requests_read_own_or_admin" on public.catalog_requests for select to authenticated
   using (submitted_by = (select auth.uid()) or public.is_platform_admin());
 drop policy if exists "catalog_requests_send_own" on public.catalog_requests;
 create policy "catalog_requests_send_own" on public.catalog_requests for insert to authenticated
-  with check (submitted_by = (select auth.uid()) and status = 'pending' and review_note is null and reviewed_at is null);
+  with check (submitted_by = (select auth.uid()) and status = 'pending' and review_note is null and reviewed_at is null and public.is_any_group_coach());
 
 -- At most 50 waiting requests a coach.
 create or replace function public.limit_catalog_requests()
@@ -126,8 +139,8 @@ revoke all on function public.limit_catalog_requests() from public, anon, authen
 drop trigger if exists limit_catalog_requests on public.catalog_requests;
 create trigger limit_catalog_requests before insert on public.catalog_requests for each row execute function public.limit_catalog_requests();
 
--- The platform admin's review. Approve: a machine goes on the shared list (its exercises added after any already there; an exercise not in the exercise catalog yet is added to it),
--- a demo becomes that exercise's demo. Deny: nothing goes public. Either way the coach sees the outcome and the note.
+-- The platform admin's review. Approve: a machine goes on the shared list (its exercises added after any already there; an exercise not in the exercise catalog yet is added to it;
+-- gyms that already added the machine get the new exercises too), a demo becomes that exercise's demo. Deny: nothing goes public. Either way the coach sees the outcome and the note.
 create or replace function public.review_catalog_request(p_request_id uuid, p_approve boolean, p_note text default null)
 returns text
 language plpgsql
@@ -141,6 +154,11 @@ declare
   v_name text;
   v_cat uuid;
   v_raw text;
+  v_item uuid;
+  v_new uuid[] := '{}';
+  v_lib uuid;
+  g record;
+  it record;
   e jsonb;
 begin
   if not public.is_platform_admin() then
@@ -178,15 +196,48 @@ begin
             end if;
           end if;
         end if;
+        v_item := null;
         insert into public.catalog_machine_exercises (machine_id, catalog_exercise_id, position) values (v_machine, v_cat, v_pos)
-          on conflict (machine_id, catalog_exercise_id) do nothing;
-        if found then
+          on conflict (machine_id, catalog_exercise_id) do nothing returning id into v_item;
+        if v_item is not null then
+          v_new := v_new || v_item;
           v_pos := v_pos + 1;
         end if;
       end loop;
+
+      -- Gyms that already added this machine get its new exercises too (Ron: anyone with that machine "pulls up that specific one and shows all the exercises listed"), in the
+      -- list's order, after their own: each in the owning coach's library (their row with that catalog exercise, else one with the same name, else a new one, as Add to my gym
+      -- does), linked to the shared exercise so its demo is read from the list. One already on the gym's machine is skipped; one the coach's library cannot take is skipped.
+      for g in select id, created_by from public.gym_machines where catalog_machine_id = v_machine order by created_at, id loop
+        for it in
+          select x.id, x.catalog_exercise_id, c.name, c.category
+          from public.catalog_machine_exercises x join public.exercise_catalog c on c.id = x.catalog_exercise_id
+          where x.id = any (v_new)
+          order by x.position
+        loop
+          continue when exists (select 1 from public.gym_machine_exercises l where l.machine_id = g.id and l.catalog_item_id = it.id);
+          v_lib := null;
+          select id into v_lib from public.exercise_library where created_by = g.created_by and catalog_id = it.catalog_exercise_id order by created_at, id limit 1;
+          if v_lib is null then
+            select id into v_lib from public.exercise_library where created_by = g.created_by and lower(btrim(name)) = lower(btrim(it.name)) order by created_at, id limit 1;
+          end if;
+          if v_lib is null then
+            begin
+              insert into public.exercise_library (created_by, name, catalog_id, category) values (g.created_by, it.name, it.catalog_exercise_id, it.category) returning id into v_lib;
+            exception when others then
+              v_lib := null;
+            end;
+          end if;
+          continue when v_lib is null;
+          insert into public.gym_machine_exercises (machine_id, exercise_id, position, catalog_item_id)
+            values (g.id, v_lib, (select coalesce(max(position) + 1, 0) from public.gym_machine_exercises where machine_id = g.id), it.id)
+            on conflict (machine_id, exercise_id) do nothing;
+        end loop;
+      end loop;
     else
+      -- The approved demo replaces the one there (a request is a video or a link, never both): a link approved over a filmed video shows, since the filmed one always wins.
       update public.catalog_machine_exercises
-        set video_path = coalesce(r.video_path, video_path), youtube_url = coalesce(r.youtube_url, youtube_url)
+        set video_path = r.video_path, youtube_url = r.youtube_url
         where id = r.item_id;
       if not found then
         raise exception 'That exercise is no longer on the shared list.' using errcode = 'P0002';
@@ -224,7 +275,7 @@ on conflict (id) do nothing;
 
 drop policy if exists machine_demos_insert_own_folder on storage.objects;
 create policy machine_demos_insert_own_folder on storage.objects for insert to authenticated
-  with check (bucket_id = 'machine-demos' and (storage.foldername(name))[1] = (select auth.uid())::text);
+  with check (bucket_id = 'machine-demos' and (storage.foldername(name))[1] = (select auth.uid())::text and public.is_any_group_coach());
 drop policy if exists machine_demos_select on storage.objects;
 create policy machine_demos_select on storage.objects for select to authenticated
   using (bucket_id = 'machine-demos' and ((storage.foldername(name))[1] = (select auth.uid())::text or public.is_platform_admin() or public.is_catalog_demo_object(name)));

@@ -18,7 +18,7 @@ export interface ReviewRequest {
   videoUrl: string | null;
   youtubeEmbed: string | null;
   youtubeUrl: string | null;
-  // The exercise already has a demo of this kind: approving replaces it.
+  // The exercise already has a demo: approving replaces it.
   replaces: boolean;
 }
 

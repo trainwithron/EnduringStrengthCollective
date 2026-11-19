@@ -14,6 +14,7 @@ alter table public.gym_machine_exercises drop column if exists catalog_item_id;
 alter table public.gym_machines drop column if exists catalog_machine_id;
 drop table if exists public.catalog_requests;
 drop function if exists public.limit_catalog_requests();
+drop function if exists public.is_any_group_coach();
 drop table if exists public.catalog_machine_exercises;
 drop table if exists public.catalog_machines;
 

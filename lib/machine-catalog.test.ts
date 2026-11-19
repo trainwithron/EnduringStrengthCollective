@@ -189,11 +189,23 @@ describe("the database step (208, migration 0453)", () => {
       expect(migration).toContain(`revoke all on public.${t} from anon, authenticated;`);
     }
     expect(migration).toContain("grant select, insert on public.catalog_requests to authenticated;");
-    expect(migration).toContain("with check (submitted_by = (select auth.uid()) and status = 'pending' and review_note is null and reviewed_at is null);");
+    expect(migration).toContain("with check (submitted_by = (select auth.uid()) and status = 'pending' and review_note is null and reviewed_at is null and public.is_any_group_coach());");
     expect(migration).toContain("if not public.is_platform_admin() then\n    raise exception 'Only the platform admin reviews shared-list requests.'");
     expect(migration).toContain("and rights_confirmed\n");
     expect(migration).toContain("values ('machine-demos', 'machine-demos', false, 367001600,");
     expect(migration).toContain("public.is_platform_admin() or public.is_catalog_demo_object(name)");
+  });
+  it("review fixes: an approved demo replaces the one there (a link over a video shows); only someone who coaches a group sends a request or uploads a video", () => {
+    expect(migration).toContain("set video_path = r.video_path, youtube_url = r.youtube_url\n        where id = r.item_id;");
+    expect(migration).toContain("select exists (select 1 from public.group_memberships where profile_id = (select auth.uid()) and role = 'coach')");
+    expect(migration).toContain("review_note is null and reviewed_at is null and public.is_any_group_coach());");
+    expect(migration).toContain("(storage.foldername(name))[1] = (select auth.uid())::text and public.is_any_group_coach());");
+  });
+  it("exercises approved later for a machine reach every gym that added it, on the server, in the list's order (rehearsed in scripts/sql-tests/machine-catalog.test.mjs)", () => {
+    expect(migration).toContain("for g in select id, created_by from public.gym_machines where catalog_machine_id = v_machine order by created_at, id loop");
+    expect(migration).toContain("where x.id = any (v_new)\n          order by x.position");
+    expect(migration).toContain("continue when exists (select 1 from public.gym_machine_exercises l where l.machine_id = g.id and l.catalog_item_id = it.id);");
+    expect(migration).toContain("insert into public.gym_machine_exercises (machine_id, exercise_id, position, catalog_item_id)");
   });
   it("the scan pages and the library page read the new columns only after the step (they fall back to the old ones before it)", () => {
     expect(read("app/scan/machine/[machineId]/page.tsx")).toContain('if (linkRead.error) linkRead = (await serviceRole.from("gym_machine_exercises").select("exercise_id, position")');

@@ -58,7 +58,7 @@ export default async function AdminMachineCatalogPage() {
       videoUrl: r.videoPath ? (signed.get(r.videoPath) ?? null) : null,
       youtubeEmbed: r.youtubeUrl ? youtubeEmbedUrl(r.youtubeUrl) : null,
       youtubeUrl: r.youtubeUrl,
-      replaces: !!item && (r.videoPath ? !!item.video_path : !!item.youtube_url),
+      replaces: !!item && (!!item.video_path || !!item.youtube_url),
     };
   });
 
