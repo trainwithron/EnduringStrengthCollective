@@ -10,47 +10,36 @@ import { ExerciseNameInput } from "./exercise-name-input";
 
 export type ExerciseTier = "A" | "B" | "C" | null;
 
+export type MovementPlane = "sagittal" | "frontal" | "transverse" | null;
+
 interface LadderItem {
   key: string;
   exerciseName: string;
   tier: ExerciseTier;
-  // The one-sided version of the pattern (a lunge is a unilateral squat).
+  // The one-sided version of the pattern (a single-arm row is a one-sided horizontal pull).
   unilateral?: boolean;
+  // This exercise's own movement plane (Ron, Nov 19: "on each of the individual exercises, I need to be able to pick which movement plane").
+  plane?: ExercisePlane;
 }
 
-export type MovementPlane = "sagittal" | "frontal" | "transverse" | null;
-
-const PLANES = ["sagittal", "frontal", "transverse"] as const;
+// An exercise's plane is stored capitalized (movement_pattern_exercises.plane, migration 0161, which also allows "Multi-planar"); a pattern's own plane column is lowercase.
+export type ExercisePlane = "Sagittal" | "Frontal" | "Transverse" | "Multi-planar" | null;
+export const EXERCISE_PLANES = ["Sagittal", "Frontal", "Transverse"] as const;
 
 export function MovementPatternRow({
   pattern,
   initialLadder,
   exerciseLibrary,
-  plane,
-  onPlaneChange,
 }: {
   pattern: { id: string; name: string };
   initialLadder: LadderItem[];
   exerciseLibrary: string[];
-  plane: MovementPlane;
-  onPlaneChange: (plane: MovementPlane) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [planeSaving, setPlaneSaving] = useState(false);
-
-  async function handlePlaneClick(next: MovementPlane) {
-    const value = plane === next ? null : next;
-    setPlaneSaving(true);
-    const supabase = createBrowserClient();
-    const planeSaved = await saved(supabase.from("movement_patterns").update({ plane: value }).eq("id", pattern.id));
-    // The list shows the plane only once it is really stored.
-    if (planeSaved) onPlaneChange(value);
-    setPlaneSaving(false);
-  }
   const [ladder, setLadder] = useState<LadderItem[]>(
     initialLadder.length > 0
       ? initialLadder
-      : [{ key: crypto.randomUUID(), exerciseName: "", tier: null, unilateral: false }]
+      : [{ key: crypto.randomUUID(), exerciseName: "", tier: null, unilateral: false, plane: null }]
   );
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -68,6 +57,10 @@ export function MovementPatternRow({
 
   function updateUnilateral(key: string, unilateral: boolean) {
     setLadder((prev) => prev.map((item) => (item.key === key ? { ...item, unilateral } : item)));
+  }
+
+  function updatePlane(key: string, plane: ExercisePlane) {
+    setLadder((prev) => prev.map((item) => (item.key === key ? { ...item, plane } : item)));
   }
 
   function removeItem(key: string) {
@@ -119,6 +112,7 @@ export function MovementPatternRow({
         difficulty_rank: i,
         tier: item.tier,
         is_unilateral: !!item.unilateral,
+        plane: item.plane ?? null,
       }))
     );
 
@@ -158,27 +152,6 @@ export function MovementPatternRow({
         </span>
       </button>
 
-      <div className="flex items-center gap-1.5 mt-1.5">
-        <span className="font-body text-xs text-steel uppercase tracking-wide mr-0.5">
-          Plane
-        </span>
-        {PLANES.map((p) => (
-          <button
-            key={p}
-            type="button"
-            onClick={() => handlePlaneClick(p)}
-            disabled={planeSaving}
-            className={`h-6 px-2 border font-body text-xs capitalize transition-colors disabled:opacity-40 ${
-              plane === p
-                ? "bg-rust border-rust text-graphite"
-                : "border-steel/30 text-steel active:border-rust active:text-rust"
-            }`}
-          >
-            {p}
-          </button>
-        ))}
-      </div>
-
       {expanded && (
         <div className="mt-3 border border-steel/20 p-3 space-y-3">
           <p className="font-body text-xs text-steel">
@@ -186,7 +159,8 @@ export function MovementPatternRow({
           </p>
           <div className="space-y-2">
             {ladder.map((item, i) => (
-              <div key={item.key} className="flex items-center gap-2">
+              <div key={item.key} data-ladder-row>
+              <div className="flex items-center gap-2">
                 <span className="font-body text-xs text-steel w-4 shrink-0">{i + 1}</span>
                 <div className="flex-1">
                   <ExerciseNameInput
@@ -251,6 +225,24 @@ export function MovementPatternRow({
                   </button>
                 )}
               </div>
+              {/* Its own line under the name, so the row still fits a phone. */}
+              <div className="pl-6 mt-1">
+                <select
+                  value={item.plane ?? ""}
+                  onChange={(e) => updatePlane(item.key, (e.target.value || null) as ExercisePlane)}
+                  aria-label={`Movement plane for ${item.exerciseName || `exercise ${i + 1}`}`}
+                  className="h-7 bg-surface border border-steel/30 text-chalk px-1.5 font-body text-xs focus:outline-none focus:border-rust"
+                >
+                  <option value="">Plane</option>
+                  {EXERCISE_PLANES.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                  {item.plane === "Multi-planar" && <option value="Multi-planar">Multi-planar</option>}
+                </select>
+              </div>
+              </div>
             ))}
           </div>
 
@@ -259,7 +251,7 @@ export function MovementPatternRow({
             onClick={() =>
               setLadder((prev) => [
                 ...prev,
-                { key: crypto.randomUUID(), exerciseName: "", tier: null, unilateral: false },
+                { key: crypto.randomUUID(), exerciseName: "", tier: null, unilateral: false, plane: null },
               ])
             }
             className="w-full h-9 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust transition-colors"

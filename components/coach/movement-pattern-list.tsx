@@ -1,13 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { MovementPatternRow, type MovementPlane } from "./movement-pattern-row";
+import { MovementPatternRow, type ExercisePlane, type MovementPlane } from "./movement-pattern-row";
 
 interface PatternWithLadder {
   id: string;
   name: string;
   plane: MovementPlane;
-  ladder: { key: string; exerciseName: string; tier: "A" | "B" | "C" | null; unilateral?: boolean; rank?: number }[];
+  ladder: { key: string; exerciseName: string; tier: "A" | "B" | "C" | null; unilateral?: boolean; rank?: number; plane?: ExercisePlane }[];
+}
+
+// Each exercise carries its own plane (Ron, Nov 19): a pattern shows under a plane when any of its exercises has it (an exercise's plane is stored capitalized, the filter is lowercase).
+export function patternHasPlane(p: { ladder: { plane?: ExercisePlane }[] }, plane: MovementPlane): boolean {
+  return plane === null || p.ladder.some((e) => (e.plane ?? "").toLowerCase() === plane);
 }
 
 const PLANES = ["sagittal", "frontal", "transverse"] as const;
@@ -19,10 +24,9 @@ export function MovementPatternList({
   initialPatterns: PatternWithLadder[];
   exerciseLibrary: string[];
 }) {
-  const [patterns, setPatterns] = useState(initialPatterns);
   const [filter, setFilter] = useState<MovementPlane>(null);
 
-  const visible = filter ? patterns.filter((p) => p.plane === filter) : patterns;
+  const visible = initialPatterns.filter((p) => patternHasPlane(p, filter));
 
   return (
     <div>
@@ -59,7 +63,7 @@ export function MovementPatternList({
 
       {visible.length === 0 ? (
         <p className="font-body text-sm text-steel py-6">
-          No patterns tagged with this plane yet.
+          No exercises tagged with this plane yet.
         </p>
       ) : (
         <div className="divide-y divide-steel/15">
@@ -69,10 +73,6 @@ export function MovementPatternList({
               pattern={{ id: p.id, name: p.name }}
               initialLadder={p.ladder}
               exerciseLibrary={exerciseLibrary}
-              plane={p.plane}
-              onPlaneChange={(plane) =>
-                setPatterns((prev) => prev.map((pp) => (pp.id === p.id ? { ...pp, plane } : pp)))
-              }
             />
           ))}
         </div>

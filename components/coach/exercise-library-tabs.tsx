@@ -7,14 +7,14 @@ import { MovementPatternList } from "./movement-pattern-list";
 import { NewMovementPatternForm } from "./new-movement-pattern-form";
 import { AddStarterLaddersButton } from "./add-starter-ladders-button";
 import { SortMyExercises } from "./sort-my-exercises";
-import type { MovementPlane } from "./movement-pattern-row";
+import type { ExercisePlane, MovementPlane } from "./movement-pattern-row";
 import { OneRepMaxCalculator } from "@/components/tools/one-rep-max-calculator";
 
 interface PatternWithLadder {
   id: string;
   name: string;
   plane: MovementPlane;
-  ladder: { key: string; exerciseName: string; tier: "A" | "B" | "C" | null; unilateral?: boolean; rank?: number }[];
+  ladder: { key: string; exerciseName: string; tier: "A" | "B" | "C" | null; unilateral?: boolean; rank?: number; plane?: ExercisePlane }[];
 }
 
 type Tab = "exercises" | "patterns" | "sort" | "one-rep-max";

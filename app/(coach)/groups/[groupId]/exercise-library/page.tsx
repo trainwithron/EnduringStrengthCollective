@@ -77,7 +77,7 @@ export default async function ExerciseLibraryPage(
 
   const { data: patterns } = await supabase
     .from("movement_patterns")
-    .select("id, name, plane, movement_pattern_exercises ( id, exercise_name, difficulty_rank, tier, is_unilateral )")
+    .select("id, name, plane, movement_pattern_exercises ( id, exercise_name, difficulty_rank, tier, is_unilateral, plane )")
     .eq("created_by", user.id)
     .order("name");
 
@@ -88,7 +88,7 @@ export default async function ExerciseLibraryPage(
     ladder: (p.movement_pattern_exercises ?? [])
       .slice()
       .sort((a: any, b: any) => a.difficulty_rank - b.difficulty_rank)
-      .map((e: any) => ({ key: e.id, exerciseName: e.exercise_name, tier: e.tier, unilateral: !!e.is_unilateral, rank: e.difficulty_rank as number })),
+      .map((e: any) => ({ key: e.id, exerciseName: e.exercise_name, tier: e.tier, unilateral: !!e.is_unilateral, rank: e.difficulty_rank as number, plane: (e.plane ?? null) as "Sagittal" | "Frontal" | "Transverse" | "Multi-planar" | null })),
   }));
 
   const exerciseLibrary = exercises.map((e) => e.name);

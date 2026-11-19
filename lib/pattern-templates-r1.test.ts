@@ -8,9 +8,9 @@ import { looksUnilateral, parseSuggestions, rankForLevel, unsortedNames } from "
 const read = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
 
 describe("Ron's taxonomy and the starter ladders", () => {
-  it("his ten patterns, then the extras", () => {
-    expect(CORE_PATTERN_NAMES).toEqual(["Hinge", "Squat", "Vertical Press", "Vertical Pull", "Horizontal Press", "Horizontal Pull", "Core: Rotation", "Core: Anti-rotation", "Core: Flexion", "Core: Extension"]);
-    expect(PATTERN_NAMES.slice(10)).toEqual(["Core: Stability", "Loaded Carry", "Elbow Flexion (Biceps)", "Elbow Extension (Triceps)"]);
+  it("his eleven patterns (Lunge separate from Squat, Nov 19), then the extras", () => {
+    expect(CORE_PATTERN_NAMES).toEqual(["Hinge", "Squat", "Lunge", "Vertical Press", "Vertical Pull", "Horizontal Press", "Horizontal Pull", "Core: Rotation", "Core: Anti-rotation", "Core: Flexion", "Core: Extension"]);
+    expect(PATTERN_NAMES.slice(11)).toEqual(["Core: Stability", "Loaded Carry", "Elbow Flexion (Biceps)", "Elbow Extension (Triceps)"]);
   });
   it("every pattern has a ladder, no exercise is on a ladder twice, every class is A, B or C", () => {
     for (const p of PATTERN_NAMES) {
@@ -21,12 +21,18 @@ describe("Ron's taxonomy and the starter ladders", () => {
     }
     expect(STARTER_RUNGS.every((r) => STARTER_PATTERNS.some((p) => p.name === r.pattern))).toBe(true);
   });
-  it("each of the six base patterns has a unilateral version (a lunge is the unilateral squat), in the same pattern", () => {
-    for (const p of ["Hinge", "Squat", "Vertical Press", "Vertical Pull", "Horizontal Press", "Horizontal Pull"]) {
+  it("the upper-body patterns and Hinge have a unilateral version in the same pattern; Squat is two-sided and every Lunge is one-sided (Ron, Nov 19: \"seperate squat and lunge\")", () => {
+    for (const p of ["Hinge", "Vertical Press", "Vertical Pull", "Horizontal Press", "Horizontal Pull"]) {
       expect(STARTER_RUNGS.some((r) => r.pattern === p && r.unilateral), p).toBe(true);
       expect(STARTER_RUNGS.some((r) => r.pattern === p && !r.unilateral), p).toBe(true);
     }
-    expect(STARTER_RUNGS.find((r) => r.exercise === "Bulgarian Split Squat")).toMatchObject({ pattern: "Squat", unilateral: true });
+    expect(STARTER_RUNGS.filter((r) => r.pattern === "Squat").every((r) => !r.unilateral)).toBe(true);
+    const lunge = STARTER_RUNGS.filter((r) => r.pattern === "Lunge");
+    expect(lunge.length).toBe(9);
+    expect(lunge.every((r) => r.unilateral)).toBe(true);
+    expect(lunge.map((r) => r.exercise)).toEqual(expect.arrayContaining(["Bodyweight Reverse Lunge", "Step Up", "Goblet Cossack Squat", "Dumbbell Split Squat", "Bulgarian Split Squat", "Barbell Rear Foot Elevated Split Squat"]));
+    expect(STARTER_RUNGS.find((r) => r.exercise === "Bulgarian Split Squat")).toMatchObject({ pattern: "Lunge", unilateral: true, tier: "A", rank: 6 });
+    expect(STARTER_PATTERNS.find((p) => p.name === "Lunge")).toEqual({ name: "Lunge", plane: "sagittal", core: true });
   });
   it("Ron's example slots all have something to pick: class A bilateral hinge, class A horizontal press, class B horizontal pull, class C biceps", () => {
     const has = (pattern: string, tier: string, uni = false) => STARTER_RUNGS.some((r) => r.pattern === pattern && r.tier === tier && r.unilateral === uni);
@@ -45,9 +51,9 @@ describe("Ron's taxonomy and the starter ladders", () => {
 describe("Add the starter ladders", () => {
   it("a coach with nothing gets every ladder", () => {
     const plan = planStarterAdd([]);
-    expect(plan.newPatterns).toHaveLength(14);
+    expect(plan.newPatterns).toHaveLength(15);
     expect(plan.exerciseCount).toBe(STARTER_RUNGS.length);
-    expect(starterResultLine(plan)).toBe(`Added 14 ladders and ${STARTER_RUNGS.length} exercises.`);
+    expect(starterResultLine(plan)).toBe(`Added 15 ladders and ${STARTER_RUNGS.length} exercises.`);
   });
   it("a coach who has it all gets told so, and nothing is added", () => {
     const all = STARTER_PATTERNS.map((p) => ({ id: p.name, name: p.name, exerciseNames: STARTER_RUNGS.filter((r) => r.pattern === p.name).map((r) => r.exercise) }));
@@ -63,7 +69,18 @@ describe("Add the starter ladders", () => {
     const inserts = buildRungInserts(plan, new Map([["Squat", "p1"]]), new Map([["Squat", 9]]));
     const squatInserts = inserts.filter((i) => i.movement_pattern_id === "p1");
     expect(Math.min(...squatInserts.map((i) => i.difficulty_rank))).toBe(10);
-    expect(squatInserts.find((i) => i.exercise_name === "Bulgarian Split Squat")?.is_unilateral).toBe(true);
+    expect(squatInserts.find((i) => i.exercise_name === "Barbell Back Squat")?.is_unilateral).toBe(false);
+    expect(squatInserts.some((i) => i.exercise_name === "Bulgarian Split Squat")).toBe(false);
+  });
+  it("Lunge is a new ladder for a coach who has none; a lunge they already keep on their Squat ladder is not added to it again", () => {
+    const plan = planStarterAdd([{ id: "p1", name: "Squat", exerciseNames: ["Goblet Squat", "Bulgarian Split Squat", "Split Squat"] }]);
+    expect(plan.newPatterns.map((p) => p.name)).toContain("Lunge");
+    const lunge = plan.rungs.find((g) => g.pattern === "Lunge")!;
+    expect(lunge.rungs.some((r) => r.exercise === "Bulgarian Split Squat")).toBe(false);
+    expect(lunge.rungs.some((r) => r.exercise === "Dumbbell Split Squat")).toBe(false);
+    expect(lunge.rungs.some((r) => r.exercise === "Dumbbell Walking Lunge")).toBe(true);
+    const inserts = buildRungInserts(plan, new Map([["Squat", "p1"], ["Lunge", "p2"]]), new Map([["Squat", 9]]));
+    expect(inserts.filter((i) => i.movement_pattern_id === "p2").every((i) => i.is_unilateral)).toBe(true);
   });
 });
 

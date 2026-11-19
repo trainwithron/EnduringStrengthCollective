@@ -1,8 +1,10 @@
 // Ron's movement-pattern taxonomy and the starter ladders that go with it. A coach taps "Add the starter ladders" once and gets a ladder for every pattern, easiest at the top. Pure, so it is tested.
 //
-//   Patterns (his ten):  Hinge, Squat, Vertical Press, Vertical Pull, Horizontal Press, Horizontal Pull, Core: Rotation / Anti-rotation / Flexion / Extension (back extension)
+//   Patterns (his eleven): Hinge, Squat, Lunge, Vertical Press, Vertical Pull, Horizontal Press, Horizontal Pull, Core: Rotation / Anti-rotation / Flexion / Extension (back extension)
 //   Extras:              Core: Stability (planks, rollouts: anti-extension), Loaded Carry, Elbow Flexion (Biceps), Elbow Extension (Triceps)
-//   A unilateral version of each is NOT a separate pattern: it is the same pattern with the exercise marked one-sided (a lunge is a unilateral squat).
+//   Lunge is its own pattern (Ron, Nov 19: "seperate squat and lunge"): lunges, split squats, step-ups and the cossack squat. Otherwise a one-sided version is NOT a separate pattern:
+//   it is the same pattern with the exercise marked one-sided (a single-arm row is a one-sided horizontal pull).
+//   Each exercise on a ladder can carry its own movement plane (sagittal, frontal, transverse), picked by the coach on the ladder row.
 //   Class: A = main lift (a deadlift), B = second lift (a lat pulldown), C = accessory (a bicep curl).
 
 export type Tier = "A" | "B" | "C";
@@ -13,13 +15,14 @@ export const TIER_KEY = "A = main lift, B = second lift, C = accessory";
 export interface StarterPattern {
   name: string;
   plane: Plane;
-  // One of Ron's ten, or an extra pattern.
+  // One of Ron's eleven, or an extra pattern.
   core: boolean;
 }
 
 export const STARTER_PATTERNS: StarterPattern[] = [
   { name: "Hinge", plane: "sagittal", core: true },
   { name: "Squat", plane: "sagittal", core: true },
+  { name: "Lunge", plane: "sagittal", core: true },
   { name: "Vertical Press", plane: "sagittal", core: true },
   { name: "Vertical Pull", plane: "sagittal", core: true },
   { name: "Horizontal Press", plane: "sagittal", core: true },
@@ -46,7 +49,7 @@ export interface StarterRung {
 // pattern, exercise, rank, tier, one-sided
 type Row = [string, string, number, Tier, boolean];
 const ROWS: Row[] = [
-  // Squat (a lunge, split squat or step-up is the one-sided squat)
+  // Squat
   ["Squat", "Bodyweight Squat", 0, "C", false],
   ["Squat", "Zombie Squat", 1, "C", false],
   ["Squat", "Leg Extension", 2, "C", false],
@@ -57,15 +60,16 @@ const ROWS: Row[] = [
   ["Squat", "Barbell Front Squat", 7, "A", false],
   ["Squat", "Barbell Back Squat", 8, "A", false],
   ["Squat", "Sissy Squat", 8, "C", false],
-  ["Squat", "Bodyweight Reverse Lunge", 1, "C", true],
-  ["Squat", "Step Up", 2, "C", true],
-  ["Squat", "Goblet Cossack Squat", 4, "C", true],
-  ["Squat", "Dumbbell Split Squat", 4, "B", true],
-  ["Squat", "Dumbbell Reverse Lunge", 5, "B", true],
-  ["Squat", "Dumbbell Walking Lunge", 5, "B", true],
-  ["Squat", "Bulgarian Split Squat", 6, "A", true],
-  ["Squat", "Barbell Front Rack Walking Lunge", 8, "B", true],
-  ["Squat", "Barbell Rear Foot Elevated Split Squat", 8, "A", true],
+  // Lunge (lunges, split squats, step-ups, the cossack squat)
+  ["Lunge", "Bodyweight Reverse Lunge", 1, "C", true],
+  ["Lunge", "Step Up", 2, "C", true],
+  ["Lunge", "Goblet Cossack Squat", 4, "C", true],
+  ["Lunge", "Dumbbell Split Squat", 4, "B", true],
+  ["Lunge", "Dumbbell Reverse Lunge", 5, "B", true],
+  ["Lunge", "Dumbbell Walking Lunge", 5, "B", true],
+  ["Lunge", "Bulgarian Split Squat", 6, "A", true],
+  ["Lunge", "Barbell Front Rack Walking Lunge", 8, "B", true],
+  ["Lunge", "Barbell Rear Foot Elevated Split Squat", 8, "A", true],
   // Hinge
   ["Hinge", "Glute Bridge", 0, "C", false],
   ["Hinge", "Lying Leg Curl", 1, "C", false],
@@ -276,6 +280,8 @@ export function planStarterAdd(existing: ExistingPattern[], libraryNames: string
     const have = byName.get(norm(sp.name));
     if (!have) newPatterns.push(sp);
     const haveNames = new Set((have?.exerciseNames ?? []).map(exerciseIdentity));
+    // Lunge used to be part of Squat: a lunge a coach already has on their Squat ladder is not added again to the new Lunge ladder (it stays where they put it).
+    if (sp.name === "Lunge") for (const n of byName.get(norm("Squat"))?.exerciseNames ?? []) haveNames.add(exerciseIdentity(n));
     const missing = STARTER_RUNGS.filter((r) => r.pattern === sp.name && !haveNames.has(exerciseIdentity(r.exercise))).map((r) => ({
       ...r,
       exercise: libraryByIdentity.get(exerciseIdentity(r.exercise)) ?? r.exercise,
