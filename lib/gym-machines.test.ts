@@ -69,7 +69,7 @@ describe("machines: the screens", () => {
   it("the library's Machines tab shows only once the database has machines (before step 206 the read fails and it is hidden)", () => {
     const tabs = read("components/coach/exercise-library-tabs.tsx");
     expect(tabs).toContain("{initialMachines && (");
-    expect(tabs).toContain('{tab === "machines" && initialMachines && <GymMachinesPanel coachId={coachId} initialMachines={initialMachines} exercises={initialExercises} />}');
+    expect(tabs).toContain('{tab === "machines" && initialMachines && <GymMachinesPanel coachId={coachId} orgId={orgId} initialMachines={initialMachines} exercises={initialExercises} />}');
     const page = read("app/(coach)/groups/[groupId]/exercise-library/page.tsx");
     expect(page).toContain('.from("gym_machines").select("id, name").eq("created_by", user.id)');
     expect(page).toContain("initialMachines={initialMachines}");
@@ -84,7 +84,7 @@ describe("machines: the screens", () => {
     expect(demo).not.toContain("addLibraryExercise(");
     expect(read("components/coach/exercise-pick-or-add.tsx")).toContain("await addLibraryExercise(supabase, {");
     const qr = read("components/coach/exercise-qr-code-button.tsx");
-    expect(qr).toContain('return <ScanQrCodeButton path={`/scan/${exerciseId}`} name={exerciseName} what="exercise" />;');
+    expect(qr).toContain('return <ScanQrCodeButton path={exerciseScanPath(exerciseId, orgId)} name={exerciseName} what="exercise" />;');
     expect(qr).toContain("const url = `${appOriginBrowser()}${path}`;");
   });
   it("the machine's main buttons are at least 44px (phone)", () => {
@@ -97,5 +97,24 @@ describe("machines: the screens", () => {
     expect(page).toContain('if (!machine) return <Message text="This QR code isn\'t valid anymore." />;');
     expect(page).toContain("No exercises on this machine yet.");
     expect(page).toContain("createServiceRoleClient()");
+  });
+});
+
+describe("machines: the gym and honest saves (review, Nov 19)", () => {
+  it("a machine records the organization it was made in, only one the coach belongs to", () => {
+    const migration = read("supabase/migrations/0451_gym_machines.sql");
+    expect(migration).toContain("organization_id uuid references public.organizations(id) on delete set null,");
+    expect(migration).toContain("with check (created_by = (select auth.uid()) and (organization_id is null or public.is_org_member(organization_id)));");
+    expect(read("supabase/apply/apply-step206-0451.sql")).toContain("as machine_has_its_gym,");
+    const panel = read("components/coach/gym-machines-panel.tsx");
+    expect(panel).toContain('.from("gym_machines").insert({ created_by: coachId, organization_id: orgId, name: cleaned.name })');
+    expect(read("components/coach/exercise-library-tabs.tsx")).toContain("<GymMachinesPanel coachId={coachId} orgId={orgId} initialMachines={initialMachines} exercises={initialExercises} />");
+  });
+  it("rename, delete and taking an exercise off only say done when the row really changed (0 rows is a failure)", () => {
+    const panel = read("components/coach/gym-machines-panel.tsx");
+    expect(panel).toContain('savedRows(createBrowserClient().from("gym_machines").update({ name: cleaned.name }).eq("id", machine.id).select("id"),');
+    expect(panel).toContain('savedRows(createBrowserClient().from("gym_machines").delete().eq("id", machine.id).select("id"),');
+    expect(panel).toContain('.eq("exercise_id", row.id).select("machine_id"),');
+    expect(panel).toContain("const result = await checked(operation, { expectRows: true, message });");
   });
 });

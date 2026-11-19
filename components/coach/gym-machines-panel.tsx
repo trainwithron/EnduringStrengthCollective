@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { Play, X } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { saved } from "@/lib/saved";
+import { checked } from "@/lib/checked-write";
+import { showSaveFailed } from "@/lib/save-failed";
 import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { demoThumbPath } from "@/lib/exercise-demo";
 import { cleanMachineName, machineScanPath, type MachineRow } from "@/lib/gym-machines";
@@ -16,10 +18,13 @@ import type { LibraryExerciseRow } from "./exercise-library-list";
 // new one right there), remove one, rename or delete the machine, and print its QR code (/scan/machine/<id>: every exercise on it, each opening its own scan page). Phone and computer alike.
 export function GymMachinesPanel({
   coachId,
+  orgId = null,
   initialMachines,
   exercises,
 }: {
   coachId: string;
+  // The workspace's organization: the gym shown on the machine's QR page (null in a coach's own space).
+  orgId?: string | null;
   initialMachines: MachineRow[];
   exercises: LibraryExerciseRow[];
 }) {
@@ -36,7 +41,7 @@ export function GymMachinesPanel({
     if (!cleaned.ok) return setError(cleaned.error);
     setBusy(true);
     setError(null);
-    const { data, error: insertError } = await createBrowserClient().from("gym_machines").insert({ created_by: coachId, name: cleaned.name }).select("id, name").single();
+    const { data, error: insertError } = await createBrowserClient().from("gym_machines").insert({ created_by: coachId, organization_id: orgId, name: cleaned.name }).select("id, name").single();
     setBusy(false);
     if (insertError || !data) return setError("Couldn't add the machine. Try again.");
     const row = data as { id: string; name: string };
@@ -142,7 +147,7 @@ function MachineEditor({
     if (!cleaned.ok) return setError(cleaned.error);
     setBusy(true);
     setError(null);
-    const ok = await saved(createBrowserClient().from("gym_machines").update({ name: cleaned.name }).eq("id", machine.id), "Couldn't rename the machine.");
+    const ok = await savedRows(createBrowserClient().from("gym_machines").update({ name: cleaned.name }).eq("id", machine.id).select("id"), "Couldn't rename the machine.");
     setBusy(false);
     if (!ok) return;
     onChange({ ...machine, name: cleaned.name });
@@ -152,7 +157,7 @@ function MachineEditor({
   async function remove() {
     if (!(await confirmDialog({ message: `Delete ${machine.name}? Its QR code stops working. The exercises stay in your library.`, confirmLabel: "Delete machine", destructive: true }))) return;
     setBusy(true);
-    const ok = await saved(createBrowserClient().from("gym_machines").delete().eq("id", machine.id), "Couldn't delete the machine.");
+    const ok = await savedRows(createBrowserClient().from("gym_machines").delete().eq("id", machine.id).select("id"), "Couldn't delete the machine.");
     setBusy(false);
     if (ok) onDeleted();
   }
@@ -170,7 +175,7 @@ function MachineEditor({
 
   async function removeExercise(row: LibraryExerciseRow) {
     setBusy(true);
-    const ok = await saved(createBrowserClient().from("gym_machine_exercises").delete().eq("machine_id", machine.id).eq("exercise_id", row.id), "Couldn't take that exercise off the machine.");
+    const ok = await savedRows(createBrowserClient().from("gym_machine_exercises").delete().eq("machine_id", machine.id).eq("exercise_id", row.id).select("machine_id"), "Couldn't take that exercise off the machine.");
     setBusy(false);
     if (ok) onChange({ ...machine, exerciseIds: machine.exerciseIds.filter((id) => id !== row.id) });
   }
@@ -267,6 +272,13 @@ function MachineEditor({
       )}
     </div>
   );
+}
+
+// A rename or delete that row security quietly turns into "0 rows changed" is not done: it must come back with the row (lib/checked-write.ts expectRows), else the shared bar says so.
+async function savedRows(operation: PromiseLike<{ data?: unknown; error?: { message?: string } | null }>, message: string): Promise<boolean> {
+  const result = await checked(operation, { expectRows: true, message });
+  if (!result.ok) showSaveFailed(result.error ?? message);
+  return result.ok;
 }
 
 // The exercise's demo as a small picture: an uploaded video's first frame, a YouTube video's thumbnail (through our own server), or a plain play tile.

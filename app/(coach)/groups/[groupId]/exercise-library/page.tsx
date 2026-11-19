@@ -42,7 +42,7 @@ export default async function ExerciseLibraryPage(
 
   const { data: group } = await supabase
     .from("groups")
-    .select("name")
+    .select("name, organization_id")
     .eq("id", params.groupId)
     .single();
 
@@ -169,6 +169,7 @@ export default async function ExerciseLibraryPage(
         biomechVocabulary={biomechVocabulary}
         initialBiomechTagsByExercise={initialBiomechTagsByExercise}
         initialMachines={initialMachines}
+        orgId={(group as { organization_id?: string | null } | null)?.organization_id ?? null}
       />
     </CoachDesktopShell>
   );

@@ -18,11 +18,20 @@ await db.exec(`
   grant execute on function auth.uid() to anon, authenticated, service_role;
   grant usage on schema public to anon, authenticated, service_role;
   create table public.profiles (id uuid primary key);
+  create table public.organizations (id uuid primary key, name text);
+  create table public.organization_memberships (organization_id uuid references public.organizations(id), profile_id uuid references public.profiles(id), departing_since timestamptz);
+  -- the live helper (is_org_member), as it is defined today
+  create function public.is_org_member(target_org_id uuid) returns boolean language sql stable security definer set search_path to 'public' as $$
+    select exists (select 1 from public.organization_memberships where organization_id = target_org_id and profile_id = auth.uid() and departing_since is null);
+  $$;
+  grant execute on function public.is_org_member(uuid) to authenticated;
   create table public.exercise_library (id uuid primary key default gen_random_uuid(), created_by uuid not null references public.profiles(id), name text not null);
   alter table public.exercise_library enable row level security;
   create policy lib_read on public.exercise_library for select to authenticated using (true);
   grant select on public.exercise_library to authenticated;
   insert into public.profiles values ('${RON}'), ('${OTHER}');
+  insert into public.organizations values ('dddddddd-0000-0000-0000-000000000001', 'Enduring Strength Co.'), ('dddddddd-0000-0000-0000-000000000002', 'Not his gym');
+  insert into public.organization_memberships values ('dddddddd-0000-0000-0000-000000000001', '${RON}', null), ('dddddddd-0000-0000-0000-000000000002', '${OTHER}', null);
   insert into public.exercise_library (id, created_by, name) values
     ('aaaaaaaa-0000-0000-0000-000000000001', '${RON}', 'Viking Press'),
     ('aaaaaaaa-0000-0000-0000-000000000002', '${RON}', 'Z Press'),
@@ -46,7 +55,11 @@ async function fails(user, sql) {
 }
 
 // Ron makes a machine and puts his two exercises on it
-await as(RON, `insert into public.gym_machines (id, created_by, name) values ('cccccccc-0000-0000-0000-000000000001', '${RON}', 'Viking press machine')`);
+await as(RON, `insert into public.gym_machines (id, created_by, organization_id, name) values ('cccccccc-0000-0000-0000-000000000001', '${RON}', 'dddddddd-0000-0000-0000-000000000001', 'Viking press machine')`);
+// no organization is fine (a coach's own space); an organization he is not in is refused, also by moving the machine into it
+await as(RON, `insert into public.gym_machines (created_by, name) values ('${RON}', 'Home rack')`);
+await fails(RON, `insert into public.gym_machines (created_by, organization_id, name) values ('${RON}', 'dddddddd-0000-0000-0000-000000000002', 'In their gym')`);
+await fails(RON, `update public.gym_machines set organization_id = 'dddddddd-0000-0000-0000-000000000002' where id = 'cccccccc-0000-0000-0000-000000000001'`);
 await as(RON, `insert into public.gym_machine_exercises (machine_id, exercise_id, position) values ('cccccccc-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001', 0), ('cccccccc-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000002', 1)`);
 assert.equal((await as(RON, "select * from public.gym_machine_exercises")).rows.length, 2);
 
@@ -62,7 +75,7 @@ assert.equal((await as(OTHER, "select * from public.gym_machines")).rows.length,
 assert.equal((await as(OTHER, "select * from public.gym_machine_exercises")).rows.length, 0);
 await as(OTHER, "update public.gym_machines set name = 'Taken' where true");
 await as(OTHER, "delete from public.gym_machine_exercises where true");
-assert.equal((await as(RON, "select name from public.gym_machines")).rows[0].name, "Viking press machine");
+assert.equal((await as(RON, "select name from public.gym_machines where id = 'cccccccc-0000-0000-0000-000000000001'")).rows[0].name, "Viking press machine");
 assert.equal((await as(RON, "select * from public.gym_machine_exercises")).rows.length, 2);
 // nor can they hang their exercise on Ron's machine
 await fails(OTHER, `insert into public.gym_machine_exercises (machine_id, exercise_id) values ('cccccccc-0000-0000-0000-000000000001', 'bbbbbbbb-0000-0000-0000-000000000001')`);
@@ -70,6 +83,11 @@ await fails(OTHER, `insert into public.gym_machine_exercises (machine_id, exerci
 // a signed-out visitor reads nothing (the public page uses the server's key)
 await fails(null, "select * from public.gym_machines");
 await fails(null, "select * from public.gym_machine_exercises");
+
+// a deleted organization leaves the machine in place with no gym (on delete set null)
+await db.exec("reset role");
+await db.exec("delete from public.organization_memberships where organization_id = 'dddddddd-0000-0000-0000-000000000001'; delete from public.organizations where id = 'dddddddd-0000-0000-0000-000000000001';");
+assert.equal((await db.query("select organization_id from public.gym_machines where id = 'cccccccc-0000-0000-0000-000000000001'")).rows[0].organization_id, null);
 
 // Ron renames, removes one exercise, then deletes the machine: its exercise rows go with it, the library keeps the exercises
 await as(RON, "update public.gym_machines set name = 'Viking press' where id = 'cccccccc-0000-0000-0000-000000000001'");

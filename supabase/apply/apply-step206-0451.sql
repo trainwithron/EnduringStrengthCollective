@@ -5,13 +5,15 @@ begin;
 -- Machines in the exercise library, each with a QR code that lists every exercise done on it (Ron, Nov 19: "on a machine I could put a QR code and it'll show you all of the exercise
 -- variations for that machine ... Viking press, unilateral Viking press, shrugs, unilateral shrugs, you can sit in front of it and do a Z press"; "i need to obiously be able to add
 -- excercises by machine in the excercise library also").
--- 1. gym_machines: a coach's machine (a name). Only the coach who made it reads or changes it.
+-- 1. gym_machines: a coach's machine (a name) and the organization it was made in (the gym shown on its QR page; a coach can own several). Only the coach who made it reads or
+--    changes it, and only in an organization they belong to (or none).
 -- 2. gym_machine_exercises: the exercises on a machine, in order. Only for a machine the coach owns AND an exercise from their own library.
 -- Nobody signed out reads either table: the public scan page (/scan/machine/<id>) reads with the server's key, as the exercise scan page does. Nothing existing is changed. Re-running is safe.
 
 create table if not exists public.gym_machines (
   id uuid primary key default gen_random_uuid(),
   created_by uuid not null references public.profiles(id) on delete cascade,
+  organization_id uuid references public.organizations(id) on delete set null,
   name text not null check (char_length(name) between 1 and 80),
   created_at timestamptz not null default now()
 );
@@ -35,7 +37,7 @@ grant select, insert, update, delete on public.gym_machine_exercises to authenti
 drop policy if exists "gym_machines_own" on public.gym_machines;
 create policy "gym_machines_own" on public.gym_machines for all to authenticated
   using (created_by = (select auth.uid()))
-  with check (created_by = (select auth.uid()));
+  with check (created_by = (select auth.uid()) and (organization_id is null or public.is_org_member(organization_id)));
 
 drop policy if exists "gym_machine_exercises_own" on public.gym_machine_exercises;
 create policy "gym_machine_exercises_own" on public.gym_machine_exercises for all to authenticated
@@ -54,6 +56,7 @@ commit;
 select
   to_regclass('public.gym_machines') is not null as machines_table,
   to_regclass('public.gym_machine_exercises') is not null as machine_exercises_table,
+  exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'gym_machines' and column_name = 'organization_id') as machine_has_its_gym,
   (select relrowsecurity from pg_class where oid = 'public.gym_machines'::regclass) and (select relrowsecurity from pg_class where oid = 'public.gym_machine_exercises'::regclass) as row_security_on,
   exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'gym_machines' and policyname = 'gym_machines_own') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'gym_machine_exercises' and policyname = 'gym_machine_exercises_own') as own_rows_only,
   not has_table_privilege('anon', 'public.gym_machines', 'select') and not has_table_privilege('anon', 'public.gym_machine_exercises', 'select') as nobody_signed_out,

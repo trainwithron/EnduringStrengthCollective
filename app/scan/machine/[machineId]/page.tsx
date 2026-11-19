@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Play } from "lucide-react";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { scanRows } from "@/lib/gym-machines";
+import { loadScanOrg } from "@/lib/scan-org";
 
 export const metadata = { title: "Scan" };
 
@@ -25,7 +26,7 @@ export default async function ScanMachinePage(props: { params: Promise<{ machine
   const { machineId } = await props.params;
   const serviceRole = createServiceRoleClient();
 
-  const { data: machine } = await serviceRole.from("gym_machines").select("id, name, created_by").eq("id", machineId).maybeSingle();
+  const { data: machine } = await serviceRole.from("gym_machines").select("id, name, created_by, organization_id").eq("id", machineId).maybeSingle();
   if (!machine) return <Message text="This QR code isn't valid anymore." />;
 
   const { data: links } = await serviceRole.from("gym_machine_exercises").select("exercise_id, position").eq("machine_id", machine.id);
@@ -36,12 +37,9 @@ export default async function ScanMachinePage(props: { params: Promise<{ machine
       : { data: [] };
   const rows = scanRows(linkRows, (exerciseRows ?? []) as { id: string; name: string; video_path: string | null; youtube_url: string | null }[]);
 
-  // The gym, the same way the exercise scan page finds it (the coach's organization).
-  const { data: coachOrgMembership } = await serviceRole.from("organization_memberships").select("organization_id").eq("profile_id", machine.created_by).maybeSingle();
-  const { data: org } = coachOrgMembership?.organization_id
-    ? await serviceRole.from("organizations").select("display_name, name, logo_url").eq("id", coachOrgMembership.organization_id).maybeSingle()
-    : { data: null };
-  const orgDisplayName = org?.display_name ?? org?.name ?? "this gym";
+  // The gym: the organization the machine was made in (while the coach is still in it), else the coach's oldest organization (lib/scan-org.ts).
+  const org = await loadScanOrg(serviceRole, machine.created_by, machine.organization_id);
+  const orgDisplayName = org?.name ?? "this gym";
 
   // An uploaded demo's first frame as the row's picture (the video bucket is private: short-lived signed links).
   const videoPaths = rows.map((r) => r.video_path).filter((p): p is string => !!p);
@@ -54,9 +52,9 @@ export default async function ScanMachinePage(props: { params: Promise<{ machine
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body px-6 py-16">
       <div className="w-full max-w-sm mx-auto">
-        {org?.logo_url && (
+        {org?.logoUrl && (
           // eslint-disable-next-line @next/next/no-img-element -- external org-uploaded logo
-          <img src={org.logo_url} alt="" className="w-16 h-16 mx-auto mb-4 object-contain" />
+          <img src={org.logoUrl} alt="" className="w-16 h-16 mx-auto mb-4 object-contain" />
         )}
         <p className="font-display uppercase text-xs tracking-[0.2em] text-rust text-center">{orgDisplayName}</p>
         <h1 className="font-display font-bold text-3xl uppercase leading-tight mt-2 text-center">{machine.name}</h1>

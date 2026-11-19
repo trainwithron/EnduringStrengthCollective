@@ -30,6 +30,7 @@ export function ExerciseLibraryTabs({
   biomechVocabulary,
   initialBiomechTagsByExercise,
   initialMachines = null,
+  orgId = null,
 }: {
   groupId: string;
   coachId: string;
@@ -40,6 +41,8 @@ export function ExerciseLibraryTabs({
   initialBiomechTagsByExercise: Record<string, BiomechTagSelection[]>;
   // The coach's machines; null before the database update that adds them (the tab is not shown).
   initialMachines?: MachineRow[] | null;
+  // The organization of the workspace the library is open in (null in a coach's own space): printed QR codes and new machines carry it.
+  orgId?: string | null;
 }) {
   const [tab, setTab] = useState<Tab>("exercises");
 
@@ -123,6 +126,7 @@ export function ExerciseLibraryTabs({
           initialExercises={initialExercises}
           biomechVocabulary={biomechVocabulary}
           initialBiomechTagsByExercise={initialBiomechTagsByExercise}
+          orgId={orgId}
         />
       )}
       {tab === "patterns" && (
@@ -145,7 +149,7 @@ export function ExerciseLibraryTabs({
           ranksByPattern={Object.fromEntries(initialPatterns.map((p) => [p.name, p.ladder.map((l) => l.rank ?? 0)]))}
         />
       )}
-      {tab === "machines" && initialMachines && <GymMachinesPanel coachId={coachId} initialMachines={initialMachines} exercises={initialExercises} />}
+      {tab === "machines" && initialMachines && <GymMachinesPanel coachId={coachId} orgId={orgId} initialMachines={initialMachines} exercises={initialExercises} />}
       {tab === "one-rep-max" && <OneRepMaxCalculator />}
     </div>
   );

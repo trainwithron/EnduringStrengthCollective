@@ -5,13 +5,15 @@ import { useDialogA11y } from "@/lib/use-dialog-a11y";
 import QRCode from "qrcode";
 import { QrCode } from "lucide-react";
 import { appOriginBrowser } from "@/lib/app-url";
+import { exerciseScanPath } from "@/lib/scan-org";
 
 // equipment_qr_decal_scoping_sept19.md — generates a QR sticker a coach
 // can print and stick on the actual piece of gym equipment. Encodes a
 // stable URL (/scan/[exerciseId]) — no per-org/per-print state to track,
 // so client-side generation on open is all this needs, no new API route.
-export function ExerciseQrCodeButton({ exerciseId, exerciseName }: { exerciseId: string; exerciseName: string }) {
-  return <ScanQrCodeButton path={`/scan/${exerciseId}`} name={exerciseName} what="exercise" />;
+// The code carries the workspace's organization (?org=), so the page shows the gym it was printed for; a coach can be in several (lib/scan-org.ts).
+export function ExerciseQrCodeButton({ exerciseId, exerciseName, orgId = null }: { exerciseId: string; exerciseName: string; orgId?: string | null }) {
+  return <ScanQrCodeButton path={exerciseScanPath(exerciseId, orgId)} name={exerciseName} what="exercise" />;
 }
 
 // The same QR code, for any scan page: an exercise (/scan/<id>) or a machine (/scan/machine/<id>, every exercise done on it; Ron, Nov 19). With `label`, the button shows its word

@@ -5,6 +5,7 @@ import { extractYoutubeId } from "@/lib/youtube";
 import { QrQuickLogStart } from "@/components/public/qr-quick-log-start";
 import { GymVisitorLeadForm } from "@/components/public/gym-visitor-lead-form";
 import type { TrackedField } from "@/lib/exercise-fields";
+import { loadScanOrg } from "@/lib/scan-org";
 
 export const metadata = { title: "Scan" };
 
@@ -15,8 +16,9 @@ export const metadata = { title: "Scan" };
 // shortcut; everyone else (signed out, or signed in somewhere else
 // entirely) gets a real public landing — the exercise's own video plus
 // a join-this-gym lead capture, framed to that specific org.
-export default async function ScanExercisePage(props: { params: Promise<{ exerciseId: string }> }) {
+export default async function ScanExercisePage(props: { params: Promise<{ exerciseId: string }>; searchParams: Promise<{ org?: string }> }) {
   const { exerciseId } = await props.params;
+  const { org: requestedOrg } = await props.searchParams;
   const serviceRole = createServiceRoleClient();
 
   const { data: exercise } = await serviceRole
@@ -38,23 +40,9 @@ export default async function ScanExercisePage(props: { params: Promise<{ exerci
     );
   }
 
-  // This app already assumes one organization per coach everywhere
-  // (every existing query does the same .maybeSingle() lookup) — this
-  // page follows that same existing assumption rather than introducing
-  // new multi-org handling nothing else in the app has today.
-  const { data: coachOrgMembership } = await serviceRole
-    .from("organization_memberships")
-    .select("organization_id")
-    .eq("profile_id", exercise.created_by)
-    .maybeSingle();
-
-  const { data: org } = coachOrgMembership?.organization_id
-    ? await serviceRole
-        .from("organizations")
-        .select("id, display_name, name, logo_url")
-        .eq("id", coachOrgMembership.organization_id)
-        .maybeSingle()
-    : { data: null };
+  // The gym: the one the code was printed in (?org=, only while the coach is still in it), else the coach's oldest organization (lib/scan-org.ts). A coach can be in several
+  // (Ron owns three): asking for exactly one membership failed for him and the page said "this gym" with no logo.
+  const org = await loadScanOrg(serviceRole, exercise.created_by, requestedOrg ?? null);
 
   let videoSignedUrl: string | null = null;
   if (exercise.video_path) {
@@ -89,15 +77,15 @@ export default async function ScanExercisePage(props: { params: Promise<{ exerci
     }
   }
 
-  const orgDisplayName = org?.display_name ?? org?.name ?? "this gym";
+  const orgDisplayName = org?.name ?? "this gym";
   const trackedFields: TrackedField[] = exercise.category === "Cardio/Mobility" ? ["time"] : ["weight", "reps"];
 
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body flex items-center justify-center px-6 py-16">
       <div className="w-full max-w-sm">
-        {org?.logo_url && (
+        {org?.logoUrl && (
           // eslint-disable-next-line @next/next/no-img-element -- external org-uploaded logo
-          <img src={org.logo_url} alt="" className="w-16 h-16 mx-auto mb-4 object-contain" />
+          <img src={org.logoUrl} alt="" className="w-16 h-16 mx-auto mb-4 object-contain" />
         )}
         <p className="font-display uppercase text-xs tracking-[0.2em] text-rust text-center">
           {orgDisplayName}
@@ -128,9 +116,9 @@ export default async function ScanExercisePage(props: { params: Promise<{ exerci
             movementPatternId={null}
             trackedFields={trackedFields}
           />
-        ) : coachOrgMembership?.organization_id ? (
+        ) : org ? (
           <GymVisitorLeadForm
-            organizationId={coachOrgMembership.organization_id}
+            organizationId={org.id}
             exerciseLibraryId={exercise.id}
             orgName={orgDisplayName}
           />

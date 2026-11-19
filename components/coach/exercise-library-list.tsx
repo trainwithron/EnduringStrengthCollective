@@ -64,6 +64,7 @@ export function ExerciseLibraryList({
   initialExercises,
   biomechVocabulary,
   initialBiomechTagsByExercise,
+  orgId = null,
 }: {
   groupId: string;
   coachId: string;
@@ -72,6 +73,8 @@ export function ExerciseLibraryList({
   // Keyed by exercise name (the tagging layer's real join key), not id —
   // shared across every coach's own copy of the same-named exercise.
   initialBiomechTagsByExercise: Record<string, BiomechTagSelection[]>;
+  // The workspace's organization: a printed exercise QR code shows that gym (lib/scan-org.ts).
+  orgId?: string | null;
 }) {
   const [exercises, setExercises] = useState(initialExercises);
   const [search, setSearch] = useState("");
@@ -741,7 +744,7 @@ export function ExerciseLibraryList({
                       >
                         <Trophy className="w-4 h-4" />
                       </Link>
-                      <ExerciseQrCodeButton exerciseId={ex.id} exerciseName={ex.name} />
+                      <ExerciseQrCodeButton exerciseId={ex.id} exerciseName={ex.name} orgId={orgId} />
                       <button
                         type="button"
                         onClick={() => setExpandedId((prev) => (prev === ex.id ? null : ex.id))}
