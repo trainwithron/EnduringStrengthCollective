@@ -303,4 +303,7 @@ select
     and exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'machine_demos_select')
     and exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'machine_demos_insert_own_folder') as private_video_bucket,
   not has_table_privilege('anon', 'public.catalog_machines', 'select') and not has_table_privilege('anon', 'public.catalog_machine_exercises', 'select')
-    and not has_table_privilege('anon', 'public.catalog_requests', 'select') as nobody_signed_out;
+    and not has_table_privilege('anon', 'public.catalog_requests', 'select') as nobody_signed_out,
+  to_regprocedure('public.is_any_group_coach()') is not null
+    and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'catalog_requests' and policyname = 'catalog_requests_send_own' and with_check like '%is_any_group_coach()%')
+    and exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'machine_demos_insert_own_folder' and with_check like '%is_any_group_coach()%') as only_coaches_send;
