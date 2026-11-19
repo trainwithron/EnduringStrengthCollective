@@ -20,7 +20,7 @@ export interface MenuSession {
   endMs: number;
 }
 
-type Dialog = { kind: "reschedule" | "duplicate" | "remove"; session: MenuSession };
+type Dialog = { kind: "reschedule" | "duplicate" | "remove" | "canceled"; session: MenuSession };
 
 // A client's session on the calendar: right-click it on a computer, or press and hold it on a phone, for Reschedule, Duplicate and Remove (Ron, Nov 2).
 // One hook per calendar view: spread handlersFor(session) on each session's element and render `node` once. Nothing about the element's own layout changes.
@@ -151,6 +151,7 @@ export function useSessionMenu(timezone: string, onChanged?: () => void) {
             document.body
           )}
         {dialog?.kind === "reschedule" && createPortal(<RescheduleDialog session={dialog.session} timezone={timezone} onClose={() => setDialog(null)} onDone={changed} />, document.body)}
+        {dialog?.kind === "canceled" && createPortal(<ClientCanceledDialog session={dialog.session} timezone={timezone} onClose={() => setDialog(null)} onDone={changed} />, document.body)}
         {dialog?.kind === "duplicate" && createPortal(<DuplicateDialog session={dialog.session} timezone={timezone} onClose={() => setDialog(null)} onDone={changed} />, document.body)}
       </>
     );
@@ -224,6 +225,10 @@ function SessionMenuPopup({ session, x, y, timezone, settled, onPick, onClose }:
         </button>
         <button type="button" role="menuitem" className={item} onClick={() => pick("duplicate")}>
           Duplicate
+        </button>
+        {/* The client called it off (Ron, Nov 19: "Amber canceled her session this morning and I have no way to just say cancel charge"): before or after the start time. */}
+        <button type="button" role="menuitem" className={item} onClick={() => pick("canceled")}>
+          Client canceled
         </button>
         {canRemove && (
           <button type="button" role="menuitem" className={`${item} text-rust`} onClick={() => pick("remove")}>
@@ -330,6 +335,67 @@ function RescheduleDialog({ session, timezone, onClose, onDone }: { session: Men
         </button>
         <button type="button" disabled={busy} onClick={onClose} className={quiet}>
           Keep it where it is
+        </button>
+      </div>
+    </DialogFrame>
+  );
+}
+
+// The client cancelled: the coach says whether it counts as one of their sessions. Before or after the start time; only this one session (a weekly schedule carries on).
+function ClientCanceledDialog({ session, timezone, onClose, onDone }: { session: MenuSession; timezone: string; onClose: () => void; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEscape(busy, onClose);
+  const first = session.name.split(" ")[0];
+
+  async function mark(charge: boolean) {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    const { error: rpcError } = await createBrowserClient().rpc("mark_client_cancelled", { p_booking_id: session.bookingId, p_charge: charge });
+    setBusy(false);
+    if (rpcError) {
+      const m = rpcError.message;
+      setError(
+        m.includes("marked as happened")
+          ? "This session is marked as happened. Undo that on the day page first."
+          : m.includes("no-show")
+            ? "This session is marked a no-show. Undo that on the day page first."
+            : m.includes("only a booked session")
+              ? "This session is already cancelled."
+              : "That didn't save. Nothing was changed."
+      );
+      return;
+    }
+    // Takes it off a connected Google calendar too, as any cancellation does.
+    mirrorGoogleCalendarEvent(session.bookingId);
+    onDone();
+    onClose();
+  }
+
+  return (
+    <DialogFrame label="Client canceled" busy={busy} onClose={onClose}>
+      <p className="font-display font-bold uppercase text-sm tracking-wide text-rust">Client canceled</p>
+      <p className="font-display font-bold text-lg leading-tight text-chalk mt-2">{session.name}</p>
+      <p className="font-body text-sm text-chalk">{formatInTimezone(new Date(session.startMs), timezone, "dateTime")}</p>
+      <p className="font-body text-sm text-steel mt-3">
+        This takes the session off the calendar. Does it count as one of {first}&apos;s sessions?
+        {session.seriesId ? " Only this one: the weekly schedule carries on." : ""}
+      </p>
+      {error && (
+        <p className="font-body text-xs text-rust mt-2" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="mt-4 flex flex-col gap-2">
+        <button type="button" disabled={busy} onClick={() => mark(true)} className={primary}>
+          Charge the session
+        </button>
+        <button type="button" disabled={busy} onClick={() => mark(false)} className="min-h-11 border border-steel/40 text-chalk font-display font-bold uppercase tracking-wide px-4 py-2 disabled:opacity-40">
+          Don&apos;t charge
+        </button>
+        <button type="button" disabled={busy} onClick={onClose} className={quiet}>
+          Keep the session
         </button>
       </div>
     </DialogFrame>

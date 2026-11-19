@@ -55,6 +55,13 @@ describe("the calendar's session menu (Ron, Nov 2)", () => {
     expect(menu).toContain('window.addEventListener("scroll", onMove, true);');
     // Review, Nov 19: a scroll while the finger is down cancels the hold, and the server-page target draws its menu outside the session (portal events bubble to the parent).
     expect(menu).toContain('window.addEventListener("scroll", onScroll, { capture: true, passive: true });');
+    // Ron, Nov 19: "Client canceled" from the same menu, Charge or Don't charge, before or after the start time (one database call that cancels and settles it).
+    expect(menu).toContain('onClick={() => pick("canceled")}');
+    expect(menu).toContain('rpc("mark_client_cancelled", { p_booking_id: session.bookingId, p_charge: charge })');
+    const sql = read("supabase/migrations/0450_mark_client_cancelled.sql");
+    expect(sql).toContain("late_charge_state = 'charged'");
+    expect(sql).toContain("late_charge_state = 'waived'");
+    expect(sql).toContain("grant execute on function public.mark_client_cancelled(uuid, boolean) to authenticated");
     expect(menu).toMatch(/<\/span>\s*\{menu\.node\}\s*<\/>/);
     // Duplicate starts at the same time next week; more than one week goes through the weekly booking (one notice to the client)
     expect(menu).toContain("useState(addDaysToKey(now.dateKey, 7))");

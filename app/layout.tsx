@@ -1,3 +1,4 @@
+import { DateFieldsOpenCalendar } from "@/components/shared/date-fields-open-calendar";
 import { BRAND, BRAND_OG_IMAGES } from "@/lib/brand";
 import { configuredAppUrl } from "@/lib/app-url";
 import type { Metadata, Viewport } from "next";
@@ -104,6 +105,7 @@ export default async function RootLayout({
         <TimezoneCapture />
         <ConfirmDialogHost />
         <SaveFailedToast />
+        <DateFieldsOpenCalendar />
       </body>
     </html>
   );
