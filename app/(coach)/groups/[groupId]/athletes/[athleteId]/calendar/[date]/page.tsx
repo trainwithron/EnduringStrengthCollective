@@ -251,7 +251,7 @@ export default async function ClientCalendarDayPage(
   const { data: dayBookingsUnsorted } = await readRowsByIds(orgGroupIds, (g) => (from, to) =>
     supabase
       .from("bookings")
-      .select("start_at, athlete_id, profiles ( full_name )")
+      .select("start_at, athlete_id, profiles!bookings_athlete_id_fkey ( full_name )")
       .eq("coach_id", user.id)
       .in("group_id", g)
       .eq("status", "confirmed")

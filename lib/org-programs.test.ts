@@ -98,6 +98,9 @@ describe("a group's program is never an organization program, on every screen th
     ]) {
       expect(read(f), f).toContain('.eq("org_program", false)');
     }
-    expect(read("lib/team-sheet/load-sheet.ts").match(/\.eq\("org_program", false\)/g)).toHaveLength(2);
+    // Once, on the programs read: group_workout_exercises has no org_program column, so filtering it there failed every team sheet download (Nov 19).
+    const sheet = read("lib/team-sheet/load-sheet.ts");
+    expect(sheet.match(/\.eq\("org_program", false\)/g)).toHaveLength(1);
+    expect(sheet).toMatch(/from\("programs"\)[^\n]*\.eq\("org_program", false\)/);
   });
 });

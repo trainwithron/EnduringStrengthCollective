@@ -38,29 +38,14 @@ export async function POST(request: Request) {
   }
 
   // The PIN is checked in the database against its hash, which also counts wrong tries and locks the athlete's PIN
-  // after five (migration 0251). Until that exists the older plain-column check is used.
+  // after five (migration 0251). (The old plain-column fallback is gone: that column no longer exists, Nov 19.)
   const { data: verdict, error: verifyError } = await supabase.rpc("verify_kiosk_pin", {
     p_group_id: groupId,
     p_athlete_id: athleteId,
     p_pin: String(pin),
   });
   if (verifyError) {
-    if (!/could not find the function|does not exist/i.test(verifyError.message)) {
-      return NextResponse.json({ error: "Couldn't check that PIN — try again." }, { status: 500 });
-    }
-    const { data: legacy } = await supabase
-      .from("group_memberships")
-      .select("kiosk_pin")
-      .eq("group_id", groupId)
-      .eq("profile_id", athleteId)
-      .eq("role", "athlete")
-      .maybeSingle();
-    if (!legacy?.kiosk_pin) {
-      return NextResponse.json({ error: "No PIN set for this athlete yet — ask your coach." }, { status: 400 });
-    }
-    if (legacy.kiosk_pin !== pin) {
-      return NextResponse.json({ error: "Wrong PIN — try again." }, { status: 401 });
-    }
+    return NextResponse.json({ error: "Couldn't check that PIN — try again." }, { status: 500 });
   } else if (verdict === "no_pin") {
     return NextResponse.json({ error: "No PIN set for this athlete yet — ask your coach." }, { status: 400 });
   } else if (verdict === "locked") {

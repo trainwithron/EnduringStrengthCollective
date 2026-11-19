@@ -45,15 +45,7 @@ export function KioskPinManager({ initialRoster, organizationId = null, showGrou
     const newPin = generateKioskPin();
     const supabase = createBrowserClient();
     setError(null);
-    let { error: saveError } = await supabase.rpc("set_kiosk_pin", { p_group_id: r.groupId, p_athlete_id: r.athleteId, p_pin: newPin });
-    if (saveError && /could not find the function|does not exist/i.test(saveError.message)) {
-      // Hashed PINs are not on this database yet: the older plain column still works.
-      ({ error: saveError } = await supabase
-        .from("group_memberships")
-        .update({ kiosk_pin: newPin })
-        .eq("group_id", r.groupId)
-        .eq("profile_id", r.athleteId));
-    }
+    const { error: saveError } = await supabase.rpc("set_kiosk_pin", { p_group_id: r.groupId, p_athlete_id: r.athleteId, p_pin: newPin });
     if (saveError) {
       setError("Couldn't save that PIN. Try again.");
     } else {

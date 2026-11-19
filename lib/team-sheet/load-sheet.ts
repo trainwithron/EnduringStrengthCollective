@@ -130,8 +130,9 @@ export async function loadSheetModel(supabase: any, input: LoadSheetInput): Prom
       .from("group_workout_exercises")
       .select(SHEET_READS.exercises)
       .in("workout_id", ids)
-      // the team's own exercises: an exercise written for one athlete (a per-client program) is not on the team's sheet
-      .is("athlete_id", null).eq("org_program", false)
+      // the team's own exercises: an exercise written for one athlete (a per-client program) is not on the team's sheet.
+      // (Organization programs are already left out by the programs read; this table has no org_program column, and filtering on it failed every download, Nov 19.)
+      .is("athlete_id", null)
       .order("exercise_order", { ascending: true })
       .order("id", { ascending: true })
       .range(from, to)

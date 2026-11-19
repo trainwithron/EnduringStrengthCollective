@@ -39,7 +39,7 @@ export function DaySchedulePanel({ date }: { date: string }) {
         readRowsByIds(orgGroupIds, (g) => (from, to) =>
           supabase
             .from("bookings")
-            .select("start_at, profiles ( full_name )")
+            .select("start_at, profiles!bookings_athlete_id_fkey ( full_name )")
             .eq("coach_id", user.id)
             .in("group_id", g)
             .eq("status", "confirmed")
