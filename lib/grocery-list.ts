@@ -157,12 +157,17 @@ export function compileGroceryList(days: PlanDay[], opts: GroceryOptions = {}): 
   return { categories, unstructured: [...unstructured].sort((a, b) => a.localeCompare(b)), daysCounted };
 }
 
-// The list as plain text, for copying into a note or a message.
-export function groceryListText(list: GroceryList, title = "GROCERY LIST"): string {
+// One item's id on the list (the ticks kept on a device are keyed by it): the same food in the same unit is the same line all week.
+export function groceryItemId(i: Pick<GroceryItem, "category" | "name" | "unit">): string {
+  return `${i.category}|${i.name}|${i.unit}`;
+}
+
+// The list as plain text, for sharing in a note or a message. An item ticked off as already there says so.
+export function groceryListText(list: GroceryList, title = "GROCERY LIST", have?: Set<string>): string {
   const lines = [title, ""];
   for (const c of list.categories) {
     lines.push(c.label.toUpperCase());
-    for (const i of c.items) lines.push(`  ${i.name}: ${i.display}`);
+    for (const i of c.items) lines.push(`  ${i.name}: ${i.display}${have?.has(groceryItemId(i)) ? " (have it)" : ""}`);
     lines.push("");
   }
   if (list.unstructured.length > 0) {

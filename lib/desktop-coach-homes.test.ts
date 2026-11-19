@@ -137,7 +137,6 @@ describe("the pages that only send you somewhere else land in a home", () => {
       ["/calendar?tab=availability", "calendar"],
       [`${g}/exercise-library`, "programs"],
       [`${g}/nutrition?tab=favorites`, "nutrition"],
-      [`${g}/nutrition?tab=calculator`, "nutrition"],
       [`${g}/resources?tab=shop`, "settings"],
       [`${g}/resources?tab=referrals`, "settings"],
       [`${g}/feed?channel=general`, "messages"],

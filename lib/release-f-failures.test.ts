@@ -168,7 +168,6 @@ describe("a screen shows the saved state only when the write saved (saved() retu
     "components/coach/main-lift-picker.tsx",
     "components/coach/desktop/team-depth-chart.tsx",
     "components/coach/desktop/coach-position-scope-list.tsx",
-    "components/coach/desktop/recipe-vote-favorite.tsx",
     "components/share/customize-share-panel.tsx",
     "components/share/background-picker.tsx",
     "components/coach/availability-manager.tsx",

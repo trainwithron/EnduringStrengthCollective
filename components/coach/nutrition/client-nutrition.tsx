@@ -21,6 +21,8 @@ import { MacrosOffSwitch } from "@/components/coach/nutrition/macros-off-switch"
 import { AutoSuggestOffSwitch } from "@/components/coach/nutrition/auto-suggest-off-switch";
 import { ClientAnswersPanel } from "@/components/coach/nutrition/client-answers-panel";
 import { PlanTriesPanel, type PlanTryView } from "@/components/coach/nutrition/plan-tries-panel";
+import { FoldSection } from "@/components/coach/nutrition/fold-section";
+import { choicesOfSnapshots } from "@/lib/starred-meals";
 import type { RecalcAnswer } from "@/lib/recalc-prompt";
 import { computeWeeklyWeightTrend } from "@/lib/weight-trend";
 import { computeReadinessAverage } from "@/lib/wellness";
@@ -62,18 +64,10 @@ import { resultLines, stanceLine, verdictLine } from "@/lib/phase-review-view";
 
 const PHASE_TAG_LABEL: Record<MilestonePhaseTag, string> = { reverse_diet: "Reverse diet", cut: "Cut", bulk: "Bulk" };
 
-function SectionHeading({ id, title, note }: { id: string; title: string; note?: string }) {
-  return (
-    <div id={id} className="scroll-mt-24 mb-3">
-      <h2 className="font-display font-bold text-xl uppercase leading-none">{title}</h2>
-      {note && <p className="font-body text-xs text-steel mt-1 max-w-[70ch]">{note}</p>}
-    </div>
-  );
-}
-
 // One client's whole Nutrition area, used by BOTH the Nutrition hub and the client's own profile Nutrition tab, so the two can never drift apart again. Server-fed:
-// it reads what it needs for this one client, then lays it out in the order a coach checks it (Ron, Oct 21, from Cronometer and MacroFactor): this week at a glance, Targets (the calculator inside),
-// the weekly check-in, the meal plan with its grocery list, and the client's own answers.
+// it reads what it needs for this one client, then lays it out in four folding sections, in the order a coach checks them (Ron, Nov 19 revamp): This week (the glance, the weekly
+// check-in, the client's answers, the Spotter's findings), Targets (the suggestion, the standing target with Calculate targets inside, the phase), Meal plan (the planner, past tries,
+// the grocery list) and About (their food preferences).
 //
 // `variant="hub"` adds a sticky header (name, target, phase, floor warning); `variant="profile"` is the same content inline, with a link to open it in Nutrition.
 export async function ClientNutrition({
@@ -209,7 +203,7 @@ export async function ClientNutrition({
   // When the client asked for a different meal plan ("Not feeling it?"): the latest tries, newest first. A failed read (or a database without the table yet) is no tries, never a failed page.
   const { data: tryRows, error: triesError } = await supabase
     .from("meal_plan_tries")
-    .select("id, try_number, note, summary, dates, requested_at, restored_at, source")
+    .select("id, try_number, note, summary, dates, requested_at, restored_at, source, previous_plan")
     .eq("athlete_id", athleteId)
     .eq("group_id", groupId)
     .order("requested_at", { ascending: false })
@@ -226,6 +220,8 @@ export async function ClientNutrition({
         requestedAt: r.requested_at as string,
         restored: !!r.restored_at,
         source: r.source === "allergy" ? ("allergy" as const) : ("client" as const),
+        // The meals they had before this change, each once, so one can be starred.
+        previousMeals: choicesOfSnapshots((r as { previous_plan?: unknown }).previous_plan),
       }));
   // The target in force today as whole numbers, when all four are set (scaling a plan needs every one).
   const scaleTarget =
@@ -544,19 +540,26 @@ export async function ClientNutrition({
   const allergyDates = new Set(planTries.filter((t) => t.source === "allergy").flatMap((t) => t.dates));
   const rebuiltEmpty = emptyMealsOf(((upcomingPlanRows ?? []) as { log_date: string; meals: unknown }[]).filter((r) => allergyDates.has(r.log_date)));
 
-  const detailsFlags = [...(reviewCard ? ["Phase review due"] : []), ...(findings.length > 0 ? [findings.length === 1 ? "1 thing to look at" : `${findings.length} things to look at`] : [])];
+  // The Details line under Targets says when something there needs a look (the phase review). The Spotter's findings are in This week.
+  const detailsFlags = reviewCard ? ["Phase review due"] : [];
+  const mealPlanNeedsLook = flaggedAssigned.length > 0 || rebuiltEmpty.length > 0;
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-6">
       <div className={variant === "hub" ? "sticky top-0 z-10 bg-graphite/95 backdrop-blur border-b border-steel/20 -mx-1 px-1 pb-3 pt-1" : "border-b border-steel/20 pb-3"}>
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
           <h2 className="font-display font-bold text-2xl uppercase leading-none">{clientName}</h2>
-          {standingTarget?.calories != null ? (
-            <p className="font-body text-sm text-chalk [font-variant-numeric:tabular-nums]">
-              Target {standingTarget.calories.toLocaleString("en-US")}
-              {standingTarget.protein_g != null ? ` · P ${standingTarget.protein_g}` : ""}
-              {standingTarget.carbs_g != null ? ` · C ${standingTarget.carbs_g}` : ""}
-              {standingTarget.fat_g != null ? ` · F ${standingTarget.fat_g}` : ""}
+          {standingTarget?.calories != null || standingTarget?.protein_g != null ? (
+            // Calories and protein lead; carbs and fat follow when they are set.
+            <p className="font-body text-sm text-chalk [font-variant-numeric:tabular-nums]" data-header-target>
+              {standingTarget?.calories != null ? `${standingTarget.calories.toLocaleString("en-US")} kcal` : "– kcal"}
+              {standingTarget?.protein_g != null ? ` · ${standingTarget.protein_g} g protein` : ""}
+              {standingTarget?.carbs_g != null || standingTarget?.fat_g != null ? (
+                <span className="text-xs text-steel">
+                  {standingTarget?.carbs_g != null ? ` · ${standingTarget.carbs_g} g carbs` : ""}
+                  {standingTarget?.fat_g != null ? ` · ${standingTarget.fat_g} g fat` : ""}
+                </span>
+              ) : null}
             </p>
           ) : (
             <p className="font-body text-sm text-steel">No standing target yet</p>
@@ -565,12 +568,12 @@ export async function ClientNutrition({
             <span className="font-body text-xs text-rust border border-rust/40 px-2 py-0.5">Phase: {PHASE_TAG_LABEL[phaseTag]}</span>
           )}
           {pendingSuggestions.length > 0 && (
-            <a href="#targets" className="font-body text-xs text-chalk bg-rust px-2 py-0.5">
-              {pendingSuggestions.length === 1 ? "Suggestion waiting" : `${pendingSuggestions.length} suggestions waiting`}
+            <a href="#targets" className="inline-flex items-center min-h-11 font-body text-xs text-chalk">
+              <span className="bg-rust px-2 py-0.5">{pendingSuggestions.length === 1 ? "Suggestion waiting" : `${pendingSuggestions.length} suggestions waiting`}</span>
             </a>
           )}
           {variant === "profile" && (
-            <Link href={`/groups/${groupId}/nutrition?athleteId=${athleteId}`} className="font-body text-xs text-rust ml-auto">
+            <Link href={`/groups/${groupId}/nutrition?athleteId=${athleteId}`} className="inline-flex items-center min-h-11 font-body text-xs text-rust ml-auto">
               Open in Nutrition &rarr;
             </Link>
           )}
@@ -583,241 +586,261 @@ export async function ClientNutrition({
             </p>
           )}
         </div>
-        <nav aria-label="Nutrition sections" className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-body text-xs text-steel">
-          <a href="#at-a-glance" className="hover:text-chalk">This week</a>
-          <a href="#targets" className="hover:text-chalk">Targets</a>
-          <a href="#check-in" className="hover:text-chalk">Check-in</a>
-          <a href="#meal-plan" className="hover:text-chalk">Meal plan</a>
-          <a href="#answers" className="hover:text-chalk">{firstName}&apos;s answers</a>
+        <nav aria-label="Nutrition sections" className="mt-1 flex flex-wrap gap-x-4 font-body text-xs text-steel">
+          <a href="#this-week" className="inline-flex items-center min-h-11 hover:text-chalk">This week</a>
+          <a href="#targets" className="inline-flex items-center min-h-11 hover:text-chalk">Targets</a>
+          <a href="#meal-plan" className="inline-flex items-center min-h-11 hover:text-chalk">Meal plan</a>
+          <a href="#about" className="inline-flex items-center min-h-11 hover:text-chalk">About</a>
         </nav>
       </div>
 
-      <section>
-        <SectionHeading id="at-a-glance" title="This week" note="What they ate against each day's target. Tap a day for what they logged and its vitamins and minerals." />
-        <NutritionGlance
-          days={glance}
-          average={weekAverage(glance)}
-          rangeLabel={`${shortDateLabel(weekStartKey)} – ${shortDateLabel(todayKey)}`}
-          nutrientsByDay={nutrientsByDay}
-          weight={weightSeries((weightLogs ?? []) as { logged_date: string; weight: number }[], todayKey)}
-          weightUnit={bodyProfile.weightUnit}
-          burn={burn}
-          clientName={firstName}
-        />
-      </section>
+      {/* Four folding sections, in the order a coach checks them (Ron, Nov 19 revamp): This week, Targets, Meal plan, About. */}
+      <div>
+        <FoldSection
+          id="this-week"
+          title="This week"
+          note="What they ate against each day's target. Tap a day for what they logged and its vitamins and minerals."
+          flag={findings.length > 0 ? (findings.length === 1 ? "1 thing to look at" : `${findings.length} things to look at`) : null}
+          defaultOpen
+        >
+          <NutritionGlance
+            days={glance}
+            average={weekAverage(glance)}
+            rangeLabel={`${shortDateLabel(weekStartKey)} – ${shortDateLabel(todayKey)}`}
+            nutrientsByDay={nutrientsByDay}
+            weight={weightSeries((weightLogs ?? []) as { logged_date: string; weight: number }[], todayKey)}
+            weightUnit={bodyProfile.weightUnit}
+            burn={burn}
+            clientName={firstName}
+          />
 
-      <section>
-        <SectionHeading id="targets" title="Targets" />
-        <TargetsCard
-          suggestion={
-            <>
-              <BaselinePrompt
+          <div id="check-in" className="scroll-mt-24">
+            <h3 className="font-display font-bold text-lg uppercase leading-none mb-2">Weekly check-in</h3>
+            <div className="border border-steel/20">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-4 py-3">
+                <p className="font-body text-sm text-chalk" data-checkin-countdown>
+                  {weeklyWaiting ? "Check-in done: its suggestion is waiting in Targets" : countdown.label}
+                </p>
+                <p className="font-body text-xs text-steel">{lastCheckinLine}</p>
+              </div>
+              <details className="border-t border-steel/15">
+                <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden min-h-[44px] flex items-center px-4 font-body text-sm text-rust">Run a check-in now</summary>
+                <div className="px-4 pb-4 pt-2 border-t border-steel/15">
+                  <WeeklyCheckinPanel
+                    athleteId={athleteId}
+                    groupId={groupId}
+                    weekAvgWeight={weightTrend.currentAvg}
+                    lastWeekAvgWeight={weightTrend.previousAvg}
+                    // The most recently set number: the standing target if it was saved after the last per-day row, otherwise that row.
+                    defaultCurrentCalories={
+                      standingTarget?.calories != null && (!latestExplicit || standingTarget.effective_from > latestExplicit.log_date)
+                        ? standingTarget.calories
+                        : latestExplicit?.calories ?? standingTarget?.calories ?? null
+                    }
+                    defaultRecoveryRating={defaultRecoveryRating}
+                    defaultAdherenceDays={defaultAdherenceDays}
+                    lastCheckin={lastCheckin}
+                    isInjured={isInjured}
+                    maintenanceCalories={maintenanceCalories}
+                    injurySurplusPct={injurySurplusPct}
+                    defaultPhase={phasePlan?.phase ?? derivedPhase?.phase ?? milestoneTagToNutritionPhase(phaseTag)}
+                    todayKey={todayKey}
+                    floorCalories={floorCalories}
+                    floorNote={floorNote}
+                    clientName={firstName}
+                    proteinGPerLb={prefs.proteinGPerLb}
+                    defaultDietaryRestrictions={rulesText}
+                    weightUnit={bodyProfile.weightUnit}
+                    ageYears={ageYears}
+                  />
+                </div>
+              </details>
+            </div>
+          </div>
+
+          {answers.length > 0 && (
+            <div id="answers" className="scroll-mt-24">
+              <h3 className="font-display font-bold text-lg uppercase leading-none mb-2">{firstName}&apos;s answers</h3>
+              <ClientAnswersPanel
                 athleteId={athleteId}
-                groupId={groupId}
                 clientName={firstName}
-                outcome={baselineOutcome}
-                phaseNote={baselinePhaseNote}
-                archetype={baselineArchetype}
-                hasStanding={standingTarget?.calories != null}
-                hasPendingBaseline={pendingSuggestions.some((p) => p.kind === "baseline")}
+                answers={answers}
+                variety={prefs.variety}
+                currentTarget={scaleTarget}
+                todayKey={todayKey}
+                metric={bodyProfile.weightUnit === "kg"}
               />
-              <NutritionCheckinSuggestionsList
+            </div>
+          )}
+
+          <NutritionSpotterPanel findings={findings} />
+        </FoldSection>
+
+        <FoldSection
+          id="targets"
+          title="Targets"
+          note="Calories and protein first; carbs and fat if you want them. Calculate targets works them out from their numbers."
+          flag={pendingSuggestions.length > 0 ? (pendingSuggestions.length === 1 ? "Suggestion waiting" : `${pendingSuggestions.length} suggestions waiting`) : null}
+          defaultOpen={pendingSuggestions.length > 0 || standingTarget?.calories == null}
+        >
+          <TargetsCard
+            suggestion={
+              <>
+                <BaselinePrompt
+                  athleteId={athleteId}
+                  groupId={groupId}
+                  clientName={firstName}
+                  outcome={baselineOutcome}
+                  phaseNote={baselinePhaseNote}
+                  archetype={baselineArchetype}
+                  hasStanding={standingTarget?.calories != null}
+                  hasPendingBaseline={pendingSuggestions.some((p) => p.kind === "baseline")}
+                />
+                <NutritionCheckinSuggestionsList
+                  athleteId={athleteId}
+                  groupId={groupId}
+                  initialSuggestions={pendingSuggestions}
+                  todayKey={todayKey}
+                  floorCalories={floorCalories}
+                  floorNote={floorNote}
+                  clientName={firstName}
+                  ageKnown={ageYears != null}
+                />
+              </>
+            }
+            standing={
+              <StandingMacroTargetCard
                 athleteId={athleteId}
                 groupId={groupId}
-                initialSuggestions={pendingSuggestions}
-                todayKey={todayKey}
+                initial={
+                  standingTarget
+                    ? { calories: standingTarget.calories, proteinG: standingTarget.protein_g, carbsG: standingTarget.carbs_g, fatG: standingTarget.fat_g }
+                    : null
+                }
+                latestExplicit={latestExplicit ? { date: latestExplicit.log_date, calories: latestExplicit.calories } : null}
+                upcomingOverrides={upcomingOverrides}
+                calendarHref={`/groups/${groupId}/athletes/${athleteId}/calendar`}
                 floorCalories={floorCalories}
                 floorNote={floorNote}
                 clientName={firstName}
-                ageKnown={ageYears != null}
+                todayKey={todayKey}
+                scheduled={scheduledTargets}
+                setByClient={standingTarget?.set_by === "self"}
+                calculator={{
+                  initialWeight: weightLogs?.[0]?.weight != null ? Number(weightLogs[0].weight) : null,
+                  initialGoal: phasePlan?.phase ?? derivedPhase?.phase ?? milestoneTagToNutritionPhase(phaseTag),
+                  weightUnit: bodyProfile.weightUnit,
+                  initialActivity: bodyProfile.activity,
+                }}
               />
-            </>
-          }
-          standing={
-            <StandingMacroTargetCard
+            }
+            phase={
+              <div>
+                <PhaseOfRecordCard
+                  athleteId={athleteId}
+                  groupId={groupId}
+                  coachId={coachId}
+                  clientName={firstName}
+                  plan={phasePlan}
+                  derived={derivedPhase && derivedPhase.source !== "plan" ? { phase: derivedPhase.phase, source: derivedPhase.source } : null}
+                  todayKey={todayKey}
+                />
+                {trendAlignment && (
+                  <p className={`font-body text-xs mt-2 ${trendAlignment.aligned ? "text-positive" : "text-rust"}`}>
+                    {trendAlignment.aligned
+                      ? "✓ Trending as expected for this phase"
+                      : `⚠ Trend reads as "${trendAlignment.trend.replace("_", " ")}", which doesn't match the tagged goal yet. Worth a look.`}
+                  </p>
+                )}
+              </div>
+            }
+            detailsFlags={detailsFlags}
+            details={
+              <>
+                {reviewCard && <PhaseReviewCard {...reviewCard} />}
+                <div className="space-y-3">
+                  <FoodTrackingSwitch athleteId={athleteId} groupId={groupId} clientName={clientName} />
+                  <MacrosOffSwitch athleteId={athleteId} groupId={groupId} clientName={clientName} />
+                  <AutoSuggestOffSwitch athleteId={athleteId} groupId={groupId} clientName={clientName} />
+                </div>
+                <BodyProfileEditor
+                  athleteId={athleteId}
+                  groupId={groupId}
+                  clientName={firstName}
+                  initial={{ heightCm: bodyProfile.heightCm, sex: bodyProfile.sex, bodyFatPct: bodyProfile.bodyFatPct, activity: bodyProfile.activity, weightUnit: bodyProfile.weightUnit }}
+                  dateOfBirthLabel={dobLabel}
+                  latestWeightLbs={weightLogs?.[0]?.weight != null ? Number(weightLogs[0].weight) : null}
+                  latestWeightDate={latestWeightDate}
+                />
+              </>
+            }
+          />
+        </FoldSection>
+
+        <FoldSection id="meal-plan" title="Meal plan" note="Built from the standing target. Three options for every meal; star one to keep it in Favorite meals." flag={mealPlanNeedsLook ? "Needs a look" : null}>
+          <div>
+            {flaggedAssigned.length > 0 && (
+              <div role="status" className="mb-4 border border-amber-400/40 bg-amber-400/5 p-3 space-y-1.5">
+                <p className="font-body text-sm text-amber-400 font-medium">
+                  {firstName}&apos;s food preferences conflict with {flaggedAssigned.length === 1 ? "an assigned day" : `${flaggedAssigned.length} assigned days`}. They don&apos;t see the flagged options; build a new plan for these days.
+                </p>
+                {flaggedAssigned.slice(0, 4).map((d) => (
+                  <p key={d.date} className="font-body text-xs text-chalk">
+                    <span className="text-steel">{shortDateLabel(d.date)}:</span> {d.flagged.slice(0, 2).map(describeFlagged).join("; ")}
+                    {d.flagged.length > 2 ? ` (and ${d.flagged.length - 2} more)` : ""}
+                  </p>
+                ))}
+                {flaggedAssigned.length > 4 && <p className="font-body text-xs text-steel">…and {flaggedAssigned.length - 4} more days.</p>}
+              </div>
+            )}
+            {rebuiltEmpty.length > 0 && (
+              <div role="status" className="mb-4 border border-amber-400/40 bg-amber-400/5 p-3 space-y-1" data-rebuilt-empty>
+                <p className="font-body text-sm text-amber-400 font-medium">
+                  {rebuiltEmpty.length === 1 ? "1 meal" : `${rebuiltEmpty.length} meals`} had no safe option after {firstName}&apos;s allergy update. {firstName} sees &ldquo;your coach will update this&rdquo;; build {rebuiltEmpty.length === 1 ? "it" : "them"} below.
+                </p>
+                <p className="font-body text-xs text-chalk">{rebuiltEmpty.slice(0, 6).map((m) => `${shortDateLabel(m.log_date)}: ${m.title}`).join("; ")}{rebuiltEmpty.length > 6 ? "; and more" : ""}</p>
+              </div>
+            )}
+            <NutritionTools
               athleteId={athleteId}
               groupId={groupId}
-              initial={
-                standingTarget
-                  ? { calories: standingTarget.calories, proteinG: standingTarget.protein_g, carbsG: standingTarget.carbs_g, fatG: standingTarget.fat_g }
-                  : null
-              }
-              latestExplicit={latestExplicit ? { date: latestExplicit.log_date, calories: latestExplicit.calories } : null}
-              upcomingOverrides={upcomingOverrides}
-              calendarHref={`/groups/${groupId}/athletes/${athleteId}/calendar`}
-              floorCalories={floorCalories}
-              floorNote={floorNote}
-              clientName={firstName}
-              todayKey={todayKey}
-              scheduled={scheduledTargets}
-              setByClient={standingTarget?.set_by === "self"}
-              calculator={{
-                initialWeight: weightLogs?.[0]?.weight != null ? Number(weightLogs[0].weight) : null,
-                initialGoal: phasePlan?.phase ?? derivedPhase?.phase ?? milestoneTagToNutritionPhase(phaseTag),
-                weightUnit: bodyProfile.weightUnit,
-                initialActivity: bodyProfile.activity,
-              }}
+              date={todayKey}
+              latestBodyWeight={weightLogs?.[0]?.weight ?? null}
+              existingPlan={existingPlan ?? null}
+              target={standingTarget ? { calories: standingTarget.calories, protein: standingTarget.protein_g, carbs: standingTarget.carbs_g, fats: standingTarget.fat_g } : null}
+              defaultDietaryRestrictions={rulesText || (lastCheckin?.dietaryRestrictions ?? null)}
+              proteinGPerLb={prefs.proteinGPerLb}
+              foodRules={foodRules}
+              rulesReadable={!prefsReadError}
+              allergiesAsked={allergiesAsked}
+              clientName={clientName}
             />
-          }
-          phase={
+          </div>
+          {planTries.length > 0 && (
             <div>
-              <PhaseOfRecordCard
-                athleteId={athleteId}
-                groupId={groupId}
-                coachId={coachId}
-                clientName={firstName}
-                plan={phasePlan}
-                derived={derivedPhase && derivedPhase.source !== "plan" ? { phase: derivedPhase.phase, source: derivedPhase.source } : null}
-                todayKey={todayKey}
-              />
-              {trendAlignment && (
-                <p className={`font-body text-xs mt-2 ${trendAlignment.aligned ? "text-positive" : "text-rust"}`}>
-                  {trendAlignment.aligned
-                    ? "✓ Trending as expected for this phase"
-                    : `⚠ Trend reads as "${trendAlignment.trend.replace("_", " ")}", which doesn't match the tagged goal yet. Worth a look.`}
-                </p>
-              )}
+              <h3 className="font-display font-bold text-lg uppercase leading-none mb-2">Past tries</h3>
+              <PlanTriesPanel clientName={firstName} tries={planTries} />
             </div>
-          }
-          detailsFlags={detailsFlags}
-          details={
-            <>
-              {reviewCard && <PhaseReviewCard {...reviewCard} />}
-              <NutritionSpotterPanel findings={findings} />
-              <div className="space-y-3">
-                <FoodTrackingSwitch athleteId={athleteId} groupId={groupId} clientName={clientName} />
-                <MacrosOffSwitch athleteId={athleteId} groupId={groupId} clientName={clientName} />
-                <AutoSuggestOffSwitch athleteId={athleteId} groupId={groupId} clientName={clientName} />
-              </div>
-              <BodyProfileEditor
-                athleteId={athleteId}
-                groupId={groupId}
-                clientName={firstName}
-                initial={{ heightCm: bodyProfile.heightCm, sex: bodyProfile.sex, bodyFatPct: bodyProfile.bodyFatPct, activity: bodyProfile.activity, weightUnit: bodyProfile.weightUnit }}
-                dateOfBirthLabel={dobLabel}
-                latestWeightLbs={weightLogs?.[0]?.weight != null ? Number(weightLogs[0].weight) : null}
-                latestWeightDate={latestWeightDate}
-              />
-            </>
-          }
-        />
-      </section>
+          )}
+          <div>
+            <h3 id="grocery-list" className="font-display font-bold text-lg uppercase leading-none mb-2 scroll-mt-24">Grocery list</h3>
+            <GroceryListSection athleteId={athleteId} todayKey={todayKey} clientName={firstName} metric={bodyProfile.weightUnit === "kg"} />
+          </div>
+        </FoldSection>
 
-      <section>
-        <SectionHeading id="check-in" title="Weekly check-in" />
-        <div className="border border-steel/20">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-4 py-3">
-            <p className="font-body text-sm text-chalk" data-checkin-countdown>
-              {weeklyWaiting ? "Check-in done: its suggestion is waiting in Targets" : countdown.label}
-            </p>
-            <p className="font-body text-xs text-steel">{lastCheckinLine}</p>
-          </div>
-          <details className="border-t border-steel/15">
-            <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden min-h-[44px] flex items-center px-4 font-body text-sm text-rust">Run a check-in now</summary>
-            <div className="px-4 pb-4 pt-2 border-t border-steel/15">
-              <WeeklyCheckinPanel
-                athleteId={athleteId}
-                groupId={groupId}
-                weekAvgWeight={weightTrend.currentAvg}
-                lastWeekAvgWeight={weightTrend.previousAvg}
-                // The most recently set number: the standing target if it was saved after the last per-day row, otherwise that row.
-                defaultCurrentCalories={
-                  standingTarget?.calories != null && (!latestExplicit || standingTarget.effective_from > latestExplicit.log_date)
-                    ? standingTarget.calories
-                    : latestExplicit?.calories ?? standingTarget?.calories ?? null
-                }
-                defaultRecoveryRating={defaultRecoveryRating}
-                defaultAdherenceDays={defaultAdherenceDays}
-                lastCheckin={lastCheckin}
-                isInjured={isInjured}
-                maintenanceCalories={maintenanceCalories}
-                injurySurplusPct={injurySurplusPct}
-                defaultPhase={phasePlan?.phase ?? derivedPhase?.phase ?? milestoneTagToNutritionPhase(phaseTag)}
-                todayKey={todayKey}
-                floorCalories={floorCalories}
-                floorNote={floorNote}
-                clientName={firstName}
-                proteinGPerLb={prefs.proteinGPerLb}
-                defaultDietaryRestrictions={rulesText}
-                weightUnit={bodyProfile.weightUnit}
-                ageYears={ageYears}
-              />
-            </div>
-          </details>
-        </div>
-      </section>
-
-      <section>
-        <SectionHeading id="meal-plan" title="Meal plan" note="Built from the standing target above." />
-        <PlanTriesPanel clientName={firstName} tries={planTries} />
-        {flaggedAssigned.length > 0 && (
-          <div role="status" className="mb-4 border border-amber-400/40 bg-amber-400/5 p-3 space-y-1.5">
-            <p className="font-body text-sm text-amber-400 font-medium">
-              {firstName}&apos;s food preferences conflict with {flaggedAssigned.length === 1 ? "an assigned day" : `${flaggedAssigned.length} assigned days`}. They don&apos;t see the flagged options; build a new plan for these days.
-            </p>
-            {flaggedAssigned.slice(0, 4).map((d) => (
-              <p key={d.date} className="font-body text-xs text-chalk">
-                <span className="text-steel">{shortDateLabel(d.date)}:</span> {d.flagged.slice(0, 2).map(describeFlagged).join("; ")}
-                {d.flagged.length > 2 ? ` (and ${d.flagged.length - 2} more)` : ""}
-              </p>
-            ))}
-            {flaggedAssigned.length > 4 && <p className="font-body text-xs text-steel">…and {flaggedAssigned.length - 4} more days.</p>}
-          </div>
-        )}
-        {rebuiltEmpty.length > 0 && (
-          <div role="status" className="mb-4 border border-amber-400/40 bg-amber-400/5 p-3 space-y-1" data-rebuilt-empty>
-            <p className="font-body text-sm text-amber-400 font-medium">
-              {rebuiltEmpty.length === 1 ? "1 meal" : `${rebuiltEmpty.length} meals`} had no safe option after {firstName}&apos;s allergy update. {firstName} sees &ldquo;your coach will update this&rdquo;; build {rebuiltEmpty.length === 1 ? "it" : "them"} below.
-            </p>
-            <p className="font-body text-xs text-chalk">{rebuiltEmpty.slice(0, 6).map((m) => `${shortDateLabel(m.log_date)}: ${m.title}`).join("; ")}{rebuiltEmpty.length > 6 ? "; and more" : ""}</p>
-          </div>
-        )}
-        <NutritionTools
-          athleteId={athleteId}
-          groupId={groupId}
-          date={todayKey}
-          latestBodyWeight={weightLogs?.[0]?.weight ?? null}
-          existingPlan={existingPlan ?? null}
-          target={standingTarget ? { calories: standingTarget.calories, protein: standingTarget.protein_g, carbs: standingTarget.carbs_g, fats: standingTarget.fat_g } : null}
-          defaultDietaryRestrictions={rulesText || (lastCheckin?.dietaryRestrictions ?? null)}
-          proteinGPerLb={prefs.proteinGPerLb}
-          foodRules={foodRules}
-          rulesReadable={!prefsReadError}
-          allergiesAsked={allergiesAsked}
-          clientName={clientName}
-        />
-        <div className="mt-8">
-          <h3 id="grocery-list" className="font-display font-bold text-lg uppercase leading-none mb-2 scroll-mt-24">Grocery list</h3>
-          <GroceryListSection athleteId={athleteId} todayKey={todayKey} clientName={firstName} metric={bodyProfile.weightUnit === "kg"} />
-        </div>
-      </section>
-
-      <section>
-        <SectionHeading id="answers" title={`${firstName}'s answers`} />
-        {answers.length > 0 && (
-          <div className="mb-4">
-            <ClientAnswersPanel
-              athleteId={athleteId}
-              clientName={firstName}
-              answers={answers}
-              variety={prefs.variety}
-              currentTarget={scaleTarget}
-              todayKey={todayKey}
-              metric={bodyProfile.weightUnit === "kg"}
-            />
-          </div>
-        )}
-        <ClientAnswersSection
-          athleteId={athleteId}
-          prefs={prefs}
-          answered={!!prefsRow}
-          weightLbs={weightLogs?.[0]?.weight ?? null}
-          updatedByName={updatedByName}
-          updatedAtLabel={prefs.updatedAt ? shortDateLabel(prefs.updatedAt.slice(0, 10)) : null}
-          clientName={firstName}
-          checkinRestrictions={lastCheckinRow?.dietary_restrictions?.trim() || null}
-        />
-      </section>
+        <FoldSection id="about" title="About" note={`${firstName}'s allergies, foods they avoid, diet and protein rules.`} flag={allergiesAsked ? null : "Allergies not answered"}>
+          <ClientAnswersSection
+            athleteId={athleteId}
+            prefs={prefs}
+            answered={!!prefsRow}
+            weightLbs={weightLogs?.[0]?.weight ?? null}
+            updatedByName={updatedByName}
+            updatedAtLabel={prefs.updatedAt ? shortDateLabel(prefs.updatedAt.slice(0, 10)) : null}
+            clientName={firstName}
+            checkinRestrictions={lastCheckinRow?.dietary_restrictions?.trim() || null}
+          />
+        </FoldSection>
+      </div>
     </div>
   );
 }

@@ -20,7 +20,7 @@ export async function ClientGroceryList({ athleteId, todayKey, metric, rules }: 
   return (
     <section aria-label="Your grocery list">
       <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">Your grocery list</h2>
-      <GroceryListPanel days={days} clientName="you" metric={metric} audience="client" />
+      <GroceryListPanel days={days} clientName="you" metric={metric} audience="client" storageKey={`grocery-have:client:${athleteId}`} />
     </section>
   );
 }

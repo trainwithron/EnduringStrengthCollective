@@ -15,5 +15,5 @@ export async function GroceryListSection({ athleteId, todayKey, clientName, metr
   const days: PlanDay[] = ((data ?? []) as { log_date: string; carb_cycling: boolean | null; meals: unknown }[])
     .filter((r) => r.meals && typeof r.meals === "object" && !Array.isArray(r.meals))
     .map((r) => ({ date: r.log_date, carbCycling: !!r.carb_cycling, meals: r.meals as Record<string, MealEntryPayload[]> }));
-  return <GroceryListPanel days={days} clientName={clientName} metric={metric} />;
+  return <GroceryListPanel days={days} clientName={clientName} metric={metric} storageKey={`grocery-have:coach:${athleteId}`} />;
 }

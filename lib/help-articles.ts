@@ -335,11 +335,11 @@ export const HELP_ARTICLES: HelpArticle[] = [
     slug: "nutrition",
     audience: "coach",
     title: "Nutrition",
-    summary: "Targets, weekly suggestions, and the This week table.",
+    summary: "The Clients list, targets, weekly suggestions, and favorite meals.",
     sections: [
       {
         heading: "Set a target",
-        body: ["Go to Nutrition > Clients, pick the client, then Targets > Set the standing target. The calculator is inside. Their Nutrition tab shows it from that day."],
+        body: ["Go to Nutrition > Clients, pick the client, then Targets > Set the standing target. Calculate targets is inside. Calories and protein are enough; carbs and fat are optional. Their Nutrition tab shows it from that day."],
       },
       {
         heading: "Weekly check-in",
@@ -358,9 +358,15 @@ export const HELP_ARTICLES: HelpArticle[] = [
         ],
       },
       {
-        heading: "This week",
+        heading: "Clients list",
         body: [
-          "One row per client for the last seven days: days logged, average calories and protein, target, and weight change. Clients who need you come first. For anyone who isn't a confirmed adult, or who has suggestions off, it shows only the days logged.",
+          "Each client shows their last seven days: days logged, days their protein target was reached, and their last log. Clients with no logs this week come first. For anyone who isn't a confirmed adult, or who has suggestions off, it shows only the days logged and the last log.",
+        ],
+      },
+      {
+        heading: "Favorite meals",
+        body: [
+          "Tap the star on any meal: a meal plan option, a meal from before a client's plan changed, or a meal a client logged. Favorite meals lists them with calories and protein. Add to plan adds one as another option for a meal on a day that already has a plan, after checking that client's food preferences.",
         ],
       },
     ],

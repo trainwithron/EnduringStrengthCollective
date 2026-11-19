@@ -7,7 +7,8 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ClientNutrition } from "@/components/coach/nutrition/client-nutrition";
 import { ClientFoodLogOnly } from "@/components/coach/nutrition/client-food-log-only";
 import { FavoriteMealsTab } from "@/components/coach/nutrition/favorite-meals-tab";
-import { MacroCalculator } from "@/components/tools/macro-calculator";
+import { NutritionClientList } from "@/components/coach/nutrition/nutrition-client-list";
+import { loadNutritionWeek, type LoadedWeek } from "@/lib/coach-nutrition-week";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { ActingAsBanner } from "@/components/athlete/acting-as-bar";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
@@ -49,7 +50,6 @@ import { NOT_IMPORTED } from "@/lib/imported-food";
 import { AiBudgetMeter } from "@/components/coach/ai-budget-meter";
 import { retryState as retryStateFor, type RetryState } from "@/lib/meal-plan-retry";
 import { ClientGroceryList } from "@/components/athlete/client-grocery-list";
-import { WeeklyNutritionSection } from "@/components/coach/nutrition/weekly-nutrition-section";
 
 export const metadata = { title: "Nutrition" };
 
@@ -118,16 +118,19 @@ export default async function NutritionPage(
       selectedTier = (tierRow?.client_tier as string | null) ?? null;
     }
 
-    // Three tabs: Clients (a client's whole nutrition, the default), Favorite meals (the coach's own recipes) and a blank Calculator (for a prospect). The tab and
-    // the redirects from the old Recipe Hub and Macro Calculator pages apply to the coach only; the client's own page below never reads `tab`.
-    const tab = searchParams.tab === "favorites" || searchParams.tab === "calculator" || searchParams.tab === "week" ? searchParams.tab : "clients";
+    // Two tabs (Ron, Nov 19 revamp): Clients (every client with this week's three facts, and the picked client's whole nutrition; the default) and Favorite meals (the meals the
+    // coach starred). The calculator is "Calculate targets" in each client's Targets, and "This week" is the Clients list, so an old ?tab=week or ?tab=calculator opens Clients.
+    // The tab applies to the coach only; the client's own page below never reads `tab`.
+    const tab = searchParams.tab === "favorites" ? "favorites" : "clients";
     const tabHref = (t: string) => `/groups/${params.groupId}/nutrition${t === "clients" ? "" : `?tab=${t}`}`;
-    const TABS: { key: "clients" | "week" | "favorites" | "calculator"; label: string }[] = [
+    const TABS: { key: "clients" | "favorites"; label: string }[] = [
       { key: "clients", label: "Clients" },
-      { key: "week", label: "This week" },
       { key: "favorites", label: "Favorite meals" },
-      { key: "calculator", label: "Calculator" },
     ];
+    const coachToday = dateKeyInZone(await getGroupCoachTimezone(supabase, params.groupId));
+    // The same clients as the list (the org wall included: getCoachClients), with this week's facts.
+    const week: LoadedWeek =
+      tab === "clients" ? await loadNutritionWeek(supabase, athletes.map((a) => ({ id: a.profileId, groupId: a.groupId, fullName: a.fullName })), coachToday) : { rows: [], total: 0, failed: false };
 
     return (
       <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="nutrition">
@@ -147,7 +150,7 @@ export default async function NutritionPage(
                 key={t.key}
                 href={tabHref(t.key)}
                 aria-current={tab === t.key ? "page" : undefined}
-                className={`h-9 px-4 flex items-center font-body text-sm border ${
+                className={`min-h-11 px-4 flex items-center font-body text-sm border ${
                   tab === t.key ? "bg-rust/10 text-rust border-rust/40" : "text-steel border-steel/20 hover:text-chalk"
                 }`}
               >
@@ -162,39 +165,25 @@ export default async function NutritionPage(
           <AiBudgetMeter variant="banner" groupId={params.groupId} />
         </div>
 
-        {tab === "week" ? (
-          <WeeklyNutritionSection groupId={params.groupId} clients={athletes.map((a) => ({ id: a.profileId, groupId: a.groupId, fullName: a.fullName }))} />
-        ) : tab === "favorites" ? (
-          <FavoriteMealsTab userId={user.id} />
-        ) : tab === "calculator" ? (
-          <div>
-            <p className="font-body text-sm text-steel mb-4 max-w-[70ch]">
-              A blank calculator, for a prospect or a quick estimate. To work out a number for one of your clients, open the client and use the calculator in their Meal plan,
-              which opens with their own weight and phase.
-            </p>
-            <MacroCalculator />
-          </div>
+        {tab === "favorites" ? (
+          <FavoriteMealsTab userId={user.id} clients={athletes.map((a) => ({ id: a.profileId, groupId: a.groupId, fullName: a.fullName }))} todayKey={coachToday} />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-8 items-start">
-            <div className="border border-steel/20 divide-y divide-steel/15">
-              {athletes.length === 0 ? (
-                <p className="font-body text-sm text-steel p-3">No clients yet.</p>
-              ) : (
-                athletes.map((a) => (
-                  <Link
-                    key={a.profileId}
-                    href={`/groups/${a.groupId}/nutrition?athleteId=${a.profileId}`}
-                    className={`block p-3 font-body text-sm ${
-                      selected?.profileId === a.profileId ? "bg-rust/10 text-rust" : "text-chalk"
-                    }`}
-                  >
-                    {a.fullName}
-                  </Link>
-                ))
-              )}
+          <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-6 md:gap-8 items-start">
+            {/* On a phone the list folds away once a client is open (the client comes first); on a computer it stays beside them. */}
+            <details className="md:hidden border border-steel/20" open={!selected} data-client-list-phone>
+              <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden min-h-11 flex items-center justify-between px-3 font-body text-sm text-chalk">
+                <span>All clients ({athletes.length})</span>
+                <span aria-hidden="true" className="text-steel">▾</span>
+              </summary>
+              <div className="border-t border-steel/15">
+                <NutritionClientList athletes={athletes} week={week} selectedId={selected?.profileId ?? null} />
+              </div>
+            </details>
+            <div className="hidden md:block border border-steel/20">
+              <NutritionClientList athletes={athletes} week={week} selectedId={selected?.profileId ?? null} />
             </div>
 
-            <div>
+            <div className="min-w-0">
               {!selected ? (
                 <p className="font-body text-sm text-steel">Pick a client to see their nutrition.</p>
               ) : selectedTier === "group" ? (

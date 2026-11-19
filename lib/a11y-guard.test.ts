@@ -184,8 +184,6 @@ describe("a field's name says what the field IS, never an example of what to typ
     expect(read("components/coach/mobile/spot-builder-panel.tsx")).not.toContain('aria-label="Conjugate"');
     // (Release 3: the program box has no Style field; its one field before the box is named for what it is)
     expect(read("components/coach/mobile/spot-builder-panel.tsx")).toContain('aria-label={term("client", "singular", { cap: true })}');
-    expect(read("components/coach/desktop/recipe-hub-manager.tsx")).toContain('aria-label="Ingredient name"');
-    expect(read("components/coach/desktop/recipe-hub-manager.tsx")).not.toContain('aria-label="Chicken Breast"');
   });
 });
 

@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { cellText, GLANCE_ROWS, type GlanceDay, type MacroRowKey, type NutrientBar, type WeekAverage } from "@/lib/nutrition-glance";
 import { formatWeight, type WeightUnit } from "@/lib/units";
+import { starFromLogged } from "@/lib/starred-meals";
+import { StarMealButton } from "@/components/coach/nutrition/star-meal-button";
 
 // The top of a coach's Nutrition page (lib/nutrition-glance.ts): this week at a glance. A column per day with four bars filled to that day's target (today outlined), the chosen day's numbers
 // beside it (consumed or remaining), the week's daily average as a ring with protein / carbs / fat, the weight trend and what they really burn. Tapping a day opens what they logged by meal,
@@ -130,9 +132,11 @@ export function NutritionGlance({
                       <p className="font-body text-xs text-steel">{m.slot}</p>
                       <ul className="mt-0.5 space-y-0.5">
                         {m.items.map((it, i) => (
-                          <li key={i} className={`flex justify-between gap-3 font-body text-sm ${it.skipped ? "text-steel line-through" : "text-chalk"}`}>
-                            <span className="truncate">{it.description}</span>
+                          <li key={i} className={`flex items-center justify-between gap-2 font-body text-sm ${it.skipped ? "text-steel line-through" : "text-chalk"}`}>
+                            <span className="truncate min-w-0 flex-1">{it.description}</span>
                             {it.calories != null && <span className="shrink-0 text-steel [font-variant-numeric:tabular-nums]">{n(it.calories)}</span>}
+                            {/* A meal the client logged can be starred (a skipped one, or one with no name, cannot). */}
+                            {!it.skipped && it.loggedName ? <StarMealButton star={starFromLogged({ description: it.loggedName, calories: it.calories, proteinG: it.proteinG, carbsG: it.carbsG, fatG: it.fatG })} /> : null}
                           </li>
                         ))}
                       </ul>

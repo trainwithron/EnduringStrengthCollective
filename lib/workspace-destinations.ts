@@ -35,7 +35,7 @@ const PAGES: PageDef[] = [
   { key: "programs", label: "Programs", section: "Programs", path: "programs", keywords: ["workouts", "training", "builder"] },
   { key: "exercise-library", label: "Exercise library", section: "Programs", path: "exercise-library", keywords: ["exercises", "movements"] },
   { key: "nutrition", label: "Nutrition", section: "Nutrition", path: "nutrition", keywords: ["macros", "food", "diet", "meal plans", "targets"] },
-  { key: "macro-calculator", label: "Calculator", section: "Nutrition", path: "nutrition?tab=calculator", keywords: ["macro calculator", "calories", "protein"] },
+  { key: "macro-calculator", label: "Calculate targets", section: "Nutrition", path: "nutrition", keywords: ["macro calculator", "calculator", "calories", "protein"] },
   { key: "recipes", label: "Favorite meals", section: "Nutrition", path: "nutrition?tab=favorites", keywords: ["food", "meals", "recipes", "recipe hub"] },
   { key: "business", label: "Business overview", section: "Home", path: "business", keywords: ["money", "income", "revenue", "mrr"] },
   { key: "packages", label: "Packages", section: "Clients", path: "business/packages", keywords: ["pricing", "plans", "subscriptions"] },

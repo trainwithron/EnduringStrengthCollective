@@ -1,87 +1,50 @@
 import { createServerClient } from "@/lib/supabase/server";
-import { RecipeHubManager, type RecipeRow } from "@/components/coach/desktop/recipe-hub-manager";
 import { BuiltinIngredientMappings } from "@/components/coach/desktop/builtin-ingredient-mappings";
 import { ALL_BUILTIN_INGREDIENT_KEYS, getBuiltinIngredientLabel } from "@/lib/builtin-recipe-ingredients";
+import { MAX_STARRED_MEALS, rowToStarredMeal, type StarredMeal, type StarredRow } from "@/lib/starred-meals";
+import { FavoriteMealsList, type FavoriteClient } from "@/components/coach/nutrition/favorite-meals-list";
 
-// The "Favorite meals" tab of Nutrition: the coach's own recipes (what the Recipe Hub was), built from real ingredients so each scales to any client's target,
-// and the shared mapping of the built-in recipes' ingredients to real food data.
-export async function FavoriteMealsTab({ userId }: { userId: string }) {
+// The "Favorite meals" tab of Nutrition (Ron, Nov 19: "the fav meals tab is not very usefull at all"): the meals the coach starred anywhere in Nutrition, newest first, each with
+// its calories and protein and "Add to plan". The ingredient-by-ingredient recipe builder is gone from here (its one recipe was carried over as a starred meal, step 207).
+// A platform admin also sees the shared mapping of the built-in recipes' ingredients (it changes every coach's clients' estimates).
+export async function FavoriteMealsTab({ userId, clients, todayKey }: { userId: string; clients: FavoriteClient[]; todayKey: string }) {
   const supabase = await createServerClient();
-  const user = { id: userId };
-  const { data: recipeRows } = await supabase
-    .from("recipes")
-    .select(
-      "id, name, slot, archetypes, keywords, recipe_ingredients ( id, sort_order, label, role, protein_per_100g, carbs_per_100g, fat_per_100g, fixed_display_text, usda_fdc_id )"
-    )
-    .eq("created_by", user.id)
-    .order("created_at", { ascending: false });
+  const { data: starRows, error: starError } = await supabase
+    .from("recipe_favorites")
+    .select("recipe_id, label, calories, protein_g, carbs_g, fat_g, meal")
+    .eq("profile_id", userId)
+    .eq("kind", "meal")
+    .order("created_at", { ascending: false })
+    .limit(MAX_STARRED_MEALS);
+  if (starError) console.error("[favorite-meals] could not read starred meals:", starError.message);
+  const meals: StarredMeal[] = ((starRows ?? []) as StarredRow[]).map(rowToStarredMeal).filter((m): m is StarredMeal => !!m);
 
-  const mappedFdcIds = Array.from(
-    new Set(
-      (recipeRows ?? []).flatMap((r: any) =>
-        (r.recipe_ingredients ?? []).map((i: any) => i.usda_fdc_id).filter((id: number | null) => id != null)
-      )
-    )
-  );
-  const { data: usdaFoodRows } = mappedFdcIds.length
-    ? await supabase.from("usda_foods").select("fdc_id, description").in("fdc_id", mappedFdcIds)
-    : { data: [] as { fdc_id: number; description: string }[] };
-  const usdaDescriptionByFdcId = new Map((usdaFoodRows ?? []).map((f) => [f.fdc_id, f.description]));
-
-  const recipes: RecipeRow[] = (recipeRows ?? []).map((r: any) => ({
-    id: r.id,
-    name: r.name,
-    slot: r.slot,
-    archetypes: r.archetypes ?? [],
-    keywords: r.keywords ?? [],
-    ingredients: (r.recipe_ingredients ?? [])
-      .slice()
-      .sort((a: any, b: any) => a.sort_order - b.sort_order)
-      .map((i: any) => ({
-        id: i.id,
-        sortOrder: i.sort_order,
-        label: i.label,
-        role: i.role,
-        proteinPer100g: i.protein_per_100g,
-        carbsPer100g: i.carbs_per_100g,
-        fatPer100g: i.fat_per_100g,
-        fixedDisplayText: i.fixed_display_text,
-        usdaFdcId: i.usda_fdc_id,
-        usdaDescription: i.usda_fdc_id ? usdaDescriptionByFdcId.get(i.usda_fdc_id) ?? null : null,
-      })),
-  }));
-
-  // The shared mapping of the built-in recipes' ingredients is a platform tool, not a coach one: only a platform admin sees it (it changes every coach's clients' estimates).
-  const { data: viewer } = await supabase.from("profiles").select("is_platform_admin").eq("id", user.id).maybeSingle();
+  const { data: viewer } = await supabase.from("profiles").select("is_platform_admin").eq("id", userId).maybeSingle();
   const showBuiltinMappings = viewer?.is_platform_admin === true;
-  const { data: builtinMappingRows } = showBuiltinMappings
-    ? await supabase.from("builtin_ingredient_usda_mappings").select("ingredient_key, usda_fdc_id")
-    : { data: [] as { ingredient_key: string; usda_fdc_id: number | null }[] };
-  const builtinMappingByKey = new Map((builtinMappingRows ?? []).map((r) => [r.ingredient_key, r.usda_fdc_id]));
-  const builtinFdcIds = Array.from(new Set(Array.from(builtinMappingByKey.values()).filter((id): id is number => id != null)));
-  const { data: builtinUsdaFoodRows } = builtinFdcIds.length
-    ? await supabase.from("usda_foods").select("fdc_id, description").in("fdc_id", builtinFdcIds)
-    : { data: [] as { fdc_id: number; description: string }[] };
-  const builtinDescriptionByFdcId = new Map((builtinUsdaFoodRows ?? []).map((f) => [f.fdc_id, f.description]));
-
-  const builtinRows = ALL_BUILTIN_INGREDIENT_KEYS.map((key) => {
-    const fdcId = builtinMappingByKey.get(key) ?? null;
-    return {
-      key,
-      label: getBuiltinIngredientLabel(key),
-      usdaFdcId: fdcId,
-      usdaDescription: fdcId ? builtinDescriptionByFdcId.get(fdcId) ?? null : null,
-    };
-  });
+  let builtinRows: { key: string; label: string; usdaFdcId: number | null; usdaDescription: string | null }[] = [];
+  if (showBuiltinMappings) {
+    const { data: builtinMappingRows } = await supabase.from("builtin_ingredient_usda_mappings").select("ingredient_key, usda_fdc_id");
+    const builtinMappingByKey = new Map((builtinMappingRows ?? []).map((r) => [r.ingredient_key, r.usda_fdc_id as number | null]));
+    const builtinFdcIds = Array.from(new Set(Array.from(builtinMappingByKey.values()).filter((id): id is number => id != null)));
+    const { data: builtinUsdaFoodRows } = builtinFdcIds.length
+      ? await supabase.from("usda_foods").select("fdc_id, description").in("fdc_id", builtinFdcIds)
+      : { data: [] as { fdc_id: number; description: string }[] };
+    const builtinDescriptionByFdcId = new Map((builtinUsdaFoodRows ?? []).map((f) => [f.fdc_id, f.description]));
+    builtinRows = ALL_BUILTIN_INGREDIENT_KEYS.map((key) => {
+      const fdcId = builtinMappingByKey.get(key) ?? null;
+      return { key, label: getBuiltinIngredientLabel(key), usdaFdcId: fdcId, usdaDescription: fdcId ? builtinDescriptionByFdcId.get(fdcId) ?? null : null };
+    });
+  }
 
   return (
     <div>
-      <p className="font-body text-sm text-steel mb-6 max-w-[70ch]">
-        Your own recipes, built from real ingredients. Each one scales automatically to hit whatever protein, carb and fat target a client&apos;s meal plan calls for, right
-        alongside the built-in recipe database in the meal planner.
-      </p>
-
-      <RecipeHubManager initialRecipes={recipes} />
+      {starError ? (
+        <p className="font-body text-sm text-rust" role="alert">
+          Couldn&apos;t load your favorite meals just now. Reload the page to try again.
+        </p>
+      ) : (
+        <FavoriteMealsList initialMeals={meals} clients={clients} todayKey={todayKey} />
+      )}
 
       {showBuiltinMappings && (
         <div className="pt-8 mt-8 border-t border-steel/20">

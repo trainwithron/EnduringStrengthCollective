@@ -43,9 +43,9 @@ export default async function MacroCalculatorPage(
 
   const effective = await getEffectiveAthlete(params.groupId, user.id);
 
-  // A coach's calculator is the Calculator tab of Nutrition (old links keep working). A client's own calculator, below, stays on this page.
+  // A coach's calculator is "Calculate targets" in each client's Targets on Nutrition (Nov 19 revamp), so old links open Nutrition's Clients list. A client's own calculator, below, stays on this page.
   if (membership.role === "coach" && !effective.isActingAsOther) {
-    redirect(`/groups/${params.groupId}/nutrition?tab=calculator`);
+    redirect(`/groups/${params.groupId}/nutrition`);
   }
 
   let actingAsFullName: string | null = null;

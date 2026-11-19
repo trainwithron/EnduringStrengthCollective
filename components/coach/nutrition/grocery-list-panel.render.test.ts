@@ -17,7 +17,7 @@ describe("GroceryListPanel", () => {
     expect(html).toContain("Proteins");
     expect(html).toContain("Chicken Breast");
     expect(html).toContain("1400g");
-    expect(html).toContain("Copy");
+    expect(html).toContain("Share");
     expect(html).toContain("Print");
     expect(html).not.toContain("Training days a week");
   });

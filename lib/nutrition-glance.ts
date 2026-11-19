@@ -25,7 +25,8 @@ export interface GlanceCell {
 
 export interface GlanceMeal {
   slot: string;
-  items: { description: string; calories: number | null; skipped: boolean }[];
+  // loggedName: the name the client logged (null when they logged none: the item then reads as its meal), with its macros, so the coach can star it.
+  items: { description: string; calories: number | null; skipped: boolean; loggedName?: string | null; proteinG?: number | null; carbsG?: number | null; fatG?: number | null }[];
 }
 
 export interface GlanceDay {
@@ -70,7 +71,7 @@ export function glanceDays(week: FoodWeekSummary, targetFor: (dateKey: string) =
     const bySlot = new Map<string, GlanceMeal["items"]>();
     for (const m of d.meals) {
       const key = m.slot ?? "";
-      bySlot.set(key, [...(bySlot.get(key) ?? []), { description: m.description || slotLabel(m.slot), calories: m.calories, skipped: m.skipped }]);
+      bySlot.set(key, [...(bySlot.get(key) ?? []), { description: m.description || slotLabel(m.slot), calories: m.calories, skipped: m.skipped, loggedName: m.description || null, proteinG: m.proteinG ?? null, carbsG: m.carbsG ?? null, fatG: m.fatG ?? null }]);
     }
     const meals = [...bySlot.entries()]
       .sort(([a], [b]) => (SLOT_ORDER.indexOf(a) + 1 || 99) - (SLOT_ORDER.indexOf(b) + 1 || 99))

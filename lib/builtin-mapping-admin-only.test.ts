@@ -5,11 +5,12 @@ import { join } from "node:path";
 const src = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
 
 describe("the built-in recipe ingredient mapping is a platform-admin tool", () => {
-  it("Favorite meals shows it only to a platform admin and keeps the recipe builder for every coach", () => {
+  it("Favorite meals shows it only to a platform admin; every coach sees their starred meals (the recipe builder left the tab, Nov 19)", () => {
     const tab = src("components/coach/nutrition/favorite-meals-tab.tsx");
     expect(tab).toContain('viewer?.is_platform_admin === true');
     expect(tab).toContain("{showBuiltinMappings && (");
-    expect(tab).toContain("<RecipeHubManager initialRecipes={recipes} />");
+    expect(tab).toContain("<FavoriteMealsList initialMeals={meals} clients={clients} todayKey={todayKey} />");
+    expect(tab).not.toContain("RecipeHubManager");
   });
   it("a mapped food's long name wraps inside the screen instead of running off it", () => {
     const picker = src("components/coach/desktop/usda-food-picker.tsx");

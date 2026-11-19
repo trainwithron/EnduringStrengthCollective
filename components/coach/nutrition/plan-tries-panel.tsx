@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { shortDateLabel } from "@/lib/apply-from";
 import { MAX_PLAN_TRIES } from "@/lib/meal-plan-retry";
+import type { MealRecipeChoice } from "@/lib/meal-plan-assignment";
+import { caloriesProteinLine, starFromChoice } from "@/lib/starred-meals";
+import { StarMealButton } from "@/components/coach/nutrition/star-meal-button";
 
 export interface PlanTryView {
   id: string;
@@ -16,10 +19,39 @@ export interface PlanTryView {
   restored: boolean;
   // 'allergy': the app swapped the options that broke a new allergy or food they avoid (0430). Not a try, and never put back.
   source: "client" | "allergy";
+  // The meals of the plan from before this change (each option once), so a meal the client had can be starred.
+  previousMeals?: MealRecipeChoice[];
 }
 
 // When a client asked for a different meal plan ("Not feeling it?"): what they said, which try it was, which days were rebuilt, and one tap to put back the plan from before. The put-back
 // goes one try at a time (the latest first) and leaves any day you changed by hand since.
+// The meals from before a change, folded away; each with its calories and protein and a star.
+function MealsBefore({ meals }: { meals?: MealRecipeChoice[] }) {
+  if (!meals || meals.length === 0) return null;
+  return (
+    <details className="mt-1 border border-steel/15" data-meals-before>
+      <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden min-h-11 flex items-center px-2 font-body text-xs text-rust">
+        Meals before this change ({meals.length})
+      </summary>
+      <ul className="border-t border-steel/15 divide-y divide-steel/10">
+        {meals.map((m, i) => {
+          const star = starFromChoice(m);
+          if (!star) return null;
+          return (
+            <li key={`${star.key}|${i}`} className="flex items-center gap-1 pl-2">
+              <div className="min-w-0 flex-1">
+                <p className="font-body text-sm text-chalk break-words">{star.name}</p>
+                <p className="font-body text-xs text-steel [font-variant-numeric:tabular-nums]">{caloriesProteinLine(star)}</p>
+              </div>
+              <StarMealButton star={star} />
+            </li>
+          );
+        })}
+      </ul>
+    </details>
+  );
+}
+
 export function PlanTriesPanel({ clientName, tries }: { clientName: string; tries: PlanTryView[] }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -57,6 +89,7 @@ export function PlanTriesPanel({ clientName, tries }: { clientName: string; trie
           t.source === "allergy" ? (
             <li key={t.id} className="font-body text-sm text-chalk" data-allergy-rebuild>
               <span className="text-steel">Rebuilt automatically on {shortDateLabel(t.requestedAt.slice(0, 10))}:</span> {t.summary}
+              <MealsBefore meals={t.previousMeals} />
             </li>
           ) : (
           <li key={t.id} className="font-body text-sm text-chalk">
@@ -73,6 +106,7 @@ export function PlanTriesPanel({ clientName, tries }: { clientName: string; trie
                 {busy ? "Putting back…" : "Put back the plan from before"}
               </button>
             )}
+            <MealsBefore meals={t.previousMeals} />
           </li>
           )
         )}

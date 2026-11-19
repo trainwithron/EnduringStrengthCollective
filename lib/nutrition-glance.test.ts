@@ -39,7 +39,7 @@ describe("the 7-day grid", () => {
   });
   it("a tapped day lists what they logged by meal, in meal order (a skipped meal shows, struck through)", () => {
     expect(days[6].meals.map((m) => m.slot)).toEqual(["Breakfast", "Lunch", "Dinner"]);
-    expect(days[6].meals[1].items[0]).toEqual({ description: "Salad", calories: 300, skipped: true });
+    expect(days[6].meals[1].items[0]).toMatchObject({ description: "Salad", calories: 300, skipped: true, loggedName: "Salad" });
   });
   it("the selected day's numbers: consumed (2134 / 2143) or remaining (9 left, or 120 over)", () => {
     expect(cellText({ eaten: 2134, target: 2143, pct: 100 }, "consumed")).toBe("2,134 / 2,143");
@@ -120,7 +120,7 @@ describe("on the page", () => {
   it("the calculator sits at the top of the standing target card, collapsed, and only there", () => {
     const card = read("components/coach/desktop/standing-macro-target-card.tsx");
     expect(card).toContain("Set the standing target");
-    expect(card).toContain("Work it out with the calculator");
+    expect(card).toContain("Calculate targets");
     expect(card).toContain("const [calcOpen, setCalcOpen] = useState(false);");
     expect(card.indexOf("data-target-calculator")).toBeLessThan(card.indexOf("{FIELDS.map("));
     expect(read("components/coach/desktop/nutrition-tools.tsx")).not.toContain("MacroCalculator");
@@ -136,8 +136,11 @@ describe("on the page", () => {
     expect(page).toContain("const countdown = checkinCountdown(todayKey);");
     expect(page).toContain("Run a check-in now");
     expect(page.match(/<WeeklyCheckinPanel/g)?.length).toBe(1);
-    // the switches, the body numbers, the phase review and the spotter are under the Targets card's Details
-    const details = page.slice(page.indexOf("details={"), page.indexOf('<SectionHeading id="check-in"'));
-    for (const c of ["<PhaseReviewCard", "<NutritionSpotterPanel", "<FoodTrackingSwitch", "<MacrosOffSwitch", "<AutoSuggestOffSwitch", "<BodyProfileEditor"]) expect(details, c).toContain(c);
+    // the switches, the body numbers and the phase review are under the Targets card's Details; the Spotter's findings are in This week (Nov 19 revamp)
+    const details = page.slice(page.indexOf("details={"), page.indexOf('id="meal-plan"'));
+    for (const c of ["<PhaseReviewCard", "<FoodTrackingSwitch", "<MacrosOffSwitch", "<AutoSuggestOffSwitch", "<BodyProfileEditor"]) expect(details, c).toContain(c);
+    expect(details).not.toContain("<NutritionSpotterPanel");
+    const thisWeek = page.slice(page.indexOf('id="this-week"'), page.indexOf('id="targets"'));
+    for (const c of ["<NutritionGlance", "<WeeklyCheckinPanel", "<ClientAnswersPanel", "<NutritionSpotterPanel"]) expect(thisWeek, c).toContain(c);
   });
 });

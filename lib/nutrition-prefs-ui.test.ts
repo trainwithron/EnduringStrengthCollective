@@ -42,7 +42,9 @@ describe("shorter food preferences, same safety", () => {
 describe("the Nutrition page's top bar and the client on the page agree", () => {
   const page = read("app/(coach)/groups/[groupId]/nutrition/page.tsx");
   it("picking a client opens that client's own group, and a one-on-one group shows its own client by default", () => {
-    expect(page).toContain("href={`/groups/${a.groupId}/nutrition?athleteId=${a.profileId}`}");
+    // (the list is its own piece since the Nov 19 revamp)
+    expect(read("components/coach/nutrition/nutrition-client-list.tsx")).toContain("href={`/groups/${a.groupId}/nutrition?athleteId=${a.profileId}`}");
+    expect(read("components/coach/nutrition/nutrition-client-list.tsx")).toContain("href={`/groups/${r.groupId}/nutrition?athleteId=${r.id}`}");
     expect(page).toContain('group_kind === "one_on_one" ? athletes.find((a) => a.groupId === params.groupId)');
     expect(page).toContain("if (selected && selected.groupId !== params.groupId) {");
     expect(page).toContain("redirect(`/groups/${selected.groupId}/nutrition?athleteId=${selected.profileId}");

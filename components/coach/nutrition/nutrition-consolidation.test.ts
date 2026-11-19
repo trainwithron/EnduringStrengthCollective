@@ -25,11 +25,15 @@ describe("one ClientNutrition, used by the hub and by the profile", () => {
       expect(page).not.toContain("<PhaseOfRecordCard");
     }
   });
-  it("the component holds, in the order a coach checks them (Oct 21): this week at a glance, Targets with the calculator inside, the weekly check-in, the meal plan, their answers", () => {
-    const ids = ['id="at-a-glance"', 'id="targets"', 'id="check-in"', 'id="meal-plan"', 'id="answers"'];
+  it("the component holds four folding sections, in the order a coach checks them (Nov 19 revamp): This week, Targets, Meal plan, About", () => {
+    const ids = ['id="this-week"', 'id="check-in"', 'id="answers"', "<NutritionSpotterPanel", 'id="targets"', "<StandingMacroTargetCard", 'id="meal-plan"', "<NutritionTools", "<PlanTriesPanel", "<GroceryListSection", 'id="about"', "<ClientAnswersSection"];
     const at = ids.map((id) => clientNutrition.indexOf(id));
     for (const [i, id] of ids.entries()) expect(at[i], id).toBeGreaterThan(0);
     expect([...at].sort((a, b) => a - b)).toEqual(at);
+    expect(clientNutrition.match(/<FoldSection/g)).toHaveLength(4);
+    // This week opens by itself; Targets opens when a suggestion is waiting or there is no target yet
+    expect(clientNutrition).toContain('id="this-week"');
+    expect(clientNutrition).toContain("defaultOpen={pendingSuggestions.length > 0 || standingTarget?.calories == null}");
     expect(clientNutrition).toContain("<NutritionGlance");
     expect(clientNutrition).toContain("<NutritionTools");
     expect(clientNutrition).toContain("<StandingMacroTargetCard");
@@ -48,13 +52,21 @@ describe("one ClientNutrition, used by the hub and by the profile", () => {
   });
 });
 
-describe("the hub has three tabs for the coach, and the client's page does not read them", () => {
-  it("Clients (the default), Favorite meals and Calculator", () => {
+describe("the hub has two tabs for the coach, and the client's page does not read them", () => {
+  it("Clients (the default) and Favorite meals; an old This week or Calculator link opens Clients", () => {
     expect(hub).toContain('label: "Clients"');
     expect(hub).toContain('label: "Favorite meals"');
-    expect(hub).toContain('label: "Calculator"');
-    expect(hub).toContain('searchParams.tab === "favorites" || searchParams.tab === "calculator"');
+    expect(hub).not.toContain('label: "Calculator"');
+    expect(hub).not.toContain('label: "This week"');
+    expect(hub).toContain('const tab = searchParams.tab === "favorites" ? "favorites" : "clients";');
     expect(hub).toContain("<FavoriteMealsTab");
+    expect(hub).not.toContain("<MacroCalculator");
+    // the Youth mode switch stays
+    expect(hub).toContain("<NutritionYouthModeToggle");
+  });
+  it("the Clients list is every client the coach has (getCoachClients, so the organization's private clients stay hidden), each with this week's facts", () => {
+    expect(hub).toContain("(await getCoachClients(supabase, user.id, params.groupId))");
+    expect(hub).toContain("<NutritionClientList athletes={athletes} week={week}");
   });
   it("the client's branch (below the coach branch) never reads the tab", () => {
     const clientBranch = hub.slice(hub.indexOf("// Athlete-facing branch"));
@@ -71,9 +83,9 @@ describe("the old pages send a coach to the new tabs, and leave the client's pag
     expect(recipesPage.indexOf('membership?.role !== "coach"')).toBeLessThan(recipesPage.indexOf("nutrition?tab=favorites"));
     expect(recipesPage).toContain("<NoAccess>");
   });
-  it("the Macro Calculator goes to the Calculator tab for a coach not acting as a client; a client's own calculator page is kept", () => {
+  it("the Macro Calculator sends a coach not acting as a client to Nutrition (Calculate targets is in each client's Targets); a client's own calculator page is kept", () => {
     expect(calcPage).toContain('membership.role === "coach" && !effective.isActingAsOther');
-    expect(calcPage).toContain("redirect(`/groups/${params.groupId}/nutrition?tab=calculator`)");
+    expect(calcPage).toContain("redirect(`/groups/${params.groupId}/nutrition`)");
     expect(calcPage).toContain("initialWeight={latestWeightRow?.weight ?? null}");
     expect(calcPage).toContain("<BottomTabBar");
     expect(calcPage).not.toContain("<CoachDesktopShell");
@@ -89,7 +101,8 @@ describe("the old pages send a coach to the new tabs, and leave the client's pag
     expect(byId("nutrition")?.label).toBe("Nutrition");
     expect(byId("recipes")?.label).toBe("Favorite meals");
     expect(byId("recipes")?.path).toBe(`/groups/${G}/nutrition?tab=favorites`);
-    expect(byId("macro-calculator")?.path).toBe(`/groups/${G}/nutrition?tab=calculator`);
+    expect(byId("macro-calculator")?.path).toBe(`/groups/${G}/nutrition`);
+    expect(byId("macro-calculator")?.label).toBe("Calculate targets");
     expect(all.map((d) => d.label)).not.toContain("Meal Plans");
     expect(all.map((d) => d.label)).not.toContain("Recipe Hub");
   });

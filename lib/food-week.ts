@@ -24,6 +24,10 @@ export interface FoodWeekMeal {
   description: string | null;
   calories: number | null;
   skipped: boolean;
+  // What was logged with it (so the coach can star the meal with its macros).
+  proteinG?: number | null;
+  carbsG?: number | null;
+  fatG?: number | null;
 }
 
 export interface FoodWeekDay {
@@ -71,7 +75,7 @@ export function buildFoodWeek(args: {
       weekday: WEEKDAYS[weekdayOfKey(dateKey)] ?? "",
       isToday: dateKey === args.todayKey,
       logged,
-      meals: rows.map((r) => ({ slot: r.meal_slot, description: r.description, calories: r.calories, skipped: r.status === "skipped" })),
+      meals: rows.map((r) => ({ slot: r.meal_slot, description: r.description, calories: r.calories, skipped: r.status === "skipped", proteinG: r.protein_g, carbsG: r.carbs_g, fatG: r.fat_g })),
       calories: Math.round(calories),
       proteinG: Math.round(eaten.reduce((a, r) => a + n(r.protein_g), 0)),
       carbsG: Math.round(eaten.reduce((a, r) => a + n(r.carbs_g), 0)),

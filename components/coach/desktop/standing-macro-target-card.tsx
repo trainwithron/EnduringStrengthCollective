@@ -23,11 +23,12 @@ interface Target {
   fatG: number | null;
 }
 
-const FIELDS: { key: keyof Target; macro: MacroKey; label: string; unit: string; max: number }[] = [
+// Calories and protein lead (Ron, Nov 19 revamp); carbs and fat are shown and saved when given, never required.
+const FIELDS: { key: keyof Target; macro: MacroKey; label: string; unit: string; max: number; optional?: boolean }[] = [
   { key: "calories", macro: "calories", label: "Calories", unit: "kcal", max: 20000 },
   { key: "proteinG", macro: "protein", label: "Protein", unit: "g", max: 1500 },
-  { key: "carbsG", macro: "carbs", label: "Carbs", unit: "g", max: 3000 },
-  { key: "fatG", macro: "fat", label: "Fat", unit: "g", max: 1500 },
+  { key: "carbsG", macro: "carbs", label: "Carbs", unit: "g", max: 3000, optional: true },
+  { key: "fatG", macro: "fat", label: "Fat", unit: "g", max: 1500, optional: true },
 ];
 
 function toDraft(t: Target | null): Record<keyof Target, string> {
@@ -205,7 +206,7 @@ export function StandingMacroTargetCard({
       {calculator && (
         <div className="mt-3 border border-steel/20" data-target-calculator>
           <button type="button" onClick={() => setCalcOpen((v) => !v)} aria-expanded={calcOpen} className="w-full flex items-center justify-between gap-3 h-11 px-3 text-left">
-            <span className="font-body text-sm text-chalk">Work it out with the calculator</span>
+            <span className="font-body text-sm text-chalk">Calculate targets</span>
             <span className="font-body text-xs text-steel">{calcOpen ? "▾" : "▸"}</span>
           </button>
           {calcOpen && (
@@ -223,13 +224,13 @@ export function StandingMacroTargetCard({
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 mt-3">
+      <div className="grid grid-cols-2 gap-3 mt-3" data-target-fields>
         {FIELDS.map((f) => {
           const field = autoFieldProps(f.macro, draft[f.key], fill);
           return (
             <label key={f.key} className="block">
-              <span className="font-body text-xs text-steel">
-                {f.label} ({f.unit})
+              <span className={`font-body text-xs ${f.optional ? "text-steel" : "text-chalk"}`}>
+                {f.label} ({f.unit}){f.optional ? ", optional" : ""}
                 <WorkedOutTag show={field.auto} />
               </span>
               <input
@@ -244,7 +245,7 @@ export function StandingMacroTargetCard({
                   setError(null);
                   setMessage(null);
                 }}
-                className={`mt-1 w-full h-11 bg-graphite border border-steel/30 px-3 font-body text-sm focus:outline-none focus:border-rust ${field.auto ? "text-steel italic" : "text-chalk"}`}
+                className={`mt-1 w-full h-11 bg-graphite border border-steel/30 px-3 font-body focus:outline-none focus:border-rust ${f.optional ? "text-sm" : "text-base font-medium"} ${field.auto ? "text-steel italic" : "text-chalk"}`}
               />
             </label>
           );
@@ -293,7 +294,7 @@ export function StandingMacroTargetCard({
               <p className="font-body text-xs text-chalk">
                 {r.calories == null ? "Standing target removed" : `${r.calories.toLocaleString("en-US")} kcal`} from {shortDateLabel(r.date)}
               </p>
-              <button type="button" onClick={() => removeScheduled(r.date)} disabled={busy} className="h-8 px-2 font-body text-xs text-steel border border-steel/30 disabled:opacity-40">
+              <button type="button" onClick={() => removeScheduled(r.date)} disabled={busy} className="min-h-11 px-2 font-body text-xs text-steel border border-steel/30 disabled:opacity-40">
                 Remove
               </button>
             </div>
