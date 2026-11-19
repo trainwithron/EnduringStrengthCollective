@@ -29,10 +29,10 @@ describe("Home loads in rounds, not one read after another", () => {
     expect(data).toContain("await clientCountsByOrg(supabase, coachedForOrg)");
   });
   it("the last round holds every chain that only needs the group list", () => {
-    const at = data.indexOf("const [dashboardData, unseenByGroup, memberCountByGroup, needsReplyThreads, soloRows, todaysClasses, lowReadiness] = await Promise.all([");
+    const at = data.indexOf("const [dashboardData, unseenByGroup, memberCountByGroup, needsReplyThreads, soloRows, todaysClasses, lowReadiness, todaysEvents] = await Promise.all([");
     expect(at).toBeGreaterThan(0);
     const round = data.slice(at);
-    for (const needle of ["getCoachDashboardData(", "loadUnseenByGroup()", "loadMemberCounts()", "loadNeedsReplyThreads()", "loadSoloClientRows()", "loadTodaysClasses()", "loadLowReadiness()"]) {
+    for (const needle of ["getCoachDashboardData(", "loadUnseenByGroup()", "loadMemberCounts()", "loadNeedsReplyThreads()", "loadSoloClientRows()", "loadTodaysClasses()", "loadLowReadiness()", "loadTodaysEvents()"]) {
       expect(round).toContain(needle);
     }
   });

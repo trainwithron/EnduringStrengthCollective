@@ -7,7 +7,7 @@ import type { ClientTierLite } from "@/lib/session-type-default";
 import { getCoachClients } from "@/lib/coach-clients";
 import { fetchBookingCounts } from "@/lib/credit-picture";
 import { dateFromKey } from "@/lib/date-key";
-import { dateKeyInZone } from "@/lib/timezone";
+import { dateKeyInZone, zonedTimeToUtc } from "@/lib/timezone";
 import { formatInTimezone } from "@/lib/format-in-timezone";
 import { SessionCountLine } from "@/components/coach/session-count-line";
 import { SessionCheckSection } from "@/components/coach/session-check-section";
@@ -15,6 +15,9 @@ import { ScheduleClientPicker } from "@/components/coach/schedule-client-picker"
 import { UpcomingSessionsList } from "@/components/coach/upcoming-sessions-list";
 
 const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+// The same dots as the computer's month (components/coach/desktop/calendar-grid.tsx): an event the coach put on the calendar glows rust, a suggestion is yellow.
+const DOT_EVENT = "bg-rust shadow-[0_0_5px_rgb(var(--rust)/0.7)]";
+const DOT_SUGGESTION = "bg-yellow-500";
 const dayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const monthLabel = (y: number, m: number) => new Date(y, m, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
@@ -125,19 +128,46 @@ export async function CoachPhoneSchedule({
       .order("id", { ascending: true })
       .range(from, to)
   );
-  const sessionsByDay = new Map<string, { time: string; name: string }[]>();
+  const sessionsByDay = new Map<string, { time: string; name: string; at: string }[]>();
   for (const b of [...monthRows].sort((a: any, b: any) => String(a.start_at).localeCompare(String(b.start_at))) as any[]) {
     const k = dateKeyInZone(timezone, new Date(b.start_at));
     const list = sessionsByDay.get(k) ?? [];
-    list.push({ time: formatInTimezone(new Date(b.start_at), timezone, "time"), name: String(b.profiles?.full_name ?? "Client").split(" ")[0] });
+    list.push({ time: formatInTimezone(new Date(b.start_at), timezone, "time"), name: String(b.profiles?.full_name ?? "Client").split(" ")[0], at: b.start_at as string });
     sessionsByDay.set(k, list);
   }
+  // The coach's own calendar events (a consult they put on their calendar, a suggestion; Ron, Nov 19: "needs to show up on my calendar ... i almost missed it"): on the month's days
+  // with a dot, in time order among the sessions (one with no time after them), and in the upcoming list. Only the coach's own rows.
+  const todayKey = dateKeyInZone(timezone);
+  const soonEndKey = dayKey(new Date(today.getFullYear(), today.getMonth(), today.getDate() + 5));
+  const eventCols = "id, title, event_date, event_time, event_type";
+  const [{ data: monthEventRows }, { data: soonEventRows }] = await Promise.all([
+    supabase.from("calendar_events").select(eventCols).eq("coach_id", userId).neq("status", "dismissed").gte("event_date", dayKey(monthStart)).lt("event_date", dayKey(monthEnd)),
+    supabase.from("calendar_events").select(eventCols).eq("coach_id", userId).neq("status", "dismissed").gte("event_date", todayKey).lt("event_date", soonEndKey),
+  ]);
+  type EventRow = { id: string; title: string; event_date: string; event_time: string | null; event_type: string };
+  const eventAt = (e: EventRow) => zonedTimeToUtc(e.event_date, e.event_time ? e.event_time.slice(0, 5) : "00:00", timezone).toISOString();
+  const eventsByDay = new Map<string, EventRow[]>();
+  for (const e of (monthEventRows ?? []) as EventRow[]) eventsByDay.set(e.event_date, [...(eventsByDay.get(e.event_date) ?? []), e]);
+  const nowIso = new Date().toISOString();
+  const soonEvents = ((soonEventRows ?? []) as EventRow[])
+    .filter((e) => !e.event_time || eventAt(e) >= nowIso)
+    .map((e) => ({
+      id: `event-${e.id}`,
+      name: `${e.event_type === "suggestion" ? "Suggested" : "Event"}: ${e.title}`,
+      at: eventAt(e),
+      when: e.event_time ? formatInTimezone(new Date(eventAt(e)), timezone, "dateTime") : `${dateFromKey(e.event_date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}, all day`,
+    }));
   const leading = new Date(year, monthIndex, 1).getDay();
   const days = new Date(year, monthIndex + 1, 0).getDate();
   const cells: (Date | null)[] = [...Array.from({ length: leading }, () => null), ...Array.from({ length: days }, (_, i) => new Date(year, monthIndex, i + 1))];
   const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-  // Their own workouts ahead first (by day), then client sessions (by time).
-  const upcomingRows = [...(own?.upcoming ?? []), ...upcoming.map((b) => ({ id: b.id, name: b.name, when: formatInTimezone(new Date(b.startAt), timezone, "dateTime") }))];
+  // Their own workouts ahead first (by day), then client sessions and calendar events (by time).
+  const upcomingRows = [
+    ...(own?.upcoming ?? []),
+    ...[...upcoming.map((b) => ({ id: b.id, name: b.name, at: b.startAt, when: formatInTimezone(new Date(b.startAt), timezone, "dateTime") })), ...soonEvents]
+      .sort((a, b) => a.at.localeCompare(b.at))
+      .map(({ id, name, when }) => ({ id, name, when })),
+  ];
 
   return (
     <div data-coach-phone-schedule>
@@ -163,16 +193,25 @@ export async function CoachPhoneSchedule({
         {cells.map((date, i) => {
           if (!date) return <div key={i} className="bg-graphite min-h-[56px]" />;
           const isToday = sameDay(date, today);
+          const dayEvents = eventsByDay.get(dayKey(date)) ?? [];
+          const timed = [
+            ...(sessionsByDay.get(dayKey(date)) ?? []).map((s, idx) => ({ key: `s${idx}`, at: s.at, text: `${s.time} ${s.name}`, className: "text-chalk", dot: null as string | null })),
+            ...dayEvents
+              .filter((e) => e.event_time)
+              .map((e) => ({ key: `e${e.id}`, at: eventAt(e), text: `${formatInTimezone(new Date(eventAt(e)), timezone, "time")} ${e.title}`, className: "text-chalk", dot: e.event_type === "suggestion" ? DOT_SUGGESTION : DOT_EVENT })),
+          ].sort((a, b) => a.at.localeCompare(b.at));
           const lines = [
-            ...(own?.byDay.get(dayKey(date)) ?? []).map((w) => ({ key: w.key, text: `You: ${w.title}`, className: w.done ? "text-positive" : "text-rust" })),
-            ...(sessionsByDay.get(dayKey(date)) ?? []).map((s, idx) => ({ key: `s${idx}`, text: `${s.time} ${s.name}`, className: "text-chalk" })),
+            ...(own?.byDay.get(dayKey(date)) ?? []).map((w) => ({ key: w.key, text: `You: ${w.title}`, className: w.done ? "text-positive" : "text-rust", dot: null as string | null })),
+            ...timed,
+            ...dayEvents.filter((e) => !e.event_time).map((e) => ({ key: `e${e.id}`, text: e.title, className: "text-chalk", dot: e.event_type === "suggestion" ? DOT_SUGGESTION : DOT_EVENT })),
           ];
           // A day page loads when it is tapped. Prefetched, every day in view was drawn on the server at once (31 per month open, Oct 27), slowing the phone.
           return (
             <Link key={i} href={`/groups/${anchorGroupId}/calendar/${dayKey(date)}`} prefetch={false} className={`bg-graphite min-h-[56px] p-1.5 flex flex-col ${isToday ? "ring-1 ring-inset ring-rust" : ""}`}>
               <span className={`font-body text-xs ${isToday ? "text-rust font-bold" : "text-steel"}`}>{date.getDate()}</span>
               {lines.slice(0, 2).map((l) => (
-                <span key={l.key} className={`font-body text-[10px] leading-tight mt-0.5 truncate ${l.className}`}>
+                <span key={l.key} className={`font-body text-[10px] leading-tight mt-0.5 truncate ${l.className}`} {...(l.dot ? { "data-calendar-event": "" } : {})}>
+                  {l.dot && <span aria-hidden="true" className={`inline-block w-[5px] h-[5px] rounded-full mr-0.5 align-middle ${l.dot}`} />}
                   {l.text}
                 </span>
               ))}

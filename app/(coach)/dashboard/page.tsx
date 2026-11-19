@@ -23,8 +23,8 @@ import { getCoachDashboardData } from "@/lib/dashboard-data";
 import { PulseTabs } from "@/components/coach/desktop/pulse-tabs";
 import { DashboardStatTiles } from "@/components/coach/desktop/dashboard-stat-tiles";
 import { YourDayPanel } from "@/components/coach/desktop/your-day-panel";
-import { attentionFromSources, buildSchedule, type ClassSource } from "@/lib/your-day";
-import { DEFAULT_COACH_TIMEZONE, addDaysToKey, dateKeyInZone, localDayBounds } from "@/lib/timezone";
+import { attentionFromSources, buildSchedule, type ClassSource, type EventSource } from "@/lib/your-day";
+import { DEFAULT_COACH_TIMEZONE, addDaysToKey, dateKeyInZone, localDayBounds, zonedTimeToUtc } from "@/lib/timezone";
 import { isValidTimeZone } from "@/lib/format-in-timezone";
 import { isLowReadiness } from "@/lib/wellness";
 import { NeedsPaymentPanel } from "@/components/coach/desktop/needs-payment-panel";
@@ -397,6 +397,28 @@ export default async function CoachHomePage() {
 
   // Your day: today's classes (the 1-on-1 sessions are already in dashboardData). Any failure (or the group-sessions migration not applied yet)
   // just leaves that part out.
+  // Today's calendar events the coach put on their own calendar (and the suggestions), for Your day (Ron, Nov 19: a consult "needs to show up on my calendar ... i almost missed it").
+  // Only the coach's own rows. They belong to no group, so their calendar link opens the day under a group the coach coaches (none: not listed).
+  async function loadTodaysEvents(): Promise<EventSource[]> {
+    try {
+      const eventsGroupId = (allGroups.find((g) => g.group_kind !== "one_on_one") ?? allGroups[0])?.id;
+      if (!eventsGroupId) return [];
+      const todayKey = dateKeyInZone(coachTimezone);
+      const { data } = await supabase.from("calendar_events").select("id, title, event_time, event_type").eq("coach_id", user!.id).eq("event_date", todayKey).neq("status", "dismissed");
+      return ((data ?? []) as { id: string; title: string; event_time: string | null; event_type: string }[]).map((e) => ({
+        id: e.id,
+        title: e.title,
+        dateKey: todayKey,
+        startAt: zonedTimeToUtc(todayKey, e.event_time ? e.event_time.slice(0, 5) : "00:00", coachTimezone).toISOString(),
+        timed: !!e.event_time,
+        type: e.event_type === "suggestion" ? "suggestion" : "custom",
+        groupId: eventsGroupId,
+      }));
+    } catch {
+      return [];
+    }
+  }
+
   async function loadTodaysClasses(): Promise<ClassSource[]> {
     try {
       const { data: classData } = await readRowsByIds(allGroupIdList, (g) => (from, to) =>
@@ -456,7 +478,7 @@ export default async function CoachHomePage() {
 
   // Round 3: everything left reads only the group list, so it all runs as one batch (the "N — Dual Signal" dashboard data — hero flag/empty-state,
   // per-team-group Team Pulse, stat tiles, today's bookings, quiet-client tiers — comes from one batched fetch in its own lib).
-  const [dashboardData, unseenByGroup, memberCountByGroup, needsReplyThreads, soloRows, todaysClasses, lowReadiness] = await Promise.all([
+  const [dashboardData, unseenByGroup, memberCountByGroup, needsReplyThreads, soloRows, todaysClasses, lowReadiness, todaysEvents] = await Promise.all([
     getCoachDashboardData(supabase, {
       coachId: user.id,
       teamGroups: teamGroups.map((g) => ({ id: g.id, name: g.name, orgName: orgNameByGroupId(g.organization_id) })),
@@ -471,6 +493,7 @@ export default async function CoachHomePage() {
     loadSoloClientRows(),
     loadTodaysClasses(),
     loadLowReadiness(),
+    loadTodaysEvents(),
   ]);
 
   const orgNotifications: OrgNotification[] = (orgNotificationRows ?? []).map((n) => ({
@@ -535,7 +558,7 @@ export default async function CoachHomePage() {
 
   const orgName = org?.display_name || org?.name || "Your Coaching Business";
 
-  const yourDaySchedule = buildSchedule(user.id, dashboardData.todayBookings, todaysClasses);
+  const yourDaySchedule = buildSchedule(user.id, dashboardData.todayBookings, todaysClasses, todaysEvents);
   const yourDayAttention = attentionFromSources({
     replies: needsReplyThreads,
     payments: dashboardData.needsPayment,

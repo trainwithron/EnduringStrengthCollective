@@ -121,21 +121,27 @@ export function attentionHeadline(total: number): string {
 export interface ScheduleEntry {
   id: string;
   groupId: string; // the group the session or class belongs to: its calendar day is /groups/{groupId}/calendar/{date}
-  kind: "session" | "class";
+  kind: "session" | "class" | "event";
   title: string;
   detail: string;
   startAt: string;
   endAt: string | null;
   href: string;
   needsPayment: boolean;
+  // A calendar event with no time: listed first, as "All day" (startAt is the start of the day, only for its calendar link).
+  allDay?: boolean;
 }
 
 export interface BookingSource { id: string; athleteId: string; groupId: string; athleteName: string; groupName: string; startAt: string; needsPayment: boolean }
 export interface ClassSource { id: string; title: string; startAt: string; endAt: string; capacity: number; joined: number; waitlisted: number; groupId: string }
+// One of the coach's own calendar events today (a consult they put on their calendar, or a suggestion). groupId is a group the coach coaches, for the calendar day link.
+export interface EventSource { id: string; title: string; dateKey: string; startAt: string; timed: boolean; type: "custom" | "suggestion"; groupId: string }
 
 // Both kinds in time order. A class's hidden anchor booking is the coach's own booking, never a client's, and is dropped here so the
 // class is not listed twice (or listed as the coach being their own client).
-export function buildSchedule(coachId: string, bookings: BookingSource[], classes: ClassSource[]): ScheduleEntry[] {
+// The coach's own calendar events go in too (Ron, Nov 19: a consult "needs to show up on my calendar ... i almost missed it"): one with a time in time order among the
+// sessions and classes, one without a time first, as "All day".
+export function buildSchedule(coachId: string, bookings: BookingSource[], classes: ClassSource[], events: EventSource[] = []): ScheduleEntry[] {
   const entries: ScheduleEntry[] = [];
   for (const b of bookings) {
     if (b.athleteId === coachId) continue;
@@ -165,5 +171,19 @@ export function buildSchedule(coachId: string, bookings: BookingSource[], classe
       needsPayment: false,
     });
   }
-  return entries.sort((a, b) => a.startAt.localeCompare(b.startAt));
+  for (const e of events) {
+    entries.push({
+      id: `event:${e.id}`,
+      kind: "event",
+      groupId: e.groupId,
+      title: e.title,
+      detail: e.type === "suggestion" ? "Suggested" : "On your calendar",
+      startAt: e.startAt,
+      endAt: null,
+      href: `/groups/${e.groupId}/calendar/${e.dateKey}`,
+      needsPayment: false,
+      allDay: !e.timed,
+    });
+  }
+  return entries.sort((a, b) => Number(!!b.allDay) - Number(!!a.allDay) || a.startAt.localeCompare(b.startAt));
 }

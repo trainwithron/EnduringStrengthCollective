@@ -8,6 +8,7 @@ import { X } from "lucide-react";
 import type { AvailabilityWindow } from "@/lib/booking-slots";
 import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { dateFromKey } from "@/lib/date-key";
+import { minutesOfDayInZone, parseClockMinutes } from "@/lib/day-time-grid";
 import type { TypeLite } from "@/lib/session-type-default";
 import { CLIENT_DRAG_MIME, type DraggedClient } from "./draggable-client-name";
 import { DayTimeGrid } from "./day-time-grid";
@@ -259,42 +260,48 @@ export function CalendarGrid({
                   </span>
                 ))}
 
-                {bookingsShown.map((b, idx) => (
+                {/* Sessions and calendar events in one list by time (Ron, Nov 19: a 5 PM consult sat under a 7 PM session); an event with no time comes last. */}
+                {[
+                  ...bookingsShown.map((b, idx) => ({ kind: "booking" as const, b, idx, min: b.startMs != null ? minutesOfDayInZone(new Date(b.startMs), timezone) : Number.MAX_SAFE_INTEGER })),
+                  ...events.map((e) => ({ kind: "event" as const, e, min: e.clock ? parseClockMinutes(e.clock) : Number.MAX_SAFE_INTEGER })),
+                ]
+                  .sort((x, y) => x.min - y.min)
+                  .map((row) =>
+                    row.kind === "booking" ? (
                   <span
-                    key={`b-${idx}`}
+                    key={`b-${row.idx}`}
                     className="font-body text-xs text-chalk leading-tight"
-                    {...(b.bookingId && b.startMs != null && b.endMs != null
-                      ? sessionMenu.handlersFor({ bookingId: b.bookingId, seriesId: b.seriesId ?? null, name: b.name, startMs: b.startMs, endMs: b.endMs })
+                    {...(row.b.bookingId && row.b.startMs != null && row.b.endMs != null
+                      ? sessionMenu.handlersFor({ bookingId: row.b.bookingId, seriesId: row.b.seriesId ?? null, name: row.b.name, startMs: row.b.startMs, endMs: row.b.endMs })
                       : {})}
                   >
-                    {b.time} &middot; {b.name}
+                    {row.b.time} &middot; {row.b.name}
                   </span>
-                ))}
-
-                {events.map((e) => (
+                    ) : (
                   <div
-                    key={e.id}
+                    key={row.e.id}
                     className={`flex items-center gap-1 font-body text-xs leading-tight ${
-                      e.type === "suggestion" ? "text-yellow-500" : "text-rust"
+                      row.e.type === "suggestion" ? "text-yellow-500" : "text-rust"
                     }`}
                   >
                     <span className="truncate flex-1">
-                      {e.time ? `${e.time} · ` : ""}
-                      {e.title}
+                      {row.e.time ? `${row.e.time} · ` : ""}
+                      {row.e.title}
                     </span>
                     <button
                       type="button"
                       onClick={(evt) => {
                         evt.stopPropagation();
-                        handleDeleteEvent(e.id);
+                        handleDeleteEvent(row.e.id);
                       }}
-                      aria-label={`Remove ${e.title}`}
+                      aria-label={`Remove ${row.e.title}`}
                       className="shrink-0 opacity-0 group-hover:opacity-100"
                     >
                       <X className="w-2.5 h-2.5" />
                     </button>
                   </div>
-                ))}
+                    )
+                  )}
 
                 {bookings.length === 0 && events.length === 0 && (
                   <span className="font-body text-xs text-steel">No sessions</span>
