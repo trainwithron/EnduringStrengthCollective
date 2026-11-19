@@ -18,6 +18,8 @@ export interface CalendarEventEntry {
   id: string;
   title: string;
   time: string | null;
+  // The event's own clock time ("17:00:00"), so the expanded day can draw it at its time.
+  clock?: string | null;
   type: "custom" | "suggestion";
   status: string;
 }
@@ -327,7 +329,7 @@ export function CalendarGrid({
             groupId={groupId}
             client={client}
             bookings={bookingsByDateKey.get(expandedKey) ?? []}
-            events={[]}
+            events={eventsByDateKey.get(expandedKey) ?? []}
             availabilityWindows={availabilityWindows}
             blockedRanges={blockedRanges}
             bufferMinutes={bufferMinutes}

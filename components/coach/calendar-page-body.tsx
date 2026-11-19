@@ -961,6 +961,7 @@ export async function CoachCalendarPageBody(
       id: e.id,
       title: e.title,
       time: e.event_time ? formatTimeString(e.event_time) : null,
+      clock: e.event_time ?? null,
       type: e.event_type as "custom" | "suggestion",
       status: e.status,
     });

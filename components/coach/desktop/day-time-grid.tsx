@@ -35,6 +35,8 @@ import { useSessionMenu } from "@/components/coach/session-menu";
 import type { CalendarEventEntry } from "./calendar-grid";
 
 const UNDO_SECONDS = 8;
+// How tall a calendar event is drawn: it has a start time but no end.
+const EVENT_MINUTES = 30;
 // Space above the first hour so its label (centred on the hour line) is not clipped at the top of the scroller.
 const GRID_HEADROOM_PX = 12;
 
@@ -150,15 +152,23 @@ export function DayTimeGrid({
       const start = new Date(b.startMs!);
       const startMin = minutesOfDayInZone(start, timezone);
       const endMin = b.endMs != null ? wall(new Date(b.endMs)) : startMin + sessionLengthDefault;
-      return { startMin, endMin: Math.max(endMin, startMin + 5), name: b.name, time: b.time, bookingId: b.bookingId, seriesId: b.seriesId ?? null, startMs: b.startMs! };
+      return { kind: "session" as const, startMin, endMin: Math.max(endMin, startMin + 5), name: b.name, time: b.time, bookingId: b.bookingId, seriesId: b.seriesId ?? null, startMs: b.startMs! };
+    });
+  // The coach's own calendar events that have a time (a consult, a call; Ron, Nov 19: "needs to show up on my calendar ... i almost missed it"): drawn at their time,
+  // beside any session at the same time, 30 minutes tall. Never clickable, so they never get in the way of booking; remove one from "Also on this day" below.
+  const eventSpans = events
+    .filter((e) => e.clock)
+    .map((e) => {
+      const startMin = parseClockMinutes(e.clock!);
+      return { kind: "event" as const, id: e.id, startMin, endMin: Math.min(24 * 60, startMin + EVENT_MINUTES), title: e.title, time: e.time ?? clockLabel12(startMin), suggestion: e.type === "suggestion" };
     });
 
-  const range = gridRange([...windowSpans, ...blockedSpans, ...sessionSpans]);
+  const range = gridRange([...windowSpans, ...blockedSpans, ...sessionSpans, ...eventSpans]);
   const trackHeight = (range.endMin - range.startMin) * PX_PER_MINUTE;
   const hours: number[] = [];
   for (let m = range.startMin; m < range.endMin; m += 60) hours.push(m);
-  const lanes = assignLanes(sessionSpans);
-  const firstBusyMin = Math.min(...[...windowSpans, ...sessionSpans].map((s) => s.startMin), Number.POSITIVE_INFINITY);
+  const lanes = assignLanes<(typeof sessionSpans)[number] | (typeof eventSpans)[number]>([...sessionSpans, ...eventSpans]);
+  const firstBusyMin = Math.min(...[...windowSpans, ...sessionSpans, ...eventSpans].map((s) => s.startMin), Number.POSITIVE_INFINITY);
   const dayKeyForScroll = dateKey;
   useEffect(() => {
     // Opens on the day's first open hour or session instead of always at the top of the axis.
@@ -469,6 +479,21 @@ export function DayTimeGrid({
             {lanes.map(({ item, lane, lanes: count }, i) => {
               const top = offsetFromMinute(item.startMin, range);
               const height = Math.max(14, (item.endMin - item.startMin) * PX_PER_MINUTE);
+              if (item.kind === "event") {
+                return (
+                  <div
+                    key={`e-${item.id}`}
+                    data-calendar-event
+                    title={`${item.time} ${item.title}`}
+                    className={`absolute pointer-events-none px-1 overflow-hidden border-l-4 ${item.suggestion ? "bg-yellow-500/20 border-yellow-500" : "bg-rust/25 border-rust"}`}
+                    style={{ top, height, left: `calc(${(lane / count) * 100}% + 2px)`, width: `calc(${100 / count}% - 4px)` }}
+                  >
+                    <span className="font-body text-[11px] leading-tight text-chalk block truncate">
+                      {item.time} {item.title}
+                    </span>
+                  </div>
+                );
+              }
               const halo = bufferMinutes * PX_PER_MINUTE;
               return (
                 <div key={`s${i}`} className="absolute" style={{ top: top - halo, height: height + halo * 2, left: `${(lane / count) * 100}%`, width: `${100 / count}%` }}>
@@ -647,11 +672,6 @@ export function DayTimeGrid({
             className="h-7 bg-graphite border border-steel/30 text-chalk px-1.5 font-body text-xs"
           />
         </label>
-        {events.length > 0 && (
-          <span className="font-body text-xs text-steel">
-            Also today: {events.map((ev) => `${ev.time ? `${ev.time} ` : ""}${ev.title}`).join(", ")}
-          </span>
-        )}
         <Link href={dayHref} className="font-body text-xs text-rust underline underline-offset-2 ml-auto">
           Open day page &rarr;
         </Link>
