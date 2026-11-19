@@ -61,7 +61,7 @@ const checkRow = async () => {
 };
 await db.exec(paste);
 assert.ok(Object.values(await checkRow()).every((v) => v === true), JSON.stringify(await checkRow()));
-assert.equal(Object.keys(await checkRow()).length, 7);
+assert.equal(Object.keys(await checkRow()).length, 8);
 await db.exec(paste); // re-running is safe
 assert.ok(Object.values(await checkRow()).every((v) => v === true));
 
