@@ -68,7 +68,8 @@ export default async function KioskPage(
     .map((m: any) => ({
       athleteId: m.profile_id as string,
       fullName: shownName((m.profiles?.full_name as string | null) ?? "Unknown", m.profile_id as string, protectedIds),
-      hasPin: pinStatus.get(m.profile_id as string) ?? false,
+      // If who has a PIN could not be read, let them type it: the server check decides, and says "No PIN set" when there is none.
+      hasPin: pinStatus ? (pinStatus.get(m.profile_id as string) ?? false) : true,
     }))
     .sort((a, b) => a.fullName.localeCompare(b.fullName));
 

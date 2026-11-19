@@ -27,3 +27,13 @@ describe("Nov 19 schema sweep fixes", () => {
     }
   });
 });
+
+describe("kiosk PIN status that could not be read", () => {
+  it("is null, never an empty map read as 'nobody has a PIN'", () => {
+    expect(read("lib/kiosk-pin-status.ts")).toContain("if (error) return null;");
+  });
+  it("settings says the list failed; the kiosk lets them type the PIN and the server decides", () => {
+    expect(read("app/(coach)/groups/[groupId]/kiosk/settings/page.tsx")).toContain("if (!pinStatus) rosterFailed = true;");
+    expect(read("app/(coach)/groups/[groupId]/kiosk/page.tsx")).toContain("hasPin: pinStatus ? (pinStatus.get(m.profile_id as string) ?? false) : true,");
+  });
+});

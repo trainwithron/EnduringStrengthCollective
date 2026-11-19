@@ -72,6 +72,8 @@ export default async function KioskSettingsPage(
       hasCard: r.has_card,
     }));
   } else {
+    // Who has a PIN could not be read: say the list failed rather than show everyone as "no PIN".
+    if (!pinStatus) rosterFailed = true;
     const ids = (memberships ?? []).map((m: any) => m.profile_id as string);
     const { data: cardRows } = cardsReady && organizationId && ids.length > 0 ? await supabase.from("checkin_cards").select("athlete_id").eq("organization_id", organizationId).in("athlete_id", ids) : { data: [] };
     const withCard = new Set(((cardRows ?? []) as { athlete_id: string }[]).map((r) => r.athlete_id));
@@ -80,7 +82,7 @@ export default async function KioskSettingsPage(
         athleteId: m.profile_id as string,
         groupId: params.groupId,
         fullName: (m.profiles?.full_name as string | null) ?? "Unknown",
-        hasPin: pinStatus.get(m.profile_id as string) ?? false,
+        hasPin: pinStatus?.get(m.profile_id as string) ?? false,
         hasCard: withCard.has(m.profile_id as string),
       }))
       .sort((a, b) => a.fullName.localeCompare(b.fullName));
