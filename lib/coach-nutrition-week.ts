@@ -148,7 +148,7 @@ export async function loadNutritionWeek(supabase: SupabaseClient, clients: WeekC
     // The single row that stood in before the history existed: used only for a client with no history row.
     readByIds(ids, (g) => (a, b) => supabase.from("client_macro_targets").select("athlete_id, group_id, calories, protein_g, carbs_g, fat_g, updated_at").in("athlete_id", g).order("athlete_id").order("group_id").range(a, b)),
     // A day's own target, and a day's meal plan target, this week.
-    readByIds(ids, (g) => (a, b) => supabase.from("daily_macros").select("id, athlete_id, group_id, log_date, calories, protein_g, carbs_g, fat_g").in("athlete_id", g).gte("log_date", from).lte("log_date", todayKey).order("id").range(a, b)),
+    readByIds(ids, (g) => (a, b) => supabase.from("daily_macros").select("athlete_id, group_id, log_date, calories, protein_g, carbs_g, fat_g").in("athlete_id", g).gte("log_date", from).lte("log_date", todayKey).order("athlete_id").order("log_date").range(a, b)),
     readByIds(ids, (g) => (a, b) => supabase.from("meal_plans").select("id, athlete_id, group_id, log_date, macros").in("athlete_id", g).gte("log_date", from).lte("log_date", todayKey).order("id").range(a, b)),
     protect(ids),
   ]);
