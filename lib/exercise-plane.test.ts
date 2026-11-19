@@ -17,7 +17,7 @@ describe("a movement plane on each exercise of a ladder", () => {
   it("is saved with the ladder, loaded back, and picked on a line of its own under the exercise name (fits a phone)", () => {
     const row = read("components/coach/movement-pattern-row.tsx");
     expect(row).toContain("        is_unilateral: !!item.unilateral,\n        plane: item.plane ?? null,\n");
-    expect(row).toContain('<option value="">Plane</option>');
+    expect(row).toContain('{patternPlane ? `Plane (${patternPlane}, from the pattern)` : "Plane"}');
     expect(row).toContain('<div className="pl-6 mt-1">');
     expect(row).toContain("aria-label={`Movement plane for ${item.exerciseName || `exercise ${i + 1}`}`}");
     // the pattern-level Plane buttons are gone (nothing writes the pattern's own plane from the row any more)
@@ -32,5 +32,17 @@ describe("a movement plane on each exercise of a ladder", () => {
     expect(patternHasPlane(pattern, "frontal")).toBe(true);
     expect(patternHasPlane(pattern, "sagittal")).toBe(false);
     expect(patternHasPlane({ ladder: [] }, "transverse")).toBe(false);
+  });
+});
+
+// Review, Nov 19: a pattern none of whose exercises has a plane yet still shows under the plane the coach gave the whole pattern, and the picker says so.
+import { patternHasPlane as hasPlane } from "@/components/coach/movement-pattern-list";
+describe("a pattern with no exercise planes yet keeps its own plane", () => {
+  it("falls back to the pattern's plane only when no exercise has one", () => {
+    expect(hasPlane({ plane: "frontal", ladder: [{ plane: null }, {}] }, "frontal")).toBe(true);
+    expect(hasPlane({ plane: "frontal", ladder: [{ plane: null }] }, "sagittal")).toBe(false);
+    expect(hasPlane({ plane: "frontal", ladder: [{ plane: "Sagittal" }] }, "frontal")).toBe(false);
+    expect(hasPlane({ plane: "frontal", ladder: [{ plane: "Sagittal" }] }, "sagittal")).toBe(true);
+    expect(hasPlane({ plane: null, ladder: [] }, null)).toBe(true);
   });
 });

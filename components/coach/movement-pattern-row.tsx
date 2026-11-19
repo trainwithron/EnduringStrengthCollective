@@ -30,10 +30,13 @@ export function MovementPatternRow({
   pattern,
   initialLadder,
   exerciseLibrary,
+  patternPlane = null,
 }: {
   pattern: { id: string; name: string };
   initialLadder: LadderItem[];
   exerciseLibrary: string[];
+  // The plane the coach gave the whole pattern before planes went on each exercise (shown as the default, not saved on the exercise).
+  patternPlane?: MovementPlane;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [ladder, setLadder] = useState<LadderItem[]>(
@@ -233,7 +236,8 @@ export function MovementPatternRow({
                   aria-label={`Movement plane for ${item.exerciseName || `exercise ${i + 1}`}`}
                   className="h-7 bg-surface border border-steel/30 text-chalk px-1.5 font-body text-xs focus:outline-none focus:border-rust"
                 >
-                  <option value="">Plane</option>
+                  {/* No plane of its own yet: say which plane the whole pattern was given, so the coach sees it. */}
+                  <option value="">{patternPlane ? `Plane (${patternPlane}, from the pattern)` : "Plane"}</option>
                   {EXERCISE_PLANES.map((p) => (
                     <option key={p} value={p}>
                       {p}

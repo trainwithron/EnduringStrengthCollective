@@ -11,8 +11,10 @@ interface PatternWithLadder {
 }
 
 // Each exercise carries its own plane (Ron, Nov 19): a pattern shows under a plane when any of its exercises has it (an exercise's plane is stored capitalized, the filter is lowercase).
-export function patternHasPlane(p: { ladder: { plane?: ExercisePlane }[] }, plane: MovementPlane): boolean {
-  return plane === null || p.ladder.some((e) => (e.plane ?? "").toLowerCase() === plane);
+// A pattern none of whose exercises has a plane yet keeps the plane the coach gave the whole pattern before (review, Nov 19: 14 of Ron's patterns would otherwise drop out of every filter).
+export function patternHasPlane(p: { plane?: MovementPlane; ladder: { plane?: ExercisePlane }[] }, plane: MovementPlane): boolean {
+  if (plane === null) return true;
+  return p.ladder.some((e) => e.plane) ? p.ladder.some((e) => (e.plane ?? "").toLowerCase() === plane) : p.plane === plane;
 }
 
 const PLANES = ["sagittal", "frontal", "transverse"] as const;
@@ -71,6 +73,7 @@ export function MovementPatternList({
             <MovementPatternRow
               key={p.id}
               pattern={{ id: p.id, name: p.name }}
+              patternPlane={p.plane}
               initialLadder={p.ladder}
               exerciseLibrary={exerciseLibrary}
             />
