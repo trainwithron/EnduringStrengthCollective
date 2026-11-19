@@ -18,7 +18,7 @@ describe("a movement plane on each exercise of a ladder", () => {
     const row = read("components/coach/movement-pattern-row.tsx");
     expect(row).toContain("        is_unilateral: !!item.unilateral,\n        plane: item.plane ?? null,\n");
     expect(row).toContain('{patternPlane ? `Plane (${patternPlane}, from the pattern)` : "Plane"}');
-    expect(row).toContain('<div className="pl-6 mt-1">');
+    expect(row).toContain('<div className="pl-6 mt-1 flex flex-wrap items-center gap-1.5">');
     expect(row).toContain("aria-label={`Movement plane for ${item.exerciseName || `exercise ${i + 1}`}`}");
     // the pattern-level Plane buttons are gone (nothing writes the pattern's own plane from the row any more)
     expect(row).not.toContain('from("movement_patterns").update({ plane');

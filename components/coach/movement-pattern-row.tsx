@@ -165,13 +165,16 @@ export function MovementPatternRow({
               <div key={item.key} data-ladder-row>
               <div className="flex items-center gap-2">
                 <span className="font-body text-xs text-steel w-4 shrink-0">{i + 1}</span>
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <ExerciseNameInput
                     value={item.exerciseName}
                     onChange={(name) => updateItem(item.key, name)}
                     suggestions={exerciseLibrary}
                   />
                 </div>
+              </div>
+              {/* The name has its own line (on a phone it was squeezed to nothing beside the buttons; Nov 19); class, side, plane and order sit on the line under it. */}
+              <div className="pl-6 mt-1 flex flex-wrap items-center gap-1.5">
                 <div className="flex items-center gap-0.5 shrink-0" aria-label="Priority tier">
                   {(["A", "B", "C"] as const).map((t) => (
                     <button
@@ -200,6 +203,21 @@ export function MovementPatternRow({
                 >
                   Unilateral
                 </button>
+                <select
+                  value={item.plane ?? ""}
+                  onChange={(e) => updatePlane(item.key, (e.target.value || null) as ExercisePlane)}
+                  aria-label={`Movement plane for ${item.exerciseName || `exercise ${i + 1}`}`}
+                  className="h-7 bg-surface border border-steel/30 text-chalk px-1.5 font-body text-xs focus:outline-none focus:border-rust"
+                >
+                  {/* No plane of its own yet: say which plane the whole pattern was given, so the coach sees it. */}
+                  <option value="">{patternPlane ? `Plane (${patternPlane}, from the pattern)` : "Plane"}</option>
+                  {EXERCISE_PLANES.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                  {item.plane === "Multi-planar" && <option value="Multi-planar">Multi-planar</option>}
+                </select>
                 <button
                   type="button"
                   onClick={() => moveItem(i, -1)}
@@ -227,24 +245,6 @@ export function MovementPatternRow({
                     Remove
                   </button>
                 )}
-              </div>
-              {/* Its own line under the name, so the row still fits a phone. */}
-              <div className="pl-6 mt-1">
-                <select
-                  value={item.plane ?? ""}
-                  onChange={(e) => updatePlane(item.key, (e.target.value || null) as ExercisePlane)}
-                  aria-label={`Movement plane for ${item.exerciseName || `exercise ${i + 1}`}`}
-                  className="h-7 bg-surface border border-steel/30 text-chalk px-1.5 font-body text-xs focus:outline-none focus:border-rust"
-                >
-                  {/* No plane of its own yet: say which plane the whole pattern was given, so the coach sees it. */}
-                  <option value="">{patternPlane ? `Plane (${patternPlane}, from the pattern)` : "Plane"}</option>
-                  {EXERCISE_PLANES.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                  {item.plane === "Multi-planar" && <option value="Multi-planar">Multi-planar</option>}
-                </select>
               </div>
               </div>
             ))}
