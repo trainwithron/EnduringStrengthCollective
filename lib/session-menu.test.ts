@@ -53,6 +53,9 @@ describe("the calendar's session menu (Ron, Nov 2)", () => {
     expect(menu).toContain("settled={() => Date.now() >= holdOpenUntil.current}");
     expect(menu).toContain("onClick={dismiss}");
     expect(menu).toContain('window.addEventListener("scroll", onMove, true);');
+    // Review, Nov 19: a scroll while the finger is down cancels the hold, and the server-page target draws its menu outside the session (portal events bubble to the parent).
+    expect(menu).toContain('window.addEventListener("scroll", onScroll, { capture: true, passive: true });');
+    expect(menu).toMatch(/<\/span>\s*\{menu\.node\}\s*<\/>/);
     // Duplicate starts at the same time next week; more than one week goes through the weekly booking (one notice to the client)
     expect(menu).toContain("useState(addDaysToKey(now.dateKey, 7))");
     expect(menu).toContain('mode: "fixed", count: weeks');

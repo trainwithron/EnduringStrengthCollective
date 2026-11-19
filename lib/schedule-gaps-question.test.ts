@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ANSWERED_QUIET_DAYS, ASK_HEADLINE, GAPS_CLIENTS_KEY, GAPS_KEY, HAPPY_QUIET_DAYS, scheduleGapsStage, wantedClientKind, type GapAnswerEvent } from "./schedule-gaps-question";
+import { ANSWERED_QUIET_DAYS, ASK_HEADLINE, GAPS_CLIENTS_KEY, GAPS_KEY, HAPPY_QUIET_DAYS, scheduleGapsStage, wantedClientKinds, type GapAnswerEvent } from "./schedule-gaps-question";
 
 const now = new Date("2026-10-20T12:00:00Z");
 const ago = (d: number) => new Date(now.getTime() - d * 86400000).toISOString();
@@ -28,7 +28,7 @@ describe("the gap question", () => {
   it("an answered follow-up is remembered and the question stays quiet for 3 months", () => {
     const events = [ev(GAPS_KEY, "fill", 5), ev(GAPS_CLIENTS_KEY, "hybrid", 4)];
     expect(scheduleGapsStage(events, now)).toBe("quiet");
-    expect(wantedClientKind(events)).toBe("hybrid");
+    expect(wantedClientKinds(events)).toEqual(["hybrid"]);
     expect(scheduleGapsStage([ev(GAPS_KEY, "fill", ANSWERED_QUIET_DAYS + 5), ev(GAPS_CLIENTS_KEY, "online", ANSWERED_QUIET_DAYS + 4)], now)).toBe("ask");
   });
   it("'Not now' on the follow-up waits 2 weeks and then asks the follow-up again", () => {
@@ -40,8 +40,11 @@ describe("the gap question", () => {
     expect(scheduleGapsStage([ev(GAPS_CLIENTS_KEY, "online", 50), ev(GAPS_KEY, "fill", 2)], now)).toBe("followup");
   });
   it("only the three real kinds count as a wanted kind", () => {
-    expect(wantedClientKind([ev(GAPS_CLIENTS_KEY, "later", 1)])).toBeNull();
-    expect(wantedClientKind([])).toBeNull();
-    expect(wantedClientKind([ev(GAPS_CLIENTS_KEY, "in_person", 1)])).toBe("in_person");
+    expect(wantedClientKinds([ev(GAPS_CLIENTS_KEY, "later", 1)])).toEqual([]);
+    expect(wantedClientKinds([])).toEqual([]);
+    // More than one kind (Ron, Nov 19: all three), in the list's order.
+    expect(wantedClientKinds([ev(GAPS_CLIENTS_KEY, "in_person,online,hybrid", 1)])).toEqual(["online", "hybrid", "in_person"]);
+    expect(wantedClientKinds([ev(GAPS_CLIENTS_KEY, "online,in_person", 1)])).toEqual(["online", "in_person"]);
+    expect(wantedClientKinds([ev(GAPS_CLIENTS_KEY, "in_person", 1)])).toEqual(["in_person"]);
   });
 });

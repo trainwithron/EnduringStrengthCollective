@@ -29,7 +29,7 @@ export function useSessionMenu(timezone: string, onChanged?: () => void) {
   const changed = onChanged ?? (() => router.refresh());
   const [open, setOpen] = useState<{ session: MenuSession; x: number; y: number } | null>(null);
   const [dialog, setDialog] = useState<Dialog | null>(null);
-  const press = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number; at: number } | null>(null);
+  const press = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number; at: number; onScroll: () => void } | null>(null);
   // A press that opened the menu must not also click what is under the finger (open the day, open the cancel box).
   const swallowClick = useRef(false);
   // Ron, Nov 19: press and hold was finicky on his phone (about six presses before the menu stayed open). The press is timed with touch events, which Chrome keeps sending
@@ -39,7 +39,10 @@ export function useSessionMenu(timezone: string, onChanged?: () => void) {
   const holdOpenUntil = useRef(0);
 
   function clearPress() {
-    if (press.current) clearTimeout(press.current.timer);
+    if (press.current) {
+      clearTimeout(press.current.timer);
+      window.removeEventListener("scroll", press.current.onScroll, true);
+    }
     press.current = null;
   }
 
@@ -77,12 +80,16 @@ export function useSessionMenu(timezone: string, onChanged?: () => void) {
         fingerDown.current = true;
         const x = touch.clientX;
         const y = touch.clientY;
+        // Anything scrolling while the finger is down makes it a scroll, not a hold (a slow drag stays inside the drift allowance but moves the page), as Chrome's own long press decides.
+        const onScroll = () => clearPress();
+        window.addEventListener("scroll", onScroll, { capture: true, passive: true });
         press.current = {
           x,
           y,
           at: Date.now(),
+          onScroll,
           timer: setTimeout(() => {
-            press.current = null;
+            clearPress();
             swallowClick.current = true;
             // A short buzz says the hold counted (phones that allow it; others ignore it).
             try {
@@ -154,11 +161,15 @@ export function useSessionMenu(timezone: string, onChanged?: () => void) {
 // For a session drawn by a server page: the same menu on one element.
 export function SessionMenuTarget({ session, timezone, className, children }: { session: MenuSession; timezone: string; className?: string; children: ReactNode }) {
   const menu = useSessionMenu(timezone);
+  // The menu is drawn beside the session, not inside it: a portal's events still reach its React parent, so inside the session a slow tap on a menu choice started a new hold
+  // (and the choice was swallowed), and a right-click on the open menu moved it instead of closing it.
   return (
-    <span className={className} {...menu.handlersFor(session)}>
-      {children}
+    <>
+      <span className={className} {...menu.handlersFor(session)}>
+        {children}
+      </span>
       {menu.node}
-    </span>
+    </>
   );
 }
 

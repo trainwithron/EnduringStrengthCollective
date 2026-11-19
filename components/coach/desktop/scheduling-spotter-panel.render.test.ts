@@ -58,7 +58,7 @@ describe("the gap question", () => {
     );
     const follow = fill.find((f) => f.checkKind === "schedule_gaps");
     expect(follow?.stage).toBe("followup");
-    expect(follow?.headline).toBe("What kind of clients are you hoping to add?");
+    expect(follow?.headline).toBe("What kind of clients are you hoping to add? Pick any that fit.");
   });
 });
 
@@ -73,11 +73,13 @@ describe("the Scheduling Spot panel", () => {
     expect(html).toContain("Edit my hours");
     expect(html).not.toContain("Confirm");
   });
-  it("the follow-up offers online, hybrid and in person", () => {
+  it("the follow-up offers online, hybrid and in person, any that fit, then Save (Ron, Nov 19: he wants all three)", () => {
     const html = renderToStaticMarkup(createElement(SchedulingSpotterPanel, { flags: [{ ...flag, patternKey: "clients", stage: "followup" }], availabilityHref: "/x" }));
     expect(html).toContain("What kind of clients are you hoping to add?");
     expect(html).toContain("Online");
     expect(html).toContain("Hybrid");
     expect(html).toContain("In person");
+    expect(html).toContain("aria-pressed=\"false\"");
+    expect(html).toContain(">Save</button>");
   });
 });

@@ -26,6 +26,8 @@ export function SchedulingSpotterPanel({
   const [handled, setHandled] = useState<Set<string>>(new Set());
   // The gap question has two parts: after "Looking to fill them" it moves straight on to what kind of clients, without a reload.
   const [gapStage, setGapStage] = useState<"ask" | "followup" | null>(null);
+  // The kinds of clients wanted: tap any that fit, then Save (Ron, Nov 19: he wants all three, and one tap used to save just one).
+  const [kinds, setKinds] = useState<ClientKind[]>([]);
 
   const visible = flags.filter((f) => !handled.has(`${f.checkKind}::${f.patternKey}`));
   if (visible.length === 0) return null;
@@ -43,7 +45,7 @@ export function SchedulingSpotterPanel({
   }
 
   // The gap question's answers are kept as the coach's own feedback rows (fill / happy / later, then online / hybrid / in_person / later).
-  async function answerGaps(flag: SchedulingSpotterFlag, stage: "ask" | "followup", answer: "fill" | "happy" | "later" | ClientKind) {
+  async function answerGaps(flag: SchedulingSpotterFlag, stage: "ask" | "followup", answer: "fill" | "happy" | "later" | "kinds") {
     const key = `${flag.checkKind}::${flag.patternKey}`;
     setBusyKey(key);
     try {
@@ -55,7 +57,7 @@ export function SchedulingSpotterPanel({
           patternKey: stage === "ask" ? "all" : "clients",
           headline: stage === "ask" ? ASK_HEADLINE : FOLLOWUP_HEADLINE,
           action: answer === "fill" ? "confirmed" : answer === "happy" || answer === "later" ? "denied" : "edited",
-          detail: answer,
+          detail: answer === "kinds" ? CLIENT_KINDS.map((k) => k.id).filter((id) => kinds.includes(id)).join(",") : answer,
         }),
       });
       if (!res.ok) return;
@@ -124,11 +126,27 @@ export function SchedulingSpotterPanel({
                         </a>
                       </>
                     ) : (
-                      CLIENT_KINDS.map((k) => (
-                        <button key={k.id} type="button" disabled={busy} onClick={() => answerGaps(flag, "followup", k.id)} className={`${choice} border-rust text-rust`}>
-                          {k.label}
+                      <>
+                        {CLIENT_KINDS.map((k) => {
+                          const on = kinds.includes(k.id);
+                          return (
+                            <button
+                              key={k.id}
+                              type="button"
+                              disabled={busy}
+                              aria-pressed={on}
+                              onClick={() => setKinds((prev) => (on ? prev.filter((x) => x !== k.id) : [...prev, k.id]))}
+                              className={`${choice} border-rust ${on ? "bg-rust text-graphite" : "text-rust"}`}
+                            >
+                              {on ? "✓ " : ""}
+                              {k.label}
+                            </button>
+                          );
+                        })}
+                        <button type="button" disabled={busy || kinds.length === 0} onClick={() => answerGaps(flag, "followup", "kinds")} className={`${choice} border-chalk text-chalk`}>
+                          Save
                         </button>
-                      ))
+                      </>
                     )}
                     <button type="button" disabled={busy} onClick={() => answerGaps(flag, stage, "later")} className={`${choice} border-steel/30 text-steel`}>
                       Not now

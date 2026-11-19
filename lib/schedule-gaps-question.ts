@@ -50,11 +50,14 @@ export function scheduleGapsStage(events: GapAnswerEvent[], now: Date): GapQuest
   return "ask";
 }
 
-// What kind of clients the coach said they want (for later client-acquisition work): the latest real answer, or null.
-export function wantedClientKind(events: GapAnswerEvent[]): ClientKind | null {
+const isKind = (s: string): s is ClientKind => s === "online" || s === "hybrid" || s === "in_person";
+
+// What kinds of clients the coach said they want (for later client-acquisition work): every kind in the latest real answer, or none.
+// A coach can want more than one (Ron, Nov 19: "I would like all three maybe, but it only let me pick one"), kept as one answer like "online,in_person".
+export function wantedClientKinds(events: GapAnswerEvent[]): ClientKind[] {
   const c = latest(events, GAPS_CLIENTS_KEY);
-  return c && (c.detail === "online" || c.detail === "hybrid" || c.detail === "in_person") ? c.detail : null;
+  return c?.detail ? CLIENT_KINDS.map((k) => k.id).filter((id) => c.detail!.split(",").filter(isKind).includes(id)) : [];
 }
 
 export const ASK_HEADLINE = "You have gaps in your schedule. Are you looking to fill them, or happy where you are?";
-export const FOLLOWUP_HEADLINE = "What kind of clients are you hoping to add?";
+export const FOLLOWUP_HEADLINE = "What kind of clients are you hoping to add? Pick any that fit.";
