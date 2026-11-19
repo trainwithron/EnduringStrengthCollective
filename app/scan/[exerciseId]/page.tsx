@@ -6,6 +6,7 @@ import { QrQuickLogStart } from "@/components/public/qr-quick-log-start";
 import { GymVisitorLeadForm } from "@/components/public/gym-visitor-lead-form";
 import type { TrackedField } from "@/lib/exercise-fields";
 import { loadScanOrg } from "@/lib/scan-org";
+import { loadSharedDemos, scanDemo } from "@/lib/machine-catalog-scan";
 
 export const metadata = { title: "Scan" };
 
@@ -16,9 +17,9 @@ export const metadata = { title: "Scan" };
 // shortcut; everyone else (signed out, or signed in somewhere else
 // entirely) gets a real public landing — the exercise's own video plus
 // a join-this-gym lead capture, framed to that specific org.
-export default async function ScanExercisePage(props: { params: Promise<{ exerciseId: string }>; searchParams: Promise<{ org?: string }> }) {
+export default async function ScanExercisePage(props: { params: Promise<{ exerciseId: string }>; searchParams: Promise<{ org?: string; machine?: string }> }) {
   const { exerciseId } = await props.params;
-  const { org: requestedOrg } = await props.searchParams;
+  const { org: requestedOrg, machine: fromMachine } = await props.searchParams;
   const serviceRole = createServiceRoleClient();
 
   const { data: exercise } = await serviceRole
@@ -44,12 +45,21 @@ export default async function ScanExercisePage(props: { params: Promise<{ exerci
   // (Ron owns three): asking for exactly one membership failed for him and the page said "this gym" with no logo.
   const org = await loadScanOrg(serviceRole, exercise.created_by, requestedOrg ?? null);
 
+  // Opened from a machine's QR page (?machine=): a machine added from the shared machine list shows the list's demo (read live), else the exercise's own, as before.
+  let sharedItemId: string | null = null;
+  if (fromMachine && /^[0-9a-f-]{36}$/i.test(fromMachine)) {
+    const { data: link } = await serviceRole.from("gym_machine_exercises").select("catalog_item_id").eq("machine_id", fromMachine).eq("exercise_id", exercise.id).maybeSingle();
+    sharedItemId = (link as { catalog_item_id?: string | null } | null)?.catalog_item_id ?? null;
+  }
+  const shared = await loadSharedDemos(serviceRole, [sharedItemId]);
+  const demo = scanDemo(shared.get(sharedItemId ?? ""), exercise);
+
   let videoSignedUrl: string | null = null;
-  if (exercise.video_path) {
-    const { data } = await serviceRole.storage.from("exercise-media").createSignedUrl(exercise.video_path, 3600);
+  if (demo?.kind === "video") {
+    const { data } = await serviceRole.storage.from(demo.bucket).createSignedUrl(demo.path, 3600);
     videoSignedUrl = data?.signedUrl ?? null;
   }
-  const youtubeId = exercise.youtube_url ? extractYoutubeId(exercise.youtube_url) : null;
+  const youtubeId = demo?.kind === "youtube" ? extractYoutubeId(demo.url) : null;
 
   const supabase = await createServerClient();
   const {

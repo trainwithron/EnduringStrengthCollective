@@ -46,6 +46,7 @@ export function uploadDemo({
   file,
   contentType,
   onProgress,
+  bucket = "exercise-media",
 }: {
   supabaseUrl: string;
   anonKey: string;
@@ -54,6 +55,8 @@ export function uploadDemo({
   file: File;
   contentType: string;
   onProgress: (fraction: number) => void;
+  // exercise-media (a coach's own demos) or machine-demos (a demo sent for the shared machine list, migration 0453).
+  bucket?: "exercise-media" | "machine-demos";
 }): Promise<{ ok: true; path: string } | { ok: false; error: string }> {
   return new Promise((resolve) => {
     // Where the video lands: a fresh place, or the place an earlier, interrupted upload of this same video started.
@@ -65,7 +68,7 @@ export function uploadDemo({
       uploadDataDuringCreation: true,
       removeFingerprintOnSuccess: true,
       chunkSize: 6 * 1024 * 1024,
-      metadata: { bucketName: "exercise-media", objectName: path, contentType, cacheControl: "3600" },
+      metadata: { bucketName: bucket, objectName: path, contentType, cacheControl: "3600" },
       onProgress: (sent, total) => {
         if (total > 0) onProgress(sent / total);
       },
