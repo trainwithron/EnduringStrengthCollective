@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode, type TouchEvent as ReactTouchEvent } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -10,7 +10,7 @@ import { formatInTimezone } from "@/lib/format-in-timezone";
 import { addDaysToKey, dateKeyInZone, zonedTimeToUtc } from "@/lib/timezone";
 import { clockLabel, clockLabel12, minutesOfDayInZone } from "@/lib/day-time-grid";
 import { CancelSessionDialog } from "@/components/coach/session-cancel-dialog";
-import { DUPLICATE_MAX_WEEKS, duplicateSummary, LONG_PRESS_MS, LONG_PRESS_SLOP_PX, menuPosition } from "@/lib/session-menu";
+import { DUPLICATE_MAX_WEEKS, duplicateSummary, LONG_PRESS_MS, LONG_PRESS_SLOP_PX, MENU_HELD_MAX_MS, MENU_SETTLE_MS, menuPosition } from "@/lib/session-menu";
 
 export interface MenuSession {
   bookingId: string;
@@ -29,13 +29,29 @@ export function useSessionMenu(timezone: string, onChanged?: () => void) {
   const changed = onChanged ?? (() => router.refresh());
   const [open, setOpen] = useState<{ session: MenuSession; x: number; y: number } | null>(null);
   const [dialog, setDialog] = useState<Dialog | null>(null);
-  const press = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number } | null>(null);
+  const press = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number; at: number } | null>(null);
   // A press that opened the menu must not also click what is under the finger (open the day, open the cancel box).
   const swallowClick = useRef(false);
+  // Ron, Nov 19: press and hold was finicky on his phone (about six presses before the menu stayed open). The press is timed with touch events, which Chrome keeps sending
+  // while it decides between a scroll and its own long press (the pointer events it cancels part way, which stopped the timer), and an open menu ignores the taps, the
+  // right-click Chrome sends for its own long press, and the small scroll a resting thumb makes until just after the finger lifts (each of those closed it at once).
+  const fingerDown = useRef(false);
+  const holdOpenUntil = useRef(0);
 
   function clearPress() {
     if (press.current) clearTimeout(press.current.timer);
     press.current = null;
+  }
+
+  function openMenu(session: MenuSession, x: number, y: number) {
+    // Capped, so a lift the page never hears (the session redrawn under the finger) cannot leave a menu that ignores every tap.
+    holdOpenUntil.current = fingerDown.current ? Date.now() + MENU_HELD_MAX_MS : 0;
+    setOpen({ session, x, y });
+  }
+
+  function fingerUp() {
+    fingerDown.current = false;
+    if (holdOpenUntil.current > Date.now()) holdOpenUntil.current = Date.now() + MENU_SETTLE_MS;
   }
 
   useEffect(() => clearPress, []);
@@ -45,30 +61,50 @@ export function useSessionMenu(timezone: string, onChanged?: () => void) {
       onContextMenu: (e: ReactMouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
+        // Chrome's own long press can land here too: the menu opens once, wherever the timer got to.
+        const touched = press.current !== null || fingerDown.current;
         clearPress();
-        setOpen({ session, x: e.clientX, y: e.clientY });
+        if (touched) swallowClick.current = true;
+        openMenu(session, e.clientX, e.clientY);
       },
-      onPointerDown: (e: ReactPointerEvent) => {
+      onPointerDown: () => {
         swallowClick.current = false;
-        if (e.pointerType !== "touch") return;
+      },
+      onTouchStart: (e: ReactTouchEvent) => {
         clearPress();
-        const x = e.clientX;
-        const y = e.clientY;
+        const touch = e.touches[0];
+        if (e.touches.length !== 1 || !touch) return;
+        fingerDown.current = true;
+        const x = touch.clientX;
+        const y = touch.clientY;
         press.current = {
           x,
           y,
+          at: Date.now(),
           timer: setTimeout(() => {
             press.current = null;
             swallowClick.current = true;
-            setOpen({ session, x, y });
+            // A short buzz says the hold counted (phones that allow it; others ignore it).
+            try {
+              navigator.vibrate?.(10);
+            } catch {}
+            openMenu(session, x, y);
           }, LONG_PRESS_MS),
         };
       },
-      onPointerMove: (e: ReactPointerEvent) => {
-        if (press.current && Math.hypot(e.clientX - press.current.x, e.clientY - press.current.y) > LONG_PRESS_SLOP_PX) clearPress();
+      onTouchMove: (e: ReactTouchEvent) => {
+        const touch = e.touches[0];
+        if (press.current && touch && Math.hypot(touch.clientX - press.current.x, touch.clientY - press.current.y) > LONG_PRESS_SLOP_PX) clearPress();
       },
-      onPointerUp: clearPress,
-      onPointerCancel: clearPress,
+      onTouchEnd: () => {
+        clearPress();
+        fingerUp();
+      },
+      // Chrome cancels the touch when it takes the press as its own long press: a finger held that long still opens the menu.
+      onTouchCancel: () => {
+        if (press.current && Date.now() - press.current.at < LONG_PRESS_MS / 2) clearPress();
+        fingerUp();
+      },
       onClickCapture: (e: ReactMouseEvent) => {
         if (!swallowClick.current) return;
         swallowClick.current = false;
@@ -89,6 +125,7 @@ export function useSessionMenu(timezone: string, onChanged?: () => void) {
               x={open.x}
               y={open.y}
               timezone={timezone}
+              settled={() => Date.now() >= holdOpenUntil.current}
               onPick={(kind) => {
                 setDialog({ kind, session: open.session });
                 setOpen(null);
@@ -125,22 +162,34 @@ export function SessionMenuTarget({ session, timezone, className, children }: { 
   );
 }
 
-function SessionMenuPopup({ session, x, y, timezone, onPick, onClose }: { session: MenuSession; x: number; y: number; timezone: string; onPick: (kind: Dialog["kind"]) => void; onClose: () => void }) {
+function SessionMenuPopup({ session, x, y, timezone, settled, onPick, onClose }: { session: MenuSession; x: number; y: number; timezone: string; settled: () => boolean; onPick: (kind: Dialog["kind"]) => void; onClose: () => void }) {
   const first = useRef<HTMLButtonElement>(null);
+  // While the finger that opened the menu is still down (and just after it lifts), a tap, scroll, right-click or resize is part of that same press, not a choice to close.
+  const latest = useRef({ settled, onClose, onPick });
+  latest.current = { settled, onClose, onPick };
+  const dismiss = () => {
+    if (latest.current.settled()) latest.current.onClose();
+  };
+  const pick = (kind: Dialog["kind"]) => {
+    if (latest.current.settled()) latest.current.onPick(kind);
+  };
   useEffect(() => {
-    first.current?.focus();
+    first.current?.focus({ preventScroll: true });
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") latest.current.onClose();
+    }
+    function onMove() {
+      if (latest.current.settled()) latest.current.onClose();
     }
     document.addEventListener("keydown", onKey);
-    window.addEventListener("scroll", onClose, true);
-    window.addEventListener("resize", onClose);
+    window.addEventListener("scroll", onMove, true);
+    window.addEventListener("resize", onMove);
     return () => {
       document.removeEventListener("keydown", onKey);
-      window.removeEventListener("scroll", onClose, true);
-      window.removeEventListener("resize", onClose);
+      window.removeEventListener("scroll", onMove, true);
+      window.removeEventListener("resize", onMove);
     };
-  }, [onClose]);
+  }, []);
   const pos = menuPosition(x, y, window.innerWidth, window.innerHeight);
   const item = "w-full min-h-11 px-4 text-left font-body text-sm text-chalk hover:bg-steel/15 focus:bg-steel/15 focus:outline-none";
   // A session that has already started is not cancelled from here (the same rule as the day page); Reschedule and Duplicate still are.
@@ -149,24 +198,24 @@ function SessionMenuPopup({ session, x, y, timezone, onPick, onClose }: { sessio
     <div
       className="fixed inset-0 z-50"
       role="presentation"
-      onClick={onClose}
+      onClick={dismiss}
       onContextMenu={(e) => {
         e.preventDefault();
-        onClose();
+        dismiss();
       }}
     >
       <div role="menu" aria-label={`${session.name}, session`} className="absolute w-56 bg-surface border border-steel/40 shadow-lg py-1" style={{ left: pos.left, top: pos.top }} onClick={(e) => e.stopPropagation()}>
         <p className="px-4 pt-2 pb-1 font-body text-xs text-steel truncate">
           {session.name} · {formatInTimezone(new Date(session.startMs), timezone, "dateTime")}
         </p>
-        <button ref={first} type="button" role="menuitem" className={item} onClick={() => onPick("reschedule")}>
+        <button ref={first} type="button" role="menuitem" className={item} onClick={() => pick("reschedule")}>
           Reschedule
         </button>
-        <button type="button" role="menuitem" className={item} onClick={() => onPick("duplicate")}>
+        <button type="button" role="menuitem" className={item} onClick={() => pick("duplicate")}>
           Duplicate
         </button>
         {canRemove && (
-          <button type="button" role="menuitem" className={`${item} text-rust`} onClick={() => onPick("remove")}>
+          <button type="button" role="menuitem" className={`${item} text-rust`} onClick={() => pick("remove")}>
             Remove
           </button>
         )}

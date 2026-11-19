@@ -4,7 +4,12 @@ import { addDaysToKey } from "@/lib/timezone";
 
 /** How long a finger stays down before the menu opens, and how far it may drift before the press counts as a scroll instead. */
 export const LONG_PRESS_MS = 500;
-export const LONG_PRESS_SLOP_PX = 10;
+// A resting thumb drifts: 10 was about 2.5 mm on Ron's phone and cancelled real holds (Nov 19). 18 is still well short of a scroll.
+export const LONG_PRESS_SLOP_PX = 18;
+/** After the finger that opened the menu lifts, how long the menu ignores the tap, right-click and small scroll that come with the lift. */
+export const MENU_SETTLE_MS = 400;
+/** The longest an open menu waits for the finger that opened it to lift. */
+export const MENU_HELD_MAX_MS = 4000;
 
 /** Duplicate books up to a year of weeks (Ron: "the next 4 weeks or 52"); the weekly booking it uses allows the same. */
 export const DUPLICATE_MAX_WEEKS = 52;

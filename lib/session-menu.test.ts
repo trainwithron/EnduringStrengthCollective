@@ -46,8 +46,13 @@ describe("the calendar's session menu (Ron, Nov 2)", () => {
   it("is on every calendar view that shows a client's session, and the phone opens it with a press and hold", () => {
     const menu = read("components/coach/session-menu.tsx");
     expect(menu).toContain("onContextMenu");
-    expect(menu).toContain('if (e.pointerType !== "touch") return;');
     expect(menu).toContain("LONG_PRESS_MS");
+    // Ron, Nov 19 (finicky on his phone): timed with touch events, which Chrome does not cancel part way; the open menu ignores the lift of the finger that opened it.
+    expect(menu).toContain("onTouchStart: (e: ReactTouchEvent) => {");
+    expect(menu).not.toContain("onPointerCancel: clearPress");
+    expect(menu).toContain("settled={() => Date.now() >= holdOpenUntil.current}");
+    expect(menu).toContain("onClick={dismiss}");
+    expect(menu).toContain('window.addEventListener("scroll", onMove, true);');
     // Duplicate starts at the same time next week; more than one week goes through the weekly booking (one notice to the client)
     expect(menu).toContain("useState(addDaysToKey(now.dateKey, 7))");
     expect(menu).toContain('mode: "fixed", count: weeks');
