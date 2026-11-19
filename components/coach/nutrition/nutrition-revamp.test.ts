@@ -42,9 +42,25 @@ describe("the grocery list", () => {
     expect(panel).toContain("if (next.has(id)) next.delete(id);\n      else next.add(id);");
     expect(panel).toContain('got ? "text-steel line-through" : "text-chalk"');
     expect(panel).toContain("window.localStorage.setItem(storageKey");
+    // kept per week: last week's ticks never carry onto next week's list
+    expect(panel).toContain("const storageKey = baseKey && days.length > 0 ? `${baseKey}:${getWeekDates(days[0].date)[0]}` : undefined;");
     expect(panel).toContain('typeof navigator.share === "function"');
     expect(src("components/coach/nutrition/grocery-list-section.tsx")).toContain("storageKey={`grocery-have:coach:${athleteId}`}");
     expect(src("components/athlete/client-grocery-list.tsx")).toContain("storageKey={`grocery-have:client:${athleteId}`}");
+  });
+});
+
+describe("review fixes (Nov 19)", () => {
+  it("the star is never a disabled button (a tap on one inside a planner option could tick the option); it ignores taps until loaded", () => {
+    const star = src("components/coach/nutrition/star-meal-button.tsx");
+    expect(star).not.toMatch(/\sdisabled=\{/);
+    expect(star).toContain("aria-disabled={busy || on === null}");
+    expect(star).toContain("if (!star || busy || on === null) return;");
+  });
+  it("Add to plan lists each client once", () => {
+    const list = src("components/coach/nutrition/favorite-meals-list.tsx");
+    expect(list).toContain("clients.filter((c, i) => clients.findIndex((x) => x.id === c.id) === i).map((c) => (");
+    expect(list).toContain("<option key={c.id} value={c.id}>");
   });
 });
 

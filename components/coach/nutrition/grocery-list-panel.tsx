@@ -2,11 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { compileGroceryList, groceryItemId, groceryListText, type GroceryOptions, type PlanDay } from "@/lib/grocery-list";
+import { getWeekDates } from "@/lib/meal-plan-assignment";
 
 // The week's grocery list from the SAVED meal plan: the same food across every meal and day added into one line, grouped by aisle, in grams (and what a person buys), swaps
 // included. Each item can be ticked off ("already have it"); a ticked item stays on the list, crossed off, and a second tap unticks it. The ticks are kept on this device only.
 // Share sends it as plain text (or copies it where sharing is not offered); Print prints just this list.
-export function GroceryListPanel({ days, clientName, metric, audience = "coach", storageKey }: { days: PlanDay[]; clientName: string; metric: boolean; audience?: "coach" | "client"; storageKey?: string }) {
+export function GroceryListPanel({ days, clientName, metric, audience = "coach", storageKey: baseKey }: { days: PlanDay[]; clientName: string; metric: boolean; audience?: "coach" | "client"; storageKey?: string }) {
+  // The ticks belong to one week's shopping: the key carries the Sunday of the week the list starts in.
+  const storageKey = baseKey && days.length > 0 ? `${baseKey}:${getWeekDates(days[0].date)[0]}` : undefined;
   const [mode, setMode] = useState<NonNullable<GroceryOptions["mode"]>>("featured");
   const [trainingDays, setTrainingDays] = useState(4);
   const [copied, setCopied] = useState(false);

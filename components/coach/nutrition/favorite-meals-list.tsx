@@ -172,8 +172,8 @@ function AddToPlan({ meal, clients, todayKey }: { meal: StarredMeal; clients: Fa
           <span className="font-body text-xs text-steel">Client</span>
           <select value={clientId} onChange={(e) => setClientId(e.target.value)} className="mt-1 w-full min-h-11 bg-graphite border border-steel/30 px-2 text-chalk font-body text-sm">
             <option value="">Pick a client</option>
-            {clients.map((c) => (
-              <option key={`${c.id}|${c.groupId}`} value={c.id}>
+            {clients.filter((c, i) => clients.findIndex((x) => x.id === c.id) === i).map((c) => (
+              <option key={c.id} value={c.id}>
                 {c.fullName}
               </option>
             ))}

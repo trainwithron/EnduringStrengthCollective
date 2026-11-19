@@ -52,7 +52,7 @@ export function StarMealButton({ star, onChange }: { star: StarredMeal | null; o
     // Inside a planner option (a label that ticks the option): starring never ticks or unticks it.
     e.preventDefault();
     e.stopPropagation();
-    if (!star || busy) return;
+    if (!star || busy || on === null) return;
     const s = await loadStarred();
     if (!s.userId) return;
     setBusy(true);
@@ -73,10 +73,10 @@ export function StarMealButton({ star, onChange }: { star: StarredMeal | null; o
     <button
       type="button"
       onClick={toggle}
-      disabled={busy || on === null}
+      aria-disabled={busy || on === null}
       aria-pressed={!!on}
       aria-label={on ? `Remove ${star.name} from favorite meals` : `Star ${star.name} as a favorite meal`}
-      className="w-11 h-11 shrink-0 flex items-center justify-center disabled:opacity-60"
+      className="w-11 h-11 shrink-0 flex items-center justify-center aria-disabled:opacity-60"
       data-star-meal={star.key}
     >
       <Star className={`w-5 h-5 ${on ? "text-amber fill-amber" : "text-steel"}`} />
