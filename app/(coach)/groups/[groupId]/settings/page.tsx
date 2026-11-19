@@ -313,7 +313,7 @@ export default async function SettingsPage(
                 <DownloadAppButton />
               </div>
             ) : (
-              <Link href={`/groups/${params.groupId}/dashboard`} className="font-body text-sm font-bold text-rust">
+              <Link href={`/groups/${params.groupId}/dashboard`} className="font-body text-sm font-bold text-rust inline-flex items-center min-h-11">
                 Coach home →
               </Link>
             )}
@@ -433,10 +433,10 @@ export default async function SettingsPage(
 
         {isCoach && !effective.isActingAsOther && (
           <SettingsGroup label="Coaches and invitations">
-            <Link href={`/groups/${params.groupId}/clients`} className="font-body text-sm font-bold text-rust">
+            <Link href={`/groups/${params.groupId}/clients`} className="font-body text-sm font-bold text-rust inline-flex items-center min-h-11">
               See your coaches and invite one →
             </Link>
-            <Link href={`/groups/${params.groupId}/branding?tab=team`} className="font-body text-sm text-steel underline underline-offset-2 mt-2 inline-block">
+            <Link href={`/groups/${params.groupId}/branding?tab=team`} className="font-body text-sm text-steel underline underline-offset-2 inline-flex items-center min-h-11">
               Manage invitations on the Team page
             </Link>
           </SettingsGroup>

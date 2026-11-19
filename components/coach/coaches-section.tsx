@@ -81,7 +81,7 @@ export function CoachesSection({
       )}
       {canManage && (
         <p className="font-body text-xs text-steel mt-3">
-          <Link href={`/groups/${groupId}/branding?tab=team`} className="underline underline-offset-2">
+          <Link href={`/groups/${groupId}/branding?tab=team`} className="underline underline-offset-2 inline-flex items-center min-h-11">
             Manage invitations on the Team page
           </Link>
         </p>

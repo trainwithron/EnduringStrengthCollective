@@ -53,7 +53,7 @@ export function OuraConnection({
             </button>
           </div>
         ) : (
-          <a href={`/api/oura/connect?groupId=${groupId}`} className="font-body text-xs text-rust">
+          <a href={`/api/oura/connect?groupId=${groupId}`} className="font-body text-xs text-rust inline-flex items-center min-h-11 px-2 -mx-2">
             Connect
           </a>
         )}

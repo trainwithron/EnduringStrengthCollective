@@ -199,7 +199,7 @@ export function WellnessCheckinWidget({
               <button
                 type="button"
                 onClick={() => setLifeImpactDismissed(true)}
-                className="font-body text-xs text-steel mt-1"
+                className="font-body text-xs text-steel mt-1 inline-flex items-center min-h-11"
               >
                 Skip this
               </button>
