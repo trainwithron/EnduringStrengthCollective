@@ -98,6 +98,8 @@ describe("B2: the coach chooses the kind of each set, and the client's workout s
   it("a Type row on each exercise, saved at once", () => {
     const card = read("components/coach/exercise-builder-card.tsx");
     expect(card).toContain("data-set-type-row");
+    // a full touch target on a phone
+    expect(card).toContain("w-12 h-11 sm:h-9 shrink-0 appearance-none");
     expect(card).toContain('.from("group_workout_exercise_sets").update({ set_type: setType }).eq("id", setId)');
     // a new set and a duplicated exercise keep the kinds
     expect(card).toContain('set_type: last?.setType ?? "working",');
@@ -134,6 +136,7 @@ describe("B6: the client's last time on the builder card", () => {
     const links = read("lib/superset-links.ts");
     expect(links).toContain('.eq("session_exercises.athlete_sessions.athlete_id", athleteId)');
     expect(links).toContain('.eq("status", "completed")');
+    expect(links).toContain('.neq("set_type", "warmup")');
     expect(read("components/coach/exercise-builder-card.tsx")).toContain("data-builder-last-time");
     expect(read("app/(coach)/groups/[groupId]/programs/[programId]/page.tsx")).toContain("<BuilderLastTimeProvider value={data.lastTimeByExercise}>");
   });

@@ -36,6 +36,8 @@ export async function recentLastTimes(supabase: SupabaseClient, athleteId: strin
       .select("weight, reps, completed_at, session_exercises!inner ( exercise_name, athlete_sessions!inner ( athlete_id ) )")
       .eq("session_exercises.athlete_sessions.athlete_id", athleteId)
       .eq("status", "completed")
+      // a warm-up is never "last time": the last working set is
+      .neq("set_type", "warmup")
       .not("weight", "is", null)
       .not("reps", "is", null)
       .order("completed_at", { ascending: false })

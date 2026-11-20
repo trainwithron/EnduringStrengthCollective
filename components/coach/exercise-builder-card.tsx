@@ -1061,7 +1061,7 @@ export function ExerciseBuilderCard({
                       title={SET_TYPE_LABELS[set.setType ?? "working"]}
                       value={set.setType ?? "working"}
                       onChange={(e) => void handleSetTypeChange(set.id, e.target.value as SetType)}
-                      className={`w-12 h-9 shrink-0 appearance-none bg-graphite border text-center font-body text-[10px] focus:outline-none focus:border-rust ${(set.setType ?? "working") === "working" ? "border-steel/30 text-steel" : "border-rust/60 text-rust"}`}
+                      className={`w-12 h-11 sm:h-9 shrink-0 appearance-none bg-graphite border text-center font-body text-[10px] focus:outline-none focus:border-rust ${(set.setType ?? "working") === "working" ? "border-steel/30 text-steel" : "border-rust/60 text-rust"}`}
                     >
                       {SET_TYPES.map((t) => (
                         <option key={t} value={t}>
