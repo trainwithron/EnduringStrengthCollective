@@ -101,7 +101,7 @@ export function PlanBillingPanel({
         <FeeNotice currentPercent={platformFeePercent(e)} />
         {isOwner && organizationId && canBuyCoachPlan(e) && (
           <div className="mt-3">
-            <PlanUpgradeButton organizationId={organizationId} groupId={groupId ?? null} available={planAvailable} />
+            <PlanUpgradeButton organizationId={organizationId} groupId={groupId ?? null} available={planAvailable} inTrial={e.state === "trial"} />
           </div>
         )}
       </div>

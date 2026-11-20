@@ -4,7 +4,8 @@ import { useState } from "react";
 import { PLAN_PRICES_CENTS } from "@/lib/coach-plan-pricing";
 
 // "Choose the paid plan" (Ron, Nov 20): opens Stripe Checkout for the coach plan (app/api/stripe/plan-checkout). Until the plan's Stripe price is set up it says so instead of opening anything.
-export function PlanUpgradeButton({ organizationId, groupId, available }: { organizationId: string; groupId: string | null; available: boolean }) {
+// `inTrial`: buying during the free weeks charges at once and ends them, said beside the button.
+export function PlanUpgradeButton({ organizationId, groupId, available, inTrial = false }: { organizationId: string; groupId: string | null; available: boolean; inTrial?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,6 +29,7 @@ export function PlanUpgradeButton({ organizationId, groupId, available }: { orga
       <button type="button" onClick={start} disabled={busy || !available} className="min-h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40">
         {!available ? "Paid plan: not available yet" : busy ? "Opening…" : `Choose the paid plan ($${PLAN_PRICES_CENTS.base / 100}/mo)`}
       </button>
+      {available && inTrial && <p className="font-body text-xs text-steel mt-1">Choosing it now charges ${PLAN_PRICES_CENTS.base / 100} today and ends your free weeks.</p>}
       {error && (
         <p className="font-body text-xs text-rust mt-1" role="alert">
           {error}

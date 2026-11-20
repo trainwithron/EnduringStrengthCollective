@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { canBuyCoachPlan, coachPlanAvailable, coachPlanPriceId, planBillingFields, planStatusFor, subscriptionPeriodEnd } from "@/lib/coach-plan-checkout";
+import { canBuyCoachPlan, coachPlanAvailable, coachPlanPriceId, isLivePlanStatus, planBillingFields, planStatusFor, subscriptionPeriodEnd } from "@/lib/coach-plan-checkout";
 import { isPlatformOnlyPurchase } from "@/lib/connect-payee";
 
 // The upgrade path (Ron, Nov 20): a free-tier coach buys the $50 plan. Ron creates the Stripe price himself; the app only reads it.
@@ -89,5 +89,28 @@ describe("the webhook moves the organization to paid", () => {
     expect(read("components/billing/plan-upgrade-button.tsx")).toContain('{!available ? "Paid plan: not available yet"');
     expect(read("app/(coach)/groups/[groupId]/business/packages/page.tsx")).toContain("upgrade={{ organizationId: group.organization_id, available: coachPlanAvailable() }}");
     expect(read("components/coach/desktop/plan-billing-panel.tsx")).toContain("{isOwner && organizationId && canBuyCoachPlan(e) && (");
+  });
+});
+
+describe("never two plans for one organization (Assistant review of 5db6fa62)", () => {
+  const route = read("app/api/stripe/plan-checkout/route.ts");
+  const hook = read("app/api/stripe/webhook/route.ts");
+  it("a plan Stripe already has stops a new checkout, and another open checkout is closed first", () => {
+    expect(route).toContain('const existing = await stripe.subscriptions.list({ customer: customerId, price: priceId, status: "all", limit: 20 });');
+    expect(route).toContain("if (existing.data.some((s) => isLivePlanStatus(s.status))) return NextResponse.json({ error: \"This organization already has a plan.\" }, { status: 409 });");
+    expect(route).toContain("if (s.metadata?.purchase_kind === COACH_PLAN_PURCHASE_KIND) await stripe.checkout.sessions.expire(s.id);");
+    expect(route).toContain("{ idempotencyKey: `coach-plan-customer-${organizationId}` }");
+  });
+  it("a second paid plan never replaces the first: the platform admin is told to refund it", () => {
+    expect(hook).toContain("if (held?.stripe_subscription_id && held.stripe_subscription_id !== planSubscription.id && isLivePlanStatus(held.subscription_status)) {");
+    expect(hook).toContain('await alertPlatformAdmins(\n              "A coach plan was paid twice",');
+  });
+  it("which statuses count as a live plan", () => {
+    for (const s of ["active", "trialing", "past_due", "incomplete", "unpaid", "paused"]) expect(isLivePlanStatus(s)).toBe(true);
+    for (const s of ["canceled", "incomplete_expired", null, ""]) expect(isLivePlanStatus(s)).toBe(false);
+  });
+  it("the pricing page says the paid plan is coming until it can be bought; buying in the free weeks says it charges at once", () => {
+    expect(read("app/pricing/page.tsx")).toContain('{coachPlanAvailable() ? "" : " (coming soon)"}');
+    expect(read("components/billing/plan-upgrade-button.tsx")).toContain("today and ends your free weeks.");
   });
 });

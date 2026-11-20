@@ -40,6 +40,11 @@ export function planBillingFields(
   };
 }
 
+/** A plan the organization is paying for (or that is still trying to charge). */
+export function isLivePlanStatus(status: string | null | undefined): boolean {
+  return !!status && ["active", "trialing", "past_due", "incomplete", "unpaid", "paused"].includes(status);
+}
+
 // The Stripe statuses the organization_billing row stores (its check constraint).
 export const PLAN_STATUSES = ["trialing", "active", "past_due", "canceled", "incomplete", "incomplete_expired", "unpaid", "paused"] as const;
 export function planStatusFor(eventType: string, stripeStatus: string): string | null {

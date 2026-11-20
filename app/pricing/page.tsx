@@ -2,6 +2,10 @@ import { HelpShell } from "@/components/support/help-shell";
 import { FeeNotice } from "@/components/billing/fee-notice";
 import { PLAN_PRICES_CENTS, TRIAL_DAYS } from "@/lib/coach-plan-pricing";
 import { feePercentLabel, PAID_OR_TRIAL_FEE_PERCENT } from "@/lib/platform-fee";
+import { coachPlanAvailable } from "@/lib/coach-plan-checkout";
+
+// Read when opened: whether the paid plan can be bought yet depends on the environment (Ron's Stripe price).
+export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Pricing" };
 
@@ -14,7 +18,7 @@ export default function PricingPage() {
         <section>
           <h2 className="font-display uppercase text-lg tracking-wide">The plan</h2>
           <p className="font-body text-sm text-chalk mt-2">
-            Every new coach starts with {TRIAL_DAYS / 7} weeks free, with no card. After that you choose: the free plan, or the paid plan at ${PLAN_PRICES_CENTS.base / 100} a month. During the free weeks Spotlight&apos;s fee on client payments is the paid plan&apos;s {feePercentLabel(PAID_OR_TRIAL_FEE_PERCENT)}.
+            Every new coach starts with {TRIAL_DAYS / 7} weeks free, with no card. After that you choose: the free plan, or the paid plan at ${PLAN_PRICES_CENTS.base / 100} a month{coachPlanAvailable() ? "" : " (coming soon)"}. During the free weeks Spotlight&apos;s fee on client payments is the paid plan&apos;s {feePercentLabel(PAID_OR_TRIAL_FEE_PERCENT)}.
           </p>
         </section>
         <section>

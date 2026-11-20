@@ -7,7 +7,7 @@ import { rateLimitResponse } from "@/lib/rate-limit";
 import { safeErrorDetail } from "@/lib/safe-error";
 import { billingRowFrom, ORG_BILLING_COLUMNS } from "@/lib/org-billing-server";
 import { deriveOrgEntitlements, isBillingEnforced } from "@/lib/org-entitlements";
-import { canBuyCoachPlan, COACH_PLAN_PURCHASE_KIND, coachPlanPriceId } from "@/lib/coach-plan-checkout";
+import { canBuyCoachPlan, COACH_PLAN_PURCHASE_KIND, coachPlanPriceId, isLivePlanStatus } from "@/lib/coach-plan-checkout";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -51,11 +51,19 @@ export async function POST(request: Request) {
     // One Stripe customer per organization, on Spotlight's own account (the plan is billed per organization).
     let customerId = (billing as { stripe_customer_id?: string | null } | null)?.stripe_customer_id ?? null;
     if (!customerId) {
-      const customer = await stripe.customers.create({ email: user.email ?? undefined, metadata: { organization_id: organizationId, owner_id: user.id } });
+      // the same key for the same organization: two first clicks at once make one customer
+      const customer = await stripe.customers.create({ email: user.email ?? undefined, metadata: { organization_id: organizationId, owner_id: user.id } }, { idempotencyKey: `coach-plan-customer-${organizationId}` });
       customerId = customer.id;
       const { error: saveError } = await db.from("organization_billing").upsert({ organization_id: organizationId, stripe_customer_id: customerId, updated_at: new Date().toISOString() }, { onConflict: "organization_id" });
       if (saveError) return NextResponse.json({ error: "Couldn't start checkout. Try again." }, { status: 502 });
     }
+
+    // Never two plans (Assistant review of 5db6fa62): a plan Stripe already has for this organization (paid a moment ago, before the webhook arrived) stops a new checkout, and a checkout
+    // still open in another tab is closed first, so only one can ever be paid.
+    const existing = await stripe.subscriptions.list({ customer: customerId, price: priceId, status: "all", limit: 20 });
+    if (existing.data.some((s) => isLivePlanStatus(s.status))) return NextResponse.json({ error: "This organization already has a plan." }, { status: 409 });
+    const open = await stripe.checkout.sessions.list({ customer: customerId, status: "open", limit: 20 });
+    for (const s of open.data) if (s.metadata?.purchase_kind === COACH_PLAN_PURCHASE_KIND) await stripe.checkout.sessions.expire(s.id);
 
     const origin = appOrigin(request);
     const back = groupId ? `${origin}/groups/${groupId}/branding?tab=billing` : `${origin}/dashboard`;

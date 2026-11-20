@@ -7,7 +7,8 @@ import { platformFeeCents } from "@/lib/platform-fee";
 import { duplicateProgram } from "@/lib/program-duplication";
 import { athleteHasCopyOfProgram, programBelongsToCoach } from "@/lib/package-program-access";
 import { endsGroupAccess, storedSubscriptionStatus } from "@/lib/subscription-status";
-import { COACH_PLAN_PURCHASE_KIND, planBillingFields, planStatusFor, subscriptionPeriodEnd } from "@/lib/coach-plan-checkout";
+import { COACH_PLAN_PURCHASE_KIND, isLivePlanStatus, planBillingFields, planStatusFor, subscriptionPeriodEnd } from "@/lib/coach-plan-checkout";
+import { alertPlatformAdmins } from "@/lib/cron-monitor";
 import { grantLinkedGroupAccess, revokeLinkedGroupAccess } from "@/lib/package-group-access";
 import { dispatchWebhookEvent } from "@/lib/webhook-dispatch";
 import { LIFT_OFF_MONTHLY_CREDITS } from "@/lib/coach-credits";
@@ -179,13 +180,25 @@ export async function POST(request: Request) {
           const planSubscription = await stripe.subscriptions.retrieve(session.subscription);
           const status = planStatusFor(event.type, planSubscription.status);
           if (!status) break;
-          const { data: before } = await supabase.from("organization_billing").select("past_due_since").eq("organization_id", organizationId).maybeSingle();
+          const { data: before, error: beforeError } = await supabase.from("organization_billing").select("past_due_since, stripe_subscription_id, subscription_status").eq("organization_id", organizationId).maybeSingle();
+          if (beforeError) throw beforeError;
+          // A second plan for an organization that already pays for one (two checkouts paid at once): the first one stays the organization's, nothing is overwritten, and the platform admin is told
+          // to refund and cancel the second in Stripe (Assistant review of 5db6fa62). Nothing here cancels or refunds money.
+          const held = before as { past_due_since?: string | null; stripe_subscription_id?: string | null; subscription_status?: string | null } | null;
+          if (held?.stripe_subscription_id && held.stripe_subscription_id !== planSubscription.id && isLivePlanStatus(held.subscription_status)) {
+            console.error("stripe webhook: a second coach plan was paid for an organization that already has one", organizationId, planSubscription.id);
+            await alertPlatformAdmins(
+              "A coach plan was paid twice",
+              `Organization ${organizationId} already has plan ${held.stripe_subscription_id}; a second one, ${planSubscription.id}, was just paid. Refund and cancel the second in Stripe.`
+            );
+            break;
+          }
           const { error: planError } = await supabase.from("organization_billing").upsert(
             {
               organization_id: organizationId,
               stripe_customer_id: typeof session.customer === "string" ? session.customer : session.customer?.id ?? null,
               stripe_subscription_id: planSubscription.id,
-              ...planBillingFields(status, subscriptionPeriodEnd(planSubscription as never), (before as { past_due_since?: string | null } | null)?.past_due_since ?? null),
+              ...planBillingFields(status, subscriptionPeriodEnd(planSubscription as never), held?.past_due_since ?? null),
               updated_at: new Date().toISOString(),
             },
             { onConflict: "organization_id" }
