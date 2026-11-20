@@ -98,20 +98,12 @@ export async function POST(request: Request) {
   return NextResponse.json({ removed, left });
 }
 
-// The space an import made for a one-on-one client, once that client is gone: deleted only if it is a one-on-one space this coach made in the last day, nobody else is in it, and nothing is filed in it
-// (a program, a session or a post). Otherwise it is left as it is.
+// The space an import made for a one-on-one client, once that client is gone. Deleting a group removes every row that points at it (bookings, notes, macros, packages: about a hundred kinds), so it is
+// deleted only by the database's own check (discard_imported_one_on_one_space, step 212): a one-on-one space this coach made in the last day, nobody else in it, and nothing at all filed in it apart from
+// the coach's seat and the client's intake. Anything else (or before step 212) keeps the space, renamed Former client the way removing a client does, so nothing the coach made is lost.
 async function removeImportedSpace(db: ReturnType<typeof createServiceRoleClient>, groupId: string, coachId: string): Promise<void> {
-  const { data: group } = await db.from("groups").select("created_by, created_at, group_kind").eq("id", groupId).maybeSingle();
-  const g = group as { created_by?: string | null; created_at?: string | null; group_kind?: string | null } | null;
-  if (!g || g.group_kind !== "one_on_one" || g.created_by !== coachId || !g.created_at || Date.now() - new Date(g.created_at).getTime() > UNDO_WINDOW_MS) return;
-  const [{ data: members }, programs, sessions, posts] = await Promise.all([
-    db.from("group_memberships").select("profile_id").eq("group_id", groupId),
-    db.from("programs").select("id", { count: "exact", head: true }).eq("group_id", groupId),
-    db.from("athlete_sessions").select("id", { count: "exact", head: true }).eq("group_id", groupId),
-    db.from("posts").select("id", { count: "exact", head: true }).eq("group_id", groupId),
-  ]);
-  if ((members ?? []).some((m: { profile_id: string }) => m.profile_id !== coachId)) return;
-  if ((programs.count ?? 0) + (sessions.count ?? 0) + (posts.count ?? 0) > 0) return;
-  await db.from("group_memberships").delete().eq("group_id", groupId);
-  await db.from("groups").delete().eq("id", groupId);
+  const { data: deleted, error } = await db.rpc("discard_imported_one_on_one_space", { p_group: groupId, p_coach: coachId });
+  if (!error && deleted === true) return;
+  const { error: renameError } = await db.from("groups").update({ name: "Former client" }).eq("id", groupId).eq("group_kind", "one_on_one");
+  if (renameError) console.error("[roster undo] couldn't rename the kept space", groupId, renameError.message);
 }

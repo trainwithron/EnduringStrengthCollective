@@ -131,7 +131,7 @@ export default async function CoachClientsPage(props: { searchParams?: Promise<{
         <h1 className="font-display font-bold text-3xl uppercase leading-none">
           <SwappableTerm termKey="client" form="plural" className="capitalize" />
         </h1>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-end gap-3">
           <RequestsLink count={requestCount} />
           <EmailAllClaimLinksButton groupId={anchor.id} />
           <AddClientButton groupId={anchor.id} groupName={anchor.name} createdBy={user.id} defaultOpen={openAdd} initialStep={openImport ? "import" : undefined} />

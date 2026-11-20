@@ -14,7 +14,7 @@ export interface RosterRow {
   email: string | null;
 }
 
-export type RosterSkipReason = "no_name" | "name_too_long" | "bad_email" | "repeated_email" | "over_limit" | "archived";
+export type RosterSkipReason = "no_name" | "name_too_long" | "bad_email" | "repeated_email" | "over_limit" | "archived" | "above_header";
 
 export interface RosterSkipped {
   rowNumber: number;
@@ -97,7 +97,8 @@ function headerColumns(row: string[]): Columns | null {
     else if (/^(first name|first|given name|firstname)$/.test(h)) cols.first ??= i;
     else if (/^(last name|last|surname|family name|lastname)$/.test(h)) cols.last ??= i;
     else if (/^(name|full name|fullname|display name|client|client name|athlete|athlete name|member|member name)$/.test(h)) cols.name ??= i;
-    else if (/^(status|account status|state)$/.test(h)) cols.status ??= i;
+    // not "state": in an address it is a place (an export's State column must never hide its Archived flags)
+    else if (/^(status|account status|client status)$/.test(h)) cols.status ??= i;
   });
   const found = cols.name != null || cols.first != null || cols.email != null;
   return found && (cols.name != null || cols.first != null) ? cols : null;
@@ -130,7 +131,12 @@ export function parseRoster(cells: string[][], options: { max?: number; noHeader
 
   cells.forEach((cellRow, index) => {
     const rowNumber = index + 1;
-    if (headerAt && index <= headerIndex) return;
+    if (headerAt && index === headerIndex) return;
+    // A line above the header (a title, a date): listed as not used, so nothing disappears without a word.
+    if (headerAt && index < headerIndex) {
+      if (cellRow.some((c) => (c ?? "").toString().trim())) skipped.push({ rowNumber, reason: "above_header", detail: "Above the file's header row, so not read as a person." });
+      return;
+    }
     if (cellRow.every((c) => !(c ?? "").toString().trim())) return;
     const row = cellRow.map((c) => (c ?? "").toString().trim());
     const skip = (reason: RosterSkipReason, detail: string) => void skipped.push({ rowNumber, reason, detail });

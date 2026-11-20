@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTerm } from "@/components/coach/terminology-provider";
 import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { parseRoster, splitPastedRoster, ROSTER_MAX_ROWS, type RosterParse } from "@/lib/roster-import";
-import { EmailAllClaimLinksButton } from "@/components/coach/email-all-claim-links-button";
+import { announceClaimLinksChanged, EmailAllClaimLinksButton } from "@/components/coach/email-all-claim-links-button";
 
 type Step = "enter" | "preview" | "adding" | "done" | "uncertain";
 interface Result {
@@ -99,6 +99,8 @@ export function RosterImportPanel({
       setStep("done");
       router.refresh();
       onAdded?.();
+      // the "email everyone not signed in yet" buttons on the page count again
+      announceClaimLinksChanged();
       return;
     }
     if (res.status >= 400 && res.status < 500 && data?.error) {
@@ -130,6 +132,7 @@ export function RosterImportPanel({
       setUndone({ removed: (data.removed ?? []).length, left: (data.left ?? []).map((l: { reason: string }) => l.reason) });
       router.refresh();
       onAdded?.();
+      announceClaimLinksChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't undo the import. Try again.");
     } finally {

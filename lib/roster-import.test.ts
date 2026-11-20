@@ -59,7 +59,8 @@ describe("parseRoster", () => {
       ["Client First Name", "Client Last Name", "Client Email", "Phone", "Program"],
       ["Jane", "Smith", "Jane@X.com", "555", "Strength 1"],
     ]);
-    expect(trainerize.skipped).toEqual([]);
+    // the title line is listed as not used, never silently dropped
+    expect(trainerize.skipped.map((s) => [s.rowNumber, s.reason])).toEqual([[1, "above_header"]]);
     expect(trainerize.rows).toEqual([{ rowNumber: 3, name: "Jane Smith", email: "jane@x.com" }]);
     // TrueCoach-style: "Name" and "Email Address".
     const truecoach = parseRoster([["Name", "Email Address", "Created"], ["Mo Ali", "mo@x.com", "2025-01-02"]]);
@@ -80,6 +81,16 @@ describe("parseRoster", () => {
     expect(rows.map((r) => r.name)).toEqual(["Ann Cole", "Paused Pat"]);
     expect(skipped.map((s) => [s.rowNumber, s.reason])).toEqual([[3, "archived"], [4, "archived"]]);
     expect(skipped[0].detail).toContain("Old Timer");
+  });
+
+  it("an address State column is not a status column, so it never hides the Archived flags", () => {
+    const { rows, skipped } = parseRoster([
+      ["Name", "Email", "State", "Status"],
+      ["Ann Cole", "ann@x.com", "Ohio", "Active"],
+      ["Old Timer", "old@x.com", "Texas", "Archived"],
+    ]);
+    expect(rows.map((r) => r.name)).toEqual(["Ann Cole"]);
+    expect(skipped.map((s) => s.reason)).toEqual(["archived"]);
   });
 
   it("a header further down than the top five rows is not looked for (those rows are people)", () => {

@@ -50,6 +50,49 @@ describe("O2: who 'email everyone not signed in yet' emails", () => {
   });
 });
 
+describe("O2 safety (Commander review of 55cea37d)", () => {
+  const route = read("app/api/clients/email-claim-links-all/route.ts");
+  const lib = read("lib/claim-links-all.ts");
+  it("never sends on a list that could not be read in full, and a failed link read counts as already linked", () => {
+    expect(route).toMatch(/if \(failed\) return NextResponse\.json\(\{ error: "Couldn't read your client list in full, so nothing was sent/);
+    expect(lib).toMatch(/if \(error\) \{\s*failed = true;\s*ids\.forEach\(\(id\) => linked\.add\(id\)\);/);
+  });
+  it("one send at a time per coach, and each person's link is checked again just before their email", () => {
+    expect(route).toContain("`email-claim-links-all-lock:${auth.user.id}`, 1, 120");
+    expect(route).toContain("if (await hasLiveClaimLink(serviceRole, c.profileId))");
+  });
+  it("never a team player or anyone with a parent on file", () => {
+    expect(lib).toContain("g.team_mode !== true");
+    expect(lib).toContain('from("guardian_links")');
+    expect(lib).toContain('from("minor_consent")');
+  });
+  it("the count has its own budget, looks people up side by side, and always takes the same people first", () => {
+    expect(route).toContain('rateLimitResponse("email-claim-links-all-count", auth.user.id, 600, 3600)');
+    expect(lib).toContain("runPool(looked, 8");
+    expect(lib).toContain("stableOrder(unclaimed).slice(0, CLAIM_LINKS_ALL_MAX)");
+  });
+});
+
+describe("O1 undo keeps anything the coach made (Commander review of 55cea37d)", () => {
+  const undo = read("app/api/clients/import-roster/undo/route.ts");
+  const migration = read("supabase/migrations/0456_discard_imported_space.sql");
+  it("the space is deleted only by the database's own check, otherwise renamed Former client", () => {
+    expect(undo).toContain('db.rpc("discard_imported_one_on_one_space", { p_group: groupId, p_coach: coachId })');
+    expect(undo).toContain('update({ name: "Former client" })');
+    expect(undo).not.toMatch(/from\("group_memberships"\)\.delete\(\)\.eq\("group_id", groupId\)/);
+  });
+  it("the check reads every table that points at groups from the database itself, and only the server may call it", () => {
+    expect(migration).toContain("c.confrelid = 'public.groups'::regclass");
+    expect(migration).toContain("c.conrelid not in ('public.group_memberships'::regclass, 'public.client_intake'::regclass)");
+    expect(migration).toContain("exception when others then");
+    expect(migration).toContain("revoke all on function public.discard_imported_one_on_one_space(uuid, uuid) from public, anon, authenticated;");
+  });
+  it("the paste is the migration word for word", () => {
+    const paste = read("supabase/apply/apply-step212-0456.sql").replace(/\r\n/g, "\n");
+    expect(paste).toContain(migration.replace(/\r\n/g, "\n"));
+  });
+});
+
 describe("O1: a pasted list of one-on-one clients", () => {
   const src = read("app/api/clients/import-one-on-one/route.ts");
   it("checks the caller coaches the space and belongs to its organization before making anything", () => {

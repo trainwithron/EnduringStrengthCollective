@@ -77,10 +77,15 @@ export async function POST(request: Request) {
       results.push({ rowNumber: row.rowNumber, name: row.name, ok: false, reason: "Couldn't set up their space. Try them again." });
       return;
     }
-    const made = await createUnclaimedClient(serviceRole, { groupId: space.id, fullName: row.name, email: row.email ?? "" });
+    // Only the coach's seat is in a space whose person could not be made: take it back (the seat goes with it), whether the add was refused or threw.
+    let made: Awaited<ReturnType<typeof createUnclaimedClient>>;
+    try {
+      made = await createUnclaimedClient(serviceRole, { groupId: space.id, fullName: row.name, email: row.email ?? "" });
+    } catch (err) {
+      await discard(space.id);
+      throw err;
+    }
     if (!made.ok) {
-      // Only the coach's seat is in it: take the empty space back.
-      await serviceRole.from("group_memberships").delete().eq("group_id", space.id).eq("profile_id", user.id);
       await discard(space.id);
       results.push({ rowNumber: row.rowNumber, name: row.name, ok: false, reason: made.error });
       return;
