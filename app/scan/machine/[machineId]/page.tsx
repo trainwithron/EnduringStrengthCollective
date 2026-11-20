@@ -4,6 +4,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { scanRows } from "@/lib/gym-machines";
 import { loadScanOrg } from "@/lib/scan-org";
 import { loadSharedDemos, scanDemo } from "@/lib/machine-catalog-scan";
+import { ReportVideoLink } from "@/components/public/report-video-link";
 
 export const metadata = { title: "Scan" };
 
@@ -93,6 +94,8 @@ export default async function ScanMachinePage(props: { params: Promise<{ machine
                 );
               })}
             </ul>
+            {/* Ron, Nov 20 (S4): any video shown here can be reported. */}
+            <ReportVideoLink videos={rows.filter((r) => demos.get(r.id)).map((r) => ({ id: r.id, name: r.name }))} machineId={machine.id} />
           </>
         )}
       </div>

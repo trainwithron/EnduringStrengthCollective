@@ -362,6 +362,10 @@ async function sendRequest(row: Record<string, unknown>, isAdmin: boolean): Prom
 }
 
 const RIGHTS_LABEL = "I filmed this video and have the right to share it";
+// Ron, Nov 20 (S4): the person on camera, not only the filmer, agreed (a client, possibly a minor, could be in a video every gym sees). Required for a filmed video, with its own
+// column (catalog_requests.subject_consent, step 211). A YouTube link plays from its owner's channel, so it gets its own wording instead of "I filmed this".
+const CONSENT_LABEL = "Everyone shown agreed to be filmed and shared; anyone under 18 has a parent's OK";
+const LINK_RIGHTS_LABEL = "This is my video, or I have the right to share it";
 
 // A demo for one exercise on a shared machine: a video recorded or chosen on the phone (into the coach's own folder of the private machine-demos bucket), or a YouTube link. The tick
 // is required: only the coach's own filming, never a manufacturer's or someone else's video. The admin can also use one of their own existing demos instead of uploading it again.
@@ -383,6 +387,8 @@ function DemoRequestForm({
   onSent: (text: string) => Promise<void>;
 }) {
   const [rights, setRights] = useState(false);
+  const [consent, setConsent] = useState(false);
+  const [linkRights, setLinkRights] = useState(false);
   const [link, setLink] = useState("");
   const [mine, setMine] = useState("");
   const [progress, setProgress] = useState<number | null>(null);
@@ -393,15 +399,27 @@ function DemoRequestForm({
   const working = progress != null;
   const done = isAdmin ? `The demo for ${item.name} is on the shared list.` : `Sent. Spotlight reviews the demo for ${item.name}; you'll see the answer under Your requests.`;
 
+  // A filmed video: both ticks. A YouTube link: its own one.
   function needRights(): boolean {
-    if (rights) return true;
-    setError(`Tick "${RIGHTS_LABEL}" first.`);
+    if (!rights) {
+      setError(`Tick "${RIGHTS_LABEL}" first.`);
+      return false;
+    }
+    if (!consent) {
+      setError(`Tick "${CONSENT_LABEL}" first.`);
+      return false;
+    }
+    return true;
+  }
+  function needLinkRights(): boolean {
+    if (linkRights) return true;
+    setError(`Tick "${LINK_RIGHTS_LABEL}" first.`);
     return false;
   }
 
   async function sendVideoPath(path: string) {
     setStage("send");
-    const r = await sendRequest({ submitted_by: coachId, kind: "demo", item_id: item.id, video_path: path, rights_confirmed: true }, isAdmin);
+    const r = await sendRequest({ submitted_by: coachId, kind: "demo", item_id: item.id, video_path: path, rights_confirmed: true, subject_consent: true }, isAdmin);
     setProgress(null);
     if (!r.ok) return setError(r.error);
     await onSent(done);
@@ -446,7 +464,7 @@ function DemoRequestForm({
   }
 
   async function sendLink() {
-    if (!needRights()) return;
+    if (!needLinkRights()) return;
     const url = catalogYoutubeLink(link);
     if (!url) return setError("Paste a YouTube video link, for example https://youtu.be/…");
     setError(null);
@@ -462,7 +480,7 @@ function DemoRequestForm({
   // exercise's own demo later never takes it off the list.
   async function sendMine() {
     const row = myDemos.find((e) => e.id === mine);
-    if (!row || !needRights()) return;
+    if (!row || !(row.videoPath ? needRights() : needLinkRights())) return;
     setError(null);
     setStage("send");
     setProgress(0);
@@ -513,6 +531,22 @@ function DemoRequestForm({
           <span className="block font-body text-xs text-steel">Your own filming only: no manufacturer videos or anyone else&apos;s.</span>
         </span>
       </label>
+      <label className="flex items-start gap-3 min-h-11 font-body text-sm text-chalk">
+        <input
+          type="checkbox"
+          checked={consent}
+          onChange={(e) => {
+            setConsent(e.target.checked);
+            setError(null);
+          }}
+          className="w-5 h-5 mt-0.5 accent-rust shrink-0"
+          data-consent-tick
+        />
+        <span>
+          {CONSENT_LABEL}
+          <span className="block font-body text-xs text-steel">Every gym with this machine will see the video.</span>
+        </span>
+      </label>
 
       {working ? (
         <div role="status" aria-live="polite">
@@ -525,12 +559,27 @@ function DemoRequestForm({
         </div>
       ) : (
         <>
-          <button type="button" onClick={() => fileRef.current?.click()} className="w-full h-12 bg-rust text-graphite font-body text-sm font-medium flex items-center justify-center gap-2">
+          <button type="button" onClick={() => needRights() && fileRef.current?.click()} className="w-full h-12 bg-rust text-graphite font-body text-sm font-medium flex items-center justify-center gap-2">
             <Video className="w-4 h-4" aria-hidden />
             Record or choose video
           </button>
           <input ref={fileRef} type="file" accept="video/*" onChange={(e) => void handleFile(e)} className="sr-only" aria-label="Demo video" tabIndex={-1} />
           <p className="font-body text-xs text-steel">Up to 30 seconds.</p>
+          <label className="flex items-start gap-3 min-h-11 font-body text-sm text-chalk pt-2 border-t border-steel/20">
+            <input
+              type="checkbox"
+              checked={linkRights}
+              onChange={(e) => {
+                setLinkRights(e.target.checked);
+                setError(null);
+              }}
+              className="w-5 h-5 mt-0.5 accent-rust shrink-0"
+              data-link-rights-tick
+            />
+            <span>
+              For a YouTube link: {LINK_RIGHTS_LABEL.charAt(0).toLowerCase() + LINK_RIGHTS_LABEL.slice(1)}
+            </span>
+          </label>
           <div className="flex flex-wrap gap-2">
             <input
               aria-label="YouTube link"

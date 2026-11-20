@@ -169,6 +169,10 @@ export function InbodyScanFlow({
       <div className="border border-steel/20 p-4">
         <p className="font-body text-sm text-chalk">Take or choose a photo of the whole InBody sheet, held flat.</p>
         <p className="font-body text-xs text-steel mt-1">We read the numbers for you to check. Nothing is saved until you say so, and the photo is kept so you don&apos;t need the paper.</p>
+        {/* Ron, Nov 20 (S5): say plainly that an outside service reads the photo. */}
+        <p className="font-body text-xs text-steel mt-1" data-ai-disclosure>
+          The photo is read by an outside AI service (Anthropic&apos;s Claude) to pull out the numbers.
+        </p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <label className="inline-flex min-h-11 items-center cursor-pointer bg-rust text-graphite font-display font-bold uppercase tracking-wide px-4">
             Choose a photo

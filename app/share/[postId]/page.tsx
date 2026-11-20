@@ -76,7 +76,7 @@ export default async function ShareWorkoutPage(
     data: { user },
   } = await supabase.auth.getUser();
 
-  // For the athlete themselves, right after finishing: a line from their coach, in the coach's voice, and the way
+  // For the athlete themselves, right after finishing: a line their coach wrote (if they wrote one), and the way
   // back to Home. Other viewers of the shared link see only the card.
   const viewerIsAuthor = !!user && user.id === shared.authorId;
   let coachCongrats: { coachFirstName: string; text: string } | null = null;
@@ -104,20 +104,17 @@ export default async function ShareWorkoutPage(
     const { data: ownProfile } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
     if (coachRow) {
       const coachProfile = coachRow.profiles as unknown as { full_name: string | null } | null;
-      // Until migration 0249 is applied this select errors and the default line is used.
       const { data: customRow } = await supabase
         .from("coach_profiles")
         .select("completion_message")
         .eq("coach_id", coachRow.profile_id)
         .maybeSingle();
-      coachCongrats = {
-        coachFirstName: firstNameOf(coachProfile?.full_name) || "Your coach",
-        text: buildCoachCongrats({
-          athleteFirstName: firstNameOf(ownProfile?.full_name),
-          customMessage: (customRow?.completion_message as string | null | undefined) ?? null,
-          hadPr: shared.celebratePrs.length > 0,
-        }),
-      };
+      // Only a line the coach wrote is shown (Ron, Nov 20): none at all until they do.
+      const text = buildCoachCongrats({
+        athleteFirstName: firstNameOf(ownProfile?.full_name),
+        customMessage: (customRow?.completion_message as string | null | undefined) ?? null,
+      });
+      if (text) coachCongrats = { coachFirstName: firstNameOf(coachProfile?.full_name) || "Your coach", text };
     }
   }
 

@@ -70,6 +70,14 @@ function ReviewCard({ request: r, outcome, onDone }: { request: ReviewRequest; o
           </ol>
         )}
         {r.replaces && <p className="font-body text-xs text-steel mt-1">Approving replaces the demo it has now.</p>}
+        {/* What the coach ticked (Ron, Nov 20, S4): the database refuses a demo without these, so they are always ticked here. */}
+        {r.kind === "demo" && (
+          <p className="font-body text-xs text-steel mt-1" data-ticked>
+            {r.youtubeUrl
+              ? "They ticked: this is their video, or they have the right to share it."
+              : "They ticked: they filmed it and have the right to share it, and everyone shown agreed to be filmed and shared (a parent's OK for anyone under 18)."}
+          </p>
+        )}
       </div>
       {r.videoUrl ? (
         <video src={r.videoUrl} controls playsInline preload="metadata" className="w-full bg-surface aspect-video" />

@@ -125,7 +125,8 @@ describe("sending a request", () => {
     const s = read("components/coach/machine-catalog-section.tsx");
     expect(s).toContain('const RIGHTS_LABEL = "I filmed this video and have the right to share it";');
     expect(s).toContain("if (!picked || !needRights()) return;");
-    expect(s).toContain("if (!needRights()) return;\n    const url = catalogYoutubeLink(link);");
+    // a YouTube link has its own tick (Nov 20, S4): "This is my video, or I have the right to share it"
+    expect(s).toContain("if (!needLinkRights()) return;\n    const url = catalogYoutubeLink(link);");
     expect(s).toContain("path: `${coachId}/${crypto.randomUUID()}.${demoExtension(contentType)}`,");
     expect(s).toContain("bucket: MACHINE_DEMOS_BUCKET,");
     expect(read("lib/exercise-demo-upload.ts")).toContain("metadata: { bucketName: bucket, objectName: path, contentType, cacheControl: \"3600\" },");

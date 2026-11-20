@@ -22,14 +22,25 @@ export function demoExtension(contentType: string): string {
   return contentType === "video/quicktime" ? "mov" : contentType === "video/webm" ? "webm" : "mp4";
 }
 
+/** How long and how big a video may be, and what it is called in the messages. */
+export interface VideoLimits {
+  maxSeconds: number;
+  maxBytes: number;
+  noun: string;
+  sizeHint: string;
+}
+export const DEMO_LIMITS: VideoLimits = { maxSeconds: DEMO_MAX_SECONDS, maxBytes: DEMO_MAX_BYTES, noun: "Demos", sizeHint: " (30 seconds of 4K)" };
+// A client's form-check video (Ron, Nov 20, V1): one set, up to a minute; the athlete-exercise-videos bucket takes 100 MB, which a minute made 1080p on the phone fits.
+export const FORM_CHECK_LIMITS: VideoLimits = { maxSeconds: 60, maxBytes: 100 * 1024 * 1024, noun: "Form-check videos", sizeHint: "" };
+
 /** What to say when a file can't be used, or null when it can. `seconds` is the video's length when the browser could read it (null when it couldn't: the size limit still applies). */
-export function demoFileProblem(file: { type: string; name: string; size: number }, seconds: number | null = null): string | null {
+export function demoFileProblem(file: { type: string; name: string; size: number }, seconds: number | null = null, limits: VideoLimits = DEMO_LIMITS): string | null {
   if (!demoContentType(file)) return "Use an MP4, MOV or WebM video.";
-  if (seconds != null && Number.isFinite(seconds) && seconds > DEMO_MAX_SECONDS + DURATION_SLACK_SECONDS) {
-    return `That video is ${Math.round(seconds)} seconds long. Demos can be up to ${DEMO_MAX_SECONDS} seconds: trim it in your phone's gallery, then pick it again.`;
+  if (seconds != null && Number.isFinite(seconds) && seconds > limits.maxSeconds + DURATION_SLACK_SECONDS) {
+    return `That video is ${Math.round(seconds)} seconds long. ${limits.noun} can be up to ${limits.maxSeconds} seconds: trim it in your phone's gallery, then pick it again.`;
   }
-  if (file.size > DEMO_MAX_BYTES) {
-    return `That video is ${Math.round(file.size / 1048576)} MB and the limit is 350 MB (30 seconds of 4K). Trim it shorter, then pick it again.`;
+  if (file.size > limits.maxBytes) {
+    return `That video is ${Math.round(file.size / 1048576)} MB and the limit is ${Math.round(limits.maxBytes / 1048576)} MB${limits.sizeHint}. Trim it shorter, then pick it again.`;
   }
   return null;
 }
@@ -56,7 +67,8 @@ export function uploadDemo({
   contentType: string;
   onProgress: (fraction: number) => void;
   // exercise-media (a coach's own demos) or machine-demos (a demo sent for the shared machine list, migration 0453).
-  bucket?: "exercise-media" | "machine-demos";
+  // athlete-exercise-videos: a client's form-check video (Nov 20).
+  bucket?: "exercise-media" | "machine-demos" | "athlete-exercise-videos";
 }): Promise<{ ok: true; path: string } | { ok: false; error: string }> {
   return new Promise((resolve) => {
     // Where the video lands: a fresh place, or the place an earlier, interrupted upload of this same video started.

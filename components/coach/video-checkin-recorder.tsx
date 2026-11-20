@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { saved } from "@/lib/saved";
 import { notifyPush } from "@/lib/push-notify";
+import { MINOR_VIDEO_REFUSED } from "@/lib/video-reports";
 
 // Coach video check-ins (coach_video_checkin_idea memory) — the mirror
 // of the athlete's own video-feedback loop. Real, in-browser recording
@@ -128,7 +129,13 @@ export function VideoCheckinRecorder({
       .single();
 
     if (insertError || !checkin) {
-      setError("Video uploaded, but the check-in couldn't be saved — try again.");
+      // Refused by the database's age rule (Ron, Nov 20, S3: a 13 to 17-year-old needs a parent's consent on file; never under 13): the video is taken back out of storage.
+      if (insertError?.code === "42501") {
+        await supabase.storage.from("coach-video-checkins").remove([path]);
+        setError(MINOR_VIDEO_REFUSED);
+      } else {
+        setError("Video uploaded, but the check-in couldn't be saved — try again.");
+      }
       setSaving(false);
       return;
     }

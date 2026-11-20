@@ -70,6 +70,9 @@ const NOT_A_SAVE = new Set([
   "/api/coaches/signup",
   "/api/collective-intelligence/chat",
   "/api/feedback",
+  // Nov 20 (S4): a visitor reporting a demo, and the admin removing or dismissing it (the admin page, not a pane)
+  "/api/public/report-video",
+  "/api/admin/video-reports",
   "/api/food/barcode",
   "/api/garmin/webhook",
   "/api/org-dispatch/submit",

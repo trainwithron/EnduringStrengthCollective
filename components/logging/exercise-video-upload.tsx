@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { notifyPush } from "@/lib/push-notify";
-
-const ALLOWED_TYPES = ["video/mp4", "video/quicktime", "video/webm"];
-const MAX_BYTES = 100 * 1024 * 1024;
+import { demoContentType, demoExtension, FORM_CHECK_LIMITS, uploadDemo } from "@/lib/exercise-demo-upload";
+import { prepareDemo } from "@/lib/demo-convert";
+import { MINOR_VIDEO_REFUSED } from "@/lib/video-reports";
 
 export interface UploadedVideo {
   id: string;
@@ -14,8 +14,9 @@ export interface UploadedVideo {
   createdAt: string;
 }
 
-// Same MIME whitelist + 100MB cap as components/coach/exercise-media-picker.tsx
-// — the stricter, validated pattern, not the feed composer's unvalidated one.
+// A client's form-check video on one exercise (Ron, Nov 20, V1). It uses the exercise-demo uploader: the phone makes it 1080p first, it uploads in pieces with a progress bar and
+// picks up where it left off after a dropped signal, and a minute is the limit. accept="video/*" with no `capture`: the phone offers its camera AND its gallery (the old exact type
+// list made some phones offer only the gallery).
 export function ExerciseVideoUpload({
   sessionId,
   sessionExerciseId,
@@ -29,50 +30,62 @@ export function ExerciseVideoUpload({
   athleteId: string;
   onUploaded: (video: UploadedVideo) => void;
 }) {
-  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState<number | null>(null);
+  const [stage, setStage] = useState<"convert" | "upload">("upload");
   const [error, setError] = useState<string | null>(null);
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+    const picked = e.target.files?.[0];
     e.target.value = "";
-    if (!file) return;
+    if (!picked) return;
 
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      setError("Use an MP4, MOV, or WebM video.");
-      return;
-    }
-    if (file.size > MAX_BYTES) {
-      setError("Video must be under 100MB.");
-      return;
-    }
-
-    setUploading(true);
     setError(null);
+    setStage("convert");
+    setProgress(0);
+    const prepared = await prepareDemo(picked, { mute: false, onProgress: setProgress, limits: FORM_CHECK_LIMITS });
+    if (!prepared.ok) {
+      setProgress(null);
+      return setError(prepared.error);
+    }
+    const file = prepared.file;
+    const contentType = demoContentType(file)!;
+
+    setStage("upload");
+    setProgress(0);
     const supabase = createBrowserClient();
-
-    const ext = file.name.split(".").pop() || "mp4";
-    const path = `${groupId}/${sessionExerciseId}/${crypto.randomUUID()}.${ext}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from("athlete-exercise-videos")
-      .upload(path, file);
-
-    if (uploadError) {
-      setError(uploadError.message);
-      setUploading(false);
-      return;
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) {
+      setProgress(null);
+      return setError("You're signed out. Sign in again, then try.");
+    }
+    const up = await uploadDemo({
+      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      accessToken: token,
+      path: `${groupId}/${sessionExerciseId}/${crypto.randomUUID()}.${demoExtension(contentType)}`,
+      file,
+      contentType,
+      onProgress: setProgress,
+      bucket: "athlete-exercise-videos",
+    });
+    if (!up.ok) {
+      setProgress(null);
+      return setError(up.error);
     }
 
     const { data: row, error: dbError } = await supabase
       .from("session_exercise_videos")
-      .insert({ session_exercise_id: sessionExerciseId, athlete_id: athleteId, group_id: groupId, video_path: path })
+      .insert({ session_exercise_id: sessionExerciseId, athlete_id: athleteId, group_id: groupId, video_path: up.path })
       .select("id, video_path, athlete_id, created_at")
       .single();
 
-    setUploading(false);
+    setProgress(null);
 
     if (dbError || !row) {
-      setError("Couldn't save the video — try again.");
+      await supabase.storage.from("athlete-exercise-videos").remove([up.path]);
+      // the database's age rules (a client's own: minor_may_write; a coach's upload for a client: minor_subject_ok, step 211)
+      setError(dbError?.code === "42501" ? (athleteId === (await supabase.auth.getUser()).data.user?.id ? "Videos need a parent's consent on file first. Ask your coach." : MINOR_VIDEO_REFUSED) : "Couldn't save the video. Try again.");
       return;
     }
 
@@ -96,18 +109,29 @@ export function ExerciseVideoUpload({
     }
   }
 
+  const uploading = progress != null;
   return (
     <div className="mt-2">
-      <label className="inline-flex items-center gap-1.5 font-body text-xs text-rust cursor-pointer">
-        <input
-          type="file"
-          accept="video/mp4,video/quicktime,video/webm"
-          onChange={handleFileChange}
-          disabled={uploading}
-          className="hidden"
-        />
-        🎥 {uploading ? "Uploading…" : "Attach form-check video"}
-      </label>
+      {uploading ? (
+        <div role="status" aria-live="polite">
+          <div className="h-1.5 w-full max-w-xs bg-steel/20 overflow-hidden">
+            <div className="h-full bg-rust transition-[width]" style={{ width: `${Math.round((progress ?? 0) * 100)}%` }} />
+          </div>
+          <p className="font-body text-xs text-steel mt-1">
+            {stage === "convert" ? "Getting it ready" : "Uploading"}… {Math.round((progress ?? 0) * 100)}%. Keep this page open.
+          </p>
+        </div>
+      ) : (
+        <>
+          <label className="inline-flex items-center gap-1.5 min-h-11 font-body text-xs text-rust cursor-pointer">
+            <input type="file" accept="video/*" onChange={(e) => void handleFileChange(e)} className="hidden" />
+            🎥 Record or attach a form-check video
+          </label>
+          {/* Ron, Nov 20 (V2): a filming tip and who can see it. */}
+          <p className="font-body text-[11px] text-steel leading-snug">Film from the side with your whole body in the frame. Up to a minute.</p>
+          <p className="font-body text-[11px] text-steel leading-snug">Only you and your coach can see this.</p>
+        </>
+      )}
       {error && (
         <p className="font-body text-xs text-rust mt-1" role="alert">
           {error}

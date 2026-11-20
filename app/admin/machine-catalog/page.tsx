@@ -6,6 +6,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { MACHINE_DEMOS_BUCKET, REQUEST_SELECT, requestFromRow } from "@/lib/machine-catalog";
 import { youtubeEmbedUrl } from "@/lib/exercise-demo";
 import { MachineCatalogReview, type ReviewRequest } from "@/components/admin/machine-catalog-review";
+import { VideoReportsList, type VideoReportRow } from "@/components/admin/video-reports-list";
 
 export const metadata = { title: "Machine requests" };
 
@@ -62,6 +63,36 @@ export default async function AdminMachineCatalogPage() {
     };
   });
 
+  // Videos reported from the public scan pages (Ron, Nov 20, S4; step 211). Before the step is applied the read fails and the section says nothing is reported.
+  const { data: reportRows } = await supabase
+    .from("video_reports")
+    .select("id, exercise_id, machine_id, catalog_item_id, reason, note, created_at")
+    .eq("status", "open")
+    .order("created_at", { ascending: false })
+    .limit(100);
+  const reports = (reportRows ?? []) as { id: string; exercise_id: string | null; machine_id: string | null; catalog_item_id: string | null; reason: string; note: string | null; created_at: string }[];
+  const reportExerciseIds = [...new Set(reports.flatMap((r) => (r.exercise_id ? [r.exercise_id] : [])))];
+  const reportMachineIds = [...new Set(reports.flatMap((r) => (r.machine_id ? [r.machine_id] : [])))];
+  const [{ data: reportExercises }, { data: reportMachines }] = await Promise.all([
+    reportExerciseIds.length > 0 ? serviceRole.from("exercise_library").select("id, name").in("id", reportExerciseIds) : Promise.resolve({ data: [] }),
+    reportMachineIds.length > 0 ? serviceRole.from("gym_machines").select("id, name").in("id", reportMachineIds) : Promise.resolve({ data: [] }),
+  ]);
+  const exerciseName = new Map(((reportExercises ?? []) as { id: string; name: string }[]).map((e) => [e.id, e.name]));
+  const machineName = new Map(((reportMachines ?? []) as { id: string; name: string }[]).map((m) => [m.id, m.name]));
+  const reportList: VideoReportRow[] = reports.map((r) => {
+    const ex = r.exercise_id ? (exerciseName.get(r.exercise_id) ?? "An exercise") : "A video that was since deleted";
+    const m = r.machine_id ? machineName.get(r.machine_id) : undefined;
+    return {
+      id: r.id,
+      what: m ? `${ex} on ${m}` : ex,
+      where: r.catalog_item_id ? "shared_list" : "exercise",
+      reason: r.reason,
+      note: r.note,
+      sentAt: r.created_at,
+      scanHref: r.exercise_id ? `/scan/${r.exercise_id}${r.machine_id ? `?machine=${r.machine_id}` : ""}` : null,
+    };
+  });
+
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body px-4 py-8 md:px-10">
       <Link href="/dashboard" className="inline-flex items-center min-h-11 font-body text-xs text-steel uppercase tracking-wide">
@@ -74,6 +105,7 @@ export default async function AdminMachineCatalogPage() {
       ) : (
         <MachineCatalogReview requests={list} />
       )}
+      <VideoReportsList initial={reportList} />
     </main>
   );
 }

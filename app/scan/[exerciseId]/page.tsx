@@ -7,6 +7,7 @@ import { GymVisitorLeadForm } from "@/components/public/gym-visitor-lead-form";
 import type { TrackedField } from "@/lib/exercise-fields";
 import { loadScanOrg } from "@/lib/scan-org";
 import { loadSharedDemos, scanDemo } from "@/lib/machine-catalog-scan";
+import { ReportVideoLink } from "@/components/public/report-video-link";
 
 export const metadata = { title: "Scan" };
 
@@ -133,6 +134,10 @@ export default async function ScanExercisePage(props: { params: Promise<{ exerci
             orgName={orgDisplayName}
           />
         ) : null}
+
+        {(videoSignedUrl || youtubeId) && (
+          <ReportVideoLink videos={[{ id: exercise.id, name: exercise.name }]} machineId={fromMachine && /^[0-9a-f-]{36}$/i.test(fromMachine) ? fromMachine : null} />
+        )}
       </div>
     </main>
   );

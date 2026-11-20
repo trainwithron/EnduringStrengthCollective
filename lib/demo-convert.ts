@@ -2,7 +2,7 @@
 // i upload"). A 4K demo then uploads and plays at about a sixth of its size. Done in the browser (no outside video service); the sound is kept as it is unless muted.
 // When the phone's browser can't convert, the original video is used (still up to 30 seconds), except a mute it can't do is said plainly instead of uploading the sound.
 
-import { demoFileProblem } from "./exercise-demo-upload";
+import { DEMO_LIMITS, demoFileProblem, type VideoLimits } from "./exercise-demo-upload";
 
 /** The longest side a demo keeps: 1080p. */
 export const DEMO_LONG_SIDE = 1920;
@@ -17,10 +17,13 @@ export const CANT_MUTE = "This phone can't take the sound out here. Mute it in y
 
 export type PreparedDemo = { ok: true; file: File; converted: boolean } | { ok: false; error: string };
 
-export async function prepareDemo(file: File, { mute, onProgress }: { mute: boolean; onProgress: (fraction: number) => void }): Promise<PreparedDemo> {
+export async function prepareDemo(
+  file: File,
+  { mute, onProgress, limits = DEMO_LIMITS }: { mute: boolean; onProgress: (fraction: number) => void; limits?: VideoLimits }
+): Promise<PreparedDemo> {
   // The original, as it was: only when it is a type and size the library takes.
   const asIs = (seconds: number | null): PreparedDemo => {
-    const problem = demoFileProblem(file, seconds);
+    const problem = demoFileProblem(file, seconds, limits);
     return problem ? { ok: false, error: problem } : { ok: true, file, converted: false };
   };
 
@@ -36,7 +39,7 @@ export async function prepareDemo(file: File, { mute, onProgress }: { mute: bool
     if (!video) return { ok: false, error: "That file has no video in it." };
     const seconds = await input.computeDuration();
     // Too long is said before any work is done.
-    const tooLong = demoFileProblem({ type: "video/mp4", name: "x.mp4", size: 0 }, seconds);
+    const tooLong = demoFileProblem({ type: "video/mp4", name: "x.mp4", size: 0 }, seconds, limits);
     if (tooLong) return { ok: false, error: tooLong };
 
     const size = demoTargetSize(video.displayWidth, video.displayHeight);
@@ -56,7 +59,7 @@ export async function prepareDemo(file: File, { mute, onProgress }: { mute: bool
     if (!buffer) return mute ? { ok: false, error: CANT_MUTE } : asIs(seconds);
     const base = file.name.replace(/\.[^.]+$/, "") || "demo";
     const out = new File([buffer], `${base}-1080p.mp4`, { type: "video/mp4", lastModified: file.lastModified });
-    const problem = demoFileProblem(out, seconds);
+    const problem = demoFileProblem(out, seconds, limits);
     return problem ? { ok: false, error: problem } : { ok: true, file: out, converted: true };
   } catch {
     return mute ? { ok: false, error: CANT_MUTE } : asIs(null);

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { saved } from "@/lib/saved";
 import { initialsOf } from "@/lib/initials";
+import { SUGGESTED_CONGRATS } from "@/lib/coach-congrats";
 
 // coach_identity_bio_social_link_pinning_scoping_sept19.md — the coach-
 // facing edit entry point (placed at the top of the coach home
@@ -119,17 +120,29 @@ export function CoachProfileEditor({
           />
           <label className="block">
             <span className="font-body text-xs text-steel block mb-1">
-              Your message to a client after a workout (optional). Use {"{name}"} for their first name.
+              Your message to a client after a workout. Clients see it as from you, so until you write one they see none. Use {"{name}"} for their first name.
             </span>
             <textarea
               value={completionMessage}
               onChange={(e) => setCompletionMessage(e.target.value.slice(0, 280))}
               onBlur={handleCompletionBlur}
               rows={2}
-              placeholder="{name}, you just did something hard. I'm proud of you."
+              placeholder={SUGGESTED_CONGRATS}
               className="w-full bg-graphite border border-steel/30 text-chalk px-3 py-2 font-body text-sm focus:outline-none focus:border-rust resize-none"
             />
           </label>
+          {!completionMessage.trim() && (
+            <button
+              type="button"
+              onClick={async () => {
+                setCompletionMessage(SUGGESTED_CONGRATS);
+                await persist({ completion_message: SUGGESTED_CONGRATS });
+              }}
+              className="min-h-11 font-body text-xs text-steel underline text-left"
+            >
+              Use the suggested line as mine
+            </button>
+          )}
           {saving && <p className="font-body text-xs text-steel">Saving…</p>}
           {error && (
             <p className="font-body text-xs text-rust" role="alert">

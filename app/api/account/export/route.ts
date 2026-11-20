@@ -4,6 +4,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { rateLimitResponse } from "@/lib/rate-limit";
 import { collectEverything, deliveryFor, storeAccountExport, type ExportClient } from "@/lib/account-export";
+import { collectExportFiles } from "@/lib/export-files";
 
 // Every read runs under the caller's own authenticated session — each query is scoped to their own id and row security backs that up regardless. The server key
 // is used for exactly one thing: putting a download too large to send directly into a private bucket (lib/account-export.ts) so it can be handed over as a short link.
@@ -81,6 +82,8 @@ export async function GET(request: Request) {
   // Everything else the app holds about this person as a member and client that their own sign-in can read, found by the database itself from every table that names them (so a table added
   // later is included without anyone remembering to list it). Null until the database has the functions; the list below still downloads then.
   const everything = await collectEverything(supabase as unknown as ExportClient);
+  // The photo and video files themselves (Ron, Nov 20, S5), as 7-day download links.
+  const ownFiles = await collectExportFiles(supabase as unknown as Parameters<typeof collectExportFiles>[0], userId);
 
   const exportData = {
     exportedAt: new Date().toISOString(),
@@ -112,6 +115,11 @@ export async function GET(request: Request) {
     mealPlanTries,
     uiSettings,
     readSettings,
+    files: ownFiles.files,
+    filesNote:
+      ownFiles.notIncluded > 0
+        ? `Your progress photos, InBody scan photos and form-check videos, each as a download link that works for 7 days. ${ownFiles.notIncluded} could not be linked this time; download again to try.`
+        : "Your progress photos, InBody scan photos and form-check videos, each as a download link that works for 7 days.",
   };
 
   const body = JSON.stringify(exportData);
