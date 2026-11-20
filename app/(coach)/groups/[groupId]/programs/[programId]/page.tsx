@@ -1,3 +1,4 @@
+import { BuilderLastTimeProvider } from "@/components/coach/builder-last-time";
 import Link from "next/link";
 import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
@@ -383,7 +384,7 @@ async function CoachProgramBuilder({
       )}
       {data.loadFailed && <ProgramLoadRetry />}
       {!data.loadFailed && <ProgrammingSpotterPanel programId={programId} flags={data.spotterFlags} />}
-      {!data.loadFailed && <ProgramBuilderDesktop
+      {!data.loadFailed && <BuilderLastTimeProvider value={data.lastTimeByExercise}><ProgramBuilderDesktop
         programId={programId}
         groupId={groupId}
         aiDraft={isAiDraft}
@@ -414,7 +415,7 @@ async function CoachProgramBuilder({
         initialTrainingIntent={data.initialTrainingIntent}
         initialProgressions={(progressionRules ?? []) as { exercise_name: string; model: string; config: unknown }[]}
         initialExpandedWeek={requestedWeek}
-      />}
+      /></BuilderLastTimeProvider>}
     </CoachDesktopShell>
   );
 }

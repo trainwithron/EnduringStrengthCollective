@@ -132,8 +132,10 @@ export function StartWorkoutButton({
             set_order: target.setOrder,
             weight: loggableWeight(target.targetWeight),
             reps: loggableReps(parseRepsTarget(target.targetReps)),
+            // the coach's kind of set (AMRAP, back-off, drop, warm-up): the workout starts each set as it (start_workout_session, step 210)
+            set_type: target.setType ?? "working",
           }))
-        : [{ set_order: 0, weight: null, reps: null }];
+        : [{ set_order: 0, weight: null, reps: null, set_type: "working" }];
     }
 
     // One atomic call: session + exercises + sets all land together or not at

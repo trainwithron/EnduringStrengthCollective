@@ -25,6 +25,7 @@ import type { DemoRow } from "@/lib/exercise-demo";
 import type { ReadForViewer } from "@/lib/read-content/for-viewer";
 import { ExerciseNameInput } from "@/components/coach/exercise-name-input";
 import { fetchExerciseHistory } from "@/lib/exercise-history-fetch";
+import { afterSupersetSet, supersetLine, supersetPlaces } from "@/lib/supersets";
 
 export function SessionLogger({
   sessionId,
@@ -131,6 +132,18 @@ export function SessionLogger({
   // that duration immediately, rather than waiting for a manual pick —
   // there's nothing to choose when the coach already specified it.
   function handleSetCompleted(set: SetLogEntry, rest?: RestForSet | null) {
+    // A superset or circuit (B1): one set of each linked exercise in turn, and the rest only after the round. The workout moves on to the next exercise of the block by itself.
+    const owner = exercises.find((ex) => ex.sets.some((s) => s.id === set.id));
+    const place = owner ? supersetByExercise.get(owner.id) : undefined;
+    if (owner && place) {
+      const members = place.members.map((id) => ({
+        id,
+        setsLeft: (exercises.find((e) => e.id === id)?.sets ?? []).filter((s) => s.status === "pending" && s.id !== set.id).length,
+      }));
+      const step = afterSupersetSet(members, owner.id);
+      if (step.nextId && step.nextId !== owner.id) goToExercise(step.nextId);
+      if (!step.rest) return;
+    }
     // The coach's rest for THIS set (or the last prescribed set before it, for a set the client added) is the only option: the timer starts it by itself. A rest
     // the client typed is used only when the coach prescribed none, and with nothing at all the usual 60/90/120 picker shows.
     if (rest && rest.source === "coach") {
@@ -140,6 +153,35 @@ export function SessionLogger({
     }
     const typed = set.restSeconds ?? null;
     setPendingRestPrompt({ defaultSeconds: typed ?? 90, isPrescribed: typed != null, source: typed != null ? "typed" : undefined });
+  }
+  // Each linked exercise's place in its superset or circuit (lib/supersets.ts), in the workout's order.
+  const supersetByExercise = useMemo(
+    () =>
+      supersetPlaces(
+        exercises
+          .slice()
+          .sort((a, b) => a.exerciseOrder - b.exerciseOrder)
+          .map((e) => ({ id: e.id, kind: "exercise" as const, supersetNext: e.supersetNext }))
+      ),
+    [exercises]
+  );
+  // What the carousels draw: each exercise with its label and line when it is in a block.
+  const shownExercises = useMemo(
+    () =>
+      exercises.map((e) => {
+        const place = supersetByExercise.get(e.id);
+        if (!place) return e;
+        const others = place.members.filter((id) => id !== e.id).map((id) => {
+          const other = exercises.find((x) => x.id === id);
+          return other?.displayName ?? other?.exerciseName ?? "the next exercise";
+        });
+        return { ...e, superset: { label: place.label, line: supersetLine(place.members.length, others) } };
+      }),
+    [exercises, supersetByExercise]
+  );
+  function goToExercise(id: string) {
+    // a moment after the tick, so the set reads as done before the card moves
+    window.setTimeout(() => document.querySelector(`[data-exercise-id="${id}"]`)?.scrollIntoView({ behavior: "smooth", inline: "center", block: "center" }), 400);
   }
   const [addingExercise, setAddingExercise] = useState(false);
   const [newExerciseName, setNewExerciseName] = useState("");
@@ -370,7 +412,7 @@ export function SessionLogger({
       <div className="relative">
       {swipeDirection === "vertical" ? (
         <ExerciseVerticalCarousel
-          exercises={exercises}
+          exercises={shownExercises}
           lastTimeByExercise={lastTimes}
           ladderByExercise={ladderByExercise}
           coachNoteByExerciseName={coachNoteByExerciseName ?? {}}
@@ -393,7 +435,7 @@ export function SessionLogger({
         />
       ) : (
         <ExerciseSwipeCarousel
-          exercises={exercises}
+          exercises={shownExercises}
           lastTimeByExercise={lastTimes}
           ladderByExercise={ladderByExercise}
           coachNoteByExerciseName={coachNoteByExerciseName ?? {}}

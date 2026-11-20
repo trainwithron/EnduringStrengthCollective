@@ -69,6 +69,7 @@ function setRows(exerciseId: string, ex: BuilderExercise) {
     target_pace: st.targetPace,
     rep_min: st.repMin,
     rep_max: st.repMax,
+    set_type: st.setType ?? "working",
   }));
 }
 
@@ -86,6 +87,7 @@ export async function restoreExercise(supabase: Db, args: { groupId: string; wor
     notes: ex.notes,
     ...(ex.slot ? { is_slot: true, slot_side: ex.slot.side, slot_tier: ex.slot.tier } : {}),
     ...(ex.progressionSlot ? { progression_slot: ex.progressionSlot } : {}),
+    ...(ex.supersetNext ? { superset_next: true } : {}),
   });
   if (error) return null;
   let restored = ex;

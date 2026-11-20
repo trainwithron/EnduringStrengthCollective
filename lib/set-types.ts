@@ -21,3 +21,6 @@ export const COUNTED_SET_TYPES: readonly SetType[] = ["working", "amrap", "backo
 export function countsForProgress(type: unknown): boolean {
   return COUNTED_SET_TYPES.includes(asSetType(type));
 }
+
+// Short enough to sit under a set's number in the client's workout.
+export const SET_TYPE_SHORT_LABEL: Record<SetType, string> = { warmup: "Warm-up", working: "Set", amrap: "AMRAP", backoff: "Back-off", drop: "Drop" };

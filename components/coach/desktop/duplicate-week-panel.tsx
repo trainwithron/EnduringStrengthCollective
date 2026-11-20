@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { SetType } from "@/lib/set-types";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { BuilderDay, BuilderExercise, BuilderItem } from "@/lib/types";
@@ -165,6 +166,9 @@ export function DuplicateWeekPanel({
       tier: "A" | "B" | "C" | null;
       // The exercise's place for its progression rule (a GZCLP T1/T2/T3 lift), copied onto the new weeks so they follow the same rule.
       progressionSlot: string;
+      // Linked with the next exercise (a superset or circuit), and this set's kind (B1, B2): copied onto the new weeks as they are.
+      supersetNext: boolean;
+      setType: SetType;
       setOrder: number;
       isDistancePace: boolean;
       otherTargets: {
@@ -206,6 +210,7 @@ export function DuplicateWeekPanel({
       trackedFields: TrackedField[];
       notes: string | null;
       tier: "A" | "B" | "C" | null;
+      supersetNext: boolean;
       otherTargets: { rpe: number | null; rir: number | null; tempo: string | null; height: number | null };
       results: IntervalResultWeek[];
     }
@@ -254,6 +259,7 @@ export function DuplicateWeekPanel({
             trackedFields: item.trackedFields,
             notes: item.notes,
             tier: item.tier,
+            supersetNext: !!item.supersetNext,
             otherTargets: {
               rpe: firstSet?.targetRpe ?? null,
               rir: firstSet?.targetRir ?? null,
@@ -341,6 +347,8 @@ export function DuplicateWeekPanel({
             notes: item.notes,
             tier: item.tier,
             progressionSlot: item.progressionSlot ?? "",
+            supersetNext: !!item.supersetNext,
+            setType: set.setType ?? "working",
             setOrder: set.setOrder,
             isDistancePace,
             otherTargets: {
@@ -443,6 +451,7 @@ export function DuplicateWeekPanel({
                 movement_pattern_id: src.movementPatternId,
                 tracked_fields: src.trackedFields,
                 notes: src.notes,
+                ...(src.supersetNext ? { superset_next: true } : {}),
                 is_slot: true,
                 slot_side: src.slot?.side ?? null,
                 slot_tier: src.slot?.tier ?? null,
@@ -472,6 +481,7 @@ export function DuplicateWeekPanel({
                   target_pace: st.targetPace,
                   rep_min: st.repMin,
                   rep_max: st.repMax,
+                  set_type: st.setType ?? "working",
                 }))
               )
               .select(SET_ROW_SELECT);
@@ -493,6 +503,7 @@ export function DuplicateWeekPanel({
                 movement_pattern_id: intervalTrack.movementPatternId,
                 tracked_fields: intervalTrack.trackedFields,
                 notes: intervalTrack.notes,
+                ...(intervalTrack.supersetNext ? { superset_next: true } : {}),
               })
               .select("id")
               .single();
@@ -531,6 +542,7 @@ export function DuplicateWeekPanel({
               videoPath: null,
               youtubeUrl: null,
               tier: intervalTrack.tier,
+              supersetNext: intervalTrack.supersetNext,
               sets: (setsData ?? []).map(mapSetRow),
             });
             continue;
@@ -551,6 +563,7 @@ export function DuplicateWeekPanel({
               tracked_fields: first.trackedFields,
               notes: first.notes,
               ...(first.progressionSlot ? { progression_slot: first.progressionSlot } : {}),
+              ...(first.supersetNext ? { superset_next: true } : {}),
             })
             .select("id")
             .single();
@@ -581,6 +594,7 @@ export function DuplicateWeekPanel({
                   target_rest_max_seconds: track.otherTargets.restMaxSeconds ?? null,
                   rep_min: track.repRange.min,
                   rep_max: track.repRange.max,
+                  set_type: track.setType,
                 };
               }
               return {
@@ -600,6 +614,7 @@ export function DuplicateWeekPanel({
                 target_pace: track.otherTargets.pace,
                 rep_min: track.repRange.min,
                 rep_max: track.repRange.max,
+                set_type: track.setType,
               };
             });
 
@@ -621,6 +636,7 @@ export function DuplicateWeekPanel({
             videoPath: null,
             youtubeUrl: null,
             tier: first.tier,
+            supersetNext: first.supersetNext,
             progressionSlot: first.progressionSlot,
             sets: (setsData ?? []).map(mapSetRow),
           });

@@ -1,6 +1,7 @@
 "use client";
 
 import { confirmDialog } from "@/components/shared/confirm-dialog";
+import { SET_TYPE_LABELS, SET_TYPE_SHORT_LABEL } from "@/lib/set-types";
 import { useEffect, useRef, useState } from "react";
 import { useSetSave } from "./set-save-context";
 import { useLiftUnit } from "./lift-unit-context";
@@ -591,17 +592,21 @@ export function ExerciseSetGrid({
                 // A done set's number turns green with a tick beside it (this replaces the old checkbox row), so it reads as done without knowing the colour code.
                 const done = set.status === "completed";
                 const doneMark = done ? "text-moss font-bold" : "";
+                // The coach's kind of set (B2): an AMRAP, back-off or drop set says so under its number, and is kept as the coach set it (the tap below only switches warm-up and working).
+                const special = set.setType === "amrap" || set.setType === "backoff" || set.setType === "drop" ? set.setType : null;
                 const label = (
                   <>
                     {warmup ? "W" : i + 1}
                     {done && <span aria-hidden="true"> &#10003;</span>}
+                    {special && <span className="block text-[9px] leading-tight text-rust uppercase">{SET_TYPE_SHORT_LABEL[special]}</span>}
                   </>
                 );
                 // Tap the set number to mark it a warm-up (it then never counts toward goals, records or your max) and tap again to undo.
-                if (readOnly) {
+                if (readOnly || special) {
                   return (
-                    <span key={set.id} data-set-done={done || undefined} className={`w-12 shrink-0 text-center font-body text-xs ${doneMark || "text-steel"}`}>
+                    <span key={set.id} data-set-done={done || undefined} title={special ? SET_TYPE_LABELS[special] : undefined} className={`w-12 shrink-0 text-center font-body text-xs ${doneMark || "text-steel"}`}>
                       {label}
+                      {special && <span className="sr-only"> ({SET_TYPE_LABELS[special]})</span>}
                       {done && <span className="sr-only"> (done)</span>}
                     </span>
                   );

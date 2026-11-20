@@ -30,7 +30,10 @@ import {
   fieldDef,
   type TrackedField,
 } from "@/lib/exercise-fields";
-import { ChevronDown, ChevronUp, Copy, GripVertical, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Copy, GripVertical, Link2, Trash2 } from "lucide-react";
+import { SET_TYPE_LABELS, SET_TYPES, type SetType } from "@/lib/set-types";
+import { useBuilderLastTime } from "./builder-last-time";
+import { lastTimeLine } from "@/lib/superset-links";
 import { useSaveToastChannel } from "./desktop/save-toast-channel";
 import { CARDIO_PRESETS, type CardioPreset } from "@/lib/cardio-presets";
 import type { RestTempoSuggestion } from "@/lib/training-intent";
@@ -124,6 +127,9 @@ function TargetCell({
 }
 
 // The coach's builder shows Time and Rest short because their cells take m:ss; the shared label keeps the unit ("Time (s)") for the client's logger, whose box is plain seconds.
+// The set types, short enough for a 48-pixel box (the box's title and label give the full name).
+const SET_TYPE_SHORT: Record<SetType, string> = { warmup: "Warm", working: "Work", amrap: "AMRAP", backoff: "Back", drop: "Drop" };
+
 function builderLabel(field: TrackedField, label: string): string {
   return field === "rest" ? "Rest" : field === "time" ? "Time" : label;
 }
@@ -170,6 +176,11 @@ export function ExerciseBuilderCard({
   onDeleted,
   onRestored,
   onDuplicated,
+  supersetLabel = null,
+  supersetKind = null,
+  linkedToNext = false,
+  canLink = false,
+  onToggleLink,
 }: {
   exercise: BuilderExercise;
   workoutId: string;
@@ -216,7 +227,16 @@ export function ExerciseBuilderCard({
   // Called with the exercise put back by "Undo", so the day draws it again.
   onRestored?: (exercise: BuilderExercise) => void;
   onDuplicated: (newExercise: BuilderExercise) => void;
+  // Supersets and circuits (B1, lib/supersets.ts): this exercise's label in its linked block ("2a"), the block's kind, whether it is linked with the next exercise, whether it can be (an
+  // exercise comes straight after it), and the switch. Left out, the card shows none of it.
+  supersetLabel?: string | null;
+  supersetKind?: string | null;
+  linkedToNext?: boolean;
+  canLink?: boolean;
+  onToggleLink?: () => void;
 }) {
+  // On a client's own program: what the client did last time on this exercise (B6).
+  const lastTime = lastTimeLine(useBuilderLastTime(exercise.exerciseName));
   const { flashSaved, flashSaveError } = useSaveToastChannel();
   const [nameDraft, setNameDraft] = useState(exercise.displayName ?? exercise.exerciseName);
   // The ladder picker below changes exercise.exerciseName from OUTSIDE
@@ -462,6 +482,7 @@ export function ExerciseBuilderCard({
           target_rest_seconds: last?.targetRestSeconds ?? null,
           target_rest_max_seconds: last?.targetRestMaxSeconds ?? null,
           target_pace: last?.targetPace ?? null,
+          set_type: last?.setType ?? "working",
         })
         .select(SET_ROW_SELECT)
         .single();
@@ -494,6 +515,17 @@ export function ExerciseBuilderCard({
     } finally {
       setSetsBusy(false);
     }
+  }
+
+  // The kind of set (B2): a warm-up, a working set, as many reps as possible, a back-off or a drop set. The client's workout starts each set as this kind (start_workout_session, step 210).
+  async function handleSetTypeChange(setId: string, setType: SetType) {
+    const { error } = await createBrowserClient().from("group_workout_exercise_sets").update({ set_type: setType }).eq("id", setId);
+    if (error) {
+      flashSaveError("Couldn't save that set type. Try again.");
+      return;
+    }
+    onSetsChange((prev) => prev.map((s) => (s.id === setId ? { ...s, setType } : s)));
+    flashSaved();
   }
 
   async function handleCellCommit(setId: string, field: TrackedField, raw: string) {
@@ -808,6 +840,7 @@ export function ExerciseBuilderCard({
             target_rest_seconds: s.targetRestSeconds,
             target_rest_max_seconds: s.targetRestMaxSeconds ?? null,
             target_pace: s.targetPace,
+            set_type: s.setType ?? "working",
           }))
         )
         .select(SET_ROW_SELECT);
@@ -913,6 +946,12 @@ export function ExerciseBuilderCard({
           }}
         />
         <div className="flex-1 min-w-0 pt-0.5">
+          {supersetLabel && (
+            <p className="flex items-center gap-1.5 mb-0.5 font-body text-xs text-rust" data-superset-label>
+              <span className="px-1.5 bg-rust text-graphite font-display font-bold">{supersetLabel}</span>
+              {supersetKind ?? "Superset"}: done back to back, then rest
+            </p>
+          )}
           {collapsed ? (
             // Collapsed: the whole name (it wraps, never cut off) and what is prescribed; tapping opens the card.
             <button type="button" onClick={toggleCollapsed} aria-label={`Expand ${exercise.displayName ?? (exercise.exerciseName || "exercise")}`} title={exercise.displayName ? `${exercise.displayName} (${exercise.exerciseName})` : exercise.exerciseName} className="block w-full text-left min-h-11 py-1">
@@ -929,6 +968,11 @@ export function ExerciseBuilderCard({
               tierByName={exerciseTierByName}
               demoLibrary={demoLibrary}
             />
+          )}
+          {lastTime && (
+            <p className="mt-0.5 font-body text-xs text-steel" data-builder-last-time>
+              {lastTime}
+            </p>
           )}
           {notInLibrary && (
             <p className="mt-0.5 flex flex-wrap items-center gap-x-2 font-body text-xs text-steel">
@@ -1007,6 +1051,28 @@ export function ExerciseBuilderCard({
 
           <div className="overflow-x-auto">
             <div className="space-y-1.5 min-w-fit">
+              {!isLoggedDay && (
+                <div className="flex items-center gap-1.5" data-set-type-row>
+                  <span className="w-14 shrink-0 font-body text-xs text-steel uppercase tracking-wide">Type</span>
+                  {exercise.sets.map((set, i) => (
+                    <select
+                      key={set.id}
+                      aria-label={`Set type, set ${i + 1}: ${SET_TYPE_LABELS[set.setType ?? "working"]}`}
+                      title={SET_TYPE_LABELS[set.setType ?? "working"]}
+                      value={set.setType ?? "working"}
+                      onChange={(e) => void handleSetTypeChange(set.id, e.target.value as SetType)}
+                      className={`w-12 h-11 sm:h-9 shrink-0 appearance-none bg-graphite border text-center font-body text-[10px] focus:outline-none focus:border-rust ${(set.setType ?? "working") === "working" ? "border-steel/30 text-steel" : "border-rust/60 text-rust"}`}
+                    >
+                      {SET_TYPES.map((t) => (
+                        <option key={t} value={t}>
+                          {SET_TYPE_SHORT[t]}
+                        </option>
+                      ))}
+                    </select>
+                  ))}
+                  <span className="w-11 sm:w-6 shrink-0" aria-hidden="true" />
+                </div>
+              )}
               {orderTrackedFields(exercise.trackedFields).map((field) => {
                 const def = fieldDef(field);
                 const firstSetId =
@@ -1070,6 +1136,18 @@ export function ExerciseBuilderCard({
           )}
 
           <div className="flex items-center gap-3 flex-wrap mt-1.5">
+            {onToggleLink && (canLink || linkedToNext) && (
+              <button
+                type="button"
+                onClick={onToggleLink}
+                aria-pressed={linkedToNext}
+                className={`min-h-11 sm:min-h-0 inline-flex items-center gap-1 font-body text-xs ${linkedToNext ? "text-rust" : "text-steel"}`}
+                data-superset-link
+              >
+                <Link2 className="w-3.5 h-3.5" aria-hidden="true" />
+                {linkedToNext ? "Linked with next (tap to unlink)" : "Link with next (superset)"}
+              </button>
+            )}
             <div className="relative">
               <button
                 type="button"

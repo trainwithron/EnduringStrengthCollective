@@ -1,5 +1,6 @@
 "use client";
 
+import { blockKind, canLinkWithNext, supersetPlaces } from "@/lib/supersets";
 import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { exerciseNameProblem } from "@/lib/exercise-name-guard";
 import type { DemoRow } from "@/lib/exercise-demo";
@@ -470,8 +471,21 @@ export function DayCard({
     );
   }
 
+  // Link an exercise with the next one, or undo it (a superset, or a circuit of three or more: lib/supersets.ts). Saved at once; the screen changes only once it saved.
+  async function toggleLink(item: BuilderExercise) {
+    const next = !item.supersetNext;
+    const { error } = await createBrowserClient().from("group_workout_exercises").update({ superset_next: next }).eq("id", item.id);
+    if (error) {
+      flashSaveError("Couldn't link those exercises. Try again.");
+      return;
+    }
+    onItemsChange((prev) => prev.map((i) => (i.id === item.id && i.kind === "exercise" ? { ...i, supersetNext: next } : i)));
+    flashSaved();
+  }
+
   // One exercise's full editor. Used by the normal view and, in the compact view, by an exercise the coach opens inline.
   function renderExerciseCard(item: BuilderExercise, sortedItems: BuilderItem[], index: number) {
+    const place = supersetPlaces(sortedItems).get(item.id) ?? null;
     if (item.slot) {
       return (
         <SlotCard
@@ -507,6 +521,11 @@ export function DayCard({
                       canMoveDown={index < sortedItems.length - 1}
                       onMoveUp={() => moveItem(sortedItems, index, -1)}
                       onMoveDown={() => moveItem(sortedItems, index, 1)}
+                      supersetLabel={place?.label ?? null}
+                      supersetKind={place ? blockKind(place.members.length) : null}
+                      linkedToNext={!!item.supersetNext && canLinkWithNext(sortedItems, item.id)}
+                      canLink={canLinkWithNext(sortedItems, item.id)}
+                      onToggleLink={() => void toggleLink(item)}
                       onUpdate={(patch) =>
                         onItemsChange((prev) => prev.map((i) => (i.id === item.id ? { ...i, ...patch } : i)))
                       }
