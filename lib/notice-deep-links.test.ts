@@ -7,10 +7,12 @@ import { noticeHref, bookingDayHref, LATE_CHANGES_HREF, RECURRING_CONFLICTS_PATH
 const read = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
 
 describe("where a notice opens", () => {
-  it("a booking request and a late change open the late-changes panel (the database writes plain /dashboard)", () => {
-    expect(noticeHref("booking_request", "/dashboard")).toBe("/dashboard#late-changes");
-    expect(noticeHref("late_change", "/dashboard")).toBe(LATE_CHANGES_HREF);
-    expect(noticeHref("late_change", null)).toBe(LATE_CHANGES_HREF);
+  // Nov 19: the Requests page at that request, waiting or answered (it used to be Home's late-changes panel, which shows nothing once it was answered)
+  it("a booking request and a late change open the Requests page at the request (the database writes plain /dashboard)", () => {
+    expect(noticeHref("booking_request", "/dashboard", { id: "n1" })).toBe("/requests?notice=n1");
+    expect(noticeHref("late_change", "/dashboard", { id: "n2" })).toBe("/requests?notice=n2");
+    expect(noticeHref("late_change", LATE_CHANGES_HREF, { id: "n2" })).toBe("/requests?notice=n2");
+    expect(noticeHref("late_change", null)).toBe("/requests");
   });
   it("any other notice, or one that already names a page, keeps its own link", () => {
     expect(noticeHref("booking_request", "/groups/g1/calendar")).toBe("/groups/g1/calendar");
@@ -26,12 +28,13 @@ describe("where a notice opens", () => {
 describe("every place a notice is opened uses it", () => {
   it("the bell, the notifications page, Home's notices, the floating inbox and the push job", () => {
     const bell = read("components/athlete/notification-bell.tsx");
-    expect(bell).toContain("router.push(noticeHref(n.type, n.linkPath));");
-    expect(bell).toContain("href={noticeHref(n.type, n.linkPath)}");
-    expect(read("app/notifications/page.tsx")).toContain("linkPath: noticeHref(n.type, n.link_path),");
-    expect(read("app/(coach)/dashboard/page.tsx")).toContain("linkPath: noticeHref(n.type, n.link_path),");
-    expect(read("app/api/messages/inbox/route.ts")).toContain("linkPath: noticeHref(n.type, n.link_path)");
-    expect(read("app/api/cron/notification-push/route.ts")).toContain('noticeHref(n.type, n.link_path || "/dashboard")');
+    expect(bell).toContain("router.push(noticeHref(n.type, n.linkPath, { id: n.id, groupId: n.groupId }));");
+    expect(bell).toContain("href={noticeHref(n.type, n.linkPath, { id: n.id, groupId: n.groupId })}");
+    expect(read("app/notifications/page.tsx")).toContain("linkPath: noticeHref(n.type, n.link_path, { id: n.id, groupId: n.group_id }),");
+    expect(read("app/(coach)/dashboard/page.tsx")).toContain("linkPath: noticeHref(n.type, n.link_path, { id: n.id }),");
+    expect(read("app/api/messages/inbox/route.ts")).toContain("linkPath: noticeHref(n.type, n.link_path, { id: n.id, groupId: n.group_id })");
+    expect(read("app/api/coach/spot-needs/route.ts")).toContain('linkPath: noticeHref(n.type, n.link_path ?? "/", { id: n.id, groupId: n.group_id }),');
+    expect(read("app/api/cron/notification-push/route.ts")).toContain('noticeHref(n.type, n.link_path || "/dashboard", { id: n.id, groupId: n.group_id })');
   });
   it("the phone Home has the same anchors as the computer Home (/dashboard opens the phone Home on a phone)", () => {
     // on a phone /dashboard opens the coach's own app; the notice's hash opens Spotlight on that panel (Release 2)

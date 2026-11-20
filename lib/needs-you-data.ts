@@ -9,6 +9,7 @@ import { DEFAULT_HEADS_UP_DAYS, expiringSoon, expiryDismissalKey, isSnoozed } fr
 import { BUTTON, sentences, type NeedsYouItem } from "@/lib/needs-you";
 import type { QuietTier } from "@/lib/quiet-client-tier";
 import { addSessionsHref } from "@/lib/add-sessions-link";
+import { requestHref } from "@/lib/requests-center";
 
 export interface NeedsYouHomeInputs {
   coachId: string;
@@ -213,10 +214,10 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
   const nameOf = (id: string) => nameById.get(id) ?? "A client";
 
   for (const r of scheduleRequests) {
-    items.push({ id: `schedule:${r.id}`, kind: "schedule_request", name: nameOf(r.athlete_id), sentence: sentences.scheduleRequest(r.kind), button: BUTTON.review, href: "/dashboard#schedule-requests", profileHref: clientPath(r.group_id, r.athlete_id), order: new Date(r.created_at).getTime() });
+    items.push({ id: `schedule:${r.id}`, kind: "schedule_request", name: nameOf(r.athlete_id), sentence: sentences.scheduleRequest(r.kind), button: BUTTON.review, href: requestHref("schedule", r.id), profileHref: clientPath(r.group_id, r.athlete_id), order: new Date(r.created_at).getTime() });
   }
   for (const r of bookingRequests) {
-    items.push({ id: `request:${r.id}`, kind: "booking_request", name: nameOf(r.athlete_id), sentence: sentences.bookingRequest(), button: BUTTON.decide, href: "/dashboard#late-changes", profileHref: clientPath(r.group_id, r.athlete_id), order: new Date(r.created_at).getTime() });
+    items.push({ id: `request:${r.id}`, kind: "booking_request", name: nameOf(r.athlete_id), sentence: sentences.bookingRequest(), button: BUTTON.decide, href: requestHref("booking", r.id), profileHref: clientPath(r.group_id, r.athlete_id), order: new Date(r.created_at).getTime() });
   }
   // One entry per client who has unread messages: how many, and the oldest first.
   const byClient = new Map<string, { groupId: string; count: number; oldest: number }>();
@@ -228,7 +229,7 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
     items.push({ id: `message:${senderId}`, kind: "client_message", name: nameOf(senderId), sentence: sentences.clientMessage(v.count), button: BUTTON.reply, href: `/groups/${v.groupId}/messages/${senderId}`, order: v.oldest });
   }
   for (const l of lateChanges) {
-    items.push({ id: `late:${l.id}`, kind: "late_change", name: nameOf(l.athlete_id), sentence: sentences.lateChange(), button: BUTTON.decide, href: "/dashboard#late-changes", profileHref: clientPath(l.group_id, l.athlete_id), order: new Date(l.start_at).getTime() });
+    items.push({ id: `late:${l.id}`, kind: "late_change", name: nameOf(l.athlete_id), sentence: sentences.lateChange(), button: BUTTON.decide, href: requestHref("late", l.id), profileHref: clientPath(l.group_id, l.athlete_id), order: new Date(l.start_at).getTime() });
   }
   for (const e of expiring) {
     items.push({ id: `expiring:${e.athleteId}:${e.groupId}`, kind: "expiring_credits", name: nameOf(e.athleteId), sentence: sentences.expiringCredits(e.daysLeft), button: BUTTON.open, href: "/dashboard#expiring", profileHref: clientPath(e.groupId, e.athleteId), order: e.expiresOn.getTime() });

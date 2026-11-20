@@ -157,6 +157,7 @@ const RULES: Rule[] = [
   // Home
   rule("/dashboard", "home", "today"),
   rule("/notifications", "home", null),
+  rule("/requests", "home", null),
   rule(`${G}/business`, "home", "business"),
   rule(`${G}/dashboard`, "home", "group-dashboard"),
   // Clients

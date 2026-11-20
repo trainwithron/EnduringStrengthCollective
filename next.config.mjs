@@ -1,7 +1,7 @@
 import { buildSecurityHeaders } from "./security-headers.mjs";
 
 // The pages this site may show inside its own frames (the workspace panes and the split screen): every coach page, and the public page.
-const EMBEDDABLE_PATHS = ["/groups/:path*", "/clients/:path*", "/dashboard/:path*", "/calendar/:path*", "/group-calendar/:path*", "/programs/:path*", "/recurring-conflicts/:path*", "/running-low/:path*", "/c/:path*"];
+const EMBEDDABLE_PATHS = ["/groups/:path*", "/clients/:path*", "/dashboard/:path*", "/calendar/:path*", "/group-calendar/:path*", "/programs/:path*", "/recurring-conflicts/:path*", "/requests/:path*", "/running-low/:path*", "/c/:path*"];
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {

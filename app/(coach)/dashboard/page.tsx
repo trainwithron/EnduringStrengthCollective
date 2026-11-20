@@ -500,7 +500,7 @@ export default async function CoachHomePage() {
     id: n.id,
     type: n.type,
     body: n.body,
-    linkPath: noticeHref(n.type, n.link_path),
+    linkPath: noticeHref(n.type, n.link_path, { id: n.id }),
     createdAt: n.created_at,
   }));
 

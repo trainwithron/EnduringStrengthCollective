@@ -67,3 +67,84 @@ export function requestAnswerLine(result: string): string {
       return "That request was closed: the session changed or the time passed.";
   }
 }
+
+// Who and when, on the push itself (Ron, Nov 19: "Hewan B. asked for Thu Nov 19, 9:00 AM"), for the three requests a coach answers. Read from the request the notice was written with; the
+// notice's own line is the fallback. With private lock screens on, the phone is shown none of it (sendPushToProfile).
+export const REQUEST_PUSH_TYPES = ["booking_request", "schedule_request", "client_request"] as const;
+
+/** "Hewan Belete" -> "Hewan B." (the same rule as the database's client_request_short_name). */
+export function shortName(full: string | null | undefined): string {
+  const parts = (full ?? "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "Someone";
+  if (parts.length === 1) return parts[0];
+  return `${parts[0]} ${parts[parts.length - 1].charAt(0).toUpperCase()}.`;
+}
+
+const PUSH_WHEN = (iso: string, timeZone: string) =>
+  new Date(iso).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone });
+
+export function bookingRequestLine(r: { kind?: string | null; from_start_at?: string | null; new_start_at: string }, who: string, timeZone: string): string {
+  if (r.kind === "move" && r.from_start_at) return `${who} asked to move ${PUSH_WHEN(r.from_start_at, timeZone)} to ${PUSH_WHEN(r.new_start_at, timeZone)}`;
+  return `${who} asked for ${PUSH_WHEN(r.new_start_at, timeZone)}`;
+}
+
+const SCHEDULE_ASK: Record<string, string> = { pause: "pause", freeze: "freeze", cancel: "end" };
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const WEEKDAYS = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"];
+const dayOf = (key: string) => {
+  const [, m, d] = key.split("-").map(Number);
+  return m && d ? `${MONTHS[m - 1]} ${d}` : key;
+};
+const clockOf = (hhmm: string) => {
+  const [h, m] = hhmm.split(":").map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return hhmm;
+  return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+};
+
+export function scheduleRequestLine(
+  r: { kind: string; effective_on: string; resume_on?: string | null; recurring_booking_series?: { weekday: number; start_time: string } | null },
+  who: string
+): string {
+  const s = r.recurring_booking_series;
+  const what = s ? `${WEEKDAYS[s.weekday] ?? "their weekly"} at ${clockOf(String(s.start_time ?? "").slice(0, 5))}` : "their weekly schedule";
+  const until = r.kind === "freeze" && r.resume_on ? ` until ${dayOf(r.resume_on)}` : "";
+  return `${who} asked to ${SCHEDULE_ASK[r.kind] ?? "change"} ${what} after ${dayOf(r.effective_on)}${until}`;
+}
+
+/** The line a request push shows. The request is found as the Requests page finds it: the coach's own, written in the same moment as the notice. */
+export async function requestPushLine(db: any, n: { profile_id: string; group_id: string | null; type: string; body: string | null; created_at: string }, timeZone: string): Promise<string> {
+  const fallback = answerableBody(n.body);
+  if (!n.created_at) return fallback;
+  const at = new Date(n.created_at).getTime();
+  const lo = new Date(at - 5000).toISOString();
+  const hi = new Date(at + 5000).toISOString();
+  try {
+    if (n.type === "booking_request") {
+      let q = db.from("booking_requests").select("kind, from_start_at, new_start_at, created_at, profiles!booking_requests_athlete_id_fkey ( full_name )").eq("coach_id", n.profile_id).gte("created_at", lo).lte("created_at", hi);
+      if (n.group_id) q = q.eq("group_id", n.group_id);
+      const { data } = await q.limit(1);
+      const r = Array.isArray(data) ? data[0] : null;
+      return r ? bookingRequestLine(r, shortName(r.profiles?.full_name), timeZone) : fallback;
+    }
+    if (n.type === "schedule_request") {
+      let q = db
+        .from("schedule_requests")
+        .select("kind, effective_on, resume_on, created_at, profiles!schedule_requests_athlete_id_fkey ( full_name ), recurring_booking_series ( weekday, start_time )")
+        .eq("coach_id", n.profile_id)
+        .gte("created_at", lo)
+        .lte("created_at", hi);
+      if (n.group_id) q = q.eq("group_id", n.group_id);
+      const { data } = await q.limit(1);
+      const r = Array.isArray(data) ? data[0] : null;
+      return r ? scheduleRequestLine(r, shortName(r.profiles?.full_name)) : fallback;
+    }
+    if (n.type === "client_request") {
+      const { data } = await db.from("client_requests").select("created_at, profiles!client_requests_requester_id_fkey ( full_name )").eq("coach_id", n.profile_id).gte("created_at", lo).lte("created_at", hi).limit(1);
+      const r = Array.isArray(data) ? data[0] : null;
+      return r ? `${shortName(r.profiles?.full_name)} asked to train with you` : fallback;
+    }
+  } catch {
+    // the notice's own line
+  }
+  return fallback;
+}

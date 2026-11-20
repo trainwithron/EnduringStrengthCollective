@@ -165,9 +165,12 @@ describe("Release K1: wiring", () => {
     expect(src("vercel.json")).toContain('"/api/cron/notification-push"');
     expect(src("lib/cron-jobs.ts")).toContain('job: "notification-push"');
   });
-  it("the job defers quiet hours, gives back what it did not send, and the phone never shows a name from it", () => {
+  // A request the coach answers says who and when (Ron, Nov 19: "Hewan B. asked for Thu Nov 19, 9:00 AM"; lib/requests-push.test.ts); every other notice the job pushes still names no one.
+  it("the job defers quiet hours, gives back what it did not send, and the phone shows a name only on a request to answer", () => {
     const job = src("app/api/cron/notification-push/route.ts");
-    expect(job).toContain("isQuietNow(await readPushPrefs(db, profileId))");
+    expect(job).toContain("const prefs = await readPushPrefs(db, profileId);");
+    expect(job).toContain("if (isQuietNow(prefs)) quietNow.add(profileId);");
+    expect(job).toContain("const line = isRequest ? await requestPushLine(db, n, zoneOf.get(n.profile_id) ?? DEFAULT_COACH_TIMEZONE) : pushBodyFor(n.type);");
     expect(job).toContain("update({ pushed_at: null })");
     expect(job).toContain("run.notStarted");
     expect(job).toContain("pushBodyFor(n.type)");

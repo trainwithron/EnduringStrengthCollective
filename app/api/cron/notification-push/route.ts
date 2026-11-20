@@ -3,7 +3,8 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { sendPushToProfile } from "@/lib/send-push";
 import { withCronRun } from "@/lib/cron-monitor";
 import { runPool } from "@/lib/run-pool";
-import { answerableBody, PUSHED_BY_JOB, pushBodyFor, pushTitleFor, STALE_PUSH_HOURS, waitingRequestFor } from "@/lib/notification-push";
+import { PUSHED_BY_JOB, pushBodyFor, pushTitleFor, REQUEST_PUSH_TYPES, requestPushLine, STALE_PUSH_HOURS, waitingRequestFor } from "@/lib/notification-push";
+import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { isQuietNow, readPushPrefs } from "@/lib/push-prefs";
 import { noticeHref } from "@/lib/notice-links";
 
@@ -39,8 +40,12 @@ async function handler(request: Request) {
 
   // Quiet hours DEFER, they do not drop: a notice for someone who is in their quiet hours right now is left unclaimed, and the first run after the window ends sends it (until it is too old to be news).
   const quietNow = new Set<string>();
+  // each person's clock, for the time on a request's push
+  const zoneOf = new Map<string, string>();
   await runPool([...new Set(candidates.map((c) => c.profile_id))], AT_ONCE, async (profileId) => {
-    if (isQuietNow(await readPushPrefs(db, profileId))) quietNow.add(profileId);
+    const prefs = await readPushPrefs(db, profileId);
+    zoneOf.set(profileId, prefs.timeZone);
+    if (isQuietNow(prefs)) quietNow.add(profileId);
   }, { deadlineMs: 30_000 });
   const ids = candidates.filter((c) => !quietNow.has(c.profile_id)).map((c) => c.id);
   if (ids.length === 0) return NextResponse.json({ claimed: 0, sent: 0, deferred: candidates.length });
@@ -52,14 +57,17 @@ async function handler(request: Request) {
   let sent = 0;
   type Claimed = { id: string; profile_id: string; group_id: string | null; type: string; body: string; link_path: string; created_at: string };
   const run = await runPool((claimed ?? []) as Claimed[], AT_ONCE, async (n) => {
-    // A booking request carries Confirm and Decline on the notification itself (Ron, Nov 5); tapping it still opens the requests.
+    // A booking request carries Confirm and Decline on the notification itself (Ron, Nov 5); tapping it opens the Requests page at that request. A request to answer says who and when
+    // (Ron, Nov 19: "Hewan B. asked for Thu Nov 19, 9:00 AM"); a schedule request and a request to train have no buttons (a schedule change has no decline: it takes effect on its day).
     const requestId = n.type === "booking_request" ? await waitingRequestFor(db, n).catch(() => null) : null;
+    const isRequest = (REQUEST_PUSH_TYPES as readonly string[]).includes(n.type);
+    const line = isRequest ? await requestPushLine(db, n, zoneOf.get(n.profile_id) ?? DEFAULT_COACH_TIMEZONE) : pushBodyFor(n.type);
     sent += await sendPushToProfile(
       db,
       n.profile_id,
       pushTitleFor(n.type),
-      requestId ? answerableBody(n.body) : pushBodyFor(n.type),
-      noticeHref(n.type, n.link_path || "/dashboard"),
+      line,
+      noticeHref(n.type, n.link_path || "/dashboard", { id: n.id, groupId: n.group_id }),
       requestId ? { answer: { requestId } } : {}
     );
   }, { deadlineMs: 90_000 });

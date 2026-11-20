@@ -7,6 +7,7 @@ import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { buildCheckInDraft, buildOfferPauseOrFreezeDraft, buildScheduleReplyDraft } from "@/lib/schedule-request-drafts";
 import { dayLabel, isOverdue, scheduleSummary, todayKey, type RequestKind } from "@/lib/schedule-request-ui";
+import { FOCUSABLE_ROW, requestAnchor } from "@/lib/requests-center";
 
 export interface ScheduleRequestCardData {
   id: string;
@@ -60,7 +61,7 @@ export function ScheduleRequestCard({
   const checkIn = buildCheckInDraft(first);
 
   return (
-    <li className="border border-rust/30 p-3" data-testid="schedule-request-card">
+    <li id={requestAnchor("schedule", data.id)} className={`${FOCUSABLE_ROW} border border-rust/30 p-3`} data-testid="schedule-request-card">
       <p className="font-body text-sm text-chalk">
         <span className="font-bold">{data.clientName}</span> asked to {PHRASE[data.kind]} their weekly schedule ({summary})
         {data.kind === "freeze" && data.resumeOn ? ` until ${dayLabel(data.resumeOn)}` : ""}.

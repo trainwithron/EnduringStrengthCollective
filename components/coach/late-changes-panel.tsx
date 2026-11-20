@@ -8,6 +8,7 @@ import { bookingFitsAvailability, resolveBlockedRangesForDate, type Availability
 import { DEFAULT_COACH_TIMEZONE, dateKeyInZone } from "@/lib/timezone";
 import { buildCreditPicture, fetchBookingCounts } from "@/lib/credit-picture";
 import { coachCreditSentence } from "@/lib/credit-sentence";
+import { FOCUSABLE_ROW, requestAnchor } from "@/lib/requests-center";
 
 interface MoveRequest {
   id: string;
@@ -187,13 +188,20 @@ export function LateChangesPanel({ groupIds: scopeGroupIds }: { groupIds?: strin
   async function answerMove(id: string, confirm: boolean) {
     setBusyId(id);
     setError(null);
-    const supabase = createBrowserClient();
-    const { data, error: rpcError } = await supabase.rpc("resolve_booking_request", { p_request_id: id, p_confirm: confirm });
-    setBusyId(null);
-    if (rpcError) {
+    // Through the answer route (the same one the phone notification's buttons use), so the client is pushed the answer at once (app/api/bookings/request-answer).
+    let data: string | null = null;
+    try {
+      const res = await fetch("/api/bookings/request-answer", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ requestId: id, confirm }) });
+      const out = (await res.json().catch(() => ({}))) as { result?: string };
+      if (!res.ok || typeof out.result !== "string") throw new Error("not saved");
+      data = out.result;
+    } catch {
+      setBusyId(null);
       setError("That didn't save. Nothing was changed. Try again.");
       return;
     }
+    setBusyId(null);
+    if (data === "already") setError("That request was already answered.");
     if (data === "closed") setError("That session is no longer scheduled, so the request was closed.");
     if (data === "slot_taken") setError("Someone else took that time first, so the request was declined and the client told.");
     setMoves((prev) => prev.filter((m) => m.id !== id));
@@ -216,7 +224,7 @@ export function LateChangesPanel({ groupIds: scopeGroupIds }: { groupIds?: strin
           </p>
           <ul className="divide-y divide-steel/15 mt-2 mb-3">
             {moves.map((m) => (
-              <li key={m.id} className="py-2.5 flex flex-wrap items-center justify-between gap-2">
+              <li key={m.id} id={requestAnchor("booking", m.id)} className={`${FOCUSABLE_ROW} py-2.5 flex flex-wrap items-center justify-between gap-2`}>
                 <div className="min-w-0">
                   <p className="font-body text-sm text-chalk truncate">{m.clientName}</p>
                   <p className="font-body text-xs text-steel">
@@ -256,7 +264,7 @@ export function LateChangesPanel({ groupIds: scopeGroupIds }: { groupIds?: strin
       )}
       <ul className="divide-y divide-steel/15 mt-2">
         {items.map((i) => (
-          <li key={i.id} className="py-2.5 flex flex-wrap items-center justify-between gap-2">
+          <li key={i.id} id={requestAnchor("late", i.id)} className={`${FOCUSABLE_ROW} py-2.5 flex flex-wrap items-center justify-between gap-2`}>
             <div className="min-w-0">
               <p className="font-body text-sm text-chalk truncate">{i.clientName}</p>
               <p className="font-body text-xs text-steel">

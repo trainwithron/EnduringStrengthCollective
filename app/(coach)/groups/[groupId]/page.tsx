@@ -908,6 +908,7 @@ export default async function GroupHubPage(
           linkPath: n.link_path,
           createdAt: n.created_at,
           readAt: n.read_at,
+          groupId: params.groupId,
         }))}
       />
 

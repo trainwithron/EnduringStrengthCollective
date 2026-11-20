@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { confirmDialog } from "@/components/shared/confirm-dialog";
+import { FOCUSABLE_ROW, requestAnchor } from "@/lib/requests-center";
 
 export interface RequestRow {
   id: string;
@@ -25,7 +26,8 @@ const NEXT_STEP: Record<string, string> = {
 
 // The coach's waiting requests (people who tapped "Request to train with me" on their public page). Approve makes an ordinary client with their own one-on-one space; Decline tells the person only that the coach is not
 // taking new clients right now. Names show as first name and last initial, with no photo, until the coach approves. Nothing here shares anything about any client.
-export function ClientRequestsPanel({ requests, supportEmail }: { requests: RequestRow[]; supportEmail: string | null }) {
+// `title`: the Requests page names this list for what it is among the other kinds of request.
+export function ClientRequestsPanel({ requests, supportEmail, title = "Waiting for you" }: { requests: RequestRow[]; supportEmail: string | null; title?: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, { kind: "ok" | "problem"; text: string; help?: boolean }>>({});
@@ -84,7 +86,9 @@ export function ClientRequestsPanel({ requests, supportEmail }: { requests: Requ
     <div className="space-y-4 max-w-3xl">
       <section aria-label="Waiting requests" className="space-y-3">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="font-display uppercase text-lg tracking-wide">Waiting for you ({requests.length})</h2>
+          <h2 className="font-display uppercase text-lg tracking-wide">
+            {title} ({requests.length})
+          </h2>
           {requests.length > 1 && (
             <button type="button" onClick={declineAll} disabled={busy !== null} className={`${small} text-rust`}>
               {busy === "all" ? "Declining…" : "Decline all waiting"}
@@ -102,7 +106,7 @@ export function ClientRequestsPanel({ requests, supportEmail }: { requests: Requ
         ) : (
           <ul className="divide-y divide-steel/15 border border-steel/20">
             {requests.map((r) => (
-              <li key={r.id} className="p-4 space-y-2">
+              <li key={r.id} id={requestAnchor("client", r.id)} className={`${FOCUSABLE_ROW} p-4 space-y-2`}>
                 <div className="flex items-start gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="font-body text-sm">

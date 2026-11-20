@@ -22,12 +22,12 @@ export async function GET(request: Request) {
   const [{ data: me }, { data: notices }] = await Promise.all([
     supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle(),
     // The same urgent lines the bell shows (schedule, pause, freeze and cancel requests, late changes), unread only. Reading them here marks nothing.
-    supabase.from("notifications").select("id, type, body, link_path, created_at").eq("profile_id", user.id).in("type", [...URGENT_NOTICE_TYPES]).is("read_at", null).order("created_at", { ascending: false }).limit(5),
+    supabase.from("notifications").select("id, type, body, link_path, created_at, group_id").eq("profile_id", user.id).in("type", [...URGENT_NOTICE_TYPES]).is("read_at", null).order("created_at", { ascending: false }).limit(5),
   ]);
   return NextResponse.json({
     conversations,
     incomplete,
-    notices: (notices ?? []).map((n: { id: string; type: string; body: string; link_path: string | null; created_at: string }) => ({ id: n.id, body: n.body, linkPath: noticeHref(n.type, n.link_path), createdAt: n.created_at })),
+    notices: (notices ?? []).map((n: { id: string; type: string; body: string; link_path: string | null; created_at: string; group_id: string | null }) => ({ id: n.id, body: n.body, linkPath: noticeHref(n.type, n.link_path, { id: n.id, groupId: n.group_id }), createdAt: n.created_at })),
     viewerId: user.id,
     viewerName: (me as { full_name?: string } | null)?.full_name ?? "You",
   });

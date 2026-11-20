@@ -15,6 +15,8 @@ const ID = "11111111-2222-4333-8444-555555555555";
 const NEVER = new Set([
   "/clients",
   "/clients/requests",
+  // Everything waiting on the coach's answer (Nov 19): the phone keeps it as a page (a notice opens it).
+  "/requests",
   "/programs",
   // Opens on the phone (Ron, Nov 12): Spotlight > Program > Exercise library, where demos recorded on the phone are added.
   "/groups/[groupId]/exercise-library",

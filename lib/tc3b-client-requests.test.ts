@@ -340,9 +340,12 @@ describe("the coach's side", () => {
     expect(panel).toContain("NEXT_STEP[data.ageBand]");
   });
   it("the Requests page, the badge and the left-panel count cover ALL the coach's organizations, with the organization's name on each row when there are several", () => {
-    const page = read("app/(coach)/clients/requests/page.tsx");
+    // Nov 19: the list is on the Requests page (read in lib/requests-center-server.ts); the old page sends people there
+    expect(read("app/(coach)/clients/requests/page.tsx")).toContain("redirect(REQUESTS_PATH);");
+    const page = read("lib/requests-center-server.ts");
     expect(page).toContain('from("organization_memberships")');
-    expect(page).toContain("organizationName: orgs.length > 1 ? org.name : null");
+    expect(page).toContain("const orgLabel = (name: string | null) => (orgs.length > 1 ? name : null);");
+    expect(page).toContain("organizationName: orgLabel(org.name),");
     expect(page).not.toContain("anchor.orgId");
     expect(read("app/(coach)/clients/page.tsx")).toContain("pendingRequestCount(supabase)");
     expect(read("app/(coach)/clients/page.tsx")).not.toContain("pendingRequestCount(supabase, anchor.orgId)");
@@ -357,7 +360,7 @@ describe("the coach's side", () => {
     expect(panel).toContain('href="/help"');
     expect(panel).toContain("supportEmail");
     expect(panel).not.toMatch(/avatar|<img|message\b.*textarea|Copy link|Make a new link/i);
-    expect(read("app/(coach)/clients/requests/page.tsx")).toContain('rpc("coach_client_requests"');
+    expect(read("lib/requests-center-server.ts")).toContain('rpc("coach_client_requests"');
   });
   it("the Requests count shows on the Clients pages (computer and phone) and in the left panel", () => {
     expect(read("app/(coach)/clients/page.tsx")).toContain("<RequestsLink count={requestCount} />");

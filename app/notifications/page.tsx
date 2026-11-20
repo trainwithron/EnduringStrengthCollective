@@ -11,6 +11,8 @@ import { CHOOSE_ORGANIZATION_PATH, getActiveAnchor } from "@/lib/active-anchor";
 import { noticeHref } from "@/lib/notice-links";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
+import { filterOfType } from "@/lib/notice-filters";
+import { answerableNotices } from "@/lib/requests-center-server";
 
 export const metadata = { title: "Notifications" };
 
@@ -51,10 +53,15 @@ export default async function NotificationsPage() {
     }
   }
 
+  // A session request or a request to train that is still waiting gets its buttons on the row (Ron, Nov 19).
+  const answerable = isCoach ? await answerableNotices(supabase, user.id, visibleRows as { id: string; type: string; created_at: string }[]) : new Map();
   const entries: CenterEntry[] = visibleRows.map((n: any) => ({
     id: n.id,
+    type: n.type,
+    filter: filterOfType(n.type),
+    answer: answerable.get(n.id) ?? null,
     body: n.body,
-    linkPath: noticeHref(n.type, n.link_path),
+    linkPath: noticeHref(n.type, n.link_path, { id: n.id, groupId: n.group_id }),
     createdAt: n.created_at,
     readAt: n.read_at,
     groupName: n.groups?.name ?? null,

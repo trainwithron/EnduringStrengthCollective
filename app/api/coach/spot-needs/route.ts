@@ -34,7 +34,7 @@ export async function GET() {
     // The same notices as the bell, for this organization (its groups, or none), unread only.
     supabase
       .from("notifications")
-      .select("id, type, body, link_path, created_at")
+      .select("id, type, body, link_path, created_at, group_id")
       .eq("profile_id", user.id)
       .is("read_at", null)
       .or(groupIds.length > 0 ? `group_id.is.null,group_id.in.(${groupIds.join(",")})` : "group_id.is.null")
@@ -42,11 +42,11 @@ export async function GET() {
       .limit(10),
     loadCoachInbox(supabase, { coachId: user.id, groupId: active.anchor.id }).catch(() => ({ conversations: [] as { unreadCount: number; lastAt: string | null }[] })),
   ]);
-  const notices = ((noticeRows ?? []) as { id: string; type: string; body: string; link_path: string | null; created_at: string }[]).map((n) => ({
+  const notices = ((noticeRows ?? []) as { id: string; type: string; body: string; link_path: string | null; created_at: string; group_id: string | null }[]).map((n) => ({
     id: n.id,
     type: n.type,
     body: n.body,
-    linkPath: noticeHref(n.type, n.link_path ?? "/"),
+    linkPath: noticeHref(n.type, n.link_path ?? "/", { id: n.id, groupId: n.group_id }),
     createdAt: n.created_at,
   }));
   const unreadConversations = inbox.conversations.filter((c) => c.unreadCount > 0);

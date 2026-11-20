@@ -62,7 +62,7 @@ export function ActingAsBanner({ athleteFullName, groupId, isSelf = false }: { a
 
       {pickerOpen && <ViewAsClientPicker onClose={() => setPickerOpen(false)} />}
       <TerminologyProvider groupId={groupId}>
-        <CoachSpotHub groupId={groupId} />
+        <CoachSpotHub groupId={groupId} bell={self} />
       </TerminologyProvider>
     </>
   );

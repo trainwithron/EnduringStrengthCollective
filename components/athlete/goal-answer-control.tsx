@@ -31,8 +31,14 @@ export function GoalAnswerControl({ goal, groupId, coachIds }: { goal: Suggested
 
   const label = goal.goalType === "custom" && goal.customLabel ? goal.customLabel : GOAL_TYPE_LABELS[goal.goalType as GoalType] ?? goal.goalType;
 
+  // Opens this client's profile on the coach's side, where the goal is (it used to open /groups/<id>/athletes, which is no page).
   function tellCoach(body: string) {
-    for (const id of coachIds) notifyPush(id, "About a goal", body, `/groups/${groupId}/athletes`);
+    void createBrowserClient()
+      .auth.getUser()
+      .then(({ data }) => {
+        const path = data.user ? `/groups/${groupId}/athletes/${data.user.id}` : `/groups/${groupId}/clients`;
+        for (const id of coachIds) notifyPush(id, "About a goal", body, path);
+      });
   }
 
   async function answer(status: "confirmed" | "declined") {

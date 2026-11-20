@@ -53,7 +53,9 @@ describe("the coach decides flagged changes and requests", () => {
   it("the panel calls resolve_late_change and resolve_booking_request and is on the dashboard and the phone Home", () => {
     const panel = read("../components/coach/late-changes-panel.tsx");
     expect(panel).toContain("resolve_late_change");
-    expect(panel).toContain("resolve_booking_request");
+    // a session request is answered through the answer route (Nov 19: so the client is pushed at once), which calls resolve_booking_request
+    expect(panel).toContain('fetch("/api/bookings/request-answer"');
+    expect(read("../app/api/bookings/request-answer/route.ts")).toContain('supabase.rpc("resolve_booking_request"');
     for (const word of ["Charge", "Waive", "Confirm", "Decline"]) expect(panel).toContain(word);
     expect(read("../app/(coach)/dashboard/page.tsx")).toContain("<LateChangesPanel groupIds=");
     expect(read("../components/coach/mobile/spot-needs-top.tsx")).toContain("<LateChangesPanel groupIds=");

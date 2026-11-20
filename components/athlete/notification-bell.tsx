@@ -16,6 +16,7 @@ export interface NotificationEntry {
   linkPath: string;
   createdAt: string;
   readAt: string | null;
+  groupId?: string | null;
 }
 
 // One bell for everyone (coach, client, trainer), on every screen that has a header. With `initial` it starts from what the page already
@@ -58,7 +59,7 @@ export function NotificationBell({
     const supabase = createBrowserClient();
     let query = supabase
       .from("notifications")
-      .select("id, type, body, link_path, read_at, created_at")
+      .select("id, type, body, link_path, read_at, created_at, group_id")
       .eq("profile_id", viewerId);
     // Notifications that belong to no group (a training-partner request, for example) stay visible in every organization's bell.
     if (scopeIds) query = scopeIds.length > 0 ? query.or(`group_id.is.null,group_id.in.(${scopeIds.join(",")})`) : query.is("group_id", null);
@@ -68,7 +69,7 @@ export function NotificationBell({
       .then(({ data }) => {
         if (cancelled || !data) return;
         setItems(
-          data.map((n: any) => ({ id: n.id, type: n.type, body: n.body, linkPath: n.link_path ?? "/", createdAt: n.created_at, readAt: n.read_at }))
+          data.map((n: any) => ({ id: n.id, type: n.type, body: n.body, linkPath: n.link_path ?? "/", createdAt: n.created_at, readAt: n.read_at, groupId: n.group_id ?? null }))
         );
       });
     return () => {
@@ -100,6 +101,7 @@ export function NotificationBell({
               linkPath: n.link_path ?? "/",
               createdAt: n.created_at,
               readAt: n.read_at,
+              groupId: n.group_id ?? null,
             },
             ...prev,
           ]);
@@ -127,7 +129,7 @@ export function NotificationBell({
   function handleOpenNotification(n: NotificationEntry) {
     setOpen(false);
     markRead([n.id]);
-    router.push(noticeHref(n.type, n.linkPath));
+    router.push(noticeHref(n.type, n.linkPath, { id: n.id, groupId: n.groupId }));
   }
 
   return (
@@ -177,7 +179,7 @@ export function NotificationBell({
                 {items.map((n) => (
                   <Link
                     key={n.id}
-                    href={noticeHref(n.type, n.linkPath)}
+                    href={noticeHref(n.type, n.linkPath, { id: n.id, groupId: n.groupId })}
                     onClick={() => handleOpenNotification(n)}
                     className={`block px-3 py-2.5 ${!n.readAt ? "bg-rust/5" : ""}`}
                   >

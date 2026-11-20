@@ -53,6 +53,12 @@ const REVIEWED = new Set([
   // the client Home's Featured cards: same inOrg(...) wrapped around the query on the line before
   "app/(coach)/groups/[groupId]/page.tsx::pro_shop_links",
   "app/(coach)/groups/[groupId]/challenges/page.tsx::challenges",
+  // the push job (no screen): the one request a coach's own notice was written with, for the push's who and when (Nov 19)
+  "lib/notification-push.ts::booking_requests",
+  "lib/notification-push.ts::schedule_requests",
+  // the one session a coach's own late-change notice is about (in the notice's group), and the waiting requests matched to notices the notifications page already limited to the open organization
+  "lib/requests-center-server.ts::bookings",
+  "lib/requests-center-server.ts::booking_requests",
 ]);
 
 function walk(dir: string, out: string[] = []): string[] {

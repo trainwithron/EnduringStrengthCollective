@@ -10,6 +10,7 @@ import { SpotNeedsTop } from "./spot-needs-top";
 import { SPOT_LAST_OPENED_KEY, SPOT_NEEDS_CACHE_KEY, readSpotNeedsCache, shouldFade, spotCount, spotNeedsCacheEntry, type SpotNeeds } from "@/lib/spot-needs";
 import { isEmbeddedWindow } from "@/components/ui/loading-watchdog";
 import { PushNotificationToggle } from "@/components/athlete/push-notification-toggle";
+import { NotificationBell } from "@/components/athlete/notification-bell";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { useTerm } from "@/components/coach/terminology-provider";
 import { getCoachedGroups, LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/coach-groups";
@@ -58,6 +59,7 @@ export function CoachSpotHub({
   initialAthleteName,
   homeHref,
   compact = false,
+  bell = true,
 }: {
   groupId: string;
   // Deep link from a client's own row/profile (?spotBuilder=...): opens
@@ -68,11 +70,15 @@ export function CoachSpotHub({
   homeHref?: string;
   // A smaller sparkle that fits the slim bar.
   compact?: boolean;
+  // The notification bell beside the button (Ron, Nov 19). Left out where a bar already fills the top (viewing a client, the slim Coach mode bar).
+  bell?: boolean;
 }) {
   const [open, setOpen] = useState(!!initialAthleteId);
   const [view, setView] = useState<"grid" | TileKey>(initialAthleteId ? "program" : "grid");
   const [builderOpen, setBuilderOpen] = useState(!!initialAthleteId);
   const [profileId, setProfileId] = useState<string | undefined>(undefined);
+  const [embedded, setEmbedded] = useState(true);
+  useEffect(() => setEmbedded(isEmbeddedWindow()), []);
   // The group every tile acts on. A coach who runs more than one organization chooses the organization in the header; the tiles then use that organization's group.
   const [activeGroupId, setActiveGroupId] = useState(groupId);
   // What needs the coach first (lib/spot-needs.ts): read when the page opens and every time Spotlight opens. It fills the top of the drop-down and the dot on the button.
@@ -397,6 +403,12 @@ export function CoachSpotHub({
           </>
         )}
       </button>
+      {/* The bell beside Spotlight (Ron, Nov 19): the unread count on it, the latest notices under it, and "See all" to the notifications page. The open organization's notices only. */}
+      {bell && !compact && !embedded && profileId && (
+        <div className="fixed top-[10px] left-[calc(50%+28px)] z-40 lg:hidden rounded-token-circle bg-graphite/90 border border-steel/30 shadow-lg" data-phone-bell>
+          <NotificationBell viewerId={profileId} scopeGroupId={null} />
+        </div>
+      )}
 
       {open && (
         <>
