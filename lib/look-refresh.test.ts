@@ -119,6 +119,13 @@ describe("Home's greeting band", () => {
     expect(greetingFor(new Date("2026-11-21T01:00:00Z"), "America/Chicago")).toBe("Good evening");
     expect(greetingTitle("Good afternoon", "Ron Arnold")).toBe("Good afternoon, Ron");
     expect(greetingTitle("Good afternoon", null)).toBe("Good afternoon");
+    // Live bug (Nov 20): Ron's profile name is "Coach Ron" and the band read "Good afternoon, Coach". A leading "Coach" is a title, the same rule as the
+    // client's Home (one helper, lib/first-name.ts).
+    expect(greetingTitle("Good afternoon", "Coach Ron")).toBe("Good afternoon, Ron");
+    expect(greetingTitle("Good afternoon", "coach   Ron Arnold")).toBe("Good afternoon, Ron");
+    expect(greetingTitle("Good afternoon", "Coach")).toBe("Good afternoon");
+    expect(greetingTitle("Good afternoon", "Coachella Smith")).toBe("Good afternoon, Coachella");
+    expect(read("lib/client-home-greeting.ts")).toContain("return greetingFirstName(fullName);");
     expect(dateLabelFor(now, "America/Chicago")).toBe("Friday, November 20");
   });
   it("one line for the day, from Your day's own counts", () => {

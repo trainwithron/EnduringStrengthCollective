@@ -1,4 +1,5 @@
 import { attentionHeadline } from "@/lib/your-day";
+import { greetingFirstName } from "@/lib/first-name";
 
 // Home's greeting band (Look Refresh, Ron Nov 20): the words at the top of Home, from what the page already has. All in the coach's own time zone.
 
@@ -13,9 +14,9 @@ export function dateLabelFor(now: Date, timeZone: string): string {
   return new Intl.DateTimeFormat("en-US", { timeZone, weekday: "long", month: "long", day: "numeric" }).format(now);
 }
 
-/** "Ron" from "Ron Arnold"; a name-less coach is greeted without one. */
+/** "Ron" from "Ron Arnold" or "Coach Ron" (Ron, Nov 20: the band read "Good afternoon, Coach"); a name-less coach is greeted without one. */
 export function greetingTitle(greeting: string, fullName: string | null | undefined): string {
-  const first = (fullName ?? "").trim().split(/\s+/)[0];
+  const first = greetingFirstName(fullName);
   return first ? `${greeting}, ${first}` : greeting;
 }
 
