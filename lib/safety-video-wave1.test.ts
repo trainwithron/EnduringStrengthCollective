@@ -37,6 +37,9 @@ describe("S3: a video of a minor", () => {
     expect(paste).toMatch(/create policy minor_subject_guard_insert on public\.session_exercise_videos as restrictive/);
     expect(paste).toMatch(/create policy minor_subject_guard_insert on public\.coach_video_checkins as restrictive/);
     expect(paste).toContain("own_upload_rule_kept");
+    // an unknown age is never taken for an adult (Assistant review, Nov 20): no date of birth falls through to the parent's-OK check
+    expect(paste).not.toMatch(/if v_youngest is null then\s+return true;/);
+    expect(paste).toContain("-- 13 to 17, or no date of birth on file: only with a parent's OK on file");
   });
   it("a refused save says why and takes the video back out of storage", () => {
     const rec = read("components/coach/video-checkin-recorder.tsx");

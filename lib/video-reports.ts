@@ -12,7 +12,7 @@ const LABELS: Record<ReportReason, string> = {
 
 // What a coach is told when the database's age rule refuses a video of a client (Ron, Nov 20, S3: step 211's minor_subject_ok).
 export const MINOR_VIDEO_REFUSED =
-  "This client is under 18 and there's no parent consent on file, so a video of them can't be saved. Under 13, never. Add the parent's consent on their profile first.";
+  "This client may be under 18: there is no date of birth showing they are an adult, and no parent consent on file. Ask them to add their date of birth in their app, or record the parent's OK on their profile, then try again. Under 13, never.";
 
 export function reportReasonLabel(reason: string): string {
   return (LABELS as Record<string, string>)[reason] ?? "Something else";

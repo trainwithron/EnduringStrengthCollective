@@ -1,6 +1,6 @@
 // Step 211 (migration 0455) in an in-memory Postgres set up like the live tables it touches: the paste runs (and runs again) and its check row is all true; a coach can no longer
-// save a form-check video or send a video check-in for a 13 to 17-year-old with no parent consent on file, can once consent is on file, and can for an adult or a client with
-// no date of birth; an under-13 is never filmed; the client's own upload is unchanged (minor_may_write still rules it); someone who does not coach the person learns nothing;
+// save a form-check video or send a video check-in for a 13 to 17-year-old, or a client with no date of birth on file, with no parent consent on file, can once consent is on
+// file, and can for an adult; an under-13 is never filmed; the client's own upload is unchanged (minor_may_write still rules it); someone who does not coach the person learns nothing;
 // a filmed shared-list demo needs the on-camera tick, a YouTube link does not; nobody signed in writes or deletes a video report and only the admin reads one; the undo takes
 // it all away. Run: node scripts/sql-tests/minor-video-subject.test.mjs
 import { PGlite } from "@electric-sql/pglite";
@@ -93,17 +93,20 @@ for (const [k, v] of Object.entries(check)) assert.equal(v, true, `check row: ${
 await as(COACH, async () => {
   assert.equal(await fails(coachVideo(TEEN)), true, "coach upload of a minor without consent");
   assert.equal(await fails(checkin(TEEN)), true, "check-in to a minor without consent");
-  // an adult and a client with no date of birth: as before
+  // an adult: as before
   assert.equal(await fails(coachVideo(ADULT)), false, "adult");
-  assert.equal(await fails(checkin(NODOB)), false, "no date of birth on file");
+  // no date of birth on file: not taken for an adult (minor_may_write does the same for their own upload)
+  assert.equal(await fails(checkin(NODOB)), true, "no date of birth on file, no consent");
+  assert.equal(await fails(coachVideo(NODOB)), true, "no date of birth on file, no consent (form check)");
   // under 13: never
   assert.equal(await fails(coachVideo(KID)), true, "under 13");
 });
 // with the parent's signature on file: allowed
-await db.exec(`insert into public.guardian_consents values ('${TEEN}', 'signed')`);
+await db.exec(`insert into public.guardian_consents values ('${TEEN}', 'signed'), ('${NODOB}', 'signed')`);
 await as(COACH, async () => {
   assert.equal(await fails(coachVideo(TEEN)), false, "minor with consent");
   assert.equal(await fails(checkin(TEEN)), false, "check-in with consent");
+  assert.equal(await fails(checkin(NODOB)), false, "no date of birth, with consent");
 });
 // the coach's word that they talked with the parent counts too (another minor)
 await db.exec(`delete from public.guardian_consents; insert into public.guardian_coach_confirmations values ('${TEEN}')`);

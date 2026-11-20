@@ -2,13 +2,13 @@
 --
 -- 1. A video of a minor (S3). The age rule on form-check videos looked only at the person UPLOADING (minor_may_write is about the caller), so a coach uploading a video of a
 --    13 to 17-year-old with no parent consent on file passed, and coach video check-ins to a client had no age rule at all. minor_subject_ok(person) asks about the person IN the
---    video: under 13 never; 13 to 17 only with a parent's signature or the coach's word that they talked with the parent (the same two records minor_may_write reads); 18 and
---    over, or no date of birth on file, as before. It answers only someone who coaches a group that person is in (anyone else gets false, so it says nothing about who is a
+--    video: under 13 never; 13 to 17, or no date of birth on file (an unknown age is not treated as an adult, as minor_may_write does), only with a parent's signature or the
+--    coach's word that they talked with the parent (the same two records minor_may_write reads); 18 and over as before. It answers only someone who coaches a group that person is in (anyone else gets false, so it says nothing about who is a
 --    minor), the person themselves (their own uploads keep minor_may_write's rule, unchanged), and the server. It guards new and changed rows of session_exercise_videos (the
 --    client's own video or a coach's upload for them) and coach_video_checkins (a video a coach sends a client). Existing rows are left as they are.
 -- 2. On-camera consent for a shared machine demo (S4): catalog_requests.subject_consent, "Everyone shown agreed to be filmed and shared; anyone under 18 has a parent's OK".
 --    Required on a filmed video sent for the shared list (a YouTube link plays from its owner's channel and keeps the rights tick only). Checked on new requests only.
--- 3. "Report this video" on the public scan pages (S4): video_reports, written only by the server (app/api/scan/report-video), read and closed only by the platform admin. When
+-- 3. "Report this video" on the public scan pages (S4): video_reports, written only by the server (app/api/public/report-video), read and closed only by the platform admin. When
 --    Ron removes a reported demo, the removed link is kept on the report so it can be put back.
 -- Nothing else changes. Re-running is safe.
 
@@ -63,16 +63,15 @@ begin
   -- the younger of the two dates on file, when there are two
   v_youngest := greatest(v_intake_dob, v_profile_birthday);
 
-  -- no date of birth on file: as before (the coach is the one who knows)
-  if v_youngest is null then
+  -- an adult by a date on file
+  if v_youngest is not null and v_today >= public.age_threshold_date(v_youngest, 18) then
     return true;
   end if;
-  if v_today >= public.age_threshold_date(v_youngest, 18) then
-    return true;
-  end if;
-  if v_today < public.age_threshold_date(v_youngest, 13) then
+  -- under 13: never
+  if v_youngest is not null and v_today < public.age_threshold_date(v_youngest, 13) then
     return false;
   end if;
+  -- 13 to 17, or no date of birth on file: only with a parent's OK on file
   return exists (select 1 from public.guardian_consents where athlete_id = p_person and status = 'signed')
       or exists (select 1 from public.guardian_coach_confirmations where athlete_id = p_person);
 end;

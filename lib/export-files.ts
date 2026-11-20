@@ -24,7 +24,11 @@ export async function collectExportFiles(supabase: Client, userId: string): Prom
   let notIncluded = 0;
   for (const s of SOURCES) {
     const { data, error } = await supabase.from(s.table).select(s.column).eq("athlete_id", userId).not(s.column, "is", null).limit(2000);
-    if (error) continue;
+    // a list that could not be read is counted as not included (the note then says to download again)
+    if (error) {
+      notIncluded++;
+      continue;
+    }
     const paths = [...new Set(((data ?? []) as Record<string, string | null>[]).map((r) => r[s.column]).filter((p): p is string => !!p))];
     for (let i = 0; i < paths.length; i += 200) {
       const chunk = paths.slice(i, i + 200);
