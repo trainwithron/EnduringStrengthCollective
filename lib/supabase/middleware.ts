@@ -58,6 +58,8 @@ export async function updateSession(request: NextRequest) {
     pathname === "/terms" ||
     pathname === "/privacy" ||
     pathname === "/refunds" ||
+    // what Spotlight costs and takes from client payments (Ron, Nov 20), for anyone
+    pathname === "/pricing" ||
     // The public support pages: the help center, what's new, and the status of the app (anyone must be able to read them, signed in or not, especially when they cannot sign in).
     pathname === "/help" ||
     pathname.startsWith("/help/") ||

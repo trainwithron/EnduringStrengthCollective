@@ -21,6 +21,7 @@ import { ClientTagManager } from "@/components/coach/desktop/client-tag-manager"
 import { TerminologySettingsPanel } from "@/components/coach/desktop/terminology-settings-panel";
 import { CoachCreditsPanel } from "@/components/coach/desktop/coach-credits-panel";
 import { PlanBillingPanel } from "@/components/coach/desktop/plan-billing-panel";
+import { coachPlanAvailable } from "@/lib/coach-plan-checkout";
 import { getOrgBillingSummary } from "@/lib/org-billing-server";
 import { isBillingEnforced } from "@/lib/org-entitlements";
 import type { ButtonShape, DisplayFont, BodyFont } from "@/lib/theme";
@@ -55,7 +56,7 @@ const ORG_TABS: { key: OrgTab; label: string }[] = [
 export default async function BrandingPage(
   props: {
     params: Promise<{ groupId: string }>;
-    searchParams: Promise<{ tab?: string }>;
+    searchParams: Promise<{ tab?: string; plan?: string }>;
   }
 ) {
   const params = await props.params;
@@ -347,7 +348,15 @@ export default async function BrandingPage(
           {showPlanTab && (
             <OrgSection title="Plan & Billing" first>
               {planSummary ? (
-                <PlanBillingPanel summary={planSummary} isOwner={isOwner} orgName={org?.name ?? "Organization"} />
+                <PlanBillingPanel
+                  summary={planSummary}
+                  isOwner={isOwner}
+                  orgName={org?.name ?? "Organization"}
+                  organizationId={orgMembership.organization_id}
+                  groupId={params.groupId}
+                  planAvailable={coachPlanAvailable()}
+                  planStarted={searchParams.plan === "started"}
+                />
               ) : (
                 <p className="font-body text-sm text-steel">Plan &amp; Billing isn&apos;t available yet.</p>
               )}

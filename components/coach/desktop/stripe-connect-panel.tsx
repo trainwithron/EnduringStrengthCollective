@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { FeeNotice } from "@/components/billing/fee-notice";
+import { PlanUpgradeButton } from "@/components/billing/plan-upgrade-button";
+import { FREE_TIER_FEE_PERCENT } from "@/lib/platform-fee";
 
 type ConnectStatus = "not_connected" | "pending" | "ready";
 
@@ -10,8 +13,21 @@ const STATUS_LABEL: Record<ConnectStatus, string> = {
   ready: "Ready",
 };
 
-// Where a coach connects their own Stripe account and sees whether clients can pay them. Every payment goes straight to this account; Spotlight never holds it.
-export function StripeConnectPanel({ groupId, status, isOwner, feePercent }: { groupId: string; status: ConnectStatus; isOwner: boolean; feePercent: number | null }) {
+// Where a coach connects their own Stripe account and sees whether clients can pay them. Every payment goes straight to this account; Spotlight never holds it. What Spotlight takes is said here in
+// plain words (Ron, Nov 20), and an owner on the free plan (5%) gets the paid plan's button beside it (`upgrade`: the organization, and whether the plan can be bought yet).
+export function StripeConnectPanel({
+  groupId,
+  status,
+  isOwner,
+  feePercent,
+  upgrade = null,
+}: {
+  groupId: string;
+  status: ConnectStatus;
+  isOwner: boolean;
+  feePercent: number | null;
+  upgrade?: { organizationId: string; available: boolean } | null;
+}) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,7 +72,12 @@ export function StripeConnectPanel({ groupId, status, isOwner, feePercent }: { g
       </div>
       <p className="font-body text-xs text-steel mt-2 max-w-[70ch]">{line}</p>
       {!isOwner && status !== "ready" && <p className="font-body text-xs text-steel mt-1">Your organization&apos;s owner connects Stripe.</p>}
-      {feePercent != null && <p className="font-body text-xs text-steel mt-1 max-w-[70ch]">Spotlight&apos;s fee is {feePercent}% of each payment made in the app. Stripe&apos;s own card fee also comes out of your account.</p>}
+      <FeeNotice currentPercent={feePercent} className="mt-3" />
+      {isOwner && upgrade && feePercent === FREE_TIER_FEE_PERCENT && (
+        <div className="mt-3">
+          <PlanUpgradeButton organizationId={upgrade.organizationId} groupId={groupId} available={upgrade.available} />
+        </div>
+      )}
       {error && (
         <p className="font-body text-xs text-rust mt-2" role="alert">
           {error}

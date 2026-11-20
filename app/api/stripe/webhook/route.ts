@@ -7,6 +7,7 @@ import { platformFeeCents } from "@/lib/platform-fee";
 import { duplicateProgram } from "@/lib/program-duplication";
 import { athleteHasCopyOfProgram, programBelongsToCoach } from "@/lib/package-program-access";
 import { endsGroupAccess, storedSubscriptionStatus } from "@/lib/subscription-status";
+import { COACH_PLAN_PURCHASE_KIND, planBillingFields, planStatusFor, subscriptionPeriodEnd } from "@/lib/coach-plan-checkout";
 import { grantLinkedGroupAccess, revokeLinkedGroupAccess } from "@/lib/package-group-access";
 import { dispatchWebhookEvent } from "@/lib/webhook-dispatch";
 import { LIFT_OFF_MONTHLY_CREDITS } from "@/lib/coach-credits";
@@ -168,6 +169,28 @@ export async function POST(request: Request) {
               eventCreatedSeconds: event.created,
             });
           }
+          break;
+        }
+
+        // The coach plan (Ron, Nov 20): the organization is on the paid plan from the moment Stripe starts the subscription. A failed write is thrown so Stripe sends the event again.
+        if (purchaseKind === COACH_PLAN_PURCHASE_KIND) {
+          const organizationId = session.metadata?.organization_id;
+          if (!organizationId || typeof session.subscription !== "string") break;
+          const planSubscription = await stripe.subscriptions.retrieve(session.subscription);
+          const status = planStatusFor(event.type, planSubscription.status);
+          if (!status) break;
+          const { data: before } = await supabase.from("organization_billing").select("past_due_since").eq("organization_id", organizationId).maybeSingle();
+          const { error: planError } = await supabase.from("organization_billing").upsert(
+            {
+              organization_id: organizationId,
+              stripe_customer_id: typeof session.customer === "string" ? session.customer : session.customer?.id ?? null,
+              stripe_subscription_id: planSubscription.id,
+              ...planBillingFields(status, subscriptionPeriodEnd(planSubscription as never), (before as { past_due_since?: string | null } | null)?.past_due_since ?? null),
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "organization_id" }
+          );
+          if (planError) throw planError;
           break;
         }
 
@@ -351,7 +374,7 @@ export async function POST(request: Request) {
       // tracking above never grants recurring credits on its own.
       // Invoices don't inherit subscription metadata automatically, so
       // the subscription itself has to be fetched to read it.
-      // Each renewal is charged at the rate of the organization's plan at that moment (1% or 5%), not the rate on the day they subscribed. Never fails the event: Stripe holds an invoice while this endpoint answers with an
+      // Each renewal is charged at the rate of the organization's plan at that moment (0.5% or 5%), not the rate on the day they subscribed: a subscription started at 1% moves to 0.5% at its next invoice. Never fails the event: Stripe holds an invoice while this endpoint answers with an
       // error, and a client's renewal must not wait on Spotlight's fee.
       case "invoice.created": {
         const invoice = event.data.object as Stripe.Invoice;
@@ -384,6 +407,8 @@ export async function POST(request: Request) {
 
         const subscription = await eventStripe.subscriptions.retrieve(subscriptionId);
         if (connectedAccount && isPlatformOnlyPurchase(subscription.metadata?.purchase_kind)) break;
+        // the coach plan grants nothing per invoice: its status comes with the subscription events below
+        if (subscription.metadata?.purchase_kind === COACH_PLAN_PURCHASE_KIND) break;
 
         // Lift Off's own recurring grant — every cycle including the
         // first, same idempotent-insert-then-RPC shape as the
@@ -481,6 +506,29 @@ export async function POST(request: Request) {
       case "customer.subscription.resumed": {
         const subscription = event.data.object as Stripe.Subscription;
         if (connectedAccount && isPlatformOnlyPurchase(subscription.metadata?.purchase_kind)) break;
+
+        // The coach plan: its status and paid-through date on the organization's billing row (past_due starts the grace period; canceled keeps the plan to the end of the paid period). An event for
+        // a subscription that is not the organization's current one (an old one, ended later) changes nothing.
+        if (subscription.metadata?.purchase_kind === COACH_PLAN_PURCHASE_KIND) {
+          const organizationId = subscription.metadata?.organization_id;
+          const status = planStatusFor(event.type, subscription.status);
+          if (!organizationId || !status) break;
+          const { data: current, error: readError } = await supabase.from("organization_billing").select("stripe_subscription_id, past_due_since").eq("organization_id", organizationId).maybeSingle();
+          if (readError) throw readError;
+          const row = current as { stripe_subscription_id?: string | null; past_due_since?: string | null } | null;
+          if (row?.stripe_subscription_id && row.stripe_subscription_id !== subscription.id) break;
+          const { error: planError } = await supabase.from("organization_billing").upsert(
+            {
+              organization_id: organizationId,
+              stripe_subscription_id: subscription.id,
+              ...planBillingFields(status, subscriptionPeriodEnd(subscription as never), row?.past_due_since ?? null),
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "organization_id" }
+          );
+          if (planError) throw planError;
+          break;
+        }
 
         if (subscription.metadata?.purchase_kind === "coach_lift_off") {
           const coachId = subscription.metadata?.coach_id;
