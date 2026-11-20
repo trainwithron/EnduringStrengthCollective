@@ -181,8 +181,12 @@
      apply opacity modifiers (bg-graphite/95, etc.) to these themeable
      colors. A hex string in a CSS var can't be combined with Tailwind's
      alpha-value substitution at all. */
-  --graphite: 28 27 26; /* #1C1B1A */
-  --surface: #262422;
+  --graphite: 15 14 13; /* #0F0E0D */
+  /* Look Refresh (Nov 20): the card colors, secondary text and quiet line follow the organization's ground and text color; the real values come from
+     orgThemeToCssVars (lib/theme.ts surfaceTokensFor) at the <html> root. These are the default theme's, as the safety net. */
+  --surface: 26 24 22; /* #1A1816 */
+  --surface-2: 35 32 29; /* #23201D */
+  --line: 46 42 38; /* #2E2A26 */
   /* Nudged from #C4622D — the original failed WCAG AA contrast (4.5:1)
      both as button text-on-background and as accent text on the dark
      surfaces it sits on; this clears 4.5:1 in both directions. Applies
@@ -191,7 +195,7 @@
      notes). */
   --rust: 210 112 59; /* #D2703B */
   --chalk: 237 232 224; /* #EDE8E0 */
-  --steel: #908B7E;
+  --steel: 182 178 171; /* #B6B2AB */
   --moss: #6B8F71;
   --font-display: "Barlow Condensed";
   --font-body: "Inter";
@@ -204,6 +208,8 @@
   --r-lg: 0px;
   --r-pill: 0px;
   --r-circle: 0px;
+  --r-card: 16px;
+  --r-row: 10px;
 }
 
 body {
@@ -217,11 +223,21 @@ body {
    to the .bg-graphite utility itself (not just body) since nearly every
    page paints its own opaque bg-graphite <main>, which would otherwise
    hide anything set on body alone. */
+/* Look Refresh (Nov 20): one soft light from the top center in the organization's own accent, instead of two fixed rust and green washes that ignored the
+   org's colors. Home adds a stronger one of its own (.home-glow). */
 .bg-graphite {
   background-color: rgb(var(--graphite));
-  background-image:
-    radial-gradient(ellipse 1200px 700px at 20% -10%, rgba(196, 98, 45, 0.05), transparent 60%),
-    radial-gradient(ellipse 900px 600px at 100% 30%, rgba(107, 143, 113, 0.04), transparent 55%);
+  background-image: radial-gradient(ellipse 1100px 520px at 50% -160px, rgb(var(--rust) / 0.06), transparent 70%);
+}
+
+/* Home's light (Look Refresh): the accent at about a fifth, from the top center, behind the greeting. Decorative only. */
+.home-glow {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 520px;
+  pointer-events: none;
+  z-index: -1;
+  background: radial-gradient(ellipse 900px 420px at 50% -120px, rgb(var(--rust) / 0.2), rgb(var(--rust) / 0) 70%);
 }
 
 body::before {
@@ -229,7 +245,7 @@ body::before {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  opacity: 0.035;
+  opacity: 0.025;
   mix-blend-mode: overlay;
   z-index: 1;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
@@ -255,6 +271,48 @@ body::before {
    class instead of a per-component pass. */
 .bg-surface {
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 20px -6px rgb(0 0 0 / 0.55);
+}
+
+/* Look Refresh (Ron, Nov 20: "plain and blocky"): every card and panel (bg-surface, about 330 places) gets rounded corners from one rule, the form fields and
+   buttons among them a smaller curve, and a strip that runs edge to edge (a top or bottom bar) stays square. :where() keeps these at zero specificity, so a
+   rounded-* class on the element still wins. An organization that chose Sharp has --r-card and --r-row at 0. */
+:where(.bg-surface) {
+  border-radius: var(--r-card, 0px);
+}
+:where(input.bg-surface, select.bg-surface, textarea.bg-surface, button.bg-surface) {
+  border-radius: var(--r-row, 0px);
+}
+:where(.bg-surface.border-b, .bg-surface.border-t) {
+  border-radius: 0;
+}
+
+/* Home's greeting band (Look Refresh): a card warmed by the accent at its top edge, the coach's photo lit by a soft halo. A Sharp organization keeps it square. */
+.home-band {
+  border-radius: calc(var(--r-card, 0px) * 1.375);
+  background: linear-gradient(180deg, rgb(var(--rust) / 0.09), rgb(var(--rust) / 0) 70%), rgb(var(--surface));
+  border: 1px solid rgb(var(--rust) / 0.16);
+}
+.home-band-avatar {
+  box-shadow: 0 0 0 4px rgb(var(--rust) / 0.16), 0 0 30px rgb(var(--rust) / 0.3);
+}
+
+/* Meaning cards (Look Refresh): a card tinted by what it is about. The accent for something due, blue for a check-in, green for a win, coral for what needs
+   the coach. The text inside keeps the body color, so contrast does not change. */
+.tint-accent {
+  background-color: rgb(var(--rust) / 0.08);
+  border: 1px solid rgb(var(--rust) / 0.22);
+}
+.tint-checkin {
+  background-color: rgb(127 178 229 / 0.07);
+  border: 1px solid rgb(127 178 229 / 0.2);
+}
+.tint-win {
+  background-color: rgb(124 196 154 / 0.07);
+  border: 1px solid rgb(124 196 154 / 0.2);
+}
+.tint-alert {
+  background-color: rgb(238 138 110 / 0.08);
+  border: 1px solid rgb(238 138 110 / 0.22);
 }
 
 /* Quiet scrollbars everywhere (Ron, Oct 6: the default chunky white track in the calendar's client list covered the numbers and looked ugly). Thin, a low-contrast

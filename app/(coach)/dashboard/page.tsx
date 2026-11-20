@@ -52,6 +52,10 @@ import { TerminologyFirstRunCard } from "@/components/coach/desktop/terminology-
 import { GettingStartedCard } from "@/components/coach/desktop/getting-started-card";
 import { NeedsYouLoader, NeedsYouLoading } from "@/components/coach/desktop/needs-you-loader";
 import { noticeHref } from "@/lib/notice-links";
+import Link from "next/link";
+import { TrainedThisWeekRing } from "@/components/coach/desktop/trained-this-week-ring";
+import { dateLabelFor, daySummary, greetingFor, greetingTitle, recentWins } from "@/lib/home-greeting";
+import { WinsCard } from "@/components/coach/desktop/wins-card";
 
 export const metadata = { title: "Home" };
 
@@ -597,23 +601,45 @@ export default async function CoachHomePage() {
   const tileTeam = pickTileTeam(tileTeams, rememberedWorkspace);
   const myCoachedGroups = (coachedRows ?? []).map((row) => (row as any).groups as GroupRow | null).filter((g): g is GroupRow => !!g);
   const departuresWithExport = departures.map((d) => ({ ...d, exportGroupId: myCoachedGroups.find((g) => g.organization_id === d.organizationId)?.id ?? null }));
+  // The greeting band's "Build a program" opens the program builder where Get started does (the coach's first shared group, else their first group).
+  const bandProgramGroupId = (allGroups.find((g) => g.group_kind !== "one_on_one") ?? allGroups[0])?.id ?? null;
   const content = (
-    <>
+    <div className="relative isolate">
       <DashboardAutoRefresh />
       {stuckInDesktopModeOnRealPhone && <StuckDesktopModeBanner />}
       <LeavingCoachBanner departures={departuresWithExport} supportEmail={supportEmail()} />
       {isTeamCoach && tileTeams.length > 0 && tileTeam && <TeamCoachHome teams={tileTeams} initialId={tileTeam.id} />}
+      {/* Look Refresh (Ron, Nov 20): a soft light in the accent from the top, behind the greeting band. The band is the page's title; the profile strip folded into it. */}
+      <div className="home-glow" aria-hidden="true" />
       <CoachProfileEditor
         coachId={user.id}
         coachName={viewerProfile?.full_name ?? "Coach"}
         initialBio={coachProfileRow?.bio ?? null}
         initialPhotoUrl={coachProfileRow?.photo_url ?? null}
         initialCompletionMessage={completionMessageRow?.completion_message ?? null}
+        band={{
+          dateLabel: dateLabelFor(new Date(), coachTimezone),
+          title: greetingTitle(greetingFor(new Date(), coachTimezone), viewerProfile?.full_name),
+          summary: daySummary(yourDaySchedule.length, yourDayAttention.length),
+          ring:
+            !moneyHidden && dashboardData.statTiles.rosterSize > 0 ? (
+              <TrainedThisWeekRing active={dashboardData.statTiles.activeThisWeekCount} total={dashboardData.statTiles.rosterSize} needCheckIn={dashboardData.statTiles.needsAttentionCount} />
+            ) : undefined,
+          actions: (
+            <>
+              {bandProgramGroupId && (
+                <Link prefetch={false} href={`/groups/${bandProgramGroupId}/programs/new?library=1`} className="inline-flex items-center h-11 px-5 bg-rust text-graphite font-body text-sm font-semibold">
+                  Build a program
+                </Link>
+              )}
+              <Link prefetch={false} href="/clients?add=1" className="inline-flex items-center h-11 px-5 rounded-token-pill border border-rust/40 text-chalk font-body text-sm hover:border-rust">
+                Add a client
+              </Link>
+              <MarkAllSeenButton groupIds={allGroupIds} />
+            </>
+          ),
+        }}
       />
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="font-display font-bold text-2xl uppercase">Home</h1>
-        <MarkAllSeenButton groupIds={allGroupIds} />
-      </div>
 
       {allGroups[0] && <TerminologyFirstRunCard groupId={allGroups[0].id} askedOnServer={askedRead.error ? null : !!(askedRead.data as { terminology_asked_at?: string | null } | null)?.terminology_asked_at} />}
 
@@ -648,6 +674,10 @@ export default async function CoachHomePage() {
       <Suspense fallback={<NeedsYouLoading />}>
         <NeedsYouLoader input={needsYouInput} />
       </Suspense>
+      </div>
+      {/* Wins (Look Refresh): who trained lately, from the client cards' last workouts above. Right under Needs you. */}
+      <div className="order-1">
+        <WinsCard wins={recentWins(clientCards, new Date(), coachTimezone)} />
       </div>
 
       {/* Replaces the old team-mode-only Team Pulse side column
@@ -715,7 +745,7 @@ export default async function CoachHomePage() {
       )}
       </div>
       </div>
-    </>
+    </div>
   );
 
   // A coach who's actually navigated into a group before gets the real

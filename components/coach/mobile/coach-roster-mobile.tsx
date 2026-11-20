@@ -7,7 +7,7 @@ import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { clientActivityStatus } from "@/lib/client-activity-status";
 import { computeQuietTier, QUIET_TIER_LABEL, type QuietTier } from "@/lib/quiet-client-tier";
-import { initialsOf } from "@/lib/initials";
+import { InitialsAvatar } from "@/components/shared/initials-avatar";
 import { QuickViewBubble } from "./quick-view-bubble";
 import { TextSignInLinkButton } from "./text-sign-in-link-button";
 import type { RosterMember } from "@/lib/types";
@@ -190,9 +190,7 @@ function RosterRow({
             // eslint-disable-next-line @next/next/no-img-element
             <img src={member.avatarUrl} alt="" className="w-9 h-9 rounded-full object-cover shrink-0" />
           ) : (
-            <div className="w-9 h-9 rounded-full bg-graphite border border-steel/30 flex items-center justify-center shrink-0">
-              <span className="font-display text-xs text-chalk">{initialsOf(member.fullName)}</span>
-            </div>
+            <InitialsAvatar name={member.fullName} tintKey={member.profileId} className="w-9 h-9 text-xs" />
           )}
           <div className="flex-1 min-w-0">
             <p className="font-body text-sm text-chalk truncate">{member.fullName}</p>

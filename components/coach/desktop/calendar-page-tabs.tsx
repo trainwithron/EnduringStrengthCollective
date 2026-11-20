@@ -51,14 +51,15 @@ export function CalendarPageTabs({
 
   return (
     <div>
-      <div className={`flex items-center gap-1 border-b border-steel/20 mb-6 ${hideStripOnDesktop ? "lg:hidden" : ""}`}>
+      {/* Pills (Look Refresh, Nov 20), like the strip on a computer. */}
+      <div className={`flex items-center gap-1.5 mb-6 ${hideStripOnDesktop ? "lg:hidden" : ""}`}>
         <button
           type="button"
           onClick={() => setTab("schedule")}
-          className={`h-10 px-4 font-body text-sm border-b-2 transition-colors ${
+          className={`h-10 px-4 rounded-token-pill font-body text-sm transition-colors ${
             tab === "schedule"
-              ? "border-rust text-chalk"
-              : "border-transparent text-steel active:text-chalk"
+              ? "bg-rust/15 text-rust font-semibold"
+              : "text-steel active:text-chalk"
           }`}
         >
           Schedule
@@ -66,10 +67,10 @@ export function CalendarPageTabs({
         <button
           type="button"
           onClick={() => setTab("availability")}
-          className={`h-10 px-4 font-body text-sm border-b-2 transition-colors ${
+          className={`h-10 px-4 rounded-token-pill font-body text-sm transition-colors ${
             tab === "availability"
-              ? "border-rust text-chalk"
-              : "border-transparent text-steel active:text-chalk"
+              ? "bg-rust/15 text-rust font-semibold"
+              : "text-steel active:text-chalk"
           }`}
         >
           Availability

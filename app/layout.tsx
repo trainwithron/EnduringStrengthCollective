@@ -46,7 +46,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#1C1B1A",
+  themeColor: "#0F0E0D",
 };
 
 // Organization branding (colors, fonts, button shape, logo/icon) is

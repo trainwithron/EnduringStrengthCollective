@@ -262,8 +262,8 @@ export function ExpiryCheckInPanel({ groupIds: scopeGroupIds }: { groupIds?: str
   const btn = "h-11 px-4 border font-body text-sm disabled:opacity-50";
 
   return (
-    <section className="border border-steel/30 bg-surface/40 rounded-token-lg p-4 mb-6" aria-label="Sessions about to expire">
-      <h2 className="font-body text-xs text-steel uppercase tracking-wide font-bold">A check-in worth making</h2>
+    <section className="tint-checkin rounded-card p-4 mb-6" aria-label="Sessions about to expire">
+      <h2 className="font-body text-[15px] font-semibold text-chalk">A check-in worth making</h2>
       <ul className="divide-y divide-steel/15 mt-1">
         {soon.map((i) => {
           const key = `soon:${i.athleteId}:${i.groupId}`;

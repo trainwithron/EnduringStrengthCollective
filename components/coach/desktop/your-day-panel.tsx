@@ -25,8 +25,8 @@ export function YourDayPanel({
   const { shown, hidden } = rankAttention(attention, 6);
   return (
     <section aria-labelledby="your-day-heading" className="mb-6 grid gap-4 md:grid-cols-2 @5xl:!grid-cols-1">
-      <div className="border border-steel/20 bg-surface p-4">
-        <h2 id="your-day-heading" className="font-display uppercase text-sm tracking-wide text-steel mb-3">
+      <div className="border border-transparent bg-surface p-4">
+        <h2 id="your-day-heading" className="font-body text-[15px] font-semibold text-chalk mb-3">
           Your day
         </h2>
         {schedule.length === 0 ? (
@@ -57,8 +57,8 @@ export function YourDayPanel({
         )}
       </div>
 
-      <div className="border border-steel/20 bg-surface p-4">
-        <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">{attentionHeadline(attention.length)}</h2>
+      <div className="border border-transparent bg-surface p-4">
+        <h2 className="font-body text-[15px] font-semibold text-chalk mb-3">{attentionHeadline(attention.length)}</h2>
         {shown.length === 0 ? (
           <p className="font-body text-sm text-steel">{showPayments ? "Replies, payments and check-ins that need you will show up here." : "Replies and check-ins that need you will show up here."}</p>
         ) : (

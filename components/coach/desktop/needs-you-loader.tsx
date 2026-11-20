@@ -21,7 +21,7 @@ export async function NeedsYouLoader({ input }: { input: NeedsYouHomeInputs }) {
 export function NeedsYouLoading() {
   return (
     <section className="mb-6" aria-label="Needs you">
-      <p className="font-body text-sm text-steel border border-steel/20 p-4" role="status">
+      <p className="font-body text-sm text-steel bg-surface rounded-card p-4" role="status">
         Checking what needs you…
       </p>
     </section>

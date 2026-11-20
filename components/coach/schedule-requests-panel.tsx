@@ -193,8 +193,8 @@ export function ScheduleRequestsPanel({ groupIds: scopeGroupIds }: { groupIds?: 
   if (items.length === 0 && !message) return null;
 
   return (
-    <section className="border border-rust/40 bg-rust/5 rounded-token-lg p-4 mb-6" aria-label="Schedule requests">
-      <h2 className="font-body text-xs text-rust uppercase tracking-wide font-bold">Schedule requests</h2>
+    <section className="tint-alert rounded-card p-4 mb-6" aria-label="Schedule requests">
+      <h2 className="font-body text-[15px] font-semibold text-chalk">Schedule requests</h2>
       <ul className="mt-3 space-y-3">
         {items.map((data) => (
           <ScheduleRequestCard

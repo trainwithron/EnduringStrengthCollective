@@ -558,8 +558,8 @@ export function DayCard({
   }
 
   return (
-    <div className="border border-steel/20 bg-surface/40 rounded-token-lg flex flex-col">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 py-3 border-b border-steel/20 bg-surface">
+    <div className="border border-transparent bg-surface rounded-card flex flex-col">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 py-3 border-b border-steel/20 bg-surface-2 rounded-t-card">
         <GripVertical className="w-4 h-4 text-steel shrink-0 cursor-grab" aria-hidden="true" />
         {(onMoveEarlier || onMoveLater) && (
           <div className="flex items-center shrink-0" role="group" aria-label="Move this day">
@@ -580,7 +580,7 @@ export function DayCard({
             onBlur={() => {
               if (titleDraft !== day.title) persistTitle(titleDraft);
             }}
-            className="w-full bg-transparent border-none focus:outline-none font-display uppercase text-base font-bold text-chalk"
+            className="w-full bg-transparent border-none focus:outline-none font-body text-[15px] font-semibold text-chalk"
           />
           {scheduledDate && (
             <span className="font-body text-xs text-steel">{formatShortDate(scheduledDate)}</span>
@@ -777,7 +777,7 @@ export function DayCard({
                   className={`w-full ${draggedItemId === item.id ? "opacity-50" : ""}`}
                 >
                   {sortedItems.length > 1 && (
-                    <p className="font-body text-xs text-steel uppercase tracking-wide text-center mb-1.5">
+                    <p className="font-body text-xs font-semibold text-steel text-center mb-1.5">
                       {index + 1} of {sortedItems.length}
                     </p>
                   )}

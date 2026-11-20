@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { clientActivityStatus } from "@/lib/client-activity-status";
-import { initialsOf } from "@/lib/initials";
+import { InitialsAvatar } from "@/components/shared/initials-avatar";
 
 export interface HomeClientCardData {
   groupId: string;
@@ -42,14 +42,12 @@ export function HomeClientCard({ client }: { client: HomeClientCardData }) {
         // eslint-disable-next-line @next/next/no-img-element
         <img src={client.avatarUrl} alt="" className="w-10 h-10 rounded-full object-cover shrink-0" />
       ) : (
-        <div className="w-10 h-10 rounded-full bg-graphite border border-steel/30 flex items-center justify-center shrink-0">
-          <span className="font-display font-bold text-xs text-steel">{initialsOf(client.fullName)}</span>
-        </div>
+        <InitialsAvatar name={client.fullName} tintKey={client.athleteId} />
       )}
       <div className="min-w-0">
         <p className="font-body text-sm text-chalk truncate">{client.fullName}</p>
         {client.orgName && (
-          <p className="font-body text-xs text-steel uppercase tracking-wide truncate">
+          <p className="font-body text-[13px] text-steel truncate">
             {client.orgName}
           </p>
         )}
@@ -58,7 +56,7 @@ export function HomeClientCard({ client }: { client: HomeClientCardData }) {
           {status.text}
         </p>
         {client.quietTier && (
-          <p className="font-body text-xs text-rust uppercase tracking-wide mt-0.5">
+          <p className="font-body text-[13px] text-alert mt-0.5">
             {client.quietTier === "strong" ? "Reach out — quiet a while" : "Missing scheduled sessions"}
           </p>
         )}

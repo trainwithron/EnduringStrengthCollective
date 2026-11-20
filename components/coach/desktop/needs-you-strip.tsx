@@ -1,5 +1,12 @@
 import Link from "next/link";
-import { CAUGHT_UP, COULD_NOT_CHECK, moreLabel, type NeedsYouView } from "@/lib/needs-you";
+import { CAUGHT_UP, COULD_NOT_CHECK, moreLabel, type NeedsYouSlot, type NeedsYouView } from "@/lib/needs-you";
+
+// Each kind on a card tinted by what it is about (Look Refresh, Nov 20): someone waiting on the coach in coral, something due in the accent, a check-in in blue.
+const SLOT_LOOK: Record<NeedsYouSlot, { card: string; title: string }> = {
+  waiting: { card: "tint-alert", title: "text-alert" },
+  due: { card: "tint-accent", title: "text-rust" },
+  slipping: { card: "tint-checkin", title: "text-checkin" },
+};
 
 // "Needs you": at most three things at the top of Home, one per slot (someone is waiting on you, something is due soon, someone may need a check-in), each the single most urgent of its
 // kind. A slot with nothing shows nothing. When nothing needs the coach it says so. "N more" jumps to the stack of panels below, which is unchanged.
@@ -8,19 +15,19 @@ export function NeedsYouStrip({ view }: { view: NeedsYouView }) {
   return (
     <section className="mb-6" aria-label="Needs you">
       {view.caughtUp ? (
-        <p className="font-body text-sm text-chalk border border-steel/20 p-4" role="status">
+        <p className="font-body text-sm text-chalk bg-surface rounded-card p-4" role="status">
           {CAUGHT_UP}
         </p>
       ) : filled.length === 0 ? (
-        <p className="font-body text-sm text-chalk border border-steel/20 p-4" role="status">
+        <p className="font-body text-sm text-chalk bg-surface rounded-card p-4" role="status">
           {COULD_NOT_CHECK}
         </p>
       ) : (
         <div className="space-y-2">
           <ul className="grid gap-2 grid-cols-[repeat(auto-fill,minmax(240px,1fr))]">
             {filled.map(({ slot, title, item }) => (
-              <li key={slot} className="border border-rust/40 p-3 flex flex-col gap-2" data-testid={`needs-you-${slot}`}>
-                <p className="font-display uppercase text-xs tracking-wide text-steel">{title}</p>
+              <li key={slot} className={`${SLOT_LOOK[slot].card} rounded-card p-4 flex flex-col gap-2`} data-testid={`needs-you-${slot}`}>
+                <p className={`font-body text-[13px] font-semibold ${SLOT_LOOK[slot].title}`}>{title}</p>
                 <p className="font-body text-sm text-chalk">
                   {item!.profileHref ? (
                     <Link prefetch={false} href={item!.profileHref} className="font-medium underline-offset-2 hover:underline">

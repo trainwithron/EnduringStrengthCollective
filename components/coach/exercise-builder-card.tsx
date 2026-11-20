@@ -874,7 +874,7 @@ export function ExerciseBuilderCard({
   );
 
   return (
-    <div className="border border-steel/20 p-3 bg-surface/40">
+    <div className="rounded-row border border-steel/20 p-3 bg-surface-2">
       <div className="flex items-center gap-1 mb-1">
         <GripVertical className="w-4 h-4 text-steel shrink-0 hidden sm:block" aria-hidden="true" />
         <div className="flex items-center gap-0.5 shrink-0" aria-label="Reorder exercise">
@@ -1053,7 +1053,7 @@ export function ExerciseBuilderCard({
             <div className="space-y-1.5 min-w-fit">
               {!isLoggedDay && (
                 <div className="flex items-center gap-1.5" data-set-type-row>
-                  <span className="w-14 shrink-0 font-body text-xs text-steel uppercase tracking-wide">Type</span>
+                  <span className="w-14 shrink-0 font-body text-[13px] font-semibold text-steel">Type</span>
                   {exercise.sets.map((set, i) => (
                     <select
                       key={set.id}
@@ -1081,7 +1081,7 @@ export function ExerciseBuilderCard({
                     : null;
                 return (
                   <div key={field} className="flex items-center gap-1.5">
-                    <span className="w-14 shrink-0 font-body text-xs text-steel uppercase tracking-wide">
+                    <span className="w-14 shrink-0 font-body text-[13px] font-semibold text-steel">
                       {builderLabel(field, def.label)}
                     </span>
                     {exercise.sets.map((set, i) => (
@@ -1127,7 +1127,7 @@ export function ExerciseBuilderCard({
           </div>
 
           {isLoggedDay && (
-            <p className="font-body text-xs text-rust uppercase tracking-wide mt-1.5">Logged</p>
+            <p className="font-body text-[13px] font-semibold text-rust mt-1.5">Logged</p>
           )}
           {openSuggestions.length > 0 && (
             <button type="button" onClick={acceptSuggestedWeights} className="mt-1.5 min-h-11 sm:min-h-0 font-body text-xs text-rust underline underline-offset-2">
@@ -1274,7 +1274,7 @@ export function ExerciseBuilderCard({
           {showDetails && (
             <div className="mt-2 pt-2 border-t border-steel/15 space-y-2">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <span className="font-body text-xs text-steel uppercase tracking-wide">
+                <span className="font-body text-[13px] font-semibold text-steel">
                   {exercise.trackedFields.includes("distance") && !exercise.trackedFields.includes("reps")
                     ? "Distance range (for Double Progression)"
                     : "Rep range (for Double Progression)"}

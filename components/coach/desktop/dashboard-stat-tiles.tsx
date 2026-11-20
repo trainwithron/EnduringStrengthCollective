@@ -49,12 +49,12 @@ export function DashboardStatTiles({
         const current = tile.values[0];
         const alternates = tile.values.slice(1);
         return (
-          <div key={tile.key} className="relative border border-steel/20 bg-surface p-4 text-center">
-            <p className="font-display font-bold text-2xl leading-none text-chalk">{current.display}</p>
+          <div key={tile.key} className="relative border border-transparent bg-surface p-4 text-left">
+            <p className="font-display font-semibold text-3xl leading-none text-chalk tabular-nums">{current.display}</p>
             <p
               onMouseEnter={() => alternates.length > 0 && setPeekTile(tile.key)}
               onMouseLeave={() => setPeekTile((v) => (v === tile.key ? null : v))}
-              className="font-body text-xs text-steel uppercase tracking-wide mt-2 cursor-default"
+              className="font-body text-[13px] text-steel mt-2 cursor-default"
             >
               {tile.key === "clients" ? (
                 <SwappableTerm termKey="client" form="plural" className="capitalize" />

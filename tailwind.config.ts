@@ -20,13 +20,18 @@ export default {
         // all — a plain var(--x) reference can't be combined with
         // Tailwind's alpha-value substitution.
         graphite: "rgb(var(--graphite) / <alpha-value>)",
-        surface: "#262422",
+        // Look Refresh (Ron, Nov 20): the card colors follow the organization's ground (lib/theme.ts surfaceTokensFor): surface for cards and panels, surface-2 for raised
+        // items in them, line for a quiet divider.
+        surface: { DEFAULT: "rgb(var(--surface) / <alpha-value>)", 2: "rgb(var(--surface-2) / <alpha-value>)" },
+        line: "rgb(var(--line) / <alpha-value>)",
+        // Meaning colors (Look Refresh): coral for "needs you" and money owed, blue for check-ins, green for wins. The accent (rust) stays the one action color.
+        alert: "#EE8A6E",
+        checkin: "#7FB2E5",
+        win: "#7CC49A",
         rust: "rgb(var(--rust) / <alpha-value>)",
         chalk: "rgb(var(--chalk) / <alpha-value>)",
-        // Nudged from #8A8578 — the original failed WCAG AA contrast
-        // (4.2:1) against the surface card background; this clears 4.5:1
-        // there while reading as visually identical at a glance.
-        steel: "#908B7E",
+        // Secondary text: the organization's own text color, dimmed and held at 4.5:1 on surface-2 (lib/theme.ts surfaceTokensFor). Was a fixed #908B7E.
+        steel: "rgb(var(--steel) / <alpha-value>)",
         moss: "#6B8F71",
         // Third accent for a 3-way category split (Upper/Lower/
         // Conditioning) where rust and moss are already spoken for —
@@ -40,6 +45,11 @@ export default {
         // low readiness) so rust stays reserved for the primary action.
         // Merges into the default amber scale, so amber-400 etc. still work.
         amber: { DEFAULT: "#D9A441" },
+      },
+      // Look Refresh: borders much quieter; cards separate by their color, not by lines. border-steel/NN (about 2,000 uses) draws the secondary text color at under
+      // half its opacity, so the usual border-steel/30 lands near #2E2A26 on a card and the stronger ones keep their order. divide-steel follows borderColor.
+      borderColor: {
+        steel: "rgb(var(--steel) / calc(<alpha-value> * 0.45))",
       },
       fontFamily: {
         // Same var()-reference trick as the colors above — lets the
@@ -61,6 +71,9 @@ export default {
         "token-lg": "var(--r-lg)",
         "token-pill": "var(--r-pill)",
         "token-circle": "var(--r-circle)",
+        // Look Refresh: cards and panels, and the rows inside them (square for a Sharp organization).
+        card: "var(--r-card)",
+        row: "var(--r-row)",
       },
     },
   },

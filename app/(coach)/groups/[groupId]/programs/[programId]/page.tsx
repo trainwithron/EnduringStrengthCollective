@@ -197,7 +197,7 @@ export default async function ProgramDetailPage(
       <header className="px-5 pt-8 pb-6 border-b border-steel/20">
         <Link
           href={`/groups/${params.groupId}`}
-          className="inline-flex items-center min-h-11 font-body text-xs text-steel uppercase tracking-wide"
+          className="inline-flex items-center min-h-11 font-body text-[13px] font-semibold text-steel"
         >
           &larr; Home
         </Link>
@@ -248,7 +248,7 @@ export default async function ProgramDetailPage(
 
         {weekNumbers.map((weekNum) => (
           <div key={weekNum} id={`week-${weekNum}`} className="pt-6 first:pt-0 scroll-mt-4">
-            <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
+            <h2 className="font-body text-[15px] font-semibold text-chalk mb-2">
               Week {weekNum}
             </h2>
             <div className="divide-y divide-steel/15">
@@ -263,7 +263,7 @@ export default async function ProgramDetailPage(
                       <span className="font-body font-medium text-[15px]">
                         {w.title}
                         {isToday && (
-                          <span className="font-display text-xs uppercase tracking-wide text-rust ml-2 align-middle">
+                          <span className="font-body text-[13px] font-semibold text-rust ml-2 align-middle">
                             Today
                           </span>
                         )}

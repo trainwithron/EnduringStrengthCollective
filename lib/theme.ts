@@ -54,7 +54,8 @@ export function radiusScaleFor(shape: ButtonShape): RadiusScale {
 // platform default — a coach who's customized their own accent color
 // isn't automatically contrast-checked.
 export const DEFAULT_ACCENT_COLOR = "#D2703B";
-export const DEFAULT_BACKGROUND_COLOR = "#1C1B1A";
+// Look Refresh (Ron, Nov 20: the coach app "feels kind of plain and blocky and lifeless"): a deeper ground, so the cards (one step lighter, see surfaceTokensFor) read as raised.
+export const DEFAULT_BACKGROUND_COLOR = "#0F0E0D";
 export const DEFAULT_TEXT_COLOR = "#EDE8E0";
 
 // A short, curated list rather than every Google Font — each one is
@@ -114,6 +115,67 @@ function hexToRgbTriplet(hex: string): string {
   return `${(n >> 16) & 255} ${(n >> 8) & 255} ${n & 255}`;
 }
 
+// Look Refresh (Ron, Nov 20): the card colors come from the organization's own ground instead of one fixed #262422, so cards always sit one warm step above it.
+// surface = cards and panels, surface2 = raised items inside them, line = a quiet divider. With the default ground #0F0E0D: #1A1816, #23201D, #2E2A26.
+// A light ground (none today) steps darker instead. steel (secondary text) is the organization's own text color dimmed a quarter toward the ground, then
+// raised back toward it until it reads at 4.5:1 on surface2, so it always passes on cards and on raised items.
+export interface SurfaceTokens {
+  surface: string;
+  surface2: string;
+  line: string;
+  steel: string;
+}
+
+const SURFACE_STEP: [number, number, number] = [11, 10, 9];
+const SURFACE_2_STEP: [number, number, number] = [20, 18, 16];
+const LINE_STEP: [number, number, number] = [31, 28, 25];
+
+function parseHex(hex: string): [number, number, number] | null {
+  const match = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!match) return null;
+  const n = parseInt(match[1], 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function toHex(rgb: [number, number, number]): string {
+  return `#${rgb.map((c) => Math.max(0, Math.min(255, Math.round(c))).toString(16).padStart(2, "0")).join("").toUpperCase()}`;
+}
+
+function luminanceOf([r, g, b]: [number, number, number]): number {
+  const lin = (c: number) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+function ratioOf(a: [number, number, number], b: [number, number, number]): number {
+  const [hi, lo] = [luminanceOf(a), luminanceOf(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+const mix = (a: [number, number, number], b: [number, number, number], t: number): [number, number, number] => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+
+export function surfaceTokensFor(backgroundColor: string, textColor: string): SurfaceTokens {
+  const ground = parseHex(backgroundColor) ?? (parseHex(DEFAULT_BACKGROUND_COLOR) as [number, number, number]);
+  const text = parseHex(textColor) ?? (parseHex(DEFAULT_TEXT_COLOR) as [number, number, number]);
+  const dir = luminanceOf(ground) > 0.4 ? -1 : 1;
+  const step = (s: [number, number, number]): [number, number, number] => [ground[0] + dir * s[0], ground[1] + dir * s[1], ground[2] + dir * s[2]];
+  const surface2 = step(SURFACE_2_STEP).map((c) => Math.max(0, Math.min(255, Math.round(c)))) as [number, number, number];
+  let t = 0.25;
+  let steel = mix(text, ground, t).map(Math.round) as [number, number, number];
+  while (t > 0 && ratioOf(steel, surface2) < 4.5) {
+    t = Math.max(0, t - 0.01);
+    steel = mix(text, ground, t).map(Math.round) as [number, number, number];
+  }
+  return { surface: toHex(step(SURFACE_STEP)), surface2: toHex(surface2), line: toHex(step(LINE_STEP)), steel: toHex(steel) };
+}
+
+// Card and row corners (Look Refresh): cards and panels rounded, rows inside them a little less; an organization that chose Sharp keeps every corner square.
+export function cardRadiiFor(shape: ButtonShape): { card: string; row: string } {
+  return shape === "sharp" ? { card: "0px", row: "0px" } : { card: "16px", row: "10px" };
+}
+
 // The single place that turns an OrgTheme into the CSS custom properties
 // globals.css/tailwind.config.ts read (--rust/--graphite/--chalk/
 // --font-display/--font-body/--btn-radius) — applied at the app root so
@@ -121,10 +183,18 @@ function hexToRgbTriplet(hex: string): string {
 // identity, instead of each shell re-deriving this mapping itself.
 export function orgThemeToCssVars(theme: OrgTheme): CSSProperties {
   const scale = radiusScaleFor(theme.buttonShape);
+  const tokens = surfaceTokensFor(theme.backgroundColor, theme.textColor);
+  const radii = cardRadiiFor(theme.buttonShape);
   return {
     "--rust": hexToRgbTriplet(theme.accentColor),
     "--graphite": hexToRgbTriplet(theme.backgroundColor),
     "--chalk": hexToRgbTriplet(theme.textColor),
+    "--surface": hexToRgbTriplet(tokens.surface),
+    "--surface-2": hexToRgbTriplet(tokens.surface2),
+    "--line": hexToRgbTriplet(tokens.line),
+    "--steel": hexToRgbTriplet(tokens.steel),
+    "--r-card": radii.card,
+    "--r-row": radii.row,
     "--font-display": `"${theme.fontDisplay}"`,
     "--font-body": `"${theme.fontBody}"`,
     "--btn-radius": BUTTON_SHAPE_RADIUS[theme.buttonShape],

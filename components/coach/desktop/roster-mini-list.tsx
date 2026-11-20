@@ -8,7 +8,7 @@ import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { useOrgGroupIds } from "@/lib/use-org-group-ids";
 import { daysSinceOf, clientActivityStatus } from "@/lib/client-activity-status";
-import { initialsOf } from "@/lib/initials";
+import { initialsOf, initialsTint } from "@/lib/initials";
 
 interface MiniRosterMember {
   athleteId: string;
@@ -97,7 +97,10 @@ export function RosterMiniList({ groupId }: { groupId: string }) {
           href={`/groups/${m.groupId}/athletes/${m.athleteId}`}
           className="flex items-center gap-2.5 px-1.5 py-2 hover:bg-surface/40 transition-colors"
         >
-          <span className="relative shrink-0 w-7 h-7 rounded-full bg-surface border border-steel/30 flex items-center justify-center font-body text-xs text-steel">
+          <span
+            className="relative shrink-0 w-7 h-7 rounded-full flex items-center justify-center font-body font-semibold text-xs"
+            style={{ backgroundColor: initialsTint(m.athleteId).bg, color: initialsTint(m.athleteId).fg }}
+          >
             {initialsOf(m.fullName)}
             <span
               className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-graphite ${

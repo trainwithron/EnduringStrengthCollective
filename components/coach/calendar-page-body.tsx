@@ -250,7 +250,7 @@ export async function CoachCalendarPageBody(
               {WEEKDAY_LABELS.map((label) => (
                 <div
                   key={label}
-                  className="bg-graphite text-center font-body text-xs text-steel uppercase tracking-wide py-1.5"
+                  className="bg-graphite text-center font-body text-xs font-semibold text-steel py-1.5"
                 >
                   {label}
                 </div>
@@ -524,7 +524,7 @@ export async function CoachCalendarPageBody(
               {new Date(movingBooking.start_at).toLocaleDateString("en-US", { timeZone: displayTz, weekday: "short", month: "short", day: "numeric" })}{" "}
               session: pick a day
             </p>
-            <Link href={`${basePath}?month=${year}-${String(monthIndex + 1).padStart(2, "0")}`} className="min-h-11 inline-flex items-center font-body text-xs text-rust uppercase tracking-wide">
+            <Link href={`${basePath}?month=${year}-${String(monthIndex + 1).padStart(2, "0")}`} className="min-h-11 inline-flex items-center font-body text-[13px] font-semibold text-rust">
               Stop moving
             </Link>
           </div>
@@ -538,7 +538,7 @@ export async function CoachCalendarPageBody(
 
         {upcomingBookings.length > 0 && (
           <section className="px-5 pt-6">
-            <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
+            <h2 className="font-body text-[15px] font-semibold text-chalk mb-2">
               Your upcoming sessions
             </h2>
             <div className="divide-y divide-steel/15">
@@ -588,13 +588,13 @@ export async function CoachCalendarPageBody(
         {view === "month" ? (
           <>
             <div className="flex items-center justify-between px-5 pt-4">
-              <Link href={prevHref} className="h-11 px-3 inline-flex items-center font-body text-xs text-rust uppercase tracking-wide">
+              <Link href={prevHref} className="h-11 px-3 inline-flex items-center font-body text-[13px] font-semibold text-rust">
                 &larr; Prev
               </Link>
-              <h2 className="font-display uppercase text-sm tracking-wide text-steel">
+              <h2 className="font-body text-[15px] font-semibold text-chalk">
                 {monthLabel(year, monthIndex)}
               </h2>
-              <Link href={nextHref} className="h-11 px-3 inline-flex items-center font-body text-xs text-rust uppercase tracking-wide">
+              <Link href={nextHref} className="h-11 px-3 inline-flex items-center font-body text-[13px] font-semibold text-rust">
                 Next &rarr;
               </Link>
             </div>
@@ -603,7 +603,7 @@ export async function CoachCalendarPageBody(
               {WEEKDAY_LABELS.map((label) => (
                 <div
                   key={label}
-                  className="bg-graphite text-center font-body text-xs text-steel uppercase tracking-wide py-1.5"
+                  className="bg-graphite text-center font-body text-xs font-semibold text-steel py-1.5"
                 >
                   {label}
                 </div>
@@ -652,13 +652,13 @@ export async function CoachCalendarPageBody(
         ) : (
           <>
             <div className="flex items-center justify-between px-5 pt-4">
-              <Link href={prevWeekHref} className="h-11 px-3 inline-flex items-center font-body text-xs text-rust uppercase tracking-wide">
+              <Link href={prevWeekHref} className="h-11 px-3 inline-flex items-center font-body text-[13px] font-semibold text-rust">
                 &larr; Prev
               </Link>
-              <h2 className="font-display uppercase text-sm tracking-wide text-steel">
+              <h2 className="font-body text-[15px] font-semibold text-chalk">
                 {weekLabel(weekStart, weekDays[6])}
               </h2>
-              <Link href={nextWeekHref} className="h-11 px-3 inline-flex items-center font-body text-xs text-rust uppercase tracking-wide">
+              <Link href={nextWeekHref} className="h-11 px-3 inline-flex items-center font-body text-[13px] font-semibold text-rust">
                 Next &rarr;
               </Link>
             </div>
@@ -669,7 +669,7 @@ export async function CoachCalendarPageBody(
                 const rowClass = `flex items-center gap-3 py-3 ${isToday ? "bg-surface/40" : ""}`;
                 const rowInner = (
                   <div className={`w-11 shrink-0 text-center ${isToday ? "text-rust" : "text-steel"}`}>
-                    <p className="font-body text-xs uppercase tracking-wide">{WEEKDAY_LABELS[i]}</p>
+                    <p className="font-body text-xs font-semibold">{WEEKDAY_LABELS[i]}</p>
                     <p className="font-display font-bold text-lg leading-none">{date.getDate()}</p>
                   </div>
                 );
@@ -1248,13 +1248,13 @@ export async function CoachCalendarPageBody(
           {view === "month" ? (
             <>
               <div className="flex items-center justify-between mb-3">
-                <Link href={prevHref} className="font-body text-xs text-rust uppercase tracking-wide">
+                <Link href={prevHref} className="font-body text-[13px] font-semibold text-rust">
                   &larr; Prev
                 </Link>
-                <h2 className="font-display uppercase text-sm tracking-wide text-steel">
+                <h2 className="font-body text-[15px] font-semibold text-chalk">
                   {monthLabel(year, monthIndex)}
                 </h2>
-                <Link href={nextHref} className="font-body text-xs text-rust uppercase tracking-wide">
+                <Link href={nextHref} className="font-body text-[13px] font-semibold text-rust">
                   Next &rarr;
                 </Link>
               </div>
@@ -1280,13 +1280,13 @@ export async function CoachCalendarPageBody(
           ) : (
             <>
               <div className="flex items-center justify-between mb-3">
-                <Link href={prevWeekHref} className="font-body text-xs text-rust uppercase tracking-wide">
+                <Link href={prevWeekHref} className="font-body text-[13px] font-semibold text-rust">
                   &larr; Prev
                 </Link>
-                <h2 className="font-display uppercase text-sm tracking-wide text-steel">
+                <h2 className="font-body text-[15px] font-semibold text-chalk">
                   {weekLabel(weekStart, weekDays[6])}
                 </h2>
-                <Link href={nextWeekHref} className="font-body text-xs text-rust uppercase tracking-wide">
+                <Link href={nextWeekHref} className="font-body text-[13px] font-semibold text-rust">
                   Next &rarr;
                 </Link>
               </div>

@@ -215,8 +215,8 @@ export function LateChangesPanel({ groupIds: scopeGroupIds }: { groupIds?: strin
   if (items.length === 0 && moves.length === 0) return null;
 
   return (
-    <section className="border border-rust/40 bg-rust/5 rounded-token-lg p-4 mb-6" aria-label="Needs your decision">
-      <h2 className="font-body text-xs text-rust uppercase tracking-wide font-bold">Needs your decision</h2>
+    <section className="tint-alert rounded-card p-4 mb-6" aria-label="Needs your decision">
+      <h2 className="font-body text-[15px] font-semibold text-chalk">Needs your decision</h2>
       {moves.length > 0 && (
         <>
           <p className="font-body text-xs text-steel mt-1">

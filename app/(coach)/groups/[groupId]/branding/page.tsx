@@ -1,6 +1,7 @@
 import { LoadFailedPage } from "@/components/ui/load-failed-page";
 import { isReadFailure } from "@/lib/read-failed";
 import Link from "next/link";
+import { DEFAULT_BACKGROUND_COLOR } from "@/lib/theme";
 import { redirectOneOnOneToAnchor } from "@/lib/coach-wide-redirect";
 import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
@@ -377,7 +378,7 @@ export default async function BrandingPage(
           organizationId={orgMembership.organization_id}
           initialButtonShape={(org?.button_shape as ButtonShape) ?? "sharp"}
           initialAccentColor={org?.accent_color ?? "#D2703B"}
-          initialBackgroundColor={org?.background_color ?? "#1C1B1A"}
+          initialBackgroundColor={org?.background_color ?? DEFAULT_BACKGROUND_COLOR}
           initialTextColor={org?.text_color ?? "#EDE8E0"}
           initialFontDisplay={(org?.font_display as DisplayFont) ?? "Barlow Condensed"}
           initialFontBody={(org?.font_body as BodyFont) ?? "Inter"}

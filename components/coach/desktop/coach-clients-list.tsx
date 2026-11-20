@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ClientRowMenu } from "@/components/coach/desktop/client-row-menu";
+import { InitialsAvatar } from "@/components/shared/initials-avatar";
 import { LayoutGrid, List, Search } from "lucide-react";
 import { WAITING_ON_GUARDIAN_LABEL } from "@/lib/guardian-wait";
 import { EMAIL_NOT_CONFIRMED_LABEL } from "@/lib/unconfirmed-emails-label";
@@ -40,20 +41,20 @@ export function CoachClientsList({ rows, selfName = null, oneView = false }: { r
             type="button"
             aria-pressed={filter === f}
             onClick={() => setFilter(f)}
-            className={`h-9 px-3 font-body text-[13px] border ${filter === f ? "bg-rust text-graphite border-rust" : "border-steel/40 text-chalk hover:border-rust"}`}
+            className={`h-9 px-4 rounded-token-pill font-body text-[13px] transition-colors ${filter === f ? "bg-rust/15 text-rust font-semibold" : "bg-surface-2 text-chalk hover:text-rust"}`}
           >
-            {FILTER_LABELS[f]} <span className={filter === f ? "text-graphite/80" : "text-steel"}>{counts[f]}</span>
+            {FILTER_LABELS[f]} <span className={filter === f ? "text-rust" : "text-steel"}>{counts[f]}</span>
           </button>
         ))}
         {!oneView && (
-        <div role="group" aria-label="View" className="ml-auto flex border border-steel/40 shrink-0">
+        <div role="group" aria-label="View" className="ml-auto flex p-0.5 gap-0.5 rounded-token-pill bg-surface-2 shrink-0">
           {(["cards", "list"] as const).map((v) => (
             <button
               key={v}
               type="button"
               aria-pressed={view === v}
               onClick={() => chooseView(v)}
-              className={`h-11 sm:h-9 px-3 font-body text-[13px] flex items-center gap-1.5 ${view === v ? "bg-rust text-graphite" : "text-chalk hover:text-rust"}`}
+              className={`h-11 sm:h-9 px-3 rounded-token-pill font-body text-[13px] flex items-center gap-1.5 ${view === v ? "bg-rust/15 text-rust font-semibold" : "text-chalk hover:text-rust"}`}
             >
               {v === "cards" ? <LayoutGrid className="w-3.5 h-3.5" aria-hidden="true" /> : <List className="w-3.5 h-3.5" aria-hidden="true" />}
               {v === "cards" ? "Cards" : "List"}
@@ -69,17 +70,15 @@ export function CoachClientsList({ rows, selfName = null, oneView = false }: { r
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by name"
-            className="w-full h-9 bg-graphite border border-steel/30 text-chalk pl-8 pr-2 font-body text-sm focus:outline-none focus:border-rust"
+            className="w-full h-9 rounded-token-pill bg-surface border border-steel/30 text-chalk pl-8 pr-3 font-body text-sm focus:outline-none focus:border-rust"
           />
         </label>
       </div>
 
       {selfName && (
         // The coach's own training, as a client of themselves: one row, always first. It is not a client of any organization, so it is outside the counts, the filters and the search.
-        <Link href="/my-space" className="flex items-center gap-3 min-h-11 border border-steel/25 bg-surface/40 hover:border-rust px-3 py-2 mb-3">
-          <span className="w-10 h-10 rounded-full bg-graphite border border-steel/30 flex items-center justify-center shrink-0 font-display text-xs" aria-hidden="true">
-            {initialsOf(selfName)}
-          </span>
+        <Link href="/my-space" className="flex items-center gap-3 min-h-11 rounded-card border border-transparent bg-surface hover:border-rust px-3 py-2 mb-3">
+          <InitialsAvatar name={selfName} tintKey={selfName} />
           <span className="font-body text-sm font-medium text-chalk truncate">{selfName} (you)</span>
         </Link>
       )}
@@ -123,14 +122,6 @@ export function ClientsListView({ rows }: { rows: CoachClientRow[] }) {
   );
 }
 
-const initialsOf = (name: string): string =>
-  name
-    .split(" ")
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-
 // The same clients as cards: initials, name, how they work with the coach, their space, and the one quiet number (sessions left to schedule). The whole card opens the client.
 export function ClientsCardView({ rows }: { rows: CoachClientRow[] }) {
   return (
@@ -140,12 +131,10 @@ export function ClientsCardView({ rows }: { rows: CoachClientRow[] }) {
         <li key={`${c.id}:${c.groupId}`} className="relative">
           <Link
             href={`/groups/${c.groupId}/athletes/${c.id}`}
-            className="block min-h-11 h-full border border-steel/25 bg-surface/40 hover:border-rust p-3 pr-12 active:bg-surface/70"
+            className="block min-h-11 h-full rounded-card border border-transparent bg-surface hover:border-rust p-3 pr-12 active:bg-surface-2"
           >
             <span className="flex items-start gap-3">
-              <span className="w-10 h-10 rounded-full bg-graphite border border-steel/30 flex items-center justify-center shrink-0 font-display text-xs" aria-hidden="true">
-                {initialsOf(c.fullName)}
-              </span>
+              <InitialsAvatar name={c.fullName} tintKey={c.id} />
               <span className="flex-1 min-w-0">
                 <span className="block font-body text-sm font-medium text-chalk break-words">{c.fullName}</span>
                 <span className="block font-body text-xs text-steel mt-0.5">

@@ -101,13 +101,13 @@ export function PulseTabs({
   const groupAttentionCount = groupCards.filter((g) => g.hasUnseenActivity).length;
 
   return (
-    <div className="border border-steel/30 bg-surface">
-      <div className="flex border-b border-steel/20">
+    <div className="border border-transparent bg-surface">
+      <div className="flex gap-1 p-1.5 border-b border-steel/20">
         <button
           type="button"
           onClick={() => setTab("clients")}
-          className={`flex-1 font-display uppercase text-xs tracking-wide py-3 transition-colors ${
-            tab === "clients" ? "text-chalk border-b-2 border-rust" : "text-steel"
+          className={`flex-1 font-body text-[13px] font-semibold py-2 rounded-token-pill transition-colors ${
+            tab === "clients" ? "bg-rust/15 text-rust" : "text-steel hover:text-chalk"
           }`}
         >
           <SwappableTerm termKey="client" cap /> Pulse
@@ -118,8 +118,8 @@ export function PulseTabs({
         <button
           type="button"
           onClick={() => setTab("groups")}
-          className={`flex-1 font-display uppercase text-xs tracking-wide py-3 transition-colors ${
-            tab === "groups" ? "text-chalk border-b-2 border-rust" : "text-steel"
+          className={`flex-1 font-body text-[13px] font-semibold py-2 rounded-token-pill transition-colors ${
+            tab === "groups" ? "bg-rust/15 text-rust" : "text-steel hover:text-chalk"
           }`}
         >
           Group Pulse

@@ -48,8 +48,8 @@ export function NeedsReplyPanel({
   if (rows.length === 0) return null;
 
   return (
-    <section className="mb-10 border border-rust/30 bg-rust/5 p-4">
-      <h2 className="font-display uppercase text-sm tracking-wide text-rust mb-2">
+    <section className="mb-10 tint-alert rounded-card p-4">
+      <h2 className="font-body text-[15px] font-semibold text-chalk mb-2">
         Needs a reply
       </h2>
       <div className="space-y-2">

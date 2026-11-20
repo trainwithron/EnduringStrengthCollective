@@ -66,7 +66,7 @@ export function NeedsPaymentPanel({ rows }: { rows: NeedsPaymentRow[] }) {
   return (
     <section className="border border-steel/25 bg-surface p-4 mb-6" aria-label="Needs payment">
       <div className="flex items-baseline justify-between gap-3 mb-3">
-        <h2 className="font-display uppercase text-sm tracking-wide text-steel">Needs payment ({list.length})</h2>
+        <h2 className="font-body text-[15px] font-semibold text-chalk">Needs payment ({list.length})</h2>
         {list.length > 1 && (
           <button type="button" onClick={holdAll} disabled={holdingAll} className="font-body text-xs text-steel underline disabled:opacity-40">
             {holdingAll ? "Holding…" : "Hold all"}

@@ -54,6 +54,8 @@ export interface StatTileDef {
 export interface DashboardStatTiles {
   rosterSize: number;
   activeThisWeekPct: number;
+  // The same week's count behind the percentage (Home's greeting band: "5 of 22 trained this week").
+  activeThisWeekCount: number;
   needsAttentionCount: number;
   estimatedMrr: number;
   tiles: StatTileDef[];
@@ -133,7 +135,7 @@ export async function getCoachDashboardData(
       heroFlag: null,
       heroEmptyState: null,
       teamPulses: [],
-      statTiles: { rosterSize: 0, activeThisWeekPct: 0, needsAttentionCount: 0, estimatedMrr: 0, tiles: [] },
+      statTiles: { rosterSize: 0, activeThisWeekPct: 0, activeThisWeekCount: 0, needsAttentionCount: 0, estimatedMrr: 0, tiles: [] },
       todayBookings: [],
       needsPayment: [],
       weekNarrative: "No clients yet — invite your first one to get started.",
@@ -709,6 +711,7 @@ export async function getCoachDashboardData(
   const statTiles: DashboardStatTiles = {
     rosterSize: athletes.length,
     activeThisWeekPct: rosterEngagement.pct,
+    activeThisWeekCount: rosterEngagement.activeCount,
     needsAttentionCount,
     estimatedMrr,
     tiles,

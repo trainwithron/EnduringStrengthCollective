@@ -102,7 +102,7 @@ export function ProgressLookPanel({ groupIds: scopeGroupIds }: { groupIds?: stri
   const byKey = new Map(data.cards.map((c) => [c.key, c]));
 
   return (
-    <section className="border border-steel/30 bg-surface/40 rounded-token-lg mb-6" aria-label="Time to progress">
+    <section className="border border-transparent bg-surface rounded-card mb-6" aria-label="Time to progress">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

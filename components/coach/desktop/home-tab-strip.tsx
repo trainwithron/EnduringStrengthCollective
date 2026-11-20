@@ -8,12 +8,13 @@ import { stripEntries, type HomeTab } from "@/lib/desktop-coach-homes";
 export function HomeTabStrip({ label, tabs, current, counts = {} }: { label: string; tabs: HomeTab[]; current: string | null; counts?: Partial<Record<NonNullable<HomeTab["badge"]>, number>> }) {
   const entries = stripEntries(tabs);
   if (entries.length < 2) return null;
-  const base = "relative h-11 px-3 font-body text-[13px] border-b-2 -mb-px whitespace-nowrap inline-flex items-center gap-1.5";
+  // Pills (Look Refresh, Nov 20): the open tab a soft accent pill, the others quiet text that lights on hover.
+  const base = "relative h-9 px-4 rounded-token-pill font-body text-sm whitespace-nowrap inline-flex items-center gap-1.5 transition-colors";
   const openGroup = entries.find((e) => e.tabs.length > 1 && e.tabs.some((t) => t.key === current));
   const newTabProps = (t: HomeTab) => (t.newTab ? { target: "_blank", rel: "noopener noreferrer" } : {});
   return (
     <>
-      <nav aria-label={label} className={`hidden lg:flex flex-wrap items-end gap-x-1 border-b border-steel/20 ${openGroup ? "mb-3" : "mb-6"}`} data-home-strip>
+      <nav aria-label={label} className={`hidden lg:flex flex-wrap items-center gap-1.5 ${openGroup ? "mb-3" : "mb-6"}`} data-home-strip>
         {entries.map((e, i) => {
           const on = e.tabs.some((t) => t.key === current);
           const first = e.tabs[0];
@@ -25,7 +26,7 @@ export function HomeTabStrip({ label, tabs, current, counts = {} }: { label: str
               prefetch={i === 0 ? undefined : false}
               aria-current={on ? "page" : undefined}
               {...newTabProps(first)}
-              className={`${base} ${on ? "border-rust text-chalk" : "border-transparent text-steel hover:text-chalk"}`}
+              className={`${base} ${on ? "bg-rust/15 text-rust font-semibold" : "text-steel hover:text-chalk hover:bg-surface"}`}
             >
               {e.tabs.length === 1 && first.termKey ? <SwappableTerm termKey={first.termKey} form="plural" className="capitalize" /> : e.label}
               {count > 0 && (
@@ -48,7 +49,7 @@ export function HomeTabStrip({ label, tabs, current, counts = {} }: { label: str
                 prefetch={false}
                 aria-current={on ? "page" : undefined}
                 {...newTabProps(t)}
-                className={`h-9 px-4 inline-flex items-center whitespace-nowrap font-body text-sm border ${on ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel hover:text-chalk"}`}
+                className={`h-9 px-4 rounded-token-pill inline-flex items-center whitespace-nowrap font-body text-sm border ${on ? "bg-rust text-graphite border-rust font-semibold" : "border-steel/30 text-steel hover:text-chalk"}`}
               >
                 {t.label}
               </Link>

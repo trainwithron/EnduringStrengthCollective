@@ -188,8 +188,8 @@ export function InactiveClientsPanel({ groupIds: scopeGroupIds }: { groupIds?: s
   const btn = "h-11 px-4 border font-body text-sm disabled:opacity-50";
 
   return (
-    <section className="border border-steel/30 bg-surface/40 rounded-token-lg p-4 mb-6" aria-label="Clients who may have moved on">
-      <h2 className="font-body text-xs text-steel uppercase tracking-wide font-bold">Door open, or set aside?</h2>
+    <section className="border border-transparent bg-surface rounded-card p-4 mb-6" aria-label="Clients who may have moved on">
+      <h2 className="font-body text-[15px] font-semibold text-chalk">Door open, or set aside?</h2>
       <ul className="divide-y divide-steel/15 mt-1">
         {items.map((i) => {
           const key = `${i.athleteId}:${i.groupId}`;

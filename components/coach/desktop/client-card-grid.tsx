@@ -13,7 +13,7 @@ import { isLowReadiness } from "@/lib/wellness";
 import { coachBalanceLabel, needsPayment } from "@/lib/reup";
 import { fetchBookingCounts } from "@/lib/credit-picture";
 import { daysSinceOf, clientActivityStatus } from "@/lib/client-activity-status";
-import { initialsOf } from "@/lib/initials";
+import { InitialsAvatar } from "@/components/shared/initials-avatar";
 import { getIntegrityRollupForGroup, type AthleteIntegrityResult } from "@/lib/session-integrity-data";
 import type { RosterMember, ClientTier } from "@/lib/types";
 import { MoreVertical, ChevronLeft, ChevronRight } from "lucide-react";
@@ -718,11 +718,7 @@ export function ClientCardGrid({
                       className={`${AVATAR_CLASS[size]} rounded-full object-cover shrink-0`}
                     />
                   ) : (
-                    <div
-                      className={`${AVATAR_CLASS[size]} rounded-full bg-graphite border border-steel/30 flex items-center justify-center shrink-0`}
-                    >
-                      <span className="font-display text-chalk">{initialsOf(member.fullName)}</span>
-                    </div>
+                    <InitialsAvatar name={member.fullName} tintKey={member.profileId} className={AVATAR_CLASS[size]} />
                   )}
                   <span className="font-body font-medium text-[15px] text-chalk">{member.fullName}</span>
                   {member.positionName && (
