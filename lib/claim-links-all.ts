@@ -40,6 +40,17 @@ export function sortClaimCandidates(candidates: ClaimCandidate[]): ClaimSort {
   return out;
 }
 
+/** The last check before one person's email: true when they have a link that still works, OR when that could not be read (so a failed read never sends, and never replaces a working link). */
+export async function liveLinkOrUnknown(serviceRole: SupabaseClient, athleteId: string): Promise<boolean> {
+  try {
+    const { data, error } = await serviceRole.from("client_invites").select("id").eq("athlete_id", athleteId).is("used_at", null).gt("expires_at", new Date().toISOString()).limit(1);
+    if (error) return true;
+    return (data ?? []).length > 0;
+  } catch {
+    return true;
+  }
+}
+
 /** The same order every time (by name, then id), so the first 250 and the first 100 are always the same people. */
 export function stableOrder<T extends { id: string; full_name: string }>(rows: T[]): T[] {
   return rows.slice().sort((a, b) => a.full_name.localeCompare(b.full_name) || a.id.localeCompare(b.id));

@@ -59,7 +59,9 @@ describe("O2 safety (Commander review of 55cea37d)", () => {
   });
   it("one send at a time per coach, and each person's link is checked again just before their email", () => {
     expect(route).toContain("`email-claim-links-all-lock:${auth.user.id}`, 1, 120");
-    expect(route).toContain("if (await hasLiveClaimLink(serviceRole, c.profileId))");
+    expect(route).toContain("if (await liveLinkOrUnknown(serviceRole, c.profileId))");
+    // that last check fails safe: a read error counts as already linked
+    expect(lib).toMatch(/export async function liveLinkOrUnknown[\s\S]*if \(error\) return true;[\s\S]*catch \{\s*return true;/);
   });
   it("never a team player or anyone with a parent on file", () => {
     expect(lib).toContain("g.team_mode !== true");
@@ -85,6 +87,8 @@ describe("O1 undo keeps anything the coach made (Commander review of 55cea37d)",
     expect(migration).toContain("c.confrelid = 'public.groups'::regclass");
     expect(migration).toContain("c.conrelid not in ('public.group_memberships'::regclass, 'public.client_intake'::regclass)");
     expect(migration).toContain("exception when others then");
+    expect(migration).toContain("where id = p_group for update;");
+    expect(migration).toContain("set search_path = public, pg_temp");
     expect(migration).toContain("revoke all on function public.discard_imported_one_on_one_space(uuid, uuid) from public, anon, authenticated;");
   });
   it("the paste is the migration word for word", () => {

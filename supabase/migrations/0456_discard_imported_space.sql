@@ -9,14 +9,15 @@ create or replace function public.discard_imported_one_on_one_space(p_group uuid
 returns boolean
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, pg_temp
 as $$
 declare
   g record;
   r record;
   v_found boolean;
 begin
-  select id, created_by, created_at, group_kind into g from public.groups where id = p_group;
+  -- The space is locked first: a row that points at it and is written while this checks waits for this to finish (and then fails, the space being gone) or is seen by the check below.
+  select id, created_by, created_at, group_kind into g from public.groups where id = p_group for update;
   if not found or g.group_kind is distinct from 'one_on_one' or g.created_by is distinct from p_coach or g.created_at < now() - interval '24 hours' then
     return false;
   end if;

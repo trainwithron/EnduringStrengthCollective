@@ -5,9 +5,8 @@ import { orgGroupIdsOf } from "@/lib/coach-groups";
 import { appOrigin } from "@/lib/app-url";
 import { isEmailConfigured } from "@/lib/email";
 import { rateLimitAllows, rateLimitResponse } from "@/lib/rate-limit";
-import { hasLiveClaimLink } from "@/lib/client-claim-server";
 import { loadCoachName, loadClaimTemplate, sendClaimEmail } from "@/lib/claim-email-send";
-import { CLAIM_LINKS_ALL_MAX, CLAIM_LINKS_ALL_PER_SEND, loadClaimCandidates, sortClaimCandidates } from "@/lib/claim-links-all";
+import { CLAIM_LINKS_ALL_MAX, CLAIM_LINKS_ALL_PER_SEND, liveLinkOrUnknown, loadClaimCandidates, sortClaimCandidates } from "@/lib/claim-links-all";
 import { runPool } from "@/lib/run-pool";
 
 export const maxDuration = 300;
@@ -90,7 +89,7 @@ export async function POST(request: Request) {
       return;
     }
     // Checked again just before sending: a link made since the list was read (the one-client button, another device) is never replaced by this.
-    if (await hasLiveClaimLink(serviceRole, c.profileId)) {
+    if (await liveLinkOrUnknown(serviceRole, c.profileId)) {
       alreadySent++;
       return;
     }
