@@ -57,9 +57,12 @@ describe("a coach's own wording", () => {
 describe("where it is wired", () => {
   it("the route uses the coach's saved message when it is valid, else the default, and shows the whole address", () => {
     const route = read("app/api/clients/email-claim-link/route.ts");
-    expect(route).toContain('from("coach_message_templates")');
-    expect(route).toContain("validateTemplate(");
-    expect(route).toContain("DEFAULT_CLAIM_TEMPLATE");
+    // the email is made by the shared sender (lib/claim-email-send.ts, Nov 20)
+    const sender = read("lib/claim-email-send.ts");
+    expect(route).toContain("sendClaimEmail(");
+    expect(sender).toContain('from("coach_message_templates")');
+    expect(sender).toContain("validateTemplate(");
+    expect(sender).toContain("DEFAULT_CLAIM_TEMPLATE");
     expect(route).toContain("sentTo: email");
     expect(route).not.toContain("maskEmail");
   });
@@ -106,7 +109,7 @@ describe("the fixed footer", () => {
     expect(withFooter("x", null)).toContain("on behalf of a coach.");
   });
   it("the send route adds it after the coach's wording is filled in, not inside the template", () => {
-    const route = read("app/api/clients/email-claim-link/route.ts");
-    expect(route).toContain("withFooter(message.text, coach?.full_name ?? null)");
+    const sender = read("lib/claim-email-send.ts");
+    expect(sender).toContain("withFooter(message.text, coachName)");
   });
 });

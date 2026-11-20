@@ -19,6 +19,8 @@ function routeFiles(rel: string): string[] {
 // payment, send a push or text, or are called by another service. Every other writing route must be in SAVING_API (lib/workspace-mutation.ts), so that a save made
 // through it refreshes the other panes. A new route fails this test until it is put in one of the two places on purpose.
 const NOT_A_SAVE = new Set([
+  // a coach asking for help moving in (Nov 20, onboarding O5): only the platform admin is told; nothing a pane shows changes
+  "/api/support/move-in-help",
   // an invited coach choosing their password on the join page, before they have a session: no pane is open to show anything
   "/api/coaches/join",
   // a visitor asking a coach to train with them from the coach's public page: only the waiting request is written; the coach's answer is the save (client-requests/answer)

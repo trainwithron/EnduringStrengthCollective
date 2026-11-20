@@ -7,6 +7,7 @@ import { RequestsLink } from "@/components/coach/requests-link";
 import { pendingRequestCount } from "@/lib/client-request-count";
 import { orgIsTeamOnly } from "@/lib/team-sport";
 import { AddClientButton } from "@/components/coach/desktop/add-client-button";
+import { EmailAllClaimLinksButton } from "@/components/coach/email-all-claim-links-button";
 import { SwappableTerm } from "@/components/coach/swappable-term";
 import { getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
 import { CHOOSE_ORGANIZATION_PATH, getActiveAnchor } from "@/lib/active-anchor";
@@ -27,7 +28,11 @@ export const metadata = { title: "Clients" };
 
 // The coach's full client list: every client across all the groups they coach (a one-on-one client and a group member each appear once), wherever the coach
 // is standing. This is what "Clients" always means; a team or social group's own roster is "Members" (a different view).
-export default async function CoachClientsPage() {
+export default async function CoachClientsPage(props: { searchParams?: Promise<{ add?: string; import?: string }> }) {
+  // ?add=1 opens Add client; ?import=1 opens it on a pasted list or a client file from another app (the Get started card, Nov 20).
+  const search = (await props.searchParams) ?? {};
+  const openAdd = search.add === "1";
+  const openImport = search.import === "1";
   const supabase = await createServerClient();
   const {
     data: { user },
@@ -47,7 +52,7 @@ export default async function CoachClientsPage() {
   }
 
   // Phones keep their own coach roster (the group page already shows the coach-level list there).
-  if (await prefersAthleteStyleView()) redirect(`/groups/${anchor.id}/clients`);
+  if (await prefersAthleteStyleView()) redirect(`/groups/${anchor.id}/clients${openImport ? "?add=1&import=1" : openAdd ? "?add=1" : ""}`);
 
   const inOrg = groupsInOrgOf(groups, anchor.id);
   const groupById = new Map(inOrg.map((g) => [g.id, g]));
@@ -126,9 +131,10 @@ export default async function CoachClientsPage() {
         <h1 className="font-display font-bold text-3xl uppercase leading-none">
           <SwappableTerm termKey="client" form="plural" className="capitalize" />
         </h1>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-end gap-3">
           <RequestsLink count={requestCount} />
-          <AddClientButton groupId={anchor.id} groupName={anchor.name} createdBy={user.id} />
+          <EmailAllClaimLinksButton groupId={anchor.id} />
+          <AddClientButton groupId={anchor.id} groupName={anchor.name} createdBy={user.id} defaultOpen={openAdd} initialStep={openImport ? "import" : undefined} />
         </div>
       </div>
       <CoachesSection groupId={anchor.id} viewerId={user.id} coaches={coachList.coaches} pending={coachList.pending} canManage={inviteManager.ok} signIns={signIns} />

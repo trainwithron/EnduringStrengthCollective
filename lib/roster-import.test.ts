@@ -48,6 +48,57 @@ describe("parseRoster", () => {
     expect(skipped.every((s) => s.reason === "over_limit")).toBe(true);
   });
 
+  it("takes up to 250 people in one batch (Nov 20: a coach moving in brings their whole list)", () => {
+    expect(ROSTER_MAX_ROWS).toBe(250);
+  });
+
+  it("reads another coaching app's client export as it is: the app's column names, a title line above the header, extra columns ignored", () => {
+    // Trainerize-style: "Client First Name" / "Client Last Name" / "Client Email", with a title row first.
+    const trainerize = parseRoster([
+      ["Client export 11/20/2026"],
+      ["Client First Name", "Client Last Name", "Client Email", "Phone", "Program"],
+      ["Jane", "Smith", "Jane@X.com", "555", "Strength 1"],
+    ]);
+    // the title line is listed as not used, never silently dropped
+    expect(trainerize.skipped.map((s) => [s.rowNumber, s.reason])).toEqual([[1, "above_header"]]);
+    expect(trainerize.rows).toEqual([{ rowNumber: 3, name: "Jane Smith", email: "jane@x.com" }]);
+    // TrueCoach-style: "Name" and "Email Address".
+    const truecoach = parseRoster([["Name", "Email Address", "Created"], ["Mo Ali", "mo@x.com", "2025-01-02"]]);
+    expect(truecoach.rows[0]).toMatchObject({ name: "Mo Ali", email: "mo@x.com" });
+    // Everfit-style: "Client Name", "Email", "Status".
+    const everfit = parseRoster([["Client Name", "Email", "Status"], ["Ann Cole", "ann@x.com", "Active"]]);
+    expect(everfit.rows[0]).toMatchObject({ name: "Ann Cole", email: "ann@x.com" });
+  });
+
+  it("a client the old app marks archived or inactive is listed as not added, with why", () => {
+    const { rows, skipped } = parseRoster([
+      ["Client Name", "Email", "Status"],
+      ["Ann Cole", "ann@x.com", "Active"],
+      ["Old Timer", "old@x.com", "Archived"],
+      ["Gone Guy", "", "Inactive"],
+      ["Paused Pat", "pat@x.com", "Paused"],
+    ]);
+    expect(rows.map((r) => r.name)).toEqual(["Ann Cole", "Paused Pat"]);
+    expect(skipped.map((s) => [s.rowNumber, s.reason])).toEqual([[3, "archived"], [4, "archived"]]);
+    expect(skipped[0].detail).toContain("Old Timer");
+  });
+
+  it("an address State column is not a status column, so it never hides the Archived flags", () => {
+    const { rows, skipped } = parseRoster([
+      ["Name", "Email", "State", "Status"],
+      ["Ann Cole", "ann@x.com", "Ohio", "Active"],
+      ["Old Timer", "old@x.com", "Texas", "Archived"],
+    ]);
+    expect(rows.map((r) => r.name)).toEqual(["Ann Cole"]);
+    expect(skipped.map((s) => s.reason)).toEqual(["archived"]);
+  });
+
+  it("a header further down than the top five rows is not looked for (those rows are people)", () => {
+    const cells = [["A One"], ["B Two"], ["C Three"], ["D Four"], ["E Five"], ["Name", "Email"]];
+    const { rows } = parseRoster(cells);
+    expect(rows.map((r) => r.name)).toContain("A One");
+  });
+
   it("a very long line (several pasted together) is not one name", () => {
     const { rows, skipped } = read("a".repeat(120));
     expect(rows).toHaveLength(0);

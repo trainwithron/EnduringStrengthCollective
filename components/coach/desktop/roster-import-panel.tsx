@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTerm } from "@/components/coach/terminology-provider";
 import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { parseRoster, splitPastedRoster, ROSTER_MAX_ROWS, type RosterParse } from "@/lib/roster-import";
+import { announceClaimLinksChanged, EmailAllClaimLinksButton } from "@/components/coach/email-all-claim-links-button";
 
 type Step = "enter" | "preview" | "adding" | "done" | "uncertain";
 interface Result {
@@ -12,6 +13,8 @@ interface Result {
   name: string;
   ok: boolean;
   profileId?: string;
+  // one-on-one mode: the person's own new space
+  groupId?: string;
   reason?: string;
 }
 
@@ -19,7 +22,23 @@ const inputClass = "w-full mt-1 bg-graphite border border-steel/30 text-chalk px
 
 // Adds a whole roster to a group from a pasted list or a spreadsheet. The coach sees exactly who will be added (and every line that was not used, with why) before anything is created; nobody is
 // emailed or texted. Right afterwards the whole import can be taken back.
-export function RosterImportPanel({ groupId, groupName, onAdded, onClose }: { groupId: string; groupName: string; onAdded?: () => void; onClose: () => void }) {
+// mode "one_on_one" (Ron, Nov 20: "onboarding smoothness is a priority"): each person becomes a one-on-one client with their own space (groupId is then only the space the coach is standing in, for the
+// organization). A client list exported from TrueCoach, Trainerize or Everfit can be chosen as it is (lib/roster-import.ts reads their column names). Once people are in, one button emails every
+// client who has not signed in yet their own sign-in link (components/coach/email-all-claim-links-button.tsx), only when the coach chooses to.
+export function RosterImportPanel({
+  groupId,
+  groupName,
+  onAdded,
+  onClose,
+  mode = "group",
+}: {
+  groupId: string;
+  groupName: string;
+  onAdded?: () => void;
+  onClose: () => void;
+  mode?: "group" | "one_on_one";
+}) {
+  const oneOnOne = mode === "one_on_one";
   const t = useTerm();
   const router = useRouter();
   const [step, setStep] = useState<Step>("enter");
@@ -29,6 +48,7 @@ export function RosterImportPanel({ groupId, groupName, onAdded, onClose }: { gr
   const [results, setResults] = useState<Result[]>([]);
   const [undone, setUndone] = useState<{ removed: number; left: string[] } | null>(null);
   const [undoing, setUndoing] = useState(false);
+  const where = oneOnOne ? `as one-on-one ${t("client", "plural")}, each in their own space` : `to ${groupName}`;
 
   function preview(cells: string[][]) {
     const result = parseRoster(cells);
@@ -62,7 +82,7 @@ export function RosterImportPanel({ groupId, groupName, onAdded, onClose }: { gr
     setError(null);
     let res: Response;
     try {
-      res = await fetch("/api/clients/import-roster", {
+      res = await fetch(oneOnOne ? "/api/clients/import-one-on-one" : "/api/clients/import-roster", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ groupId, people: parsed.rows.map((r) => ({ name: r.name, email: r.email })) }),
@@ -79,6 +99,8 @@ export function RosterImportPanel({ groupId, groupName, onAdded, onClose }: { gr
       setStep("done");
       router.refresh();
       onAdded?.();
+      // the "email everyone not signed in yet" buttons on the page count again
+      announceClaimLinksChanged();
       return;
     }
     if (res.status >= 400 && res.status < 500 && data?.error) {
@@ -92,6 +114,7 @@ export function RosterImportPanel({ groupId, groupName, onAdded, onClose }: { gr
   }
 
   const addedIds = results.filter((r) => r.ok && r.profileId).map((r) => r.profileId as string);
+  const addedSpaces = results.filter((r) => r.ok && r.profileId && r.groupId).map((r) => ({ groupId: r.groupId as string, profileId: r.profileId as string }));
 
   async function undo() {
     if (undoing || addedIds.length === 0) return;
@@ -99,12 +122,17 @@ export function RosterImportPanel({ groupId, groupName, onAdded, onClose }: { gr
     setUndoing(true);
     setError(null);
     try {
-      const res = await fetch("/api/clients/import-roster/undo", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ groupId, profileIds: addedIds }) });
+      const res = await fetch("/api/clients/import-roster/undo", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(oneOnOne ? { spaces: addedSpaces } : { groupId, profileIds: addedIds }),
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Couldn't undo the import. Try again.");
       setUndone({ removed: (data.removed ?? []).length, left: (data.left ?? []).map((l: { reason: string }) => l.reason) });
       router.refresh();
       onAdded?.();
+      announceClaimLinksChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't undo the import. Try again.");
     } finally {
@@ -150,7 +178,7 @@ export function RosterImportPanel({ groupId, groupName, onAdded, onClose }: { gr
           </p>
         ) : (
           <p className="font-body text-sm text-positive">
-            {addedIds.length} added to {groupName}. Nothing was sent to them.
+            {addedIds.length} added {where}. Nothing was sent to them.
           </p>
         )}
         {failed.length > 0 && (
@@ -166,9 +194,14 @@ export function RosterImportPanel({ groupId, groupName, onAdded, onClose }: { gr
             </div>
           </div>
         )}
-        {!undone && <p className="font-body text-xs text-steel mt-2">Build their programs and schedules now. When you&apos;re ready, send each sign-in link from their profile.</p>}
-        {/* Anyone who also signs up with this group&apos;s invite link would become a second person, so each person gets their own sign-in link (not the group link). */}
-        {!undone && addedIds.length > 0 && <p className="font-body text-xs text-steel mt-2">These people now have accounts. Send each one their own sign-in link from their profile. If they use the group&apos;s invite link instead, they will be added a second time.</p>}
+        {!undone && <p className="font-body text-xs text-steel mt-2">Build their programs and schedules now. When you&apos;re ready, send their sign-in links: each from their profile, or all at once below.</p>}
+        {/* Anyone who also signs up with this group's invite link would become a second person, so each person gets their own sign-in link (not the group link). */}
+        {!undone && !oneOnOne && addedIds.length > 0 && <p className="font-body text-xs text-steel mt-2">These people now have accounts. Send each one their own sign-in link from their profile, or all at once below. If they use the group&apos;s invite link instead, they will be added a second time.</p>}
+        {!undone && addedIds.length > 0 && (
+          <div className="mt-3">
+            <EmailAllClaimLinksButton groupId={groupId} />
+          </div>
+        )}
         {error && (
           <p className="font-body text-xs text-rust mt-2" role="alert">
             {error}
@@ -192,7 +225,7 @@ export function RosterImportPanel({ groupId, groupName, onAdded, onClose }: { gr
     return (
       <div>
         <p className="font-body text-sm text-chalk mb-2">
-          Add {parsed.rows.length} {parsed.rows.length === 1 ? "person" : "people"} to {groupName}? Nothing is sent to them.
+          Add {parsed.rows.length} {parsed.rows.length === 1 ? "person" : "people"} {where}? Nothing is sent to them.
         </p>
         {parsed.repeatedNames.length > 0 && <p className="font-body text-xs text-steel mb-2">The same name appears more than once ({parsed.repeatedNames.slice(0, 5).join(", ")}). That is fine if they are different people.</p>}
         {skippedList}
@@ -228,7 +261,10 @@ export function RosterImportPanel({ groupId, groupName, onAdded, onClose }: { gr
         Paste names, one per line. Put an email after a comma if you have it. Up to {ROSTER_MAX_ROWS} at a time.
       </label>
       <textarea id="roster-text" rows={6} value={text} onChange={(e) => setText(e.target.value)} placeholder={"Jane Smith, jane@example.com\nMo Ali"} className={inputClass} />
-      <div className="flex items-center gap-3 mt-3">
+      <p className="font-body text-xs text-steel mt-1.5" data-import-from-app>
+        Moving from TrueCoach, Trainerize or Everfit? Export your client list there and choose the file here as it is.
+      </p>
+      <div className="flex flex-wrap items-center gap-3 mt-3">
         <button type="button" onClick={() => preview(splitPastedRoster(text))} disabled={!text.trim()} className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40">
           Preview
         </button>

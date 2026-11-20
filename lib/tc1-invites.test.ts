@@ -430,6 +430,6 @@ describe("TC1b: one plain coach list at the top of the Clients page", () => {
     expect(page.indexOf("<CoachesSection ")).toBeLessThan(page.indexOf("<CoachClientsList "));
     expect(page).not.toMatch(/&&s*<CoachesSection /);
     // a phone is sent to the group page, which has it too
-    expect(page).toContain("redirect(`/groups/${anchor.id}/clients`)");
+    expect(page).toContain("redirect(`/groups/${anchor.id}/clients${openImport ? \"?add=1&import=1\" : openAdd ? \"?add=1\" : \"\"}`)");
   });
 });
