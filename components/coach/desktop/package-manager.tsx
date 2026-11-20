@@ -58,7 +58,7 @@ const KINDS: PackageKind[] = ["team", "program", "coaching", "sessions"];
 const labelCls = "font-body text-xs text-steel uppercase tracking-wide";
 // A dim hint, so an example price is never read as one already typed in.
 const inputCls = "h-10 px-2.5 bg-surface border border-steel/30 text-chalk font-body text-sm w-full placeholder:text-steel focus:outline-none focus:border-rust";
-const segCls = (on: boolean) => `min-h-9 px-3 border font-body text-sm ${on ? "border-rust text-rust bg-rust/10" : "border-steel/30 text-steel"}`;
+const segCls = (on: boolean) => `min-h-9 px-3 border font-body text-sm ${on ? "border-rust text-rust-ink bg-rust/10" : "border-steel/30 text-steel"}`;
 
 // What a saved package is, in one line for the list.
 function detailLine(p: CoachPackageRow, programs: LinkableProgramOption[], groups: AccessGroupOption[]): string {

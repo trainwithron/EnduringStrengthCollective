@@ -103,7 +103,7 @@ export function OrgSwitcher({
                   role="menuitem"
                   onClick={() => chooseOrg(o)}
                   className={`block w-full text-left px-3 py-2 font-body text-sm ${
-                    o.id === currentOrgId ? "text-rust bg-rust/10" : "text-chalk hover:bg-surface/60"
+                    o.id === currentOrgId ? "text-rust-ink bg-rust/10" : "text-chalk hover:bg-surface/60"
                   }`}
                 >
                   {o.name}

@@ -36,7 +36,8 @@ describe("the skin: card colors, secondary text and lines follow the organizatio
   it("the accent ink reads at 4.5:1 on a raised item, on the soft pill over the ground or a card, and on a tinted card", () => {
     for (const [bg, text, accent] of LIVE) {
       const t = surfaceTokensFor(bg, text, accent);
-      for (const ground of [t.surface2, over(t.surface, accent, 0.15), over(bg, accent, 0.15), over(bg, accent, 0.08)]) {
+      const grounds = [t.surface2, ...[0.15, 0.1, 0.08].flatMap((a) => [over(bg, accent, a), over(t.surface, accent, a), over(t.surface2, accent, a)])];
+      for (const ground of grounds) {
         expect(contrastRatio(t.accentInk, ground)!, `${accent} on ${ground}`).toBeGreaterThanOrEqual(4.5);
       }
     }
@@ -54,8 +55,23 @@ describe("the skin: card colors, secondary text and lines follow the organizatio
   it("the selected pills and the Due soon title use the accent ink", () => {
     expect(read("components/coach/desktop/home-tab-strip.tsx")).toContain('on ? "bg-rust/15 text-rust-ink font-semibold"');
     expect(read("components/coach/desktop/needs-you-strip.tsx")).toContain('due: { card: "tint-accent", title: "text-rust-ink" },');
-    for (const f of ["components/coach/desktop/home-tab-strip.tsx", "components/coach/desktop/calendar-page-tabs.tsx", "components/coach/desktop/coach-clients-list.tsx", "components/coach/desktop/pulse-tabs.tsx"]) {
-      expect(read(f), f).not.toMatch(/bg-rust\/15 text-rust(?!-ink)/);
+    for (const f of [
+      "components/coach/desktop/home-tab-strip.tsx",
+      "components/coach/desktop/calendar-page-tabs.tsx",
+      "components/coach/desktop/coach-clients-list.tsx",
+      "components/coach/desktop/pulse-tabs.tsx",
+      "components/coach/desktop/calendar-grid.tsx",
+      "components/athlete/nutrition-first-visit-prompt.tsx",
+      "components/coach/desktop/client-card-grid.tsx",
+      "components/coach/desktop/group-switcher.tsx",
+      "components/coach/desktop/org-switcher.tsx",
+      "components/coach/coach-home-shell.tsx",
+      "components/coach/desktop/dashboard-tile-grid.tsx",
+      "components/coach/desktop/package-manager.tsx",
+      "app/(coach)/groups/[groupId]/nutrition/page.tsx",
+    ]) {
+      // the plain accent as text beside a soft accent fill (rust/10 or rust/15), in either order
+      expect(read(f), f).not.toMatch(/bg-rust\/1[05] text-rust(?!-ink)|text-rust(?!-ink)[^"`]*bg-rust\/1[05]|bg-rust\/1[05][^"`]*text-rust(?![-\w])/);
     }
   });
   it("a light ground steps darker for its cards", () => {

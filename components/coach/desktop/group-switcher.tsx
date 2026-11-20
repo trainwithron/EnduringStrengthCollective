@@ -323,7 +323,7 @@ export function GroupSwitcher({
                           onClick={() => switchTo(g.id)}
                           disabled={switching}
                           className={`w-full text-left px-3 py-2.5 font-body text-sm disabled:opacity-50 ${
-                            g.id === groupId ? "text-rust bg-rust/10" : "text-chalk hover:bg-graphite/50"
+                            g.id === groupId ? "text-rust-ink bg-rust/10" : "text-chalk hover:bg-graphite/50"
                           }`}
                         >
                           {g.name}

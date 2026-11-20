@@ -75,7 +75,7 @@ export function DashboardTileGrid({
           type="button"
           onClick={() => setCustomizing((v) => !v)}
           className={`flex items-center gap-1.5 font-body text-xs px-2 py-1 border ${
-            customizing ? "border-rust text-rust bg-rust/10" : "border-steel/30 text-steel"
+            customizing ? "border-rust text-rust-ink bg-rust/10" : "border-steel/30 text-steel"
           }`}
         >
           <Settings2 className="w-3.5 h-3.5" />

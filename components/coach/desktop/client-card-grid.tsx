@@ -763,7 +763,7 @@ export function ClientCardGrid({
                   return integrity.level === "pattern" ? (
                     <span
                       title={`${integrity.flaggedCount} of ${integrity.totalSessions} recent sessions logged implausibly fast`}
-                      className="font-body text-xs text-rust bg-rust/10 border border-rust/40 rounded-token-pill px-1.5 py-0.5"
+                      className="font-body text-xs text-rust-ink bg-rust/10 border border-rust/40 rounded-token-pill px-1.5 py-0.5"
                     >
                       ⏱ Fast sessions ({integrity.flaggedCount})
                     </span>

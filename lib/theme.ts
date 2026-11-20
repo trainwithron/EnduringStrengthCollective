@@ -177,7 +177,11 @@ export function surfaceTokensFor(backgroundColor: string, textColor: string, acc
   }
   // The accent ink: the accent, moved toward the text color only as far as it must to read at 4.5:1 on every ground it is used on (a raised item, the
   // soft accent pill over the ground or a card, a tinted card).
-  const inkGrounds = [surface2, mix(surface, accent, 0.15), mix(ground, accent, 0.15), mix(ground, accent, 0.08), mix(surface, accent, 0.08)].map(clamp);
+  // (rust/15 and rust/10 over the ground, a card and a raised item: the Clients view switch puts its selected pill in a surface-2 track.)
+  const inkGrounds = [
+    surface2,
+    ...[0.15, 0.1, 0.08].flatMap((a) => [mix(ground, accent, a), mix(surface, accent, a), mix(surface2, accent, a)]),
+  ].map(clamp);
   let ink = accent;
   for (let k = 0; k <= 100 && inkGrounds.some((g) => ratioOf(ink, g) < 4.5); k++) ink = clamp(mix(accent, text, k / 100));
   // A field's edge: the secondary text color over a card, as faint as it can be while still 3:1 against the ground, the cards and the raised items.

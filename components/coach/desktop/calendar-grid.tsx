@@ -358,7 +358,7 @@ export function CalendarGrid({
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${item.dotClass}`} />
                     <span className="font-body text-sm text-chalk flex-1 truncate">{item.label}</span>
                     {item.badge && (
-                      <span className="font-mono text-xs px-1.5 py-0.5 rounded-token-pill bg-rust/15 text-rust shrink-0">{item.badge}</span>
+                      <span className="font-mono text-xs px-1.5 py-0.5 rounded-token-pill bg-rust/15 text-rust-ink shrink-0">{item.badge}</span>
                     )}
                     {item.deleteId && (
                       <button

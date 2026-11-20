@@ -49,7 +49,7 @@ function CoachHomeShellFull({ orgName, children }: { orgName: string; children: 
         <nav className="flex-1 py-3">
           <Link
             href="/dashboard"
-            className="flex items-center gap-3 h-11 px-5 font-body text-sm text-rust bg-rust/10 border-r-2 border-rust"
+            className="flex items-center gap-3 h-11 px-5 font-body text-sm text-rust-ink bg-rust/10 border-r-2 border-rust"
           >
             <Home className="w-4 h-4 shrink-0" strokeWidth={2.25} />
             Home

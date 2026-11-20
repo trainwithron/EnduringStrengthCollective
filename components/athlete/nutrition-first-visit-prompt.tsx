@@ -75,7 +75,7 @@ export function NutritionFirstVisitPrompt({ athleteId }: { athleteId: string }) 
               type="button"
               aria-pressed={on}
               onClick={() => setAllergies((list) => toggleAllergy(list, key))}
-              className={`h-11 px-3 font-body text-sm border ${on ? "bg-rust/15 text-rust border-rust/50" : "text-steel border-steel/30"}`}
+              className={`h-11 px-3 font-body text-sm border ${on ? "bg-rust/15 text-rust-ink border-rust/50" : "text-steel border-steel/30"}`}
             >
               {ALLERGY_LABELS[key]}
             </button>

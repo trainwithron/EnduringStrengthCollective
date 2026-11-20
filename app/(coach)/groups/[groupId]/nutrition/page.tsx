@@ -151,7 +151,7 @@ export default async function NutritionPage(
                 href={tabHref(t.key)}
                 aria-current={tab === t.key ? "page" : undefined}
                 className={`min-h-11 px-4 flex items-center font-body text-sm border ${
-                  tab === t.key ? "bg-rust/10 text-rust border-rust/40" : "text-steel border-steel/20 hover:text-chalk"
+                  tab === t.key ? "bg-rust/10 text-rust-ink border-rust/40" : "text-steel border-steel/20 hover:text-chalk"
                 }`}
               >
                 {t.label}
