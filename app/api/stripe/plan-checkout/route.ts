@@ -61,7 +61,11 @@ export async function POST(request: Request) {
     // Never two plans (Assistant review of 5db6fa62): a plan Stripe already has for this organization (paid a moment ago, before the webhook arrived) stops a new checkout, and a checkout
     // still open in another tab is closed first, so only one can ever be paid.
     const existing = await stripe.subscriptions.list({ customer: customerId, price: priceId, status: "all", limit: 20 });
-    if (existing.data.some((s) => isLivePlanStatus(s.status))) return NextResponse.json({ error: "This organization already has a plan." }, { status: 409 });
+    const live = existing.data.filter((s) => isLivePlanStatus(s.status));
+    // a first payment still waiting on the bank's check (left unfinished): Stripe closes it within a day
+    if (live.length > 0 && live.every((s) => s.status === "incomplete"))
+      return NextResponse.json({ error: "Your last checkout is still waiting for your bank to confirm the card. Finish it in that window, or try again tomorrow (an unfinished one closes within a day)." }, { status: 409 });
+    if (live.length > 0) return NextResponse.json({ error: "This organization already has a plan." }, { status: 409 });
     const open = await stripe.checkout.sessions.list({ customer: customerId, status: "open", limit: 20 });
     for (const s of open.data) if (s.metadata?.purchase_kind === COACH_PLAN_PURCHASE_KIND) await stripe.checkout.sessions.expire(s.id);
 

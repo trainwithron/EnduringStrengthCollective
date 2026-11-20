@@ -97,7 +97,11 @@ describe("never two plans for one organization (Assistant review of 5db6fa62)", 
   const hook = read("app/api/stripe/webhook/route.ts");
   it("a plan Stripe already has stops a new checkout, and another open checkout is closed first", () => {
     expect(route).toContain('const existing = await stripe.subscriptions.list({ customer: customerId, price: priceId, status: "all", limit: 20 });');
-    expect(route).toContain("if (existing.data.some((s) => isLivePlanStatus(s.status))) return NextResponse.json({ error: \"This organization already has a plan.\" }, { status: 409 });");
+    expect(route).toContain("const live = existing.data.filter((s) => isLivePlanStatus(s.status));");
+    expect(route).toContain('if (live.length > 0) return NextResponse.json({ error: "This organization already has a plan." }, { status: 409 });');
+    // an unfinished first payment (the bank's check left open) says what to do instead
+    expect(route).toContain('if (live.length > 0 && live.every((s) => s.status === "incomplete"))');
+    expect(route).toContain("or try again tomorrow");
     expect(route).toContain("if (s.metadata?.purchase_kind === COACH_PLAN_PURCHASE_KIND) await stripe.checkout.sessions.expire(s.id);");
     expect(route).toContain("{ idempotencyKey: `coach-plan-customer-${organizationId}` }");
   });
