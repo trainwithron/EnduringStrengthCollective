@@ -46,35 +46,16 @@ export function SessionProgressStrip({
 }) {
   const unit = useLiftUnit();
   const previous = exercises[activeIndex - 1] ?? null;
-  const next = exercises[activeIndex + 1] ?? null;
   const previousSummary = previous ? lastCompletedSetSummary(previous, unit) : null;
 
-  if (!previousSummary && !next) return null;
+  // What was just done ("Bench Press — 3×8 @ 135 lb"). Next is on the bottom bar now (Look Refresh, client step), so this is only the look back.
+  if (!previousSummary) return null;
 
   return (
-    <div className="flex items-center justify-between gap-3 mb-2 px-3 py-1 border border-steel/20 bg-surface/20 overflow-hidden [@media(max-height:760px)]:hidden">
-      {previousSummary ? (
-        <p className="font-body text-xs text-steel truncate min-w-0">
-          <span className="text-chalk">{previous!.exerciseName}</span> — {previousSummary}
-        </p>
-      ) : (
-        <span />
-      )}
-      {next && (
-        // A long exercise name is cut short here; it must never widen the page (a page wider than the screen makes the phone zoom out and the whole logger stops fitting).
-        // A tap goes to the next exercise, the same as a swipe.
-        <button
-          type="button"
-          onClick={() =>
-            document.querySelector(`[data-exercise-id="${next.id}"]`)?.scrollIntoView({ behavior: "smooth", inline: "center", block: "center" })
-          }
-          className="min-h-11 font-body text-xs text-steel min-w-0 flex items-center gap-1 active:text-rust"
-        >
-          <span className="shrink-0">Next:</span>
-          <span className="text-chalk truncate">{next.exerciseName}</span>
-          <span className="shrink-0">→</span>
-        </button>
-      )}
+    <div className="flex items-center gap-3 mb-2 px-3 py-1.5 rounded-row bg-surface/60 overflow-hidden [@media(max-height:760px)]:hidden">
+      <p className="font-body text-xs text-steel truncate min-w-0">
+        <span className="text-chalk">{previous!.exerciseName}</span> — {previousSummary}
+      </p>
     </div>
   );
 }

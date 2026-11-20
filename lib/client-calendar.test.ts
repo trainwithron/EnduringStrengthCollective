@@ -60,13 +60,24 @@ describe("the client's Calendar is one calendar, never a program's", () => {
     expect(clientBranch).not.toContain("ProgramChips");
     expect(clientBranch).not.toContain("Back to program");
   });
-  it("the Schedule card stays on top, then the cards for programs with no dates, then the calendar", () => {
-    const card = clientBranch.indexOf("<ScheduleCard");
-    const undated = clientBranch.indexOf("<UndatedProgramCards");
+  // Look Refresh (Ron, Nov 20, approved client mockup): the calendar first, then the open day and the next session, then programs with no dates, and the
+  // full-width Book a session at the end.
+  it("the calendar comes first, then the day's cards, the programs with no dates, and Book a session last", () => {
     const grid = clientBranch.indexOf("WEEKDAY_LABELS.map");
-    expect(card).toBeGreaterThan(clientBranch.indexOf("</header>"));
-    expect(card).toBeLessThan(undated);
-    expect(undated).toBeLessThan(grid);
+    const sessions = clientBranch.indexOf("Next session with your coach");
+    const undated = clientBranch.indexOf("<UndatedProgramCards");
+    const card = clientBranch.indexOf("<ScheduleCard");
+    expect(grid).toBeGreaterThan(clientBranch.indexOf("</header>"));
+    expect(grid).toBeLessThan(sessions);
+    expect(sessions).toBeLessThan(undated);
+    expect(undated).toBeLessThan(card);
+  });
+  it("Day / Week / Month live here (not on Home), the month shows dots with a legend, and a session has one Change button", () => {
+    expect(clientBranch).toContain('{ key: "day", label: "Day", href: dayHref(today) },');
+    expect(clientBranch).toContain("data-calendar-legend");
+    expect(clientBranch).toContain('{done && <span className="w-[5px] h-[5px] rounded-full bg-win" />}');
+    expect(clientBranch).toContain('{session && <span className="w-[5px] h-[5px] rounded-full bg-checkin" />}');
+    expect(clientBranch).toContain("<ChangeSessionDisclosure");
   });
   it("a day with something on it opens the day page even when the coach has no open hours", () => {
     expect(clientBranch).toContain("if (hasAvailability || lines.length > 0) {");

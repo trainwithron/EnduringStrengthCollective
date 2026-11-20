@@ -9,6 +9,8 @@ import type { DayWorkoutInfo } from "@/lib/athlete-day-schedule";
 import type { DaySession } from "@/lib/program-day-contexts";
 import { computeReadinessAverage, type WellnessCheckinValues } from "@/lib/wellness";
 import type { WeightUnit } from "@/lib/units";
+import type { HomeProgramCard } from "@/lib/home-programs";
+import { TodayTiles } from "./today-tiles";
 
 // "Unlocks Tue, Oct 14": the day the workout really opens, which is earlier than its own date when the coach opens a week or a month ahead. Falls back to the workout's date.
 function unlockLabel(unlocksOn: Date | null | undefined, fallback: string): string {
@@ -21,6 +23,8 @@ function unlockLabel(unlocksOn: Date | null | undefined, fallback: string): stri
 // plain browse-only summary — any other date, past or future, never
 // gets an action control, only a read of what actually happened or
 // what's planned. See [[athlete_home_calendar_redesign]] rule #1.
+// Look Refresh (client step, Ron Nov 20): the Today card comes first (the day, the program, "Week x of y", how many workouts are done, one big Start
+// workout), then three tiles (Check in, Log weight, InBody) that open what is further down, then the check-in, the programs, and the day's nutrition and weight.
 export function DayCard({
   groupId,
   athleteId,
@@ -40,6 +44,8 @@ export function DayCard({
   sessionsLeft = null,
   ownChoice = false,
   afterWorkout = null,
+  programs = [],
+  checkin = null,
 }: {
   groupId: string;
   athleteId: string;
@@ -66,6 +72,10 @@ export function DayCard({
   ownChoice?: boolean;
   // Shown right under the workout card(s) for the day, before nutrition and weight (the client's programs on Home).
   afterWorkout?: React.ReactNode;
+  // The client's programs as Home already lists them: where each one is up to ("Week x of y") and how many workouts are done, for the Today card.
+  programs?: HomeProgramCard[];
+  // Today's wellness check-in, right under the tiles (the Check in tile opens it).
+  checkin?: React.ReactNode;
 }) {
   return (
     <div className="space-y-4">
@@ -81,14 +91,20 @@ export function DayCard({
         sessionsLeft={sessionsLeft}
         wellnessCheckin={isToday ? wellnessCheckin ?? null : null}
         nextLabel={nextLabel}
+        programs={programs}
       />
+
+      {isToday && <TodayTiles />}
+      {checkin}
 
       {afterWorkout}
 
       {isToday ? (
         <>
           <TodayWidget todayDate={dateKey} macros={macros} habits={habits} mealLine={mealLine ?? null} mealHref={`/groups/${groupId}/nutrition`} />
-          <WeightLogWidget athleteId={athleteId} groupId={groupId} initialLogs={weightLogs} weightUnit={weightUnit} />
+          <div id="log-weight" className="scroll-mt-4">
+            <WeightLogWidget athleteId={athleteId} groupId={groupId} initialLogs={weightLogs} weightUnit={weightUnit} />
+          </div>
           <InbodyEntry athleteId={athleteId} groupId={groupId} />
         </>
       ) : (
@@ -97,6 +113,51 @@ export function DayCard({
     </div>
   );
 }
+
+// The program behind a day's workout, as Home lists it (a single program is the one, when the day names none).
+function programFor(programs: HomeProgramCard[], programId: string | null | undefined): HomeProgramCard | null {
+  if (programId) return programs.find((p) => p.id === programId) ?? null;
+  return programs.length === 1 ? programs[0] : null;
+}
+
+// The Today card's frame: the day on the left in the accent, "Week x of y" on the right when the program has weeks.
+function TodayFrame({ dateLabel, program, readinessChip, children }: { dateLabel: string; program: HomeProgramCard | null; readinessChip: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section className="home-band p-5" aria-label={dateLabel} data-today-card>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <p className="font-body text-[13px] font-semibold text-rust-ink">
+          {dateLabel}
+          {readinessChip}
+        </p>
+        {program && program.week != null && program.weeks > 0 && (
+          <p className="font-body text-xs text-steel tabular-nums">
+            Week {program.week} of {program.weeks}
+          </p>
+        )}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+// "21 of 84 workouts done", with a bar.
+function ProgramProgress({ program }: { program: HomeProgramCard | null }) {
+  if (!program || program.total <= 0) return null;
+  const pct = Math.round((Math.min(program.done, program.total) / program.total) * 100);
+  return (
+    <div className="mt-3">
+      <div className="h-1.5 rounded-full bg-line overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={program.total} aria-valuenow={program.done} aria-label="Workouts done">
+        <div className="h-full rounded-full bg-rust" style={{ width: `${pct}%` }} />
+      </div>
+      <p className="font-body text-xs text-steel mt-1.5 tabular-nums">
+        {program.done} of {program.total} workouts done
+      </p>
+    </div>
+  );
+}
+
+const START_BUTTON = "w-full h-[52px] flex items-center justify-center bg-rust text-graphite font-body text-base font-semibold";
+const SECOND_BUTTON = "w-full h-11 flex items-center justify-center rounded-token-pill border border-rust/50 text-rust-ink font-body text-sm font-semibold";
 
 function WorkoutSection({
   ownChoice = false,
@@ -110,6 +171,7 @@ function WorkoutSection({
   sessionsLeft,
   wellnessCheckin,
   nextLabel,
+  programs,
 }: {
   ownChoice?: boolean;
   groupId: string;
@@ -122,9 +184,10 @@ function WorkoutSection({
   sessionsLeft?: number | null;
   wellnessCheckin?: WellnessCheckinValues | null;
   nextLabel?: string | null;
+  programs: HomeProgramCard[];
 }) {
   const readinessChip = wellnessCheckin ? (
-    <span className="font-body text-xs text-steel border border-steel/30 px-2 py-0.5 ml-2">
+    <span className="font-body text-xs font-normal text-steel bg-surface-2 rounded-token-pill px-2 py-0.5 ml-2 align-middle">
       Feeling {Math.round(computeReadinessAverage(wellnessCheckin))}/5 today
     </span>
   ) : null;
@@ -134,27 +197,31 @@ function WorkoutSection({
   const finished = sessions.length > 0 ? sessions : workout.workoutId ? [workout] : [];
   if (isToday && finished.length > 0 && finished.every((x) => x.status === "done")) {
     const titles = finished.map((x) => x.title).filter(Boolean).join(" + ");
+    const program = programFor(programs, sessions[0]?.programId);
     return (
-      <div className="border border-positive/40 p-4 flex items-center gap-3">
-        <span className="w-11 h-11 shrink-0 rounded-full bg-positive/15 flex items-center justify-center">
-          <Check className="w-6 h-6 text-positive" strokeWidth={3} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="font-display font-bold text-xl uppercase leading-none">Done for today</p>
-          <p className="font-body text-xs text-steel mt-1 truncate">
-            {titles}
-            {nextLabel ? ` · Next: ${nextLabel}` : ""}
-          </p>
+      <section className="tint-win rounded-card p-5" aria-label={dateLabel} data-today-card>
+        <div className="flex items-center gap-3">
+          <span className="w-11 h-11 shrink-0 rounded-full bg-win/15 flex items-center justify-center">
+            <Check className="w-6 h-6 text-win" strokeWidth={3} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="font-display font-semibold text-2xl leading-none">Done for today</p>
+            <p className="font-body text-[13px] text-steel mt-1 truncate">
+              {titles}
+              {nextLabel ? ` · Next: ${nextLabel}` : ""}
+            </p>
+          </div>
+          {finished[0].workoutId && (
+            <Link
+              href={`/groups/${groupId}/workouts/${finished[0].workoutId}`}
+              className="inline-flex items-center min-h-11 font-body text-sm text-chalk underline underline-offset-2 shrink-0"
+            >
+              View
+            </Link>
+          )}
         </div>
-        {finished[0].workoutId && (
-          <Link
-            href={`/groups/${groupId}/workouts/${finished[0].workoutId}`}
-            className="inline-flex items-center min-h-11 font-body text-xs text-steel underline underline-offset-2 shrink-0"
-          >
-            View
-          </Link>
-        )}
-      </div>
+        <ProgramProgress program={program} />
+      </section>
     );
   }
 
@@ -163,39 +230,36 @@ function WorkoutSection({
   if (sessions.length > 1) {
     const firstPlannedIndex = sessions.findIndex((x) => x.status === "planned");
     return (
-      <div className="border border-steel/20">
-        <p className="font-body text-xs text-steel uppercase tracking-wide px-4 pt-4">
-          {dateLabel}
-          {readinessChip}
-        </p>
+      <TodayFrame dateLabel={dateLabel} program={null} readinessChip={readinessChip}>
         {sessions.map((x, i) => (
-          <div key={x.programId} className={i === 0 ? "px-4 pb-4 pt-2" : "px-4 py-4 border-t border-steel/15"}>
+          <div key={x.programId} className={i === 0 ? "pt-2" : "pt-4 mt-4 border-t border-steel/20"}>
             {x.status === "done" ? (
               <Link
                 href={`/groups/${groupId}/workouts/${x.workoutId}`}
                 className="flex items-center gap-2 min-h-11 font-body text-sm text-steel"
               >
-                <Check className="w-4 h-4 text-positive shrink-0" strokeWidth={3} />
+                <Check className="w-4 h-4 text-win shrink-0" strokeWidth={3} />
                 <span className="min-w-0">
-                  <span className="uppercase tracking-wide text-xs">{x.heading}</span>
+                  <span className="text-xs font-semibold">{x.heading}</span>
                   <span className="block text-chalk">{x.title} — done</span>
                 </span>
               </Link>
             ) : (
               <>
-                <p className="font-body text-xs text-rust uppercase tracking-wide">{x.heading}</p>
-                <p className="font-display font-bold text-xl uppercase leading-none mt-1">{x.title}</p>
+                <p className="font-body text-xs font-semibold text-steel">{x.heading}</p>
+                <p className="font-display font-semibold text-2xl leading-tight mt-0.5">{x.title}</p>
                 {x.note && <p className="font-body text-sm text-chalk mt-2 whitespace-pre-line">{x.note}</p>}
+                {isToday && i === firstPlannedIndex && <ProgramProgress program={programFor(programs, x.programId)} />}
                 <div className="mt-3">
                   {x.status === "planned" && (
                     <Link
                       href={`/groups/${groupId}/workouts/${x.workoutId}`}
                       className={
                         isToday && i === firstPlannedIndex
-                          ? "w-full h-11 flex items-center justify-center bg-rust text-graphite font-display uppercase text-sm font-bold"
+                          ? START_BUTTON
                           : isToday
-                          ? "w-full h-11 flex items-center justify-center border border-rust text-rust font-display uppercase text-sm font-bold"
-                          : "inline-flex items-center min-h-11 font-body text-sm text-rust"
+                          ? SECOND_BUTTON
+                          : "inline-flex items-center min-h-11 font-body text-sm text-rust-ink"
                       }
                     >
                       {isToday ? (ownChoice ? startLabel(weekdayOfDate(dateKey)) : "Start workout") : "View planned workout"}
@@ -213,7 +277,7 @@ function WorkoutSection({
             )}
           </div>
         ))}
-      </div>
+      </TodayFrame>
     );
   }
 
@@ -224,15 +288,11 @@ function WorkoutSection({
 
   if (workout.status === "no-program") {
     return (
-      <div className="border border-steel/20 p-4">
-        <p className="font-body text-xs text-steel uppercase tracking-wide">
-          {dateLabel}
-          {readinessChip}
-        </p>
+      <TodayFrame dateLabel={dateLabel} program={null} readinessChip={readinessChip}>
         <p className="font-body text-sm text-steel mt-2">
           No program is assigned to you right now. Your coach will add one.
         </p>
-      </div>
+      </TodayFrame>
     );
   }
 
@@ -242,15 +302,11 @@ function WorkoutSection({
   // has nothing real to show here.
   if (workout.status === "unscheduled") {
     return (
-      <div className="border border-steel/20 p-4">
-        <p className="font-body text-xs text-steel uppercase tracking-wide">
-          {dateLabel}
-          {readinessChip}
-        </p>
+      <TodayFrame dateLabel={dateLabel} program={null} readinessChip={readinessChip}>
         <p className="font-body text-sm text-steel mt-2">
           Your program isn&apos;t scheduled by date, so there is nothing on this day. Your next workout is on Today.
         </p>
-      </div>
+      </TodayFrame>
     );
   }
 
@@ -263,17 +319,13 @@ function WorkoutSection({
     // past/future rest day, ReadOnlyDaySummary owns it instead. Showing
     // them a third time here was a real duplicate, not a second signal.
     return (
-      <div className="border border-steel/20 p-4">
-        <p className="font-body text-xs text-steel uppercase tracking-wide">
-          {dateLabel}
-          {readinessChip}
-        </p>
-        <p className="font-display font-bold text-lg uppercase leading-none mt-1">Rest day</p>
+      <TodayFrame dateLabel={dateLabel} program={null} readinessChip={readinessChip}>
+        <p className="font-display font-semibold text-[28px] leading-tight mt-1">Rest day</p>
 
         {canBook && (
           <Link
             href={`/groups/${groupId}/calendar/${dateKey}`}
-            className="font-body text-sm text-rust mt-3 inline-flex items-center min-h-11"
+            className="font-body text-sm text-rust-ink mt-3 inline-flex items-center min-h-11"
           >
             Book a session with your coach &rarr;
           </Link>
@@ -281,31 +333,31 @@ function WorkoutSection({
         {canBook && sessionsLeft != null && sessionsLeft > 0 && (
           <p className="font-body text-xs text-steel mt-1">{sessionBalanceLine(sessionsLeft)}</p>
         )}
-      </div>
+      </TodayFrame>
     );
   }
 
   const isPrimary = isToday && workout.status === "planned";
+  const program = programFor(programs, sessions[0]?.programId);
+  const programLine = program?.name ?? sessions[0]?.heading ?? null;
 
   return (
-    <div className="border border-steel/20 p-4">
-      <p className="font-body text-xs text-steel uppercase tracking-wide">
-        {dateLabel}
-        {readinessChip}
-      </p>
-      <p className="font-display font-bold text-xl uppercase leading-none mt-1">{workout.title}</p>
+    <TodayFrame dateLabel={dateLabel} program={program} readinessChip={readinessChip}>
+      <p className="font-display font-semibold text-[28px] leading-tight mt-1 break-words">{workout.title}</p>
+      {programLine && <p className="font-body text-sm text-steel mt-0.5 break-words">{programLine}</p>}
+      <ProgramProgress program={program} />
 
-      <div className="mt-3">
+      <div className="mt-4">
         {workout.status === "done" && workout.workoutId && (
           <Link
             href={`/groups/${groupId}/workouts/${workout.workoutId}`}
-            className="inline-flex items-center min-h-11 font-body text-sm text-positive"
+            className="inline-flex items-center min-h-11 font-body text-sm text-win"
           >
             Completed — view workout
           </Link>
         )}
         {workout.status === "done" && !workout.workoutId && (
-          <p className="font-body text-sm text-positive">You finished every workout in this program.</p>
+          <p className="font-body text-sm text-win">You finished every workout in this program.</p>
         )}
         {workout.status === "missed" && (
           <p className="font-body text-sm text-steel">Not logged.</p>
@@ -320,8 +372,8 @@ function WorkoutSection({
             href={`/groups/${groupId}/workouts/${workout.workoutId}`}
             className={
               isPrimary
-                ? "w-full h-11 flex items-center justify-center bg-rust text-graphite font-display uppercase text-sm font-bold"
-                : "inline-flex items-center min-h-11 font-body text-sm text-rust"
+                ? START_BUTTON
+                : "inline-flex items-center min-h-11 font-body text-sm text-rust-ink"
             }
           >
             {isToday ? (ownChoice ? startLabel(weekdayOfDate(dateKey)) : "Start workout") : "View planned workout"}
@@ -329,7 +381,7 @@ function WorkoutSection({
         )}
         {ownChoice && isToday && workout.status === "planned" && <ViewWholeProgramLink groupId={groupId} programId={sessions?.[0]?.programId ?? null} />}
       </div>
-    </div>
+    </TodayFrame>
   );
 }
 
@@ -342,7 +394,7 @@ function weekdayOfDate(dateKey: string): string {
 function ViewWholeProgramLink({ groupId, programId }: { groupId: string; programId: string | null }) {
   if (!programId) return null;
   return (
-    <Link href={`/groups/${groupId}/programs/${programId}`} className="mt-2 w-full h-11 flex items-center justify-center border border-steel/40 text-chalk font-body text-sm">
+    <Link href={`/groups/${groupId}/programs/${programId}`} className="mt-2 w-full h-11 flex items-center justify-center rounded-token-pill border border-steel/40 text-chalk font-body text-sm">
       {VIEW_PROGRAM_LABEL}
     </Link>
   );
@@ -359,26 +411,26 @@ function ReadOnlyDaySummary({
   if (!hasMacros && habits.length === 0) return null;
 
   return (
-    <div className="border border-steel/20 p-4">
+    <div className="bg-surface rounded-card p-4">
       {hasMacros && (
         <>
-          <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">Targets</p>
+          <p className="font-body text-[13px] font-semibold text-steel mb-1">Targets</p>
           <div className="grid grid-cols-4 gap-2 text-center mb-3">
             <div>
               <p className="font-display text-lg leading-none">{macros!.calories ?? "--"}</p>
-              <p className="font-body text-xs text-steel uppercase mt-1">Kcal</p>
+              <p className="font-body text-xs text-steel mt-1">Kcal</p>
             </div>
             <div>
               <p className="font-display text-lg leading-none">{macros!.proteinG ?? "--"}</p>
-              <p className="font-body text-xs text-steel uppercase mt-1">Protein</p>
+              <p className="font-body text-xs text-steel mt-1">Protein</p>
             </div>
             <div>
               <p className="font-display text-lg leading-none">{macros!.carbsG ?? "--"}</p>
-              <p className="font-body text-xs text-steel uppercase mt-1">Carbs</p>
+              <p className="font-body text-xs text-steel mt-1">Carbs</p>
             </div>
             <div>
               <p className="font-display text-lg leading-none">{macros!.fatG ?? "--"}</p>
-              <p className="font-body text-xs text-steel uppercase mt-1">Fat</p>
+              <p className="font-body text-xs text-steel mt-1">Fat</p>
             </div>
           </div>
         </>

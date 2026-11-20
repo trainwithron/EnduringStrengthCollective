@@ -127,7 +127,8 @@ export function ExerciseSwipeCarousel({
       const top = scroller.getBoundingClientRect().top + window.scrollY;
       // Everything pinned under the card, measured from the top of the Complete bar to the bottom of the screen: the bar itself (it grows with the phone's safe area) AND the tab bar under it, plus a little air.
       // (The bar's own height alone left the tab bar out, so on a long card the Sets row or the form-video link could sit behind the bars.)
-      const bar = document.querySelector("[data-complete-bar]") as HTMLElement | null;
+      // The workout's bottom bar (Rest / Next); the Complete workout panel only while it is open.
+      const bar = (document.querySelector("[data-logger-bar]") ?? document.querySelector("[data-complete-bar]")) as HTMLElement | null;
       const below = (bar ? window.innerHeight - bar.getBoundingClientRect().top : 65) + 4;
       setMaxHeight(Math.max(260, Math.floor(window.innerHeight - top - below)));
     };
@@ -314,7 +315,7 @@ export function ExerciseSwipeCarousel({
               className="relative snap-center snap-always shrink-0 w-full overflow-x-hidden overflow-y-auto overscroll-x-auto overscroll-y-contain px-5"
               style={{ maxHeight: maxHeight ?? undefined }}
             >
-              <div className="border border-steel/20 bg-surface/20 p-2.5">
+              <div className="rounded-card bg-surface p-3">
               <p className="sr-only">
                 Exercise {exercises.findIndex((e) => e.id === exercise.id) + 1} of {exercises.length}
               </p>
@@ -349,7 +350,7 @@ export function ExerciseSwipeCarousel({
                   <button
                     type="button"
                     onClick={() => setExpandedId(expanded ? null : exercise.id)}
-                    className="flex items-center gap-1 min-h-[44px] px-1 font-body text-xs text-steel uppercase tracking-wide active:text-rust"
+                    className="flex items-center gap-1 min-h-[44px] px-1 font-body text-xs text-steel active:text-rust"
                   >
                     {expanded ? "Less room" : "More room"}
                     {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}

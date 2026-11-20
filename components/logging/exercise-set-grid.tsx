@@ -84,6 +84,15 @@ function useSwipeGesture(onAccept: () => void, enabled: boolean) {
   };
 }
 
+// The grey number a cell offers while it is empty: the weight suggestion for Weight, the coach's prescribed value for everything else.
+function suggestionFor(set: SetLogEntry, field: TrackedField): number | string | null {
+  return field === "weight"
+    ? set.suggestedWeight ?? null
+    : field === "reps"
+      ? parseNumericReps((set[TARGET_PROP.reps as keyof SetLogEntry] as string | null) ?? null)
+      : ((set[TARGET_PROP[field] as keyof SetLogEntry] as number | string | null | undefined) ?? null);
+}
+
 // One editable cell: this set's own actual value for this field, with a
 // grayed-out prescribed/suggested value as its placeholder while empty.
 // Swiping within the cell accepts that placeholder — the correlating-
@@ -155,12 +164,7 @@ function GridCell({
   // Weight's placeholder is the correlating-history suggestion (already
   // reconciled with any explicit coach target server-side); every other
   // field falls back to its plain prescribed target, same as before.
-  const suggestion =
-    field === "weight"
-      ? set.suggestedWeight ?? null
-      : field === "reps"
-      ? parseNumericReps((set[TARGET_PROP.reps as keyof SetLogEntry] as string | null) ?? null)
-      : (set[TARGET_PROP[field] as keyof SetLogEntry] as number | string | null | undefined) ?? null;
+  const suggestion = suggestionFor(set, field);
 
   // Just the number: the row's label already says what it is, and a longer hint does not fit in the cell.
   // The suggestion as text in the person's unit (a stored pound value shows as kilograms for a kilogram client).
@@ -241,7 +245,7 @@ function GridCell({
   if (field === "rest" && coachRest != null) {
     return (
       <div
-        className="w-12 h-11 shrink-0 flex items-center justify-center rounded-token-pill bg-surface/40 border border-steel/20 text-chalk font-body text-sm tabular-nums"
+        className="w-full h-12 flex items-center justify-center rounded-row bg-surface-2/60 text-chalk font-body text-sm tabular-nums"
         aria-label={`Rest after set ${setNumber}: ${formatRestSpan(coachRest, coachRestMax)}, set by your coach`}
       >
         {coachRestMax != null ? `${Math.round(coachRest)}-${Math.round(coachRestMax)}` : formatRest(coachRest)}
@@ -250,7 +254,8 @@ function GridCell({
   }
 
   return (
-    <div className="relative w-12 h-11 shrink-0">
+    // One box of a set's row (Look Refresh, client step): the full width of its column and 48px tall.
+    <div className="relative w-full h-12 min-w-0">
       <input
         type={isNumeric ? "number" : "text"}
         inputMode={isNumeric ? (field === "reps" ? "numeric" : "decimal") : undefined}
@@ -298,11 +303,11 @@ function GridCell({
           onTouched();
           commit(suggestion);
         }}
-        className={`w-12 h-11 rounded-token-pill font-body text-sm text-center focus:outline-none focus:border-rust disabled:opacity-60 ${
+        className={`w-full h-12 rounded-row font-body text-[17px] font-semibold tabular-nums text-center placeholder:font-normal placeholder:text-steel focus:outline-none focus:border-rust disabled:opacity-60 ${
           unsaved ? "border-2 border-amber-400/70 " : ""
         }${
           invalid ? "border-2 border-rust " : ""
-        }bg-surface border border-steel/30 text-chalk`}
+        }bg-surface-2 border border-transparent text-chalk`}
       />
       {unsaved && (
         <span
@@ -312,6 +317,35 @@ function GridCell({
         />
       )}
     </div>
+  );
+}
+
+// The end of a set's row (Look Refresh, client step): green with a check once the set is done. Before that, a tap fills the set's empty boxes with what they suggest (the set
+// then completes the usual way, once it is all filled in); it never marks a set done that is not filled in.
+function DoneCheck({ set, setNumber, done, readOnly, onAccept }: { set: SetLogEntry; setNumber: number; done: boolean; readOnly: boolean; onAccept: () => void }) {
+  const tick = (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+      <path d="M5 12l5 5 9-10" />
+    </svg>
+  );
+  if (done) {
+    return (
+      <span role="img" aria-label={`Set ${setNumber} done`} data-set-check={set.id} className="w-full h-12 rounded-row bg-win text-graphite flex items-center justify-center">
+        {tick}
+      </span>
+    );
+  }
+  if (readOnly) return <span aria-hidden="true" className="w-full h-12" />;
+  return (
+    <button
+      type="button"
+      onClick={onAccept}
+      aria-label={`Set ${setNumber}: fill in what is suggested`}
+      data-set-check={set.id}
+      className="w-full h-12 rounded-row bg-surface-2 border border-steel/40 text-steel flex items-center justify-center active:border-win active:text-win transition-colors"
+    >
+      {tick}
+    </button>
   );
 }
 
@@ -498,7 +532,7 @@ export function ExerciseSetGrid({
   function RowHandle({ field }: { field: TrackedField }) {
     const dragStartX = useRef<number | null>(null);
     const dragFired = useRef(false);
-    if (readOnly || sets.length < 2) return <div className="w-8 shrink-0" />;
+    if (readOnly || sets.length < 2) return null;
     return (
       <button
         type="button"
@@ -549,6 +583,32 @@ export function ExerciseSetGrid({
     );
   }
 
+  // The rows' columns: the set number, one per tracked field (each at least 52px), and the done check. Past what the phone has room for, the rows scroll sideways.
+  const columns = `2.5rem repeat(${fields.length}, minmax(3.25rem, 1fr)) 3rem`;
+  const rowMinWidth = `${40 + fields.length * 52 + 48 + (fields.length + 1) * 8}px`;
+
+  // The check at the end of a set's row: every empty box takes the number it suggests (the same as tapping each grey number), and the set is done once it is all filled in.
+  // A box with nothing to suggest is focused instead, so the person types it. Nothing else changes about when a set counts as done.
+  function acceptSuggested(set: SetLogEntry) {
+    if (readOnly || set.status === "completed") return;
+    for (const field of fields) {
+      if (field === "rest") continue;
+      const prop = ACTUAL_PROP[field] as keyof SetLogEntry;
+      if (set[prop] !== null && set[prop] !== undefined) continue;
+      const suggestion = suggestionFor(set, field);
+      if (suggestion === null || suggestion === undefined) continue;
+      onSetChange(set.id, { [prop]: suggestion, ...(field === "weight" ? { weightConfirmed: true } : {}) } as Partial<SetLogEntry>);
+      save(set.id, { [ACTUAL_COLUMN[field]]: suggestion, ...(field === "weight" ? { weight_confirmed: true } : {}) });
+    }
+    vibrateConfirm();
+    markTouched(set.id);
+    // Anything still empty is for the person to type: the first such box gets the focus.
+    requestAnimationFrame(() => {
+      const empty = Array.from(document.querySelectorAll<HTMLInputElement>(`[data-set-row="${set.id}"] input`)).find((el) => el.value.trim() === "");
+      empty?.focus();
+    });
+  }
+
   return (
     <div>
       {sets.map((set) => (
@@ -567,14 +627,15 @@ export function ExerciseSetGrid({
           onChange={(patch, arrived) => onSetChange(set.id, patch, arrived)}
         />
       ))}
-      {/* Every set in one line (Ron, Nov 12: a fifth set wrapping onto a second row "needs to scroll"). The names of the rows and the fill handles stay put on the left; the sets scroll
-          sideways beside them. The scroll stays inside the grid (overscroll contained), so swiping the sets never flips to the next exercise; a swipe anywhere else on the card still does. */}
-      <div className="flex items-start gap-1">
-        <div className="flex flex-col gap-1 shrink-0">
-          <div className="h-11" />
+      {/* Sets as rows (Look Refresh, client step, Ron Nov 20): each set is one row, its number, a 48px box for each thing the coach tracks (lb, reps, RPE...), and a done check at the end. The
+          column names sit on top, each with its fill dot (tap or drag: every set takes set 1's value). With more columns than the phone has room for, the rows scroll sideways inside the card
+          (overscroll contained), so swiping the sets never flips to the next exercise. A set is still done once it is filled in (lib/set-complete.ts); the check only fills in what is suggested. */}
+      <div className="overflow-x-auto overscroll-x-contain -mx-1 px-1" data-set-scroll>
+        <div className="grid gap-x-2 gap-y-2 items-center" style={{ gridTemplateColumns: columns, minWidth: rowMinWidth }} data-set-rows>
+          <span className="font-body text-xs text-steel">Set</span>
           {fields.map((field) => (
-            <div key={field} className="h-11 flex items-center gap-1">
-              <span className="w-12 shrink-0 font-body text-xs text-steel truncate flex items-center gap-1">
+            <div key={field} className="flex items-center justify-center gap-0.5 min-w-0">
+              <span className="font-body text-xs text-steel truncate flex items-center gap-1">
                 {rowLabel(field)}
                 {field === "rpe" && (
                   <InfoTip text="Rate of Perceived Exertion — how hard that set felt, 1 (easy) to 10 (max effort)." />
@@ -583,63 +644,55 @@ export function ExerciseSetGrid({
               <RowHandle field={field} />
             </div>
           ))}
-        </div>
-        <div className="min-w-0 flex-1 overflow-x-auto overscroll-x-contain" data-set-scroll>
-          <div className="flex flex-col gap-1 w-max pr-1">
-            <div className="h-11 flex items-center gap-1">
-              {sets.map((set, i) => {
-                const warmup = set.setType === "warmup";
-                // A done set's number turns green with a tick beside it (this replaces the old checkbox row), so it reads as done without knowing the colour code.
-                const done = set.status === "completed";
-                const doneMark = done ? "text-moss font-bold" : "";
-                // The coach's kind of set (B2): an AMRAP, back-off or drop set says so under its number, and is kept as the coach set it (the tap below only switches warm-up and working).
-                const special = set.setType === "amrap" || set.setType === "backoff" || set.setType === "drop" ? set.setType : null;
-                const label = (
-                  <>
-                    {warmup ? "W" : i + 1}
-                    {done && <span aria-hidden="true"> &#10003;</span>}
-                    {special && <span className="block text-[9px] leading-tight text-rust uppercase">{SET_TYPE_SHORT_LABEL[special]}</span>}
-                  </>
-                );
-                // Tap the set number to mark it a warm-up (it then never counts toward goals, records or your max) and tap again to undo.
-                if (readOnly || special) {
-                  return (
-                    <span key={set.id} data-set-done={done || undefined} title={special ? SET_TYPE_LABELS[special] : undefined} className={`w-12 shrink-0 text-center font-body text-xs ${doneMark || "text-steel"}`}>
-                      {label}
-                      {special && <span className="sr-only"> ({SET_TYPE_LABELS[special]})</span>}
-                      {done && <span className="sr-only"> (done)</span>}
-                    </span>
-                  );
-                }
-                return (
-                  <button
-                    key={set.id}
-                    type="button"
-                    aria-pressed={warmup}
-                    data-set-done={done || undefined}
-                    aria-label={`${warmup ? `Set ${i + 1} is a warm-up. Tap to make it a working set.` : `Mark set ${i + 1} as a warm-up`}${done ? " (done)" : ""}`}
-                    title={warmup ? "Warm-up (tap to change)" : "Tap to mark as a warm-up"}
-                    onClick={() => {
-                      const next = warmup ? "working" : "warmup";
-                      onSetChange(set.id, { setType: next });
-                      save(set.id, { set_type: next });
-                    }}
-                    className={`w-12 shrink-0 min-h-11 text-center font-body text-xs ${doneMark || (warmup ? "text-rust font-bold" : "text-steel")}`}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-            {fields.map((field) => (
-              <div key={field} className="h-11 flex items-center gap-1">
-                {sets.map((set, j) => (
+          <span aria-hidden="true" />
+          {sets.map((set, i) => {
+            const warmup = set.setType === "warmup";
+            // A done set's number turns green (the check at the end of the row says it too), so it reads as done without knowing the colour code.
+            const done = set.status === "completed";
+            const doneMark = done ? "text-moss font-bold" : "";
+            // The coach's kind of set (B2): an AMRAP, back-off or drop set says so under its number, and is kept as the coach set it (the tap below only switches warm-up and working).
+            const special = set.setType === "amrap" || set.setType === "backoff" || set.setType === "drop" ? set.setType : null;
+            const label = (
+              <>
+                {warmup ? "W" : i + 1}
+                {special && <span className="block font-body text-[9px] leading-tight text-rust uppercase">{SET_TYPE_SHORT_LABEL[special]}</span>}
+              </>
+            );
+            // Tap the set number to mark it a warm-up (it then never counts toward goals, records or your max) and tap again to undo.
+            const number =
+              readOnly || special ? (
+                <span key={`n-${set.id}`} data-set-done={done || undefined} title={special ? SET_TYPE_LABELS[special] : undefined} className={`w-full text-center font-display text-lg leading-none ${doneMark || "text-steel"}`}>
+                  {label}
+                  {special && <span className="sr-only"> ({SET_TYPE_LABELS[special]})</span>}
+                  {done && <span className="sr-only"> (done)</span>}
+                </span>
+              ) : (
+                <button
+                  key={`n-${set.id}`}
+                  type="button"
+                  aria-pressed={warmup}
+                  data-set-done={done || undefined}
+                  aria-label={`${warmup ? `Set ${i + 1} is a warm-up. Tap to make it a working set.` : `Mark set ${i + 1} as a warm-up`}${done ? " (done)" : ""}`}
+                  title={warmup ? "Warm-up (tap to change)" : "Tap to mark as a warm-up"}
+                  onClick={() => {
+                    const next = warmup ? "working" : "warmup";
+                    onSetChange(set.id, { setType: next });
+                    save(set.id, { set_type: next });
+                  }}
+                  className={`w-full min-h-12 text-center font-display text-lg leading-none ${doneMark || (warmup ? "text-rust font-bold" : "text-steel")}`}
+                >
+                  {label}
+                </button>
+              );
+            return [
+              number,
+              ...fields.map((field) => (
+                <div key={`${set.id}:${field}`} data-set-row={set.id} className="min-w-0">
                   <GridCell
-                    key={set.id}
                     set={set}
                     field={field}
                     readOnly={readOnly}
-                    setNumber={j + 1}
+                    setNumber={i + 1}
                     onTouched={() => markTouched(set.id)}
                     onInvalid={(message) => setCellInvalid(`${set.id}:${field}`, message)}
                     onChange={(patch) => onSetChange(set.id, patch)}
@@ -652,10 +705,11 @@ export function ExerciseSetGrid({
                       return r && r.source === "coach" ? r.maxSeconds ?? null : null;
                     })()}
                   />
-                ))}
-              </div>
-            ))}
-          </div>
+                </div>
+              )),
+              <DoneCheck key={`d-${set.id}`} set={set} setNumber={i + 1} done={done} readOnly={readOnly} onAccept={() => acceptSuggested(set)} />,
+            ];
+          })}
         </div>
       </div>
       {invalidLines.length > 0 && (

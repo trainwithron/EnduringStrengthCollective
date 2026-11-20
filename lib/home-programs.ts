@@ -17,6 +17,9 @@ export interface HomeProgramCard {
   done: number;
   /** "Week 2, Day 3" (right after the one done last), "Program complete", or "Nothing in it yet" */
   upNext: string;
+  /** The week they are in (the week of the workout they pick up at; the last week once it is complete), and how many weeks the program has. Null when it has no workouts. */
+  week: number | null;
+  weeks: number;
 }
 
 const byAge = (a: HomeProgramInput, b: HomeProgramInput) => String(a.created_at ?? "").localeCompare(String(b.created_at ?? "")) || a.name.localeCompare(b.name);
@@ -42,6 +45,9 @@ export function homeProgramCards(programs: HomeProgramInput[], workouts: HomeWor
   return [...programs].sort(byAge).map((p) => {
     const list = byProgram.get(p.id) ?? [];
     const done = list.filter((w) => doneAt.has(w.id)).length;
-    return { id: p.id, name: p.name, total: list.length, done, upNext: pickupLabel(pickUpWhereLeftOff(list, doneAt)) };
+    const pickup = pickUpWhereLeftOff(list, doneAt);
+    const weeks = list.reduce((max, w) => Math.max(max, w.week_number ?? 1), 0);
+    const week = pickup.kind === "next" ? pickup.workout.week_number ?? 1 : pickup.kind === "complete" ? weeks : null;
+    return { id: p.id, name: p.name, total: list.length, done, upNext: pickupLabel(pickup), week, weeks };
   });
 }

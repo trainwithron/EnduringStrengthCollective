@@ -63,7 +63,10 @@ export function RestTimerBar({
   groupId,
   todayDate,
   read,
+  nextUp = null,
 }: {
+  // The exercise that comes after this rest (the bottom bar's Next), shown on the rest sheet.
+  nextUp?: string | null;
   sessionId: string;
   // A set just auto-completed — offer to start a rest timer, defaulting
   // to that exercise's own target rest if it has one. When isPrescribed
@@ -241,85 +244,135 @@ export function RestTimerBar({
   }
 
   const showPrompt = pendingPrompt && !running;
-  // Always on screen: a rest can be started any time, not only when a set is ticked (Ron, Oct 31: he fills all the sets in up front once the weight is agreed, and still
-  // needs the timer between them). The prompt and the countdown open over it, so nothing moves.
-  const restRow = (
-    <div className="flex items-center gap-1.5 px-5 py-1 border-b border-steel/20">
-      <span className="font-body text-xs text-steel">Rest</span>
-      {PRESETS.map((seconds) => (
-        <button key={seconds} type="button" onClick={() => startPreset(seconds)} className="h-11 px-3 font-body text-xs border border-steel/30 text-steel">
-          {seconds}s
-        </button>
-      ))}
-    </div>
-  );
-  // Nothing running: just the row. (The workout's stopwatch is on the header's top line.)
-  if (!showPrompt && !running && !justFinished) return restRow;
+  // A rest can be started any time from the workout's bottom bar ("Rest 90s"), not only when a set is ticked (Ron, Oct 31: he fills all the sets in up front once the weight is agreed, and
+  // still needs the timer between them). Nothing asked and nothing running: nothing here.
+  if (!showPrompt && !running && !justFinished) return null;
+
+  // The ring: how much of the rest is left.
+  const ringR = 52;
+  const ringC = 2 * Math.PI * ringR;
+  const ringLeft = running && running.durationSeconds > 0 ? Math.max(0, Math.min(1, remaining / running.durationSeconds)) : 0;
+  const chip = (on: boolean) =>
+    `flex-1 min-w-0 h-11 rounded-token-pill font-body text-[13px] ${on ? "bg-rust/15 text-rust-ink font-semibold" : "bg-surface-2 text-steel"}`;
 
   return (
     <>
-    {restRow}
-    {/* Over the top of the card, not above it, so the sets don't move when rest starts. */}
-    <div className="absolute inset-x-0 top-0 z-40 bg-graphite border-b border-steel/20 px-5 py-1 shadow-lg">
-      <div className="flex items-center justify-between gap-3">
-      {showPrompt && (
-        <div className="flex items-center gap-1.5 min-w-0">
-          <span className="font-body text-xs text-steel">Rest?</span>
-          {PRESETS.map((seconds) => (
-            <button
-              key={seconds}
-              type="button"
-              onClick={() => startPreset(seconds)}
-              className={`h-11 px-3 font-body text-xs border ${
-                seconds === pendingPrompt!.defaultSeconds
-                  ? "bg-rust border-rust text-graphite"
-                  : "border-steel/30 text-steel"
-              }`}
-            >
-              {seconds}s
-            </button>
-          ))}
-          {!PRESETS.includes(pendingPrompt!.defaultSeconds) && (
-            <button
-              type="button"
-              onClick={() => startPreset(pendingPrompt!.defaultSeconds)}
-              className="h-11 px-3 font-body text-xs border bg-rust border-rust text-graphite"
-            >
-              {pendingPrompt!.defaultSeconds}s
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={onPromptHandled}
-            aria-label="Dismiss rest timer prompt"
-            className="ml-auto w-11 h-11 shrink-0 flex items-center justify-center font-body text-xs text-steel"
-          >
-            ✕
-          </button>
-        </div>
+      {/* "Rest complete" for a few seconds after the countdown ends, above the bottom bar. */}
+      {justFinished && !running && !showPrompt && (
+        <p role="status" className="fixed left-5 right-5 bottom-[calc(6.5rem+env(safe-area-inset-bottom))] z-40 rounded-card tint-win bg-surface px-4 py-3 font-body text-sm text-chalk text-center">
+          Rest complete! 💪
+        </p>
       )}
 
-        {running && (
-          <div className="flex flex-1 flex-wrap items-center justify-end gap-x-2 gap-y-2">
-            <p className="mr-auto font-display text-3xl leading-none text-rust tabular-nums">
-              {formatMMSS(remaining)}
-            </p>
-            {running.source !== "coach" && (
-              <button
-                type="button"
-                onClick={addFifteen}
-                className="h-11 px-3 border border-steel/30 text-steel font-body text-xs"
-              >
-                +15s
+      {/* A set was just done and the coach set no rest for it: "Rest?" with the three lengths (the one that fits highlighted), or ✕. */}
+      {showPrompt && (
+        <section aria-label="Start a rest" className="fixed inset-x-0 bottom-0 z-50 rounded-t-[28px] bg-surface border-t border-rust/25 px-5 pt-3 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-[0_-16px_40px_rgb(0_0_0/0.5)]">
+          <span aria-hidden="true" className="block mx-auto mb-3 w-10 h-1 rounded-full bg-steel/40" />
+          <div className="flex items-center gap-2">
+            <span className="font-body text-sm font-semibold text-chalk shrink-0">Rest?</span>
+            {PRESETS.map((seconds) => (
+              <button key={seconds} type="button" onClick={() => startPreset(seconds)} className={chip(seconds === pendingPrompt!.defaultSeconds)}>
+                {seconds}s
+              </button>
+            ))}
+            {!PRESETS.includes(pendingPrompt!.defaultSeconds) && (
+              <button type="button" onClick={() => startPreset(pendingPrompt!.defaultSeconds)} className={chip(true)}>
+                {pendingPrompt!.defaultSeconds}s
               </button>
             )}
             <button
               type="button"
-              onClick={skip}
-              className="h-11 px-3 border border-steel/30 text-steel font-body text-xs"
+              onClick={onPromptHandled}
+              aria-label="Dismiss rest timer prompt"
+              className="w-11 h-11 shrink-0 flex items-center justify-center rounded-full font-body text-sm text-steel"
             >
-              Skip
+              ✕
             </button>
+          </div>
+        </section>
+      )}
+
+      {/* Resting (Look Refresh, client step, Ron Nov 20): a sheet up from the bottom with a big countdown ring, what is next, +15s, the 60 / 90 / 120 lengths, Read and the game, and a big
+          Skip rest. The coach's own rest keeps its rule: no +15s and no other length on it (Skip stays). */}
+      {running && (
+        <section
+          aria-label="Rest timer"
+          data-rest-sheet
+          className="fixed inset-x-0 bottom-0 z-50 max-h-[88dvh] overflow-y-auto overscroll-contain rounded-t-[28px] bg-surface border-t border-rust/25 px-5 pt-3 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-[0_-16px_40px_rgb(0_0_0/0.5)] flex flex-col gap-3.5"
+        >
+          <span aria-hidden="true" className="block mx-auto w-10 h-1 rounded-full bg-steel/40" />
+
+          {readOpen && read && !readTurnedOff && athleteId && (
+            <ReadSlot
+              athleteId={athleteId}
+              reference={read.ref}
+              text={read.text}
+              noteSeen={read.noteSeen}
+              onClose={() => setReadOpen(false)}
+              onTurnedOff={() => {
+                setReadTurnedOff(true);
+                setReadOpen(false);
+              }}
+            />
+          )}
+
+          {selectedGame && (
+            <MiniGameSlot
+              gameKey={selectedGame}
+              startedAtMs={running.startedAtMs}
+              durationSeconds={running.durationSeconds}
+              onClose={() => setSelectedGame(null)}
+            />
+          )}
+
+          <div className="flex items-center gap-5">
+            <svg width="120" height="120" viewBox="0 0 120 120" role="img" aria-label={`${formatMMSS(remaining)} of rest left`} className="shrink-0">
+              <circle cx="60" cy="60" r={ringR} fill="none" stroke="rgb(var(--line))" strokeWidth="10" />
+              {ringLeft > 0 && (
+                <circle
+                  cx="60"
+                  cy="60"
+                  r={ringR}
+                  fill="none"
+                  stroke="rgb(var(--rust))"
+                  strokeWidth="10"
+                  strokeLinecap="round"
+                  strokeDasharray={`${(ringLeft * ringC).toFixed(1)} ${ringC.toFixed(1)}`}
+                  transform="rotate(-90 60 60)"
+                />
+              )}
+              <text x="60" y="70" textAnchor="middle" fill="rgb(var(--chalk))" className="font-display" fontSize="30">
+                {formatMMSS(remaining)}
+              </text>
+            </svg>
+            <div className="flex-1 min-w-0 flex flex-col gap-2">
+              <p className="font-body text-[13px] text-steel">{nextUp ? "Resting · next up" : "Resting"}</p>
+              {nextUp && <p className="font-body text-base font-semibold text-chalk truncate">{nextUp}</p>}
+              {running.source !== "coach" && (
+                <button type="button" onClick={addFifteen} className="h-11 rounded-token-pill border border-steel/40 text-chalk font-body text-sm font-semibold">
+                  +15s
+                </button>
+              )}
+            </div>
+          </div>
+
+          {running.source === "coach" && (
+            <p className="font-body text-xs text-steel">
+              {running.readySeconds != null
+                ? running.durationSeconds - remaining >= running.readySeconds
+                  ? `You can go now. Your coach's rest is ${formatRestSpan(running.readySeconds, running.durationSeconds)}.`
+                  : `Rest ${formatRestSpan(running.readySeconds, running.durationSeconds)} (set by your coach)`
+                : `Rest ${formatRest(running.prescribedSeconds ?? running.durationSeconds)} (set by your coach)`}
+            </p>
+          )}
+
+          <div className="flex items-center gap-2">
+            {running.source !== "coach" &&
+              PRESETS.map((seconds) => (
+                <button key={seconds} type="button" onClick={() => startPreset(seconds)} className={chip(seconds === running.durationSeconds)}>
+                  {seconds}s
+                </button>
+              ))}
             {read && !readTurnedOff && (
               <button
                 type="button"
@@ -328,9 +381,7 @@ export function RestTimerBar({
                   setPickerOpen(false);
                   setReadOpen((v) => !v);
                 }}
-                className={`h-11 px-2.5 border font-body text-xs ${
-                  readOpen ? "bg-rust border-rust text-graphite" : "border-steel/30 text-steel"
-                }`}
+                className={chip(readOpen)}
               >
                 📖 {readOpen ? "Hide" : "Read"}
               </button>
@@ -340,28 +391,18 @@ export function RestTimerBar({
                 window to feel like a game rather than a flash on
                 screen (custom_shape_theming_idea.md). */}
             {running.durationSeconds >= MIN_REST_SECONDS_FOR_GAME && (
-              <div className="relative">
+              <div className="relative flex-1 min-w-0 flex">
                 {pendingTask && !taskResolved ? (
-                  <button
-                    type="button"
-                    onClick={() => setGateOpen((v) => !v)}
-                    className="h-11 px-3 border border-steel/30 text-steel font-body text-xs"
-                  >
+                  <button type="button" onClick={() => setGateOpen((v) => !v)} className={chip(gateOpen)}>
                     🔒 Unlock
                   </button>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => (selectedGame ? setSelectedGame(null) : setPickerOpen((v) => !v))}
-                    className={`h-11 px-2.5 border font-body text-xs ${
-                      selectedGame ? "bg-rust border-rust text-graphite" : "border-steel/30 text-steel"
-                    }`}
-                  >
-                    🎮 {selectedGame ? "Hide" : "Play"}
+                  <button type="button" onClick={() => (selectedGame ? setSelectedGame(null) : setPickerOpen((v) => !v))} className={chip(!!selectedGame)}>
+                    🎮 {selectedGame ? "Hide" : "Game"}
                   </button>
                 )}
                 {pickerOpen && !selectedGame && !(pendingTask && !taskResolved) && (
-                  <div className="absolute right-0 top-full mt-1 z-20 bg-surface border border-steel/30 py-1 w-40">
+                  <div className="absolute right-0 bottom-full mb-2 z-20 rounded-card bg-surface-2 border border-steel/30 py-1 w-44 shadow-lg">
                     {GAME_ORDER.map((key) => (
                       <button
                         key={key}
@@ -371,7 +412,7 @@ export function RestTimerBar({
                           setPickerOpen(false);
                           setReadOpen(false);
                         }}
-                        className="w-full min-h-11 text-left px-3 font-body text-xs text-chalk active:text-rust"
+                        className="w-full min-h-11 text-left px-3 font-body text-sm text-chalk active:text-rust"
                       >
                         {GAME_LABELS[key]}
                       </button>
@@ -379,7 +420,7 @@ export function RestTimerBar({
                   </div>
                 )}
                 {gateOpen && pendingTask && !taskResolved && (
-                  <div className="absolute right-0 top-full mt-1 z-20 bg-surface border border-steel/30 p-3 w-72">
+                  <div className="absolute right-0 bottom-full mb-2 z-20 rounded-card bg-surface-2 border border-steel/30 p-3 w-72 max-w-[calc(100vw-2.5rem)] shadow-lg">
                     <p className="font-body text-xs text-steel mb-2">
                       Finish this to unlock the mini-game/trivia:
                     </p>
@@ -409,47 +450,12 @@ export function RestTimerBar({
               </div>
             )}
           </div>
-        )}
 
-        {justFinished && !running && (
-          <p className="font-body text-sm text-rust">Rest complete! 💪</p>
-        )}
-      </div>
-
-      {running && running.source === "coach" && (
-        <p className="font-body text-xs text-steel mt-1.5">
-          {running.readySeconds != null
-            ? running.durationSeconds - remaining >= running.readySeconds
-              ? `You can go now. Your coach's rest is ${formatRestSpan(running.readySeconds, running.durationSeconds)}.`
-              : `Rest ${formatRestSpan(running.readySeconds, running.durationSeconds)} (set by your coach)`
-            : `Rest ${formatRest(running.prescribedSeconds ?? running.durationSeconds)} (set by your coach)`}
-        </p>
+          <button type="button" onClick={skip} className="w-full h-[54px] rounded-token-pill bg-rust text-graphite font-body text-base font-semibold">
+            Skip rest
+          </button>
+        </section>
       )}
-
-      {running && readOpen && read && !readTurnedOff && athleteId && (
-        <ReadSlot
-          athleteId={athleteId}
-          reference={read.ref}
-          text={read.text}
-          noteSeen={read.noteSeen}
-          onClose={() => setReadOpen(false)}
-          onTurnedOff={() => {
-            setReadTurnedOff(true);
-            setReadOpen(false);
-          }}
-        />
-      )}
-
-      {running && selectedGame && (
-        <MiniGameSlot
-          gameKey={selectedGame}
-          startedAtMs={running.startedAtMs}
-          durationSeconds={running.durationSeconds}
-          onClose={() => setSelectedGame(null)}
-        />
-      )}
-
-    </div>
     </>
   );
 }

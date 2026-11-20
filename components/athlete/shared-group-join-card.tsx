@@ -63,12 +63,12 @@ export function SharedGroupJoinCard({
 
   if (joined) {
     return (
-      <div className="border border-rust/50 bg-surface/40 px-4 py-3" role="status">
+      <div className="tint-accent rounded-card px-4 py-3" role="status">
         <p className="font-body text-sm text-chalk">You joined {groupName}.</p>
         <p className="font-body text-xs text-steel mt-0.5">
           {joined === "shared" ? "Your finished workouts will post there too." : "Your workouts stay private."} You can change this in Settings.
         </p>
-        <Link href={`/groups/${spaceGroupId}/feed`} className="inline-flex items-center min-h-11 mt-1 font-body text-sm text-rust underline underline-offset-2">
+        <Link href={`/groups/${spaceGroupId}/feed`} className="inline-flex items-center min-h-11 mt-1 font-body text-sm text-rust-ink underline underline-offset-2">
           Open the group feed
         </Link>
       </div>
@@ -77,7 +77,7 @@ export function SharedGroupJoinCard({
 
   if (!show) return null;
   return (
-    <div className="border border-rust/50 bg-surface/40 px-4 py-3">
+    <div className="tint-accent rounded-card px-4 py-3">
       <div className="flex items-start justify-between gap-3">
         <p className="font-body text-sm text-chalk">Join {groupName}</p>
         <button
@@ -129,7 +129,7 @@ export function SharedGroupJoinCard({
         </button>
       </div>
       {error && (
-        <p className="font-body text-xs text-rust mt-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-2" role="alert">
           {error}
         </p>
       )}

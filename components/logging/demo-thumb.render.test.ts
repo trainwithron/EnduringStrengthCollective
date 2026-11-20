@@ -80,10 +80,12 @@ describe("privacy and the logger wiring", () => {
       expect(readFileSync(new URL(f, import.meta.url), "utf8")).not.toContain("ytimg");
     }
   });
-  it("the card puts the thumbnail beside Last time, and both carousels mark each slide so the workout returns to where the sheet ended", () => {
+  // Look Refresh (client step, Nov 20): the demo is big, at the top of the exercise (DemoHero); a tap still opens the workout's demo sheet.
+  it("the card puts the big demo at the top, above Last time, and both carousels mark each slide so the workout returns to where the sheet ended", () => {
     const card = readFileSync(new URL("./exercise-card.tsx", import.meta.url), "utf8");
-    expect(card).toContain("<DemoThumb");
-    expect(card.indexOf("<DemoThumb")).toBeLessThan(card.indexOf("Last time:"));
+    expect(card).toContain("<DemoHero");
+    expect(card).toContain("onOpen={openDemo ? () => openDemo(exercise.id) : undefined}");
+    expect(card.indexOf("<DemoHero")).toBeLessThan(card.indexOf("Last time:"));
     for (const f of ["./exercise-swipe-carousel.tsx", "./exercise-vertical-carousel.tsx"]) {
       expect(readFileSync(new URL(f, import.meta.url), "utf8")).toContain("data-exercise-id={exercise.id}");
     }

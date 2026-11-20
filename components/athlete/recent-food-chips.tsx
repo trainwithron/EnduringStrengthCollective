@@ -46,7 +46,7 @@ export function RecentFoodChips({
 
   return (
     <div>
-      <p className="font-body text-xs text-steel uppercase tracking-wide mb-1.5">Recent</p>
+      <p className="font-body text-[13px] font-semibold text-steel mb-1.5">Recent</p>
       <div className="flex flex-wrap gap-1.5">
         {recents.map((r) => (
           <button
@@ -54,7 +54,7 @@ export function RecentFoodChips({
             type="button"
             onClick={() => handleTap(r)}
             disabled={loggingKey === r.key}
-            className="min-h-11 px-2.5 py-1 border border-steel/30 text-chalk font-body text-xs text-left active:border-rust active:text-rust transition-colors disabled:opacity-40"
+            className="min-h-11 px-3 py-1 rounded-row bg-surface-2 border border-steel/30 text-chalk font-body text-xs text-left active:border-rust active:text-rust transition-colors disabled:opacity-40"
           >
             {loggingKey === r.key ? "Logging…" : r.label}
           </button>

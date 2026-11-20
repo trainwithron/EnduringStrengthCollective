@@ -19,6 +19,7 @@ import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-bar";
 import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
+import { ChangeSessionDisclosure } from "@/components/athlete/change-session-disclosure";
 import { BookingModeLine } from "@/components/athlete/booking-mode-line";
 import { ScheduleCard } from "@/components/athlete/schedule-card";
 import { CoachPhoneSchedule, loadScheduleClients } from "@/components/coach/mobile/coach-phone-schedule";
@@ -499,16 +500,51 @@ export async function CoachCalendarPageBody(
         .sort((a, b) => a.fullName.localeCompare(b.fullName));
     }
 
+    // Look Refresh (client step, Ron Nov 20): the period between round arrows, the Day / Week / Month pill, the month as dates with small dots (green done,
+    // accent planned, blue a session with the coach) and a legend, then the open day's workout and the next session, and Book a session at the end.
+    const todayInView = shownDates.some((d) => isSameDayLocal(d, today));
+    const todayDay = todayInView ? dayOf(today) : null;
+    const periodLabel = view === "month" ? monthLabel(year, monthIndex) : weekLabel(weekStart, weekDays[6]);
+    const periodPrev = view === "month" ? prevHref : prevWeekHref;
+    const periodNext = view === "month" ? nextHref : nextWeekHref;
+    const viewPills: { key: "day" | "week" | "month"; label: string; href: string }[] = [
+      { key: "day", label: "Day", href: dayHref(today) },
+      { key: "week", label: "Week", href: weekViewHref },
+      { key: "month", label: "Month", href: monthViewHref },
+    ];
+
     return (
-      <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
+      <main className="min-h-screen bg-graphite text-chalk font-body pb-28">
         {isActingAsOther && (
           <ActingAsBanner athleteFullName={actingAsFullName ?? "Client"} groupId={params.groupId} />
         )}
         {isCoach && !isActingAsOther && (
           <ScheduleClientPicker groupId={params.groupId} clients={scheduleClientsForCoach} />
         )}
-        <header className="px-5 pt-8 pb-6 border-b border-steel/20">
-          <h1 className="font-display font-bold text-4xl leading-none uppercase">Calendar</h1>
+        <header className="px-5 pt-5">
+          <h1 className="sr-only">Calendar</h1>
+          <div className="flex items-center justify-between gap-3">
+            <Link href={periodPrev} aria-label={view === "month" ? "Previous month" : "Previous week"} className="w-11 h-11 shrink-0 rounded-full bg-surface-2 text-chalk inline-flex items-center justify-center">
+              <span aria-hidden="true">&lsaquo;</span>
+            </Link>
+            <h2 className="font-display font-semibold text-2xl text-chalk text-center leading-tight">{periodLabel}</h2>
+            <Link href={periodNext} aria-label={view === "month" ? "Next month" : "Next week"} className="w-11 h-11 shrink-0 rounded-full bg-surface-2 text-chalk inline-flex items-center justify-center">
+              <span aria-hidden="true">&rsaquo;</span>
+            </Link>
+          </div>
+          <nav aria-label="Calendar view" className="mt-3 grid grid-cols-3 gap-1 p-1 rounded-token-pill bg-surface">
+            {viewPills.map((p) => (
+              <Link
+                key={p.key}
+                href={p.href}
+                prefetch={false}
+                aria-current={view === p.key ? "page" : undefined}
+                className={`min-h-11 rounded-token-pill inline-flex items-center justify-center font-body text-sm ${view === p.key ? "bg-rust text-graphite font-semibold" : "text-steel active:text-chalk"}`}
+              >
+                {p.label}
+              </Link>
+            ))}
+          </nav>
           {coachMembership && !scheduleHref && (
             <p className="font-body text-xs text-steel mt-3">
               {clientSessionsLine(creditPicture, NO_SESSIONS_LINE)}
@@ -518,197 +554,183 @@ export async function CoachCalendarPageBody(
 
         {/* A session is being moved (?reschedule= from the day page): say so here, so a day tapped from this month keeps the move going. */}
         {movingBooking && (
-          <div className="mx-5 mt-4 border border-rust/40 px-3 py-2 flex flex-wrap items-center justify-between gap-x-3">
+          <div className="mx-5 mt-4 tint-accent rounded-row px-3 py-2 flex flex-wrap items-center justify-between gap-x-3">
             <p className="font-body text-sm text-chalk">
               Moving your{" "}
               {new Date(movingBooking.start_at).toLocaleDateString("en-US", { timeZone: displayTz, weekday: "short", month: "short", day: "numeric" })}{" "}
               session: pick a day
             </p>
-            <Link href={`${basePath}?month=${year}-${String(monthIndex + 1).padStart(2, "0")}`} className="min-h-11 inline-flex items-center font-body text-[13px] font-semibold text-rust">
+            <Link href={`${basePath}?month=${year}-${String(monthIndex + 1).padStart(2, "0")}`} className="min-h-11 inline-flex items-center font-body text-[13px] font-semibold text-rust-ink">
               Stop moving
             </Link>
           </div>
         )}
 
-        {scheduleHref && <ScheduleCard available={creditPicture.toBook} href={scheduleHref.href} note={scheduleHref.note} />}
-        {coachMembership && bookingMode === "coach_schedules" && <BookingModeLine groupId={params.groupId} />}
-        <UndatedProgramCards groupId={params.groupId} programs={calendar.undated} visuals={undatedVisuals} />
+        {view === "month" ? (
+          <section aria-label={monthLabel(year, monthIndex)} className="mx-5 mt-4 bg-surface rounded-card px-2.5 py-3">
+            <div className="grid grid-cols-7 text-center mb-1">
+              {WEEKDAY_LABELS.map((label) => (
+                <div key={label} className="font-body text-[11px] font-semibold text-steel py-1">
+                  {label.slice(0, 1)}
+                  <span className="sr-only">{label.slice(1)}</span>
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-y-0.5">
+              {cells.map((date, i) => {
+                if (!date) return <div key={i} className="min-h-11" />;
+                const isToday = isSameDayLocal(date, today);
+                const isPast = date.getTime() < today.getTime() && !isToday;
+                const day = dayOf(date);
+                const lines = [
+                  ...day.sessions.map((s) => ({ key: `s-${s.id}`, text: `Session ${s.time}` })),
+                  ...day.workouts.map((w) => ({ key: `w-${w.workoutId}`, text: `${w.title}${w.status === "done" ? ", done" : w.status === "missed" ? ", missed" : ""}` })),
+                ];
+                const done = day.workouts.some((w) => w.status === "done");
+                const planned = day.workouts.some((w) => w.status !== "done" && w.status !== "missed");
+                const session = day.sessions.length > 0;
+                const cellClass = "min-h-11 py-1 rounded-row flex flex-col items-center justify-center gap-1";
+                const dayNumber = (
+                  <>
+                    <span
+                      className={
+                        isToday
+                          ? "w-7 h-7 rounded-full bg-rust text-graphite font-body text-[13px] font-semibold inline-flex items-center justify-center"
+                          : `font-body text-[13px] ${isPast ? "text-steel" : "text-chalk"}`
+                      }
+                    >
+                      {date.getDate()}
+                    </span>
+                    <span className="flex gap-[3px] h-[5px]" aria-hidden="true">
+                      {done && <span className="w-[5px] h-[5px] rounded-full bg-win" />}
+                      {planned && <span className="w-[5px] h-[5px] rounded-full bg-rust" />}
+                      {session && <span className="w-[5px] h-[5px] rounded-full bg-checkin" />}
+                    </span>
+                  </>
+                );
+                const label = `${date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}${isToday ? ", today" : ""}${lines.length > 0 ? `: ${lines.map((l) => l.text).join("; ")}` : ""}`;
 
-        <UpcomingGroupEvents athleteId={athleteId} timezone={displayTz} />
+                if (hasAvailability || lines.length > 0) {
+                  return (
+                    <Link key={i} href={dayHref(date)} prefetch={false} aria-label={label} className={`${cellClass} active:bg-surface-2`}>
+                      {dayNumber}
+                    </Link>
+                  );
+                }
+                return (
+                  <div key={i} aria-label={label} className={cellClass}>
+                    {dayNumber}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 mt-2 font-body text-[11px] text-steel" data-calendar-legend>
+              <span className="inline-flex items-center gap-1.5"><span className="w-[7px] h-[7px] rounded-full bg-win" aria-hidden="true" />Done</span>
+              <span className="inline-flex items-center gap-1.5"><span className="w-[7px] h-[7px] rounded-full bg-rust" aria-hidden="true" />Workout</span>
+              <span className="inline-flex items-center gap-1.5"><span className="w-[7px] h-[7px] rounded-full bg-checkin" aria-hidden="true" />With your coach</span>
+            </div>
+          </section>
+        ) : (
+          <div className="mt-4 mx-5 bg-surface rounded-card px-3 divide-y divide-steel/15">
+            {weekDays.map((date, i) => {
+              const isToday = isSameDayLocal(date, today);
+              const rowClass = `flex items-center gap-3 py-3 ${isToday ? "text-chalk" : ""}`;
+              const rowInner = (
+                <div className={`w-11 shrink-0 text-center ${isToday ? "text-rust" : "text-steel"}`}>
+                  <p className="font-body text-xs font-semibold">{WEEKDAY_LABELS[i]}</p>
+                  <p className="font-display font-bold text-lg leading-none">{date.getDate()}</p>
+                </div>
+              );
+
+              const day = dayOf(date);
+              const has = day.sessions.length > 0 || day.workouts.length > 0;
+              const detail = (
+                <div className="flex-1 min-w-0">
+                  {day.sessions.map((s) => (
+                    <p key={s.id} className="font-body text-sm text-checkin">Session {s.time}</p>
+                  ))}
+                  {day.workouts.map((w) => (
+                    <p key={w.workoutId} className={`font-body text-sm truncate ${w.status === "done" ? "text-win" : w.status === "locked" || w.status === "missed" ? "text-steel" : "text-chalk"}`}>
+                      {w.title}
+                      {w.status === "done" ? " · Done" : w.status === "locked" ? " · Locked" : ""}
+                    </p>
+                  ))}
+                  {!has && hasAvailability && <p className="font-body text-xs text-steel">See open sessions</p>}
+                </div>
+              );
+
+              if (hasAvailability || has) {
+                return (
+                  <Link key={i} href={dayHref(date)} prefetch={false} className={rowClass}>
+                    {rowInner}
+                    {detail}
+                  </Link>
+                );
+              }
+              return (
+                <div key={i} className={rowClass}>
+                  {rowInner}
+                  {detail}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* The open day (today when it is in view): its workout with Start. */}
+        {todayDay && todayDay.workouts.length > 0 && (
+          <section className="px-5 pt-5 space-y-2" aria-label="Today">
+            <h2 className="font-body text-[15px] font-semibold text-chalk">
+              {today.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+            </h2>
+            {todayDay.workouts.map((w) => (
+              <div key={w.workoutId} className="tint-accent rounded-card px-4 py-3 flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="font-body text-xs font-semibold text-rust-ink">{w.status === "done" ? "Done" : "Workout"}</p>
+                  <p className="font-body text-sm font-semibold text-chalk truncate">{w.title}</p>
+                </div>
+                {w.status !== "locked" && (
+                  <Link href={`/groups/${params.groupId}/workouts/${w.workoutId}`} className="min-h-11 px-5 inline-flex items-center bg-rust text-graphite font-body text-sm font-semibold shrink-0">
+                    {w.status === "done" ? "Open" : "Start"}
+                  </Link>
+                )}
+              </div>
+            ))}
+          </section>
+        )}
 
         {upcomingBookings.length > 0 && (
-          <section className="px-5 pt-6">
-            <h2 className="font-body text-[15px] font-semibold text-chalk mb-2">
-              Your upcoming sessions
-            </h2>
-            <div className="divide-y divide-steel/15">
-              {upcomingBookings.map((b) => {
-                const start = new Date(b.start_at);
-                return (
-                  <div key={b.id} className="py-2 flex items-center justify-between">
-                    <span className="font-body text-sm">
-                      {formatInTimezone(start, displayTz, "dateTime")}
-                    </span>
+          <section className="px-5 pt-5 space-y-2" aria-label="Your upcoming sessions">
+            <h2 className="sr-only">Your upcoming sessions</h2>
+            {upcomingBookings.map((b, i) => {
+              const start = new Date(b.start_at);
+              return (
+                <div key={b.id} className={i === 0 ? "tint-checkin rounded-card px-4 py-3 flex items-start gap-3" : "bg-surface rounded-card px-4 py-3 flex items-start gap-3"}>
+                  <div className="flex-1 min-w-0 pt-1">
+                    <p className="font-body text-xs font-semibold text-checkin">{i === 0 ? "Next session with your coach" : "Later session"}</p>
+                    <p className="font-body text-sm font-semibold text-chalk">{formatInTimezone(start, displayTz, "dateTime")}</p>
+                  </div>
+                  <ChangeSessionDisclosure tone={i === 0 ? "checkin" : "plain"}>
                     <CancelBookingButton
                       bookingId={b.id}
                       rescheduleHref={bookingMode === "coach_schedules" ? undefined : `${basePath}/${dateKeyInZone(displayTz, start)}?reschedule=${b.id}`}
                       messageHref={bookingMode === "coach_schedules" ? `/groups/${params.groupId}/messages` : undefined}
                       recurringSeriesId={b.recurring_series_id}
                     />
-                  </div>
-                );
-              })}
-            </div>
+                  </ChangeSessionDisclosure>
+                </div>
+              );
+            })}
           </section>
         )}
 
-        <div className="flex items-center gap-1 px-5 pt-6">
-          <Link
-            href={monthViewHref}
-            className={`min-h-11 px-3 flex items-center font-body text-xs border ${
-              view === "month"
-                ? "bg-rust text-graphite border-rust"
-                : "border-steel/30 text-steel active:border-rust active:text-rust"
-            }`}
-          >
-            Month
-          </Link>
-          <Link
-            href={weekViewHref}
-            className={`min-h-11 px-3 flex items-center font-body text-xs border ${
-              view === "week"
-                ? "bg-rust text-graphite border-rust"
-                : "border-steel/30 text-steel active:border-rust active:text-rust"
-            }`}
-          >
-            Week
-          </Link>
-        </div>
+        <UndatedProgramCards groupId={params.groupId} programs={calendar.undated} visuals={undatedVisuals} />
 
-        {view === "month" ? (
-          <>
-            <div className="flex items-center justify-between px-5 pt-4">
-              <Link href={prevHref} className="h-11 px-3 inline-flex items-center font-body text-[13px] font-semibold text-rust">
-                &larr; Prev
-              </Link>
-              <h2 className="font-body text-[15px] font-semibold text-chalk">
-                {monthLabel(year, monthIndex)}
-              </h2>
-              <Link href={nextHref} className="h-11 px-3 inline-flex items-center font-body text-[13px] font-semibold text-rust">
-                Next &rarr;
-              </Link>
-            </div>
+        <UpcomingGroupEvents athleteId={athleteId} timezone={displayTz} />
 
-            <div className="grid grid-cols-7 gap-px bg-steel/15 mt-4 mx-5 border border-steel/15">
-              {WEEKDAY_LABELS.map((label) => (
-                <div
-                  key={label}
-                  className="bg-graphite text-center font-body text-xs font-semibold text-steel py-1.5"
-                >
-                  {label}
-                </div>
-              ))}
-
-              {cells.map((date, i) => {
-                if (!date) return <div key={i} className="bg-graphite min-h-[64px]" />;
-                const isToday = isSameDayLocal(date, today);
-                const cellClass = `bg-graphite min-h-[64px] p-1.5 flex flex-col ${
-                  isToday ? "ring-1 ring-inset ring-rust" : ""
-                }`;
-                const day = dayOf(date);
-                const lines = [
-                  ...day.sessions.map((s) => ({ key: `s-${s.id}`, text: s.time, className: "text-rust" })),
-                  ...day.workouts.map((w) => ({ key: `w-${w.workoutId}`, text: w.title, className: w.status === "done" ? "text-positive" : w.status === "locked" || w.status === "missed" ? "text-steel" : "text-chalk" })),
-                ];
-                const dayNumber = (
-                  <>
-                    <span className={`font-body text-xs ${isToday ? "text-rust font-bold" : "text-steel"}`}>
-                      {date.getDate()}
-                    </span>
-                    {lines.slice(0, 2).map((l) => (
-                      <span key={l.key} className={`font-body text-[10px] leading-tight mt-0.5 truncate ${l.className}`}>
-                        {l.text}
-                      </span>
-                    ))}
-                    {lines.length > 2 && <span className="font-body text-[10px] leading-tight text-rust mt-0.5">+{lines.length - 2}</span>}
-                  </>
-                );
-
-                if (hasAvailability || lines.length > 0) {
-                  return (
-                    <Link key={i} href={dayHref(date)} prefetch={false} className={cellClass}>
-                      {dayNumber}
-                    </Link>
-                  );
-                }
-                return (
-                  <div key={i} className={cellClass}>
-                    {dayNumber}
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="flex items-center justify-between px-5 pt-4">
-              <Link href={prevWeekHref} className="h-11 px-3 inline-flex items-center font-body text-[13px] font-semibold text-rust">
-                &larr; Prev
-              </Link>
-              <h2 className="font-body text-[15px] font-semibold text-chalk">
-                {weekLabel(weekStart, weekDays[6])}
-              </h2>
-              <Link href={nextWeekHref} className="h-11 px-3 inline-flex items-center font-body text-[13px] font-semibold text-rust">
-                Next &rarr;
-              </Link>
-            </div>
-
-            <div className="mt-4 mx-5 divide-y divide-steel/15 border-y border-steel/15">
-              {weekDays.map((date, i) => {
-                const isToday = isSameDayLocal(date, today);
-                const rowClass = `flex items-center gap-3 py-3 ${isToday ? "bg-surface/40" : ""}`;
-                const rowInner = (
-                  <div className={`w-11 shrink-0 text-center ${isToday ? "text-rust" : "text-steel"}`}>
-                    <p className="font-body text-xs font-semibold">{WEEKDAY_LABELS[i]}</p>
-                    <p className="font-display font-bold text-lg leading-none">{date.getDate()}</p>
-                  </div>
-                );
-
-                const day = dayOf(date);
-                const has = day.sessions.length > 0 || day.workouts.length > 0;
-                const detail = (
-                  <div className="flex-1 min-w-0">
-                    {day.sessions.map((s) => (
-                      <p key={s.id} className="font-body text-sm text-rust">Session {s.time}</p>
-                    ))}
-                    {day.workouts.map((w) => (
-                      <p key={w.workoutId} className={`font-body text-sm truncate ${w.status === "done" ? "text-positive" : w.status === "locked" || w.status === "missed" ? "text-steel" : "text-chalk"}`}>
-                        {w.title}
-                        {w.status === "done" ? " · Done" : w.status === "locked" ? " · Locked" : ""}
-                      </p>
-                    ))}
-                    {!has && hasAvailability && <p className="font-body text-xs text-steel">See open sessions</p>}
-                  </div>
-                );
-
-                if (hasAvailability || has) {
-                  return (
-                    <Link key={i} href={dayHref(date)} prefetch={false} className={rowClass}>
-                      {rowInner}
-                      {detail}
-                    </Link>
-                  );
-                }
-                return (
-                  <div key={i} className={rowClass}>
-                    {rowInner}
-                    {detail}
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )}
+        {coachMembership && bookingMode === "coach_schedules" && <BookingModeLine groupId={params.groupId} />}
+        {/* Book a session, full width, when booking is open (the coach's open hours and booking mode decide, as before: lib/schedule-card.ts). */}
+        {scheduleHref && <ScheduleCard available={creditPicture.toBook} href={scheduleHref.href} note={scheduleHref.note} />}
 
         <BottomTabBar groupId={params.groupId} activeOverride="calendar" />
       </main>

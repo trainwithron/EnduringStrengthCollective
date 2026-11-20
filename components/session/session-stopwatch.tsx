@@ -16,7 +16,8 @@ function formatElapsed(totalSeconds: number): string {
 // Genuinely prominent, not tucked in a corner — the whole point of the
 // original ask. Ticks from the session's real started_at, so it's
 // correct immediately on load regardless of when this component mounted.
-export function SessionStopwatch({ startedAt }: { startedAt: string }) {
+// compact: under the workout's title in the header (Look Refresh, client step, Ron Nov 20), still in the body colour and always on screen.
+export function SessionStopwatch({ startedAt, compact = false }: { startedAt: string; compact?: boolean }) {
   const [elapsedSeconds, setElapsedSeconds] = useState(() =>
     Math.max(0, Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000))
   );
@@ -31,7 +32,7 @@ export function SessionStopwatch({ startedAt }: { startedAt: string }) {
 
   return (
     // The server renders a second or two before the browser does; the first tick fixes it.
-    <p className="font-display text-2xl leading-none text-chalk tabular-nums" suppressHydrationWarning>
+    <p className={compact ? "font-body text-sm font-semibold leading-tight text-chalk tabular-nums" : "font-display text-2xl leading-none text-chalk tabular-nums"} suppressHydrationWarning>
       {formatElapsed(elapsedSeconds)}
     </p>
   );

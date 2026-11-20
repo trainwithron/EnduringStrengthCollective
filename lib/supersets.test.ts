@@ -120,7 +120,8 @@ describe("B2: the coach chooses the kind of each set, and the client's workout s
   it("the client's workout shows an AMRAP, back-off or drop set under its number and keeps it as the coach set it", () => {
     const grid = read("components/logging/exercise-set-grid.tsx");
     expect(grid).toContain('const special = set.setType === "amrap" || set.setType === "backoff" || set.setType === "drop" ? set.setType : null;');
-    expect(grid).toContain("if (readOnly || special) {");
+    // not a toggle: a plain number, like a read-only one (sets as rows since the Look Refresh)
+    expect(grid).toContain("readOnly || special ? (");
   });
 });
 

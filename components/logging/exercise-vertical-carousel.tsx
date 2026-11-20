@@ -200,7 +200,7 @@ export function ExerciseVerticalCarousel({
               data-exercise-id={exercise.id}
               onFocusCapture={() => setActiveIndex(exerciseIndex)}
               onPointerDownCapture={() => setActiveIndex(exerciseIndex)}
-              className="snap-center snap-always shrink-0 border border-steel/20 bg-surface/20 p-4"
+              className="snap-center snap-always shrink-0 rounded-card bg-surface p-4"
             >
               <div className="flex items-center justify-between gap-2 mb-2">
                 <p className="font-body text-xs text-steel uppercase tracking-wide">
@@ -209,7 +209,7 @@ export function ExerciseVerticalCarousel({
                 <button
                   type="button"
                   onClick={() => setExpandedId(expanded ? null : exercise.id)}
-                  className="flex items-center gap-1 min-h-[44px] px-2 -mr-2 font-body text-xs text-steel uppercase tracking-wide active:text-rust"
+                  className="flex items-center gap-1 min-h-[44px] px-2 -mr-2 font-body text-xs text-steel active:text-rust"
                 >
                   {expanded ? "Less room" : "More room"}
                   {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}

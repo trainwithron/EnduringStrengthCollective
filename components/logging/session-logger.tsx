@@ -26,6 +26,8 @@ import type { ReadForViewer } from "@/lib/read-content/for-viewer";
 import { ExerciseNameInput } from "@/components/coach/exercise-name-input";
 import { fetchExerciseHistory } from "@/lib/exercise-history-fetch";
 import { afterSupersetSet, supersetLine, supersetPlaces } from "@/lib/supersets";
+import { barRest, nextExerciseId } from "@/lib/logger-bottom-bar";
+import { askWorkoutChoice } from "@/lib/workout-choice";
 
 export function SessionLogger({
   sessionId,
@@ -179,6 +181,27 @@ export function SessionLogger({
       }),
     [exercises, supersetByExercise]
   );
+  // The bottom bar (Look Refresh, client step, Ron Nov 20): "Rest {n}s" and "Next: {exercise}", for the exercise on screen. Next follows a superset or circuit the same way the workout does
+  // after a set (the next exercise of the block that still has a set to do); on the last exercise it becomes Finish workout (the same choice as the header's Finish).
+  const activeExercise = shownExercises[activeExerciseIndex] ?? shownExercises[0] ?? null;
+  const nextId = activeExercise ? nextExerciseId(shownExercises, shownExercises.indexOf(activeExercise), supersetByExercise.get(activeExercise.id)?.members ?? null) : null;
+  const nextExercise = nextId ? shownExercises.find((e) => e.id === nextId) ?? null : null;
+  const nextName = nextExercise ? nextExercise.displayName ?? (nextExercise.exerciseName || "Next exercise") : null;
+  const barRestNow = activeExercise ? barRest(activeExercise.sets) : { seconds: 90, rest: null };
+  function startBarRest() {
+    const r = barRestNow.rest;
+    // The coach's rest starts as the coach's (no +15 s on it, a range counts to its high end), the same as after a set; anything else is a plain rest of that length.
+    if (r?.source === "coach") setPendingRestPrompt({ defaultSeconds: r.maxSeconds ?? r.seconds, isPrescribed: true, source: "coach", ...(r.maxSeconds ? { readySeconds: r.seconds } : {}) });
+    else setPendingRestPrompt({ defaultSeconds: barRestNow.seconds, isPrescribed: true, source: r ? "typed" : undefined });
+  }
+  function showNext() {
+    if (!nextId) {
+      askWorkoutChoice();
+      return;
+    }
+    const reduce = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    document.querySelector(`[data-exercise-id="${nextId}"]`)?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", inline: "center", block: "center" });
+  }
   function goToExercise(id: string) {
     // a moment after the tick, so the set reads as done before the card moves
     window.setTimeout(() => document.querySelector(`[data-exercise-id="${id}"]`)?.scrollIntoView({ behavior: "smooth", inline: "center", block: "center" }), 400);
@@ -392,6 +415,7 @@ export function SessionLogger({
           groupId={groupId}
           todayDate={todayDate}
           read={read}
+          nextUp={nextName}
         />
       )}
       <SetSaveBanner />
@@ -536,6 +560,33 @@ export function SessionLogger({
       )}
       </div>
 
+      {/* The bar at the bottom of a live workout: Rest on the left, Next on the right. Finish is at the top right of the header; its choice opens over this bar. */}
+      {!isCompleted && exercises.length > 0 && (
+        <div
+          data-logger-bar
+          className={`fixed ${raised ? "bottom-[calc(4.75rem+env(safe-area-inset-bottom))]" : "bottom-0"} left-0 right-0 z-30 px-5 pt-3.5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] bg-gradient-to-b from-graphite/0 via-graphite to-graphite flex items-center gap-2.5`}
+        >
+          <button
+            type="button"
+            onClick={startBarRest}
+            aria-label={`Start a ${barRestNow.seconds} second rest`}
+            className="shrink-0 h-[54px] px-4 rounded-token-pill tint-accent text-rust-ink font-body text-[15px] font-semibold inline-flex items-center gap-2"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <circle cx="12" cy="13" r="8" />
+              <path d="M12 9v4l2.5 2M9 2h6" />
+            </svg>
+            Rest {barRestNow.seconds}s
+          </button>
+          <button
+            type="button"
+            onClick={showNext}
+            className="flex-1 min-w-0 h-[54px] px-4 rounded-token-pill bg-rust text-graphite font-body text-[15px] font-semibold truncate"
+          >
+            {nextName ? `Next: ${nextName}` : "Finish workout"}
+          </button>
+        </div>
+      )}
       {!isCompleted && (
         <CompleteWorkoutButton
           sessionId={sessionId}
@@ -554,7 +605,7 @@ export function SessionLogger({
         </p>
       )}
       {isCompleted && pausedSessionId && (
-        <div className={`fixed ${raised ? "bottom-16" : "bottom-0"} left-0 right-0 bg-graphite border-t border-steel/20 px-5 py-4`}>
+        <div className={`fixed ${raised ? "bottom-[calc(4.75rem+env(safe-area-inset-bottom))]" : "bottom-0"} left-0 right-0 bg-graphite border-t border-steel/20 px-5 py-4`}>
           <ResumeWorkoutButton sessionId={pausedSessionId} />
         </div>
       )}

@@ -18,11 +18,11 @@ export function GoalSheetPromptCard({ groupId, athleteId }: { groupId: string; a
   }, [key]);
   if (!show) return null;
   return (
-    <div className="border border-rust/50 bg-surface/40 px-4 py-3 flex items-start justify-between gap-3">
+    <div className="tint-accent rounded-card px-4 py-3 flex items-start justify-between gap-3">
       <div>
         <p className="font-body text-sm text-chalk">Fill out your goal sheet</p>
         <p className="font-body text-xs text-steel mt-0.5">A few questions so your coach can build your plan around what you want.</p>
-        <Link href={`/groups/${groupId}/goal#goal-sheet`} className="inline-flex items-center min-h-11 mt-2 font-body text-sm text-rust underline underline-offset-2">
+        <Link href={`/groups/${groupId}/goal#goal-sheet`} className="inline-flex items-center min-h-11 mt-2 font-body text-sm text-rust-ink underline underline-offset-2">
           Fill it out
         </Link>
       </div>

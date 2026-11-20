@@ -8,13 +8,13 @@ import { ClientProgramMenu } from "@/components/coach/client-program-menu";
 export function OtherProgramsCard({ programs }: { programs: MyProgramRow[] }) {
   if (programs.length === 0) return null;
   return (
-    <section className="border border-steel/30 bg-surface/40 px-4 py-3">
-      <p className="font-body text-xs text-steel uppercase tracking-wide">Your other programs</p>
+    <section className="bg-surface rounded-card px-4 py-3">
+      <p className="font-body text-[13px] font-semibold text-steel">Your other programs</p>
       <ul className="mt-1 divide-y divide-steel/15">
         {programs.map((p) => (
           <li key={p.programId} className="flex items-center gap-1">
-            <Link href={`/groups/${p.groupId}`} className="flex flex-1 min-w-0 items-center justify-between gap-3 py-2.5 active:bg-surface/60">
-              <span className="font-display font-bold text-lg uppercase leading-tight truncate text-chalk">{p.programName}</span>
+            <Link href={`/groups/${p.groupId}`} className="flex flex-1 min-w-0 min-h-11 items-center justify-between gap-3 py-2.5 active:bg-surface-2">
+              <span className="font-body font-semibold text-base leading-tight truncate text-chalk">{p.programName}</span>
               <span className="font-body text-xs text-steel shrink-0">{p.groupName}</span>
             </Link>
             {p.canRemove && <ClientProgramMenu programId={p.programId} programName={p.programName} clientName="" isActive aiDraft self />}

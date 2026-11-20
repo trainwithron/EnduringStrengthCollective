@@ -28,10 +28,8 @@ import { aboutYouComplete, rowToBodyProfile } from "@/lib/client-body-profile";
 import type { WeightUnit } from "@/lib/units";
 import { HomeWeekView, type HomeDaySummary } from "@/components/athlete/home-week-view";
 import { HomeMonthView } from "@/components/athlete/home-month-view";
-import {
-  DayWeekMonthSwitcher,
-  ViewModeRedirector,
-} from "@/components/athlete/day-week-month-switcher";
+import { AddToHomeScreenPrompt } from "@/components/add-to-home-screen-prompt";
+import { clientGreeting } from "@/lib/client-home-greeting";
 import { ProgramCardList } from "@/components/athlete/program-card-list";
 import { HomeThread } from "@/components/athlete/home-thread";
 import { buildHomeThread } from "@/lib/home-thread";
@@ -901,6 +899,17 @@ export default async function GroupHubPage(
         // A coach looking at any client app (their own or a client's) has Spotlight, which lists the same notices: on a phone the separate bell is not shown (Ron, Oct 23: "I have two
         // different notification bells"). The computer keeps its bell.
         bellOnComputerOnly={isActingAsOther}
+        // A client's Home greets them by name with their coach's name under the date (Look Refresh, client step); every other view keeps the group title.
+        greeting={
+          showMobileView && athleteId
+            ? clientGreeting({
+                clientName: roster.find((m) => m.profileId === athleteId)?.fullName,
+                coachName: roster.find((m) => m.role === "coach" && m.profileId !== athleteId)?.fullName,
+                now: new Date(),
+                timeZone: timezone,
+              })
+            : null
+        }
         notifications={(notificationRows ?? []).map((n: any) => ({
           id: n.id,
           type: n.type,
@@ -925,12 +934,54 @@ export default async function GroupHubPage(
       {guideEligible && user && guideDismissed && <PushNotificationToggle variant="chip" profileId={user.id} />}
 
       {showMobileView && athleteId && (
-        <section className="px-5 pt-6">
-          <ViewModeRedirector hasViewParam={!!searchParams.view} />
-          <DayWeekMonthSwitcher groupId={params.groupId} />
+        <section className="px-5 pt-4">
+          {/* Day, Week and Month live on Calendar now (Look Refresh, client step, Ron Nov 20): Home is today. An old ?view= link still opens its view. */}
 
           {view === "day" && (
             <div className="space-y-4">
+              {/* Today first: a workout left open comes back first of all, then the Today card, the three tiles and the check-in (inside DayCard). */}
+              {openOwnSession && (
+                <Link href={`/sessions/${(openOwnSession as { id: string }).id}?resume=1`} className="block tint-accent rounded-card px-4 py-3 active:bg-rust/15">
+                  <span className="block font-display font-semibold text-xl leading-tight text-chalk">Finish your workout</span>
+                  <span className="block font-body text-sm text-steel">You left one open. Pick up where you stopped.</span>
+                </Link>
+              )}
+              <DayCard
+                groupId={params.groupId}
+                athleteId={athleteId}
+                dateKey={targetDateKey}
+                dateLabel={
+                  isToday
+                    ? "Today"
+                    : targetDate.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })
+                }
+                isToday={isToday}
+                workout={dayWorkout}
+                sessions={daySessions}
+                nextLabel={nextWorkoutText}
+                macros={dayMacros}
+                habits={dayHabits}
+                weightLogs={weightLogs}
+                weightUnit={weightUnit}
+                canBook={canBook}
+                wellnessCheckin={wellnessCheckin}
+                mealLine={mealLine}
+                sessionsLeft={sessionsLeft}
+                ownChoice={isCoach && !isActingAsOther && athleteId === user?.id}
+                programs={programsBlockReady ? homePrograms : []}
+                checkin={
+                  isToday && !isFirstDay ? (
+                    <WellnessCheckinPopup
+                      athleteId={athleteId}
+                      groupId={params.groupId}
+                      todayDate={todayKey}
+                      initialCheckin={wellnessCheckin}
+                      lifeImpactPrompt={lifeImpactPrompt}
+                    />
+                  ) : null
+                }
+                afterWorkout={programsBlockReady && homePrograms.length > 0 ? <MyProgramsBlock groupId={params.groupId} programs={homePrograms} /> : null}
+              />
               {isToday && <HomeThread lines={homeThreadLines} />}
               {isToday && goalSheetNeeded && <GoalSheetPromptCard groupId={params.groupId} athleteId={athleteId} />}
               {isToday && !goalSheetNeeded && sharedGroupOffer && (
@@ -958,52 +1009,13 @@ export default async function GroupHubPage(
               )}
               {/* One block for group sessions: when the week's list renders below, this short link is not shown as well. */}
               {upcomingClasses > 0 && !(isToday && weekClasses) && (
-                <Link href={`/groups/${params.groupId}/classes`} className="block border border-steel/30 bg-surface/40 px-4 py-3 font-body text-sm text-chalk">
+                <Link href={`/groups/${params.groupId}/classes`} className="block bg-surface rounded-card px-4 py-3 min-h-11 font-body text-sm text-chalk">
                   Group sessions: {upcomingClasses} coming up &rarr;
                 </Link>
               )}
-              {isToday && !isFirstDay && (
-                <WellnessCheckinPopup
-                  athleteId={athleteId}
-                  groupId={params.groupId}
-                  todayDate={todayKey}
-                  initialCheckin={wellnessCheckin}
-                  lifeImpactPrompt={lifeImpactPrompt}
-                />
-              )}
-              {openOwnSession && (
-                <Link href={`/sessions/${(openOwnSession as { id: string }).id}?resume=1`} className="block border border-rust bg-rust/10 px-4 py-3 active:bg-rust/15">
-                  <span className="block font-display font-bold uppercase text-lg leading-tight text-chalk">Finish your workout</span>
-                  <span className="block font-body text-sm text-steel">You left one open. Pick up where you stopped.</span>
-                </Link>
-              )}
-              <DayCard
-                groupId={params.groupId}
-                athleteId={athleteId}
-                dateKey={targetDateKey}
-                dateLabel={
-                  isToday
-                    ? "Today"
-                    : targetDate.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })
-                }
-                isToday={isToday}
-                workout={dayWorkout}
-                sessions={daySessions}
-                nextLabel={nextWorkoutText}
-                macros={dayMacros}
-                habits={dayHabits}
-                weightLogs={weightLogs}
-                weightUnit={weightUnit}
-                canBook={canBook}
-                wellnessCheckin={wellnessCheckin}
-                mealLine={mealLine}
-                sessionsLeft={sessionsLeft}
-                ownChoice={isCoach && !isActingAsOther && athleteId === user?.id}
-                afterWorkout={programsBlockReady && homePrograms.length > 0 ? <MyProgramsBlock groupId={params.groupId} programs={homePrograms} /> : null}
-              />
               {isToday && weekClasses && (
                 <section aria-label="Group sessions this week">
-                  <h2 className="font-body text-xs uppercase tracking-wide text-steel mb-2">Group sessions this week</h2>
+                  <h2 className="font-body text-[13px] font-semibold text-steel mb-2">Group sessions this week</h2>
                   <ClassesList classes={weekClasses.classes} balance={weekClasses.balance} timezone={timezone} nowIso={weekClasses.nowIso} />
                   <Link href={`/groups/${params.groupId}/classes`} className="inline-block mt-2 font-body text-xs text-rust min-h-11 leading-[44px]">
                     See all group sessions
@@ -1020,6 +1032,8 @@ export default async function GroupHubPage(
                   lifeImpactPrompt={lifeImpactPrompt}
                 />
               )}
+              {/* The add-to-home-screen banner sits here, below the main content (the copy at the top of every page steps aside while this one is on the page). */}
+              <AddToHomeScreenPrompt slot="home" />
             </div>
           )}
 

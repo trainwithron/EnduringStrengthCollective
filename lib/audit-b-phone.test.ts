@@ -21,9 +21,10 @@ describe("a client's own Rest is m:ss both ways", () => {
 
 describe("the set grid is phone-sized", () => {
   const grid = read("components/logging/exercise-set-grid.tsx");
-  it("cells are 44px tall, the fill handle is wider, and the hint is just the number", () => {
+  // Look Refresh (client step, Nov 20): sets as rows, each box 48px tall and the full width of its column.
+  it("cells are 48px tall, the fill handle is wider, and the hint is just the number", () => {
     expect(grid).not.toMatch(/\bh-10\b/);
-    expect(grid).toContain('className="relative w-12 h-11 shrink-0"');
+    expect(grid).toContain('className="relative w-full h-12 min-w-0"');
     expect(grid).toContain("w-8 h-11 shrink-0");
     expect(grid).not.toContain("(target)");
     expect(grid).not.toContain("lbs`");

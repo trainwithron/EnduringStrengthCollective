@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { notifyPush } from "@/lib/push-notify";
-import { ExerciseVideoUpload, type UploadedVideo } from "./exercise-video-upload";
+import { ExerciseVideoUpload, FormCheckTips, type UploadedVideo } from "./exercise-video-upload";
 
 interface VideoRow {
   id: string;
@@ -32,7 +32,12 @@ export function ExerciseVideoThread({
   athleteId,
   viewerId,
   canUpload,
+  leading = null,
+  between = null,
 }: {
+  // Look Refresh (client step): "+ Add a set" sits at the start of the Form check row, and the Sets row goes between that row and the videos.
+  leading?: ReactNode;
+  between?: ReactNode;
   sessionId: string;
   sessionExerciseId: string;
   groupId: string;
@@ -91,24 +96,38 @@ export function ExerciseVideoThread({
       });
   }
 
+  const upload = canUpload ? (
+    <ExerciseVideoUpload
+      sessionId={sessionId}
+      sessionExerciseId={sessionExerciseId}
+      groupId={groupId}
+      athleteId={athleteId}
+      onUploaded={handleUploaded}
+      compact={leading != null}
+    />
+  ) : null;
   return (
-    <div className="mt-2">
+    <div className="mt-3">
+      {leading != null ? (
+        <>
+          <div className="flex items-start gap-2" data-add-set-row>
+            {leading}
+            {upload}
+          </div>
+          {canUpload && <FormCheckTips />}
+          {between}
+        </>
+      ) : (
+        between
+      )}
       {videos && videos.length > 0 && (
-        <div className="space-y-4 mb-2">
+        <div className="space-y-4 my-2">
           {videos.map((v) => (
             <VideoWithComments key={v.id} video={v} groupId={groupId} viewerId={viewerId} />
           ))}
         </div>
       )}
-      {canUpload && (
-        <ExerciseVideoUpload
-          sessionId={sessionId}
-          sessionExerciseId={sessionExerciseId}
-          groupId={groupId}
-          athleteId={athleteId}
-          onUploaded={handleUploaded}
-        />
-      )}
+      {leading == null && upload}
     </div>
   );
 }

@@ -9,8 +9,8 @@ export interface MyScheduleCardState {
 // On Home, for a client with a weekly schedule: one obvious place to look at it and ask for a pause, a freeze or to cancel.
 export function MyScheduleCard({ groupId, state }: { groupId: string; state: MyScheduleCardState }) {
   return (
-    <Link href={`/groups/${groupId}/my-schedule`} className="block min-h-11 border border-steel/30 bg-surface/40 px-4 py-3" aria-label="My schedule">
-      <p className="font-body text-xs uppercase tracking-wider text-steel">My schedule</p>
+    <Link href={`/groups/${groupId}/my-schedule`} className="block min-h-11 bg-surface rounded-card px-4 py-3" aria-label="My schedule">
+      <p className="font-body text-[13px] font-semibold text-steel">My schedule</p>
       <p className="font-body text-sm text-chalk mt-1">
         {state.summary} · {state.state}
       </p>

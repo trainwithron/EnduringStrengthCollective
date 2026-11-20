@@ -21,6 +21,8 @@ import type { DayTotals, LoggedEntry } from "@/lib/nutrient-day";
 import type { PlanEstimate } from "@/lib/nutrient-view";
 import type { Sex } from "@/lib/dri-data";
 import { COACH_CAN_SEE_LINE, hasTarget, noTargetLine, sumLoggedFood, type DayTargetLike } from "@/lib/nutrition-tracking";
+import { NutritionTotalsCard } from "./nutrition-totals-card";
+import { CopyYesterdayButton } from "./copy-yesterday-button";
 
 // Wires the checkoff list + quick-log entry point + a running "logged so
 // far today" total into one section for the athlete's Nutrition page
@@ -44,6 +46,7 @@ export function FoodLogSection({
   totalsTitle = "Logged so far today",
   planHeading,
   isToday = true,
+  setTargetsHref = null,
 }: {
   athleteId: string;
   groupId: string;
@@ -68,6 +71,8 @@ export function FoodLogSection({
   planHeading?: string;
   // Whether the day shown is today (the day switcher can show another).
   isToday?: boolean;
+  // Where this page's own "Set my targets" is (a client who may set their own target); the totals card links to it when there is no target.
+  setTargetsHref?: string | null;
 }) {
   const planHasMeals = !!plan?.meals && Object.values(plan.meals).some((entries) => (entries ?? []).length > 0);
   const [allEntries, setAllEntries] = useState(initialEntries);
@@ -78,7 +83,6 @@ export function FoodLogSection({
   const withTarget = hasTarget(target);
   // The day's entries in the shape the nutrient totals read; they follow every food as it is logged, edited or deleted.
   const loggedToday: LoggedEntry[] = allEntries.map((e) => ({ logDate, status: e.status, description: e.description, calories: e.calories, nutrients: e.nutrients ?? null }));
-  const of = (value: number | null | undefined) => (value != null ? ` / ${Math.round(value)}` : "");
   const shownRecents = withJustLogged(justLogged, recents);
 
   function remember(entries: FoodLogEntry[]) {
@@ -107,22 +111,39 @@ export function FoodLogSection({
     setAllEntries((prev) => prev.filter((e) => e.id !== id));
   }
 
+  // Look Refresh (Ron, Nov 20): the day's totals first, then one big Search foods bar, the three other ways to log as tiles (Scan, Photo, My foods), the two small extras as pills
+  // (Copy yesterday, a snack or a meal out), then the plan, one-tap Favorites and Recent, what was logged, and the vitamins and minerals. Every control is the same one as before;
+  // only where it sits and how it looks changed. An open panel (a scan, a photo estimate, My foods, the snack box) takes the full width under its row.
   return (
-    <div className="space-y-3">
-      <div className="border border-steel/20 p-3" data-testid="logged-totals">
-        <p className="font-body text-xs text-steel uppercase tracking-wide mb-1.5">{totalsTitle}</p>
-        <p className="font-display text-lg leading-none [font-variant-numeric:tabular-nums]">
-          {Math.round(loggedTotals.calories)}
-          {withTarget ? of(target?.calories) : ""} kcal
-        </p>
-        <p className="font-body text-xs text-steel mt-0.5 [font-variant-numeric:tabular-nums]">
-          {Math.round(loggedTotals.proteinG)}
-          {withTarget ? of(target?.proteinG) : ""}p / {Math.round(loggedTotals.carbsG)}
-          {withTarget ? of(target?.carbsG) : ""}c / {Math.round(loggedTotals.fatG)}
-          {withTarget ? of(target?.fatG) : ""}f
-        </p>
-        {!withTarget && <p className="font-body text-xs text-steel mt-2">{noTargetLine(coachProgramming, selfCoached)}</p>}
-        {!selfCoached && <p className="font-body text-xs text-steel mt-1">{COACH_CAN_SEE_LINE}</p>}
+    <div className="space-y-4">
+      <NutritionTotalsCard
+        title={totalsTitle}
+        totals={loggedTotals}
+        target={target}
+        withTarget={withTarget}
+        noTargetLine={noTargetLine(coachProgramming, selfCoached)}
+        coachCanSeeLine={selfCoached ? null : COACH_CAN_SEE_LINE}
+        setTargetsHref={setTargetsHref}
+      />
+
+      <FoodSearchLog athleteId={athleteId} groupId={groupId} logDate={logDate} onLogged={handleQuickLogged} />
+
+      <div className="flex flex-wrap gap-2.5" data-log-tiles>
+        <BarcodeScanButton athleteId={athleteId} groupId={groupId} logDate={logDate} onLogged={handleQuickLogged} />
+        <PhotoLogFoodButton athleteId={athleteId} groupId={groupId} logDate={logDate} onLogged={handleQuickLogged} />
+        <MyFoodsPanel athleteId={athleteId} groupId={groupId} logDate={logDate} onLogged={handleAdded} />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2" data-log-pills>
+        <CopyYesterdayButton
+          athleteId={athleteId}
+          groupId={groupId}
+          logDate={logDate}
+          isToday={isToday}
+          onAdded={handleAdded}
+          className="min-h-[44px] px-4 rounded-token-pill border border-steel/40 text-chalk font-body text-[13px] font-medium active:border-rust active:text-rust transition-colors disabled:opacity-50"
+        />
+        <QuickLogFoodButton athleteId={athleteId} groupId={groupId} logDate={logDate} onLogged={handleQuickLogged} />
       </div>
 
       {planHasMeals ? (
@@ -159,15 +180,8 @@ export function FoodLogSection({
         <RecentFoodChips athleteId={athleteId} groupId={groupId} logDate={logDate} recents={shownRecents} onLogged={handleQuickLogged} />
       </div>
 
-      <div className="space-y-2">
-        <FoodSearchLog athleteId={athleteId} groupId={groupId} logDate={logDate} onLogged={handleQuickLogged} />
-        <MyFoodsPanel athleteId={athleteId} groupId={groupId} logDate={logDate} onLogged={handleAdded} />
-        <QuickLogFoodButton athleteId={athleteId} groupId={groupId} logDate={logDate} onLogged={handleQuickLogged} />
-        <BarcodeScanButton athleteId={athleteId} groupId={groupId} logDate={logDate} onLogged={handleQuickLogged} />
-        <PhotoLogFoodButton athleteId={athleteId} groupId={groupId} logDate={logDate} onLogged={handleQuickLogged} />
-      </div>
-
       <FoodLogEntries
+        showCopyYesterday={false}
         athleteId={athleteId}
         groupId={groupId}
         logDate={logDate}

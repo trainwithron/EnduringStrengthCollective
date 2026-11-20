@@ -34,8 +34,10 @@ describe("page order (item 1)", () => {
 });
 
 describe("inside Today's food (items 2 and 3)", () => {
-  it("totals, the plan, the one-tap chips, search first, the other ways to log, what was logged, then the nutrients", () => {
-    const order = ['data-testid="logged-totals"', "<TodaysMealCards", "<MealCheckoffList", "<FavoriteFoodChips", "<RecentFoodChips", "<FoodSearchLog", "<MyFoodsPanel", "<QuickLogFoodButton", "<BarcodeScanButton", "<PhotoLogFoodButton", "<FoodLogEntries", "<LogNutrients"];
+  // Look Refresh (Ron, Nov 20): the totals card, Search foods, the three tiles (Scan, Photo, My foods), the pills (Copy yesterday, a snack or a meal out), then the plan, the one-tap
+  // chips, what was logged and the nutrients.
+  it("totals, search first, the three tiles, the pills, the plan, the one-tap chips, what was logged, then the nutrients", () => {
+    const order = ["<NutritionTotalsCard", "<FoodSearchLog", "<BarcodeScanButton", "<PhotoLogFoodButton", "<MyFoodsPanel", "<CopyYesterdayButton", "<QuickLogFoodButton", "<TodaysMealCards", "<MealCheckoffList", "<FavoriteFoodChips", "<RecentFoodChips", "<FoodLogEntries", "<LogNutrients"];
     let last = -1;
     for (const m of order) {
       const i = section.indexOf(m);

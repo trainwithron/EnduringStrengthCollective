@@ -71,7 +71,7 @@ export function FavoriteFoodChips({
 
   return (
     <div className="mb-2">
-      <p className="font-body text-xs text-steel uppercase tracking-wide mb-1.5">Favorites</p>
+      <p className="font-body text-[13px] font-semibold text-steel mb-1.5">Favorites</p>
       <div className="flex flex-wrap gap-1.5">
         {favorites.map((f) => (
           <button
@@ -80,7 +80,7 @@ export function FavoriteFoodChips({
             onClick={() => tap(f)}
             disabled={loggingKey === f.key}
             title={`${Math.round(f.calories)} kcal`}
-            className="h-11 px-2.5 border border-steel/30 text-chalk font-body text-xs active:border-rust active:text-rust transition-colors disabled:opacity-40"
+            className="h-11 px-3 rounded-token-pill bg-surface-2 border border-steel/30 text-chalk font-body text-xs active:border-rust active:text-rust transition-colors disabled:opacity-40"
           >
             {loggingKey === f.key ? "Logging…" : f.label}
           </button>

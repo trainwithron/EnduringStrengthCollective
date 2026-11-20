@@ -32,7 +32,8 @@ describe("the logger shows the demo through the button, from the library, and ho
   const card = readFileSync(new URL("./exercise-card.tsx", import.meta.url), "utf8");
   it("the exercise card uses the lookup by what the exercise is, the button, and the hide setting; the tiny link and 200px video are gone", () => {
     expect(card).toContain("findDemo(demoLibrary, exercise.exerciseName)");
-    expect(card).toContain("<ExerciseDemoButton");
+    // Look Refresh (client step): the big demo at the top of the exercise; without the workout's sheet it opens its own (components/logging/demo-hero.tsx).
+    expect(card).toContain("<DemoHero");
     expect(card).toContain("!demosHidden");
     expect(card).not.toContain("Watch demo");
     expect(card).not.toContain("max-w-[200px]");

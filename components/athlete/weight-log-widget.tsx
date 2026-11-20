@@ -95,7 +95,7 @@ export function WeightLogWidget({
   }
 
   const milestoneBanner = newMilestone && (
-    <div className="border border-rust/40 bg-rust/5 p-3 mb-3">
+    <div className="tint-win rounded-row p-3 mb-3">
       <p className="font-body text-sm text-chalk">
         🎉 You&apos;ve hit a real milestone — down {displayWeightValue(newMilestone.thresholdLbs, weightUnit)}+ {weightUnit === "kg" ? "kg" : "lbs"} since you started!
       </p>
@@ -175,10 +175,10 @@ export function WeightLogWidget({
   }
 
   return (
-    <div className="border border-steel/20 p-4">
+    <div className="bg-surface rounded-card p-4">
       {milestoneBanner}
       <div className="flex items-center justify-between mb-3">
-        <h2 className="font-display uppercase text-sm tracking-wide text-steel">Body weight</h2>
+        <h2 className="font-body text-[15px] font-semibold text-chalk">Body weight</h2>
         <button
           type="button"
           onClick={() => setExpanded(false)}

@@ -1,13 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { SetStepper } from "./set-stepper";
+import { AddSetButton, SetStepper } from "./set-stepper";
 
 const base = {
   count: 4,
   canRemove: true,
-  addBusy: false,
-  onAdd: () => {},
   onRemove: () => {},
   prescribedNote: null,
   confirmText: null,
@@ -18,21 +16,25 @@ const base = {
 const html = (over: Partial<Parameters<typeof SetStepper>[0]> = {}) => renderToStaticMarkup(createElement(SetStepper, { ...base, ...over }));
 
 describe("the Sets stepper", () => {
-  it("puts the card's own controls (trailing) at the right end of the same row, after Add a set", () => {
+  // Look Refresh (client step, Nov 20): "+ Add a set" is its own wide button under the set rows (AddSetButton); this row keeps the minus, the count and the card's own controls.
+  it("puts the card's own controls (trailing) at the right end of the same row, after the count", () => {
     const out = html({ trailing: createElement("button", { type: "button" }, "Edit metrics") });
     const row = out.slice(out.indexOf('<div class="flex flex-wrap items-center gap-x-3 gap-y-1">'));
     const rowEnd = row.indexOf("</div></div>");
-    expect(row.indexOf('aria-label="Add a set"')).toBeGreaterThan(-1);
-    expect(row.indexOf("Edit metrics")).toBeGreaterThan(row.indexOf('aria-label="Add a set"'));
+    expect(row.indexOf("Edit metrics")).toBeGreaterThan(row.indexOf(">4<"));
     expect(row.indexOf("Edit metrics")).toBeLessThan(rowEnd);
     expect(out).toContain('<div class="ml-auto flex items-center gap-3">');
     expect(html()).not.toContain("ml-auto");
   });
-  it("is one row: Sets, a minus, the count, a plus", () => {
+  it("is one row: Sets, a minus, the count; Add a set is the wide button above it", () => {
     const out = html();
     expect(out).toContain("Sets");
     expect(out.indexOf('aria-label="Remove the last set"')).toBeLessThan(out.indexOf(">4<"));
-    expect(out.indexOf(">4<")).toBeLessThan(out.indexOf('aria-label="Add a set"'));
+    expect(out).not.toContain('aria-label="Add a set"');
+    const add = renderToStaticMarkup(createElement(AddSetButton, { busy: false, onAdd: () => {} }));
+    expect(add).toContain('aria-label="Add a set"');
+    expect(add).toContain("Add a set");
+    expect(renderToStaticMarkup(createElement(AddSetButton, { busy: true, onAdd: () => {} }))).toContain('disabled=""');
   });
   it("disables the minus at one set, and only then", () => {
     const one = html({ count: 1, canRemove: false });

@@ -24,8 +24,8 @@ describe("less dead space in the logger", () => {
     expect(card).toContain("{rowAction && <span");
     expect(card).toContain("absolute z-10 right-0 bottom-full mb-1");
   });
-  it("the set-number cell is a full 44 px tap target, like the cells you type in", () => {
-    expect(grid).toContain("w-12 shrink-0 min-h-11 text-center");
+  it("the set-number cell is a full 48 px tap target, like the cells you type in", () => {
+    expect(grid).toContain("w-full min-h-12 text-center");
     expect(grid).not.toContain("w-12 shrink-0 min-h-9 text-center");
   });
   it("the rest bar, the save banner and the cards share one box, so the bar can open over the card", () => {

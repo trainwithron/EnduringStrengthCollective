@@ -479,11 +479,11 @@ export default async function NutritionPage(
       {isActingAsOther && (
         <ActingAsBanner athleteFullName={actingAsFullName ?? "Client"} groupId={params.groupId} />
       )}
-      <header className="px-5 pt-8 pb-6 border-b border-steel/20">
-        <Link href={`/groups/${params.groupId}`} className="inline-flex items-center min-h-11 font-body text-xs text-steel uppercase tracking-wide">
+      <header className="px-5 pt-4 pb-1">
+        <Link href={`/groups/${params.groupId}`} className="inline-flex items-center min-h-11 font-body text-[13px] font-semibold text-steel">
           &larr; Home
         </Link>
-        <h1 className="font-display font-bold text-3xl leading-none uppercase mt-3">Nutrition</h1>
+        <h1 className="font-display font-semibold text-3xl leading-none mt-1">Nutrition</h1>
       </header>
 
       {/* coach_em_up_finley_funston_transcript.md — real client-safety
@@ -492,7 +492,7 @@ export default async function NutritionPage(
           through), linking to one real, credible source rather than
           inventing content. */}
       {athleteInjuryStatus?.is_injured && (
-        <div className="mx-5 mt-6 border border-rust/40 bg-rust/5 p-4">
+        <div className="mx-5 mt-4 tint-alert rounded-card p-4">
           <p className="font-body text-sm text-chalk font-medium mb-1">
             Your coach has marked you as currently injured
           </p>
@@ -512,7 +512,7 @@ export default async function NutritionPage(
 
       {/* Every client can track what they eat here, whatever their tier and whether or not a coach has set a target. Targets, meal plans, food rules and the weekly
           check-in are a coach-run feature and show only for clients on a tier that has them. */}
-      <div className="px-5 pt-6 space-y-6">
+      <div className="px-5 pt-4 space-y-6">
           {/* Asked once while they have never answered (Oct 21): allergies or foods they avoid. Blocks nothing; a clash with an assigned plan is swapped right away. */}
           {macrosEnabled && !viewingOther && !prefsRow && !prefsError && <NutritionFirstVisitPrompt athleteId={athleteId} />}
           {recalcPrompt && (
@@ -520,7 +520,7 @@ export default async function NutritionPage(
           )}
           {/* On a phone the food comes first (FIX_NUTRITION_PHONE item 1): Today's food, then today's targets, the food rules and the grocery list. */}
           <section>
-            <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
+            <h2 className="font-body text-[15px] font-semibold text-chalk mb-2">
               {shownIsToday ? <>Today&apos;s food</> : foodDayHeading(shownDay, todayKey)}
             </h2>
             {trackingOn ? (
@@ -544,18 +544,20 @@ export default async function NutritionPage(
                   totalsTitle={loggedTotalsTitle(shownDay, todayKey)}
                   isToday={shownIsToday}
                   planHeading={shownIsToday ? "Today's meal plan" : `Meal plan: ${foodDayLabel(shownDay, todayKey)}`}
+                  // The totals card's "Set my targets" opens this page's own targets card, further down.
+                  setTargetsHref={macrosEnabled && setMyTargets ? "#my-targets" : null}
                 />
               </>
             ) : (
-              <p className="font-body text-sm text-steel border border-steel/20 p-4" data-testid="tracking-off">
+              <p className="font-body text-sm text-steel bg-surface rounded-card p-4" data-testid="tracking-off">
                 {FOOD_TRACKING_OFF_LINE}
               </p>
             )}
           </section>
 
           {macrosEnabled && (
-          <section className="border border-steel/20 p-4">
-            <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">
+          <section id="my-targets" className="bg-surface rounded-card p-4 scroll-mt-4">
+            <p className="font-body text-[13px] font-semibold text-steel mb-2">
               Today&apos;s targets
             </p>
             {todayMacros && (todayMacros.calories != null || todayMacros.proteinG != null) ? (
@@ -566,16 +568,16 @@ export default async function NutritionPage(
                 <div>
                   <div className="text-center pb-3 mb-3 border-b border-steel/15">
                     <p className="font-display text-4xl leading-none">{todayMacros.proteinG ?? "--"}g</p>
-                    <p className="font-body text-xs text-steel uppercase mt-1">Protein target</p>
+                    <p className="font-body text-xs text-steel mt-1">Protein target</p>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-center">
                     <div>
                       <p className="font-display text-lg leading-none">{todayMacros.carbsG ?? "--"}</p>
-                      <p className="font-body text-xs text-steel uppercase mt-1">Carbs</p>
+                      <p className="font-body text-xs text-steel mt-1">Carbs</p>
                     </div>
                     <div>
                       <p className="font-display text-lg leading-none">{todayMacros.fatG ?? "--"}</p>
-                      <p className="font-body text-xs text-steel uppercase mt-1">Fat</p>
+                      <p className="font-body text-xs text-steel mt-1">Fat</p>
                     </div>
                   </div>
                 </div>
@@ -583,19 +585,19 @@ export default async function NutritionPage(
                 <div className="grid grid-cols-4 gap-2 text-center">
                   <div>
                     <p className="font-display text-xl leading-none">{todayMacros.calories ?? "--"}</p>
-                    <p className="font-body text-xs text-steel uppercase mt-1">Kcal</p>
+                    <p className="font-body text-xs text-steel mt-1">Kcal</p>
                   </div>
                   <div>
                     <p className="font-display text-xl leading-none">{todayMacros.proteinG ?? "--"}</p>
-                    <p className="font-body text-xs text-steel uppercase mt-1">Protein</p>
+                    <p className="font-body text-xs text-steel mt-1">Protein</p>
                   </div>
                   <div>
                     <p className="font-display text-xl leading-none">{todayMacros.carbsG ?? "--"}</p>
-                    <p className="font-body text-xs text-steel uppercase mt-1">Carbs</p>
+                    <p className="font-body text-xs text-steel mt-1">Carbs</p>
                   </div>
                   <div>
                     <p className="font-display text-xl leading-none">{todayMacros.fatG ?? "--"}</p>
-                    <p className="font-body text-xs text-steel uppercase mt-1">Fat</p>
+                    <p className="font-body text-xs text-steel mt-1">Fat</p>
                   </div>
                 </div>
               )
@@ -630,7 +632,7 @@ export default async function NutritionPage(
           )}
           {macrosEnabled && (
           <section>
-            <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
+            <h2 className="font-body text-[15px] font-semibold text-chalk mb-2">
               Weekly check-in
             </h2>
             {latestCheckin ? (
@@ -640,7 +642,7 @@ export default async function NutritionPage(
               // a second signal. This card's real, non-duplicate value is
               // the *reasoning* behind the current target and when it was
               // set.
-              <div className="border border-steel/20 p-4 space-y-3">
+              <div className="bg-surface rounded-card p-4 space-y-3">
                 <p className="font-body text-sm text-chalk">{latestCheckin.rationale}</p>
                 <p className="font-body text-xs text-steel pt-2 border-t border-steel/15">
                   {new Date(latestCheckin.created_at).toLocaleDateString("en-US", {
@@ -651,7 +653,7 @@ export default async function NutritionPage(
                 </p>
               </div>
             ) : (
-              <p className="font-body text-sm text-steel border border-steel/20 p-4">
+              <p className="font-body text-sm text-steel bg-surface rounded-card p-4">
                 {/* A coach in their own personal space is their own coach. */}
                 {selfCoached ? (
                   SELF_NO_CHECKIN_LINE
@@ -667,14 +669,14 @@ export default async function NutritionPage(
           )}
 
           <section>
-            <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
+            <h2 className="font-body text-[15px] font-semibold text-chalk mb-2">
               Body weight
             </h2>
             <TrendChart points={weightTrendPoints} unit={` ${weightUnit}`} />
           </section>
 
           <section>
-            <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
+            <h2 className="font-body text-[15px] font-semibold text-chalk mb-2">
               Calories eaten
             </h2>
             <TrendChart points={caloriesEatenPoints} unit=" cal" emptyLabel="Nothing logged in the last 30 days yet." />
@@ -682,7 +684,7 @@ export default async function NutritionPage(
 
           {macrosEnabled && (
           <section>
-            <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
+            <h2 className="font-body text-[15px] font-semibold text-chalk mb-2">
               Calorie target
             </h2>
             <TrendChart points={calorieTrendPoints} unit=" cal" emptyLabel="No calorie targets set yet." />

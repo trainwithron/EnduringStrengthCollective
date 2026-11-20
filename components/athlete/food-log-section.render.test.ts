@@ -16,7 +16,10 @@ describe("FoodLogSection for a client with no target (any tier)", () => {
   it("shows running totals even before anything is logged, with the friendly line", () => {
     const html = renderToStaticMarkup(createElement(FoodLogSection, { ...base, initialEntries: [] }));
     expect(html).toContain("Logged so far today");
-    expect(html).toContain("0 kcal");
+    // The calories ring (Look Refresh, Nov 20): the number in the middle, "kcal" under it, no fill without a target.
+    expect(html).toContain('aria-label="0 calories logged, no target"');
+    expect(html).toContain(">0</text>");
+    expect(html).toContain(">kcal</text>");
     expect(html).toContain("Your coach hasn&#x27;t set a target yet. You can still track what you eat.");
   });
 
@@ -45,8 +48,12 @@ describe("FoodLogSection for a group-tier client (no targets in their plan)", ()
 describe("FoodLogSection for a client with a target", () => {
   it("shows the totals against the target and not the no-target line", () => {
     const html = renderToStaticMarkup(createElement(FoodLogSection, { ...base, initialEntries: [entry], target: { calories: 2200, proteinG: 180, carbsG: 220, fatG: 70 } }));
-    expect(html).toContain("150 / 2200 kcal");
-    expect(html).toContain("15 / 180p / 8 / 220c / 4 / 70f");
+    // The ring and the three bars show each logged number against its target (Look Refresh, Nov 20).
+    expect(html).toContain('aria-label="150 of 2200 calories"');
+    expect(html).toContain(">of 2200 kcal</text>");
+    expect(html).toContain("15 / 180 g");
+    expect(html).toContain("8 / 220 g");
+    expect(html).toContain("4 / 70 g");
     expect(html).not.toContain("hasn&#x27;t set a target yet");
   });
 });
@@ -57,7 +64,9 @@ describe("FoodLogSection on a phone (FIX_NUTRITION_PHONE)", () => {
     const html = renderToStaticMarkup(createElement(FoodLogSection, { ...base, initialEntries: [], recents: [recent] }));
     expect(html).toContain(">Recent<");
     expect(html.indexOf(">Greek yogurt<")).toBeGreaterThan(-1);
-    expect(html.indexOf(">Recent<")).toBeLessThan(html.indexOf("Log something else"));
+    // No box has to be opened to reach it: the snack box is still closed (a pill) while the chip is on screen.
+    expect(html).not.toContain("Log something else");
+    expect(html).toContain("+ Snack or ate out");
   });
   it("heads the plan Today's meal plan", () => {
     const plan = { meals: { daily: [{ mealId: "m1", title: "Breakfast", proteinTarget: 30, carbsTarget: 40, fatTarget: 10, recipes: [] }] }, hiddenCount: 0, emptiedMeals: [] };

@@ -100,7 +100,7 @@ export async function WorkoutOverviewView({
 
       <div
         className={`fixed ${
-          showTabBar ? "bottom-16" : "bottom-0"
+          showTabBar ? "bottom-[calc(4.75rem+env(safe-area-inset-bottom))]" : "bottom-0"
         } left-0 right-0 bg-graphite border-t border-steel/20 px-5 py-4`}
       >
         {existingSession ? (

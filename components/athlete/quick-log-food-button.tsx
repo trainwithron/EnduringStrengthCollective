@@ -31,8 +31,8 @@ export function QuickLogFoodButton({
 
   if (open) {
     return (
-      <div className="border border-steel/20 p-3">
-        <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">
+      <div className="basis-full order-last min-w-0 bg-surface rounded-card p-3">
+        <p className="font-body text-[13px] font-semibold text-steel mb-1">
           Log something else
         </p>
         <FreeTextFoodLog
@@ -61,13 +61,14 @@ export function QuickLogFoodButton({
     );
   }
 
+  // A small pill beside Copy yesterday (Look Refresh, Nov 20); the box opens full width under the pills.
   return (
     <button
       type="button"
       onClick={() => setOpen(true)}
-      className="w-full min-h-[44px] border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors"
+      className="min-h-[44px] px-4 rounded-token-pill border border-steel/40 text-chalk font-body text-[13px] font-medium active:border-rust active:text-rust transition-colors"
     >
-      + Log something else (snack, ate out, etc.)
+      + Snack or ate out
     </button>
   );
 }

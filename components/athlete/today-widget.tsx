@@ -71,28 +71,28 @@ export function TodayWidget({
   if (!hasMacros && state.length === 0 && !mealLine) return null;
 
   return (
-    <div className="border border-steel/20 p-4">
-      <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">Today</h2>
+    <div className="bg-surface rounded-card p-4">
+      <h2 className="font-body text-[15px] font-semibold text-chalk mb-3">Nutrition and habits</h2>
 
       {hasMacros && (
         <>
-        <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">Your targets today</p>
+        <p className="font-body text-[13px] font-semibold text-steel mb-1">Your targets today</p>
         <div className="grid grid-cols-4 gap-2 text-center mb-4">
           <div>
             <p className="font-display text-lg leading-none">{macros!.calories ?? "--"}</p>
-            <p className="font-body text-xs text-steel uppercase mt-1">Kcal</p>
+            <p className="font-body text-xs text-steel mt-1">Kcal</p>
           </div>
           <div>
             <p className="font-display text-lg leading-none">{macros!.proteinG ?? "--"}</p>
-            <p className="font-body text-xs text-steel uppercase mt-1">Protein</p>
+            <p className="font-body text-xs text-steel mt-1">Protein</p>
           </div>
           <div>
             <p className="font-display text-lg leading-none">{macros!.carbsG ?? "--"}</p>
-            <p className="font-body text-xs text-steel uppercase mt-1">Carbs</p>
+            <p className="font-body text-xs text-steel mt-1">Carbs</p>
           </div>
           <div>
             <p className="font-display text-lg leading-none">{macros!.fatG ?? "--"}</p>
-            <p className="font-body text-xs text-steel uppercase mt-1">Fat</p>
+            <p className="font-body text-xs text-steel mt-1">Fat</p>
           </div>
         </div>
         </>
@@ -140,7 +140,7 @@ export function TodayWidget({
 
       {pinnedLinks && pinnedLinks.length > 0 && (
         <div className="space-y-1.5 pt-3 border-t border-steel/15">
-          <p className="font-body text-xs text-steel uppercase tracking-wide">From your coach, for today</p>
+          <p className="font-body text-[13px] font-semibold text-steel">From your coach, for today</p>
           {pinnedLinks.map((l) => (
             <a
               key={l.id}

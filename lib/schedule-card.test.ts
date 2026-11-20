@@ -26,11 +26,12 @@ describe("Schedule card: the sentence", () => {
     expect(clientSessionsLine({ left: 0, booked: 2, toBook: 0 }, "NONE")).toBe("No sessions left");
     expect(read("app/(coach)/groups/[groupId]/calendar/[date]/page.tsx")).toContain("clientSessionsLine(buildCreditPicture(");
   });
-  it("the card is one line and a Schedule button (shown at 0 too)", () => {
+  it("the card is one line and a full-width Book a session button (shown at 0 too)", () => {
     const html = renderToStaticMarkup(createElement(ScheduleCard, { available: 0, href: "/groups/g/calendar/2026-10-21" }));
     expect(html).toContain("No sessions left");
     expect(html).toContain('href="/groups/g/calendar/2026-10-21"');
-    expect(html).toContain(">Schedule</a>");
+    expect(html).toContain(">Book a session</a>");
+    expect(html).toContain("w-full");
   });
 });
 

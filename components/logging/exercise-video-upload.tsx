@@ -23,12 +23,15 @@ export function ExerciseVideoUpload({
   groupId,
   athleteId,
   onUploaded,
+  compact = false,
 }: {
   sessionId: string;
   sessionExerciseId: string;
   groupId: string;
   athleteId: string;
   onUploaded: (video: UploadedVideo) => void;
+  // The Form check button beside "+ Add a set" (Look Refresh, client step): just the button (and its progress and any error); the filming tips go under the row (FormCheckTips).
+  compact?: boolean;
 }) {
   const [progress, setProgress] = useState<number | null>(null);
   const [stage, setStage] = useState<"convert" | "upload">("upload");
@@ -110,6 +113,32 @@ export function ExerciseVideoUpload({
   }
 
   const uploading = progress != null;
+  if (compact) {
+    return (
+      <div className="shrink-0 flex flex-col items-end">
+        {uploading ? (
+          <span role="status" aria-live="polite" className="h-11 px-3.5 rounded-row tint-checkin inline-flex items-center font-body text-[13px] font-medium text-checkin tabular-nums">
+            {stage === "convert" ? "Getting it ready" : "Uploading"} {Math.round((progress ?? 0) * 100)}%
+          </span>
+        ) : (
+          <label className="h-11 px-3.5 rounded-row tint-checkin inline-flex items-center gap-1.5 font-body text-[13px] font-medium text-checkin cursor-pointer" aria-label="Record or attach a form-check video">
+            <input type="file" accept="video/*" onChange={(e) => void handleFileChange(e)} className="hidden" />
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+              <rect x="3" y="6" width="13" height="12" rx="2" />
+              <path d="M16 10l5-3v10l-5-3" />
+            </svg>
+            Form check
+          </label>
+        )}
+        {error && (
+          <p className="font-body text-xs text-rust mt-1 text-right" role="alert">
+            {error}
+          </p>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="mt-2">
       {uploading ? (
@@ -137,6 +166,16 @@ export function ExerciseVideoUpload({
           {error}
         </p>
       )}
+    </div>
+  );
+}
+
+// Under the "+ Add a set" / Form check row: how to film it and who sees it (Ron, Nov 20, V2).
+export function FormCheckTips() {
+  return (
+    <div className="mt-1.5">
+      <p className="font-body text-[11px] text-steel leading-snug">Film from the side with your whole body in the frame. Up to a minute.</p>
+      <p className="font-body text-[11px] text-steel leading-snug">Only you and your coach can see this.</p>
     </div>
   );
 }

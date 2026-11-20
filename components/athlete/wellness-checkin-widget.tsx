@@ -128,11 +128,23 @@ export function WellnessCheckinWidget({
       });
   }
 
+  // One question at a time (Look Refresh, client step, Ron Nov 20): the same three scales and, on the days it is asked, the optional reflection, as "1 of 4".
+  // Picking a number moves on to the next question; the last one holds Save. What is saved, and when, is unchanged.
+  const totalSteps = FIELDS.length + (lifeImpactPrompt ? 1 : 0);
+  const [step, setStep] = useState(0);
+  const lastStep = step === totalSteps - 1;
+  const field = step < FIELDS.length ? FIELDS[step] : null;
+
   return (
-    <div className="border border-steel/20 p-4">
-      <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">
-        How are you feeling?
-      </h2>
+    <div>
+      <div className="flex items-baseline justify-between gap-3 mb-3">
+        <h2 className="font-body text-[15px] font-semibold text-chalk">How are you feeling?</h2>
+        {(editing || !saved) && (
+          <span className="font-body text-xs text-steel tabular-nums" data-checkin-step>
+            {step + 1} of {totalSteps}
+          </span>
+        )}
+      </div>
 
       {error && (
         <p className="font-body text-xs text-rust mb-2" role="alert">
@@ -149,6 +161,7 @@ export function WellnessCheckinWidget({
             type="button"
             onClick={() => {
               setDraft(saved);
+              setStep(0);
               setEditing(true);
             }}
             className="inline-flex items-center min-h-11 px-2 font-body text-xs text-rust"
@@ -157,10 +170,10 @@ export function WellnessCheckinWidget({
           </button>
         </div>
       ) : (
-        <div className="space-y-4">
-          {FIELDS.map((field) => (
+        <div className="space-y-4" data-checkin-one-at-a-time>
+          {field && (
             <div key={field.key}>
-              <p className="font-body text-sm mb-1.5">{field.label}</p>
+              <p className="font-body text-sm font-semibold text-chalk mb-2">{field.label}</p>
               <div className="flex items-center gap-1.5">
                 {[1, 2, 3, 4, 5].map((n) => (
                   <button
@@ -168,11 +181,14 @@ export function WellnessCheckinWidget({
                     type="button"
                     aria-label={`${field.label}: ${n} of 5${n === 1 ? ` (${field.lowLabel})` : n === 5 ? ` (${field.highLabel})` : ""}`}
                     aria-pressed={draft[field.key] === (field.flipped ? sorenessStored(n) : n)}
-                    onClick={() => setDraft((prev) => ({ ...prev, [field.key]: field.flipped ? sorenessStored(n) : n }))}
-                    className={`flex-1 h-11 border font-body text-sm ${
+                    onClick={() => {
+                      setDraft((prev) => ({ ...prev, [field.key]: field.flipped ? sorenessStored(n) : n }));
+                      if (!lastStep) setStep((s) => Math.min(s + 1, totalSteps - 1));
+                    }}
+                    className={`flex-1 h-11 rounded-row font-body text-[15px] font-medium ${
                       draft[field.key] === (field.flipped ? sorenessStored(n) : n)
-                        ? "bg-rust border-rust text-graphite"
-                        : "border-steel/30 text-chalk"
+                        ? "bg-rust text-graphite"
+                        : "bg-surface-2 text-chalk"
                     }`}
                   >
                     {n}
@@ -184,36 +200,56 @@ export function WellnessCheckinWidget({
                 <span className="font-body text-xs text-steel">{field.highLabel}</span>
               </div>
             </div>
-          ))}
+          )}
 
-          {lifeImpactPrompt && !lifeImpactDismissed && (
-            <div className="pt-2 border-t border-steel/15">
-              <p className="font-body text-sm mb-1.5">{lifeImpactPrompt}</p>
-              <textarea aria-label="Your answer (optional)"
-                value={lifeImpactNote}
-                onChange={(e) => setLifeImpactNote(e.target.value)}
-                placeholder="Totally optional — only if something comes to mind."
-                rows={2}
-                className="w-full bg-surface border border-steel/30 text-chalk px-2 py-1.5 font-body text-sm focus:outline-none focus:border-rust"
-              />
-              <button
-                type="button"
-                onClick={() => setLifeImpactDismissed(true)}
-                className="font-body text-xs text-steel mt-1 inline-flex items-center min-h-11"
-              >
-                Skip this
-              </button>
+          {!field && lifeImpactPrompt && (
+            <div>
+              <p className="font-body text-sm font-semibold text-chalk mb-2">{lifeImpactPrompt}</p>
+              {!lifeImpactDismissed && (
+                <>
+                  <textarea aria-label="Your answer (optional)"
+                    value={lifeImpactNote}
+                    onChange={(e) => setLifeImpactNote(e.target.value)}
+                    placeholder="Totally optional — only if something comes to mind."
+                    rows={2}
+                    className="w-full rounded-row bg-surface-2 border border-steel/30 text-chalk px-3 py-2 font-body text-sm focus:outline-none focus:border-rust"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setLifeImpactDismissed(true)}
+                    className="font-body text-xs text-steel mt-1 inline-flex items-center min-h-11"
+                  >
+                    Skip this
+                  </button>
+                </>
+              )}
             </div>
           )}
 
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={!complete}
-            className="w-full h-11 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
-          >
-            Save
-          </button>
+          <div className="flex items-center gap-2">
+            {step > 0 && (
+              <button type="button" onClick={() => setStep((s) => Math.max(0, s - 1))} className="h-11 px-4 rounded-row bg-surface-2 font-body text-sm text-chalk">
+                Back
+              </button>
+            )}
+            {lastStep ? (
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={!complete}
+                className="flex-1 h-11 bg-rust text-graphite font-body text-sm font-semibold disabled:opacity-40"
+              >
+                Save
+              </button>
+            ) : (
+              field &&
+              draft[field.key] != null && (
+                <button type="button" onClick={() => setStep((s) => Math.min(s + 1, totalSteps - 1))} className="flex-1 h-11 rounded-row bg-surface-2 font-body text-sm text-chalk">
+                  Next
+                </button>
+              )
+            )}
+          </div>
         </div>
       )}
     </div>

@@ -34,22 +34,23 @@ describe("the card fits the screen", () => {
     expect(horizontal).toContain("Math.floor(window.innerHeight - top - below)");
   });
   it("the top is one slim block while a workout is in progress", () => {
-    expect(page).toContain('"relative px-5 pt-1 pb-1 border-b border-steel/20"');
-    expect(page).toContain("font-display font-bold text-lg leading-none uppercase truncate");
+    expect(page).toContain('"relative px-4 pt-2 pb-2"');
+    expect(page).toContain("font-display font-semibold text-lg leading-tight truncate");
   });
-  it("the rest timer is always one slim row (start a rest any time); the prompt and countdown open over the top of the card; the stopwatch is on the header's top line", () => {
+  // Look Refresh (client step, Nov 20): a rest starts any time from the bottom bar's Rest button; the prompt after a set and the countdown are sheets up from the bottom.
+  it("a rest can start any time (the bottom bar); the prompt and countdown open as sheets from the bottom; the stopwatch is on the header's top line", () => {
     expect(rest).toContain("{showPrompt && (");
-    expect(rest).toContain("if (!showPrompt && !running && !justFinished) return restRow;");
-    expect(rest).toContain("onClick={() => startPreset(seconds)} className=\"h-11 px-3");
-    expect(rest).toContain('"absolute inset-x-0 top-0 z-40 bg-graphite border-b border-steel/20 px-5 py-1 shadow-lg"');
-    expect(rest).toContain("flex flex-1 flex-wrap items-center justify-end gap-x-2 gap-y-2");
-    expect(rest).toContain('<p className="mr-auto font-display text-3xl');
+    expect(rest).toContain("if (!showPrompt && !running && !justFinished) return null;");
+    expect(rest).toContain("onClick={() => startPreset(seconds)} className={chip(");
+    expect(rest).toContain("fixed inset-x-0 bottom-0 z-50");
+    expect(read("components/logging/session-logger.tsx")).toContain("onClick={startBarRest}");
     expect(rest).not.toContain("<SessionStopwatch");
     expect(rest).not.toContain("startedAt: string;");
-    expect(page).toContain("<SessionStopwatch startedAt={session.started_at} />");
+    expect(page).toContain("<SessionStopwatch startedAt={session.started_at} compact />");
     // the coach logging for a client: stopwatch and Send to client on the same top line
-    const top = page.slice(page.indexOf('<div className="flex items-center gap-2 shrink-0">'), page.indexOf(") : (\n          <Link href={backHref}"));
+    const top = page.slice(page.indexOf('<div className="flex items-center gap-2.5">'), page.indexOf(") : (\n          <Link href={backHref}"));
     expect(top).toContain("<SessionStopwatch");
+    expect(top).toContain("<FinishWorkoutButton />");
     expect(top).toContain("<SendToClientButton");
     expect(page).not.toContain('<span className="w-12 shrink-0" aria-hidden="true" />');
     expect(page).toContain("In progress is ONE slim row");

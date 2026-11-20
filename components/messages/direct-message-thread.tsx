@@ -151,7 +151,7 @@ export function DirectMessageThread({
       <div
         className={
           fixedComposer
-            ? "fixed bottom-16 inset-x-0 z-10 bg-graphite/95 backdrop-blur border-t border-steel/20 flex items-center gap-2 px-5 py-3"
+            ? "fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] inset-x-0 z-10 bg-graphite/95 backdrop-blur border-t border-steel/20 flex items-center gap-2 px-5 py-3"
             : "flex items-center gap-2 px-5 py-3 border-t border-steel/20 shrink-0"
         }
       >

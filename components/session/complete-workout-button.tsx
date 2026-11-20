@@ -84,8 +84,9 @@ export function CompleteWorkoutButton({
   // The on-screen Back and the phone's own back gesture open this same choice (complete, pause, or keep going) instead of leaving. The page keeps one extra history step while the workout is open so the
   // gesture lands here; the step is dropped again when this unmounts.
   useEffect(() => {
+    // The header's Finish (finish-workout-button.tsx), Back and the back gesture all open the choice, the same as a tap here used to.
     function open() {
-      setConfirming(true);
+      handleTap();
     }
     function guard() {
       window.history.pushState({ workoutGuard: true }, "");
@@ -490,7 +491,7 @@ export function CompleteWorkoutButton({
   if (walkIn) {
     const time = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
     return (
-      <div data-complete-bar data-walk-in className={`fixed ${raised ? "bottom-16" : "bottom-0"} left-0 right-0 bg-graphite border-t border-steel/20 px-5 py-3`}>
+      <div data-complete-bar data-walk-in className={`fixed ${raised ? "bottom-[calc(4.75rem+env(safe-area-inset-bottom))]" : "bottom-0"} left-0 right-0 bg-graphite border-t border-steel/20 px-5 py-3`}>
         <p className="font-body text-sm text-chalk">
           Put this on your calendar? {time(walkIn.startIso)} to {time(walkIn.endIso)} today. Uses 1 session.
         </p>
@@ -516,7 +517,7 @@ export function CompleteWorkoutButton({
       <div
         data-complete-bar
         className={`fixed ${
-          raised ? "bottom-16" : "bottom-0"
+          raised ? "bottom-[calc(4.75rem+env(safe-area-inset-bottom))]" : "bottom-0"
         } left-0 right-0 bg-graphite border-t border-steel/20 px-5 py-2`}
       >
         <p className="font-body text-sm text-chalk mb-2">How hard was that whole session? (1-10)</p>
@@ -555,7 +556,7 @@ export function CompleteWorkoutButton({
       <div
         data-complete-bar
         className={`fixed ${
-          raised ? "bottom-16" : "bottom-0"
+          raised ? "bottom-[calc(4.75rem+env(safe-area-inset-bottom))]" : "bottom-0"
         } left-0 right-0 bg-graphite border-t border-steel/20 px-5 py-2`}
       >
         <p className="font-body text-sm text-chalk mb-2">Log today&apos;s weight while you&apos;re here?</p>
@@ -591,12 +592,16 @@ export function CompleteWorkoutButton({
     );
   }
 
+  // Finish is at the top right of the workout's header now (Look Refresh, client step, Ron Nov 20: components/session/finish-workout-button.tsx asks for this same choice). This panel opens
+  // over the bottom bar only while there is something to answer or say: the choice, the long-workout check, "Finishing…", or an error.
+  if (!confirming && longRunSeconds == null && !error && !submitting) return null;
+
   return (
     <div
       data-complete-bar
       className={`fixed ${
-        raised ? "bottom-16" : "bottom-0"
-      } left-0 right-0 bg-graphite border-t border-steel/20 px-5 py-2`}
+        raised ? "bottom-[calc(4.75rem+env(safe-area-inset-bottom))]" : "bottom-0"
+      } left-0 right-0 z-40 rounded-t-[28px] bg-surface border-t border-rust/25 px-5 pt-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-[0_-16px_40px_rgb(0_0_0/0.5)]`}
     >
       {longRunSeconds != null && (
         <div className="mb-3 p-3 border border-rust/40 bg-surface/60" data-long-workout-check>
@@ -720,14 +725,11 @@ export function CompleteWorkoutButton({
           {error}
         </p>
       )}
-      <button
-        type="button"
-        onClick={handleTap}
-        disabled={disabled || submitting}
-        className="w-full h-12 bg-rust text-graphite font-display uppercase text-lg font-bold disabled:opacity-40 active:bg-rust/80 transition-colors"
-      >
-        {submitting ? "Finishing…" : "Complete workout"}
-      </button>
+      {submitting && !confirming && (
+        <p className="font-body text-sm text-chalk text-center" role="status">
+          Finishing…
+        </p>
+      )}
     </div>
   );
 }

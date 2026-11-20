@@ -136,13 +136,14 @@ export function BottomTabBar({
   const active: TabKey | null = activeOverride !== undefined ? activeOverride ?? pendingTab : pendingTab ?? resolvedActive;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 h-16 bg-graphite border-t border-steel/20 flex z-20">
+    // A floating rounded bar (Look Refresh, client step, Ron Nov 20): the open tab's icon sits in an accent pill, labels in mixed case.
+    <nav className="fixed left-3 right-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] h-16 rounded-[22px] bg-surface/95 backdrop-blur border border-steel/30 shadow-[0_12px_32px_rgb(0_0_0/0.45)] flex z-20">
       {tabs.map((tab) => {
         const isActive = active === tab.key;
         const Icon = tab.icon;
         const content = (
           <>
-            <span className="relative">
+            <span className={`relative inline-flex items-center justify-center h-7 px-3.5 rounded-full transition-colors ${isActive ? "bg-rust/15" : ""}`}>
               <Icon
                 className={`w-5 h-5 ${isActive ? "text-rust" : "text-steel"}`}
                 strokeWidth={2.5}
@@ -150,13 +151,13 @@ export function BottomTabBar({
               {tab.key === "settings" && pushState === "off" && (
                 <span
                   aria-label="Notifications are off"
-                  className="absolute -top-0.5 -right-1 w-2.5 h-2.5 rounded-full bg-amber border border-graphite"
+                  className="absolute top-0 right-2 w-2.5 h-2.5 rounded-full bg-amber border border-graphite"
                 />
               )}
             </span>
             <span
-              className={`font-body text-xs uppercase tracking-wide ${
-                isActive ? "text-rust" : "text-steel"
+              className={`font-body text-[11px] ${
+                isActive ? "text-rust font-semibold" : "text-steel"
               }`}
             >
               {tab.label}

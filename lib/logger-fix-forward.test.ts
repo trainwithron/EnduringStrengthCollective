@@ -29,13 +29,15 @@ describe("the logging card fits the screen", () => {
     expect(carousel).toContain("const index = Math.round(scroller.scrollLeft / width);");
     expect(carousel).toContain("const target = index * width;");
   });
-  it("the set grid columns are narrow enough for three or four sets inside the card", () => {
+  // Look Refresh (client step, Nov 20): sets as rows; each column at least 52px, and more columns than fit scroll sideways inside the card.
+  it("the set columns are narrow enough for three tracked fields inside a 375px card", () => {
     expect(grid).not.toContain("w-16");
-    expect(grid).toContain("w-12");
+    expect(grid).toContain("minmax(3.25rem, 1fr)");
+    expect(grid).toContain('className="overflow-x-auto overscroll-x-contain -mx-1 px-1" data-set-scroll');
   });
-  it("Add sits on the dots row when swiping sideways, and the page has no bottom padding to scroll through while a workout is in progress", () => {
+  it("Add sits on the dots row when swiping sideways, and the page keeps only the room of the bottom bar while a workout is in progress", () => {
     expect(logger).toContain('"absolute right-0 top-0 z-30"');
-    expect(page).toContain('"pb-16" : isOwnSession && session.status === "abandoned" ? "pb-40" : "pb-32"');
+    expect(page).toContain('"pb-28" : isOwnSession && session.status === "abandoned" ? "pb-40" : "pb-32"');
   });
   it("the in-progress header is one slim row", () => {
     expect(page).toContain("In progress is ONE slim row");
@@ -76,8 +78,8 @@ describe("the swipe works with a real finger", () => {
     expect(grid).toContain('e.pointerType === "touch"');
   });
   it("a long next-exercise name is cut short and the page can never grow wider than the screen", () => {
-    const strip = read("components/logging/session-progress-strip.tsx");
-    expect(strip).toContain('<span className="text-chalk truncate">{next.exerciseName}</span>');
+    // Next is on the bottom bar now (Look Refresh, client step): one line, cut short.
+    expect(logger).toContain("flex-1 min-w-0 h-[54px] px-4 rounded-token-pill bg-rust text-graphite font-body text-[15px] font-semibold truncate");
     expect(page).toContain("overflow-x-clip");
   });
 });
@@ -92,11 +94,13 @@ describe("the chrome is slim so the card gets the height", () => {
     expect(bar).toContain("homeHref={homeHref} compact");
     expect(read("components/coach/mobile/coach-spot-hub.tsx")).toContain("href={homeHref}");
   });
-  it("the Complete bar is one compact row whose real height the card budget uses", () => {
+  // Look Refresh (client step, Nov 20): Finish is in the header; the bottom bar is Rest / Next, and the card budget measures it (the Complete workout choice opens over it).
+  it("the bottom bar is one compact row whose real height the card budget uses", () => {
     const button = read("components/session/complete-workout-button.tsx");
     expect(button).toContain("data-complete-bar");
-    expect(button).toContain('className="w-full h-12 bg-rust');
-    expect(carousel).toContain('document.querySelector("[data-complete-bar]")');
+    expect(button).toContain("if (!confirming && longRunSeconds == null && !error && !submitting) return null;");
+    expect(logger).toContain("data-logger-bar");
+    expect(carousel).toContain('document.querySelector("[data-logger-bar]") ?? document.querySelector("[data-complete-bar]")');
   });
   it("the timer, the dots, the note and the sets stepper are tightened", () => {
     expect(read("components/session/session-stopwatch.tsx")).toContain("text-2xl");

@@ -11,7 +11,6 @@ import {
   MEAL_SLOT_LABEL,
   copyRows,
   deleteEntry,
-  fetchFoodLogDay,
   insertCopies,
   rescaleEntryPatch,
   updateEntry,
@@ -22,6 +21,7 @@ import { FoodNutrientPanel } from "@/components/nutrition/food-nutrient-panel";
 import { itemInsertRow, itemsFromEntries } from "@/lib/saved-meal";
 import { checkMacros, parseNumberField } from "@/lib/food-validation";
 import { addDaysToKey } from "@/lib/date-key";
+import { CopyYesterdayButton } from "./copy-yesterday-button";
 
 // What the client logged today, by meal: each entry can be edited (the number of servings for a searched food; the name and numbers for anything else) or deleted, and a meal
 // can be copied from yesterday or to another day. Planned meals ticked off from the coach's plan stay on the plan cards above; this list is the free-form log.
@@ -37,6 +37,7 @@ export function FoodLogEntries({
   onChanged,
   onDeleted,
   isToday = true,
+  showCopyYesterday = true,
 }: {
   athleteId: string;
   groupId: string;
@@ -47,13 +48,14 @@ export function FoodLogEntries({
   onDeleted: (id: string) => void;
   // Whether the day shown is today (the day switcher can show another): the copy button then says "Copy the day before".
   isToday?: boolean;
+  // The client Nutrition page shows Copy yesterday with the ways to log instead (food-log-section.tsx); elsewhere it heads this list.
+  showCopyYesterday?: boolean;
 }) {
   const mine = entries.filter(isFreeForm);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [copyFor, setCopyFor] = useState<MealSlot | "other" | null>(null);
   const [copyDate, setCopyDate] = useState(addDaysToKey(logDate, 1));
-  const [copiedYesterday, setCopiedYesterday] = useState(false);
   const [saveFor, setSaveFor] = useState<MealSlot | "other" | null>(null);
   const [mealName, setMealName] = useState("");
 
@@ -93,33 +95,6 @@ export function FoodLogEntries({
     setNotice(`Saved "${name}". Find it under My foods and saved meals.`);
   }
 
-  // On another day than today (the day switcher), "yesterday" would be wrong: it copies the day before the day shown.
-  const dayBefore = isToday ? "yesterday" : "the day before";
-
-  async function copyFromYesterday() {
-    if (busy || copiedYesterday) return;
-    setBusy(true);
-    setNotice(null);
-    const supabase = createBrowserClient();
-    const yesterday = await fetchFoodLogDay(supabase, athleteId, addDaysToKey(logDate, -1));
-    const rows = copyRows(yesterday, { athleteId, groupId, toDate: logDate });
-    if (rows.length === 0) {
-      setNotice(`Nothing was logged ${dayBefore} to copy.`);
-      setBusy(false);
-      return;
-    }
-    const added = await insertCopies(supabase, rows);
-    setBusy(false);
-    if (!added) {
-      setNotice("That didn't copy. Try again.");
-      return;
-    }
-    onAdded(added);
-    // Once is enough: pressing it again would double the day.
-    setCopiedYesterday(true);
-    setNotice(`Copied ${added.length} ${added.length === 1 ? "entry" : "entries"} from ${dayBefore}.`);
-  }
-
   async function copyMeal(slot: MealSlot | "other", group: FoodLogEntry[]) {
     if (busy) return;
     if (!copyDate) return;
@@ -144,17 +119,18 @@ export function FoodLogEntries({
 
   return (
     <div className="space-y-3" data-testid="food-log-entries">
-      <div className="flex flex-wrap items-center gap-2">
-        <button type="button" onClick={copyFromYesterday} disabled={busy || copiedYesterday} className="min-h-[44px] px-3 border border-steel/30 text-steel font-body text-xs disabled:opacity-50">
-          {copiedYesterday ? `Copied from ${dayBefore}` : isToday ? "Copy yesterday" : "Copy the day before"}
-        </button>
-        {notice && <p className="font-body text-xs text-steel" role="status">{notice}</p>}
-      </div>
+      {(showCopyYesterday || notice) && (
+        <div className="flex flex-wrap items-center gap-2">
+          {showCopyYesterday && <CopyYesterdayButton athleteId={athleteId} groupId={groupId} logDate={logDate} isToday={isToday} onAdded={onAdded} />}
+          {notice && <p className="font-body text-xs text-steel" role="status">{notice}</p>}
+        </div>
+      )}
 
+      {groups.length > 0 && <h2 className="font-body text-[15px] font-semibold text-chalk">{isToday ? "Today's log" : "Logged"}</h2>}
       {groups.map((g) => (
-        <section key={g.slot}>
+        <section key={g.slot} className="bg-surface rounded-card p-3">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="font-display uppercase text-xs tracking-wide text-steel">{g.label}</h3>
+            <h3 className="font-body text-[13px] font-semibold text-steel">{g.label}</h3>
             <div className="flex items-center">
               <button type="button" onClick={() => { setSaveFor(saveFor === g.slot ? null : g.slot); setCopyFor(null); setMealName(g.label === "Other" ? "" : g.label); }} className="min-h-[44px] px-2 font-body text-xs text-steel underline">
                 Save as a meal

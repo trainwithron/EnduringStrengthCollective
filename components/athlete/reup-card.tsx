@@ -34,7 +34,7 @@ export function ReupCard({ state }: { state: ReupState }) {
   const canBuy = !!state.package && state.canPay;
 
   return (
-    <div className="border border-steel/30 bg-surface/40 p-4" role="region" aria-label="Add sessions">
+    <div className="tint-accent rounded-card p-4" role="region" aria-label="Add sessions">
       {state.nextSessionLabel ? (
         <>
           <p className="font-body text-sm text-chalk">Your session is {state.nextSessionLabel}.</p>
@@ -69,7 +69,7 @@ export function ReupCard({ state }: { state: ReupState }) {
           </p>
         )}
         {error && (
-          <p className="font-body text-xs text-rust mt-2" role="alert">
+          <p className="font-body text-xs text-rust-ink mt-2" role="alert">
             {error}
           </p>
         )}

@@ -8,6 +8,8 @@ import { CUSTOM_FOOD_SELECT, customFoodEntryProblem, customFoodEntryRow, customF
 import { FOOD_LOG_DETAIL_SELECT, defaultMealSlot, entryFromRow, type FoodLogRow } from "@/lib/food-entry";
 import { normalizeBarcode } from "@/lib/food-barcode";
 import { barcodeBasisLabel, scaleBarcodeResult, type BarcodeLookupResult } from "@/lib/open-food-facts";
+import { ScanBarcode } from "lucide-react";
+import { LOG_TILE_CLASS } from "./log-tile";
 
 // A scan looks in the client's OWN foods first (so a bar they created is found again), then the product database; when neither knows the code the client can create the food with
 // the code already filled in and log it. Codes are compared without leading zeros (UPC-A and EAN-13 of the same product match).
@@ -32,27 +34,32 @@ export function BarcodeScanButton({
 
   if (!open) {
     return (
+      // A tile in the row of three (Look Refresh, Nov 20); the scanner opens full width under the row.
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="w-full min-h-[44px] border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors"
+        aria-label="Scan a barcode"
+        className={LOG_TILE_CLASS}
       >
-        Scan a barcode
+        <ScanBarcode className="w-[22px] h-[22px] text-rust" aria-hidden="true" />
+        Scan
       </button>
     );
   }
 
   return (
-    <BarcodeScanPanel
-      athleteId={athleteId}
-      groupId={groupId}
-      logDate={logDate}
-      onLogged={(entry) => {
-        onLogged(entry);
-        setOpen(false);
-      }}
-      onCancel={() => setOpen(false)}
-    />
+    <div className="basis-full order-last min-w-0">
+      <BarcodeScanPanel
+        athleteId={athleteId}
+        groupId={groupId}
+        logDate={logDate}
+        onLogged={(entry) => {
+          onLogged(entry);
+          setOpen(false);
+        }}
+        onCancel={() => setOpen(false)}
+      />
+    </div>
   );
 }
 

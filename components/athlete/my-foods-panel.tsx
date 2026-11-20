@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { FoodLogEntry } from "./meal-checkoff-list";
 import { CustomFoodFormPanel } from "./custom-food-form";
+import { Bookmark } from "lucide-react";
+import { LOG_TILE_CLASS } from "./log-tile";
 import { CUSTOM_FOOD_SELECT, customFoodEntryProblem, customFoodEntryRow, customFoodFromRow, customFoodTitle, servingsProblem, type CustomFood, type CustomFoodRow } from "@/lib/custom-food";
 import { MEAL_SLOTS, MEAL_SLOT_LABEL, FOOD_LOG_DETAIL_SELECT, defaultMealSlot, entryFromRow, insertCopies, type FoodLogRow, type MealSlot } from "@/lib/food-entry";
 import { SAVED_MEAL_ITEM_SELECT, itemFromRow, mealEntryProblem, mealEntryRows, mealServingsProblem, mealTotals, type SavedMeal, type SavedMealItemRow } from "@/lib/saved-meal";
@@ -56,16 +58,18 @@ export function MyFoodsPanel({ athleteId, groupId, logDate, onLogged }: { athlet
 
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} className="w-full min-h-[44px] border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors">
-        My foods and saved meals
+      // A tile in the row of three (Look Refresh, Nov 20); the list opens full width under the row.
+      <button type="button" onClick={() => setOpen(true)} aria-label="My foods and saved meals" className={LOG_TILE_CLASS}>
+        <Bookmark className="w-[22px] h-[22px] text-rust" aria-hidden="true" />
+        My foods
       </button>
     );
   }
 
   return (
-    <div className="border border-steel/20 p-3 space-y-3" data-testid="my-foods">
+    <div className="basis-full order-last min-w-0 bg-surface rounded-card p-3 space-y-3" data-testid="my-foods">
       <div className="flex items-center justify-between gap-3">
-        <p className="font-body text-xs text-steel uppercase tracking-wide">My foods and saved meals</p>
+        <p className="font-body text-[13px] font-semibold text-steel">My foods and saved meals</p>
         <button type="button" onClick={() => setOpen(false)} className="min-h-[44px] px-2 font-body text-xs text-steel">
           Close
         </button>

@@ -30,6 +30,7 @@ import { countsForProgress } from "@/lib/set-types";
 import { computeVolumeHistory } from "@/lib/exercise-volume-history";
 import { sessionBackHref } from "@/lib/session-back-href";
 import { ExitWorkoutButton } from "@/components/session/exit-workout-button";
+import { FinishWorkoutButton } from "@/components/session/finish-workout-button";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 import { findDemo, type DemoRow } from "@/lib/exercise-demo";
 import { loadPlatformDemos } from "@/lib/platform-demos";
@@ -605,21 +606,25 @@ export default async function SessionPage(
 
   return (
     // A paused workout of your own stacks the Resume bar on the tab bar (about 156px), so it gets more room under the last card.
-    <main className={`min-h-screen overflow-x-clip bg-graphite text-chalk font-body ${session.status === "in_progress" ? "pb-16" : isOwnSession && session.status === "abandoned" ? "pb-40" : "pb-32"}`}>
+    <main className={`min-h-screen overflow-x-clip bg-graphite text-chalk font-body ${session.status === "in_progress" ? "pb-28" : isOwnSession && session.status === "abandoned" ? "pb-40" : "pb-32"}`}>
       {coachModeClient && <CoachModeBar groupId={session.group_id} clientName={coachModeClient.name} homeHref={coachHomeHref} />}
-      <header className={session.status === "in_progress" ? "relative px-5 pt-1 pb-1 border-b border-steel/20" : "px-5 pt-8 pb-6 border-b border-steel/20"}>
-        {/* In progress is ONE slim row (Back, the day, who logged it) so the exercise card keeps the screen; a finished or paused workout keeps the roomier header. */}
+      <header className={session.status === "in_progress" ? "relative px-4 pt-2 pb-2" : "px-5 pt-8 pb-6 border-b border-steel/20"}>
+        {/* In progress is ONE slim row so the exercise keeps the screen (Look Refresh, client step): Back, the day with its stopwatch under it, who logged it, and Finish at the top right.
+            A finished or paused workout keeps the roomier header. */}
         {session.status === "in_progress" ? (
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
             <ExitWorkoutButton sessionId={session.id} backHref={backHref} />
-            <h1 className="font-display font-bold text-lg leading-none uppercase truncate min-w-0 flex-1 text-center">{(session as any).workouts?.title ?? "Workout"}</h1>
+            <div className="min-w-0 flex-1">
+              <h1 className="font-display font-semibold text-lg leading-tight truncate">{(session as any).workouts?.title ?? "Workout"}</h1>
+              <SessionStopwatch startedAt={session.started_at} compact />
+            </div>
             <div className="flex items-center gap-2 shrink-0">
-              <SessionStopwatch startedAt={session.started_at} />
               {session.logged_by_coach && !isOwnSession ? (
                 <SendToClientButton athleteId={session.athlete_id} sessionId={session.id} workoutTitle={(session as any).workouts?.title ?? "Workout"} compact />
               ) : session.logged_by_coach ? (
                 <CoachLoggedBadge />
               ) : null}
+              <FinishWorkoutButton />
             </div>
           </div>
         ) : (

@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { WellnessCheckinWidget, type WellnessCheckinValues } from "./wellness-checkin-widget";
+import { OPEN_CHECKIN_EVENT } from "./today-tiles";
 
 const DISMISS_KEY_PREFIX = "wellness-popup-dismissed-";
 // Deliberately sessionStorage, not localStorage: Ron's own call
@@ -88,45 +89,70 @@ export function WellnessCheckinPopup({
   const [dismissed, setDismissed] = useState(true); // default hidden until the effect below confirms it's actually needed, so SSR/hydration never briefly flashes the overlay for someone who already checked in or already dismissed it earlier today
   const [snoozed, setSnoozed] = useState(true); // same reasoning — defaults hidden until confirmed
 
+  // The Check in tile on Home opens it on purpose (Look Refresh, Nov 20): then it shows even when it was skipped, snoozed or already answered (to change today's answers).
+  // Opening it changes nothing stored: a skip or a snooze stays as it was.
+  const [opened, setOpened] = useState(false);
+  const sectionRef = useRef<HTMLElement | null>(null);
+
   useEffect(() => {
     setDismissed(!!initialCheckin || readDismissed(todayDate));
     setSnoozed(readSnoozed());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [todayDate]);
 
-  if (checkin || dismissed || snoozed) return null;
+  useEffect(() => {
+    const open = () => setOpened(true);
+    window.addEventListener(OPEN_CHECKIN_EVENT, open);
+    return () => window.removeEventListener(OPEN_CHECKIN_EVENT, open);
+  }, []);
+
+  useEffect(() => {
+    if (opened) sectionRef.current?.scrollIntoView({ block: "nearest" });
+  }, [opened]);
+
+  if (!opened && (checkin || dismissed || snoozed)) return null;
 
   function handleSkip() {
     writeDismissed(todayDate);
     setDismissed(true);
+    setOpened(false);
   }
 
   function handleSnooze() {
     writeSnooze();
     setSnoozed(true);
+    setOpened(false);
   }
 
   return (
-    <section className="border border-steel/20 p-4" aria-label="Wellness check-in" data-wellness-card>
+    <section ref={sectionRef} id="checkin" className="bg-surface rounded-card p-4 scroll-mt-4" aria-label="Wellness check-in" data-wellness-card>
       <WellnessCheckinWidget
         athleteId={athleteId}
         groupId={groupId}
         todayDate={todayDate}
-        initialCheckin={null}
+        initialCheckin={checkin}
         onSaved={(values) => {
           setCheckin(values);
           onSaved?.(values);
         }}
         lifeImpactPrompt={lifeImpactPrompt}
       />
-      <div className="flex flex-wrap justify-center gap-x-6 mt-1">
-        <button type="button" onClick={handleSkip} className="h-11 font-body text-sm text-steel">
-          Skip for today
-        </button>
-        <button type="button" onClick={handleSnooze} className="h-11 font-body text-sm text-steel">
-          Don&apos;t ask for a week
-        </button>
-      </div>
+      {checkin ? (
+        <div className="flex justify-center mt-1">
+          <button type="button" onClick={() => setOpened(false)} className="h-11 font-body text-sm text-steel">
+            Close
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-wrap justify-center gap-x-6 mt-1">
+          <button type="button" onClick={handleSkip} className="h-11 font-body text-sm text-steel">
+            Skip for today
+          </button>
+          <button type="button" onClick={handleSnooze} className="h-11 font-body text-sm text-steel">
+            Don&apos;t ask for a week
+          </button>
+        </div>
+      )}
     </section>
   );
 }

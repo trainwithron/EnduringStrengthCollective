@@ -9,16 +9,15 @@ import type { SessionExerciseEntry, SetLogEntry } from "@/lib/types";
 import { TRACKED_FIELD_DEFS, ACTUAL_COLUMN, ACTUAL_PROP, fieldDef, type TrackedField } from "@/lib/exercise-fields";
 import { UnclearPointsNote } from "@/components/logging/unclear-points-note";
 import { ExerciseSetGrid } from "./exercise-set-grid";
-import { SetStepper } from "./set-stepper";
+import { AddSetButton, SetStepper } from "./set-stepper";
 import { restForSet, type RestForSet } from "@/lib/rest-time";
 import { UNDO_REMOVE_SET_MS, canRemoveSet, lastSet, prescribedNote, removeSetConfirmText, restoreSetRow, setHasLoggedWork } from "@/lib/set-removal";
 import { useSetSave } from "./set-save-context";
 import { classifyEquipmentType } from "@/lib/equipment-classifier";
 import { isNoLoadExercise } from "@/lib/exercise-load";
 import { ExerciseVideoThread } from "./exercise-video-thread";
-import { ExerciseDemoButton } from "./exercise-demo-button";
 import { useDemoLibrary, useOpenDemo } from "./demo-library-context";
-import { DemoThumb } from "./demo-thumb";
+import { DemoHero } from "./demo-hero";
 import { useDemosHidden } from "./demo-preference";
 import { findDemo } from "@/lib/exercise-demo";
 import { ExerciseAthleteNote } from "./exercise-athlete-note";
@@ -320,6 +319,16 @@ export function ExerciseCard({
 
   return (
     <div>
+      {/* The demo, big, at the top of the exercise (Look Refresh, client step): a tap plays it full screen. A client can turn demos off in Settings. */}
+      {demo && !demosHidden && (
+        <DemoHero
+          title={exercise.displayName ?? (exercise.exerciseName || "Exercise")}
+          youtubeUrl={demo.youtubeUrl}
+          videoUrl={openDemo ? null : exercise.videoUrl}
+          videoPath={openDemo ? null : demo.videoPath}
+          onOpen={openDemo ? () => openDemo(exercise.id) : undefined}
+        />
+      )}
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-1">
         {swapping ? (
           <div className="flex-1 min-w-0">
@@ -371,9 +380,9 @@ export function ExerciseCard({
         ) : (
           <>
             {/* A long name keeps one line and Swap / Remove drop under it, rather than the name squeezed onto three (Ron, Oct 31). */}
-            <h2 className="font-body font-medium text-[15px]">
+            <h2 className="font-display font-semibold text-[22px] leading-tight text-chalk">
               {exercise.superset && (
-                <span className="inline-block mr-1.5 px-1.5 bg-rust text-graphite font-display text-xs font-bold align-middle" data-superset-label>
+                <span className="inline-block mr-1.5 px-2 rounded-token-pill bg-rust text-graphite font-display text-xs font-bold align-middle" data-superset-label>
                   {exercise.superset.label}
                 </span>
               )}
@@ -435,20 +444,9 @@ export function ExerciseCard({
         </p>
       )}
 
-      {/* The demo thumbnail and "Last time" / history side by side, so one short row has both: glanceable, and a tap opens the demo sheet. */}
-      {((demo && !demosHidden) || lastTime || (exercise.volumeHistory && exercise.volumeHistory.length > 0)) && (
+      {/* "Last time" and the history, in one short row under the name (the demo is at the top of the exercise now). */}
+      {(lastTime || (exercise.volumeHistory && exercise.volumeHistory.length > 0)) && (
         <div className="flex flex-row items-start gap-3 mb-2">
-          {demo && !demosHidden && openDemo && (
-            <DemoThumb title={exercise.displayName ?? (exercise.exerciseName || "Exercise")} youtubeUrl={demo.youtubeUrl} onOpen={() => openDemo(exercise.id)} />
-          )}
-          {demo && !demosHidden && !openDemo && (
-            <ExerciseDemoButton
-              title={exercise.exerciseName || "Exercise"}
-              youtubeUrl={demo.youtubeUrl}
-              videoUrl={exercise.videoUrl}
-              videoPath={demo.videoPath}
-            />
-          )}
           <div className="min-w-0 flex-1">
             {lastTime && (
               <p className="font-body text-xs text-steel mb-1">
@@ -533,12 +531,20 @@ export function ExerciseCard({
           {addSetError}
         </p>
       )}
-      {!readOnly && (
+      {/* Under the rows: "+ Add a set" beside Form check (the form-check video's own button, in the video thread), then the quiet Sets row (take the last set off, the
+          count, Edit metrics), then any form-check videos and their notes. */}
+      <ExerciseVideoThread
+        sessionId={sessionId}
+        sessionExerciseId={exercise.id}
+        groupId={groupId}
+        athleteId={athleteId}
+        viewerId={viewerId}
+        canUpload={canUpload}
+        leading={!readOnly ? <AddSetButton busy={addSetBusy || undoBusy} onAdd={handleAddSet} /> : null}
+        between={!readOnly ? (
         <SetStepper
           count={exercise.sets.length}
           canRemove={canRemoveSet(exercise.sets) && !undoBusy && !confirmRemoveId}
-          addBusy={addSetBusy || undoBusy}
-          onAdd={handleAddSet}
           onRemove={handleRemoveLastSet}
           prescribedNote={prescribedNote(exercise.prescribedSetCount, exercise.sets.length)}
           confirmText={
@@ -613,15 +619,7 @@ export function ExerciseCard({
             </div>
           }
         />
-      )}
-
-      <ExerciseVideoThread
-        sessionId={sessionId}
-        sessionExerciseId={exercise.id}
-        groupId={groupId}
-        athleteId={athleteId}
-        viewerId={viewerId}
-        canUpload={canUpload}
+        ) : null}
       />
     </div>
   );

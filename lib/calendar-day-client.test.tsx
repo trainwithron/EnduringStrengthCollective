@@ -262,7 +262,7 @@ describe("a month on the Calendar does not load every day page when it opens", (
     const read = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
     expect(read("components/coach/mobile/coach-phone-schedule.tsx")).toContain("href={`/groups/${anchorGroupId}/calendar/${dayKey(date)}`} prefetch={false}");
     const body = read("components/coach/calendar-page-body.tsx");
-    expect(body).toContain("<Link key={i} href={dayHref(date)} prefetch={false} className={cellClass}>");
+    expect(body).toContain("<Link key={i} href={dayHref(date)} prefetch={false} aria-label={label} className={`${cellClass} active:bg-surface-2`}>");
     expect(body).toContain("<Link key={i} href={dayHref(date)} prefetch={false} className={rowClass}>");
     expect(body).toContain("href={`/groups/${params.groupId}/calendar/${dateKey(date)}?client=${selected.id}`}\n                    prefetch={false}");
     // no other link to a day page in these two files prefetches

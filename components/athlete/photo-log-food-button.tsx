@@ -4,6 +4,8 @@ import { useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { defaultMealSlot } from "@/lib/food-entry";
 import type { FoodLogEntry } from "./meal-checkoff-list";
+import { Camera } from "lucide-react";
+import { LOG_TILE_CLASS } from "./log-tile";
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -112,7 +114,7 @@ export function PhotoLogFoodButton({
 
   if (estimate) {
     return (
-      <div className="border border-rust/40 bg-rust/5 p-3">
+      <div className="basis-full order-last min-w-0 tint-accent rounded-card p-3">
         <p className="font-body text-sm text-chalk">{estimate.description}</p>
         <p className="font-body text-xs text-steel mt-1">
           ~{estimate.calories} kcal · {estimate.proteinG}p / {estimate.carbsG}c / {estimate.fatG}f
@@ -121,7 +123,7 @@ export function PhotoLogFoodButton({
           Rough visual estimate — photo-based logging is the least precise option here.
         </p>
         {error && (
-          <p className="font-body text-xs text-rust mt-1" role="alert">
+          <p className="font-body text-xs text-rust-ink mt-1" role="alert">
             {error}
           </p>
         )}
@@ -147,8 +149,9 @@ export function PhotoLogFoodButton({
     );
   }
 
+  // A tile in the row of three (Look Refresh, Nov 20); a problem shows full width under the row.
   return (
-    <div>
+    <>
       <input
         ref={fileInputRef}
         type="file"
@@ -160,15 +163,17 @@ export function PhotoLogFoodButton({
           if (file) handleFile(file);
         }}
       />
-      {error && <p className="font-body text-xs text-rust mb-1.5">{error}</p>}
       <button
         type="button"
         onClick={() => fileInputRef.current?.click()}
         disabled={estimating}
-        className="w-full h-10 border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors disabled:opacity-40"
+        aria-label={estimating ? "Estimating from photo" : "Take a photo"}
+        className={LOG_TILE_CLASS}
       >
-        {estimating ? "Estimating from photo…" : "Take a photo"}
+        <Camera className="w-[22px] h-[22px] text-rust" aria-hidden="true" />
+        {estimating ? "Estimating…" : "Photo"}
       </button>
-    </div>
+      {error && <p className="basis-full order-last font-body text-xs text-rust-ink" role="alert">{error}</p>}
+    </>
   );
 }

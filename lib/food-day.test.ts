@@ -75,8 +75,12 @@ describe("the page uses the day for everything in Today's food", () => {
     expect(section).toContain("todayKey={logDate}");
   });
   it("Copy yesterday copies from the day before the shown day", () => {
-    expect(entries).toContain("fetchFoodLogDay(supabase, athleteId, addDaysToKey(logDate, -1))");
-    expect(entries).toContain("copyRows(yesterday, { athleteId, groupId, toDate: logDate })");
+    // Its own button since the Look Refresh (Nov 20): the list and the Nutrition page's pill row both use it, with the day shown.
+    const copy = readFileSync(join(__dirname, "..", "components/athlete/copy-yesterday-button.tsx"), "utf8").replace(/\r\n/g, "\n");
+    expect(copy).toContain("fetchFoodLogDay(supabase, athleteId, addDaysToKey(logDate, -1))");
+    expect(copy).toContain("copyRows(yesterday, { athleteId, groupId, toDate: logDate })");
+    expect(entries).toContain("<CopyYesterdayButton athleteId={athleteId} groupId={groupId} logDate={logDate} isToday={isToday} onAdded={onAdded} />");
+    expect(section).toContain("logDate={logDate}\n          isToday={isToday}\n          onAdded={handleAdded}");
   });
   it("the switcher is plain 44 px links in the address, with no new page", () => {
     const sw = readFileSync(join(__dirname, "..", "components/athlete/food-day-switcher.tsx"), "utf8");

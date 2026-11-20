@@ -7,6 +7,7 @@ import { loadFoodDetail, searchFoods, type FoodDetail, type FoodHit } from "@/li
 import { defaultServing, formatAmount, gramsFor, macrosOf, quantityProblem, scaleNutrients, servingOptions } from "@/lib/food-serving";
 import { MEAL_SLOTS, MEAL_SLOT_LABEL, defaultMealSlot, insertUsdaEntry, type MealSlot } from "@/lib/food-entry";
 import { completeness, formatNutrientAmount, panelRows } from "@/lib/nutrient-panel";
+import { Search } from "lucide-react";
 
 // The free, default way to log food: search the USDA foods, pick a serving (household measure, grams or ounces), see the full nutrient panel for that amount, choose the meal and
 // add it. No AI, no cost. Both units are shown everywhere; a nutrient the food does not report says "not reported", never zero.
@@ -113,20 +114,22 @@ export function FoodSearchLog({
 
   if (!open) {
     return (
+      // One big bar (Look Refresh, Nov 20): the first way to log on the page.
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="w-full min-h-[44px] border border-rust/60 text-rust font-body text-sm font-medium"
+        className="w-full min-h-[44px] h-[52px] px-5 rounded-token-pill bg-surface-2 border border-rust/30 flex items-center gap-2.5 text-left font-body text-[15px] font-medium text-chalk active:border-rust transition-colors"
       >
+        <Search className="w-5 h-5 text-rust shrink-0" aria-hidden="true" />
         Search foods
       </button>
     );
   }
 
   return (
-    <div className="border border-steel/20 p-3" data-testid="food-search">
+    <div className="bg-surface rounded-card p-3" data-testid="food-search">
       <div className="flex items-center justify-between gap-3 mb-2">
-        <p className="font-body text-xs text-steel uppercase tracking-wide">Search foods</p>
+        <p className="font-body text-[13px] font-semibold text-steel">Search foods</p>
         <button type="button" onClick={() => setOpen(false)} className="min-h-[44px] px-2 font-body text-xs text-steel">
           Close
         </button>
