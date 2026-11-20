@@ -1,7 +1,11 @@
 // Reading a pasted list or a spreadsheet of people into the clients a coach is about to add (names, and an email if there is one). Pure. Every line that is not used is listed with its row number and why,
 // so nothing disappears, and the coach sees exactly who will be added before anything is created. Nobody is emailed by adding them (see app/api/clients/invite).
+// A client list exported from another coaching app (TrueCoach, Trainerize, Everfit) reads as it is (Ron, Nov 20: "onboarding smoothness is a priority"): its header row may sit below a title line or two,
+// its columns carry the app's own names ("Client First Name", "Email Address"), and a client marked archived or inactive in the old app is listed as not added, never silently imported.
 
-export const ROSTER_MAX_ROWS = 100;
+export const ROSTER_MAX_ROWS = 250;
+// How far down a file the header row is looked for (an export can start with a title or a date line).
+export const ROSTER_HEADER_SEARCH_ROWS = 5;
 export const ROSTER_NAME_MAX = 80;
 
 export interface RosterRow {
@@ -10,7 +14,7 @@ export interface RosterRow {
   email: string | null;
 }
 
-export type RosterSkipReason = "no_name" | "name_too_long" | "bad_email" | "repeated_email" | "over_limit";
+export type RosterSkipReason = "no_name" | "name_too_long" | "bad_email" | "repeated_email" | "over_limit" | "archived";
 
 export interface RosterSkipped {
   rowNumber: number;
@@ -72,21 +76,35 @@ export function splitPastedRoster(text: string): string[][] {
   });
 }
 
-type Columns = { name?: number; first?: number; last?: number; email?: number };
+type Columns = { name?: number; first?: number; last?: number; email?: number; status?: number };
 
-// A first row that names its columns ("Name", "Full name", "First name" and "Last name", "Email") is a header, not a person.
+// A header cell, lowercased with everything but letters turned into single spaces. A leading "client", "athlete", "member" or "contact" is dropped when more follows (Trainerize "Client First Name",
+// "Client Email"), so a lone "Client" or "Athlete" column still reads as the name.
+export function headerKey(raw: string): string {
+  return (raw ?? "")
+    .toLowerCase()
+    .replace(/[^a-z]+/g, " ")
+    .trim()
+    .replace(/^(client|athlete|member|contact|customer|user) (?=\S)/, "");
+}
+
+// A row that names its columns ("Name", "Full name", "First name" and "Last name", "Email", "Status") is a header, not a person.
 function headerColumns(row: string[]): Columns | null {
   const cols: Columns = {};
   row.forEach((raw, i) => {
-    const h = raw.toLowerCase().replace(/[^a-z]+/g, " ").trim();
-    if (/^(e ?mail|email address)$/.test(h)) cols.email ??= i;
-    else if (/^(first name|first|given name)$/.test(h)) cols.first ??= i;
-    else if (/^(last name|last|surname|family name)$/.test(h)) cols.last ??= i;
-    else if (/^(name|full name|client|client name|athlete|athlete name|member)$/.test(h)) cols.name ??= i;
+    const h = headerKey(raw);
+    if (/^(e ?mail|e ?mail address|email id|primary email)$/.test(h)) cols.email ??= i;
+    else if (/^(first name|first|given name|firstname)$/.test(h)) cols.first ??= i;
+    else if (/^(last name|last|surname|family name|lastname)$/.test(h)) cols.last ??= i;
+    else if (/^(name|full name|fullname|display name|client|client name|athlete|athlete name|member|member name)$/.test(h)) cols.name ??= i;
+    else if (/^(status|account status|state)$/.test(h)) cols.status ??= i;
   });
   const found = cols.name != null || cols.first != null || cols.email != null;
   return found && (cols.name != null || cols.first != null) ? cols : null;
 }
+
+// A client the old app says is no longer active: listed as not added (the coach can take the status column out to add them anyway).
+const ARCHIVED_STATUS = /\b(archived?|inactive|deactivated|deleted|removed|cancell?ed|former|churned|disabled)\b/i;
 
 // noHeader: the rows are already people (the server checking what the page sent), never a header row.
 export function parseRoster(cells: string[][], options: { max?: number; noHeader?: boolean } = {}): RosterParse {
@@ -96,11 +114,23 @@ export function parseRoster(cells: string[][], options: { max?: number; noHeader
   const seenEmails = new Set<string>();
   const nameCount = new Map<string, number>();
 
-  const headerAt = cells.length > 0 && !options.noHeader ? headerColumns(cells[0]) : null;
+  // The header row: the first of the top few rows that names its columns (rows above it, a title or a date, are not people).
+  let headerIndex = -1;
+  let headerAt: Columns | null = null;
+  if (!options.noHeader) {
+    for (let i = 0; i < Math.min(cells.length, ROSTER_HEADER_SEARCH_ROWS); i++) {
+      const found = headerColumns(cells[i] ?? []);
+      if (found) {
+        headerIndex = i;
+        headerAt = found;
+        break;
+      }
+    }
+  }
 
   cells.forEach((cellRow, index) => {
     const rowNumber = index + 1;
-    if (index === 0 && headerAt) return;
+    if (headerAt && index <= headerIndex) return;
     if (cellRow.every((c) => !(c ?? "").toString().trim())) return;
     const row = cellRow.map((c) => (c ?? "").toString().trim());
     const skip = (reason: RosterSkipReason, detail: string) => void skipped.push({ rowNumber, reason, detail });
@@ -110,6 +140,11 @@ export function parseRoster(cells: string[][], options: { max?: number; noHeader
     if (headerAt) {
       name = headerAt.name != null ? row[headerAt.name] ?? "" : [row[headerAt.first ?? -1], headerAt.last != null ? row[headerAt.last] : ""].filter(Boolean).join(" ");
       emailText = headerAt.email != null ? row[headerAt.email] ?? "" : "";
+      const status = headerAt.status != null ? row[headerAt.status] ?? "" : "";
+      if (status && ARCHIVED_STATUS.test(status)) {
+        const who = name.replace(/\s+/g, " ").trim() || emailText.trim() || "This person";
+        return skip("archived", `${who}: marked "${status}" in the file, so not added. Take the status column out of the file to add them anyway.`);
+      }
     } else {
       // No header: an email is any cell that holds one (or sits in the middle of a line, "Jane Smith jane@x.com"), the name is the rest.
       const rest: string[] = [];

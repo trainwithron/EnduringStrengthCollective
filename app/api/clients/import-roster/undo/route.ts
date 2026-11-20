@@ -4,6 +4,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { rateLimitResponse } from "@/lib/rate-limit";
 import { deletionBlocker, eraseAccount, loadDeletionFacts } from "@/lib/account-deletion";
 import { ROSTER_MAX_ROWS } from "@/lib/roster-import";
+import { readRowsByIds } from "@/lib/read-by-ids";
 
 export const maxDuration = 300;
 
@@ -23,13 +24,28 @@ export async function POST(request: Request) {
   if (limited) return limited;
 
   const raw = await request.json().catch(() => null);
-  const body: { groupId?: unknown; profileIds?: unknown } = raw && typeof raw === "object" ? raw : {};
-  const groupId = typeof body.groupId === "string" ? body.groupId : "";
-  const ids: string[] = Array.isArray(body.profileIds) ? body.profileIds.filter((x: unknown): x is string => typeof x === "string").slice(0, ROSTER_MAX_ROWS) : [];
-  if (!groupId || ids.length === 0) return NextResponse.json({ error: "Missing the group or the people." }, { status: 400 });
+  const body: { groupId?: unknown; profileIds?: unknown; spaces?: unknown } = raw && typeof raw === "object" ? raw : {};
+  // Either one group and the people added to it (a roster), or each one-on-one client with their own space (a pasted list of one-on-one clients, Nov 20).
+  const pairs: { groupId: string; profileId: string; ownSpace: boolean }[] = [];
+  if (Array.isArray(body.spaces)) {
+    for (const s of body.spaces.slice(0, ROSTER_MAX_ROWS) as unknown[]) {
+      const item = s && typeof s === "object" ? (s as { groupId?: unknown; profileId?: unknown }) : {};
+      if (typeof item.groupId === "string" && typeof item.profileId === "string") pairs.push({ groupId: item.groupId, profileId: item.profileId, ownSpace: true });
+    }
+  } else {
+    const groupId = typeof body.groupId === "string" ? body.groupId : "";
+    const ids: string[] = Array.isArray(body.profileIds) ? body.profileIds.filter((x: unknown): x is string => typeof x === "string").slice(0, ROSTER_MAX_ROWS) : [];
+    for (const id of groupId ? ids : []) pairs.push({ groupId, profileId: id, ownSpace: false });
+  }
+  if (pairs.length === 0) return NextResponse.json({ error: "Missing the group or the people." }, { status: 400 });
 
-  const { data: coachRow } = await supabase.from("group_memberships").select("role").eq("group_id", groupId).eq("profile_id", user.id).maybeSingle();
-  if (coachRow?.role !== "coach") return NextResponse.json({ error: "Only the coach of this group can take back an import." }, { status: 403 });
+  // The caller must coach every group named (checked as the caller, so row security decides).
+  const groupIds = Array.from(new Set(pairs.map((p) => p.groupId)));
+  const { data: coachRows } = await readRowsByIds(groupIds, (g) => (from, to) =>
+    supabase.from("group_memberships").select("group_id, role").eq("profile_id", user.id).in("group_id", g).order("group_id").range(from, to)
+  );
+  const coached = new Set(((coachRows ?? []) as { group_id: string; role: string }[]).filter((r) => r.role === "coach").map((r) => r.group_id));
+  if (groupIds.some((g) => !coached.has(g))) return NextResponse.json({ error: "Only the coach of this group can take back an import." }, { status: 403 });
 
   const db = createServiceRoleClient();
   const { data: myCoachGroups } = await db.from("group_memberships").select("group_id").eq("profile_id", user.id).eq("role", "coach");
@@ -37,7 +53,7 @@ export async function POST(request: Request) {
 
   const removed: string[] = [];
   const left: { profileId: string; reason: string }[] = [];
-  for (const id of ids) {
+  for (const { groupId, profileId: id, ownSpace } of pairs) {
     if (id === user.id) {
       left.push({ profileId: id, reason: "That is you." });
       continue;
@@ -70,9 +86,32 @@ export async function POST(request: Request) {
       continue;
     }
     const result = await eraseAccount(db, id, { eraseHistory: false, deleteEmptyOneOnOneGroups: [] });
-    if (result.ok) removed.push(id);
-    else left.push({ profileId: id, reason: result.error });
+    if (!result.ok) {
+      left.push({ profileId: id, reason: result.error });
+      continue;
+    }
+    removed.push(id);
+    // A one-on-one client's own space, made by the same import: removed with them when nothing else is in it (only the coach's seat, nothing filed in it).
+    if (ownSpace) await removeImportedSpace(db, groupId, user.id);
   }
 
   return NextResponse.json({ removed, left });
+}
+
+// The space an import made for a one-on-one client, once that client is gone: deleted only if it is a one-on-one space this coach made in the last day, nobody else is in it, and nothing is filed in it
+// (a program, a session or a post). Otherwise it is left as it is.
+async function removeImportedSpace(db: ReturnType<typeof createServiceRoleClient>, groupId: string, coachId: string): Promise<void> {
+  const { data: group } = await db.from("groups").select("created_by, created_at, group_kind").eq("id", groupId).maybeSingle();
+  const g = group as { created_by?: string | null; created_at?: string | null; group_kind?: string | null } | null;
+  if (!g || g.group_kind !== "one_on_one" || g.created_by !== coachId || !g.created_at || Date.now() - new Date(g.created_at).getTime() > UNDO_WINDOW_MS) return;
+  const [{ data: members }, programs, sessions, posts] = await Promise.all([
+    db.from("group_memberships").select("profile_id").eq("group_id", groupId),
+    db.from("programs").select("id", { count: "exact", head: true }).eq("group_id", groupId),
+    db.from("athlete_sessions").select("id", { count: "exact", head: true }).eq("group_id", groupId),
+    db.from("posts").select("id", { count: "exact", head: true }).eq("group_id", groupId),
+  ]);
+  if ((members ?? []).some((m: { profile_id: string }) => m.profile_id !== coachId)) return;
+  if ((programs.count ?? 0) + (sessions.count ?? 0) + (posts.count ?? 0) > 0) return;
+  await db.from("group_memberships").delete().eq("group_id", groupId);
+  await db.from("groups").delete().eq("id", groupId);
 }

@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { hasLiveClaimLink, loadUnclaimedClient, mintClaimLink } from "@/lib/client-claim-server";
+import { hasLiveClaimLink, loadUnclaimedClient } from "@/lib/client-claim-server";
 import { isPlaceholderEmail } from "@/lib/client-claim";
-import { DEFAULT_CLAIM_TEMPLATE, renderTemplate, validateTemplate, withFooter, type MessageTemplate } from "@/lib/message-template";
+import { sendClaimEmail } from "@/lib/claim-email-send";
 import { appOrigin } from "@/lib/app-url";
-import { isEmailConfigured, sendEmail } from "@/lib/email";
+import { isEmailConfigured } from "@/lib/email";
 import { rateLimitAllows, rateLimitResponse } from "@/lib/rate-limit";
 
 // A coach emails a client who has never signed in their sign-in (claim) link. It goes ONLY to the address already on the client's account, never to a
@@ -50,24 +50,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ needsConfirm: true }, { status: 409 });
   }
 
-  const minted = await mintClaimLink(serviceRole, user.id, athleteId, appOrigin(request));
-  if (!minted.ok) return NextResponse.json({ error: "Couldn't create the link — try again." }, { status: 500 });
-
-  const { data: coach } = await serviceRole.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
-  // The coach's own wording if they wrote one (and it is still valid, with {link} in it); otherwise the default. Before the template table exists the read just errors and the default is used.
-  let template: MessageTemplate = DEFAULT_CLAIM_TEMPLATE;
-  const { data: custom } = await serviceRole.from("coach_message_templates").select("claim_email_subject, claim_email_body").eq("coach_id", user.id).maybeSingle();
-  if (custom) {
-    const checked = validateTemplate({ subject: custom.claim_email_subject, body: custom.claim_email_body });
-    if (checked.ok) template = checked.template;
-  }
-  const message = renderTemplate(template, { firstName: client.fullName.split(" ")[0] ?? "", coachName: coach?.full_name ?? null, link: minted.link });
-  const sent = await sendEmail(email, message.subject, withFooter(message.text, coach?.full_name ?? null));
-  if (!sent) {
+  // The same email the "email everyone not signed in yet" button sends (lib/claim-email-send.ts): the coach's own wording if they wrote one.
+  const sent = await sendClaimEmail(serviceRole, { coachId: user.id, athleteId, fullName: client.fullName, email, origin: appOrigin(request) });
+  if (!sent.ok && !sent.link) return NextResponse.json({ error: "Couldn't create the link — try again." }, { status: 500 });
+  if (!sent.ok) {
     return NextResponse.json(
-      { error: "The email couldn't be sent. Here is the link to copy or text instead.", link: minted.link },
+      { error: "The email couldn't be sent. Here is the link to copy or text instead.", link: sent.link },
       { status: 502 }
     );
   }
-  return NextResponse.json({ ok: true, sentTo: email, expiresAt: minted.expiresAt });
+  return NextResponse.json({ ok: true, sentTo: email, expiresAt: sent.expiresAt });
 }

@@ -13,6 +13,7 @@ import { ClientCardGrid } from "@/components/coach/desktop/client-card-grid";
 import { UnavailableState } from "@/components/ui/unavailable-state";
 import { GroupInvitesPanel, type GroupInviteRow } from "@/components/coach/desktop/group-invites-panel";
 import { AddClientButton } from "@/components/coach/desktop/add-client-button";
+import { EmailAllClaimLinksButton } from "@/components/coach/email-all-claim-links-button";
 import { RequestsLink } from "@/components/coach/requests-link";
 import { pendingRequestCount } from "@/lib/client-request-count";
 import { SwappableTerm } from "@/components/coach/swappable-term";
@@ -41,12 +42,14 @@ export const metadata = { title: "Clients" };
 export default async function ClientsPage(
   props: {
     params: Promise<{ groupId: string }>;
-    searchParams: Promise<{ add?: string; view?: string }>;
+    searchParams: Promise<{ add?: string; view?: string; import?: string }>;
   }
 ) {
   const params = await props.params;
   const search = await props.searchParams;
   const openAdd = search.add === "1";
+  // Add client opened on a pasted list or a client file from another app (the Get started card, Nov 20).
+  const openImport = search.import === "1";
   const supabase = await createServerClient();
   const {
     data: { user },
@@ -330,7 +333,10 @@ export default async function ClientsPage(
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <RequestsLink count={requestCount} />
-              <AddClientButton groupId={params.groupId} groupName={group?.name ?? "This group"} createdBy={user.id} defaultOpen={openAdd} />
+              <AddClientButton groupId={params.groupId} groupName={group?.name ?? "This group"} createdBy={user.id} defaultOpen={openAdd} initialStep={openImport ? "import" : undefined} />
+            </div>
+            <div className="w-full">
+              <EmailAllClaimLinksButton groupId={params.groupId} />
             </div>
           </div>
           <CoachesSection groupId={params.groupId} viewerId={user.id} coaches={coachList.coaches} pending={coachList.pending} canManage={inviteManager.ok} signIns={signIns} />

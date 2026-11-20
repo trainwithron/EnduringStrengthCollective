@@ -27,11 +27,14 @@ const inputClass = "w-full h-11 mt-1 bg-graphite border border-steel/30 text-cha
 // ONE way to bring someone in (Ron, Oct 6: "an Add client button, and inside it: add a one-on-one client, and add to a group"). A plain Add client is always a
 // one-on-one client with their own space; only the explicit "Add to a group" puts someone in a group. In a group you can add a person by name, or use the group's
 // ONE current invite link (a new link replaces the old one, 7 days).
+// One-on-one clients can also be added as a pasted list or a client file from another app, each with their own space (Ron, Nov 20: "onboarding smoothness is a priority"); initialStep "import" opens
+// straight on that (the Get started card's "Moving from another app?").
 export function AddClientButton({
   groupId,
   groupName,
   createdBy,
   defaultOpen = false,
+  initialStep,
   onAdded,
 }: {
   // The group the coach is standing in (only a starting point for "Add to a group").
@@ -39,14 +42,17 @@ export function AddClientButton({
   groupName: string;
   createdBy: string;
   defaultOpen?: boolean;
+  initialStep?: "import";
   // Called once someone has been added (the left panel uses it to show them in its list at once).
   onAdded?: () => void;
 }) {
   void createdBy;
   const t = useTerm();
   const router = useRouter();
-  const [open, setOpen] = useState(defaultOpen);
-  const [step, setStep] = useState<Step>("choose");
+  const [open, setOpen] = useState(defaultOpen || initialStep === "import");
+  const [step, setStep] = useState<Step>(initialStep === "import" ? "one_on_one" : "choose");
+  // A one-on-one client by name, or a list of them.
+  const [oneMode, setOneMode] = useState<"name" | "list">(initialStep === "import" ? "list" : "name");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -154,6 +160,7 @@ export function AddClientButton({
     setResentNote(null);
     setLink(null);
     setGroupMode("name");
+    setOneMode("name");
     createdGroupIdRef.current = null;
   }
 
@@ -394,6 +401,26 @@ export function AddClientButton({
         </div>
       ) : step === "one_on_one" ? (
         <div>
+          <div className="flex items-center gap-1 mb-3" data-one-on-one-mode>
+            {(["name", "list"] as const).map((m) => (
+              <button key={m} type="button" onClick={() => setOneMode(m)} className={`h-10 px-3 font-body text-xs border ${oneMode === m ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"}`}>
+                {m === "name" ? "Add by name" : "Paste a list or file"}
+              </button>
+            ))}
+          </div>
+          {oneMode === "list" ? (
+            orgInfo.checked && !orgInfo.name ? (
+              <p className="font-body text-xs text-steel">This space is not part of an organization, so one-on-one {t("client", "plural")} cannot be added from here. Open one of your organizations first.</p>
+            ) : (
+              <>
+                <p className="font-body text-xs text-steel mb-3">
+                  Each person becomes a one-on-one {t("client")} with their own space with you. Accounts are made right away, with no email sent, so you can build their programs before they ever sign in.
+                </p>
+                <RosterImportPanel groupId={groupId} groupName={groupName} mode="one_on_one" onAdded={onAdded} onClose={reset} />
+              </>
+            )
+          ) : (
+            <>
           <p className="font-body text-xs text-steel mb-3">
             Add a one-on-one {t("client")}. A real account is made right away, with no email sent, so you can build their program before they ever sign in.
           </p>
@@ -413,6 +440,8 @@ export function AddClientButton({
             </div>
           )}
           {nameForm}
+            </>
+          )}
         </div>
       ) : (
         <div>
