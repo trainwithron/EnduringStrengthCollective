@@ -1,3 +1,4 @@
+import { linkedExercisesAmong } from "@/lib/superset-links";
 import { isTeamSportGroup } from "@/lib/team-sport";
 import { COACH_HOME_HREF } from "@/lib/start-group";
 import { loadPostWorkoutCards } from "@/lib/post-workout-cards";
@@ -199,6 +200,9 @@ export default async function SessionPage(
     .map((se: any) => se.group_workout_exercise_id)
     .filter((id: string | null): id is string => id != null);
 
+  // Supersets (B1): which of the program's exercises the coach linked with the next one. A failed read (or a database before step 210) means no links, never a broken workout.
+  const linkedTemplateIds = await linkedExercisesAmong(supabase, templateExerciseIds);
+
   const prescribedSetCountByExercise = new Map<string, number>();
   const targetsByExerciseAndOrder = new Map<
     string,
@@ -397,6 +401,7 @@ export default async function SessionPage(
         notes: se.group_workout_exercises?.notes ?? null,
         athleteNote: se.athlete_note ?? null,
         prescribedSetCount: se.group_workout_exercise_id ? prescribedSetCountByExercise.get(se.group_workout_exercise_id) ?? null : null,
+        supersetNext: !!se.group_workout_exercise_id && linkedTemplateIds.has(se.group_workout_exercise_id),
         volumeHistory: volumeHistoryByExerciseName.get(se.exercise_name) ?? [],
         sets: (se.set_logs ?? [])
           .slice()

@@ -1,4 +1,5 @@
 import type { ExerciseSetTarget } from "./types";
+import { asSetType } from "./set-types";
 
 // The fixed set of trackable per-set fields — shared by the coach's builder
 // cards and the athlete's logging screen so both stay in sync. Not a fully
@@ -121,6 +122,7 @@ export function mapSetRow(row: {
   target_pace?: string | null;
   rep_min?: number | null;
   rep_max?: number | null;
+  set_type?: string | null;
 }): ExerciseSetTarget {
   return {
     id: row.id,
@@ -138,6 +140,7 @@ export function mapSetRow(row: {
     targetPace: row.target_pace ?? null,
     repMin: row.rep_min ?? null,
     repMax: row.rep_max ?? null,
+    setType: asSetType(row.set_type),
   };
 }
 
@@ -170,4 +173,4 @@ export function formatCondensedSets(
 }
 
 export const SET_ROW_SELECT =
-  "id, set_order, target_reps, target_weight, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance, target_rest_seconds, target_rest_max_seconds, target_pace, rep_min, rep_max";
+  "id, set_order, target_reps, target_weight, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance, target_rest_seconds, target_rest_max_seconds, target_pace, rep_min, rep_max, set_type";

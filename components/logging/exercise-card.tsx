@@ -372,6 +372,11 @@ export function ExerciseCard({
           <>
             {/* A long name keeps one line and Swap / Remove drop under it, rather than the name squeezed onto three (Ron, Oct 31). */}
             <h2 className="font-body font-medium text-[15px]">
+              {exercise.superset && (
+                <span className="inline-block mr-1.5 px-1.5 bg-rust text-graphite font-display text-xs font-bold align-middle" data-superset-label>
+                  {exercise.superset.label}
+                </span>
+              )}
               {exercise.displayName ?? (exercise.exerciseName || "Untitled exercise")}
               {exercise.isSwapped && (
                 <span className="font-body text-xs text-steel ml-2 align-middle">
@@ -422,6 +427,13 @@ export function ExerciseCard({
           </>
         )}
       </div>
+
+      {/* A superset or circuit (B1): what to do with the exercises linked to this one. */}
+      {exercise.superset && (
+        <p className="font-body text-xs text-rust mb-2" data-superset-line>
+          {exercise.superset.line}
+        </p>
+      )}
 
       {/* The demo thumbnail and "Last time" / history side by side, so one short row has both: glanceable, and a tap opens the demo sheet. */}
       {((demo && !demosHidden) || lastTime || (exercise.volumeHistory && exercise.volumeHistory.length > 0)) && (

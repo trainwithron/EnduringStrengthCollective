@@ -112,6 +112,10 @@ export interface SessionExerciseEntry {
   // (e.g. the coach-builder preview).
   athleteNote?: string | null;
   sets: SetLogEntry[];
+  // Linked with the next exercise of the workout by the coach (a superset or circuit: lib/supersets.ts). From the program's exercise; never on one the client added.
+  supersetNext?: boolean;
+  // Its place in that block, worked out by the logger: "2a", and the line said under the name ("Superset with Row: one set of each, then rest.").
+  superset?: { label: string; line: string } | null;
   // How many sets the coach prescribed for this exercise (the program's own count), so the Sets stepper can say "Prescribed 4" when the athlete did 3.
   // Optional/undefined for an exercise with no program behind it (one the athlete added) and on any render path that does not compute it.
   prescribedSetCount?: number | null;
@@ -154,6 +158,8 @@ export interface ExerciseSetTarget {
   // instead of Reps (see lib/progression-models.ts).
   repMin: number | null;
   repMax: number | null;
+  // What kind of set the coach prescribes (group_workout_exercise_sets.set_type): a warm-up, a working set, as many reps as possible, a back-off or a drop set (Ron, Nov 20: B2).
+  setType?: "warmup" | "working" | "amrap" | "backoff" | "drop";
 }
 
 export interface BuilderExercise {
@@ -179,6 +185,8 @@ export interface BuilderExercise {
   slot?: { side: "bilateral" | "unilateral" | null; tier: "A" | "B" | "C" | null } | null;
   // The exercise's place in the program for its progression rule (group_workout_exercises.progression_slot: "T1", "T2", "T3" in GZCLP; "" or left out = the name's rule, as before).
   progressionSlot?: string;
+  // Done back to back with the next exercise of the day (group_workout_exercises.superset_next; lib/supersets.ts).
+  supersetNext?: boolean;
 }
 
 export interface BuilderNote {

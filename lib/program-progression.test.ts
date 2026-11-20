@@ -125,7 +125,8 @@ describe("the builder and the way back from Progression", () => {
   it("a failed read of the days is shown as a failure with Try again, never as an empty program", () => {
     expect(src("lib/program-builder-data.ts")).toContain("loadFailed: !!workoutsError");
     expect(page).toContain("data.loadFailed && <ProgramLoadRetry />");
-    expect(page).toContain("!data.loadFailed && <ProgramBuilderDesktop");
+    // Nov 20 (B6): wrapped in the client's last-time data
+    expect(page).toContain("!data.loadFailed && <BuilderLastTimeProvider value={data.lastTimeByExercise}><ProgramBuilderDesktop");
   });
   it("closing the tab with something typed and not yet saved asks first; Saved clears it", () => {
     expect(builder).toContain('window.addEventListener("beforeunload"');

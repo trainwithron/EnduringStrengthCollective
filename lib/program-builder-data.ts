@@ -1,3 +1,4 @@
+import { linkedExercisesOfProgram, recentLastTimes } from "./superset-links";
 import { sortByUsage } from "@/lib/exercise-search";
 import { usableExerciseNames } from "@/lib/exercise-name-guard";
 import { mergeAliases } from "@/lib/exercise-alias-seed";
@@ -56,6 +57,8 @@ export interface ProgramBuilderData {
   spotterFlags: SpotterFlag[];
   // The program's days could not be read just now (the read itself failed). The page then says so and offers a retry instead of drawing an empty program.
   loadFailed: boolean;
+  // On a client's own program (athleteId set): the client's last weight and reps on each exercise, by name (B6). Empty otherwise.
+  lastTimeByExercise: Record<string, { weight: number; reps: number }>;
 }
 
 export async function getProgramBuilderData(
@@ -91,6 +94,8 @@ export async function getProgramBuilderData(
     timezone,
     { data: logRows },
     spotterFlags,
+    linkedIds,
+    lastTimeByExercise,
   ] = await Promise.all([
     supabase.from("groups").select("name").eq("id", groupId).single(),
     supabase
@@ -127,6 +132,9 @@ export async function getProgramBuilderData(
       ? supabase.from("workout_logs").select("total_volume, workouts!inner ( program_id )").eq("workouts.program_id", programId)
       : Promise.resolve({ data: null }),
     gatherProgrammingSpotterFlags(supabase, { programId, programName: program.name, coachId }),
+    // Supersets (B1) and, on a client's own program, what the client did last time on each exercise (B6). Each read on its own: a failed read leaves it off, never the program.
+    linkedExercisesOfProgram(supabase, programId),
+    program.athlete_id ? recentLastTimes(supabase, program.athlete_id as string) : Promise.resolve({} as Record<string, { weight: number; reps: number }>),
   ]);
 
   // The coach's own demos first, then the Spotlight ones (the builder card says when a Spotlight demo is the one showing).
@@ -177,6 +185,7 @@ export async function getProgramBuilderData(
         tier: tierByName.get(ex.exercise_name) ?? null,
         slot: ex.is_slot ? { side: ex.slot_side ?? null, tier: ex.slot_tier ?? null } : null,
         progressionSlot: (ex.progression_slot as string | null) ?? "",
+        supersetNext: linkedIds.has(ex.id),
         sets: (ex.group_workout_exercise_sets ?? [])
           .slice()
           .sort((a: any, b: any) => a.set_order - b.set_order)
@@ -244,6 +253,7 @@ export async function getProgramBuilderData(
     totalVolumeLbs,
     spotterFlags,
     loadFailed: !!workoutsError,
+    lastTimeByExercise,
   };
 }
 
