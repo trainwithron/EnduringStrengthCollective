@@ -172,18 +172,23 @@ export async function requestForNotice(supabase: SupabaseClient, userId: string,
     return best ? { kind, id: best.id } : null;
   }
   if (kind === "late") {
-    let q = supabase
-      .from("bookings")
-      .select("id, start_at")
-      .eq("coach_id", userId)
-      .not("late_charge_state", "is", null)
-      .gte("start_at", new Date(at - 3600000).toISOString())
-      .lte("start_at", new Date(at + 14 * 86400000).toISOString())
-      .order("start_at", { ascending: true })
-      .limit(1);
-    if (groupId) q = q.eq("group_id", groupId);
-    const { data } = await q;
-    const row = ((data ?? []) as { id: string }[])[0];
+    // A booking keeps no time for its late change, so the session is the notice's group's next late-changed one. One still waiting is preferred (the change the coach has not decided yet),
+    // then any; the group (each client has their own space) keeps it to the client the notice is about.
+    const lateIn = (waitingOnly: boolean) => {
+      let q = supabase
+        .from("bookings")
+        .select("id, start_at")
+        .eq("coach_id", userId)
+        .gte("start_at", new Date(at - 3600000).toISOString())
+        .lte("start_at", new Date(at + 14 * 86400000).toISOString())
+        .order("start_at", { ascending: true })
+        .limit(1);
+      q = waitingOnly ? q.eq("late_charge_state", "flagged") : q.not("late_charge_state", "is", null);
+      if (groupId) q = q.eq("group_id", groupId);
+      return q;
+    };
+    const flagged = ((await lateIn(true)).data ?? []) as { id: string }[];
+    const row = flagged[0] ?? (((await lateIn(false)).data ?? []) as { id: string }[])[0];
     return row ? { kind, id: row.id } : null;
   }
   // a client request: the coach reads that table only through the server (the row is the coach's own, matched to the coach's own notice)
@@ -214,40 +219,44 @@ async function readOneAnswered(supabase: SupabaseClient, userId: string, focus: 
 }
 
 /** The request notices on the notifications page that can still be answered there: a session still waiting (Confirm or Decline) and a person still waiting to train with the coach (Approve or
- *  Decline). Matched to their request the way the Requests page matches them. Anything else, or anything already answered, just opens the Requests page. */
+ *  Decline). Each notice is matched to ITS request first (the coach's own, in the notice's group, written in the same moment, whatever its status), and gets buttons only when that one is still
+ *  waiting: matching among the waiting ones only would give an old notice, whose request was answered, the buttons of another client's request made a moment later. Anything else just opens
+ *  the Requests page. */
 export async function answerableNotices(
   supabase: SupabaseClient,
   userId: string,
-  notices: { id: string; type: string; created_at: string }[],
+  notices: { id: string; type: string; created_at: string; group_id?: string | null }[],
   now: Date = new Date()
 ): Promise<Map<string, { kind: "booking" | "client"; requestId: string }>> {
   const out = new Map<string, { kind: "booking" | "client"; requestId: string }>();
-  const bookingNotices = notices.filter((n) => n.type === "booking_request");
-  const clientNotices = notices.filter((n) => n.type === "client_request");
-  try {
-    const [bookings, clients] = await Promise.all([
-      bookingNotices.length > 0
-        ? supabase.from("booking_requests").select("id, created_at").eq("coach_id", userId).eq("status", "pending").gt("new_start_at", now.toISOString()).order("created_at", { ascending: false }).limit(100)
-        : Promise.resolve({ data: [] as { id: string; created_at: string }[] }),
-      // the coach reads that table only through the server: the coach's own waiting requests
-      clientNotices.length > 0
-        ? createServiceRoleClient().from("client_requests").select("id, created_at").eq("coach_id", userId).eq("status", "pending").order("created_at", { ascending: false }).limit(100)
-        : Promise.resolve({ data: [] as { id: string; created_at: string }[] }),
-    ]);
-    const match = (list: { id: string; created_at: string }[], n: { created_at: string }) => {
-      const best = closestByTime(list, n.created_at);
-      return best && Math.abs(new Date(best.created_at).getTime() - new Date(n.created_at).getTime()) <= 5000 ? best.id : null;
-    };
-    for (const n of bookingNotices) {
-      const id = match((bookings.data ?? []) as { id: string; created_at: string }[], n);
-      if (id) out.set(n.id, { kind: "booking", requestId: id });
-    }
-    for (const n of clientNotices) {
-      const id = match((clients.data ?? []) as { id: string; created_at: string }[], n);
-      if (id) out.set(n.id, { kind: "client", requestId: id });
-    }
-  } catch {
-    // no buttons: the rows still open the Requests page
-  }
+  // the newest 40 (a request still waiting is a recent one)
+  const asks = notices.filter((n) => n.type === "booking_request" || n.type === "client_request").slice(0, 40);
+  if (asks.length === 0) return out;
+  const nowIso = now.toISOString();
+  let service: SupabaseClient | null = null;
+  await Promise.all(
+    asks.map(async (n) => {
+      try {
+        const at = new Date(n.created_at).getTime();
+        const lo = new Date(at - 5000).toISOString();
+        const hi = new Date(at + 5000).toISOString();
+        if (n.type === "booking_request") {
+          let q = supabase.from("booking_requests").select("id, created_at, status, new_start_at").eq("coach_id", userId).gte("created_at", lo).lte("created_at", hi).limit(10);
+          if (n.group_id) q = q.eq("group_id", n.group_id);
+          const { data } = await q;
+          const it = closestByTime((data ?? []) as { id: string; created_at: string; status: string; new_start_at: string }[], n.created_at);
+          if (it && it.status === "pending" && it.new_start_at > nowIso) out.set(n.id, { kind: "booking", requestId: it.id });
+          return;
+        }
+        // the coach reads that table only through the server: the coach's own requests
+        service ??= createServiceRoleClient();
+        const { data } = await service.from("client_requests").select("id, created_at, status").eq("coach_id", userId).gte("created_at", lo).lte("created_at", hi).limit(10);
+        const it = closestByTime((data ?? []) as { id: string; created_at: string; status: string }[], n.created_at);
+        if (it && it.status === "pending") out.set(n.id, { kind: "client", requestId: it.id });
+      } catch {
+        // no buttons: the row still opens the Requests page
+      }
+    })
+  );
   return out;
 }

@@ -12,7 +12,7 @@ import {
   requestHref,
   sortAnswered,
 } from "@/lib/requests-center";
-import { requestForNotice } from "@/lib/requests-center-server";
+import { answerableNotices, requestForNotice } from "@/lib/requests-center-server";
 import { bookingRequestLine, requestPushLine, scheduleRequestLine, shortName } from "@/lib/notification-push";
 
 // The Requests page and the request pushes (Ron, Nov 19: a session-request push "leads me to nothing", and there was no place to find requests again).
@@ -129,6 +129,47 @@ describe("the request a notice is about", () => {
       schedule_requests: [{ id: "s1", group_id: "g1", applied_at: "2026-11-24T12:00:00.000Z", created_at: "2026-11-01T00:00:00.000Z" }],
     });
     expect(await requestForNotice(db, "coach", N)).toEqual({ kind: "schedule", id: "s1" });
+  });
+});
+
+describe("buttons on a notifications row answer that row's own request", () => {
+  // Assistant review of 107b0fbe: matching among WAITING requests only gave an old notice (its request answered) the buttons of another client's request made a moment later.
+  const at = "2026-11-18T19:00:00.000Z";
+  const later = "2026-11-18T19:00:02.000Z";
+  const db = () =>
+    fakeDb({
+      booking_requests: [
+        { id: "a-answered", coach_id: "coach", group_id: "gA", created_at: at, status: "confirmed", new_start_at: "2026-11-30T14:00:00Z" },
+        { id: "b-waiting", coach_id: "coach", group_id: "gB", created_at: later, status: "pending", new_start_at: "2026-11-30T15:00:00Z" },
+        { id: "c-past", coach_id: "coach", group_id: "gC", created_at: at, status: "pending", new_start_at: "2026-11-01T15:00:00Z" },
+      ],
+    });
+  const now = new Date("2026-11-19T00:00:00Z");
+  it("an answered request's notice gets no buttons, even with another client's request a second later", async () => {
+    const out = await answerableNotices(db(), "coach", [{ id: "nA", type: "booking_request", created_at: at, group_id: "gA" }], now);
+    expect(out.has("nA")).toBe(false);
+  });
+  it("a waiting request's own notice gets them; one whose time has passed does not", async () => {
+    const out = await answerableNotices(
+      db(),
+      "coach",
+      [
+        { id: "nB", type: "booking_request", created_at: later, group_id: "gB" },
+        { id: "nC", type: "booking_request", created_at: at, group_id: "gC" },
+      ],
+      now
+    );
+    expect(out.get("nB")).toEqual({ kind: "booking", requestId: "b-waiting" });
+    expect(out.has("nC")).toBe(false);
+  });
+  it("the push names the client written with the notice, not one a second later", async () => {
+    const two = fakeDb({
+      booking_requests: [
+        { coach_id: "coach", kind: "new", new_start_at: "2026-11-19T15:00:00Z", created_at: "2026-11-18T19:00:03.000Z", profiles: { full_name: "Other Person" } },
+        { coach_id: "coach", kind: "new", new_start_at: "2026-11-19T14:00:00Z", created_at: at, profiles: { full_name: "Hewan Belete" } },
+      ],
+    });
+    expect(await requestPushLine(two, { profile_id: "coach", group_id: null, type: "booking_request", body: "", created_at: at }, TZ)).toBe("Hewan B. asked for Thu, Nov 19, 9:00 AM");
   });
 });
 

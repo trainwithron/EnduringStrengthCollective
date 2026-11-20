@@ -111,6 +111,13 @@ export function scheduleRequestLine(
   return `${who} asked to ${SCHEDULE_ASK[r.kind] ?? "change"} ${what} after ${dayOf(r.effective_on)}${until}`;
 }
 
+// The one written in the same moment as the notice (another client's request a second later is not it).
+function closestTo(rows: unknown, at: string): any {
+  if (!Array.isArray(rows)) return null;
+  const t = new Date(at).getTime();
+  return rows.reduce((best: any, r: any) => (!best || Math.abs(new Date(r.created_at).getTime() - t) < Math.abs(new Date(best.created_at).getTime() - t) ? r : best), null);
+}
+
 /** The line a request push shows. The request is found as the Requests page finds it: the coach's own, written in the same moment as the notice. */
 export async function requestPushLine(db: any, n: { profile_id: string; group_id: string | null; type: string; body: string | null; created_at: string }, timeZone: string): Promise<string> {
   const fallback = answerableBody(n.body);
@@ -122,8 +129,8 @@ export async function requestPushLine(db: any, n: { profile_id: string; group_id
     if (n.type === "booking_request") {
       let q = db.from("booking_requests").select("kind, from_start_at, new_start_at, created_at, profiles!booking_requests_athlete_id_fkey ( full_name )").eq("coach_id", n.profile_id).gte("created_at", lo).lte("created_at", hi);
       if (n.group_id) q = q.eq("group_id", n.group_id);
-      const { data } = await q.limit(1);
-      const r = Array.isArray(data) ? data[0] : null;
+      const { data } = await q.limit(10);
+      const r = closestTo(data, n.created_at);
       return r ? bookingRequestLine(r, shortName(r.profiles?.full_name), timeZone) : fallback;
     }
     if (n.type === "schedule_request") {
@@ -134,13 +141,13 @@ export async function requestPushLine(db: any, n: { profile_id: string; group_id
         .gte("created_at", lo)
         .lte("created_at", hi);
       if (n.group_id) q = q.eq("group_id", n.group_id);
-      const { data } = await q.limit(1);
-      const r = Array.isArray(data) ? data[0] : null;
+      const { data } = await q.limit(10);
+      const r = closestTo(data, n.created_at);
       return r ? scheduleRequestLine(r, shortName(r.profiles?.full_name)) : fallback;
     }
     if (n.type === "client_request") {
-      const { data } = await db.from("client_requests").select("created_at, profiles!client_requests_requester_id_fkey ( full_name )").eq("coach_id", n.profile_id).gte("created_at", lo).lte("created_at", hi).limit(1);
-      const r = Array.isArray(data) ? data[0] : null;
+      const { data } = await db.from("client_requests").select("created_at, profiles!client_requests_requester_id_fkey ( full_name )").eq("coach_id", n.profile_id).gte("created_at", lo).lte("created_at", hi).limit(10);
+      const r = closestTo(data, n.created_at);
       return r ? `${shortName(r.profiles?.full_name)} asked to train with you` : fallback;
     }
   } catch {

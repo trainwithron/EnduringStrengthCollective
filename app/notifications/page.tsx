@@ -54,7 +54,7 @@ export default async function NotificationsPage() {
   }
 
   // A session request or a request to train that is still waiting gets its buttons on the row (Ron, Nov 19).
-  const answerable = isCoach ? await answerableNotices(supabase, user.id, visibleRows as { id: string; type: string; created_at: string }[]) : new Map();
+  const answerable = isCoach ? await answerableNotices(supabase, user.id, visibleRows as { id: string; type: string; created_at: string; group_id: string | null }[]) : new Map();
   const entries: CenterEntry[] = visibleRows.map((n: any) => ({
     id: n.id,
     type: n.type,
