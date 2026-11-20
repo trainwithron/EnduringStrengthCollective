@@ -24,6 +24,8 @@ export default {
         // items in them, line for a quiet divider.
         surface: { DEFAULT: "rgb(var(--surface) / <alpha-value>)", 2: "rgb(var(--surface-2) / <alpha-value>)" },
         line: "rgb(var(--line) / <alpha-value>)",
+        // The accent as text on soft accent pills and tinted cards: held at 4.5:1 there for every organization's colors (lib/theme.ts surfaceTokensFor).
+        "rust-ink": "rgb(var(--rust-ink) / <alpha-value>)",
         // Meaning colors (Look Refresh): coral for "needs you" and money owed, blue for check-ins, green for wins. The accent (rust) stays the one action color.
         alert: "#EE8A6E",
         checkin: "#7FB2E5",

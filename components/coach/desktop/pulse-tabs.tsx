@@ -107,24 +107,24 @@ export function PulseTabs({
           type="button"
           onClick={() => setTab("clients")}
           className={`flex-1 font-body text-[13px] font-semibold py-2 rounded-token-pill transition-colors ${
-            tab === "clients" ? "bg-rust/15 text-rust" : "text-steel hover:text-chalk"
+            tab === "clients" ? "bg-rust/15 text-rust-ink" : "text-steel hover:text-chalk"
           }`}
         >
           <SwappableTerm termKey="client" cap /> Pulse
           {clientAttentionCount > 0 && (
-            <span className="ml-1.5 text-rust">({clientAttentionCount})</span>
+            <span className="ml-1.5 text-rust-ink">({clientAttentionCount})</span>
           )}
         </button>
         <button
           type="button"
           onClick={() => setTab("groups")}
           className={`flex-1 font-body text-[13px] font-semibold py-2 rounded-token-pill transition-colors ${
-            tab === "groups" ? "bg-rust/15 text-rust" : "text-steel hover:text-chalk"
+            tab === "groups" ? "bg-rust/15 text-rust-ink" : "text-steel hover:text-chalk"
           }`}
         >
           Group Pulse
           {groupAttentionCount > 0 && (
-            <span className="ml-1.5 text-rust">({groupAttentionCount})</span>
+            <span className="ml-1.5 text-rust-ink">({groupAttentionCount})</span>
           )}
         </button>
       </div>

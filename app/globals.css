@@ -187,6 +187,8 @@
   --surface: 26 24 22; /* #1A1816 */
   --surface-2: 35 32 29; /* #23201D */
   --line: 46 42 38; /* #2E2A26 */
+  --rust-ink: 212 119 69; /* #D47745: the accent as text on soft accent pills and tinted cards */
+  --field-line: 109 106 101; /* #6D6A65: a field's edge, 3:1 on the ground, cards and raised items */
   /* Nudged from #C4622D — the original failed WCAG AA contrast (4.5:1)
      both as button text-on-background and as accent text on the dark
      surfaces it sits on; this clears 4.5:1 in both directions. Applies
@@ -294,6 +296,15 @@ body::before {
 }
 .home-band-avatar {
   box-shadow: 0 0 0 4px rgb(var(--rust) / 0.16), 0 0 30px rgb(var(--rust) / 0.3);
+}
+
+/* Field edges (Assistant review of 026dc4a5): the quiet border-steel/NN would leave a text field, select or text box at about 1.25:1, hard to find. Fields
+   with a steel edge get --field-line instead (3:1 against the ground, the cards and the raised items). One element plus one attribute selector beats the
+   single-class border utility; focus:border-rust and hover:border-rust (a class plus a pseudo-class) still win, so the focus edge shows. */
+input[class*="border-steel"],
+select[class*="border-steel"],
+textarea[class*="border-steel"] {
+  border-color: rgb(var(--field-line));
 }
 
 /* Meaning cards (Look Refresh): a card tinted by what it is about. The accent for something due, blue for a check-in, green for a win, coral for what needs

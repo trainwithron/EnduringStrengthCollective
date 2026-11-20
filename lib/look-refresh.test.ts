@@ -21,6 +21,43 @@ describe("the skin: card colors, secondary text and lines follow the organizatio
       expect(contrastRatio(t.steel, t.surface)!, `${bg}/${text}`).toBeGreaterThanOrEqual(4.5);
     }
   });
+  // Assistant review of 026dc4a5: the plain accent on its own soft pill was under 4.5:1 for 3 of the 4 live orgs; fields were about 1.25:1.
+  const LIVE = [
+    ["#0F0E0D", "#EDE8E0", "#D2703B"],
+    ["#0f0e0d", "#f1ece4", "#e4a73f"],
+    ["#0A0A0A", "#F5F0E6", "#C8102E"],
+    ["#211c1c", "#fecdcd", "#d30000"],
+    ["#1C1B1A", "#EDE8E0", "#D2703B"],
+  ];
+  const over = (base: string, top: string, a: number) => {
+    const p = (h: string, i: number) => parseInt(h.slice(1 + 2 * i, 3 + 2 * i), 16);
+    return `#${[0, 1, 2].map((i) => Math.round(p(base, i) + (p(top, i) - p(base, i)) * a).toString(16).padStart(2, "0")).join("")}`;
+  };
+  it("the accent ink reads at 4.5:1 on a raised item, on the soft pill over the ground or a card, and on a tinted card", () => {
+    for (const [bg, text, accent] of LIVE) {
+      const t = surfaceTokensFor(bg, text, accent);
+      for (const ground of [t.surface2, over(t.surface, accent, 0.15), over(bg, accent, 0.15), over(bg, accent, 0.08)]) {
+        expect(contrastRatio(t.accentInk, ground)!, `${accent} on ${ground}`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+    // an accent that already reads is left as it is
+    expect(surfaceTokensFor("#0f0e0d", "#f1ece4", "#e4a73f").accentInk).toBe("#E4A73F");
+  });
+  it("a field's edge is 3:1 against the ground, the cards and the raised items", () => {
+    for (const [bg, text, accent] of LIVE) {
+      const t = surfaceTokensFor(bg, text, accent);
+      for (const ground of [bg, t.surface, t.surface2]) expect(contrastRatio(t.fieldLine, ground)!, `${bg}: ${t.fieldLine} on ${ground}`).toBeGreaterThanOrEqual(3);
+    }
+    const css = read("app/globals.css");
+    expect(css).toContain('input[class*="border-steel"],\nselect[class*="border-steel"],\ntextarea[class*="border-steel"] {\n  border-color: rgb(var(--field-line));');
+  });
+  it("the selected pills and the Due soon title use the accent ink", () => {
+    expect(read("components/coach/desktop/home-tab-strip.tsx")).toContain('on ? "bg-rust/15 text-rust-ink font-semibold"');
+    expect(read("components/coach/desktop/needs-you-strip.tsx")).toContain('due: { card: "tint-accent", title: "text-rust-ink" },');
+    for (const f of ["components/coach/desktop/home-tab-strip.tsx", "components/coach/desktop/calendar-page-tabs.tsx", "components/coach/desktop/coach-clients-list.tsx", "components/coach/desktop/pulse-tabs.tsx"]) {
+      expect(read(f), f).not.toMatch(/bg-rust\/15 text-rust(?!-ink)/);
+    }
+  });
   it("a light ground steps darker for its cards", () => {
     const t = surfaceTokensFor("#F7F6F3", "#1C1B1A");
     expect(parseInt(t.surface.slice(1, 3), 16)).toBeLessThan(0xf7);

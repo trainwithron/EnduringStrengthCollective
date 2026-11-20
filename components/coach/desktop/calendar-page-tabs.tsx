@@ -58,7 +58,7 @@ export function CalendarPageTabs({
           onClick={() => setTab("schedule")}
           className={`h-10 px-4 rounded-token-pill font-body text-sm transition-colors ${
             tab === "schedule"
-              ? "bg-rust/15 text-rust font-semibold"
+              ? "bg-rust/15 text-rust-ink font-semibold"
               : "text-steel active:text-chalk"
           }`}
         >
@@ -69,7 +69,7 @@ export function CalendarPageTabs({
           onClick={() => setTab("availability")}
           className={`h-10 px-4 rounded-token-pill font-body text-sm transition-colors ${
             tab === "availability"
-              ? "bg-rust/15 text-rust font-semibold"
+              ? "bg-rust/15 text-rust-ink font-semibold"
               : "text-steel active:text-chalk"
           }`}
         >

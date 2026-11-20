@@ -124,6 +124,10 @@ export interface SurfaceTokens {
   surface2: string;
   line: string;
   steel: string;
+  // The accent as text on the soft accent pills and tinted cards (Assistant review of 026dc4a5: the plain accent was under 4.5:1 there for 3 of 4 orgs).
+  accentInk: string;
+  // The edge of a text field, select or text box: at least 3:1 against the ground, the cards and the raised items, so a field can be found.
+  fieldLine: string;
 }
 
 const SURFACE_STEP: [number, number, number] = [11, 10, 9];
@@ -156,19 +160,30 @@ function ratioOf(a: [number, number, number], b: [number, number, number]): numb
 
 const mix = (a: [number, number, number], b: [number, number, number], t: number): [number, number, number] => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 
-export function surfaceTokensFor(backgroundColor: string, textColor: string): SurfaceTokens {
+export function surfaceTokensFor(backgroundColor: string, textColor: string, accentColor: string = DEFAULT_ACCENT_COLOR): SurfaceTokens {
   const ground = parseHex(backgroundColor) ?? (parseHex(DEFAULT_BACKGROUND_COLOR) as [number, number, number]);
   const text = parseHex(textColor) ?? (parseHex(DEFAULT_TEXT_COLOR) as [number, number, number]);
+  const accent = parseHex(accentColor) ?? (parseHex(DEFAULT_ACCENT_COLOR) as [number, number, number]);
   const dir = luminanceOf(ground) > 0.4 ? -1 : 1;
-  const step = (s: [number, number, number]): [number, number, number] => [ground[0] + dir * s[0], ground[1] + dir * s[1], ground[2] + dir * s[2]];
-  const surface2 = step(SURFACE_2_STEP).map((c) => Math.max(0, Math.min(255, Math.round(c)))) as [number, number, number];
+  const clamp = (c: [number, number, number]) => c.map((v) => Math.max(0, Math.min(255, Math.round(v)))) as [number, number, number];
+  const step = (s: [number, number, number]): [number, number, number] => clamp([ground[0] + dir * s[0], ground[1] + dir * s[1], ground[2] + dir * s[2]]);
+  const surface = step(SURFACE_STEP);
+  const surface2 = step(SURFACE_2_STEP);
   let t = 0.25;
   let steel = mix(text, ground, t).map(Math.round) as [number, number, number];
   while (t > 0 && ratioOf(steel, surface2) < 4.5) {
     t = Math.max(0, t - 0.01);
     steel = mix(text, ground, t).map(Math.round) as [number, number, number];
   }
-  return { surface: toHex(step(SURFACE_STEP)), surface2: toHex(surface2), line: toHex(step(LINE_STEP)), steel: toHex(steel) };
+  // The accent ink: the accent, moved toward the text color only as far as it must to read at 4.5:1 on every ground it is used on (a raised item, the
+  // soft accent pill over the ground or a card, a tinted card).
+  const inkGrounds = [surface2, mix(surface, accent, 0.15), mix(ground, accent, 0.15), mix(ground, accent, 0.08), mix(surface, accent, 0.08)].map(clamp);
+  let ink = accent;
+  for (let k = 0; k <= 100 && inkGrounds.some((g) => ratioOf(ink, g) < 4.5); k++) ink = clamp(mix(accent, text, k / 100));
+  // A field's edge: the secondary text color over a card, as faint as it can be while still 3:1 against the ground, the cards and the raised items.
+  let field = clamp(mix(surface, steel, 0.3));
+  for (let k = 30; k <= 100 && [ground, surface, surface2].some((g) => ratioOf(field, g) < 3); k++) field = clamp(mix(surface, steel, k / 100));
+  return { surface: toHex(surface), surface2: toHex(surface2), line: toHex(step(LINE_STEP)), steel: toHex(steel), accentInk: toHex(ink), fieldLine: toHex(field) };
 }
 
 // Card and row corners (Look Refresh): cards and panels rounded, rows inside them a little less; an organization that chose Sharp keeps every corner square.
@@ -183,7 +198,7 @@ export function cardRadiiFor(shape: ButtonShape): { card: string; row: string } 
 // identity, instead of each shell re-deriving this mapping itself.
 export function orgThemeToCssVars(theme: OrgTheme): CSSProperties {
   const scale = radiusScaleFor(theme.buttonShape);
-  const tokens = surfaceTokensFor(theme.backgroundColor, theme.textColor);
+  const tokens = surfaceTokensFor(theme.backgroundColor, theme.textColor, theme.accentColor);
   const radii = cardRadiiFor(theme.buttonShape);
   return {
     "--rust": hexToRgbTriplet(theme.accentColor),
@@ -193,6 +208,8 @@ export function orgThemeToCssVars(theme: OrgTheme): CSSProperties {
     "--surface-2": hexToRgbTriplet(tokens.surface2),
     "--line": hexToRgbTriplet(tokens.line),
     "--steel": hexToRgbTriplet(tokens.steel),
+    "--rust-ink": hexToRgbTriplet(tokens.accentInk),
+    "--field-line": hexToRgbTriplet(tokens.fieldLine),
     "--r-card": radii.card,
     "--r-row": radii.row,
     "--font-display": `"${theme.fontDisplay}"`,

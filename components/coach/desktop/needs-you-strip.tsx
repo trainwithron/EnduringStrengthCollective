@@ -4,7 +4,7 @@ import { CAUGHT_UP, COULD_NOT_CHECK, moreLabel, type NeedsYouSlot, type NeedsYou
 // Each kind on a card tinted by what it is about (Look Refresh, Nov 20): someone waiting on the coach in coral, something due in the accent, a check-in in blue.
 const SLOT_LOOK: Record<NeedsYouSlot, { card: string; title: string }> = {
   waiting: { card: "tint-alert", title: "text-alert" },
-  due: { card: "tint-accent", title: "text-rust" },
+  due: { card: "tint-accent", title: "text-rust-ink" },
   slipping: { card: "tint-checkin", title: "text-checkin" },
 };
 

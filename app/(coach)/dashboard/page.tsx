@@ -632,7 +632,7 @@ export default async function CoachHomePage() {
                   Build a program
                 </Link>
               )}
-              <Link prefetch={false} href="/clients?add=1" className="inline-flex items-center h-11 px-5 rounded-token-pill border border-rust/40 text-chalk font-body text-sm hover:border-rust">
+              <Link prefetch={false} href="/clients?add=1" className="inline-flex items-center h-11 px-5 rounded-[var(--btn-radius)] border border-rust/40 text-chalk font-body text-sm hover:border-rust">
                 Add a client
               </Link>
               <MarkAllSeenButton groupIds={allGroupIds} />

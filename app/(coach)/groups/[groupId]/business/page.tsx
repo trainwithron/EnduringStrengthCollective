@@ -338,7 +338,7 @@ export default async function BusinessDashboardPage(
           <p className="font-body text-xs text-steel mt-1">
             {engagement.pct}% of clients logged a workout in the last 14 days
           </p>
-          <div className="w-full h-2 bg-surface mt-3">
+          <div className="w-full h-2 bg-surface mt-3 overflow-hidden">
             <div className="h-2 bg-positive" style={{ width: `${engagement.pct}%` }} />
           </div>
         </div>

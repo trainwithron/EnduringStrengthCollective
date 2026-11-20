@@ -26,7 +26,7 @@ export function HomeTabStrip({ label, tabs, current, counts = {} }: { label: str
               prefetch={i === 0 ? undefined : false}
               aria-current={on ? "page" : undefined}
               {...newTabProps(first)}
-              className={`${base} ${on ? "bg-rust/15 text-rust font-semibold" : "text-steel hover:text-chalk hover:bg-surface"}`}
+              className={`${base} ${on ? "bg-rust/15 text-rust-ink font-semibold" : "text-steel hover:text-chalk hover:bg-surface"}`}
             >
               {e.tabs.length === 1 && first.termKey ? <SwappableTerm termKey={first.termKey} form="plural" className="capitalize" /> : e.label}
               {count > 0 && (

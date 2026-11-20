@@ -41,9 +41,9 @@ export function CoachClientsList({ rows, selfName = null, oneView = false }: { r
             type="button"
             aria-pressed={filter === f}
             onClick={() => setFilter(f)}
-            className={`h-9 px-4 rounded-token-pill font-body text-[13px] transition-colors ${filter === f ? "bg-rust/15 text-rust font-semibold" : "bg-surface-2 text-chalk hover:text-rust"}`}
+            className={`h-9 px-4 rounded-token-pill font-body text-[13px] transition-colors ${filter === f ? "bg-rust/15 text-rust-ink font-semibold" : "bg-surface-2 text-chalk hover:text-rust"}`}
           >
-            {FILTER_LABELS[f]} <span className={filter === f ? "text-rust" : "text-steel"}>{counts[f]}</span>
+            {FILTER_LABELS[f]} <span className={filter === f ? "text-rust-ink" : "text-steel"}>{counts[f]}</span>
           </button>
         ))}
         {!oneView && (
@@ -54,7 +54,7 @@ export function CoachClientsList({ rows, selfName = null, oneView = false }: { r
               type="button"
               aria-pressed={view === v}
               onClick={() => chooseView(v)}
-              className={`h-11 sm:h-9 px-3 rounded-token-pill font-body text-[13px] flex items-center gap-1.5 ${view === v ? "bg-rust/15 text-rust font-semibold" : "text-chalk hover:text-rust"}`}
+              className={`h-11 sm:h-9 px-3 rounded-token-pill font-body text-[13px] flex items-center gap-1.5 ${view === v ? "bg-rust/15 text-rust-ink font-semibold" : "text-chalk hover:text-rust"}`}
             >
               {v === "cards" ? <LayoutGrid className="w-3.5 h-3.5" aria-hidden="true" /> : <List className="w-3.5 h-3.5" aria-hidden="true" />}
               {v === "cards" ? "Cards" : "List"}
