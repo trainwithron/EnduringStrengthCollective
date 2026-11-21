@@ -64,7 +64,8 @@ describe("the pieces are wired", () => {
   it("both coach pickers go straight to My training: no 'Which group's program?' step", () => {
     for (const f of ["components/athlete/view-as-client-picker.tsx", "components/coach/mobile/spot-clients-groups-panel.tsx"]) {
       const src = read(f);
-      expect(src).toContain('router.push("/my-space/home")');
+      // (straight into today's workout since Nov 21, audit P19)
+      expect(src).toContain('router.push("/my-space/home?start=1")');
       expect(src).not.toContain("Which group");
       expect(src).toContain("Start your own workout");
     }

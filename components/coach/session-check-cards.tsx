@@ -22,9 +22,14 @@ const SHOWN = 3;
 // "Did this session happen?" (Ron, Oct 19): a session whose time has passed and that nobody marked gets a card in the app, never a push and never auto-completed. Yes marks it attended (the session comes off their balance, as
 // always) and tells the client; No-show records it as a no-show and asks Charge (it uses 1 session) or Waive (nothing used) (FIX 3: the old "No" erased the session with no record); Reschedule changes its day right
 // there. Then the card is gone. Oldest first, three at a time, with "N more".
-export function SessionCheckCards({ sessions, timezone }: { sessions: SessionToCheck[]; timezone: string }) {
+export function SessionCheckCards({ sessions, timezone, onAnswered }: { sessions: SessionToCheck[]; timezone: string; onAnswered?: () => void }) {
   const router = useRouter();
   const [gone, setGone] = useState<Set<string>>(new Set());
+  // A card answered goes, and whoever shows the count (Spotlight) reads it again (audit P31).
+  function markGone(bookingId: string) {
+    setGone((g) => new Set(g).add(bookingId));
+    onAnswered?.();
+  }
   const [showAll, setShowAll] = useState(false);
   const [moving, setMoving] = useState<string | null>(null);
   // The card whose No-show is asking Charge or Waive.
@@ -77,7 +82,7 @@ export function SessionCheckCards({ sessions, timezone }: { sessions: SessionToC
       setErrors((e) => ({ ...e, [s.bookingId]: "That didn't save. Nothing was changed. Try again." }));
       return;
     }
-    setGone((g) => new Set(g).add(s.bookingId));
+    markGone(s.bookingId);
     checkAndNotifyLowSessionBalance(s.athleteId, s.groupId);
     // The client hears it was completed (best effort; one push for this one session).
     void fetch("/api/bookings/completed-notice", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ bookingId: s.bookingId }), keepalive: true }).catch(() => undefined);
@@ -99,7 +104,7 @@ export function SessionCheckCards({ sessions, timezone }: { sessions: SessionToC
       return;
     }
     setAskingNoShow(null);
-    setGone((g) => new Set(g).add(s.bookingId));
+    markGone(s.bookingId);
     if (charge) checkAndNotifyLowSessionBalance(s.athleteId, s.groupId);
     router.refresh();
   }
@@ -172,7 +177,7 @@ export function SessionCheckCards({ sessions, timezone }: { sessions: SessionToC
               onMoved={(iso) => {
                 setStartOverride((o) => ({ ...o, [s.bookingId]: iso }));
                 // moved to a day that has not happened yet: it is no longer waiting for an answer
-                if (new Date(iso).getTime() > Date.now()) setGone((g) => new Set(g).add(s.bookingId));
+                if (new Date(iso).getTime() > Date.now()) markGone(s.bookingId);
                 router.refresh();
               }}
             />

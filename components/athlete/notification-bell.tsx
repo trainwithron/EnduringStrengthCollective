@@ -157,7 +157,7 @@ export function NotificationBell({
             className={`fixed left-3 right-3 z-50 max-h-[70vh] overflow-y-auto bg-surface border border-steel/30 shadow-lg sm:absolute sm:w-80 ${placement === "above" ? "bottom-20 sm:bottom-11 sm:left-0 sm:right-auto" : "top-16 sm:top-11 sm:right-0 sm:left-auto"}`}
             data-notification-panel
           >
-            <div className="flex items-center justify-between px-3 py-2.5 border-b border-steel/15">
+            <div className="flex items-center justify-between px-3 py-1 min-h-11 border-b border-steel/15">
               <p className="font-display uppercase text-xs tracking-wide text-steel">
                 Notifications
               </p>
@@ -165,7 +165,7 @@ export function NotificationBell({
                 <button
                   type="button"
                   onClick={() => markRead(items.filter((n) => !n.readAt).map((n) => n.id))}
-                  className="font-body text-xs text-rust-ink"
+                  className="min-h-11 px-2 -mr-2 inline-flex items-center font-body text-xs text-rust-ink"
                 >
                   Mark all read
                 </button>
@@ -201,7 +201,7 @@ export function NotificationBell({
             <Link
               href="/notifications"
               onClick={() => setOpen(false)}
-              className="block px-3 py-2.5 border-t border-steel/15 font-body text-xs text-steel text-center"
+              className="min-h-11 flex items-center justify-center px-3 border-t border-steel/15 font-body text-xs text-steel"
             >
               See all notifications
             </Link>

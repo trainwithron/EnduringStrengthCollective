@@ -126,7 +126,7 @@ export function QuickViewBubble({
                 ref={closeButtonRef}
                 onClick={close}
                 aria-label="Close"
-                className="w-8 h-8 flex items-center justify-center text-steel"
+                className="w-11 h-11 -mr-2 flex items-center justify-center text-steel"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -136,7 +136,7 @@ export function QuickViewBubble({
               <div className="px-5 pb-5">
                 <Link
                   href={deeperHref}
-                  className="font-body text-xs text-rust-ink underline underline-offset-2"
+                  className="min-h-11 inline-flex items-center font-body text-xs text-rust-ink underline underline-offset-2"
                 >
                   {deeperLabel ?? "Open"}
                 </Link>

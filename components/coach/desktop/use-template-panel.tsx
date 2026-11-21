@@ -230,7 +230,8 @@ export function UseTemplatePanel({
 
   let lastHeading = "";
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60" onClick={onClose}>
+    // data-spot-keep-open: a tap on this backdrop closes the template, not Spotlight behind it (audit P10)
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60" onClick={onClose} data-spot-keep-open>
       <div role="dialog" aria-label="Use this template" className="w-full sm:max-w-xl bg-graphite border-t sm:border border-steel/30 p-5 max-h-[90dvh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-3">
           <h2 className="font-display font-bold uppercase text-lg leading-none">Use this template</h2>
