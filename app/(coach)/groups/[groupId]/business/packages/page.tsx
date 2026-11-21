@@ -11,6 +11,7 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { isStripeConfigured } from "@/lib/stripe";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { connectStatusFromAccount, feePercentForOrg, getOrgConnect, type ConnectStatus } from "@/lib/connect-payee";
+import { coachPlanAvailable } from "@/lib/coach-plan-checkout";
 import { getStripeClient } from "@/lib/stripe";
 import { StripeConnectPanel } from "@/components/coach/desktop/stripe-connect-panel";
 import { PackageManager, type CoachPackageRow, type LinkableProgramOption } from "@/components/coach/desktop/package-manager";
@@ -146,7 +147,7 @@ export default async function PackagesPage(
         </p>
       </div>
 
-      {isStripeConfigured() && group?.organization_id && <StripeConnectPanel groupId={params.groupId} status={connectStatus} isOwner={isOrgOwner} feePercent={feePercent} />}
+      {isStripeConfigured() && group?.organization_id && <StripeConnectPanel groupId={params.groupId} status={connectStatus} isOwner={isOrgOwner} feePercent={feePercent} upgrade={{ organizationId: group.organization_id, available: coachPlanAvailable() }} />}
 
       <PackageManager groupId={params.groupId} initialPackages={packages} linkablePrograms={linkablePrograms} accessGroups={accessGroups} siteLinkBase={siteLinkBase} />
     </CoachDesktopShell>

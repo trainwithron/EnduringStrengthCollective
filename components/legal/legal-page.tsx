@@ -41,6 +41,7 @@ export function LegalPage({
           <Link href="/terms">Terms</Link>
           <Link href="/privacy">Privacy</Link>
           <Link href="/refunds">Refunds</Link>
+          <Link href="/pricing">Pricing</Link>
         </p>
       </div>
     </main>

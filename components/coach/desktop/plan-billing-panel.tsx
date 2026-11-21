@@ -1,6 +1,10 @@
 import { TRIAL_DAYS, GRACE_DAYS, formatPlanCents, MAX_AUTO_CLIENTS } from "@/lib/coach-plan-pricing";
 import type { OrgBillingSummary } from "@/lib/org-billing-server";
 import { FREE_TIER_AI_USES, FREE_TIER_CLIENT_LIMIT } from "@/lib/ai-usage";
+import { platformFeePercent } from "@/lib/platform-fee";
+import { canBuyCoachPlan } from "@/lib/coach-plan-checkout";
+import { FeeNotice } from "@/components/billing/fee-notice";
+import { PlanUpgradeButton } from "@/components/billing/plan-upgrade-button";
 
 // Shown only once billing is enforced; until then the plan page words an ended trial the way it did before the free plan existed.
 const FREE_PLAN_SENTENCE = `You are on the free plan: up to ${FREE_TIER_CLIENT_LIMIT} clients and ${FREE_TIER_AI_USES} AI uses a month. Nothing was deleted, and your clients can still log workouts. Choose a plan to add more clients and use AI freely.`;
@@ -20,17 +24,25 @@ function plural(n: number, word: string): string {
   return `${n} ${word}${n === 1 ? "" : "s"}`;
 }
 
-// Read-only for now: shows where the organization stands and what the
-// plan costs at its current size. No checkout yet (phase 2) — so nothing
-// here asks for a card or claims anything is being charged.
+// Where the organization stands, what the plan costs at its current size, and what Spotlight takes on client payments (Ron, Nov 20). The owner of an organization that is not paying (a trial, an
+// ended trial, a lapsed plan) can choose the paid plan here; Stripe Checkout asks for the card, and the plan starts when Stripe confirms it (the webhook). Until Ron's Stripe price is set the button
+// says the plan is not available yet.
 export function PlanBillingPanel({
   summary,
   isOwner,
   orgName,
+  organizationId,
+  groupId,
+  planAvailable = false,
+  planStarted = false,
 }: {
   summary: OrgBillingSummary;
   isOwner: boolean;
   orgName: string;
+  organizationId?: string;
+  groupId?: string;
+  planAvailable?: boolean;
+  planStarted?: boolean;
 }) {
   const { entitlements: e, quote, exemptReason } = summary;
 
@@ -78,9 +90,25 @@ export function PlanBillingPanel({
         {statusDetail && <p className="font-body text-sm text-steel mt-1">{statusDetail}</p>}
       </div>
 
+      {planStarted && e.state !== "active" && (
+        <p className="font-body text-sm text-chalk border border-positive/40 p-3" role="status">
+          Thanks. Your paid plan starts as soon as Stripe confirms the payment, usually within a minute. Refresh this page to see it.
+        </p>
+      )}
+
+      <div className="border border-steel/20 p-4">
+        <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">What Spotlight takes on client payments</p>
+        <FeeNotice currentPercent={platformFeePercent(e)} />
+        {isOwner && organizationId && canBuyCoachPlan(e) && (
+          <div className="mt-3">
+            <PlanUpgradeButton organizationId={organizationId} groupId={groupId ?? null} available={planAvailable} inTrial={e.state === "trial"} />
+          </div>
+        )}
+      </div>
+
       {!e.enforced && (
         <p className="font-body text-xs text-steel border-l-2 border-steel/40 pl-3">
-          Billing isn&apos;t switched on yet — nothing is charged and nothing is limited.
+          Billing isn&apos;t switched on yet: nothing is limited, and nothing is charged unless you choose the paid plan.
           {e.rawAccessLevel !== "full" || (!e.exempt && !e.rawOrgAddon)
             ? " This is what would apply once it is."
             : ""}
