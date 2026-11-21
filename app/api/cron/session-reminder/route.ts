@@ -4,7 +4,10 @@ import { sendPushToProfile } from "@/lib/send-push";
 import { dispatchSms } from "@/lib/sms-dispatch";
 import { formatInTimezone, timezoneForProfiles } from "@/lib/format-in-timezone";
 import { withCronRun } from "@/lib/cron-monitor";
-import { emailClientNotice, reminderEmail, shouldReleaseClaim, wasDelivered, type EmailOutcome } from "@/lib/client-notice-email";
+import { dayBeforeEmail, emailClientNotice, reminderEmail, shouldReleaseClaim, wasDelivered, type EmailOutcome } from "@/lib/client-notice-email";
+import { DAY_BEFORE_MIN_AHEAD_HOURS, dayBeforeDue, dayBeforeMessage, freeCancelUntil } from "@/lib/day-before-reminder";
+import { DEFAULT_CANCELLATION_WINDOW_HOURS } from "@/lib/cancel-window";
+import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 
 // acuity_replacement_gap_audit_sept16.md — the single clearest,
 // highest-value gap against Acuity: zero reminder/confirmation infra
@@ -111,7 +114,69 @@ async function handler(request: Request) {
     if (delivered) sent += 1;
   }
 
-  return NextResponse.json({ checked: upcoming?.length ?? 0, sent, smsSent, emailed, released });
+  const dayBefore = await dayBeforePass(supabase, now);
+  return NextResponse.json({ checked: upcoming?.length ?? 0, sent, smsSent, emailed, released, dayBefore });
+}
+
+// The day-before reminder (Ron, Nov 20, wave 2 C2), timed to each coach's cancel window (lib/day-before-reminder.ts). Same run, same channels: a phone alert first, an email when no phone was reached.
+// Claimed per start time before anything is sent (bookings.day_before_reminded_for = the start time), and given back when nothing was delivered (it is tried again until the cutoff).
+const DAY_BEFORE_LOOK_AHEAD_DAYS = 8;
+async function dayBeforePass(supabase: ReturnType<typeof createServiceRoleClient>, now: Date): Promise<{ checked: number; sent: number; emailed: number; released: number } | { error: string }> {
+  const { data: rows, error } = await supabase
+    .from("bookings")
+    .select("id, athlete_id, coach_id, group_id, start_at, created_at, day_before_reminded_for, profiles!bookings_coach_id_fkey ( full_name )")
+    .eq("status", "confirmed")
+    .gte("start_at", new Date(now.getTime() + DAY_BEFORE_MIN_AHEAD_HOURS * 3600000).toISOString())
+    .lte("start_at", new Date(now.getTime() + DAY_BEFORE_LOOK_AHEAD_DAYS * 86400000).toISOString())
+    .order("start_at")
+    .limit(2000);
+  // Before step 214 is applied the column is not there: nothing is sent, and the one-hour reminder above is unaffected.
+  if (error) return { error: "day-before reminders skipped: " + error.message };
+  type Row = { id: string; athlete_id: string; coach_id: string; group_id: string; start_at: string; created_at: string | null; day_before_reminded_for: string | null; profiles?: { full_name?: string | null } | null };
+  const bookings = (rows ?? []) as unknown as Row[];
+  const coachIds = [...new Set(bookings.map((b) => b.coach_id))];
+  const windowByCoach = new Map<string, number>();
+  for (let i = 0; i < coachIds.length; i += 100) {
+    const { data: policies } = await supabase.from("coach_booking_policies").select("coach_id, cancellation_window_hours").in("coach_id", coachIds.slice(i, i + 100));
+    for (const p of (policies ?? []) as { coach_id: string; cancellation_window_hours: number | null }[]) windowByCoach.set(p.coach_id, p.cancellation_window_hours ?? DEFAULT_CANCELLATION_WINDOW_HOURS);
+  }
+  let sent = 0;
+  let emailed = 0;
+  let released = 0;
+  const due = bookings.filter((b) =>
+    dayBeforeDue({ startAt: b.start_at, createdAt: b.created_at, remindedFor: b.day_before_reminded_for, windowHours: windowByCoach.get(b.coach_id) }, now)
+  );
+  for (const b of due) {
+    // One spelling of the time for every write below (the database compares the moment, not the text).
+    const startIso = new Date(b.start_at).toISOString();
+    // Claimed for this start time only if nobody has yet and the session has not moved since it was read.
+    const { data: claimed, error: claimError } = await supabase
+      .from("bookings")
+      .update({ day_before_reminded_for: startIso })
+      .eq("id", b.id)
+      .eq("status", "confirmed")
+      .eq("start_at", startIso)
+      .or(`day_before_reminded_for.is.null,day_before_reminded_for.neq.${startIso}`)
+      .select("id");
+    if (claimError || (claimed ?? []).length === 0) continue;
+    const timeZone = (await timezoneForProfiles(supabase, [b.athlete_id, b.coach_id])) ?? DEFAULT_COACH_TIMEZONE;
+    const message = dayBeforeMessage({ startAt: startIso, windowHours: windowByCoach.get(b.coach_id), coachName: b.profiles?.full_name, timeZone, now });
+    const count = await sendPushToProfile(supabase, b.athlete_id, message.title, message.body, `/groups/${b.group_id}/calendar`).catch(() => 0);
+    let email: EmailOutcome | null = null;
+    if (count === 0) {
+      const mail = dayBeforeEmail({ ...message, groupId: b.group_id });
+      email = await emailClientNotice(supabase, b.athlete_id, mail.subject, mail.text).catch(() => "failed" as EmailOutcome);
+      if (email === "sent") emailed += 1;
+    }
+    const delivered = wasDelivered({ pushCount: count, smsSent: false, email });
+    if (!delivered && now.getTime() < freeCancelUntil(startIso, windowByCoach.get(b.coach_id)).getTime()) {
+      await supabase.from("bookings").update({ day_before_reminded_for: null }).eq("id", b.id).eq("day_before_reminded_for", startIso);
+      released += 1;
+      continue;
+    }
+    if (delivered) sent += 1;
+  }
+  return { checked: due.length, sent, emailed, released };
 }
 
 export const GET = withCronRun("session-reminder", handler);

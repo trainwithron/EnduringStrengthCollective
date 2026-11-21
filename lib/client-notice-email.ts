@@ -24,6 +24,11 @@ export function reminderEmail(opts: { coachName: string | null | undefined; time
   };
 }
 
+/** The day-before reminder (lib/day-before-reminder.ts): the same line as the push, with a link to the calendar where Change has Cancel and Pick a different time. */
+export function dayBeforeEmail(opts: { title: string; body: string; groupId: string }): { subject: string; text: string } {
+  return { subject: opts.title, text: `${opts.body}\n\n${calendarLine(opts.groupId)}${ALERTS_LINE}\n` };
+}
+
 /** "Session confirmed: Mon, Oct 19 at 3:00 PM" */
 export function confirmationEmail(opts: { coachName: string | null | undefined; when: string; groupId: string }): { subject: string; text: string } {
   return {

@@ -7,6 +7,7 @@ import { PUSHED_BY_JOB, pushBodyFor, pushTitleFor, REQUEST_PUSH_TYPES, requestPu
 import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { isQuietNow, readPushPrefs } from "@/lib/push-prefs";
 import { noticeHref } from "@/lib/notice-links";
+import { emailNoticeBackup } from "@/lib/notice-email-backup";
 
 // Every five minutes: pushes the notices the DATABASE writes (a client's booking request, a late change, a schedule request, the decision on a request), which no other code path sends. Each notice is claimed
 // (marked pushed) before it is sent, so it goes out once; a notice older than a few hours is marked and not sent (it would only be noise). The person's quiet hours and private lock screen apply (sendPushToProfile).
@@ -55,6 +56,7 @@ async function handler(request: Request) {
   if (claimError) return NextResponse.json({ error: "Could not claim the notices." }, { status: 500 });
 
   let sent = 0;
+  let emailed = 0;
   type Claimed = { id: string; profile_id: string; group_id: string | null; type: string; body: string; link_path: string; created_at: string };
   const run = await runPool((claimed ?? []) as Claimed[], AT_ONCE, async (n) => {
     // A booking request carries Confirm and Decline on the notification itself (Ron, Nov 5); tapping it opens the Requests page at that request. A request to answer says who and when
@@ -62,7 +64,7 @@ async function handler(request: Request) {
     const requestId = n.type === "booking_request" ? await waitingRequestFor(db, n).catch(() => null) : null;
     const isRequest = (REQUEST_PUSH_TYPES as readonly string[]).includes(n.type);
     const line = isRequest ? await requestPushLine(db, n, zoneOf.get(n.profile_id) ?? DEFAULT_COACH_TIMEZONE) : pushBodyFor(n.type);
-    sent += await sendPushToProfile(
+    const reached = await sendPushToProfile(
       db,
       n.profile_id,
       pushTitleFor(n.type),
@@ -70,6 +72,10 @@ async function handler(request: Request) {
       noticeHref(n.type, n.link_path || "/dashboard", { id: n.id, groupId: n.group_id }),
       requestId ? { answer: { requestId } } : {}
     );
+    sent += reached;
+    // No phone was reached (no alerts turned on, or every phone gone): a request to answer, or the answer to a client's request, goes by email instead (wave 2 C3).
+    // An answer's email carries the database's own line (what was decided); a request's, who and when.
+    if (reached === 0 && (await emailNoticeBackup(db, n, isRequest ? line : n.body || line)) === "sent") emailed += 1;
   }, { deadlineMs: 90_000 });
   if (run.failed.length > 0) console.error(`notification-push: ${run.failed.length} pushes failed`);
 
@@ -80,7 +86,7 @@ async function handler(request: Request) {
     if (giveBackError) console.error("notification-push: could not give back unsent notices:", giveBackError.message);
   }
 
-  return NextResponse.json({ claimed: (claimed ?? []).length, sent, failed: run.failed.length, givenBack: unsent.length, deferred: candidates.length - ids.length });
+  return NextResponse.json({ claimed: (claimed ?? []).length, sent, emailed, failed: run.failed.length, givenBack: unsent.length, deferred: candidates.length - ids.length });
 }
 
 export const GET = withCronRun("notification-push", handler);
