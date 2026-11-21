@@ -16,13 +16,13 @@ export default function PricingPage() {
     <HelpShell title="Pricing" intro="What Spotlight costs a coach, and what it takes from your clients' payments.">
       <div className="space-y-8 max-w-[65ch]">
         <section>
-          <h2 className="font-display uppercase text-lg tracking-wide">The plan</h2>
+          <h2 className="font-body text-[15px] font-semibold">The plan</h2>
           <p className="font-body text-sm text-chalk mt-2">
             Every new coach starts with {TRIAL_DAYS / 7} weeks free, with no card. After that you choose: the free plan, or the paid plan at ${PLAN_PRICES_CENTS.base / 100} a month{coachPlanAvailable() ? "" : " (coming soon)"}. During the free weeks Spotlight&apos;s fee on client payments is the paid plan&apos;s {feePercentLabel(PAID_OR_TRIAL_FEE_PERCENT)}.
           </p>
         </section>
         <section>
-          <h2 className="font-display uppercase text-lg tracking-wide">Fees on your clients&apos; payments</h2>
+          <h2 className="font-body text-[15px] font-semibold">Fees on your clients&apos; payments</h2>
           <FeeNotice showPricingLink={false} className="mt-2 text-sm" />
         </section>
       </div>

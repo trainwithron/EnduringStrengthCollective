@@ -84,8 +84,8 @@ export function PlanBillingPanel({
 
   return (
     <div className="max-w-[64ch] space-y-5">
-      <div className="border border-steel/20 p-4">
-        <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">{orgName}</p>
+      <div className="bg-surface rounded-card p-4">
+        <p className="font-body text-[13px] font-semibold text-steel mb-1">{orgName}</p>
         <p className="font-display text-2xl uppercase leading-tight">{statusLine}</p>
         {statusDetail && <p className="font-body text-sm text-steel mt-1">{statusDetail}</p>}
       </div>
@@ -96,8 +96,8 @@ export function PlanBillingPanel({
         </p>
       )}
 
-      <div className="border border-steel/20 p-4">
-        <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">What Spotlight takes on client payments</p>
+      <div className="bg-surface rounded-card p-4">
+        <p className="font-body text-[13px] font-semibold text-steel mb-2">What Spotlight takes on client payments</p>
         <FeeNotice currentPercent={platformFeePercent(e)} />
         {isOwner && organizationId && canBuyCoachPlan(e) && (
           <div className="mt-3">
@@ -116,8 +116,8 @@ export function PlanBillingPanel({
       )}
 
       {showQuote && (
-        <div className="border border-steel/20 p-4">
-          <p className="font-body text-xs text-steel uppercase tracking-wide mb-3">
+        <div className="bg-surface rounded-card p-4">
+          <p className="font-body text-[13px] font-semibold text-steel mb-3">
             Your plan at your current size
           </p>
           <div className="space-y-2">
@@ -145,8 +145,8 @@ export function PlanBillingPanel({
         </div>
       )}
 
-      <div className="border border-steel/20 p-4">
-        <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">Usage</p>
+      <div className="bg-surface rounded-card p-4">
+        <p className="font-body text-[13px] font-semibold text-steel mb-2">Usage</p>
         <div className="grid grid-cols-2 gap-4">
           <div>
             <p className="font-display text-2xl tabular-nums">{quote.clients}</p>

@@ -31,7 +31,7 @@ export function breakEvenLabel(): string {
   return `$${dollars.toLocaleString("en-US")}`;
 }
 
-// What a coach pays, in plain words, wherever they set up payments, on Plan & Billing and on the public pricing page (DRAFT wording: Ron approves the final copy).
+// What a coach pays, in plain words, wherever they set up payments, on Plan & Billing and on the public pricing page (wording approved by Ron, Nov 20).
 export const FEE_NOTICE_LINES: string[] = [
   `Free plan: Spotlight takes ${feePercentLabel(FREE_TIER_FEE_PERCENT)} of each client payment, plus Stripe's own fee.`,
   `Paid plan ($${PLAN_PRICES_CENTS.base / 100}/mo): ${feePercentLabel(PAID_OR_TRIAL_FEE_PERCENT)}.`,
