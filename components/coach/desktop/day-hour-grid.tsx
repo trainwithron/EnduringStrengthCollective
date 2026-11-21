@@ -36,6 +36,15 @@ export interface GridBlocked {
   label: string;
 }
 
+// A session the client cancelled (Ron, Nov 21): drawn dimmed and struck through at its time, under everything else, and never in the way: a tap goes through it to the time
+// (which is open again).
+export interface GridCanceled {
+  id: string;
+  start: Date;
+  end: Date;
+  label: string; // "Hewan · Client canceled · Charged"
+}
+
 export interface GridEvent {
   id: string;
   time: string | null; // "HH:MM:SS", null = no specific time (not shown on the grid)
@@ -87,6 +96,7 @@ export function DayHourGrid({
   bookings,
   events,
   blocked = [],
+  canceled = [],
   timeZone,
   onPickTime,
 }: {
@@ -94,6 +104,7 @@ export function DayHourGrid({
   bookings: GridBooking[];
   events: GridEvent[];
   blocked?: GridBlocked[];
+  canceled?: GridCanceled[];
   timeZone?: string;
   onPickTime?: (time: string) => void;
 }) {
@@ -106,6 +117,7 @@ export function DayHourGrid({
     ...bookings.flatMap((b) => [dateToMinutes(b.start, timeZone), dateToMinutes(b.end, timeZone)]),
     ...timedEvents.map((e) => timeStrToMinutes(e.time)),
     ...blocked.flatMap((b) => [dateToMinutes(b.start, timeZone), dateToMinutes(b.end, timeZone)]),
+    ...canceled.flatMap((b) => [dateToMinutes(b.start, timeZone), dateToMinutes(b.end, timeZone)]),
   ];
 
   const rangeStart =
@@ -189,6 +201,23 @@ export function DayHourGrid({
             >
               <p className="font-body text-xs leading-tight truncate">
                 {formatMinutes(start)} · {b.label}
+              </p>
+            </div>
+          );
+        })}
+
+        {canceled.map((b) => {
+          const start = dateToMinutes(b.start, timeZone);
+          const end = dateToMinutes(b.end, timeZone);
+          return (
+            <div
+              key={`canceled-${b.id}`}
+              className="absolute left-1 right-1 border border-dashed border-steel/50 text-steel px-2 py-0.5 overflow-hidden pointer-events-none"
+              style={blockBox(start, end, rangeStart)}
+              data-canceled-session
+            >
+              <p className="font-body text-xs leading-tight truncate">
+                <span className="line-through">{formatMinutes(start)}</span> · {b.label}
               </p>
             </div>
           );

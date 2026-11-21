@@ -41,10 +41,22 @@ interface DotItem {
   dotClass: string;
   badge?: string;
   deleteId?: string;
+  // a session the client cancelled: struck through, opens its day page (details, Charge or Waive)
+  canceledHref?: string;
+}
+
+// A session the client cancelled (Ron, Nov 21): it stays on the calendar, struck through with "Client canceled" and its late-cancel state, never blocking the time or counting.
+export interface CanceledEntry {
+  id: string;
+  time: string;
+  name: string;
+  line: string; // "Client canceled · Charged"
+  startMs: number;
 }
 
 const DOT_WORKOUT = "bg-positive";
 const DOT_BOOKING = "bg-blue-400";
+const DOT_CANCELED = "border border-steel/70 bg-transparent";
 const DOT_SUGGESTION = "bg-yellow-500";
 const DOT_CUSTOM_GLOW =
   "bg-rust shadow-[0_0_5px_rgb(var(--rust)/0.7)]";
@@ -59,6 +71,7 @@ export function CalendarGrid({
   cellKeys,
   todayKey,
   bookingsByDateKey,
+  canceledByDateKey = new Map(),
   eventsByDateKey,
   workoutsByDateKey,
   availabilityWindows,
@@ -76,6 +89,8 @@ export function CalendarGrid({
   cellKeys: (string | null)[];
   todayKey: string;
   bookingsByDateKey: Map<string, { time: string; name: string; startMs?: number; endMs?: number; bookingId?: string; seriesId?: string | null }[]>;
+  // client-cancelled sessions, shown and never blocking (a separate list from the sessions above, which block times)
+  canceledByDateKey?: Map<string, CanceledEntry[]>;
   eventsByDateKey: Map<string, CalendarEventEntry[]>;
   // Every program's computed workout for this date, across the whole
   // group — the overlay that makes this the coach's one real calendar
@@ -163,6 +178,13 @@ export function CalendarGrid({
         time: b.time,
         label: b.name,
         dotClass: DOT_BOOKING,
+      })),
+      ...(canceledByDateKey.get(key) ?? []).map((c) => ({
+        key: `c-${c.id}`,
+        time: c.time,
+        label: `${c.name}: ${c.line}`,
+        dotClass: DOT_CANCELED,
+        canceledHref: `${dayHref(key)}#canceled-${c.id}`,
       })),
       ...events.map((e) => ({
         key: e.id,
@@ -263,11 +285,25 @@ export function CalendarGrid({
                 {/* Sessions and calendar events in one list by time (Ron, Nov 19: a 5 PM consult sat under a 7 PM session); an event with no time comes last. */}
                 {[
                   ...bookingsShown.map((b, idx) => ({ kind: "booking" as const, b, idx, min: b.startMs != null ? minutesOfDayInZone(new Date(b.startMs), timezone) : Number.MAX_SAFE_INTEGER })),
+                  ...(canceledByDateKey.get(key) ?? []).map((c) => ({ kind: "canceled" as const, c, min: minutesOfDayInZone(new Date(c.startMs), timezone) })),
                   ...events.map((e) => ({ kind: "event" as const, e, min: e.clock ? parseClockMinutes(e.clock) : Number.MAX_SAFE_INTEGER })),
                 ]
                   .sort((x, y) => x.min - y.min)
                   .map((row) =>
-                    row.kind === "booking" ? (
+                    row.kind === "canceled" ? (
+                  <a
+                    key={`c-${row.c.id}`}
+                    href={`${dayHref(key)}#canceled-${row.c.id}`}
+                    onClick={(evt) => evt.stopPropagation()}
+                    className="font-body text-xs leading-tight text-steel"
+                    data-canceled-session
+                  >
+                    <span className="line-through">
+                      {row.c.time} &middot; {row.c.name}
+                    </span>
+                    <span className="block">{row.c.line}</span>
+                  </a>
+                    ) : row.kind === "booking" ? (
                   <span
                     key={`b-${row.idx}`}
                     className="font-body text-xs text-chalk leading-tight"
@@ -303,7 +339,7 @@ export function CalendarGrid({
                     )
                   )}
 
-                {bookings.length === 0 && events.length === 0 && (
+                {bookings.length === 0 && events.length === 0 && (canceledByDateKey.get(key) ?? []).length === 0 && (
                   <span className="font-body text-xs text-steel">No sessions</span>
                 )}
               </>
@@ -356,7 +392,13 @@ export function CalendarGrid({
                   <div key={item.key} className="flex items-center gap-3 py-1.5 group/row">
                     <span className="font-mono text-xs text-steel w-12 shrink-0">{item.time ?? ""}</span>
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${item.dotClass}`} />
-                    <span className="font-body text-sm text-chalk flex-1 truncate">{item.label}</span>
+                    {item.canceledHref ? (
+                      <a href={item.canceledHref} className="font-body text-sm text-steel flex-1 truncate" data-canceled-session>
+                        <span className="line-through">{item.label.split(": ")[0]}</span>: {item.label.split(": ").slice(1).join(": ")}
+                      </a>
+                    ) : (
+                      <span className="font-body text-sm text-chalk flex-1 truncate">{item.label}</span>
+                    )}
                     {item.badge && (
                       <span className="font-mono text-xs px-1.5 py-0.5 rounded-token-pill bg-rust/15 text-rust-ink shrink-0">{item.badge}</span>
                     )}
