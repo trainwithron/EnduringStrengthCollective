@@ -42,7 +42,8 @@ describe("Bulk edit reads what was typed, and a blank never clears by accident",
     expect(parseBulkValue("rest", "  ")).toEqual({ ok: true, blank: true, value: null });
   });
   it("other fields as before", () => {
-    expect(parseBulkValue("weight", "135")).toEqual({ ok: true, blank: false, value: 135 });
+    // (a weight also says it is not a percent of max, wave 2 T3)
+    expect(parseBulkValue("weight", "135")).toEqual({ ok: true, blank: false, value: 135, pctMax: null });
     expect(parseBulkValue("weight", "x")).toMatchObject({ ok: false });
     expect(parseBulkValue("tempo", " 3010 ")).toEqual({ ok: true, blank: false, value: "3010" });
   });
@@ -67,7 +68,8 @@ describe("the builder and the AI keep the rest", () => {
     expect(read("components/coach/desktop/week-grid.tsx")).toContain("update.addedField && !item.trackedFields.includes(update.field)");
   });
   it("the box is a text box for a time, reads it before writing, refuses what it cannot read and asks before clearing", () => {
-    expect(panel).toContain('field !== "rest" && field !== "time" ? "number" : "text"');
+    // (and for a weight, which takes 75% too: wave 2 T3)
+    expect(panel).toContain('field !== "rest" && field !== "time" && field !== "weight" ? "number" : "text"');
     expect(panel).toContain("parseBulkValue(field, entry.raw)");
     expect(panel).toContain("Clear ${fieldDef(field).label} on every set?");
     expect(panel).toContain("Type a value to apply.");
