@@ -41,6 +41,7 @@ import { caloriesProteinLine, starFromChoice } from "@/lib/starred-meals";
 import { AiOutputWrongButton } from "@/components/coach/ai-output-wrong-button";
 import { AiUsageMeter } from "@/components/coach/ai-usage-meter";
 import { readAiJson } from "@/lib/ai-fetch";
+import { REBUILD_WITH_REQUESTS_EVENT, type RebuildWithRequests } from "@/lib/meal-plan-rebuild";
 
 type DayView = "daily" | "train" | "rest";
 
@@ -192,12 +193,12 @@ export function MealPlanGenerator({
     return libraryDietFor(effectiveRules.dietType, recipeArchetype);
   }
 
-  function selectionCtx(recipeArchetype: string, excludeKeys?: Set<string>): SelectionContext {
+  function selectionCtx(recipeArchetype: string, excludeKeys?: Set<string>, favorites: string = favoriteFoods): SelectionContext {
     return buildSelectionContext({
       libraryData,
       rules: effectiveRules,
       archetype: recipeArchetype,
-      extraLikes: [...typedRules.likes, ...favoriteFoods.split(/[,/]/).map((x) => x.trim()).filter(Boolean)],
+      extraLikes: [...typedRules.likes, ...favorites.split(/[,/]/).map((x) => x.trim()).filter(Boolean)],
       excludeKeys,
     });
   }
@@ -216,7 +217,8 @@ export function MealPlanGenerator({
     return Object.fromEntries([...most].map(([id, n]) => [id, Array.from({ length: n }, (_, i) => i)]));
   };
 
-  function handleGenerate() {
+  // `favorites`: the requests to build with when they come from outside the box (the client's answers' "Rebuild with their requests"), since the box's own value is set in the same moment.
+  function handleGenerate(favorites: string = favoriteFoods) {
     setError(null);
     if (!rulesReadable) {
       setError(RULES_UNREADABLE);
@@ -239,7 +241,7 @@ export function MealPlanGenerator({
     setLeftOutForRules(0);
     const nMeals = parseInt(mealCount, 10) || 4;
     const isCycling = carbCycling && recipeArchetype !== "carnivore";
-    const ctx = selectionCtx(recipeArchetype);
+    const ctx = selectionCtx(recipeArchetype, undefined, favorites);
 
     let views: Record<DayView, GeneratedMeal[]>;
     if (isCycling) {
@@ -256,7 +258,7 @@ export function MealPlanGenerator({
     }
     setMealsByView(views);
 
-    const flex = matchFlexTreat(favoriteFoods, recipeArchetype);
+    const flex = matchFlexTreat(favorites, recipeArchetype);
     setFlexTreatText(
       flex
         ? `Requested ${flex.treat.name} (~${flex.treat.cals} kcal). Weekly buffer: trim ~${flex.dailyTrimCalories} kcal/day on the other 6 days. Same-day swap: drop ${flex.sameDayCarbDrop}g carbs and ${flex.sameDayFatDrop}g fat that day instead, keeping protein locked in.`
@@ -264,6 +266,22 @@ export function MealPlanGenerator({
     );
     setSelections(allOptionsSelected(views.daily, views.train, views.rest));
   }
+
+  // "Rebuild with their requests" in the client's answers (audit, Nov 21): their requests go into Favorite foods / specific requests and the plan is built again at once, the same build as
+  // Generate meal plan (from the library, no AI). Nothing is saved until the coach saves it. The latest handleGenerate is kept in a ref so the listener never builds from old values.
+  const generateRef = useRef(handleGenerate);
+  generateRef.current = handleGenerate;
+  useEffect(() => {
+    const onRebuild = (e: Event) => {
+      const requests = ((e as CustomEvent<RebuildWithRequests>).detail?.requests ?? "").trim();
+      if (requests) setFavoriteFoods(requests);
+      generateRef.current(requests || undefined);
+      // the results show on the next render
+      setTimeout(() => resultsRef.current?.scrollIntoView({ block: "start" }), 80);
+    };
+    window.addEventListener(REBUILD_WITH_REQUESTS_EVENT, onRebuild);
+    return () => window.removeEventListener(REBUILD_WITH_REQUESTS_EVENT, onRebuild);
+  }, []);
 
   // The standing target as whole numbers for the plan: protein, carbs and fat as set, or (calories only) split from the latest weight and the diet, as the check-in splits them.
   function targetMacros(): MacroTargets | null {
@@ -922,7 +940,7 @@ export function MealPlanGenerator({
 
       <button
         type="button"
-        onClick={handleGenerate}
+        onClick={() => handleGenerate()}
         disabled={!rulesReadable}
         className="min-h-11 px-5 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
       >

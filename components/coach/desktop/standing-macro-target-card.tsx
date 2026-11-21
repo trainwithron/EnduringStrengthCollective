@@ -1,7 +1,7 @@
 "use client";
 
 import { confirmDialog } from "@/components/shared/confirm-dialog";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -10,6 +10,8 @@ import { applyStandingTarget, scheduledConfirmMessage, type ApplyPlan } from "@/
 import { shortDateLabel } from "@/lib/apply-from";
 import { CalorieFloorWarning } from "@/components/coach/nutrition/calorie-floor-warning";
 import { ApplyOutcomeNotice } from "@/components/coach/nutrition/apply-outcome-notice";
+
+export const CALCULATE_TARGETS_ANCHOR = "calculate-targets";
 import { macroAutofill, type MacroKey } from "@/lib/macro-autofill";
 import { autoFieldProps, MacroMismatchLine, WorkedOutTag } from "@/components/coach/nutrition/macro-autofill-bits";
 import { MacroCalculator, type CalculatedMacros } from "@/components/tools/macro-calculator";
@@ -92,6 +94,20 @@ export function StandingMacroTargetCard({
   // What the last save really did (days that still use their own target or a meal plan, and whether today changed).
   const [outcome, setOutcome] = useState<{ plan: ApplyPlan; target: Target } | null>(null);
   const [calcOpen, setCalcOpen] = useState(false);
+  const calcRef = useRef<HTMLDivElement>(null);
+  // Ask Spot's "{name}'s macro calculator" links here (#calculate-targets, audit Nov 21): the Targets section around it opens, the calculator opens, and it comes into view.
+  useEffect(() => {
+    const openIfAsked = () => {
+      if (window.location.hash !== `#${CALCULATE_TARGETS_ANCHOR}` || !calcRef.current) return;
+      const fold = calcRef.current.closest("details");
+      if (fold && !fold.open) fold.open = true;
+      setCalcOpen(true);
+      calcRef.current.scrollIntoView({ block: "start" });
+    };
+    openIfAsked();
+    window.addEventListener("hashchange", openIfAsked);
+    return () => window.removeEventListener("hashchange", openIfAsked);
+  }, []);
 
   function applyCalculated(m: CalculatedMacros) {
     setDraft({ calories: String(m.calories), proteinG: String(m.protein), carbsG: String(m.carbs), fatG: String(m.fats) });
@@ -204,7 +220,7 @@ export function StandingMacroTargetCard({
       </p>
 
       {calculator && (
-        <div className="mt-3 border border-steel/20" data-target-calculator>
+        <div ref={calcRef} id={CALCULATE_TARGETS_ANCHOR} className="mt-3 border border-steel/20 scroll-mt-24" data-target-calculator>
           <button type="button" onClick={() => setCalcOpen((v) => !v)} aria-expanded={calcOpen} className="w-full flex items-center justify-between gap-3 h-11 px-3 text-left">
             <span className="font-body text-sm text-chalk">Calculate targets</span>
             <span className="font-body text-xs text-steel">{calcOpen ? "▾" : "▸"}</span>

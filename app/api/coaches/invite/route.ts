@@ -112,7 +112,10 @@ export async function POST(request: Request) {
       subject: `${orgRow?.name ?? "An organization"} invited you to join`,
     });
     // Same shape as the new-address answer below: whether the email went out, never whether the address has an account. (A failed email is told to the person who invited, so they can send it again.)
-    return NextResponse.json({ invited: true, emailed: sent.emailed });
+    // When the email did not go, the invitation comes back (`unsentId`, the same key on every path, so it never tells which kind of address this was) and the form offers Send again and Copy
+    // link right there (audit, Nov 21).
+    const unsent = sent.emailed ? {} : { unsentId: invite.id };
+    return NextResponse.json({ invited: true, emailed: sent.emailed, ...unsent });
   }
   const origin = appOrigin(request);
 
@@ -156,7 +159,8 @@ export async function POST(request: Request) {
     const { error: frontDeskError } = await serviceRole.from("org_front_desk").insert({ organization_id: group.organization_id, profile_id: newUserId, added_by: user.id });
     if (frontDeskError && frontDeskError.code !== "23505") return fail("Couldn't add them to the front desk. Try again.");
     const emailedDesk = await emailTheInvite();
-    return NextResponse.json({ invited: true, emailed: emailedDesk });
+    const unsentDesk = emailedDesk ? {} : { unsentId: newUserId };
+    return NextResponse.json({ invited: true, emailed: emailedDesk, ...unsentDesk });
   }
 
   const { error: groupMembershipError } = await serviceRole
@@ -170,5 +174,6 @@ export async function POST(request: Request) {
   if (orgMembershipError && orgMembershipError.code !== "23505") return fail("Couldn't add them to the organization. Try again.");
 
   const emailed = await emailTheInvite();
-  return NextResponse.json({ invited: true, emailed });
+  const unsent = emailed ? {} : { unsentId: newUserId };
+  return NextResponse.json({ invited: true, emailed, ...unsent });
 }

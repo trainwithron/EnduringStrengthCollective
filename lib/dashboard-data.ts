@@ -19,6 +19,7 @@ import { ratesByMembership } from "@/lib/client-rates";
 import { readRowsByIds } from "@/lib/read-by-ids";
 import { pageAll } from "@/lib/page-all";
 import { prShoutout } from "@/lib/pr-wording";
+import { PULSE_ATTENTION_HREF } from "@/lib/home-greeting";
 
 export interface DashboardGroupInfo {
   id: string;
@@ -47,6 +48,8 @@ export interface StatTileValue {
   key: string;
   label: string;
   display: string;
+  // Where the number opens, when it is a list on Home (the Pulse "need attention" list).
+  href?: string;
 }
 export interface StatTileDef {
   key: "clients" | "active" | "attention" | "mrr" | "income";
@@ -670,7 +673,7 @@ export async function getCoachDashboardData(
       values: withOverride("clients", [
         { key: "current", label: "Clients", display: String(athletes.length) },
         { key: "new_this_month", label: "New this month", display: String(newThisMonthCount) },
-        { key: "at_risk", label: "At-risk clients", display: String(needsAttentionCount) },
+        { key: "at_risk", label: "At-risk clients", display: String(needsAttentionCount), href: PULSE_ATTENTION_HREF },
       ]),
     },
     {
@@ -684,7 +687,7 @@ export async function getCoachDashboardData(
     {
       key: "attention",
       values: withOverride("attention", [
-        { key: "current", label: "Need attention", display: String(needsAttentionCount) },
+        { key: "current", label: "Need attention", display: String(needsAttentionCount), href: PULSE_ATTENTION_HREF },
         { key: "mild", label: "Mild tier", display: String(mildTierCount) },
         { key: "strong", label: "Strong tier", display: String(strongTierCount) },
       ]),

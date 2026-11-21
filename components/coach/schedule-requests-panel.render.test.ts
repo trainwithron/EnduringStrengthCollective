@@ -5,6 +5,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 vi.mock("@/lib/supabase/client", () => ({ createBrowserClient: () => ({}) }));
 
 import { ScheduleRequestCard, type ScheduleRequestCardData } from "./schedule-requests-panel";
+import { buildOfferPauseOrFreezeDraft } from "@/lib/schedule-request-drafts";
+// a drafted-message link opens the conversation through the app's router
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => {}, refresh: () => {} }) }));
 
 const NOW = new Date("2026-10-13T16:00:00Z"); // Oct 13, noon in New York
 const data = (patch: Partial<ScheduleRequestCardData> = {}): ScheduleRequestCardData => ({
@@ -37,7 +40,8 @@ describe("the coach's card for a schedule request", () => {
     expect(h).toContain(">Done<");
     expect(h).toContain("Mark handled");
     expect(h).not.toMatch(/decline/i);
-    expect(h).toContain("/groups/g1/messages/a1?draft=");
+    // a drafted-message link: the plain conversation, the draft kept in the tab when pressed (review, Nov 21)
+    expect(h).toContain('data-message-draft="true" href="/groups/g1/messages/a1"');
   });
   it("before its day Done is not offered: it says the request applies on its own after that day", () => {
     const h = render(data({ effectiveOn: "2026-10-20" }));
@@ -47,13 +51,16 @@ describe("the coach's card for a schedule request", () => {
   it("a cancel also offers a pause or freeze instead, as a draft the coach sends", () => {
     const h = render(data({ kind: "cancel" }));
     expect(h).toContain("Offer pause or freeze");
-    expect(decodeURIComponent(h.split("Offer pause or freeze")[0].split('href="').pop() ?? "")).toContain("would a pause or a freeze fit better");
+    // the draft opens in the box by its key (the words are kept in the tab, never in the address: review, Nov 21)
+    expect(buildOfferPauseOrFreezeDraft("Sam")).toContain("would a pause or a freeze fit better");
+    expect(h.split("Offer pause or freeze")[0].split('href="').pop()).toBe('/groups/g1/messages/a1">');
     expect(render(data())).not.toContain("Offer pause or freeze");
   });
   it("the drafts open in the message box; nothing is sent from here, and the draft never contains the note", () => {
     const h = render(data({ note: "my husband is ill" }));
     const hrefs = [...h.matchAll(/href="([^"]+)"/g)].map((m) => decodeURIComponent(m[1])).join(" ");
-    expect(hrefs).toContain("/messages/a1?draft=");
+    expect(hrefs).toContain("/messages/a1");
+    expect(hrefs).not.toContain("draft=");
     expect(hrefs).not.toMatch(/husband/);
     // the only place the note appears is the quoted line
     expect(h.split("my husband is ill").length).toBe(2);

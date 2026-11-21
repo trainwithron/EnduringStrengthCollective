@@ -77,8 +77,8 @@ const COACH_DESKTOP: [string, string][] = [
   ["build a new program", "/groups/g1/programs/new"],
   ["create a program", "/groups/g1/programs/new"],
   ["new program", "/groups/g1/programs/new"],
-  ["import a program", "/groups/g1/programs/import"],
-  ["upload a program", "/groups/g1/programs/import"],
+  ["import a program", "/groups/g1/programs?import=1"],
+  ["upload a program", "/groups/g1/programs?import=1"],
   ["exercise library", "/groups/g1/exercise-library"],
   ["add an exercise", "/groups/g1/exercise-library"],
   ["my exercises", "/groups/g1/exercise-library"],
@@ -161,7 +161,7 @@ const COACH_DESKTOP: [string, string][] = [
   ["i want to see my programs", "/groups/g1/programs"],
   ["where do i set my availability", "/calendar?tab=availability"],
   ["how do i send an announcement", "/groups/g1/messages/announce"],
-  ["how do i add a client", "/groups/g1/clients"],
+  ["how do i add a client", "/clients?add=1"],
   ["how do i assign sessions", "/groups/g1/clients"],
   ["how do i set a balance to 0", "/groups/g1/clients"],
   ["how do i mark a session attended", "/groups/g1/calendar"],
@@ -188,7 +188,6 @@ const COACH_PHONE: [string, string][] = [
   ["programs", "/groups/g1/programs"],
   ["nutrition", "/groups/g1/nutrition"],
   ["macros", "/groups/g1/nutrition"],
-  ["records", "/groups/g1/records"],
   ["team feed", "/groups/g1/feed"],
   ["settings", "/groups/g1/settings"],
   ["see all notifications", "/notifications"],
@@ -198,13 +197,11 @@ const COACH_PHONE: [string, string][] = [
   ["open jordan's profile", "/groups/g1/athletes/a-jordan"],
   ["go to sam lee", "/groups/g1/athletes/a-sam"],
   ["log a session for jordan", "/groups/g1/athletes/a-jordan/log"],
-  ["jordan's workout history", "/groups/g1/athletes/a-jordan/history"],
+  ["jordan's workout history", "/groups/g1/athletes/a-jordan"],
   ["show me the 1rm calculator", "/groups/g1/tools/one-rep-max"],
   ["macro calculator", "/groups/g1/nutrition"],
   ["recipes", "/groups/g1/nutrition?tab=favorites"],
-  ["challenges", "/groups/g1/challenges"],
   ["video check ins", "/groups/g1/video-checkins"],
-  ["pro shop", "/groups/g1/resources"],
   ["find a coach", "/find-a-coach"],
   ["can you take me to the clients page", "/groups/g1/clients"],
   ["i want to see my calendar", "/groups/g1/calendar"],
@@ -490,7 +487,7 @@ describe("a named client: the place is asked as a question, never a silent jump"
   });
   it("a client with no program known opens their profile, where the program is", () => {
     const r = resolveNavigation("pull up Alice's program", ctx);
-    expect(r.kind === "navigate" && r.chips[0].href).toBe("/groups/g1/athletes/c-alice");
+    expect(r.kind === "navigate" && r.chips[0].href).toBe("/groups/g1/athletes/c-alice?tab=program");
   });
   it("each place a coach asks for: calendar, nutrition, messages, history, goals, balance", () => {
     const href = (m: string) => {
@@ -502,7 +499,7 @@ describe("a named client: the place is asked as a question, never a silent jump"
     expect(href("open Johann's messages")).toBe("/groups/g9/messages/c-johann");
     expect(href("Karina's workout history")).toBe("/groups/g2/athletes/c-karina/history");
     expect(href("Karina's goals")).toBe("/groups/g2/athletes/c-karina");
-    expect(href("Karina's session balance")).toBe("/groups/g2/athletes/c-karina");
+    expect(href("Karina's session balance")).toBe("/groups/g2/athletes/c-karina?tab=settings#add-sessions");
   });
   it("a name said loosely still finds the person: a first name, a slip, a nickname", () => {
     for (const m of ["pull up Johan's program", "johann program", "show Johan Gorsik's program"]) {

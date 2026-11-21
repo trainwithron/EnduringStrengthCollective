@@ -6,6 +6,7 @@ import { sendDirectMessage, sendVoiceNote } from "@/lib/direct-message-send";
 import { attachVisibleReader } from "@/lib/visible-read";
 import { VoiceNotePlayer } from "@/components/messages/voice-note-player";
 import { VoiceNoteRecorder } from "@/components/messages/voice-note-recorder";
+import { initialDraftText, isDraftKey, readDraft } from "@/lib/message-draft";
 
 interface MessageRow {
   id: string;
@@ -40,11 +41,19 @@ export function DirectMessageThread({
   otherName: string;
   initialMessages: MessageRow[];
   fixedComposer?: boolean;
-  // A draft the coach opens the thread with (for example the expiry check-in): shown in the box to edit, never sent by itself.
+  // A draft the coach opens the thread with (for example the expiry check-in): shown in the box to edit, never sent by itself. Usually a key (?draft=md-…) whose words this tab kept when
+  // the link was pressed (lib/message-draft.ts), so the words never ride in the address; an older link's words as they are.
   initialDraft?: string;
 }) {
   const [messages, setMessages] = useState<MessageRow[]>(initialMessages);
-  const [body, setBody] = useState(initialDraft);
+  const [body, setBody] = useState(() => initialDraftText(initialDraft));
+
+  // A key: the words are read from this tab once the page is in the browser; none kept (another tab, storage blocked) leaves the box empty.
+  useEffect(() => {
+    if (!isDraftKey(initialDraft)) return;
+    const words = readDraft(initialDraft);
+    if (words) setBody((current) => current || words);
+  }, [initialDraft]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
@@ -127,7 +136,9 @@ export function DirectMessageThread({
 
   return (
     <div className="flex flex-col h-full">
-      <div className={`flex-1 overflow-y-auto space-y-3 px-5 py-4 ${fixedComposer ? "pb-24" : ""}`}>
+      {/* With the composer fixed above the bottom bar (4.75rem bar + about 4.25rem composer), the newest message must clear both: room below the list, and the end marker keeps that much
+          margin when it is scrolled to (audit, Nov 21: at 375px the newest message sat behind the box). */}
+      <div className={`flex-1 overflow-y-auto space-y-3 px-5 py-4 ${fixedComposer ? "pb-[calc(9.75rem+env(safe-area-inset-bottom))]" : ""}`}>
         {messages.length === 0 && (
           <p className="font-body text-sm text-steel text-center mt-8">
             No messages yet — say hello to {otherName}.
@@ -148,7 +159,7 @@ export function DirectMessageThread({
             </div>
           );
         })}
-        <div ref={bottomRef} />
+        <div ref={bottomRef} className={fixedComposer ? "scroll-mb-[calc(9.75rem+env(safe-area-inset-bottom))]" : undefined} />
       </div>
 
       {error && (

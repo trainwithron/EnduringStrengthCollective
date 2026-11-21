@@ -1,6 +1,16 @@
 import { createServerClient } from "@/lib/supabase/server";
 import { formatInTimezone } from "@/lib/format-in-timezone";
+import Link from "next/link";
 import { chunk } from "@/lib/chunk";
+import { addSessionsHref } from "@/lib/add-sessions-link";
+import { OpenStripeButton } from "@/components/coach/open-stripe-button";
+import { DraftMessageLink } from "@/components/messages/draft-message-link";
+
+// A short note for a client whose card failed, opened in the message box for the coach to edit and send (audit, Nov 21).
+export function failedCardDraft(firstName: string): string {
+  const name = firstName.trim() || "there";
+  return `Hi ${name}, a quick heads-up: your last card payment didn't go through. Could you update your card when you get a chance? Thanks!`;
+}
 
 const LABEL: Record<string, string> = {
   payment_failed: "Payment failed",
@@ -22,6 +32,7 @@ const TABLE_MISSING = new Set(["42P01", "PGRST205"]);
 interface EventRow {
   id: string;
   kind: string;
+  group_id: string | null;
   athlete_id: string | null;
   amount_cents: number | null;
   total_cents: number | null;
@@ -44,7 +55,7 @@ export async function PaymentProblemsSection({ groupIds, timezone }: { groupIds:
   for (let i = 0; i < groups.length; i += 4) {
     const results = await Promise.all(
       groups.slice(i, i + 4).map((g) =>
-        supabase.from("payment_events").select("id, kind, athlete_id, amount_cents, total_cents, currency, detail, created_at").in("group_id", g).gte("created_at", since).order("created_at", { ascending: false }).limit(LIMIT)
+        supabase.from("payment_events").select("id, kind, group_id, athlete_id, amount_cents, total_cents, currency, detail, created_at").in("group_id", g).gte("created_at", since).order("created_at", { ascending: false }).limit(LIMIT)
       )
     );
     for (const r of results) {
@@ -75,11 +86,23 @@ export async function PaymentProblemsSection({ groupIds, timezone }: { groupIds:
     <section aria-label="Payment problems" className="mb-8">
       <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">Payment problems, last 90 days</h2>
       <ul className="border border-steel/20 divide-y divide-steel/15">
-        {shown.map((e) => (
+        {shown.map((e) => {
+          const name = e.athlete_id && !peopleError ? names.get(e.athlete_id) ?? null : null;
+          const first = name ? name.trim().split(/\s+/)[0] ?? "" : "";
+          // Who it is about, where they are: the name opens their profile, and each kind gets its next step right on the row (audit, Nov 21).
+          const client = e.athlete_id && e.group_id ? { groupId: e.group_id, athleteId: e.athlete_id } : null;
+          return (
           <li key={e.id} className="p-3 font-body text-sm">
             <p className="text-chalk">
               <strong>{LABEL[e.kind] ?? e.kind}</strong>
-              {e.athlete_id ? ` · ${peopleError ? "A client" : names.get(e.athlete_id) ?? "A client"}` : ""}
+              {e.athlete_id ? " · " : ""}
+              {e.athlete_id && client ? (
+                <Link prefetch={false} href={`/groups/${client.groupId}/athletes/${client.athleteId}`} className="underline underline-offset-2 hover:text-rust-ink">
+                  {name ?? "A client"}
+                </Link>
+              ) : e.athlete_id ? (
+                name ?? "A client"
+              ) : null}
               {money(e.amount_cents, e.currency) ? ` · ${money(e.amount_cents, e.currency)}` : ""}
               {e.kind === "refund" && e.total_cents != null && e.total_cents !== e.amount_cents ? ` (${money(e.total_cents, e.currency)} refunded in total)` : ""}
               {e.detail ? ` · ${e.detail}` : ""}
@@ -88,8 +111,20 @@ export async function PaymentProblemsSection({ groupIds, timezone }: { groupIds:
               {formatInTimezone(e.created_at, timezone, "date")}
               {HELP[e.kind] ? ` · ${HELP[e.kind]}` : ""}
             </p>
+            {client && e.kind === "payment_failed" && (
+              <DraftMessageLink threadHref={`/groups/${client.groupId}/messages/${client.athleteId}`} draft={failedCardDraft(first)} className="inline-flex items-center min-h-11 font-body text-sm font-semibold text-rust-ink hover:underline underline-offset-2">
+                {first ? `Message ${first}` : "Message them"}
+              </DraftMessageLink>
+            )}
+            {client && e.kind === "refund" && (
+              <Link prefetch={false} href={addSessionsHref(client.groupId, client.athleteId)} className="inline-flex items-center min-h-11 font-body text-sm font-semibold text-rust-ink hover:underline underline-offset-2">
+                Add sessions
+              </Link>
+            )}
+            {e.group_id && e.kind === "dispute_opened" && <OpenStripeButton groupId={e.group_id} />}
           </li>
-        ))}
+          );
+        })}
       </ul>
       {capped && <p className="font-body text-xs text-steel mt-2">Showing the latest {LIMIT}.</p>}
     </section>

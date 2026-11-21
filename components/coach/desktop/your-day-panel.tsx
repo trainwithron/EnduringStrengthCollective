@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { formatInTimezone } from "@/lib/format-in-timezone";
 import { dateKeyInZone } from "@/lib/timezone";
-import { attentionHeadline, KIND_LABEL, rankAttention, type AttentionItem, type ScheduleEntry } from "@/lib/your-day";
+import { attentionHeadline, rankAttention, type AttentionItem, type ScheduleEntry } from "@/lib/your-day";
+import { YourDayAttentionList } from "@/components/coach/desktop/your-day-attention-list";
 
 // The first thing on a coach's Home: today's sessions, classes and calendar events in order, and one ranked list of what needs them. Each row opens the
 // place to act; the detailed panels further down (replies, payments, insights) are where the actions themselves live. In the schedule, the NAME opens the client's profile (a class opens its
@@ -22,7 +23,8 @@ export function YourDayPanel({
   /** false for a team organization: nothing about payments on its Home */
   showPayments?: boolean;
 }) {
-  const { shown, hidden } = rankAttention(attention, 6);
+  // The whole list, ranked; the first six show and "Show N more" opens the rest in place.
+  const { shown } = rankAttention(attention, attention.length);
   return (
     <section aria-labelledby="your-day-heading" className="mb-6 grid gap-4 md:grid-cols-2 @5xl:!grid-cols-1">
       <div className="border border-transparent bg-surface p-4">
@@ -62,21 +64,8 @@ export function YourDayPanel({
         {shown.length === 0 ? (
           <p className="font-body text-sm text-steel">{showPayments ? "Replies, payments and check-ins that need you will show up here." : "Replies and check-ins that need you will show up here."}</p>
         ) : (
-          <ul className="space-y-2">
-            {shown.map((a) => (
-              <li key={a.id}>
-                <Link prefetch={false} href={a.href} className="flex items-baseline gap-3 group">
-                  <span className="font-body text-xs text-steel w-16 shrink-0">{KIND_LABEL[a.kind]}</span>
-                  <span className="min-w-0">
-                    <span className="font-body text-sm text-chalk group-hover:underline">{a.text}</span>
-                    {a.detail && <span className="block font-body text-xs text-steel truncate">{a.detail}</span>}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <YourDayAttentionList items={shown} limit={6} />
         )}
-        {hidden > 0 && <p className="font-body text-xs text-steel mt-3">and {hidden} more below</p>}
       </div>
     </section>
   );

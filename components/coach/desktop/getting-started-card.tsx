@@ -9,7 +9,8 @@ export function GettingStartedCard({ groupId }: { groupId: string }) {
     {
       title: "Add your first client",
       body: "Add them by name (or send a link). You can build their program before they ever sign in.",
-      href: `/groups/${groupId}/clients`,
+      // Opens Add client itself, not just the list (audit, Nov 21).
+      href: "/clients?add=1",
       cta: "Add a client",
     },
     {

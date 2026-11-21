@@ -195,7 +195,7 @@ describe("gathering what needs the coach", () => {
     );
     const jeff = items.filter((i) => i.name === "Jeff Ziegler");
     expect(jeff.map((i) => i.kind)).toEqual(["not_signed_in"]);
-    expect(jeff[0]).toMatchObject({ sentence: "hasn't signed in yet. Send the sign-in link.", button: "Send link", href: "/groups/g1/athletes/a1" });
+    expect(jeff[0]).toMatchObject({ sentence: "hasn't signed in yet. Send the sign-in link.", button: "Send link", href: "/groups/g1/athletes/a1?tab=settings#sign-in-options", profileHref: "/groups/g1/athletes/a1", claimLink: { athleteId: "a1", groupId: "g1" } });
     expect(items.some((i) => i.kind === "quiet_strong" && i.name === "Bo")).toBe(true);
     expect(items.some((i) => i.kind === "quiet_strong" && i.name === "Jeff Ziegler")).toBe(false);
   });

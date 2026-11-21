@@ -27,6 +27,7 @@ export function ProgramImportLauncher({
   tone = "link",
   orgProgram = false,
   programId = null,
+  autoOpen = false,
 }: {
   groupId: string;
   athleteId?: string | null;
@@ -34,9 +35,21 @@ export function ProgramImportLauncher({
   orgProgram?: boolean;
   // The program whose builder this is in: an import fills it while it has no days (Ron, Oct 27), else makes a new one.
   programId?: string | null;
+  // Opened from Ask Spot's "Import a program" (?import=1, audit Nov 21): the button is brought into view, focused and pointed out, so one press opens the file picker. (A browser opens its file
+  // picker only from a press, never by itself after a page loads.)
+  autoOpen?: boolean;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const [panel, setPanel] = useState<{ file: File } | null>(null);
+  const [asked, setAsked] = useState(false);
+
+  useEffect(() => {
+    if (!autoOpen) return;
+    setAsked(true);
+    buttonRef.current?.scrollIntoView({ block: "center" });
+    buttonRef.current?.focus();
+  }, [autoOpen]);
 
   return (
     <>
@@ -51,10 +64,14 @@ export function ProgramImportLauncher({
           onChange={(e) => {
             const file = e.target.files?.[0];
             e.target.value = "";
-            if (file) setPanel({ file });
+            if (file) {
+              setAsked(false);
+              setPanel({ file });
+            }
           }}
         />
         <button
+          ref={buttonRef}
           type="button"
           onClick={() => fileRef.current?.click()}
           className={
@@ -65,6 +82,11 @@ export function ProgramImportLauncher({
         >
           Import program
         </button>
+        {asked && (
+          <p className="basis-full bg-surface-2 rounded-card px-3 py-2 font-body text-sm text-chalk" role="status" data-import-asked>
+            Press <span className="font-semibold">Import program</span> and choose the file: a spreadsheet, a PDF, a photo or a text file.
+          </p>
+        )}
       </div>
       {panel && <ProgramImportPanel groupId={groupId} athleteId={athleteId} orgProgram={orgProgram} programId={programId} file={panel.file} onClose={() => setPanel(null)} />}
     </>

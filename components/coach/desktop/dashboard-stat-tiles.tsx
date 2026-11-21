@@ -50,7 +50,14 @@ export function DashboardStatTiles({
         const alternates = tile.values.slice(1);
         return (
           <div key={tile.key} className="relative border border-transparent bg-surface p-4 text-left">
-            <p className="font-display font-semibold text-3xl leading-none text-chalk tabular-nums">{current.display}</p>
+            {current.href ? (
+              // a count that is a list on Home opens it (the Pulse "need attention" list; audit, Nov 21)
+              <a href={current.href} className="block font-display font-semibold text-3xl leading-none text-chalk tabular-nums hover:text-rust-ink" aria-label={`${current.display} ${current.label}: open the list`}>
+                {current.display}
+              </a>
+            ) : (
+              <p className="font-display font-semibold text-3xl leading-none text-chalk tabular-nums">{current.display}</p>
+            )}
             <p
               onMouseEnter={() => alternates.length > 0 && setPeekTile(tile.key)}
               onMouseLeave={() => setPeekTile((v) => (v === tile.key ? null : v))}

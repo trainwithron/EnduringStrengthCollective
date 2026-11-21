@@ -3,6 +3,10 @@ import { greetingFirstName } from "@/lib/first-name";
 
 // Home's greeting band (Look Refresh, Ron Nov 20): the words at the top of Home, from what the page already has. All in the coach's own time zone.
 
+// The Pulse "need attention" list on Home. A link to it (the greeting band's "N could use a check-in", the Need attention and At-risk tiles) opens the list, not just scrolls to it (audit, Nov 21).
+export const PULSE_ATTENTION_ANCHOR = "pulse-attention";
+export const PULSE_ATTENTION_HREF = `#${PULSE_ATTENTION_ANCHOR}`;
+
 export function greetingFor(now: Date, timeZone: string): string {
   const hour = Number(new Intl.DateTimeFormat("en-US", { timeZone, hour: "numeric", hourCycle: "h23" }).format(now));
   if (hour < 12) return "Good morning";

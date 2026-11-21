@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { DraftMessageLink } from "@/components/messages/draft-message-link";
 import { ChevronDown } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { ProgressCardData } from "@/lib/progress-look-gather";
@@ -213,7 +214,7 @@ export function ProgressCardView({
     if (!look) return;
     setMessage(null);
     if (!card.programIsPersonal) {
-      setMessage(`${first || "This client"} follows a shared program, so changing it would change it for everyone. Give them their own copy first (Programming on their profile), then apply.`);
+      setMessage(`${first || "This client"} follows a shared program, so changing it would change it for everyone. Give them their own copy first (Assign program on their Program tab), then apply.`);
       return;
     }
     if (!slot) {
@@ -339,10 +340,11 @@ export function ProgressCardView({
           {!card.programIsPersonal && (
             <p className="font-body text-xs text-steel">
               {first || "This client"} follows a shared program, so changes here would reach everyone.{" "}
-              <Link prefetch={false} href={`/groups/${card.groupId}/athletes/${card.athleteId}`} className="underline text-chalk">
-                Give them their own copy
+              {/* Their Program tab, where Assign program gives them their own copy of it (audit, Nov 21: this named a Programming tab that does not exist). */}
+              <Link prefetch={false} href={`/groups/${card.groupId}/athletes/${card.athleteId}?tab=program`} className="underline text-chalk">
+                Open their Program tab
               </Link>{" "}
-              (Programming on their profile) to apply changes to just them.
+              and use Assign program to give them their own copy, then apply changes to just them.
             </p>
           )}
           <ul className="divide-y divide-steel/10">
@@ -401,15 +403,15 @@ export function ProgressCardView({
       )}
 
       <div className="mt-3 flex flex-wrap items-center gap-3 font-body text-xs">
-        <Link prefetch={false} href={`/groups/${card.groupId}/messages/${card.athleteId}?draft=${encodeURIComponent(noteDraft)}`} className="text-rust-ink underline">
+        <DraftMessageLink threadHref={`/groups/${card.groupId}/messages/${card.athleteId}`} draft={noteDraft} className="text-rust-ink underline">
           Draft a note to {first || "them"}
-        </Link>
+        </DraftMessageLink>
         <Link prefetch={false} href={`/groups/${card.groupId}/calendar?client=${card.athleteId}&scheduleFor=${card.athleteId}`} className="text-steel underline">
           Suggest a time
         </Link>
-        <Link prefetch={false} href={`/groups/${card.groupId}/messages/${card.athleteId}?draft=${encodeURIComponent(helpDraft)}`} className="text-steel underline">
+        <DraftMessageLink threadHref={`/groups/${card.groupId}/messages/${card.athleteId}`} draft={helpDraft} className="text-steel underline">
           Ask what they need most help with
-        </Link>
+        </DraftMessageLink>
       </div>
     </li>
   );

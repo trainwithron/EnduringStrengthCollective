@@ -6,6 +6,7 @@
 // renamed or removed page fails the tests instead of quietly sending people nowhere.
 import { findHowTos, type HowTo } from "@/lib/howto-library";
 import { rankClientsByName } from "@/lib/client-name-match";
+import { addSessionsHref } from "@/lib/add-sessions-link";
 
 export type NavRole = "coach" | "athlete";
 export type NavDevice = "desktop" | "phone";
@@ -20,6 +21,8 @@ export interface NavDestination {
   roles: NavRole[];
   // Where it exists. Left out means both. Coach business pages are desktop-only.
   devices?: NavDevice[];
+  // Where it exists for a COACH, when that differs: a page clients use on a phone, which a coach's phone sends somewhere else (lib/phone-coach-routes.ts), so Ask Spot never offers it there.
+  coachDevices?: NavDevice[];
   synonyms: string[];
   needsAthlete?: boolean;
   // How it reads after a client's name ("Johann's program"). Left out: the lower-cased label.
@@ -71,7 +74,9 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   D({ id: "home", label: "Home", path: "/dashboard", phonePath: "/groups/{groupId}", roles: ["coach"], synonyms: ["home", "dashboard", "home page", "main page", "start page", "overview", "my day", "today overview"] }),
   D({ id: "athlete-home", label: "Home", path: "/groups/{groupId}", roles: ["athlete"], synonyms: ["home", "home page", "main page", "start page", "overview", "dashboard"] }),
   // ---- People ----
-  D({ id: "clients", label: "Clients", path: "/groups/{groupId}/clients", roles: ["coach"], synonyms: ["clients", "client list", "my clients", "roster", "all clients", "people", "athletes", "add a client", "add client", "new client", "invite a client", "add an athlete", "add athlete", "onboard a client"] }),
+  D({ id: "clients", label: "Clients", path: "/groups/{groupId}/clients", roles: ["coach"], synonyms: ["clients", "client list", "my clients", "roster", "all clients", "people", "athletes"] }),
+  // Opens Add client itself, not just the list (audit, Nov 21).
+  D({ id: "add-client", label: "Add a client", path: "/clients?add=1", roles: ["coach"], synonyms: ["add a client", "add client", "new client", "invite a client", "add an athlete", "add athlete", "onboard a client"] }),
   D({ id: "messages", label: "Messages", path: "/groups/{groupId}/messages", roles: ["coach", "athlete"], synonyms: ["messages", "inbox", "chat", "dm", "dms", "direct messages", "message", "texts", "talk to my coach", "message my coach", "message coach"] }),
   D({ id: "announce", label: "Message all clients", path: "/groups/{groupId}/messages/announce", roles: ["coach"], devices: ["desktop", "phone"], synonyms: ["message all clients", "message everyone", "announcement", "announce", "bulk message", "send to everyone", "broadcast", "mass message", "message all", "text everyone", "broadcast to all clients", "message all my clients", "send to all clients"] }),
   D({ id: "team", label: "Team and depth chart", path: "/groups/{groupId}/team", roles: ["coach"], devices: ["desktop"], synonyms: ["team", "depth chart", "positions", "team roster", "team page"] }),
@@ -84,20 +89,21 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   // ---- Programming ----
   D({ id: "programs", label: "Programs", path: "/groups/{groupId}/programs", roles: ["coach", "athlete"], synonyms: ["programs", "my programs", "program list", "training programs", "program builder", "builder", "programming", "all programs"] }),
   D({ id: "new-program", label: "Build a new program", path: "/groups/{groupId}/programs/new", roles: ["coach"], devices: ["desktop"], synonyms: ["new program", "build a program", "create a program", "make a program", "start a program", "write a program", "new training program", "build program"] }),
-  D({ id: "import-program", label: "Import a program", path: "/groups/{groupId}/programs/import", roles: ["coach"], devices: ["desktop"], synonyms: ["import a program", "import program", "import", "upload a program", "photo of a program", "upload program", "bring in a program", "paste a program"] }),
+  D({ id: "import-program", label: "Import a program", path: "/groups/{groupId}/programs?import=1", roles: ["coach"], devices: ["desktop"], synonyms: ["import a program", "import program", "import", "upload a program", "photo of a program", "upload program", "bring in a program", "paste a program"] }),
   D({ id: "exercise-library", label: "Exercise library", path: "/groups/{groupId}/exercise-library", roles: ["coach"], devices: ["desktop", "phone"], synonyms: ["exercise library", "exercises", "library", "add an exercise", "exercise list", "movement library", "my exercises"] }),
   D({ id: "movement-patterns", label: "Movement patterns", path: "/groups/{groupId}/movement-patterns", roles: ["coach"], devices: ["desktop"], synonyms: ["movement patterns", "patterns", "ladders", "exercise ladders", "tiers"] }),
   D({ id: "nutrition", label: "Nutrition", path: "/groups/{groupId}/nutrition", roles: ["coach", "athlete"], synonyms: ["nutrition", "macros", "meal plan", "meal plans", "food", "diet", "calories", "what should i eat", "what do i eat", "my macros", "nutrition plan", "standing macro", "macro targets", "eating"] }),
   // A coach's recipes and calculator are tabs of Nutrition; a client keeps their own pages.
   D({ id: "recipes", label: "Favorite meals", path: "/groups/{groupId}/nutrition?tab=favorites", roles: ["coach"], synonyms: ["recipes", "recipe", "meal ideas", "cook", "favorite meals", "favourite meals", "favorites", "recipe hub"] }),
-  D({ id: "macro-calculator", label: "Macro calculator", path: "/groups/{groupId}/nutrition", roles: ["coach"], synonyms: ["macro calculator", "calculate macros", "calorie calculator", "tdee", "macro tool"] }),
+  // A coach's calculator is "Calculate targets" in each client's Targets: named with a client it opens theirs (client-macro-calculator below); on its own it opens Nutrition to pick one.
+  D({ id: "macro-calculator", label: "Macro calculator (pick a client)", path: "/groups/{groupId}/nutrition", roles: ["coach"], synonyms: ["macro calculator", "calculate macros", "calorie calculator", "tdee", "macro tool"] }),
   D({ id: "athlete-macro-calculator", label: "Macro calculator", path: "/groups/{groupId}/tools/macro-calculator", roles: ["athlete"], synonyms: ["macro calculator", "calculate macros", "calorie calculator", "tdee", "macro tool"] }),
   D({ id: "one-rep-max", label: "1RM calculator", path: "/groups/{groupId}/tools/one-rep-max", roles: ["coach", "athlete"], synonyms: ["one rep max", "1rm", "1 rep max", "max calculator", "1rm calculator", "estimate my max", "rep max"] }),
-  D({ id: "records", label: "Records", path: "/groups/{groupId}/records", roles: ["coach", "athlete"], synonyms: ["records", "prs", "personal records", "pr board", "my prs", "personal bests", "group records"] }),
+  D({ id: "records", label: "Records", path: "/groups/{groupId}/records", roles: ["coach", "athlete"], coachDevices: ["desktop"], synonyms: ["records", "prs", "personal records", "pr board", "my prs", "personal bests", "group records"] }),
   // ---- Community ----
   D({ id: "feed", label: "Team feed", path: "/groups/{groupId}/feed", roles: ["coach", "athlete"], synonyms: ["feed", "team feed", "posts", "community", "social", "activity", "announcements feed"] }),
   D({ id: "leaderboard", label: "Leaderboard", path: "/groups/{groupId}/leaderboard", roles: ["coach", "athlete"], synonyms: ["leaderboard", "rankings", "standings", "top lifters", "who is leading", "who is winning"] }),
-  D({ id: "challenges", label: "Challenges", path: "/groups/{groupId}/challenges", roles: ["coach", "athlete"], synonyms: ["challenges", "challenge", "competition", "contests"] }),
+  D({ id: "challenges", label: "Challenges", path: "/groups/{groupId}/challenges", roles: ["coach", "athlete"], coachDevices: ["desktop"], synonyms: ["challenges", "challenge", "competition", "contests"] }),
   D({ id: "video-checkins", label: "Video check-ins", path: "/groups/{groupId}/video-checkins", roles: ["coach", "athlete"], synonyms: ["video check ins", "video checkins", "video check in", "form check", "form checks", "videos", "check in videos"] }),
   D({ id: "progress-photos", label: "Progress photos", path: "/groups/{groupId}/progress-photos", roles: ["athlete", "coach"], synonyms: ["progress photos", "photos", "before and after", "progress pictures", "transformation photos", "my photos"] }),
   D({ id: "my-history", label: "My workout history", path: "/groups/{groupId}/my-history", roles: ["athlete", "coach"], synonyms: ["my history", "workout history", "past workouts", "my logs", "history", "what i did", "previous workouts"] }),
@@ -106,8 +112,8 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   D({ id: "more", label: "More", path: "/groups/{groupId}/more", roles: ["coach", "athlete"], devices: ["phone"], synonyms: ["more", "more menu", "the more page", "other pages", "everything else", "all tools", "where are the tools", "tools and community"] }),
   D({ id: "notification-center", label: "Notifications", path: "/notifications", roles: ["coach", "athlete"], synonyms: ["notification center", "all notifications", "see all notifications", "see my notifications", "my notifications", "unread notifications", "what did i miss", "what did i miss today", "alerts", "my alerts", "the bell"] }),
   D({ id: "settings", label: "Settings", path: "/groups/{groupId}/settings", roles: ["coach", "athlete"], synonyms: ["settings", "my settings", "profile settings", "account", "my account", "preferences", "notifications", "turn on notifications", "push notifications", "sign out", "log out", "logout", "feedback", "report a problem", "send feedback", "change my name"] }),
-  D({ id: "resources", label: "Resources", path: "/groups/{groupId}/resources", roles: ["coach", "athlete"], synonyms: ["resources", "pro shop", "shop", "supplements", "links", "recommended products"] }),
-  D({ id: "quick-tips", label: "Quick tips", path: "/groups/{groupId}/quick-tips", roles: ["coach", "athlete"], synonyms: ["quick tips", "tips", "help tips"] }),
+  D({ id: "resources", label: "Resources", path: "/groups/{groupId}/resources", roles: ["coach", "athlete"], coachDevices: ["desktop"], synonyms: ["resources", "pro shop", "shop", "supplements", "links", "recommended products"] }),
+  D({ id: "quick-tips", label: "Quick tips", path: "/groups/{groupId}/quick-tips", roles: ["coach", "athlete"], coachDevices: ["desktop"], synonyms: ["quick tips", "tips", "help tips"] }),
   // ---- Business (coach, desktop) ----
   D({ id: "business", label: "Business", path: "/groups/{groupId}/business", roles: ["coach"], devices: ["desktop"], synonyms: ["business", "revenue", "income", "money", "mrr", "business dashboard", "earnings", "how much am i making", "payments overview"] }),
   D({ id: "packages", label: "Packages", path: "/groups/{groupId}/business/packages", roles: ["coach"], devices: ["desktop"], synonyms: ["packages", "pricing", "create a package", "add a package", "session packs", "memberships", "subscriptions", "prices", "set my prices"] }),
@@ -131,12 +137,13 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   // ---- A client's own pages (coach) ----
   D({ id: "client-profile", label: "Client profile", path: "/groups/{groupId}/athletes/{athleteId}", roles: ["coach"], needsAthlete: true, synonyms: ["profile", "client profile", "their profile", "open profile", "go to profile", "view profile", "page", "overview", "sign in link", "sign-in link", "claim link"] }),
   D({ id: "client-calendar", label: "Client calendar", path: "/groups/{groupId}/athletes/{athleteId}/calendar", roles: ["coach"], needsAthlete: true, devices: ["desktop"], synonyms: ["calendar", "schedule", "their calendar", "habits", "macros calendar", "schedule weekly", "weekly", "book weekly", "recurring", "repeat sessions", "plan their week"] }),
-  D({ id: "client-history", label: "Client history", path: "/groups/{groupId}/athletes/{athleteId}/history", roles: ["coach"], needsAthlete: true, synonyms: ["history", "workout history", "logs", "past workouts", "their workouts", "what they did"] }),
-  D({ id: "client-program", label: "Program", short: "program", path: "/groups/{groupId}/athletes/{athleteId}", roles: ["coach"], needsAthlete: true, synonyms: ["program", "their program", "workout plan", "training plan", "plan", "programming", "what are they doing", "their training"] }),
+  D({ id: "client-history", label: "Client history", path: "/groups/{groupId}/athletes/{athleteId}/history", roles: ["coach"], needsAthlete: true, devices: ["desktop"], synonyms: ["history", "workout history", "logs", "past workouts", "their workouts", "what they did"] }),
+  D({ id: "client-program", label: "Program", short: "program", path: "/groups/{groupId}/athletes/{athleteId}?tab=program", roles: ["coach"], needsAthlete: true, synonyms: ["program", "their program", "workout plan", "training plan", "plan", "programming", "what are they doing", "their training"] }),
   D({ id: "client-nutrition", label: "Nutrition", short: "nutrition", path: "/groups/{groupId}/athletes/{athleteId}?tab=nutrition", phonePath: "/groups/{groupId}/athletes/{athleteId}", roles: ["coach"], needsAthlete: true, synonyms: ["nutrition", "macros", "their macros", "meal plan", "food log", "diet", "what are they eating", "calories"] }),
   D({ id: "client-messages", label: "Messages", short: "messages", path: "/groups/{groupId}/messages/{athleteId}", roles: ["coach"], needsAthlete: true, synonyms: ["messages", "message", "chat", "conversation", "thread", "last chat", "texts", "inbox", "what did they say", "said"] }),
   D({ id: "client-goals", label: "Goals", short: "goals", path: "/groups/{groupId}/athletes/{athleteId}", roles: ["coach"], needsAthlete: true, synonyms: ["goal", "goals", "their goal", "what are they working toward", "suggest a goal"] }),
-  D({ id: "client-balance", label: "Session balance", short: "session balance", path: "/groups/{groupId}/athletes/{athleteId}", roles: ["coach"], needsAthlete: true, synonyms: ["balance", "sessions left", "session balance", "credits", "how many sessions", "assign sessions", "add sessions"] }),
+  D({ id: "client-balance", label: "Session balance", short: "session balance", path: addSessionsHref("{groupId}", "{athleteId}"), roles: ["coach"], needsAthlete: true, synonyms: ["balance", "sessions left", "session balance", "credits", "how many sessions", "assign sessions", "add sessions"] }),
+  D({ id: "client-macro-calculator", label: "Macro calculator", short: "macro calculator", path: "/groups/{groupId}/athletes/{athleteId}?tab=nutrition#calculate-targets", phonePath: "/groups/{groupId}/athletes/{athleteId}", roles: ["coach"], needsAthlete: true, synonyms: ["macro calculator", "calculate macros", "calorie calculator", "tdee", "macro tool", "calculate targets", "work out their macros"] }),
   D({ id: "client-log", label: "Log an in-person session", path: "/groups/{groupId}/athletes/{athleteId}/log", roles: ["coach"], needsAthlete: true, synonyms: ["log session", "log a session", "log workout", "log in person", "in person session", "log for them", "start their workout", "log a workout for"] }),
 ];
 
@@ -183,6 +190,13 @@ const HOWTO_PATTERNS: RegExp[] = [/\bhow (do|can|would|should|to) (i|we|you)?/, 
 
 function applicable(d: NavDestination, ctx: NavContext): boolean {
   return d.roles.includes(ctx.role);
+}
+
+// A place that is not on a phone for this person (a desktop-only page, or a page a coach's phone sends elsewhere).
+export function notOnPhone(d: NavDestination, ctx: Pick<NavContext, "role" | "device">): boolean {
+  if (ctx.device !== "phone") return false;
+  const devices = ctx.role === "coach" && d.coachDevices ? d.coachDevices : d.devices;
+  return !!devices && !devices.includes("phone");
 }
 
 function resolvePath(d: NavDestination, ctx: NavContext, athleteId: string | null, groupId: string | null = ctx.groupId): string | null {
@@ -346,11 +360,12 @@ export function resolveNavigation(message: string, ctx: NavContext): NavResult {
   const clientId = mentions.length === 1 ? mentions[0].id : thisClient;
   const pickClientDest = () => {
     const clientDests = NAV_DESTINATIONS.filter((d) => d.needsAthlete && applicable(d, ctx));
-    const scored = clientDests
-      .map((d) => ({ d, score: scoreDestination(d, norm, tokens) }))
-      .filter((x) => !(ctx.device === "phone" && x.d.devices && !x.d.devices.includes("phone")))
-      .sort((a, b) => b.score - a.score);
-    return scored[0] && scored[0].score >= CLOSE ? scored[0].d : clientDests.find((d) => d.id === "client-profile")!;
+    const scored = clientDests.map((d) => ({ d, score: scoreDestination(d, norm, tokens) })).sort((a, b) => b.score - a.score);
+    const profile = clientDests.find((d) => d.id === "client-profile")!;
+    // The place asked for is not on this phone (their history, on a coach's phone): their profile, where the phone sends it too, rather than the next-closest word match.
+    if (scored[0] && scored[0].score >= CLOSE && notOnPhone(scored[0].d, ctx)) return profile;
+    const here = scored.filter((x) => !notOnPhone(x.d, ctx));
+    return here[0] && here[0].score >= CLOSE ? here[0].d : profile;
   };
   const shortOf = (d: NavDestination) => d.short ?? d.label.toLowerCase();
   if (mentions.length > 1) {
@@ -387,9 +402,9 @@ export function resolveNavigation(message: string, ctx: NavContext): NavResult {
 
   if (best && best.score >= CONFIDENT) {
     // Desktop-only place asked for from a phone: say so, and never leave it at that.
-    if (ctx.device === "phone" && best.d.devices && !best.d.devices.includes("phone")) {
+    if (notOnPhone(best.d, ctx)) {
       const near = candidates
-        .filter((c) => c.score >= CLOSE && !(c.d.devices && !c.d.devices.includes("phone")))
+        .filter((c) => c.score >= CLOSE && !notOnPhone(c.d, ctx))
         .slice(0, 3)
         .map((c) => chipFor(c.d, ctx, null))
         .filter((c): c is NavChip => !!c);
@@ -403,7 +418,7 @@ export function resolveNavigation(message: string, ctx: NavContext): NavResult {
     const chip = chipFor(best.d, ctx, null);
     // Ties (two destinations with the same top score) are offered together.
     const ties = candidates
-      .filter((c) => c.score === best.score && c.d.id !== best.d.id && !(ctx.device === "phone" && c.d.devices && !c.d.devices.includes("phone")))
+      .filter((c) => c.score === best.score && c.d.id !== best.d.id && !notOnPhone(c.d, ctx))
       .slice(0, 2)
       .map((c) => chipFor(c.d, ctx, null))
       .filter((c): c is NavChip => !!c);
@@ -412,7 +427,7 @@ export function resolveNavigation(message: string, ctx: NavContext): NavResult {
 
   // Not sure: the closest places, then the common ones. Never a dead end.
   const near = candidates
-    .filter((c) => c.score >= CLOSE && !(ctx.device === "phone" && c.d.devices && !c.d.devices.includes("phone")))
+    .filter((c) => c.score >= CLOSE && !notOnPhone(c.d, ctx))
     .slice(0, 3)
     .map((c) => chipFor(c.d, ctx, null))
     .filter((c): c is NavChip => !!c);

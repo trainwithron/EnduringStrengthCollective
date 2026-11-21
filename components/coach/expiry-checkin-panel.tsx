@@ -3,7 +3,7 @@
 import { readRowsByIds } from "@/lib/read-by-ids";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { DraftMessageLink } from "@/components/messages/draft-message-link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { saved } from "@/lib/saved";
 import {
@@ -278,12 +278,9 @@ export function ExpiryCheckInPanel({ groupIds: scopeGroupIds }: { groupIds?: str
                 {i.lastWorkoutAt ? `Last workout ${fmtDate(new Date(i.lastWorkoutAt))}.` : "No workout logged yet."} Maybe reach out and see how they are doing.
               </p>
               <div className="flex flex-wrap items-center gap-2 mt-2">
-                <Link prefetch={false}
-                  href={`/groups/${i.groupId}/messages/${i.athleteId}?draft=${encodeURIComponent(draft)}`}
-                  className={`${btn} border-rust text-rust-ink inline-flex items-center`}
-                >
+                <DraftMessageLink threadHref={`/groups/${i.groupId}/messages/${i.athleteId}`} draft={draft} className={`${btn} border-rust text-rust-ink inline-flex items-center`}>
                   Message them
-                </Link>
+                </DraftMessageLink>
                 <button type="button" onClick={() => { setOpenExtend(openExtend === key ? null : key); setNote(""); }} className={`${btn} border-steel/30 text-chalk`}>
                   Extend or pause
                 </button>

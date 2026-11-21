@@ -510,7 +510,10 @@ function CoachDesktopShellFull({
           )}
         </div>
         <div className="ml-auto flex items-center gap-1.5 shrink-0">
-          <HeaderNotificationBell scopeGroupId={groupId} />
+          {/* Below lg the phone layout's Spotlight has its own floating bell: one bell only (audit, Nov 21). */}
+          <div className="hidden lg:flex">
+            <HeaderNotificationBell scopeGroupId={groupId} />
+          </div>
           <DownloadAppButton variant="topbar" />
           <ClientFinder currentGroupId={groupId} />
         </div>

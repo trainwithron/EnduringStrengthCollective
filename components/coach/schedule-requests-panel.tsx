@@ -3,7 +3,7 @@
 import { readRowsByIds } from "@/lib/read-by-ids";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { DraftMessageLink } from "@/components/messages/draft-message-link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { buildCheckInDraft, buildOfferPauseOrFreezeDraft, buildScheduleReplyDraft } from "@/lib/schedule-request-drafts";
 import { dayLabel, isOverdue, scheduleSummary, todayKey, type RequestKind } from "@/lib/schedule-request-ui";
@@ -55,7 +55,8 @@ export function ScheduleRequestCard({
   const waiting = isOverdue({ status: data.status === "pending" ? "pending" : "applying", createdAt: data.createdAt }, now);
   const days = Math.max(2, Math.floor((now.getTime() - new Date(data.createdAt).getTime()) / 86400000));
   const effectiveLabel = dayLabel(data.effectiveOn);
-  const messageBase = `/groups/${data.groupId}/messages/${data.athleteId}?draft=`;
+  // the conversation; each draft is kept in the tab when its link is pressed, never put in the address (lib/message-draft.ts)
+  const thread = `/groups/${data.groupId}/messages/${data.athleteId}`;
   const reply = buildScheduleReplyDraft({ firstName: first, kind: data.kind, effectiveLabel, resumeLabel: data.resumeOn ? dayLabel(data.resumeOn) : null });
   const offer = buildOfferPauseOrFreezeDraft(first);
   const checkIn = buildCheckInDraft(first);
@@ -89,13 +90,13 @@ export function ScheduleRequestCard({
         </div>
       ) : (
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Link prefetch={false} href={`${messageBase}${encodeURIComponent(data.kind === "cancel" ? checkIn : reply)}`} className="inline-flex h-11 items-center border border-steel/40 px-4 font-body text-sm text-chalk">
+          <DraftMessageLink threadHref={thread} draft={data.kind === "cancel" ? checkIn : reply} className="inline-flex h-11 items-center border border-steel/40 px-4 font-body text-sm text-chalk">
             Message
-          </Link>
+          </DraftMessageLink>
           {data.kind === "cancel" && (
-            <Link prefetch={false} href={`${messageBase}${encodeURIComponent(offer)}`} className="inline-flex h-11 items-center border border-steel/40 px-4 font-body text-sm text-chalk">
+            <DraftMessageLink threadHref={thread} draft={offer} className="inline-flex h-11 items-center border border-steel/40 px-4 font-body text-sm text-chalk">
               Offer pause or freeze
-            </Link>
+            </DraftMessageLink>
           )}
           {dueToday ? (
             <button type="button" onClick={onAskDone} disabled={busy} className="h-11 border border-chalk px-4 font-body text-sm font-bold text-chalk disabled:opacity-50">

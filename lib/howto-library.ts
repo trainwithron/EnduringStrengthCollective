@@ -79,7 +79,7 @@ export const HOWTOS: HowTo[] = [
       "client profile before signup", "pre signup", "set up a client", "onboard a client", "add someone", "add an athlete",
     ],
     steps: [
-      { text: "Open Clients and press Add client.", href: "/groups/{groupId}/clients", linkLabel: "Clients" },
+      { text: "Open Clients and press Add client.", href: "/clients?add=1", linkLabel: "Add a client" },
       { text: "Type their name and email. They start as a one-on-one client, which is the right choice for most people." },
       { text: "You can build or assign their program right away. They claim the profile when they sign in with their link." },
     ],

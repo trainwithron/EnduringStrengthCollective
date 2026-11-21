@@ -1,6 +1,8 @@
 import Link from "next/link";
-import { CAUGHT_UP, COULD_NOT_CHECK, moreLabel, type NeedsYouSlot, type NeedsYouView } from "@/lib/needs-you";
+import { CAUGHT_UP, COULD_NOT_CHECK, type NeedsYouSlot, type NeedsYouView } from "@/lib/needs-you";
 import { QuietClientNudgeButton } from "@/components/coach/quiet-client-nudge-button";
+import { NeedsYouMore, NeedsYouSendLink } from "@/components/coach/desktop/needs-you-more";
+import { DraftMessageLink } from "@/components/messages/draft-message-link";
 
 // Each kind on a card tinted by what it is about (Look Refresh, Nov 20): someone waiting on the coach in coral, something due in the accent, a check-in in blue.
 const SLOT_LOOK: Record<NeedsYouSlot, { card: string; title: string }> = {
@@ -10,7 +12,7 @@ const SLOT_LOOK: Record<NeedsYouSlot, { card: string; title: string }> = {
 };
 
 // "Needs you": at most three things at the top of Home, one per slot (someone is waiting on you, something is due soon, someone may need a check-in), each the single most urgent of its
-// kind. A slot with nothing shows nothing. When nothing needs the coach it says so. "N more" jumps to the stack of panels below, which is unchanged.
+// kind. A slot with nothing shows nothing. When nothing needs the coach it says so. "N more" opens the rest of the ranked list in place, each with its own button (audit, Nov 21).
 export function NeedsYouStrip({ view, viewer = null }: { view: NeedsYouView; viewer?: { id: string; name: string } | null }) {
   const filled = view.slots.filter((s) => s.item);
   return (
@@ -44,6 +46,14 @@ export function NeedsYouStrip({ view, viewer = null }: { view: NeedsYouView; vie
                   <div className="mt-auto">
                     <QuietClientNudgeButton athleteId={item!.nudge.athleteId} athleteFirstName={item!.nudge.firstName} groupId={item!.nudge.groupId} coachId={viewer.id} coachName={viewer.name} />
                   </div>
+                ) : item!.draft ? (
+                  // the conversation, with the drafted message kept in this tab (never in the address)
+                  <DraftMessageLink threadHref={item!.draft.threadHref} draft={item!.draft.text} className="mt-auto inline-flex items-center justify-center h-11 px-5 bg-rust text-graphite font-body text-sm font-medium self-start">
+                    {item!.button}
+                  </DraftMessageLink>
+                ) : item!.claimLink ? (
+                  // "Send link" emails the sign-in link from here (the profile's same send and confirm), with Sign-in options beside it
+                  <NeedsYouSendLink groupId={item!.claimLink.groupId} athleteId={item!.claimLink.athleteId} optionsHref={item!.href} />
                 ) : (
                   <Link prefetch={false} href={item!.href} className="mt-auto inline-flex items-center justify-center h-11 px-5 bg-rust text-graphite font-body text-sm font-medium self-start">
                     {item!.button}
@@ -57,11 +67,7 @@ export function NeedsYouStrip({ view, viewer = null }: { view: NeedsYouView; vie
               {COULD_NOT_CHECK}
             </p>
           )}
-          {view.moreCount > 0 && (
-            <Link prefetch={false} href="#needs-stack" className="inline-block font-body text-sm text-steel hover:text-chalk underline underline-offset-2 min-h-11 leading-[2.75rem]">
-              {moreLabel(view.moreCount)}
-            </Link>
-          )}
+          {view.moreCount > 0 && <NeedsYouMore items={view.more} viewer={viewer} />}
         </div>
       )}
     </section>

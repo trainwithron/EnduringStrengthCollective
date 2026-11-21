@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createGroupWithCoach } from "@/lib/create-group";
 import { discardEmptyGroup } from "@/lib/discard-empty-group";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { UserPlus } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { useTerm } from "@/components/coach/terminology-provider";
@@ -61,7 +62,7 @@ export function AddClientButton({
   const [invitedExisting, setInvitedExisting] = useState<{ email: string; already: boolean } | null>(null);
   // The person was already this coach's client: what was sent to them again (and the link, when it is for the coach to copy or text).
   const [resentNote, setResentNote] = useState<{ message: string; link: string | null } | null>(null);
-  const [added, setAdded] = useState<{ groupId: string; profileId: string; name: string; inGroup: string | null; hasEmail: boolean; note?: string | null } | null>(null);
+  const [added, setAdded] = useState<{ groupId: string; profileId: string; name: string; inGroup: string | null; hasEmail: boolean; note?: string | null; handOver?: boolean } | null>(null);
   const [groups, setGroups] = useState<GroupOption[] | null>(null);
   const [selectedGroupId, setSelectedGroupId] = useState("");
   const [groupMode, setGroupMode] = useState<GroupMode>("name");
@@ -227,12 +228,14 @@ export function AddClientButton({
       }
       // The person adding chose another coach to hold this client: add them to the client's space (and step out of it).
       let note: string | null = null;
+      let handOver = false;
       if (step === "one_on_one" && assignTo) {
         const coachName = orgCoaches.find((c) => c.id === assignTo)?.name ?? "that coach";
         const { error: assignError } = await createBrowserClient().rpc("assign_group_coach", { p_group: target, p_coach: assignTo });
         note = assignError ? `Added, but ${coachName} could not be given them: ${assignError.message}. You still coach them; you can hand them over from the Team page.` : `${coachName} is their coach now.`;
+        handOver = !!assignError;
       }
-      setAdded({ groupId: target, profileId: data.profileId, name: fullName, inGroup: step === "group" ? groups?.find((g) => g.id === target)?.name ?? null : null, hasEmail: email.trim().length > 0, note });
+      setAdded({ groupId: target, profileId: data.profileId, name: fullName, inGroup: step === "group" ? groups?.find((g) => g.id === target)?.name ?? null : null, hasEmail: email.trim().length > 0, note, handOver });
       setFullName("");
       setEmail("");
       router.refresh();
@@ -359,6 +362,12 @@ export function AddClientButton({
             {added.name} added{added.inGroup ? ` to ${added.inGroup}` : ""}. Nothing was sent to them.
           </p>
           {added.note && <p className="font-body text-xs text-steel mt-1.5">{added.note}</p>}
+          {added.handOver && (
+            // the Team page itself (audit, Nov 21: the note named it with no way there)
+            <Link prefetch={false} href={`/groups/${groupId}/branding?tab=team`} className="inline-flex items-center min-h-11 font-body text-sm font-semibold text-rust-ink underline-offset-2 hover:underline">
+              Open the Team page
+            </Link>
+          )}
           <p className="font-body text-xs text-steel mt-1.5">Build their program and schedule now. When you&apos;re ready, send their sign-in link from their profile.</p>
           {added.hasEmail && (
             <div className="mt-3">

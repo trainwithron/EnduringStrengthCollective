@@ -7,6 +7,7 @@ import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { runDeleteClient, runRemoveClient } from "@/components/coach/delete-client-flow";
 import { useTerm } from "@/components/coach/terminology-provider";
 import { CLIENT_TYPE_CHOICES, type ClientType } from "@/lib/client-type";
+import { setPaymentHold } from "@/lib/payment-hold-client";
 
 // The small three-dot menu on a client's card and on a row of the Clients list: three actions, the same the client's own profile has (Release Z1 added Remove), and above them the client's type.
 //   * Client type: In person / Online / Group, one tap, no confirm. It is the tier the coach sets on the client (group_memberships.client_tier), the same value the Clients filters read; the calendar's
@@ -14,6 +15,7 @@ import { CLIENT_TYPE_CHOICES, type ClientType } from "@/lib/client-type";
 //   * Set inactive: the existing set_client_inactive call (nothing is deleted; a workout, session or message from them brings them back). A client already set aside shows "Bring back" instead.
 //   * Remove from my clients: the default way out. They leave your lists, their account and data are kept, and you can put them back (components/coach/delete-client-flow.ts).
 //   * Delete permanently: the same removal with 30 days to undo, then the account is erased; the in-page confirm has the history tick-box.
+//   * Take off hold: only for a client Needs payment put on hold (comped, on a break, pays another way). Read when the menu opens; the same call the group's client cards use (audit, Nov 21).
 // It sits beside the card's link, never inside it, so opening it does not open the client.
 export function ClientRowMenu({ groupId, athleteId, athleteName, setAside = false, clientType = null }: { groupId: string; athleteId: string; athleteName: string; setAside?: boolean; clientType?: ClientType | null }) {
   const term = useTerm();
@@ -21,6 +23,25 @@ export function ClientRowMenu({ groupId, athleteId, athleteName, setAside = fals
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Whether this client is on a payment hold: read each time the menu opens (null until known; a read that fails shows no hold item).
+  const [held, setHeld] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    createBrowserClient()
+      .from("session_credits")
+      .select("payment_hold")
+      .eq("athlete_id", athleteId)
+      .eq("group_id", groupId)
+      .maybeSingle()
+      .then(({ data, error: readError }) => {
+        if (!cancelled) setHeld(readError ? null : (data as { payment_hold?: boolean | null } | null)?.payment_hold === true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, groupId, athleteId]);
 
   useEffect(() => {
     if (!open) return;
@@ -92,6 +113,20 @@ export function ClientRowMenu({ groupId, athleteId, athleteName, setAside = fals
     else if (result.status === "deleted") window.location.reload();
   }
 
+  async function takeOffHold() {
+    setOpen(false);
+    if (!(await confirmDialog({ message: `Take ${athleteName} off hold? They count in Needs payment again, and get re-up reminders, when they run out of sessions.`, confirmLabel: "Take off hold" }))) return;
+    setBusy(true);
+    setError(null);
+    const result = await setPaymentHold(groupId, athleteId, false);
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    setHeld(false);
+  }
+
   const item = "w-full text-left min-h-11 px-3 font-body text-sm text-chalk hover:bg-graphite/60 focus:bg-graphite/60 focus:outline-none";
 
   return (
@@ -120,6 +155,11 @@ export function ClientRowMenu({ groupId, athleteId, athleteName, setAside = fals
           <button type="button" role="menuitem" onClick={() => void toggleInactive()} className={item}>
             {setAside ? "Bring back" : "Set inactive"}
           </button>
+          {held && (
+            <button type="button" role="menuitem" onClick={() => void takeOffHold()} className={item}>
+              Take off hold
+            </button>
+          )}
           <button type="button" role="menuitem" onClick={() => void removeClient()} className={item}>
             Remove from my {term("client")}s
           </button>

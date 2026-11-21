@@ -9,9 +9,11 @@ import { scaleSavedPlans, describeScalePlans } from "@/lib/scale-plans";
 import { shortDateLabel } from "@/lib/apply-from";
 import { VARIETY_LABELS, type VarietyValue } from "@/lib/nutrition-preferences";
 import type { MacroTargetsLike } from "@/lib/plan-scaling";
+import { REBUILD_WITH_REQUESTS_EVENT, requestsFromAnswers, type RebuildWithRequests } from "@/lib/meal-plan-rebuild";
 
 // What a client answered to "are you happy with your meal plan?" after a new target. The coach can mark an answer handled, turn the variety up when the client called the plan
-// boring, scale the saved plan to the new number in one tap (nothing is rebuilt and no AI is used), or go build the plan again with the client's words in front of them.
+// boring, scale the saved plan to the new number in one tap (nothing is rebuilt and no AI is used), or build the plan again with the client's requests in it (audit, Nov 21: the button used to
+// only jump to the builder): the requests go into the builder's Favorite foods / specific requests and it builds at once, the same as Generate meal plan. Nothing is saved until the coach saves it.
 export function ClientAnswersPanel({
   athleteId,
   clientName,
@@ -40,6 +42,7 @@ export function ClientAnswersPanel({
   const wantsVariety = open.some((a) => a.boring);
   const topOfVariety = moreVariety(currentVariety) === currentVariety;
   const varietyLabel = (v: string) => VARIETY_LABELS[v as VarietyValue] ?? v;
+  const requests = requestsFromAnswers(answers);
 
   if (answers.length === 0) return null;
 
@@ -76,6 +79,17 @@ export function ClientAnswersPanel({
     setCurrentVariety(next);
     setMessage(`Meal variety is now "${varietyLabel(next)}". New plans use it.`);
     router.refresh();
+  }
+
+  // The builder (Meal plan, further down this page) listens for this; its section is opened so the new plan shows.
+  function rebuildWithRequests() {
+    setError(null);
+    setMessage(null);
+    const fold = document.getElementById("meal-plan");
+    if (fold instanceof HTMLDetailsElement && !fold.open) fold.open = true;
+    const detail: RebuildWithRequests = { requests };
+    window.dispatchEvent(new CustomEvent<RebuildWithRequests>(REBUILD_WITH_REQUESTS_EVENT, { detail }));
+    setMessage(requests ? `Rebuilt below with ${clientName}'s requests: ${requests}. Look it over, then save it.` : "Rebuilt below. Look it over, then save it.");
   }
 
   async function scalePlan() {
@@ -131,9 +145,9 @@ export function ClientAnswersPanel({
           >
             {busy === "scale" ? "Scaling…" : "Scale my plan to the new target"}
           </button>
-          <a href="#meal-plan" className="h-11 px-5 border border-rust text-rust-ink font-body text-sm flex items-center">
-            Rebuild with their requests
-          </a>
+          <button type="button" onClick={rebuildWithRequests} disabled={busy !== null} className="h-11 px-5 border border-rust text-rust-ink font-body text-sm flex items-center disabled:opacity-40">
+            {requests ? "Rebuild with their requests" : "Rebuild the meal plan"}
+          </button>
           {wantsVariety && (
             <button type="button" onClick={turnUpVariety} disabled={busy !== null || topOfVariety} className="h-11 px-5 border border-steel/40 text-chalk font-body text-sm disabled:opacity-40">
               {topOfVariety ? `Variety is already "${varietyLabel(currentVariety)}"` : `More variety (now "${varietyLabel(currentVariety)}")`}

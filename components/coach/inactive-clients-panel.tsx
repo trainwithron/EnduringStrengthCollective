@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { readRowsByIds } from "@/lib/read-by-ids";
 import { pageAll } from "@/lib/page-all";
-import Link from "next/link";
+import { DraftMessageLink } from "@/components/messages/draft-message-link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { saved } from "@/lib/saved";
 import {
@@ -201,9 +201,9 @@ export function InactiveClientsPanel({ groupIds: scopeGroupIds }: { groupIds?: s
                 {i.reasons.join(", ")}. Setting someone aside hides them from your dashboard and alerts. Nothing is deleted, and a workout, session or message from them brings them back.
               </p>
               <div className="flex flex-wrap items-center gap-2 mt-2">
-                <Link prefetch={false} href={`/groups/${i.groupId}/messages/${i.athleteId}?draft=${encodeURIComponent(draft)}`} className={`${btn} border-rust text-rust-ink inline-flex items-center`}>
+                <DraftMessageLink threadHref={`/groups/${i.groupId}/messages/${i.athleteId}`} draft={draft} className={`${btn} border-rust text-rust-ink inline-flex items-center`}>
                   Send a door-open note
-                </Link>
+                </DraftMessageLink>
                 <button type="button" disabled={busyKey === key} onClick={() => setAside(i)} className={`${btn} border-steel/30 text-chalk`}>
                   Set aside as inactive
                 </button>
