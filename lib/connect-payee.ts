@@ -141,7 +141,7 @@ export async function eventAccountMatchesGroup(db: SupabaseClient, eventAccount:
 }
 
 // What a coach pays Spotlight for. These only ever happen on the platform's own account; the same purchase kind on a connected account is ignored.
-const PLATFORM_ONLY_PURCHASES = new Set(["ai_topup", "coach_credit_pack", "coach_lift_off"]);
+const PLATFORM_ONLY_PURCHASES = new Set(["ai_topup", "coach_credit_pack", "coach_lift_off", "coach_plan"]);
 export function isPlatformOnlyPurchase(kind: string | null | undefined): boolean {
   return !!kind && PLATFORM_ONLY_PURCHASES.has(kind);
 }

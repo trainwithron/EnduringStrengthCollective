@@ -101,7 +101,7 @@ describe("the payee has to be ready", () => {
     expect(res.status).toBe(200);
     const [params, options] = stripeMock.checkout.sessions.create.mock.calls[0] as unknown as [any, any];
     expect(options).toEqual({ stripeAccount: "acct_1" });
-    expect(params.payment_intent_data.application_fee_amount).toBe(1000); // 1% of 10 x $100
+    expect(params.payment_intent_data.application_fee_amount).toBe(500); // 0.5% of 10 x $100 (Ron, Nov 20: the paid rate is 0.5%)
     expect(params.customer).toBe("cus_new");
     expect(params.line_items[0].price).toBe("price_new");
     expect((stripeMock.prices.create.mock.calls[0] as unknown as unknown[])[1]).toEqual({ stripeAccount: "acct_1" });

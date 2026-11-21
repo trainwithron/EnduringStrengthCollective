@@ -97,6 +97,7 @@ const NOT_A_SAVE = new Set([
   "/api/share/sign",
   "/api/stripe/checkout",
   "/api/stripe/coach-checkout",
+  "/api/stripe/plan-checkout",
   "/api/stripe/connect/dashboard",
   "/api/stripe/connect/onboard",
   "/api/stripe/portal",
