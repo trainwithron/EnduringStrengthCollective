@@ -365,8 +365,11 @@ export async function rescheduleManagedBooking(
     const booked = await store.book({ ...args, start: newStart, end: newEnd });
     if (!booked.ok) return { ok: false, message: "That time was just taken. Please pick another." };
     newBookingId = booked.bookingId;
+    // The link points at the new session BEFORE the old one is cancelled, so a payment for it (wave 3 C7) follows at once and is never refunded in between.
+    await store.repointLink(link.linkId, newBookingId);
     const cancelled = await store.cancel(link.bookingId);
     if (!cancelled.ok) {
+      await store.repointLink(link.linkId, link.bookingId);
       await store.cancel(newBookingId);
       return { ok: false, message: "We couldn't move your session. Nothing was changed." };
     }

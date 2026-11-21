@@ -183,7 +183,16 @@ export function PublicSessionTypesEditor({
                     value={t.displayPrice}
                     placeholder="e.g. 95"
                     onChange={(e) => update(t.id, { displayPrice: e.target.value })}
-                    onBlur={() => persist(t.id, { display_price_cents: priceToCents(t.displayPrice) })}
+                    onBlur={() => {
+                      const cents = priceToCents(t.displayPrice);
+                      // no price (or under $1) means nothing to charge: Pay when booking goes off with it (the database refuses it on otherwise)
+                      if (t.payToBook && (cents ?? 0) < 100) {
+                        update(t.id, { payToBook: false });
+                        persist(t.id, { display_price_cents: cents, pay_to_book: false });
+                      } else {
+                        persist(t.id, { display_price_cents: cents });
+                      }
+                    }}
                   />
                   <span className="font-body text-xs text-steel block mt-1">
                     {t.payToBook ? "Charged when they book." : "Shown only if you turn on prices for the page. Not charged unless you turn on Pay when booking."}

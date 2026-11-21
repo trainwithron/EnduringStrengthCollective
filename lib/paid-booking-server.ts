@@ -5,6 +5,7 @@ import { notifyPaymentReceived } from "@/lib/notify-payment";
 import { isEmailConfigured, sendEmail } from "@/lib/email";
 import { formatInTimezone } from "@/lib/format-in-timezone";
 import { dollars, type PaidDeps } from "@/lib/paid-booking";
+import { alertPlatformAdmins } from "@/lib/cron-monitor";
 
 // The real pieces behind lib/paid-booking.ts: Stripe, the booking store, email and the coach's notices. Service role throughout (a visitor has no account).
 export function paidBookingDeps(db: any, origin: string): PaidDeps {
@@ -43,6 +44,9 @@ export function paidBookingDeps(db: any, origin: string): PaidDeps {
         `Hi ${guestName},\n\nYou paid and your ${typeName} with ${coachName} is booked for ${when}.\n\nNeed to change it or cancel? Use this private link:\n${manageUrl}\n\nSee you then.`
       );
       if (sent) await db.from("booking_manage_links").update({ email_sent_at: new Date().toISOString() }).eq("booking_id", bookingId);
+    },
+    async alertAdmin(subject, body) {
+      await alertPlatformAdmins(subject, body);
     },
     async coachBookedPush({ coachId, groupId, guestName, typeName, startIso, timezone, amountCents }) {
       const when = formatInTimezone(new Date(startIso), timezone, "dateTime");

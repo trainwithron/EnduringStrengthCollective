@@ -7,7 +7,15 @@ begin;
 -- C1: a coach is warned about two hours before a waiting session request lapses, and told once it has (lib/request-lapse-job.ts, run by the five-minute booking job). When
 -- a request lapses is unchanged (expire_stale_booking_requests). Each message is claimed once on the request, so it goes out once.
 alter table public.booking_requests add column if not exists lapse_warned_at timestamptz;
-alter table public.booking_requests add column if not exists lapse_told_at timestamptz;
+-- Requests that lapsed before this step are marked as already told, once, when the column is made: the first run tells only lapses from now on, not a burst for the last day.
+do $$
+begin
+  if not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'booking_requests' and column_name = 'lapse_told_at') then
+    alter table public.booking_requests add column lapse_told_at timestamptz;
+    update public.booking_requests set lapse_told_at = coalesce(decided_at, now()) where status = 'expired';
+  end if;
+end;
+$$;
 
 -- R8: a NEW client starts with quiet hours on, 9 PM to 7 AM in their own time zone, or their coach's when theirs is not known (Ron, Nov 20). Changeable in their Settings as
 -- today. Only accounts made from now on: a marker column is added false for every existing profile, then its default turns true, so only rows made after this step carry it.
@@ -105,12 +113,38 @@ grant execute on function public.turn_off_calendar_feed() to authenticated;
 
 -- C7: paid booking on the public page (Ron, Nov 20). A coach can switch "Pay when booking" on for a public session type that has a price; off for every type until they do.
 -- The visitor pays through the organization's own Stripe account (a direct charge, Spotlight's usual fee) BEFORE anything is booked:
---   * "Pay and book" makes a HOLD on that time for about half an hour (the public page treats it as taken), not a booking.
+--   * "Pay and book" makes a HOLD on that time for 33 minutes (two longer than the 31-minute checkout; the public page treats it as taken), not a booking.
 --   * A paid checkout claims its hold once and only then makes the client record, the booking and the private link. If the time was taken meanwhile, the payment is refunded.
 --   * A payment that never happens leaves no booking and no client record: the hold lapses and the visitor's details on it are wiped.
---   * Refunds follow the cancel rules (lib/paid-booking.ts), each one recorded here with Stripe's refund id so it can never happen twice.
+--   * Refunds follow the cancel rules (lib/paid-booking.ts), each one recorded here with Stripe's refund id so it can never happen twice. A cancellation is refunded only once
+--     it has been seen on two runs five minutes apart (refund_candidate_at), so a session being moved is never refunded in between.
 -- Only the server writes it (visitors have no account). The coach can read their own, for the "Paid online" line on the calendar; they are also told about each payment and refund.
 alter table public.session_types add column if not exists pay_to_book boolean not null default false;
+
+-- Pay when booking can only be on for a type with a price of at least a dollar, in an organization whose Stripe account is ready (also checked when a visitor pays). Turning it
+-- on, or changing the price or organization while it is on, is refused otherwise. Turning it off is always allowed.
+create or replace function public.guard_pay_to_book()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if new.pay_to_book and (tg_op = 'INSERT' or not old.pay_to_book or new.display_price_cents is distinct from old.display_price_cents or new.organization_id is distinct from old.organization_id) then
+    if new.display_price_cents is null or new.display_price_cents < 100 then
+      raise exception 'Pay when booking needs a price of at least one dollar.';
+    end if;
+    if new.organization_id is null or not exists (select 1 from public.org_connect_accounts a where a.organization_id = new.organization_id and a.status = 'ready') then
+      raise exception 'Pay when booking needs the organization''s Stripe account to be ready.';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.guard_pay_to_book() from public, anon, authenticated;
+drop trigger if exists session_types_guard_pay_to_book on public.session_types;
+create trigger session_types_guard_pay_to_book before insert or update on public.session_types
+  for each row execute function public.guard_pay_to_book();
 
 create table if not exists public.public_booking_holds (
   id uuid primary key default gen_random_uuid(),
@@ -139,6 +173,7 @@ create table if not exists public.public_booking_holds (
   refund_id text unique,
   refunded_at timestamptz,
   refund_reason text,
+  refund_candidate_at timestamptz,
   created_at timestamptz not null default now()
 );
 create index if not exists public_booking_holds_coach_time on public.public_booking_holds (coach_id, start_at) where state in ('open', 'claimed');
@@ -190,6 +225,7 @@ select
   not has_function_privilege('anon', 'public.new_calendar_feed_link()', 'execute') as signed_out_cannot_make_links,
   exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'session_types' and column_name = 'pay_to_book') as pay_when_booking_ready,
   (select count(*) from public.session_types where pay_to_book) = 0 as every_session_still_free,
+  exists (select 1 from pg_trigger where tgname = 'session_types_guard_pay_to_book' and not tgisinternal) as pay_needs_price_and_stripe,
   exists (select 1 from pg_class where oid = 'public.public_booking_holds'::regclass and relrowsecurity) as payments_private,
   not has_table_privilege('authenticated', 'public.public_booking_holds', 'insert') as only_the_server_records_payments,
   position('public_booking_holds' in (select prosrc from pg_proc where oid = 'public.resolve_late_change(uuid, boolean)'::regprocedure)) > 0 as charge_takes_no_session_when_paid_online;

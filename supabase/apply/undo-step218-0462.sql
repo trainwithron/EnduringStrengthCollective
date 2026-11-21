@@ -28,6 +28,8 @@ end
 $unpatch$;
 
 drop table if exists public.public_booking_holds;
+drop trigger if exists session_types_guard_pay_to_book on public.session_types;
+drop function if exists public.guard_pay_to_book();
 alter table public.session_types drop column if exists pay_to_book;
 
 drop function if exists public.turn_off_calendar_feed();
@@ -47,6 +49,7 @@ commit;
 select
   to_regclass('public.public_booking_holds') is null as payments_table_gone,
   to_regclass('public.coach_calendar_feeds') is null as calendar_links_gone,
+  not exists (select 1 from pg_trigger where tgname = 'session_types_guard_pay_to_book') as pay_guard_gone,
   not exists (select 1 from pg_trigger where tgname = 'group_memberships_default_new_client_quiet_hours') as quiet_hours_trigger_gone,
   not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'booking_requests' and column_name in ('lapse_warned_at', 'lapse_told_at')) as lapse_columns_gone,
   position('public_booking_holds' in (select prosrc from pg_proc where oid = 'public.resolve_late_change(uuid, boolean)'::regprocedure)) = 0 as charge_back_as_it_was;

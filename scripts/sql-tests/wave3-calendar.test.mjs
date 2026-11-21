@@ -17,10 +17,11 @@ await db.exec(`
   create table public.profiles (id uuid primary key, full_name text, timezone text, quiet_hours_start smallint, quiet_hours_end smallint, created_at timestamptz default now());
   create table public.group_memberships (id serial primary key, group_id uuid, profile_id uuid, role text, joined_at timestamptz default now());
   create table public.organization_memberships (id serial primary key, organization_id uuid, profile_id uuid, role text);
-  create table public.booking_requests (id uuid primary key default gen_random_uuid(), status text);
+  create table public.booking_requests (id uuid primary key default gen_random_uuid(), status text, decided_at timestamptz);
+  create table public.org_connect_accounts (organization_id uuid primary key, stripe_account_id text, status text);
   create table public.organizations (id uuid primary key);
   create table public.groups (id uuid primary key);
-  create table public.session_types (id uuid primary key default gen_random_uuid(), coach_id uuid, name text, display_price_cents int);
+  create table public.session_types (id uuid primary key default gen_random_uuid(), coach_id uuid, name text, display_price_cents int, organization_id uuid);
   create table public.bookings (id uuid primary key default gen_random_uuid(), status text, athlete_id uuid, group_id uuid, coach_id uuid, late_charge_state text, late_change_kind text, credit_state text);
   create table public.credit_log (athlete_id uuid, amount int, booking_id uuid);
   create function public.is_group_coach(g uuid) returns boolean language sql as $$ select true $$;
@@ -43,12 +44,18 @@ const [fxHead, fxBody, fxTail] = fixture.split("$function$");
 await db.exec(fxHead + "$function$" + fxBody.split(String.fromCharCode(10)).join(String.fromCharCode(13, 10)) + "$function$" + fxTail);
 const lateMd5 = async () => (await db.query(`select md5(prosrc) m, md5(replace(prosrc, chr(13), '')) lf from pg_proc where proname = 'resolve_late_change'`)).rows[0];
 const liveMd5 = await lateMd5();
-const migration = read("../../supabase/migrations/0462_wave3_calendar.sql");
-await db.exec(migration);
-await db.exec(migration);
-
 const failures = [];
 const expect = (name, cond) => { if (!cond) failures.push(name); };
+const migration = read("../../supabase/migrations/0462_wave3_calendar.sql");
+// a request that lapsed before this step
+const oldLapse = (await db.query(`insert into public.booking_requests (status, decided_at) values ('expired', now() - interval '3 hours') returning id`)).rows[0].id;
+await db.exec(migration);
+await db.exec(migration);
+expect("C1: a request that lapsed before this step is never announced now", (await db.query(`select lapse_told_at from public.booking_requests where id = $1`, [oldLapse])).rows[0].lapse_told_at !== null);
+const newLapse = (await db.query(`insert into public.booking_requests (status, decided_at) values ('expired', now()) returning id`)).rows[0].id;
+await db.exec(migration);
+expect("C1: one that lapses after it is (running the step again does not mark it)", (await db.query(`select lapse_told_at from public.booking_requests where id = $1`, [newLapse])).rows[0].lapse_told_at === null);
+
 const prof = async (p) => (await db.query(`select * from public.profiles where id = $1`, [p])).rows[0];
 const join = (g, p, role = "athlete") => db.query(`insert into public.group_memberships (group_id, profile_id, role) values ($1, $2, $3)`, [g, p, role]);
 
@@ -141,6 +148,18 @@ const oldType = (await db.query(`select id from public.session_types limit 1`)).
 expect("C7: no stand-in type yet", !oldType);
 const typeId = (await db.query(`insert into public.session_types (coach_id, name, display_price_cents) values ($1, 'Training', 6000) returning id, pay_to_book`, [coach])).rows[0];
 expect("C7: Pay when booking starts off", typeId.pay_to_book === false);
+// Pay when booking needs a price of at least a dollar and a ready Stripe account
+const tryOn = async (sql, params) => { try { await db.query(sql, params); return true; } catch { return false; } };
+await db.query(`update public.session_types set organization_id = $1 where id = $2`, [org, typeId.id]);
+expect("C7: refused on while the organization's Stripe account is not ready", !(await tryOn(`update public.session_types set pay_to_book = true where id = $1`, [typeId.id])));
+await db.query(`insert into public.org_connect_accounts (organization_id, stripe_account_id, status) values ($1, 'acct_1', 'pending')`, [org]);
+expect("C7: refused on while it is still pending", !(await tryOn(`update public.session_types set pay_to_book = true where id = $1`, [typeId.id])));
+await db.query(`update public.org_connect_accounts set status = 'ready' where organization_id = $1`, [org]);
+expect("C7: on once the account is ready and there is a price", await tryOn(`update public.session_types set pay_to_book = true where id = $1`, [typeId.id]));
+expect("C7: the price cannot drop under a dollar while it is on", !(await tryOn(`update public.session_types set display_price_cents = 50 where id = $1`, [typeId.id])));
+expect("C7: no price, no switch (even when made that way)", !(await tryOn(`insert into public.session_types (coach_id, name, display_price_cents, organization_id, pay_to_book) values ($1, 'Free', null, $2, true)`, [coach, org])));
+expect("C7: turning it off is always allowed, with the price at once", await tryOn(`update public.session_types set pay_to_book = false, display_price_cents = null where id = $1`, [typeId.id]));
+await db.query(`update public.session_types set display_price_cents = 6000 where id = $1`, [typeId.id]);
 const hold = (email, extra = {}) =>
   db.query(
     `insert into public.public_booking_holds (coach_id, session_type_id, organization_id, start_at, end_at, expires_at, status_token_hash, guest_name, guest_email, amount_cents, stripe_account_id, state)

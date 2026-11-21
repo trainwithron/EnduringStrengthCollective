@@ -218,6 +218,8 @@ export async function POST(request: Request) {
             paid: session.payment_status === "paid",
             eventAccount: connectedAccount,
             customerEmail: session.customer_details?.email ?? session.customer_email ?? null,
+            amountTotal: session.amount_total ?? null,
+            currency: session.currency ?? null,
           });
           break;
         }
