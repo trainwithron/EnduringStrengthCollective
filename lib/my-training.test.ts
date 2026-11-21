@@ -62,13 +62,17 @@ describe("the pieces are wired", () => {
     expect(read("lib/my-training-cookies.ts")).toContain("JSON.stringify({ athleteId: userId, groupId })");
   });
   it("both coach pickers go straight to My training: no 'Which group's program?' step", () => {
-    for (const f of ["components/athlete/view-as-client-picker.tsx", "components/coach/mobile/spot-clients-groups-panel.tsx"]) {
+    for (const f of ["components/athlete/view-as-client-picker.tsx"]) {
       const src = read(f);
       // (straight into today's workout since Nov 21, audit P19)
       expect(src).toContain('router.push("/my-space/home?start=1")');
       expect(src).not.toContain("Which group");
       expect(src).toContain("Start your own workout");
     }
+    // Spotlight's Clients panel is about clients (PH10, Nov 21): the coach's own workout is Home's.
+    const panel = read("components/coach/mobile/spot-clients-groups-panel.tsx");
+    expect(panel).not.toContain("Start your own workout");
+    expect(panel).not.toContain("Which group");
   });
   it("Assign (Me) files the program in the coach's personal space", () => {
     const panel = read("components/coach/desktop/program-assign-panel.tsx");

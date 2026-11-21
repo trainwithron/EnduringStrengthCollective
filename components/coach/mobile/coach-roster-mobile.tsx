@@ -190,7 +190,7 @@ function RosterRow({
   return (
     <QuickViewBubble
       title={member.fullName}
-      // (no "Open full profile" under it: "Open profile" is the first link inside; audit P32)
+      // (no "Open full profile" under it: "Profile" is a link inside; audit P32)
       trigger={
         <div className="flex items-center gap-3 px-3 py-2.5 active:bg-surface/40">
           {member.avatarUrl ? (
@@ -218,20 +218,21 @@ function RosterRow({
           {member.signInStatus && member.signInStatus !== "active" && (
             <TextSignInLinkButton groupId={groupId} athleteId={member.profileId} clientName={member.fullName} />
           )}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-2">
+          {/* The same buttons, in the same order, as Spotlight's client list (PH9): Log their workout first (the main one), then Profile and Message. */}
+          <Link
+            href={`/groups/${groupId}/athletes/${member.profileId}/log`}
+            onClick={close}
+            className="w-full h-11 bg-rust text-graphite font-body text-sm font-medium flex items-center justify-center"
+          >
+            Log their workout
+          </Link>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
             <Link
               href={`/groups/${groupId}/athletes/${member.profileId}`}
               onClick={close}
               className="font-body text-sm text-rust-ink min-h-11 inline-flex items-center"
             >
-              Open profile
-            </Link>
-            <Link
-              href={`/groups/${groupId}/athletes/${member.profileId}/log`}
-              onClick={close}
-              className="font-body text-sm text-rust-ink min-h-11 inline-flex items-center"
-            >
-              Log their workout
+              Profile
             </Link>
             <Link
               href={`/groups/${groupId}/messages/${member.profileId}`}

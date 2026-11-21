@@ -7,7 +7,8 @@ import { ArrowLeft, ChevronDown, Dumbbell, Mail, MessageCircle, Sparkles, Trendi
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { SpotNeedsTop } from "./spot-needs-top";
-import { SPOT_LAST_OPENED_KEY, SPOT_NEEDS_CACHE_KEY, readSpotNeedsCache, shouldFade, spotCount, spotNeedsCacheEntry, type SpotNeeds } from "@/lib/spot-needs";
+import { SPOT_LAST_OPENED_KEY, SPOT_NEEDS_CACHE_KEY, badgeCountOf, fetchSpotNeeds, readSpotNeedsCache, shouldFade, spotCount, spotNeedsCacheEntry, type SpotNeeds } from "@/lib/spot-needs";
+import { syncAppBadge } from "@/components/coach/app-badge-sync";
 import { isEmbeddedWindow } from "@/components/ui/loading-watchdog";
 import { PushNotificationToggle } from "@/components/athlete/push-notification-toggle";
 import { NotificationBell } from "@/components/athlete/notification-bell";
@@ -33,13 +34,16 @@ const SpotTemplates = dynamic(() => import("./spot-templates").then((m) => m.Spo
 type TileKey = "clients" | "messages" | "business" | "program" | "ask-spot";
 
 export const SPOT_OPEN_HASHES = ["late-changes", "schedule-requests", "expiring"] as const;
+// ?spot=build opens Spotlight on Program > Build a program (the phone's New program, PH19).
+export const SPOT_BUILD_PARAM = "build";
 
 // Ron, Oct 19: "I already have a calendar button. That doesn't need to be there. Quick payment could probably be rolled into business." "I do want messages in the spotlight tab."
+// In order of daily use (Nov 21, PH15); Ask Spot, the last, takes the full width.
 export const TILES: { key: TileKey; label: string; icon: typeof Users }[] = [
   { key: "clients", label: "Clients", icon: Users },
   { key: "messages", label: "Messages", icon: Mail },
-  { key: "business", label: "Business", icon: TrendingUp },
   { key: "program", label: "Program", icon: Dumbbell },
+  { key: "business", label: "Business", icon: TrendingUp },
   { key: "ask-spot", label: "Ask Spot", icon: MessageCircle },
 ];
 
@@ -89,6 +93,8 @@ export function CoachSpotHub({
   const needsRequest = useRef(0);
   function showNeeds(data: SpotNeeds) {
     setNeeds(data);
+    // the app icon shows the same number as the dot (PH1)
+    syncAppBadge(badgeCountOf(data));
     let lastOpened: string | null = null;
     try {
       lastOpened = window.localStorage.getItem(SPOT_LAST_OPENED_KEY);
@@ -114,24 +120,21 @@ export function CoachSpotHub({
       }
     }
     const request = ++needsRequest.current;
-    fetch("/api/coach/spot-needs")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data: SpotNeeds | null) => {
-        if (!data || request !== needsRequest.current) return;
-        try {
-          window.sessionStorage.setItem(SPOT_NEEDS_CACHE_KEY, spotNeedsCacheEntry(data, org, Date.now()));
-        } catch {
-          // not kept: the next page reads it again
-        }
-        if (opening) {
-          setNeeds(data);
-          return;
-        }
-        showNeeds(data);
-      })
-      .catch(() => {
-        // the button simply shows no dot
-      });
+    // shared with the app icon's badge when both ask at once; a failed read leaves the button with no dot. Opening Spotlight asks for the full answer (where Start goes).
+    void fetchSpotNeeds(opening).then((data) => {
+      if (!data || request !== needsRequest.current) return;
+      try {
+        window.sessionStorage.setItem(SPOT_NEEDS_CACHE_KEY, spotNeedsCacheEntry(data, org, Date.now()));
+      } catch {
+        // not kept: the next page reads it again
+      }
+      if (opening) {
+        setNeeds(data);
+        syncAppBadge(badgeCountOf(data));
+        return;
+      }
+      showNeeds(data);
+    });
   }
   // Opened by a link (Release 2): ?spot=1 (a coach page that lives in Spotlight on a phone), or a notice naming a panel (#late-changes, #schedule-requests, #expiring). Checked on the
   // first load AND each time the address changes (Nov 21: a second notice tapped while the app was open did nothing): a new path, a new ?spot=1, or a new #panel.
@@ -152,6 +155,12 @@ export function CoachSpotHub({
   useEffect(() => {
     if (isEmbeddedWindow()) return;
     const anchor = SPOT_OPEN_HASHES.find((h) => hash === `#${h}`) ?? null;
+    if (spotParam === SPOT_BUILD_PARAM) {
+      setOpen(true);
+      setView("program");
+      setBuilderOpen(true);
+      return;
+    }
     if (spotParam !== "1" && !anchor) return;
     setOpen(true);
     setView("grid");
@@ -206,17 +215,13 @@ export function CoachSpotHub({
   // The coach's groups (read with the organizations), so choosing a team organization on the phone can open its team Home.
   const coachedGroups = useRef<CoachedGroup[]>([]);
   const orgsRequested = useRef(false);
-  // A platform admin's own tools (Support inbox, Organizations) sit under Business (Release 2: they used to be in the More list).
-  const [platformAdmin, setPlatformAdmin] = useState(false);
+  // Business: Take a payment opens Quick payment in place (PH15: the main action on top). A platform admin's tools are in Settings > Admin, not here (PH16).
+  const [paymentOpen, setPaymentOpen] = useState(false);
   useEffect(() => {
-    // Only needed for the notification tile's test message, and the admin links.
-    const supabase = createBrowserClient();
-    supabase.auth.getUser().then(async ({ data }) => {
-      setProfileId(data.user?.id);
-      if (!data.user) return;
-      const { data: me } = await supabase.from("profiles").select("is_platform_admin").eq("id", data.user.id).maybeSingle();
-      setPlatformAdmin((me as { is_platform_admin?: boolean } | null)?.is_platform_admin === true);
-    });
+    // Only needed for the notification tile's test message and the bell.
+    createBrowserClient()
+      .auth.getUser()
+      .then(({ data }) => setProfileId(data.user?.id));
   }, []);
   useEffect(() => {
     // Which organizations this coach has: read the first time the hub is opened (the dropdown is only visible then), not on every page.
@@ -307,10 +312,31 @@ export function CoachSpotHub({
   const headerDrag = useRef<{ x: number; y: number; moved: boolean } | null>(null);
 
   function close() {
+    // Something may have been answered inside Waiting for you (a check-in, a request): the dot and the icon are read again, not taken from the remembered answer.
+    if (needsOpen) {
+      try {
+        window.sessionStorage.removeItem(SPOT_NEEDS_CACHE_KEY);
+      } catch {
+        // nothing remembered
+      }
+      loadNeeds(true);
+    }
     setOpen(false);
     setView("grid");
     setBuilderOpen(false);
     setNeedsOpen(false);
+    // A link that opened the program box (?spot=build, ?spotBuilder=) is taken off the address, so the same New program tapped again opens it again (PH19).
+    try {
+      const url = new URL(window.location.href);
+      const keys = ["spotBuilder", "spotBuilderName"].filter((k) => url.searchParams.has(k));
+      if (url.searchParams.get("spot") === SPOT_BUILD_PARAM) keys.push("spot");
+      if (keys.length > 0) {
+        for (const k of keys) url.searchParams.delete(k);
+        window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+      }
+    } catch {
+      // the address stays; nothing else depends on it
+    }
   }
 
   function toggle() {
@@ -511,7 +537,7 @@ export function CoachSpotHub({
                         key={tile.key}
                         type="button"
                         onClick={() => setView(tile.key)}
-                        className="border border-steel/20 p-4 flex flex-col items-center gap-2 active:border-rust active:bg-rust/5 transition-colors"
+                        className={`${tile.key === "ask-spot" ? "col-span-2 " : ""}border border-steel/20 p-4 flex flex-col items-center gap-2 active:border-rust active:bg-rust/5 transition-colors`}
                       >
                         <Icon className="w-6 h-6 text-rust-ink" strokeWidth={2.25} />
                         <span className="font-body text-sm text-chalk text-center">{labelOf(tile)}</span>
@@ -572,7 +598,14 @@ export function CoachSpotHub({
               )}
               {view === "clients" && !needsOrg && (
                 <div className="h-full overflow-y-auto p-4">
-                  <SpotClientsGroupsPanel key={activeGroupId} groupId={activeGroupId} onNavigated={close} fromHub />
+                  <SpotClientsGroupsPanel
+                    key={activeGroupId}
+                    groupId={activeGroupId}
+                    onNavigated={close}
+                    fromHub
+                    requestsWaiting={needs?.requestsWaiting ?? null}
+                    checkinsToReview={needs?.checkinsToReview ?? null}
+                  />
                 </div>
               )}
               {view === "messages" && !needsOrg && (
@@ -582,30 +615,28 @@ export function CoachSpotHub({
               )}
               {view === "business" && !needsOrg && (
                 <div className="h-full overflow-y-auto p-4 space-y-4">
+                  {/* Every panel: the main action on top, then the list, then links (PH15). Quick payment lives inside Business (Ron: "Quick payment could probably be rolled into business"). */}
+                  <button
+                    type="button"
+                    onClick={() => setPaymentOpen((v) => !v)}
+                    aria-expanded={paymentOpen}
+                    className="w-full h-11 bg-rust text-graphite font-body text-sm font-medium flex items-center justify-center gap-2"
+                    data-quick-payment-open
+                  >
+                    Take a payment
+                    <ChevronDown className={`w-4 h-4 transition-transform ${paymentOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+                  </button>
+                  {paymentOpen && (
+                    <div className="border-b border-steel/20 -mx-4 pb-2">
+                      <QuickPaymentPanel key={activeGroupId} groupId={activeGroupId} />
+                    </div>
+                  )}
                   <BusinessMiniDashboard key={activeGroupId} groupId={activeGroupId} expanded />
-                  {/* Quick payment lives inside Business (Ron: "Quick payment could probably be rolled into business"). */}
-                  <div className="border-t border-steel/20 -mx-4">
-                    <p className="px-4 pt-4 font-body text-xs text-steel uppercase tracking-wide font-bold">Quick payment</p>
-                    <QuickPaymentPanel key={activeGroupId} groupId={activeGroupId} />
-                  </div>
-                  {/* The organization's own settings (colors, team, plan live on its pages) and, for a platform admin, their tools: they used to be in the phone's More list. */}
+                  {/* The organization's own settings (colors, team, plan live on its pages). No admin tools here: a platform admin's are in Settings > Admin (PH16). */}
                   <div className="border-t border-steel/20 pt-3 space-y-1" data-business-links>
                     <a href={`/groups/${activeGroupId}/settings`} className="block min-h-11 leading-[2.75rem] font-body text-sm text-rust-ink">
                       Organization settings →
                     </a>
-                    {platformAdmin && (
-                      <>
-                        <a href="/admin/support" className="block min-h-11 leading-[2.75rem] font-body text-sm text-chalk">
-                          Support inbox →
-                        </a>
-                        <a href="/admin/organizations" className="block min-h-11 leading-[2.75rem] font-body text-sm text-chalk">
-                          Organizations →
-                        </a>
-                        <a href="/admin/nutrition-ingredients" className="block min-h-11 leading-[2.75rem] font-body text-sm text-chalk">
-                          Recipe ingredients →
-                        </a>
-                      </>
-                    )}
                   </div>
                 </div>
               )}
@@ -631,9 +662,11 @@ export function CoachSpotHub({
                         <Sparkles className="w-4 h-4" />
                         Build a program
                       </button>
-                      <p className="font-body text-xs text-steel mb-4">Describe it, paste one, or attach a file or photo. You check it before anything is made.</p>
-                      {/* Exercise library beside All programs (Ron, Nov 12): where demos are added from the phone. */}
-                      <div className="flex items-center justify-between gap-4 mb-2">
+                      <p className="font-body text-xs text-steel">Describe it, paste one, or attach a file or photo. You check it before anything is made.</p>
+                      {/* Use a template (built on a computer): its slots filled from the ladders, tailored with Easier / Harder. Shows only when there are templates (PH18). */}
+                      <SpotTemplates key={activeGroupId} groupId={activeGroupId} />
+                      {/* Links last, as in every panel (PH15). Exercise library beside All programs (Ron, Nov 12): where demos are added from the phone. */}
+                      <div className="flex items-center justify-between gap-4 mt-4 border-t border-steel/20 pt-2">
                         <a href="/programs" className="min-h-11 leading-[2.75rem] font-body text-sm text-rust-ink" data-all-programs>
                           All programs →
                         </a>
@@ -641,8 +674,6 @@ export function CoachSpotHub({
                           Exercise library →
                         </a>
                       </div>
-                      {/* Use a template (built on a computer): its slots filled from the ladders, tailored with Easier / Harder. */}
-                      <SpotTemplates key={activeGroupId} groupId={activeGroupId} />
                     </>
                   )}
                 </div>

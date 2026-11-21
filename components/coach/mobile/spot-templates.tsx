@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { loadOrgTemplates, NO_TEMPLATES_MESSAGE, type OrgTemplate } from "@/lib/org-templates";
+import { loadOrgTemplates, type OrgTemplate } from "@/lib/org-templates";
 import { UseTemplatePanel } from "@/components/coach/desktop/use-template-panel";
 
 // Spotlight > Program on a phone: "Start from a template" (Ron, Oct 27: templates are built on a computer; on the phone a coach only USES one). The coach's templates in the organization being
@@ -27,19 +27,18 @@ export function SpotTemplates({ groupId }: { groupId: string }) {
     };
   }, [groupId]);
 
+  // Nothing at all until there are templates (PH18): no heading over an empty list, and no line sending the coach to a computer.
+  if (templates === null || (templates !== "failed" && templates.length === 0)) return null;
+
   return (
     <section className="mt-4" aria-labelledby="spot-templates" data-spot-templates>
       <h3 id="spot-templates" className="font-display uppercase text-xs tracking-wide text-steel mb-2">
         Start from a template
       </h3>
-      {templates === null ? (
-        <p className="font-body text-xs text-steel">One moment…</p>
-      ) : templates === "failed" ? (
+      {templates === "failed" ? (
         <p className="font-body text-xs text-rust-ink" role="alert">
           Couldn&apos;t load your templates. Close this and try again.
         </p>
-      ) : templates.length === 0 ? (
-        <p className="font-body text-xs text-steel">{NO_TEMPLATES_MESSAGE}</p>
       ) : (
         <ul className="divide-y divide-steel/15 border border-steel/20">
           {templates.map((t) => (

@@ -12,16 +12,19 @@ import { InactiveClientsPanel } from "@/components/coach/inactive-clients-panel"
 import { ProgressLookPanel } from "@/components/coach/progress-look-panel";
 import { nextSessionLabel } from "@/lib/next-session-order";
 import type { SpotNeeds } from "@/lib/spot-needs";
+import { REQUESTS_PATH } from "@/lib/requests-center";
+import { COACH_CHECKINS_PATH } from "@/lib/weekly-checkin";
 
-// The top of the Spotlight drop-down on a coach's phone: what needs the coach first. Unread notices (the bell's), "did this session happen?", the next client's workout (or one left open),
+// The top of the Spotlight drop-down on a coach's phone: what needs the coach first. Requests (n) and Check-ins (n) when something waits there, unread notices (the bell's), "did this session happen?", the next client's workout (or one left open),
 // then the same panels Home shows (late changes, schedule requests, expiring sessions, quiet clients, progress looks). Each part draws nothing when it has nothing.
 export function SpotNeedsTop({ needs, onNavigated, onNoticesCleared, onChanged }: { needs: SpotNeeds; onNavigated: () => void; onNoticesCleared?: () => void; onChanged?: () => void }) {
   const [clearing, setClearing] = useState(false);
   const [clearError, setClearError] = useState(false);
   const now = new Date();
   const showNext = needs.next && needs.next.athleteId !== needs.open?.athleteId;
-  // Audit P11 (Nov 21): always the client's log page, which offers today's workout and Wing it (it used to open their profile when they had no program).
-  const nextHref = needs.next ? `/groups/${needs.next.groupId}/athletes/${needs.next.athleteId}/log` : null;
+  // Audit P11 (Nov 21): the client's log page, which offers today's workout and Wing it (it used to open their profile when they had no program). PH24: when that page would offer
+  // exactly one Start, the workout itself (one Start tap, not two).
+  const nextHref = needs.next ? needs.next.startHref || `/groups/${needs.next.groupId}/athletes/${needs.next.athleteId}/log` : null;
 
   function openNotice(id: string) {
     // Marked read the way the bell does it; the link opens either way.
@@ -45,6 +48,27 @@ export function SpotNeedsTop({ needs, onNavigated, onNoticesCleared, onChanged }
 
   return (
     <div className="col-span-2 space-y-3" data-spot-needs>
+      {/* First, the two pages that hold what waits (PH3): only when something is waiting there. */}
+      {(needs.requestsWaiting > 0 || needs.checkinsToReview > 0) && (
+        <ul className="border border-steel/20 divide-y divide-steel/15" aria-label="Waiting pages" data-spot-waiting-pages>
+          {needs.requestsWaiting > 0 && (
+            <li>
+              <Link href={REQUESTS_PATH} onClick={onNavigated} className="flex items-center justify-between gap-3 px-3 min-h-11 font-body text-sm text-chalk" data-spot-requests>
+                <span>Requests ({needs.requestsWaiting})</span>
+                <span aria-hidden="true" className="text-rust-ink">→</span>
+              </Link>
+            </li>
+          )}
+          {needs.checkinsToReview > 0 && (
+            <li>
+              <Link href={COACH_CHECKINS_PATH} onClick={onNavigated} className="flex items-center justify-between gap-3 px-3 min-h-11 font-body text-sm text-chalk" data-spot-checkins>
+                <span>Check-ins ({needs.checkinsToReview})</span>
+                <span aria-hidden="true" className="text-rust-ink">→</span>
+              </Link>
+            </li>
+          )}
+        </ul>
+      )}
       {needs.notices.length > 0 && (
         <div className="flex items-center justify-between gap-3">
           <p className="font-body text-xs text-steel uppercase tracking-wide">Notifications</p>
@@ -87,10 +111,10 @@ export function SpotNeedsTop({ needs, onNavigated, onNoticesCleared, onChanged }
         <>
           {/* Notice links (#late-changes, #schedule-requests, #expiring) open Spotlight on the panel they name (coach-spot-hub.tsx). */}
           <div data-spot-anchor="late-changes">
-            <LateChangesPanel groupIds={needs.groupIds} />
+            <LateChangesPanel groupIds={needs.groupIds} onChanged={onChanged} />
           </div>
           <div data-spot-anchor="schedule-requests">
-            <ScheduleRequestsPanel groupIds={needs.groupIds} />
+            <ScheduleRequestsPanel groupIds={needs.groupIds} onChanged={onChanged} />
           </div>
           <div data-spot-anchor="expiring">
             <ExpiryCheckInPanel groupIds={needs.groupIds} />

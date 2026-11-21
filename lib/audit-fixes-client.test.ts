@@ -244,10 +244,13 @@ describe("Spotlight and the phone coach shell", () => {
     expect(read("components/coach/desktop/use-template-panel.tsx")).toContain("onClick={onClose} data-spot-keep-open>");
   });
   it("P11: Start {Name}'s workout opens their log page (today's workout or Wing it)", () => {
-    expect(read("components/coach/mobile/spot-needs-top.tsx")).toContain("const nextHref = needs.next ? `/groups/${needs.next.groupId}/athletes/${needs.next.athleteId}/log` : null;");
+    // (PH24, Nov 21: straight into the workout when the log page would offer exactly one Start)
+    expect(read("components/coach/mobile/spot-needs-top.tsx")).toContain("const nextHref = needs.next ? needs.next.startHref || `/groups/${needs.next.groupId}/athletes/${needs.next.athleteId}/log` : null;");
   });
   it("P19: Start your own workout starts it (through the own space's Today)", () => {
-    expect(read("components/coach/mobile/spot-clients-groups-panel.tsx")).toContain('router.push("/my-space/home?start=1");');
+    // (PH10, Nov 21: no longer in Spotlight's Clients panel; Home and the computer's picker start it)
+    expect(read("components/coach/mobile/spot-clients-groups-panel.tsx")).not.toContain("Start your own workout");
+    expect(read("components/athlete/view-as-client-picker.tsx")).toContain('router.push("/my-space/home?start=1")');
     expect(placeParams("home", new URLSearchParams("start=1")).get("start")).toBe("1");
     expect(mySpaceTarget("space1", placeParams("home", new URLSearchParams("start=1")))).toBe("/groups/space1/today?start=1");
     expect(mySpaceTarget("space1", placeParams("home", new URLSearchParams()))).toBe("/groups/space1");
@@ -276,7 +279,8 @@ describe("Spotlight and the phone coach shell", () => {
   it("P32: one way to the full profile in the roster's quick view", () => {
     const roster = read("components/coach/mobile/coach-roster-mobile.tsx");
     expect(roster).not.toContain('deeperLabel="Open full profile"');
-    expect(roster).toContain("Open profile");
+    // (PH9: named Profile, as on Spotlight's client list)
+    expect(roster).toMatch(/>\s*Profile\s*<\/Link>/);
   });
   it("P33: a link to a folded nutrition section opens it every time", () => {
     const f = read("components/coach/nutrition/fold-section.tsx");

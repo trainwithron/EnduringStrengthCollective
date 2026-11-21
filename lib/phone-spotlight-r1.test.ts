@@ -10,18 +10,20 @@ const read = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").repla
 const hub = read("components/coach/mobile/coach-spot-hub.tsx");
 
 describe("Spotlight tiles", () => {
-  it("Clients, Messages, Business, Program, Ask Spot: no Calendar tile and no Quick payment tile", () => {
+  it("Clients, Messages, Program, Business, Ask Spot (daily use, PH15): no Calendar tile and no Quick payment tile", () => {
     const tiles = hub.slice(hub.indexOf("export const TILES"), hub.indexOf("];", hub.indexOf("export const TILES")));
-    expect([...tiles.matchAll(/key: "([a-z-]+)"/g)].map((m) => m[1])).toEqual(["clients", "messages", "business", "program", "ask-spot"]);
+    expect([...tiles.matchAll(/key: "([a-z-]+)"/g)].map((m) => m[1])).toEqual(["clients", "messages", "program", "business", "ask-spot"]);
     expect(hub).not.toContain("CalendarMiniView");
     expect(hub).not.toContain('view === "quick-payment"');
   });
   it("a team-sport group hides Business (Quick payment is inside it)", () => {
     expect(TEAM_SPORT_HIDDEN_HUB_TILES).toEqual(["business"]);
   });
-  it("Business shows the business numbers, then Quick payment under them; no dead-end Go deeper", () => {
+  it("Business: Take a payment on top (opens Quick payment), then the business numbers, then links (PH15); no dead-end Go deeper", () => {
     const business = hub.slice(hub.indexOf('{view === "business" && !needsOrg && ('), hub.indexOf('{view === "program" && !needsOrg && ('));
-    expect(business.indexOf("<BusinessMiniDashboard")).toBeLessThan(business.indexOf("<QuickPaymentPanel"));
+    expect(business.indexOf("Take a payment")).toBeLessThan(business.indexOf("<BusinessMiniDashboard"));
+    expect(business).toContain("{paymentOpen && (");
+    expect(business.indexOf("<BusinessMiniDashboard")).toBeLessThan(business.indexOf("data-business-links"));
     expect(read("components/coach/desktop/business-mini-dashboard.tsx")).not.toContain("Go deeper");
   });
   it("Messages lists every conversation and opens it", () => {
@@ -70,9 +72,10 @@ describe("what needs the coach is at the top of the drop-down", () => {
 });
 
 describe("the dot and the gentle fade", () => {
-  it("counts sessions to check, unread notices and unread messages", () => {
-    expect(spotCount({ sessionsToCheck: [{} as never, {} as never], notices: [{} as never], unreadMessages: 3 })).toBe(6);
-    expect(spotCount({ sessionsToCheck: [], notices: [], unreadMessages: 0 })).toBe(0);
+  it("counts sessions to check, unread notices, requests waiting and check-ins to review (PH1)", () => {
+    const notice = { id: "n", type: "direct_message", body: "", linkPath: "/", createdAt: "" };
+    expect(spotCount({ sessionsToCheck: [{} as never, {} as never], notices: [notice], requestsWaiting: 2, checkinsToReview: 1 })).toBe(6);
+    expect(spotCount({ sessionsToCheck: [], notices: [], requestsWaiting: 0, checkinsToReview: 0 })).toBe(0);
   });
   it("fades only for something newer than the last open, never with reduced motion", () => {
     expect(newestOf(["2026-10-20T01:00:00Z", null, "2026-10-20T03:00:00Z"])).toBe("2026-10-20T03:00:00Z");
