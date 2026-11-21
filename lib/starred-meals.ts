@@ -1,6 +1,8 @@
 import { mealRecipeChoices, mergeMealIntoPlan, type MealEntryPayload, type MealPlanBucket, type MealPlanRow, type MealRecipeChoice } from "@/lib/meal-plan-assignment";
 import { checkPlanAgainstPreferences, describeFlagged } from "@/lib/plan-preference-check";
 import type { FoodRules } from "@/lib/allergen-check";
+import type { LibraryRecipe } from "@/lib/library-scaling";
+import { starChoiceForMeal } from "@/lib/star-to-plan";
 
 // Starred meals (Ron, Nov 19: the coach's Nutrition page revamp; database step 207). A coach stars any meal they see: a meal plan option, a meal from before a client's plan change,
 // a meal a client logged. The Favorite meals tab lists them with calories and protein and "Add to plan". A starred meal is a row of the coach's favorites (recipe_favorites,
@@ -123,16 +125,21 @@ export function mealsOfPlan(meals: Record<string, MealEntryPayload[]> | null | u
 
 export type AddToMealResult = { ok: true; row: MealPlanRow } | { ok: false; reason: string };
 
-// The starred meal, checked against the client's food rules, added as one more option of the chosen meal. The day is marked as changed by hand (so "Build the week" asks before
-// replacing it), and every other meal of the day is left exactly as it is.
-export function addStarredToPlan(args: { plan: MealPlanRow; bucket: MealPlanBucket; mealId: string; star: StarredMeal; rules: FoodRules; clientFirst: string }): AddToMealResult {
+// The starred meal, scaled to the chosen meal's own target (Ron, Nov 21: the builder's scaling, ingredient by ingredient, or a whole portion when it has no amounts), checked against
+// the client's food rules, added as one more option of that meal. The day is marked as changed by hand (so "Build the week" asks before replacing it), and every other meal of the
+// day is left exactly as it is. coachRecipe: the coach's own recipe a "r:" star stands for, read by the caller.
+export function addStarredToPlan(args: { plan: MealPlanRow; bucket: MealPlanBucket; mealId: string; star: StarredMeal; rules: FoodRules; clientFirst: string; coachRecipe?: LibraryRecipe | null }): AddToMealResult {
   const entry = (args.plan.meals?.[args.bucket] ?? []).find((m) => m.mealId === args.mealId);
   if (!entry) return { ok: false, reason: "That meal isn't in the plan for that day any more. Pick the day again." };
-  const flagged = checkPlanAgainstPreferences({ [args.bucket]: [{ ...entry, recipes: [args.star.meal] }] }, args.rules);
+  const hasTarget = [entry.proteinTarget, entry.carbsTarget, entry.fatTarget].every((n) => typeof n === "number" && Number.isFinite(n)) && (entry.proteinTarget ?? 0) + (entry.carbsTarget ?? 0) + (entry.fatTarget ?? 0) > 0;
+  const choice = hasTarget
+    ? starChoiceForMeal(args.star, { proteinG: entry.proteinTarget as number, carbsG: entry.carbsTarget as number, fatG: entry.fatTarget as number }, args.coachRecipe)
+    : { ...args.star.meal, fromFavorite: true };
+  const flagged = checkPlanAgainstPreferences({ [args.bucket]: [{ ...entry, recipes: [choice] }] }, args.rules);
   if (flagged.length > 0) return { ok: false, reason: `Not added: ${describeFlagged(flagged[0])}, against ${args.clientFirst}'s food preferences.` };
   const choices = mealRecipeChoices(entry);
   if (choices.some((c) => starredMealKey(c.recipeName ?? "") === args.star.key)) return { ok: false, reason: `${args.star.name} is already an option for ${entry.title} that day.` };
-  const updated: MealEntryPayload = { ...entry, recipes: [...choices, args.star.meal] };
+  const updated: MealEntryPayload = { ...entry, recipes: [...choices, choice] };
   delete updated.recipeId;
   delete updated.recipeName;
   delete updated.ingredients;

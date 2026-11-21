@@ -71,7 +71,12 @@ describe("the client's Today's meals shows options and logs the one they ate", (
 describe("what the builder reads", () => {
   it("never reads a client's starred foods for a coach's menu (stars are private); favorites come from what they ate", () => {
     expect(data).toContain("stars: []");
-    expect(data).not.toContain('from("recipe_favorites")');
+    // the only stars read are the COACH's own starred meals (Nov 21: they feed every new plan), never the client's
+    expect(data.split('.from("recipe_favorites")').length - 1).toBe(1);
+    const at = data.indexOf('.from("recipe_favorites")');
+    const starRead = data.slice(at, at + 200);
+    expect(starRead).toContain('.eq("profile_id", args.coachId)');
+    expect(starRead).not.toContain("athleteId");
   });
   it("reads the new recipe columns softly, falling back to the old select before the release's database step", () => {
     expect(data).toContain("RECIPE_SELECT(true)");

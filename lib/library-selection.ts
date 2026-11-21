@@ -13,6 +13,9 @@ import { scaleTemplate } from "@/lib/meal-templates/scale";
 import { missScore, type SlotTarget } from "@/lib/meal-templates/tolerance";
 import type { DietType, Slot } from "@/lib/meal-templates/types";
 import { checkTextOf, fromTemplateMeal, type ScaledMeal } from "@/lib/scaled-meal";
+import { ENABLED_TEMPLATES } from "@/lib/meal-templates";
+import { MAX_STARS_PER_SLOT, portionStarMeal, starBuilderKey, starredBuilderKeys, STAR_RANK_BONUS } from "@/lib/starred-in-plans";
+import type { StarredMeal } from "@/lib/starred-meals";
 
 export const OPTIONS_PER_SLOT = 3;
 export const DEFAULT_RECENT_DAYS = 7;
@@ -31,6 +34,8 @@ export interface SelectionContext {
   coachRecipes: LibraryRecipe[];
   // Meals already used elsewhere in this build (so one day does not offer the same meal twice).
   excludeKeys?: Set<string>;
+  // The coach's starred meals (Ron, Nov 21): worked in first, scaled to this client (lib/starred-in-plans.ts).
+  starred?: StarredMeal[];
 }
 
 export interface SlotSelection {
@@ -66,25 +71,46 @@ function likeHits(meal: ScaledMeal, likes: string[]): number {
 }
 
 // Every candidate for the slot, scaled to the target. Nothing here knows the client's rules yet.
-export function scaledCandidates(slot: Slot, target: SlotTarget, ctx: Pick<SelectionContext, "diet" | "coachRecipes">): ScaledMeal[] {
+// The coach's stars: a starred library meal or coach recipe is the same candidate, marked (so it is scaled to this client by its own scaler, ingredient by ingredient); any other
+// star with macros is offered as a whole portion where it fits (portionStarMeal).
+export function scaledCandidates(slot: Slot, target: SlotTarget, ctx: Pick<SelectionContext, "diet" | "coachRecipes" | "starred">): ScaledMeal[] {
   const out: ScaledMeal[] = [];
+  const starredKeys = starredBuilderKeys(ctx.starred);
   for (const recipe of templatesFor(slot, ctx.diet)) {
     const meal = scaleTemplate(recipe, target);
-    if (meal) out.push(fromTemplateMeal(meal, recipe));
+    if (meal) out.push(markStar(fromTemplateMeal(meal, recipe), starredKeys));
   }
   for (const recipe of ctx.coachRecipes) {
     if (recipe.slot !== slot && recipe.slot !== "any") continue;
     if (!recipe.diets.includes(ctx.diet)) continue;
     const meal = scaleLibraryRecipe(recipe, slot, target);
-    if (meal) out.push(meal);
+    if (meal) out.push(markStar(meal, starredKeys));
+  }
+  if (ctx.starred && ctx.starred.length > 0) {
+    // A star whose builder meal still exists is scaled above (or does not fit this meal); the others go in whole.
+    const known = new Set([...ENABLED_TEMPLATES.map((r) => `t:${r.id}`), ...ctx.coachRecipes.map((r) => `r:${r.id}`)]);
+    const offered = new Set(out.map((m) => normalizeName(m.name)));
+    for (const star of ctx.starred) {
+      const k = starBuilderKey(star);
+      if (k && known.has(k)) continue;
+      if (offered.has(normalizeName(star.name))) continue;
+      const meal = portionStarMeal(star, slot, target);
+      if (meal) out.push(meal);
+    }
   }
   return out;
+}
+
+function markStar(meal: ScaledMeal, starredKeys: Set<string>): ScaledMeal {
+  return starredKeys.has(meal.key) ? { ...meal, coachStar: true } : meal;
 }
 
 export function rankScore(meal: ScaledMeal, target: SlotTarget, ctx: SelectionContext): number {
   const fav = isFavorite(meal, ctx.favorites);
   let score = missScore(meal.macros, target) + meal.drift * 2;
   if (fav) score -= 100;
+  // The coach's stars come first; unlike a client's favorite they still take the "offered lately" move-down below, so several stars take turns.
+  if (meal.coachStar) score -= STAR_RANK_BONUS;
   score -= 2 * Math.min(3, likeHits(meal, ctx.likes));
   if (ctx.mixItUp && !fav) {
     const days = ctx.recentlyOffered.get(meal.key);
@@ -108,16 +134,23 @@ export function selectOptions(slot: Slot, target: SlotTarget, ctx: SelectionCont
   const picked: ScaledMeal[] = [];
   const families = new Set<string>();
   // First pass: different main proteins. Second pass: fill what is left in rank order.
+  // At most MAX_STARS_PER_SLOT stars among a meal's options, so the menu still changes when the coach has starred many.
+  let stars = 0;
+  const room = (m: ScaledMeal) => !m.coachStar || stars < MAX_STARS_PER_SLOT;
+  const take = (m: ScaledMeal) => {
+    picked.push(m);
+    if (m.coachStar) stars++;
+  };
   for (const m of ranked) {
     if (picked.length >= count) break;
     const family = m.mainProtein ?? m.key;
-    if (families.has(family)) continue;
+    if (families.has(family) || !room(m)) continue;
     families.add(family);
-    picked.push(m);
+    take(m);
   }
   for (const m of ranked) {
     if (picked.length >= count) break;
-    if (!picked.includes(m)) picked.push(m);
+    if (!picked.includes(m) && room(m)) take(m);
   }
   // Keep the rank order inside the three (best first), whichever pass added it.
   picked.sort((a, b) => ranked.indexOf(a) - ranked.indexOf(b));

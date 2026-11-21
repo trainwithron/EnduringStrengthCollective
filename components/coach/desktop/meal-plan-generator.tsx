@@ -1088,7 +1088,15 @@ export function MealPlanGenerator({
                       >
                         <div className="flex flex-wrap items-center gap-x-2 mb-1.5">
                           <input type="checkbox" checked={checked} readOnly className="w-4 h-4" />
-                          <span className="font-body text-sm font-medium flex-1 min-w-0 break-words">{opt.recipeName}</span>
+                          <span className="font-body text-sm font-medium flex-1 min-w-0 break-words">
+                            {/* one of the coach's starred meals, scaled to this client (Nov 21) */}
+                            {opt.fromFavorite && (
+                              <span className="text-rust-ink mr-1" title="From your favorites" aria-label="From your favorites" data-from-favorite>
+                                ★
+                              </span>
+                            )}
+                            {opt.recipeName}
+                          </span>
                           {opt.isAi && (
                             <span className="font-body text-xs uppercase tracking-wide text-rust-ink border border-rust/40 px-1.5 py-0.5">
                               Nutrition Spot · verified

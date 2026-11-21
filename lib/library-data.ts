@@ -7,6 +7,7 @@ import { favoriteSignals, FAVORITE_WINDOW_DAYS, type FavoriteSignals } from "@/l
 import { libraryRecipeFromRow, type LibraryRecipe } from "@/lib/library-scaling";
 import { choiceKey, mealRecipeChoices, type MealEntryPayload } from "@/lib/meal-plan-assignment";
 import { addDaysToKey } from "@/lib/date-key";
+import { MAX_STARRED_MEALS, rowToStarredMeal, type StarredMeal, type StarredRow } from "@/lib/starred-meals";
 
 export interface LibraryContextData {
   coachRecipes: LibraryRecipe[];
@@ -14,6 +15,8 @@ export interface LibraryContextData {
   variety: string | null;
   favorites: FavoriteSignals;
   recentlyOffered: Map<string, number>;
+  // The coach's starred meals (Ron, Nov 21): worked into every new plan first, scaled to the client (lib/starred-in-plans.ts).
+  starred: StarredMeal[];
   // Plain sentences for anything that could not be read (shown quietly; the build still runs on what was read).
   notes: string[];
 }
@@ -103,5 +106,27 @@ export async function loadLibraryContext(supabase: SupabaseClient, args: { coach
     else recentlyOffered = offeredKeysFromPlans((data ?? []) as { log_date: string; meals: unknown }[], args.todayKey);
   }
 
-  return { coachRecipes, likes, variety, favorites, recentlyOffered, notes };
+  let starred: StarredMeal[] = [];
+  {
+    const { data, error } = await supabase
+      .from("recipe_favorites")
+      .select("recipe_id, label, calories, protein_g, carbs_g, fat_g, meal")
+      .eq("profile_id", args.coachId)
+      .eq("kind", "meal")
+      .order("created_at", { ascending: false })
+      .limit(MAX_STARRED_MEALS);
+    if (error) notes.push("Your starred meals could not be read, so they are not worked into this plan.");
+    else starred = ((data ?? []) as StarredRow[]).map(rowToStarredMeal).filter((m): m is StarredMeal => !!m);
+  }
+
+  return { coachRecipes, likes, variety, favorites, recentlyOffered, starred, notes };
+}
+
+// One of the coach's own saved recipes, as the builder scales it: what a starred coach recipe ("r:<id>") is scaled from when it is added to a plan (Favorite meals' Add to plan).
+// Null when it is gone or cannot be read (the star then goes in as a whole portion).
+export async function loadCoachRecipe(supabase: SupabaseClient, recipeId: string): Promise<LibraryRecipe | null> {
+  let res = await supabase.from("recipes").select(RECIPE_SELECT(true)).eq("id", recipeId).maybeSingle();
+  if (res.error) res = await supabase.from("recipes").select(RECIPE_SELECT(false)).eq("id", recipeId).maybeSingle();
+  if (res.error || !res.data) return null;
+  return libraryRecipeFromRow(res.data as unknown as Record<string, unknown>);
 }

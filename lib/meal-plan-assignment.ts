@@ -26,6 +26,8 @@ export interface MealRecipeChoice {
   mainProtein?: string | null;
   // The meal's stable key ("t:<template id>" or "r:<recipe id>"), so a later build knows what was offered before.
   key?: string;
+  // One of the coach's starred meals, scaled to this client (Ron, Nov 21): shown with a small star on the coach's plan.
+  fromFavorite?: boolean;
 }
 
 // The key of a saved option. Plans saved before keys existed are read from the recipe id: a starter-library id starts with a slot letter and an underscore ("l_chicken..."),

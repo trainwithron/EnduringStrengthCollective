@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { checked } from "@/lib/checked-write";
+import { loadCoachRecipe } from "@/lib/library-data";
 import { rowToPreferences } from "@/lib/nutrition-preferences";
 import { addStarredToPlan, caloriesProteinLine, mealsOfPlan, STARRED_MEALS_CHANGED, type PlanMealChoiceTarget, type StarredMeal } from "@/lib/starred-meals";
 import type { MealPlanRow } from "@/lib/meal-plan-assignment";
@@ -137,6 +138,9 @@ function AddToPlan({ meal, clients, todayKey }: { meal: StarredMeal; clients: Fa
     }
     const prefs = rowToPreferences(prefsRow as Record<string, unknown>);
     const [bucket, mealId] = target.split("|");
+    // A starred coach recipe is scaled from the recipe itself (ingredient by ingredient); any other star by its template or as a whole portion (lib/star-to-plan.ts).
+    const recipeKey = typeof meal.meal.key === "string" && meal.meal.key.startsWith("r:") ? meal.meal.key.slice(2) : null;
+    const coachRecipe = recipeKey ? await loadCoachRecipe(supabase, recipeKey) : null;
     const result = addStarredToPlan({
       plan: state.plan,
       bucket: bucket as "daily" | "train" | "rest",
@@ -144,6 +148,7 @@ function AddToPlan({ meal, clients, todayKey }: { meal: StarredMeal; clients: Fa
       star: meal,
       rules: { allergies: prefs.allergies, intolerances: prefs.intolerances, dislikes: prefs.dislikes, dietType: prefs.dietType },
       clientFirst: first,
+      coachRecipe,
     });
     if (!result.ok) {
       setBusy(false);

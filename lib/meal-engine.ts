@@ -1042,6 +1042,8 @@ export interface MealOption {
   swaps?: MealSwap[];
   mainProtein?: string | null;
   key?: string;
+  // One of the coach's starred meals, scaled to this client (lib/starred-in-plans.ts): the plan shows a small star on it.
+  fromFavorite?: boolean;
   // Only on an AI option the coach may save to their library: the verified lines with the real food each was matched to.
   aiLines?: { rawLine: string; name: string | null; grams: number | null; fdcId: number | null; proteinG: number | null; carbsG: number | null; fatG: number | null }[];
 }

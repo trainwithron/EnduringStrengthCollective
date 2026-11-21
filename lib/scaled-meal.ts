@@ -32,6 +32,10 @@ export interface ScaledMeal {
   drift: number;
   // The allergen groups a saved recipe was tagged with when it was saved (a speed filter and a second net: a recipe tagged with one of the client's allergies is never offered).
   allergenTags?: string[];
+  // One of the coach's starred meals (lib/starred-in-plans.ts): ranked first, and marked with a star on the plan.
+  coachStar?: boolean;
+  // A star scaled as a whole portion (1.25 = "1¼ servings"), when it had no amounts the builder could scale.
+  portion?: number;
 }
 
 const plain = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();

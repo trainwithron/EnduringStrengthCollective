@@ -20,6 +20,7 @@ export function optionFromScaled(m: ScaledMeal): MealOption {
     lines: m.lines,
     mainProtein: m.mainProtein,
     key: m.key,
+    ...(m.coachStar ? { fromFavorite: true } : {}),
   };
 }
 
@@ -85,6 +86,7 @@ export function choiceFromOption(opt: MealOption): MealRecipeChoice {
     ...(macros ? { macros: roundMacros(macros) } : {}),
     ...(opt.mainProtein !== undefined ? { mainProtein: opt.mainProtein } : {}),
     ...(opt.key ? { key: opt.key } : {}),
+    ...(opt.fromFavorite ? { fromFavorite: true } : {}),
   };
 }
 
@@ -116,6 +118,7 @@ export function buildSelectionContext(args: {
     recentDays: v.recentDays,
     coachRecipes: args.libraryData?.coachRecipes ?? [],
     excludeKeys: args.excludeKeys,
+    starred: args.libraryData?.starred ?? [],
   };
 }
 
