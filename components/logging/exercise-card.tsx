@@ -91,6 +91,9 @@ export function ExerciseCard({
   const [nameDraft, setNameDraft] = useState(exercise.exerciseName);
   const [swapBusy, setSwapBusy] = useState(false);
   const [swapError, setSwapError] = useState<string | null>(null);
+  // "Just today, or every week?" (B5): the exercise picked, waiting for the answer; and what happened to the other weeks.
+  const [askWeeks, setAskWeeks] = useState<string | null>(null);
+  const [weeksNote, setWeeksNote] = useState<{ text: string; error: boolean } | null>(null);
   // The Swap box searches the same library as the program builder (Ron, Oct 29: "a smart exercise name parser and not just a crude name replacement"): one tap on a match swaps.
   const libraryNames = Array.from(new Set((demoLibrary ?? []).map((r) => r.name)));
   // Guards handleAddSet against a real race: it computes set_order off the
@@ -119,10 +122,11 @@ export function ExerciseCard({
   // after so it never lingers as stuck-looking state.
   const [justConfirmedWeightSetId, setJustConfirmedWeightSetId] = useState<string | null>(null);
 
-  async function applySwap(name: string) {
+  async function applySwap(name: string, scope?: "today" | "every") {
     if (swapBusy) return;
     if (!name || name === exercise.exerciseName) {
       setSwapping(false);
+      setAskWeeks(null);
       return;
     }
     // Never an exercise named with only numbers or with its sets and reps.
@@ -131,6 +135,13 @@ export function ExerciseCard({
       setSwapError(problem);
       return;
     }
+    // On the client's own one-on-one program, ask first: just today, or every week (B5). Everywhere else a swap is for today only, and nothing is asked.
+    if (exercise.everyWeekSwap && !scope) {
+      setAskWeeks(name);
+      return;
+    }
+    setAskWeeks(null);
+    setWeeksNote(null);
     setSwapBusy(true);
     setSwapError(null);
     const oldName = exercise.exerciseName;
@@ -150,6 +161,7 @@ export function ExerciseCard({
     }
     onRenamed(name);
     setSwapping(false);
+    if (scope === "every") void swapForEveryWeek(name);
 
     // Equipment-variant load-ratio suggestion
     // (equipment_variant_load_ratio_and_smart_swap_scoping_sept19.md) —
@@ -175,6 +187,22 @@ export function ExerciseCard({
           }
         }
       }
+    }
+  }
+
+  // Today's swap is saved; this changes the program from the next time on (the same place in each later week that still has the old exercise) and tells the coach when the client did it.
+  async function swapForEveryWeek(name: string) {
+    try {
+      const res = await fetch("/api/program/swap-every-week", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionExerciseId: exercise.id, newName: name }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setWeeksNote({ text: `Swapped for today. ${data.error ?? "The other weeks couldn't be changed."}`, error: true });
+        return;
+      }
+      const later = Number(data.changed ?? 0);
+      setWeeksNote({ text: `${later > 0 ? `Swapped for every week from here on (${later} more week${later === 1 ? "" : "s"}).` : "Swapped for every week from here on."}${data.byClient ? " Your coach is told." : ""}`, error: false });
+    } catch {
+      setWeeksNote({ text: "Swapped for today. The other weeks couldn't be changed: check your connection.", error: true });
     }
   }
 
@@ -346,6 +374,7 @@ export function ExerciseCard({
                   onChange={(v) => {
                     setNameDraft(v);
                     setSwapError(null);
+                    setAskWeeks(null);
                   }}
                   onCommit={(v) => setNameDraft(v)}
                   onPick={(v) => applySwap(v)}
@@ -370,6 +399,7 @@ export function ExerciseCard({
                 onClick={() => {
                   setSwapping(false);
                   setSwapError(null);
+                  setAskWeeks(null);
                 }}
                 disabled={swapBusy}
                 className="min-h-11 px-1 font-body text-xs text-steel disabled:opacity-40"
@@ -381,6 +411,17 @@ export function ExerciseCard({
               <p className="font-body text-xs text-rust-ink mt-1" role="alert">
                 {swapError}
               </p>
+            )}
+            {askWeeks && (
+              <div className="mt-2 flex flex-wrap items-center gap-2" role="group" aria-label="Swap for how long" data-swap-weeks>
+                <p className="basis-full font-body text-sm text-chalk">Swap to {askWeeks}: just today, or every week?</p>
+                <button type="button" disabled={swapBusy} onClick={() => void applySwap(askWeeks, "today")} className="min-h-11 px-4 rounded-token-pill border border-steel/40 font-body text-sm text-chalk disabled:opacity-40">
+                  Just today
+                </button>
+                <button type="button" disabled={swapBusy} onClick={() => void applySwap(askWeeks, "every")} className="min-h-11 px-4 rounded-token-pill bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40">
+                  Every week
+                </button>
+              </div>
             )}
           </div>
         ) : (
@@ -443,6 +484,11 @@ export function ExerciseCard({
         )}
       </div>
 
+      {weeksNote && (
+        <p className={`font-body text-xs mb-2 ${weeksNote.error ? "text-rust-ink" : "text-steel"}`} role={weeksNote.error ? "alert" : "status"} data-swap-weeks-note>
+          {weeksNote.text}
+        </p>
+      )}
       {/* A superset or circuit (B1): what to do with the exercises linked to this one. */}
       {exercise.superset && (
         <p className="font-body text-xs text-rust-ink mb-2" data-superset-line>

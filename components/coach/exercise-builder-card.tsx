@@ -1,7 +1,7 @@
 "use client";
 
 import { confirmDialog } from "@/components/shared/confirm-dialog";
-import { badExerciseNameMessage, isBadExerciseName, splitPrescriptionName, PRESCRIPTION_MESSAGE } from "@/lib/exercise-name-guard";
+import { badExerciseNameMessage, cleanExerciseName, exerciseNameProblem, isBadExerciseName, splitPrescriptionName, PRESCRIPTION_MESSAGE } from "@/lib/exercise-name-guard";
 import { platformOnly, type DemoRow } from "@/lib/exercise-demo";
 import { useEffect, useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -17,6 +17,7 @@ import { cleanDisplayName } from "@/lib/exercise-alias-seed";
 import { existingLibraryName } from "@/lib/exercise-search";
 import { ExerciseProgressionControl } from "./exercise-progression-control";
 import { renameProgramExercise } from "@/lib/rename-program-exercise";
+import { everyWeekDone, everyWeekQuestion, laterWeeksToChange, swapEveryWeek, undoEveryWeekSwap } from "@/lib/every-week-swap";
 import { addLibraryExercise } from "@/lib/library-write";
 import { matchExercise, type AliasEntry } from "@/lib/exercise-matching";
 import { ExerciseMediaPicker } from "./exercise-media-picker";
@@ -184,6 +185,7 @@ export function ExerciseBuilderCard({
   linkedToNext = false,
   canLink = false,
   onToggleLink,
+  onRenamedInLaterWeeks,
 }: {
   exercise: BuilderExercise;
   workoutId: string;
@@ -237,6 +239,8 @@ export function ExerciseBuilderCard({
   linkedToNext?: boolean;
   canLink?: boolean;
   onToggleLink?: () => void;
+  // "Every week from here on" (B4) also changed these exercises in later weeks: the builder shows them changed too (and back again on Undo).
+  onRenamedInLaterWeeks?: (ids: string[], exerciseName: string, displayName: string | null) => void;
 }) {
   // On a client's own program: what the client did last time on this exercise (B6).
   const lastTime = lastTimeLine(useBuilderLastTime(exercise.exerciseName));
@@ -381,6 +385,48 @@ export function ExerciseBuilderCard({
     if (trimmed === exercise.exerciseName && display === exercise.displayName) return;
     if (!aliasUsed && exercise.displayName && trimmed === exercise.displayName) return;
     const supabase = createBrowserClient();
+    // A different exercise in a program with later weeks that have it in the same place (B4): just this week, or every week from here on. Before step 219, or when no later week has it,
+    // nothing is asked and only this week changes, as always.
+    // (a name the rename would refuse goes the usual way, which says why)
+    if (trimmed !== exercise.exerciseName && !exercise.slot && !exerciseNameProblem(cleanExerciseName(trimmed))) {
+      trimmed = cleanExerciseName(trimmed);
+      const later = await laterWeeksToChange(supabase, exercise.id, trimmed, display);
+      if (later && later > 0) {
+        const fromLabel = exercise.displayName ?? exercise.exerciseName;
+        const everyWeek = await confirmDialog({ message: everyWeekQuestion(fromLabel, display ?? trimmed, later), confirmLabel: "Every week from here on", cancelLabel: "Just this week", destructive: false });
+        if (everyWeek) {
+          const before = { exerciseName: exercise.exerciseName, displayName: exercise.displayName ?? null };
+          const done = await swapEveryWeek(supabase, exercise.id, trimmed, display);
+          if (!done.ok) {
+            flashSaveError(done.error);
+            setNameDraft(exercise.displayName ?? exercise.exerciseName);
+            return;
+          }
+          onUpdate({ exerciseName: trimmed, displayName: display });
+          setNameDraft(display ?? trimmed);
+          onRenamedInLaterWeeks?.(done.result.ids, trimmed, display);
+          flashSaved();
+          const swapId = done.result.swap;
+          if (swapId) {
+            showUndo({
+              message: everyWeekDone(done.result.changed),
+              onUndo: async () => {
+                const back = await undoEveryWeekSwap(createBrowserClient(), swapId);
+                if (back === null) {
+                  flashSaveError("Couldn't undo that. Change it back in each week, or try again.");
+                  return;
+                }
+                onUpdate(before);
+                setNameDraft(before.displayName ?? before.exerciseName);
+                onRenamedInLaterWeeks?.(done.result.ids, before.exerciseName, before.displayName);
+              },
+            });
+          }
+          if (prescription && exercise.sets.length === 0) await applyPrescription(prescription);
+          return;
+        }
+      }
+    }
     // The shared rename: checks the name, sets the shown name, and moves the program's progression rule with the exercise.
     const renamed = await renameProgramExercise(supabase, { exerciseId: exercise.id, workoutId, oldName: exercise.exerciseName, newName: trimmed, displayName: display });
     if (renamed.error) {

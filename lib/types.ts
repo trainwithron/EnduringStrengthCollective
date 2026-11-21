@@ -118,6 +118,8 @@ export interface SessionExerciseEntry {
   superset?: { label: string; line: string } | null;
   // The coach's section headers just above this exercise in the program ("Warm-up"; B3). Never on one the client added.
   sectionHeaders?: string[];
+  // A swap can be for every week (B5): a program exercise on the client's own one-on-one program. Never on a team or group program, nor on one the client added.
+  everyWeekSwap?: boolean;
   // How many sets the coach prescribed for this exercise (the program's own count), so the Sets stepper can say "Prescribed 4" when the athlete did 3.
   // Optional/undefined for an exercise with no program behind it (one the athlete added) and on any render path that does not compute it.
   prescribedSetCount?: number | null;

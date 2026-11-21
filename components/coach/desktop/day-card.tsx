@@ -63,6 +63,7 @@ export function DayCard({
   onMoveEarlier,
   onMoveLater,
   onRestored,
+  onRenamedInLaterWeeks,
   programId,
 }: {
   day: BuilderDay;
@@ -92,6 +93,8 @@ export function DayCard({
   // A function is given the CURRENT items, so two edits made close together both land (building from the list the screen last drew made the second one undo the first).
   onItemsChange: (items: BuilderItem[] | ((prev: BuilderItem[]) => BuilderItem[])) => void;
   onDeleted: () => void;
+  // "Every week from here on" (B4) changed exercises on other days: the builder shows them changed (the week grid changes them in its days).
+  onRenamedInLaterWeeks?: (ids: string[], exerciseName: string, displayName: string | null) => void;
   // Move this day one place earlier or later in its week (buttons that work at every screen width, as an alternative to dragging). Not given at the edge of the week.
   onMoveEarlier?: () => void;
   onMoveLater?: () => void;
@@ -531,6 +534,7 @@ export function DayCard({
                       linkedToNext={!!item.supersetNext && canLinkWithNext(sortedItems, item.id)}
                       canLink={canLinkWithNext(sortedItems, item.id)}
                       onToggleLink={() => void toggleLink(item)}
+                      onRenamedInLaterWeeks={onRenamedInLaterWeeks}
                       onUpdate={(patch) =>
                         onItemsChange((prev) => prev.map((i) => (i.id === item.id ? { ...i, ...patch } : i)))
                       }

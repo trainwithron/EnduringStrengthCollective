@@ -370,6 +370,10 @@ export function WeekGrid({
                     onDaysChange((prev) => prev.map((d) => (d.id === day.id ? { ...d, items: typeof items === "function" ? items(d.items) : items } : d)))
                   }
                   onDeleted={() => onDaysChange((prev) => prev.filter((d) => d.id !== day.id))}
+                  onRenamedInLaterWeeks={(ids, exerciseName, displayName) => {
+                    const changed = new Set(ids);
+                    onDaysChange((prev) => prev.map((d) => ({ ...d, items: d.items.map((i) => (i.kind === "exercise" && changed.has(i.id) ? { ...i, exerciseName, displayName } : i)) })));
+                  }}
                   programId={programId}
                   onRestored={(back) => onDaysChange((prev) => (prev.some((d) => d.id === back.id) ? prev : [...prev, back]))}
                   onMoveEarlier={sortedDays[0]?.id === day.id ? undefined : () => moveDay(day.id, -1)}
