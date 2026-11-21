@@ -17,7 +17,7 @@ import {
   type TrackedField,
 } from "@/lib/exercise-fields";
 import { parseNumericReps } from "@/lib/program-card-visuals";
-import { isSetFilled } from "@/lib/set-complete";
+import { completingFields, isSetFilled } from "@/lib/set-complete";
 import { InfoTip } from "@/components/shared/info-tip";
 import { MAX_REST_SECONDS, formatRest, formatRestSpan, parseRestInput, restForSet } from "@/lib/rest-time";
 
@@ -587,26 +587,40 @@ export function ExerciseSetGrid({
   const columns = `2.5rem repeat(${fields.length}, minmax(3.25rem, 1fr)) 3rem`;
   const rowMinWidth = `${40 + fields.length * 52 + 48 + (fields.length + 1) * 8}px`;
 
-  // The check at the end of a set's row: every empty box takes the number it suggests (the same as tapping each grey number), and the set is done once it is all filled in.
-  // A box with nothing to suggest is focused instead, so the person types it. Nothing else changes about when a set counts as done.
+  // The check at the end of a set's row: only the boxes that complete the set (weight and reps, or the one field of a timed or distance exercise; lib/set-complete.ts
+  // completingFields) take the number they suggest, the same as tapping each grey number. RPE, RIR, tempo and every other optional box stay as the person left them:
+  // a tap never logs the coach's target as the client's own effort. A weight that arrived pre-filled is confirmed, as leaving the weight box does. A completing box
+  // with nothing to suggest gets the focus so the person types it; an optional box never does. The set is then done the usual way, once it is filled in.
   function acceptSuggested(set: SetLogEntry) {
     if (readOnly || set.status === "completed") return;
-    for (const field of fields) {
-      if (field === "rest") continue;
+    const needed = completingFields(fields, weightOptional);
+    const stillEmpty: TrackedField[] = [];
+    let weightConfirmed = false;
+    for (const field of needed) {
       const prop = ACTUAL_PROP[field] as keyof SetLogEntry;
-      if (set[prop] !== null && set[prop] !== undefined) continue;
+      if (set[prop] !== null && set[prop] !== undefined && set[prop] !== "") continue;
       const suggestion = suggestionFor(set, field);
-      if (suggestion === null || suggestion === undefined) continue;
+      if (suggestion === null || suggestion === undefined) {
+        stillEmpty.push(field);
+        continue;
+      }
+      if (field === "weight") weightConfirmed = true;
       onSetChange(set.id, { [prop]: suggestion, ...(field === "weight" ? { weightConfirmed: true } : {}) } as Partial<SetLogEntry>);
       save(set.id, { [ACTUAL_COLUMN[field]]: suggestion, ...(field === "weight" ? { weight_confirmed: true } : {}) });
     }
+    // A pre-filled weight (the program's target) the person is now saying they lifted.
+    if (needed.includes("weight") && !weightConfirmed && set.weight !== null && set.weight !== undefined && !set.weightConfirmed) {
+      onSetChange(set.id, { weightConfirmed: true });
+      save(set.id, { weight_confirmed: true });
+    }
     vibrateConfirm();
     markTouched(set.id);
-    // Anything still empty is for the person to type: the first such box gets the focus.
-    requestAnimationFrame(() => {
-      const empty = Array.from(document.querySelectorAll<HTMLInputElement>(`[data-set-row="${set.id}"] input`)).find((el) => el.value.trim() === "");
-      empty?.focus();
-    });
+    const focusField = stillEmpty[0];
+    if (focusField) {
+      requestAnimationFrame(() => {
+        document.querySelector<HTMLInputElement>(`[data-set-row="${set.id}"][data-set-field="${focusField}"] input`)?.focus();
+      });
+    }
   }
 
   return (
@@ -687,7 +701,7 @@ export function ExerciseSetGrid({
             return [
               number,
               ...fields.map((field) => (
-                <div key={`${set.id}:${field}`} data-set-row={set.id} className="min-w-0">
+                <div key={`${set.id}:${field}`} data-set-row={set.id} data-set-field={field} className="min-w-0">
                   <GridCell
                     set={set}
                     field={field}

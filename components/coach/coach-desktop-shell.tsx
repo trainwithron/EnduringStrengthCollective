@@ -557,11 +557,11 @@ function CoachDesktopShellFull({
         {/* On a phone (Release 2): Spotlight on top, and the coach's OWN app's five tabs at the bottom. Desktop/tablet keeps the rail + list panel above, unchanged. */}
         <div className="lg:hidden">
           <CoachSpotHub groupId={groupId} />
-          <BottomTabBar groupId={groupId} variant="own" activeOverride={null} />
+          <BottomTabBar groupId={groupId} variant="own" activeOverride={null} spacer={false} />
         </div>
 
         {/* The page area is a size container: pages switch to two or three columns on the width THEY have (@3xl:, @5xl:), so the split panel never squeezes a two-column page. Capped pages sit centred, not pinned to the left edge (layout audit, Oct 31). */}
-        <main id="main-content" tabIndex={-1} className="@container flex-1 min-w-0 px-4 pt-6 pb-24 md:px-10 md:pt-8 lg:pb-8 lg:mr-[var(--ws-dock,0px)] focus:outline-none">
+        <main id="main-content" tabIndex={-1} className="@container flex-1 min-w-0 px-4 pt-6 pb-[calc(6.5rem+env(safe-area-inset-bottom))] md:px-10 md:pt-8 lg:pb-8 lg:mr-[var(--ws-dock,0px)] focus:outline-none">
           <div className={wide ? "" : "mx-auto w-full max-w-[1400px]"}>
           <PendingNoticeFlusher />
           {here && (

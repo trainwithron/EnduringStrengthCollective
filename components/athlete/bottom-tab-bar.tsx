@@ -31,12 +31,16 @@ export function BottomTabBar({
   activeOverride,
   variant = "athlete",
   homeHref,
+  spacer = true,
 }: {
   groupId: string;
   // null: a coach page that is none of the five tabs (nothing lit).
   activeOverride?: TabKey | null;
   variant?: "athlete" | "own";
   homeHref?: string;
+  // An in-flow block the height of the floating bar, so the end of any page clears it (an iPhone home-screen app adds its 34px safe area). Off where the page
+  // reserves the room itself (the coach shell, whose bar sits before its page area).
+  spacer?: boolean;
 }) {
   const pathname = usePathname();
   // A small dot on Settings while notifications could be switched on but aren't — the way to
@@ -136,7 +140,9 @@ export function BottomTabBar({
   const active: TabKey | null = activeOverride !== undefined ? activeOverride ?? pendingTab : pendingTab ?? resolvedActive;
 
   return (
-    // A floating rounded bar (Look Refresh, client step, Ron Nov 20): the open tab's icon sits in an accent pill, labels in mixed case.
+    <>
+    {spacer && <div aria-hidden="true" data-tab-bar-spacer className="h-[calc(5.5rem+env(safe-area-inset-bottom))]" />}
+    {/* A floating rounded bar (Look Refresh, client step, Ron Nov 20): the open tab's icon sits in an accent pill, labels in mixed case. */}
     <nav className="fixed left-3 right-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] h-16 rounded-[22px] bg-surface/95 backdrop-blur border border-steel/30 shadow-[0_12px_32px_rgb(0_0_0/0.45)] flex z-20">
       {tabs.map((tab) => {
         const isActive = active === tab.key;
@@ -176,5 +182,6 @@ export function BottomTabBar({
         );
       })}
     </nav>
+    </>
   );
 }

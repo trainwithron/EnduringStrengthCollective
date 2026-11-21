@@ -30,7 +30,8 @@ describe("Release 2: the phone opens as the coach's own account", () => {
     expect(bar).not.toContain('label: "More"');
     for (const tab of ['mySpaceHref("calendar")', 'mySpaceHref("feed")', 'mySpaceHref("nutrition")', 'mySpaceHref("settings")', "homeHref ?? mySpaceHref(null)"]) expect(bar).toContain(tab);
     expect(read("components/coach/mobile/coach-mobile-shell.tsx")).toContain('<BottomTabBar groupId={groupId} variant="own" activeOverride={activeOverride} homeHref={homeHref} />');
-    expect(read("components/coach/coach-desktop-shell.tsx")).toContain('<BottomTabBar groupId={groupId} variant="own" activeOverride={null} />');
+    // the shell reserves the floating bar's room on its page area itself (Look Refresh), so the bar brings no spacer there
+    expect(read("components/coach/coach-desktop-shell.tsx")).toContain('<BottomTabBar groupId={groupId} variant="own" activeOverride={null} spacer={false} />');
   });
   it("says who is being logged for on the coach-logs-for-a-client bar", () => {
     const bar = read("components/coach/mobile/coach-mode-bar.tsx");

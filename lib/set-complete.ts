@@ -21,6 +21,17 @@ export function isSetFilled(set: SetValues, trackedProps: string[], weightOption
   return trackedProps.some((p) => has(set[p]));
 }
 
+// The fields that decide whether a set is done, the same rule as isSetFilled: weight (unless it is a bodyweight movement) and reps when the exercise tracks
+// them; otherwise the first field it tracks. The logger's done check fills only these (Assistant review of the Look Refresh, Nov 20): an optional RPE, RIR,
+// tempo or time is the client's own, never the coach's target copied in by a tap. Rest is never one of them.
+export function completingFields<F extends string>(fields: readonly F[], weightOptional: boolean): F[] {
+  const usable = fields.filter((f) => f !== "rest");
+  const tracksWeight = usable.includes("weight" as F) && !weightOptional;
+  const tracksReps = usable.includes("reps" as F);
+  if (tracksWeight || tracksReps) return usable.filter((f) => (f === "weight" && tracksWeight) || f === "reps");
+  return usable.slice(0, 1);
+}
+
 // Reading a PAST set (a finished workout's history): done when it was marked done, or when it has the values the logger itself requires (isSetFilled, with the exercise's own tracked
 // fields; weight optional for a bodyweight movement). Sets logged under the old checkbox rule kept their weight and reps but stayed "pending", and were read as skipped: a coach was
 // told a first exercise "averaged 46% of its sets" when every set was there (Oct 20). A set marked skipped is never done. The live logger is unchanged (it flips the status itself).

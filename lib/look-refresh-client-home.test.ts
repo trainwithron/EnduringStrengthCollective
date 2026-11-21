@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -41,6 +41,8 @@ describe("client Home: today first", () => {
     const page = read("app/(coach)/groups/[groupId]/page.tsx");
     expect(page).not.toContain("<DayWeekMonthSwitcher");
     expect(page).not.toContain("<ViewModeRedirector");
+    // the switcher (and its remembered-view redirect) is gone from the app; Day / Week / Month live on the client Calendar
+    expect(existsSync(join(__dirname, "..", "components/athlete/day-week-month-switcher.tsx"))).toBe(false);
   });
   it("the add-to-home-screen banner sits below Home's content; the top copy steps aside while Home's is on the page", () => {
     const banner = read("components/add-to-home-screen-prompt.tsx");

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { barRest, nextExerciseId } from "@/lib/logger-bottom-bar";
+import { completingFields } from "@/lib/set-complete";
 
 // Look Refresh, client step (Ron, Nov 20: "I'm good with all of that"): the workout logger, laid out like the ClientWorkout and ClientWorkoutRest boards. Only placement, sizing and style.
 const read = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
@@ -103,5 +104,39 @@ describe("the rest timer is a sheet from the bottom while it runs", () => {
   it("the game still waits for a pending habit or check-in", () => {
     expect(rest).toContain("{pendingTask && !taskResolved ? (");
     expect(rest).toContain("Finish this to unlock the mini-game/trivia:");
+  });
+});
+
+// Assistant review of f46a5c24: the done check fills only what completes the set, focuses only a box that still blocks it, and confirms a pre-filled weight.
+describe("the done check", () => {
+  it("(a) fills only the fields that complete the set: weight and reps, or the one field of a timed or distance exercise; never RPE, RIR, tempo or rest", () => {
+    expect(completingFields(["weight", "reps", "rpe", "rir", "tempo", "rest"], false)).toEqual(["weight", "reps"]);
+    expect(completingFields(["weight", "reps", "rpe"], true)).toEqual(["reps"]);
+    expect(completingFields(["time", "rpe", "rest"], false)).toEqual(["time"]);
+    expect(completingFields(["distance", "pace"], false)).toEqual(["distance"]);
+    expect(completingFields(["rest"], false)).toEqual([]);
+    expect(grid).toContain("const needed = completingFields(fields, weightOptional);");
+    expect(grid).toContain("for (const field of needed) {");
+    expect(grid).not.toContain('for (const field of fields) {\n      if (field === "rest") continue;');
+  });
+  it("(b) focuses only a completing box that has nothing to suggest, never an optional one", () => {
+    expect(grid).toContain("const focusField = stillEmpty[0];");
+    expect(grid).toContain("document.querySelector<HTMLInputElement>(`[data-set-row=\"${set.id}\"][data-set-field=\"${focusField}\"] input`)?.focus();");
+    expect(grid).toContain("data-set-row={set.id} data-set-field={field}");
+  });
+  it("(c) a pre-filled weight is confirmed when the check completes the set, as leaving the weight box does", () => {
+    expect(grid).toContain("if (needed.includes(\"weight\") && !weightConfirmed && set.weight !== null && set.weight !== undefined && !set.weightConfirmed) {");
+    expect(grid).toContain("save(set.id, { weight_confirmed: true });");
+  });
+});
+
+// Assistant review of f46a5c24: the floating nav covered page bottoms on an iPhone home-screen app (its 34px safe area).
+describe("page bottoms clear the floating nav", () => {
+  it("the bar brings an in-flow spacer its own height; the coach shell, whose bar sits before its page, reserves the room itself", () => {
+    const bar = read("components/athlete/bottom-tab-bar.tsx");
+    expect(bar).toContain("{spacer && <div aria-hidden=\"true\" data-tab-bar-spacer className=\"h-[calc(5.5rem+env(safe-area-inset-bottom))]\" />}");
+    const shell = read("components/coach/coach-desktop-shell.tsx");
+    expect(shell).toContain("<BottomTabBar groupId={groupId} variant=\"own\" activeOverride={null} spacer={false} />");
+    expect(shell).toContain("pb-[calc(6.5rem+env(safe-area-inset-bottom))]");
   });
 });
