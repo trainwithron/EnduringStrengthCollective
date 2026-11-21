@@ -81,7 +81,7 @@ export default async function LogForClientPage(
           <p className="font-body text-sm text-steel">Log {clientName}&apos;s session as it happens: type or say each exercise as they do it.</p>
           <WingItStartButton groupId={params.groupId} athleteId={params.athleteId} />
           <Link
-            href={`/groups/${params.groupId}/athletes/${params.athleteId}`}
+            href={`/groups/${params.groupId}/athletes/${params.athleteId}?tab=program`}
             className="w-full min-h-11 flex items-center justify-center border border-steel/40 text-chalk font-body text-sm text-center px-3"
           >
             Assign a program

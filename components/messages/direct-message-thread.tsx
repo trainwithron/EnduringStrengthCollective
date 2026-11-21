@@ -127,7 +127,9 @@ export function DirectMessageThread({
 
   return (
     <div className="flex flex-col h-full">
-      <div className={`flex-1 overflow-y-auto space-y-3 px-5 py-4 ${fixedComposer ? "pb-24" : ""}`}>
+      {/* With the composer fixed above the bottom bar (4.75rem bar + about 4.25rem composer), the newest message must clear both: room below the list, and the end marker keeps that much
+          margin when it is scrolled to (audit, Nov 21: at 375px the newest message sat behind the box). */}
+      <div className={`flex-1 overflow-y-auto space-y-3 px-5 py-4 ${fixedComposer ? "pb-[calc(9.75rem+env(safe-area-inset-bottom))]" : ""}`}>
         {messages.length === 0 && (
           <p className="font-body text-sm text-steel text-center mt-8">
             No messages yet — say hello to {otherName}.
@@ -148,7 +150,7 @@ export function DirectMessageThread({
             </div>
           );
         })}
-        <div ref={bottomRef} />
+        <div ref={bottomRef} className={fixedComposer ? "scroll-mb-[calc(9.75rem+env(safe-area-inset-bottom))]" : undefined} />
       </div>
 
       {error && (

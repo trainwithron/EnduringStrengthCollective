@@ -6,6 +6,7 @@ import Link from "next/link";
 import { coachBalanceLabel } from "@/lib/reup";
 import type { NeedsPaymentRow } from "@/lib/dashboard-data";
 import { addSessionsHref } from "@/lib/add-sessions-link";
+import { HOLD_UNDO_WHERE } from "@/lib/payment-hold-client";
 
 // Clients who have run out of sessions, most owed first, with a one-tap Remind (a push to the client, at most once every 3 days)
 // and Hold (comped, on a break, pays another way: out of the count, never reminded). Shows nothing when everyone has sessions.
@@ -34,7 +35,10 @@ export function NeedsPaymentPanel({ rows }: { rows: NeedsPaymentRow[] }) {
         setNote({ id: row.athleteId, text: data.error ?? "That didn't work.", error: true });
         return;
       }
-      if (action === "hold") setList((prev) => prev.filter((r) => r.athleteId !== row.athleteId));
+      if (action === "hold") {
+        setList((prev) => prev.filter((r) => r.athleteId !== row.athleteId));
+        setHoldAllNote(`${row.name} is on hold. ${HOLD_UNDO_WHERE}`);
+      }
       else setNote({ id: row.athleteId, text: data.message ?? "Reminder sent.", error: false });
     } catch {
       setNote({ id: row.athleteId, text: "That didn't work. Try again.", error: true });
@@ -44,9 +48,9 @@ export function NeedsPaymentPanel({ rows }: { rows: NeedsPaymentRow[] }) {
   }
 
   // For a coach who bills outside the app (Acuity, cash, a gym): put everyone on this list on hold in one go. A held client leaves the list, is
-  // never reminded, and never sees a re-up prompt. Each one can be taken off hold from the Clients page.
+  // never reminded, and never sees a re-up prompt. Each one can be taken off hold from the Clients page's menu or their Billing.
   async function holdAll() {
-    if (!await confirmDialog({ message: `Put all ${list.length} on hold? They leave this list, are never reminded, and don't see a re-up prompt. You can take a hold off from the Clients page.`, confirmLabel: "Put on hold" })) return;
+    if (!await confirmDialog({ message: `Put all ${list.length} on hold? They leave this list, are never reminded, and don't see a re-up prompt. ${HOLD_UNDO_WHERE}`, confirmLabel: "Put on hold" })) return;
     setHoldingAll(true);
     setHoldAllNote(null);
     const failed: string[] = [];

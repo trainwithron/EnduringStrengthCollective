@@ -75,7 +75,8 @@ export async function NextClientWorkoutSection({ coachId, groupIds, emptyLine = 
   // The same client is already named above: no second button for them.
   const showNext = next && next.athleteId !== open?.athleteId;
   if (!showNext) return resume ? <section aria-label="Next client workout" className="mb-6">{resume}</section> : null;
-  const href = next.hasProgram ? `/groups/${next.groupId}/athletes/${next.athleteId}/log` : `/groups/${next.groupId}/athletes/${next.athleteId}`;
+  // Always the log: with no program it opens on starting an empty workout (the wing-it logger) and Assign a program (audit, Nov 21: it used to open the profile).
+  const href = `/groups/${next.groupId}/athletes/${next.athleteId}/log`;
   return (
     <section aria-label="Next client workout" className="mb-6 space-y-2">
       {resume}

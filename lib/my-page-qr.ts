@@ -6,7 +6,9 @@ import { CANONICAL_APP_URL } from "@/lib/share-card-coach";
 // that page is really showing (switched on and published, the same rule the page itself and the share-picture code use). Otherwise the coach is pointed to where it is switched
 // on: Calendar > Availability (the one switch; a coach with no page yet gets theirs there, as always), or the website settings when the page is on but not published. Reading this
 // never makes, switches on or publishes anything.
-export const AVAILABILITY_HREF = "/calendar?tab=availability";
+// The public page block on that screen (components/coach/desktop/availability-settings.tsx), which the link opens on (audit, Nov 21).
+export const PUBLIC_PAGE_ANCHOR = "public-page";
+export const AVAILABILITY_HREF = `/calendar?tab=availability#${PUBLIC_PAGE_ANCHOR}`;
 export const TURN_ON_PAGE_TEXT = "Turn on your public page to get a QR code";
 
 export type MyPageQr = { kind: "ready"; url: string } | { kind: "off"; href: string };

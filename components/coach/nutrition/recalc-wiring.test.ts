@@ -50,8 +50,11 @@ describe("the coach's panel", () => {
     expect(html).toContain("Says the plan is getting boring.");
     expect(html).toContain("Mark handled");
     expect(html).toContain("Scale my plan to the new target");
-    expect(html).toContain("Rebuild with their requests");
+    expect(html).toContain("Rebuild the meal plan");
     expect(html).toContain("More variety");
+    // with requests, the button builds with them (audit, Nov 21: it used to be a link that only jumped to the builder)
+    expect(panel([answer({ requestsText: "steak, sweet potato" })])).toContain("Rebuild with their requests");
+    expect(html).not.toContain('href="#meal-plan"');
   });
   it("no variety button unless the client called it boring, and none at the top step", () => {
     expect(panel([answer({ boring: false })])).not.toContain("More variety");

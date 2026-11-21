@@ -12,6 +12,8 @@ import { ShareCardSettings } from "@/components/coach/share-card-settings";
 import { readShareCardSettings } from "@/lib/share-card-settings";
 import { SessionLimitsControl } from "@/components/coach/desktop/session-limits-control";
 import { limitsFromRow } from "@/lib/session-caps";
+import { ScrollToHash } from "@/components/shared/scroll-to-hash";
+import { PUBLIC_PAGE_ANCHOR } from "@/lib/my-page-qr";
 
 // ONE Availability place (Calendar > Availability). Beside the weekly hours this gives two columns (layout audit, Oct 31): how clients book and the booking
 // rules; then the time zone, the public page and the time off. These used to live on a second page, /groups/<id>/availability, which now sends the coach
@@ -77,7 +79,13 @@ export async function AvailabilityBookingSettings({ coachId }: { coachId: string
         </p>
       )}
       <TimezoneControl initialTimezone={coachProfile?.timezone ?? null} />
-      {publicPage && <ConsultationLinkBlock coachId={coachId} slug={publicPage.slug} enabled={publicPage.enabled} acceptsRequests={publicPage.acceptsRequests} hasOpenHours={(openWindowCount ?? 0) > 0} />}
+      {/* "Turn on your public page" (Settings' QR code) lands here (#public-page, audit Nov 21) and outlines it. */}
+      {publicPage && (
+        <div id={PUBLIC_PAGE_ANCHOR} className="scroll-mt-24">
+          <ScrollToHash ids={[PUBLIC_PAGE_ANCHOR]} />
+          <ConsultationLinkBlock coachId={coachId} slug={publicPage.slug} enabled={publicPage.enabled} acceptsRequests={publicPage.acceptsRequests} hasOpenHours={(openWindowCount ?? 0) > 0} />
+        </div>
+      )}
       {shareCard && <ShareCardSettings coachId={coachId} initialHandle={shareCard.handle} initialQr={shareCard.qr} />}
       <AvailabilityTimeOff coachId={coachId} />
     </div>

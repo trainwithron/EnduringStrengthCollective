@@ -275,8 +275,12 @@ describe("the wiring", () => {
     expect(route).not.toContain("inviteUserByEmail(");
     expect(route).toContain('makeAuthLink(serviceRole, { type: "invite"');
     expect(route).toContain("sendAuthMail(");
-    expect(route).toContain("{ invited: true, emailed }");
-    expect(route).toContain("{ invited: true, emailed: sent.emailed }");
+    // when the email did not go, the invitation comes back so the form offers Send again and Copy link (audit, Nov 21)
+    // (one key, unsentId, on every path: it never tells which kind of address it was)
+    expect(route).toContain("const unsent = emailed ? {} : { unsentId: newUserId };");
+    expect(route).toContain("const unsent = sent.emailed ? {} : { unsentId: invite.id };");
+    expect(route).toContain("{ invited: true, emailed, ...unsent }");
+    expect(route).toContain("{ invited: true, emailed: sent.emailed, ...unsent }");
     // EVERY success answer has the same keys, so a missing key can never reveal that an address has an account
     const answers = route.match(/NextResponse\.json\(\{ invited: true[^}]*\}\)/g) ?? [];
     expect(answers.length).toBeGreaterThanOrEqual(5);

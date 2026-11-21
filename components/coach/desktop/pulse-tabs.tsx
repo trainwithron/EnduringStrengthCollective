@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { QUIET_SNOOZE_DAYS, QUIET_SNOOZE_KIND, quietSnoozeKey, snoozedQuietKeys } from "@/lib/quiet-snooze";
 import { sortPulseFirst } from "@/lib/pulse-sort";
+import { PULSE_ATTENTION_ANCHOR, PULSE_ATTENTION_HREF } from "@/lib/home-greeting";
 import { RosterSection } from "@/components/coach/desktop/roster-section";
 import { HomeClientCard, type HomeClientCardData } from "@/components/coach/desktop/home-client-card";
 import { HomeGroupCard, type HomeGroupCardData } from "@/components/coach/desktop/home-group-card";
@@ -38,6 +39,30 @@ export function PulseTabs({
   const [attentionOpen, setAttentionOpen] = useState(false);
   const [coachId, setCoachId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // A link to the list ("N could use a check-in", the Need attention and At-risk tiles) opens it, on the Clients tab, and brings it into view (audit, Nov 21). A click on such a link counts too,
+  // since the address does not change when it already names the list.
+  useEffect(() => {
+    const openList = () => {
+      setTab("clients");
+      setAttentionOpen(true);
+      setTimeout(() => document.getElementById(PULSE_ATTENTION_ANCHOR)?.scrollIntoView({ block: "start" }), 50);
+    };
+    if (window.location.hash === PULSE_ATTENTION_HREF) openList();
+    const onHash = () => {
+      if (window.location.hash === PULSE_ATTENTION_HREF) openList();
+    };
+    const onClick = (e: MouseEvent) => {
+      const a = (e.target as Element | null)?.closest?.(`a[href="${PULSE_ATTENTION_HREF}"]`);
+      if (a) openList();
+    };
+    window.addEventListener("hashchange", onHash);
+    document.addEventListener("click", onClick);
+    return () => {
+      window.removeEventListener("hashchange", onHash);
+      document.removeEventListener("click", onClick);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -131,7 +156,7 @@ export function PulseTabs({
 
       <div className="p-3">
         {tab === "clients" && clientAttentionCount > 0 && (
-          <div className="mb-3 border border-rust/30 bg-rust/5">
+          <div id={PULSE_ATTENTION_ANCHOR} className="mb-3 border border-rust/30 bg-rust/5 scroll-mt-24">
             {/* Collapsed to a count until opened, so a long list never takes over Home. Each client can be snoozed for a week, or all at once. */}
             <div className="flex items-center justify-between gap-3 px-3 py-2">
               <button

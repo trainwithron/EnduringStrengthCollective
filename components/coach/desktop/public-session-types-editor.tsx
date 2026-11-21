@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 
 export interface PublicTypeEditRow {
@@ -33,7 +34,10 @@ export function PublicSessionTypesEditor({
   organizationId,
   payeeReady = false,
   payToBookAvailable = false,
+  groupId,
 }: {
+  // The space this is in, so "your Packages page" is a link (audit, Nov 21).
+  groupId?: string;
   initialTypes: PublicTypeEditRow[];
   organizationId: string | null;
   payeeReady?: boolean;
@@ -215,7 +219,19 @@ export function PublicSessionTypesEditor({
                         Pay when booking
                         <span className="font-body text-xs text-steel block mt-0.5">
                           {!payeeReady
-                            ? "Connect Stripe on your Packages page first. Only the organization's owner can do that."
+                            ? (
+                                <>
+                                  Connect Stripe on your{" "}
+                                  {groupId ? (
+                                    <Link prefetch={false} href={`/groups/${groupId}/business/packages`} className="text-rust-ink underline underline-offset-2">
+                                      Packages page
+                                    </Link>
+                                  ) : (
+                                    "Packages page"
+                                  )}{" "}
+                                  first. Only the organization&apos;s owner can do that.
+                                </>
+                              )
                             : (priceToCents(t.displayPrice) ?? 0) < 100
                               ? "Set a price of at least $1 first."
                               : "People pay this price by card before the time is booked. If they cancel in time with their link, or you cancel, it is refunded. If a paid booking is refunded, your client gets the full amount back and Spotlight's fee is returned; Stripe keeps its card processing fee."}

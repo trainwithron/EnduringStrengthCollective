@@ -132,7 +132,7 @@ export default async function BookingPageSettingsPage(props: { params: Promise<{
 
             <section className="min-w-0">
               <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">Sessions people can book</h2>
-              <PublicSessionTypesEditor initialTypes={types} organizationId={typesOrgId} payeeReady={payeeReady} payToBookAvailable={payToBookAvailable} />
+              <PublicSessionTypesEditor initialTypes={types} organizationId={typesOrgId} payeeReady={payeeReady} payToBookAvailable={payToBookAvailable} groupId={params.groupId} />
             </section>
           </div>
         </div>

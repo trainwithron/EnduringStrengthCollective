@@ -19,9 +19,12 @@ export const metadata = { title: "Programs" };
 export default async function ProgramsListPage(
   props: {
     params: Promise<{ groupId: string }>;
+    searchParams?: Promise<{ import?: string }>;
   }
 ) {
   const params = await props.params;
+  // ?import=1 (Ask Spot's "Import a program", and the old /programs/import address) points straight at Import program.
+  const openImport = (await props.searchParams)?.import === "1";
   const supabase = await createServerClient();
   const {
     data: { user },
@@ -103,7 +106,7 @@ export default async function ProgramsListPage(
           {cards.length} {cards.length === 1 ? "program" : "programs"}
         </p>
         <div className="flex items-center gap-4 mt-4">
-          <ProgramImportLauncher groupId={params.groupId} />
+          <ProgramImportLauncher groupId={params.groupId} autoOpen={openImport} />
           <Link
             href={`/groups/${params.groupId}/programs/new`}
             className="font-body text-xs text-rust-ink"

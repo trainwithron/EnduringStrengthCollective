@@ -10,12 +10,17 @@ export function EmailClaimLinkButton({
   athleteId,
   onSent,
   onLink,
+  label = "Email the sign-in link",
+  className = "h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-50",
 }: {
   groupId: string;
   athleteId: string;
   onSent?: () => void;
   // Called with a link the coach should copy or text when the email itself couldn't be sent.
   onLink?: (link: string) => void;
+  // The words and look of the button (Home's Needs you card says "Send link"); the send and its confirm are the same.
+  label?: string;
+  className?: string;
 }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
@@ -59,9 +64,9 @@ export function EmailClaimLinkButton({
         type="button"
         onClick={onClick}
         disabled={busy}
-        className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-50"
+        className={className}
       >
-        {busy ? "Sending…" : "Email the sign-in link"}
+        {busy ? "Sending…" : label}
       </button>
       {msg && (
         <p className={`font-body text-xs mt-1.5 ${msg.kind === "error" ? "text-rust-ink" : "text-positive"}`} role={msg.kind === "error" ? "alert" : "status"}>

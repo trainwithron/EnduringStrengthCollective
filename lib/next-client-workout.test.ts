@@ -117,9 +117,11 @@ describe("the Home button reads only what it should and goes where 'Log their wo
   it("the coach's own booking is never offered as a client", async () => {
     expect(await loadNextClientToday(fakeSupabase([{ id: "b1", athlete_id: "coach", group_id: "g1", start_at: "2026-10-19T15:00:00Z" }], true), "coach", ["g1"], LA, NOW)).toBeNull();
   });
-  it("source: the button goes to the client's log page, or to their profile with a plain line when there is no program", () => {
+  it("source: the button always goes to the client's log page (with no program it starts an empty workout there), with a plain line when there is no program", () => {
     const src = read("components/coach/next-client-workout-section.tsx");
-    expect(src).toContain("/log` : `/groups/${next.groupId}/athletes/${next.athleteId}`");
+    // audit, Nov 21: a client with no program used to open their profile, not the workout
+    expect(src).toContain("const href = `/groups/${next.groupId}/athletes/${next.athleteId}/log`;");
+    expect(src).not.toContain("next.hasProgram ? `");
     // the short name already ends with a period ("Cindie D."): none is added
     expect(src).toContain("No program yet for {next.name}</p>");
     expect(src).not.toContain("No program yet for {next.name}.");

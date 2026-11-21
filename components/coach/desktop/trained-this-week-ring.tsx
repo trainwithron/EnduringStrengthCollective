@@ -1,4 +1,4 @@
-import { trainedThisWeek } from "@/lib/home-greeting";
+import { PULSE_ATTENTION_HREF, trainedThisWeek } from "@/lib/home-greeting";
 
 // The ring in Home's greeting band (Look Refresh, Nov 20): how many clients trained this week, the same count as the Active this week tile.
 export function TrainedThisWeekRing({ active, total, needCheckIn }: { active: number; total: number; needCheckIn: number }) {
@@ -31,7 +31,14 @@ export function TrainedThisWeekRing({ active, total, needCheckIn }: { active: nu
         <p className="font-body text-sm font-semibold text-chalk">
           {t.active} of {t.total} trained this week
         </p>
-        <p className="font-body text-[13px] text-steel">{needCheckIn === 0 ? "No one needs a check-in" : `${needCheckIn} could use a check-in`}</p>
+        {needCheckIn === 0 ? (
+          <p className="font-body text-[13px] text-steel">No one needs a check-in</p>
+        ) : (
+          // opens the Pulse "need attention" list on this page (audit, Nov 21)
+          <a href={PULSE_ATTENTION_HREF} className="inline-flex items-center min-h-11 font-body text-[13px] font-semibold text-rust-ink underline-offset-2 hover:underline">
+            {needCheckIn} could use a check-in
+          </a>
+        )}
       </div>
     </div>
   );

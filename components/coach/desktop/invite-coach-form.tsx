@@ -4,6 +4,80 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { UserPlus } from "lucide-react";
 
+// The invitation whose email did not go out, so Send again and Copy link are offered right in the message (audit, Nov 21). The server hands back one id whatever kind of address it was
+// (a new address: the person waiting to accept; an address that already had an account: their in-app invitation), so the answer never tells which; these buttons try the new-address
+// calls first (the Invitations list's own routes) and the in-app invitation's calls when that one is not it.
+type Unsent = { id: string; name: string } | null;
+
+async function postJson(path: string, body: Record<string, string>): Promise<{ status: number; ok: boolean; data: any }> {
+  const res = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  return { status: res.status, ok: res.ok, data: await res.json().catch(() => ({})) };
+}
+
+function UnsentInviteActions({ groupId, id, name }: { groupId: string; id: string; name: string }) {
+  const [working, setWorking] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [shownLink, setShownLink] = useState<string | null>(null);
+  async function resend() {
+    setWorking("resend");
+    setMessage(null);
+    try {
+      let r = await postJson("/api/coaches/invite/resend", { groupId, profileId: id });
+      if (r.status === 404) r = await postJson("/api/org-invites/resend", { inviteId: id });
+      if (!r.ok) setMessage({ ok: false, text: r.data.error || "Couldn't send it again. Try again." });
+      else if (r.data.emailed === false) setMessage({ ok: false, text: `The email to ${name} did not go out again. Use Copy link and send it yourself.` });
+      else setMessage({ ok: true, text: `Sent again to ${name}.` });
+    } catch {
+      setMessage({ ok: false, text: "Couldn't send it again. Check your connection and try again." });
+    } finally {
+      setWorking(null);
+    }
+  }
+  async function copy() {
+    setWorking("copy");
+    setMessage(null);
+    setShownLink(null);
+    try {
+      const r = await postJson("/api/coaches/invite/link", { groupId, profileId: id });
+      const link = r.ok && typeof r.data.link === "string" ? r.data.link : r.status === 404 ? `${window.location.origin}/org-invite/${id}` : null;
+      if (!link) {
+        setMessage({ ok: false, text: r.data.error || "Couldn't get the link. Try again." });
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(link);
+        setMessage({ ok: true, text: `Link copied. Send it to ${name}.` });
+      } catch {
+        setShownLink(link);
+        setMessage({ ok: true, text: "Copy this link and send it to the person." });
+      }
+    } catch {
+      setMessage({ ok: false, text: "Couldn't get the link. Check your connection and try again." });
+    } finally {
+      setWorking(null);
+    }
+  }
+  const button = "min-h-11 font-body text-sm font-semibold text-rust-ink disabled:opacity-40";
+  return (
+    <div className="mt-2">
+      <div className="flex items-center gap-4">
+        <button type="button" onClick={resend} disabled={working !== null} className={button}>
+          {working === "resend" ? "Sending…" : "Send again"}
+        </button>
+        <button type="button" onClick={copy} disabled={working !== null} className={button}>
+          {working === "copy" ? "Getting…" : "Copy link"}
+        </button>
+      </div>
+      {shownLink && <input readOnly value={shownLink} onFocus={(e) => e.currentTarget.select()} aria-label="Invitation link" className="w-full h-10 bg-graphite border border-steel/30 text-chalk px-2.5 font-body text-xs" />}
+      {message && (
+        <p className={`font-body text-xs mt-1 ${message.ok ? "text-positive" : "text-rust-ink"}`} role={message.ok ? "status" : "alert"}>
+          {message.text}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function InviteCoachForm({ groupId }: { groupId: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -14,6 +88,7 @@ export function InviteCoachForm({ groupId }: { groupId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [emailed, setEmailed] = useState(true);
+  const [unsent, setUnsent] = useState<Unsent>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -31,6 +106,7 @@ export function InviteCoachForm({ groupId }: { groupId: string }) {
       if (!res.ok) throw new Error(data.error || "Couldn't invite this coach.");
 
       setEmailed(data.emailed !== false);
+      setUnsent(data.emailed === false && typeof data.unsentId === "string" ? { id: data.unsentId, name: fullName.trim() } : null);
       setSuccess(true);
       setFullName("");
       setEmail("");
@@ -71,9 +147,14 @@ export function InviteCoachForm({ groupId }: { groupId: string }) {
               If that person has no open invitation, we sent one, and they join once they accept. Check Invitations on the Team page for anything already open: you can send it again, copy the link or cancel it there.
             </p>
           ) : (
-            <p className="font-body text-sm text-rust-ink" role="alert">
-              The invitation was made, but the email did not go out. Open Invitations on the Team page and choose Send again, or Copy link and send it yourself.
-            </p>
+            <div>
+              <p className="font-body text-sm text-rust-ink" role="alert">
+                {unsent
+                  ? "The invitation was made, but the email did not go out. Send it again, or copy the link and send it yourself."
+                  : "The invitation was made, but the email did not go out. Open Invitations on the Team page and choose Send again, or Copy link and send it yourself."}
+              </p>
+              {unsent && <UnsentInviteActions groupId={groupId} id={unsent.id} name={unsent.name} />}
+            </div>
           )}
           <button
             type="button"

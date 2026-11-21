@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { checked } from "@/lib/checked-write";
 
@@ -26,8 +27,11 @@ export function PackageAssignmentControl({
   athleteId,
   privatePackages,
   initialAssignedIds,
+  groupId,
 }: {
   athleteId: string;
+  // The space this is in, so "the Packages page" is a link (audit, Nov 21).
+  groupId?: string;
   privatePackages: PrivatePackageOption[];
   initialAssignedIds: string[];
 }) {
@@ -90,7 +94,15 @@ export function PackageAssignmentControl({
       )}
       {privatePackages.length === 0 ? (
         <p className="font-body text-sm text-steel">
-          No private packages yet — create one from the Packages page to assign custom pricing here.
+          No private packages yet — create one from the{" "}
+          {groupId ? (
+            <Link prefetch={false} href={`/groups/${groupId}/business/packages`} className="text-rust-ink underline underline-offset-2">
+              Packages page
+            </Link>
+          ) : (
+            "Packages page"
+          )}{" "}
+          to assign custom pricing here.
         </p>
       ) : (
         <div className="space-y-1.5">

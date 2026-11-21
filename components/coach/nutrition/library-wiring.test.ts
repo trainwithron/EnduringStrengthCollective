@@ -96,7 +96,7 @@ describe("review fixes", () => {
     expect(clientNutritionSrc).toContain("rulesReadable={!prefsReadError}");
     expect(toolsSrc).toContain("rulesReadable={rulesReadable}");
     expect(generator).toContain("rulesReadable: rulesReadableProp = true");
-    for (const fn of ["function handleGenerate()", "async function handleBuildWeek()", "async function handleAiSuggest(", "async function handleAiSuggestAll()"]) {
+    for (const fn of ["function handleGenerate(", "async function handleBuildWeek()", "async function handleAiSuggest(", "async function handleAiSuggestAll()"]) {
       const body = generator.slice(generator.indexOf(fn), generator.indexOf(fn) + 700);
       expect(body, fn).toContain("rulesReadable");
     }

@@ -72,6 +72,10 @@ import { ageBand } from "@/lib/guardian-consent";
 import { ClientSignInPanel } from "@/components/coach/client-signin-panel";
 import { GetStartedCard } from "@/components/coach/get-started-card";
 import { getStartedSteps, HIDE_GET_STARTED_KEY, showGetStarted, SIGN_IN_OPTIONS_ANCHOR } from "@/lib/get-started-checklist";
+import { ScrollToHash } from "@/components/shared/scroll-to-hash";
+import { ADD_SESSIONS_ANCHOR } from "@/lib/add-sessions-link";
+import { GOAL_SHEET_ANCHOR } from "@/lib/goal-review";
+import { PaymentHoldControl, PAYMENT_HOLD_ANCHOR } from "@/components/coach/payment-hold-control";
 import { ClientNameControl } from "@/components/coach/client-name-control";
 import { CorrectClientEmail } from "@/components/coach/correct-client-email";
 import { claimStatus, isPlaceholderEmail } from "@/lib/client-claim";
@@ -1074,6 +1078,8 @@ export default async function AthleteProfilePage(
       )}
 
       <div id="client-profile-body" data-active-tab={initialTab}>
+        {/* A link to a section ("#sign-in-options", "#add-sessions", "#goal-sheet") lands on it once its tab shows (audit, Nov 21). */}
+        <ScrollToHash ids={[SIGN_IN_OPTIONS_ANCHOR, ADD_SESSIONS_ANCHOR, GOAL_SHEET_ANCHOR, PAYMENT_HOLD_ANCHOR]} />
         <ClientProfileTabs groupId={params.groupId} athleteId={params.athleteId} initial={initialTab} hide={selfView ? SELF_HIDDEN_TABS : []} />
         <div data-tab="calendar" className="mb-8">
           {/* Sessions can be added right here too (Ron, Oct 19: "it would be nice to be able to do it from the calendar also. That's where I'd be looking at it most likely"): the same
@@ -1148,7 +1154,7 @@ export default async function AthleteProfilePage(
           {!selfView && signInStatus !== "active" && (
             <p className="font-body text-sm text-steel">
               Hasn&apos;t signed in yet.{" "}
-              <Link href={`/groups/${params.groupId}/athletes/${params.athleteId}?tab=settings`} className="text-rust-ink underline underline-offset-2">
+              <Link href={`/groups/${params.groupId}/athletes/${params.athleteId}?tab=settings#${SIGN_IN_OPTIONS_ANCHOR}`} className="text-rust-ink underline underline-offset-2">
                 Sign-in options
               </Link>
             </p>
@@ -1588,6 +1594,7 @@ export default async function AthleteProfilePage(
             />
           )}
           {!selfView && user && (
+            <div id={GOAL_SHEET_ANCHOR} className="scroll-mt-24">
             <GoalSheetSection
               groupId={params.groupId}
               athleteId={params.athleteId}
@@ -1596,6 +1603,7 @@ export default async function AthleteProfilePage(
               clientFirstName={(profile?.full_name ?? "").trim().split(/\s+/)[0] || undefined}
               timeZone={displayZone}
             />
+            </div>
           )}
           {latestGoalRow?.status === "proposed" && latestGoalRow.created_by === params.athleteId && (
             <section>
@@ -1617,6 +1625,8 @@ export default async function AthleteProfilePage(
             <SettingsGroup label="Billing">
               {/* A failed card payment, how to pause them today, and their card payments with Evidence for a dispute (Ron, Nov 20). */}
               {!selfView && <ClientBillingFacts groupId={params.groupId} athleteId={params.athleteId} timeZone={displayZone} />}
+              {/* On hold (Needs payment's Hold): said here, with the way to take it off (audit, Nov 21). Shows nothing when they are not on hold. */}
+              {!selfView && <PaymentHoldControl groupId={params.groupId} athleteId={params.athleteId} clientName={profile?.full_name ?? "this client"} />}
               <p className="font-body text-sm text-chalk mb-3">{sessionsSentence}</p>
               {/* Add sessions sits right under the sentence (FIX 3): every "out of sessions" and "running low" link lands here (lib/add-sessions-link.ts). */}
               <div id="add-sessions" className="scroll-mt-24 mb-4">
@@ -1659,6 +1669,7 @@ export default async function AthleteProfilePage(
             <SettingsGroup label="Packages">
               <PackageAssignmentControl
                 athleteId={params.athleteId}
+                groupId={params.groupId}
                 privatePackages={(privatePackageRows ?? []).map((p) => ({
                   id: p.id,
                   name: p.name,

@@ -6,13 +6,15 @@ import { formatInTimezone } from "@/lib/format-in-timezone";
 import { answerByText, requestDeadline } from "@/lib/request-deadline";
 import type { PageQuery } from "@/lib/page-all";
 import { readByIds, readRowsByIds } from "@/lib/read-by-ids";
-import { DEFAULT_HEADS_UP_DAYS, expiringSoon, expiryDismissalKey, isSnoozed } from "@/lib/expiry-checkin";
+import { DEFAULT_HEADS_UP_DAYS, buildCheckInDraft, expiringSoon, expiryDismissalKey, isSnoozed } from "@/lib/expiry-checkin";
 import { BUTTON, sentences, type NeedsYouItem } from "@/lib/needs-you";
 import type { QuietTier } from "@/lib/quiet-client-tier";
 import { addSessionsHref } from "@/lib/add-sessions-link";
 import { requestHref } from "@/lib/requests-center";
 import { COACH_CHECKINS_PATH } from "@/lib/weekly-checkin";
-import { goalReviewCutoffIso, goalReviewDue } from "@/lib/goal-review";
+import { GOAL_SHEET_ANCHOR, goalReviewCutoffIso, goalReviewDue } from "@/lib/goal-review";
+import { SIGN_IN_OPTIONS_ANCHOR } from "@/lib/get-started-checklist";
+import { getQuietClientNudgeTemplates } from "@/lib/quiet-client-nudge-templates";
 import { loadQuietInChat, quietChatSentence } from "@/lib/quiet-chat";
 
 // A weekly check-in older than this is not news for Home's strip (the Check-ins page keeps the same window).
@@ -39,6 +41,10 @@ export interface NeedsYouHomeInputs {
 export const SESSION_SOON_MINUTES = 120;
 
 const clientPath = (groupId: string, athleteId: string) => `/groups/${groupId}/athletes/${athleteId}`;
+// A message thread with a drafted note in its box (the coach edits it before sending; the thread page keeps the draft when it opens the conversation on a computer).
+const threadWithDraft = (groupId: string, athleteId: string, draft: string) => `/groups/${groupId}/messages/${athleteId}?draft=${encodeURIComponent(draft)}`;
+// A first name for a button or a draft; "" when the name could not be read.
+const firstOf = (name: string) => (name === "A client" ? "" : name.trim().split(/\s+/)[0] ?? "");
 
 // An injury flag older than this is a standing condition, not news: the coach has it on the client's page and in the panels below. The strip is for what changed.
 export const INJURY_RECENT_DAYS = 14;
@@ -277,13 +283,15 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
     items.push({ id: `late:${l.id}`, kind: "late_change", name: nameOf(l.athlete_id), sentence: sentences.lateChange(), button: BUTTON.decide, href: requestHref("late", l.id), profileHref: clientPath(l.group_id, l.athlete_id), order: new Date(l.start_at).getTime() });
   }
   for (const e of expiring) {
-    items.push({ id: `expiring:${e.athleteId}:${e.groupId}`, kind: "expiring_credits", name: nameOf(e.athleteId), sentence: sentences.expiringCredits(e.daysLeft), button: BUTTON.open, href: "/dashboard#expiring", profileHref: clientPath(e.groupId, e.athleteId), order: e.expiresOn.getTime() });
+    // The same drafted check-in as the expiry panel's "Message them" (audit, Nov 21: "Open" only jumped down Home).
+    const first = firstOf(nameOf(e.athleteId));
+    items.push({ id: `expiring:${e.athleteId}:${e.groupId}`, kind: "expiring_credits", name: nameOf(e.athleteId), sentence: sentences.expiringCredits(e.daysLeft), button: first ? `Message ${first}` : BUTTON.message, href: threadWithDraft(e.groupId, e.athleteId, buildCheckInDraft({ firstName: first, balance: e.balance, daysLeft: e.daysLeft })), profileHref: clientPath(e.groupId, e.athleteId), order: e.expiresOn.getTime() });
   }
   for (const c of checkinsHere) {
     items.push({ id: `checkin:${c.id}`, kind: "checkin_review", name: nameOf(c.athlete_id), sentence: sentences.checkinReview(), button: BUTTON.review, href: COACH_CHECKINS_PATH, profileHref: clientPath(c.group_id, c.athlete_id), order: new Date(c.submitted_at).getTime() });
   }
   for (const g of goalsHere) {
-    items.push({ id: `goal:${g.athlete_id}:${g.group_id}`, kind: "goal_review", name: nameOf(g.athlete_id), sentence: sentences.goalReview(), button: BUTTON.open, href: clientPath(g.group_id, g.athlete_id), order: new Date(g.filled_at ?? 0).getTime() });
+    items.push({ id: `goal:${g.athlete_id}:${g.group_id}`, kind: "goal_review", name: nameOf(g.athlete_id), sentence: sentences.goalReview(), button: BUTTON.open, href: `${clientPath(g.group_id, g.athlete_id)}#${GOAL_SHEET_ANCHOR}`, profileHref: clientPath(g.group_id, g.athlete_id), order: new Date(g.filled_at ?? 0).getTime() });
   }
   // someone with a message the coach hasn't read is waiting on the coach, not quiet
   for (const q of chat.quiet) {
@@ -312,7 +320,8 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
     // Not known (their profile could not be read): say nothing rather than the wrong thing.
     if (claimed === undefined) continue;
     if (!claimed) {
-      items.push({ id: `notsignedin:${q.id}`, kind: "not_signed_in", name: nameOf(q.id), sentence: sentences.notSignedIn(), button: BUTTON.sendLink, href: clientPath(g, q.id), order: 0 });
+      // "Send link" emails it from the card; the link (when the email cannot go) is the profile's sign-in options (audit, Nov 21).
+      items.push({ id: `notsignedin:${q.id}`, kind: "not_signed_in", name: nameOf(q.id), sentence: sentences.notSignedIn(), button: BUTTON.sendLink, href: `${clientPath(g, q.id)}?tab=settings#${SIGN_IN_OPTIONS_ANCHOR}`, profileHref: clientPath(g, q.id), claimLink: { athleteId: q.id, groupId: g }, order: 0 });
       continue;
     }
     items.push({
@@ -321,7 +330,8 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
       name: nameOf(q.id),
       sentence: q.tier === "strong" ? sentences.quietStrong() : sentences.quietMild(),
       button: BUTTON.checkIn,
-      href: `/groups/${g}/messages/${q.id}`,
+      // with a check-in drafted in the box, like the panels below (audit, Nov 21)
+      href: threadWithDraft(g, q.id, getQuietClientNudgeTemplates(firstOf(nameOf(q.id)) || "there")[1].text),
       order: 0,
     });
   }

@@ -24,6 +24,7 @@ import {
 } from "@/lib/nutrition-trend-classifier";
 import { ClientCardNutritionSparkline } from "@/components/coach/desktop/client-card-nutrition-sparkline";
 import { useTerm } from "@/components/coach/terminology-provider";
+import { SIGN_IN_OPTIONS_ANCHOR } from "@/lib/get-started-checklist";
 
 // A real page of cards, not the whole roster — a stress-test pass found
 // the old unpaginated page taking 18.5s and shipping 1.1MB at 500
@@ -733,7 +734,7 @@ export function ClientCardGrid({
 
                 {member.signInStatus && member.signInStatus !== "active" && (
                   <Link
-                    href={`/groups/${groupId}/athletes/${member.profileId}`}
+                    href={`/groups/${groupId}/athletes/${member.profileId}?tab=settings#${SIGN_IN_OPTIONS_ANCHOR}`}
                     className="font-body text-xs text-amber-400 bg-amber-400/10 border border-amber-400/30 rounded-token-pill px-2 py-0.5 underline-offset-2 hover:underline"
                     title="Open their profile to see, cancel or remake the sign-in link"
                   >

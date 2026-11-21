@@ -14,7 +14,7 @@ describe("Import program", () => {
     // the same list the wizard's own file box takes
     expect(read("components/coach/desktop/import-wizard.tsx")).toContain(`accept="${IMPORT_FILE_ACCEPT}"`);
     expect(launcher).toContain("onClick={() => fileRef.current?.click()}");
-    expect(launcher).toContain("if (file) setPanel({ file });");
+    expect(launcher).toContain("if (file) {");
   });
   it("the page button is Import program, and the old link and the 'or build with AI' words are gone", () => {
     expect(launcher).toContain("Import program");
@@ -50,7 +50,8 @@ describe("the panel", () => {
 describe("old addresses", () => {
   it("/programs/import lands on the Programs page; /programs/new?method=ai makes a program and opens the builder, where the AI box is", () => {
     const old = read("app/(coach)/groups/[groupId]/programs/import/page.tsx");
-    expect(old).toContain("redirect(`/groups/${params.groupId}/programs`)");
+    // with Import program pointed out (audit, Nov 21)
+    expect(old).toContain("redirect(`/groups/${params.groupId}/programs?import=1`)");
     const created = read("app/(coach)/groups/[groupId]/programs/new/page.tsx");
     expect(created).toContain("<CreateAndOpenProgram");
     expect(created).not.toContain("programs/import");

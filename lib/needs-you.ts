@@ -1,5 +1,6 @@
 // The "Needs you" strip at the top of a coach's Home: THREE fixed slots, each showing only the single most urgent thing of its kind, with one plain sentence, the client's name and one
-// button. A slot with nothing shows nothing; when all three are empty the strip says "You're caught up." A small "N more" link opens the stack of panels below, which is unchanged.
+// button. A slot with nothing shows nothing; when all three are empty the strip says "You're caught up." A small "N more" button opens the rest of the ranked list right there, each with its own button
+// (audit, Nov 21: it used to jump to the panels below, where several kinds never appear).
 // This file is the ranking only (no database): the data is gathered by lib/needs-you-data.ts from signals Home already works with.
 
 export type NeedsYouSlot = "waiting" | "due" | "slipping";
@@ -103,6 +104,8 @@ export interface NeedsYouItem {
   order: number;
   // The button is "Message {first name}", sent inside Spotlight from the card (R1's send), instead of a link. Only for a quiet-in-chat client (R3).
   nudge?: { athleteId: string; groupId: string; firstName: string };
+  // The button emails the client their sign-in link from the card (the same send and confirm as the profile's button), instead of a link. Only for a client who has not signed in.
+  claimLink?: { athleteId: string; groupId: string };
 }
 
 export interface SlotView {
@@ -115,6 +118,8 @@ export interface NeedsYouView {
   slots: SlotView[];
   // Items beyond the ones shown (the "N more" link). Zero when every slot shows its only item or nothing.
   moreCount: number;
+  // Those items, in rank order: what "N more" opens.
+  more: NeedsYouItem[];
   // True only when nothing needs the coach AND every check was made.
   caughtUp: boolean;
   // Some check could not be made, so "nothing" may not be the whole truth: the strip says so instead of "You're caught up."
@@ -131,11 +136,14 @@ export function pickNeedsYou(items: NeedsYouItem[], opts: { incomplete?: boolean
   const slots: SlotView[] = SLOT_ORDER.map((slot) => ({ slot, title: SLOT_TITLE[slot], item: sorted.find((i) => KIND_SLOT[i.kind] === slot) ?? null }));
   const shown = slots.filter((s) => s.item).length;
   const incomplete = !!opts.incomplete;
-  return { slots, moreCount: Math.max(0, unique.length - shown), caughtUp: unique.length === 0 && !incomplete, incomplete };
+  const shownIds = new Set(slots.map((s) => s.item?.id).filter(Boolean));
+  const more = sorted.filter((i) => !shownIds.has(i.id));
+  return { slots, moreCount: Math.max(0, unique.length - shown), more, caughtUp: unique.length === 0 && !incomplete, incomplete };
 }
 
 // "N more" wording.
 export const moreLabel = (n: number): string => `${n} more`;
+export const FEWER_LABEL = "Show fewer";
 
 // ---- the sentences (kept here so they read the same everywhere and can be tested) -------------------------------------------------
 
@@ -171,4 +179,5 @@ export const BUTTON = {
   checkIn: "Check in",
   sendLink: "Send link",
   addSessions: "Add sessions",
+  message: "Message them",
 } as const;

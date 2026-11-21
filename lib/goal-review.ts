@@ -2,6 +2,8 @@
 // (client_goal_sheets.reviewed_at, step 215), "Update my goal" opens the goal sheet, and saving it starts the 90 days again. The coach sees the same thing on Home's Needs you.
 // Pure, so it is tested.
 export const GOAL_REVIEW_DAYS = 90;
+// Where the goal sheet sits on a client's profile: Home's "Worth a goal talk" opens the profile on it (audit, Nov 21).
+export const GOAL_SHEET_ANCHOR = "goal-sheet";
 const DAY_MS = 86_400_000;
 
 export const GOAL_REVIEW_HEADING = "It's been 90 days since you set your goal";

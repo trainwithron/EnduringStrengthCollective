@@ -8,8 +8,15 @@ const read = (rel: string) => readFileSync(join(__dirname, "..", "..", "..", rel
 describe("the three-dot menu on a client", () => {
   const menu = read("components/coach/desktop/client-row-menu.tsx");
   const list = read("components/coach/desktop/coach-clients-list.tsx");
-  it("has exactly three actions, reusing the existing flows (Set inactive, Remove from my clients, Delete permanently)", () => {
-    expect(menu.match(/role="menuitem"/g)?.length).toBe(3);
+  it("has exactly three actions, reusing the existing flows (Set inactive, Remove from my clients, Delete permanently), plus Take off hold for a client on hold", () => {
+    expect(menu.match(/role="menuitem"/g)?.length).toBe(4);
+    // Take off hold shows only when the client is held, and uses the same call as the group's client cards (audit, Nov 21: Needs payment said a hold comes off here)
+    expect(menu).toMatch(/\{held && \(\s*<button type="button" role="menuitem" onClick=\{\(\) => void takeOffHold\(\)\}/);
+    expect(menu).toContain('setPaymentHold(groupId, athleteId, false)');
+    expect(read("lib/payment-hold-client.ts")).toContain('fetch("/api/reup/hold"');
+    expect(read("components/coach/desktop/client-card-grid.tsx")).toContain('"/api/reup/hold"');
+    expect(read("components/coach/desktop/needs-payment-panel.tsx")).toContain("${HOLD_UNDO_WHERE}");
+    expect(read("app/(coach)/groups/[groupId]/athletes/[athleteId]/page.tsx")).toContain("<PaymentHoldControl groupId={params.groupId}");
     expect(menu).toContain('supabase.rpc("set_client_inactive"');
     expect(menu).toContain("runDeleteClient(");
     expect(menu).toContain("runRemoveClient(");
