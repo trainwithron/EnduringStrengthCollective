@@ -138,7 +138,8 @@ export function ProgramAssignPanel({ programId, programName, groupId, aiDraft, o
   }
 
   const list = targets();
-  const count = list.length + (selected.has("me") ? 1 : 0) + selectedGroups.length;
+  // The coach counts only when they don't already have it (ticked before the assigned list loaded, or just assigned): the button never reads "Assign to 1" and assigns nothing.
+  const count = list.length + (selected.has("me") && !meHas ? 1 : 0) + selectedGroups.length;
 
   // What is on file NOW for the people about to receive this program (age, birthdate missing, a flagged health concern): the coach is told before it goes, not only when it was built.
   const [notices, setNotices] = useState<string[]>([]);

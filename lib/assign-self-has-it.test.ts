@@ -14,4 +14,7 @@ describe("the assign panel treats the coach like a client who already has the pr
     expect(src).toContain('{meHas ? <span className="text-steel text-xs"> · has it</span> : null}');
     expect(src).toContain('if (selected.has("me") && !meHas) {');
   });
+  it("doesn't count the coach in the button when they already have it (Code Chat review)", () => {
+    expect(src).toContain('const count = list.length + (selected.has("me") && !meHas ? 1 : 0) + selectedGroups.length;');
+  });
 });
