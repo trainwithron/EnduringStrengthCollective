@@ -2,6 +2,9 @@ import { notifyPaymentReceived } from "@/lib/notify-payment";
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getConnectedStripeClient, getStripeClient, isStripeConfigured } from "@/lib/stripe";
+import { handlePaidCheckout, PURCHASE_KIND as PAID_BOOKING_KIND } from "@/lib/paid-booking";
+import { paidBookingDeps } from "@/lib/paid-booking-server";
+import { appOrigin } from "@/lib/app-url";
 import { connectStatusFromAccount, constructEventFromSecrets, eventAccountMatchesGroup, feePercentForOrg, getPayeeForGroup, isPlatformOnlyPurchase } from "@/lib/connect-payee";
 import { platformFeeCents } from "@/lib/platform-fee";
 import { duplicateProgram } from "@/lib/program-duplication";
@@ -202,6 +205,20 @@ export async function POST(request: Request) {
             );
             if (liftOffStartError) throw liftOffStartError;
           }
+          break;
+        }
+
+        // A visitor paying for a session on a coach's public page (wave 3 C7): the booking is made now, once, or the payment is refunded (lib/paid-booking.ts).
+        // Card only, so a completed checkout is a paid one. A thrown error makes Stripe send the event again.
+        if (purchaseKind === PAID_BOOKING_KIND) {
+          if (!connectedAccount) break;
+          await handlePaidCheckout(paidBookingDeps(supabase, appOrigin(request)), {
+            holdId: session.metadata?.hold_id ?? null,
+            paymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : (session.payment_intent?.id ?? null),
+            paid: session.payment_status === "paid",
+            eventAccount: connectedAccount,
+            customerEmail: session.customer_details?.email ?? session.customer_email ?? null,
+          });
           break;
         }
 

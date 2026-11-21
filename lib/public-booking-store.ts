@@ -19,6 +19,25 @@ function looksLikeMissingSchema(message: string | undefined): boolean {
   return !!message && /column|relation|schema cache|does not exist/i.test(message);
 }
 
+// Times held while a visitor pays (wave 3 C7): an open hold until it lapses, and a paid one being booked. Before step 218 there are none.
+export async function heldTimes(db: any, coachId: string, from: Date, to: Date, exceptHoldId?: string): Promise<{ start: Date; end: Date }[]> {
+  let q = db
+    .from("public_booking_holds")
+    .select("id, start_at, end_at")
+    .eq("coach_id", coachId)
+    .or(`and(state.eq.open,expires_at.gt.${new Date().toISOString()}),state.eq.claimed`)
+    .lt("start_at", to.toISOString())
+    .gt("end_at", from.toISOString())
+    .limit(500);
+  if (exceptHoldId) q = q.neq("id", exceptHoldId);
+  const { data, error } = await q;
+  if (error) {
+    if (looksLikeMissingSchema(error.message)) return [];
+    throw new Error("could not read held times");
+  }
+  return ((data ?? []) as { start_at: string; end_at: string }[]).map((h) => ({ start: new Date(h.start_at), end: new Date(h.end_at) }));
+}
+
 export function publicBookingStore(db: any): PublicBookingStore {
   const series = supabaseSeriesStore(db);
 
@@ -49,12 +68,11 @@ export function publicBookingStore(db: any): PublicBookingStore {
     },
 
     async sessionTypes(coachId): Promise<PublicSessionTypeRow[]> {
-      const { data, error } = await db
-        .from("session_types")
-        .select("id, name, duration_minutes, location_kind, location_text, description, display_price_cents, public_visible, sort_order, organization_id")
-        .eq("coach_id", coachId)
-        .eq("public_visible", true)
-        .order("sort_order", { ascending: true });
+      const read = (cols: string) => db.from("session_types").select(cols).eq("coach_id", coachId).eq("public_visible", true).order("sort_order", { ascending: true });
+      const base = "id, name, duration_minutes, location_kind, location_text, description, display_price_cents, public_visible, sort_order, organization_id";
+      // "Pay when booking" arrives with step 218; until then every type reads as free, exactly as today.
+      let { data, error } = await read(`${base}, pay_to_book`);
+      if (error && looksLikeMissingSchema(error.message)) ({ data, error } = await read(base));
       if (error) return [];
       return (data ?? []).map((r: any) => ({
         id: r.id,
@@ -67,6 +85,7 @@ export function publicBookingStore(db: any): PublicBookingStore {
         publicVisible: !!r.public_visible,
         sortOrder: r.sort_order ?? 0,
         organizationId: r.organization_id ?? null,
+        payToBook: r.pay_to_book === true,
       }));
     },
 
@@ -86,9 +105,10 @@ export function publicBookingStore(db: any): PublicBookingStore {
 
     // The coach's sessions and calls, and the coach's personal Google Calendar busy times (wave 2 C4, lib/google-busy.ts): a visitor is never offered a time the coach is busy.
     // The same list is checked again when the visitor books, so a time that became busy in between is refused.
-    async busy(coachId, from, to) {
-      const [own, google] = await Promise.all([series.busy(coachId, from, to), googleBusyRanges(coachId, from.toISOString(), to.toISOString())]);
-      return [...own, ...withoutOwnCopies(google, own).map((g) => ({ start: g.start, end: g.end }))];
+    // Also every time held for a visitor who is paying right now (wave 3 C7), except the one being booked.
+    async busy(coachId, from, to, exceptHoldId) {
+      const [own, google, held] = await Promise.all([series.busy(coachId, from, to), googleBusyRanges(coachId, from.toISOString(), to.toISOString()), heldTimes(db, coachId, from, to, exceptHoldId)]);
+      return [...own, ...withoutOwnCopies(google, own).map((g) => ({ start: g.start, end: g.end })), ...held];
     },
 
     async hasUpcomingPublicBooking(coachId, email, now) {
@@ -182,7 +202,7 @@ export function publicBookingStore(db: any): PublicBookingStore {
     },
 
     async insertLink(a) {
-      const { error } = await db.from("booking_manage_links").insert({
+      const { data, error } = await db.from("booking_manage_links").insert({
         booking_id: a.bookingId,
         coach_id: a.coachId,
         athlete_id: a.athleteId,
@@ -191,9 +211,9 @@ export function publicBookingStore(db: any): PublicBookingStore {
         guest_email: a.guestEmail,
         guest_phone: a.guestPhone,
         note: a.note,
-      });
+      }).select("id").single();
       if (error) return { ok: false as const, message: looksLikeMissingSchema(error.message) ? NOT_READY : error.message };
-      return { ok: true as const };
+      return { ok: true as const, linkId: (data as { id?: string } | null)?.id };
     },
 
     async linkByHash(tokenHash): Promise<ManagedBooking | null> {

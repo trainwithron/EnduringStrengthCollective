@@ -17,6 +17,7 @@ import { zonedTimeToUtc, DEFAULT_COACH_TIMEZONE, dateKeyInZone, getGroupCoachTim
 import { loadClientCalendar } from "@/lib/client-calendar";
 import { addDaysToDateKey } from "@/lib/series-schedule";
 import { coachCreditSentence } from "@/lib/credit-sentence";
+import { dollars as paidDollars } from "@/lib/paid-booking-money";
 import { buildCreditPicture, fetchBookingCounts } from "@/lib/credit-picture";
 import { AssignSlotButton } from "@/components/coach/desktop/assign-slot-button";
 import { AssignOtherTime } from "@/components/coach/desktop/assign-other-time";
@@ -761,6 +762,17 @@ export default async function CoachDayDetailPage(
     }
   }
 
+  // Paid online on the public page (wave 3 C7): the coach sees it on the session. Soft: before step 218 the read fails and nothing shows.
+  const paidByBooking = new Map<string, number>();
+  if ((bookingRows ?? []).length > 0) {
+    const { data: paidRows, error: paidError } = await supabase
+      .from("public_booking_holds")
+      .select("booking_id, amount_cents")
+      .eq("state", "booked")
+      .in("booking_id", (bookingRows ?? []).map((b) => b.id));
+    if (!paidError) for (const r of (paidRows ?? []) as { booking_id: string; amount_cents: number }[]) paidByBooking.set(r.booking_id, r.amount_cents);
+  }
+
   const slots = generateSlotsForDate(date, windows, blockedRanges, timezone);
   const bookingByTime = new Map(
     (bookingRows ?? []).map((b) => [new Date(b.start_at).getTime(), b as any])
@@ -831,6 +843,7 @@ export default async function CoachDayDetailPage(
       >
         Booked — {(booking.profiles as any)?.full_name ?? "Client"}
       </SessionMenuTarget>
+      {paidByBooking.has(booking.id) && <span className="font-body text-xs text-rust-ink">Paid online {paidDollars(paidByBooking.get(booking.id)!)}</span>}
       {booking.needs_coach_resolution && <RecurringConflictBadge bookingId={booking.id} />}
       {typeByBooking.has(booking.id) && <BookingTypeSelect bookingId={booking.id} types={coachTypes} current={typeByBooking.get(booking.id) ?? null} />}
       {/* A no-show is settled by its own Charge or Waive (FIX 3): undo the no-show to mark it happened. */}

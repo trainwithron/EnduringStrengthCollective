@@ -5,6 +5,10 @@ import { formatInTimezone, timezoneForProfiles } from "@/lib/format-in-timezone"
 import { dateKeyInZone } from "@/lib/timezone";
 import { withCronRun } from "@/lib/cron-monitor";
 import { tellLapsed, warnBeforeLapse } from "@/lib/request-lapse-job";
+import { runPaidBookingSweep } from "@/lib/paid-booking";
+import { paidBookingDeps } from "@/lib/paid-booking-server";
+import { appOrigin } from "@/lib/app-url";
+import { isStripeConfigured } from "@/lib/stripe";
 
 // acuity_replacement_gap_audit_sept16.md — waitlists. The instant "a
 // slot just freed up" moment is handled synchronously inside
@@ -80,7 +84,19 @@ async function handler(request: Request) {
   const { data: lapsed } = await supabase.rpc("expire_stale_booking_requests");
   const lapseNotices = await tellLapsed(supabase, now);
 
-  return NextResponse.json({ ok: true, pushed, expired, lapsedRequests: typeof lapsed === "number" ? lapsed : 0, lapseWarnings, lapseNotices });
+  // Wave 3 C7: paid public bookings. Unpaid holds lapse (and the visitor's details go), and the cancel rules decide refunds (lib/paid-booking.ts). Its own failure never
+  // stops the rest of this job; the next run tries again.
+  let paidBookings: unknown = null;
+  if (isStripeConfigured()) {
+    try {
+      paidBookings = await runPaidBookingSweep(paidBookingDeps(supabase, appOrigin(request)));
+    } catch (e) {
+      console.error("[paid booking sweep] failed:", e instanceof Error ? e.message : e);
+      paidBookings = "failed";
+    }
+  }
+
+  return NextResponse.json({ ok: true, pushed, expired, lapsedRequests: typeof lapsed === "number" ? lapsed : 0, lapseWarnings, lapseNotices, paidBookings });
 }
 
 export const GET = withCronRun("process-booking-waitlist", handler);

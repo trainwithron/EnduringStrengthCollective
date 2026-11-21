@@ -12,6 +12,8 @@ export interface PublicTypeEditRow {
   description: string;
   displayPrice: string; // dollars as typed, "" for none
   publicVisible: boolean;
+  // "Pay when booking" (wave 3 C7)
+  payToBook?: boolean;
 }
 
 const input = "bg-surface border border-steel/30 text-chalk px-2.5 py-1.5 font-body text-sm focus:outline-none focus:border-rust";
@@ -26,7 +28,17 @@ function priceToCents(value: string): number | null {
 
 // Which of the coach's session types are offered on the public page, and what a visitor sees: length, where it happens, a
 // short description and an optional price. Each change saves as you leave the field.
-export function PublicSessionTypesEditor({ initialTypes , organizationId}: { initialTypes: PublicTypeEditRow[] ; organizationId: string | null}) {
+export function PublicSessionTypesEditor({
+  initialTypes,
+  organizationId,
+  payeeReady = false,
+  payToBookAvailable = false,
+}: {
+  initialTypes: PublicTypeEditRow[];
+  organizationId: string | null;
+  payeeReady?: boolean;
+  payToBookAvailable?: boolean;
+}) {
   const [types, setTypes] = useState(initialTypes);
   const [newName, setNewName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -173,8 +185,36 @@ export function PublicSessionTypesEditor({ initialTypes , organizationId}: { ini
                     onChange={(e) => update(t.id, { displayPrice: e.target.value })}
                     onBlur={() => persist(t.id, { display_price_cents: priceToCents(t.displayPrice) })}
                   />
-                  <span className="font-body text-xs text-steel block mt-1">Shown only if you turn on prices for the page. Never charged here.</span>
+                  <span className="font-body text-xs text-steel block mt-1">
+                    {t.payToBook ? "Charged when they book." : "Shown only if you turn on prices for the page. Not charged unless you turn on Pay when booking."}
+                  </span>
                 </label>
+                {payToBookAvailable && (
+                  <div className="sm:col-span-2 bg-surface rounded-card p-3">
+                    <label className="flex items-start gap-2 font-body text-sm text-chalk">
+                      <input
+                        type="checkbox"
+                        className="accent-rust mt-1"
+                        checked={!!t.payToBook}
+                        disabled={!t.payToBook && (!payeeReady || (priceToCents(t.displayPrice) ?? 0) < 100)}
+                        onChange={(e) => {
+                          update(t.id, { payToBook: e.target.checked });
+                          persist(t.id, { pay_to_book: e.target.checked });
+                        }}
+                      />
+                      <span>
+                        Pay when booking
+                        <span className="font-body text-xs text-steel block mt-0.5">
+                          {!payeeReady
+                            ? "Connect Stripe on your Packages page first. Only the organization's owner can do that."
+                            : (priceToCents(t.displayPrice) ?? 0) < 100
+                              ? "Set a price of at least $1 first."
+                              : "People pay this price by card before the time is booked. If they cancel in time with their link, or you cancel, they get it back in full. Stripe keeps its own processing fee on a refund."}
+                        </span>
+                      </span>
+                    </label>
+                  </div>
+                )}
               </div>
             )}
           </div>

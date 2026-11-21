@@ -18,6 +18,17 @@ await db.exec(`
   create table public.group_memberships (id serial primary key, group_id uuid, profile_id uuid, role text, joined_at timestamptz default now());
   create table public.organization_memberships (id serial primary key, organization_id uuid, profile_id uuid, role text);
   create table public.booking_requests (id uuid primary key default gen_random_uuid(), status text);
+  create table public.organizations (id uuid primary key);
+  create table public.groups (id uuid primary key);
+  create table public.session_types (id uuid primary key default gen_random_uuid(), coach_id uuid, name text, display_price_cents int);
+  create table public.bookings (id uuid primary key default gen_random_uuid(), status text, athlete_id uuid, group_id uuid, coach_id uuid, late_charge_state text, late_change_kind text, credit_state text);
+  create table public.credit_log (athlete_id uuid, amount int, booking_id uuid);
+  create function public.is_group_coach(g uuid) returns boolean language sql as $$ select true $$;
+  create function public.is_org_admin_of_group(g uuid) returns boolean language sql as $$ select false $$;
+  create function public.booking_late_move_charged(b uuid) returns boolean language sql as $$ select false $$;
+  create function public.booking_taken(b uuid) returns int language sql as $$ select 0 $$;
+  create function public.apply_session_credit_change(a uuid, g uuid, n int, k text, why text, b uuid, by uuid) returns void language sql as $$ insert into public.credit_log values (a, n, b) $$;
+  create table public.booking_manage_links (id uuid primary key default gen_random_uuid(), booking_id uuid);
   create function public.coach_time_zone(p_coach_id uuid) returns text language sql stable as $$ select timezone from public.profiles where id = p_coach_id $$;
 `);
 
@@ -26,6 +37,12 @@ const coach = id(1), existing = id(2), group = id(100), otherGroup = id(101);
 await db.query(`insert into public.profiles (id, full_name, timezone) values ($1, 'Coach Ron', 'America/Chicago'), ($2, 'Old Client', null)`, [coach, existing]);
 await db.query(`insert into public.group_memberships (group_id, profile_id, role) values ($1, $2, 'coach'), ($3, $2, 'coach')`, [group, coach, otherGroup]);
 
+// The LIVE resolve_late_change of Nov 20, its lines ending in CR LF as they do live (md5 0010aa033f297f17b1feea309f052d4c).
+const fixture = read("./fixtures/resolve-late-change-live-nov20.sql");
+const [fxHead, fxBody, fxTail] = fixture.split("$function$");
+await db.exec(fxHead + "$function$" + fxBody.split(String.fromCharCode(10)).join(String.fromCharCode(13, 10)) + "$function$" + fxTail);
+const lateMd5 = async () => (await db.query(`select md5(prosrc) m, md5(replace(prosrc, chr(13), '')) lf from pg_proc where proname = 'resolve_late_change'`)).rows[0];
+const liveMd5 = await lateMd5();
 const migration = read("../../supabase/migrations/0462_wave3_calendar.sql");
 await db.exec(migration);
 await db.exec(migration);
@@ -116,6 +133,83 @@ expect("C8: signed-out callers cannot run the functions", (await db.query("selec
 await as(coach, "select public.turn_off_calendar_feed()");
 const left = (await db.query("select coach_id from public.coach_calendar_feeds")).rows.map((r) => r.coach_id);
 expect("C8: Turn off removes only the caller's own link", !left.includes(coach) && left.includes(newCoach));
+
+// C7
+const org = id(300);
+await db.query(`insert into public.organizations (id) values ($1)`, [org]);
+const oldType = (await db.query(`select id from public.session_types limit 1`)).rows[0];
+expect("C7: no stand-in type yet", !oldType);
+const typeId = (await db.query(`insert into public.session_types (coach_id, name, display_price_cents) values ($1, 'Training', 6000) returning id, pay_to_book`, [coach])).rows[0];
+expect("C7: Pay when booking starts off", typeId.pay_to_book === false);
+const hold = (email, extra = {}) =>
+  db.query(
+    `insert into public.public_booking_holds (coach_id, session_type_id, organization_id, start_at, end_at, expires_at, status_token_hash, guest_name, guest_email, amount_cents, stripe_account_id, state)
+     values ($1, $2, $3, now() + interval '2 days', now() + interval '2 days 1 hour', now() + interval '33 minutes', md5(random()::text), 'Hewan', $4, 6000, 'acct_1', $5) returning id`,
+    [extra.coach ?? coach, typeId.id, org, email, extra.state ?? "open"]
+  );
+const h1 = (await hold("hewan@example.com")).rows[0].id;
+let dup = null;
+try { await hold("HEWAN@example.com"); } catch (e) { dup = e; }
+expect("C7: one open hold per visitor per coach (any letter case)", dup !== null);
+await db.query(`update public.public_booking_holds set state = 'lapsed' where id = $1`, [h1]);
+let again = null;
+try { await hold("hewan@example.com"); } catch (e) { again = e; }
+expect("C7: after it lapses the visitor can start again", again === null);
+let badEnd = null;
+try {
+  await db.query(`insert into public.public_booking_holds (coach_id, session_type_id, organization_id, start_at, end_at, expires_at, status_token_hash, amount_cents, stripe_account_id) values ($1, $2, $3, now(), now(), now(), 'x', 6000, 'a')`, [coach, typeId.id, org]);
+} catch (e) { badEnd = e; }
+expect("C7: a hold must end after it starts", badEnd !== null);
+let free = null;
+try { await hold("free@example.com", { state: "open" }).then(() => db.query(`update public.public_booking_holds set amount_cents = 0 where guest_email = 'free@example.com'`)); } catch (e) { free = e; }
+expect("C7: a hold is always for a real amount", free !== null);
+await hold("other@example.com", { coach: newCoach });
+expect("C7: a coach reads only their own holds", (await as(coach, "select coach_id from public.public_booking_holds")).rows.every((r) => r.coach_id === coach) && (await as(coach, "select 1 from public.public_booking_holds")).rows.length >= 1);
+expect("C7: a client reads none", (await as(fresh, "select 1 from public.public_booking_holds")).rows.length === 0);
+expect("C7: signed out reads none", (await as(null, "select 1 from public.public_booking_holds")).error !== null || (await as(null, "select 1 from public.public_booking_holds")).rows.length === 0);
+expect("C7: nobody signed in writes holds", (await as(coach, "update public.public_booking_holds set state = 'booked'")).error !== null);
+expect("C7: nobody signed in makes holds", (await as(coach, `insert into public.public_booking_holds (coach_id, session_type_id, organization_id, start_at, end_at, expires_at, status_token_hash, amount_cents, stripe_account_id) values ('${coach}', '${typeId.id}', '${org}', now(), now() + interval '1 hour', now(), 'y', 100, 'a')`)).error !== null);
+let refundTwice = null;
+await db.query(`update public.public_booking_holds set refund_id = 're_1' where guest_email = 'hewan@example.com' and state = 'open'`);
+try { await db.query(`update public.public_booking_holds set refund_id = 're_1' where guest_email = 'other@example.com'`); } catch (e) { refundTwice = e; }
+expect("C7: one Stripe refund belongs to one hold only", refundTwice !== null);
+
+// C7: Charge on a late change of a session paid online keeps the payment and takes no session; any other session is charged one, as before.
+expect("fixture: the live function, byte for byte", liveMd5.m === "0010aa033f297f17b1feea309f052d4c");
+const charge = async (paid) => {
+  const b = (await db.query(`insert into public.bookings (status, athlete_id, group_id, coach_id, late_charge_state, late_change_kind) values ('cancelled', $1, $2, $3, 'flagged', 'cancel') returning id`, [fresh, group, coach])).rows[0].id;
+  if (paid) await db.query(`insert into public.public_booking_holds (coach_id, session_type_id, organization_id, start_at, end_at, expires_at, status_token_hash, amount_cents, stripe_account_id, state, booking_id) values ($1, $2, $3, now(), now() + interval '1 hour', now(), md5(random()::text), 6000, 'acct_1', 'booked', $4)`, [coach, typeId.id, org, b]);
+  await db.exec("begin");
+  await db.query("select set_config('request.jwt.claim.role', 'service_role', true)");
+  await db.query("select public.resolve_late_change($1, true)", [b]);
+  await db.exec("commit");
+  return (await db.query(`select amount from public.credit_log where booking_id = $1`, [b])).rows[0]?.amount;
+};
+expect("C7: Charge on a session paid online takes no session", (await charge(true)) === 0);
+expect("C7: Charge on any other late change still takes one", (await charge(false)) === -1);
+
+// The paste itself (step 218): it holds the migration word for word, runs again safely, and its check row is all true.
+const apply = read("../../supabase/apply/apply-step218-0462.sql");
+const undo = read("../../supabase/apply/undo-step218-0462.sql");
+expect("paste: the migration word for word", apply.includes(migration.trimEnd()));
+expect("paste and undo: plain ASCII", !/[^\x00-\x7f]/.test(apply) && !/[^\x00-\x7f]/.test(undo));
+const lastRow = (results) => results[results.length - 1].rows[0];
+const allTrue = (row) => row && Object.values(row).every((v) => v === true);
+await db.query(`delete from public.public_booking_holds`);
+await db.query(`update public.profiles set quiet_hours_default_pending = false`);
+expect("paste: check row all true", allTrue(lastRow(await db.exec(apply))));
+
+// The undo refuses once anyone has paid, and changes nothing.
+await hold("paid@example.com", { state: "booked" });
+let refused = null;
+try { await db.exec(undo); } catch (e) { refused = e; }
+expect("undo: refuses once a visitor has paid", refused !== null && /payment records are kept/.test(String(refused?.message)));
+try { await db.exec("rollback"); } catch {}
+expect("undo: a refusal changes nothing", (await db.query(`select count(*)::int as n from public.public_booking_holds`)).rows[0].n === 1);
+await db.query(`delete from public.public_booking_holds`);
+expect("undo: check row all true", allTrue(lastRow(await db.exec(undo))));
+expect("undo: Charge is back exactly as it was (line endings aside)", (await lateMd5()).lf === liveMd5.lf);
+expect("paste: applies again after the undo", allTrue(lastRow(await db.exec(apply))));
 
 if (failures.length) {
   console.error("FAILED:\n- " + failures.join("\n- "));

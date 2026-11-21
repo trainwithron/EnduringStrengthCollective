@@ -105,6 +105,8 @@ export interface PublicSessionTypeRow {
   sortOrder: number;
   // The organization this session type belongs to (a coach in two organizations has a page for each kind of session): the visitor's client record is made there.
   organizationId?: string | null;
+  // "Pay when booking" (wave 3 C7): the visitor pays the price through Stripe before the time is booked.
+  payToBook?: boolean;
 }
 
 export interface PublicSessionTypeView {
@@ -114,6 +116,8 @@ export interface PublicSessionTypeView {
   where: string;
   description: string | null;
   priceLabel: string | null;
+  // The visitor pays this when booking (wave 3 C7); the price is always shown for these.
+  payToBook: boolean;
 }
 
 export function whereLabel(kind: PublicSessionTypeRow["locationKind"], text: string | null): string {
@@ -128,6 +132,11 @@ export function priceLabelFor(cents: number | null, showPrices: boolean): string
   return Number.isInteger(dollars) ? `$${dollars}` : `$${dollars.toFixed(2)}`;
 }
 
+// A type is paid when booking only when the coach switched it on AND it has a real price ($1 or more).
+export function paysWhenBooking(r: Pick<PublicSessionTypeRow, "payToBook" | "displayPriceCents">): boolean {
+  return !!r.payToBook && typeof r.displayPriceCents === "number" && r.displayPriceCents >= 100;
+}
+
 export function publicSessionTypes(rows: PublicSessionTypeRow[], showPrices: boolean): PublicSessionTypeView[] {
   return rows
     .filter((r) => r.publicVisible)
@@ -138,7 +147,8 @@ export function publicSessionTypes(rows: PublicSessionTypeRow[], showPrices: boo
       durationMinutes: r.durationMinutes,
       where: whereLabel(r.locationKind, r.locationText),
       description: r.description?.trim() || null,
-      priceLabel: priceLabelFor(r.displayPriceCents, showPrices),
+      priceLabel: priceLabelFor(r.displayPriceCents, showPrices || paysWhenBooking(r)),
+      payToBook: paysWhenBooking(r),
     }));
 }
 
