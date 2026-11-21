@@ -28,7 +28,8 @@ export async function POST(request: Request) {
   const groupId = typeof body?.groupId === "string" ? body.groupId : "";
   const access = await requireCoach(supabase, groupId);
   if (!access.ok) return access.response;
-  const source = body.source === "csv" ? "csv" : "xlsx";
+  // A photo of a printed sheet is saved as what it is (step 217 lets the database record "photo"); before that step it is refused below, never saved under another label.
+  const source = body.source === "csv" ? "csv" : body.source === "photo" ? "photo" : "xlsx";
   const replace = body.replace === true;
   const sheets: unknown[] = Array.isArray(body.sheets) ? body.sheets : [];
   if (sheets.length === 0 || sheets.length > 60) return fail(400, "There is nothing to save.");
@@ -92,6 +93,7 @@ export async function POST(request: Request) {
       console.error("team-sheet save failed", { groupId, piece: i / piece, message: error.message });
       if (batch === null) {
         if (/not authorized/i.test(error.message)) return fail(403, "Only a coach of this group can save a team sheet.");
+        if (source === "photo" && /unknown source/i.test(error.message)) return fail(503, "Saving a team sheet read from a photo isn't switched on yet. Nothing was saved. Try again soon.");
         return fail(502, "Couldn't save the team sheet. Nothing was saved. Try again.");
       }
       // some pieces were saved: close the upload (one notice, one undo) and say exactly what happened

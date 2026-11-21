@@ -73,6 +73,8 @@ export type AiFeature =
   | "pattern_sort_suggest"
   | "program_template"
   | "client_notes_summary"
+  // a photo of a filled team sheet read for the coach to review (nothing is saved by the call)
+  | "team_sheet_photo"
   // system/automatic (logged, never limited)
   | "session_pattern_check"
   | "coach_briefing"
@@ -144,6 +146,7 @@ const POLICY: Record<AiFeature, FeaturePolicy> = {
   program_template: { enforce: true, monthlyCeiling: 150 },
   // The short list of important facts kept about a client after the coach builds or corrects with them chosen: one small call, no credit charged, so its own ceiling bounds it.
   client_notes_summary: { enforce: true, burstLimit: 12, monthlyCeiling: 600 },
+  team_sheet_photo: { enforce: true, monthlyCeiling: 200 },
   session_pattern_check: { enforce: false },
   coach_briefing: { enforce: false },
   spotter_cornerstone: { enforce: false },
