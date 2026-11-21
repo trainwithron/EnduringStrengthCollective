@@ -43,6 +43,7 @@ export function ProgramAssignPanel({ programId, programName, groupId, aiDraft, o
   const [groupName, setGroupName] = useState("");
   const [groupIsOneOnOne, setGroupIsOneOnOne] = useState(true);
   const [myName, setMyName] = useState("Me");
+  const [myId, setMyId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
   const [startDate, setStartDate] = useState(localDateKey());
@@ -65,6 +66,7 @@ export function ProgramAssignPanel({ programId, programName, groupId, aiDraft, o
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return;
+      setMyId(user.id);
       void reloadAssigned();
       const [list, { data: posRows }, { data: memberRows }, { data: groupRow }, { data: me }] = await Promise.all([
         loadAssignableClients(supabase, user.id, groupId),
@@ -106,6 +108,8 @@ export function ProgramAssignPanel({ programId, programName, groupId, aiDraft, o
   const shownGroups = (orgGroups ?? []).filter((g) => !q || g.name.toLowerCase().includes(q));
   const selectedGroups = (orgGroups ?? []).filter((g) => selected.has(`g:${g.id}`) && !groupHasCopy.has(g.id));
   const showMe = !q || "me".includes(q) || myName.toLowerCase().includes(q);
+  // The coach already has this program (Ron, Nov 21: "Coach Ron" was listed under Assigned to and still selectable below, and assigning again failed): shown as "has it", like a client.
+  const meHas = myId !== null && alreadyAssigned.has(myId);
 
   function toggle(key: string) {
     setSelected((prev) => {
@@ -134,7 +138,8 @@ export function ProgramAssignPanel({ programId, programName, groupId, aiDraft, o
   }
 
   const list = targets();
-  const count = list.length + (selected.has("me") ? 1 : 0) + selectedGroups.length;
+  // The coach counts only when they don't already have it (ticked before the assigned list loaded, or just assigned): the button never reads "Assign to 1" and assigns nothing.
+  const count = list.length + (selected.has("me") && !meHas ? 1 : 0) + selectedGroups.length;
 
   // What is on file NOW for the people about to receive this program (age, birthdate missing, a flagged health concern): the coach is told before it goes, not only when it was built.
   const [notices, setNotices] = useState<string[]>([]);
@@ -211,7 +216,7 @@ export function ProgramAssignPanel({ programId, programName, groupId, aiDraft, o
     }
     const supabase = createBrowserClient();
     const all: Target[] = [...list];
-    if (selected.has("me")) {
+    if (selected.has("me") && !meHas) {
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -320,9 +325,12 @@ export function ProgramAssignPanel({ programId, programName, groupId, aiDraft, o
           />
           <div className="mt-2 max-h-60 overflow-y-auto border border-steel/15">
             {showMe && (
-              <label className={row}>
-                <input type="checkbox" checked={selected.has("me")} onChange={() => toggle("me")} />
-                <span className="truncate">{myName === "Me" ? "Me" : `${myName} (you)`}</span>
+              <label className={`${row} ${meHas ? "opacity-50 cursor-default" : ""}`}>
+                <input type="checkbox" disabled={meHas} checked={!meHas && selected.has("me")} onChange={() => toggle("me")} />
+                <span className="truncate">
+                  {myName === "Me" ? "Me" : `${myName} (you)`}
+                  {meHas ? <span className="text-steel text-xs"> · has it</span> : null}
+                </span>
               </label>
             )}
             {clients === null && <p className="font-body text-xs text-steel px-3 py-2">Loading…</p>}
