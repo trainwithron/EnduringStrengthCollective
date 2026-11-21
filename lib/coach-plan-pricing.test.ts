@@ -58,3 +58,21 @@ describe("computePlanQuote", () => {
     expect(formatPlanCents(1550)).toBe("$15.50");
   });
 });
+
+// O4 (Ron, Nov 20: "the wording is good"): the line under the sign-up heading, word for word, and its weeks tied to the one trial length.
+describe("the sign-up page's trial line", () => {
+  it("says Ron's words, with the weeks taken from TRIAL_DAYS", async () => {
+    const { SIGNUP_TRIAL_LINE, TRIAL_DAYS } = await import("@/lib/coach-plan-pricing");
+    expect(TRIAL_DAYS).toBe(42);
+    expect(SIGNUP_TRIAL_LINE).toBe("6 weeks free. No card. Leave any time and take all your data with you.");
+    expect(SIGNUP_TRIAL_LINE.startsWith(`${TRIAL_DAYS / 7} weeks free.`)).toBe(true);
+  });
+  it("sits directly under the heading's one-step line, in the same small secondary style", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const page = readFileSync(join(__dirname, "..", "app/signup/page.tsx"), "utf8").replace(/\r\n/g, "\n");
+    expect(page).toContain(
+      '          Create your account and your own organization in one step.\n        </p>\n        <p className="font-body text-steel text-sm text-center mt-1 mb-8" data-signup-trial-line>\n          {SIGNUP_TRIAL_LINE}\n        </p>'
+    );
+  });
+});

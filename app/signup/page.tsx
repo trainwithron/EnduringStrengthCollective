@@ -5,6 +5,7 @@ import { COACH_TYPES, type CoachType } from "@/lib/coach-type";
 import Link from "next/link";
 import { LegalAcceptance } from "@/components/legal/legal-acceptance";
 import { LegalLinks } from "@/components/legal/legal-links";
+import { SIGNUP_TRIAL_LINE } from "@/lib/coach-plan-pricing";
 
 export default function SignupPage() {
   const [fullName, setFullName] = useState("");
@@ -100,8 +101,11 @@ export default function SignupPage() {
         <h1 className="font-display uppercase text-3xl font-bold text-center">
           Start coaching
         </h1>
-        <p className="font-body text-steel text-sm text-center mt-2 mb-8">
+        <p className="font-body text-steel text-sm text-center mt-2">
           Create your account and your own organization in one step.
+        </p>
+        <p className="font-body text-steel text-sm text-center mt-1 mb-8" data-signup-trial-line>
+          {SIGNUP_TRIAL_LINE}
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
