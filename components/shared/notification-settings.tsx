@@ -38,7 +38,7 @@ export function NotificationSettings({
       </summary>
       <div className="px-4 pb-4 pt-3 border-t border-steel/15">
         <PushNotificationToggle variant="settings" profileId={profileId} audience={audience} />
-        <PushPreferences profileId={profileId} initialStart={pushPrefs?.quiet_hours_start ?? null} initialEnd={pushPrefs?.quiet_hours_end ?? null} initialGeneric={pushPrefs?.generic_push_text === true} available={!!pushPrefs} />
+        <PushPreferences profileId={profileId} initialStart={pushPrefs?.quiet_hours_start ?? null} initialEnd={pushPrefs?.quiet_hours_end ?? null} initialGeneric={pushPrefs?.generic_push_text === true} available={!!pushPrefs} who={audience} />
         {notices && <NoticeSwitches profileId={profileId} initialOff={notices.initialOff} available onOffChange={setOff} />}
       </div>
     </details>

@@ -95,6 +95,26 @@ describe("quiet hours (Ron, Nov 20, wave 3 R8)", () => {
     expect(w.until.toISOString()).toBe("2026-11-23T18:00:00.000Z"); // 1:00 PM
     expect(w.from.toISOString()).toBe("2026-11-23T17:30:00.000Z");
   });
+  it("a clock change overnight never puts it inside quiet hours (Chicago, quiet 9 PM to 7 AM)", () => {
+    const chi = quiet(21, 7, "America/Chicago");
+    // fall back, Sun Nov 1 2026: the usual moment is 3:30 AM CST (09:30Z); quiet hours began Sat 9:00 PM CDT (02:00Z), not 10 PM
+    const fall = dayBeforeWindow("2026-11-02T11:00:00.000Z", 24, chi);
+    expect(fall.until.toISOString()).toBe("2026-11-01T02:00:00.000Z");
+    expect(fall.from.toISOString()).toBe("2026-11-01T01:30:00.000Z");
+    // spring forward, Sun Mar 8 2026: the usual moment is 3:30 AM CDT (08:30Z); quiet hours began Sat 9:00 PM CST (03:00Z), not 8 PM
+    const spring = dayBeforeWindow("2026-03-09T10:00:00.000Z", 24, chi);
+    expect(spring.until.toISOString()).toBe("2026-03-08T03:00:00.000Z");
+    expect(spring.from.toISOString()).toBe("2026-03-08T02:30:00.000Z");
+    // the whole window is outside quiet hours, and its end is the first quiet minute
+    for (const w of [fall, spring]) {
+      for (let t = w.from.getTime(); t < w.until.getTime(); t += 60000) expect(quietStartedAt(new Date(t), chi)).toBeNull();
+      expect(quietStartedAt(w.until, chi)?.toISOString()).toBe(w.until.toISOString());
+    }
+  });
+  it("a session at an odd minute (6:10 AM) still moves to the half hour before 9 PM sharp", () => {
+    const w = dayBeforeWindow("2026-11-24T11:10:00.000Z", 24, quiet(21, 7));
+    expect(w.until.toISOString()).toBe("2026-11-23T02:00:00.000Z");
+  });
   it("finds when quiet hours began in any time zone, half-hour ones too", () => {
     expect(quietStartedAt(new Date("2026-11-23T17:45:00.000Z"), quiet(22, 6, "Asia/Kolkata"))?.toISOString()).toBe("2026-11-23T16:30:00.000Z"); // 11:15 PM -> 10 PM IST
     expect(quietStartedAt(new Date("2026-11-23T15:00:00.000Z"), quiet(22, 6, "Asia/Kolkata"))).toBeNull(); // 8:30 PM IST: not quiet

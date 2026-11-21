@@ -152,7 +152,8 @@ create trigger session_types_guard_pay_to_book before insert or update on public
   for each row execute function public.guard_pay_to_book();
 
 -- Who cancelled a session: the signed-in person whose change cancelled it (a coach, or the client in the app); empty when the server did it (a visitor's private link, a job).
--- Set on every way a session is cancelled, by one trigger. A paid session the coach charged for a late move keeps its money when the client cancels it, and is refunded when
+-- Set on every way a session is cancelled, by one trigger on every change to a booking, and never written any other way (whatever an update says, it keeps its value unless the
+-- session moves into or out of cancelled). A paid session the coach charged for a late move keeps its money when the client cancels it, and is refunded when
 -- the coach does (as the session credit is given back on a coach's cancel).
 alter table public.bookings add column if not exists cancelled_by uuid;
 create or replace function public.note_booking_cancelled_by()
@@ -163,15 +164,17 @@ as $$
 begin
   if new.status = 'cancelled' and old.status is distinct from 'cancelled' then
     new.cancelled_by := auth.uid();
-  elsif new.status is distinct from 'cancelled' then
+  elsif old.status = 'cancelled' and new.status is distinct from 'cancelled' then
     new.cancelled_by := null;
+  else
+    new.cancelled_by := old.cancelled_by;
   end if;
   return new;
 end;
 $$;
 revoke all on function public.note_booking_cancelled_by() from public, anon, authenticated;
 drop trigger if exists bookings_note_cancelled_by on public.bookings;
-create trigger bookings_note_cancelled_by before update of status on public.bookings
+create trigger bookings_note_cancelled_by before update on public.bookings
   for each row execute function public.note_booking_cancelled_by();
 
 create table if not exists public.public_booking_holds (

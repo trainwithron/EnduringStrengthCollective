@@ -176,6 +176,16 @@ await db.query(`update public.bookings set status = 'confirmed' where id = $1`, 
 expect("C7: a session that comes back has no canceller", (await db.query(`select cancelled_by from public.bookings where id = $1`, [cb])).rows[0].cancelled_by === null);
 await db.query(`update public.bookings set status = 'cancelled' where id = $1`, [cb]);
 expect("C7: the server's cancel (a visitor's link, a job) has no canceller", (await db.query(`select cancelled_by from public.bookings where id = $1`, [cb])).rows[0].cancelled_by === null);
+// it cannot be written directly: an update that sets it, or changes anything else, keeps what it was
+await db.query(`update public.bookings set cancelled_by = $1 where id = $2`, [coach, cb]);
+expect("C7: who cancelled cannot be written directly (cancelled)", (await db.query(`select cancelled_by from public.bookings where id = $1`, [cb])).rows[0].cancelled_by === null);
+const cb2 = (await db.query(`insert into public.bookings (status, athlete_id, coach_id) values ('confirmed', $1, $2) returning id`, [fresh, coach])).rows[0].id;
+await as(coach, `update public.bookings set status = 'cancelled' where id = '${cb2}'`);
+await db.query(`update public.bookings set cancelled_by = $1, late_charge_state = 'waived' where id = $2`, [fresh, cb2]);
+expect("C7: another change to a cancelled session keeps who cancelled it", (await db.query(`select cancelled_by from public.bookings where id = $1`, [cb2])).rows[0].cancelled_by === coach);
+const cb3 = (await db.query(`insert into public.bookings (status, athlete_id, coach_id) values ('confirmed', $1, $2) returning id`, [fresh, coach])).rows[0].id;
+await db.query(`update public.bookings set cancelled_by = $1 where id = $2`, [coach, cb3]);
+expect("C7: a session still on has no canceller, whatever an update says", (await db.query(`select cancelled_by from public.bookings where id = $1`, [cb3])).rows[0].cancelled_by === null);
 const hold = (email, extra = {}) =>
   db.query(
     `insert into public.public_booking_holds (coach_id, session_type_id, organization_id, start_at, end_at, expires_at, status_token_hash, guest_name, guest_email, amount_cents, stripe_account_id, state)

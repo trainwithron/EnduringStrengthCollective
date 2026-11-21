@@ -8,7 +8,23 @@ const hourLabel = (h: number) => `${h % 12 === 0 ? 12 : h % 12}:00 ${h < 12 ? "a
 
 // Two choices about what reaches the phone: quiet hours (nothing is pushed between the two hours; the notice is still in the app) and private lock screens (the phone shows only "You have a new notification").
 // Saved on the person's own profile, as they choose.
-export function PushPreferences({ profileId, initialStart, initialEnd, initialGeneric, available }: { profileId: string; initialStart: number | null; initialEnd: number | null; initialGeneric: boolean; available: boolean }) {
+// who: a coach's quiet hours let through a request about a session starting within 12 hours and its lapse warning (wave 3 C9); a client's let through the reminder an hour
+// before their own session (R8). The line under the setting says which.
+export function PushPreferences({
+  profileId,
+  initialStart,
+  initialEnd,
+  initialGeneric,
+  available,
+  who = "client",
+}: {
+  profileId: string;
+  initialStart: number | null;
+  initialEnd: number | null;
+  initialGeneric: boolean;
+  available: boolean;
+  who?: "coach" | "client";
+}) {
   const [start, setStart] = useState<number | null>(initialStart);
   const [end, setEnd] = useState<number | null>(initialEnd);
   const [generic, setGeneric] = useState(initialGeneric);
@@ -53,7 +69,9 @@ export function PushPreferences({ profileId, initialStart, initialEnd, initialGe
         />
         <span>
           Quiet hours
-          <span className="block text-xs text-steel">No notifications are sent to your phone during these hours, except the reminder an hour before your own session. The rest are waiting for you in the app.</span>
+          <span className="block text-xs text-steel">{who === "coach"
+              ? "No notifications are sent to your phone during these hours, except a request about a session starting within 12 hours, and its warning before it lapses. The rest are waiting for you in the app."
+              : "No notifications are sent to your phone during these hours, except the reminder an hour before your own session. The rest are waiting for you in the app."}</span>
         </span>
       </label>
       {quietOn && (

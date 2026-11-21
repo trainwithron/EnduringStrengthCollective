@@ -727,3 +727,23 @@ describe("re-check follow-ups (Nov 20)", () => {
     expect(t.deps.refund).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("final-check nits (Nov 20)", () => {
+  it("two runs at once at the third failure tell the admin once", async () => {
+    const t = setup({
+      holds: [holdRow({ state: "booked", booking_id: "b1", manage_link_id: "l1", group_id: "group-1", payment_intent_id: "pi_1", refund_candidate_at: SEEN_BEFORE, decision_failures: 2 })],
+      bookings: [{ id: "b1", status: "cancelled", late_cancel: false, late_charge_state: null, athlete_id: "athlete-1", coach_id: COACH, cancelled_by: COACH }],
+      links: [{ id: "l1", booking_id: "b1" }],
+      lateMoveFails: true,
+    });
+    await Promise.all([runPaidBookingSweep(t.deps), runPaidBookingSweep(t.deps)]);
+    expect(t.deps.alertAdmin).toHaveBeenCalledTimes(1);
+    expect(t.hold().decision_failures).toBe(3);
+  });
+  it("the quiet-hours line says what gets through, for a coach and for a client", () => {
+    const ui = read("components/athlete/push-preferences.tsx");
+    expect(ui).toContain("except a request about a session starting within 12 hours, and its warning before it lapses.");
+    expect(ui).toContain("except the reminder an hour before your own session.");
+    expect(read("components/shared/notification-settings.tsx")).toContain("who={audience}");
+  });
+});

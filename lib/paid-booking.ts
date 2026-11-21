@@ -436,8 +436,9 @@ export async function runPaidBookingSweep(deps: PaidDeps): Promise<SweepResult> 
       if (chargedError) {
         // unknown: decide next run, never refund on a guess; three runs in a row and the platform admin is told (once)
         const failures = (row.decision_failures ?? 0) + 1;
-        await deps.db.from("public_booking_holds").update({ decision_failures: failures }).eq("id", row.id).eq("decision_failures", row.decision_failures ?? 0);
-        if (failures === DECISION_FAILURES_ALERT) {
+        const { data: counted } = await deps.db.from("public_booking_holds").update({ decision_failures: failures }).eq("id", row.id).eq("decision_failures", row.decision_failures ?? 0).select("id");
+        // only the run whose count went in tells the admin (two runs at once cannot both)
+        if (failures === DECISION_FAILURES_ALERT && (counted ?? []).length === 1) {
           await deps
             .alertAdmin("Paid booking: refund rule can't be read", `Hold ${row.id} (booking ${row.booking_id}): booking_late_move_charged failed ${failures} runs in a row: ${chargedError.message ?? "unknown error"}. No refund until it can be read.`)
             .catch(() => {});

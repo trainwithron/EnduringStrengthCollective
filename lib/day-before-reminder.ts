@@ -21,17 +21,31 @@ export const BEFORE_QUIET_WINDOW_MINUTES = 30;
 
 export type QuietPrefs = Pick<PushPrefs, "quietStart" | "quietEnd" | "timeZone">;
 
-/** When the quiet hours that `at` falls in began; null when `at` is not in quiet hours (or there are none). */
+const MINUTE = 60000;
+
+/**
+ * When the quiet hours that `at` falls in began, as a real instant (the first minute that is quiet); null when `at` is not in quiet hours (or there are none).
+ * Found by real time, so a clock change overnight (fall back, spring forward) cannot put it an hour off: the quick guess from the wall clock is used only when it checks out
+ * (quiet, and the minute before it is not); otherwise it steps back from `at` a quarter hour at a time while still quiet, then forward a minute at a time to the first quiet one.
+ */
 export function quietStartedAt(at: Date, q: QuietPrefs | null | undefined): Date | null {
   if (!q || q.quietStart == null || !isQuietNow(q, at)) return null;
-  let local: Date;
+  const quiet = (t: number) => isQuietNow(q, new Date(t));
+  const isStart = (t: number) => quiet(t) && !quiet(t - MINUTE);
+  const base = Math.floor(at.getTime() / MINUTE) * MINUTE;
   try {
-    local = nowInZone(q.timeZone, at);
+    const local = nowInZone(q.timeZone, at);
+    const sinceStart = (((local.getUTCHours() * 60 + local.getUTCMinutes() - q.quietStart * 60) % 1440) + 1440) % 1440;
+    const guess = base - sinceStart * MINUTE;
+    if (isStart(guess)) return new Date(guess);
   } catch {
     return null;
   }
-  const sinceStart = (((local.getUTCHours() * 60 + local.getUTCMinutes() - q.quietStart * 60) % 1440) + 1440) % 1440;
-  return new Date(at.getTime() - sinceStart * 60000 - local.getUTCSeconds() * 1000 - (at.getTime() % 1000));
+  // a clock change in between: by real time
+  let t = base;
+  for (let i = 0; i < 26 * 4 && quiet(t - 15 * MINUTE); i++) t -= 15 * MINUTE;
+  for (let i = 0; i < 16 && !isStart(t); i++) t -= MINUTE;
+  return isStart(t) ? new Date(t) : null;
 }
 
 /** When the day-before reminder may go out for this session: the usual hour and a half before the cutoff, or, when that is in quiet hours, the half hour before they begin. */
