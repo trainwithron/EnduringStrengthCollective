@@ -126,6 +126,8 @@ export function SessionLogger({
     source?: "coach" | "typed";
     readySeconds?: number;
   } | null>(null);
+  // The rest timer is minimized to its slim bar above the bottom bar: the list keeps room for it.
+  const [restMinimized, setRestMinimized] = useState(false);
 
   // Smart-default rest duration: the set's own prescribed rest (from the
   // cardio-interval work) when it has one, else a sensible generic
@@ -416,6 +418,8 @@ export function SessionLogger({
           todayDate={todayDate}
           read={read}
           nextUp={nextName}
+          raised={raised}
+          onMinimizedChange={setRestMinimized}
         />
       )}
       <SetSaveBanner />
@@ -559,6 +563,10 @@ export function SessionLogger({
         </div>
       )}
       </div>
+
+      {/* Room for the minimized rest timer, so the last set and Next are never behind it (Nov 21). */}
+      {/* (never under a finished workout: the timer is gone then, minimized or not) */}
+      {!isCompleted && restMinimized && <div aria-hidden="true" className="h-20" data-rest-mini-space />}
 
       {/* The bar at the bottom of a live workout: Rest on the left, Next on the right. Finish is at the top right of the header; its choice opens over this bar. */}
       {!isCompleted && exercises.length > 0 && (
