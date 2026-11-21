@@ -1,5 +1,6 @@
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { slotConflict } from "@/lib/booking-slots";
+import { googleBusyRanges } from "@/lib/google-busy";
 
 // Only the open times on a client's day page (Ron, Nov 3: "it needs to only present the open times, the available times, and not all times"). A client can read only their own
 // sessions, so every other client's session was invisible to their screen and its hour was offered, then refused ("That slot was just taken"). The coach's busy times for the day
@@ -10,13 +11,15 @@ export type BusyRange = { id: string; start: Date; end: Date };
 export async function coachBusyRanges(coachId: string, fromIso: string, toIso: string): Promise<BusyRange[]> {
   try {
     const admin = createServiceRoleClient();
-    const [sessions, calls] = await Promise.all([
+    const [sessions, calls, google] = await Promise.all([
       admin.from("bookings").select("id, start_at, end_at").eq("coach_id", coachId).eq("status", "confirmed").lt("start_at", toIso).gt("end_at", fromIso).limit(500),
       admin.from("discovery_bookings").select("id, start_at, end_at").eq("coach_id", coachId).eq("status", "confirmed").lt("start_at", toIso).gt("end_at", fromIso).limit(200),
+      // The coach's personal Google Calendar, busy times only (wave 2 C4, lib/google-busy.ts); none when not connected or Google does not answer in time.
+      googleBusyRanges(coachId, fromIso, toIso),
     ]);
     const rows = (r: { data: unknown; error: unknown }, prefix: string) =>
       r.error ? [] : ((r.data ?? []) as { id: string; start_at: string; end_at: string }[]).map((b) => ({ id: `${prefix}${b.id}`, start: new Date(b.start_at), end: new Date(b.end_at) }));
-    return [...rows(sessions, ""), ...rows(calls, "discovery:")];
+    return [...rows(sessions, ""), ...rows(calls, "discovery:"), ...google];
   } catch {
     return [];
   }
