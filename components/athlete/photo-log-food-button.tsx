@@ -34,7 +34,11 @@ export function PhotoLogFoodButton({
   logDate: string;
   onLogged: (entry: FoodLogEntry) => void;
 }) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Audit C6 (Nov 21): the camera, or the phone's photos (like InBody). The two inputs are always on the page, so "Try again" can open the same one again in the same tap (C21).
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
+  const lastPicker = useRef<"camera" | "gallery">("camera");
+  const [choosing, setChoosing] = useState(false);
   const [estimating, setEstimating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,9 +68,29 @@ export function PhotoLogFoodButton({
       setEstimate(data);
     } finally {
       setEstimating(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      if (cameraRef.current) cameraRef.current.value = "";
+      if (galleryRef.current) galleryRef.current.value = "";
     }
   }
+
+  function openPicker(which: "camera" | "gallery") {
+    lastPicker.current = which;
+    setChoosing(false);
+    (which === "camera" ? cameraRef : galleryRef).current?.click();
+  }
+
+  const inputs = (
+    <>
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" tabIndex={-1} aria-hidden="true" onChange={(e) => {
+        const file = e.target.files?.[0];
+        if (file) handleFile(file);
+      }} />
+      <input ref={galleryRef} type="file" accept="image/*" className="hidden" tabIndex={-1} aria-hidden="true" onChange={(e) => {
+        const file = e.target.files?.[0];
+        if (file) handleFile(file);
+      }} />
+    </>
+  );
 
   async function handleConfirm() {
     if (!estimate) return;
@@ -115,6 +139,7 @@ export function PhotoLogFoodButton({
   if (estimate) {
     return (
       <div className="basis-full order-last min-w-0 tint-accent rounded-card p-3">
+        {inputs}
         <p className="font-body text-sm text-chalk">{estimate.description}</p>
         <p className="font-body text-xs text-steel mt-1">
           ~{estimate.calories} kcal · {estimate.proteinG}p / {estimate.carbsG}c / {estimate.fatG}f
@@ -136,11 +161,16 @@ export function PhotoLogFoodButton({
           >
             {saving ? "Saving…" : "Confirm & log"}
           </button>
+          {/* Audit C21: Try again opens the camera or photos again (the one used last), not just clears the estimate. */}
           <button
             type="button"
-            onClick={() => setEstimate(null)}
+            onClick={() => {
+              setEstimate(null);
+              openPicker(lastPicker.current);
+            }}
             disabled={saving}
-            className="font-body text-xs text-steel disabled:opacity-40"
+            className="min-h-11 px-3 font-body text-xs text-steel disabled:opacity-40"
+            data-photo-try-again
           >
             Try again
           </button>
@@ -152,27 +182,28 @@ export function PhotoLogFoodButton({
   // A tile in the row of three (Look Refresh, Nov 20); a problem shows full width under the row.
   return (
     <>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) handleFile(file);
-        }}
-      />
+      {inputs}
       <button
         type="button"
-        onClick={() => fileInputRef.current?.click()}
+        onClick={() => setChoosing((c) => !c)}
         disabled={estimating}
-        aria-label={estimating ? "Estimating from photo" : "Take a photo"}
+        aria-expanded={choosing}
+        aria-label={estimating ? "Estimating from photo" : "Log food from a photo"}
         className={LOG_TILE_CLASS}
       >
         <Camera className="w-[22px] h-[22px] text-rust-ink" aria-hidden="true" />
         {estimating ? "Estimating…" : "Photo"}
       </button>
+      {choosing && (
+        <div className="basis-full order-last grid grid-cols-2 gap-2.5" data-photo-choice>
+          <button type="button" onClick={() => openPicker("camera")} className="min-h-11 px-3 rounded-token-pill bg-rust text-graphite font-body text-sm font-semibold">
+            Take a photo
+          </button>
+          <button type="button" onClick={() => openPicker("gallery")} className="min-h-11 px-3 rounded-token-pill border border-rust/50 text-rust-ink font-body text-sm font-semibold">
+            Choose from photos
+          </button>
+        </div>
+      )}
       {error && <p className="basis-full order-last font-body text-xs text-rust-ink" role="alert">{error}</p>}
     </>
   );

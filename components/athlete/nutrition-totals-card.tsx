@@ -1,5 +1,6 @@
 // The first thing on the client's Nutrition page (Look Refresh, Ron Nov 20): what is logged for the day as a calories ring and protein / carbs / fat bars. With a target the
 // ring and bars fill toward it; without one they show the logged numbers and stay empty, with the same friendly line as before. Colors come from the organization's theme.
+import { OpenSetTargetsButton } from "@/components/athlete/set-my-targets-sheet";
 
 export interface TotalsLike {
   calories: number;
@@ -103,9 +104,7 @@ export function NutritionTotalsCard({
           {setTargetsHref && (
             <>
               {" "}
-              <a href={setTargetsHref} className="inline-flex items-center min-h-[44px] text-rust-ink font-semibold underline-offset-2 hover:underline">
-                Set my targets
-              </a>
+              <OpenSetTargetsButton fallbackHref={setTargetsHref} className="inline-flex items-center min-h-[44px] text-rust-ink font-semibold underline-offset-2 hover:underline" />
             </>
           )}
         </p>

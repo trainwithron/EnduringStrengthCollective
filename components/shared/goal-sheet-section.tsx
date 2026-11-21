@@ -30,6 +30,7 @@ export function GoalSheetSection({
   viewer,
   clientFirstName,
   timeZone,
+  startEditing = false,
 }: {
   groupId: string;
   athleteId: string;
@@ -37,13 +38,16 @@ export function GoalSheetSection({
   viewer: "client" | "coach";
   clientFirstName?: string;
   timeZone?: string;
+  // The client came to change it ("Update my goal", ?edit=1; audit C4, Nov 21): open with the boxes, not the read-only answers.
+  startEditing?: boolean;
 }) {
   const router = useRouter();
   const saved: GoalSheetAnswers = sheet ? { ...EMPTY_GOAL_SHEET, ...pick(sheet) } : EMPTY_GOAL_SHEET;
   const hasAnswers = goalSheetHasAnswers(saved);
   const waiting = goalSheetWaitingOnClient(sheet);
   const first = clientFirstName || "your client";
-  const [editing, setEditing] = useState(viewer === "client" && !hasAnswers);
+  // Open for writing when there is nothing yet, when the client came to change it, or while the coach's request waits on them (audit C12).
+  const [editing, setEditing] = useState(viewer === "client" && (!hasAnswers || startEditing || waiting));
   const [answers, setAnswers] = useState<GoalSheetAnswers>(saved);
   const [busy, setBusy] = useState<"save" | "send" | null>(null);
   const [note, setNote] = useState<string | null>(null);

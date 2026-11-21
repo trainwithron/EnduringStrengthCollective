@@ -16,9 +16,12 @@ export const metadata = { title: "Workouts" };
 export default async function WorkoutOverviewPage(
   props: {
     params: Promise<{ groupId: string; workoutId: string }>;
+    searchParams?: Promise<{ start?: string }>;
   }
 ) {
   const params = await props.params;
+  // ?start=1 (Home's "Start workout", audit C8, Nov 21): start it at once, the same as this page's own Start; the preview stays the page without it.
+  const wantsStart = (await props.searchParams)?.start === "1";
   const supabase = await createServerClient();
   const {
     data: { user },
@@ -52,6 +55,11 @@ export default async function WorkoutOverviewPage(
     return (
       <NoAccess>This workout isn&apos;t available, or you don&apos;t have access to it.</NoAccess>
     );
+  }
+  // Never for a coach looking through a client's app. A workout already started or finished opens that session instead.
+  const autoStart = wantsStart && !effective.isActingAsOther;
+  if (autoStart && data.existingSession) {
+    redirect(data.existingSession.status === "completed" ? `/sessions/${data.existingSession.id}` : `/sessions/${data.existingSession.id}?resume=1`);
   }
 
   // Content-dripping only applies to the athlete viewing their own,
@@ -93,6 +101,7 @@ export default async function WorkoutOverviewPage(
           athleteId={effective.athleteId}
           backHref={`/groups/${params.groupId}/programs/${data.workout.programId}`}
           actingAs={actingAs}
+          autoStart={autoStart}
         />
       );
     }
@@ -142,6 +151,7 @@ export default async function WorkoutOverviewPage(
       athleteId={effective.athleteId}
       backHref={`/groups/${params.groupId}/programs/${data.workout.programId}`}
       actingAs={actingAs}
+      autoStart={autoStart}
     />
   );
 }

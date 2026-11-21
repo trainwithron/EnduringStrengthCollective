@@ -18,6 +18,8 @@ export interface JoinView {
   note: string | null;
   // The button is disabled (a reason is shown in `note`).
   disabled: boolean;
+  // Disabled only because there is no session on the account: the list offers Message your coach beside it.
+  needsSession?: boolean;
 }
 
 // What a client sees on one class. `mine` is their own attendee status, if any. `balance` is their session balance (null when
@@ -38,7 +40,7 @@ export function joinView(opts: {
   const left = spotsLeft(opts.capacity, opts.joined);
   if (left === 0) return { action: "waitlist", label: "Join waiting list", note: "This group session is full.", disabled: false };
   if ((opts.balance ?? 0) <= 0) {
-    return { action: "join", label: "Join", note: "You need a session on your account to join. Your coach can add one.", disabled: true };
+    return { action: "join", label: "Join", note: "You need a session on your account to join. Your coach can add one.", disabled: true, needsSession: true };
   }
   return { action: "join", label: "Join", note: `${left} ${left === 1 ? "spot" : "spots"} left`, disabled: false };
 }

@@ -28,7 +28,8 @@ export async function POST(request: Request) {
     .upsert({ athlete_id: athleteId, group_id: groupId, requested_by: user.id, requested_at: new Date().toISOString() }, { onConflict: "athlete_id,group_id" });
   if (error) return NextResponse.json({ error: "Couldn't send it. Try again." }, { status: 500 });
 
-  const path = `/groups/${groupId}/goal`;
+  // Straight to the sheet, open for writing (audit C12, Nov 21; the page also opens it for writing while this request waits).
+  const path = `/groups/${groupId}/goal?edit=1#goal-sheet`;
   await db.from("notifications").insert({ profile_id: athleteId, group_id: groupId, type: "goal_proposed", body: "Your coach sent you a goal sheet to fill in.", link_path: path });
   await sendPushToProfile(db, athleteId, "Your coach sent you a goal sheet", "Open My Goal to fill it in.", path).catch(() => 0);
   return NextResponse.json({ ok: true });

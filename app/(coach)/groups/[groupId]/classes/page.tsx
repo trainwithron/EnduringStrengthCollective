@@ -45,7 +45,7 @@ export default async function ClassesPage(props: { params: Promise<{ groupId: st
           {notReady ? (
             <p className="font-body text-sm text-steel">Group sessions aren&apos;t switched on yet.</p>
           ) : (
-            <ClassesList classes={classes} balance={balance} timezone={timezone} nowIso={nowIso} />
+            <ClassesList classes={classes} balance={balance} timezone={timezone} nowIso={nowIso} groupId={params.groupId} />
           )}
         </div>
       </div>

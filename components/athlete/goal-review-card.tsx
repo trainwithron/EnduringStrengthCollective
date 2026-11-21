@@ -45,7 +45,7 @@ export function GoalReviewCard({ groupId, athleteId, goalText }: { groupId: stri
         >
           {state === "saving" ? "Saving…" : "Still my goal"}
         </button>
-        <Link href={`/groups/${groupId}/goal#goal-sheet`} className="inline-flex items-center min-h-11 px-4 rounded-token-pill border border-steel/40 text-chalk font-body text-sm">
+        <Link href={`/groups/${groupId}/goal?edit=1#goal-sheet`} className="inline-flex items-center min-h-11 px-4 rounded-token-pill border border-steel/40 text-chalk font-body text-sm">
           Update my goal
         </Link>
       </div>

@@ -17,7 +17,7 @@ const base = { athleteId: "a1", groupId: "g1", logDate: "2026-11-20", meals: [],
 describe("the order on the page: totals, search, three tiles, pills, then the rest", () => {
   it("renders in that order", () => {
     const html = renderToStaticMarkup(createElement(FoodLogSection, { ...base }));
-    const order = ['data-testid="logged-totals"', ">Search foods<", 'aria-label="Scan a barcode"', 'aria-label="Take a photo"', 'aria-label="My foods and saved meals"', ">Copy yesterday<", ">+ Snack or ate out<"];
+    const order = ['data-testid="logged-totals"', ">Search foods<", 'aria-label="Scan a barcode"', 'aria-label="Log food from a photo"', 'aria-label="My foods and saved meals"', ">Copy yesterday<", ">+ Snack or ate out<"];
     let last = -1;
     for (const m of order) {
       const i = html.indexOf(m);
@@ -56,7 +56,10 @@ describe("the totals card", () => {
     expect(html).toContain('aria-label="420 calories logged, no target"');
     expect(html).not.toContain('stroke="rgb(var(--rust))"');
     expect(html).toContain("30 g");
-    expect(html).toContain('href="#my-targets"');
+    // a button that opens the targets in a pop-up (audit C10, Nov 21), not a jump down the page
+    expect(html).toContain('aria-haspopup="dialog"');
+    expect(html).toContain("data-set-targets");
+    expect(html).not.toContain('href="#my-targets"');
     expect(html).toContain(">Set my targets<");
   });
   it("with a target: the ring and bars fill toward it, never past full", () => {

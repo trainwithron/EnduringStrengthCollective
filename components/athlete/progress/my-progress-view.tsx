@@ -86,6 +86,10 @@ export function MyProgressView({
       {cards.length === 0 && bodyWeight.length === 0 ? (
         <section className="bg-surface rounded-card p-4">
           <p className="font-body text-sm text-chalk">Your lifts show up here once you log a few workouts.</p>
+          {/* Audit C20 (Nov 21): the way to start, from here. Today's workout is on Home. */}
+          <Link href={`/groups/${groupId}`} className="mt-3 inline-flex items-center min-h-11 px-5 rounded-token-pill bg-rust text-graphite font-body text-sm font-semibold" data-progress-go-workout>
+            Go to today&apos;s workout
+          </Link>
         </section>
       ) : (
         <>

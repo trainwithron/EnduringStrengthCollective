@@ -1,7 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { createBrowserClient } from "@/lib/supabase/client";
+import { uploadProgressPhoto } from "@/lib/progress-photo-upload";
 import { compareStats, defaultPair, photoDays, signedChange, type ComparePhoto, type WeighIn } from "@/lib/photo-compare";
 import { lbToKg, type WeightUnit } from "@/lib/units";
 import { tapeUnitFor } from "@/lib/body-measurements";
@@ -89,13 +92,64 @@ function Side({
   );
 }
 
+// The empty compare page's "Add a photo" (audit C5): the picker opens right here, the photo goes into the journal (private), and the page stays.
+function AddPhotoHere({ owner }: { owner: { athleteId: string; groupId: string } }) {
+  const router = useRouter();
+  const pickRef = useRef<HTMLInputElement>(null);
+  const [adding, setAdding] = useState(false);
+  const [addNote, setAddNote] = useState<{ text: string; error: boolean } | null>(null);
+
+  async function addPhoto(file: File | null) {
+    if (!file || adding) return;
+    setAdding(true);
+    setAddNote(null);
+    const r = await uploadProgressPhoto(createBrowserClient(), { athleteId: owner.athleteId, groupId: owner.groupId, file, sharedWithCoach: false });
+    setAdding(false);
+    if (!r.ok) {
+      setAddNote({ text: r.error, error: true });
+      return;
+    }
+    setAddNote({ text: "Added to your photos.", error: false });
+    router.refresh();
+  }
+
+  return (
+    <>
+      <button type="button" onClick={() => pickRef.current?.click()} disabled={adding} className="self-start min-h-11 px-5 inline-flex items-center bg-rust text-graphite font-body text-sm font-semibold disabled:opacity-50" data-compare-add>
+        {adding ? "Adding…" : "Add a photo"}
+      </button>
+      <input
+        ref={pickRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        tabIndex={-1}
+        aria-hidden="true"
+        onChange={(e) => {
+          const f = e.target.files?.[0] ?? null;
+          e.target.value = "";
+          void addPhoto(f);
+        }}
+      />
+      {addNote && (
+        <p className={`font-body text-sm ${addNote.error ? "text-rust-ink" : "text-chalk"}`} role={addNote.error ? "alert" : "status"}>
+          {addNote.text}
+        </p>
+      )}
+    </>
+  );
+}
+
 export function PhotoCompare({
   photos,
   weighIns,
   waists,
   weightUnit,
   addHref,
+  owner,
 }: {
+  // The client's own compare page: "Add a photo" opens the picker right here and the photo is added to the journal (private), staying on this page (audit C5, Nov 21).
+  owner?: { athleteId: string; groupId: string };
   photos: CompareInputPhoto[];
   weighIns: WeighIn[];
   // waist readings in inches, shaped like weigh-ins (date, value)
@@ -109,7 +163,6 @@ export function PhotoCompare({
   const [after, setAfter] = useState(first?.after ?? "");
   const [beforeIndex, setBeforeIndex] = useState(0);
   const [afterIndex, setAfterIndex] = useState(0);
-
   if (!first) {
     return (
       <div className="bg-surface rounded-card p-5 flex flex-col gap-3" data-photo-compare-empty>
@@ -117,9 +170,13 @@ export function PhotoCompare({
         <p className="font-body text-sm text-steel">
           {days.length === 1 ? "You have photos from one day so far. Add one on another day and they show up here side by side." : "Add a progress photo today, and another in a few weeks, and they show up here side by side."}
         </p>
-        <Link href={addHref} className="self-start min-h-11 px-5 inline-flex items-center bg-rust text-graphite font-body text-sm font-semibold">
-          Add a photo
-        </Link>
+        {owner ? (
+          <AddPhotoHere owner={owner} />
+        ) : (
+          <Link href={addHref} className="self-start min-h-11 px-5 inline-flex items-center bg-rust text-graphite font-body text-sm font-semibold">
+            Add a photo
+          </Link>
+        )}
         <p className="font-body text-xs text-steel">Only you see your photos. Your coach sees one only if you share it.</p>
       </div>
     );

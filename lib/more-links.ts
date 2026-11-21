@@ -27,6 +27,8 @@ export function buildMoreSections(opts: {
   if (!opts.isCoach) {
     // Wave 2, P1 (Ron, Nov 20): the client's own lifts, body weight, photos and measurements, first in Training.
     training.unshift({ label: "My progress", hint: "Your lifts, best sets, photos and measurements", href: `${g}/progress` });
+    // Audit C2 (Nov 21): the weekly check-in can always be opened again from here (to change it before the coach reviews it, or to see it after).
+    training.splice(1, 0, { label: "Weekly check-in", hint: "Tell your coach how the week went", href: `${g}/check-in` });
     training.push({ label: "Video check-ins", hint: "Short videos from your coach", href: `${g}/video-checkins` });
     if (opts.historyImportEnabled) training.push({ label: "My exercise history", hint: "Past lifts you brought in", href: `${g}/my-history` });
   }

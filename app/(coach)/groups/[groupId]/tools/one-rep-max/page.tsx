@@ -9,6 +9,7 @@ import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-bar";
 import { OneRepMaxCalculator } from "@/components/tools/one-rep-max-calculator";
 import { getEffectiveAthlete } from "@/lib/acting-as";
+import { loadLiftUnit } from "@/lib/lift-unit-server";
 
 export const metadata = { title: "One rep max" };
 
@@ -62,7 +63,7 @@ export default async function OneRepMaxPage(
             percentages.
           </p>
         </div>
-        <OneRepMaxCalculator />
+        <OneRepMaxCalculator unit={await loadLiftUnit(supabase, user.id)} />
       </CoachDesktopShell>
     );
   }
@@ -84,10 +85,10 @@ export default async function OneRepMaxPage(
       )}
       <header className="px-5 pt-8 pb-6 border-b border-steel/20">
         <Link
-          href={`/groups/${params.groupId}/settings`}
-          className="font-body text-xs text-steel uppercase tracking-wide"
+          href={`/groups/${params.groupId}/more`}
+          className="min-h-11 inline-flex items-center font-body text-xs text-steel uppercase tracking-wide"
         >
-          &larr; Back to settings
+          &larr; More
         </Link>
         <h1 className="font-display font-bold text-3xl leading-none mt-3 uppercase">
           1RM Calculator
@@ -99,7 +100,7 @@ export default async function OneRepMaxPage(
       </header>
 
       <section className="px-5 pt-6">
-        <OneRepMaxCalculator />
+        <OneRepMaxCalculator unit={await loadLiftUnit(supabase, effective.athleteId)} />
       </section>
 
       <BottomTabBar groupId={params.groupId} activeOverride="settings" />

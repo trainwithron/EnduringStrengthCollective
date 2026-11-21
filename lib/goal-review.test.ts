@@ -38,7 +38,8 @@ describe("the 90-day goal look (Ron, Nov 20: R5)", () => {
     expect(html).toContain("It&#x27;s been 90 days since you set your goal");
     expect(html).toContain("Deadlift 300");
     expect(html).toContain("Still my goal");
-    expect(html).toContain('href="/groups/g1/goal#goal-sheet"');
+    // opens the sheet for writing (audit C4, Nov 21)
+    expect(html).toContain('href="/groups/g1/goal?edit=1#goal-sheet"');
     expect(html).toContain("Update my goal");
   });
   it("Still my goal is the client's own, through the server, and only on a sheet they filled in", () => {

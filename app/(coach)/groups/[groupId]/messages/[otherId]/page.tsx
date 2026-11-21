@@ -8,6 +8,7 @@ import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
 import { ActingAsBanner } from "@/components/athlete/acting-as-bar";
 import { DirectMessageThread } from "@/components/messages/direct-message-thread";
 import { CoachProfilePopup } from "@/components/shared/coach-profile-popup";
+import { BackOrHomeLink } from "@/components/shared/back-or-home-link";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { loadDirectThread } from "@/lib/direct-thread";
@@ -91,12 +92,16 @@ export default async function MessageThreadPage(
         <ActingAsBanner athleteFullName={actingAsFullName ?? "Client"} groupId={params.groupId} />
       )}
       <header className="px-5 pt-8 pb-4 border-b border-steel/20">
-        <Link
-          href={viewerIsCoach ? `/groups/${params.groupId}/messages` : `/groups/${params.groupId}/settings`}
-          className="font-body text-xs text-steel uppercase tracking-wide"
-        >
-          {viewerIsCoach ? "\u2190 All messages" : "\u2190 Back"}
-        </Link>
+        {viewerIsCoach ? (
+          <Link href={`/groups/${params.groupId}/messages`} className="min-h-11 inline-flex items-center font-body text-xs text-steel uppercase tracking-wide">
+            {"\u2190 All messages"}
+          </Link>
+        ) : (
+          // Audit C14 (Nov 21): back to where they came from, or Home (it always went to Settings).
+          <BackOrHomeLink fallbackHref={`/groups/${params.groupId}`} className="min-h-11 inline-flex items-center font-body text-xs text-steel uppercase tracking-wide">
+            {"\u2190 Back"}
+          </BackOrHomeLink>
+        )}
         {viewerIsCoach ? (
           <h1 className="font-display font-bold text-2xl uppercase leading-none mt-2">{otherName}</h1>
         ) : (

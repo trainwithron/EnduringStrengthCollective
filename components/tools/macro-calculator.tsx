@@ -101,6 +101,7 @@ export function MacroCalculator({
           </span>
           <input
             type="number"
+            inputMode="decimal"
             value={weight}
             onChange={(e) => setWeight(e.target.value)}
             className="w-full min-w-0 h-10 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
@@ -112,6 +113,7 @@ export function MacroCalculator({
           </span>
           <input
             type="number"
+            inputMode="decimal"
             step="0.1"
             value={proteinPerLb}
             onChange={(e) => setProteinPerLb(e.target.value)}

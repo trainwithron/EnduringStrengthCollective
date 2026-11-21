@@ -166,7 +166,7 @@ function MeasurementsForm({ rows, unit, athleteId, groupId, onDone }: { rows: Me
         />
       </label>
       <div className="grid grid-cols-2 gap-3">
-        {MEASUREMENT_FIELDS.map((f) => (
+        {MEASUREMENT_FIELDS.map((f, i) => (
           <label key={f} className="flex flex-col gap-1 min-w-0">
             <span className="font-body text-[13px] font-semibold text-steel">
               {MEASUREMENT_LABELS[f]} ({unit})
@@ -174,6 +174,8 @@ function MeasurementsForm({ rows, unit, athleteId, groupId, onDone }: { rows: Me
             <input
               type="text"
               inputMode="decimal"
+              // the form opens on "Add today's measurements": the first box is ready to type in (audit C18)
+              autoFocus={i === 0}
               value={typed[f]}
               onChange={(e) => setTyped((t) => ({ ...t, [f]: e.target.value }))}
               aria-invalid={!!errors[f]}

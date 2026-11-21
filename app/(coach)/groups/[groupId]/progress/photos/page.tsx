@@ -66,7 +66,7 @@ export default async function ComparePhotosPage(props: { params: Promise<{ group
       </header>
 
       <section className="px-5 pt-3">
-        <PhotoCompare photos={photos} weighIns={weighIns} waists={waists} weightUnit={unit} addHref={`/groups/${params.groupId}/progress-photos`} />
+        <PhotoCompare photos={photos} weighIns={weighIns} waists={waists} weightUnit={unit} addHref={`/groups/${params.groupId}/progress-photos`} owner={{ athleteId: user.id, groupId: params.groupId }} />
       </section>
 
       {membership.role === "athlete" && <BottomTabBar groupId={params.groupId} activeOverride="settings" />}

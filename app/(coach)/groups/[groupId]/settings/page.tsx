@@ -569,7 +569,7 @@ export default async function SettingsPage(
 
       <section className="px-5 pt-6 space-y-6 @3xl:space-y-0 @3xl:flex @3xl:flex-wrap @3xl:items-start @3xl:gap-x-12 @3xl:gap-y-4 @3xl:mx-5 @3xl:px-0 @3xl:mt-2 @3xl:border-t @3xl:border-steel/20">
         <SettingsGroup label="Help">
-          <Link href="/help" className="block font-body text-sm text-chalk">
+          <Link href="/help" className="min-h-11 inline-flex items-center font-body text-sm text-chalk">
             Help articles, what&apos;s new and app status →
           </Link>
         </SettingsGroup>
@@ -589,7 +589,7 @@ export default async function SettingsPage(
         )}
 
         <SettingsGroup label="More">
-          <Link href={`/groups/${params.groupId}/more`} className="block font-body text-sm text-chalk">
+          <Link href={`/groups/${params.groupId}/more`} className="min-h-11 inline-flex items-center font-body text-sm text-chalk">
             Goals, tools, photos, messages and community →
           </Link>
         </SettingsGroup>

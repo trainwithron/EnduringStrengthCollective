@@ -24,7 +24,7 @@ describe("page order (item 1)", () => {
     expect(at("Today&apos;s targets\n")).toBeLessThan(at("<NutritionPreferencesCard"));
     expect(at("<NutritionPreferencesCard")).toBeLessThan(at("<ClientGroceryList"));
     expect(at("<ClientGroceryList")).toBeLessThan(at("{!trackingOn && nutrientData && planEstimate && ("));
-    expect(at("{!trackingOn && nutrientData && planEstimate && (")).toBeLessThan(at("Weekly check-in"));
+    expect(at("{!trackingOn && nutrientData && planEstimate && (")).toBeLessThan(at("Why your target is what it is"));
   });
   it("youth mode's protein-first targets are unchanged", () => {
     expect(page).toContain("youthMode ? (");
@@ -144,7 +144,7 @@ describe("a coach in their own personal space", () => {
     expect(page).toContain("selfCoached={selfCoached}");
     expect(read("components/athlete/meal-checkoff-list.tsx")).toContain("{selfCoached ? SELF_NO_MEAL_PLAN_LINE :");
     // the weekly check-in, too
-    expect(SELF_NO_CHECKIN_LINE).toBe("No weekly check-in yet.");
+    expect(SELF_NO_CHECKIN_LINE).toBe("No change to your target yet.");
     expect(page).toContain("{selfCoached ? (\n                  SELF_NO_CHECKIN_LINE");
   });
   it("on another day than today the copy button says Copy the day before", () => {

@@ -160,18 +160,20 @@ export function ProgressPhotoJournal({ athleteId, groupId }: { athleteId: string
                     year: "numeric",
                   })}
                 </p>
-                <label className="flex items-center gap-1.5 mt-1.5 font-body text-xs text-chalk">
+                {/* 44px rows to tap (audit C19, Nov 21). */}
+                <label className="flex items-center gap-2 min-h-11 font-body text-xs text-chalk cursor-pointer">
                   <input
                     type="checkbox"
                     checked={photo.sharedWithCoach}
                     onChange={() => handleToggleShare(photo)}
+                    className="w-5 h-5"
                   />
                   Share with coach
                 </label>
                 <button
                   type="button"
                   onClick={() => handleDelete(photo)}
-                  className="font-body text-xs text-steel active:text-rust-ink transition-colors mt-1"
+                  className="min-h-11 inline-flex items-center font-body text-xs text-steel active:text-rust-ink transition-colors"
                 >
                   Delete
                 </button>

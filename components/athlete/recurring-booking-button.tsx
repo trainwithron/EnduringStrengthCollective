@@ -12,6 +12,12 @@ import { bookingRefusalMessage, failedWeeklyDates } from "@/lib/booking-refusal-
 // entire safety net per occurrence — this is just the UI entry point
 // next to the existing single-slot "Book" button, not a replacement
 // for it.
+// 1 to 12 weeks; an empty or unreadable box is 1.
+export function clampWeeks(text: string): number {
+  const n = Math.round(Number(text));
+  return Number.isFinite(n) && n >= 1 ? Math.min(12, n) : 1;
+}
+
 export function RecurringBookingButton({
   coachId,
   athleteId,
@@ -26,13 +32,16 @@ export function RecurringBookingButton({
   durationMinutes: number;
 }) {
   const [open, setOpen] = useState(false);
-  const [occurrences, setOccurrences] = useState(4);
+  // What is typed is kept as typed (audit C9, Nov 21: clearing the box to type 8 used to snap it to 1); it is read as 1 to 12 when the box is left and when Confirm is pressed.
+  const [weeksText, setWeeksText] = useState("4");
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{ booked: number; failed: number; failedDates: Date[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   async function handleCreate() {
+    const occurrences = clampWeeks(weeksText);
+    setWeeksText(String(occurrences));
     setSubmitting(true);
     setError(null);
     const supabase = createBrowserClient();
@@ -66,7 +75,7 @@ export function RecurringBookingButton({
   if (result) {
     return (
       <div className="font-body text-xs text-steel text-right max-w-[240px]">
-        <p>Booked {result.booked} of {occurrences} weekly sessions.</p>
+        <p>Booked {result.booked} of {clampWeeks(weeksText)} weekly sessions.</p>
         {result.failed > 0 && (
           <p className="mt-1">
             Couldn&apos;t book {result.failedDates.length > 0 ? result.failedDates.map((d) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" })).join(", ") : `${result.failed} of them`}. Check how many sessions you have left, and that the time is inside your coach&apos;s hours.{" "}
@@ -92,11 +101,12 @@ export function RecurringBookingButton({
       <label className="font-body text-xs text-steel flex items-center gap-1.5">
         Repeat for
         <input
-          type="number"
-          min={1}
-          max={12}
-          value={occurrences}
-          onChange={(e) => setOccurrences(Math.min(12, Math.max(1, Number(e.target.value) || 1)))}
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          value={weeksText}
+          onChange={(e) => setWeeksText(e.target.value.replace(/[^0-9]/g, "").slice(0, 2))}
+          onBlur={() => setWeeksText(String(clampWeeks(weeksText)))}
           className="w-14 h-11 bg-graphite border border-steel/30 text-chalk px-1 font-body text-sm text-center"
         />
         weeks

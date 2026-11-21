@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatInTimezone } from "@/lib/format-in-timezone";
 import { classSummaryLine, joinView, type AttendeeStatus } from "@/lib/group-sessions";
+import { MessageCoachLink } from "@/components/athlete/message-coach-link";
 
 export interface ClassCard {
   id: string;
@@ -21,7 +22,7 @@ export interface ClassCard {
 
 // A client's view of the coach's small-group sessions: spots left, one tap to join (or the waiting list when it is full), and
 // leave. The database decides who gets the last spot; this just asks and shows what happened.
-export function ClassesList({ classes, balance, timezone, nowIso }: { classes: ClassCard[]; balance: number | null; timezone: string; nowIso: string }) {
+export function ClassesList({ classes, balance, timezone, nowIso, groupId }: { classes: ClassCard[]; balance: number | null; timezone: string; nowIso: string; groupId?: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<{ id: string; text: string; error: boolean } | null>(null);
@@ -82,6 +83,8 @@ export function ClassesList({ classes, balance, timezone, nowIso }: { classes: C
               )}
               {view.note && <span className="font-body text-xs text-steel">{view.note}</span>}
             </div>
+            {/* Audit C3 (Nov 21): a Join that can't be pressed for want of a session says what to do next, in one tap. */}
+            {view.needsSession && groupId && <MessageCoachLink groupId={groupId} />}
             {message?.id === c.id && (
               <p className={`font-body text-xs mt-2 ${message.error ? "text-rust-ink" : "text-chalk"}`} role={message.error ? "alert" : "status"}>
                 {message.text}

@@ -49,10 +49,10 @@ export default async function ProgressPhotosPage(
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
       <header className="px-5 pt-8 pb-6 border-b border-steel/20">
         <Link
-          href={`/groups/${params.groupId}/settings`}
-          className="font-body text-xs text-steel uppercase tracking-wide"
+          href={`/groups/${params.groupId}/more`}
+          className="min-h-11 inline-flex items-center font-body text-xs text-steel uppercase tracking-wide"
         >
-          &larr; Back to settings
+          &larr; More
         </Link>
       </header>
 
