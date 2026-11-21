@@ -7,6 +7,8 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ClientNutrition } from "@/components/coach/nutrition/client-nutrition";
 import { ClientFoodLogOnly } from "@/components/coach/nutrition/client-food-log-only";
 import { FavoriteMealsTab } from "@/components/coach/nutrition/favorite-meals-tab";
+import { showFavoritesTab } from "@/lib/starred-meals";
+import { openOwnNutritionSpace } from "@/lib/personal-space";
 import { NutritionClientList } from "@/components/coach/nutrition/nutrition-client-list";
 import { loadNutritionWeek, type LoadedWeek } from "@/lib/coach-nutrition-week";
 import { getEffectiveAthlete } from "@/lib/acting-as";
@@ -103,13 +105,30 @@ export default async function NutritionPage(
     // The bar at the top names the group in the address. In a one-on-one client's own group that is the client, so with nothing picked that client is the one shown (not a blank next to
     // their name), and picking someone else opens THEIR group's address below, so the name on top and the client on the page are always the same person.
     const ownClient = (group as { group_kind?: string | null } | null)?.group_kind === "one_on_one" ? athletes.find((a) => a.groupId === params.groupId) ?? null : null;
-    const selected = athletes.find((a) => a.profileId === searchParams.athleteId) ?? ownClient;
-    // An old bookmark or a hand-typed address for a client in another group: go to that client's own group, so the name on the top bar is theirs.
-    if (selected && selected.groupId !== params.groupId) {
+    // The coach's OWN row, first in the list (Ron, Nov 21: "I'd like to see myself on the nutrition list, so I can assign myself meal plans"): their nutrition lives in their personal
+    // space (the group their own client app uses, /my-space/home), with them as the athlete, so what is set here is what their own Nutrition shows. Only ever the signed-in coach's
+    // own row: never in another coach's list, and never in the counts. The space is made the first time it is opened here, exactly as the program assign panel does.
+    const { data: meRow } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
+    const myName = ((meRow as { full_name?: string | null } | null)?.full_name ?? "").trim() || "Me";
+    const selfHref = `/groups/${params.groupId}/nutrition?athleteId=${user.id}`;
+    const wantsSelf = searchParams.athleteId === user.id;
+    let selfSpace: { groupId: string | null; problem: string | null } | null = null;
+    if (wantsSelf) {
+      selfSpace = await openOwnNutritionSpace(supabase, user.id);
+    }
+    const selected = wantsSelf
+      ? selfSpace?.groupId
+        ? { profileId: user.id, fullName: myName, groupId: selfSpace.groupId }
+        : null
+      : athletes.find((a) => a.profileId === searchParams.athleteId) ?? ownClient;
+    const isSelf = wantsSelf && !!selected;
+    // An old bookmark or a hand-typed address for a client in another group: go to that client's own group, so the name on the top bar is theirs. (The coach's own row stays on this
+    // page: their space is private and has no organization to show on the top bar.)
+    if (selected && !isSelf && selected.groupId !== params.groupId) {
       redirect(`/groups/${selected.groupId}/nutrition?athleteId=${selected.profileId}${searchParams.tab ? `&tab=${searchParams.tab}` : ""}`);
     }
     let selectedTier: string | null = null;
-    if (selected) {
+    if (selected && !isSelf) {
       const { data: tierRow } = await supabase
         .from("group_memberships")
         .select("client_tier")
@@ -122,11 +141,19 @@ export default async function NutritionPage(
     // Two tabs (Ron, Nov 19 revamp): Clients (every client with this week's three facts, and the picked client's whole nutrition; the default) and Favorite meals (the meals the
     // coach starred). The calculator is "Calculate targets" in each client's Targets, and "This week" is the Clients list, so an old ?tab=week or ?tab=calculator opens Clients.
     // The tab applies to the coach only; the client's own page below never reads `tab`.
-    const tab = searchParams.tab === "favorites" ? "favorites" : "clients";
+    // Favorite meals shows only once the coach has starred a meal (Ron, Nov 21: an empty tab is noise); until then the tabs are Clients alone, and an old /recipes or ?tab=favorites
+    // link opens Clients. The meal plan's "star one to keep it in Favorite meals" says how a favorite starts. A failed count keeps the tab (nothing a coach has goes missing).
+    const { count: favoriteCount, error: favoriteCountError } = await supabase
+      .from("recipe_favorites")
+      .select("recipe_id", { count: "exact", head: true })
+      .eq("profile_id", user.id)
+      .eq("kind", "meal");
+    const hasFavorites = showFavoritesTab(favoriteCount, !!favoriteCountError);
+    const tab = searchParams.tab === "favorites" && hasFavorites ? "favorites" : "clients";
     const tabHref = (t: string) => `/groups/${params.groupId}/nutrition${t === "clients" ? "" : `?tab=${t}`}`;
     const TABS: { key: "clients" | "favorites"; label: string }[] = [
       { key: "clients", label: "Clients" },
-      { key: "favorites", label: "Favorite meals" },
+      ...(hasFavorites ? [{ key: "favorites" as const, label: "Favorite meals" }] : []),
     ];
     const coachToday = dateKeyInZone(await getGroupCoachTimezone(supabase, params.groupId));
     // The same clients as the list (the org wall included: getCoachClients), with this week's facts.
@@ -177,16 +204,22 @@ export default async function NutritionPage(
                 <span aria-hidden="true" className="text-steel">▾</span>
               </summary>
               <div className="border-t border-steel/15">
-                <NutritionClientList athletes={athletes} week={week} selectedId={selected?.profileId ?? null} />
+                <NutritionClientList athletes={athletes} week={week} selectedId={selected?.profileId ?? null} self={{ name: myName, href: selfHref }} />
               </div>
             </details>
             <div className="hidden md:block border border-steel/20">
-              <NutritionClientList athletes={athletes} week={week} selectedId={selected?.profileId ?? null} />
+              <NutritionClientList athletes={athletes} week={week} selectedId={selected?.profileId ?? null} self={{ name: myName, href: selfHref }} />
             </div>
 
             <div className="min-w-0">
               {!selected ? (
-                <p className="font-body text-sm text-steel">Pick a client to see their nutrition.</p>
+                wantsSelf && selfSpace?.problem ? (
+                  <p className="font-body text-sm text-rust-ink" role="alert">
+                    {selfSpace.problem}
+                  </p>
+                ) : (
+                  <p className="font-body text-sm text-steel">Pick a client to see their nutrition.</p>
+                )
               ) : selectedTier === "group" ? (
                 <ClientFoodLogOnly groupId={selected.groupId} athleteId={selected.profileId} clientName={selected.fullName} />
               ) : (

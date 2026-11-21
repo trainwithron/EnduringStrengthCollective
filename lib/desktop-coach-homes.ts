@@ -136,6 +136,8 @@ export function homeTabs(f: HomeFacts): Record<HomeKey, HomeTab[]> {
       f.teamSport && { key: "business-tools", label: TEAM_SPORT_BUSINESS_LABEL, href: teamSportBusinessHref(f.groupId) },
       f.isPlatformAdmin && { key: "admin-organizations", label: "Organizations", href: "/admin/organizations", group: ADMIN },
       f.isPlatformAdmin && { key: "admin-ranking", label: "Marketplace ranking", href: "/admin/marketplace-ranking", group: ADMIN },
+      // the built-in recipes' ingredient mapping, moved off the coach's Nutrition page (Ron, Nov 21)
+      f.isPlatformAdmin && { key: "admin-ingredients", label: "Recipe ingredients", href: "/admin/nutrition-ingredients", group: ADMIN },
     ],
   };
   const out = {} as Record<HomeKey, HomeTab[]>;
@@ -245,6 +247,7 @@ const RULES: Rule[] = [
   rule(`${G}/business/zapier`, "settings", "zapier"),
   rule("/admin/organizations", "settings", "admin-organizations"),
   rule("/admin/marketplace-ranking", "settings", "admin-ranking"),
+  rule("/admin/nutrition-ingredients", "settings", "admin-ingredients"),
   rule(`/admin/${ID}`, "settings", null),
 ];
 

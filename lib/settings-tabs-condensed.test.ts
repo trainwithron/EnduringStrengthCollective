@@ -15,7 +15,7 @@ describe("Settings has five tabs, each group's pages picked under the strip (Ron
   });
 
   it("the platform admin also sees Admin", () => {
-    expect(shown({ ...ordinary, isPlatformAdmin: true }).at(-1)).toEqual(["Admin", ["Organizations", "Marketplace ranking"]]);
+    expect(shown({ ...ordinary, isPlatformAdmin: true }).at(-1)).toEqual(["Admin", ["Organizations", "Marketplace ranking", "Recipe ingredients"]]);
   });
 
   it("a group tab opens its first page; where money is hidden, Website & shop goes and Zapier leaves Account", () => {

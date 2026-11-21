@@ -161,3 +161,8 @@ export function choicesOfSnapshots(snapshots: unknown, max = 12): MealRecipeChoi
   }
   return out;
 }
+
+// Nutrition's Favorite meals tab shows once the coach has starred a meal (Ron, Nov 21); a count that could not be read keeps it, so nothing the coach has goes missing.
+export function showFavoritesTab(count: number | null | undefined, readFailed: boolean): boolean {
+  return readFailed || (count ?? 0) > 0;
+}

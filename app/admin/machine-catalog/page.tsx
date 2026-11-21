@@ -95,9 +95,14 @@ export default async function AdminMachineCatalogPage() {
 
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body px-4 py-8 md:px-10">
-      <Link href="/dashboard" className="inline-flex items-center min-h-11 font-body text-xs text-steel uppercase tracking-wide">
-        &larr; Home
-      </Link>
+      <div className="flex flex-wrap items-center gap-x-5">
+        <Link href="/dashboard" className="inline-flex items-center min-h-11 font-body text-xs text-steel uppercase tracking-wide">
+          &larr; Home
+        </Link>
+        <Link href="/admin/nutrition-ingredients" className="inline-flex items-center min-h-11 font-body text-xs text-steel uppercase tracking-wide">
+          Recipe ingredients
+        </Link>
+      </div>
       <h1 className="font-display font-bold text-3xl uppercase leading-none mt-1">Machine requests</h1>
       <p className="font-body text-sm text-steel mt-2 max-w-[65ch]">What coaches sent for the shared machine list. Approve puts it on the list for every gym; Deny keeps it off. Your note is shown to the coach.</p>
       {error ? (

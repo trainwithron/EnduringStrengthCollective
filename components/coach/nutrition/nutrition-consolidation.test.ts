@@ -58,7 +58,8 @@ describe("the hub has two tabs for the coach, and the client's page does not rea
     expect(hub).toContain('label: "Favorite meals"');
     expect(hub).not.toContain('label: "Calculator"');
     expect(hub).not.toContain('label: "This week"');
-    expect(hub).toContain('const tab = searchParams.tab === "favorites" ? "favorites" : "clients";');
+    // Favorite meals only once a meal is starred (Nov 21)
+    expect(hub).toContain('const tab = searchParams.tab === "favorites" && hasFavorites ? "favorites" : "clients";');
     expect(hub).toContain("<FavoriteMealsTab");
     expect(hub).not.toContain("<MacroCalculator");
     // the Youth mode switch stays

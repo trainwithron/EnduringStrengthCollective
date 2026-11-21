@@ -5,10 +5,10 @@ import { join } from "node:path";
 const src = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
 
 describe("the built-in recipe ingredient mapping is a platform-admin tool", () => {
-  it("Favorite meals shows it only to a platform admin; every coach sees their starred meals (the recipe builder left the tab, Nov 19)", () => {
+  it("is the platform admin's own page (Nov 21: moved off Favorite meals); every coach sees their starred meals there (the recipe builder left the tab, Nov 19)", () => {
     const tab = src("components/coach/nutrition/favorite-meals-tab.tsx");
-    expect(tab).toContain('viewer?.is_platform_admin === true');
-    expect(tab).toContain("{showBuiltinMappings && (");
+    expect(tab).not.toContain("showBuiltinMappings");
+    expect(src("app/admin/nutrition-ingredients/page.tsx")).toContain("if (!me?.is_platform_admin)");
     expect(tab).toContain("<FavoriteMealsList initialMeals={meals} clients={clients} todayKey={todayKey} />");
     expect(tab).not.toContain("RecipeHubManager");
   });

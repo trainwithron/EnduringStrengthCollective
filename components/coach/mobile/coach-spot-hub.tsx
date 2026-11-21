@@ -601,6 +601,9 @@ export function CoachSpotHub({
                         <a href="/admin/organizations" className="block min-h-11 leading-[2.75rem] font-body text-sm text-chalk">
                           Organizations →
                         </a>
+                        <a href="/admin/nutrition-ingredients" className="block min-h-11 leading-[2.75rem] font-body text-sm text-chalk">
+                          Recipe ingredients →
+                        </a>
                       </>
                     )}
                   </div>
