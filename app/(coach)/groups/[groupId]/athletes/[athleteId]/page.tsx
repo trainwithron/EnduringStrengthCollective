@@ -560,6 +560,7 @@ export default async function AthleteProfilePage(
     standingHistory,
     { data: mainLiftExerciseRows },
     seriesReads,
+    testedRead,
   ] = await Promise.all([
     activeProgram
       ? supabase.from("programs").select("training_days").eq("id", activeProgram.id).maybeSingle()
@@ -674,6 +675,8 @@ export default async function AthleteProfilePage(
       ]);
       return { rows, upcomingRows: (upcomingRows ?? []) as unknown[], frozenRows: (frozenRows ?? []) as unknown[] };
     })(),
+    // Tested maxes the coach typed and locked (wave 2 T2): read on their own, so a database without them yet still shows the estimates.
+    supabase.from("athlete_training_maxes").select("exercise_name, estimated_max, locked, tested_at").eq("athlete_id", params.athleteId).eq("locked", true),
   ]);
   // A teen not yet let in (no signed permission and no coach tick): the checkbox is shown first, above the tabs.
   const guardianWaiting = isTeen && !!guardianStateRow && (guardianStateRow as GuardianStateInfo).state !== "signed";
@@ -747,8 +750,6 @@ export default async function AthleteProfilePage(
   const maxByName = new Map((trainingMaxRows ?? []).map((r: any) => [String(r.exercise_name).trim().toLowerCase(), r.estimated_max as number]));
   const trainingIntent = ((personalProgram ?? sharedProgramRaw) as { training_intent?: string | null } | null)?.training_intent ?? null;
   const cardMetric = defaultMetric(trainingIntent, ((progressPrefs?.metric as "weight" | "volume" | null | undefined) ?? null));
-  // Tested maxes the coach typed and locked (wave 2 T2): read on their own, so a database without them yet still shows the estimates.
-  const testedRead = await supabase.from("athlete_training_maxes").select("exercise_name, estimated_max, locked, tested_at").eq("athlete_id", params.athleteId).eq("locked", true);
   const testedMaxes = testedByName(testedRead.error ? [] : (testedRead.data as TestedMaxRow[]));
   const cardNames = new Set(cardPlan.cards.map((c) => c.name.trim().toLowerCase()));
   const testedOnly = [...testedMaxes.entries()].filter(([key]) => !cardNames.has(key)).map(([, t]) => t);
