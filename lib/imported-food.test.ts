@@ -90,7 +90,9 @@ describe("the upload panel and its route", () => {
   it("the route checks the caller coaches the group and the person is a client in it before writing, and never logs rows", () => {
     const route = read("app/api/clients/nutrition-history/route.ts");
     expect(route).toContain('if (caller?.role !== "coach")');
-    expect(route).toContain('if (member?.role !== "athlete")');
+    // a client of this group, or the coach themselves in their own personal space (step 221)
+    expect(route).toContain('if (member?.role !== "athlete" && !ownSpace)');
+    expect(route).toContain('member?.role !== "athlete" && athleteId === user.id && (await isOwnPersonalSpace(serviceRole, user.id, groupId))');
     expect(route.indexOf("checkCaller(groupId, athleteId)")).toBeLessThan(route.indexOf("saveImportedHistory(checked.serviceRole"));
     expect(route).not.toMatch(/console\.(log|error|warn)/);
     const save = read("lib/nutrition-history-save.ts");

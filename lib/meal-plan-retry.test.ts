@@ -205,7 +205,9 @@ describe("the route and the screens are wired as designed", () => {
     expect(route.indexOf("Not authenticated")).toBeGreaterThan(-1);
     expect(route.indexOf('membership.role !== "athlete"')).toBeGreaterThan(route.indexOf("Not authenticated"));
     expect(route.indexOf("readRetryNote(")).toBeGreaterThan(route.indexOf('membership.role !== "athlete"'));
-    expect(route.indexOf("createServiceRoleClient()")).toBeGreaterThan(route.indexOf("readRetryNote("));
+    // the plan work reads with the service role only after the note is checked (the own-personal-space check before it is a single read of the groups row: step 221)
+    expect(route.indexOf("const service = createServiceRoleClient()")).toBeGreaterThan(route.indexOf("readRetryNote("));
+    expect(route).toContain('const ownSpace = membership?.role === "coach" && (await isOwnPersonalSpace(createServiceRoleClient(), user.id, groupId));');
   });
   it("never sends what the client typed to an AI", () => {
     expect(route).not.toMatch(/anthropic|callClaude|ai-usage|\/api\/ai\//i);
