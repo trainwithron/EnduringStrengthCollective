@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { CalendarPageTabs } from "@/components/coach/desktop/calendar-page-tabs";
+import { CalendarViewMemory } from "@/components/coach/desktop/calendar-view-memory";
 import { CalendarGrid, type CalendarEventEntry, type CanceledEntry } from "@/components/coach/desktop/calendar-grid";
 import { CalendarClientRail } from "@/components/coach/desktop/calendar-client-rail";
 import { CalendarAttentionChip } from "@/components/coach/desktop/calendar-attention-chip";
@@ -31,7 +32,7 @@ import { AvailabilityBookingSettings } from "@/components/coach/desktop/availabi
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { computeScheduledDates } from "@/lib/program-schedule";
 import { ScheduleClientPicker } from "@/components/coach/schedule-client-picker";
-import { DEFAULT_COACH_TIMEZONE, dateKeyInZone } from "@/lib/timezone";
+import { DEFAULT_COACH_TIMEZONE, dateKeyInZone, zonedTimeToUtc } from "@/lib/timezone";
 import { formatInTimezone } from "@/lib/format-in-timezone";
 import { getCoachClients } from "@/lib/coach-clients";
 import { coachCreditSentence } from "@/lib/credit-sentence";
@@ -234,7 +235,9 @@ export async function CoachCalendarPageBody(
       <main className="min-h-screen bg-graphite text-chalk font-body">
         <CoachMobileShell groupId={params.groupId} groupName={coachGroupName} activeOverride="calendar">
           <div className="pb-24">
-            <ScheduleClientPicker groupId={params.groupId} clients={scheduleClients} selectedId={selected.id} />
+            <div className="px-5 pt-4 pb-2 border-b border-steel/20">
+              <ScheduleClientPicker groupId={params.groupId} clients={scheduleClients} selectedId={selected.id} />
+            </div>
             <div className="px-5 pt-4">
               <p className="font-body text-sm text-chalk">
                 <span className="text-steel">{coachCreditSentence(buildCreditPicture({ balance: selected.balance, booked: selected.booked ?? 0, toMark: 0 }), selected.fullName)}</span>
@@ -312,7 +315,14 @@ export async function CoachCalendarPageBody(
       const upcomingMine = nextDays.flatMap((d) =>
         (soon.days.get(dateKey(d))?.workouts ?? [])
           .filter((w) => w.status === "planned")
-          .map((w) => ({ id: `you-${dateKey(d)}-${w.workoutId}`, name: `You: ${w.title}`, when: d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) }))
+          .map((w) => ({
+            id: `you-${dateKey(d)}-${w.workoutId}`,
+            name: `You: ${w.title}`,
+            when: d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }),
+            // no time of its own: it sorts at the start of its day among the client sessions
+            at: zonedTimeToUtc(dateKey(d), "00:00", tz).toISOString(),
+            href: `/groups/${params.groupId}/workouts/${w.workoutId}`,
+          }))
       );
       const uncoveredMine = mine.undated.filter((c) => !c.coverImagePath).map((c) => c.id);
       const visualsMine = uncoveredMine.length > 0 ? Object.fromEntries(await computeProgramCardVisuals(supabase, uncoveredMine, user.id)) : {};
@@ -322,7 +332,6 @@ export async function CoachCalendarPageBody(
           <header className="px-5 pt-16 pb-2">
             <h1 className="font-display font-bold text-4xl leading-none uppercase">Calendar</h1>
           </header>
-          <UndatedProgramCards groupId={params.groupId} programs={mine.undated} visuals={visualsMine} />
           <div className="px-5 pt-4">
             <CoachPhoneSchedule
               supabase={supabase}
@@ -335,6 +344,8 @@ export async function CoachCalendarPageBody(
               own={{ byDay, upcoming: upcomingMine }}
             />
           </div>
+          {/* Their own programs with no dates are personal, so they come after the schedule (clutter pass, Nov 21: they used to sit above Today and the month). */}
+          <UndatedProgramCards groupId={params.groupId} programs={mine.undated} visuals={visualsMine} />
           <BottomTabBar groupId={params.groupId} activeOverride="calendar" />
         </main>
       );
@@ -510,7 +521,7 @@ export async function CoachCalendarPageBody(
     }
 
     // Look Refresh (client step, Ron Nov 20): the period between round arrows, the Day / Week / Month pill, the month as dates with small dots (green done,
-    // accent planned, blue a session with the coach) and a legend, then the open day's workout and the next session, and Book a session at the end.
+    // accent planned, blue a session with the coach) and a legend, then the open day's workout and the next session. Book a session sits right under the pill (clutter pass, Nov 21).
     const todayInView = shownDates.some((d) => isSameDayLocal(d, today));
     const todayDay = todayInView ? dayOf(today) : null;
     const periodLabel = view === "month" ? monthLabel(year, monthIndex) : weekLabel(weekStart, weekDays[6]);
@@ -528,7 +539,9 @@ export async function CoachCalendarPageBody(
           <ActingAsBanner athleteFullName={actingAsFullName ?? "Client"} groupId={params.groupId} />
         )}
         {isCoach && !isActingAsOther && (
-          <ScheduleClientPicker groupId={params.groupId} clients={scheduleClientsForCoach} />
+          <div className="px-5 pt-4">
+            <ScheduleClientPicker groupId={params.groupId} clients={scheduleClientsForCoach} />
+          </div>
         )}
         <header className="px-5 pt-5">
           <h1 className="sr-only">Calendar</h1>
@@ -560,6 +573,10 @@ export async function CoachCalendarPageBody(
             </p>
           )}
         </header>
+
+        {/* Book a session, full width, right under the Day / Week / Month pills (clutter pass, Nov 21: booking is why a client opens Calendar, and it sat at the bottom), when booking
+            is open (the coach's open hours and booking mode decide, as before: lib/schedule-card.ts). */}
+        {scheduleHref && <ScheduleCard available={creditPicture.toBook} href={scheduleHref.href} note={scheduleHref.note} />}
 
         {/* A session is being moved (?reschedule= from the day page): say so here, so a day tapped from this month keeps the move going. */}
         {movingBooking && (
@@ -698,8 +715,13 @@ export async function CoachCalendarPageBody(
                   <p className="font-body text-xs font-semibold text-rust-ink">{w.status === "done" ? "Done" : "Workout"}</p>
                   <p className="font-body text-sm font-semibold text-chalk truncate">{w.title}</p>
                 </div>
+                {/* A plain link (clutter pass, Nov 21: Book a session is the one gold button here, Home owns the big Start). Start starts at once, as on Home (?start=1). */}
                 {w.status !== "locked" && (
-                  <Link href={`/groups/${params.groupId}/workouts/${w.workoutId}`} className="min-h-11 px-5 inline-flex items-center bg-rust text-graphite font-body text-sm font-semibold shrink-0">
+                  <Link
+                    href={`/groups/${params.groupId}/workouts/${w.workoutId}${w.status === "done" ? "" : "?start=1"}`}
+                    className="min-h-11 px-2 inline-flex items-center font-body text-sm font-semibold text-rust-ink underline underline-offset-2 shrink-0"
+                    data-calendar-today-start
+                  >
                     {w.status === "done" ? "Open" : "Start"}
                   </Link>
                 )}
@@ -740,8 +762,6 @@ export async function CoachCalendarPageBody(
         <UpcomingGroupEvents athleteId={athleteId} timezone={displayTz} />
 
         {coachMembership && bookingMode === "coach_schedules" && <BookingModeLine groupId={params.groupId} />}
-        {/* Book a session, full width, when booking is open (the coach's open hours and booking mode decide, as before: lib/schedule-card.ts). */}
-        {scheduleHref && <ScheduleCard available={creditPicture.toBook} href={scheduleHref.href} note={scheduleHref.note} />}
 
         <BottomTabBar groupId={params.groupId} activeOverride="calendar" />
       </main>
@@ -1225,15 +1245,8 @@ export async function CoachCalendarPageBody(
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="calendar" coachLevel={coachLevel}>
       <div className="pb-6 border-b border-steel/20 mb-6">
         <h1 className="font-display font-bold text-3xl uppercase leading-none">Calendar</h1>
-        <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">
-          Your sessions with clients, your time off and your own events. A
-          client&apos;s workouts live on their own calendar: tap a name to open
-          it. Let clients book:{" "}
-          <Link href={`${basePath}?tab=availability`} className="text-rust-ink underline underline-offset-2">
-            Availability
-          </Link>
-          .
-        </p>
+        {/* No explanation paragraph (clutter pass, Nov 21: it repeated the Availability tab right below). The view the coach used last is remembered. */}
+        {searchParams.tab !== "availability" && <CalendarViewMemory view={view} explicit={!!(searchParams.view || searchParams.month || searchParams.week)} />}
       </div>
 
       <CalendarPageTabs

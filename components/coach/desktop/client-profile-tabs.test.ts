@@ -24,14 +24,16 @@ describe("the tab strip", () => {
     expect(isClientProfileTab("calendar")).toBe(true);
     expect(isClientProfileTab("nonsense")).toBe(false);
   });
-  it("every tab is a button on this page (none leaves the profile), and the strip wraps instead of scrolling", () => {
+  it("every tab is a button on this page (none leaves the profile); on a phone the strip is one line that scrolls sideways, on a computer it wraps", () => {
     const html = renderToStaticMarkup(createElement(ClientProfileTabs, { groupId: "g1", athleteId: "a1", initial: "overview" }));
     expect((html.match(/<button/g) ?? []).length).toBe(7);
     // History is no longer a link in the strip: it is reached from Logged workouts ("Import or add past history")
     expect((html.match(/<a /g) ?? []).length).toBe(0);
     expect(html).not.toContain(">History<");
-    expect(html).toContain("flex-wrap");
-    expect(html).not.toContain("overflow-x-auto");
+    // clutter pass, Nov 21 (PH20): seven tabs wrapped onto about three rows on a phone
+    expect(html).toContain("flex flex-nowrap overflow-x-auto");
+    expect(html).toContain("lg:flex-wrap");
+    expect(html).toContain("whitespace-nowrap shrink-0");
     expect(html).toContain('aria-pressed="true"');
   });
   it("Calendar is loaded when opened; the others are already on the page", () => {
@@ -41,11 +43,34 @@ describe("the tab strip", () => {
 });
 
 describe("the profile page", () => {
-  it("the action row on desktop keeps only Upload exercise history and Record check-in", () => {
+  it("the action row keeps only Record check-in; Upload exercise history is in the Programs tab (clutter pass, Nov 21)", () => {
     const header = page.slice(page.indexOf("{profileFlag && ("), page.indexOf('<div id="client-profile-body"'));
-    expect(header).toContain("Upload exercise history");
+    expect(header).not.toContain("data-upload-history");
+    expect(header).not.toContain("/history`}");
     expect(header).toContain("<VideoCheckinRecorder");
     for (const gone of ["Log in-person session", "Programming", "This client&apos;s calendar", "Schedule session", "Message<", "Current program:"]) expect(header, gone).not.toContain(gone);
+    const programs = page.slice(page.indexOf('<div data-tab="program" className="mb-8 max-w-3xl">'), page.indexOf('<div className="profile-grid'));
+    expect(programs).toContain("data-upload-history");
+    expect(programs).toContain("Upload exercise history");
+  });
+  it("on a computer the header has Schedule and Message beside the name, and still no Log (that stays on the phone)", () => {
+    const head = page.slice(page.indexOf("<h1"), page.indexOf("{profileFlag && ("));
+    const actions = head.slice(head.indexOf("data-profile-header-actions") - 80, head.indexOf("</div>", head.indexOf("data-profile-header-actions")));
+    expect(actions).toContain('className="hidden lg:flex');
+    expect(actions).toContain("/calendar?client=${params.athleteId}");
+    expect(actions).toMatch(/>\s*Schedule\s*</);
+    expect(actions).toMatch(/>\s*Message\s*</);
+    expect(actions).toContain("?tab=messages");
+    expect(actions).not.toContain("/log`");
+    expect(actions).not.toMatch(/>\s*Log/);
+    // Back returns where the coach came from (the Clients page, or Spotlight on a phone, when there is no step back)
+    expect(page).toContain("<BackLink fallbackHref={backFallback}");
+    expect(page).toContain("(await prefersAthleteStyleView()) ? PHONE_SPOTLIGHT : \"/clients\"");
+  });
+  it("Nutrition opens with the nutrition panel; the Injured toggle and the food-diary import come after it", () => {
+    const nutrition = page.slice(page.indexOf('<div data-tab="nutrition"'));
+    expect(nutrition.indexOf("<ClientNutrition")).toBeLessThan(nutrition.indexOf("<InjuryStatusToggle"));
+    expect(nutrition.indexOf("<ClientFoodLogOnly")).toBeLessThan(nutrition.indexOf("<NutritionHistoryUploader"));
   });
   it("a quiet current-program line stays in the header", () => {
     expect(page).toContain("activeProgram.name");
@@ -122,9 +147,11 @@ describe("leaving Messages", () => {
     const choose = tabsSource.slice(tabsSource.indexOf("function choose"), tabsSource.indexOf("const base ="));
     // the navigation branch covers BOTH opening and leaving a load-on-open tab
     expect(choose).toContain("LOADED_ON_OPEN.includes(next) || LOADED_ON_OPEN.includes(tab)");
-    expect(choose).toContain("router.push(");
+    // by address, replacing the entry (clutter pass, Nov 21: a tab is not a step for Back to clients)
+    expect(choose).toContain("router.replace(");
+    expect(choose).not.toContain("router.push(");
     // the in-page switch (replaceState only) is reached only when neither tab is load-on-open
-    expect(choose.indexOf("router.push(")).toBeLessThan(choose.indexOf("window.history.replaceState"));
+    expect(choose.indexOf("router.replace(")).toBeLessThan(choose.indexOf("window.history.replaceState"));
   });
 });
 

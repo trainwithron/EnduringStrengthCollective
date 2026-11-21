@@ -21,7 +21,8 @@ describe("the running-low notice opens the place sessions are added", () => {
     const profile = read("app/(coach)/groups/[groupId]/athletes/[athleteId]/page.tsx");
     const billing = profile.slice(profile.indexOf('<SettingsGroup label="Billing">'));
     expect(billing.indexOf("{sessionsSentence}")).toBeLessThan(billing.indexOf('<div id="add-sessions" className="scroll-mt-24 mb-4">'));
-    expect(billing.indexOf('<div id="add-sessions"')).toBeLessThan(billing.indexOf("<SessionCreditsControl"));
+    // one control there (clutter pass, Nov 21): the balance with - and +, and Add sessions; the same one Overview shows
+    expect(billing.slice(billing.indexOf('<div id="add-sessions"'), billing.indexOf("</SettingsGroup>"))).toContain('{sessionsControl("billing")}');
     expect(profile).not.toContain('<SettingsGroup label="Assign sessions">');
   });
   it("every 'out of sessions' place goes straight to Add sessions, labelled so (FIX 3)", () => {

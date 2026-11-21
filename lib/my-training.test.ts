@@ -122,7 +122,8 @@ describe("The coach as their own client (personal space)", () => {
     expect(profilePage.slice(profilePage.indexOf("<OverviewMessageBox") - 60, profilePage.indexOf("<OverviewMessageBox"))).toContain("!selfView");
     const page = read("app/(coach)/groups/[groupId]/athletes/[athleteId]/page.tsx");
     expect(page).toContain("hide={selfView ? SELF_HIDDEN_TABS : []}");
-    expect(page).toContain("{!selfView && <VideoCheckinRecorder");
+    const recorder = page.indexOf("<VideoCheckinRecorder");
+    expect(page.slice(recorder - 120, recorder)).toContain("{!selfView && (");
   });
   it("the personal space never becomes the open workspace, and is invisible to every coach-wide scope", () => {
     // a group with no organization (the personal space) gives workspaceDecision no organization: nothing is written

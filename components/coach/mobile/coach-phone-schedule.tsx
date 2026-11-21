@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { readRowsByIds } from "@/lib/read-by-ids";
 import { chunk } from "@/lib/chunk";
@@ -58,12 +59,14 @@ export async function loadScheduleClients(supabase: SupabaseClient, userId: stri
 export interface OwnScheduleDays {
   // The coach's own workouts by day (their personal space's dated programs), shown on the same grid as "You".
   byDay: Map<string, { key: string; title: string; done: boolean }[]>;
-  // Their own workouts still ahead in the next 5 days, for the upcoming list.
-  upcoming: { id: string; name: string; when: string }[];
+  // Their own workouts still ahead in the next 5 days, for the upcoming list: sorted in among the client sessions by day (a workout has no time, so it sits at the start of its
+  // day), and each opens that workout.
+  upcoming: { id: string; name: string; when: string; at: string; href: string }[];
 }
 
-// The coach's schedule on a phone (Release 2: the coach's own Calendar): this month, every client session of the ORGANIZATION they are working in (one organization at a time, switched in
-// Spotlight; Ron decided), the did-it-happen cards, the client picker to book someone, and the next five days. With `own`, their own workouts sit on the same days ("You").
+// The coach's schedule on a phone (Release 2: the coach's own Calendar): today's sessions first (clutter pass, Nov 21: "who am I seeing today" was a scroll away), the did-it-happen
+// cards, this month with every client session of the ORGANIZATION they are working in (one organization at a time, switched in Spotlight; Ron decided), the client picker to book
+// someone under the month, and the next five days. With `own`, their own workouts sit on the same days ("You").
 // `monthBase` is where the month arrows go (their own Calendar); a day opens the organization's day page (sessions and open times).
 export async function CoachPhoneSchedule({
   supabase,
@@ -118,6 +121,26 @@ export async function CoachPhoneSchedule({
   const monthEnd = new Date(year, monthIndex + 1, 1);
   // Sessions the client cancelled stay on the month, struck through (Ron, Nov 21); read on their own, never counted or in Upcoming (lib/canceled-sessions.ts).
   const canceledRead = readCanceledSessions(supabase, userId, orgGroupIds, new Date(monthStart.getTime() - 86400000).toISOString(), new Date(monthEnd.getTime() + 86400000).toISOString());
+  // Today's sessions for the list at the top, read on their own so they show whichever month is in view (a canceled one stays, struck through).
+  const todayKeyZone = dateKeyInZone(timezone);
+  const todayFrom = zonedTimeToUtc(todayKeyZone, "00:00", timezone).toISOString();
+  const todayTo = zonedTimeToUtc(dayKey(new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1)), "00:00", timezone).toISOString();
+  const todayRead = Promise.all([
+    readRowsByIds(orgGroupIds, (g) => (from, to) =>
+      supabase
+        .from("bookings")
+        .select("id, start_at, profiles!bookings_athlete_id_fkey ( full_name )")
+        .eq("coach_id", userId)
+        .in("group_id", g)
+        .eq("status", "confirmed")
+        .gte("start_at", todayFrom)
+        .lt("start_at", todayTo)
+        .order("start_at", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to)
+    ),
+    readCanceledSessions(supabase, userId, orgGroupIds, todayFrom, todayTo),
+  ]);
   const { data: monthRows } = await readRowsByIds(orgGroupIds, (g) => (from, to) =>
     supabase
       .from("bookings")
@@ -169,23 +192,48 @@ export async function CoachPhoneSchedule({
   const days = new Date(year, monthIndex + 1, 0).getDate();
   const cells: (Date | null)[] = [...Array.from({ length: leading }, () => null), ...Array.from({ length: days }, (_, i) => new Date(year, monthIndex, i + 1))];
   const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-  // Their own workouts ahead first (by day), then client sessions and calendar events (by time).
+  // Everything in time order (clutter pass, Nov 21: their own workouts used to come first and pushed today's clients behind "Show all"). Each client session and event opens its
+  // day; each of their own workouts opens that workout.
   const upcomingRows = [
     ...(own?.upcoming ?? []),
-    // each session and event opens its day (Nov 21)
-    ...[
-      ...upcoming.map((b) => ({ id: b.id, name: b.name, at: b.startAt, when: formatInTimezone(new Date(b.startAt), timezone, "dateTime"), href: `/groups/${anchorGroupId}/calendar/${dateKeyInZone(timezone, new Date(b.startAt))}` })),
-      ...soonEvents.map((e) => ({ ...e, href: `/groups/${anchorGroupId}/calendar/${dateKeyInZone(timezone, new Date(e.at))}` })),
-    ]
-      .sort((a, b) => a.at.localeCompare(b.at))
-      .map(({ id, name, when, href }) => ({ id, name, when, href })),
+    ...upcoming.map((b) => ({ id: b.id, name: b.name, at: b.startAt, when: formatInTimezone(new Date(b.startAt), timezone, "dateTime"), href: `/groups/${anchorGroupId}/calendar/${dateKeyInZone(timezone, new Date(b.startAt))}` })),
+    ...soonEvents.map((e) => ({ ...e, href: `/groups/${anchorGroupId}/calendar/${dateKeyInZone(timezone, new Date(e.at))}` })),
   ];
+  upcomingRows.sort((a, b) => a.at.localeCompare(b.at));
+
+  // Today: time and name, each opening today's day page (where Mark attended, No-show and the session menu are).
+  const [{ data: todayBooked }, todayCanceled] = await todayRead;
+  const todayHref = `/groups/${anchorGroupId}/calendar/${todayKeyZone}`;
+  const todayRows = [
+    ...(todayBooked as any[]).map((b) => ({ id: b.id as string, at: b.start_at as string, name: String(b.profiles?.full_name ?? "Client"), canceled: null as string | null })),
+    ...todayCanceled.map((c) => ({ id: c.id, at: c.startAt, name: c.name, canceled: c.label as string | null })),
+  ].sort((a, b) => a.at.localeCompare(b.at));
 
   return (
     <div data-coach-phone-schedule>
-      <SessionCountLine coachId={userId} groupIds={orgGroupIds} timezone={timezone} view="month" year={year} monthIndex={monthIndex} weekStartKey={null} />
+      <section aria-label="Today" data-phone-today>
+        <h2 className="font-body text-xs text-steel uppercase tracking-wide mb-1">Today</h2>
+        {todayRows.length === 0 ? (
+          <p className="font-body text-sm text-steel pb-2">No sessions today.</p>
+        ) : (
+          <div className="divide-y divide-steel/15 border-t border-steel/15">
+            {todayRows.map((r) => (
+              <Link key={r.id} href={todayHref} prefetch={false} className="min-h-11 py-2 flex items-center gap-3" data-phone-today-row {...(r.canceled ? { "data-canceled-session": "" } : {})}>
+                <span className={`font-body text-sm w-20 shrink-0 ${r.canceled ? "text-steel line-through" : "text-chalk"}`}>{formatInTimezone(new Date(r.at), timezone, "time")}</span>
+                <span className={`font-body text-sm min-w-0 truncate flex-1 ${r.canceled ? "text-steel" : "text-chalk"}`}>
+                  <span className={r.canceled ? "line-through" : ""}>{r.name}</span>
+                  {r.canceled && <span className="text-xs"> · {r.canceled}</span>}
+                </span>
+                <ChevronRight className="w-4 h-4 text-steel shrink-0" aria-hidden="true" />
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
+      <div className="mt-4">
+        <SessionCountLine coachId={userId} groupIds={orgGroupIds} timezone={timezone} view="month" year={year} monthIndex={monthIndex} weekStartKey={null} />
+      </div>
       <SessionCheckSection coachId={userId} groupIds={orgGroupIds} />
-      <ScheduleClientPicker groupId={anchorGroupId} clients={scheduleClients} />
       <div className="flex items-center justify-between mt-3">
         <Link href={`${monthBase}?month=${monthKey(prev)}`} className="h-11 px-3 inline-flex items-center font-body text-sm text-chalk underline underline-offset-2">
           &larr; {prev.toLocaleDateString("en-US", { month: "short" })}
@@ -238,6 +286,11 @@ export async function CoachPhoneSchedule({
             </Link>
           );
         })}
+      </div>
+
+      {/* Booking one client is a tool, not the schedule: it sits under the month (clutter pass, Nov 21). */}
+      <div className="mt-4">
+        <ScheduleClientPicker groupId={anchorGroupId} clients={scheduleClients} />
       </div>
 
       <h2 className="font-body text-xs text-steel uppercase tracking-wide mt-8 mb-2">Upcoming</h2>

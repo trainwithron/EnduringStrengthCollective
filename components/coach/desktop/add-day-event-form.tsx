@@ -5,17 +5,11 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { saved } from "@/lib/saved";
 
-// Real relocation, not new scope: this exact insert used to live as a
-// cramped inline popup on the month-grid calendar cell
-// (live_walkthrough_round2_findings.md — "clicking a day opens a small
-// popup instead of taking you into that day"). The grid cell now always
-// navigates straight into this real day view; this is where "add a
-// to-do/event" actually belongs now, with real room instead of a
-// 3-input hover popup.
+// A to-do for this day, with no time (clutter pass, Nov 21). A timed event, a session or time off is added by tapping a time on the day (day-calendar.tsx): that sheet needs
+// a time, so a to-do with none is the one thing it cannot add, and this small box under the day's to-dos is kept for it alone.
 export function AddDayEventForm({ coachId, dateKey, organizationId }: { coachId: string; dateKey: string; organizationId: string | null }) {
   const router = useRouter();
   const [title, setTitle] = useState("");
-  const [time, setTime] = useState("");
   const [saving, setSaving] = useState(false);
 
   async function handleAdd() {
@@ -27,42 +21,34 @@ export function AddDayEventForm({ coachId, dateKey, organizationId }: { coachId:
       organization_id: organizationId,
       title: title.trim(),
       event_date: dateKey,
-      event_time: time || null,
+      event_time: null,
       event_type: "custom",
     }));
     setSaving(false);
     // What was typed is kept when the save failed, so trying again is one tap.
     if (!ok) return;
     setTitle("");
-    setTime("");
     router.refresh();
   }
 
   return (
-    <div className="flex items-end gap-2 mb-4 max-w-lg">
-      <div className="flex-1">
-        <label className="font-body text-xs text-steel uppercase tracking-wide mb-1 block">
-          Add a to-do or event
-        </label>
-        <input aria-label="Add a to-do or event"
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="e.g. Call the gym about equipment"
-          className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2.5 font-body text-sm"
-        />
-      </div>
-      <input aria-label="Time (optional)"
-        type="time"
-        value={time}
-        onChange={(e) => setTime(e.target.value)}
-        className="w-28 h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm"
+    <div className="flex items-center gap-2" data-add-day-todo>
+      <input
+        aria-label="Add a to-do"
+        type="text"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") handleAdd();
+        }}
+        placeholder="Add a to-do"
+        className="flex-1 min-w-0 h-11 bg-graphite border border-steel/30 text-chalk px-2.5 font-body text-base sm:text-sm"
       />
       <button
         type="button"
         onClick={handleAdd}
         disabled={saving || !title.trim()}
-        className="h-9 px-3 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
+        className="h-11 px-4 border border-steel/40 text-chalk font-body text-sm font-medium disabled:opacity-40"
       >
         {saving ? "Adding…" : "Add"}
       </button>

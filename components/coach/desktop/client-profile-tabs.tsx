@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { CLIENT_PROFILE_TABS, LOADED_ON_OPEN, type ClientProfileTab } from "@/lib/client-profile-tabs";
 
 // The strip across the top of one client's profile (Ron, Oct 6: "I want my Facebook page, but if I'm on their profile I see what's about them"). It sits in the
 // normal coach layout, beside the coach's own rail, which never changes. Every tab shows its content right below the strip, on this page. Overview, Programs, Nutrition,
 // Progress, Forms & notes and Billing & settings are already loaded, so they switch instantly; Messages and Calendar are loaded when opened (the address gets ?tab=...,
-// so a link, a reload or the phone's full pages still work). The tab is remembered in the address. The strip wraps instead of scrolling.
+// so a link, a reload or the phone's full pages still work). The tab is remembered in the address, replacing the entry (a tab is not a step back: "Back to clients" and the
+// phone's back go where the coach came from). On a computer the strip wraps; on a phone it is one line that scrolls sideways.
 export function ClientProfileTabs({ groupId, athleteId, initial = "overview", hide = [] }: { groupId?: string; athleteId?: string; initial?: ClientProfileTab; hide?: ClientProfileTab[] }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -32,7 +33,7 @@ export function ClientProfileTabs({ groupId, athleteId, initial = "overview", hi
       // mounted and keep marking what the client sends as read while the coach looks at another tab, and the unread badge would never show it.
       // The strip changes at once; the content follows as soon as it is loaded.
       setTab(next);
-      startTransition(() => router.push(next === "overview" ? pathname : `${pathname}?tab=${next}`, { scroll: false }));
+      startTransition(() => router.replace(next === "overview" ? pathname : `${pathname}?tab=${next}`, { scroll: false }));
       return;
     }
     setTab(next);
@@ -47,9 +48,17 @@ export function ClientProfileTabs({ groupId, athleteId, initial = "overview", hi
     }
   }
 
-  const base = "h-11 px-3 font-body text-[13px] border-b-2 -mb-px whitespace-nowrap";
+  // On a phone the strip is one line that scrolls sideways (clutter pass, Nov 21: seven tabs wrapped onto about three rows); the chosen tab is scrolled into view.
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const nav = navRef.current;
+    const active = nav?.querySelector<HTMLElement>('[aria-pressed="true"]');
+    if (nav && active && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = Math.max(0, active.offsetLeft - nav.offsetLeft - 16);
+  }, [tab]);
+
+  const base = "h-11 px-3 font-body text-[13px] border-b-2 lg:-mb-px whitespace-nowrap shrink-0";
   return (
-    <nav aria-label="This client" aria-busy={pending} className="flex flex-wrap items-end gap-x-1 border-b border-steel/20 mb-6">
+    <nav ref={navRef} aria-label="This client" aria-busy={pending} className="flex flex-nowrap overflow-x-auto [scrollbar-width:none] lg:flex-wrap lg:overflow-x-visible items-end gap-x-1 border-b border-steel/20 mb-6" data-profile-tab-strip>
       {CLIENT_PROFILE_TABS.filter((t) => !hide.includes(t.key)).map((t) => (
         <button key={t.key} type="button" onClick={() => choose(t.key)} aria-pressed={tab === t.key} className={`${base} ${tab === t.key ? "border-rust text-chalk" : "border-transparent text-steel hover:text-chalk"}`}>
           {t.label}

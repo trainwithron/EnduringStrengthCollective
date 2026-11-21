@@ -19,11 +19,14 @@ export interface ScheduleClientOption {
   setAside?: boolean;
 }
 
-// ONE quiet number: how many are still available to schedule, or "owed N" when more are booked than they have.
-function pickerNumber(balance: number, booked: number): string {
+// ONE quiet number: how many are still available to schedule ("3 left"), or "owed N" when more are booked than they have.
+export function pickerNumber(balance: number, booked: number): string {
   const picture = buildCreditPicture({ balance, booked, toMark: 0 });
-  return picture.owed > 0 ? `owed ${picture.owed}` : String(picture.toBook);
+  return picture.owed > 0 ? `owed ${picture.owed}` : `${picture.toBook} left`;
 }
+
+// The coach's phone Calendar has it under the month as "Book a client…"; the one-client booking calendar shows who it is for, with "All clients" to go back.
+// No side padding of its own: the page around it has it (clutter pass, Nov 21: it was px-5 inside px-5).
 
 export function ScheduleClientPicker({
   groupId,
@@ -40,23 +43,25 @@ export function ScheduleClientPicker({
   const offered = offeredForBooking(clients, { tierOf: (c) => c.tier, isSetAside: (c) => !!c.setAside, showOnline, keep: (c) => c.id === selectedId });
 
   return (
-    <div className="px-5 pt-4 pb-2 border-b border-steel/20">
-      <label className="font-body text-xs text-steel uppercase tracking-wide">
-        Calendar for
-      </label>
-      <select aria-label="Calendar for"
+    <div data-schedule-client-picker>
+      {selectedId && (
+        <label className="font-body text-xs text-steel uppercase tracking-wide">
+          Calendar for
+        </label>
+      )}
+      <select aria-label={selectedId ? "Calendar for" : "Book a client"}
         value={selectedId ?? ""}
         onChange={(e) => {
           const value = e.target.value;
           const target = clients.find((c) => c.id === value);
           router.push(value ? `/groups/${target?.groupId ?? groupId}/calendar?scheduleFor=${value}` : `/groups/${groupId}/calendar`);
         }}
-        className="w-full h-11 mt-1 bg-graphite border border-steel/30 text-chalk px-2 font-body text-base sm:text-sm focus:outline-none focus:border-rust"
+        className={`w-full h-11 ${selectedId ? "mt-1" : ""} bg-graphite border border-steel/30 text-chalk px-2 font-body text-base sm:text-sm focus:outline-none focus:border-rust`}
       >
-        <option value="">All clients</option>
+        <option value="">{selectedId ? "All clients" : "Book a client…"}</option>
         {offered.map((c) => (
           <option key={c.id} value={c.id}>
-            {c.fullName} — {pickerNumber(c.balance, c.booked ?? 0)}
+            {c.fullName} · {pickerNumber(c.balance, c.booked ?? 0)}
           </option>
         ))}
       </select>

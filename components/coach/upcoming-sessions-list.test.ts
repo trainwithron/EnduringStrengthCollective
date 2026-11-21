@@ -35,7 +35,7 @@ describe("coach phone Calendar: upcoming sessions fold", () => {
   it("3 or fewer: no toggle", () => {
     expect(render(rows.slice(0, 3))).not.toContain("Show all");
   });
-  it("the coach's phone Calendar uses it (their own workouts first, then client sessions)", () => {
+  it("the coach's phone Calendar uses it (everything in time order, their own workouts among the client sessions)", () => {
     const src = readFileSync(join(__dirname, "mobile", "coach-phone-schedule.tsx"), "utf8");
     expect(src).toContain("<UpcomingSessionsList rows={upcomingRows} />");
   });
