@@ -1,6 +1,7 @@
 import { isEmailConfigured, sendEmail } from "@/lib/email";
 import { isPlaceholderEmail } from "@/lib/placeholder-email";
 import { sendPushToProfile } from "@/lib/send-push";
+import { pushHrefForNotice } from "@/lib/notice-links";
 import { EXPORT_LINK_DAYS, WINDOW_DAYS } from "@/lib/leaving-coach-policy";
 import { periodAfter } from "@/lib/end-sentence";
 
@@ -18,10 +19,10 @@ async function emailOf(db: any, profileId: string): Promise<string | null> {
 
 async function tell(db: any, args: { profileId: string; type: "coach_departure_reminder" | "coach_account_closed"; subject: string; body: string; linkPath: string; origin: string; emailToo?: boolean }): Promise<boolean> {
   let delivered = false;
-  const { error } = await db.from("notifications").insert({ profile_id: args.profileId, type: args.type, body: args.body, link_path: args.linkPath });
+  const { data: notice, error } = await db.from("notifications").insert({ profile_id: args.profileId, type: args.type, body: args.body, link_path: args.linkPath }).select("id").maybeSingle();
   if (error) console.error(`[leaving-coach] notice (${args.type}) was refused:`, error.message);
   else delivered = true;
-  await sendPushToProfile(db, args.profileId, args.subject, args.body, args.linkPath).catch(() => 0);
+  await sendPushToProfile(db, args.profileId, args.subject, args.body, pushHrefForNotice((notice as { id?: string } | null)?.id, args.linkPath)).catch(() => 0);
   if (args.emailToo !== false && isEmailConfigured()) {
     const to = await emailOf(db, args.profileId);
     if (to) {
@@ -40,7 +41,7 @@ export const tellCoachTheyAreLeaving = (db: any, a: { coachId: string; orgName: 
     type: "coach_departure_reminder",
     subject: `You are leaving ${a.orgName}`,
     body: `You are leaving ${a.orgName}${periodAfter(a.orgName)} Your clients are still with you and you can keep coaching them for ${WINDOW_DAYS} days, until ${dateWord(a.endsAt)}. Before then, choose: start your own account (your clients and everything move with you), or export everything you have. After that your coaching access ends.`,
-    linkPath: "/dashboard",
+    linkPath: "/leaving",
     origin: a.origin,
   });
 
@@ -50,7 +51,7 @@ export const remindCoach = (db: any, a: { coachId: string; orgName: string; days
     type: "coach_departure_reminder",
     subject: `${a.daysLeft} day${a.daysLeft === 1 ? "" : "s"} left to choose`,
     body: `${a.daysLeft} day${a.daysLeft === 1 ? "" : "s"} left. Your coaching access with ${a.orgName} ends on ${dateWord(a.endsAt)}. Start your own account to keep your clients and everything, or export what you have.`,
-    linkPath: "/dashboard",
+    linkPath: "/leaving",
     origin: a.origin,
   });
 
@@ -63,7 +64,7 @@ export const sendCoachTheirExport = (db: any, a: { coachId: string; orgName: str
       ? `${a.fired ? `Your coaching access with ${a.orgName} has ended.` : `Your ${WINDOW_DAYS} days with ${a.orgName} are over and your coaching access has ended.`} You had no clients to take with you, so there is nothing to export.`
       : `${a.fired ? `Your coaching access with ${a.orgName} has ended.` : `Your ${WINDOW_DAYS} days with ${a.orgName} are over and your coaching access has ended.`} Everything for the clients you kept is in one download: clients, programs, workouts, sets, bookings, credits and notes. ${a.couldNotStore ? "It is too large to prepare ahead, so it is made when you open the link, and that can take a few minutes. If it does not finish, write to support. " : ""}The link needs you to sign in, and it works for ${EXPORT_LINK_DAYS} days.`,
     // the organization is named, so a coach whose access ended in two organizations gets the right export
-    linkPath: a.nothingToExport ? "/dashboard" : `/api/coach/exit-export?organizationId=${encodeURIComponent(a.organizationId)}`,
+    linkPath: a.nothingToExport ? "/leaving" : `/api/coach/exit-export?organizationId=${encodeURIComponent(a.organizationId)}`,
     origin: a.origin,
   });
 

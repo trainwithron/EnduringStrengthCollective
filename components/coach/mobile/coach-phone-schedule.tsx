@@ -172,9 +172,13 @@ export async function CoachPhoneSchedule({
   // Their own workouts ahead first (by day), then client sessions and calendar events (by time).
   const upcomingRows = [
     ...(own?.upcoming ?? []),
-    ...[...upcoming.map((b) => ({ id: b.id, name: b.name, at: b.startAt, when: formatInTimezone(new Date(b.startAt), timezone, "dateTime") })), ...soonEvents]
+    // each session and event opens its day (Nov 21)
+    ...[
+      ...upcoming.map((b) => ({ id: b.id, name: b.name, at: b.startAt, when: formatInTimezone(new Date(b.startAt), timezone, "dateTime"), href: `/groups/${anchorGroupId}/calendar/${dateKeyInZone(timezone, new Date(b.startAt))}` })),
+      ...soonEvents.map((e) => ({ ...e, href: `/groups/${anchorGroupId}/calendar/${dateKeyInZone(timezone, new Date(e.at))}` })),
+    ]
       .sort((a, b) => a.at.localeCompare(b.at))
-      .map(({ id, name, when }) => ({ id, name, when })),
+      .map(({ id, name, when, href }) => ({ id, name, when, href })),
   ];
 
   return (

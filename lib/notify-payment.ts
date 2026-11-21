@@ -1,4 +1,5 @@
 import { sendCoachPush } from "@/lib/coach-notice";
+import { pushHrefForNotice } from "@/lib/notice-links";
 
 // A coach is told when a client pays: a notice in the app and a push. Best effort and silent on failure: the payment is already recorded, and a notice that fails must never make Stripe retry the event.
 // One notice per coach seat of the group; the client's name is in the text, which a person who wants private lock screens turns off (sendPushToProfile).
@@ -20,9 +21,9 @@ export async function notifyPaymentReceived(
     // The notice in the app has the details; the phone's lock screen does not (a client's name and an amount are not for anyone who glances at the phone).
     const lockScreenBody = "Open the app to see who paid.";
     for (const coachId of coachIds) {
-      const { error } = await db.from("notifications").insert({ profile_id: coachId, group_id: args.groupId, type: "payment_received", body, link_path: link, pushed_at: new Date().toISOString() });
+      const { data: notice, error } = await db.from("notifications").insert({ profile_id: coachId, group_id: args.groupId, type: "payment_received", body, link_path: link, pushed_at: new Date().toISOString() }).select("id").maybeSingle();
       if (error) console.error("[payment notice] the notification was refused:", error.message);
-      await sendCoachPush(db, coachId, "payments", "Payment received", lockScreenBody, link).catch(() => 0);
+      await sendCoachPush(db, coachId, "payments", "Payment received", lockScreenBody, pushHrefForNotice((notice as { id?: string } | null)?.id, link)).catch(() => 0);
     }
     return { coaches: coachIds.length };
   } catch (e) {

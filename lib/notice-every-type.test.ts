@@ -3,6 +3,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { noticeHref, NOTICE_RESOLVE_PREFIX } from "@/lib/notice-links";
 import { FILTER_OF_TYPE, filterOfType, NOTICE_FILTERS } from "@/lib/notice-filters";
+import { phoneCoachRedirect } from "@/lib/phone-coach-routes";
 
 // Every notice opens something real (Ron, Nov 19: a session-request notice "leads me to nothing"). Walks EVERY type the database allows, with the links its writers give it (as written, so old
 // rows are covered too), and checks where noticeHref sends each: a page or route that exists, the Requests page for the four things a coach answers, never a coach-only page for a client, and
@@ -78,7 +79,8 @@ const WRITTEN: Record<string, Case[]> = {
   ],
   coach_account_closed: [{ link: "/api/account/export", to: "client", ok: "the download of their own data" }],
   coach_departure_reminder: [
-    { link: "/dashboard", to: "coach", ok: "Home carries the leaving-coach banner with the steps" },
+    { link: "/dashboard", to: "coach", ok: "old rows: opens /leaving, the leaving coach's steps" },
+    { link: "/leaving", to: "coach" },
     { link: "/api/coach/exit-export?organizationId=x", to: "coach", ok: "the download of their clients' data" },
   ],
   comment: [
@@ -126,7 +128,7 @@ const WRITTEN: Record<string, Case[]> = {
   partner_request_accepted: [{ link: "/partners/requests", to: "client" }],
   payment_problem: [
     { link: `${G}/business`, to: "coach" },
-    { link: "/dashboard", to: "coach", ok: "a payment with no group: Home's business summary" },
+    { link: "/dashboard", to: "coach", ok: "the coach's own plan: opens Plan & Billing, found on open" },
   ],
   payment_received: [{ link: `${G}/business`, to: "coach" }],
   pr_promotion: [{ link: "/pr-promotion/p1", to: "client" }],
@@ -151,16 +153,16 @@ const WRITTEN: Record<string, Case[]> = {
   support_reply: [
     { link: "/admin/support", to: "coach" },
     { link: `${G}/business/support`, to: "coach" },
-    { link: "/dashboard", to: "coach", ok: "a support thread with no group: Home, where Support is" },
+    { link: "/dashboard", to: "coach", ok: "a support thread with no group: that organization's Support page, found on open" },
   ],
   team_sheet_saved: [{ link: `${G}/team-sheet`, to: "coach" }],
   trainer_dispatch_offer: [
     { link: "/dispatch/d1", to: "coach" },
-    { link: "/dashboard", to: "coach", ok: "to the organization's admins when no trainer took it: Home's dispatch notice" },
+    { link: "/dashboard", to: "coach", ok: "to the organization's admins when no trainer took it: the message itself (no admin page for a request yet)" },
   ],
   trainer_dispatch_question: [
     { link: "/dispatch/d1", to: "coach" },
-    { link: "/dashboard", to: "coach", ok: "to the organization's admins: Home's dispatch notice" },
+    { link: "/dashboard", to: "coach", ok: "to the organization's admins: the message itself (no admin page for a request yet)" },
   ],
   waitlist_slot_offered: [{ link: `${G}/calendar/2026-11-19`, to: "client" }],
   weekly_checkin: [{ link: "/clients/check-ins", to: "coach" }],
@@ -191,6 +193,23 @@ describe("every notice type opens something real", () => {
       }
     });
   }
+  // Ron, Nov 21: a notice or push opened on a phone must land on what it is about, never on a page the phone redirects away (lib/phone-coach-routes.ts).
+  // Only a coach of a group is ever redirected (a client's notices are never sent away). Listed here with why: none but the team sheet, a spreadsheet tool for a computer.
+  const PHONE_REDIRECT_OK: Record<string, string> = { team_sheet_saved: "the team sheet is a computer tool; on a phone it opens Spotlight" };
+  it("no notice opens a page a phone is redirected away from", () => {
+    const bad: string[] = [];
+    for (const [type, cases] of Object.entries(WRITTEN)) {
+      if (PHONE_REDIRECT_OK[type]) continue;
+      for (const c of cases) {
+        if (c.to === "client") continue;
+        const href = noticeHref(type, c.link, { id: "44444444-4444-4444-4444-444444444444", groupId: c.group ?? null });
+        const [pathAndQuery] = href.split("#");
+        const [path, query = ""] = pathAndQuery.split("?");
+        if (phoneCoachRedirect(path, query ? `?${query}` : "")) bad.push(`${type} ${c.link} -> ${href}`);
+      }
+    }
+    expect(bad).toEqual([]);
+  });
   it("the four things a coach answers open the Requests page at the request, whatever the database wrote", () => {
     for (const type of ["booking_request", "late_change", "schedule_request", "client_request"]) {
       for (const link of ["/dashboard", "/dashboard#late-changes", "/clients/requests", null]) expect(noticeHref(type, link, { id: "n1" })).toBe("/requests?notice=n1");

@@ -62,7 +62,8 @@ describe("the calendar's session menu (Ron, Nov 2)", () => {
     expect(sql).toContain("late_charge_state = 'charged'");
     expect(sql).toContain("late_charge_state = 'waived'");
     expect(sql).toContain("grant execute on function public.mark_client_cancelled(uuid, boolean) to authenticated");
-    expect(menu).toMatch(/<\/span>\s*\{menu\.node\}\s*<\/>/);
+    // the menu is drawn beside the session (a span, or a button that a tap opens: Nov 21), never inside it
+    expect(menu).toMatch(/<\/span>\s*\)\}\s*\{menu\.node\}\s*<\/>/);
     // Duplicate starts at the same time next week; more than one week goes through the weekly booking (one notice to the client)
     expect(menu).toContain("useState(addDaysToKey(now.dateKey, 7))");
     expect(menu).toContain('mode: "fixed", count: weeks');

@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Dumbbell, Mail, MessageCircle, Sparkles, TrendingUp, Users, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -131,28 +131,47 @@ export function CoachSpotHub({
         // the button simply shows no dot
       });
   }
+  // Opened by a link (Release 2): ?spot=1 (a coach page that lives in Spotlight on a phone), or a notice naming a panel (#late-changes, #schedule-requests, #expiring). Checked on the
+  // first load AND each time the address changes (Nov 21: a second notice tapped while the app was open did nothing): a new path, a new ?spot=1, or a new #panel.
+  const pathname = usePathname();
+  const spotParam = useSearchParams()?.get("spot") ?? null;
+  const [hash, setHash] = useState("");
+  useEffect(() => {
+    const read = () => setHash(window.location.hash);
+    read();
+    // a hash set by the app's own navigation fires no hashchange: also on back and forward, and whenever the path or ?spot changes
+    window.addEventListener("hashchange", read);
+    window.addEventListener("popstate", read);
+    return () => {
+      window.removeEventListener("hashchange", read);
+      window.removeEventListener("popstate", read);
+    };
+  }, [pathname, spotParam]);
+  useEffect(() => {
+    if (isEmbeddedWindow()) return;
+    const anchor = SPOT_OPEN_HASHES.find((h) => hash === `#${h}`) ?? null;
+    if (spotParam !== "1" && !anchor) return;
+    setOpen(true);
+    setView("grid");
+    loadNeeds(true);
+    if (!anchor) return;
+    // the panel reads its own rows; look for it for a few seconds
+    let tries = 0;
+    const timer = window.setInterval(() => {
+      const el = document.querySelector(`[data-spot-anchor="${anchor}"] section`);
+      if (el || ++tries > 20) {
+        window.clearInterval(timer);
+        el?.scrollIntoView({ block: "start" });
+      }
+    }, 250);
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, spotParam, hash]);
   useEffect(() => {
     // Never inside an embedded frame (the split half, a workspace pane): the page holding it has its own Spotlight.
     if (isEmbeddedWindow()) return;
-    // Opened by a link (Release 2): ?spot=1 (a coach page that lives in Spotlight on a phone), or a notice naming a panel (#late-changes, #schedule-requests, #expiring).
-    const anchor = SPOT_OPEN_HASHES.find((h) => window.location.hash === `#${h}`) ?? null;
-    if (new URLSearchParams(window.location.search).get("spot") === "1" || anchor) {
-      setOpen(true);
-      setView("grid");
-      loadNeeds(true);
-      if (anchor) {
-        // the panel reads its own rows; look for it for a few seconds
-        let tries = 0;
-        const timer = window.setInterval(() => {
-          const el = document.querySelector(`[data-spot-anchor="${anchor}"] section`);
-          if (el || ++tries > 20) {
-            window.clearInterval(timer);
-            el?.scrollIntoView({ block: "start" });
-          }
-        }, 250);
-      }
-      return;
-    }
+    // opened by a link: the effect above does it
+    if (new URLSearchParams(window.location.search).get("spot") === "1" || SPOT_OPEN_HASHES.some((h) => window.location.hash === `#${h}`)) return;
     // Only where the button is actually on screen (on a computer it is mounted but hidden), and never for a hidden tab: an idle open page must not keep asking (Oct 20 outage).
     // Opening Spotlight always reads it.
     if (document.visibilityState !== "visible" || !triggerRef.current || triggerRef.current.getClientRects().length === 0) return;

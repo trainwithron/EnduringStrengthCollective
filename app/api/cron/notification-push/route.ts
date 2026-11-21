@@ -6,7 +6,7 @@ import { runPool } from "@/lib/run-pool";
 import { isUrgentRequestNotice, PUSHED_BY_JOB, pushBodyFor, pushTitleFor, REQUEST_PUSH_TYPES, requestPushLine, STALE_PUSH_HOURS, waitingRequestFor } from "@/lib/notification-push";
 import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { isQuietNow, readPushPrefs } from "@/lib/push-prefs";
-import { noticeHref } from "@/lib/notice-links";
+import { noticeHref, pushHrefForNotice } from "@/lib/notice-links";
 import { emailNoticeBackup } from "@/lib/notice-email-backup";
 
 // Every five minutes: pushes the notices the DATABASE writes (a client's booking request, a late change, a schedule request, the decision on a request), which no other code path sends. Each notice is claimed
@@ -74,7 +74,8 @@ async function handler(request: Request) {
       n.profile_id,
       pushTitleFor(n.type),
       line,
-      noticeHref(n.type, n.link_path || "/dashboard", { id: n.id, groupId: n.group_id }),
+      // through the notice itself: opening it marks it read, then it goes where noticeHref sends it (Nov 21)
+      pushHrefForNotice(n.id, noticeHref(n.type, n.link_path || "/dashboard", { id: n.id, groupId: n.group_id })),
       { ...(requestId ? { answer: { requestId } } : {}), ...(urgent.has(n.id) ? { ignoreQuiet: true } : {}) }
     );
     sent += reached;

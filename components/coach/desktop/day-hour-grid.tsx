@@ -27,6 +27,9 @@ export interface GridBooking {
   label: string;
   // The weekly schedule it belongs to, for Remove on the session menu (which asks "only this one or every later one").
   seriesId?: string | null;
+  // the client and their space: the menu then also offers Open profile and Log their workout
+  athleteId?: string | null;
+  groupId?: string | null;
 }
 
 export interface GridBlocked {
@@ -226,18 +229,23 @@ export function DayHourGrid({
         {bookings.map((b) => {
           const start = dateToMinutes(b.start, timeZone);
           const end = dateToMinutes(b.end, timeZone);
+          const session = { bookingId: b.id, seriesId: b.seriesId ?? null, name: b.label, startMs: b.start.getTime(), endMs: b.end.getTime(), athleteId: b.athleteId ?? null, groupId: b.groupId ?? null };
           return (
-            <div
+            <button
+              type="button"
               key={b.id}
-              className="absolute left-1 right-1 bg-rust/80 text-graphite px-2 py-0.5 overflow-hidden"
-              {...sessionMenu.handlersFor({ bookingId: b.id, seriesId: b.seriesId ?? null, name: b.label, startMs: b.start.getTime(), endMs: b.end.getTime() })}
+              aria-haspopup="menu"
+              aria-label={`${b.label}, ${formatMinutes(start)}. Open the session's menu`}
+              className="absolute left-1 right-1 bg-rust/80 text-graphite px-2 py-0.5 overflow-hidden text-left cursor-pointer"
+              {...sessionMenu.handlersFor(session)}
               style={{ ...blockBox(start, end, rangeStart), WebkitTouchCallout: "none", userSelect: "none" }}
-              onClick={(e) => e.stopPropagation()}
+              // a plain tap opens the same menu as press and hold (Nov 21: a tap did nothing); it never reaches the grid behind (which would start a new session there)
+              onClick={sessionMenu.tapOpens(session)}
             >
               <p className="font-body text-xs font-medium leading-tight truncate">
                 {formatMinutes(start)} · {b.label}
               </p>
-            </div>
+            </button>
           );
         })}
 

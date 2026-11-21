@@ -5,6 +5,7 @@ import Link from "next/link";
 import { X } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { saved } from "@/lib/saved";
+import { noticeHref } from "@/lib/notice-links";
 
 export interface OrgNotification {
   id: string;
@@ -50,7 +51,8 @@ export function OrgNotificationsPanel({ initialNotifications }: { initialNotific
         {rows.map((n) => (
           <div key={n.id} className="flex items-start justify-between gap-3">
             <Link prefetch={false}
-              href={n.linkPath}
+              // where every notice opens (Nov 21: these went to the raw link, so a dispatch, support or payment notice opened Home)
+              href={noticeHref(n.type, n.linkPath, { id: n.id })}
               onClick={() => dismiss(n.id)}
               className="min-w-0 flex-1 group"
             >

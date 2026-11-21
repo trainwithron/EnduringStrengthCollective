@@ -41,7 +41,7 @@ describe("the switch is the existing view choice", () => {
     const mw = read("lib/supabase/middleware.ts");
     expect(mw).toContain("isPhoneView({ override: request.cookies.get(VIEW_OVERRIDE_COOKIE)?.value");
     // a computer page still has a phone target, so only the choice keeps the tablet on it
-    expect(phoneCoachRedirect("/running-low")).not.toBeNull();
+    expect(phoneCoachRedirect("/group-calendar")).not.toBeNull();
   });
 });
 

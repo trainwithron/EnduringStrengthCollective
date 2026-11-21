@@ -50,7 +50,7 @@ export default async function ProgramDetailPage(
     // always landed back at the top and had to manually find and expand
     // that week themselves. `?week=N` lets the mini-view jump straight
     // to the right week already open.
-    searchParams: Promise<{ week?: string; forClient?: string; clientGroup?: string; edit?: string; templateNote?: string }>;
+    searchParams: Promise<{ week?: string; forClient?: string; clientGroup?: string; edit?: string; templateNote?: string; swap?: string }>;
   }
 ) {
   const params = await props.params;
@@ -99,7 +99,8 @@ export default async function ProgramDetailPage(
   }
 
   // On a phone a program opens as a plain view (every week, pick the week and the day, log it); the builder is one tap away for the coach ("Edit program", ?edit=1). Desktop is unchanged.
-  if (!searchParams.edit && (await prefersAthleteStyleView())) {
+  // A client's "every week" swap notice (?swap=) opens the builder on a phone too, where the swap is shown with Undo (Nov 21: the plain view had neither).
+  if (!searchParams.edit && !searchParams.swap && (await prefersAthleteStyleView())) {
     // A real coach (not acting as a client) sees it inside the coach's phone app: the bottom bar (More lit: Programs lives under More) and the Spotlight button, never a dead end with only Back.
     const coachShell = membership.role === "coach" && !(await getEffectiveAthlete(params.groupId, user.id)).isActingAsOther;
     const view = (

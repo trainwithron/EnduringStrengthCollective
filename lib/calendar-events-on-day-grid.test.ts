@@ -70,7 +70,8 @@ describe("the phone Calendar and the computer's week view show events at their t
     const phone = read("components/coach/mobile/coach-phone-schedule.tsx");
     expect(phone.match(/\.from\("calendar_events"\)\.select\(eventCols\)\.eq\("coach_id", userId\)\.neq\("status", "dismissed"\)/g)?.length).toBe(2);
     expect(phone).toContain("].sort((a, b) => a.at.localeCompare(b.at));");
-    expect(phone).toContain(".sort((a, b) => a.at.localeCompare(b.at))\n      .map(({ id, name, when }) => ({ id, name, when })),");
+    // each row also opens its day (Nov 21)
+    expect(phone).toContain(".sort((a, b) => a.at.localeCompare(b.at))\n      .map(({ id, name, when, href }) => ({ id, name, when, href })),");
     expect(phone).toContain('{l.dot && <span aria-hidden="true"');
   });
   it("week view: sessions and events in one list by time, an event with no time last", () => {

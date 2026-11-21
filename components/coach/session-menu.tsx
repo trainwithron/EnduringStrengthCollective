@@ -18,6 +18,16 @@ export interface MenuSession {
   name: string;
   startMs: number;
   endMs: number;
+  // the client and their space: the menu then also offers Open profile and Log their workout (Nov 21)
+  athleteId?: string | null;
+  groupId?: string | null;
+}
+
+/** The client's profile and their logging page, for a session whose client is known. */
+export function sessionLinks(s: Pick<MenuSession, "athleteId" | "groupId">): { profile: string; log: string } | null {
+  if (!s.athleteId || !s.groupId) return null;
+  const base = `/groups/${s.groupId}/athletes/${s.athleteId}`;
+  return { profile: base, log: `${base}/log` };
 }
 
 type Dialog = { kind: "reschedule" | "duplicate" | "remove" | "canceled"; session: MenuSession };
@@ -156,19 +166,34 @@ export function useSessionMenu(timezone: string, onChanged?: () => void) {
       </>
     );
 
-  return { handlersFor, node };
+  // A plain tap opens the same menu (Ron, Nov 21, the calendar's day page: a tap on a session did nothing, the menu was press-and-hold only). A tap that was a hold is already handled.
+  function tapOpens(session: MenuSession) {
+    return (e: ReactMouseEvent) => {
+      if (swallowClick.current) return;
+      e.stopPropagation();
+      openMenu(session, e.clientX, e.clientY);
+    };
+  }
+
+  return { handlersFor, tapOpens, node };
 }
 
-// For a session drawn by a server page: the same menu on one element.
-export function SessionMenuTarget({ session, timezone, className, children }: { session: MenuSession; timezone: string; className?: string; children: ReactNode }) {
+// For a session drawn by a server page: the same menu on one element. openOnTap: a plain tap opens it too (the day page), as a button.
+export function SessionMenuTarget({ session, timezone, className, openOnTap = false, children }: { session: MenuSession; timezone: string; className?: string; openOnTap?: boolean; children: ReactNode }) {
   const menu = useSessionMenu(timezone);
   // The menu is drawn beside the session, not inside it: a portal's events still reach its React parent, so inside the session a slow tap on a menu choice started a new hold
   // (and the choice was swallowed), and a right-click on the open menu moved it instead of closing it.
   return (
     <>
-      <span className={className} {...menu.handlersFor(session)}>
-        {children}
-      </span>
+      {openOnTap ? (
+        <button type="button" aria-haspopup="menu" className={`${className ?? ""} min-h-11 text-left`} {...menu.handlersFor(session)} onClick={menu.tapOpens(session)}>
+          {children}
+        </button>
+      ) : (
+        <span className={className} {...menu.handlersFor(session)}>
+          {children}
+        </span>
+      )}
       {menu.node}
     </>
   );
@@ -206,6 +231,7 @@ function SessionMenuPopup({ session, x, y, timezone, settled, onPick, onClose }:
   const item = "w-full min-h-11 px-4 text-left font-body text-sm text-chalk hover:bg-steel/15 focus:bg-steel/15 focus:outline-none";
   // A session that has already started is not cancelled from here (the same rule as the day page); Reschedule and Duplicate still are.
   const canRemove = session.startMs > Date.now();
+  const links = sessionLinks(session);
   return (
     <div
       className="fixed inset-0 z-50"
@@ -234,6 +260,17 @@ function SessionMenuPopup({ session, x, y, timezone, settled, onPick, onClose }:
           <button type="button" role="menuitem" className={`${item} text-rust-ink`} onClick={() => pick("remove")}>
             Remove
           </button>
+        )}
+        {links && (
+          <>
+            <div className="my-1 border-t border-steel/20" role="separator" />
+            <a href={links.profile} role="menuitem" className={`${item} flex items-center`}>
+              Open profile
+            </a>
+            <a href={links.log} role="menuitem" className={`${item} flex items-center`}>
+              Log their workout
+            </a>
+          </>
         )}
       </div>
     </div>

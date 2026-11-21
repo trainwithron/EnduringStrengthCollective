@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { FOCUSABLE_ROW } from "@/lib/requests-center";
 import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -22,6 +23,7 @@ export function CheckinReviewList({
   nowIso,
   weekStart,
   notSentCount,
+  focusId = null,
 }: {
   items: ReviewItem[];
   photos: Record<string, { id: string; url: string }[]>;
@@ -30,9 +32,19 @@ export function CheckinReviewList({
   nowIso: string;
   weekStart: string;
   notSentCount: number;
+  // the check-in Needs you named: open first and shown (the list is newest first, so it could be at the bottom)
+  focusId?: string | null;
 }) {
   const [items, setItems] = useState(initialItems);
-  const [openId, setOpenId] = useState<string | null>(initialItems[0]?.id ?? null);
+  const focusHere = focusId && initialItems.some((i) => i.id === focusId) ? focusId : null;
+  const [openId, setOpenId] = useState<string | null>(focusHere ?? initialItems[0]?.id ?? null);
+  useEffect(() => {
+    if (!focusHere) return;
+    const el = document.getElementById(`checkin-${focusHere}`);
+    el?.setAttribute("data-focused", "true");
+    el?.scrollIntoView({ block: "start", behavior: "smooth" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [done, setDone] = useState<{ name: string; href: string | null } | null>(null);
   const now = new Date(nowIso);
 
@@ -70,11 +82,11 @@ export function CheckinReviewList({
         <ul className="space-y-2">
           {items.map((item) =>
             item.id === openId ? (
-              <li key={item.id}>
+              <li key={item.id} id={`checkin-${item.id}`} className={FOCUSABLE_ROW}>
                 <OpenCheckin item={item} photos={photos[item.id] ?? []} coach={coach} timeZone={timeZone} now={now} weekStart={weekStart} onDone={(replied) => finish(item, replied)} />
               </li>
             ) : (
-              <li key={item.id}>
+              <li key={item.id} id={`checkin-${item.id}`} className={FOCUSABLE_ROW}>
                 <button
                   type="button"
                   onClick={() => setOpenId(item.id)}

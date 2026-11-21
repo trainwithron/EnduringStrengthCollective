@@ -102,7 +102,7 @@ describe("the coach is told on Home's Needs you", () => {
       base
     );
     expect(failed).toEqual([]);
-    expect(items.find((i) => i.kind === "checkin_review")).toMatchObject({ name: "Ann", button: "Review", href: "/clients/check-ins", profileHref: "/groups/g1/athletes/a1", sentence: "sent their weekly check-in." });
+    expect(items.find((i) => i.kind === "checkin_review")).toMatchObject({ name: "Ann", button: "Review", href: "/clients/check-ins?focus=c1", profileHref: "/groups/g1/athletes/a1", sentence: "sent their weekly check-in." });
     // the coach's own check-in in their personal space is not one to review
     expect(items.filter((i) => i.kind === "checkin_review").length).toBe(1);
     // only Bo's goal is due (Cy confirmed theirs three days ago)

@@ -51,14 +51,17 @@ export interface PhoneRedirect {
 
 const GROUP = /^\/groups\/([0-9a-f-]{36})(\/.*)?$/i;
 const ID = "[^/]+";
+// The organization page's tabs that open on a phone (the names its own ?tab= takes: app/(coach)/groups/[groupId]/branding/page.tsx OLD_TAB_HOME).
+export const PHONE_ORG_TABS = new Set(["team", "dispatch", "billing", "plan", "credits"]);
 
 // Pages under /groups/<g> and where they go on a phone. A target starting with "/my-space" is absolute; any other keeps the same <g>.
 const GROUP_TABLE: { pattern: RegExp; to: string; shared?: boolean }[] = [
-  ...["dashboard", "business", "business/packages", "business/leads", "business/website", "business/zapier", "business/waiver", "revenue-splits", `coaches/${ID}`, "team", "team-sheet", "team-sheet/upload", "team-performance"].map((p) => ({ pattern: new RegExp(`^/${p}$`), to: PHONE_SPOTLIGHT })),
+  // Shown on the phone since Nov 21 (Ron: notices and pushes must open what they are about): Business (a payment notice), leads (a gym visitor), support (a reply), Message all,
+  // a client's history import, and the organization's Team and Plan & Billing tabs (PHONE_ORG_TABS). Each is a plain list or form that fits a phone.
+  ...["dashboard", "business/packages", "business/website", "business/zapier", "business/waiver", "revenue-splits", `coaches/${ID}`, "team", "team-sheet", "team-sheet/upload", "team-performance"].map((p) => ({ pattern: new RegExp(`^/${p}$`), to: PHONE_SPOTLIGHT })),
   ...["business/booking-page", "business/session-types", "availability", "group-sessions", "group-calendar"].map((p) => ({ pattern: new RegExp(`^/${p}$`), to: PHONE_CALENDAR })),
   { pattern: /^\/business\/session-ledger$/, to: PHONE_SPOTLIGHT },
-  ...["business/sms-settings", "business/support", "branding"].map((p) => ({ pattern: new RegExp(`^/${p}$`), to: "/settings" })),
-  { pattern: /^\/messages\/announce$/, to: "/messages" },
+  ...["business/sms-settings", "branding"].map((p) => ({ pattern: new RegExp(`^/${p}$`), to: "/settings" })),
   { pattern: /^\/team-activity$/, to: "/feed" },
   ...["challenges", `challenges/${ID}`, "records", `games/${ID}`].map((p) => ({ pattern: new RegExp(`^/${p}$`), to: "/feed", shared: true })),
   ...["resources", "quick-tips", "pro-shop", "referrals"].map((p) => ({ pattern: new RegExp(`^/${p}$`), to: PHONE_SPOTLIGHT, shared: true })),
@@ -78,12 +81,11 @@ const TO_PROGRAMS: { pattern: RegExp; shared?: boolean }[] = [
  */
 export function phoneCoachRedirect(pathname: string, search = ""): PhoneRedirect | null {
   const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
-  if (pathname === "/calendar" || pathname === "/group-calendar" || pathname === "/recurring-conflicts") {
+  if (pathname === "/calendar" || pathname === "/group-calendar") {
     // Booking one client (?scheduleFor=) stays: the page takes it to that client's group. So does Availability (?tab=availability): the one place a coach sets their hours, on a phone too.
     if (pathname === "/calendar" && (params.get("scheduleFor") || params.get("tab") === "availability")) return null;
     return { to: phoneCalendarHref(params.get("month")), groupId: null, shared: false };
   }
-  if (pathname === "/running-low") return { to: PHONE_SPOTLIGHT, groupId: null, shared: false };
   // The computer's Home. Decided here, before the page renders: the page has a loading screen, so a redirect from inside it arrives in the middle of the stream (Release 2 follow-up, Oct 20).
   if (pathname === "/dashboard") return { to: PHONE_ENTRY, groupId: null, shared: false };
 
@@ -95,6 +97,8 @@ export function phoneCoachRedirect(pathname: string, search = ""): PhoneRedirect
   // A group's own page for a coach who is not acting as a client: their own app (a team-sport group keeps its team Home: the middleware leaves that page alone). Shared, so a coach looking at
   // a client's app (or their own space) is never sent away.
   if (rest === "") return { to: PHONE_OWN_APP, groupId: g, shared: true, home: true };
+  // The organization's Team tab (invitations, the coaches) and Plan & Billing (the plan, credits) open on the phone; its look and labels tabs still go to Settings.
+  if (rest === "/branding" && PHONE_ORG_TABS.has(params.get("tab") ?? "")) return null;
 
   for (const r of GROUP_TABLE) {
     if (!r.pattern.test(rest)) continue;
@@ -107,7 +111,7 @@ export function phoneCoachRedirect(pathname: string, search = ""): PhoneRedirect
   if (progressions) return { to: `${base}/programs/${progressions[1]}`, groupId: g, shared: false };
   const athleteCalendar = new RegExp(`^/athletes/(${ID})/calendar(?:/${ID})?$`).exec(rest);
   if (athleteCalendar) return { to: `${base}/athletes/${athleteCalendar[1]}?tab=calendar`, groupId: g, shared: false };
-  const athleteOther = new RegExp(`^/athletes/(${ID})/(?:history|view)$`).exec(rest);
+  const athleteOther = new RegExp(`^/athletes/(${ID})/view$`).exec(rest);
   if (athleteOther) return { to: `${base}/athletes/${athleteOther[1]}`, groupId: g, shared: false };
 
   return null;

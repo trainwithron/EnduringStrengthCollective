@@ -45,9 +45,14 @@ function fakeDb(tables: Record<string, any[]>, opts: { profileColumnsMissing?: b
           if (table === "profiles" && opts.profileColumnsMissing && /quiet_hours|generic_push_text/.test(selected)) return { data: null, error: { message: "column does not exist" } };
           return { data: rows[0] ?? null, error: null };
         },
-        insert: async (row: any) => {
+        insert: (row: any) => {
           (inserted[table] ??= []).push(row);
-          return { error: null };
+          const id = `${table}-${inserted[table].length}`;
+          // awaited as is, or with .select("id").maybeSingle() (the notice's id for its push, Nov 21)
+          return {
+            then: (resolve: (v: unknown) => unknown) => resolve({ error: null }),
+            select: () => ({ maybeSingle: async () => ({ data: { id }, error: null }), single: async () => ({ data: { id }, error: null }) }),
+          };
         },
         delete: () => ({ eq: async () => ({}) }),
         then: (resolve: (v: unknown) => unknown) => resolve({ data: rows, error: null }),

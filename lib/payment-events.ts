@@ -1,5 +1,6 @@
 import type Stripe from "stripe";
 import { sendCoachPush } from "@/lib/coach-notice";
+import { pushHrefForNotice } from "@/lib/notice-links";
 
 // Money events that used to leave no trace in the app (Release M1): a client's failed payment, a refund made in Stripe, a dispute (chargeback) opened and closed. Each is RECORDED (payment_events, one row per Stripe event) and the
 // coach who owns the money is told. Nothing else happens: no balance changes, no sessions are taken back, no access ends and no money moves. A refund does not take sessions off the client and a failed payment does not
@@ -147,13 +148,14 @@ export async function notifyPaymentProblem(db: any, e: PaymentEventInput): Promi
     const link = e.groupId ? `/groups/${e.groupId}/business` : "/dashboard";
     let delivered = 0;
     for (const coachId of coachIds) {
-      const { error } = await db.from("notifications").insert({ profile_id: coachId, group_id: e.groupId, type: "payment_problem", body, link_path: link, pushed_at: new Date().toISOString() });
+      const { data: notice, error } = await db.from("notifications").insert({ profile_id: coachId, group_id: e.groupId, type: "payment_problem", body, link_path: link, pushed_at: new Date().toISOString() }).select("id").maybeSingle();
       if (error) {
         console.error("[payment problem notice] the notification was refused:", error.message);
         continue;
       }
       delivered++;
-      await sendCoachPush(db, coachId, "payments", TITLE[e.kind], LOCK_SCREEN_TEXT, link).catch(() => 0);
+      // through the notice: it is marked read when opened, and the coach's own plan opens its Plan & Billing (app/notice/[id])
+      await sendCoachPush(db, coachId, "payments", TITLE[e.kind], LOCK_SCREEN_TEXT, pushHrefForNotice((notice as { id?: string } | null)?.id, link)).catch(() => 0);
     }
     return delivered;
   } catch (err) {

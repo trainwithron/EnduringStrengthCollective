@@ -250,6 +250,8 @@ const RULES: Rule[] = [
 
 /** Pages that are not part of any home on the computer: a client's own pages, in-person logging, tablet screens. Patterns over the route (with [params]). */
 export const DESKTOP_EXCLUDED: string[] = [
+  // a leaving coach's steps, opened from their notices (Nov 21): the same sections as the top of Home, not a home of its own
+  "/leaving",
   "/groups/[groupId]",
   "/groups/[groupId]/about-you",
   "/groups/[groupId]/goal",

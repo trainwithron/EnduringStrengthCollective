@@ -96,6 +96,6 @@ describe("each place in the coach's own app", () => {
     expect(phoneCalendarHref("2026-11")).toBe("/my-space/calendar?month=2026-11");
     expect(phoneCalendarHref("nope")).toBe("/my-space/calendar");
     expect(phoneCoachRedirect("/calendar", "?month=2026-11")?.to).toBe("/my-space/calendar?month=2026-11");
-    expect(phoneCoachRedirect("/groups/11111111-1111-4111-8111-111111111111/business")?.to).toBe("/my-space/spotlight");
+    expect(phoneCoachRedirect("/groups/11111111-1111-4111-8111-111111111111/business/packages")?.to).toBe("/my-space/spotlight");
   });
 });

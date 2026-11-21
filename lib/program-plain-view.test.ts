@@ -67,7 +67,7 @@ describe("the page", () => {
   const picker = read("components/shared/program-day-picker.tsx");
   const creator = read("components/coach/create-and-open-program.tsx");
   it("opens the plain view on a phone and the builder with ?edit=1, never for desktop", () => {
-    expect(page).toContain("!searchParams.edit && (await prefersAthleteStyleView())");
+    expect(page).toContain("!searchParams.edit && !searchParams.swap && (await prefersAthleteStyleView())");
     expect(page).toContain("<ProgramPlainView");
   });
   it("Build / New program still open the builder", () => {

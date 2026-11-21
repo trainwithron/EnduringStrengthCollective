@@ -18,7 +18,9 @@ export const metadata = { title: "Check-ins" };
 
 // The coach's weekly check-ins (Ron, Nov 20: R2): every check-in waiting to be reviewed in the open organization, newest first, and who has not sent this week's. Reached from the Clients
 // page, Home's Needs you, and the notice a check-in sends. Phone and computer alike.
-export default async function CheckinsPage() {
+// ?focus=<check-in id> (Needs you's Review, Nov 21): that client's check-in opens first and is shown, as Requests does with its rows.
+export default async function CheckinsPage(props: { searchParams?: Promise<{ focus?: string }> }) {
+  const focus = (await props.searchParams)?.focus ?? null;
   const supabase = await createServerClient();
   const {
     data: { user },
@@ -53,6 +55,7 @@ export default async function CheckinsPage() {
         nowIso={new Date().toISOString()}
         weekStart={data.weekStart}
         notSentCount={data.notSent.length}
+        focusId={focus}
       />
     </>
   );

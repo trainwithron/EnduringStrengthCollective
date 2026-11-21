@@ -61,8 +61,9 @@ export default async function BrandingPage(
   }
 ) {
   const params = await props.params;
-  await redirectOneOnOneToAnchor(params.groupId, "branding");
   const searchParams = await props.searchParams;
+  // the tab goes along (a Plan & Billing link from a one-on-one client's space must land on Plan & Billing, Nov 21)
+  await redirectOneOnOneToAnchor(params.groupId, searchParams.tab ? `branding?tab=${encodeURIComponent(searchParams.tab)}` : "branding");
   const tab: OrgTab = OLD_TAB_HOME[searchParams.tab ?? ""] ?? "team";
   const supabase = await createServerClient();
   const {

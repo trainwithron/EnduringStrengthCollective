@@ -62,6 +62,14 @@ import { coachBusyRanges, onlyOpenSlots, withBusy } from "@/lib/coach-busy";
 import { insideWindowHours } from "@/lib/cancel-window";
 import { readClientCancelPolicy } from "@/lib/late-cancel-auto";
 import { capToneClass, fetchSlotReasons, fullyBookedLine, keepOffered, limitsActive, limitsFromRow, loadCapLines } from "@/lib/session-caps";
+import { AddAtTimeButton } from "@/components/coach/add-at-time-button";
+import { minutesOfDayInZone } from "@/lib/day-time-grid";
+
+// "HH:MM" on the coach's clock, what the day's Add sheet takes
+const hhmmInZone = (d: Date, tz: string) => {
+  const m = minutesOfDayInZone(d, tz);
+  return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+};
 
 export const metadata = { title: "Calendar" };
 
@@ -728,7 +736,7 @@ export default async function CoachDayDetailPage(
       supabase
         .from("bookings")
         .select(
-          "id, start_at, end_at, athlete_id, session_type, no_show, needs_coach_resolution, recurring_series_id, profiles!bookings_athlete_id_fkey ( full_name )"
+          "id, start_at, end_at, athlete_id, group_id, session_type, no_show, needs_coach_resolution, recurring_series_id, profiles!bookings_athlete_id_fkey ( full_name )"
         )
         .eq("coach_id", user.id)
         .in("group_id", g)
@@ -843,10 +851,12 @@ export default async function CoachDayDetailPage(
   const renderBooked = (booking: any, start: Date) => (
     <div className="flex flex-wrap items-center gap-2 min-w-0">
       {/* Press and hold (or right-click) for Reschedule, Duplicate and Remove (Ron, Nov 2). */}
+      {/* A tap (or press and hold, or right-click) opens Reschedule, Duplicate, Client canceled, Remove, Open profile and Log their workout (Nov 21: a tap did nothing). */}
       <SessionMenuTarget
-        session={{ bookingId: booking.id, seriesId: booking.recurring_series_id ?? null, name: (booking.profiles as any)?.full_name ?? "Client", startMs: start.getTime(), endMs: new Date(booking.end_at).getTime() }}
+        session={{ bookingId: booking.id, seriesId: booking.recurring_series_id ?? null, name: (booking.profiles as any)?.full_name ?? "Client", startMs: start.getTime(), endMs: new Date(booking.end_at).getTime(), athleteId: booking.athlete_id ?? null, groupId: booking.group_id ?? params.groupId }}
         timezone={timezone}
-        className="font-body text-xs text-steel"
+        className="font-body text-xs text-steel underline underline-offset-2 decoration-steel/40"
+        openOnTap
       >
         Booked — {(booking.profiles as any)?.full_name ?? "Client"}
       </SessionMenuTarget>
@@ -948,6 +958,8 @@ export default async function CoachDayDetailPage(
           end: new Date(b.end_at),
           label: b.profiles?.full_name ?? "Client",
           seriesId: b.recurring_series_id ?? null,
+          athleteId: b.athlete_id ?? null,
+          groupId: b.group_id ?? params.groupId,
         }))}
         events={(dayEventRows ?? []).map((e) => ({ id: e.id, time: e.event_time, title: e.title }))}
         blocked={blockedRanges.map((b, i) => ({ id: `blocked-${i}`, start: b.start, end: b.end, label: "Blocked" }))}
@@ -1024,7 +1036,8 @@ export default async function CoachDayDetailPage(
                     endAt={endAt.toISOString()}
                   />
                 ) : (
-                  <span className="font-body text-xs text-steel">Open</span>
+                  // opens the day's Add sheet at this time (Nov 21: "Open" was only a word)
+                  <AddAtTimeButton time={hhmmInZone(start, timezone)} label={formatSlotTime(start, timezone)} />
                 )}
               </div>
             );

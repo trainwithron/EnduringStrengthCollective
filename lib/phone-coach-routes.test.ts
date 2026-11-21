@@ -47,6 +47,16 @@ const NEVER = new Set([
   "/groups/[groupId]/display",
   "/groups/[groupId]/billing/success", // the return from a checkout must land where it was sent
   "/groups/[groupId]/billing/canceled",
+  // Open on the phone since Nov 21 (Ron: a notice or push opens what it is about): running low, recurring conflicts, Business (payments), leads, support, Message all, history.
+  "/running-low",
+  "/recurring-conflicts",
+  "/groups/[groupId]/business",
+  "/groups/[groupId]/business/leads",
+  "/groups/[groupId]/business/support",
+  "/groups/[groupId]/messages/announce",
+  "/groups/[groupId]/athletes/[athleteId]/history",
+  // a leaving coach's steps (their notices open it; Nov 21)
+  "/leaving",
 ]);
 
 // A client's own pages: never a coach redirect.
@@ -94,9 +104,13 @@ describe("the table", () => {
     expect(to("/calendar")).toBe("/my-space/calendar");
     expect(to("/calendar", "?month=2026-11")).toBe("/my-space/calendar?month=2026-11");
     expect(to("/group-calendar")).toBe("/my-space/calendar");
-    expect(to("/recurring-conflicts")).toBe("/my-space/calendar");
-    expect(to("/running-low")).toBe("/my-space/spotlight");
-    expect(to(`/groups/${G}/business`)).toBe("/my-space/spotlight");
+    // open on the phone since Nov 21 (their notices and pushes land on them)
+    for (const p of ["/recurring-conflicts", "/running-low", `/groups/${G}/business`, `/groups/${G}/business/leads`, `/groups/${G}/business/support`, `/groups/${G}/messages/announce`, `/groups/${G}/athletes/${ID}/history`]) {
+      expect(to(p), p).toBeNull();
+    }
+    // the organization's Team and Plan & Billing tabs open on the phone; its look and labels tabs still go to Settings
+    for (const tab of ["team", "billing", "credits", "plan"]) expect(to(`/groups/${G}/branding`, `?tab=${tab}`), tab).toBeNull();
+    expect(to(`/groups/${G}/branding`, "?tab=labels")).toBe(`/groups/${G}/settings`);
     expect(to(`/groups/${G}/dashboard`)).toBe("/my-space/spotlight");
     expect(phoneCoachRedirect(`/groups/${G}/dashboard`)?.home).toBe(true);
     expect(to(`/groups/${G}/coaches/${ID}`)).toBe("/my-space/spotlight");
@@ -105,7 +119,6 @@ describe("the table", () => {
     expect(to(`/groups/${G}/business/session-ledger`)).toBe("/my-space/spotlight");
     expect(to(`/groups/${G}/business/sms-settings`)).toBe(`/groups/${G}/settings`);
     expect(to(`/groups/${G}/branding`)).toBe(`/groups/${G}/settings`);
-    expect(to(`/groups/${G}/messages/announce`)).toBe(`/groups/${G}/messages`);
     expect(to(`/groups/${G}/team-activity`)).toBe(`/groups/${G}/feed`);
     expect(to(`/groups/${G}/challenges/${ID}`)).toBe(`/groups/${G}/feed`);
     expect(to(`/groups/${G}/games/${ID}`)).toBe(`/groups/${G}/feed`);
@@ -116,7 +129,6 @@ describe("the table", () => {
     expect(to(`/groups/${G}/programs/${ID}/progressions`)).toBe(`/groups/${G}/programs/${ID}`);
     expect(to(`/groups/${G}/athletes/${ID}/calendar`)).toBe(`/groups/${G}/athletes/${ID}?tab=calendar`);
     expect(to(`/groups/${G}/athletes/${ID}/calendar/2026-10-21`)).toBe(`/groups/${G}/athletes/${ID}?tab=calendar`);
-    expect(to(`/groups/${G}/athletes/${ID}/history`)).toBe(`/groups/${G}/athletes/${ID}`);
     expect(to(`/groups/${G}/athletes/${ID}/view`)).toBe(`/groups/${G}/athletes/${ID}`);
   });
   it("keeps the in-person pages and the program builder", () => {
@@ -129,9 +141,9 @@ describe("the table", () => {
     for (const p of ["challenges", `challenges/${ID}`, "records", `games/${ID}`, "resources", "quick-tips", "pro-shop", "referrals", "tools/one-rep-max"]) {
       expect(phoneCoachRedirect(`/groups/${G}/${p}`)?.shared, p).toBe(true);
     }
-    expect(phoneCoachRedirect(`/groups/${G}/business`)?.shared).toBe(false);
-    expect(phoneCoachRedirect(`/groups/${G}/business`)?.groupId).toBe(G);
-    expect(phoneCoachRedirect("/running-low")?.groupId).toBeNull();
+    expect(phoneCoachRedirect(`/groups/${G}/business/packages`)?.shared).toBe(false);
+    expect(phoneCoachRedirect(`/groups/${G}/business/packages`)?.groupId).toBe(G);
+    expect(phoneCoachRedirect("/group-calendar")?.groupId).toBeNull();
   });
   it("leaves everything that is not a coach page alone", () => {
     for (const p of ["/", "/login", "/api/x", "/admin/support", "/notifications", "/my-space", `/sessions/${ID}`]) expect(phoneCoachRedirect(p), p).toBeNull();

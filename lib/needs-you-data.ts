@@ -280,7 +280,7 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
     items.push({ id: `expiring:${e.athleteId}:${e.groupId}`, kind: "expiring_credits", name: nameOf(e.athleteId), sentence: sentences.expiringCredits(e.daysLeft), button: BUTTON.open, href: "/dashboard#expiring", profileHref: clientPath(e.groupId, e.athleteId), order: e.expiresOn.getTime() });
   }
   for (const c of checkinsHere) {
-    items.push({ id: `checkin:${c.id}`, kind: "checkin_review", name: nameOf(c.athlete_id), sentence: sentences.checkinReview(), button: BUTTON.review, href: COACH_CHECKINS_PATH, profileHref: clientPath(c.group_id, c.athlete_id), order: new Date(c.submitted_at).getTime() });
+    items.push({ id: `checkin:${c.id}`, kind: "checkin_review", name: nameOf(c.athlete_id), sentence: sentences.checkinReview(), button: BUTTON.review, href: `${COACH_CHECKINS_PATH}?focus=${c.id}`, profileHref: clientPath(c.group_id, c.athlete_id), order: new Date(c.submitted_at).getTime() });
   }
   for (const g of goalsHere) {
     items.push({ id: `goal:${g.athlete_id}:${g.group_id}`, kind: "goal_review", name: nameOf(g.athlete_id), sentence: sentences.goalReview(), button: BUTTON.open, href: clientPath(g.group_id, g.athlete_id), order: new Date(g.filled_at ?? 0).getTime() });

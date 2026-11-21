@@ -136,6 +136,8 @@ async function answerRequest(requestId, confirm, url) {
     });
     const out = await res.json().catch(() => ({}));
     if (res.ok && typeof out.line === "string") {
+      // answered from the notification: its notice is read too (Nov 21). Opening /notice/<id> marks it; the redirect it answers with is not followed.
+      if (/^\/notice\/[0-9a-f-]{36}$/i.test(url)) await fetch(url, { credentials: "include", redirect: "manual" }).catch(() => null);
       await self.registration.showNotification(out.line, { icon: "/icon-192.png", badge: "/brand/spotlight-badge-72.png", tag: "answer-" + requestId, data: { url } });
       return;
     }

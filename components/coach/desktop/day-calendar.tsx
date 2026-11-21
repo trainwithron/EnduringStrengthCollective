@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { zonedTimeToUtc } from "@/lib/timezone";
@@ -17,6 +17,8 @@ export interface DayClient {
 
 // The day grid plus the one sheet a tap opens. The coach taps a time; the sheet asks what to put there (a client's session, an event, or time blocked off), already set to that exact time. The start time
 // is the coach's to change to any minute and the length is theirs too: the open slots are for clients booking themselves, never a rule for the coach. Overlaps are warned about, never blocked.
+export const DAY_ADD_AT_EVENT = "day-calendar-add-at";
+
 export function DayCalendar({
   coachId,
   groupId,
@@ -67,6 +69,16 @@ export function DayCalendar({
     setEndTime(endFrom(t, defaultMinutes));
     setError(null);
   }
+  // An "Open" time in the list beside the grid opens this same sheet at that time (Nov 21: it was only a word).
+  useEffect(() => {
+    const onAddAt = (e: Event) => {
+      const t = (e as CustomEvent<{ time?: string }>).detail?.time;
+      if (typeof t === "string" && /^\d{2}:\d{2}$/.test(t)) openAt(t);
+    };
+    window.addEventListener(DAY_ADD_AT_EVENT, onAddAt);
+    return () => window.removeEventListener(DAY_ADD_AT_EVENT, onAddAt);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaultMinutes]);
   function close() {
     setPickedTime(null);
     setTitle("");

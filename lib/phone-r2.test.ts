@@ -42,7 +42,7 @@ describe("the phone redirects", () => {
   it("coach Home and business pages open Spotlight in their own app; calendar pages open their own Calendar", () => {
     expect(PHONE_SPOTLIGHT).toBe("/my-space/spotlight");
     expect(PHONE_CALENDAR).toBe("/my-space/calendar");
-    expect(phoneCoachRedirect(`/groups/${S}/business`)).toMatchObject({ to: PHONE_SPOTLIGHT, home: true, groupId: S });
+    expect(phoneCoachRedirect(`/groups/${S}/business/packages`)).toMatchObject({ to: PHONE_SPOTLIGHT, home: true, groupId: S });
     expect(phoneCoachRedirect(`/groups/${S}/group-calendar`)?.to).toBe(PHONE_CALENDAR);
   });
   it("a team-sport group's coach keeps the team Home: the middleware sends a coach-Home redirect to the group's page", () => {
@@ -57,8 +57,9 @@ describe("the phone redirects", () => {
 describe("Spotlight", () => {
   const hub = read("components/coach/mobile/coach-spot-hub.tsx");
   it("opens by itself for ?spot=1 and for a notice naming a panel", () => {
-    expect(hub).toContain('if (new URLSearchParams(window.location.search).get("spot") === "1" || anchor) {');
-    expect(hub).toContain("const anchor = SPOT_OPEN_HASHES.find((h) => window.location.hash === `#${h}`) ?? null;");
+    // checked again whenever the address changes (Nov 21)
+    expect(hub).toContain('if (spotParam !== "1" && !anchor) return;');
+    expect(hub).toContain("const anchor = SPOT_OPEN_HASHES.find((h) => hash === `#${h}`) ?? null;");
   });
   it("Business has the organization's settings and, for a platform admin, their tools; Program has All programs", () => {
     expect(hub).toContain("href={`/groups/${activeGroupId}/settings`}");

@@ -4,6 +4,7 @@ import { findAndRankAvailableTrainers } from "./trainer-dispatch-gather";
 import { computeStepExpiry, findMatchingSlotForTrainer, resolveLocalDateForInstant, type GoalType } from "./trainer-dispatch";
 import { resolveBlockedRangesForDate, type AvailabilityWindow } from "./booking-slots";
 import { sendPushToProfile } from "./send-push";
+import { pushHrefForNotice } from "./notice-links";
 import { isEmailConfigured, sendEmail } from "./email";
 import { DEFAULT_COACH_TIMEZONE } from "./timezone";
 import { formatInTimezone } from "@/lib/format-in-timezone";
@@ -30,10 +31,12 @@ async function notifyOrgAdmins(
     .eq("organization_id", organizationId)
     .in("role", ["owner", "admin"]);
   for (const a of admins ?? []) {
-    await supabase
+    const { data: notice } = await supabase
       .from("notifications")
-      .insert({ profile_id: a.profile_id, group_id: null, type, body, link_path: linkPath });
-    await sendPushToProfile(supabase, a.profile_id, title, body, linkPath);
+      .insert({ profile_id: a.profile_id, group_id: null, type, body, link_path: linkPath })
+      .select("id")
+      .maybeSingle();
+    await sendPushToProfile(supabase, a.profile_id, title, body, pushHrefForNotice((notice as { id?: string } | null)?.id, linkPath));
   }
 }
 
@@ -104,10 +107,12 @@ export async function advanceDispatch(
 
   const linkPath = `/dispatch/${step!.id}`;
   const body = `${request.prospect_name} wants to train — respond within ${ttlMinutes} minutes.`;
-  await supabase
+  const { data: offerNotice } = await supabase
     .from("notifications")
-    .insert({ profile_id: next.trainerId, group_id: null, type: "trainer_dispatch_offer", body, link_path: linkPath });
-  await sendPushToProfile(supabase, next.trainerId, "New client request", body, linkPath);
+    .insert({ profile_id: next.trainerId, group_id: null, type: "trainer_dispatch_offer", body, link_path: linkPath })
+    .select("id")
+    .maybeSingle();
+  await sendPushToProfile(supabase, next.trainerId, "New client request", body, pushHrefForNotice((offerNotice as { id?: string } | null)?.id, linkPath));
 
   return { status: "dispatched", trainerId: next.trainerId, stepId: step!.id };
 }
@@ -320,10 +325,12 @@ export async function answerDispatchQuestion(
     : { data: null };
 
   const body = `${request?.prospect_name ?? "The prospect"} answered your question.`;
-  await supabase
+  const { data: replyNotice } = await supabase
     .from("notifications")
-    .insert({ profile_id: question.trainer_id, group_id: null, type: "trainer_dispatch_question", body, link_path: `/dispatch/${question.step_id}` });
-  await sendPushToProfile(supabase, question.trainer_id, "New reply", body, `/dispatch/${question.step_id}`);
+    .insert({ profile_id: question.trainer_id, group_id: null, type: "trainer_dispatch_question", body, link_path: `/dispatch/${question.step_id}` })
+    .select("id")
+    .maybeSingle();
+  await sendPushToProfile(supabase, question.trainer_id, "New reply", body, pushHrefForNotice((replyNotice as { id?: string } | null)?.id, `/dispatch/${question.step_id}`));
 
   if (request) {
     await notifyOrgAdmins(supabase, request.organization_id, "trainer_dispatch_question", "Prospect replied", body, "/dashboard");

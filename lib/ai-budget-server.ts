@@ -173,7 +173,15 @@ export async function noteBudgetLevel(db: SupabaseClient, crossingCoachId: strin
     const recipients = [...new Set([(org?.owner_id as string | undefined) ?? null, crossingCoachId].filter((x): x is string => !!x))];
     const title = level === "low" ? "Your AI is almost used up this month" : level === "balance" ? "You're now using your AI top-up balance" : "Your AI is used up this month";
     const body = coachBudgetMessage(level, topUpInfo(now, status));
-    for (const to of recipients) await sendPushToProfile(db, to, title, body, "/dashboard");
+    // Plan & Billing, where top-ups are bought (Nov 21: Home on a phone is the coach's own app, with nothing about AI); Home only when the organization has no group yet
+    let href = "/dashboard";
+    try {
+      const { data: anyGroup } = await db.from("groups").select("id").eq("organization_id", orgId).limit(1).maybeSingle();
+      if (anyGroup?.id) href = `/groups/${anyGroup.id}/branding?tab=billing`;
+    } catch {
+      // Home: the push still goes
+    }
+    for (const to of recipients) await sendPushToProfile(db, to, title, body, href);
     return true;
   } catch {
     return false;

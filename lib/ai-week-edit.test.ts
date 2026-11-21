@@ -250,6 +250,6 @@ describe("the same box, computer and phone", () => {
     expect(box).toContain('{editBusy === "apply" ? "Applying…" : "Apply"}');
     expect(box).toContain("Cancel");
     // the phone reaches the same builder through Edit program (?edit=1)
-    expect(read("app/(coach)/groups/[groupId]/programs/[programId]/page.tsx")).toContain("if (!searchParams.edit && (await prefersAthleteStyleView())) {");
+    expect(read("app/(coach)/groups/[groupId]/programs/[programId]/page.tsx")).toContain("if (!searchParams.edit && !searchParams.swap && (await prefersAthleteStyleView())) {");
   });
 });
