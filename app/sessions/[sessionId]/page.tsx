@@ -25,7 +25,7 @@ import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import type { SessionExerciseEntry } from "@/lib/types";
 import { findCorrelatingWeightSuggestion, resolveWeightSuggestion } from "@/lib/set-suggestions";
 import { findAthleteVisibleCoachNoteForExercise } from "@/lib/exercise-note-history";
-import { parseNumericReps } from "@/lib/program-card-visuals";
+import { parseRepTarget, repTargetValue } from "@/lib/rep-target";
 import { readLoggedSets } from "@/lib/read-logged-sets";
 import { resumeSession } from "@/lib/resume-session";
 import { countsForProgress } from "@/lib/set-types";
@@ -241,6 +241,7 @@ export default async function SessionPage(
       restMaxSeconds: number | null;
       pace: string | null;
       reps: number | null;
+      repsHint: string | null;
       weight: number | null;
     }
   >();
@@ -269,7 +270,9 @@ export default async function SessionPage(
         restSeconds: t.target_rest_seconds,
         restMaxSeconds: t.target_rest_max_seconds,
         pace: t.target_pace,
-        reps: parseNumericReps(t.target_reps),
+        // a range ("12-15") stands for its low end; the whole range is the reps box's grey target (lib/rep-target.ts, Nov 21)
+        reps: parseRepTarget(t.target_reps).value,
+        repsHint: parseRepTarget(t.target_reps).hint,
         weight: setWeightFor({ targetWeight: t.target_weight, targetPctMax: t.target_pct_max == null ? null : Number(t.target_pct_max) }, liftOfTemplate.get(t.group_workout_exercise_id) ?? "", athleteMaxes),
       });
     }
@@ -352,7 +355,7 @@ export default async function SessionPage(
   >();
   for (const row of priorTargetRows ?? []) {
     priorTargetByExerciseAndOrder.set(`${row.group_workout_exercise_id}::${row.set_order}`, {
-      targetReps: parseNumericReps(row.target_reps),
+      targetReps: repTargetValue(row.target_reps),
       targetRpe: row.target_rpe,
       targetRir: row.target_rir,
     });
@@ -461,6 +464,7 @@ export default async function SessionPage(
               dataFlag: (sl.data_flag as "unclear" | "accepted" | null) ?? null,
               dataFlagReason: (sl.data_flag_reason as string | null) ?? null,
               targetReps: target?.reps ?? null,
+              targetRepsHint: target?.repsHint ?? null,
               targetWeight: target?.weight ?? null,
               targetRpe: target?.rpe ?? null,
               targetRir: target?.rir ?? null,

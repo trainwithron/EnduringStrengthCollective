@@ -1,5 +1,5 @@
 import { findCorrelatingWeightSuggestion, resolveWeightSuggestion } from "@/lib/set-suggestions";
-import { parseNumericReps } from "@/lib/program-card-visuals";
+import { repTargetValue } from "@/lib/rep-target";
 
 // The gray weight a set shows before anything is typed: found in the athlete's real logged history (the most recent past set of the same exercise with the same target reps, or the
 // same reps and RPE/RIR), reconciled with an explicit target weight on the set. ONE function, used by the client's workout screen AND by the coach's builder, so the two can never
@@ -39,7 +39,7 @@ export async function suggestedWeightsFromHistory(
   const targetByExerciseAndOrder = new Map<string, { targetReps: number | null; targetRpe: number | null; targetRir: number | null }>();
   for (const row of (historicalTargetRows ?? []) as any[]) {
     targetByExerciseAndOrder.set(`${row.group_workout_exercise_id}::${row.set_order}`, {
-      targetReps: parseNumericReps(row.target_reps),
+      targetReps: repTargetValue(row.target_reps),
       targetRpe: row.target_rpe,
       targetRir: row.target_rir,
     });
@@ -68,7 +68,8 @@ export async function suggestedWeightsFromHistory(
   for (const ex of exercises) {
     const history = historyByExerciseName.get(ex.exerciseName) ?? [];
     for (const set of ex.sets) {
-      const currentTargetReps = parseNumericReps(set.targetReps);
+      // a range stands for its low end, the same on both sides of the match (lib/rep-target.ts)
+      const currentTargetReps = repTargetValue(set.targetReps);
       const correlatingMatch = findCorrelatingWeightSuggestion(history, currentTargetReps, set.targetRpe, set.targetRir);
       const suggestion = resolveWeightSuggestion(correlatingMatch, set.targetWeight);
       if (suggestion != null) suggestedWeightBySetId.set(set.id, suggestion);

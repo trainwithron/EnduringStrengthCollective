@@ -16,7 +16,7 @@ import {
   orderTrackedFields,
   type TrackedField,
 } from "@/lib/exercise-fields";
-import { parseNumericReps } from "@/lib/program-card-visuals";
+import { repTargetValue } from "@/lib/rep-target";
 import { completingFields, isSetFilled } from "@/lib/set-complete";
 import { InfoTip } from "@/components/shared/info-tip";
 import { MAX_REST_SECONDS, formatRest, formatRestSpan, parseRestInput, restForSet } from "@/lib/rest-time";
@@ -89,7 +89,8 @@ function suggestionFor(set: SetLogEntry, field: TrackedField): number | string |
   return field === "weight"
     ? set.suggestedWeight ?? null
     : field === "reps"
-      ? parseNumericReps((set[TARGET_PROP.reps as keyof SetLogEntry] as string | null) ?? null)
+      ? // the low end of a range (lib/rep-target.ts): the done check and a tap on the grey target fill it in
+        repTargetValue((set[TARGET_PROP.reps as keyof SetLogEntry] as number | string | null) ?? null)
       : ((set[TARGET_PROP[field] as keyof SetLogEntry] as number | string | null | undefined) ?? null);
 }
 
@@ -169,7 +170,8 @@ function GridCell({
   // Just the number: the row's label already says what it is, and a longer hint does not fit in the cell.
   // The suggestion as text in the person's unit (a stored pound value shows as kilograms for a kilogram client).
   const suggestionText = suggestion === null || suggestion === undefined ? null : field === "weight" && typeof suggestion === "number" ? liftCellText(suggestion, unit) : String(suggestion);
-  const placeholder = field === "rest" ? "m:ss" : suggestionText ?? "—";
+  // Reps shows the coach's whole range in grey ("12–15"), while what a tap fills in is its low end (Ron, Nov 21: a range showed only "—").
+  const placeholder = field === "rest" ? "m:ss" : field === "reps" && set.targetRepsHint ? set.targetRepsHint : suggestionText ?? "—";
 
 
   function commit(next: string | number | null) {

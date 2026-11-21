@@ -28,7 +28,8 @@ describe("the set grid is phone-sized", () => {
     expect(grid).toContain("w-8 h-11 shrink-0");
     expect(grid).not.toContain("(target)");
     expect(grid).not.toContain("lbs`");
-    expect(grid).toContain('const placeholder = field === "rest" ? "m:ss" : suggestion');
+    // (a rep range shows in full, "12–15", Nov 21: lib/rep-target.test.ts)
+    expect(grid).toContain('const placeholder = field === "rest" ? "m:ss" : field === "reps" && set.targetRepsHint ? set.targetRepsHint : suggestion');
   });
 });
 

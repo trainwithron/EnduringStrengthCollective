@@ -8,7 +8,7 @@ import { standingForDate } from "./macro-resolution";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { deriveEventWindow } from "./event-window";
 import { computeScheduledDates } from "./program-schedule";
-import { parseNumericReps } from "./program-card-visuals";
+import { repTargetValue } from "./rep-target";
 import {
   taperAdjustedMacroSuggestion,
   volumeRelativeMacroSuggestion,
@@ -153,7 +153,8 @@ export async function gatherMacroSuggestion(
   for (const s of sets ?? []) {
     const workoutId = workoutIdByExerciseId.get(s.group_workout_exercise_id);
     const week = workoutId ? weekByWorkoutId.get(workoutId) : undefined;
-    const reps = parseNumericReps(s.target_reps);
+    // a range ("12-15") counts as its low end, the same as the logger (lib/rep-target.ts)
+    const reps = repTargetValue(s.target_reps);
     if (!week || !reps || !s.target_weight) continue;
     volumeByWeek.set(week, (volumeByWeek.get(week) ?? 0) + s.target_weight * reps);
   }
