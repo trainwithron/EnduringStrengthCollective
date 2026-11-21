@@ -5,6 +5,9 @@ import { readFileSync } from "node:fs";
 import { buildComeBackDraft } from "./attendance-draft";
 import { CalendarSpotterPanel } from "@/components/coach/desktop/calendar-spotter-panel";
 
+// DraftMessageLink uses the router to add a random draft key at the press (Nov 21: no drafted words in the address)
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => {}, refresh: () => {} }) }));
+
 describe("attendance: a drafted note for the coach, never an automatic text", () => {
   it("drafts a warm note with no guilt and no money", () => {
     const t = buildComeBackDraft("Sam");
@@ -20,7 +23,9 @@ describe("attendance: a drafted note for the coach, never an automatic text", ()
     ];
     const html = renderToStaticMarkup(createElement(CalendarSpotterPanel, { findings, groupId: "g1" }));
     expect(html).toContain("Send a note");
-    expect(html).toContain("/groups/g1/messages/a1?draft=");
+    // the rendered link is the plain conversation: the draft is added under a random key only when pressed, so no words or key are in the page
+    expect(html).toContain('href="/groups/g1/messages/a1"');
+    expect(html).not.toContain("?draft=");
     expect(html.match(/Send a note/g)?.length).toBe(1);
   });
 
