@@ -273,7 +273,8 @@ export const BUILDER_ONE_WORKOUT_SELECT = `
       workout_notes ( id, body, position )
     `;
 
-export function mapWorkoutRowToBuilderDay(w: any, demoRows: DemoRow[], tierByName: Map<string, "A" | "B" | "C" | null>): BuilderDay {
+// headerIds: the day's notes that are section headers (B3, read on their own: lib/section-headers.ts), so a redrawn day keeps them as headers.
+export function mapWorkoutRowToBuilderDay(w: any, demoRows: DemoRow[], tierByName: Map<string, "A" | "B" | "C" | null>, headerIds: Set<string> = new Set()): BuilderDay {
   const exerciseItems: BuilderExercise[] = (w.group_workout_exercises ?? []).map((ex: any) => {
     const media = findDemo(demoRows, ex.exercise_name);
     return {
@@ -296,7 +297,7 @@ export function mapWorkoutRowToBuilderDay(w: any, demoRows: DemoRow[], tierByNam
         .map(mapSetRow),
     };
   });
-  const noteItems: BuilderNote[] = (w.workout_notes ?? []).map((n: any) => ({ kind: "note" as const, id: n.id, order: n.position, body: n.body }));
+  const noteItems: BuilderNote[] = (w.workout_notes ?? []).map((n: any) => ({ kind: "note" as const, id: n.id, order: n.position, body: n.body, ...(headerIds.has(n.id) ? { header: true } : {}) }));
   return {
     id: w.id,
     title: w.title,

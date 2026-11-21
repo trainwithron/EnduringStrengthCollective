@@ -57,6 +57,7 @@ end
 $types$;
 
 drop function if exists public.undo_exercise_swap(uuid);
+drop function if exists public.preview_exercise_every_week(uuid, text, text);
 drop function if exists public.swap_exercise_every_week(uuid, text, text, boolean);
 drop table if exists public.program_exercise_swaps;
 drop function if exists public.business_client_tenure(uuid[]);

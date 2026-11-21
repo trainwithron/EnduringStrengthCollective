@@ -6,7 +6,8 @@
 --   3. "Every week from here on" (B4, B5): swap_exercise_every_week replaces an exercise in the same slot of each later week of its program (the same day of the week; the same progression
 --      slot when it has one, else the same place in the day), only where that slot still holds the same exercise, keeping each week's own sets, reps, set types, percent of max and its
 --      progression rule. The coach of the group may; so may a client on their OWN one-on-one program (never a team or group program). Each change is recorded (program_exercise_swaps)
---      and undo_exercise_swap puts back exactly what it changed (a row edited since is left alone).
+--      and undo_exercise_swap puts back exactly what it changed (a row edited since is left alone) and says which. When a client does it, the group's coaches get a notice
+--      (exercise_swap, written here, so no way of calling it skips the notice).
 --   4. A new notice type, exercise_swap (a client changed an exercise for every week), under "Client activity": notifications_type_check widened from the live one, and notice_kind_of
 --      (LIVE, in place) gets that one line.
 -- Re-running is safe.
@@ -69,7 +70,7 @@ as $$
   select s.athlete_id, s.group_id, s.joined_at, s.removed_at,
     greatest(
       (select max(l.created_at) from public.workout_logs l where l.group_id = s.group_id and l.athlete_id = s.athlete_id),
-      (select max(b.start_at) from public.bookings b where b.group_id = s.group_id and b.athlete_id = s.athlete_id and b.status = 'confirmed' and b.start_at <= now())
+      (select max(b.start_at) from public.bookings b where b.group_id = s.group_id and b.athlete_id = s.athlete_id and b.status = 'confirmed' and not coalesce(b.no_show, false) and b.start_at <= now())
     ) as last_active
   from spans s
   where auth.uid() is not null
@@ -127,6 +128,7 @@ declare
   v_swap uuid;
   v_prog_note text;
   v_rule public.exercise_progressions%rowtype;
+  v_who text;
 begin
   if me is null then
     raise exception 'not authorized';
@@ -227,6 +229,17 @@ begin
   values (v_w.program_id, v_src.group_id, v_src.id, v_src.exercise_name, v_name, v_changes, v_prog_note, v_slot, me, v_by_client)
   returning id into v_swap;
 
+  -- a client's change tells the group's coaches (the bell; the push goes from the app), with the program to open, where it can be undone
+  if v_by_client then
+    select coalesce(nullif(btrim(full_name), ''), 'Your client') into v_who from public.profiles where id = me;
+    insert into public.notifications (profile_id, group_id, type, body, link_path)
+    select m.profile_id, v_src.group_id, 'exercise_swap',
+      coalesce(v_who, 'Your client') || ' swapped ' || v_src.exercise_name || ' for ' || v_name || ' for every week.',
+      '/groups/' || v_src.group_id || '/programs/' || v_w.program_id || '?swap=' || v_swap
+    from public.group_memberships m
+    where m.group_id = v_src.group_id and m.role = 'coach' and m.profile_id <> me;
+  end if;
+
   return jsonb_build_object('swap', v_swap, 'changed', coalesce(array_length(v_targets, 1), 0), 'weeks', to_jsonb(v_weeks), 'program', v_w.program_id, 'group', v_src.group_id,
     'byClient', v_by_client, 'from', v_src.exercise_name, 'to', v_name, 'ids', to_jsonb(v_targets));
 end
@@ -234,16 +247,29 @@ $function$;
 revoke all on function public.swap_exercise_every_week(uuid, text, text, boolean) from public, anon;
 grant execute on function public.swap_exercise_every_week(uuid, text, text, boolean) to authenticated;
 
--- Puts back what one swap changed (only the coach of the group). A row changed again since (no longer the swapped-in name) is left as it is. Returns how many were put back.
+-- The builder's question asks first how many later weeks would change: the same function run dry, under a name the app counts as a read (so asking never refreshes other panes).
+create or replace function public.preview_exercise_every_week(p_exercise uuid, p_new_name text, p_display_name text default null)
+returns jsonb
+language sql
+volatile
+set search_path = public
+as $$
+  select public.swap_exercise_every_week(p_exercise, p_new_name, p_display_name, true)
+$$;
+revoke all on function public.preview_exercise_every_week(uuid, text, text) from public, anon;
+grant execute on function public.preview_exercise_every_week(uuid, text, text) to authenticated;
+
+-- Puts back what one swap changed (only the coach of the group). A row changed again since (no longer the swapped-in name) is left as it is. Returns which were put back, each as
+-- it now is: {"restored": n, "rows": [{id, exercise_name, display_name}]}.
 create or replace function public.undo_exercise_swap(p_swap uuid)
-returns int
+returns jsonb
 language plpgsql
 security definer
 set search_path = public
 as $function$
 declare
   v public.program_exercise_swaps%rowtype;
-  n int;
+  v_rows jsonb;
 begin
   if auth.uid() is null then
     raise exception 'not authorized';
@@ -256,20 +282,23 @@ begin
     raise exception 'not authorized';
   end if;
   if v.undone_at is not null then
-    return 0;
+    return jsonb_build_object('restored', 0, 'rows', '[]'::jsonb);
   end if;
-  update public.group_workout_exercises e
-  set exercise_name = c ->> 'exercise_name', display_name = c ->> 'display_name'
-  from jsonb_array_elements(v.changes) c
-  where e.id = (c ->> 'id')::uuid and e.exercise_name = v.to_name;
-  get diagnostics n = row_count;
+  with back as (
+    update public.group_workout_exercises e
+    set exercise_name = c ->> 'exercise_name', display_name = c ->> 'display_name'
+    from jsonb_array_elements(v.changes) c
+    where e.id = (c ->> 'id')::uuid and e.exercise_name = v.to_name
+    returning jsonb_build_object('id', e.id, 'exercise_name', e.exercise_name, 'display_name', e.display_name) as r
+  )
+  select coalesce(jsonb_agg(r), '[]'::jsonb) into v_rows from back;
   if v.progression = 'copied' then
     delete from public.exercise_progressions where program_id = v.program_id and exercise_name = v.to_name and slot = v.slot;
   elsif v.progression = 'moved' and not exists (select 1 from public.exercise_progressions where program_id = v.program_id and exercise_name = v.from_name and slot = v.slot) then
     update public.exercise_progressions set exercise_name = v.from_name, updated_at = now() where program_id = v.program_id and exercise_name = v.to_name and slot = v.slot;
   end if;
   update public.program_exercise_swaps set undone_at = now() where id = v.id;
-  return n;
+  return jsonb_build_object('restored', jsonb_array_length(v_rows), 'rows', v_rows);
 end
 $function$;
 revoke all on function public.undo_exercise_swap(uuid) from public, anon;

@@ -15,6 +15,8 @@ export interface ChatMessage {
   recipient_id: string;
   group_id: string;
   created_at: string;
+  // an away auto-reply (0315) is not the coach answering
+  auto_reply?: boolean | null;
 }
 
 export interface QuietInChat {
@@ -30,6 +32,8 @@ export function quietInChat(messages: ChatMessage[], coachId: string, clients: S
   const byClient = new Map<string, { lastFromClient: number; lastFromCoach: number; groupId: string }>();
   for (const m of messages) {
     const fromCoach = m.sender_id === coachId;
+    // the coach's away auto-reply is not the coach writing: the client who wrote before it is still waiting on the coach
+    if (fromCoach && m.auto_reply) continue;
     const other = fromCoach ? m.recipient_id : m.sender_id;
     if (other === coachId || (!fromCoach && m.recipient_id !== coachId) || !clients.has(other)) continue;
     const t = new Date(m.created_at).getTime();
@@ -78,7 +82,7 @@ export const loadQuietInChat = cache(async (supabase: SupabaseClient, coachId: s
   try {
     const [roster, sent, received] = await Promise.all([
       readByIds(groupIds, (g) => (from, to) => supabase.from("group_memberships").select("group_id, profile_id").in("group_id", g).eq("role", "athlete").order("group_id").order("profile_id").range(from, to)),
-      readByIds(groupIds, (g) => (from, to) => supabase.from("direct_messages").select("sender_id, recipient_id, group_id, created_at").in("group_id", g).eq("sender_id", coachId).gte("created_at", since).order("created_at").order("id").range(from, to)),
+      readByIds(groupIds, (g) => (from, to) => supabase.from("direct_messages").select("sender_id, recipient_id, group_id, created_at, auto_reply").in("group_id", g).eq("sender_id", coachId).is("broadcast_batch_id", null).gte("created_at", since).order("created_at").order("id").range(from, to)),
       readByIds(groupIds, (g) => (from, to) => supabase.from("direct_messages").select("sender_id, recipient_id, group_id, created_at").in("group_id", g).eq("recipient_id", coachId).gte("created_at", since).order("created_at").order("id").range(from, to)),
     ]);
     // a read cut short could leave out a client's newest message and flag them wrongly: count it as failed

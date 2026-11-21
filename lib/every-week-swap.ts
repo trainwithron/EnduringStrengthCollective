@@ -34,7 +34,8 @@ const asResult = (r: any): EveryWeekResult => ({
 /** How many later weeks would change. Null when it cannot be told (before step 219, or the check failed): then only this week changes, as before. */
 export async function laterWeeksToChange(supabase: SupabaseClient, exerciseId: string, newName: string, displayName: string | null): Promise<number | null> {
   try {
-    const { data, error } = await supabase.rpc("swap_exercise_every_week", { p_exercise: exerciseId, p_new_name: newName, p_display_name: displayName, p_dry_run: true });
+    // the dry run, under a read's name (lib/workspace-mutation.ts READ_RPC: asking never refreshes other panes)
+    const { data, error } = await supabase.rpc("preview_exercise_every_week", { p_exercise: exerciseId, p_new_name: newName, p_display_name: displayName });
     if (error) return null;
     return asResult(data).changed;
   } catch {
@@ -57,20 +58,30 @@ export async function swapEveryWeek(supabase: SupabaseClient, exerciseId: string
   }
 }
 
-/** Puts back what one swap changed. Returns how many exercises went back, or null when it failed. */
-export async function undoEveryWeekSwap(supabase: SupabaseClient, swapId: string): Promise<number | null> {
+export interface RestoredExercise {
+  id: string;
+  exerciseName: string;
+  displayName: string | null;
+}
+
+/** Puts back what one swap changed: the exercises that went back, each with its own name again (one changed since stays as it is), or null when it failed. */
+export async function undoEveryWeekSwap(supabase: SupabaseClient, swapId: string): Promise<RestoredExercise[] | null> {
   try {
     const { data, error } = await supabase.rpc("undo_exercise_swap", { p_swap: swapId });
     if (error) return null;
-    return Number(data ?? 0);
+    const rows = Array.isArray((data as { rows?: unknown })?.rows) ? ((data as { rows: { id: unknown; exercise_name: unknown; display_name: unknown }[] }).rows) : [];
+    return rows.map((r) => ({ id: String(r.id), exerciseName: String(r.exercise_name ?? ""), displayName: typeof r.display_name === "string" ? r.display_name : null }));
   } catch {
     return null;
   }
 }
 
-/** The coach's question in the builder. */
+/** The coach's question in the builder, and its tick box (unticked: just this week). */
 export function everyWeekQuestion(from: string, to: string, laterWeeks: number): string {
-  return `Change ${from} to ${to} just this week, or every week from here on? ${laterWeeks} later week${laterWeeks === 1 ? " has" : "s have"} ${from} in this place.`;
+  return `Change ${from} to ${to}? ${laterWeeks} later week${laterWeeks === 1 ? " has" : "s have"} ${from} in this place.`;
+}
+export function everyWeekChoice(laterWeeks: number): string {
+  return `Every week from here on (${laterWeeks} later week${laterWeeks === 1 ? "" : "s"} too)`;
 }
 
 /** What is said once it is done ("Changed in this week and 3 later weeks."). */

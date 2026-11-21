@@ -76,3 +76,17 @@ describe("in Needs you", () => {
     expect(home).toContain('coachName: viewerProfile?.full_name ?? "Coach",');
   });
 });
+
+describe("what counts as the coach writing", () => {
+  it("an away auto-reply is not the coach answering: the client is waiting on the coach, not quiet", () => {
+    const out = quietInChat([msg("sam", COACH, 20), { ...msg(COACH, "sam", 20), auto_reply: true }], COACH, clients, now);
+    expect(out).toEqual([]);
+    const real = quietInChat([msg("sam", COACH, 20), { ...msg(COACH, "sam", 20), auto_reply: true }, msg(COACH, "sam", 5)], COACH, clients, now);
+    expect(real.map((q) => q.athleteId)).toEqual(["sam"]);
+  });
+  it("a message sent to everyone at once (a broadcast) is not read as the coach writing to them", () => {
+    const q = src("lib/quiet-chat.ts");
+    expect(q).toContain('.eq("sender_id", coachId).is("broadcast_batch_id", null)');
+    expect(q).toContain("if (fromCoach && m.auto_reply) continue;");
+  });
+});

@@ -49,6 +49,31 @@ export async function headersOfWorkouts(supabase: SupabaseClient, workoutIds: st
   return out;
 }
 
+/** Where the day's notes and headers sit (every note, header or not), for the workout. None when the read fails. */
+export async function notePositionsOfWorkout(supabase: SupabaseClient, workoutId: string): Promise<number[]> {
+  try {
+    const { data, error } = await supabase.from("workout_notes").select("position").eq("workout_id", workoutId).limit(500);
+    if (error) return [];
+    return ((data ?? []) as { position: number }[]).map((r) => r.position);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Which links to the next exercise a note or a section header ends (the builder's rule, lib/supersets.ts): given the exercises' orders (in the day's one order), the indices whose next
+ * exercise has a note or header before it, or that have no next exercise at all. A database row can still say "linked" after a note was moved in between; the workout follows the builder.
+ */
+export function linksEndedByNotes(exerciseOrders: number[], notePositions: number[]): Set<number> {
+  const order = exerciseOrders.map((o, i) => ({ o, i })).sort((a, b) => a.o - b.o || a.i - b.i);
+  const out = new Set<number>();
+  order.forEach((e, k) => {
+    const next = order[k + 1];
+    if (!next || notePositions.some((p) => p > e.o && p < next.o)) out.add(e.i);
+  });
+  return out;
+}
+
 /**
  * Which header goes above which exercise: each header heads the first exercise placed after it in the day (exercises and notes share one order). A header with no exercise after it heads
  * nothing and is not shown to the client; two headers in a row both show (the last one nearest its exercise). Returns, by exercise index, the headers above it.

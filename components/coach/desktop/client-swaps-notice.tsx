@@ -58,19 +58,19 @@ export function ClientSwapsNotice({ programId, onDaysChange }: { programId: stri
       setNote("Couldn't undo that. Try again.");
       return;
     }
-    // the builder shows the weeks as they were (only those still holding the swapped-in exercise went back)
-    const before = new Map(s.changes.map((c) => [c.id, c]));
+    // the builder shows only what the database put back, each with its own name again
+    const restored = new Map(back.map((r) => [r.id, r]));
     onDaysChange((prev) =>
       prev.map((d) => ({
         ...d,
         items: d.items.map((i) => {
-          const c = i.kind === "exercise" ? before.get(i.id) : undefined;
-          return c && i.kind === "exercise" && i.exerciseName === s.to_name ? { ...i, exerciseName: c.exercise_name, displayName: c.display_name } : i;
+          const r = i.kind === "exercise" ? restored.get(i.id) : undefined;
+          return r && i.kind === "exercise" ? { ...i, exerciseName: r.exerciseName, displayName: r.displayName } : i;
         }),
       }))
     );
     setSwaps((prev) => prev.filter((x) => x.id !== s.id));
-    setNote(`Put back ${s.from_name} (${back} exercise${back === 1 ? "" : "s"}).`);
+    setNote(`Put back ${s.from_name} (${back.length} exercise${back.length === 1 ? "" : "s"}).`);
   }
 
   if (swaps.length === 0 && !note) return null;

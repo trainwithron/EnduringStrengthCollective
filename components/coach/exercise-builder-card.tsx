@@ -1,6 +1,6 @@
 "use client";
 
-import { confirmDialog } from "@/components/shared/confirm-dialog";
+import { confirmDialog, confirmDialogWithChoice } from "@/components/shared/confirm-dialog";
 import { badExerciseNameMessage, cleanExerciseName, exerciseNameProblem, isBadExerciseName, splitPrescriptionName, PRESCRIPTION_MESSAGE } from "@/lib/exercise-name-guard";
 import { platformOnly, type DemoRow } from "@/lib/exercise-demo";
 import { useEffect, useRef, useState } from "react";
@@ -17,7 +17,7 @@ import { cleanDisplayName } from "@/lib/exercise-alias-seed";
 import { existingLibraryName } from "@/lib/exercise-search";
 import { ExerciseProgressionControl } from "./exercise-progression-control";
 import { renameProgramExercise } from "@/lib/rename-program-exercise";
-import { everyWeekDone, everyWeekQuestion, laterWeeksToChange, swapEveryWeek, undoEveryWeekSwap } from "@/lib/every-week-swap";
+import { everyWeekChoice, everyWeekDone, everyWeekQuestion, laterWeeksToChange, swapEveryWeek, undoEveryWeekSwap } from "@/lib/every-week-swap";
 import { addLibraryExercise } from "@/lib/library-write";
 import { matchExercise, type AliasEntry } from "@/lib/exercise-matching";
 import { ExerciseMediaPicker } from "./exercise-media-picker";
@@ -393,9 +393,19 @@ export function ExerciseBuilderCard({
       const later = await laterWeeksToChange(supabase, exercise.id, trimmed, display);
       if (later && later > 0) {
         const fromLabel = exercise.displayName ?? exercise.exerciseName;
-        const everyWeek = await confirmDialog({ message: everyWeekQuestion(fromLabel, display ?? trimmed, later), confirmLabel: "Every week from here on", cancelLabel: "Just this week", destructive: false });
-        if (everyWeek) {
-          const before = { exerciseName: exercise.exerciseName, displayName: exercise.displayName ?? null };
+        // Change it (this week, or with the box ticked every week from here on) or Cancel; Esc and a tap outside cancel, so nothing changes by accident
+        const answer = await confirmDialogWithChoice({
+          message: everyWeekQuestion(fromLabel, display ?? trimmed, later),
+          confirmLabel: "Change it",
+          cancelLabel: "Cancel",
+          destructive: false,
+          checkbox: { label: everyWeekChoice(later), checked: false },
+        });
+        if (!answer.confirmed) {
+          setNameDraft(exercise.displayName ?? exercise.exerciseName);
+          return;
+        }
+        if (answer.checked) {
           const done = await swapEveryWeek(supabase, exercise.id, trimmed, display);
           if (!done.ok) {
             flashSaveError(done.error);
@@ -416,9 +426,13 @@ export function ExerciseBuilderCard({
                   flashSaveError("Couldn't undo that. Change it back in each week, or try again.");
                   return;
                 }
-                onUpdate(before);
-                setNameDraft(before.displayName ?? before.exerciseName);
-                onRenamedInLaterWeeks?.(done.result.ids, before.exerciseName, before.displayName);
+                // only what the database put back changes on screen, each with its own name (a week changed again since stays as it is)
+                const mine = back.find((r) => r.id === exercise.id);
+                if (mine) {
+                  onUpdate({ exerciseName: mine.exerciseName, displayName: mine.displayName });
+                  setNameDraft(mine.displayName ?? mine.exerciseName);
+                }
+                for (const r of back) if (r.id !== exercise.id) onRenamedInLaterWeeks?.([r.id], r.exerciseName, r.displayName);
               },
             });
           }

@@ -154,10 +154,13 @@ export function DayCard({
 
   async function persistOrder(items: BuilderItem[]) {
     const supabase = createBrowserClient();
+    // A link to the next exercise (a superset) ends when a note or a section header now sits after it, or nothing does: it is taken off in the same save, so the client's workout
+    // never keeps a link the builder no longer shows (lib/supersets.ts: a note between ends a link).
+    const unlink = new Set(items.filter((it, i) => it.kind === "exercise" && it.supersetNext && items[i + 1]?.kind !== "exercise").map((it) => it.id));
     const results = await Promise.all(
       items.map((item, i) =>
         item.kind === "exercise"
-          ? supabase.from("group_workout_exercises").update({ exercise_order: i }).eq("id", item.id)
+          ? supabase.from("group_workout_exercises").update({ exercise_order: i, ...(unlink.has(item.id) ? { superset_next: false } : {}) }).eq("id", item.id)
           : supabase.from("workout_notes").update({ position: i }).eq("id", item.id)
       )
     );
@@ -165,6 +168,7 @@ export function DayCard({
       flashSaveError("Couldn't save the new order — reload to check.");
       return;
     }
+    if (unlink.size > 0) onItemsChange((prev) => prev.map((i) => (i.kind === "exercise" && unlink.has(i.id) ? { ...i, supersetNext: false } : i)));
     flashSaved();
   }
 

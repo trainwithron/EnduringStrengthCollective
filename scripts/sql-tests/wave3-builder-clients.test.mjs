@@ -32,7 +32,7 @@ await db.exec(`
   create role anon nologin; create role authenticated nologin; create role service_role nologin;
   create schema auth;
   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
-  create table public.profiles (id uuid primary key);
+  create table public.profiles (id uuid primary key, full_name text);
   create table public.groups (id uuid primary key, group_kind text, organization_id uuid);
   create table public.group_memberships (id uuid primary key default gen_random_uuid(), group_id uuid, profile_id uuid, role text, joined_at timestamptz default now(), private_from_org boolean default false);
   create table public.organization_admins (organization_id uuid, profile_id uuid);
@@ -40,7 +40,7 @@ await db.exec(`
   create function public.my_admin_group_ids() returns setof uuid language sql stable as $$ select g.id from public.groups g join public.organization_admins a on a.organization_id = g.organization_id where a.profile_id = auth.uid() $$;
   create table public.client_removals (id uuid primary key default gen_random_uuid(), group_id uuid, athlete_id uuid, membership jsonb, removed_at timestamptz default now(), restored_at timestamptz, purged_at timestamptz);
   create table public.workout_logs (id uuid primary key default gen_random_uuid(), group_id uuid, athlete_id uuid, created_at timestamptz);
-  create table public.bookings (id uuid primary key default gen_random_uuid(), group_id uuid, athlete_id uuid, start_at timestamptz, status text);
+  create table public.bookings (id uuid primary key default gen_random_uuid(), group_id uuid, athlete_id uuid, start_at timestamptz, status text, no_show boolean default false);
   create table public.programs (id uuid primary key default gen_random_uuid(), group_id uuid, name text, description text, created_by uuid, athlete_id uuid, is_active boolean, start_date date, training_days int[],
     visibility_window int, training_intent text, cover_image_path text, ai_sequencing_notes text, source_program_id uuid, ai_draft boolean default false, org_program boolean default false);
   create table public.exercise_progressions (id uuid primary key default gen_random_uuid(), program_id uuid, group_id uuid, exercise_name text, model text, config jsonb, tier_label text, slot text not null default '',
@@ -96,6 +96,9 @@ await db.exec(`
   insert into public.workout_logs (group_id, athlete_id, created_at) values ('${G_ANN}', '${ANN}', now() - interval '20 days'), ('${G_CY}', '${CY}', now() - interval '90 days'), ('${G_TEAM}', '${TEAMMATE}', now());
   insert into public.bookings (group_id, athlete_id, start_at, status) values ('${G_ANN}', '${ANN}', now() - interval '2 days', 'confirmed'), ('${G_ANN}', '${ANN}', now() + interval '5 days', 'confirmed'),
     ('${G_ANN}', '${ANN}', now() - interval '1 day', 'cancelled');
+  -- a session Bo did not come to is not activity
+  insert into public.bookings (group_id, athlete_id, start_at, status, no_show) values ('${G_BO}', '${BO}', now() - interval '3 days', 'confirmed', true);
+  update public.profiles set full_name = 'Ann Adams' where id = '${ANN}';
 `);
 
 // ---- 2. how long one-on-one clients stay ----
@@ -142,7 +145,10 @@ await db.query(`delete from public.programs where id = $1`, [copy.id]);
 
 // ---- 3. every week from here on ----
 const name = async (id) => (await one(`select exercise_name from public.group_workout_exercises where id = $1`, [id])).exercise_name;
-const swap = async (id, to, dry = false) => (await one(`select public.swap_exercise_every_week($1, $2, null, $3) as r`, [id, to, dry])).r;
+const swap = async (id, to, dry = false) =>
+  dry ? (await one(`select public.preview_exercise_every_week($1, $2) as r`, [id, to])).r : (await one(`select public.swap_exercise_every_week($1, $2, null, false) as r`, [id, to])).r;
+const undoSwap = async (id) => (await one(`select public.undo_exercise_swap($1) as r`, [id])).r;
+const notices = async () => (await db.query(`select profile_id, type, body, link_path from public.notifications where type = 'exercise_swap' order by body`)).rows;
 await db.query(`insert into public.exercise_progressions (program_id, group_id, exercise_name, model, config, created_by, slot) values ($1, $2, 'Leg Press', 'linear', '{"step": 10}', $3, '')`, [prog.id, G_ANN, COACH]);
 
 // a dry run says how many later weeks would change and writes nothing
@@ -156,6 +162,7 @@ assert.equal((await one(`select count(*)::int n from public.program_exercise_swa
 r = await swap(w2Squat, "Hack Squat");
 assert.equal(r.changed, 1);
 assert.equal(r.byClient, false);
+assert.deepEqual(await notices(), [], "a coach's own change tells nobody");
 assert.deepEqual([await name(w1Squat), await name(w2Squat), await name(w3Diff), await name(w4Squat), await name(otherDayPress)], ["Leg Press", "Hack Squat", "Hack Squat", "Hack Squat", "Leg Press"]);
 assert.equal((await one(`select count(*)::int n from public.group_workout_exercises where workout_id = $1 and exercise_name = 'Leg Press'`, [wk[2]])).n, 1, "week 3's Leg Press in another place is left alone");
 // each week keeps its own sets
@@ -172,10 +179,10 @@ await db.query(`update public.group_workout_exercises set exercise_name = 'Belt 
 await as(ANN);
 await assert.rejects(() => db.query(`select public.undo_exercise_swap($1)`, [coachSwap]), /not authorized/, "only the coach undoes");
 await as(COACH);
-assert.equal((await one(`select public.undo_exercise_swap($1) as n`, [coachSwap])).n, 1);
+assert.deepEqual(await undoSwap(coachSwap), { restored: 1, rows: [{ id: w2Squat, exercise_name: "Leg Press", display_name: null }] }, "only what went back is named");
 assert.deepEqual([await name(w2Squat), await name(w4Squat)], ["Leg Press", "Belt Squat"]);
 assert.deepEqual((await db.query(`select exercise_name from public.exercise_progressions where program_id = $1`, [prog.id])).rows, [{ exercise_name: "Leg Press" }]);
-assert.equal((await one(`select public.undo_exercise_swap($1) as n`, [coachSwap])).n, 0, "a second undo does nothing");
+assert.deepEqual(await undoSwap(coachSwap), { restored: 0, rows: [] }, "a second undo does nothing");
 await db.query(`update public.group_workout_exercises set exercise_name = 'Leg Press' where id = $1`, [w4Squat]);
 
 // the client on their own one-on-one program, from week 1: every later Leg Press in that place changes, and the rule moves (no week keeps the old name in that place)
@@ -188,8 +195,10 @@ assert.deepEqual([await name(w1Squat), await name(w2Squat), await name(w4Squat)]
 assert.deepEqual((await db.query(`select exercise_name from public.exercise_progressions where program_id = $1 order by 1`, [prog.id])).rows.map((x) => x.exercise_name), ["Hack Squat", "Leg Press"]);
 assert.equal((await one(`select by_client, from_name, to_name, jsonb_array_length(changes) n from public.program_exercise_swaps where id = $1`, [r.swap])).n, 3);
 const clientSwap = r.swap;
+// the coach is told, by the database itself (a direct call cannot skip it), with the program to open
+assert.deepEqual(await notices(), [{ profile_id: COACH, type: "exercise_swap", body: "Ann Adams swapped Leg Press for Hack Squat for every week.", link_path: `/groups/${G_ANN}/programs/${prog.id}?swap=${clientSwap}` }]);
 await as(COACH);
-assert.equal((await one(`select public.undo_exercise_swap($1) as n`, [clientSwap])).n, 3);
+assert.equal((await undoSwap(clientSwap)).restored, 3);
 assert.deepEqual([await name(w1Squat), await name(w2Squat), await name(w4Squat)], ["Leg Press", "Leg Press", "Leg Press"]);
 
 // by progression slot: a T1 lift is matched by its slot, wherever it sits in the day
@@ -215,7 +224,6 @@ await assert.rejects(() => swap(w1Squat, "  "), /an exercise name is needed/);
 assert.equal((await swap(w1Squat, "Leg Press")).changed, 0, "the same name changes nothing");
 
 // ---- 4. the notice type ----
-await db.query(`insert into public.notifications (profile_id, group_id, type, body) values ($1, $2, 'exercise_swap', 'Ann swapped Leg Press for Hack Squat for every week')`, [COACH, G_ANN]);
 await assert.rejects(() => db.query(`insert into public.notifications (profile_id, type, body) values ($1, 'nonsense', 'x')`, [COACH]));
 assert.equal((await one(`select public.notice_kind_of('exercise_swap') k`)).k, "client_activity");
 

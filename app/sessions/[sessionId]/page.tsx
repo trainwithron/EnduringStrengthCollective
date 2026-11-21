@@ -1,5 +1,5 @@
 import { linkedExercisesAmong } from "@/lib/superset-links";
-import { headersAbove, headersOfWorkouts } from "@/lib/section-headers";
+import { headersAbove, headersOfWorkouts, linksEndedByNotes, notePositionsOfWorkout } from "@/lib/section-headers";
 import { isTeamSportGroup } from "@/lib/team-sport";
 import { maxByLift, setWeightFor } from "@/lib/pct-of-max";
 import { COACH_HOME_HREF } from "@/lib/start-group";
@@ -205,13 +205,15 @@ export default async function SessionPage(
 
   // Supersets (B1): which of the program's exercises the coach linked with the next one. A failed read (or a database before step 210) means no links, never a broken workout.
   // Section headers (B3) read alongside, the same way (none before step 219). Each heads the first programmed exercise after it; an exercise the client added has none.
-  const [linkedTemplateIds, headersByWorkout, programRow] = await Promise.all([
+  const [linkedTemplateIds, headersByWorkout, programRow, notePositions] = await Promise.all([
     linkedExercisesAmong(supabase, templateExerciseIds),
     session.workout_id ? headersOfWorkouts(supabase, [session.workout_id]) : Promise.resolve(new Map()),
     // whose program this is: "every week" on a swap (B5) is only for the client's own one-on-one program (the database checks it again)
     session.workout_id
       ? supabase.from("workouts").select("program_id, programs ( athlete_id, org_program )").eq("id", session.workout_id).maybeSingle().then((r: any) => (r.error ? null : r.data))
       : Promise.resolve(null),
+    // every note and header of the day: one between two linked exercises ends the link, as in the builder
+    session.workout_id ? notePositionsOfWorkout(supabase, session.workout_id) : Promise.resolve([] as number[]),
   ]);
   const prog = programRow ? (Array.isArray((programRow as any).programs) ? (programRow as any).programs[0] : (programRow as any).programs) : null;
   const everyWeekSwap =
@@ -221,6 +223,7 @@ export default async function SessionPage(
     (prog.athlete_id == null || prog.athlete_id === session.athlete_id);
   const programmed = ((sessionExercises ?? []) as any[]).filter((se) => se.group_workout_exercise_id && !se.is_added);
   const headersAboveIndex = headersAbove(programmed.map((se) => se.exercise_order as number), (session.workout_id ? headersByWorkout.get(session.workout_id) : null) ?? []);
+  const linkEnded = new Set([...linksEndedByNotes(programmed.map((se) => se.exercise_order as number), notePositions)].map((i) => programmed[i].id as string));
   const headersBySessionExercise = new Map<string, string[]>();
   headersAboveIndex.forEach((hs, i) => headersBySessionExercise.set(programmed[i].id, hs));
 
@@ -428,7 +431,7 @@ export default async function SessionPage(
         notes: se.group_workout_exercises?.notes ?? null,
         athleteNote: se.athlete_note ?? null,
         prescribedSetCount: se.group_workout_exercise_id ? prescribedSetCountByExercise.get(se.group_workout_exercise_id) ?? null : null,
-        supersetNext: !!se.group_workout_exercise_id && linkedTemplateIds.has(se.group_workout_exercise_id),
+        supersetNext: !!se.group_workout_exercise_id && linkedTemplateIds.has(se.group_workout_exercise_id) && !linkEnded.has(se.id),
         ...(headersBySessionExercise.has(se.id) ? { sectionHeaders: headersBySessionExercise.get(se.id) } : {}),
         ...(everyWeekSwap && se.group_workout_exercise_id && !se.is_added ? { everyWeekSwap: true } : {}),
         volumeHistory: volumeHistoryByExerciseName.get(se.exercise_name) ?? [],

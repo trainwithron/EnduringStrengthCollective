@@ -124,3 +124,57 @@ describe("the printed team sheet", () => {
     expect(all).toContain("(Back Squat)");
   });
 });
+
+describe("a note or a header between two linked exercises ends the link, in the workout too", () => {
+  it("the links a note or header ends, by the day's one order; the last exercise has no next", async () => {
+    const { linksEndedByNotes } = await import("@/lib/section-headers");
+    // order: 0 A (linked) 1 Header 2 B 3 C 4 D: the header ends A's link to B; D is last
+    expect([...linksEndedByNotes([0, 2, 3, 4], [1])].sort()).toEqual([0, 3]);
+    expect([...linksEndedByNotes([0, 2, 3, 4], [2.5, 3.5])].sort()).toEqual([1, 2, 3]);
+    expect([...linksEndedByNotes([4, 0], [1])].sort()).toEqual([0, 1]);
+    expect([...linksEndedByNotes([0, 1], [])]).toEqual([1]);
+  });
+  it("the builder takes the link off when a reorder leaves a note or header after it; the workout ignores a link a note sits inside", () => {
+    const day = src("components/coach/desktop/day-card.tsx");
+    expect(day).toContain('const unlink = new Set(items.filter((it, i) => it.kind === "exercise" && it.supersetNext && items[i + 1]?.kind !== "exercise").map((it) => it.id));');
+    expect(day).toContain("...(unlink.has(item.id) ? { superset_next: false } : {})");
+    const page = src("app/sessions/[sessionId]/page.tsx");
+    expect(page).toContain("linksEndedByNotes(programmed.map((se) => se.exercise_order as number), notePositions)");
+    expect(page).toContain("&& !linkEnded.has(se.id),");
+  });
+  it("an AI-built day redrawn in the builder keeps its headers", () => {
+    expect(src("components/coach/desktop/ai-program-builder-box.tsx")).toContain("headersOfWorkouts(supabase, [workoutId])");
+    expect(src("lib/program-builder-data.ts")).toContain("...(headerIds.has(n.id) ? { header: true } : {})");
+  });
+});
+
+describe("the Excel team sheet", () => {
+  it("prints headers in a row above the names, and the sheet still reads back exactly", async () => {
+    const XLSX = await import("xlsx");
+    const { buildSheetWorkbook } = await import("@/lib/team-sheet/export-xlsx");
+    const { readUpload } = await import("@/lib/team-sheet/read-upload");
+    const { dayLabel, makeRacks } = await import("@/lib/team-sheet/sheet-model");
+    const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+    for (const mode of ["day", "week"] as const) {
+      const wb = buildSheetWorkbook({
+        groupId: uuid(1),
+        groupName: "Varsity",
+        mode,
+        unit: "lb",
+        days: [{ date: "2026-11-16", label: dayLabel("2026-11-16"), title: "Lower", exercises: [
+          { id: uuid(101), name: "Bike", prescription: "1x5", sets: 1, reps: 5, unread: false, section: "Warm-up" },
+          { id: uuid(102), name: "Back Squat", prescription: "3x5", sets: 3, reps: 5, unread: false, section: "Strength" },
+        ] }],
+        racks: makeRacks([{ id: uuid(11), fullName: "Ann Adams" }], 4),
+      });
+      const ws = wb.Sheets["Rack 1"];
+      const cells = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1, defval: "" });
+      const at = cells.findIndex((r) => r[0] === "Athlete");
+      expect(cells[at - 1].slice(1, 3), mode).toEqual(["WARM-UP", "STRENGTH"]);
+      expect(cells[at].slice(1, 3)).toEqual(["Bike", "Back Squat"]);
+      const read = readUpload(Buffer.from(XLSX.write(wb, { type: "buffer", bookType: "xlsx" })), "sheet.xlsx");
+      expect(read.ok, mode).toBe(true);
+      if (read.ok) expect(read.racks[0].headers).toEqual([["Bike", "Back Squat"]]);
+    }
+  });
+});
