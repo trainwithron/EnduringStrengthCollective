@@ -4,10 +4,7 @@ import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { saved } from "@/lib/saved";
-import { localDateKey } from "@/lib/timezone";
-
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic"];
-const MAX_BYTES = 15 * 1024 * 1024;
+import { photoProblem, uploadProgressPhoto } from "@/lib/progress-photo-upload";
 
 interface PhotoRow {
   id: string;
@@ -68,36 +65,18 @@ export function ProgressPhotoJournal({ athleteId, groupId }: { athleteId: string
     e.target.value = "";
     if (!file) return;
 
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      setError("Use a JPEG, PNG, WebP, or HEIC photo.");
-      return;
-    }
-    if (file.size > MAX_BYTES) {
-      setError("Photo is too large — 15MB max.");
+    const problem = photoProblem(file);
+    if (problem) {
+      setError(problem);
       return;
     }
 
     setUploading(true);
     setError(null);
-    const supabase = createBrowserClient();
-    const ext = file.name.split(".").pop() || "jpg";
-    const path = `${athleteId}/${crypto.randomUUID()}.${ext}`;
-
-    const { error: uploadError } = await supabase.storage.from("progress-photos").upload(path, file);
-    if (uploadError) {
-      setError("Couldn't upload — try again.");
-      setUploading(false);
-      return;
-    }
-
-    const { error: insertError } = await supabase.from("progress_photos").insert({
-      athlete_id: athleteId,
-      group_id: groupId,
-      storage_path: path,
-      taken_date: localDateKey(),
-    });
-    if (insertError) {
-      setError("Uploaded, but couldn't save it to your journal — try again.");
+    // Private by default: the journal's own photos are never shared until the client flips "Share with coach".
+    const result = await uploadProgressPhoto(createBrowserClient(), { athleteId, groupId, file, sharedWithCoach: false });
+    if (!result.ok) {
+      setError(result.error);
       setUploading(false);
       return;
     }

@@ -34,7 +34,7 @@ export default async function CheckinsPage() {
   const { data: me } = await supabase.from("profiles").select("full_name, timezone").eq("id", user.id).maybeSingle();
   const timeZone = isValidTimeZone(me?.timezone) ? (me!.timezone as string) : DEFAULT_COACH_TIMEZONE;
   const data = await loadCoachCheckins(supabase, { coachId: user.id, anchorGroupId: anchor.id, groupIds, timeZone });
-  const photoEntries = await Promise.all(data.toReview.filter((i) => i.photoIds.length > 0).map(async (i) => [i.id, await signedPhotoUrls(supabase, i.photoIds)] as const));
+  const photoEntries = await Promise.all(data.toReview.filter((i) => i.photoIds.length > 0).map(async (i) => [i.id, await signedPhotoUrls(supabase, i.photoIds, i.athleteId)] as const));
 
   const body = !data.available ? (
     <p className="font-body text-sm text-steel">Check-ins aren&apos;t switched on yet. Check back soon.</p>

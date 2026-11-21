@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { X } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { uploadCheckinPhoto } from "@/lib/checkin-photo-upload";
+import { uploadProgressPhoto } from "@/lib/progress-photo-upload";
 import {
   AUTO_FILL_LINE,
   CHECKIN_PHOTOS_MAX,
@@ -61,7 +61,7 @@ export function WeeklyCheckinForm({
     setError(null);
     const supabase = createBrowserClient();
     for (const file of files) {
-      const r = await uploadCheckinPhoto(supabase, { athleteId, groupId, file });
+      const r = await uploadProgressPhoto(supabase, { athleteId, groupId, file, sharedWithCoach: true });
       if (!r.ok) {
         setError(r.error);
         break;

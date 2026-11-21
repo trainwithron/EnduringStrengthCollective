@@ -113,9 +113,10 @@ export async function loadOwnCheckin(supabase: SupabaseClient, athleteId: string
 }
 
 // Short-lived links to the client's own progress photos sent with a check-in (only the ones the reader may see come back).
-export async function signedPhotoUrls(supabase: SupabaseClient, photoIds: string[]): Promise<{ id: string; url: string }[]> {
+// Only the sender's own photos (Code Chat review, Nov 20): a check-in that lists another client's photo id never shows it.
+export async function signedPhotoUrls(supabase: SupabaseClient, photoIds: string[], athleteId: string): Promise<{ id: string; url: string }[]> {
   if (photoIds.length === 0) return [];
-  const { data } = await supabase.from("progress_photos").select("id, storage_path").in("id", photoIds);
+  const { data } = await supabase.from("progress_photos").select("id, storage_path").in("id", photoIds).eq("athlete_id", athleteId);
   const rows = (data ?? []) as { id: string; storage_path: string }[];
   if (rows.length === 0) return [];
   const { data: signed } = await supabase.storage.from("progress-photos").createSignedUrls(rows.map((r) => r.storage_path), 3600);

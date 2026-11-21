@@ -34,7 +34,7 @@ export default async function WeeklyCheckinPage(props: { params: Promise<{ group
     loadCheckinSnapshot(supabase, { athleteId: user.id, groupId: params.groupId, weekStart, timeZone }),
   ]);
   const row = own.row;
-  const photos = row ? await signedPhotoUrls(supabase, (row.photo_ids ?? []) as string[]) : [];
+  const photos = row ? await signedPhotoUrls(supabase, (row.photo_ids ?? []) as string[], user.id) : [];
   // A reviewed check-in shows what was sent then; otherwise the numbers are today's.
   const snapshot = row?.reviewed_at ? readSnapshot(row.auto_snapshot) : liveSnapshot;
 
