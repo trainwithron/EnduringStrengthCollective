@@ -26,6 +26,8 @@ export interface PaymentEventInput {
   // For a refund: Stripe's own id of THIS refund (one row per refund).
   refundId?: string | null;
   detail: string | null;
+  // For a failed payment: when Stripe says it will try the card again (the invoice's next_payment_attempt), or null when it will not.
+  nextAttemptAt?: string | null;
 }
 
 const money = (cents: number | null, currency: string | null) =>
@@ -104,6 +106,18 @@ async function insertEvent(db: any, e: PaymentEventInput): Promise<{ data: unkno
     })
     .select("id")
     .single();
+}
+
+// The date Stripe gave for its next try on a failed payment (migration 0464), written apart from the record itself and best effort: before that database update the column is not
+// there, and the payment problem must still be recorded (and Stripe never sent the event again because of it).
+export async function recordNextAttempt(db: any, id: string | null, nextAttemptAt: string | null): Promise<void> {
+  if (!id) return;
+  try {
+    const { error } = await db.from("payment_events").update({ next_attempt_at: nextAttemptAt }).eq("id", id);
+    if (error && error.code !== "42703" && error.code !== "PGRST204") console.error("[payment events] could not record the next try:", error.message);
+  } catch (err) {
+    console.error("[payment events] could not record the next try:", err instanceof Error ? err.message : err);
+  }
 }
 
 // Remembers that the coach was told, so a redelivery that finds the row but no memory of a notice still tells them once.
@@ -258,7 +272,9 @@ export async function handlePaymentProblemEvent(event: Stripe.Event, deps: { db:
     const subscriptionId = subscriptionIdOfInvoice(invoice);
     const { value: who, note } = await attribute(event, () => whoFromSubscription(stripe, subscriptionId), nobody);
     const attempt = (invoice as unknown as { attempt_count?: number }).attempt_count;
+    const nextAttempt = (invoice as unknown as { next_payment_attempt?: number | null }).next_payment_attempt;
     inputs.push({
+      nextAttemptAt: typeof nextAttempt === "number" && nextAttempt > 0 ? new Date(nextAttempt * 1000).toISOString() : null,
       eventId: event.id,
       kind: "payment_failed",
       ...who,
@@ -342,6 +358,7 @@ export async function handlePaymentProblemEvent(event: Stripe.Event, deps: { db:
       }
     }
     if (!recorded) recorded = await recordPaymentEvent(db, input);
+    if (input.kind === "payment_failed" && input.nextAttemptAt !== undefined) await recordNextAttempt(db, recorded.id, input.nextAttemptAt);
     // The coach is told the first time, and also on a redelivery of an event whose notice never went out. The mark is only made when a notice was really written (no coach seat, or a refused notice, leaves it open for a later delivery).
     if (announce && (recorded.first || !recorded.notified)) {
       const delivered = await notifyPaymentProblem(db, recorded.stored);

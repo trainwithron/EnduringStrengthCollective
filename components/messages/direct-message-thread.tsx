@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { sendDirectMessage } from "@/lib/direct-message-send";
+import { sendDirectMessage, sendVoiceNote } from "@/lib/direct-message-send";
 import { attachVisibleReader } from "@/lib/visible-read";
+import { VoiceNotePlayer } from "@/components/messages/voice-note-player";
+import { VoiceNoteRecorder } from "@/components/messages/voice-note-recorder";
 
 interface MessageRow {
   id: string;
@@ -11,6 +13,9 @@ interface MessageRow {
   body: string;
   created_at: string;
   auto_reply?: boolean;
+  // a voice note (migration 0464): played in place of the words
+  voice_path?: string | null;
+  voice_seconds?: number | null;
 }
 
 // Coach<->Athlete DM thread — realtime message list + composer, same
@@ -42,6 +47,7 @@ export function DirectMessageThread({
   const [body, setBody] = useState(initialDraft);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [recording, setRecording] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -110,6 +116,15 @@ export function DirectMessageThread({
     setBody("");
   }
 
+  // A voice note goes through the same send (lib/direct-message-send.ts): the file first, then the message that names it.
+  async function handleVoice(audio: Blob, mimeType: string, seconds: number): Promise<boolean> {
+    setError(null);
+    const inserted = await sendVoiceNote(createBrowserClient(), { groupId, senderId: viewerId, senderName: viewerName, recipientId: otherId, audio, mimeType, seconds });
+    if (!inserted) return false;
+    setMessages((prev) => (prev.some((m) => m.id === inserted.id) ? prev : [...prev, inserted]));
+    return true;
+  }
+
   return (
     <div className="flex flex-col h-full">
       <div className={`flex-1 overflow-y-auto space-y-3 px-5 py-4 ${fixedComposer ? "pb-24" : ""}`}>
@@ -127,7 +142,7 @@ export function DirectMessageThread({
                   isOwn ? "bg-rust text-graphite" : "bg-surface border border-steel/20 text-chalk"
                 }`}
               >
-                {m.body}
+                {m.voice_path && m.voice_seconds ? <VoiceNotePlayer path={m.voice_path} seconds={m.voice_seconds} own={isOwn} /> : m.body}
                 {m.auto_reply && <span className={`block text-[11px] mt-1 ${isOwn ? "text-graphite/70" : "text-steel"}`}>Auto-reply{isOwn ? " (sent because you are away)" : ""}</span>}
               </div>
             </div>
@@ -149,25 +164,31 @@ export function DirectMessageThread({
             : "flex items-center gap-2 px-5 py-3 border-t border-steel/20 shrink-0"
         }
       >
-        <input aria-label={`Message ${otherName}`}
-          type="text"
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") handleSend();
-          }}
-          placeholder={`Message ${otherName}`}
-          disabled={sending}
-          className="flex-1 h-11 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust disabled:opacity-60"
-        />
-        <button
-          type="button"
-          onClick={handleSend}
-          disabled={sending || !body.trim()}
-          className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
-        >
-          {sending ? "…" : "Send"}
-        </button>
+        {/* The mic sits beside the box (hidden where the browser cannot record); while a voice note is being made the box steps aside for it. */}
+        <VoiceNoteRecorder disabled={sending} onActiveChange={setRecording} onSend={handleVoice} />
+        {!recording && (
+          <>
+            <input aria-label={`Message ${otherName}`}
+              type="text"
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSend();
+              }}
+              placeholder={`Message ${otherName}`}
+              disabled={sending}
+              className="flex-1 min-w-0 h-11 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust disabled:opacity-60"
+            />
+            <button
+              type="button"
+              onClick={handleSend}
+              disabled={sending || !body.trim()}
+              className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
+            >
+              {sending ? "…" : "Send"}
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

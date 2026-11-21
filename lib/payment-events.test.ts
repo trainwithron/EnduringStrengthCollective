@@ -436,10 +436,11 @@ describe("how it is wired", () => {
     // the one thing it ever removes is its own redundant fallback row
     expect((lib.match(/\.delete\(/g) ?? []).length).toBe(1);
     expect((lib.match(/from\("payment_events"\)\.delete\(/g) ?? []).length).toBe(1);
-    // the only thing it ever changes is the 'coach was told' mark on its own record
-    expect((lib.match(/\.update\(/g) ?? []).length).toBe(2);
-    expect((lib.match(/from\("payment_events"\)\.update\(/g) ?? []).length).toBe(2);
+    // the only things it ever changes are on its own record: the 'coach was told' mark, a fallback refund row made real, and Stripe's next-try date (step 220)
+    expect((lib.match(/\.update\(/g) ?? []).length).toBe(3);
+    expect((lib.match(/from\("payment_events"\)\.update\(/g) ?? []).length).toBe(3);
     expect(lib).toContain('update({ notified_at:');
+    expect(lib).toContain('update({ next_attempt_at: nextAttemptAt })');
   });
 
   it("the migration records and reports only: group coaches and the organization's admins read, nothing is written from a browser, the report is for a platform admin", () => {

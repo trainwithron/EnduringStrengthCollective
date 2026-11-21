@@ -159,7 +159,8 @@ describe("Release I: wiring", () => {
     const csv = src("app/api/coach/activity-csv/route.ts");
     expect(csv).toContain('orgRow?.role !== "owner" && orgRow?.role !== "admin"');
     expect(csv).toContain("INCOMPLETE");
-    expect(src("components/org/coach-activity-table.tsx")).toContain("not saved");
+    // the rate is kept only in a saved pay period (Ron, Nov 20, $3), never on its own
+    expect(src("components/org/coach-activity-table.tsx")).toContain("the rates are kept only when you save the pay period");
     const announce = src("app/api/org/announce/route.ts");
     expect(announce).toContain('mine?.role !== "owner" && mine?.role !== "admin"');
     expect(announce).toContain('from("organization_memberships")');

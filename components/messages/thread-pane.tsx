@@ -8,6 +8,9 @@ interface ThreadMessage {
   sender_id: string;
   body: string;
   created_at: string;
+  auto_reply?: boolean;
+  voice_path?: string | null;
+  voice_seconds?: number | null;
 }
 
 // One conversation opened in place (the All messages page and the floating panel). It loads the thread when it is shown and not before, because loading a thread is the "seen it" moment
