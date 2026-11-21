@@ -25,9 +25,3 @@ export function scaleStarForMeal(star: StarredMeal, target: SlotTarget, coachRec
   // The coach picked this meal for it: a whole portion nearest the target, whatever its kind of meal.
   return portionStarMeal(star, "lunch", target, { force: true });
 }
-
-/** The option that is saved for the star in that meal, or the star exactly as it was when it has nothing to scale by (no macros at all). */
-export function starChoiceForMeal(star: StarredMeal, target: SlotTarget, coachRecipe?: LibraryRecipe | null): MealRecipeChoice {
-  const scaled = scaleStarForMeal(star, target, coachRecipe);
-  return scaled ? { ...choiceFromOption(optionFromScaled(scaled)), fromFavorite: true } : { ...star.meal, fromFavorite: true };
-}

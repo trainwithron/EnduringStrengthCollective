@@ -10,6 +10,8 @@ import { scaleStarForMeal } from "@/lib/star-to-plan";
 import { addStarredToPlan, starFromChoice, starFromLogged, type StarredMeal } from "@/lib/starred-meals";
 import { choiceFromOption, optionFromScaled } from "@/lib/library-meal-plan";
 import type { MealPlanRow } from "@/lib/meal-plan-assignment";
+import type { LibraryRecipe } from "@/lib/library-scaling";
+import { loadCoachRecipe } from "@/lib/library-data";
 
 // Ron, Nov 21 (approved): the coach's starred meals feed every new plan, first, scaled to each client; a star with no amounts goes in as whole portions; the plan marks them.
 const read = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
@@ -67,12 +69,31 @@ describe("stars come first", () => {
 });
 
 describe("a client's food rules still decide", () => {
-  it("an allergy keeps a star out", () => {
-    const shrimp = logged("Shrimp fried rice", 640, 40, 80, 16);
-    const target = { proteinG: 42, carbsG: 78, fatG: 17 };
-    expect(scaledCandidates("lunch", target, ctxOf({ starred: [shrimp] })).some((m) => m.name === "Shrimp fried rice")).toBe(true);
-    const sel = selectOptions("lunch", target, ctxOf({ starred: [shrimp], rules: { allergies: ["shellfish"] } }));
-    expect(sel.options.some((m) => m.name === "Shrimp fried rice")).toBe(false);
+  it("a starred logged meal never reaches a built plan: a 'Pad thai' is not offered to a peanut allergy (only its name could be checked), nor to anyone", () => {
+    const padThai = logged("Pad thai", 640, 30, 80, 20);
+    const target = { proteinG: 30, carbsG: 80, fatG: 20 };
+    for (const rules of [{ allergies: ["peanut"] }, {}]) {
+      for (const slot of ["lunch", "dinner"] as const) {
+        expect(scaledCandidates(slot, target, ctxOf({ starred: [padThai], rules })).some((m) => m.name === "Pad thai" || m.key.startsWith("fav:"))).toBe(false);
+        expect(selectOptions(slot, target, ctxOf({ starred: [padThai], rules })).options.some((m) => m.name === "Pad thai")).toBe(false);
+      }
+    }
+  });
+  it("no whole-portion star (logged, AI or a deleted recipe) is ever in a built plan, across a whole week", () => {
+    const stars = [logged("Chipotle chicken bowl", 600, 45, 60, 20), { ...logged("Deleted recipe bowl", 600, 45, 60, 20), meal: { ...logged("Deleted recipe bowl", 600, 45, 60, 20).meal, key: "r:gone" } }, { ...logged("AI salmon plate", 620, 45, 50, 22), meal: { ...logged("AI salmon plate", 620, 45, 50, 22).meal, key: "ai:abc", source: "ai" as const } }];
+    for (const slot of ["breakfast", "lunch", "dinner", "snack"] as const) {
+      expect(scaledCandidates(slot, lunch, ctxOf({ starred: stars })).filter((m) => m.portion != null || m.key.startsWith("fav:"))).toEqual([]);
+    }
+    expect(read("lib/library-selection.ts")).not.toContain("portionStarMeal");
+  });
+  it("a keto lunch never gets a 90 g-carb star", () => {
+    const all = scaledCandidates("lunch", { proteinG: 40, carbsG: 90, fatG: 15 }, ctxOf()).filter((m) => m.macros.carbsG >= 80);
+    expect(all.length).toBeGreaterThan(0);
+    const star = starFromChoice(choiceFromOption(optionFromScaled(all[0])))!;
+    const keto = { proteinG: 40, carbsG: 10, fatG: 35 };
+    const sel = selectOptions("lunch", keto, ctxOf({ diet: "keto", starred: [star] }));
+    expect(sel.options.some((m) => m.key === star.meal.key)).toBe(false);
+    expect(sel.options.every((m) => m.macros.carbsG < 30)).toBe(true);
   });
   it("a food the client dislikes keeps a starred library meal out", () => {
     const star = starOfCandidate(0);
@@ -150,6 +171,19 @@ describe("Add to plan scales the star to the meal it joins", () => {
     expect(added?.ingredients).toEqual(["1¼ servings of the starred meal, as it was starred"]);
     expect(added?.macros?.proteinG).toBe(56);
   });
+  it("a whole-portion star is refused for a keto, carnivore or paleo client, and when it brings more carbs than the meal allows", () => {
+    const bowl = logged("Chipotle chicken bowl", 600, 45, 60, 20);
+    for (const dietType of ["keto", "carnivore", "paleo"]) {
+      const r = addStarredToPlan({ plan: planWith({ proteinTarget: 56, carbsTarget: 75, fatTarget: 25 }), bucket: "daily", mealId: "m1", star: bowl, rules: { dietType }, clientFirst: "Sawyer" });
+      expect(r.ok, dietType).toBe(false);
+    }
+    const ketoPlan = { ...planWith({ proteinTarget: 56, carbsTarget: 75, fatTarget: 25 }), archetype: "keto" } as MealPlanRow;
+    expect(addStarredToPlan({ plan: ketoPlan, bucket: "daily", mealId: "m1", star: bowl, rules: {}, clientFirst: "Sawyer" }).ok).toBe(false);
+    const pasta = logged("Pasta bake", 700, 25, 120, 12);
+    const r = addStarredToPlan({ plan: planWith({ proteinTarget: 50, carbsTarget: 30, fatTarget: 30 }), bucket: "daily", mealId: "m1", star: pasta, rules: {}, clientFirst: "Sawyer" });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toContain("more carbs");
+  });
   it("still refuses a star against the client's food rules", () => {
     const shrimp = logged("Shrimp fried rice", 640, 40, 80, 16);
     const r = addStarredToPlan({ plan: planWith({ proteinTarget: 40, carbsTarget: 80, fatTarget: 16 }), bucket: "daily", mealId: "m1", star: shrimp, rules: { allergies: ["shellfish"] }, clientFirst: "Sawyer" });
@@ -162,6 +196,80 @@ describe("wiring", () => {
     expect(read("lib/library-data.ts")).toContain('.from("recipe_favorites")');
     expect(read("lib/library-meal-plan.ts")).toContain("starred: args.libraryData?.starred ?? [],");
     expect(read("components/coach/desktop/meal-plan-generator.tsx")).toContain('title="From your favorites" aria-label="From your favorites" data-from-favorite');
-    expect(read("components/coach/nutrition/favorite-meals-list.tsx")).toContain("const coachRecipe = recipeKey ? await loadCoachRecipe(supabase, recipeKey) : null;");
+    expect(read("components/coach/nutrition/favorite-meals-list.tsx")).toContain("const loaded = recipeKey && me ? await loadCoachRecipe(supabase, recipeKey, me.id) : null;");
+  });
+});
+
+describe("Add to plan, a starred coach recipe: the food rules are as strict as the builder's", () => {
+  const line = (id: string, label: string, role: "protein_source" | "carb_source" | "fat_source", p: number, c: number, f: number, gramsRef: number, matchedDescription?: string) => ({
+    id,
+    label,
+    role,
+    proteinPer100g: p,
+    carbsPer100g: c,
+    fatPer100g: f,
+    fixedDisplayText: null,
+    usdaFdcId: matchedDescription ? 1000 + Number(id.slice(1)) : null,
+    gramsRef,
+    ...(matchedDescription ? { matchedDescription } : {}),
+  });
+  const crunch: LibraryRecipe = {
+    id: "rec1",
+    name: "Protein crunch",
+    slot: "lunch",
+    diets: ["omnivore"],
+    keywords: [],
+    lines: [line("l1", "Chicken breast", "protein_source", 31, 0, 3.6, 100), line("l2", "White rice", "carb_source", 2.8, 28, 0.3, 150), line("l3", "Crunch topping", "fat_source", 24, 21, 49, 20, "Peanuts, all types, dry-roasted")],
+    mainProtein: "chicken",
+    source: "coach",
+  };
+  // the star as it was saved, before its lines knew the matched foods
+  const star: StarredMeal = { key: "meal:protein crunch", name: "Protein crunch", calories: 450, proteinG: 40, carbsG: 46, fatG: 14, meal: { recipeId: "rec1", recipeName: "Protein crunch", ingredients: ["Chicken breast", "White rice", "Crunch topping"], key: "r:rec1", lines: [{ name: "Crunch topping", label: "Crunch topping", grams: 20 }], macros: { proteinG: 40, carbsG: 46, fatG: 14, calories: 450 } } };
+  const plan = { meals: { daily: [{ mealId: "m1", title: "Lunch", proteinTarget: 40, carbsTarget: 46, fatTarget: 14, recipes: [] }] }, archetype: "standard", meal_count: 3, include_snack: false, carb_cycling: false, macros: null } as unknown as MealPlanRow;
+  it("a line matched to peanuts refuses it for a peanut allergy, though its label says only 'Crunch topping'", () => {
+    const r = addStarredToPlan({ plan, bucket: "daily", mealId: "m1", star, rules: { allergies: ["peanut"] }, clientFirst: "Sawyer", coachRecipe: crunch });
+    expect(r.ok).toBe(false);
+    // and without the allergy it goes in, scaled from the recipe
+    const ok = addStarredToPlan({ plan, bucket: "daily", mealId: "m1", star, rules: {}, clientFirst: "Sawyer", coachRecipe: crunch });
+    expect(ok.ok).toBe(true);
+  });
+  it("a recipe tagged with the client's allergy when it was saved is refused, whatever its lines say", () => {
+    const tagged: LibraryRecipe = { ...crunch, lines: crunch.lines.map((l) => ({ ...l, matchedDescription: undefined, usdaFdcId: null })), allergens: ["peanut"] };
+    const r = addStarredToPlan({ plan, bucket: "daily", mealId: "m1", star, rules: { allergies: ["peanut"] }, clientFirst: "Sawyer", coachRecipe: tagged });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toContain("marked as containing peanut");
+  });
+  it("the starred meal itself is checked too, not only what it was scaled into", () => {
+    const shrimpStar: StarredMeal = { ...star, name: "Shrimp bowl", meal: { ...star.meal, recipeName: "Shrimp bowl", ingredients: ["Shrimp"] } };
+    const r = addStarredToPlan({ plan, bucket: "daily", mealId: "m1", star: shrimpStar, rules: { allergies: ["shellfish"] }, clientFirst: "Sawyer", coachRecipe: { ...crunch, lines: crunch.lines.map((l) => ({ ...l, matchedDescription: undefined })) } });
+    expect(r.ok).toBe(false);
+  });
+});
+
+describe("loadCoachRecipe reads only the coach's own recipe, with its matched foods, and fails closed", () => {
+  const fake = (foods: { data: unknown; error: unknown }) => {
+    const calls: string[] = [];
+    const row = { id: "rec1", name: "Protein crunch", slot: "lunch", archetypes: ["omnivore"], keywords: [], recipe_ingredients: [{ id: "l1", sort_order: 1, label: "Crunch topping", role: "fat_source", protein_per_100g: 24, carbs_per_100g: 21, fat_per_100g: 49, fixed_display_text: null, usda_fdc_id: 77, grams_ref: 20 }] };
+    const chain = (table: string) => {
+      const q: Record<string, unknown> = {
+        select: () => q,
+        eq: (c: string, v: unknown) => (calls.push(`${table}.${c}=${String(v)}`), q),
+        in: () => Promise.resolve(foods),
+        maybeSingle: () => Promise.resolve({ data: row, error: null }),
+      };
+      return q;
+    };
+    return { calls, db: { from: chain } };
+  };
+  it("filters on the coach and fills the matched food", async () => {
+    const f = fake({ data: [{ fdc_id: 77, description: "Peanuts, all types, dry-roasted" }], error: null });
+    const recipe = await loadCoachRecipe(f.db as never, "rec1", "coach-1");
+    expect(f.calls).toContain("recipes.created_by=coach-1");
+    expect(recipe && recipe !== "unreadable" ? recipe.lines[0].matchedDescription : null).toBe("Peanuts, all types, dry-roasted");
+  });
+  it("a matched food that cannot be read: nothing is added", async () => {
+    const f = fake({ data: null, error: { message: "boom" } });
+    expect(await loadCoachRecipe(f.db as never, "rec1", "coach-1")).toBe("unreadable");
+    expect(read("components/coach/nutrition/favorite-meals-list.tsx")).toContain('if (loaded === "unreadable") {');
   });
 });

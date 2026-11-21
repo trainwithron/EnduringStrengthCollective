@@ -140,7 +140,16 @@ function AddToPlan({ meal, clients, todayKey }: { meal: StarredMeal; clients: Fa
     const [bucket, mealId] = target.split("|");
     // A starred coach recipe is scaled from the recipe itself (ingredient by ingredient); any other star by its template or as a whole portion (lib/star-to-plan.ts).
     const recipeKey = typeof meal.meal.key === "string" && meal.meal.key.startsWith("r:") ? meal.meal.key.slice(2) : null;
-    const coachRecipe = recipeKey ? await loadCoachRecipe(supabase, recipeKey) : null;
+    const {
+      data: { user: me },
+    } = await supabase.auth.getUser();
+    const loaded = recipeKey && me ? await loadCoachRecipe(supabase, recipeKey, me.id) : null;
+    if (loaded === "unreadable") {
+      setBusy(false);
+      setError(`Couldn't check that recipe against ${first}'s food preferences just now, so nothing was added. Try again.`);
+      return;
+    }
+    const coachRecipe = loaded;
     const result = addStarredToPlan({
       plan: state.plan,
       bucket: bucket as "daily" | "train" | "rest",

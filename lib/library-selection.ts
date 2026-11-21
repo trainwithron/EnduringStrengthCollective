@@ -13,8 +13,7 @@ import { scaleTemplate } from "@/lib/meal-templates/scale";
 import { missScore, type SlotTarget } from "@/lib/meal-templates/tolerance";
 import type { DietType, Slot } from "@/lib/meal-templates/types";
 import { checkTextOf, fromTemplateMeal, type ScaledMeal } from "@/lib/scaled-meal";
-import { ENABLED_TEMPLATES } from "@/lib/meal-templates";
-import { MAX_STARS_PER_SLOT, portionStarMeal, starBuilderKey, starredBuilderKeys, STAR_RANK_BONUS } from "@/lib/starred-in-plans";
+import { MAX_STARS_PER_SLOT, starredBuilderKeys, STAR_RANK_BONUS } from "@/lib/starred-in-plans";
 import type { StarredMeal } from "@/lib/starred-meals";
 
 export const OPTIONS_PER_SLOT = 3;
@@ -71,8 +70,9 @@ function likeHits(meal: ScaledMeal, likes: string[]): number {
 }
 
 // Every candidate for the slot, scaled to the target. Nothing here knows the client's rules yet.
-// The coach's stars: a starred library meal or coach recipe is the same candidate, marked (so it is scaled to this client by its own scaler, ingredient by ingredient); any other
-// star with macros is offered as a whole portion where it fits (portionStarMeal).
+// The coach's stars: a starred library meal or coach recipe is the same candidate, marked (so it is scaled to this client by its own scaler, ingredient by ingredient, and checked
+// against the client's rules on every line it really contains). A star with no such lines (a meal a client logged, an AI option, a deleted recipe) is NEVER offered by a build: only
+// its name could be checked (a starred "Pad thai" would reach a peanut allergy), and one client's own log would reach other clients. The coach adds it by hand (Add to plan).
 export function scaledCandidates(slot: Slot, target: SlotTarget, ctx: Pick<SelectionContext, "diet" | "coachRecipes" | "starred">): ScaledMeal[] {
   const out: ScaledMeal[] = [];
   const starredKeys = starredBuilderKeys(ctx.starred);
@@ -85,18 +85,6 @@ export function scaledCandidates(slot: Slot, target: SlotTarget, ctx: Pick<Selec
     if (!recipe.diets.includes(ctx.diet)) continue;
     const meal = scaleLibraryRecipe(recipe, slot, target);
     if (meal) out.push(markStar(meal, starredKeys));
-  }
-  if (ctx.starred && ctx.starred.length > 0) {
-    // A star whose builder meal still exists is scaled above (or does not fit this meal); the others go in whole.
-    const known = new Set([...ENABLED_TEMPLATES.map((r) => `t:${r.id}`), ...ctx.coachRecipes.map((r) => `r:${r.id}`)]);
-    const offered = new Set(out.map((m) => normalizeName(m.name)));
-    for (const star of ctx.starred) {
-      const k = starBuilderKey(star);
-      if (k && known.has(k)) continue;
-      if (offered.has(normalizeName(star.name))) continue;
-      const meal = portionStarMeal(star, slot, target);
-      if (meal) out.push(meal);
-    }
   }
   return out;
 }

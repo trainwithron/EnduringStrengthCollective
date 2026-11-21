@@ -3,8 +3,9 @@
 //      three options, and the client's food rules are checked on it exactly as on every other option).
 //   2. Each star is scaled to THIS client's meal target with the builder's own scaling: a starter-library meal ("t:<id>") through its template, a coach recipe ("r:<id>") through the
 //      recipe scaler, so 6 oz of chicken becomes 8 oz for a bigger client. No new formula.
-//   3. A star with no ingredient amounts the builder can scale (a meal a client logged, an AI option) is scaled as a whole portion, in quarters ("1¼ servings"), and says so. No
-//      ingredient is ever made up.
+//   3. A star with no ingredient lines the builder can scale and check (a meal a client logged, an AI option, a deleted recipe) is NEVER offered by a build (its name is all that
+//      could be checked against a client's allergies, and a client's own log must not reach other clients). The coach can still add it to one client's plan by hand (Add to plan,
+//      lib/star-to-plan.ts), as a whole portion in quarters ("1¼ servings"), after the diet and carb checks there. No ingredient is ever made up.
 import { caloriesOf, type Macros } from "@/lib/meal-templates/macros";
 import { CALORIE_TOLERANCE, PROTEIN_TOLERANCE, type SlotTarget } from "@/lib/meal-templates/tolerance";
 import type { Slot } from "@/lib/meal-templates/types";

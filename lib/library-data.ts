@@ -122,11 +122,21 @@ export async function loadLibraryContext(supabase: SupabaseClient, args: { coach
   return { coachRecipes, likes, variety, favorites, recentlyOffered, starred, notes };
 }
 
-// One of the coach's own saved recipes, as the builder scales it: what a starred coach recipe ("r:<id>") is scaled from when it is added to a plan (Favorite meals' Add to plan).
-// Null when it is gone or cannot be read (the star then goes in as a whole portion).
-export async function loadCoachRecipe(supabase: SupabaseClient, recipeId: string): Promise<LibraryRecipe | null> {
-  let res = await supabase.from("recipes").select(RECIPE_SELECT(true)).eq("id", recipeId).maybeSingle();
-  if (res.error) res = await supabase.from("recipes").select(RECIPE_SELECT(false)).eq("id", recipeId).maybeSingle();
+// One of the coach's OWN saved recipes, read exactly as the builder reads them (loadLibraryContext): what a starred coach recipe ("r:<id>") is scaled from when it is added to a plan
+// (Favorite meals' Add to plan). Each matched line gets its real food (the USDA description) so the client's rules are checked against it too. Null when it is gone or not the
+// coach's (the star then goes in as a whole portion); "unreadable" when its matched foods could not be read (fail closed: nothing is added).
+export async function loadCoachRecipe(supabase: SupabaseClient, recipeId: string, coachId: string): Promise<LibraryRecipe | null | "unreadable"> {
+  let res = await supabase.from("recipes").select(RECIPE_SELECT(true)).eq("id", recipeId).eq("created_by", coachId).maybeSingle();
+  if (res.error) res = await supabase.from("recipes").select(RECIPE_SELECT(false)).eq("id", recipeId).eq("created_by", coachId).maybeSingle();
   if (res.error || !res.data) return null;
-  return libraryRecipeFromRow(res.data as unknown as Record<string, unknown>);
+  const recipe = libraryRecipeFromRow(res.data as unknown as Record<string, unknown>);
+  if (!recipe) return null;
+  const ids = [...new Set(recipe.lines.map((l) => l.usdaFdcId).filter((id): id is number => typeof id === "number"))];
+  if (ids.length > 0) {
+    const { data: foods, error } = await supabase.from("usda_foods").select("fdc_id, description").in("fdc_id", ids);
+    if (error) return "unreadable";
+    const byId = new Map((foods ?? []).map((f) => [f.fdc_id as number, f.description as string]));
+    for (const l of recipe.lines) if (l.usdaFdcId !== null && byId.has(l.usdaFdcId)) l.matchedDescription = byId.get(l.usdaFdcId);
+  }
+  return recipe;
 }

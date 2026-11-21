@@ -2,7 +2,13 @@ import { mealRecipeChoices, mergeMealIntoPlan, type MealEntryPayload, type MealP
 import { checkPlanAgainstPreferences, describeFlagged } from "@/lib/plan-preference-check";
 import type { FoodRules } from "@/lib/allergen-check";
 import type { LibraryRecipe } from "@/lib/library-scaling";
-import { starChoiceForMeal } from "@/lib/star-to-plan";
+import { scaleStarForMeal } from "@/lib/star-to-plan";
+import { choiceFromOption, optionFromScaled } from "@/lib/library-meal-plan";
+import { allergyKeysOf } from "@/lib/allergen-check";
+import { checkTolerance } from "@/lib/meal-templates/tolerance";
+
+// A whole-portion star cannot be re-split into carbs and fat, so it never goes into a low-carb plan (Assistant review, Nov 21).
+const NO_PORTION_DIETS = new Set(["keto", "carnivore", "paleo"]);
 
 // Starred meals (Ron, Nov 19: the coach's Nutrition page revamp; database step 207). A coach stars any meal they see: a meal plan option, a meal from before a client's plan change,
 // a meal a client logged. The Favorite meals tab lists them with calories and protein and "Add to plan". A starred meal is a row of the coach's favorites (recipe_favorites,
@@ -131,14 +137,26 @@ export type AddToMealResult = { ok: true; row: MealPlanRow } | { ok: false; reas
 export function addStarredToPlan(args: { plan: MealPlanRow; bucket: MealPlanBucket; mealId: string; star: StarredMeal; rules: FoodRules; clientFirst: string; coachRecipe?: LibraryRecipe | null }): AddToMealResult {
   const entry = (args.plan.meals?.[args.bucket] ?? []).find((m) => m.mealId === args.mealId);
   if (!entry) return { ok: false, reason: "That meal isn't in the plan for that day any more. Pick the day again." };
-  const hasTarget = [entry.proteinTarget, entry.carbsTarget, entry.fatTarget].every((n) => typeof n === "number" && Number.isFinite(n)) && (entry.proteinTarget ?? 0) + (entry.carbsTarget ?? 0) + (entry.fatTarget ?? 0) > 0;
-  const choice = hasTarget
-    ? starChoiceForMeal(args.star, { proteinG: entry.proteinTarget as number, carbsG: entry.carbsTarget as number, fatG: entry.fatTarget as number }, args.coachRecipe)
-    : { ...args.star.meal, fromFavorite: true };
-  const flagged = checkPlanAgainstPreferences({ [args.bucket]: [{ ...entry, recipes: [choice] }] }, args.rules);
-  if (flagged.length > 0) return { ok: false, reason: `Not added: ${describeFlagged(flagged[0])}, against ${args.clientFirst}'s food preferences.` };
   const choices = mealRecipeChoices(entry);
   if (choices.some((c) => starredMealKey(c.recipeName ?? "") === args.star.key)) return { ok: false, reason: `${args.star.name} is already an option for ${entry.title} that day.` };
+  const hasTarget = [entry.proteinTarget, entry.carbsTarget, entry.fatTarget].every((n) => typeof n === "number" && Number.isFinite(n)) && (entry.proteinTarget ?? 0) + (entry.carbsTarget ?? 0) + (entry.fatTarget ?? 0) > 0;
+  const target = hasTarget ? { proteinG: entry.proteinTarget as number, carbsG: entry.carbsTarget as number, fatG: entry.fatTarget as number } : null;
+  const scaled = target ? scaleStarForMeal(args.star, target, args.coachRecipe) : null;
+  // A whole portion (no amounts to scale): never in a low-carb plan, and never with more carbs than the meal allows.
+  if (!scaled || scaled.portion != null) {
+    const diet = [args.rules.dietType, args.plan.archetype].find((d): d is string => !!d && NO_PORTION_DIETS.has(d));
+    if (diet) return { ok: false, reason: `Not added: ${args.star.name} is a whole meal with no amounts to adjust, so it can't go into ${args.clientFirst}'s ${diet} plan.` };
+    if (scaled && target && checkTolerance(scaled.macros, target).misses.includes("carbs")) return { ok: false, reason: `Not added: ${args.star.name} has more carbs than ${entry.title} allows for ${args.clientFirst}.` };
+  }
+  // A coach recipe tagged with one of the client's allergies when it was saved is never added (the builder's second net).
+  const recipe = args.coachRecipe && args.star.meal.key === `r:${args.coachRecipe.id}` ? args.coachRecipe : null;
+  const allergyKeys = allergyKeysOf(args.rules.allergies) as Set<string>;
+  const taggedHit = (recipe?.allergens ?? []).find((t) => allergyKeys.has(t));
+  if (taggedHit) return { ok: false, reason: `Not added: ${args.star.name} is marked as containing ${taggedHit}, against ${args.clientFirst}'s food preferences.` };
+  const choice: MealRecipeChoice = scaled ? { ...choiceFromOption(optionFromScaled(scaled)), fromFavorite: true } : { ...args.star.meal, fromFavorite: true };
+  // The rules on what is added AND on the meal as it was starred: a hit on either refuses it.
+  const flagged = checkPlanAgainstPreferences({ [args.bucket]: [{ ...entry, recipes: [choice, args.star.meal] }] }, args.rules);
+  if (flagged.length > 0) return { ok: false, reason: `Not added: ${describeFlagged(flagged[0])}, against ${args.clientFirst}'s food preferences.` };
   const updated: MealEntryPayload = { ...entry, recipes: [...choices, choice] };
   delete updated.recipeId;
   delete updated.recipeName;
