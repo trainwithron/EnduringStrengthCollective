@@ -156,3 +156,13 @@ describe("finding the sheet code in a photo", () => {
     expect(decodeScale({ x: 0, y: 0, width: 4800, height: 3600 })).toBe(MAX_DECODE_EDGE / 4800);
   });
 });
+
+describe("section labels on the printed sheet", () => {
+  it("the model is told a small capitalised section word above a name is not part of the name", async () => {
+    const { TEAM_SHEET_PHOTO_PROMPT } = await import("@/lib/team-sheet/photo-read");
+    expect(TEAM_SHEET_PHOTO_PROMPT).toContain("A small capitalised section word printed above an exercise name (WARM-UP, STRENGTH, CONDITIONING) is a section label: it is not part of the name");
+  });
+  it("and if one is read into a name anyway, the page is refused, never matched to the wrong column", () => {
+    expect(matchColumns(["STRENGTH Back Squat", "Bench Press"], ["Back Squat", "Bench Press"])).toBeNull();
+  });
+});

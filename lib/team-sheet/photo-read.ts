@@ -22,6 +22,7 @@ const MAX_NOTE_CHARS = 120;
 
 export const TEAM_SHEET_PHOTO_PROMPT = `You read a photo of ONE printed page of a gym team sheet that athletes filled in by hand.
 The page is a table: a row per athlete (the athlete's printed name in the first column), and a column per exercise, with small boxes in each cell, one box per set. A Notes column is at the right.
+A small capitalised section word printed above an exercise name (WARM-UP, STRENGTH, CONDITIONING) is a section label: it is not part of the name, so leave it out of "columns".
 Copy exactly what is handwritten in each box. Never work anything out, never fill a box in from the boxes around it, never correct what was written.
 A box's text is what was written: a weight ("225", "132.5"), a weight and reps ("225x5"), "BW", "-", "X", or "" when the box is empty.
 For EVERY box also say whether you are sure: "sure": false when the writing is smudged, crossed out, ambiguous, partly outside the box or cut off in the photo, or you are not certain of every character.
