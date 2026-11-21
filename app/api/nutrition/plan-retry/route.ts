@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { isOwnPersonalSpace } from "@/lib/own-personal-space";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 import { loadLibraryContext } from "@/lib/library-data";
 import { buildSelectionContext } from "@/lib/library-meal-plan";
@@ -38,7 +39,9 @@ export async function POST(request: Request) {
 
   // Only the client themself (a coach "acting as" a client cannot ask on their behalf): they must be an athlete of this group.
   const { data: membership } = await supabase.from("group_memberships").select("role, client_tier").eq("group_id", groupId).eq("profile_id", user.id).maybeSingle();
-  if (!membership || membership.role !== "athlete") return fail("Only the client can ask for a different plan.", 403);
+  // ...or a coach in their OWN personal space, asking for themselves (Ron, Nov 21). Never a coach on anyone else's plan.
+  const ownSpace = membership?.role === "coach" && (await isOwnPersonalSpace(createServiceRoleClient(), user.id, groupId));
+  if (!membership || (membership.role !== "athlete" && !ownSpace)) return fail("Only the client can ask for a different plan.", 403);
   if ((membership.client_tier ?? null) === "group") return fail("This plan can't be changed here. Message your coach.", 403);
 
   const read = readRetryNote(typeof body.note === "string" ? body.note : "");

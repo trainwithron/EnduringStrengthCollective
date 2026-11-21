@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { ownPersonalSpaceIds } from "@/lib/own-personal-space";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 import { addDaysToKey } from "@/lib/date-key";
 import { loadLibraryContext } from "@/lib/library-data";
@@ -50,7 +51,8 @@ export async function POST() {
   const service = createServiceRoleClient();
   // The plan days from yesterday on (each group's own "today" is worked out below), in the groups where they are a client.
   const { data: seats } = await service.from("group_memberships").select("group_id").eq("profile_id", user.id).eq("role", "athlete");
-  const groupIds = (seats ?? []).map((s) => s.group_id as string);
+  // the groups where they are the athlete, and their own personal space (a coach's own plan lives there, with them as the athlete: Ron, Nov 21)
+  const groupIds = [...new Set([...(seats ?? []).map((s) => s.group_id as string), ...(await ownPersonalSpaceIds(service, user.id))])];
   if (groupIds.length === 0) return NextResponse.json({ daysChanged: 0, mealsNeedingCoach: 0 }, { headers: { "Cache-Control": "no-store" } });
   const { data: allPlanRows, error: planError } = await service
     .from("meal_plans")
