@@ -46,6 +46,13 @@ export function answerByText(deadlineIso: string, timeZone: string, now: Date = 
   return `Answer by ${deadlineWhen(deadlineIso, timeZone, now)}`;
 }
 
+/** From the client's side, just after sending: the request lapses within 12 hours, so the coach is told even in their quiet hours (C9) and no "reply in the morning" is promised. */
+export function lapsesSoon(lapsesAtIso: string | null | undefined, now: Date = new Date()): boolean {
+  if (!lapsesAtIso) return false;
+  const left = new Date(lapsesAtIso).getTime() - now.getTime();
+  return Number.isFinite(left) && left <= URGENT_WITHIN_MS;
+}
+
 /** Due for the two-hour warning now (inside the last two hours, not lapsed yet). */
 export function dueForLapseWarning(deadlineIso: string, now: Date = new Date()): boolean {
   const left = new Date(deadlineIso).getTime() - now.getTime();

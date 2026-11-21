@@ -60,3 +60,28 @@ describe("C9: urgent requests", () => {
     expect(isUrgentRequest({ kind: "new", new_start_at: "2026-11-21T09:00:00Z", created_at: "2026-11-20T20:59:59Z" })).toBe(false);
   });
 });
+
+describe("C9: the coach's quiet hours give way for a session starting soon", () => {
+  it("the five-minute job sends an urgent session request through the coach's quiet hours, push and email, and holds the rest as before", () => {
+    const job = read("app/api/cron/notification-push/route.ts");
+    expect(job).toContain('const ids = candidates.filter((c) => !quietNow.has(c.profile_id) || urgent.has(c.id)).map((c) => c.id);');
+    expect(job).toContain("...(urgent.has(n.id) ? { ignoreQuiet: true } : {})");
+    expect(job).toContain("{ ignoreQuiet: urgent.has(n.id) }");
+    const lib = read("lib/notification-push.ts");
+    expect(lib).toMatch(/return !!r && r\.status === "pending" && isUrgentRequest\(r\);/);
+    expect(read("lib/client-notice-email.ts")).toContain("if (!opts.ignoreQuiet && isQuietNow(prefs)) return \"quiet\";");
+  });
+  it("and the client is then not promised a reply in the morning: no line at all", async () => {
+    const { lapsesSoon } = await import("./request-deadline");
+    const now = new Date("2026-11-21T03:00:00Z");
+    expect(lapsesSoon("2026-11-21T14:59:59Z", now)).toBe(true);
+    expect(lapsesSoon("2026-11-21T15:00:01Z", now)).toBe(false);
+    expect(lapsesSoon(null, now)).toBe(false);
+    const notice = read("components/athlete/quiet-hours-notice.tsx");
+    expect(notice).toMatch(/if \(lapsesSoon\(lapse\)\) \{\s*onLine\?\.\(null\);\s*return;\s*\}/);
+    expect(read("components/athlete/request-slot-button.tsx")).toContain("lapsesAt={startAt}");
+    expect(read("components/athlete/request-different-time.tsx")).toContain("lapsesAt={sentAt}");
+    // a move lapses at the session's own (original) time, read with the coach
+    expect(notice).toContain('.select("coach_id, start_at")');
+  });
+});
