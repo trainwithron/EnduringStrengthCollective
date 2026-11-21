@@ -15,7 +15,8 @@ describe("what a builder cell saves", () => {
   });
   it("other fields save as before", () => {
     expect(cellWrite("reps", "8-10").patch).toEqual({ target_reps: "8-10" });
-    expect(cellWrite("weight", "135").patch).toEqual({ target_weight: 135 });
-    expect(cellWrite("weight", "").patch).toEqual({ target_weight: null });
+    // a weight also clears a percent of max on the set (wave 2 T3)
+    expect(cellWrite("weight", "135").patch).toEqual({ target_weight: 135, target_pct_max: null });
+    expect(cellWrite("weight", "").patch).toEqual({ target_weight: null, target_pct_max: null });
   });
 });
