@@ -7,16 +7,21 @@ describe("what a builder cell saves", () => {
       patch: { target_rest_seconds: 60, target_rest_max_seconds: 90 },
       local: { targetRestSeconds: 60, targetRestMaxSeconds: 90 },
     });
-    expect(cellWrite("rest", "90-150").patch).toEqual({ target_rest_seconds: 90, target_rest_max_seconds: 150 });
+    expect(cellWrite("rest", "90-150")!.patch).toEqual({ target_rest_seconds: 90, target_rest_max_seconds: 150 });
   });
   it("a single rest clears any old high end, and an empty one clears both", () => {
-    expect(cellWrite("rest", "90").patch).toEqual({ target_rest_seconds: 90, target_rest_max_seconds: null });
-    expect(cellWrite("rest", "").patch).toEqual({ target_rest_seconds: null, target_rest_max_seconds: null });
+    expect(cellWrite("rest", "90")!.patch).toEqual({ target_rest_seconds: 90, target_rest_max_seconds: null });
+    expect(cellWrite("rest", "")!.patch).toEqual({ target_rest_seconds: null, target_rest_max_seconds: null });
   });
   it("other fields save as before", () => {
-    expect(cellWrite("reps", "8-10").patch).toEqual({ target_reps: "8-10" });
+    expect(cellWrite("reps", "8-10")!.patch).toEqual({ target_reps: "8-10" });
     // a weight also clears a percent of max on the set (wave 2 T3)
-    expect(cellWrite("weight", "135").patch).toEqual({ target_weight: 135, target_pct_max: null });
-    expect(cellWrite("weight", "").patch).toEqual({ target_weight: null, target_pct_max: null });
+    expect(cellWrite("weight", "135")!.patch).toEqual({ target_weight: 135, target_pct_max: null });
+    expect(cellWrite("weight", "")!.patch).toEqual({ target_weight: null, target_pct_max: null });
+  });
+  it("a typo in a weight box is refused, never saved as an empty weight (wave 2 T3 review: it used to clear the set)", () => {
+    for (const typo of ["abc", "200%", "75 lb", "1,5,0", "-5"]) expect(cellWrite("weight", typo)).toBeNull();
+    expect(cellWrite("rest", "abc")).toBeNull();
+    expect(cellWrite("rpe", "abc")).toBeNull();
   });
 });

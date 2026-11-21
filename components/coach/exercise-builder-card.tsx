@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { saved } from "@/lib/saved";
 import { MAX_TIME_SECONDS, formatRest, parseRestInput, parseRestSpan } from "@/lib/rest-time";
-import { cellWrite } from "@/lib/cell-write";
+import { cellWrite, WEIGHT_CELL_MESSAGE } from "@/lib/cell-write";
 import { pctText } from "@/lib/pct-of-max";
 import { ExerciseNameInput } from "./exercise-name-input";
 import { BuilderDemoThumb } from "@/components/coach/builder-demo-thumb";
@@ -534,6 +534,11 @@ export function ExerciseBuilderCard({
 
   async function handleCellCommit(setId: string, field: TrackedField, raw: string) {
     const write = cellWrite(field, raw);
+    // Something that is not a value (a typo in a weight box): nothing is saved and the box goes back (wave 2 T3 review).
+    if (!write) {
+      flashSaveError(field === "weight" ? WEIGHT_CELL_MESSAGE : "That isn't a value this box can save.");
+      return false;
+    }
     const supabase = createBrowserClient();
     const { error } = await supabase
       .from("group_workout_exercise_sets")
@@ -553,6 +558,10 @@ export function ExerciseBuilderCard({
   // Only the sets that were still empty, or still had the first set's old value, follow it; a set the coach already gave its own number (a heavier top set) is never overwritten.
   async function handleFirstSetCommit(setId: string, field: TrackedField, raw: string) {
     const write = cellWrite(field, raw);
+    if (!write) {
+      flashSaveError(field === "weight" ? WEIGHT_CELL_MESSAGE : "That isn't a value this box can save.");
+      return false;
+    }
     const followers = firstSetFollowers(exercise.sets, setId, Object.keys(write.local) as Array<keyof ExerciseSetTarget>);
     const followerIds = new Set(followers);
     const supabase = createBrowserClient();

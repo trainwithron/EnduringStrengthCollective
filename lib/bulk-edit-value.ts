@@ -1,10 +1,13 @@
 import { fieldDef, type TrackedField } from "@/lib/exercise-fields";
 import { MAX_REST_SECONDS, MAX_TIME_SECONDS, parseRestSpan } from "@/lib/rest-time";
+import { parseWeightCell } from "@/lib/pct-of-max";
+import { WEIGHT_CELL_MESSAGE } from "@/lib/cell-write";
 
 // What the Bulk edit box does with what was typed. A blank box used to write "nothing" onto every set (so typing a time the box could not read quietly CLEARED the rest on the whole program); now a blank
 // is its own case the coach must confirm, and a time is read the same way everywhere (90, 1:30, 90s, 2 min, a range).
 // highValue: the top of a rest range ("60-90" is value 60, highValue 90); null for a single time.
-export type BulkValue = { ok: true; blank: false; value: string | number; highValue?: number | null } | { ok: true; blank: true; value: null; highValue?: undefined } | { ok: false; message: string };
+// pctMax: a weight written as a percent of max ("75%", wave 2 T3); value is then the text and no fixed weight is saved.
+export type BulkValue = { ok: true; blank: false; value: string | number; highValue?: number | null; pctMax?: number | null } | { ok: true; blank: true; value: null; highValue?: undefined } | { ok: false; message: string };
 
 export const BULK_NEEDS_TIME = "Type a time like 90 or 1:30.";
 export const BULK_NEEDS_NUMBER = "Type a number.";
@@ -21,6 +24,12 @@ export function parseBulkValue(field: TrackedField, raw: string): BulkValue {
     // A small bare number ("2") could mean minutes; ask rather than save two seconds.
     if (/^\d+$/.test(text) && seconds < 20) return { ok: false, message: BULK_NEEDS_TIME };
     return { ok: true, blank: false, value: seconds, highValue: field === "rest" ? span.high : null };
+  }
+  // Weight: the same reading as the single box (lib/cell-write.ts): a fixed weight or a percent of max; anything else is refused.
+  if (field === "weight") {
+    const w = parseWeightCell(text);
+    if (!w) return { ok: false, message: WEIGHT_CELL_MESSAGE };
+    return w.pct != null ? { ok: true, blank: false, value: `${w.pct}%`, pctMax: w.pct } : { ok: true, blank: false, value: w.weight as number, pctMax: null };
   }
   if (fieldDef(field).kind === "number") {
     const n = Number(text);
