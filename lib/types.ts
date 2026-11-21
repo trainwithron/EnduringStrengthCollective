@@ -68,6 +68,8 @@ export interface SetLogEntry {
   // no placeholder-hint use for these two: targetReps/targetWeight
   // compare an actual logged set against today's real prescribed goal.
   targetReps?: number | null;
+  // How the reps box shows the target while empty: a range in full ("12–15"; targetReps is then its low end), or the number (Nov 21).
+  targetRepsHint?: string | null;
   targetWeight?: number | null;
   targetRpe?: number | null;
   targetRir?: number | null;
