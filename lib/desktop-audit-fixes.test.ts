@@ -17,6 +17,7 @@ import { AVAILABILITY_HREF, PUBLIC_PAGE_ANCHOR } from "@/lib/my-page-qr";
 import { PULSE_ATTENTION_HREF } from "@/lib/home-greeting";
 import { failedCardDraft } from "@/components/coach/payment-problems-section";
 import type { AttentionItem } from "@/lib/your-day";
+import { draftKey } from "@/lib/message-draft";
 
 const ROOT = join(__dirname, "..");
 const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8").replace(/\r\n/g, "\n");
@@ -82,8 +83,11 @@ describe("Needs you on Home", () => {
     const e = items.find((i) => i.kind === "expiring_credits")!;
     expect(e).toBeDefined();
     expect(e.button).toBe("Message Sam");
-    expect(e.href.startsWith("/groups/g1/messages/a1?draft=")).toBe(true);
-    expect(decodeURIComponent(e.href.split("draft=")[1])).toContain("Hi Sam, I noticed you have 4 sessions left");
+    // the words go with the item (kept in the tab on press); the address carries only their key
+    expect(e.draft?.threadHref).toBe("/groups/g1/messages/a1");
+    expect(e.draft?.text).toContain("Hi Sam, I noticed you have 4 sessions left");
+    expect(e.href).toBe(`/groups/g1/messages/a1?draft=${draftKey(e.draft!.text)}`);
+    expect(e.href).not.toMatch(/Sam|sessions/);
     expect(e.href).not.toContain("#expiring");
   });
 
@@ -93,8 +97,9 @@ describe("Needs you on Home", () => {
       { ...base, quietTierByAthlete: new Map([["a1", "strong"]]) as never }
     );
     const q = items.find((i) => i.kind === "quiet_strong")!;
-    expect(q.href.startsWith("/groups/g1/messages/a1?draft=")).toBe(true);
-    expect(decodeURIComponent(q.href.split("draft=")[1])).toMatch(/^Hey Ann, haven't seen you in a bit/);
+    expect(q.draft?.text).toMatch(/^Hey Ann, haven't seen you in a bit/);
+    expect(q.href).toBe(`/groups/g1/messages/a1?draft=${draftKey(q.draft!.text)}`);
+    expect(q.href).not.toContain("Ann");
     expect(q.profileHref).toBe("/groups/g1/athletes/a1");
   });
 
@@ -223,7 +228,8 @@ describe("business and settings", () => {
     const s = read("components/coach/payment-problems-section.tsx");
     expect(s).toContain('select("id, kind, group_id, athlete_id, amount_cents');
     expect(s).toContain('e.kind === "payment_failed"');
-    expect(s).toContain("?draft=${encodeURIComponent(failedCardDraft(first))}");
+    expect(s).toContain("<DraftMessageLink threadHref={`/groups/${client.groupId}/messages/${client.athleteId}`} draft={failedCardDraft(first)}");
+    expect(s).not.toContain("encodeURIComponent(failedCardDraft");
     expect(s).toContain("href={addSessionsHref(client.groupId, client.athleteId)}");
     expect(s).toContain('e.kind === "dispute_opened" && <OpenStripeButton groupId={e.group_id} />');
     expect(s).toContain("href={`/groups/${client.groupId}/athletes/${client.athleteId}`}");
@@ -246,11 +252,10 @@ describe("business and settings", () => {
     expect(route).toContain("const unsent = emailed ? {} : { unsentId: newUserId };");
     const form = read("components/coach/desktop/invite-coach-form.tsx");
     expect(form).toContain("{unsent && <UnsentInviteActions groupId={groupId} id={unsent.id} name={unsent.name} />}");
-    // the Invitations list's own routes: by person first, then the in-app invitation
-    expect(form).toContain('postJson("/api/coaches/invite/resend", { groupId, profileId: id })');
-    expect(form).toContain('if (r.status === 404) r = await postJson("/api/org-invites/resend", { inviteId: id });');
-    expect(form).toContain('postJson("/api/coaches/invite/link", { groupId, profileId: id })');
-    expect(form).toContain("/org-invite/${id}");
+    // ONE route that works out the kind on the server (review, Nov 21: a fallback on a 404 told which kind it was)
+    expect(form).toContain('postJson("/api/coaches/invite/retry", { groupId, unsentId: id, action: "resend" })');
+    expect(form).toContain('postJson("/api/coaches/invite/retry", { groupId, unsentId: id, action: "link" })');
+    for (const other of ["/api/coaches/invite/resend", "/api/org-invites/resend", "/api/coaches/invite/link", "/org-invite/"]) expect(form).not.toContain(other);
   });
   it("D25: 'hand them over from the Team page' links the Team page", () => {
     expect(read("components/coach/desktop/add-client-button.tsx")).toContain("href={`/groups/${groupId}/branding?tab=team`}");

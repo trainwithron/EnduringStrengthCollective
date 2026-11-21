@@ -16,6 +16,7 @@ import { GOAL_SHEET_ANCHOR, goalReviewCutoffIso, goalReviewDue } from "@/lib/goa
 import { SIGN_IN_OPTIONS_ANCHOR } from "@/lib/get-started-checklist";
 import { getQuietClientNudgeTemplates } from "@/lib/quiet-client-nudge-templates";
 import { loadQuietInChat, quietChatSentence } from "@/lib/quiet-chat";
+import { draftThreadHref } from "@/lib/message-draft";
 
 // A weekly check-in older than this is not news for Home's strip (the Check-ins page keeps the same window).
 const CHECKIN_REVIEW_DAYS = 56;
@@ -41,8 +42,12 @@ export interface NeedsYouHomeInputs {
 export const SESSION_SOON_MINUTES = 120;
 
 const clientPath = (groupId: string, athleteId: string) => `/groups/${groupId}/athletes/${athleteId}`;
-// A message thread with a drafted note in its box (the coach edits it before sending; the thread page keeps the draft when it opens the conversation on a computer).
-const threadWithDraft = (groupId: string, athleteId: string, draft: string) => `/groups/${groupId}/messages/${athleteId}?draft=${encodeURIComponent(draft)}`;
+// A message thread with a drafted note in its box (the coach edits it before sending). The address carries only the draft's key; the words go with the item and are kept in the tab when the
+// button is pressed (lib/message-draft.ts), so a client's name and sessions never reach a server log.
+const withDraft = (groupId: string, athleteId: string, text: string) => {
+  const threadHref = `/groups/${groupId}/messages/${athleteId}`;
+  return { href: draftThreadHref(threadHref, text), draft: { threadHref, text } };
+};
 // A first name for a button or a draft; "" when the name could not be read.
 const firstOf = (name: string) => (name === "A client" ? "" : name.trim().split(/\s+/)[0] ?? "");
 
@@ -285,7 +290,7 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
   for (const e of expiring) {
     // The same drafted check-in as the expiry panel's "Message them" (audit, Nov 21: "Open" only jumped down Home).
     const first = firstOf(nameOf(e.athleteId));
-    items.push({ id: `expiring:${e.athleteId}:${e.groupId}`, kind: "expiring_credits", name: nameOf(e.athleteId), sentence: sentences.expiringCredits(e.daysLeft), button: first ? `Message ${first}` : BUTTON.message, href: threadWithDraft(e.groupId, e.athleteId, buildCheckInDraft({ firstName: first, balance: e.balance, daysLeft: e.daysLeft })), profileHref: clientPath(e.groupId, e.athleteId), order: e.expiresOn.getTime() });
+    items.push({ id: `expiring:${e.athleteId}:${e.groupId}`, kind: "expiring_credits", name: nameOf(e.athleteId), sentence: sentences.expiringCredits(e.daysLeft), button: first ? `Message ${first}` : BUTTON.message, ...withDraft(e.groupId, e.athleteId, buildCheckInDraft({ firstName: first, balance: e.balance, daysLeft: e.daysLeft })), profileHref: clientPath(e.groupId, e.athleteId), order: e.expiresOn.getTime() });
   }
   for (const c of checkinsHere) {
     items.push({ id: `checkin:${c.id}`, kind: "checkin_review", name: nameOf(c.athlete_id), sentence: sentences.checkinReview(), button: BUTTON.review, href: COACH_CHECKINS_PATH, profileHref: clientPath(c.group_id, c.athlete_id), order: new Date(c.submitted_at).getTime() });
@@ -331,7 +336,7 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
       sentence: q.tier === "strong" ? sentences.quietStrong() : sentences.quietMild(),
       button: BUTTON.checkIn,
       // with a check-in drafted in the box, like the panels below (audit, Nov 21)
-      href: threadWithDraft(g, q.id, getQuietClientNudgeTemplates(firstOf(nameOf(q.id)) || "there")[1].text),
+      ...withDraft(g, q.id, getQuietClientNudgeTemplates(firstOf(nameOf(q.id)) || "there")[1].text),
       order: 0,
     });
   }

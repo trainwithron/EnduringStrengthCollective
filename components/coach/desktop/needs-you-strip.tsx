@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CAUGHT_UP, COULD_NOT_CHECK, type NeedsYouSlot, type NeedsYouView } from "@/lib/needs-you";
 import { QuietClientNudgeButton } from "@/components/coach/quiet-client-nudge-button";
 import { NeedsYouMore, NeedsYouSendLink } from "@/components/coach/desktop/needs-you-more";
+import { DraftMessageLink } from "@/components/messages/draft-message-link";
 
 // Each kind on a card tinted by what it is about (Look Refresh, Nov 20): someone waiting on the coach in coral, something due in the accent, a check-in in blue.
 const SLOT_LOOK: Record<NeedsYouSlot, { card: string; title: string }> = {
@@ -45,6 +46,11 @@ export function NeedsYouStrip({ view, viewer = null }: { view: NeedsYouView; vie
                   <div className="mt-auto">
                     <QuietClientNudgeButton athleteId={item!.nudge.athleteId} athleteFirstName={item!.nudge.firstName} groupId={item!.nudge.groupId} coachId={viewer.id} coachName={viewer.name} />
                   </div>
+                ) : item!.draft ? (
+                  // the conversation, with the drafted message kept in this tab (never in the address)
+                  <DraftMessageLink threadHref={item!.draft.threadHref} draft={item!.draft.text} className="mt-auto inline-flex items-center justify-center h-11 px-5 bg-rust text-graphite font-body text-sm font-medium self-start">
+                    {item!.button}
+                  </DraftMessageLink>
                 ) : item!.claimLink ? (
                   // "Send link" emails the sign-in link from here (the profile's same send and confirm), with Sign-in options beside it
                   <NeedsYouSendLink groupId={item!.claimLink.groupId} athleteId={item!.claimLink.athleteId} optionsHref={item!.href} />

@@ -106,6 +106,8 @@ export interface NeedsYouItem {
   nudge?: { athleteId: string; groupId: string; firstName: string };
   // The button emails the client their sign-in link from the card (the same send and confirm as the profile's button), instead of a link. Only for a client who has not signed in.
   claimLink?: { athleteId: string; groupId: string };
+  // The button opens a conversation with this drafted message in its box. The words are kept in the tab when it is pressed and the address carries only a key (lib/message-draft.ts).
+  draft?: { threadHref: string; text: string };
 }
 
 export interface SlotView {

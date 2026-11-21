@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { DraftMessageLink } from "@/components/messages/draft-message-link";
 import { ChevronDown } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { ProgressCardData } from "@/lib/progress-look-gather";
@@ -402,15 +403,15 @@ export function ProgressCardView({
       )}
 
       <div className="mt-3 flex flex-wrap items-center gap-3 font-body text-xs">
-        <Link prefetch={false} href={`/groups/${card.groupId}/messages/${card.athleteId}?draft=${encodeURIComponent(noteDraft)}`} className="text-rust-ink underline">
+        <DraftMessageLink threadHref={`/groups/${card.groupId}/messages/${card.athleteId}`} draft={noteDraft} className="text-rust-ink underline">
           Draft a note to {first || "them"}
-        </Link>
+        </DraftMessageLink>
         <Link prefetch={false} href={`/groups/${card.groupId}/calendar?client=${card.athleteId}&scheduleFor=${card.athleteId}`} className="text-steel underline">
           Suggest a time
         </Link>
-        <Link prefetch={false} href={`/groups/${card.groupId}/messages/${card.athleteId}?draft=${encodeURIComponent(helpDraft)}`} className="text-steel underline">
+        <DraftMessageLink threadHref={`/groups/${card.groupId}/messages/${card.athleteId}`} draft={helpDraft} className="text-steel underline">
           Ask what they need most help with
-        </Link>
+        </DraftMessageLink>
       </div>
     </li>
   );

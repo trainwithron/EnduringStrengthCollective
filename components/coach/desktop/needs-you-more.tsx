@@ -5,6 +5,7 @@ import Link from "next/link";
 import { FEWER_LABEL, moreLabel, type NeedsYouItem } from "@/lib/needs-you";
 import { QuietClientNudgeButton } from "@/components/coach/quiet-client-nudge-button";
 import { EmailClaimLinkButton } from "@/components/coach/email-claim-link-button";
+import { DraftMessageLink } from "@/components/messages/draft-message-link";
 
 // "Send link" on a Needs you item for a client who has not signed in (audit, Nov 21): emails their sign-in link right from Home, with the same confirm as the profile's button when a working
 // link already exists. When the email cannot go, the link comes back to copy, and "Sign-in options" opens the profile's section with every other way.
@@ -53,6 +54,13 @@ export function NeedsYouSendLink({ groupId, athleteId, optionsHref, compact = fa
 function ItemAction({ item, viewer }: { item: NeedsYouItem; viewer: { id: string; name: string } | null }) {
   if (item.nudge && viewer) {
     return <QuietClientNudgeButton athleteId={item.nudge.athleteId} athleteFirstName={item.nudge.firstName} groupId={item.nudge.groupId} coachId={viewer.id} coachName={viewer.name} />;
+  }
+  if (item.draft) {
+    return (
+      <DraftMessageLink threadHref={item.draft.threadHref} draft={item.draft.text} className="inline-flex items-center min-h-11 font-body text-sm font-semibold text-rust-ink hover:underline underline-offset-2">
+        {item.button}
+      </DraftMessageLink>
+    );
   }
   if (item.claimLink) return <NeedsYouSendLink groupId={item.claimLink.groupId} athleteId={item.claimLink.athleteId} optionsHref={item.href} compact />;
   return (

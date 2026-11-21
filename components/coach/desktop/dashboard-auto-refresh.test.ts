@@ -79,8 +79,11 @@ describe("Home does not prefetch every client link at once", () => {
     ]) {
       const s = readFileSync(join(root, f), "utf8");
       const links = s.match(/<Link\s/g)?.length ?? 0;
-      expect(links, f).toBeGreaterThan(0);
+      // a drafted-message link (components/messages/draft-message-link.tsx) is a Link that never prefetches either
+      const draftLinks = s.match(/<DraftMessageLink\s/g)?.length ?? 0;
+      expect(links + draftLinks, f).toBeGreaterThan(0);
       expect(s.match(/<Link prefetch=\{false\}/g)?.length ?? 0, f).toBe(links);
     }
+    expect(readFileSync(join(root, "components/messages/draft-message-link.tsx"), "utf8")).toContain("<Link prefetch={false}");
   });
 });

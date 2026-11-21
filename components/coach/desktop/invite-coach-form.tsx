@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { UserPlus } from "lucide-react";
 
 // The invitation whose email did not go out, so Send again and Copy link are offered right in the message (audit, Nov 21). The server hands back one id whatever kind of address it was
-// (a new address: the person waiting to accept; an address that already had an account: their in-app invitation), so the answer never tells which; these buttons try the new-address
-// calls first (the Invitations list's own routes) and the in-app invitation's calls when that one is not it.
+// (a new address: the person waiting to accept; an address that already had an account: their in-app invitation), so the answer never tells which. Both buttons call ONE route
+// (/api/coaches/invite/retry) that works out the kind on the server and answers the same way for both, so nothing seen in the browser tells which kind it was.
 type Unsent = { id: string; name: string } | null;
 
 async function postJson(path: string, body: Record<string, string>): Promise<{ status: number; ok: boolean; data: any }> {
@@ -22,8 +22,7 @@ function UnsentInviteActions({ groupId, id, name }: { groupId: string; id: strin
     setWorking("resend");
     setMessage(null);
     try {
-      let r = await postJson("/api/coaches/invite/resend", { groupId, profileId: id });
-      if (r.status === 404) r = await postJson("/api/org-invites/resend", { inviteId: id });
+      const r = await postJson("/api/coaches/invite/retry", { groupId, unsentId: id, action: "resend" });
       if (!r.ok) setMessage({ ok: false, text: r.data.error || "Couldn't send it again. Try again." });
       else if (r.data.emailed === false) setMessage({ ok: false, text: `The email to ${name} did not go out again. Use Copy link and send it yourself.` });
       else setMessage({ ok: true, text: `Sent again to ${name}.` });
@@ -38,8 +37,8 @@ function UnsentInviteActions({ groupId, id, name }: { groupId: string; id: strin
     setMessage(null);
     setShownLink(null);
     try {
-      const r = await postJson("/api/coaches/invite/link", { groupId, profileId: id });
-      const link = r.ok && typeof r.data.link === "string" ? r.data.link : r.status === 404 ? `${window.location.origin}/org-invite/${id}` : null;
+      const r = await postJson("/api/coaches/invite/retry", { groupId, unsentId: id, action: "link" });
+      const link = r.ok && typeof r.data.link === "string" ? r.data.link : null;
       if (!link) {
         setMessage({ ok: false, text: r.data.error || "Couldn't get the link. Try again." });
         return;

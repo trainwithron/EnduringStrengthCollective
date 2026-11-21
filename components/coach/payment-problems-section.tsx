@@ -4,6 +4,7 @@ import Link from "next/link";
 import { chunk } from "@/lib/chunk";
 import { addSessionsHref } from "@/lib/add-sessions-link";
 import { OpenStripeButton } from "@/components/coach/open-stripe-button";
+import { DraftMessageLink } from "@/components/messages/draft-message-link";
 
 // A short note for a client whose card failed, opened in the message box for the coach to edit and send (audit, Nov 21).
 export function failedCardDraft(firstName: string): string {
@@ -111,9 +112,9 @@ export async function PaymentProblemsSection({ groupIds, timezone }: { groupIds:
               {HELP[e.kind] ? ` · ${HELP[e.kind]}` : ""}
             </p>
             {client && e.kind === "payment_failed" && (
-              <Link prefetch={false} href={`/groups/${client.groupId}/messages/${client.athleteId}?draft=${encodeURIComponent(failedCardDraft(first))}`} className="inline-flex items-center min-h-11 font-body text-sm font-semibold text-rust-ink hover:underline underline-offset-2">
+              <DraftMessageLink threadHref={`/groups/${client.groupId}/messages/${client.athleteId}`} draft={failedCardDraft(first)} className="inline-flex items-center min-h-11 font-body text-sm font-semibold text-rust-ink hover:underline underline-offset-2">
                 {first ? `Message ${first}` : "Message them"}
-              </Link>
+              </DraftMessageLink>
             )}
             {client && e.kind === "refund" && (
               <Link prefetch={false} href={addSessionsHref(client.groupId, client.athleteId)} className="inline-flex items-center min-h-11 font-body text-sm font-semibold text-rust-ink hover:underline underline-offset-2">
