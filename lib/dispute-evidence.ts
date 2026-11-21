@@ -129,8 +129,9 @@ export type EvidenceLoad = { ok: true; evidence: DisputeEvidence } | { ok: false
 
 // db: the signed-in coach's own client. server: the server's client, used only after the coach has been checked, and only for this payment's package (which belongs to
 // whichever coach of the space made it) and for this client's classes and Quick Payments in this space.
-// A Quick Payment ({ kind: "quick", groupId }): the coach is checked in that space FIRST, and only then is the charge read with the server's key, by its id, in that space,
-// and only when it is a Stripe card charge (a Stripe checkout id). Its window runs to the client's next payment of either kind in the space, or today.
+// A Quick Payment ({ kind: "quick", groupId }): the coach is checked in that space FIRST, then the charge is read under their own sign-in (row security: the coach who
+// charged it, or the organization's owner or an admin), by its id, in that space, and only when it is a Stripe card charge (a Stripe checkout id). The server's key is used
+// only after that. Its window runs to the client's next payment of either kind in the space, or today.
 export async function loadDisputeEvidence(
   db: any,
   server: any,
@@ -149,7 +150,9 @@ export async function loadDisputeEvidence(
   if (kind === "quick") {
     if (!args.groupId) return notThere;
     if (!(await coachOf(args.groupId))) return notCoach;
-    const { data: q, error } = await server
+    // Read under the coach's own sign-in, so row security decides: the coach who charged it (only their Stripe account can answer the dispute), or the organization's owner
+    // or an admin. Another coach of the space is told it is not there.
+    const { data: q, error } = await db
       .from("coach_quick_payments")
       .select("id, created_at, amount_cents, description, stripe_checkout_session_id, athlete_id, group_id")
       .eq("id", args.purchaseId)
@@ -197,9 +200,9 @@ export async function loadDisputeEvidence(
 
   const [next, nextQuick, people, group, intake, legal] = await Promise.all([
     db.from("credit_purchases").select("created_at").eq("athlete_id", payment.athleteId).eq("group_id", payment.groupId).gt("created_at", payment.createdAt).order("created_at", { ascending: true }).limit(1),
-    // a Quick Payment's window also ends at the client's next Quick Payment
+    // a Quick Payment's window also ends at the client's next Quick Payment (read under the coach's own sign-in, like the charge itself)
     kind === "quick"
-      ? server.from("coach_quick_payments").select("created_at").eq("athlete_id", payment.athleteId).eq("group_id", payment.groupId).like("stripe_checkout_session_id", "cs_%").gt("created_at", payment.createdAt).order("created_at", { ascending: true }).limit(1)
+      ? db.from("coach_quick_payments").select("created_at").eq("athlete_id", payment.athleteId).eq("group_id", payment.groupId).like("stripe_checkout_session_id", "cs_%").gt("created_at", payment.createdAt).order("created_at", { ascending: true }).limit(1)
       : Promise.resolve({ data: [], error: null }),
     db.from("profiles").select("id, full_name").in("id", [payment.athleteId, args.viewerId]),
     db.from("groups").select("name").eq("id", payment.groupId).maybeSingle(),
