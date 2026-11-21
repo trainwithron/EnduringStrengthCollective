@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { WellnessCheckinWidget, type WellnessCheckinValues } from "./wellness-checkin-widget";
 import { OPEN_CHECKIN_EVENT } from "./today-tiles";
+import { HomeSheet } from "./home-sheet";
 
 const DISMISS_KEY_PREFIX = "wellness-popup-dismissed-";
 // Deliberately sessionStorage, not localStorage: Ron's own call
@@ -90,9 +91,8 @@ export function WellnessCheckinPopup({
   const [snoozed, setSnoozed] = useState(true); // same reasoning — defaults hidden until confirmed
 
   // The Check in tile on Home opens it on purpose (Look Refresh, Nov 20): then it shows even when it was skipped, snoozed or already answered (to change today's answers).
-  // Opening it changes nothing stored: a skip or a snooze stays as it was.
+  // Opening it changes nothing stored: a skip or a snooze stays as it was. Since Nov 21 (Ron) the tile opens it as a pop-up over Home, never by scrolling the page.
   const [opened, setOpened] = useState(false);
-  const sectionRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     setDismissed(!!initialCheckin || readDismissed(todayDate));
@@ -105,10 +105,6 @@ export function WellnessCheckinPopup({
     window.addEventListener(OPEN_CHECKIN_EVENT, open);
     return () => window.removeEventListener(OPEN_CHECKIN_EVENT, open);
   }, []);
-
-  useEffect(() => {
-    if (opened) sectionRef.current?.scrollIntoView({ block: "nearest" });
-  }, [opened]);
 
   if (!opened && (checkin || dismissed || snoozed)) return null;
 
@@ -124,8 +120,8 @@ export function WellnessCheckinPopup({
     setOpened(false);
   }
 
-  return (
-    <section ref={sectionRef} id="checkin" className="bg-surface rounded-card p-4 scroll-mt-4" aria-label="Wellness check-in" data-wellness-card>
+  const body = (
+    <>
       <WellnessCheckinWidget
         athleteId={athleteId}
         groupId={groupId}
@@ -137,13 +133,7 @@ export function WellnessCheckinPopup({
         }}
         lifeImpactPrompt={lifeImpactPrompt}
       />
-      {checkin ? (
-        <div className="flex justify-center mt-1">
-          <button type="button" onClick={() => setOpened(false)} className="h-11 font-body text-sm text-steel">
-            Close
-          </button>
-        </div>
-      ) : (
+      {checkin ? null : (
         <div className="flex flex-wrap justify-center gap-x-6 mt-1">
           <button type="button" onClick={handleSkip} className="h-11 font-body text-sm text-steel">
             Skip for today
@@ -153,6 +143,22 @@ export function WellnessCheckinPopup({
           </button>
         </div>
       )}
+    </>
+  );
+
+  // Opened from the tile: the same check-in in a pop-up over Home, with a close button (closing it changes nothing stored). Otherwise the card in the page, as before.
+  if (opened) {
+    return (
+      <HomeSheet open title="Wellness check-in" showTitle={false} onClose={() => setOpened(false)} returnFocusTo='[data-tile="checkin"]'>
+        <div data-wellness-card data-checkin-sheet>
+          {body}
+        </div>
+      </HomeSheet>
+    );
+  }
+  return (
+    <section id="checkin" className="bg-surface rounded-card p-4" aria-label="Wellness check-in" data-wellness-card>
+      {body}
     </section>
   );
 }

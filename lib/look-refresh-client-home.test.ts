@@ -29,11 +29,11 @@ describe("client Home: today first", () => {
       expect(page.indexOf(later), later).toBeGreaterThan(day);
     }
   });
-  it("the three tiles open what Home already had: the check-in, the weight log and the InBody scans", () => {
+  it("the three tiles open what Home already had: the check-in, the weight log and the InBody scans (each in a pop-up since Nov 21: lib/home-tiles-open.test.ts)", () => {
     const tiles = read("components/athlete/today-tiles.tsx");
     expect(tiles).toContain('data-tile="checkin"');
-    expect(tiles).toContain('href="#log-weight"');
-    expect(tiles).toContain("window.dispatchEvent(new Event(OPEN_INBODY_EVENT))");
+    expect(tiles).not.toContain('href="#log-weight"');
+    expect(tiles).toContain("openFromTile(e, OPEN_INBODY_EVENT)");
     expect(read("components/athlete/wellness-checkin-popup.tsx")).toContain("window.addEventListener(OPEN_CHECKIN_EVENT, open);");
     expect(read("components/body/inbody-entry.tsx")).toContain("window.addEventListener(OPEN_INBODY_EVENT, openIt);");
   });

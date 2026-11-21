@@ -1,11 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { localDateKey } from "@/lib/timezone";
 import { computeNewlyCrossedThresholds } from "@/lib/transformation-milestones";
-import { displayWeightValue, formatWeight, parseWeightInput, type WeightUnit } from "@/lib/units";
+import { displayWeightValue, formatWeight, parseWeightInput, weightUnitLabel, type WeightUnit } from "@/lib/units";
+import { HomeSheet } from "@/components/athlete/home-sheet";
+
+// The Log weight tile on Home (Ron, Nov 21) opens a small pop-up: one number box, already focused so the phone keyboard comes up, in the client's unit, with Save and Cancel.
+// It is the same save as the form below (saveWeight), and after it the pop-up says "Saved: 182.4 lb" and closes.
+export const OPEN_WEIGHT_EVENT = "open-weight-log";
+export const SAVED_CLOSE_MS = 1400;
+export const savedWeightLine = (lbs: number, unit: WeightUnit) => `Saved: ${formatWeight(lbs, unit)}`;
 
 export interface WeightLogEntry {
   id: string;
@@ -22,12 +30,18 @@ export function WeightLogWidget({
   groupId,
   initialLogs,
   weightUnit = "lb",
+  opensFromTile = false,
+  initialSheetOpen = false,
 }: {
   athleteId: string;
   groupId: string;
   initialLogs: WeightLogEntry[];
   // How the client likes to see weight. Weights are always stored in pounds; this only changes what is shown and typed.
   weightUnit?: WeightUnit;
+  // On Home: the Log weight tile opens this widget's pop-up (only the one on Home listens, so a weight log on another page never opens too).
+  opensFromTile?: boolean;
+  // (tests: draw the pop-up open)
+  initialSheetOpen?: boolean;
 }) {
   const [logs, setLogs] = useState(initialLogs);
   const [weight, setWeight] = useState("");
@@ -44,10 +58,38 @@ export function WeightLogWidget({
   // is logged); actually generating/sharing a card stays the athlete's
   // own choice via the "Create a card" link below, never auto-published.
   const [newMilestone, setNewMilestone] = useState<{ id: string; thresholdLbs: number } | null>(null);
+  // The tile's pop-up: whether it is open, what is typed in it, and "Saved: 182.4 lb" once saved.
+  const [sheetOpen, setSheetOpen] = useState(initialSheetOpen);
+  const [sheetWeight, setSheetWeight] = useState("");
+  const [sheetSaved, setSheetSaved] = useState<string | null>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!opensFromTile) return;
+    // flushSync: the box is on the screen and focused while the tap is still being handled, which is when a phone lets the keyboard come up.
+    const open = () => {
+      if (closeTimer.current) clearTimeout(closeTimer.current);
+      flushSync(() => {
+        setSheetWeight("");
+        setSheetSaved(null);
+        setError(null);
+        setSheetOpen(true);
+      });
+    };
+    window.addEventListener(OPEN_WEIGHT_EVENT, open);
+    return () => window.removeEventListener(OPEN_WEIGHT_EVENT, open);
+  }, [opensFromTile]);
+
+  useEffect(
+    () => () => {
+      if (closeTimer.current) clearTimeout(closeTimer.current);
+    },
+    []
+  );
 
   const todayLog = logs.find((l) => l.loggedDate === todayIso());
 
-  async function checkTransformationMilestone(currentWeight: number) {
+  async function checkTransformationMilestone(currentWeight: number): Promise<boolean> {
     const supabase = createBrowserClient();
     const { data: firstEntry } = await supabase
       .from("body_weight_logs")
@@ -57,10 +99,10 @@ export function WeightLogWidget({
       .order("logged_date", { ascending: true })
       .limit(1)
       .maybeSingle();
-    if (!firstEntry) return;
+    if (!firstEntry) return false;
 
     const totalLossLbs = firstEntry.weight - currentWeight;
-    if (totalLossLbs <= 0) return;
+    if (totalLossLbs <= 0) return false;
 
     const { data: seenRows } = await supabase
       .from("transformation_milestones")
@@ -69,7 +111,7 @@ export function WeightLogWidget({
       .eq("group_id", groupId);
     const seen = new Set((seenRows ?? []).map((r) => r.threshold_lbs));
     const newly = computeNewlyCrossedThresholds(totalLossLbs, seen);
-    if (newly.length === 0) return;
+    if (newly.length === 0) return false;
 
     // A logging gap (or a real sudden jump) can cross several tiers at
     // once — mark all of them seen so none silently re-fires later, but
@@ -91,7 +133,57 @@ export function WeightLogWidget({
     const highestRow = (inserted ?? []).find((r) => r.threshold_lbs === highest);
     if (highestRow) {
       setNewMilestone({ id: highestRow.id, thresholdLbs: highest });
+      return true;
     }
+    return false;
+  }
+
+  // The one weight save, for the form below and the tile's pop-up: what was typed, in the client's unit, read once as pounds (what is stored). A converted number is never saved twice.
+  // Returns the pounds saved, or null (the problem is in `error`).
+  async function saveWeight(typed: string): Promise<number | null> {
+    const value = parseWeightInput(typed, weightUnit);
+    if (value == null) {
+      setError("That doesn't look like a body weight. Check the number.");
+      return null;
+    }
+
+    setSubmitting(true);
+    setError(null);
+    const supabase = createBrowserClient();
+    const date = todayIso();
+
+    const { data, error: upsertError } = await supabase
+      .from("body_weight_logs")
+      .upsert(
+        { athlete_id: athleteId, group_id: groupId, logged_date: date, weight: value },
+        { onConflict: "athlete_id,logged_date" }
+      )
+      .select("id, logged_date, weight")
+      .single();
+
+    if (upsertError || !data) {
+      setError(upsertError?.message ?? "Couldn't save weight.");
+      setSubmitting(false);
+      return null;
+    }
+
+    setLogs((prev) => [
+      { id: data.id, loggedDate: data.logged_date, weight: data.weight },
+      ...prev.filter((l) => l.loggedDate !== date),
+    ]);
+    setSubmitting(false);
+    return data.weight;
+  }
+
+  async function handleSheetSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (submitting) return;
+    const saved = await saveWeight(sheetWeight);
+    if (saved == null) return;
+    setSheetSaved(savedWeightLine(saved, weightUnit));
+    // A milestone just reached stays on the screen until they choose; otherwise the pop-up closes on its own.
+    const milestone = await checkTransformationMilestone(saved);
+    if (!milestone) closeTimer.current = setTimeout(() => setSheetOpen(false), SAVED_CLOSE_MS);
   }
 
   const milestoneBanner = newMilestone && (
@@ -117,10 +209,60 @@ export function WeightLogWidget({
     </div>
   );
 
+  const unitLabel = weightUnitLabel(weightUnit);
+  const sheet = opensFromTile && (
+    <HomeSheet open={sheetOpen} title="Log weight" onClose={() => setSheetOpen(false)} guard={() => (submitting ? "block" : "close")} returnFocusTo='[data-tile="weight"]'>
+      {sheetSaved ? (
+        <div data-weight-saved>
+          <p className="font-body text-base font-semibold text-win py-2" role="status">
+            {sheetSaved}
+          </p>
+          {milestoneBanner}
+          <button type="button" onClick={() => setSheetOpen(false)} className="mt-2 w-full h-11 rounded-token-pill border border-steel/40 font-body text-sm text-chalk">
+            Close
+          </button>
+        </div>
+      ) : (
+        <form onSubmit={handleSheetSubmit} data-weight-sheet>
+          <label htmlFor="weight-sheet-input" className="block font-body text-sm text-steel">
+            {todayLog ? `Today's weight in ${unitLabel} (now ${formatWeight(todayLog.weight, weightUnit)})` : `Today's weight in ${unitLabel}`}
+          </label>
+          <input
+            id="weight-sheet-input"
+            type="text"
+            inputMode="decimal"
+            enterKeyHint="done"
+            autoComplete="off"
+            autoFocus
+            value={sheetWeight}
+            onChange={(e) => setSheetWeight(e.target.value)}
+            className="mt-2 w-full h-14 rounded-row bg-surface-2 border border-steel/30 text-chalk px-4 font-display text-2xl tabular-nums focus:outline-none focus:border-rust"
+          />
+          {error && (
+            <p className="font-body text-xs text-rust-ink mt-2" role="alert">
+              {error}
+            </p>
+          )}
+          <div className="mt-4 grid grid-cols-2 gap-2.5">
+            <button type="button" onClick={() => setSheetOpen(false)} disabled={submitting} className="h-11 rounded-token-pill border border-steel/40 font-body text-sm text-chalk disabled:opacity-40">
+              Cancel
+            </button>
+            <button type="submit" disabled={submitting || !sheetWeight.trim()} className="h-11 rounded-token-pill bg-rust text-graphite font-body text-sm font-semibold disabled:opacity-40">
+              {submitting ? "Saving..." : "Save"}
+            </button>
+          </div>
+        </form>
+      )}
+    </HomeSheet>
+  );
+  // While the pop-up is open the milestone shows in it, not twice.
+  const pageBanner = sheet && sheetOpen ? null : milestoneBanner;
+
   if (!expanded) {
     return (
       <div>
-        {milestoneBanner}
+        {sheet}
+        {pageBanner}
         <button
           type="button"
           onClick={() => setExpanded(true)}
@@ -137,46 +279,17 @@ export function WeightLogWidget({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    // What they typed, in their unit, read once as pounds (what is stored). A converted number is never saved twice.
-    const value = parseWeightInput(weight, weightUnit);
-    if (value == null) {
-      setError("That doesn't look like a body weight. Check the number.");
-      return;
-    }
-
-    setSubmitting(true);
-    setError(null);
-    const supabase = createBrowserClient();
-    const date = todayIso();
-
-    const { data, error: upsertError } = await supabase
-      .from("body_weight_logs")
-      .upsert(
-        { athlete_id: athleteId, group_id: groupId, logged_date: date, weight: value },
-        { onConflict: "athlete_id,logged_date" }
-      )
-      .select("id, logged_date, weight")
-      .single();
-
-    if (upsertError || !data) {
-      setError(upsertError?.message ?? "Couldn't save weight.");
-      setSubmitting(false);
-      return;
-    }
-
-    setLogs((prev) => [
-      { id: data.id, loggedDate: data.logged_date, weight: data.weight },
-      ...prev.filter((l) => l.loggedDate !== date),
-    ]);
+    const saved = await saveWeight(weight);
+    if (saved == null) return;
     setWeight("");
-    setSubmitting(false);
     setExpanded(false);
-    await checkTransformationMilestone(data.weight);
+    await checkTransformationMilestone(saved);
   }
 
   return (
     <div className="bg-surface rounded-card p-4">
-      {milestoneBanner}
+      {sheet}
+      {pageBanner}
       <div className="flex items-center justify-between mb-3">
         <h2 className="font-body text-[15px] font-semibold text-chalk">Body weight</h2>
         <button
@@ -207,7 +320,7 @@ export function WeightLogWidget({
         </button>
       </form>
 
-      {error && (
+      {error && !sheetOpen && (
         <p className="font-body text-xs text-rust-ink mt-2" role="alert">
           {error}
         </p>

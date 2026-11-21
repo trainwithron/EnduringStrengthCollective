@@ -5,7 +5,8 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { resizePhoto, type ResizedPhoto } from "@/lib/image-resize";
 import { EMPTY_SCAN, FIELD_LABELS, numberFromField, sanityChecks, valuesForSave, type Check, type ScanValues } from "@/lib/inbody-scan";
 
-type Step = "pick" | "reading" | "review" | "saving";
+export type InbodyStep = "pick" | "reading" | "review" | "saving";
+type Step = InbodyStep;
 
 const field = "h-11 w-full bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm";
 
@@ -23,6 +24,8 @@ export function InbodyScanFlow({
   athleteName,
   onSaved,
   onClose,
+  onStepChange,
+  framed = true,
 }: {
   athleteId: string;
   groupId: string;
@@ -30,10 +33,21 @@ export function InbodyScanFlow({
   athleteName: string;
   onSaved: () => void;
   onClose: () => void;
+  // Told where the flow is, so a pop-up around it knows when closing would lose work (the InBody tile on Home).
+  onStepChange?: (step: InbodyStep) => void;
+  // false inside a pop-up, which is its own frame.
+  framed?: boolean;
 }) {
   const coachAdding = viewerId !== athleteId;
-  const fileRef = useRef<HTMLInputElement>(null);
+  // Two ways in (Ron, Nov 21): the camera (capture) or the phone's photos (no capture, so the gallery opens).
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState<Step>("pick");
+  const frame = framed ? "border border-steel/20 p-4" : "";
+  useEffect(() => {
+    onStepChange?.(step);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
   const [photo, setPhoto] = useState<ResizedPhoto | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -166,19 +180,25 @@ export function InbodyScanFlow({
 
   if (step === "pick") {
     return (
-      <div className="border border-steel/20 p-4">
+      <div className={frame} data-inbody-pick>
         <p className="font-body text-sm text-chalk">Take or choose a photo of the whole InBody sheet, held flat.</p>
         <p className="font-body text-xs text-steel mt-1">We read the numbers for you to check. Nothing is saved until you say so, and the photo is kept so you don&apos;t need the paper.</p>
         {/* Ron, Nov 20 (S5): say plainly that an outside service reads the photo. */}
         <p className="font-body text-xs text-steel mt-1" data-ai-disclosure>
           The photo is read by an outside AI service (Anthropic&apos;s Claude) to pull out the numbers.
         </p>
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <label className="inline-flex min-h-11 items-center cursor-pointer bg-rust text-graphite font-display font-bold uppercase tracking-wide px-4">
-            Choose a photo
-            <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => void onFile(e.target.files?.[0] ?? null)} />
-          </label>
-          <button type="button" onClick={onClose} className="min-h-11 px-2 font-body text-sm text-steel underline underline-offset-2">
+        <div className="mt-3 grid grid-cols-2 gap-2.5">
+          <button type="button" onClick={() => cameraRef.current?.click()} className="min-h-11 px-3 rounded-token-pill bg-rust text-graphite font-body text-sm font-semibold" data-inbody-camera>
+            Take a photo
+          </button>
+          <button type="button" onClick={() => galleryRef.current?.click()} className="min-h-11 px-3 rounded-token-pill border border-rust/50 text-rust-ink font-body text-sm font-semibold" data-inbody-gallery>
+            Upload a photo
+          </button>
+        </div>
+        <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" tabIndex={-1} aria-hidden="true" onChange={(e) => void onFile(e.target.files?.[0] ?? null)} />
+        <input ref={galleryRef} type="file" accept="image/*" className="hidden" tabIndex={-1} aria-hidden="true" onChange={(e) => void onFile(e.target.files?.[0] ?? null)} />
+        <div className="mt-2 flex justify-center">
+          <button type="button" onClick={onClose} className="min-h-11 px-3 font-body text-sm text-steel">
             Cancel
           </button>
         </div>
@@ -193,14 +213,14 @@ export function InbodyScanFlow({
 
   if (step === "reading") {
     return (
-      <div className="border border-steel/20 p-4" role="status">
+      <div className={frame} role="status">
         <p className="font-body text-sm text-chalk">Reading your sheet…</p>
       </div>
     );
   }
 
   return (
-    <div className="border border-steel/20 p-4">
+    <div className={frame}>
       <h3 className="font-display uppercase text-sm tracking-wide text-steel">Check the numbers before you save</h3>
       <p className="font-body text-xs text-steel mt-1">Imported from a photo, check the numbers. Leave a box blank if you can&apos;t read it.</p>
       {notice && (

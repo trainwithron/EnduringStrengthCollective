@@ -24,7 +24,7 @@ function unlockLabel(unlocksOn: Date | null | undefined, fallback: string): stri
 // gets an action control, only a read of what actually happened or
 // what's planned. See [[athlete_home_calendar_redesign]] rule #1.
 // Look Refresh (client step, Ron Nov 20): the Today card comes first (the day, the program, "Week x of y", how many workouts are done, one big Start
-// workout), then three tiles (Check in, Log weight, InBody) that open what is further down, then the check-in, the programs, and the day's nutrition and weight.
+// workout), then three tiles (Check in, Log weight, InBody) that each open a pop-up over Home (Nov 21), then the check-in, the programs, and the day's nutrition and weight.
 export function DayCard({
   groupId,
   athleteId,
@@ -103,7 +103,7 @@ export function DayCard({
         <>
           <TodayWidget todayDate={dateKey} macros={macros} habits={habits} mealLine={mealLine ?? null} mealHref={`/groups/${groupId}/nutrition`} />
           <div id="log-weight" className="scroll-mt-4">
-            <WeightLogWidget athleteId={athleteId} groupId={groupId} initialLogs={weightLogs} weightUnit={weightUnit} />
+            <WeightLogWidget athleteId={athleteId} groupId={groupId} initialLogs={weightLogs} weightUnit={weightUnit} opensFromTile />
           </div>
           <InbodyEntry athleteId={athleteId} groupId={groupId} />
         </>

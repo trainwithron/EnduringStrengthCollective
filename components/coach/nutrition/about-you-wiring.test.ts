@@ -99,7 +99,8 @@ describe("the weekly job", () => {
 
 describe("units", () => {
   it("the client's weight log is typed and shown in their unit and stored once as pounds", () => {
-    expect(weightWidget).toContain("parseWeightInput(weight, weightUnit)");
+    // (the one save, for the form and the Home tile's pop-up, Nov 21)
+    expect(weightWidget).toContain("parseWeightInput(typed, weightUnit)");
     expect(weightWidget).toContain("formatWeight(todayLog.weight, weightUnit)");
   });
   it("the coach's weekly panel, the calculator and the food week follow the client's unit", () => {
