@@ -17,6 +17,8 @@ describe("a client with macros switched off", () => {
     const section = read("components/athlete/food-log-section.tsx");
     expect(section).toContain(") : coachProgramming ? (");
     expect(section).toContain(") : null}");
-    expect(read("components/athlete/meal-checkoff-list.tsx")).toContain("Your coach is still setting up your meal plan.");
+    // and with no plan it promises nothing at all (CL3, Nov 21: "still setting up" stayed for good)
+    expect(read("components/athlete/meal-checkoff-list.tsx")).toContain("if (meals.length === 0) return null;");
+    expect(read("components/athlete/meal-checkoff-list.tsx")).not.toContain("still setting up your meal plan");
   });
 });

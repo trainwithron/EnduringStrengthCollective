@@ -46,7 +46,7 @@ import { FOOD_LOG_BASE_SELECT, FOOD_LOG_DETAIL_SELECT, entryFromRow, type FoodLo
 import { foodDayHeading, foodDayLabel, loggedTotalsTitle, shownFoodDay } from "@/lib/food-day";
 import { FoodDaySwitcher } from "@/components/athlete/food-day-switcher";
 import { getCoachClients } from "@/lib/coach-clients";
-import { FOOD_TRACKING_OFF_LINE, SELF_NO_CHECKIN_LINE, dailyCaloriesFromLog } from "@/lib/nutrition-tracking";
+import { FOOD_TRACKING_OFF_LINE, canDrawTrend, dailyCaloriesFromLog } from "@/lib/nutrition-tracking";
 import { addDaysToKey } from "@/lib/date-key";
 import { fetchFoodLogDay } from "@/lib/food-entry";
 import { NOT_IMPORTED } from "@/lib/imported-food";
@@ -170,7 +170,10 @@ export default async function NutritionPage(
                 Targets, meal plans and what each client actually ate, in one place.
               </p>
             </div>
-            <NutritionYouthModeToggle groupId={params.groupId} initialEnabled={group?.nutrition_youth_mode ?? false} />
+            {/* A team or social group's own setting: not shown for a one-on-one client's group (DK7, Nov 21), and it names the group it changes. */}
+            {((group as { group_kind?: string | null } | null)?.group_kind === "team" || (group as { group_kind?: string | null } | null)?.group_kind === "social") && (
+              <NutritionYouthModeToggle groupId={params.groupId} initialEnabled={group?.nutrition_youth_mode ?? false} groupName={group?.name ?? null} />
+            )}
           </div>
           <nav aria-label="Nutrition" className="mt-4 flex gap-1">
             {TABS.map((t) => (
@@ -513,11 +516,9 @@ export default async function NutritionPage(
       {isActingAsOther && (
         <ActingAsBanner athleteFullName={actingAsFullName ?? "Client"} groupId={params.groupId} />
       )}
-      <header className="px-5 pt-4 pb-1">
-        <Link href={`/groups/${params.groupId}`} className="inline-flex items-center min-h-11 font-body text-[13px] font-semibold text-steel">
-          &larr; Home
-        </Link>
-        <h1 className="font-display font-semibold text-3xl leading-none mt-1">Nutrition</h1>
+      {/* (CL21, Nov 21: no "← Home"; Nutrition is a tab of the bar at the bottom) */}
+      <header className="px-5 pt-6 pb-1">
+        <h1 className="font-display font-semibold text-3xl leading-none">Nutrition</h1>
       </header>
 
       {/* coach_em_up_finley_funston_transcript.md — real client-safety
@@ -589,60 +590,31 @@ export default async function NutritionPage(
             )}
           </section>
 
-          {macrosEnabled && (
+          {/* Targets are on the totals ring at the top (CL4, Nov 21: this card repeated the same four numbers, and showed today's even on another day). It stays only to
+             hold "Set my targets" for a client who sets their own. */}
+          {/* Youth/Team mode keeps its protein-first targets here, a deliberate safety choice (no calorie framing); the totals ring does not do that itself. */}
+          {macrosEnabled && (setMyTargets || (youthMode && todayMacros?.proteinG != null)) && (
           <section id="my-targets" className="bg-surface rounded-card p-4 scroll-mt-4">
-            <p className="font-body text-[13px] font-semibold text-steel mb-2">
-              Today&apos;s targets
-            </p>
-            {todayMacros && (todayMacros.calories != null || todayMacros.proteinG != null) ? (
-              youthMode ? (
-                // Youth/Team mode: protein-first, no calorie-deficit framing —
-                // real disordered-eating-safety design decision, see
-                // calorie_tracking_ux_research_and_plan.md.
-                <div>
-                  <div className="text-center pb-3 mb-3 border-b border-steel/15">
-                    <p className="font-display text-4xl leading-none">{todayMacros.proteinG ?? "--"}g</p>
-                    <p className="font-body text-xs text-steel mt-1">Protein target</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-center">
-                    <div>
-                      <p className="font-display text-lg leading-none">{todayMacros.carbsG ?? "--"}</p>
-                      <p className="font-body text-xs text-steel mt-1">Carbs</p>
-                    </div>
-                    <div>
-                      <p className="font-display text-lg leading-none">{todayMacros.fatG ?? "--"}</p>
-                      <p className="font-body text-xs text-steel mt-1">Fat</p>
-                    </div>
-                  </div>
+            <p className="font-body text-[13px] font-semibold text-steel mb-2">{youthMode ? "Today's targets" : "Your targets"}</p>
+            {youthMode && todayMacros?.proteinG != null ? (
+              <div className={setMyTargets ? "mb-4 pb-4 border-b border-steel/15" : ""}>
+                <div className="text-center pb-3 mb-3 border-b border-steel/15">
+                  <p className="font-display text-4xl leading-none">{todayMacros.proteinG ?? "--"}g</p>
+                  <p className="font-body text-xs text-steel mt-1">Protein target</p>
                 </div>
-              ) : (
-                <div className="grid grid-cols-4 gap-2 text-center">
+                <div className="grid grid-cols-2 gap-2 text-center">
                   <div>
-                    <p className="font-display text-xl leading-none">{todayMacros.calories ?? "--"}</p>
-                    <p className="font-body text-xs text-steel mt-1">Kcal</p>
-                  </div>
-                  <div>
-                    <p className="font-display text-xl leading-none">{todayMacros.proteinG ?? "--"}</p>
-                    <p className="font-body text-xs text-steel mt-1">Protein</p>
-                  </div>
-                  <div>
-                    <p className="font-display text-xl leading-none">{todayMacros.carbsG ?? "--"}</p>
+                    <p className="font-display text-lg leading-none">{todayMacros.carbsG ?? "--"}</p>
                     <p className="font-body text-xs text-steel mt-1">Carbs</p>
                   </div>
                   <div>
-                    <p className="font-display text-xl leading-none">{todayMacros.fatG ?? "--"}</p>
+                    <p className="font-display text-lg leading-none">{todayMacros.fatG ?? "--"}</p>
                     <p className="font-body text-xs text-steel mt-1">Fat</p>
                   </div>
                 </div>
-              )
-            ) : setMyTargets ? null : (
-              <p className="font-body text-sm text-steel">No targets set for today yet.</p>
-            )}
-            {setMyTargets && (
-              <div className={todayMacros && (todayMacros.calories != null || todayMacros.proteinG != null) ? "mt-4 pt-4 border-t border-steel/15" : ""}>
-                <SetMyTargetsCard {...setMyTargets} />
               </div>
-            )}
+            ) : null}
+            {setMyTargets && <SetMyTargetsCard {...setMyTargets} />}
             {setMyTargets && <SetMyTargetsSheet {...setMyTargets} />}
           </section>
           )}
@@ -665,63 +637,50 @@ export default async function NutritionPage(
               partialLog={nutrientData.partialLog}
             />
           )}
-          {macrosEnabled && (
+          {/* Each of these shows only when it has something to show (CL3, Nov 21: empty sections under the food log were filler). */}
+          {macrosEnabled && latestCheckin && (
           <section>
             <h2 className="font-body text-[15px] font-semibold text-chalk mb-2">
               Why your target is what it is
             </h2>
-            {latestCheckin ? (
-              // The actual target numbers already render once, above, in
-              // "Today's targets" — a check-in applies straight to
-              // daily_macros, so repeating them here was a duplicate, not
-              // a second signal. This card's real, non-duplicate value is
-              // the *reasoning* behind the current target and when it was
-              // set.
-              <div className="bg-surface rounded-card p-4 space-y-3">
-                <p className="font-body text-sm text-chalk">{latestCheckin.rationale}</p>
-                <p className="font-body text-xs text-steel pt-2 border-t border-steel/15">
-                  {new Date(latestCheckin.created_at).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
-                </p>
-              </div>
-            ) : (
-              <p className="font-body text-sm text-steel bg-surface rounded-card p-4">
-                {/* A coach in their own personal space is their own coach. */}
-                {selfCoached ? (
-                  SELF_NO_CHECKIN_LINE
-                ) : (
-                  <>
-                    Your coach hasn&apos;t changed your target yet. When they do, why they changed it shows up here.
-                  </>
-                )}
+            {/* The target numbers are on the totals ring above: this card is the reasoning behind the current target and when it was set. */}
+            <div className="bg-surface rounded-card p-4 space-y-3">
+              <p className="font-body text-sm text-chalk">{latestCheckin.rationale}</p>
+              <p className="font-body text-xs text-steel pt-2 border-t border-steel/15">
+                {new Date(latestCheckin.created_at).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
               </p>
-            )}
+            </div>
           </section>
           )}
 
+          {canDrawTrend(weightTrendPoints) && (
           <section>
             <h2 className="font-body text-[15px] font-semibold text-chalk mb-2">
               Body weight
             </h2>
             <TrendChart points={weightTrendPoints} unit={` ${weightUnit}`} />
           </section>
+          )}
 
+          {canDrawTrend(caloriesEatenPoints) && (
           <section>
             <h2 className="font-body text-[15px] font-semibold text-chalk mb-2">
               Calories eaten
             </h2>
-            <TrendChart points={caloriesEatenPoints} unit=" cal" emptyLabel="Nothing logged in the last 30 days yet." />
+            <TrendChart points={caloriesEatenPoints} unit=" cal" />
           </section>
+          )}
 
-          {macrosEnabled && (
+          {macrosEnabled && canDrawTrend(calorieTrendPoints) && (
           <section>
             <h2 className="font-body text-[15px] font-semibold text-chalk mb-2">
               Calorie target
             </h2>
-            <TrendChart points={calorieTrendPoints} unit=" cal" emptyLabel="No calorie targets set yet." />
+            <TrendChart points={calorieTrendPoints} unit=" cal" />
           </section>
           )}
       </div>

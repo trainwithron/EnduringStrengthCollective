@@ -96,7 +96,9 @@ describe("where Set my targets shows", () => {
     expect(page).toContain(
       "macrosEnabled && coachSetsMacros && !youthMode && ownSpace && coachRowsOnly(standingHistory).length === 0 && !todayMacroRow && !(todayMealPlan?.macros as unknown);"
     );
-    expect(page).toContain(") : setMyTargets ? null : (\n              <p className=\"font-body text-sm text-steel\">No targets set for today yet.</p>");
+    // the targets card holds Set my targets (or youth mode's protein-first targets); the totals ring above says when there is no target (CL4, Nov 21)
+    expect(page).toContain("{macrosEnabled && (setMyTargets || (youthMode && todayMacros?.proteinG != null)) && (");
+    expect(page).not.toContain("No targets set for today yet.");
   });
   it("never for a coach acting as a client, but in the coach's own personal space", () => {
     expect(page).toContain("const ownSpace = !isActingAsOther || athleteId === user.id;");

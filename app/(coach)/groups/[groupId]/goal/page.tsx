@@ -7,11 +7,11 @@ import { createServerClient } from "@/lib/supabase/server";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { GoalProposalForm } from "@/components/athlete/goal-proposal-form";
 import { GoalAnswerControl } from "@/components/athlete/goal-answer-control";
-import { GOAL_TYPE_LABELS } from "@/lib/goal-types";
+import { GOAL_TYPE_LABELS, goalStatusWords } from "@/lib/goal-types";
 import { inOwnPersonalSpace } from "@/lib/personal-space";
 import { SubGoalsSection } from "@/components/shared/sub-goals-section";
 import { GoalSheetSection } from "@/components/shared/goal-sheet-section";
-import { GOAL_SHEET_COLUMNS, type GoalSheetRow } from "@/lib/goal-sheet";
+import { GOAL_SHEET_COLUMNS, goalSheetHasAnswers, type GoalSheetRow } from "@/lib/goal-sheet";
 import type { SubGoalStatus, SubGoalView } from "@/lib/sub-goals";
 import type { GoalType } from "@/lib/goal-reversal";
 
@@ -64,6 +64,8 @@ export default async function GoalPage(props: { params: Promise<{ groupId: strin
 
   // The goal sheet (before step 197 there is no such table: read as none, and the section shows empty)
   const { data: goalSheetRow } = await supabase.from("client_goal_sheets").select(GOAL_SHEET_COLUMNS).eq("athlete_id", user.id).eq("group_id", params.groupId).maybeSingle();
+  // The sheet goes first while it has no answers yet (CL19).
+  const sheetFirst = !goalSheetHasAnswers((goalSheetRow as GoalSheetRow | null) ?? null);
 
   const current = (goals ?? [])[0] ?? null;
   // A goal their coach suggested and the client has not answered yet.
@@ -94,6 +96,8 @@ export default async function GoalPage(props: { params: Promise<{ groupId: strin
       </header>
 
       <section className="px-5 pt-6">
+      {/* Not filled in yet: the goal sheet first, the thing the client usually came for ("Fill out your goal sheet"; CL19, Nov 21). */}
+      {sheetFirst && <GoalSheetSection groupId={params.groupId} athleteId={user.id} sheet={(goalSheetRow as GoalSheetRow | null) ?? null} viewer="client" startEditing={startEditing} />}
       {suggested && (
         <GoalAnswerControl
           goal={{
@@ -111,7 +115,7 @@ export default async function GoalPage(props: { params: Promise<{ groupId: strin
       {current && !suggested && (
         <div className="border border-steel/20 p-4 mb-6">
           <p className="font-body text-xs text-steel uppercase tracking-wide font-bold mb-1">
-            {current.status === "confirmed" ? "Current goal" : current.status === "proposed" ? "Waiting on your coach" : "Declined"}
+            {current.status === "confirmed" ? "Current goal" : goalStatusWords(current.status)}
           </p>
           <p className="font-body text-lg">{labelFor(current.goal_type, current.custom_label)}</p>
           {current.target_date && (
@@ -123,14 +127,18 @@ export default async function GoalPage(props: { params: Promise<{ groupId: strin
 
       <SubGoalsSection groupId={params.groupId} athleteId={user.id} viewerId={user.id} otherName="your coach" items={subGoals} />
 
-      <GoalSheetSection groupId={params.groupId} athleteId={user.id} sheet={(goalSheetRow as GoalSheetRow | null) ?? null} viewer="client" startEditing={startEditing} />
+      {!sheetFirst && <GoalSheetSection groupId={params.groupId} athleteId={user.id} sheet={(goalSheetRow as GoalSheetRow | null) ?? null} viewer="client" startEditing={startEditing} />}
 
-      <div className="border border-steel/20 p-4 mb-6">
-        <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">
+      {/* Changing the goal is a tap away, closed until asked for (CL19); with no goal yet it is open, as "Set your goal". */}
+      <details className="group border border-steel/20 p-4 mb-6" open={!current} data-goal-propose>
+        <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden min-h-11 flex items-center justify-between font-display uppercase text-sm tracking-wide text-steel">
           {current ? "Propose a change" : "Set your goal"}
-        </h2>
-        <GoalProposalForm athleteId={user.id} groupId={params.groupId} />
-      </div>
+          <span aria-hidden="true" className="text-steel group-open:rotate-90 transition-transform">&#9656;</span>
+        </summary>
+        <div className="mt-3">
+          <GoalProposalForm athleteId={user.id} groupId={params.groupId} />
+        </div>
+      </details>
 
       {history.length > 0 && (
         <div>
@@ -140,7 +148,7 @@ export default async function GoalPage(props: { params: Promise<{ groupId: strin
               <div key={g.id} className="py-2">
                 <p className="font-body text-sm">{labelFor(g.goal_type, g.custom_label)}</p>
                 <p className="font-body text-xs text-steel">
-                  {g.status} · {new Date(g.created_at).toLocaleDateString()}
+                  {goalStatusWords(g.status) || g.status} · {new Date(g.created_at).toLocaleDateString()}
                 </p>
               </div>
             ))}

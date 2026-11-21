@@ -412,10 +412,11 @@ describe("TC1b: one plain coach list at the top of the Clients page", () => {
     expect(home).toContain("hiddenProfileIds={[...pendingCoaches]}");
   });
 
-  it("Settings has Coaches and invitations, pointing at the list and the Team page", () => {
+  it("Settings has Coaches and invitations, one link to the Team page (DK15, Nov 21)", () => {
     const settings = src("app/(coach)/groups/[groupId]/settings/page.tsx");
     expect(settings).toContain('label="Coaches and invitations"');
-    expect(settings).toContain("See your coaches and invite one");
+    expect(settings).toContain("branding?tab=team");
+    expect(settings).toContain("Your coaches and invitations");
   });
 
   it("TC1c: the Clients link on a computer lands on /clients, so that coach-level page carries the same Coaches section at the top for every organization", () => {

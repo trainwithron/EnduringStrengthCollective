@@ -101,11 +101,8 @@ export interface HomeThreadInput {
   today: Date;
 }
 
-// The lines to show, in order. Empty when there is nothing to say.
+// The lines to show, in order. Empty when there is nothing to say. The program's place is NOT one of them (CL5, Nov 21): the Today card already says "Week x of y" and
+// how many are done, and a third copy pushed the rest of Home down. describeProgramPosition stays for anything else that says it.
 export function buildHomeThread(input: HomeThreadInput): string[] {
-  return [
-    describeGoal(input.goal, input.today),
-    describeProgramPosition(input.program, input.today),
-    describeStreak(currentWeekStreak(input.logDates, input.today)),
-  ].filter((x): x is string => !!x);
+  return [describeGoal(input.goal, input.today), describeStreak(currentWeekStreak(input.logDates, input.today))].filter((x): x is string => !!x);
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { SELF_NO_MEAL_PLAN_LINE } from "@/lib/nutrition-tracking";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { GeneratedMeal } from "@/lib/meal-engine";
 import { FavoriteStar } from "./favorite-star";
@@ -52,7 +51,7 @@ export function MealCheckoffList({
   // component owns its own per-meal display state, but isn't the source
   // of truth for anything aggregated across the whole day.
   onEntryLogged?: (entry: FoodLogEntry) => void;
-  // A coach in their own personal space (their own coach): no "your coach is still setting up" line.
+  // A coach in their own personal space (their own coach). (With no plan the list draws nothing at all now, so it needs no wording of its own; CL3, Nov 21.)
   selfCoached?: boolean;
 }) {
   const [entries, setEntries] = useState(initialEntries);
@@ -107,13 +106,8 @@ export function MealCheckoffList({
     setModifyingSlot(null);
   }
 
-  if (meals.length === 0) {
-    return (
-      <p className="font-body text-sm text-steel border border-steel/20 p-4">
-        {selfCoached ? SELF_NO_MEAL_PLAN_LINE : "Your coach is still setting up your meal plan. It will show up here once it is ready."}
-      </p>
-    );
-  }
+  // No plan yet: nothing here (CL3, Nov 21: the old placeholder promised a plan that might never come, for a coach who sets macros but no plan).
+  if (meals.length === 0) return null;
 
   return (
     <div className="space-y-2">

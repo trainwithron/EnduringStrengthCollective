@@ -16,3 +16,8 @@ export function clientGreeting({ clientName, coachName, now, timeZone }: { clien
     line: coach && coach !== "Unknown" ? `${date} · with Coach ${coach}` : date,
   };
 }
+
+// The one row on a client's Home that opens their messages (CL11, Nov 21): "Message Ron", or "Message your coach" with no name.
+export function messageCoachLabel(coachName: string | null | undefined): string {
+  return coachName && coachName.trim() ? `Message ${coachFirstName(coachName)}` : "Message your coach";
+}

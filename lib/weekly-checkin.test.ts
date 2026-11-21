@@ -239,7 +239,8 @@ describe("how it is wired", () => {
   });
   it("the client finds it on Home and any time at its own page; the coach from Clients and the notice", () => {
     const home = read("app/(coach)/groups/[groupId]/page.tsx");
-    expect(home).toContain("{isToday && checkinCard && <WeeklyCheckinCard");
+    // right under the workout and the tiles (CL8, Nov 21)
+    expect(home).toContain("{checkinCard && <WeeklyCheckinCard");
     expect(read("app/(coach)/groups/[groupId]/check-in/page.tsx")).toContain('membership?.role !== "athlete"');
     expect(read("app/(coach)/clients/page.tsx")).toContain("<CheckinsLink count={checkinCount} />");
     expect(read("app/(coach)/groups/[groupId]/clients/page.tsx")).toContain("<CheckinsLink count={checkinCount} />");

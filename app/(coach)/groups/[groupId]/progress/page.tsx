@@ -11,6 +11,7 @@ import { recapYearFor } from "@/lib/year-recap";
 import { greetingFirstName } from "@/lib/first-name";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { MyProgressView } from "@/components/athlete/progress/my-progress-view";
+import { InbodyEntry } from "@/components/body/inbody-entry";
 
 export const metadata = { title: "My progress" };
 
@@ -55,6 +56,12 @@ export default async function MyProgressPage(props: { params: Promise<{ groupId:
         incomplete={progress.incomplete}
         recapYear={recapYear}
       />
+      {/* The InBody scans and their graphs live here now (CL1, Nov 21: Home keeps only the InBody tile, which adds one). */}
+      <section className="px-5 pt-4" data-progress-inbody>
+        <div className="bg-surface rounded-card px-4 py-1">
+          <InbodyEntry athleteId={athleteId} groupId={params.groupId} />
+        </div>
+      </section>
       <BottomTabBar groupId={params.groupId} />
     </main>
   );

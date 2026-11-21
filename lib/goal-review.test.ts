@@ -49,7 +49,8 @@ describe("the 90-day goal look (Ron, Nov 20: R5)", () => {
     expect(route).toContain('.eq("athlete_id", user.id)');
     expect(route).toContain('.not("filled_at", "is", null)');
     expect(read("components/athlete/goal-review-card.tsx")).toContain('fetch("/api/goal-sheet/review"');
-    expect(read("app/(coach)/groups/[groupId]/page.tsx")).toContain("{isToday && goalReview && <GoalReviewCard");
+    // right under the workout and the tiles now (CL8, Nov 21)
+    expect(read("app/(coach)/groups/[groupId]/page.tsx")).toContain("{goalReview && <GoalReviewCard");
   });
 });
 

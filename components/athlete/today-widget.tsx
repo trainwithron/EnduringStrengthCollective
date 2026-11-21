@@ -24,6 +24,11 @@ export interface PinnedProShopLink {
   url: string;
 }
 
+// A whole number with thousands commas, or "--" when it is not known.
+export function shownNumber(n: number | null | undefined): string {
+  return n == null ? "--" : Math.round(n).toLocaleString("en-US");
+}
+
 export function TodayWidget({
   todayDate,
   macros,
@@ -31,7 +36,10 @@ export function TodayWidget({
   pinnedLinks,
   mealLine,
   mealHref,
+  eaten = null,
 }: {
+  // What is logged so far today (the same sum as the Nutrition page's ring): each number shows as eaten / target (CL22, Nov 21).
+  eaten?: { calories: number; proteinG: number; carbsG: number; fatG: number } | null;
   todayDate: string;
   macros: TodayMacros | null;
   habits: TodayHabit[];
@@ -75,27 +83,24 @@ export function TodayWidget({
       <h2 className="font-body text-[15px] font-semibold text-chalk mb-3">Nutrition and habits</h2>
 
       {hasMacros && (
-        <>
-        <p className="font-body text-[13px] font-semibold text-steel mb-1">Your targets today</p>
-        <div className="grid grid-cols-4 gap-2 text-center mb-4">
-          <div>
-            <p className="font-display text-lg leading-none">{macros!.calories ?? "--"}</p>
-            <p className="font-body text-xs text-steel mt-1">Kcal</p>
+        // The whole block opens Nutrition, where the food is logged (CL22).
+        <Link href={mealHref ?? "#"} className="block mb-4 -mx-1 px-1 rounded-row active:bg-surface-2" data-today-eaten>
+          <p className="font-body text-[13px] font-semibold text-steel mb-1">{eaten ? "Eaten today" : "Your targets today"}</p>
+          <div className="grid grid-cols-4 gap-2 text-center">
+            {[
+              { label: "Kcal", target: macros!.calories, eaten: eaten?.calories },
+              { label: "Protein", target: macros!.proteinG, eaten: eaten?.proteinG },
+              { label: "Carbs", target: macros!.carbsG, eaten: eaten?.carbsG },
+              { label: "Fat", target: macros!.fatG, eaten: eaten?.fatG },
+            ].map((m) => (
+              <div key={m.label} className="min-w-0">
+                <p className="font-display text-lg leading-none tabular-nums">{m.eaten == null ? shownNumber(m.target) : shownNumber(m.eaten)}</p>
+                {m.eaten != null && <p className="font-body text-[11px] text-steel tabular-nums mt-0.5">of {shownNumber(m.target)}</p>}
+                <p className="font-body text-xs text-steel mt-1">{m.label}</p>
+              </div>
+            ))}
           </div>
-          <div>
-            <p className="font-display text-lg leading-none">{macros!.proteinG ?? "--"}</p>
-            <p className="font-body text-xs text-steel mt-1">Protein</p>
-          </div>
-          <div>
-            <p className="font-display text-lg leading-none">{macros!.carbsG ?? "--"}</p>
-            <p className="font-body text-xs text-steel mt-1">Carbs</p>
-          </div>
-          <div>
-            <p className="font-display text-lg leading-none">{macros!.fatG ?? "--"}</p>
-            <p className="font-body text-xs text-steel mt-1">Fat</p>
-          </div>
-        </div>
-        </>
+        </Link>
       )}
 
       {mealLine && (

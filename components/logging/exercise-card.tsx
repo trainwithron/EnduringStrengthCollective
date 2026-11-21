@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { confirmDialog } from "@/components/shared/confirm-dialog";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { saved } from "@/lib/saved";
 import type { SessionExerciseEntry, SetLogEntry } from "@/lib/types";
@@ -116,6 +116,24 @@ export function ExerciseCard({
   }, [removed]);
   const [showLoad, setShowLoad] = useState(false);
   const [fieldsOpen, setFieldsOpen] = useState(false);
+  // Swap, Remove and Change what I log behind one "⋯" on the exercise (CL18, Nov 21: seven or eight small controls per exercise mid-set).
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const away = (e: PointerEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", away);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("pointerdown", away);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [menuOpen]);
   const [fieldsBusy, setFieldsBusy] = useState(false);
   // Phase 3 (custom_shape_theming_idea.md) — the per-set equipment-visual
   // confirm animation fires on a real weight commit, cleared shortly
@@ -441,15 +459,29 @@ export function ExerciseCard({
               )}
             </h2>
             {!readOnly && (
-              <div className="flex items-center gap-3 shrink-0">
+              <div ref={menuRef} className="relative shrink-0" data-exercise-menu>
                 <button
                   type="button"
+                  aria-label="More for this exercise"
+                  aria-haspopup="menu"
+                  aria-expanded={menuOpen}
+                  onClick={() => setMenuOpen((v) => !v)}
+                  className="min-w-11 min-h-11 -mr-2 flex items-center justify-center rounded-full font-body text-lg leading-none text-steel active:bg-surface-2"
+                >
+                  &#8943;
+                </button>
+                {menuOpen && (
+              <div role="menu" className="absolute right-0 top-full z-20 mt-1 w-56 rounded-card bg-surface-2 border border-steel/30 py-1 shadow-lg flex flex-col">
+                <button
+                  type="button"
+                  role="menuitem"
                   onClick={() => {
+                    setMenuOpen(false);
                     setNameDraft("");
                     setSwapError(null);
                     setSwapping(true);
                   }}
-                  className="min-h-11 px-2 -mx-2 font-body text-xs text-steel"
+                  className="min-h-11 px-4 text-left font-body text-sm text-chalk"
                 >
                   Swap exercise
                 </button>
@@ -459,7 +491,9 @@ export function ExerciseCard({
                   // never counted as missed.
                   <button
                     type="button"
+                    role="menuitem"
                     onClick={async () => {
+                      setMenuOpen(false);
                       if (
                         !exercise.isAdded &&
                         !(await confirmDialog({
@@ -472,11 +506,25 @@ export function ExerciseCard({
                       onDelete();
                     }}
                     disabled={deleting}
-                    className="min-h-11 px-2 -mx-2 font-body text-xs text-rust-ink disabled:opacity-40"
+                    className="min-h-11 px-4 text-left font-body text-sm text-rust-ink disabled:opacity-40"
                     data-remove-from-today={exercise.isAdded ? undefined : true}
                   >
                     {deleting ? "Removing…" : exercise.isAdded ? "Remove" : "Remove from today"}
                   </button>
+                )}
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setFieldsOpen(true);
+                  }}
+                  className="min-h-11 px-4 text-left font-body text-sm text-chalk"
+                  data-change-what-i-log
+                >
+                  Change what I log
+                </button>
+              </div>
                 )}
               </div>
             )}
@@ -621,13 +669,7 @@ export function ExerciseCard({
           // Edit metrics and Add weight / RPE sit at the right end of the Sets row (they used to take a row of their own above the sets); the fields popup opens above the row.
           trailing={
             <div className="relative flex items-center gap-3 whitespace-nowrap">
-              <button
-                type="button"
-                onClick={() => setFieldsOpen((v) => !v)}
-                className="font-body text-xs text-steel active:text-rust-ink transition-colors min-h-11"
-              >
-                Edit metrics
-              </button>
+              {/* (what is logged is changed from the exercise's "⋯", as "Change what I log"; this popup opens from there, with a Done to close it) */}
               {canAddLoad && (
                 <button type="button" onClick={() => setShowLoad(true)} className="font-body text-xs text-steel active:text-rust-ink min-h-11">
                   Add weight / RPE
@@ -666,6 +708,9 @@ export function ExerciseCard({
                       ))}
                     </div>
                   )}
+                  <button type="button" onClick={() => setFieldsOpen(false)} className="mt-1.5 w-full min-h-11 font-body text-sm text-chalk border border-steel/30" data-fields-done>
+                    Done
+                  </button>
                 </div>
               )}
             </div>

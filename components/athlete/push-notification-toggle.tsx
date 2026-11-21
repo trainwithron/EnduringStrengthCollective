@@ -59,18 +59,15 @@ export function PushNotificationToggle({
 
   // ---- tile: coach hub; shows only while off ----
   if (variant === "tile") {
-    if (state === "loading" || state === "on" || state === "unsupported") return null;
+    // Blocked on the phone itself: nothing can be done from here, so no box (PH13, Nov 21); Settings > Notifications explains it.
+    if (state === "loading" || state === "on" || state === "unsupported" || state === "denied") return null;
     return (
       <div className="border border-amber/50 bg-surface/60 px-4 py-3">
         <p className="font-body text-sm text-chalk">Turn on notifications</p>
         <p className="font-body text-xs text-steel mt-0.5">
           Get new messages, low-readiness flags and your daily summary on this phone.
         </p>
-        {state === "denied" ? (
-          <p className="font-body text-xs text-steel mt-2">
-            Notifications are blocked for this app. Turn them on in your phone&apos;s settings.
-          </p>
-        ) : needsInstall ? (
+        {needsInstall ? (
           <p className="font-body text-xs text-steel mt-2">
             Add this app to your home screen first. Notifications work from the home-screen app.
           </p>

@@ -13,7 +13,8 @@ const read = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").repla
 describe("client Home: today first", () => {
   it("the Today card comes first, then the three tiles, then the check-in, then the programs and the day's nutrition and weight", () => {
     const card = read("components/athlete/day-card.tsx");
-    const order = ["<WorkoutSection", "{isToday && <TodayTiles />}", "{checkin}", "{afterWorkout}", "<TodayWidget", 'id="log-weight"', "<InbodyEntry athleteId={athleteId} groupId={groupId} />"];
+    // the week's asks right under the check-in (CL8); the InBody line is only its pop-up (CL1)
+    const order = ["<WorkoutSection", "{isToday && <TodayTiles />}", "{checkin}", "{asks}", "{afterWorkout}", "<TodayWidget", 'id="log-weight"', "<InbodyEntry athleteId={athleteId} groupId={groupId} sheetOnly />"];
     const at = order.map((s) => card.indexOf(s));
     for (const i of at) expect(i).toBeGreaterThan(-1);
     expect([...at].sort((a, b) => a - b)).toEqual(at);
@@ -25,7 +26,9 @@ describe("client Home: today first", () => {
     const page = read("app/(coach)/groups/[groupId]/page.tsx");
     const day = page.indexOf("<DayCard\n                groupId={params.groupId}");
     expect(page.indexOf("Finish your workout")).toBeLessThan(day);
-    for (const later of ["<HomeThread lines={homeThreadLines} />", "<GoalSheetPromptCard", "<OtherProgramsCard", "<ReviewPromptSection", "<MyScheduleCard groupId", "Message your coach", "<FeaturedShopCards", '<AddToHomeScreenPrompt slot="home" />']) {
+    // the goal and streak line sits just above the Today card (CL6, Nov 21)
+    expect(page.indexOf("<HomeThread lines={homeThreadLines} />")).toBeLessThan(day);
+    for (const later of ["<GoalSheetPromptCard", "<OtherProgramsCard", "<ReviewPromptSection", "<MyScheduleCard groupId", "data-message-coach", "<FeaturedShopCards", '<AddToHomeScreenPrompt slot="home" />']) {
       expect(page.indexOf(later), later).toBeGreaterThan(day);
     }
   });

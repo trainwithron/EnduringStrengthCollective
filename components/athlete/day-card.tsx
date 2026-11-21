@@ -11,6 +11,7 @@ import { computeReadinessAverage, type WellnessCheckinValues } from "@/lib/welln
 import type { WeightUnit } from "@/lib/units";
 import type { HomeProgramCard } from "@/lib/home-programs";
 import { TodayTiles } from "./today-tiles";
+import type { FoodTotals } from "@/lib/nutrition-tracking";
 
 // "Unlocks Tue, Oct 14": the day the workout really opens, which is earlier than its own date when the coach opens a week or a month ahead. Falls back to the workout's date.
 function unlockLabel(unlocksOn: Date | null | undefined, fallback: string): string {
@@ -48,6 +49,9 @@ export function DayCard({
   afterWorkout = null,
   programs = [],
   checkin = null,
+  asks = null,
+  eaten = null,
+  resume = null,
 }: {
   groupId: string;
   athleteId: string;
@@ -82,6 +86,12 @@ export function DayCard({
   programs?: HomeProgramCard[];
   // Today's wellness check-in, right under the tiles (the Check in tile opens it).
   checkin?: React.ReactNode;
+  // The week's asks (the weekly check-in, the 90-day goal look), right under the workout and the tiles (CL8, Nov 21).
+  asks?: React.ReactNode;
+  // What is eaten so far today, for the Nutrition card's "eaten / target" (CL22).
+  eaten?: FoodTotals | null;
+  // Today's workout was left open: its button says Resume workout and opens that session (CL7).
+  resume?: { sessionId: string; workoutId: string } | null;
 }) {
   return (
     <div className="space-y-4">
@@ -100,20 +110,23 @@ export function DayCard({
         wellnessCheckin={isToday ? wellnessCheckin ?? null : null}
         nextLabel={nextLabel}
         programs={programs}
+        resume={resume}
       />
 
       {isToday && <TodayTiles />}
       {checkin}
+      {asks}
 
       {afterWorkout}
 
       {isToday ? (
         <>
-          <TodayWidget todayDate={dateKey} macros={macros} habits={habits} mealLine={mealLine ?? null} mealHref={`/groups/${groupId}/nutrition`} />
+          <TodayWidget todayDate={dateKey} macros={macros} habits={habits} mealLine={mealLine ?? null} mealHref={`/groups/${groupId}/nutrition`} eaten={eaten} />
+          {/* The Log weight and InBody tiles open these (CL1: no second weight row and no "InBody scans" link here; the scans are on My progress). */}
           <div id="log-weight" className="scroll-mt-4">
             <WeightLogWidget athleteId={athleteId} groupId={groupId} initialLogs={weightLogs} weightUnit={weightUnit} opensFromTile />
           </div>
-          <InbodyEntry athleteId={athleteId} groupId={groupId} />
+          <InbodyEntry athleteId={athleteId} groupId={groupId} sheetOnly />
         </>
       ) : (
         <ReadOnlyDaySummary macros={macros} habits={habits} />
@@ -193,6 +206,7 @@ function WorkoutSection({
   wellnessCheckin,
   nextLabel,
   programs,
+  resume = null,
 }: {
   ownChoice?: boolean;
   groupId: string;
@@ -208,7 +222,12 @@ function WorkoutSection({
   wellnessCheckin?: WellnessCheckinValues | null;
   nextLabel?: string | null;
   programs: HomeProgramCard[];
+  resume?: { sessionId: string; workoutId: string } | null;
 }) {
+  // The workout left open is this one: one button that resumes it (CL7, Nov 21: a "Finish your workout" card and a "Start workout" both did it).
+  const isResume = (workoutId: string | null) => isToday && !!resume && workoutId === resume.workoutId;
+  const startOrResumeHref = (workoutId: string | null) => (isResume(workoutId) ? `/sessions/${resume!.sessionId}?resume=1` : startHref(groupId, workoutId, isToday));
+  const startText = (workoutId: string | null) => (isResume(workoutId) ? "Resume workout" : isToday ? (ownChoice ? startLabel(weekdayOfDate(dateKey)) : "Start workout") : "View planned workout");
   const readinessChip = wellnessCheckin ? (
     <span className="font-body text-xs font-normal text-steel bg-surface-2 rounded-token-pill px-2 py-0.5 ml-2 align-middle">
       Feeling {Math.round(computeReadinessAverage(wellnessCheckin))}/5 today
@@ -276,7 +295,7 @@ function WorkoutSection({
                 <div className="mt-3">
                   {x.status === "planned" && (
                     <Link
-                      href={startHref(groupId, x.workoutId, isToday)}
+                      href={startOrResumeHref(x.workoutId)}
                       className={
                         isToday && i === firstPlannedIndex
                           ? START_BUTTON
@@ -285,7 +304,7 @@ function WorkoutSection({
                           : "inline-flex items-center min-h-11 font-body text-sm text-rust-ink"
                       }
                     >
-                      {isToday ? (ownChoice ? startLabel(weekdayOfDate(dateKey)) : "Start workout") : "View planned workout"}
+                      {startText(x.workoutId)}
                     </Link>
                   )}
                   {ownChoice && x.status === "planned" && isToday && <ViewWholeProgramLink groupId={groupId} programId={x.programId} />}
@@ -368,7 +387,15 @@ function WorkoutSection({
   return (
     <TodayFrame dateLabel={dateLabel} program={program} readinessChip={readinessChip}>
       <p className="font-display font-semibold text-[28px] leading-tight mt-1 break-words">{workout.title}</p>
-      {programLine && <p className="font-body text-sm text-steel mt-0.5 break-words">{programLine}</p>}
+      {/* With one program the name opens the whole program (CL5, Nov 21: the separate "Your program" card shows only with two or more). */}
+      {programLine &&
+        (program && programs.length === 1 ? (
+          <Link href={`/groups/${groupId}/programs/${program.id}`} className="inline-flex items-center min-h-11 -my-2 font-body text-sm text-steel underline underline-offset-2 decoration-steel/40 break-words" data-today-program-link>
+            {programLine}
+          </Link>
+        ) : (
+          <p className="font-body text-sm text-steel mt-0.5 break-words">{programLine}</p>
+        ))}
       <ProgramProgress program={program} />
 
       <div className="mt-4">
@@ -393,14 +420,14 @@ function WorkoutSection({
         )}
         {workout.status === "planned" && (
           <Link
-            href={startHref(groupId, workout.workoutId, isToday)}
+            href={startOrResumeHref(workout.workoutId)}
             className={
               isPrimary
                 ? START_BUTTON
                 : "inline-flex items-center min-h-11 font-body text-sm text-rust-ink"
             }
           >
-            {isToday ? (ownChoice ? startLabel(weekdayOfDate(dateKey)) : "Start workout") : "View planned workout"}
+            {startText(workout.workoutId)}
           </Link>
         )}
         {ownChoice && isToday && workout.status === "planned" && <ViewWholeProgramLink groupId={groupId} programId={sessions?.[0]?.programId ?? null} />}

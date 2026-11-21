@@ -40,7 +40,7 @@ import { payeeReadyForGroup } from "@/lib/connect-payee";
 import type { PackageOption } from "@/components/athlete/package-picker";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { WaitlistJoinButton } from "@/components/athlete/waitlist-join-button";
-import { RecurringBookingButton } from "@/components/athlete/recurring-booking-button";
+import { rescheduleLine } from "@/lib/reschedule-line";
 import { RecurringConflictBadge } from "@/components/coach/desktop/recurring-conflict-badge";
 import { sessionBalanceLine, NO_SESSIONS_SLOT_LABEL } from "@/lib/session-credit-copy";
 import { fetchSlotReasons, fullyBookedLine, keepOffered, limitsActive, limitsFromRow } from "@/lib/session-caps";
@@ -539,16 +539,9 @@ export default async function DayDetailPage(
           </div>
         )}
         {reschedulingBooking && (
-          <p className="font-body text-xs text-rust-ink mt-2">
-            Picking a new time for your{" "}
-            {new Date(reschedulingBooking.start_at).toLocaleDateString("en-US", {
-              weekday: "short",
-              month: "short",
-              day: "numeric",
-            })}{" "}
-            session — moving it less than your coach&apos;s cancellation window
-            before that session lets your coach know, and they decide whether it counts as a session.
-            {bookingMode === "request" && " Your coach confirms every move: your session stays where it is until they do."}
+          // One line (CL16, Nov 21)
+          <p className="font-body text-xs text-rust-ink mt-2" data-reschedule-line>
+            {rescheduleLine(new Date(reschedulingBooking.start_at), bookingMode === "request")}
           </p>
         )}
       </header>
@@ -685,19 +678,14 @@ export default async function DayDetailPage(
                       />
                     ) : creditBalance > 0 ? (
                     <div className="flex flex-col items-end gap-1">
+                      {/* One Book per open time; every week is inside its confirm step (CL15, Nov 21). */}
                       <BookSlotButton
                         coachId={coachMembership.profile_id}
                         athleteId={athleteId}
                         groupId={params.groupId}
                         startAt={iso}
                         endAt={endAt.toISOString()}
-                      />
-                      <RecurringBookingButton
-                        coachId={coachMembership.profile_id}
-                        athleteId={athleteId}
-                        groupId={params.groupId}
-                        startAt={iso}
-                        durationMinutes={durationMinutes}
+                        weekly={{ durationMinutes }}
                       />
                     </div>
                   ) : (

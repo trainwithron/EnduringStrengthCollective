@@ -193,7 +193,8 @@ describe("C14 / C15 / C16 the way back", () => {
   it("Settings' text links are 44px", () => {
     const s = read("app/(coach)/groups/[groupId]/settings/page.tsx");
     expect(s).toContain('<Link href="/help" className="min-h-11 inline-flex items-center font-body text-sm text-chalk">');
-    expect(s).toContain('<Link href={`/groups/${params.groupId}/more`} className="min-h-11 inline-flex items-center font-body text-sm text-chalk">');
+    // More is a 56px row under the name now (CL2, Nov 21)
+    expect(s).toContain('<Link href={`/groups/${params.groupId}/more`} className="flex items-center justify-between min-h-14');
   });
 });
 

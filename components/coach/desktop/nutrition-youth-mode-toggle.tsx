@@ -11,9 +11,12 @@ import { createBrowserClient } from "@/lib/supabase/client";
 export function NutritionYouthModeToggle({
   groupId,
   initialEnabled,
+  groupName = null,
 }: {
   groupId: string;
   initialEnabled: boolean;
+  // The group it changes, named on the switch (DK7, Nov 21).
+  groupName?: string | null;
 }) {
   const [enabled, setEnabled] = useState(initialEnabled);
   const [saving, setSaving] = useState(false);
@@ -37,7 +40,7 @@ export function NutritionYouthModeToggle({
     <div>
       <label className="flex items-center gap-2 font-body text-xs text-steel cursor-pointer select-none">
         <input type="checkbox" checked={enabled} disabled={saving} onChange={toggle} className="accent-rust" />
-        Youth/Team mode — protein-first, no calorie-deficit framing
+        Youth/Team mode{groupName ? ` for ${groupName}` : ""} — protein-first, no calorie-deficit framing
       </label>
       {error && (
         <p className="font-body text-xs text-rust-ink mt-1" role="alert">

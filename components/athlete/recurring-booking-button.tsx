@@ -24,14 +24,19 @@ export function RecurringBookingButton({
   groupId,
   startAt,
   durationMinutes,
+  startOpen = false,
+  onCancel,
 }: {
   coachId: string;
   athleteId: string;
   groupId: string;
   startAt: string;
   durationMinutes: number;
+  // Opened from Book's confirm step ("Make it every week", CL15 Nov 21): it starts open, and Cancel goes back to that step.
+  startOpen?: boolean;
+  onCancel?: () => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(startOpen);
   // What is typed is kept as typed (audit C9, Nov 21: clearing the box to type 8 used to snap it to 1); it is read as 1 to 12 when the box is left and when Confirm is pressed.
   const [weeksText, setWeeksText] = useState("4");
   const [submitting, setSubmitting] = useState(false);
@@ -114,7 +119,7 @@ export function RecurringBookingButton({
       <div className="flex items-center gap-2">
         <button
           type="button"
-          onClick={() => setOpen(false)}
+          onClick={() => (onCancel ? onCancel() : setOpen(false))}
           className="min-h-11 px-2 font-body text-xs text-steel"
         >
           Cancel

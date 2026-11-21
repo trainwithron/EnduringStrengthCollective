@@ -12,7 +12,6 @@ describe("buildMoreSections", () => {
       "/groups/g1/tools/one-rep-max",
       "/groups/g1/tools/macro-calculator",
       "/partners",
-      "/groups/g1/progress-photos",
       "/groups/g1/resources",
       "/groups/g1/quick-tips",
       "/groups/g1/records",

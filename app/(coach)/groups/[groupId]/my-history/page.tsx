@@ -68,7 +68,7 @@ export default async function MyHistoryPage(
       <h1 className="font-display font-bold text-2xl uppercase mb-1">Your exercise history</h1>
       <p className="font-body text-sm text-steel mb-6">
         Add anything from before you joined — a recent PR, a working max, or a spreadsheet of past sessions. This
-        helps your coach&apos;s AI program builder start from where you actually are.
+        helps your coach build your program from where you are now.
       </p>
       <ExerciseHistoryUploader
         athleteId={user.id}

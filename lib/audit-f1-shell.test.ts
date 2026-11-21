@@ -10,8 +10,8 @@ describe("coach pages sit in the coach shell", () => {
     expect(settings).toContain('active="settings"');
     expect(settings).toContain("const coachDesktop = isCoach && !effective.isActingAsOther;");
     expect(settings).not.toContain("CoachMobileShell");
-    // the client's "Back to group" link and client tab bar are for clients only
-    expect(settings).toContain("{!coachDesktop && (");
+    // the client tab bar is for clients only (and no "← Home" on a tab, CL21)
+    expect(settings).not.toContain("&larr; Home");
     expect(settings).toContain("{!coachDesktop && <BottomTabBar");
     expect(read("components/coach/coach-desktop-shell.tsx")).toContain('| "settings"');
   });

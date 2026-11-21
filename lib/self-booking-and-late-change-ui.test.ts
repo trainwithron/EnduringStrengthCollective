@@ -44,11 +44,15 @@ describe("a late change is never described to the client as a session taken", ()
     expect(lines).toContain("if (takesSession === true) return");
   });
   it("the two reschedule banners say the coach decides", () => {
+    // one line now (CL16, Nov 21), written once in lib/reschedule-line.ts
     for (const p of dayPages) {
       const src = read(p);
-      expect(src).toContain("they decide whether it counts as a session");
+      expect(src).toContain('rescheduleLine(new Date(reschedulingBooking.start_at), bookingMode === "request")');
       expect(src).not.toContain("still uses 1 session");
     }
+    const line = read("../lib/reschedule-line.ts");
+    expect(line).toContain("your coach decides whether it counts as a session");
+    expect(line).not.toContain("still uses 1 session");
   });
 });
 

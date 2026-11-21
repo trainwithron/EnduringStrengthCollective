@@ -20,14 +20,17 @@ describe("page order (item 1)", () => {
     };
     expect(at("is_injured && (")).toBeLessThan(at("<RecalcPromptCard"));
     expect(at("<RecalcPromptCard")).toBeLessThan(at("<FoodLogSection"));
-    expect(at("<FoodLogSection")).toBeLessThan(at("Today&apos;s targets\n"));
-    expect(at("Today&apos;s targets\n")).toBeLessThan(at("<NutritionPreferencesCard"));
+    // the targets card is only for Set my targets or youth mode's protein-first targets now (CL4, Nov 21)
+    expect(at("<FoodLogSection")).toBeLessThan(at('<section id="my-targets"'));
+    expect(at('<section id="my-targets"')).toBeLessThan(at("<NutritionPreferencesCard"));
     expect(at("<NutritionPreferencesCard")).toBeLessThan(at("<ClientGroceryList"));
     expect(at("<ClientGroceryList")).toBeLessThan(at("{!trackingOn && nutrientData && planEstimate && ("));
     expect(at("{!trackingOn && nutrientData && planEstimate && (")).toBeLessThan(at("Why your target is what it is"));
+    // and it shows only when there is a reason to show (CL3)
+    expect(page).toContain("{macrosEnabled && latestCheckin && (");
   });
   it("youth mode's protein-first targets are unchanged", () => {
-    expect(page).toContain("youthMode ? (");
+    expect(page).toContain("youthMode && todayMacros?.proteinG != null ? (");
     expect(page).toContain("Protein target");
     expect(page).toContain("showCalories={!youthMode}");
   });
@@ -142,10 +145,10 @@ describe("a coach in their own personal space", () => {
     expect(noTargetLine(true)).toBe(NO_TARGET_LINE);
     expect(page).toContain("const selfCoached = isActingAsOther && athleteId === user.id;");
     expect(page).toContain("selfCoached={selfCoached}");
-    expect(read("components/athlete/meal-checkoff-list.tsx")).toContain("{selfCoached ? SELF_NO_MEAL_PLAN_LINE :");
-    // the weekly check-in, too
+    // with no plan and no target change there is nothing to say at all now (CL3, Nov 21), so no "your coach" line either
+    expect(read("components/athlete/meal-checkoff-list.tsx")).not.toContain("still setting up");
     expect(SELF_NO_CHECKIN_LINE).toBe("No change to your target yet.");
-    expect(page).toContain("{selfCoached ? (\n                  SELF_NO_CHECKIN_LINE");
+    expect(page).not.toContain("Your coach hasn&apos;t changed your target yet");
   });
   it("on another day than today the copy button says Copy the day before", () => {
     expect(page).toContain("isToday={shownIsToday}");

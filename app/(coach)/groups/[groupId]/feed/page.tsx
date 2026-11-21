@@ -179,11 +179,9 @@ export default async function FeedPage(
     }
     return (
       <main className="min-h-screen bg-graphite text-chalk font-body pb-28">
+        {/* (CL21, Nov 21: no "← Home"; Feed is a tab of the bar at the bottom) */}
         <header className="px-5 pt-8 pb-4">
-          <Link href={`/groups/${params.groupId}`} className="inline-flex items-center min-h-11 font-body text-xs text-steel uppercase tracking-wide">
-            &larr; Home
-          </Link>
-          <h1 className="font-display font-bold text-3xl uppercase leading-none mt-3">Feed</h1>
+          <h1 className="font-display font-bold text-3xl uppercase leading-none">Feed</h1>
         </header>
         <div className="px-5 mb-4">
           <FeedViewSwitch basePath={feedBase} active="clients" />
@@ -330,14 +328,9 @@ export default async function FeedPage(
       {isActingAsOther && (
         <ActingAsBanner athleteFullName={viewerProfile?.full_name ?? "Client"} groupId={params.groupId} />
       )}
+      {/* (CL21: no "← Home" on a tab) */}
       <header className="px-5 pt-8 pb-4 border-b border-steel/20">
-        <Link
-          href={`/groups/${params.groupId}`}
-          className="inline-flex items-center min-h-11 font-body text-xs text-steel uppercase tracking-wide"
-        >
-          &larr; Home
-        </Link>
-        <div className="flex items-center justify-between mt-3">
+        <div className="flex items-center justify-between">
           <h1 className="font-display font-bold text-3xl uppercase leading-none">
             Team feed
           </h1>

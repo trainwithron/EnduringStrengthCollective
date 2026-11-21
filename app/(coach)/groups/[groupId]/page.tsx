@@ -10,7 +10,6 @@ import type { CheckinCardState } from "@/lib/client-home-asks";
 import { loadMySchedule } from "@/lib/my-schedule-data";
 import { openRequest, scheduleStateLine, scheduleSummary } from "@/lib/schedule-request-ui";
 import { FirstRunGuideCard } from "@/components/athlete/first-run-guide-card";
-import { PushNotificationToggle } from "@/components/athlete/push-notification-toggle";
 import { UnavailableState } from "@/components/ui/unavailable-state";
 import { createServerClient } from "@/lib/supabase/server";
 import { GroupHubHeader } from "@/components/group/group-hub-header";
@@ -35,7 +34,8 @@ import type { WeightUnit } from "@/lib/units";
 import { HomeWeekView, type HomeDaySummary } from "@/components/athlete/home-week-view";
 import { HomeMonthView } from "@/components/athlete/home-month-view";
 import { AddToHomeScreenPrompt } from "@/components/add-to-home-screen-prompt";
-import { clientGreeting } from "@/lib/client-home-greeting";
+import { clientGreeting, messageCoachLabel } from "@/lib/client-home-greeting";
+import { sumLoggedFood, type FoodTotals } from "@/lib/nutrition-tracking";
 import { ProgramCardList } from "@/components/athlete/program-card-list";
 import { HomeThread } from "@/components/athlete/home-thread";
 import { buildHomeThread } from "@/lib/home-thread";
@@ -385,7 +385,7 @@ export default async function GroupHubPage(
     isToday && user && athleteId === user.id && !isCoach
       ? supabase
           .from("athlete_sessions")
-          .select("id")
+          .select("id, workout_id")
           .eq("athlete_id", athleteId)
           .eq("group_id", params.groupId)
           .eq("logged_by_coach", false)
@@ -615,6 +615,7 @@ export default async function GroupHubPage(
   let isFirstDay = false;
   let homeThreadLines: string[] = [];
   let mealLine: string | null = null;
+  let dayEaten: FoodTotals | null = null;
   let weekDays: HomeDaySummary[] = [];
   let monthSummaryByDateKey = new Map<string, HomeDaySummary>();
   let weekRangeStart = targetDate;
@@ -785,22 +786,29 @@ export default async function GroupHubPage(
         standingForDate(standingTarget, targetDateKey)
       ).target;
 
-      // Meals checked off today, when the client has a meal plan for the day. Any failure just leaves the line out.
-      if (isToday && macrosEnabled && Array.isArray(mealPlanResult.data?.meals)) {
+      // Today's log: what is eaten so far (the Nutrition card shows eaten / target, CL22, Nov 21; the same sum as the Nutrition page's ring), and the meals checked off when there is
+      // a meal plan. Any failure just leaves them out.
+      if (isToday && macrosEnabled) {
         try {
-          const { data: loggedMeals } = await supabase
+          const { data: loggedMeals, error: loggedError } = await supabase
             .from("food_log_entries")
-            .select("meal_slot")
+            .select("meal_slot, status, calories, protein_g, carbs_g, fat_g")
             .eq("athlete_id", athleteId)
             .eq("log_date", targetDateKey);
-          mealLine = mealProgressLine(
-            mealProgress(
-              (mealPlanResult.data!.meals as any[]).filter((m) => m?.spec?.id),
-              (loggedMeals ?? []).map((l: any) => ({ mealSlot: l.meal_slot }))
-            )
-          );
+          if (!loggedError) {
+            dayEaten = sumLoggedFood(((loggedMeals ?? []) as any[]).map((l) => ({ status: l.status, calories: l.calories, proteinG: l.protein_g, carbsG: l.carbs_g, fatG: l.fat_g })));
+            if (Array.isArray(mealPlanResult.data?.meals)) {
+              mealLine = mealProgressLine(
+                mealProgress(
+                  (mealPlanResult.data!.meals as any[]).filter((m) => m?.spec?.id),
+                  (loggedMeals ?? []).map((l: any) => ({ mealSlot: l.meal_slot }))
+                )
+              );
+            }
+          }
         } catch {
           mealLine = null;
+          dayEaten = null;
         }
       }
 
@@ -893,6 +901,10 @@ export default async function GroupHubPage(
 
   // The phone's program list (MyProgramsBlock) needs every program read to have worked; otherwise the plain list below says the programs could not be loaded.
   const programsBlockReady = !programsError && !programWorkoutRead.error && !programDoneRead.failed;
+  // The workout left open is today's own planned workout (CL7): then the Today card's button resumes it and the separate "Finish your workout" card is not shown too.
+  const openWorkoutId = (openOwnSession as { workout_id?: string | null } | null)?.workout_id ?? null;
+  const openIsTodays =
+    !!openWorkoutId && isToday && (daySessions.some((s) => s.workoutId === openWorkoutId && s.status === "planned") || (dayWorkout.workoutId === openWorkoutId && dayWorkout.status === "planned"));
 
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
@@ -955,7 +967,7 @@ export default async function GroupHubPage(
           scrollIntoView={searchParams.welcome === "1"}
         />
       )}
-      {guideEligible && user && guideDismissed && <PushNotificationToggle variant="chip" profileId={user.id} />}
+      {/* (CL12, Nov 21: once the guide is dismissed nothing more asks about notifications here; the amber dot on Settings is the reminder) */}
 
       {showMobileView && athleteId && (
         <section className="px-5 pt-4">
@@ -964,7 +976,10 @@ export default async function GroupHubPage(
           {view === "day" && (
             <div className="space-y-4">
               {/* Today first: a workout left open comes back first of all, then the Today card, the three tiles and the check-in (inside DayCard). */}
-              {openOwnSession && (
+              {/* The line above Today: the goal and the weekly streak (CL6, Nov 21: it sat below everything). */}
+              {isToday && <HomeThread lines={homeThreadLines} />}
+              {/* A workout left open: when it is today's own workout the Today card's button says Resume workout (CL7), so this card shows only for another one. */}
+              {openOwnSession && !openIsTodays && (
                 <Link href={`/sessions/${(openOwnSession as { id: string }).id}?resume=1`} className="block tint-accent rounded-card px-4 py-3 active:bg-rust/15">
                   <span className="block font-display font-semibold text-xl leading-tight text-chalk">Finish your workout</span>
                   <span className="block font-body text-sm text-steel">You left one open. Pick up where you stopped.</span>
@@ -992,6 +1007,7 @@ export default async function GroupHubPage(
                 canBook={canBook}
                 wellnessCheckin={wellnessCheckin}
                 mealLine={mealLine}
+                eaten={dayEaten}
                 sessionsLeft={sessionsLeft}
                 bookHref={bookHref}
                 doneSessionByWorkout={doneSessionByWorkout}
@@ -1008,12 +1024,27 @@ export default async function GroupHubPage(
                     />
                   ) : null
                 }
-                afterWorkout={programsBlockReady && homePrograms.length > 0 ? <MyProgramsBlock groupId={params.groupId} programs={homePrograms} /> : null}
+                // "Your program" only with two or more programs: with one, the Today card's program name opens it (CL5, Nov 21)
+                afterWorkout={programsBlockReady && homePrograms.length > 1 ? <MyProgramsBlock groupId={params.groupId} programs={homePrograms} /> : null}
+                resume={openOwnSession && openIsTodays && openWorkoutId ? { sessionId: (openOwnSession as { id: string }).id, workoutId: openWorkoutId } : null}
+                // The week's asks right under the workout and the tiles (CL8, Nov 21: they sat below the fold)
+                asks={
+                  isToday && (checkinCard || goalReview) ? (
+                    <>
+                      {checkinCard && <WeeklyCheckinCard groupId={params.groupId} coachName={roster.find((m) => m.role === "coach" && m.profileId !== athleteId)?.fullName ?? null} sent={checkinCard === "sent"} />}
+                      {goalReview && <GoalReviewCard groupId={params.groupId} athleteId={athleteId} goalText={goalReview.text} />}
+                    </>
+                  ) : null
+                }
               />
-              {isToday && <HomeThread lines={homeThreadLines} />}
+              {/* Reaching the coach, one tap, right under today (CL11, Nov 21: it floated mid-page, and a coach list at the bottom did nothing when tapped). */}
+              {isToday && !isCoach && !isActingAsOther && (
+                <Link href={`/groups/${params.groupId}/messages`} className="flex items-center justify-between min-h-11 bg-surface rounded-card px-4 font-body text-sm text-chalk" data-message-coach>
+                  <span>{messageCoachLabel(roster.find((m) => m.role === "coach" && m.profileId !== athleteId)?.fullName ?? null)}</span>
+                  <span aria-hidden="true" className="text-steel">&rarr;</span>
+                </Link>
+              )}
               {isToday && goalSheetNeeded && <GoalSheetPromptCard groupId={params.groupId} athleteId={athleteId} />}
-              {isToday && checkinCard && <WeeklyCheckinCard groupId={params.groupId} coachName={roster.find((m) => m.role === "coach" && m.profileId !== athleteId)?.fullName ?? null} sent={checkinCard === "sent"} />}
-              {isToday && goalReview && <GoalReviewCard groupId={params.groupId} athleteId={athleteId} goalText={goalReview.text} />}
               {isToday && !goalSheetNeeded && sharedGroupOffer && (
                 <SharedGroupJoinCard
                   spaceGroupId={params.groupId}
@@ -1031,12 +1062,6 @@ export default async function GroupHubPage(
               {isToday && <OtherProgramsCard programs={(myTraining?.mine ?? []).filter((p) => p.groupId !== params.groupId || p.canRemove)} />}
               {isToday && !isCoach && !isActingAsOther && athleteId && <ReviewPromptSection groupId={params.groupId} athleteId={athleteId} />}
               {scheduleCard && <MyScheduleCard groupId={params.groupId} state={scheduleCard} />}
-              {isToday && !isCoach && !isActingAsOther && (
-                // The one place a client reaches their coach: it was three taps deep (Settings, More, Messages).
-                <Link href={`/groups/${params.groupId}/messages`} className="inline-flex items-center min-h-11 font-body text-sm text-chalk underline underline-offset-2">
-                  Message your coach
-                </Link>
-              )}
               {/* One block for group sessions: when the week's list renders below, this short link is not shown as well. */}
               {upcomingClasses > 0 && !(isToday && weekClasses) && (
                 <Link href={`/groups/${params.groupId}/classes`} className="block bg-surface rounded-card px-4 py-3 min-h-11 font-body text-sm text-chalk">
@@ -1138,13 +1163,16 @@ export default async function GroupHubPage(
       </section>
       )}
 
-      <RosterList
-        hiddenProfileIds={[...pendingCoaches]}
-        members={roster}
-        groupId={params.groupId}
-        viewerId={user?.id}
-        viewerIsCoach={renderAsCoach}
-      />
+      {/* A client's Home no longer ends with the coaching staff list (CL11): "Message <coach>" is under today. A coach still sees the roster. */}
+      {renderAsCoach && (
+        <RosterList
+          hiddenProfileIds={[...pendingCoaches]}
+          members={roster}
+          groupId={params.groupId}
+          viewerId={user?.id}
+          viewerIsCoach={renderAsCoach}
+        />
+      )}
 
       {showMobileView && <BottomTabBar groupId={params.groupId} />}
     </main>

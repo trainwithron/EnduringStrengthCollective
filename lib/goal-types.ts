@@ -30,3 +30,11 @@ export const GOAL_TYPE_ORDER: GoalType[] = [
 export function goalTypeHasEventFields(goalType: GoalType): boolean {
   return goalType === "powerbuilding_strongman" || goalType === "endurance_event";
 }
+
+// A goal's status in words a client reads (CL19, Nov 21: the history showed "proposed" and "declined" as stored).
+export function goalStatusWords(status: string | null | undefined): string {
+  if (status === "proposed") return "Waiting on your coach";
+  if (status === "confirmed") return "Confirmed";
+  if (status === "declined") return "Not approved";
+  return "";
+}

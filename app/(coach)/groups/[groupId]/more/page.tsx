@@ -26,8 +26,10 @@ export default async function MorePage(props: { params: Promise<{ groupId: strin
   const [{ data: membership }, { data: profile }, { data: groupRow }] = await Promise.all([
     supabase.from("group_memberships").select("role, history_import_enabled").eq("group_id", params.groupId).eq("profile_id", athleteId).maybeSingle(),
     supabase.from("profiles").select("full_name").eq("id", athleteId).maybeSingle(),
-    supabase.from("groups").select("organization_id").eq("id", params.groupId).maybeSingle(),
+    supabase.from("groups").select("organization_id, group_kind").eq("id", params.groupId).maybeSingle(),
   ]);
+  // The coach's "No macros for <client>" switch, read on its own (a database without it reads as on): when the coach sets the targets there is no Macro calculator here (CL20).
+  const { data: macrosRow } = await supabase.from("group_memberships").select("coach_sets_macros").eq("group_id", params.groupId).eq("profile_id", athleteId).maybeSingle();
   if (!membership) redirect("/");
 
   // In the coach's OWN personal space the coach sees what a client sees (My goal, My exercise history, the Macro calculator).
@@ -43,6 +45,8 @@ export default async function MorePage(props: { params: Promise<{ groupId: strin
     athleteId,
     isCoach: membership.role === "coach" && !ownSpace,
     historyImportEnabled: !!membership.history_import_enabled || ownSpace,
+    coachSetsTargets: !ownSpace && (macrosRow as { coach_sets_macros?: boolean | null } | null)?.coach_sets_macros !== false,
+    oneOnOne: (groupRow as { group_kind?: string | null } | null)?.group_kind === "one_on_one",
   });
 
   return (

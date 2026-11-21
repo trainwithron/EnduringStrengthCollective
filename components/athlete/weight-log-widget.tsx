@@ -265,16 +265,19 @@ export function WeightLogWidget({
       <div>
         {sheet}
         {pageBanner}
-        <button
-          type="button"
-          onClick={() => setExpanded(true)}
-          className="w-full border border-steel/20 p-4 flex items-center justify-between text-left"
-        >
-          <span className="font-body text-sm text-chalk">
-            {todayLog ? `Today's weight: ${formatWeight(todayLog.weight, weightUnit)}` : "Log today's weight"}
-          </span>
-          <span className="font-body text-xs text-rust-ink">{todayLog ? "Update" : "Log"}</span>
-        </button>
+        {/* On Home the Log weight tile is the one way in (CL1, Nov 21: a second "Log today's weight" row did the same thing); elsewhere the row opens the form. */}
+        {!opensFromTile && (
+          <button
+            type="button"
+            onClick={() => setExpanded(true)}
+            className="w-full border border-steel/20 p-4 flex items-center justify-between text-left"
+          >
+            <span className="font-body text-sm text-chalk">
+              {todayLog ? `Today's weight: ${formatWeight(todayLog.weight, weightUnit)}` : "Log today's weight"}
+            </span>
+            <span className="font-body text-xs text-rust-ink">{todayLog ? "Update" : "Log"}</span>
+          </button>
+        )}
       </div>
     );
   }

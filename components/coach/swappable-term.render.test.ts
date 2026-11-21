@@ -53,10 +53,11 @@ describe("the word is chosen once and changed in Settings", () => {
     // before it has read its saved state it shows nothing, so it never flashes for someone who already answered
     expect(renderToStaticMarkup(createElement(TerminologyFirstRunCard, { groupId: "g" }))).toBe("");
   });
-  it("Settings has the question for coaches, on desktop and the phone's Settings page, and the full list stays in Branding", () => {
+  it("Settings has the question for coaches as a link to Organization > Labels, where the list is set (DK14, Nov 21)", () => {
     const settings = read("../../app/(coach)/groups/[groupId]/settings/page.tsx");
     expect(settings).toContain('label="What do you call your people?"');
-    expect(settings).toContain("<TerminologyChooser");
+    expect(settings).toContain("branding?tab=labels");
+    expect(settings).not.toContain("<TerminologyChooser");
     expect(read("./desktop/terminology-settings-panel.tsx")).toContain("What do you call your people?");
   });
   it("the phone's coach screens carry the vocabulary, so the Spotlight tile and More list use the chosen word", () => {

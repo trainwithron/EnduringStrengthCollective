@@ -21,7 +21,8 @@ export function inbodyCloseRule(step: InbodyStep): { action: EscapeAction; ask?:
 }
 
 // On the client's own Home, right under where they log their weight: one quiet line that opens their InBody scans (add one from a photo, see the graphs).
-export function InbodyEntry({ athleteId, groupId, initialSheetOpen = false }: { athleteId: string; groupId: string; initialSheetOpen?: boolean }) {
+// sheetOnly (client Home, CL1 Nov 21): only the pop-up the InBody tile opens, and "Scan saved."; the scans and graphs are on My progress.
+export function InbodyEntry({ athleteId, groupId, initialSheetOpen = false, sheetOnly = false }: { athleteId: string; groupId: string; initialSheetOpen?: boolean; sheetOnly?: boolean }) {
   const [open, setOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(initialSheetOpen);
   // A fresh reading each time the pop-up opens; the list below reloads after a save.
@@ -44,16 +45,18 @@ export function InbodyEntry({ athleteId, groupId, initialSheetOpen = false }: { 
   return (
     <div id="inbody" className="mt-2">
       <div className="flex flex-wrap items-center gap-x-3">
-        <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="min-h-11 font-body text-xs text-rust-ink underline underline-offset-2">
-          {open ? "Hide InBody scans" : "InBody scans"}
-        </button>
+        {!sheetOnly && (
+          <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="min-h-11 font-body text-xs text-rust-ink underline underline-offset-2">
+            {open ? "Hide InBody scans" : "InBody scans"}
+          </button>
+        )}
         {saved && (
           <p className="font-body text-xs text-win" role="status">
             Scan saved.
           </p>
         )}
       </div>
-      {open && (
+      {open && !sheetOnly && (
         <div className="mt-2">
           <InbodyScansSection key={round} athleteId={athleteId} groupId={groupId} viewerId={athleteId} athleteName="you" />
         </div>

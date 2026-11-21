@@ -87,7 +87,8 @@ describe("Johann: both programs show on Home", () => {
   });
   it("Home puts the block right under the workout card(s) on every day, under the grid in Week and Month, and the old bottom list only stays for the computer", () => {
     const home = read("app/(coach)/groups/[groupId]/page.tsx");
-    expect(home).toContain("afterWorkout={programsBlockReady && homePrograms.length > 0");
+    // two or more programs (CL5, Nov 21: with one, the Today card's program name opens it)
+    expect(home).toContain("afterWorkout={programsBlockReady && homePrograms.length > 1");
     expect(home).toContain("<MyProgramsBlock groupId={params.groupId} programs={homePrograms} />");
     expect(home).toContain('view !== "day" && programsBlockReady && homePrograms.length > 0');
     expect(home).toContain("{!(showMobileView && athleteId && programsBlockReady) && (");

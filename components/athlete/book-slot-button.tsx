@@ -7,6 +7,7 @@ import { notifyBookingConfirmed } from "@/lib/notify-booking-confirmed";
 import { mirrorGoogleCalendarEvent } from "@/lib/mirror-google-calendar-event";
 import { CANT_BOOK_NO_SESSIONS } from "@/lib/session-credit-copy";
 import { bookingRefusalMessage } from "@/lib/booking-refusal-copy";
+import { RecurringBookingButton } from "@/components/athlete/recurring-booking-button";
 
 // The same day page, marked with the time just booked (any other query, such as ?client=, is kept).
 export function justBookedHref(pathname: string, search: string, startAt: string): string {
@@ -21,15 +22,19 @@ export function BookSlotButton({
   groupId,
   startAt,
   endAt,
+  weekly = null,
 }: {
   coachId: string;
   athleteId: string;
   groupId: string;
   startAt: string;
   endAt: string;
+  // Booking this time every week is offered inside the confirm step (CL15, Nov 21: a "Book weekly" on every row doubled the buttons). Absent: no weekly offer.
+  weekly?: { durationMinutes: number } | null;
 }) {
   const [submitting, setSubmitting] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [everyWeek, setEveryWeek] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
@@ -64,11 +69,20 @@ export function BookSlotButton({
     router.replace(justBookedHref(window.location.pathname, window.location.search, startAt), { scroll: false });
   }
 
+  if (everyWeek && weekly) {
+    return <RecurringBookingButton coachId={coachId} athleteId={athleteId} groupId={groupId} startAt={startAt} durationMinutes={weekly.durationMinutes} startOpen onCancel={() => setEveryWeek(false)} />;
+  }
+
   // Booking spends a session credit, so a second tap confirms it.
   if (confirming && !submitting) {
     return (
       <div className="flex flex-col items-end gap-1.5">
         <span className="font-body text-xs text-chalk">Book this time? Uses 1 session.</span>
+        {weekly && (
+          <button type="button" onClick={() => setEveryWeek(true)} className="min-h-11 px-1 font-body text-xs text-rust-ink" data-book-every-week>
+            Make it every week →
+          </button>
+        )}
         <div className="flex items-center gap-2">
           <button
             type="button"

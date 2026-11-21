@@ -14,9 +14,10 @@ describe("less dead space in the logger", () => {
     expect(carousel).toContain('<div className="h-11 mb-1" aria-hidden="true" />');
     expect(carousel).not.toContain("h-9 mb-3");
   });
-  it("Edit metrics and Add weight / RPE ride on the Sets row (after the grid), and their popup opens above it", () => {
-    const button = card.search(/>\s*Edit metrics\s*<\/button>/);
-    expect(card.match(/>\s*Edit metrics\s*<\/button>/g)?.length).toBe(1);
+  it("Add weight / RPE rides on the Sets row (after the grid), and the fields popup (opened from the exercise's \"Change what I log\", CL18) opens above it", () => {
+    expect(card).not.toMatch(/>\s*Edit metrics\s*<\/button>/);
+    expect(card).toContain("Change what I log");
+    const button = card.lastIndexOf("Add weight / RPE");
     expect(button).toBeGreaterThan(card.indexOf("<ExerciseSetGrid"));
     expect(button).toBeGreaterThan(card.indexOf("<SetStepper"));
     expect(card).toContain("trailing={");

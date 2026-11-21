@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Activity, ClipboardList, Smile } from "lucide-react";
 import { OPEN_INBODY_EVENT } from "@/components/body/inbody-entry";
 import { OPEN_WEIGHT_EVENT } from "@/components/athlete/weight-log-widget";
@@ -15,6 +16,15 @@ export function openWellnessCheckin(): void {
   window.dispatchEvent(new Event(OPEN_CHECKIN_EVENT));
 }
 
+// The daily check-in card is on the page (CL1, Nov 21): the Check in tile would only open what is already there, so it steps aside while the card shows.
+export const WELLNESS_CARD_SHOWN_EVENT = "wellness-card-shown";
+let wellnessCardShown = false;
+export function setWellnessCardShown(shown: boolean): void {
+  if (typeof window === "undefined" || shown === wellnessCardShown) return;
+  wellnessCardShown = shown;
+  window.dispatchEvent(new Event(WELLNESS_CARD_SHOWN_EVENT));
+}
+
 function openFromTile(e: React.MouseEvent<HTMLButtonElement>, event: string): void {
   e.currentTarget.focus();
   window.dispatchEvent(new Event(event));
@@ -22,7 +32,15 @@ function openFromTile(e: React.MouseEvent<HTMLButtonElement>, event: string): vo
 
 const tile = "flex flex-col items-center justify-center gap-1.5 min-h-[76px] px-2 py-3 rounded-card bg-surface font-body text-[13px] font-medium text-chalk active:bg-surface-2 text-center";
 
-export function TodayTiles({ showCheckin = true }: { showCheckin?: boolean }) {
+export function TodayTiles({ showCheckin: allowCheckin = true }: { showCheckin?: boolean }) {
+  const [cardShown, setCardShown] = useState(false);
+  useEffect(() => {
+    const read = () => setCardShown(wellnessCardShown);
+    read();
+    window.addEventListener(WELLNESS_CARD_SHOWN_EVENT, read);
+    return () => window.removeEventListener(WELLNESS_CARD_SHOWN_EVENT, read);
+  }, []);
+  const showCheckin = allowCheckin && !cardShown;
   return (
     <nav aria-label="Log for today" className={`grid ${showCheckin ? "grid-cols-3" : "grid-cols-2"} gap-2.5`} data-today-tiles>
       {showCheckin && (

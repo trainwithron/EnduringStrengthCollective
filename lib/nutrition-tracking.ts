@@ -69,3 +69,8 @@ export interface DayTargetLike {
 
 // A target counts when it carries at least a calorie or protein number.
 export const hasTarget = (t: DayTargetLike | null | undefined): boolean => !!t && (t.calories != null || t.proteinG != null);
+
+// A trend line needs two points to draw; with fewer its section is not shown at all (CL3, Nov 21: "Not enough data yet" boxes were filler).
+export function canDrawTrend(points: readonly unknown[] | null | undefined): boolean {
+  return (points?.length ?? 0) >= 2;
+}

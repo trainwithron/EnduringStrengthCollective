@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { WellnessCheckinWidget, type WellnessCheckinValues } from "./wellness-checkin-widget";
-import { OPEN_CHECKIN_EVENT } from "./today-tiles";
+import { OPEN_CHECKIN_EVENT, setWellnessCardShown } from "./today-tiles";
 import { HomeSheet } from "./home-sheet";
 
 const DISMISS_KEY_PREFIX = "wellness-popup-dismissed-";
@@ -105,6 +105,13 @@ export function WellnessCheckinPopup({
     window.addEventListener(OPEN_CHECKIN_EVENT, open);
     return () => window.removeEventListener(OPEN_CHECKIN_EVENT, open);
   }, []);
+
+  // The card in the page is showing: the Check in tile steps aside (CL1); opened from the tile it is a pop-up, and the tile is what opened it.
+  const cardInPage = !opened && !(checkin || dismissed || snoozed);
+  useEffect(() => {
+    setWellnessCardShown(cardInPage);
+    return () => setWellnessCardShown(false);
+  }, [cardInPage]);
 
   if (!opened && (checkin || dismissed || snoozed)) return null;
 

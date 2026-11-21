@@ -14,6 +14,14 @@ import { Smartphone, X, Copy, Check } from "lucide-react";
 // and once they're logged in there, they automatically land on the same
 // athlete-style mobile experience as any client, per the PWA-detection
 // routing already built.
+export function isPhoneOrInstalled(w: Pick<Window, "matchMedia">): boolean {
+  try {
+    return w.matchMedia("(display-mode: standalone)").matches || w.matchMedia("(pointer: coarse) and (max-width: 1024px)").matches;
+  } catch {
+    return false;
+  }
+}
+
 export function DownloadAppButton({
   collapsed = false,
   variant = "sidebar",
@@ -26,8 +34,11 @@ export function DownloadAppButton({
   const [copied, setCopied] = useState(false);
   const dialogRef = useDialogA11y<HTMLDivElement>(open, () => setOpen(false));
 
+  // Already on a phone, or in the installed app: there is nothing to "get" (PH23, Nov 21), so the button is not shown.
+  const [alreadyOnPhone, setAlreadyOnPhone] = useState(false);
   useEffect(() => {
     setOrigin(window.location.origin);
+    setAlreadyOnPhone(isPhoneOrInstalled(window));
   }, []);
 
   async function handleCopy() {
@@ -39,6 +50,8 @@ export function DownloadAppButton({
       // Clipboard API blocked — the URL is still shown on screen to copy by hand.
     }
   }
+
+  if (alreadyOnPhone) return null;
 
   return (
     <>

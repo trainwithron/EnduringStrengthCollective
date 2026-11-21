@@ -55,7 +55,7 @@ import { phoneCalendarHref } from "@/lib/phone-coach-routes";
 import { meetsMinimumAge } from "@/lib/coppa";
 import { MarkNoShowToggle } from "@/components/coach/mark-no-show-toggle";
 import { WaitlistJoinButton } from "@/components/athlete/waitlist-join-button";
-import { RecurringBookingButton } from "@/components/athlete/recurring-booking-button";
+import { rescheduleLine } from "@/lib/reschedule-line";
 import { RecurringConflictBadge } from "@/components/coach/desktop/recurring-conflict-badge";
 import { NO_SESSIONS_LINE } from "@/lib/session-credit-copy";
 import { clientSessionsLine } from "@/lib/schedule-card";
@@ -452,16 +452,9 @@ export default async function CoachDayDetailPage(
             </div>
           )}
           {reschedulingBooking && (
-            <p className="font-body text-xs text-rust-ink mt-2">
-              Picking a new time for your{" "}
-              {new Date(reschedulingBooking.start_at).toLocaleDateString("en-US", {
-                weekday: "short",
-                month: "short",
-                day: "numeric",
-              })}{" "}
-              session — moving it less than your coach&apos;s cancellation window
-              before that session lets your coach know, and they decide whether it counts as a session.
-              {bookingMode === "request" && " Your coach confirms every move: your session stays where it is until they do."}
+            // One line (CL16, Nov 21: a two-to-three sentence paragraph sat above the times).
+            <p className="font-body text-xs text-rust-ink mt-2" data-reschedule-line>
+              {rescheduleLine(new Date(reschedulingBooking.start_at), bookingMode === "request")}
             </p>
           )}
         </header>
@@ -606,6 +599,7 @@ export default async function CoachDayDetailPage(
                         endAt={endAt.toISOString()}
                       />
                     ) : creditBalance > 0 ? (
+                      // One Book per open time; every week is offered inside its confirm step (CL15, Nov 21).
                       <div className="flex flex-col items-end gap-1">
                         <BookSlotButton
                           coachId={coachMembership.profile_id}
@@ -613,13 +607,7 @@ export default async function CoachDayDetailPage(
                           groupId={params.groupId}
                           startAt={iso}
                           endAt={endAt.toISOString()}
-                        />
-                        <RecurringBookingButton
-                          coachId={coachMembership.profile_id}
-                          athleteId={athleteId}
-                          groupId={params.groupId}
-                          startAt={iso}
-                          durationMinutes={durationMinutes}
+                          weekly={{ durationMinutes }}
                         />
                       </div>
                     ) : null}

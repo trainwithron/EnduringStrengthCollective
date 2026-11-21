@@ -37,7 +37,6 @@ import { myPagePoster } from "@/lib/qr-poster";
 import { QrPosterButton } from "@/components/coach/qr-poster-button";
 import { SwipeDirectionSetting } from "@/components/athlete/swipe-direction-setting";
 import { HideDemosToggle } from "@/components/athlete/hide-demos-toggle";
-import { TerminologyChooser } from "@/components/coach/desktop/terminology-chooser";
 import { SettingsGroup } from "@/components/shared/settings-group";
 import { ExportDataButton } from "@/components/athlete/export-data-button";
 import { FeedBroadcastSettings } from "@/components/athlete/feed-broadcast-settings";
@@ -234,6 +233,9 @@ export default async function SettingsPage(
   }
   // The first-name-on-shared-pictures switch (0334). Read on its own so a database that does not have the column yet still shows the whole page (the switch is just left out).
   const shareNameRead = await supabase.from("profiles").select("show_name_on_share").eq("id", athleteId).maybeSingle();
+  // The platform admin's own tools, in an Admin fold at the bottom (PH16, Nov 21: they sat in Spotlight's Business tile). A failed read shows no fold.
+  const adminRead = isCoach ? await supabase.from("profiles").select("is_platform_admin").eq("id", user.id).maybeSingle() : null;
+  const isPlatformAdmin = (adminRead?.data as { is_platform_admin?: boolean } | null)?.is_platform_admin === true;
   const showNameAvailable = !shareNameRead.error;
   // With no choice made yet the box shows what the default is for them: off under 18, on for an adult or when no date of birth is on file.
   const ownDob = shareNameRead.error ? null : ((await supabase.from("client_intake").select("date_of_birth").eq("athlete_id", athleteId).maybeSingle()).data as { date_of_birth?: string | null } | null)?.date_of_birth ?? null;
@@ -318,8 +320,12 @@ export default async function SettingsPage(
                 Coach home →
               </Link>
             )}
+            {/* These three change only this group: it is named, so a switch is never flipped on the wrong group without knowing (DK16, Nov 21). */}
+            <p className="mt-4 pt-4 border-t border-steel/15 font-body text-xs text-steel uppercase tracking-wide" data-group-switches>
+              For {(group as { name?: string } | null)?.name ?? "this group"} only
+            </p>
             {(group as { group_kind?: string } | null)?.group_kind !== "one_on_one" && (
-              <div className="mt-4 pt-4 border-t border-steel/15">
+              <div className="mt-3">
                 <TeamSportToggle groupId={params.groupId} initialEnabled={(group as { team_mode?: boolean | null } | null)?.team_mode === true} />
               </div>
             )}
@@ -358,9 +364,12 @@ export default async function SettingsPage(
           </SettingsGroup>
   ) : null;
   const terminologyGroup = isCoach && !inPersonalSpace ? (
+    // One place for it: Organization > Labels (DK14, Nov 21; it was set here, there and on Home).
     <SettingsGroup label="What do you call your people?">
-            <TerminologyChooser groupId={params.groupId} />
-          </SettingsGroup>
+      <Link href={`/groups/${params.groupId}/branding?tab=labels`} className="font-body text-sm font-bold text-rust-ink inline-flex items-center min-h-11" data-settings-labels>
+        Clients, athletes, members: set it in Organization &gt; Labels →
+      </Link>
+    </SettingsGroup>
   ) : null;
   const notificationsGroup = (
     <SettingsGroup label="Notifications">
@@ -376,21 +385,16 @@ export default async function SettingsPage(
 
   // A coach (not acting as a client) gets the same coach shell as every other coach page (sidebar on a desktop, the coach tabs on a phone), not the phone client page.
   const coachDesktop = isCoach && !effective.isActingAsOther;
+  // More is the client's page: on a client's settings, and a coach's in their own space or looking as a client; not on a coach's own settings (DK16).
+  const showMore = !isCoach || effective.isActingAsOther;
   const page = (
     <main className={`bg-graphite text-chalk font-body ${coachDesktop ? "max-w-3xl @3xl:max-w-6xl pb-10" : "min-h-screen pb-24"}`}>
       {effective.isActingAsOther && (
         <ActingAsBanner athleteFullName={actingAsFullName ?? "Client"} groupId={params.groupId} />
       )}
+      {/* (CL21, Nov 21: no "← Home" here; Settings is a tab of the bar at the bottom) */}
       <header className="px-5 pt-8 pb-6 border-b border-steel/20">
-        {!coachDesktop && (
-          <Link
-            href={`/groups/${params.groupId}`}
-            className="inline-flex items-center min-h-11 font-body text-xs text-steel uppercase tracking-wide"
-          >
-            &larr; Home
-          </Link>
-        )}
-        <h1 className={`font-display font-bold text-3xl leading-none uppercase ${coachDesktop ? "" : "mt-3"}`}>
+        <h1 className="font-display font-bold text-3xl leading-none uppercase">
           Settings
         </h1>
       </header>
@@ -424,6 +428,20 @@ export default async function SettingsPage(
         </section>
       )}
 
+      {/* Progress, goal, the weekly check-in, messages and photos, right under the name (CL2, Nov 21: the More row was last on the page). Not on a coach's own settings
+          (DK16: More is the client's page). */}
+      {showMore && (
+        <section className="px-5 pt-5" data-settings-more>
+          <Link href={`/groups/${params.groupId}/more`} className="flex items-center justify-between min-h-14 bg-surface rounded-card px-4 py-2">
+            <span>
+              <span className="block font-body text-[15px] font-semibold text-chalk">More</span>
+              <span className="block font-body text-xs text-steel">My progress, goal, weekly check-in, messages and photos</span>
+            </span>
+            <span aria-hidden="true" className="text-steel">&rarr;</span>
+          </Link>
+        </section>
+      )}
+
       {/* With room (a coach's page area, @3xl), the groups flow in two balanced columns; help, feedback, more and sign out sit in one row underneath. On a phone and for a client, one column as before. */}
       <section className="px-5 pt-8 space-y-6 @3xl:space-y-0 @3xl:columns-2 @3xl:gap-10 [&>*]:break-inside-avoid @3xl:[&>*]:mb-6">
         {isCoach ? <>{coachingGroup}{terminologyGroup}{notificationsGroup}</> : notificationsGroup}
@@ -435,12 +453,10 @@ export default async function SettingsPage(
         )}
 
         {isCoach && !effective.isActingAsOther && (
+          // One way in (DK15, Nov 21): coaches and invitations live on Organization > Team.
           <SettingsGroup label="Coaches and invitations">
-            <Link href={`/groups/${params.groupId}/clients`} className="font-body text-sm font-bold text-rust-ink inline-flex items-center min-h-11">
-              See your coaches and invite one →
-            </Link>
-            <Link href={`/groups/${params.groupId}/branding?tab=team`} className="font-body text-sm text-steel underline underline-offset-2 inline-flex items-center min-h-11">
-              Manage invitations on the Team page
+            <Link href={`/groups/${params.groupId}/branding?tab=team`} className="font-body text-sm font-bold text-rust-ink inline-flex items-center min-h-11" data-settings-team>
+              Your coaches and invitations →
             </Link>
           </SettingsGroup>
         )}
@@ -486,20 +502,21 @@ export default async function SettingsPage(
           />
         </SettingsGroup>
 
-        <SettingsGroup label="Text messages & devices">
-          {/* Consent is the person's own to give, so it is never shown (or
-              writable) while a coach is acting as them. */}
-          {!isCoach && !effective.isActingAsOther && isTwilioConfigured() && (
-            <div className="py-4 border-b border-steel/20">
-              <SmsConsentSettings
-                initialPhone={smsConsent?.phone_e164 ?? profileDetails?.phone ?? ""}
-                initialAppointments={smsConsent?.appointments ?? false}
-                initialAnnouncements={smsConsent?.announcements ?? false}
-                optedOut={!!smsConsent?.opted_out_at}
-              />
-            </div>
-          )}
-          <div className="pt-4">
+        {/* Consent is the person's own to give, so it is never shown (or writable) while a coach is acting as them. Its own group now, and the number comes from Profile
+            (CL23, Nov 21: wearables were filed under "Text messages"). */}
+        {!isCoach && !effective.isActingAsOther && isTwilioConfigured() && (
+          <SettingsGroup label="Text messages">
+            <SmsConsentSettings
+              initialPhone={smsConsent?.phone_e164 ?? profileDetails?.phone ?? ""}
+              initialAppointments={smsConsent?.appointments ?? false}
+              initialAnnouncements={smsConsent?.announcements ?? false}
+              optedOut={!!smsConsent?.opted_out_at}
+            />
+          </SettingsGroup>
+        )}
+
+        <SettingsGroup label="Devices">
+          <div>
             <WearablePlaceholder
               groupId={params.groupId}
               ouraConnected={!!ouraConnection}
@@ -519,7 +536,7 @@ export default async function SettingsPage(
         </SettingsGroup>
 
         {!isCoach && (
-          <SettingsGroup label="Workout Logging">
+          <SettingsGroup label="Workout logging">
             <SwipeDirectionSetting
               athleteId={athleteId}
               label="Swipe direction"
@@ -588,11 +605,6 @@ export default async function SettingsPage(
           </SettingsGroup>
         )}
 
-        <SettingsGroup label="More">
-          <Link href={`/groups/${params.groupId}/more`} className="min-h-11 inline-flex items-center font-body text-sm text-chalk">
-            Goals, tools, photos, messages and community →
-          </Link>
-        </SettingsGroup>
 
         {!isCoach && !effective.isActingAsOther && (
           <SettingsGroup label="Your Data">
@@ -609,6 +621,24 @@ export default async function SettingsPage(
               Open the front desk check-in screen →
             </Link>
           </p>
+        )}
+
+        {isPlatformAdmin && !effective.isActingAsOther && (
+          <details className="border-t border-steel/20 pt-2" data-settings-admin>
+            <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden min-h-11 flex items-center font-body text-xs text-steel uppercase tracking-wide">Admin</summary>
+            <div className="flex flex-col pb-2">
+              {[
+                ["Support inbox", "/admin/support"],
+                ["Organizations", "/admin/organizations"],
+                ["Machine requests", "/admin/machine-catalog"],
+                ["Recipe ingredients", "/admin/nutrition-ingredients"],
+              ].map(([label, href]) => (
+                <Link key={href} href={href} className="min-h-11 inline-flex items-center font-body text-sm text-chalk">
+                  {label} &rarr;
+                </Link>
+              ))}
+            </div>
+          </details>
         )}
 
         <div className="pt-2 pb-4 @3xl:pt-0 @3xl:self-center">

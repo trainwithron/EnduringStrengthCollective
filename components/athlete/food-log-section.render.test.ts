@@ -76,7 +76,8 @@ describe("FoodLogSection on a phone (FIX_NUTRITION_PHONE)", () => {
   it("in the coach's own personal space it says No target yet / No meal plan yet, never 'your coach'", () => {
     const html = renderToStaticMarkup(createElement(FoodLogSection, { ...base, initialEntries: [], selfCoached: true }));
     expect(html).toContain("No target yet. You can still track what you eat.");
-    expect(html).toContain("No meal plan yet.");
+    // no plan: nothing at all now (CL3, Nov 21)
+    expect(html).not.toContain("No meal plan yet.");
     expect(html).not.toContain("Your coach hasn&#x27;t");
     expect(html).not.toContain("still setting up");
   });
