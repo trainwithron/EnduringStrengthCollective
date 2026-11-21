@@ -231,7 +231,8 @@ describe("gathering what needs the coach", () => {
   it("a read that returns an error answer (the database client does not throw) is reported as failed, never as 'nothing'", async () => {
     const out = await loadNeedsYouItems(fakeDb({}, ["schedule_requests", "direct_messages", "bookings"]), base);
     expect(out.items).toEqual([]);
-    expect(out.failed.sort()).toEqual(["late changes", "schedule requests", "unread messages"]);
+    // a failed messages read also means quiet in chat (R3) could not be checked
+    expect(out.failed.sort()).toEqual(["late changes", "quiet in chat", "schedule requests", "unread messages"]);
     expect(pickNeedsYou(out.items, { incomplete: out.failed.length > 0 }).caughtUp).toBe(false);
   });
   it("when every read worked and there is nothing, nothing failed", async () => {

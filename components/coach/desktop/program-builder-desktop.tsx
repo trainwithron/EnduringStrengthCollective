@@ -29,6 +29,7 @@ import { TrainingIntentSelector } from "../training-intent-selector";
 import { AiProgramBuilderBox } from "./ai-program-builder-box";
 import { REST_TEMPO_SUGGESTIONS, type TrainingIntent } from "@/lib/training-intent";
 import { ProgramDescriptionEditor } from "@/components/coach/program-description-editor";
+import { ClientSwapsNotice } from "./client-swaps-notice";
 
 export function ProgramBuilderDesktop({
   programId,
@@ -318,6 +319,8 @@ export function ProgramBuilderDesktop({
           />
         </div>
         <ProgramAssignedClients programId={programId} groupId={groupId} athleteId={athleteId} />
+        {/* a client's "every week" swaps on their own program (B5), each with Undo */}
+        <ClientSwapsNotice programId={programId} onDaysChange={setDays} />
         <div className="mt-2">
           <SaveStatusBar />
         </div>

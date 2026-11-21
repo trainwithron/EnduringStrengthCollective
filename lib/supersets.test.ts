@@ -56,7 +56,7 @@ describe("B1: in the client's workout, one set of each, then rest", () => {
     expect(card).toContain("{exercise.superset.label}");
     expect(card).toContain("{exercise.superset.line}");
     // the link comes from the program's exercise, read on its own so the workout opens without it
-    expect(read("app/sessions/[sessionId]/page.tsx")).toContain("supersetNext: !!se.group_workout_exercise_id && linkedTemplateIds.has(se.group_workout_exercise_id),");
+    expect(read("app/sessions/[sessionId]/page.tsx")).toContain("supersetNext: !!se.group_workout_exercise_id && linkedTemplateIds.has(se.group_workout_exercise_id) && !linkEnded.has(se.id),");
   });
 });
 

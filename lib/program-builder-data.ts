@@ -1,4 +1,5 @@
 import { linkedExercisesOfProgram, recentLastTimes } from "./superset-links";
+import { headerNotesOfProgram } from "./section-headers";
 import { sortByUsage } from "@/lib/exercise-search";
 import { usableExerciseNames } from "@/lib/exercise-name-guard";
 import { mergeAliases } from "@/lib/exercise-alias-seed";
@@ -96,6 +97,7 @@ export async function getProgramBuilderData(
     spotterFlags,
     linkedIds,
     lastTimeByExercise,
+    headerIds,
   ] = await Promise.all([
     supabase.from("groups").select("name").eq("id", groupId).single(),
     supabase
@@ -135,6 +137,8 @@ export async function getProgramBuilderData(
     // Supersets (B1) and, on a client's own program, what the client did last time on each exercise (B6). Each read on its own: a failed read leaves it off, never the program.
     linkedExercisesOfProgram(supabase, programId),
     program.athlete_id ? recentLastTimes(supabase, program.athlete_id as string) : Promise.resolve({} as Record<string, { weight: number; reps: number }>),
+    // Section headers (B3): which day notes are headers. Read on their own like the links.
+    headerNotesOfProgram(supabase, programId),
   ]);
 
   // The coach's own demos first, then the Spotlight ones (the builder card says when a Spotlight demo is the one showing).
@@ -198,6 +202,7 @@ export async function getProgramBuilderData(
       id: n.id,
       order: n.position,
       body: n.body,
+      ...(headerIds.has(n.id) ? { header: true } : {}),
     }));
 
     return {
@@ -268,7 +273,8 @@ export const BUILDER_ONE_WORKOUT_SELECT = `
       workout_notes ( id, body, position )
     `;
 
-export function mapWorkoutRowToBuilderDay(w: any, demoRows: DemoRow[], tierByName: Map<string, "A" | "B" | "C" | null>): BuilderDay {
+// headerIds: the day's notes that are section headers (B3, read on their own: lib/section-headers.ts), so a redrawn day keeps them as headers.
+export function mapWorkoutRowToBuilderDay(w: any, demoRows: DemoRow[], tierByName: Map<string, "A" | "B" | "C" | null>, headerIds: Set<string> = new Set()): BuilderDay {
   const exerciseItems: BuilderExercise[] = (w.group_workout_exercises ?? []).map((ex: any) => {
     const media = findDemo(demoRows, ex.exercise_name);
     return {
@@ -291,7 +297,7 @@ export function mapWorkoutRowToBuilderDay(w: any, demoRows: DemoRow[], tierByNam
         .map(mapSetRow),
     };
   });
-  const noteItems: BuilderNote[] = (w.workout_notes ?? []).map((n: any) => ({ kind: "note" as const, id: n.id, order: n.position, body: n.body }));
+  const noteItems: BuilderNote[] = (w.workout_notes ?? []).map((n: any) => ({ kind: "note" as const, id: n.id, order: n.position, body: n.body, ...(headerIds.has(n.id) ? { header: true } : {}) }));
   return {
     id: w.id,
     title: w.title,

@@ -45,6 +45,8 @@ export const FILTER_OF_TYPE: Record<string, NoticeFilter> = {
   session_pattern_note: "clients",
   gym_visitor_lead: "clients",
   weekly_checkin: "clients",
+  // a client changed an exercise for every week of their own program (B5, step 219)
+  exercise_swap: "clients",
   // training and nutrition plans
   program_assigned: "programs",
   macros_assigned: "programs",

@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { readAiJson } from "@/lib/ai-fetch";
 import { BUILDER_ONE_WORKOUT_SELECT, mapWorkoutRowToBuilderDay } from "@/lib/program-builder-data";
+import { headersOfWorkouts } from "@/lib/section-headers";
 import { AiRunPanel } from "@/components/coach/desktop/ai-run-panel";
 import { MicButton } from "@/components/shared/mic-button";
 import { ProgramImportLauncher, ProgramImportPanel } from "@/components/coach/desktop/program-import-launcher";
@@ -111,9 +112,11 @@ export function AiProgramBuilderBox({
 
   // Draws the finished day in the builder.
   async function show(workoutId: string): Promise<boolean> {
-    const { data } = await createBrowserClient().from("workouts").select(BUILDER_ONE_WORKOUT_SELECT).eq("id", workoutId).maybeSingle();
+    const supabase = createBrowserClient();
+    // the day's section headers (B3) read on their own, so the redrawn day keeps them (none before step 219)
+    const [{ data }, headers] = await Promise.all([supabase.from("workouts").select(BUILDER_ONE_WORKOUT_SELECT).eq("id", workoutId).maybeSingle(), headersOfWorkouts(supabase, [workoutId])]);
     if (!data) return false;
-    onDay(mapWorkoutRowToBuilderDay(data, demoLibrary, new Map(Object.entries(exerciseTierByName))));
+    onDay(mapWorkoutRowToBuilderDay(data, demoLibrary, new Map(Object.entries(exerciseTierByName)), new Set((headers.get(workoutId) ?? []).map((h) => h.id))));
     return true;
   }
 

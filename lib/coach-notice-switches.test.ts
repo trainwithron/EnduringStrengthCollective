@@ -30,7 +30,15 @@ describe("the kinds of notice a coach can switch", () => {
       .pop()!;
     expect(latest >= "0423").toBe(true);
     const sql = read(`supabase/migrations/${latest}`);
-    const inSql = [...sql.matchAll(/when '([a-z_]+)' then '([a-z_]+)'/g)].map((m) => `${m[1]}:${m[2]}`).sort();
+    // A later migration may instead add its line to the LIVE function in place (0463: exercise_swap), written inside a quoted string with its quotes doubled.
+    const added = readdirSync("supabase/migrations")
+      .filter((f) => f.endsWith(".sql") && f > latest && read(`supabase/migrations/${f}`).includes("pg_get_functiondef('public.notice_kind_of(text)'"))
+      .flatMap((f) => {
+        const s = read(`supabase/migrations/${f}`);
+        const newLine = /v_new constant text := E'([^;]*)';/.exec(s.slice(s.indexOf("pg_get_functiondef('public.notice_kind_of(text)'")))?.[1] ?? "";
+        return [...newLine.matchAll(/when ''([a-z_]+)'' then ''([a-z_]+)''/g)].map((m) => `${m[1]}:${m[2]}`);
+      });
+    const inSql = [...new Set([...[...sql.matchAll(/when '([a-z_]+)' then '([a-z_]+)'/g)].map((m) => `${m[1]}:${m[2]}`), ...added])].sort();
     const inCode = NOTICE_KINDS.flatMap((k) => k.types.map((t) => `${t}:${k.id}`)).sort();
     expect(inSql).toEqual(inCode);
     expect(kindOfType("direct_message")).toBe("messages");

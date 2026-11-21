@@ -37,6 +37,7 @@ import { loadMyDepartures } from "@/lib/leaving-coach";
 import { supportEmail } from "@/lib/legal";
 import { ExpiryCheckInPanel } from "@/components/coach/expiry-checkin-panel";
 import { InactiveClientsPanel } from "@/components/coach/inactive-clients-panel";
+import { QuietInChatPanel } from "@/components/coach/desktop/quiet-in-chat-panel";
 import { ProgressLookPanel } from "@/components/coach/progress-look-panel";
 import { DashboardWeekNarrative } from "@/components/coach/desktop/dashboard-week-narrative";
 import { DashboardAutoRefresh } from "@/components/coach/desktop/dashboard-auto-refresh";
@@ -583,6 +584,7 @@ export default async function CoachHomePage() {
     quietTierByAthlete: dashboardData.quietTierByAthlete,
     needsReplyThreads,
     heroFlag: dashboardData.heroFlag,
+    coachName: viewerProfile?.full_name ?? "Coach",
   };
 
   // "N — Dual Signal" (coach_dashboard_redesign_scoping.md): a "Right
@@ -703,6 +705,10 @@ export default async function CoachHomePage() {
           <ExpiryCheckInPanel groupIds={allGroupIds} />
         </div>
         <InactiveClientsPanel groupIds={allGroupIds} />
+        {/* Quiet in chat (R3): the same read as its Needs you card. */}
+        <Suspense fallback={null}>
+          <QuietInChatPanel coachId={user.id} coachName={needsYouInput.coachName} groupIds={needsYouInput.groupIds} now={needsYouInput.now} />
+        </Suspense>
         <ProgressLookPanel groupIds={allGroupIds} />
         {!moneyHidden && <NeedsPaymentPanel rows={dashboardData.needsPayment} />}
       </div>

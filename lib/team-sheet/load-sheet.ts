@@ -7,6 +7,7 @@
 // Only the group's shared, active programs count: a program or exercise written for one athlete is not the team's. The racks are made from the roster at this moment; the sheet code keeps who was on which rack.
 import { pageAll } from "@/lib/page-all";
 import { readRowsByIds } from "@/lib/read-by-ids";
+import { headersAbove, headersOfWorkouts } from "@/lib/section-headers";
 import { maxByLift, pctText, weightFromPct } from "@/lib/pct-of-max";
 import {
   MAX_ATHLETES,
@@ -141,6 +142,8 @@ export async function loadSheetModel(supabase: any, input: LoadSheetInput): Prom
   if (exerciseRead.error) return { ok: false, status: 502, error: "Couldn't read the exercises. Try again." };
   const byWorkout = new Map<string, ExerciseRow[]>();
   for (const e of (exerciseRead.data ?? []) as ExerciseRow[]) byWorkout.set(e.workout_id, [...(byWorkout.get(e.workout_id) ?? []), e]);
+  // the section headers (B3) of these workouts, printed above the exercise each heads; none before step 219 or when the read fails
+  const headersByWorkout = await headersOfWorkouts(supabase, placed.map((p) => p.workout.id));
 
   // one block per day; two workouts on the same day share it
   const days: SheetDay[] = [];
@@ -149,7 +152,9 @@ export async function loadSheetModel(supabase: any, input: LoadSheetInput): Prom
     const todays = placed.filter((p) => p.date === date);
     const exercises: SheetExercise[] = [];
     for (const { workout } of todays) {
-      for (const e of byWorkout.get(workout.id) ?? []) {
+      const rows = byWorkout.get(workout.id) ?? [];
+      const sectionAt = headersAbove(rows.map((r) => r.exercise_order ?? 0), headersByWorkout.get(workout.id) ?? []);
+      for (const [ri, e] of rows.entries()) {
         const sets = [...(e.group_workout_exercise_sets ?? [])].sort((a, b) => (a.set_order ?? 0) - (b.set_order ?? 0));
         const p = describePrescription({ sets });
         // What the exercise records decides how it is read: weight (and reps) are read; reps alone are read as reps; anything with neither (a plank's time, a jump's height, a sprint) goes in Notes for now.
@@ -162,7 +167,8 @@ export async function loadSheetModel(supabase: any, input: LoadSheetInput): Prom
         const pctRaw = sets.find((st) => st.target_pct_max != null)?.target_pct_max;
         const pct = hasWeight && pctRaw != null ? Number(pctRaw) : null;
         const text = repsOnly ? `${p.text} reps` : pct != null ? `${p.text} @${pctText(pct)}` : p.text;
-        exercises.push({ id: e.id, name: (e.display_name ?? "").trim() || e.exercise_name, prescription: text, sets: p.sets, reps: p.reps, unread, repsOnly, pct });
+        const section = sectionAt.get(ri)?.join(" / ");
+        exercises.push({ id: e.id, name: (e.display_name ?? "").trim() || e.exercise_name, prescription: text, sets: p.sets, reps: p.reps, unread, repsOnly, pct, ...(section ? { section } : {}) });
         if (pct != null) liftOfExercise.set(e.id, e.exercise_name);
       }
     }

@@ -35,6 +35,8 @@ export type NeedsYouKind =
   | "load_fatigue"
   | "quiet_strong"
   | "quiet_mild"
+  // a client who hasn't replied in chat for 14+ days while the coach has messaged them (Ron, Nov 20: R3; lib/quiet-chat.ts)
+  | "quiet_chat"
   | "missed_habits"
   | "not_signed_in";
 
@@ -54,6 +56,7 @@ export const KIND_SLOT: Record<NeedsYouKind, NeedsYouSlot> = {
   load_fatigue: "slipping",
   quiet_strong: "slipping",
   quiet_mild: "slipping",
+  quiet_chat: "slipping",
   missed_habits: "slipping",
   not_signed_in: "slipping",
 };
@@ -78,6 +81,7 @@ export const KIND_ORDER: NeedsYouKind[] = [
   "load_fatigue",
   "quiet_strong",
   "quiet_mild",
+  "quiet_chat",
   "missed_habits",
   "not_signed_in",
 ];
@@ -97,6 +101,8 @@ export interface NeedsYouItem {
   profileHref?: string;
   // Within a kind, lower comes first (the one waiting longest, the one starting soonest). A millisecond time or any number.
   order: number;
+  // The button is "Message {first name}", sent inside Spotlight from the card (R1's send), instead of a link. Only for a quiet-in-chat client (R3).
+  nudge?: { athleteId: string; groupId: string; firstName: string };
 }
 
 export interface SlotView {

@@ -19,6 +19,8 @@ import { ClientRateEditor } from "@/components/coach/desktop/client-rate-editor"
 import { SwappableTerm } from "@/components/coach/swappable-term";
 import { StatHeroTile } from "@/components/coach/desktop/stat-hero-tile";
 import { PaymentProblemsSection } from "@/components/coach/payment-problems-section";
+import { ClientRetentionPanel } from "@/components/coach/desktop/client-retention-panel";
+import type { TenureRow } from "@/lib/client-retention";
 import { ratesByMembership } from "@/lib/client-rates";
 import {
   computeEstimatedMRR,
@@ -213,6 +215,10 @@ export default async function BusinessDashboardPage(
   );
   const maxGrowthCount = Math.max(1, ...growth.map((g) => g.count));
 
+  // How long one-on-one clients stay (R4): one database read of dates only (business_client_tenure, step 219), under the page's privacy. Before step 219, or if it fails, the panel is left off.
+  const tenure = await pageAll((from, to) => supabase.rpc("business_client_tenure", { p_group_ids: groupIds }).range(from, to));
+  const tenureRows = tenure.failed ? null : (tenure.rows as TenureRow[]);
+
   const newThisMonth = clients.filter((c) => {
     return dateKey(new Date(c.joinedAt)).slice(0, 7) === monthKey;
   }).length;
@@ -343,6 +349,12 @@ export default async function BusinessDashboardPage(
           </div>
         </div>
       </div>
+
+      {tenureRows && (
+        <div className="mb-8" id="client-retention">
+          <ClientRetentionPanel rows={tenureRows} nowIso={new Date().toISOString()} />
+        </div>
+      )}
 
       {/* Ron, Oct 19: "the client rates should be collapsible." Closed by default; the summary says how many clients and how many rates are set. */}
       <details className="group" data-client-rates>

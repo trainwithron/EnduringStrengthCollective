@@ -75,8 +75,11 @@ function drawRackPage(model: SheetModel, rack: SheetRack, blocks: ReturnType<typ
     for (const ex of list) {
       page.rect(x, y, colW, NAME_ROW_H + RX_ROW_H, { fill: 0.9, stroke: 0.4 });
       if (ex) {
-        const lines = wrapToWidth(ex.name, colW - 6, 7.5, true, 3);
-        lines.forEach((ln, i) => page.text(x + 3, y + 9 + i * 8.5, ln, { size: 7.5, bold: true }));
+        // a section header (B3) above the exercise it heads: a small grey line, then the name on up to two lines
+        const top = ex.section ? 8.5 : 0;
+        if (ex.section) page.text(x + 3, y + 8, ex.section.toUpperCase().slice(0, Math.floor((colW - 4) / 3.6)), { size: 6.5, gray: 0.4 });
+        const lines = wrapToWidth(ex.name, colW - 6, 7.5, true, ex.section ? 2 : 3);
+        lines.forEach((ln, i) => page.text(x + 3, y + 9 + top + i * 8.5, ln, { size: 7.5, bold: true }));
         page.text(x + 3, y + NAME_ROW_H + 9, ex.unread ? "timed: use Notes" : ex.prescription.slice(0, Math.floor((colW - 4) / 3.9)), { size: 7, gray: 0.35 });
       } else {
         page.text(x + 3, y + 12, "(no exercises)", { size: 7, gray: 0.4 });

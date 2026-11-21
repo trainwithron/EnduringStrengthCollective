@@ -43,6 +43,8 @@ export function buildSheetWorkbook(model: SheetModel): XLSX.WorkBook {
     const band: string[] = [""];
     const names: string[] = ["Athlete"];
     const rx: string[] = [""];
+    // the coach's section headers (B3), in a row of their own just above the names: the upload finds the names by their "Athlete" row, so a row above it is never read back
+    const sections: string[] = [""];
     let col = 1;
     for (const d of model.days) {
       const list = d.exercises.length > 0 ? d.exercises : [null];
@@ -52,16 +54,20 @@ export function buildSheetWorkbook(model: SheetModel): XLSX.WorkBook {
       for (const ex of list) {
         names.push(ex ? ex.name : "(no exercises)");
         rx.push(ex ? (ex.unread ? "timed: use Notes" : ex.prescription) : "");
+        sections.push(ex?.section ? ex.section.toUpperCase() : "");
       }
       col += list.length;
     }
     band.push("");
     names.push("Notes");
     rx.push("");
+    sections.push("");
+    const anySection = sections.some((s) => s !== "");
     if (week) {
       rows.push(band);
+      if (anySection) rows.push(sections);
     } else {
-      rows.push([]);
+      rows.push(anySection ? sections : []);
     }
     rows.push(names);
     rows.push(rx);

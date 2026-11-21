@@ -37,7 +37,7 @@ describe("a walk-in", () => {
   it("only in coach mode (a client's own workout is never a walk-in), and never in a team-sport group (no sessions there)", () => {
     expect(c.indexOf("if (coachMode?.offerWalkIn) {\n      const { data: done }")).toBeGreaterThan(-1);
     const page = read("app/sessions/[sessionId]/page.tsx");
-    expect(page).toContain('supabase.from("groups").select("gamification_enabled, team_mode")');
+    expect(page).toContain('supabase.from("groups").select("gamification_enabled, team_mode, group_kind")');
     expect(page).toContain("offerWalkIn: !isTeamSportGroup((groupRow as { team_mode?: boolean | null } | null)?.team_mode)");
   });
   it("an overlap says so and nothing is used", () => {

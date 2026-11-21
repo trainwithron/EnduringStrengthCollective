@@ -14,7 +14,9 @@ const read = (p: string) => readFileSync(join(ROOT, p), "utf8").replace(/\r\n/g,
 // from them; a migration that adds a type adds it here too (the test below fails on a type written in code that is not here).
 const LIVE_TYPES = ["booking_request", "client_request", "client_request_answer", "coach_account_closed", "coach_departure_reminder", "comment", "content_reported", "credits_expired", "direct_message", "email_change_cancelled", "email_change_requested", "email_changed", "goal_answered", "goal_proposed", "gym_visitor_lead", "late_change", "macros_assigned", "meal_plan_try", "milestone_celebration", "minor_consent_needed", "new_training_block", "nutrition_allergies_updated", "nutrition_baseline_ready", "nutrition_preferences_changed", "nutrition_prompt_answered", "nutrition_target_changed", "org_announcement", "organization_invite", "partner_request", "partner_request_accepted", "payment_problem", "payment_received", "pr_promotion", "program_assigned", "recurring_booking_conflict", "request_decision", "schedule_applied", "schedule_request", "schedule_resumed", "session_pattern_note", "space_invite", "support_reply", "team_sheet_saved", "trainer_dispatch_offer", "trainer_dispatch_question", "waitlist_slot_offered",
   // step 215 (migration 0459, Nov 20): a client sent their weekly check-in
-  "weekly_checkin"];
+  "weekly_checkin",
+  // step 219 (migration 0463, Nov 20): a client changed an exercise for every week of their own program
+  "exercise_swap"];
 function allowedTypes(): string[] {
   return LIVE_TYPES;
 }
@@ -162,6 +164,7 @@ const WRITTEN: Record<string, Case[]> = {
   ],
   waitlist_slot_offered: [{ link: `${G}/calendar/2026-11-19`, to: "client" }],
   weekly_checkin: [{ link: "/clients/check-ins", to: "coach" }],
+  exercise_swap: [{ link: `${G}/programs/p1?swap=s1`, to: "coach" }],
 };
 
 // Pages only a coach can open (a client sent there gets "only coaches...").
@@ -169,8 +172,8 @@ const COACH_ONLY = [/^\/dashboard/, /^\/requests/, /^\/recurring-conflicts/, /^\
 
 describe("every notice type opens something real", () => {
   const types = allowedTypes();
-  it("the database's own list of types (46 on Nov 19, 47 with step 215), and every type code writes is on it", () => {
-    expect(types.length).toBe(47);
+  it("the database's own list of types (46 on Nov 19, 47 with step 215, 48 with step 219), and every type code writes is on it", () => {
+    expect(types.length).toBe(48);
     const written = typesWrittenInCode();
     expect(written.length).toBeGreaterThan(5);
     for (const t of written) expect(types, t).toContain(t);

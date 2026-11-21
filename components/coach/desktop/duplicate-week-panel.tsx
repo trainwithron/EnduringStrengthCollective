@@ -218,7 +218,7 @@ export function DuplicateWeekPanel({
     }
 
     const sortedDays = sourceDays.slice().sort((a, b) => a.dayIndex - b.dayIndex);
-    const dayNoteTracks: { dayIndex: number; dayTitle: string; itemOrder: number; body: string }[] = [];
+    const dayNoteTracks: { dayIndex: number; dayTitle: string; itemOrder: number; body: string; header?: boolean }[] = [];
     const setTracks: SetTrack[] = [];
     const intervalTracks: IntervalTrack[] = [];
     // A template slot is copied into the new weeks exactly as it is (it has no weight to progress).
@@ -232,6 +232,7 @@ export function DuplicateWeekPanel({
             dayTitle: day.title,
             itemOrder: item.order,
             body: item.body,
+            ...(item.header ? { header: true } : {}),
           });
           continue;
         }
@@ -423,11 +424,13 @@ export function DuplicateWeekPanel({
               body: note.body,
               position: note.itemOrder,
               created_by: user?.id,
+              // a section header is copied as a header (B3)
+              ...(note.header ? { is_header: true } : {}),
             })
             .select("id, body, position")
             .single();
           if (noteRow) {
-            items.push({ kind: "note", id: noteRow.id, order: noteRow.position, body: noteRow.body });
+            items.push({ kind: "note", id: noteRow.id, order: noteRow.position, body: noteRow.body, ...(note.header ? { header: true } : {}) });
           } else if (noteError) {
             anyFailed = true;
           }

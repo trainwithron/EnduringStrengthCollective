@@ -116,6 +116,8 @@ export async function restoreNote(supabase: Db, args: { groupId: string; workout
     body: args.note.body,
     position: args.note.order,
     created_by: user?.id,
+    // a section header comes back as a header (B3); a plain note sends nothing new, so it is put back as before step 219 too
+    ...(args.note.header ? { is_header: true } : {}),
   });
   return error ? null : args.note;
 }
