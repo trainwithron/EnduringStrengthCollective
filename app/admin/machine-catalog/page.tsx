@@ -7,6 +7,7 @@ import { MACHINE_DEMOS_BUCKET, REQUEST_SELECT, requestFromRow } from "@/lib/mach
 import { youtubeEmbedUrl } from "@/lib/exercise-demo";
 import { MachineCatalogReview, type ReviewRequest } from "@/components/admin/machine-catalog-review";
 import { VideoReportsList, type VideoReportRow } from "@/components/admin/video-reports-list";
+import { MachineCatalogCurate } from "@/components/admin/machine-catalog-curate";
 
 export const metadata = { title: "Machine requests" };
 
@@ -108,7 +109,11 @@ export default async function AdminMachineCatalogPage() {
       {error ? (
         <p className="font-body text-sm text-steel mt-6">The shared machine list isn&apos;t set up yet.</p>
       ) : (
-        <MachineCatalogReview requests={list} />
+        <>
+          <MachineCatalogReview requests={list} />
+          {/* the list itself, curated directly (DK1: no longer on the coach's Exercise library) */}
+          <MachineCatalogCurate adminId={user.id} />
+        </>
       )}
       <VideoReportsList initial={reportList} />
     </main>

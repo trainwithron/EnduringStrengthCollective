@@ -60,6 +60,7 @@ export function MachineCatalogSection({
   machines,
   library,
   onAdded,
+  curateOnly = false,
 }: {
   coachId: string;
   orgId: string | null;
@@ -69,6 +70,8 @@ export function MachineCatalogSection({
   machines: MachineRow[];
   library: LibraryExerciseRow[];
   onAdded: (machine: MachineRow, newLibraryRows: LibraryExerciseRow[]) => void;
+  // On the platform admin's own page (/admin/machine-catalog): the list is curated there, so there is no "Add to my gym" and no link back to the review (clutter audit DK1, Nov 21).
+  curateOnly?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
@@ -122,9 +125,13 @@ export function MachineCatalogSection({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <h2 className="font-display font-bold uppercase text-base">Shared machine list</h2>
-          <p className="font-body text-sm text-steel mt-1 max-w-[60ch]">Machines from gyms on Spotlight, each with its exercises and demos. Add one to your gym in one tap.</p>
+          <p className="font-body text-sm text-steel mt-1 max-w-[60ch]">
+            {curateOnly
+              ? "Search it, add machines, exercises and demos, or take something off. What you change here is on the list for every gym at once."
+              : "Machines from gyms on Spotlight, each with its exercises and demos. Add one to your gym in one tap."}
+          </p>
         </div>
-        {isAdmin && (
+        {isAdmin && !curateOnly && (
           <Link href="/admin/machine-catalog" className="min-h-11 px-3 inline-flex items-center border border-rust/60 text-chalk font-body text-sm shrink-0" data-review-requests>
             Review requests{pendingCount ? ` (${pendingCount})` : ""}
           </Link>
@@ -167,7 +174,7 @@ export function MachineCatalogSection({
                       {m.items.length} {m.items.length === 1 ? "exercise" : "exercises"}
                     </span>
                   </button>
-                  {inGym.has(m.id) ? (
+                  {curateOnly ? null : inGym.has(m.id) ? (
                     <span className="font-body text-xs text-positive shrink-0 px-2">In your gym</span>
                   ) : (
                     <button

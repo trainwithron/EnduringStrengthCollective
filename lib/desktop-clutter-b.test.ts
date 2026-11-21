@@ -15,6 +15,37 @@ describe("DK1: a coach's Exercise library never shows the shared machine list's 
     expect(page).toContain("isAdmin={false}");
     expect(page).not.toContain("is_platform_admin");
   });
+  it("the admin page curates the list directly, under the review, with the admin's powers and no Add to my gym (review of 6027ef5d)", () => {
+    const admin = read("app/admin/machine-catalog/page.tsx");
+    // its own admin check comes before anything is drawn
+    expect(admin.indexOf("if (!me?.is_platform_admin) return <NoAccess>")).toBeLessThan(admin.indexOf("<MachineCatalogCurate adminId={user.id} />"));
+    expect(admin.indexOf("<MachineCatalogReview requests={list} />")).toBeLessThan(admin.indexOf("<MachineCatalogCurate adminId={user.id} />"));
+    const curate = read("components/admin/machine-catalog-curate.tsx");
+    expect(curate).toContain("<MachineCatalogSection coachId={adminId} orgId={null} isAdmin curateOnly catalog={catalog} reload={reload} machines={[]} library={[]} onAdded={() => {}} />");
+    const section = read("components/coach/machine-catalog-section.tsx");
+    expect(section).toContain("{curateOnly ? null : inGym.has(m.id) ? (");
+    expect(section).toContain("{isAdmin && !curateOnly && (");
+  });
+});
+
+describe("DK5: the folded panels are never out of reach", () => {
+  it("the fold has its own toggle whenever any panel in it drew something, as well as N more and a notice's #link", () => {
+    const fold = read("components/coach/desktop/needs-stack-fold.tsx");
+    expect(fold).toContain('export const SHOW_STACK_LABEL = "Show everything else";');
+    expect(fold).toContain("{hasContent && (");
+    expect(fold).toContain("{open ? HIDE_STACK_LABEL : SHOW_STACK_LABEL}");
+    expect(fold).toContain("observer.observe(ref.current, { childList: true, subtree: true, characterData: true });");
+    expect(fold).toContain('window.addEventListener("hashchange", fromHash);');
+    expect(fold).toContain("window.addEventListener(NEEDS_STACK_EVENT, onMore);");
+  });
+});
+
+describe("DK4: the closed panel's open button is big enough to hit", () => {
+  it("24 wide by 44 tall", () => {
+    const panel = read("components/coach/desktop/shell-list-panel.tsx");
+    const collapsed = panel.slice(panel.indexOf("if (collapsed) {"), panel.indexOf('aria-label="Expand panel"') + 400);
+    expect(collapsed).toContain('className="w-6 h-11 mt-3');
+  });
 });
 
 describe("DK2: Plan & Billing", () => {

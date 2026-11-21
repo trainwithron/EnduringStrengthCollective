@@ -116,7 +116,8 @@ export function ShellListPanel({
           onClick={toggleCollapsed}
           aria-label="Expand panel"
           title="Expand panel"
-          className="w-4 h-11 mt-3 flex items-center justify-center border border-steel/30 border-l-0 bg-graphite text-steel active:text-chalk"
+          // the panel starts closed for everyone now (DK4), so this is how it opens: 24 by 44, big enough to hit
+          className="w-6 h-11 mt-3 flex items-center justify-center border border-steel/30 border-l-0 bg-graphite text-steel hover:text-chalk active:text-chalk"
         >
           <ChevronRight className="w-3 h-3" />
         </button>
