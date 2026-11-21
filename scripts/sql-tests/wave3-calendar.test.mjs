@@ -160,6 +160,22 @@ expect("C7: the price cannot drop under a dollar while it is on", !(await tryOn(
 expect("C7: no price, no switch (even when made that way)", !(await tryOn(`insert into public.session_types (coach_id, name, display_price_cents, organization_id, pay_to_book) values ($1, 'Free', null, $2, true)`, [coach, org])));
 expect("C7: turning it off is always allowed, with the price at once", await tryOn(`update public.session_types set pay_to_book = false, display_price_cents = null where id = $1`, [typeId.id]));
 await db.query(`update public.session_types set display_price_cents = 6000 where id = $1`, [typeId.id]);
+// a coach leaving: their types move to their own new organization (no Stripe there) and Pay when booking goes off, never refusing the leave
+await db.query(`update public.session_types set pay_to_book = true where id = $1`, [typeId.id]);
+const soloOrg = id(301);
+await db.query(`insert into public.organizations (id) values ($1)`, [soloOrg]);
+expect("C7: moving a paid type to an organization without Stripe succeeds (a departure never fails over it)", await tryOn(`update public.session_types set organization_id = $1 where id = $2`, [soloOrg, typeId.id]));
+expect("C7: and Pay when booking is off after the move", (await db.query(`select pay_to_book from public.session_types where id = $1`, [typeId.id])).rows[0].pay_to_book === false);
+await db.query(`update public.session_types set organization_id = $1 where id = $2`, [org, typeId.id]);
+
+// who cancelled a session: the signed-in person; nobody when the server does it; cleared if it comes back
+const cb = (await db.query(`insert into public.bookings (status, athlete_id, coach_id) values ('confirmed', $1, $2) returning id`, [fresh, coach])).rows[0].id;
+const byCoach = await as(coach, `update public.bookings set status = 'cancelled' where id = '${cb}'`);
+expect("C7: a coach's cancel is recorded as theirs", !byCoach.error && (await db.query(`select cancelled_by from public.bookings where id = $1`, [cb])).rows[0].cancelled_by === coach);
+await db.query(`update public.bookings set status = 'confirmed' where id = $1`, [cb]);
+expect("C7: a session that comes back has no canceller", (await db.query(`select cancelled_by from public.bookings where id = $1`, [cb])).rows[0].cancelled_by === null);
+await db.query(`update public.bookings set status = 'cancelled' where id = $1`, [cb]);
+expect("C7: the server's cancel (a visitor's link, a job) has no canceller", (await db.query(`select cancelled_by from public.bookings where id = $1`, [cb])).rows[0].cancelled_by === null);
 const hold = (email, extra = {}) =>
   db.query(
     `insert into public.public_booking_holds (coach_id, session_type_id, organization_id, start_at, end_at, expires_at, status_token_hash, guest_name, guest_email, amount_cents, stripe_account_id, state)

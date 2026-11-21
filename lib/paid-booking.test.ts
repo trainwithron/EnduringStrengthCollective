@@ -195,7 +195,7 @@ function holdRow(over: Row = {}): Row {
 }
 
 function setup(
-  opts: { holds?: Row[]; busy?: { start: Date; end: Date }[]; bookings?: Row[]; links?: Row[]; refundFails?: number; alreadyRefunded?: boolean; requests?: Row[]; lateMoveCharged?: boolean } = {}
+  opts: { holds?: Row[]; busy?: { start: Date; end: Date }[]; bookings?: Row[]; links?: Row[]; refundFails?: number; alreadyRefunded?: boolean; requests?: Row[]; lateMoveCharged?: boolean; lateMoveFails?: boolean } = {}
 ) {
   const db = makeDb(
     {
@@ -206,7 +206,7 @@ function setup(
       booking_manage_links: opts.links ?? [],
       booking_requests: opts.requests ?? [],
     },
-    { booking_late_move_charged: () => opts.lateMoveCharged === true }
+    opts.lateMoveFails ? {} : { booking_late_move_charged: () => opts.lateMoveCharged === true }
   );
   const clock = { now: NOW };
   let bookingN = 0;
@@ -678,5 +678,52 @@ describe("review fixes (Nov 20)", () => {
     const sql = read("supabase/migrations/0462_wave3_calendar.sql");
     expect(sql).toContain("create trigger session_types_guard_pay_to_book before insert or update on public.session_types");
     expect(sql).toContain("a.status = 'ready'");
+  });
+});
+
+describe("re-check follow-ups (Nov 20)", () => {
+  const charged = (cancelledBy: string | null) =>
+    setup({
+      holds: [holdRow({ state: "booked", booking_id: "b1", manage_link_id: "l1", group_id: "group-1", payment_intent_id: "pi_1", refund_candidate_at: SEEN_BEFORE })],
+      bookings: [{ id: "b1", status: "cancelled", late_cancel: false, late_charge_state: null, athlete_id: "athlete-1", coach_id: COACH, cancelled_by: cancelledBy }],
+      links: [{ id: "l1", booking_id: "b1" }],
+      lateMoveCharged: true,
+    });
+
+  it("2. a charged late move that the COACH cancels is refunded (the session goes back, so the money does)", async () => {
+    const t = charged(COACH);
+    await runPaidBookingSweep(t.deps);
+    expect(t.hold()).toMatchObject({ state: "refunded", refund_reason: "you cancelled it" });
+    expect(refundDecision({ status: "cancelled", late_cancel: false, late_charge_state: null }, { lateMoveCharged: true, cancelledByCoach: true })).toEqual({ kind: "refund", reason: "you cancelled it" });
+  });
+
+  it("2. the client cancelling it (in the app, or with their link) keeps the money", async () => {
+    for (const who of ["athlete-1", null]) {
+      const t = charged(who);
+      await runPaidBookingSweep(t.deps);
+      expect(t.deps.refund).not.toHaveBeenCalled();
+      expect(t.hold().state).toBe("booked");
+    }
+  });
+
+  it("3. when the refund rule can't be read, nothing is refunded and the admin is told once, at the third run in a row; a good read resets the count", async () => {
+    const t = setup({
+      holds: [holdRow({ state: "booked", booking_id: "b1", manage_link_id: "l1", group_id: "group-1", payment_intent_id: "pi_1", refund_candidate_at: SEEN_BEFORE, decision_failures: 0 })],
+      bookings: [{ id: "b1", status: "cancelled", late_cancel: false, late_charge_state: null, athlete_id: "athlete-1", coach_id: COACH, cancelled_by: COACH }],
+      links: [{ id: "l1", booking_id: "b1" }],
+      lateMoveFails: true,
+    });
+    for (let i = 0; i < 4; i++) {
+      await runPaidBookingSweep(t.deps);
+      t.later(5);
+    }
+    expect(t.deps.refund).not.toHaveBeenCalled();
+    expect(t.deps.alertAdmin).toHaveBeenCalledTimes(1);
+    expect((t.deps.alertAdmin as any).mock.calls[0][0]).toBe("Paid booking: refund rule can't be read");
+    expect(t.hold().decision_failures).toBe(4);
+    (t.db as any).rpc = async () => ({ data: false, error: null });
+    await runPaidBookingSweep(t.deps);
+    expect(t.hold().decision_failures).toBe(0);
+    expect(t.deps.refund).toHaveBeenCalledTimes(1);
   });
 });

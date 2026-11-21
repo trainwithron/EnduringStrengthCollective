@@ -218,7 +218,7 @@ export function PublicSessionTypesEditor({
                             ? "Connect Stripe on your Packages page first. Only the organization's owner can do that."
                             : (priceToCents(t.displayPrice) ?? 0) < 100
                               ? "Set a price of at least $1 first."
-                              : "People pay this price by card before the time is booked. If they cancel in time with their link, or you cancel, they get it back in full. Stripe keeps its own processing fee on a refund."}
+                              : "People pay this price by card before the time is booked. If they cancel in time with their link, or you cancel, it is refunded. If a paid booking is refunded, your client gets the full amount back and Spotlight's fee is returned; Stripe keeps its card processing fee."}
                         </span>
                       </span>
                     </label>

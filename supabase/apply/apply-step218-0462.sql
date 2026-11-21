@@ -122,7 +122,8 @@ grant execute on function public.turn_off_calendar_feed() to authenticated;
 alter table public.session_types add column if not exists pay_to_book boolean not null default false;
 
 -- Pay when booking can only be on for a type with a price of at least a dollar, in an organization whose Stripe account is ready (also checked when a visitor pays). Turning it
--- on, or changing the price or organization while it is on, is refused otherwise. Turning it off is always allowed.
+-- on, or changing the price while it is on, is refused otherwise. Turning it off is always allowed. A type that moves to another organization (a coach leaving moves their types
+-- to their own new organization, complete_departure) has it turned off on the way, never refused: a leave or offboarding never fails over it.
 create or replace function public.guard_pay_to_book()
 returns trigger
 language plpgsql
@@ -130,6 +131,10 @@ security definer
 set search_path = public, pg_temp
 as $$
 begin
+  if tg_op = 'UPDATE' and old.pay_to_book and new.organization_id is distinct from old.organization_id then
+    new.pay_to_book := false;
+    return new;
+  end if;
   if new.pay_to_book and (tg_op = 'INSERT' or not old.pay_to_book or new.display_price_cents is distinct from old.display_price_cents or new.organization_id is distinct from old.organization_id) then
     if new.display_price_cents is null or new.display_price_cents < 100 then
       raise exception 'Pay when booking needs a price of at least one dollar.';
@@ -145,6 +150,29 @@ revoke all on function public.guard_pay_to_book() from public, anon, authenticat
 drop trigger if exists session_types_guard_pay_to_book on public.session_types;
 create trigger session_types_guard_pay_to_book before insert or update on public.session_types
   for each row execute function public.guard_pay_to_book();
+
+-- Who cancelled a session: the signed-in person whose change cancelled it (a coach, or the client in the app); empty when the server did it (a visitor's private link, a job).
+-- Set on every way a session is cancelled, by one trigger. A paid session the coach charged for a late move keeps its money when the client cancels it, and is refunded when
+-- the coach does (as the session credit is given back on a coach's cancel).
+alter table public.bookings add column if not exists cancelled_by uuid;
+create or replace function public.note_booking_cancelled_by()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+begin
+  if new.status = 'cancelled' and old.status is distinct from 'cancelled' then
+    new.cancelled_by := auth.uid();
+  elsif new.status is distinct from 'cancelled' then
+    new.cancelled_by := null;
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.note_booking_cancelled_by() from public, anon, authenticated;
+drop trigger if exists bookings_note_cancelled_by on public.bookings;
+create trigger bookings_note_cancelled_by before update of status on public.bookings
+  for each row execute function public.note_booking_cancelled_by();
 
 create table if not exists public.public_booking_holds (
   id uuid primary key default gen_random_uuid(),
@@ -174,6 +202,8 @@ create table if not exists public.public_booking_holds (
   refunded_at timestamptz,
   refund_reason text,
   refund_candidate_at timestamptz,
+  -- runs in a row the cancel rules could not be read for this session (the admin is told at three; never a refund on a guess)
+  decision_failures integer not null default 0,
   created_at timestamptz not null default now()
 );
 create index if not exists public_booking_holds_coach_time on public.public_booking_holds (coach_id, start_at) where state in ('open', 'claimed');
@@ -226,6 +256,7 @@ select
   exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'session_types' and column_name = 'pay_to_book') as pay_when_booking_ready,
   (select count(*) from public.session_types where pay_to_book) = 0 as every_session_still_free,
   exists (select 1 from pg_trigger where tgname = 'session_types_guard_pay_to_book' and not tgisinternal) as pay_needs_price_and_stripe,
+  exists (select 1 from pg_trigger where tgname = 'bookings_note_cancelled_by' and not tgisinternal) as who_cancelled_is_recorded,
   exists (select 1 from pg_class where oid = 'public.public_booking_holds'::regclass and relrowsecurity) as payments_private,
   not has_table_privilege('authenticated', 'public.public_booking_holds', 'insert') as only_the_server_records_payments,
   position('public_booking_holds' in (select prosrc from pg_proc where oid = 'public.resolve_late_change(uuid, boolean)'::regprocedure)) > 0 as charge_takes_no_session_when_paid_online;

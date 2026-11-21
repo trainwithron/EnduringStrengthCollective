@@ -53,7 +53,7 @@ export function PushPreferences({ profileId, initialStart, initialEnd, initialGe
         />
         <span>
           Quiet hours
-          <span className="block text-xs text-steel">No notifications are sent to your phone during these hours. They are still waiting for you in the app.</span>
+          <span className="block text-xs text-steel">No notifications are sent to your phone during these hours, except the reminder an hour before your own session. The rest are waiting for you in the app.</span>
         </span>
       </label>
       {quietOn && (

@@ -23,6 +23,7 @@ export const STUCK_CLAIM_MINUTES = 10;
 export const REFUND_CLAIM_STALE_MINUTES = 15;
 export const CANCEL_SEEN_TWICE_MINUTES = 5;
 export const SWEEP_LOOKBACK_DAYS = 45;
+export const DECISION_FAILURES_ALERT = 3;
 
 export type RefundDecision = { kind: "refund"; reason: string } | { kind: "keep" } | { kind: "wait" } | { kind: "nothing" };
 
@@ -34,9 +35,10 @@ export interface BookingState {
 
 /**
  * What happens to the money for a paid session, by the same rules as a session credit. lateMoveCharged: the coach charged this session for a late move earlier (it then
- * stays that visit's one paid session, so cancelling it later keeps the money, as it keeps the session).
+ * stays that visit's one paid session, so the client cancelling it later keeps the money, as it keeps the session). cancelledByCoach: the coach cancelled it, which gives the
+ * session back, so the money goes back too.
  */
-export function refundDecision(b: BookingState | null, opts: { lateMoveCharged?: boolean } = {}): RefundDecision {
+export function refundDecision(b: BookingState | null, opts: { lateMoveCharged?: boolean; cancelledByCoach?: boolean } = {}): RefundDecision {
   if (!b) return { kind: "refund", reason: "the session was removed" };
   if (b.status !== "cancelled") return { kind: "nothing" };
   if (b.late_cancel) {
@@ -44,7 +46,7 @@ export function refundDecision(b: BookingState | null, opts: { lateMoveCharged?:
     if (b.late_charge_state === "waived") return { kind: "refund", reason: "late cancel, you let it go" };
     return { kind: "keep" };
   }
-  if (opts.lateMoveCharged) return { kind: "keep" };
+  if (opts.lateMoveCharged) return opts.cancelledByCoach ? { kind: "refund", reason: "you cancelled it" } : { kind: "keep" };
   return { kind: "refund", reason: "cancelled in time" };
 }
 
@@ -95,6 +97,7 @@ export interface HoldRow {
   payment_intent_id: string | null;
   refund_id: string | null;
   refund_candidate_at?: string | null;
+  decision_failures?: number;
 }
 
 export interface PaidDeps {
@@ -344,7 +347,7 @@ export interface SweepResult {
 }
 
 const BOOKED_SELECT =
-  "*, bookings!public_booking_holds_booking_id_fkey ( status, late_cancel, late_charge_state, athlete_id, coach_id ), booking_manage_links!public_booking_holds_manage_link_id_fkey ( booking_id )";
+  "*, bookings!public_booking_holds_booking_id_fkey ( status, late_cancel, late_charge_state, athlete_id, coach_id, cancelled_by ), booking_manage_links!public_booking_holds_manage_link_id_fkey ( booking_id )";
 
 /** Lapses unpaid holds, finishes or refunds stuck ones, and applies the cancel rules to paid sessions. Safe to run twice at once. */
 export async function runPaidBookingSweep(deps: PaidDeps): Promise<SweepResult> {
@@ -430,10 +433,23 @@ export async function runPaidBookingSweep(deps: PaidDeps): Promise<SweepResult> 
     let lateMoveCharged = false;
     if (b && b.status === "cancelled" && !b.late_cancel) {
       const { data: charged, error: chargedError } = await deps.db.rpc("booking_late_move_charged", { p_booking_id: row.booking_id });
-      if (chargedError) continue; // unknown: decide next run, never refund on a guess
+      if (chargedError) {
+        // unknown: decide next run, never refund on a guess; three runs in a row and the platform admin is told (once)
+        const failures = (row.decision_failures ?? 0) + 1;
+        await deps.db.from("public_booking_holds").update({ decision_failures: failures }).eq("id", row.id).eq("decision_failures", row.decision_failures ?? 0);
+        if (failures === DECISION_FAILURES_ALERT) {
+          await deps
+            .alertAdmin("Paid booking: refund rule can't be read", `Hold ${row.id} (booking ${row.booking_id}): booking_late_move_charged failed ${failures} runs in a row: ${chargedError.message ?? "unknown error"}. No refund until it can be read.`)
+            .catch(() => {});
+        }
+        out.failed++;
+        continue;
+      }
+      if ((row.decision_failures ?? 0) > 0) await deps.db.from("public_booking_holds").update({ decision_failures: 0 }).eq("id", row.id);
       lateMoveCharged = charged === true;
     }
-    const d = refundDecision(b ? { status: b.status, late_cancel: b.late_cancel, late_charge_state: b.late_charge_state } : null, { lateMoveCharged });
+    const cancelledByCoach = !!b && !!b.cancelled_by && b.cancelled_by !== b.athlete_id;
+    const d = refundDecision(b ? { status: b.status, late_cancel: b.late_cancel, late_charge_state: b.late_charge_state } : null, { lateMoveCharged, cancelledByCoach });
     if (d.kind !== "refund") {
       await clearCandidate();
       continue;
