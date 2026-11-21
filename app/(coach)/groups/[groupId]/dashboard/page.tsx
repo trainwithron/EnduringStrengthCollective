@@ -8,9 +8,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { getNeedsAttentionItems } from "@/lib/needs-attention-data";
-import { SuggestionSettings } from "@/components/coach/desktop/suggestion-settings";
 import { NeedsAttentionPanel } from "@/components/coach/desktop/needs-attention-panel";
-import { RosterSection } from "@/components/coach/desktop/roster-section";
 import { AddClientButton } from "@/components/coach/desktop/add-client-button";
 import { WorkoutSummaryCard } from "@/components/feed/workout-summary-card";
 import type { FeedPost } from "@/lib/types";
@@ -245,19 +243,7 @@ export default async function CoachDashboardPage(
   // pinned strip can reuse the exact same computation.
   const needsAttentionItems = await getNeedsAttentionItems(supabase, { coachId: user.id, groupIds });
 
-  // Re-fetched here (a cheap single-row lookup) purely to seed the
-  // SuggestionSettings display below — getNeedsAttentionItems reads these
-  // same values internally but doesn't return them, since every other
-  // caller (the shell's pinned strip) only needs the computed items.
-  const { data: prefsRow } = await supabase
-    .from("coach_preferences")
-    .select("suggestion_mode, suggestion_lead_days, suggestion_lead_mode, suggestion_lead_weekday")
-    .eq("coach_id", user.id)
-    .maybeSingle();
-  const suggestionMode = (prefsRow?.suggestion_mode ?? "list") as "list" | "auto_add";
-  const suggestionLeadDays = prefsRow?.suggestion_lead_days ?? 3;
-  const suggestionLeadMode = (prefsRow?.suggestion_lead_mode ?? "days_before") as "days_before" | "weekday_before";
-  const suggestionLeadWeekday = prefsRow?.suggestion_lead_weekday ?? 5;
+  // (Suggestion settings, when to be reminded a program is ending, are on Calendar > Availability now: clutter audit DK11, Nov 21.)
 
   const TYPE_LABEL: Record<ActivityItem["type"], string> = {
     comment: "Comment",
@@ -374,34 +360,6 @@ export default async function CoachDashboardPage(
       <div className="contents @4xl:block @4xl:col-start-2 @4xl:row-start-1 @4xl:space-y-8 min-w-0">
       {scopeAll && <div className="order-1"><NeedsAttentionPanel coachId={user.id} items={needsAttentionItems} /></div>}
 
-      {/* Moved off the top of the page and made collapsible
-          (live_walkthrough_round2_findings.md) — this is a standing,
-          rarely-touched preference (one row per coach, set once), not
-          something that needs to greet a coach every time they open a
-          page whose whole point is recent activity. Expanded by default
-          only the very first time, before any real preference row
-          exists yet — the one moment a coach actually needs to see it
-          unprompted; collapsed on every visit after that. */}
-      <div className="order-3 mt-8 max-w-2xl @4xl:mt-0 @4xl:max-w-none">
-        <RosterSection
-          title="Suggestion Settings"
-          summary={
-            suggestionMode === "auto_add"
-              ? "Auto-add to calendar"
-              : "Show as a list to review"
-          }
-          defaultExpanded={!prefsRow}
-          variant="glow"
-        >
-          <SuggestionSettings
-            coachId={user.id}
-            initialMode={suggestionMode}
-            initialLeadDays={suggestionLeadDays}
-            initialLeadMode={suggestionLeadMode}
-            initialLeadWeekday={suggestionLeadWeekday}
-          />
-        </RosterSection>
-      </div>
       </div>
       </div>
     </CoachDesktopShell>

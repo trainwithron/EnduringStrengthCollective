@@ -14,13 +14,14 @@ import { SessionLimitsControl } from "@/components/coach/desktop/session-limits-
 import { limitsFromRow } from "@/lib/session-caps";
 import { ScrollToHash } from "@/components/shared/scroll-to-hash";
 import { PUBLIC_PAGE_ANCHOR } from "@/lib/my-page-qr";
+import { SuggestionSettings } from "@/components/coach/desktop/suggestion-settings";
 
 // ONE Availability place (Calendar > Availability). Beside the weekly hours this gives two columns (layout audit, Oct 31): how clients book and the booking
 // rules; then the time zone, the public page and the time off. These used to live on a second page, /groups/<id>/availability, which now sends the coach
 // here. Each read that depends on a later database update hides its control until the column exists, as before.
 export async function AvailabilityBookingSettings({ coachId }: { coachId: string }) {
   const supabase = await createServerClient();
-  const [{ data: coachProfile, error: profileError }, { data: policyRow, error: policyError }, nudgeResult, headsUpResult, bookingModeResult, limitsResult, takesSessionResult] = await Promise.all([
+  const [{ data: coachProfile, error: profileError }, { data: policyRow, error: policyError }, nudgeResult, headsUpResult, bookingModeResult, limitsResult, takesSessionResult, suggestionResult] = await Promise.all([
     supabase.from("profiles").select("timezone, full_name").eq("id", coachId).maybeSingle(),
     supabase.from("coach_booking_policies").select("cancellation_window_hours, buffer_minutes, minimum_notice_hours, credit_expiry_days").eq("coach_id", coachId).maybeSingle(),
     supabase.from("coach_booking_policies").select("reup_nudges_enabled").eq("coach_id", coachId).maybeSingle(),
@@ -30,6 +31,8 @@ export async function AvailabilityBookingSettings({ coachId }: { coachId: string
     supabase.from("coach_booking_policies").select("max_sessions_per_week, max_sessions_per_month, keep_together, lunch_start, lunch_end").eq("coach_id", coachId).maybeSingle(),
     // The late-cancel setting (step 214, wave 2 C5): hidden until the column exists.
     supabase.from("coach_booking_policies").select("late_cancel_takes_session").eq("coach_id", coachId).maybeSingle(),
+    // When to be reminded that a program is ending (Suggestion settings), moved here from the group dashboard (clutter audit DK11, Nov 21). A failed read hides it.
+    supabase.from("coach_preferences").select("suggestion_mode, suggestion_lead_days, suggestion_lead_mode, suggestion_lead_weekday").eq("coach_id", coachId).maybeSingle(),
   ]);
   // A failed read must not show default settings as if they were the coach's own (the next edit would save those defaults over the real ones).
   if (profileError || policyError) {
@@ -70,6 +73,18 @@ export async function AvailabilityBookingSettings({ coachId }: { coachId: string
         {expiryHeadsUpDays !== null && <ExpiryHeadsUpControl coachId={coachId} initialDays={expiryHeadsUpDays} />}
         {reupNudgesEnabled !== null && <ReupNudgeToggle coachId={coachId} initialEnabled={reupNudgesEnabled} />}
       </section>
+
+      {!suggestionResult.error && (
+        <section className="mb-6" data-suggestion-settings>
+          <SuggestionSettings
+            coachId={coachId}
+            initialMode={((suggestionResult.data as { suggestion_mode?: string | null } | null)?.suggestion_mode ?? "list") as "list" | "auto_add"}
+            initialLeadDays={(suggestionResult.data as { suggestion_lead_days?: number | null } | null)?.suggestion_lead_days ?? 3}
+            initialLeadMode={((suggestionResult.data as { suggestion_lead_mode?: string | null } | null)?.suggestion_lead_mode ?? "days_before") as "days_before" | "weekday_before"}
+            initialLeadWeekday={(suggestionResult.data as { suggestion_lead_weekday?: number | null } | null)?.suggestion_lead_weekday ?? 5}
+          />
+        </section>
+      )}
     </div>
 
     <div className="min-w-0">

@@ -29,7 +29,7 @@ describe("Settings' tabs, each group's pages picked under the strip", () => {
     expect(noMoney[1][1]).toEqual(["Text messages"]);
   });
 
-  it("Calendar folds Booking page and Session types under Availability; the other homes have no groups", () => {
+  it("Calendar folds Booking page and Session types under Availability, Home folds the business pages under Business (DK10); the other homes have no groups", () => {
     const t = homeTabs(ordinary);
     expect(stripEntries(t.calendar).map((e) => [e.label, e.tabs.map((x) => x.label)])).toEqual([
       ["Schedule", ["Schedule"]],
@@ -38,6 +38,10 @@ describe("Settings' tabs, each group's pages picked under the strip", () => {
       ["Kiosk check-in", ["Kiosk check-in"]],
       ["Display mode", ["Display mode"]],
     ]);
-    for (const home of ["home", "clients", "programs", "messages"] as const) expect(stripEntries(t[home]).length).toBe(t[home].length);
+    expect(stripEntries(t.home).map((e) => [e.label, e.tabs.map((x) => x.label)])).toEqual([
+      ["Today", ["Today"]],
+      ["Business", ["Overview", "Packages", "Session ledger", "Waiver", "Leads"]],
+    ]);
+    for (const home of ["clients", "programs", "messages"] as const) expect(stripEntries(t[home]).length).toBe(t[home].length);
   });
 });

@@ -58,6 +58,8 @@ const INTEGRATIONS = { key: "integrations", label: "Integrations" };
 const ORGANIZATION = { key: "organization", label: "Organization" };
 // Booking page and Session types are set up next to Availability: one tab, its pages picked under the strip (clutter audit DK9, Nov 21).
 const AVAILABILITY = { key: "availability", label: "Availability" };
+// Every money and business page in one tab on Home, its pages picked under the strip (clutter audit DK10, Nov 21). Booking page and Session types stay under Availability.
+const BUSINESS = { key: "business", label: "Business" };
 const WEBSITE_SHOP = { key: "website-shop", label: "Website & shop" };
 const HELP = { key: "help", label: "Help" };
 const ADMIN = { key: "admin", label: "Admin" };
@@ -85,20 +87,21 @@ export function homeTabs(f: HomeFacts): Record<HomeKey, HomeTab[]> {
   const tabs: Record<HomeKey, (HomeTab | false)[]> = {
     home: [
       { key: "today", label: "Today", href: "/dashboard" },
-      { key: "business", label: "Business", href: `${g}/business` },
-      !f.teamSport && { key: "group-dashboard", label: "Group dashboard", href: `${g}/dashboard` },
+      { key: "business", label: "Overview", href: `${g}/business`, group: BUSINESS },
+      { key: "packages", label: "Packages", href: `${g}/business/packages`, group: BUSINESS },
+      { key: "session-ledger", label: "Session ledger", href: `${g}/business/session-ledger`, group: BUSINESS },
+      { key: "waiver", label: "Waiver", href: `${g}/business/waiver`, group: BUSINESS },
+      { key: "leads", label: "Leads", href: `${g}/business/leads`, group: BUSINESS },
+      // (no Group dashboard tab: a third dashboard that repeated the Team feed, out of the navigation; its address still opens it: DK11)
     ],
     clients: [
       f.teamSport
         ? { key: "members", label: "Athletes", href: membersHref(f.groupId), badge: "clients", termKey: "client" }
         : { key: "clients", label: "Clients", href: CLIENTS_HREF, badge: "clients", termKey: "client" },
       !f.teamSport && showsMembers(f.groupKind, f.coachLevel) && { key: "members", label: "Group roster", href: membersHref(f.groupId) },
-      { key: "leads", label: "Leads", href: `${g}/business/leads` },
+      // only client lists and client things here: the business pages are Home > Business (DK10)
       inGroup && { key: "attendance", label: "Attendance", href: `${g}/attendance` },
       f.onFrontDesk && { key: "front-desk", label: "Front desk", href: "/front-desk", newTab: true },
-      { key: "waiver", label: "Waiver", href: `${g}/business/waiver` },
-      { key: "session-ledger", label: "Session ledger", href: `${g}/business/session-ledger` },
-      { key: "packages", label: "Packages", href: `${g}/business/packages` },
     ],
     calendar: [
       // a team-sport group's calendar is the team calendar (its address lights that tab)
@@ -174,7 +177,12 @@ const RULES: Rule[] = [
   // the requests page belongs to Clients, like /clients/requests (DK30)
   rule("/requests", "clients", "clients"),
   rule(`${G}/business`, "home", "business"),
-  rule(`${G}/dashboard`, "home", "group-dashboard"),
+  // the group dashboard, out of the navigation (DK11): an old link still opens it, under Home
+  rule(`${G}/dashboard`, "home", null),
+  rule(`${G}/business/leads`, "home", "leads"),
+  rule(`${G}/business/waiver`, "home", "waiver"),
+  rule(`${G}/business/session-ledger`, "home", "session-ledger"),
+  rule(`${G}/business/packages`, "home", "packages"),
   // Clients
   rule("/clients", "clients", "clients"),
   rule("/clients/requests", "clients", "clients"),
@@ -188,12 +196,8 @@ const RULES: Rule[] = [
   rule(`${G}/athletes/${ID}/calendar/${ID}`, "clients", "clients"),
   rule(`${G}/athletes/${ID}/history`, "clients", "clients"),
   rule(`${G}/athletes/${ID}/view`, "clients", "clients"),
-  rule(`${G}/business/leads`, "clients", "leads"),
   rule(`${G}/attendance`, "clients", "attendance"),
   rule("/front-desk", "clients", "front-desk"),
-  rule(`${G}/business/waiver`, "clients", "waiver"),
-  rule(`${G}/business/session-ledger`, "clients", "session-ledger"),
-  rule(`${G}/business/packages`, "clients", "packages"),
   // Calendar
   rule("/calendar", "calendar", "availability", (q) => q.get("tab") === "availability"),
   rule("/calendar", "calendar", "schedule"),

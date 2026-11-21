@@ -309,16 +309,12 @@ export default async function SettingsPage(
   const myPageQr = isCoach && !viewingOther ? await readMyPageQr(supabase, user.id, params.groupId) : null;
   const coachingGroup = isCoach ? (
     <SettingsGroup label="Coaching">
-            {/* In their own space the phone IS their app (Release 2): no "Coach home"; the layout switch (tablets only) and the app download instead. */}
-            {inPersonalSpace ? (
+            {/* In their own space the phone IS their app (Release 2): the layout switch (tablets only) and the app download. No "Coach home" link anywhere: the group dashboard is out of the navigation (clutter audit DK11, Nov 21). */}
+            {inPersonalSpace && (
               <div className="space-y-2">
                 <TabletLayoutSwitch to="desktop" />
                 <DownloadAppButton />
               </div>
-            ) : (
-              <Link href={`/groups/${params.groupId}/dashboard`} className="font-body text-sm font-bold text-rust-ink inline-flex items-center min-h-11">
-                Coach home →
-              </Link>
             )}
             <div className="mt-4 pt-4 border-t border-steel/15">
               <GoogleCalendarConnection

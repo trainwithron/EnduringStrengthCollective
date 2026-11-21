@@ -173,3 +173,19 @@ describe("DK12: no 'not switched on yet'", () => {
     expect(read("app/(coach)/clients/check-ins/page.tsx")).not.toContain("switched on yet");
   });
 });
+
+describe("DK11 (round 2, Ron Nov 21): the group dashboard is out of the navigation; its Suggestion settings are on Calendar > Availability", () => {
+  it("Suggestion settings are on Availability, read there, and gone from the group dashboard", () => {
+    const avail = read("components/coach/desktop/availability-settings.tsx");
+    expect(avail).toContain('supabase.from("coach_preferences").select("suggestion_mode, suggestion_lead_days, suggestion_lead_mode, suggestion_lead_weekday").eq("coach_id", coachId).maybeSingle()');
+    expect(avail).toContain("{!suggestionResult.error && (");
+    expect(avail).toContain("<SuggestionSettings");
+    const dash = read("app/(coach)/groups/[groupId]/dashboard/page.tsx");
+    expect(dash).not.toContain("SuggestionSettings");
+    expect(dash).not.toContain("coach_preferences");
+  });
+  it("no Coach home link in Settings; the page itself still opens by its address", () => {
+    expect(read("app/(coach)/groups/[groupId]/settings/page.tsx")).not.toContain("Coach home →");
+    expect(read("app/(coach)/groups/[groupId]/dashboard/page.tsx")).toContain("export default async function");
+  });
+});

@@ -60,7 +60,8 @@ describe("TC2: the menus use it", () => {
     expect(homes).toContain('{ key: "members", label: "Athletes", href: membersHref(f.groupId), badge: "clients", termKey: "client" }');
     expect(homes).toContain('f.teamSport ? { key: "team-calendar", label: "Team calendar", href: `${g}/team/calendar` }');
     // no Group dashboard, Group calendar, Group sessions or kiosk tab of its own; Team sheet and the quiet Business link are its own
-    expect(homes).toContain('!f.teamSport && { key: "group-dashboard"');
+    // (no Group dashboard tab for anyone since clutter audit DK11)
+    expect(homes).not.toContain('key: "group-dashboard"');
     expect(homes).toContain('!f.teamSport && inGroup && { key: "group-calendar"');
     expect(homes).not.toContain('key: "group-sessions"');
     expect(homes).toContain('!f.teamSport && (f.onFrontDesk || inGroup) && { key: "kiosk"');

@@ -41,7 +41,7 @@ describe("Home's desktop rail", () => {
       expect(html).not.toContain("Client</span>");
     });
   }
-  it("FIX 6: /dashboard shows the Home strip (Today lit, Business, Group dashboard) at the top of the page", () => {
+  it("FIX 6: /dashboard shows the Home strip (Today lit, Business; no Group dashboard since clutter audit DK11) at the top of the page", () => {
     const html = render({ groupId: "g-team", groupName: "Varsity" });
     expect(html).toContain('aria-label="Home"');
     expect(html).toContain("data-home-strip");
@@ -49,7 +49,7 @@ describe("Home's desktop rail", () => {
     expect(strip).toContain('href="/dashboard"');
     expect(strip).toMatch(/aria-current="page"[^>]*>Today|>Today<\/a>/);
     expect(strip).toContain('href="/groups/g-team/business"');
-    expect(strip).toContain('href="/groups/g-team/dashboard"');
+    expect(strip).not.toContain('href="/groups/g-team/dashboard"');
   });
   // the rail icon with this label, lit or not
   const railLit = (html: string, label: string) => {
@@ -85,13 +85,18 @@ describe("Home's desktop rail", () => {
     expect(railLit(html, "Calendar")).toBe(true);
     expect(railLit(html, "Home")).toBe(false);
   });
-  it("FIX 6 R2: /running-low lights Clients (strip: Clients, Leads, Waiver, Session ledger, Packages)", () => {
+  it("FIX 6 R2: /running-low lights Clients, whose tabs are client things only (the business pages are Home > Business: clutter audit DK10, Nov 21)", () => {
     const html = page("/running-low", "", "clients");
-    const strip = html.slice(html.indexOf("data-home-strip"), html.indexOf("HOME CONTENT"));
-    expect(html).toContain('<nav aria-label="Clients"');
-    expect(tabOn(strip, "/clients")).toBe(true);
-    for (const p of ["leads", "waiver", "session-ledger", "packages"]) expect(strip, p).toContain(`href="/groups/g-team/business/${p}"`);
     expect(railLit(html, "Clients")).toBe(true);
+    for (const p of ["leads", "waiver", "session-ledger", "packages"]) expect(html, p).not.toContain(`href="/groups/g-team/business/${p}"`);
+  });
+  it("DK10: a business page shows Home's strip with Business lit, its pages in the row under it, and lights Home", () => {
+    const html = page("/groups/g-team/business/packages", "", "packages");
+    const strip = html.slice(html.indexOf("data-home-strip"), html.indexOf("HOME CONTENT"));
+    expect(html).toContain('<nav aria-label="Home"');
+    for (const p of ["business", "business/packages", "business/session-ledger", "business/waiver", "business/leads"]) expect(strip, p).toContain(`href="/groups/g-team/${p}"`);
+    expect(tabOn(strip, "/groups/g-team/business/packages")).toBe(true);
+    expect(railLit(html, "Home")).toBe(true);
   });
   it("FIX 6 R3: the exercise library shows the Programs strip with Exercise library lit, and the Programs icon lit", () => {
     const html = page("/groups/g-team/exercise-library", "", "exercise-library");

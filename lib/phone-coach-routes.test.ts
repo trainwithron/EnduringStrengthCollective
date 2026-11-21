@@ -238,9 +238,9 @@ describe("the phone's menus only offer the phone's places", () => {
     }
     expect(() => statSync(join(root, "components", "coach", "view-mode-toggle.tsx"))).toThrow();
   });
-  it("the client app's Settings sends a coach to Coach home", () => {
+  it("the client app's Settings has no Coach home link (the group dashboard is out of the navigation: clutter audit DK11, Nov 21)", () => {
     const settings = read("app/(coach)/groups/[groupId]/settings/page.tsx");
-    expect(settings).toContain("Coach home →");
+    expect(settings).not.toContain("Coach home →");
     expect(settings).not.toContain("the full site.");
   });
 });

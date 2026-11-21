@@ -68,11 +68,12 @@ describe("today's menus all have a place", () => {
     "/clients", "/calendar", `${g}/messages`, "/programs", `${g}/exercise-library`, `${g}/nutrition`,
     `${g}/business`, `${g}/business/packages`, `${g}/resources`, `${g}/business/website`, "/calendar?tab=availability", `${g}/business/session-types`, `${g}/business/booking-page`,
     `${g}/business/waiver`, `${g}/business/leads`, `${g}/business/session-ledger`, `${g}/branding`, `${g}/business/zapier`, "/admin/organizations", "/admin/marketplace-ranking",
-    `${g}/clients?view=members`, `${g}/dashboard`, `${g}/team-performance`, `${g}/attendance`, `${g}/feed`, `${g}/team`, `${g}/team/calendar`, `${g}/group-calendar`, "/group-calendar",
+    `${g}/clients?view=members`, `${g}/team-performance`, `${g}/attendance`, `${g}/feed`, `${g}/team`, `${g}/team/calendar`, `${g}/group-calendar`, "/group-calendar",
     `${g}/challenges`, `${g}/records`, `${g}/settings`, `${g}/display`, `${g}/kiosk/settings`, "/front-desk", `${g}/business/sms-settings`, `${g}/business/support`,
     `${g}/quick-tips`, "/admin/support", `${g}/team-sheet`, "/dashboard",
   ];
-  // Group sessions are on the Group calendar since Oct 31 (one page); the old address redirects there and has no tab of its own.
+  // Group sessions are on the Group calendar since Oct 31 (one page); the old address redirects there and has no tab of its own. The group dashboard is out of the navigation
+  // (clutter audit DK11, Nov 21): its address still opens it, under Home, with no tab.
   it("each is a tab in exactly one home (for a coach who sees everything)", () => {
     const tabs = [...HOMES.flatMap((h) => homeTabs(everything)[h.key].map((t) => ({ ...t, home: h.key }))), ...homeTabs({ ...everything, coachLevel: true }).calendar.map((t) => ({ ...t, home: "calendar" as HomeKey })), ...homeTabs({ ...everything, teamSport: true }).programs.map((t) => ({ ...t, home: "programs" as HomeKey }))];
     for (const href of OLD) {
@@ -105,9 +106,16 @@ describe("who sees which tab (the old menus' rules, moved word for word)", () =>
     for (const k of ["leads", "session-ledger", "availability", "session-types", "booking-page", "resources", "website"]) expect(all, k).not.toContain(k);
     expect(all).toContain("waiver");
   });
-  it("a mixed organization's ordinary group keeps every selling tab", () => {
-    expect(keys(ordinary, "clients")).toEqual(expect.arrayContaining(["leads", "waiver", "session-ledger", "packages"]));
-    expect(keys(ordinary, "home")).toEqual(["today", "business", "group-dashboard"]);
+  it("a mixed organization's ordinary group keeps every selling tab, in one Business group on Home (DK10); no Group dashboard tab (DK11)", () => {
+    expect(keys(ordinary, "home")).toEqual(["today", "business", "packages", "session-ledger", "waiver", "leads"]);
+    for (const k of ["leads", "waiver", "session-ledger", "packages"]) expect(keys(ordinary, "clients")).not.toContain(k);
+    expect(homeTabs(ordinary).home.filter((t) => t.group?.key === "business").map((t) => t.label)).toEqual(["Overview", "Packages", "Session ledger", "Waiver", "Leads"]);
+    // old addresses still open and light Business on Home
+    for (const [p, tab] of [["business/leads", "leads"], ["business/waiver", "waiver"], ["business/session-ledger", "session-ledger"], ["business/packages", "packages"], ["business", "business"]]) {
+      expect(homeOfPath(`/groups/${G}/${p}`)).toEqual({ home: "home", tab });
+    }
+    expect(homeOfPath(`/groups/${G}/dashboard`)).toEqual({ home: "home", tab: null });
+    expect(HOMES.flatMap((h) => keys(everything, h.key))).not.toContain("group-dashboard");
   });
   it("the platform admin gets one Admin group under Settings (Support inbox, Organizations, ranking, machine list); nothing admin in Messages; nobody else gets any (DK3)", () => {
     expect(keys({ ...ordinary, isPlatformAdmin: true }, "messages")).toEqual(["messages", "feed"]);

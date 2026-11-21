@@ -12,11 +12,12 @@ describe("Settings in the coach's own personal space", () => {
   it("hides the organization's vocabulary choice there", () => {
     expect(page).toContain("const terminologyGroup = isCoach && !inPersonalSpace ? (");
   });
-  it("has no 'Coach home' there (Release 2: the phone is their own app; the layout switch and the app download instead), and the group's workspace everywhere else", () => {
-    expect(page).toContain("{inPersonalSpace ? (");
+  it("has the layout switch and the app download there (Release 2), and no 'Coach home' link anywhere (clutter audit DK11, Nov 21)", () => {
+    expect(page).toContain("{inPersonalSpace && (");
     expect(page).toContain('<TabletLayoutSwitch to="desktop" />');
     expect(page).toContain("<DownloadAppButton />");
-    expect(page).toContain("<Link href={`/groups/${params.groupId}/dashboard`} className=\"font-body text-sm font-bold text-rust-ink inline-flex items-center min-h-11\">");
+    expect(page).not.toContain("Coach home →");
+    expect(page).not.toContain("<Link href={`/groups/${params.groupId}/dashboard`}");
     expect(page).toContain("const viewingOther = effective.isActingAsOther && athleteId !== user.id;");
   });
 });

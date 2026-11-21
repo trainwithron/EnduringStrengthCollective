@@ -11,9 +11,9 @@ describe("small text links are full-size tap targets on a phone", () => {
       expect(read(f), f).toContain('className="font-body text-xs text-rust-ink inline-flex items-center min-h-11 px-2 -mx-2"');
     }
   });
-  it("Settings' Coach home and coach-invite links, the coaches section link, and Skip this on the check-in", () => {
+  it("Settings' coach-invite links (Coach home is gone: DK11), the coaches section link, and Skip this on the check-in", () => {
     const settings = read("app/(coach)/groups/[groupId]/settings/page.tsx");
-    expect(settings.match(/inline-flex items-center min-h-11/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(settings.match(/inline-flex items-center min-h-11/g)?.length).toBeGreaterThanOrEqual(2);
     expect(read("components/coach/coaches-section.tsx")).toContain("underline underline-offset-2 inline-flex items-center min-h-11");
     expect(read("components/athlete/wellness-checkin-widget.tsx")).toContain("text-steel mt-1 inline-flex items-center min-h-11");
   });
