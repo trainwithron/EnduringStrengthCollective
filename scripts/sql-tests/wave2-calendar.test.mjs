@@ -182,6 +182,24 @@ expect("T2: signed-in only (the function checks it is the athlete's coach)", tmP
 const tmDefs = (await db.query(`select string_agg(prosrc, ' ') d from pg_proc where proname in ('recompute_training_max', 'recompute_training_maxes_internal')`)).rows[0].d;
 expect("T2: each estimate writer patched once, even after running twice", tmDefs.split("not public.athlete_training_maxes.locked").length - 1 === 2 && tmDefs.split("and not m.locked").length - 1 === 1);
 
+// The paste files themselves: the undo puts the three live functions back exactly (same md5 as live on Nov 20) and removes the rest; the paste then applies cleanly again and its
+// check row is all true; and the paste holds the migration word for word.
+const md5s = async () => (await db.query(`select proname, md5(prosrc) m from pg_proc where proname in ('cancel_booking_and_refund_credit', 'recompute_training_max', 'recompute_training_maxes_internal') order by proname`)).rows.map((x) => `${x.proname}:${x.m}`).join(" ");
+const undo = lf(readFileSync(new URL("../../supabase/apply/undo-step214-0458.sql", import.meta.url), "utf8"));
+const paste = lf(readFileSync(new URL("../../supabase/apply/apply-step214-0458.sql", import.meta.url), "utf8"));
+expect("the paste is the migration word for word", paste.includes(migration));
+await db.exec(`select set_config('request.jwt.claim.sub', '', false)`);
+await db.exec(undo);
+expect(
+  "undo: the three functions are exactly the live ones again",
+  (await md5s()) === "cancel_booking_and_refund_credit:1a3f38fb5fdcf93a3767cd31bbec10fc recompute_training_max:64fe631d4c5fdb5b3a449fcc55695190 recompute_training_maxes_internal:af72466742549e7cb3fac0ec9917ee42"
+);
+const leftover = (await db.query(`select count(*)::int n from pg_proc where proname in ('take_late_cancel_session', 'give_back_late_cancel', 'set_tested_max', 'unlock_tested_max')`)).rows[0].n;
+expect("undo: the new functions are gone", leftover === 0);
+const results = await db.exec(paste);
+const checkRow = results[results.length - 1].rows[0];
+expect(`paste: the check row is all true (${JSON.stringify(checkRow)})`, Object.values(checkRow).length === 7 && Object.values(checkRow).every((v) => v === true));
+
 if (failures.length) {
   console.error("FAILED:\n- " + failures.join("\n- "));
   process.exit(1);
