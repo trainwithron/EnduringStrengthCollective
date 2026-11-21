@@ -4,6 +4,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { rateLimitResponse } from "@/lib/rate-limit";
 import { limitByIp } from "@/lib/public-booking-route";
 import { isRealCalendarDate, requestTargetFor } from "@/lib/client-requests";
+import { coachQuietNotice } from "@/lib/quiet-notice";
 
 // A SIGNED-IN person sends a request to train with a coach, from the coach's public page. The body is only { slug, dob }: no message and no link of any kind. The database function does the checking (the page is on and
 // taking requests, under 13, already a client, a second request, the 30-day wait, the limits) and writes nothing but the waiting request: no seat, no data. It ANSWERS with {ok, id} or {ok: false, code, message}, so
@@ -33,5 +34,7 @@ export async function POST(request: Request) {
     const code = out.code ?? "failed";
     return NextResponse.json({ error: out.message ?? "Couldn't send the request.", code }, { status: code === "too_many" ? 429 : 409 });
   }
-  return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
+  // The coach in their quiet hours: one line for the requester (lib/quiet-notice.ts), in their own time zone. Only the line, never the hours.
+  const quietNotice = await coachQuietNotice(createServiceRoleClient(), target.coachId, raw?.timeZone);
+  return NextResponse.json({ ok: true, quietNotice }, { headers: { "Cache-Control": "no-store" } });
 }

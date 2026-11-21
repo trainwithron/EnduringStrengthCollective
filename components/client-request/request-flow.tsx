@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { QuietHoursNotice } from "@/components/athlete/quiet-hours-notice";
+import { deviceTimeZone } from "@/lib/quiet-notice";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { saved } from "@/lib/saved";
@@ -18,6 +20,8 @@ type Phase = "checking" | "guest" | "authed" | "awaiting-confirmation" | "sent" 
 // logoUrl / orgName: the organization's logo chip from the coach's public page, so the form looks like the page it came from (optional; the page passes them when it has them).
 export function RequestFlow({ slug, coachName, coachId, logoUrl = null, orgName = null }: { slug: string; coachName: string; coachId: string; logoUrl?: string | null; orgName?: string | null }) {
   const [phase, setPhase] = useState<Phase>("checking");
+  // the coach in their quiet hours (lib/quiet-notice.ts): one line on the Sent screen, worked out on the server
+  const [quietNotice, setQuietNotice] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>("signup");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -100,10 +104,11 @@ export function RequestFlow({ slug, coachName, coachId, logoUrl = null, orgName 
         const res = await fetch("/api/client-requests/signup", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ slug, name, email: email.trim().toLowerCase(), password, dob }),
+          body: JSON.stringify({ slug, name, email: email.trim().toLowerCase(), password, dob, timeZone: deviceTimeZone() }),
         });
         const data = await res.json().catch(() => ({}));
         if (res.ok) {
+          setQuietNotice(typeof data.quietNotice === "string" ? data.quietNotice : null);
           if (data.confirmed) void flushLegalConsent();
           setPhase(data.confirmed ? "sent" : "sent-unconfirmed");
         } else if (data.code === "has_account") {
@@ -151,9 +156,10 @@ export function RequestFlow({ slug, coachName, coachId, logoUrl = null, orgName 
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch("/api/client-requests/submit", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ slug, dob: needsDob ? dob : null }) });
+      const res = await fetch("/api/client-requests/submit", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ slug, dob: needsDob ? dob : null, timeZone: deviceTimeZone() }) });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
+        setQuietNotice(typeof data.quietNotice === "string" ? data.quietNotice : null);
         setPhase("sent");
         return;
       }
@@ -221,6 +227,7 @@ export function RequestFlow({ slug, coachName, coachId, logoUrl = null, orgName 
       <div className="w-full max-w-sm text-center" role="status">
         <h1 className="font-display uppercase text-2xl font-bold">Sent</h1>
         <p className="font-body text-steel text-sm mt-3">{first} will get back to you.</p>
+        <QuietHoursNotice text={quietNotice} className="mt-2" />
         {nextStep}
         {back}
         {!authedEmail && (
@@ -237,6 +244,7 @@ export function RequestFlow({ slug, coachName, coachId, logoUrl = null, orgName 
       <div className="w-full max-w-sm text-center" role="status">
         <h1 className="font-display uppercase text-2xl font-bold">Sent</h1>
         <p className="font-body text-steel text-sm mt-3">{first} can see your request now.</p>
+        <QuietHoursNotice text={quietNotice} className="mt-2" />
         <p className="font-body text-steel text-sm mt-3">
           We also emailed a link to <span className="text-chalk">{email}</span>. Open it to confirm your email, so you can sign in once {first} says yes. It comes from Spotlight Coaching; check spam too.
         </p>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { QuietHoursNotice } from "@/components/athlete/quiet-hours-notice";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 
@@ -59,6 +60,7 @@ export function RequestSlotButton({
     return (
       <span className="font-body text-xs text-chalk text-right max-w-[200px]">
         Requested. Your coach will confirm; you will be told either way.
+        <QuietHoursNotice coachId={coachId} className="mt-1 text-xs" />
       </span>
     );
   }

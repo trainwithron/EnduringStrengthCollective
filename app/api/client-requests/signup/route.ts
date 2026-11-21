@@ -4,6 +4,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { limitByIp } from "@/lib/public-booking-route";
 import { isRealCalendarDate, requestTargetFor } from "@/lib/client-requests";
 import { friendlySignUpError } from "@/lib/sign-in-errors";
+import { coachQuietNotice } from "@/lib/quiet-notice";
 
 // A visitor on a coach's "Request to train" page makes an account AND sends the request in one go (Ron, Oct 31: a new client at the gym could not find the
 // confirmation email, so the request was never sent and the coach never heard). The coach is told at once; their list says the email is not confirmed yet, and the
@@ -60,5 +61,7 @@ export async function POST(request: Request) {
     const code = out.code ?? "failed";
     return NextResponse.json({ error: out.message ?? "Couldn't send the request.", code, accountMade: true }, { status: code === "too_many" ? 429 : 409 });
   }
-  return NextResponse.json({ ok: true, confirmed: !!data.session }, { headers: { "Cache-Control": "no-store" } });
+  // The coach in their quiet hours: one line for the requester (lib/quiet-notice.ts), in their own time zone. Only the line, never the hours.
+  const quietNotice = await coachQuietNotice(service, target.coachId, raw?.timeZone);
+  return NextResponse.json({ ok: true, confirmed: !!data.session, quietNotice }, { headers: { "Cache-Control": "no-store" } });
 }

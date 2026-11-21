@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { QuietHoursNotice } from "@/components/athlete/quiet-hours-notice";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 
@@ -76,7 +77,12 @@ export function RequestDifferentTime({
   }
 
   if (sentLabel) {
-    return <p className="font-body text-sm text-chalk mt-4">Asked for {sentLabel}. Your coach will confirm, and you will be told either way.</p>;
+    return (
+      <div className="mt-4">
+        <p className="font-body text-sm text-chalk">Asked for {sentLabel}. Your coach will confirm, and you will be told either way.</p>
+        <QuietHoursNotice coachId={coachId} className="mt-1" />
+      </div>
+    );
   }
 
   return (

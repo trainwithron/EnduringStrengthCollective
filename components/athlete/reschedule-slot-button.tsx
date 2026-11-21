@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { QuietHoursNotice } from "@/components/athlete/quiet-hours-notice";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { mirrorGoogleCalendarEvent } from "@/lib/mirror-google-calendar-event";
@@ -77,6 +78,7 @@ export function RescheduleSlotButton({
         {sent ? (
           <span className="font-body text-xs text-chalk text-right">
             Sent. Your coach will confirm your new time. Your session stays where it is until then.
+            <QuietHoursNotice bookingId={bookingId} className="mt-1 text-xs" />
           </span>
         ) : (
           <button

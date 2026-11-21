@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { QuietHoursNotice } from "@/components/athlete/quiet-hours-notice";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -55,6 +56,8 @@ function ScheduleCard({ groupId, item, canRequest }: { groupId: string; item: Sc
   const [sheet, setSheet] = useState<RequestKind | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // a request just sent from this card (for the coach's quiet-hours line)
+  const [justSent, setJustSent] = useState(false);
   const { series, requests } = item;
   const open = openRequest(requests, series.id);
   const kinds = requestableKinds(series.status);
@@ -122,8 +125,9 @@ function ScheduleCard({ groupId, item, canRequest }: { groupId: string; item: Sc
         </ul>
       )}
       {error && <p className="mt-3 font-body text-sm text-chalk" role="alert">{error}</p>}
+      {justSent && <QuietHoursNotice seriesId={series.id} className="mt-3" />}
 
-      {sheet && <RequestSheet kind={sheet} series={series} onClose={() => setSheet(null)} onSent={() => { setSheet(null); router.refresh(); }} />}
+      {sheet && <RequestSheet kind={sheet} series={series} onClose={() => setSheet(null)} onSent={() => { setSheet(null); setJustSent(true); router.refresh(); }} />}
     </section>
   );
 }
