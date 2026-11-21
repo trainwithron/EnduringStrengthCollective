@@ -25,6 +25,10 @@
       "schedule": "0 14 * * 1"
     },
     {
+      "path": "/api/cron/sessions-to-mark",
+      "schedule": "30 14 * * 1"
+    },
+    {
       "path": "/api/cron/nutrition-checkin-suggestions",
       "schedule": "0 15 * * 1"
     },

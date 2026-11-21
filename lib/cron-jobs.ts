@@ -18,6 +18,8 @@ export const CRON_JOBS: CronJob[] = [
   { job: "oura-sync", path: "/api/oura/sync", maxAgeHours: DAILY },
   { job: "coach-digest", path: "/api/cron/coach-digest", maxAgeHours: DAILY },
   { job: "milestone-scan", path: "/api/cron/milestone-scan", maxAgeHours: WEEKLY },
+  // Wave 2 C6: the weekly "sessions to mark" line for coaches.
+  { job: "sessions-to-mark", path: "/api/cron/sessions-to-mark", maxAgeHours: WEEKLY },
   { job: "nutrition-checkin-suggestions", path: "/api/cron/nutrition-checkin-suggestions", maxAgeHours: WEEKLY },
   { job: "rest-day-nudge", path: "/api/cron/rest-day-nudge", maxAgeHours: DAILY },
   { job: "withings-sync", path: "/api/withings/sync", maxAgeHours: DAILY },
