@@ -47,7 +47,8 @@ describe("a coach on a computer has no separate message page", () => {
     expect(profile).not.toContain("loadDirectThread(");
     expect(profile).toContain("const unreadMessages = messageRows.filter(");
     expect(section).toContain('if (mode === "closed" || messages !== null) return;');
-    expect(tabs).toContain("router.push");
+    // opening the Calendar tab goes by address, replacing the entry (clutter pass, Nov 21: a tab is not a step for Back)
+    expect(tabs).toContain("router.replace");
     expect(profile).toContain('(tabParam as string | undefined) === "messages" || draftParam !== ""');
     expect(profile).toContain("initialOpen={openMessages}");
   });

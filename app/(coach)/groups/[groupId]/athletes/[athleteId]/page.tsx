@@ -22,6 +22,10 @@ import { ClientProfileTabs } from "@/components/coach/desktop/client-profile-tab
 import { ClientProgramsSection } from "@/components/coach/desktop/client-programs-section";
 import { isClientProfileTab, SELF_HIDDEN_TABS } from "@/lib/client-profile-tabs";
 import Link from "next/link";
+import { BackLink } from "@/components/coach/back-link";
+import { MessageClientButton } from "@/components/coach/desktop/message-client-button";
+import { prefersAthleteStyleView } from "@/lib/pwa-server";
+import { PHONE_SPOTLIGHT } from "@/lib/phone-coach-routes";
 import { NoAccess } from "@/components/shared/no-access";
 import { calorieSeriesWithStanding, standingForDate } from "@/lib/macro-resolution";
 import { fetchStandingHistory } from "@/lib/standing-macros";
@@ -991,6 +995,25 @@ export default async function AthleteProfilePage(
 
   // The coach's own profile lives in their personal space, which is in no organization: the coach rail around it stays on the organization they have open.
   // The coach's own profile lives in their personal space, which is in no organization: the page around it is the normal coach page of the organization they have open.
+  // ONE session control (clutter pass, Nov 21: Billing had Add sessions, then −/+ and an editable number under it, and the Calendar tab a third copy): the balance with − and +,
+  // and Add sessions (an amount, a note) beside it. On Overview, at the top of Calendar and first on Billing & settings; all three are the same control.
+  const sessionsControl = (where: "overview" | "calendar" | "billing") => (
+    <div className="flex flex-wrap items-end gap-x-6 gap-y-3" data-sessions-control={where}>
+      <SessionCreditsControl key={`${where}-credits-${creditsRow?.balance ?? 0}`} athleteId={params.athleteId} groupId={params.groupId} initialBalance={creditsRow?.balance ?? 0} />
+      <AssignSessionsControl
+        key={`${where}-assign-${creditsRow?.balance ?? 0}`}
+        compact
+        athleteId={params.athleteId}
+        groupId={params.groupId}
+        clientName={profile?.full_name ?? "this client"}
+        initialBalance={creditsRow?.balance ?? 0}
+      />
+    </div>
+  );
+
+  // Where "Back" goes when there is no step back to take: Spotlight (which holds the client list) on a phone, the Clients page on a computer.
+  const backFallback = (await prefersAthleteStyleView()) ? PHONE_SPOTLIGHT : "/clients";
+
   let shellGroupId = params.groupId;
   let shellGroupName = group?.name ?? "Coaching";
   if (selfView) {
@@ -1004,12 +1027,10 @@ export default async function AthleteProfilePage(
   return (
     <CoachDesktopShell groupId={shellGroupId} groupName={shellGroupName} active="clients">
       <div className="pb-6 border-b border-steel/20 mb-6">
-        <Link
-          href="/clients"
-          className="font-body text-xs text-steel uppercase tracking-wide"
-        >
-          &larr; Back to clients
-        </Link>
+        {/* Back to where the coach came from (Spotlight, the calendar, the Clients page); opened straight from a link, the Clients page, or Spotlight's list on a phone. */}
+        <BackLink fallbackHref={backFallback} className="inline-flex items-center min-h-11 -mt-3 font-body text-xs text-steel uppercase tracking-wide">
+          &larr; Back
+        </BackLink>
         <div className="flex items-center gap-3 mt-3">
           {profile?.avatar_url ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -1039,6 +1060,16 @@ export default async function AthleteProfilePage(
               )}
             </p>
           </div>
+          {/* On a computer, the everyday jobs beside the name (clutter pass, Nov 21): book them, message them. Logging stays phone-only (decided Oct 24). */}
+          {!selfView && (
+            <div className="hidden lg:flex items-center gap-2 ml-auto" data-profile-header-actions>
+              <Link href={`/groups/${params.groupId}/calendar?client=${params.athleteId}&scheduleFor=${params.athleteId}`} className="min-h-11 px-4 inline-flex items-center border border-steel/40 text-chalk font-body text-sm">
+                Schedule
+              </Link>
+              {/* Opens the message box on Overview from any tab, with no address change and no step for Back (lib/open-client-messages.ts). */}
+              <MessageClientButton className="min-h-11 px-4 inline-flex items-center border border-steel/40 text-chalk font-body text-sm" />
+            </div>
+          )}
         </div>
         {/* On the phone, the first thing under the name on every tab (it sits above the tabs): logging their workout, on the Log page that has Wing it.
             The desktop profile does not offer it. */}
@@ -1056,16 +1087,12 @@ export default async function AthleteProfilePage(
             {profileFlag}
           </p>
         )}
-        <div className="flex flex-wrap items-center gap-2 mt-4">
-          <Link
-            href={`/groups/${params.groupId}/athletes/${params.athleteId}/history`}
-            className="inline-flex items-center h-9 font-body text-xs text-rust-ink border border-rust px-3"
-            title="Backfill training history from before this client joined — grounds the AI program builder"
-          >
-            Upload exercise history
-          </Link>
-          {!selfView && <VideoCheckinRecorder athleteId={params.athleteId} groupId={params.groupId} coachId={user.id} />}
-        </div>
+        {/* Upload exercise history is a one-time setup job: it lives in the Programs tab now (clutter pass, Nov 21). */}
+        {!selfView && (
+          <div className="flex flex-wrap items-center gap-2 mt-4">
+            <VideoCheckinRecorder athleteId={params.athleteId} groupId={params.groupId} coachId={user.id} />
+          </div>
+        )}
       </div>
 
       {getStartedShown && <GetStartedCard athleteId={params.athleteId} firstName={(profile?.full_name ?? "").trim().split(/\s+/)[0] || "them"} steps={getStarted} />}
@@ -1081,19 +1108,20 @@ export default async function AthleteProfilePage(
         {/* A link to a section ("#sign-in-options", "#add-sessions", "#goal-sheet") lands on it once its tab shows (audit, Nov 21). */}
         <ScrollToHash ids={[SIGN_IN_OPTIONS_ANCHOR, ADD_SESSIONS_ANCHOR, GOAL_SHEET_ANCHOR, PAYMENT_HOLD_ANCHOR]} />
         <ClientProfileTabs groupId={params.groupId} athleteId={params.athleteId} initial={initialTab} hide={selfView ? SELF_HIDDEN_TABS : []} />
+        {/* Under Log their workout, Overview opens with how many sessions they have and the one control that changes it (clutter pass, Nov 21: adding a package meant a tab
+            switch). The same control is at the top of Calendar and first on Billing & settings. */}
+        {!selfView && (
+          <div data-tab="overview" className="mb-6" data-overview-sessions>
+            <p className="font-body text-sm text-chalk mb-3">{sessionsSentence}</p>
+            {sessionsControl("overview")}
+          </div>
+        )}
         <div data-tab="calendar" className="mb-8">
           {/* Sessions can be added right here too (Ron, Oct 19: "it would be nice to be able to do it from the calendar also. That's where I'd be looking at it most likely"): the same
-              sentence as Billing and the same Add sessions control as the Settings tab (links still point at the Settings copy). */}
+              sentence as Billing and the same session control (links still point at the Billing copy). */}
           <div className="mb-4 flex flex-col lg:flex-row lg:items-center gap-2 lg:gap-6" data-calendar-add-sessions>
             <p className="font-body text-sm text-chalk lg:flex-1">{sessionsSentence}</p>
-            <AssignSessionsControl
-              key={`calendar-assign-${creditsRow?.balance ?? 0}`}
-              compact
-              athleteId={params.athleteId}
-              groupId={params.groupId}
-              clientName={profile?.full_name ?? "this client"}
-              initialBalance={creditsRow?.balance ?? 0}
-            />
+            {sessionsControl("calendar")}
           </div>
           {initialTab === "calendar" && (
             <Suspense fallback={<SectionLoading />}>
@@ -1133,6 +1161,15 @@ export default async function AthleteProfilePage(
             }
           />
           </Suspense>
+          {/* A one-time setup job, so it sits with their programs, not above every tab (clutter pass, Nov 21). */}
+          <Link
+            href={`/groups/${params.groupId}/athletes/${params.athleteId}/history`}
+            className="mt-4 min-h-11 inline-flex items-center font-body text-sm text-rust-ink underline underline-offset-2"
+            title="Backfill training history from before this client joined. It grounds the AI program builder."
+            data-upload-history
+          >
+            Upload exercise history
+          </Link>
         </div>
 
       <div className="profile-grid grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6 lg:gap-10 items-start">
@@ -1165,6 +1202,20 @@ export default async function AthleteProfilePage(
             </p>
           )}
           {parqNotice && <ParqFlagNotice athleteId={params.athleteId} coachId={user.id} flagged={parQFlaggedCount} />}
+          </div>
+          {/* Billing comes first on Billing & settings (clutter pass, Nov 21: sign-in, name and personal info sat above it). */}
+          <div data-tab="settings">
+            <SettingsGroup label="Billing">
+              {/* A failed card payment, how to pause them today, and their card payments with Evidence for a dispute (Ron, Nov 20). */}
+              {!selfView && <ClientBillingFacts groupId={params.groupId} athleteId={params.athleteId} timeZone={displayZone} />}
+              {/* On hold (Needs payment's Hold): said here, with the way to take it off (audit, Nov 21). Shows nothing when they are not on hold. */}
+              {!selfView && <PaymentHoldControl groupId={params.groupId} athleteId={params.athleteId} clientName={profile?.full_name ?? "this client"} />}
+              <p className="font-body text-sm text-chalk mb-3">{sessionsSentence}</p>
+              {/* The session control sits right under the sentence (FIX 3): every "out of sessions" and "running low" link lands here (lib/add-sessions-link.ts). */}
+              <div id="add-sessions" className="scroll-mt-24 mb-4">
+                {sessionsControl("billing")}
+              </div>
+            </SettingsGroup>
           </div>
           {!selfView && (
             <div data-tab="settings" className="mb-4">
@@ -1621,32 +1672,6 @@ export default async function AthleteProfilePage(
           </div>
 
           <section className="space-y-4">
-            <div data-tab="settings">
-            <SettingsGroup label="Billing">
-              {/* A failed card payment, how to pause them today, and their card payments with Evidence for a dispute (Ron, Nov 20). */}
-              {!selfView && <ClientBillingFacts groupId={params.groupId} athleteId={params.athleteId} timeZone={displayZone} />}
-              {/* On hold (Needs payment's Hold): said here, with the way to take it off (audit, Nov 21). Shows nothing when they are not on hold. */}
-              {!selfView && <PaymentHoldControl groupId={params.groupId} athleteId={params.athleteId} clientName={profile?.full_name ?? "this client"} />}
-              <p className="font-body text-sm text-chalk mb-3">{sessionsSentence}</p>
-              {/* Add sessions sits right under the sentence (FIX 3): every "out of sessions" and "running low" link lands here (lib/add-sessions-link.ts). */}
-              <div id="add-sessions" className="scroll-mt-24 mb-4">
-                <AssignSessionsControl
-                  key={`assign-${creditsRow?.balance ?? 0}`}
-                  athleteId={params.athleteId}
-                  groupId={params.groupId}
-                  clientName={profile?.full_name ?? "this client"}
-                  initialBalance={creditsRow?.balance ?? 0}
-                />
-              </div>
-              <SessionCreditsControl
-                key={`credits-${creditsRow?.balance ?? 0}`}
-                athleteId={params.athleteId}
-                groupId={params.groupId}
-                initialBalance={creditsRow?.balance ?? 0}
-              />
-            </SettingsGroup>
-            </div>
-
             <div data-tab="program">
             <SettingsGroup label="Weekly schedule">
               <ClientSeriesPanel
@@ -1902,18 +1927,6 @@ export default async function AthleteProfilePage(
       </div>
 
       <div data-tab="nutrition" className="border-t border-steel/20 pt-6 mt-8">
-        {/* It only changes nutrition check-ins and meal plans (calories are held at maintenance), so it lives here; an Injured tag shows on Overview while it is on. */}
-        <div className="mb-6 max-w-xl">
-          <InjuryStatusToggle
-            athleteId={params.athleteId}
-            groupId={params.groupId}
-            coachId={user.id}
-            initialIsInjured={injuryStatusRow?.is_injured ?? false}
-            initialSurplusPct={injuryStatusRow?.surplus_pct ?? 0}
-          />
-        </div>
-        {/* A client's food diary from another app, brought in as history only (never counted as days logged). */}
-        {!selfView && <NutritionHistoryUploader athleteId={params.athleteId} groupId={params.groupId} clientName={profile?.full_name ?? "Client"} />}
         <Suspense fallback={<SectionLoading />}>
           {macrosEnabled ? (
             <ClientNutrition
@@ -1927,6 +1940,21 @@ export default async function AthleteProfilePage(
             <ClientFoodLogOnly athleteId={params.athleteId} groupId={params.groupId} clientName={profile?.full_name ?? "Client"} />
           )}
         </Suspense>
+        {/* The rare tools come after the daily view (clutter pass, Nov 21: they opened the tab, above the targets and food log). */}
+        <div className="mt-8 space-y-6" data-nutrition-rare-tools>
+          {/* It only changes nutrition check-ins and meal plans (calories are held at maintenance), so it lives here; an Injured tag shows on Overview while it is on. */}
+          <div className="max-w-xl">
+            <InjuryStatusToggle
+              athleteId={params.athleteId}
+              groupId={params.groupId}
+              coachId={user.id}
+              initialIsInjured={injuryStatusRow?.is_injured ?? false}
+              initialSurplusPct={injuryStatusRow?.surplus_pct ?? 0}
+            />
+          </div>
+          {/* A client's food diary from another app, brought in as history only (never counted as days logged). */}
+          {!selfView && <NutritionHistoryUploader athleteId={params.athleteId} groupId={params.groupId} clientName={profile?.full_name ?? "Client"} />}
+        </div>
       </div>
       </div>
     </CoachDesktopShell>

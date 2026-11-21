@@ -200,7 +200,7 @@ export function SessionMenuTarget({ session, timezone, className, openOnTap = fa
 }
 
 function SessionMenuPopup({ session, x, y, timezone, settled, onPick, onClose }: { session: MenuSession; x: number; y: number; timezone: string; settled: () => boolean; onPick: (kind: Dialog["kind"]) => void; onClose: () => void }) {
-  const first = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   // While the finger that opened the menu is still down (and just after it lifts), a tap, scroll, right-click or resize is part of that same press, not a choice to close.
   const latest = useRef({ settled, onClose, onPick });
   latest.current = { settled, onClose, onPick };
@@ -211,7 +211,7 @@ function SessionMenuPopup({ session, x, y, timezone, settled, onPick, onClose }:
     if (latest.current.settled()) latest.current.onPick(kind);
   };
   useEffect(() => {
-    first.current?.focus({ preventScroll: true });
+    menuRef.current?.querySelector<HTMLElement>("[data-first-item]")?.focus({ preventScroll: true });
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") latest.current.onClose();
     }
@@ -242,11 +242,23 @@ function SessionMenuPopup({ session, x, y, timezone, settled, onPick, onClose }:
         dismiss();
       }}
     >
-      <div role="menu" aria-label={`${session.name}, session`} className="absolute w-56 bg-surface border border-steel/40 shadow-lg py-1" style={{ left: pos.left, top: pos.top }} onClick={(e) => e.stopPropagation()}>
+      <div ref={menuRef} role="menu" aria-label={`${session.name}, session`} className="absolute w-56 bg-surface border border-steel/40 shadow-lg py-1" style={{ left: pos.left, top: pos.top }} onClick={(e) => e.stopPropagation()}>
         <p className="px-4 pt-2 pb-1 font-body text-xs text-steel truncate">
           {session.name} · {formatInTimezone(new Date(session.startMs), timezone, "dateTime")}
         </p>
-        <button ref={first} type="button" role="menuitem" className={item} onClick={() => pick("reschedule")}>
+        {/* The everyday jobs first, the one that deletes last and set apart (clutter pass, Nov 21: Log their workout sat right under red Remove). */}
+        {links && (
+          <>
+            <a href={links.log} role="menuitem" className={`${item} flex items-center`} data-first-item>
+              Log their workout
+            </a>
+            <a href={links.profile} role="menuitem" className={`${item} flex items-center`}>
+              Open profile
+            </a>
+            <div className="my-1 border-t border-steel/20" role="separator" />
+          </>
+        )}
+        <button type="button" role="menuitem" className={item} onClick={() => pick("reschedule")} {...(links ? {} : { "data-first-item": "" })}>
           Reschedule
         </button>
         <button type="button" role="menuitem" className={item} onClick={() => pick("duplicate")}>
@@ -257,19 +269,11 @@ function SessionMenuPopup({ session, x, y, timezone, settled, onPick, onClose }:
           Client canceled
         </button>
         {canRemove && (
-          <button type="button" role="menuitem" className={`${item} text-rust-ink`} onClick={() => pick("remove")}>
-            Remove
-          </button>
-        )}
-        {links && (
           <>
             <div className="my-1 border-t border-steel/20" role="separator" />
-            <a href={links.profile} role="menuitem" className={`${item} flex items-center`}>
-              Open profile
-            </a>
-            <a href={links.log} role="menuitem" className={`${item} flex items-center`}>
-              Log their workout
-            </a>
+            <button type="button" role="menuitem" className={`${item} text-rust-ink`} onClick={() => pick("remove")} data-menu-remove>
+              Remove
+            </button>
           </>
         )}
       </div>

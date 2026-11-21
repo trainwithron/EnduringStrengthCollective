@@ -44,7 +44,8 @@ describe("Availability has ONE home: Calendar > Availability", () => {
     expect(tabs).toContain("sessionTypeEnabled={sessionTypeEnabled}");
     const body = read("components/coach/calendar-page-body.tsx");
     expect(body).toContain("settingsSlot={<AvailabilityBookingSettings coachId={user.id} />}");
-    expect(body).toContain("Let clients book:");
+    // the explanation paragraph above the tabs is gone (clutter pass, Nov 21): the Availability tab right below is the way in
+    expect(body).not.toContain("Let clients book:");
   });
   it("a phone coach asking for the tab gets the full page (the one place availability lives)", () => {
     expect(read("app/(coach)/calendar/page.tsx")).toContain('searchParams.tab !== "availability"');

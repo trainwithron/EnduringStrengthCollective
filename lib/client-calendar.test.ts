@@ -62,15 +62,25 @@ describe("the client's Calendar is one calendar, never a program's", () => {
   });
   // Look Refresh (Ron, Nov 20, approved client mockup): the calendar first, then the open day and the next session, then programs with no dates, and the
   // full-width Book a session at the end.
-  it("the calendar comes first, then the day's cards, the programs with no dates, and Book a session last", () => {
+  // Clutter pass (Nov 21, CL13): Book a session moved up, right under the Day / Week / Month pill; today's Start is a plain link that starts at once (CL14).
+  it("Book a session right under the pill, then the calendar, the day's cards and the programs with no dates", () => {
     const grid = clientBranch.indexOf("WEEKDAY_LABELS.map");
     const sessions = clientBranch.indexOf("Next session with your coach");
     const undated = clientBranch.indexOf("<UndatedProgramCards");
     const card = clientBranch.indexOf("<ScheduleCard");
-    expect(grid).toBeGreaterThan(clientBranch.indexOf("</header>"));
+    const headerEnd = clientBranch.indexOf("</header>");
+    expect(card).toBeGreaterThan(headerEnd);
+    expect(clientBranch.slice(headerEnd, card)).not.toContain("<section");
+    expect(card).toBeLessThan(grid);
     expect(grid).toBeLessThan(sessions);
     expect(sessions).toBeLessThan(undated);
-    expect(undated).toBeLessThan(card);
+    expect(clientBranch.match(/<ScheduleCard/g)?.length).toBe(1);
+  });
+  it("today's Start is a plain link (the one gold button is Book a session) and starts at once, as on Home", () => {
+    const start = clientBranch.slice(clientBranch.indexOf("data-calendar-today-start") - 400, clientBranch.indexOf("data-calendar-today-start"));
+    expect(start).toContain('${w.status === "done" ? "" : "?start=1"}');
+    expect(start).toContain("text-rust-ink underline");
+    expect(start).not.toContain("bg-rust");
   });
   it("Day / Week / Month live here (not on Home), the month shows dots with a legend, and a session has one Change button", () => {
     expect(clientBranch).toContain('{ key: "day", label: "Day", href: dayHref(today) },');

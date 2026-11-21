@@ -840,15 +840,15 @@ export default async function CoachDayDetailPage(
   // One booked session: who, then the controls that settle or change it. Used for sessions on a slot and for ones off the slots.
   const renderBooked = (booking: any, start: Date) => (
     <div className="flex flex-wrap items-center gap-2 min-w-0">
-      {/* Press and hold (or right-click) for Reschedule, Duplicate and Remove (Ron, Nov 2). */}
-      {/* A tap (or press and hold, or right-click) opens Reschedule, Duplicate, Client canceled, Remove, Open profile and Log their workout (Nov 21: a tap did nothing). */}
+      {/* A tap (or press and hold, or right-click) opens the session menu: Log their workout and Open profile first, Remove last (Nov 21: a tap did nothing).
+          The client's name is the row's label, at normal size (clutter pass, Nov 21: it was a small grey underlined line). */}
       <SessionMenuTarget
         session={{ bookingId: booking.id, seriesId: booking.recurring_series_id ?? null, name: (booking.profiles as any)?.full_name ?? "Client", startMs: start.getTime(), endMs: new Date(booking.end_at).getTime(), athleteId: booking.athlete_id ?? null, groupId: booking.group_id ?? params.groupId }}
         timezone={timezone}
-        className="font-body text-xs text-steel underline underline-offset-2 decoration-steel/40"
+        className="font-body text-[15px] font-medium text-chalk"
         openOnTap
       >
-        Booked — {(booking.profiles as any)?.full_name ?? "Client"}
+        <span data-booked-name>{(booking.profiles as any)?.full_name ?? "Client"}</span>
       </SessionMenuTarget>
       {paidByBooking.has(booking.id) && <span className="font-body text-xs text-rust-ink">Paid online {paidDollars(paidByBooking.get(booking.id)!)}</span>}
       {booking.needs_coach_resolution && <RecurringConflictBadge bookingId={booking.id} />}
@@ -867,7 +867,10 @@ export default async function CoachDayDetailPage(
       {start.getTime() < Date.now() ? (
         !settlementById.get(booking.id)?.attended_at && <MarkNoShowToggle bookingId={booking.id} initialNoShow={booking.no_show ?? false} />
       ) : (
-        <CancelBookingButton bookingId={booking.id} viewer="coach" recurringSeriesId={booking.recurring_series_id ?? null} />
+        // Not on a narrow screen (clutter pass, Nov 21): the menu's Client canceled and Remove cover it there.
+        <span className="hidden @4xl:contents" data-inline-cancel>
+          <CancelBookingButton bookingId={booking.id} viewer="coach" recurringSeriesId={booking.recurring_series_id ?? null} />
+        </span>
       )}
       {videoEligibleAthleteIds.has(booking.athlete_id) && (
         <BookingVideoPanel bookingId={booking.id} initialSessionType={booking.session_type ?? "in_person"} />
@@ -928,9 +931,10 @@ export default async function CoachDayDetailPage(
         )}
       </div>
 
-      {/* The hour grid on the left; the open slots, sessions and to-dos beside it when the page is wide enough (layout audit, Oct 31). */}
+      {/* The hour grid on the left; the open slots, sessions and to-dos beside it when the page is wide enough (layout audit, Oct 31). On a narrow screen the sessions come
+          first and the hour grid after them (clutter pass, Nov 21: Mark attended and No-show sat a full screen below the grid). */}
       <div className="grid grid-cols-1 gap-8 items-start @4xl:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
-      <div className="min-w-0">
+      <div className="min-w-0 order-2 @4xl:order-none" data-day-hour-grid-column>
       {/* Tap a time on the day to add a session, an event or time off: one sheet, set to that exact time. */}
       <DayCalendar
         coachId={user.id}
@@ -961,7 +965,7 @@ export default async function CoachDayDetailPage(
       />
       </div>
 
-      <div className="min-w-0">
+      <div className="min-w-0 order-1 @4xl:order-none" data-day-sessions-column>
       {selectedClient && assignableWorkouts.length > 0 && (
         <div className="mb-6 max-w-lg">
           <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
@@ -972,26 +976,6 @@ export default async function CoachDayDetailPage(
               <div key={w.id} className="py-2.5 px-3 flex items-center justify-between gap-3">
                 <span className="font-body text-sm text-chalk truncate">{w.title}</span>
                 <AssignWorkoutToDateButton workoutId={w.id} dateKey={params.date} alreadyHere={w.alreadyHere} />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <AddDayEventForm coachId={user.id} dateKey={params.date} organizationId={pageOrgId} />
-
-      {dayEventRows && dayEventRows.length > 0 && (
-        <div className="mb-6 max-w-lg">
-          <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
-            To-dos &amp; events
-          </h2>
-          <div className="divide-y divide-steel/15">
-            {dayEventRows.map((e) => (
-              <div key={e.id} className="py-2 flex items-center justify-between">
-                <span className="font-body text-sm text-chalk">{e.title}</span>
-                {e.event_time && (
-                  <span className="font-body text-xs text-steel">{e.event_time.slice(0, 5)}</span>
-                )}
               </div>
             ))}
           </div>
@@ -1089,6 +1073,29 @@ export default async function CoachDayDetailPage(
           </div>
         </div>
       )}
+
+      {/* The day's to-dos and events, after the sessions. A timed event is added from the tap-a-time sheet; the small box under the list adds a to-do with no time,
+          which the sheet cannot (clutter pass, Nov 21: the old "Add a to-do or event" form above the sessions did both). */}
+      <div className="mt-6 max-w-lg" data-day-todos>
+        {dayEventRows && dayEventRows.length > 0 && (
+          <>
+            <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
+              To-dos &amp; events
+            </h2>
+            <div className="divide-y divide-steel/15 mb-3">
+              {dayEventRows.map((e) => (
+                <div key={e.id} className="py-2 flex items-center justify-between">
+                  <span className="font-body text-sm text-chalk">{e.title}</span>
+                  {e.event_time && (
+                    <span className="font-body text-xs text-steel">{e.event_time.slice(0, 5)}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+        <AddDayEventForm coachId={user.id} dateKey={params.date} organizationId={pageOrgId} />
+      </div>
       </div>
       </div>
     </CoachDesktopShell>
