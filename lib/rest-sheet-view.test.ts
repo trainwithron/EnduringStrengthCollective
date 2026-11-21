@@ -64,7 +64,9 @@ describe("the slim bar", () => {
     expect(bar).toContain('const miniBottom = raised ? "bottom-[calc(10.5rem+env(safe-area-inset-bottom))]" : "bottom-[calc(5.75rem+env(safe-area-inset-bottom))]";');
     const logger = read("components/logging/session-logger.tsx");
     expect(logger).toContain("onMinimizedChange={setRestMinimized}");
-    expect(logger).toContain('{restMinimized && <div aria-hidden="true" className="h-20" data-rest-mini-space />}');
+    expect(logger).toContain('{!isCompleted && restMinimized && <div aria-hidden="true" className="h-20" data-rest-mini-space />}');
+    // the timer going away (the workout finished while minimized) gives the room back
+    expect(bar).toContain("() => () => onMinimizedChange?.(false),");
   });
 });
 

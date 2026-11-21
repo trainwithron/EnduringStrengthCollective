@@ -317,6 +317,12 @@ export function RestTimerBar({
     onMinimizedChange?.(minimizedShown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [minimizedShown]);
+  // Gone (the workout finished while minimized): the logger stops keeping room for the bar.
+  useEffect(
+    () => () => onMinimizedChange?.(false),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
   // A rest can be started any time from the workout's bottom bar ("Rest 90s"), not only when a set is ticked (Ron, Oct 31: he fills all the sets in up front once the weight is agreed, and
   // still needs the timer between them). Nothing asked and nothing running: nothing here.
   if (!showPrompt && !running && !justFinished) return null;

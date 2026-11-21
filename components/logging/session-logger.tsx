@@ -565,7 +565,8 @@ export function SessionLogger({
       </div>
 
       {/* Room for the minimized rest timer, so the last set and Next are never behind it (Nov 21). */}
-      {restMinimized && <div aria-hidden="true" className="h-20" data-rest-mini-space />}
+      {/* (never under a finished workout: the timer is gone then, minimized or not) */}
+      {!isCompleted && restMinimized && <div aria-hidden="true" className="h-20" data-rest-mini-space />}
 
       {/* The bar at the bottom of a live workout: Rest on the left, Next on the right. Finish is at the top right of the header; its choice opens over this bar. */}
       {!isCompleted && exercises.length > 0 && (
