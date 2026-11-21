@@ -4,7 +4,7 @@ import { getActiveAnchor } from "@/lib/active-anchor";
 import { DEFAULT_COACH_TIMEZONE, dateKeyInZone } from "@/lib/timezone";
 import { isValidTimeZone } from "@/lib/format-in-timezone";
 import { isUuid } from "@/lib/requests-center";
-import { NOTICE_RESOLVE_PREFIX, noticeHref } from "@/lib/notice-links";
+import { NOTICE_RESOLVE_PREFIX, isPrefetch, noticeHref } from "@/lib/notice-links";
 
 const HOME_LINKS = new Set(["", "/", "/dashboard"]);
 
@@ -27,8 +27,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { data: n } = await supabase.from("notifications").select("id, type, group_id, link_path, created_at").eq("id", id).eq("profile_id", user.id).maybeSingle();
   if (!n) return go("/notifications");
   const notice = n as { id: string; type: string; group_id: string | null; link_path: string | null; created_at: string };
-  // read now that it was opened (best effort: the page opens either way)
-  await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("id", notice.id).eq("profile_id", user.id).is("read_at", null);
+  // read now that it was opened (best effort: the page opens either way); never by a prefetch of a link on screen, only by really opening it
+  if (!isPrefetch(request)) await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("id", notice.id).eq("profile_id", user.id).is("read_at", null);
   const fallback = () => {
     const href = noticeHref(notice.type, notice.link_path, { groupId: notice.group_id });
     return go(href.startsWith(NOTICE_RESOLVE_PREFIX) ? notice.link_path || "/" : href);

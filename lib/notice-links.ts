@@ -51,6 +51,18 @@ export function noticeHref(type: string | null | undefined, linkPath: string | n
   return link || "/";
 }
 
+/** A request the browser or the app's router made ahead of a tap (a prefetch), not someone opening the notice: app/notice/[id] does not mark it read then. */
+export function isPrefetch(request: Pick<Request, "headers">): boolean {
+  const h = request.headers;
+  if (h.get("next-router-prefetch")) return true;
+  return [h.get("purpose"), h.get("sec-purpose"), h.get("x-purpose"), h.get("x-moz")].some((v) => !!v && /prefetch/i.test(v));
+}
+
+/** A link through /notice/<id> is never prefetched: opening it marks the notice read, and a list on screen must not mark every notice it shows (Nov 21). */
+export function noticeLinkPrefetch(href: string): false | undefined {
+  return href.startsWith(NOTICE_RESOLVE_PREFIX) ? false : undefined;
+}
+
 /** What a push about a notice opens: the notice itself (app/notice/[id]: marks it read and opens what it is about, on a phone too), or the given link when no notice was written. */
 export function pushHrefForNotice(noticeId: string | null | undefined, fallback: string): string {
   return noticeId ? `${NOTICE_RESOLVE_PREFIX}${noticeId}` : fallback;

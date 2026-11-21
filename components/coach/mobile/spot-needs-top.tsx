@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { noticeLinkPrefetch } from "@/lib/notice-links";
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { SessionCheckCards } from "@/components/coach/session-check-cards";
@@ -60,7 +61,7 @@ export function SpotNeedsTop({ needs, onNavigated, onNoticesCleared }: { needs: 
         <ul className="border border-steel/20 divide-y divide-steel/15" aria-label="Notifications">
           {needs.notices.map((n) => (
             <li key={n.id}>
-              <Link href={n.linkPath} onClick={() => openNotice(n.id)} className="block px-3 py-2.5 font-body text-sm text-chalk min-h-11">
+              <Link href={n.linkPath} prefetch={noticeLinkPrefetch(n.linkPath)} onClick={() => openNotice(n.id)} className="block px-3 py-2.5 font-body text-sm text-chalk min-h-11">
                 {n.body}
               </Link>
             </li>

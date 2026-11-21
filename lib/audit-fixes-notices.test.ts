@@ -37,7 +37,7 @@ describe("P1 to P9: what a notice or push opens is shown on the phone", () => {
     expect(route).toContain("`/groups/${active.anchor.id}/business/support`");
     expect(route).toContain("`/groups/${active.anchor.id}/branding?tab=billing`");
     // the AI budget push opens Plan & Billing too, and an organization announcement the notifications list
-    expect(read("lib/ai-budget-server.ts")).toContain("`/groups/${anyGroup.id}/branding?tab=billing`");
+    expect(read("lib/ai-budget-server.ts")).toContain("`/groups/${groupId}/branding?tab=billing`");
     expect(read("app/api/org/announce/route.ts")).toContain('.slice(0, 140), "/notifications")');
   });
 });
@@ -111,5 +111,39 @@ describe("P15, P23, D10", () => {
     const list = read("components/coach/checkin-review-list.tsx");
     expect(list).toContain("useState<string | null>(focusHere ?? initialItems[0]?.id ?? null)");
     expect(list).toContain("id={`checkin-${item.id}`}");
+  });
+});
+
+describe("review fixes (Code Chat, Nov 21)", () => {
+  it("A: a prefetch request does not mark read; links through /notice/ are never prefetched", async () => {
+    const { isPrefetch, noticeLinkPrefetch } = await import("@/lib/notice-links");
+    const req = (h: Record<string, string>) => ({ headers: new Headers(h) });
+    expect(isPrefetch(req({ "next-router-prefetch": "1" }))).toBe(true);
+    expect(isPrefetch(req({ purpose: "prefetch" }))).toBe(true);
+    expect(isPrefetch(req({ "sec-purpose": "prefetch;prerender" }))).toBe(true);
+    expect(isPrefetch(req({}))).toBe(false);
+    expect(read("app/notice/[id]/route.ts")).toContain("if (!isPrefetch(request)) await supabase.from(\"notifications\").update({ read_at:");
+    expect(noticeLinkPrefetch(`/notice/${N}`)).toBe(false);
+    expect(noticeLinkPrefetch("/requests")).toBeUndefined();
+    for (const f of ["components/athlete/notification-bell.tsx", "components/notifications/notification-list.tsx", "components/coach/mobile/spot-needs-top.tsx"]) expect(read(f), f).toContain("prefetch={noticeLinkPrefetch(");
+    expect(read("components/coach/desktop/org-notifications-panel.tsx")).toContain("<Link prefetch={false}");
+  });
+  it("B: an AI budget push opens Plan & Billing in a group the recipient coaches in that organization, else Home", async () => {
+    const { budgetHrefFor } = await import("@/lib/ai-budget-server");
+    const db = (rows: unknown[] | null, fail = false) => {
+      const q: any = {
+        select: () => q,
+        eq: () => q,
+        limit: async () => (fail ? Promise.reject(new Error("down")) : { data: rows, error: null }),
+      };
+      return { from: () => q } as any;
+    };
+    expect(await budgetHrefFor(db([{ group_id: "g1" }]), "coach1", "org1")).toBe("/groups/g1/branding?tab=billing");
+    expect(await budgetHrefFor(db([]), "coach1", "org1")).toBe("/dashboard");
+    expect(await budgetHrefFor(db(null, true), "coach1", "org1")).toBe("/dashboard");
+    const src = read("lib/ai-budget-server.ts");
+    expect(src).toContain('.select("group_id, groups!inner ( organization_id )")');
+    expect(src).toContain('.eq("role", "coach")');
+    expect(src).toContain('.eq("groups.organization_id", orgId)');
   });
 });

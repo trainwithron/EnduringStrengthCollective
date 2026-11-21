@@ -161,6 +161,23 @@ export async function getCoachBudgetStatus(db: SupabaseClient, coachId: string, 
   }
 }
 
+/** Where a budget push opens for this person: Plan & Billing in a group of the organization they coach, else Home. Never throws. */
+export async function budgetHrefFor(db: SupabaseClient, profileId: string, orgId: string): Promise<string> {
+  try {
+    const { data } = await db
+      .from("group_memberships")
+      .select("group_id, groups!inner ( organization_id )")
+      .eq("profile_id", profileId)
+      .eq("role", "coach")
+      .eq("groups.organization_id", orgId)
+      .limit(1);
+    const groupId = ((data ?? []) as { group_id?: string }[])[0]?.group_id;
+    return groupId ? `/groups/${groupId}/branding?tab=billing` : "/dashboard";
+  } catch {
+    return "/dashboard";
+  }
+}
+
 // Tells the organization ONCE per month and level (the record's primary key makes a repeat a no-op): the organization's owner and the coach whose use crossed the line, by push; the
 // meter shows it when they open the app. Best effort: never throws.
 export async function noteBudgetLevel(db: SupabaseClient, crossingCoachId: string, level: "low" | "out" | "balance", now: Date = new Date(), status?: BudgetStatus | null): Promise<boolean> {
@@ -173,15 +190,9 @@ export async function noteBudgetLevel(db: SupabaseClient, crossingCoachId: strin
     const recipients = [...new Set([(org?.owner_id as string | undefined) ?? null, crossingCoachId].filter((x): x is string => !!x))];
     const title = level === "low" ? "Your AI is almost used up this month" : level === "balance" ? "You're now using your AI top-up balance" : "Your AI is used up this month";
     const body = coachBudgetMessage(level, topUpInfo(now, status));
-    // Plan & Billing, where top-ups are bought (Nov 21: Home on a phone is the coach's own app, with nothing about AI); Home only when the organization has no group yet
-    let href = "/dashboard";
-    try {
-      const { data: anyGroup } = await db.from("groups").select("id").eq("organization_id", orgId).limit(1).maybeSingle();
-      if (anyGroup?.id) href = `/groups/${anyGroup.id}/branding?tab=billing`;
-    } catch {
-      // Home: the push still goes
-    }
-    for (const to of recipients) await sendPushToProfile(db, to, title, body, href);
+    // Plan & Billing, where top-ups are bought (Nov 21: Home on a phone is the coach's own app, with nothing about AI), in a group of this organization that the recipient COACHES (one they
+    // do not coach would say "Only coaches can..."); Home when they coach none there or it cannot be read.
+    for (const to of recipients) await sendPushToProfile(db, to, title, body, await budgetHrefFor(db, to, orgId));
     return true;
   } catch {
     return false;

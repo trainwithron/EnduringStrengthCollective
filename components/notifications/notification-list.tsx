@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { noticeLinkPrefetch } from "@/lib/notice-links";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { groupNotificationsByDay, timeAgo } from "@/lib/notification-days";
@@ -125,7 +126,7 @@ export function NotificationList({ initial, timezone }: { initial: CenterEntry[]
               <ul className="divide-y divide-steel/15 border border-steel/20">
                 {g.items.map((n) => (
                   <li key={n.id} className={!n.readAt ? "bg-surface" : ""}>
-                    <Link href={n.linkPath} onClick={() => markRead([n.id])} className="flex items-start gap-3 px-4 py-3">
+                    <Link href={n.linkPath} prefetch={noticeLinkPrefetch(n.linkPath)} onClick={() => markRead([n.id])} className="flex items-start gap-3 px-4 py-3">
                       <span aria-hidden="true" className={`mt-2 w-1.5 h-1.5 rounded-full shrink-0 ${!n.readAt ? "bg-chalk" : "bg-transparent"}`} />
                       <span className="min-w-0">
                         <span className={`block font-body text-sm break-words ${!n.readAt ? "text-chalk" : "text-steel"}`}>{n.body}</span>

@@ -112,10 +112,39 @@ describe("every coach push goes through the one sender", () => {
       expect(s, f).not.toMatch(/\bsendPushToProfile\(/);
     }
   });
-  it("no code reads back the id of a notice row it inserted (the trigger may drop the row)", () => {
+  // The trigger may drop the row (a kind the coach switched off), so an insert that reads its id back may get none. Reading it back is allowed ONLY as .maybeSingle() whose id is used
+  // through pushHrefForNotice (no id: the push falls back to the notice's own link); .single() (an error on no row) or using the id any other way is not.
+  // Each insert call is read with its brackets matched, so a ")" inside it (new Date().toISOString()) does not end it early.
+  function insertsWithTail(src: string): { call: string; tail: string }[] {
+    const out: { call: string; tail: string }[] = [];
+    const re = /from\("notifications"\)\s*\.insert\(/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(src))) {
+      let depth = 1;
+      let i = m.index + m[0].length;
+      for (; i < src.length && depth > 0; i++) {
+        if (src[i] === "(") depth++;
+        else if (src[i] === ")") depth--;
+      }
+      out.push({ call: src.slice(m.index, i), tail: src.slice(i, i + 400) });
+    }
+    return out;
+  }
+  it("reading back the id of a notice row it inserted is only ever optional (the trigger may drop the row)", () => {
     for (const f of ["lib/notify-payment.ts", "lib/payment-events.ts", "app/api/session-pattern-check/route.ts", "app/api/cron/milestone-scan/route.ts"]) {
       const s = read(f);
-      expect(s, f).not.toMatch(/from\("notifications"\)\s*\.insert\([^)]*\)\s*\.select/);
+      const inserts = insertsWithTail(s);
+      expect(inserts.length, f).toBeGreaterThan(0);
+      for (const { tail } of inserts) {
+        if (!/^\s*\.select\(/.test(tail)) continue;
+        expect(tail, `${f}: a read-back must be .maybeSingle()`).toMatch(/^\s*\.select\("id"\)\s*\.maybeSingle\(\)/);
+        expect(s, `${f}: the id goes only through pushHrefForNotice (falls back to the link)`).toContain("pushHrefForNotice((notice as { id?: string } | null)?.id, ");
+      }
     }
+  });
+  it("the guard sees a read-back past a ) inside the insert (the old one stopped at it)", () => {
+    const [ins] = insertsWithTail('db.from("notifications").insert({ at: new Date().toISOString() }).select("id").single();');
+    expect(ins.tail.startsWith('.select("id").single()')).toBe(true);
+    expect(/^\s*\.select\("id"\)\s*\.maybeSingle\(\)/.test(ins.tail)).toBe(false);
   });
 });
