@@ -94,7 +94,8 @@ describe("a new person makes an account and sends the request together (Ron, Oct
   it("makes the account, then files the request for THAT account only, through the server-only function", async () => {
     const res = await signupAndRequest(post("/api/client-requests/signup", body));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, confirmed: false });
+    // quietNotice: the coach-in-quiet-hours line (lib/quiet-notice.ts); null here (no quiet hours read in this test)
+    expect(await res.json()).toEqual({ ok: true, confirmed: false, quietNotice: null });
     expect(state.signUpCalls).toBe(1);
     expect(state.rpcCalls).toEqual([{ fn: "submit_client_request_at_signup", args: { p_requester: "new-1", p_coach: "coach-1", p_dob: "1995-04-02" } }]);
   });
@@ -146,7 +147,8 @@ describe("a new person makes an account and sends the request together (Ron, Oct
   it("the page sends the whole form in one go and, after the confirmation link, says Sent instead of offering Send again", () => {
     const flow = read("components/client-request/request-flow.tsx");
     expect(flow).toContain('fetch("/api/client-requests/signup"');
-    expect(flow).toContain("JSON.stringify({ slug, name, email: email.trim().toLowerCase(), password, dob })");
+    // (plus the device's time zone, for the quiet-hours line: still no message and no link)
+    expect(flow).toContain("JSON.stringify({ slug, name, email: email.trim().toLowerCase(), password, dob, timeZone: deviceTimeZone() })");
     expect(flow).toContain('.from("client_requests").select("id").eq("coach_id", coachId).eq("status", "pending")');
     expect(flow).toContain("can see your request now.");
   });
@@ -211,7 +213,7 @@ describe("sending a request", () => {
   it("passes only who and the date of birth to the database; there is no message and no link anywhere", async () => {
     const res = await submit(post("/api/client-requests/submit", { slug: "coach-ron", dob: "1990-01-01", message: "hello", token: "abc.def", coachId: "someone-else" }));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true });
+    expect(await res.json()).toEqual({ ok: true, quietNotice: null });
     expect(state.rpcCalls).toEqual([{ fn: "submit_client_request", args: { p_coach: "coach-1", p_dob: "1990-01-01" } }]);
     const route = read("app/api/client-requests/submit/route.ts");
     expect(route).not.toMatch(/raw\??\.(message|token|link)/);
@@ -311,7 +313,7 @@ describe("the flow on the page", () => {
     expect(flow).not.toMatch(/<textarea|setMessage|const \[message|maxLength=\{300\}/);
   });
   it("sends only the page's address and the date", () => {
-    expect(flow).toContain("JSON.stringify({ slug, dob: needsDob ? dob : null })");
+    expect(flow).toContain("JSON.stringify({ slug, dob: needsDob ? dob : null, timeZone: deviceTimeZone() })");
   });
   it("the request page is read-only and an unavailable coach gets a plain notice", () => {
     const page = read("app/c/[slug]/request/page.tsx");
