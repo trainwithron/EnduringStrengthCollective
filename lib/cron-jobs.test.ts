@@ -3,6 +3,27 @@ import fs from "node:fs";
 import path from "node:path";
 import { CRON_JOBS, MONITORING_STARTED, findStaleJobs, shouldAlertForFailures, type CronRunRow } from "@/lib/cron-jobs";
 
+describe("a new job always carries the date it went in (Ron got a false 'sessions-to-mark: never run' alarm on Nov 21 because it did not)", () => {
+  // Every job that existed on Nov 21 2026. A job not on this list is new: it must have a JOB_ADDED date, or the watchdog calls it "never run" before its first run.
+  const KNOWN_ON_NOV_21 = ["spotter-tier-sync", "coach-briefing", "oura-sync", "coach-digest", "milestone-scan", "sessions-to-mark", "requests-digest", "nutrition-checkin-suggestions", "rest-day-nudge", "withings-sync", "google-health-sync", "coach-chat-cleanup", "session-reminder", "google-calendar-sync", "attendance-nudge-sms", "webhook-retry", "trainer-dispatch-advance", "expire-session-credits", "process-booking-waitlist", "flag-recurring-booking-conflicts", "schedule-requests", "series-top-up", "close-stale-sessions", "notification-push", "departing-coaches", "protect-wearable-tokens", "purge-removed-clients", "purge-client-request-attempts", "low-session-digest", "cron-watchdog"];
+  it("every job added after Nov 21 has a JOB_ADDED date", async () => {
+    const { JOB_ADDED } = await import("./cron-jobs");
+    const missing = CRON_JOBS.map((j) => j.job).filter((j) => !KNOWN_ON_NOV_21.includes(j) && !(JOB_ADDED[j] instanceof Date));
+    expect(missing, "Add each new job to JOB_ADDED in lib/cron-jobs.ts with the time it goes live").toEqual([]);
+  });
+  it("the two jobs added on Nov 20 are not called never run before their first chance", async () => {
+    const { JOB_ADDED } = await import("./cron-jobs");
+    expect(JOB_ADDED["sessions-to-mark"]).toBeInstanceOf(Date);
+    expect(JOB_ADDED["requests-digest"]).toBeInstanceOf(Date);
+    // the night after it went live (the false alarm): not reported
+    expect(findStaleJobs([], new Date("2026-11-21T09:00:00Z"), { since: MONITORING_STARTED }).map((s) => s.job)).not.toContain("sessions-to-mark");
+  });
+  it("an admin alert is emailed only when the push reached no phone", () => {
+    const src = fs.readFileSync(path.resolve(__dirname, "cron-monitor.ts"), "utf8");
+    expect(src).toContain("if (!reached && isEmailConfigured())");
+  });
+});
+
 describe("job list", () => {
   it("matches vercel.json exactly", () => {
     const vercel = JSON.parse(fs.readFileSync(path.resolve(__dirname, "..", "vercel.json"), "utf8"));
