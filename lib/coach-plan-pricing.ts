@@ -17,6 +17,9 @@ import { CLIENT_STEP_SIZE, clientSteps } from "@/lib/ai-usage";
 // created_at", so changing this changes every unsettled trial at once.
 export const TRIAL_DAYS = 42; // 6 weeks, no card required (Ron, 2026-10-05)
 
+// The line under the coach sign-up page's heading (O4; Ron, Nov 20: "the wording is good"). The weeks come from TRIAL_DAYS, so the line can never promise a different trial.
+export const SIGNUP_TRIAL_LINE = `${TRIAL_DAYS / 7} weeks free. No card. Leave any time and take all your data with you.`;
+
 // After a trial or a failed payment runs out, coaches get this many days
 // of banner-only warnings before the coach side locks.
 export const GRACE_DAYS = 7;
