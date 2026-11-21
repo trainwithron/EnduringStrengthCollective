@@ -15,7 +15,8 @@ begin;
 --    again, or for an older row. Written only by the server, like the rest of that table.
 -- 3. Saved payroll reports ($3): payroll_reports, a frozen copy of a pay period from Coach activity (the dates, each coach's numbers, the rates typed, the pay lines and the
 --    sessions behind them, exactly as shown), with a note. Only the server writes it (after checking the person is an owner or admin of the organization); the owner and
---    admins of that organization read it; nobody changes it once saved (a trigger refuses every change, the server included), so it never moves when sessions change later.
+--    admins of that organization read it; nobody changes it once saved (a trigger refuses every change, the server included, except the database emptying who saved it
+--    when that person's account is deleted), so it never moves when sessions change later.
 -- Re-running is safe.
 
 -- ---- 1. voice notes ------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -112,13 +113,17 @@ drop policy if exists "payroll_reports_read_owner_admin" on public.payroll_repor
 create policy "payroll_reports_read_owner_admin" on public.payroll_reports for select to authenticated
   using (public.is_org_owner_or_admin(organization_id));
 
--- a saved report is never changed, by anyone
+-- a saved report is never changed, by anyone. The one exception: when the person who saved it deletes their account, the database itself empties created_by (on delete set
+-- null is an update), and only that column may change, so the report stays and their account can still be deleted.
 create or replace function public.payroll_reports_frozen()
 returns trigger
 language plpgsql
 set search_path = public
 as $$
 begin
+  if new.created_by is null and old.created_by is not null and (to_jsonb(new) - 'created_by') = (to_jsonb(old) - 'created_by') then
+    return new;
+  end if;
   raise exception 'A saved payroll report cannot be changed.';
 end;
 $$;
@@ -147,4 +152,5 @@ select
     and not has_table_privilege('authenticated', 'public.payroll_reports', 'delete')
     and not has_table_privilege('anon', 'public.payroll_reports', 'select') as payroll_server_writes_only,
   exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'payroll_reports' and policyname = 'payroll_reports_read_owner_admin') as payroll_owner_admin_reads,
-  exists (select 1 from pg_trigger where tgname = 'payroll_reports_frozen' and tgrelid = 'public.payroll_reports'::regclass) as payroll_never_changes;
+  exists (select 1 from pg_trigger where tgname = 'payroll_reports_frozen' and tgrelid = 'public.payroll_reports'::regclass) as payroll_never_changes,
+  (select prosrc from pg_proc where oid = 'public.payroll_reports_frozen()'::regprocedure) like '%old.created_by is not null%' as payroll_saver_can_delete_account;

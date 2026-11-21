@@ -191,6 +191,19 @@ await as(null, async () => assert.equal(await fails(`select * from public.payrol
 assert.equal(await fails(`update public.payroll_reports set snapshot = '{}'`), true, "the server changes a saved report");
 assert.equal((await db.query(`select snapshot->'rows'->0->>'estimateCents' as e from public.payroll_reports`)).rows[0].e, "18000", "the report is as saved");
 
+// the person who saved a report can still delete their account: the database empties created_by (and only that), the report stays
+await db.exec(report.replace(`'${OWNER}', '2026-11-01'`, `'${ADMIN}', '2026-11-01'`).replace("First half", "Admin copy"));
+assert.equal(await fails(`update public.payroll_reports set created_by = null, note = 'sneaky' where created_by = '${ADMIN}'`), true, "emptying who saved it along with another change");
+assert.equal(await fails(`update public.payroll_reports set created_by = '${OWNER}' where created_by = '${ADMIN}'`), true, "changing who saved it");
+assert.equal(await fails(`update public.payroll_reports set snapshot = '{}', created_by = null where created_by = '${ADMIN}'`), true, "emptying who saved it while changing the numbers");
+assert.equal(await fails(`delete from public.profiles where id = '${OWNER}'`), false, "the owner who saved a report deletes their account");
+const kept = (await db.query(`select created_by, note, snapshot->'rows'->0->>'estimateCents' as e from public.payroll_reports where note = 'First half'`)).rows;
+assert.deepEqual(kept, [{ created_by: null, note: "First half", e: "18000" }], "the report stays as saved, with nobody named as its saver");
+assert.equal(await fails(`update public.payroll_reports set note = 'changed' where note = 'First half'`), true, "a report whose saver is gone is still never changed");
+assert.equal(await fails(`update public.payroll_reports set created_by = '${ADMIN}' where note = 'First half'`), true, "nor given a saver again");
+assert.equal(await fails(`delete from public.profiles where id = '${ADMIN}'`), false, "an admin who saved a report deletes their account");
+assert.equal(await n(`select count(*)::int n from public.payroll_reports where created_by is null`), 2, "both reports stay");
+
 // ---- the undo ----
 await db.exec(undo);
 const gone = (await db.query(`select

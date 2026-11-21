@@ -5,7 +5,7 @@ import { NoAccess } from "@/components/shared/no-access";
 import { PrintButton } from "@/components/shared/print-button";
 import { getViewerDisplayTimezone } from "@/lib/display-timezone-server";
 import { formatInTimezone } from "@/lib/format-in-timezone";
-import { loadDisputeEvidence, money, packageWhat, sessionOutcome } from "@/lib/dispute-evidence";
+import { classOutcome, loadDisputeEvidence, money, packageWhat, sessionOutcome } from "@/lib/dispute-evidence";
 import { DISPUTE_UPLOAD_LINE } from "@/lib/billing-help";
 
 export const metadata = { title: "Dispute evidence" };
@@ -66,7 +66,7 @@ export default async function DisputeEvidencePage(props: { params: Promise<{ pur
           {e.clientName}
           {e.spaceName ? ` · ${e.spaceName}` : ""} · Coach {e.coachName} · Made {day(now.toISOString())} · Times in {tz}
         </p>
-        <p className="text-xs text-gray-700 mt-1">Only what Spotlight holds is shown. Sessions and messages run from the payment to {e.windowEndIsNextPayment ? "their next payment" : "today"} ({day(e.windowEnd)}).</p>
+        <p className="text-xs text-gray-700 mt-1">Only what Spotlight holds is shown. Sessions, classes and messages run from the payment to {e.windowEndIsNextPayment ? "their next payment" : "today"} ({day(e.windowEnd)}).</p>
         {e.incomplete && <p className="text-sm font-bold mt-1">Some of this could not be read. Open the page again before you use it.</p>}
       </header>
 
@@ -144,6 +144,53 @@ export default async function DisputeEvidencePage(props: { params: Promise<{ pur
           </table>
         )}
       </section>
+
+      {e.classes && (
+        <section className="mb-5">
+          <h2 className="text-sm font-bold uppercase tracking-wide border-b border-gray-400 mb-2">Group classes ({e.classes.length})</h2>
+          <p className="text-xs text-gray-700 mb-1">A class takes a session from the same balance this payment filled.</p>
+          {e.classes.length === 0 ? (
+            <p className="text-sm">No classes were joined in this time.</p>
+          ) : (
+            <table>
+              <thead>
+                <tr><th>Class</th><th>Joined on</th><th>What happened</th><th>Session taken</th></tr>
+              </thead>
+              <tbody>
+                {e.classes.map((c, i) => (
+                  <tr key={i}>
+                    <td>{c.title} · {when(c.startAt)}</td>
+                    <td>{when(c.joinedAt)}</td>
+                    <td>{classOutcome(c, now)}{c.attendedAt ? ` (${when(c.attendedAt)})` : ""}</td>
+                    <td>{c.sessionTaken ? "Yes" : "No"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+      )}
+
+      {e.quickPayments.length > 0 && (
+        <section className="print-block mb-5">
+          <h2 className="text-sm font-bold uppercase tracking-wide border-b border-gray-400 mb-2">Other card payments ({e.quickPayments.length})</h2>
+          <p className="text-xs text-gray-700 mb-1">Quick Payments this client made in this space, each through Stripe.</p>
+          <table>
+            <thead>
+              <tr><th>Paid on</th><th>Amount</th><th>For</th></tr>
+            </thead>
+            <tbody>
+              {e.quickPayments.map((q, i) => (
+                <tr key={i}>
+                  <td>{when(q.paidAt)}</td>
+                  <td>{money(q.amountCents)}</td>
+                  <td>{q.what}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
 
       <section className="mb-5">
         <h2 className="text-sm font-bold uppercase tracking-wide border-b border-gray-400 mb-2">Messages ({e.messages.length})</h2>

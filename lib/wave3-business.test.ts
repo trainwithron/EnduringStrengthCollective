@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 const pushes: unknown[][] = [];
@@ -8,8 +8,11 @@ vi.mock("@/lib/push-notify", () => ({ notifyPush: (...args: unknown[]) => pushes
 import {
   HOLD_MS,
   VOICE_MAX_SECONDS,
+  VOICE_CANNOT_PLAY,
   baseMimeType,
+  canPlayVoice,
   canRecordVoice,
+  voiceMimeFromPath,
   formatVoiceTime,
   pickVoiceMimeType,
   releaseAction,
@@ -25,7 +28,7 @@ import { clientFailedPaymentLine, coachFailedPaymentLine, failedPayment, loadFai
 import { recordNextAttempt } from "@/lib/payment-events";
 import { DISPUTE_HELP, DISPUTE_UPLOAD_LINE, FAILED_CARD_HELP, PAUSE_CLIENT_HELP, PAUSE_CLIENT_LINE } from "@/lib/billing-help";
 import { HELP_BY_SLUG } from "@/lib/help-articles";
-import { evidenceFiles, loadDisputeEvidence, sessionOutcome, type DisputeEvidence } from "@/lib/dispute-evidence";
+import { classOutcome, evidenceFiles, loadDisputeEvidence, sessionOutcome, type DisputeEvidence } from "@/lib/dispute-evidence";
 import { buildPayrollSnapshot, cleanNote, cleanRates, payrollCsv } from "@/lib/payroll-report";
 import { isWriteRequest } from "@/lib/workspace-mutation";
 
@@ -79,6 +82,8 @@ function fakeDb(handler: (q: Q, single: boolean) => { data: unknown; error: unkn
       lt: (k: string, v: unknown) => ((q.filters[`lt:${k}`] = v), b),
       or: (v: string) => ((q.filters.or = v), b),
       not: () => b,
+      neq: (k: string, v: unknown) => ((q.filters[`neq:${k}`] = v), b),
+      like: (k: string, v: unknown) => ((q.filters[`like:${k}`] = v), b),
       is: (k: string, v: unknown) => ((q.filters[k] = v), b),
       order: () => b,
       limit: () => b,
@@ -95,6 +100,9 @@ function fakeDb(handler: (q: Q, single: boolean) => { data: unknown; error: unkn
 describe("R7 voice notes: the small rules", () => {
   it("records in a format the bucket takes, in the browser's own order of preference", () => {
     expect(pickVoiceMimeType((t) => t === "audio/mp4")).toBe("audio/mp4");
+    // MP4 first: a browser that can record both records the one every device plays
+    expect(pickVoiceMimeType(() => true)).toBe("audio/mp4");
+    expect(pickVoiceMimeType((t) => t !== "audio/ogg")).toBe("audio/mp4");
     expect(pickVoiceMimeType((t) => t.startsWith("audio/webm"))).toBe("audio/webm;codecs=opus");
     expect(pickVoiceMimeType(() => false)).toBeNull();
     expect(pickVoiceMimeType(null)).toBeNull();
@@ -118,6 +126,27 @@ describe("R7 voice notes: the small rules", () => {
     expect(voiceSeconds(65_400)).toBe(65);
     expect(voiceSeconds(500_000)).toBe(120);
     expect([formatVoiceTime(7), formatVoiceTime(105), formatVoiceTime(120)]).toEqual(["0:07", "1:45", "2:00"]);
+  });
+  it("a device that cannot play a recording says so plainly, before anything is fetched", () => {
+    expect([voiceMimeFromPath(`${ANN}/${G1}/${FILE}.webm`), voiceMimeFromPath("a/b/c.m4a"), voiceMimeFromPath("a/b/c.ogg"), voiceMimeFromPath("a/b/c.exe")]).toEqual(["audio/webm", "audio/mp4", "audio/ogg", null]);
+    // an older iPhone: MP4 yes, webm no
+    const iphone = (t: string) => (t === "audio/mp4" ? "maybe" : "");
+    expect(canPlayVoice(iphone, "a/b/c.m4a")).toBe(true);
+    expect(canPlayVoice(iphone, "a/b/c.webm")).toBe(false);
+    expect(canPlayVoice(() => "probably", "a/b/c.webm")).toBe(true);
+    expect(canPlayVoice(() => "probably", "a/b/c.exe")).toBe(false);
+    expect(canPlayVoice(null, "a/b/c.m4a")).toBe(false);
+    expect(canPlayVoice(() => {
+      throw new Error("no");
+    }, "a/b/c.m4a")).toBe(false);
+    expect(VOICE_CANNOT_PLAY).toBe("This phone can't play this recording. Open Messages on a computer, or ask them to type it.");
+    const player = read("components/messages/voice-note-player.tsx");
+    expect(player).toContain("probe.canPlayType(t)");
+    // the check comes before the signed link is asked for
+    const toggle = player.slice(player.indexOf("async function toggle()"));
+    expect(toggle.indexOf("if (!deviceCanPlay(path))")).toBeGreaterThan(-1);
+    expect(toggle.indexOf("if (!deviceCanPlay(path))")).toBeLessThan(toggle.indexOf("createSignedUrl("));
+    expect(player).toContain("{VOICE_CANNOT_PLAY}");
   });
   it("hold to talk sends when let go; a short tap keeps recording", () => {
     expect(releaseAction(HOLD_MS + 10)).toBe("send");
@@ -320,7 +349,7 @@ describe("$6 evidence for a dispute", () => {
       if (q.table === "group_memberships") return { data: role ? { role } : null, error: null };
       if (q.table === "profiles") return { data: [{ id: ANN, full_name: "Ann Lee" }, { id: COACH, full_name: "Ron" }], error: null };
       if (q.table === "groups") return { data: { name: "Ann Lee" }, error: null };
-      if (q.table === "client_intake") return { data: { waiver_signed_name: "Ann Lee", waiver_accepted: true, completed_at: "2026-09-30T12:00:00Z" }, error: null };
+      if (q.table === "client_intake") return { data: [{ waiver_signed_name: "Ann Lee", waiver_accepted: true, completed_at: "2026-09-30T12:00:00Z" }], error: null };
       if (q.table === "legal_acceptances") return { data: [{ version: "2026-09", accepted_at: "2026-09-30T12:00:00Z" }], error: null };
       if (q.table === "bookings")
         return {
@@ -338,6 +367,17 @@ describe("$6 evidence for a dispute", () => {
     fakeDb((q) => {
       if (q.table === "coach_packages") return { data: { name: "8 sessions", billing_type: "one_time", kind: "sessions", sessions_granted: 8, sessions_per_week: 2, rate_cents: 40000, price_cents: null, coach_id: COACH }, error: null };
       if (q.table === "group_memberships") return { data: { role: "coach" }, error: null };
+      if (q.table === "group_session_attendees")
+        return { data: [{ status: "attended", credit_taken: true, attended_at: "2026-10-08T00:00:00Z", created_at: "2026-10-05T10:00:00Z", group_sessions: { title: "Tuesday small group", start_at: "2026-10-07T23:00:00Z", status: "scheduled" } }], error: null };
+      if (q.table === "coach_quick_payments")
+        return {
+          data: [
+            { created_at: "2026-10-04T12:00:00Z", amount_cents: 2500, description: "Protein shake", stripe_checkout_session_id: "cs_q1" },
+            // not a Stripe checkout: never shown
+            { created_at: "2026-10-05T12:00:00Z", amount_cents: 900, description: "Cash", stripe_checkout_session_id: "manual" },
+          ],
+          error: null,
+        };
       return { data: null, error: null };
     });
 
@@ -367,22 +407,75 @@ describe("$6 evidence for a dispute", () => {
     expect(d.calls.find((c) => c.table === "legal_acceptances")!.filters).toMatchObject({ profile_id: ANN, document: "waiver" });
     expect(d.calls.find((c) => c.table === "direct_messages")!.filters.or).toBe(`and(sender_id.eq.${COACH},recipient_id.eq.${ANN}),and(sender_id.eq.${ANN},recipient_id.eq.${COACH})`);
     // the server's key reads only the package this payment names (and checks it is a package of a coach of the space)
-    expect(s.calls.map((c) => c.table)).toEqual(["coach_packages", "group_memberships"]);
+    expect(s.calls.map((c) => c.table)).toEqual(["coach_packages", "group_memberships", "group_session_attendees", "coach_quick_payments"]);
     expect(s.calls[0].filters).toEqual({ id: "pkg1" });
+    // the classes and quick payments are this client's in this space only, quick payments only Stripe card charges
+    for (const q of s.calls.slice(2)) expect(q.filters).toMatchObject({ athlete_id: ANN, group_id: G1 });
+    expect(s.calls[2].filters).toMatchObject({ "neq:status": "waitlisted", "gte:group_sessions.start_at": payRow.created_at, "lt:group_sessions.start_at": "2026-11-01T15:00:00Z" });
+    expect(s.calls[3].filters["like:stripe_checkout_session_id"]).toBe("cs_%");
+    expect(e.classes).toEqual([
+      { title: "Tuesday small group", startAt: "2026-10-07T23:00:00Z", joinedAt: "2026-10-05T10:00:00Z", status: "attended", classStatus: "scheduled", sessionTaken: true, attendedAt: "2026-10-08T00:00:00Z" },
+    ]);
+    expect(e.quickPayments).toEqual([{ paidAt: "2026-10-04T12:00:00Z", amountCents: 2500, what: "Protein shake", checkoutId: "cs_q1" }]);
+    // the waiver is read as a list (one form per person), newest first, never maybeSingle
+    expect(d.calls.find((c) => c.table === "client_intake")!.filters).toEqual({ athlete_id: ANN });
+    expect(read("lib/dispute-evidence.ts")).not.toMatch(/from\("client_intake"\)[^\n]*maybeSingle/);
   });
   it("the download is spreadsheets of the same facts, with how to upload them", async () => {
     const loaded = await loadDisputeEvidence(db("coach"), server(), { purchaseId: PAY, viewerId: COACH });
     const e = (loaded as { evidence: DisputeEvidence }).evidence;
     const files = evidenceFiles(e, "America/New_York", DISPUTE_UPLOAD_LINE);
-    expect(files.map((f) => f.name)).toEqual(["payment.csv", "package.csv", "waiver.csv", "sessions.csv", "messages.csv", "README.txt"]);
+    expect(files.map((f) => f.name)).toEqual(["payment.csv", "package.csv", "waiver.csv", "sessions.csv", "classes.csv", "quick-payments.csv", "messages.csv", "README.txt"]);
+    expect(files.find((f) => f.name === "classes.csv")!.text).toContain("Tuesday small group");
+    expect(files.find((f) => f.name === "classes.csv")!.text).toContain("Attended,yes");
+    expect(files.find((f) => f.name === "quick-payments.csv")!.text).toContain("$25.00,Protein shake,cs_q1");
+    expect(files.find((f) => f.name === "quick-payments.csv")!.text).not.toContain("Cash");
     expect(files[0].text).toContain("$400.00");
     expect(files[1].text).toContain("The app does not keep a copy of the checkout page.");
     expect(files[2].text).toContain("2026-09");
     expect(files[3].text).toContain("No-show");
-    expect(files[4].text).toContain("See you Friday");
-    expect(files[5].text).toContain(DISPUTE_UPLOAD_LINE);
+    expect(files.find((f) => f.name === "messages.csv")!.text).toContain("See you Friday");
+    expect(files.find((f) => f.name === "README.txt")!.text).toContain(DISPUTE_UPLOAD_LINE);
     expect(sessionOutcome({ startAt: "2099-01-01T00:00:00Z", endAt: null, bookedAt: "x", status: "confirmed", noShow: false, lateCancel: false, attendedAt: null })).toBe("Booked, still to come");
     expect(sessionOutcome({ startAt: "2020-01-01T00:00:00Z", endAt: null, bookedAt: "x", status: "cancelled", noShow: false, lateCancel: true, attendedAt: null })).toBe("Cancelled late");
+  });
+  it("a payment that gave no sessions leaves classes out (classes use sessions), and says so", async () => {
+    const d = fakeDb((q, single) => {
+      if (q.table === "credit_purchases" && single) return { data: { ...payRow, credits_purchased: 0 }, error: null };
+      if (q.table === "group_memberships") return { data: { role: "coach" }, error: null };
+      return { data: [], error: null };
+    });
+    const s = server();
+    const loaded = await loadDisputeEvidence(d, s, { purchaseId: PAY, viewerId: COACH });
+    const e = (loaded as { evidence: DisputeEvidence }).evidence;
+    expect(e.classes).toBeNull();
+    expect(s.calls.some((c) => c.table === "group_session_attendees")).toBe(false);
+    const files = evidenceFiles(e, "UTC", DISPUTE_UPLOAD_LINE);
+    expect(files.some((f) => f.name === "classes.csv")).toBe(false);
+    expect(files.find((f) => f.name === "README.txt")!.text).toContain("This payment gave no sessions, so classes are not part of it.");
+    // the waiver form taken from a list: none on file is no waiver, not an error
+    expect(e.waiver).toBeNull();
+  });
+  it("classes take sessions from the same balance a package fills (the reason they are in the pack)", () => {
+    const sql = read("supabase/migrations/0263_group_sessions.sql");
+    expect(sql).toContain("perform public.apply_session_credit_change(v_next.athlete_id, v_next.group_id, -1, 'booked'");
+    expect(classOutcome({ title: "x", startAt: "2020-01-01T00:00:00Z", joinedAt: "x", status: "joined", classStatus: "scheduled", sessionTaken: true, attendedAt: null })).toBe("Joined (not marked attended)");
+    expect(classOutcome({ title: "x", startAt: "2020-01-01T00:00:00Z", joinedAt: "x", status: "joined", classStatus: "cancelled", sessionTaken: false, attendedAt: null })).toBe("Class cancelled");
+    expect(classOutcome({ title: "x", startAt: "2020-01-01T00:00:00Z", joinedAt: "x", status: "cancelled", classStatus: "scheduled", sessionTaken: false, attendedAt: null })).toBe("Left the class");
+    // only the Stripe webhook writes quick payments, always from a Stripe checkout
+    const writers = ["app", "lib", "components"].flatMap((d) => {
+      const out: string[] = [];
+      const walk = (dir: string) => {
+        for (const e of readdirSync(join(ROOT, dir), { withFileTypes: true })) {
+          const p = join(dir, e.name);
+          if (e.isDirectory()) walk(p);
+          else if (/\.tsx?$/.test(e.name) && !/\.test\./.test(e.name) && /from\("coach_quick_payments"\)\.insert\(/.test(readFileSync(join(ROOT, p), "utf8"))) out.push(p.replace(/\\/g, "/"));
+        }
+      };
+      walk(d);
+      return out;
+    });
+    expect(writers).toEqual(["app/api/stripe/webhook/route.ts"]);
   });
   it("the page prints, the download is read only, and the client's payments link to it", () => {
     const page = read("app/print/dispute-evidence/[purchaseId]/page.tsx");
@@ -454,6 +547,12 @@ describe("step 220: the paste", () => {
     expect(paste.startsWith("-- PASTE: step 220")).toBe(true);
     const tail = paste.slice(paste.indexOf("-- check: one row"));
     expect(tail.match(/^select$/m)?.length).toBe(1);
-    expect(tail.trim().endsWith("as payroll_never_changes;")).toBe(true);
+    expect(tail.trim().endsWith("as payroll_saver_can_delete_account;")).toBe(true);
+  });
+  it("the person who saved a pay period can still delete their account (on delete set null is an update)", () => {
+    const sql = read("supabase/migrations/0464_voice_notes_payroll_reports.sql");
+    expect(sql).toContain("created_by uuid references public.profiles(id) on delete set null");
+    expect(sql).toContain("if new.created_by is null and old.created_by is not null and (to_jsonb(new) - 'created_by') = (to_jsonb(old) - 'created_by') then");
+    expect(read("scripts/sql-tests/voice-notes-payroll.test.mjs")).toContain("the owner who saved a report deletes their account");
   });
 });

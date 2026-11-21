@@ -3,7 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Pause, Play } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { VOICE_BUCKET, VOICE_LINK_SECONDS, formatVoiceTime } from "@/lib/voice-note";
+import { VOICE_BUCKET, VOICE_CANNOT_PLAY, VOICE_LINK_SECONDS, canPlayVoice, formatVoiceTime } from "@/lib/voice-note";
+
+// Asks this browser whether it can play the recording's type (from the file's ending), before anything is fetched.
+function deviceCanPlay(path: string): boolean {
+  if (typeof Audio === "undefined") return true;
+  const probe = new Audio();
+  return canPlayVoice((t) => probe.canPlayType(t), path);
+}
 
 // One voice note in a conversation: play or pause, how long it is, and how far it has played. The sound is fetched only when Play is tapped, through a short-lived link made
 // under the listener's own sign-in (storage lets only the two people in the conversation open it), and a fresh link is asked for when the last one is near its end.
@@ -15,8 +22,11 @@ export function VoiceNotePlayer({ path, seconds, own }: { path: string; seconds:
   const [loading, setLoading] = useState(false);
   const [at, setAt] = useState(0);
   const [failed, setFailed] = useState(false);
+  // a recording this device cannot play (an older iPhone and a webm file): said plainly, and nothing is fetched
+  const [unplayable, setUnplayable] = useState(false);
 
   useEffect(() => {
+    if (!deviceCanPlay(path)) setUnplayable(true);
     return () => {
       audioRef.current?.pause();
       audioRef.current = null;
@@ -25,6 +35,11 @@ export function VoiceNotePlayer({ path, seconds, own }: { path: string; seconds:
 
   async function toggle() {
     if (loading) return;
+    // checked again before anything is fetched
+    if (!deviceCanPlay(path)) {
+      setUnplayable(true);
+      return;
+    }
     const current = audioRef.current;
     if (current && playing) {
       current.pause();
@@ -66,6 +81,14 @@ export function VoiceNotePlayer({ path, seconds, own }: { path: string; seconds:
     } catch {
       setFailed(true);
     }
+  }
+
+  if (unplayable) {
+    return (
+      <p className={`min-w-[200px] text-xs ${own ? "text-graphite/80" : "text-steel"}`} role="status" data-voice-unplayable>
+        Voice note ({formatVoiceTime(seconds)}). {VOICE_CANNOT_PLAY}
+      </p>
+    );
   }
 
   const total = Math.max(1, seconds);

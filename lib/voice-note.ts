@@ -7,8 +7,9 @@ export const VOICE_LINK_SECONDS = 300;
 // What a voice note says in the message list, the bell and anywhere else only the words are shown.
 export const VOICE_NOTE_BODY = "Voice note";
 
-// The recording formats in the order they are tried: the browser's own first choice that the bucket also accepts.
-const CANDIDATES = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus", "audio/ogg"] as const;
+// The recording formats in the order they are tried. MP4 first: every phone and computer plays it (an iPhone may not play webm), so every browser that can record MP4
+// does; then webm and ogg for the browsers that cannot. The bucket accepts all three.
+const CANDIDATES = ["audio/mp4", "audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus", "audio/ogg"] as const;
 
 export function pickVoiceMimeType(isTypeSupported: ((t: string) => boolean) | null | undefined): string | null {
   if (!isTypeSupported) return null;
@@ -39,6 +40,28 @@ export function voicePath(senderId: string, groupId: string, fileId: string, mim
   const ext = voiceExtension(mime);
   return ext ? `${senderId}/${groupId}/${fileId}.${ext}` : null;
 }
+
+// The type of a stored recording, from its name (the database allows only these three endings).
+export function voiceMimeFromPath(path: string): "audio/webm" | "audio/mp4" | "audio/ogg" | null {
+  const ext = path.split(".").pop()?.toLowerCase();
+  if (ext === "webm") return "audio/webm";
+  if (ext === "m4a") return "audio/mp4";
+  if (ext === "ogg") return "audio/ogg";
+  return null;
+}
+
+// Can this device play it? Asked of the browser before anything is fetched ("" means no; "maybe" and "probably" are a yes).
+export function canPlayVoice(canPlayType: ((t: string) => string) | null | undefined, path: string): boolean {
+  const type = voiceMimeFromPath(path);
+  if (!type || !canPlayType) return false;
+  try {
+    return canPlayType(type) !== "";
+  } catch {
+    return false;
+  }
+}
+
+export const VOICE_CANNOT_PLAY = "This phone can't play this recording. Open Messages on a computer, or ask them to type it.";
 
 // Whole seconds for the message: at least 1, at most the limit. A recording under half a second is nothing (an accidental tap) and is not sent.
 export function voiceSeconds(elapsedMs: number): number | null {
