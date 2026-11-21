@@ -55,13 +55,8 @@ export function ProgramRoleControl({
     router.refresh();
   }
 
-  if (!available) {
-    return (
-      <p className="font-body text-xs text-steel max-w-[40ch]">
-        Labels for programs (Main, Mobility, Warm-up) are not switched on yet.
-      </p>
-    );
-  }
+  // Before its database step there is no label to set: the control is simply not shown (clutter audit DK12, Nov 21: no "not switched on yet").
+  if (!available) return null;
 
   return (
     <div className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">

@@ -1,35 +1,21 @@
 import Link from "next/link";
 import { formatInTimezone } from "@/lib/format-in-timezone";
 import { dateKeyInZone } from "@/lib/timezone";
-import { attentionHeadline, rankAttention, type AttentionItem, type ScheduleEntry } from "@/lib/your-day";
-import { YourDayAttentionList } from "@/components/coach/desktop/your-day-attention-list";
+import type { ScheduleEntry } from "@/lib/your-day";
 
-// The first thing on a coach's Home: today's sessions, classes and calendar events in order, and one ranked list of what needs them. Each row opens the
-// place to act; the detailed panels further down (replies, payments, insights) are where the actions themselves live. In the schedule, the NAME opens the client's profile (a class opens its
-// group sessions) and the TIME opens the coach's calendar on that day.
+// Today's sessions, classes and calendar events on a coach's Home, in order. What needs the coach is one list only, Needs you at the top of Home (clutter audit DK5, Nov 21: this
+// panel's own "N things need you" column was a second copy of it). The section is called Today, like the Home tab (DK30). In the schedule, the NAME opens the client's profile (a
+// class opens its group sessions) and the TIME opens the coach's calendar on that day.
 export function scheduleCalendarHref(entry: { groupId: string; startAt: string }, timezone: string): string {
   return `/groups/${entry.groupId}/calendar/${dateKeyInZone(timezone, new Date(entry.startAt))}`;
 }
 
-export function YourDayPanel({
-  schedule,
-  attention,
-  timezone,
-  showPayments = true,
-}: {
-  schedule: ScheduleEntry[];
-  attention: AttentionItem[];
-  timezone: string;
-  /** false for a team organization: nothing about payments on its Home */
-  showPayments?: boolean;
-}) {
-  // The whole list, ranked; the first six show and "Show N more" opens the rest in place.
-  const { shown } = rankAttention(attention, attention.length);
+export function YourDayPanel({ schedule, timezone }: { schedule: ScheduleEntry[]; timezone: string }) {
   return (
-    <section aria-labelledby="your-day-heading" className="mb-6 grid gap-4 md:grid-cols-2 @5xl:!grid-cols-1">
+    <section aria-labelledby="your-day-heading" className="mb-6">
       <div className="border border-transparent bg-surface p-4">
         <h2 id="your-day-heading" className="font-body text-[15px] font-semibold text-chalk mb-3">
-          Your day
+          Today
         </h2>
         {schedule.length === 0 ? (
           <p className="font-body text-sm text-steel">Nothing on the calendar today.</p>
@@ -56,15 +42,6 @@ export function YourDayPanel({
               </li>
             ))}
           </ul>
-        )}
-      </div>
-
-      <div className="border border-transparent bg-surface p-4">
-        <h2 className="font-body text-[15px] font-semibold text-chalk mb-3">{attentionHeadline(attention.length)}</h2>
-        {shown.length === 0 ? (
-          <p className="font-body text-sm text-steel">{showPayments ? "Replies, payments and check-ins that need you will show up here." : "Replies and check-ins that need you will show up here."}</p>
-        ) : (
-          <YourDayAttentionList items={shown} limit={6} />
         )}
       </div>
     </section>

@@ -100,7 +100,8 @@ describe("the All messages page", () => {
     expect(page).toContain("<MessagesTwoPane");
     expect(page).toContain("selectedConversation(conversations, search.with)");
     expect(page).toContain('(search.draft ?? "").slice(0, 600)');
-    expect(page).toContain("All messages");
+    // the page is called Messages, like its tab (clutter audit DK30, Nov 21)
+    expect(page).toContain('uppercase leading-none">Messages</h1>');
   });
   it("picking a row opens the thread in place: no navigation, the address kept with replaceState so Back leaves the page", () => {
     expect(pane).toContain("window.history.replaceState");
@@ -140,21 +141,14 @@ describe("opening a thread in place is the 'seen it' moment, and only when it is
     expect(thread).toContain("method: \"POST\"");
     expect(thread).toContain("useEffect");
   });
-  it("the panel opens on Spot, the Messages tab mounts its content only while showing, and the Spot chat stays mounted but hidden", () => {
-    expect(panel).toContain('useState<"spot" | "messages">("spot")');
-    expect(panel).toContain('{groupId && tab === "messages" && (');
-    expect(panel).toContain('tab === "spot" || !groupId ? "flex-1 min-h-0 flex flex-col" : "hidden"');
-  });
-  it("the Messages tab shows an unread badge, pins the viewed client, has an All messages link, and urgent notices come from the same types as the bell", () => {
-    expect(panel).toContain("unreadNow > 0");
-    expect(panel).toContain("clientIdFromPath(usePathname())");
-    expect(read("../components/coach/desktop/floating-messages.tsx")).toContain("All messages");
-    expect(read("../components/coach/desktop/floating-messages.tsx")).toContain("withPinnedClient(");
+  it("Ask Spot is Spot only (clutter audit DK18, Nov 21): no Messages tab, no unread badge of its own; messages are on the Messages page and the rail's count", () => {
+    expect(panel).not.toContain("FloatingMessages");
+    expect(panel).not.toContain('"messages"');
+    expect(panel).not.toMatch(/unreadNow|unread =|badgeText/);
+    expect(panel).toContain("<AskSpotChatPanel />");
+    expect(read("../components/coach/coach-desktop-shell.tsx")).toContain("<CollectiveIntelligenceChat />");
     expect(URGENT_NOTICE_TYPES).toContain("schedule_request");
     expect(URGENT_NOTICE_TYPES).toContain("late_change");
-  });
-  it("the shell passes the group and the rail's unread count", () => {
-    expect(read("../components/coach/coach-desktop-shell.tsx")).toContain("<CollectiveIntelligenceChat groupId={groupId} unread={messagesUnread} />");
   });
 });
 
@@ -182,6 +176,5 @@ describe("the inbox is read in full and kept fresh (Assistant's review)", () => 
     expect(refresh).toContain('document.visibilityState !== "visible"');
     expect(refresh).toContain("/api/messages/inbox?groupId=");
     expect(read("../components/messages/messages-two-pane.tsx")).toContain("useInboxRefresh(");
-    expect(read("../components/coach/desktop/floating-messages.tsx")).toContain("setInterval(() => load(false), INBOX_REFRESH_MS)");
   });
 });

@@ -22,7 +22,8 @@ describe("coach desktop shell", () => {
     expect(shell).toContain('href: homeHref(tabsByHome, h.key) ?? "/dashboard",');
     expect(shell).toContain("active: litHome === h.key,");
     // the hover widgets (decision 6): Business on Home where money shows, Feed under Messages, Team performance on Programs in a team-sport group only
-    expect(shell).toContain("home: moneyHidden ? undefined : <BusinessRailWidget groupId={groupId} />,");
+    // no money hover on Home's icon for anyone: money is on the Business tab only (clutter audit DK29, Nov 21)
+    expect(shell).not.toContain("BusinessRailWidget");
     expect(shell).toContain("programs: teamSport ? <TeamRailWidget groupId={groupId} /> : undefined,");
     expect(shell).toContain('{groupKind !== null && groupKind !== "one_on_one" && <FeedRailWidget groupId={groupId} />}');
     // the footer keeps only the workspace switcher, Report a problem, Download app and Sign out
@@ -31,9 +32,9 @@ describe("coach desktop shell", () => {
     expect(shell).toContain("<FeedbackButton");
     expect(shell).toContain("<SignOutButton");
   });
-  it("the Settings home holds Account, Display mode, Text messages, Zapier, Organization, My website, Pro shop and referrals, Support, Quick tips (grouped into five tabs, Ron Nov 2; and the team-sport Business link, and the admin pages)", () => {
+  it("the Settings home holds Account, Text messages, Zapier, Organization, My website, Pro shop and referrals, Support, Quick tips (grouped, Ron Nov 2; Display mode moved to Calendar, DK17; and the team-sport Business link, and the admin pages)", () => {
     const settings = homesLib.slice(homesLib.indexOf("    settings: ["), homesLib.indexOf("  };\n  const out"));
-    const order = ["Account", "Display mode", "Text messages", "Zapier", "Organization", "My website", "Pro shop and referrals", "Support", "Quick tips", "TEAM_SPORT_BUSINESS_LABEL", "Organizations", "Marketplace ranking"];
+    const order = ["Account", "Text messages", "Zapier", "Organization", "My website", "Pro shop and referrals", "Support", "Quick tips", "TEAM_SPORT_BUSINESS_LABEL", "Organizations", "Marketplace ranking"];
     let last = -1;
     for (const m of order) {
       const at = settings.indexOf(m);
@@ -68,8 +69,8 @@ describe("client finder wording", () => {
 });
 
 describe("Display Mode opens in a new tab", () => {
-  it("the Settings tab marks it newTab and the strip adds target=_blank", () => {
-    expect(homesLib).toContain('{ key: "display", label: "Display mode", href: `${g}/display`, newTab: true, group: ACCOUNT }');
+  it("the tab (on Calendar, next to Kiosk: DK17) marks it newTab and the strip adds target=_blank", () => {
+    expect(homesLib).toContain('{ key: "display", label: "Display mode", href: `${g}/display`, newTab: true }');
     const strip = readFileSync(new URL("./desktop/home-tab-strip.tsx", import.meta.url), "utf8");
     expect(strip).toContain('target: "_blank", rel: "noopener noreferrer"');
   });

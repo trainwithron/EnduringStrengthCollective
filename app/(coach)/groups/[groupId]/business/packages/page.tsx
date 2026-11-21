@@ -143,7 +143,7 @@ export default async function PackagesPage(
         <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">
           {isStripeConfigured() && connectStatus === "ready"
             ? "Define what you actually sell — a client sees these on their Billing page."
-            : "Packages are for assigning to clients by hand until payments are turned on."}
+            : "Define what you sell, and assign it to clients by hand."}
         </p>
       </div>
 

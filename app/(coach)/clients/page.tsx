@@ -22,9 +22,6 @@ import { waitingOnGuardian } from "@/lib/guardian-wait";
 import { loadUnconfirmedUserIds } from "@/lib/unconfirmed-emails";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import type { CoachClientRow } from "@/lib/coach-client-filter";
-import { CoachesSection } from "@/components/coach/coaches-section";
-import { loadOrgCoaches, signInsFor } from "@/lib/pending-coaches";
-import { authorizeInviteManager } from "@/lib/coach-invite-server";
 
 export const metadata = { title: "Clients" };
 
@@ -121,10 +118,7 @@ export default async function CoachClientsPage(props: { searchParams?: Promise<{
   const { data: selfProfile } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
   const selfName = (selfProfile?.full_name as string | null | undefined)?.trim() || "You";
 
-  // The plain Coaches list (every coach of the organization once, who has not accepted yet, Invite a coach) sits at the top of this page for every organization: on a computer the Clients link always lands here.
-  const [coachList, inviteManager] = await Promise.all([loadOrgCoaches(anchor.id), authorizeInviteManager(supabase, user.id, anchor.id)]);
-
-  const signIns = await signInsFor(coachList.coaches, inviteManager.ok, user.id);
+  // Coaches and invitations live on Organization > Team only (clutter audit DK15, Nov 21): the daily client list no longer opens with a Coaches box.
   const [requestCount, checkinCount] = await Promise.all([pendingRequestCount(supabase), pendingCheckinCount(supabase, inOrg.map((g) => g.id), user.id)]);
 
   return (
@@ -140,8 +134,6 @@ export default async function CoachClientsPage(props: { searchParams?: Promise<{
           <AddClientButton groupId={anchor.id} groupName={anchor.name} createdBy={user.id} defaultOpen={openAdd} initialStep={openImport ? "import" : undefined} />
         </div>
       </div>
-      <CoachesSection groupId={anchor.id} viewerId={user.id} coaches={coachList.coaches} pending={coachList.pending} canManage={inviteManager.ok} signIns={signIns} />
-
       <CoachClientsList rows={rows} selfName={selfName} oneView={oneView} />
     </CoachDesktopShell>
   );

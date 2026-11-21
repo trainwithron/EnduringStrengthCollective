@@ -49,7 +49,7 @@ import { StuckDesktopModeBanner } from "@/components/coach/desktop/stuck-desktop
 import { fetchInactiveKeys, inactiveKey } from "@/lib/inactive-ids";
 import { readRowsByIds } from "@/lib/read-by-ids";
 import { pageAll } from "@/lib/page-all";
-import { TerminologyFirstRunCard } from "@/components/coach/desktop/terminology-first-run-card";
+import { NeedsStackFold } from "@/components/coach/desktop/needs-stack-fold";
 import { GettingStartedCard } from "@/components/coach/desktop/getting-started-card";
 import { NeedsYouLoader, NeedsYouLoading } from "@/components/coach/desktop/needs-you-loader";
 import { noticeHref } from "@/lib/notice-links";
@@ -156,13 +156,13 @@ export default async function CoachHomePage() {
   const activeOrgCookie = (await cookies()).get(ACTIVE_ORG_COOKIE)?.value ?? null;
   // The briefing is filed under the coach's own day (their time zone, set below), which is the UTC day or a day either side of it: read that window, keep the right one once the zone is known.
   const utcTodayKey = new Date().toISOString().slice(0, 10);
-  // One read of the coach's own profile row (SPEED, Oct 19: three reads before). Has this coach already answered "What do you call your people?" (migration 0336) and what kind of coach are they?
-  // A database without those columns yet leaves the rest of Home alone: the plain read is made instead, the question is "unknown" (null) and the coach type is the usual one.
+  // One read of the coach's own profile row (SPEED, Oct 19: three reads before): who they are and what kind of coach they are. A database without the coach type yet leaves the rest of
+  // Home alone: the plain read is made instead and the coach type is the usual one. ("What do you call your people?" is asked on Organization > Labels only: clutter audit DK14, Nov 21.)
   async function readViewerProfile() {
-    const full = await supabase.from("profiles").select("full_name, timezone, terminology_asked_at, coach_type").eq("id", user!.id).maybeSingle();
-    if (!full.error) return { profile: full.data as { full_name?: string | null; timezone?: string | null } | null, askedRead: { data: full.data, error: null }, coachType: (full.data as { coach_type?: string | null } | null)?.coach_type ?? null };
+    const full = await supabase.from("profiles").select("full_name, timezone, coach_type").eq("id", user!.id).maybeSingle();
+    if (!full.error) return { profile: full.data as { full_name?: string | null; timezone?: string | null } | null, coachType: (full.data as { coach_type?: string | null } | null)?.coach_type ?? null };
     const basic = await supabase.from("profiles").select("full_name, timezone").eq("id", user!.id).maybeSingle();
-    return { profile: basic.data as { full_name?: string | null; timezone?: string | null } | null, askedRead: { data: null, error: full.error }, coachType: null };
+    return { profile: basic.data as { full_name?: string | null; timezone?: string | null } | null, coachType: null };
   }
   // One read of the coach's public profile; until migration 0249 the completion message column is missing and the field is just empty.
   async function readCoachProfile() {
@@ -178,7 +178,7 @@ export default async function CoachHomePage() {
     // there's more than one org membership.
     { data: orgMemberships },
     coachedForOrg,
-    { profile: viewerProfile, askedRead, coachType },
+    { profile: viewerProfile, coachType },
     { row: coachProfileRow, completionMessageRow },
     // Same merge shape GroupSwitcher already uses: every group this coach coaches, plus every group in each org where they're an owner/admin.
     { data: coachedRows },
@@ -643,8 +643,6 @@ export default async function CoachHomePage() {
         }}
       />
 
-      {allGroups[0] && <TerminologyFirstRunCard groupId={allGroups[0].id} askedOnServer={askedRead.error ? null : !!(askedRead.data as { terminology_asked_at?: string | null } | null)?.terminology_asked_at} />}
-
       {!moneyHidden && clientCards.length === 0 && teamCards.length === 0 && socialCards.length === 0 && allGroups[0] && (
         <GettingStartedCard groupId={(allGroups.find((g) => g.group_kind !== "one_on_one") ?? allGroups[0]).id} />
       )}
@@ -667,7 +665,7 @@ export default async function CoachHomePage() {
       </div>
 
       <div className="order-4">
-      <YourDayPanel schedule={yourDaySchedule} attention={yourDayAttention} timezone={coachTimezone} showPayments={!moneyHidden} />
+      <YourDayPanel schedule={yourDaySchedule} timezone={coachTimezone} />
       </div>
       </div>
 
@@ -689,8 +687,10 @@ export default async function CoachHomePage() {
           separate "Roster" tile lower on this page (same data,
           collapsed-and-buried) was removed rather than showing the same
           clients/groups twice on one page. */}
-      {/* The stack below is what the strip's "N more" opens; the strip's buttons also jump to the panel that handles the request. Nothing in it changed. */}
-      <div id="needs-stack" className="order-6">
+      {/* The stack below is what the strip's "N more" opens (clutter audit DK5, Nov 21: hidden until then, so Needs you is the one list on Home); a notice's link to one of its panels
+          (#late-changes, #schedule-requests, #expiring) opens it too. */}
+      <div className="order-6">
+      <NeedsStackFold>
         <OrgNotificationsPanel initialNotifications={orgNotifications} />
 
         <NeedsReplyPanel coachId={user.id} threads={needsReplyThreads} />
@@ -711,6 +711,7 @@ export default async function CoachHomePage() {
         </Suspense>
         <ProgressLookPanel groupIds={allGroupIds} />
         {!moneyHidden && <NeedsPaymentPanel rows={dashboardData.needsPayment} />}
+      </NeedsStackFold>
       </div>
       </div>
 
@@ -737,7 +738,8 @@ export default async function CoachHomePage() {
             key: "stats",
             label: "Stats",
             node: (
-              <DashboardStatTiles tiles={moneyHidden ? dashboardData.statTiles.tiles.filter((x) => x.key !== "mrr" && x.key !== "income") : dashboardData.statTiles.tiles} initialOverrides={tileMetricOverrides} />
+              // Money is on the Business tab only (clutter audit DK29, Nov 21): no MRR or income tile on Home, for anyone.
+              <DashboardStatTiles tiles={dashboardData.statTiles.tiles.filter((x) => x.key !== "mrr" && x.key !== "income")} initialOverrides={tileMetricOverrides} />
             ),
           },
           {

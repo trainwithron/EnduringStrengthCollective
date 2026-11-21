@@ -38,7 +38,6 @@ import { MessagesRailWidget } from "@/components/coach/desktop/rail-widgets/mess
 import { FeedRailWidget } from "@/components/coach/desktop/rail-widgets/feed-rail-widget";
 import { CalendarRailWidget } from "@/components/coach/desktop/rail-widgets/calendar-rail-widget";
 import { TeamRailWidget } from "@/components/coach/desktop/rail-widgets/team-rail-widget";
-import { BusinessRailWidget } from "@/components/coach/desktop/rail-widgets/business-rail-widget";
 import { ShellListPanel } from "@/components/coach/desktop/shell-list-panel";
 import { CollectiveIntelligenceChat } from "@/components/coach/desktop/collective-intelligence-chat";
 import { useWorkspaceRegistration } from "@/components/coach/workspace/workspace-host";
@@ -404,11 +403,10 @@ function CoachDesktopShellFull({
   const litHome: HomeKey | null =
     here?.home ?? (active === "home" ? "home" : HOMES.find((h) => tabsByHome[h.key].some((t) => t.key === active))?.key ?? null);
 
-  // Hover rail widgets (hover_expand_rail_widgets_idea.md, decided per icon by Ron; FIX 6 decision 6): Business on Home (not where the money numbers are hidden), Clients, Calendar,
-  // Messages with the Team feed under it, and Team performance on Programs in a team-sport group only. Settings has none.
+  // Hover rail widgets (hover_expand_rail_widgets_idea.md, decided per icon by Ron; FIX 6 decision 6): Clients, Calendar, Messages with the Team feed under it, and Team performance on
+  // Programs in a team-sport group only. Home and Settings have none: the money numbers are on the Business tab only (clutter audit DK29, Nov 21).
   const HOME_ICON: Record<HomeKey, RailIcon["icon"]> = { home: Home, clients: teamSport ? Users2 : UserRound, calendar: CalendarDays, programs: Dumbbell, nutrition: Apple, messages: Mail, settings: Settings };
   const homeWidget: Partial<Record<HomeKey, React.ReactNode>> = {
-    home: moneyHidden ? undefined : <BusinessRailWidget groupId={groupId} />,
     clients: <ClientsRailWidget groupId={groupId} />,
     calendar: <CalendarRailWidget groupId={groupId} />,
     programs: teamSport ? <TeamRailWidget groupId={groupId} /> : undefined,
@@ -514,7 +512,10 @@ function CoachDesktopShellFull({
           <div className="hidden lg:flex">
             <HeaderNotificationBell scopeGroupId={groupId} />
           </div>
-          <DownloadAppButton variant="topbar" />
+          {/* One Download button (clutter audit DK18, Nov 21): the rail's on a computer, this one only where there is no rail */}
+          <div className="lg:hidden">
+            <DownloadAppButton variant="topbar" />
+          </div>
           <ClientFinder currentGroupId={groupId} />
         </div>
       </header>
@@ -591,7 +592,7 @@ function CoachDesktopShellFull({
           so hide this one below lg (position:fixed still hides with its wrapper). */}
       {isDesktop === true && (
         <div className="hidden lg:block">
-          <CollectiveIntelligenceChat groupId={groupId} unread={messagesUnread} />
+          <CollectiveIntelligenceChat />
         </div>
       )}
     </div>

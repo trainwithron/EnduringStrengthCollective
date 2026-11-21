@@ -287,11 +287,20 @@ describe("Home is wired as designed", () => {
     expect(page).toMatch(/<div className="order-4">\s*<YourDayPanel/);
     expect(page).toContain('<div className="contents @5xl:block @5xl:min-w-0" data-home-needs>');
     for (const p of ["<OrgNotificationsPanel", "<NeedsReplyPanel", "<LateChangesPanel", "<ScheduleRequestsPanel", "<ExpiryCheckInPanel", "<InactiveClientsPanel", "<ProgressLookPanel", "<NeedsPaymentPanel"]) {
-      expect(page.indexOf(p)).toBeGreaterThan(page.indexOf('id="needs-stack"'));
+      expect(page.indexOf(p)).toBeGreaterThan(page.indexOf("<NeedsStackFold>"));
+      expect(page.indexOf(p)).toBeLessThan(page.indexOf("</NeedsStackFold>"));
     }
   });
+  it("the stack is hidden until 'N more' opens it, or a notice's link names one of its panels (clutter audit DK5, Nov 21)", () => {
+    const fold = readFileSync(join(__dirname, "..", "components/coach/desktop/needs-stack-fold.tsx"), "utf8").replace(/\r\n/g, "\n");
+    expect(fold).toContain('<div ref={ref} id="needs-stack" hidden={!open}');
+    expect(fold).toContain('window.addEventListener("hashchange", fromHash);');
+    expect(fold).toContain("window.addEventListener(NEEDS_STACK_EVENT, onMore);");
+    const more = readFileSync(join(__dirname, "..", "components/coach/desktop/needs-you-more.tsx"), "utf8").replace(/\r\n/g, "\n");
+    expect(more).toContain("announceNeedsYouMore(next);");
+  });
   it("the strip's buttons and 'N more' land on anchors that exist", () => {
-    for (const id of ["needs-stack", "late-changes", "schedule-requests", "expiring"]) expect(page).toContain(`id="${id}"`);
+    for (const id of ["late-changes", "schedule-requests", "expiring"]) expect(page).toContain(`id="${id}"`);
   });
   it("the Right now box does not name a client who has not signed in as gone quiet, and the strip is given the same box", () => {
     const data = readFileSync(join(__dirname, "..", "lib/dashboard-data.ts"), "utf8").replace(/\r\n/g, "\n");

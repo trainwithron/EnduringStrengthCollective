@@ -162,7 +162,7 @@ describe("no page asks the database for 'all my groups' in one request", () => {
     for (const f of ["lib/dashboard-data.ts", "lib/coach-briefing-gather.ts", "app/(coach)/dashboard/page.tsx"]) {
       expect(src(f), f).toContain("Could not read the clients' last workouts.");
     }
-    for (const f of ["components/coach/desktop/business-mini-dashboard.tsx", "components/coach/desktop/rail-widgets/business-rail-widget.tsx", "components/coach/desktop/roster-mini-list.tsx"]) {
+    for (const f of ["components/coach/desktop/business-mini-dashboard.tsx", "components/coach/desktop/roster-mini-list.tsx"]) {
       expect(src(f), f).toContain("lastActive.failed");
     }
     expect(src("app/(coach)/groups/[groupId]/clients/page.tsx")).toContain("scopeLastResult.failed");

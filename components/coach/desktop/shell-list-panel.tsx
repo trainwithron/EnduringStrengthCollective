@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
   MIN_LIST_PANEL_WIDTH,
@@ -27,7 +28,7 @@ import { SwappableTerm } from "@/components/coach/swappable-term";
 //
 // Split screen (Ron, Oct 19: "If you click Business, it should pull up the full Business page in that half, or Clients, it should pull up your full client list"): each tile shows its section's FULL
 // page below the tiles, in a frame of its own (the same frame the workspace panes use: the app's own pages only, drawn without the app's chrome, and links inside stay inside the half, so Build a program
-// builds there). The page on the other side is never touched. The panel opens at half the window; a dragged width is remembered. The frames themselves live in the coach layout (split-half.tsx) so they
+// builds there). The page on the other side is never touched. The panel starts closed (clutter audit DK4, Nov 21: the page being worked on gets the whole window) and opens at half the window when the coach opens it; that choice and a dragged width are remembered. The frames themselves live in the coach layout (split-half.tsx) so they
 // survive the other side changing pages; each tile keeps its page (and its place in it) while another is shown.
 export function ShellListPanel({
   coachId,
@@ -42,7 +43,10 @@ export function ShellListPanel({
   hideMoney?: boolean;
 }) {
   const [width, setWidth] = useState(MIN_LIST_PANEL_WIDTH);
-  const [collapsed, setCollapsed] = useState(false);
+  // closed until read otherwise, so it never flashes open on a page load (DK4)
+  const [collapsed, setCollapsed] = useState(true);
+  // Home has its own Needs you list: the panel's strip would be a second copy of it there (DK5).
+  const onHome = usePathname() === "/dashboard";
   const [pickedView, setView] = useState<ListPanelView>("roster");
   // a Business view pinned earlier (in another group) never shows where the money numbers are hidden
   const view: ListPanelView = hideMoney && pickedView === "business" ? "roster" : pickedView;
@@ -127,8 +131,12 @@ export function ShellListPanel({
     >
       <div className="flex-1 min-w-0 flex flex-col">
       <div className="shrink-0 max-h-[45%] overflow-y-auto p-3 pb-0">
-        <NeedsAttentionStrip coachId={coachId} groupId={groupId} />
-        <PendingRequestsLine groupId={groupId} />
+        {!onHome && (
+          <>
+            <NeedsAttentionStrip coachId={coachId} groupId={groupId} />
+            <PendingRequestsLine groupId={groupId} />
+          </>
+        )}
 
         <div className={`grid ${hideMoney ? "grid-cols-3" : "grid-cols-2"} gap-1 mb-2`}>
           <button
@@ -150,7 +158,7 @@ export function ShellListPanel({
             }`}
             title="Your Business page, in this half"
           >
-            💰 Business
+            Business
           </button>
           )}
           <button
@@ -161,7 +169,7 @@ export function ShellListPanel({
             }`}
             title="Your Calendar, in this half"
           >
-            📅 Calendar
+            Calendar
           </button>
           <button
             type="button"
@@ -171,7 +179,7 @@ export function ShellListPanel({
             }`}
             title="Your programs, in this half: build one here while the other side stays put"
           >
-            🏋 Program
+            Program
           </button>
         </div>
 

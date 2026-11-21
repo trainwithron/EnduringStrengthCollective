@@ -78,8 +78,10 @@ describe("Home's desktop rail", () => {
     expect(html).toContain('<nav aria-label="Calendar"');
     expect(tabOn(strip, "/calendar?tab=availability")).toBe(true);
     expect(tabOn(strip, "/calendar")).toBe(false);
-    expect(strip).toContain('href="/group-calendar"');
+    // Booking page and Session types are pages of the Availability tab (clutter audit DK9, Nov 21); the Group calendar shows once the group is known to be a group (it is not read in this render)
     expect(strip).toContain('href="/groups/g-team/business/booking-page"');
+    expect(strip).toContain('href="/groups/g-team/business/session-types"');
+    expect(strip).not.toContain('href="/group-calendar"');
     expect(railLit(html, "Calendar")).toBe(true);
     expect(railLit(html, "Home")).toBe(false);
   });
@@ -96,7 +98,8 @@ describe("Home's desktop rail", () => {
     const strip = html.slice(html.indexOf("data-home-strip"), html.indexOf("HOME CONTENT"));
     expect(html).toContain('<nav aria-label="Programs"');
     expect(tabOn(strip, "/groups/g-team/exercise-library")).toBe(true);
-    for (const p of ["challenges", "records", "team-performance"]) expect(strip, p).toContain(`href="/groups/g-team/${p}"`);
+    // Challenges, Hall of fame and Team performance are a group's (clutter audit DK8, Nov 21): not shown before the group's kind is read (lib/desktop-coach-homes.test.ts has the rule)
+    for (const p of ["challenges", "records", "team-performance"]) expect(strip, p).not.toContain(`href="/groups/g-team/${p}"`);
     // Nutrition has its own icon (Ron, Nov 2), not a Programs tab
     expect(strip).not.toContain('href="/groups/g-team/nutrition"');
     expect(html).toContain('aria-label="Nutrition"');
@@ -108,10 +111,9 @@ describe("Home's desktop rail", () => {
     const strip = html.slice(html.indexOf("data-home-strip"), html.indexOf("HOME CONTENT"));
     expect(html).toContain('<nav aria-label="Settings"');
     expect(tabOn(strip, "/groups/g-team/settings")).toBe(true);
-    // Five tabs (Ron, Nov 2): each group opens its first page; the Account group's pages are picked in the row under the strip.
-    for (const p of ["settings", "branding", "business/website", "business/support"]) expect(strip, p).toContain(`href="/groups/g-team/${p}"`);
-    const sub = html.slice(html.indexOf("data-home-substrip"), html.indexOf("HOME CONTENT"));
-    for (const p of ["display", "business/sms-settings", "business/zapier"]) expect(sub, p).toContain(`href="/groups/g-team/${p}"`);
+    // Each group opens its first page (Ron, Nov 2); Integrations holds Text messages and Zapier, and Display mode moved to Calendar (clutter audit DK17, Nov 21).
+    for (const p of ["settings", "business/sms-settings", "branding", "business/website", "business/support"]) expect(strip, p).toContain(`href="/groups/g-team/${p}"`);
+    expect(strip).not.toContain('href="/groups/g-team/display"');
     expect(railLit(html, "Settings")).toBe(true);
   });
   it("does not need a remembered group: nothing in the rendered rail comes from a cookie", () => {

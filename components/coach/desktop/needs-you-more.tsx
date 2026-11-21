@@ -6,6 +6,7 @@ import { FEWER_LABEL, moreLabel, type NeedsYouItem } from "@/lib/needs-you";
 import { QuietClientNudgeButton } from "@/components/coach/quiet-client-nudge-button";
 import { EmailClaimLinkButton } from "@/components/coach/email-claim-link-button";
 import { DraftMessageLink } from "@/components/messages/draft-message-link";
+import { announceNeedsYouMore } from "@/components/coach/desktop/needs-stack-fold";
 
 // "Send link" on a Needs you item for a client who has not signed in (audit, Nov 21): emails their sign-in link right from Home, with the same confirm as the profile's button when a working
 // link already exists. When the email cannot go, the link comes back to copy, and "Sign-in options" opens the profile's section with every other way.
@@ -79,7 +80,12 @@ export function NeedsYouMore({ items, viewer = null }: { items: NeedsYouItem[]; 
     <div data-needs-you-more>
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          // Home's detailed panels open and close with this list (needs-stack-fold.tsx, DK5)
+          const next = !open;
+          setOpen(next);
+          announceNeedsYouMore(next);
+        }}
         aria-expanded={open}
         aria-controls="needs-you-more-list"
         className="inline-flex items-center gap-1.5 min-h-11 font-body text-sm font-semibold text-steel hover:text-chalk"

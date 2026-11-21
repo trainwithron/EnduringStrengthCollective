@@ -45,7 +45,7 @@ describe("Business: Client rates folds", () => {
     expect(summary).toContain("<ChevronDown");
   });
   it("the explanation and the list are inside", () => {
-    expect(block).toContain("Set what each client actually pays");
+    expect(block).toContain("Set what each client pays you outside Spotlight");
     expect(block).toContain("<ClientRateEditor");
   });
 });

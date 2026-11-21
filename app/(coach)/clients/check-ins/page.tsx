@@ -39,7 +39,7 @@ export default async function CheckinsPage(props: { searchParams?: Promise<{ foc
   const photoEntries = await Promise.all(data.toReview.filter((i) => i.photoIds.length > 0).map(async (i) => [i.id, await signedPhotoUrls(supabase, i.photoIds, i.athleteId)] as const));
 
   const body = !data.available ? (
-    <p className="font-body text-sm text-steel">Check-ins aren&apos;t switched on yet. Check back soon.</p>
+    <p className="font-body text-sm text-steel">No weekly check-ins have come in yet.</p>
   ) : (
     <>
       {data.failed && (

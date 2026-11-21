@@ -72,7 +72,9 @@ describe("packages and Business", () => {
   it("Business no longer repeats Home's 'Right now' nudge and uses the packages page's words", () => {
     const biz = read("app/(coach)/groups/[groupId]/business/page.tsx");
     expect(biz).not.toContain("DashboardHero");
-    expect(biz).toContain("until payments are turned on.");
+    // the current state, not "until payments are turned on" (clutter audit DK12, Nov 21)
+    expect(biz).not.toContain("until payments are turned on");
+    expect(biz).toContain("Once your\n          packages bring in recurring payments, the real number is shown instead.");
     expect(biz).toContain("Set up packages &rarr;");
   });
 });

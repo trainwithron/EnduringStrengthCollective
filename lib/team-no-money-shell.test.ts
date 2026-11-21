@@ -41,7 +41,8 @@ describe("the shell applies it itself, not page by page", () => {
     expect(shell).not.toContain("teamSport={teamSport}");
   });
   it("the Business tab (and the income hover widget on Home) is left out where the money is hidden (FIX 6)", () => {
-    expect(shell).toContain("home: moneyHidden ? undefined : <BusinessRailWidget groupId={groupId} />,");
+    // no money hover on Home's icon for anyone: money is on the Business tab only (clutter audit DK29, Nov 21)
+    expect(shell).not.toContain("BusinessRailWidget");
     expect(read("lib/desktop-coach-homes.ts")).toContain('const MONEY_TABS = new Set(["business",');
   });
   it("the left panel ignores a Business view pinned earlier, in any group, and never renders the mini dashboard", () => {
@@ -59,17 +60,19 @@ describe("the shell applies it itself, not page by page", () => {
 
 describe("the left panel on the Trojans' page", () => {
   const props = { coachId: "c1", groupId: "g1", groupName: "TROJANS" };
-  it("with the money hidden there is no Business tile, no whole-organization money tiles and no Go deeper", () => {
-    const html = renderToStaticMarkup(createElement(ShellListPanel, { ...props, hideMoney: true }));
-    expect(html).not.toMatch(/Business/);
-    expect(html).not.toMatch(/WHOLE ORGANIZATION|Whole organization|Go deeper|MRR|Paying clients|Income/i);
-    expect(html).toContain("grid-cols-3");
-    expect(html).toContain("Clients");
-    expect(html).toContain("Calendar");
+  // The panel starts closed (clutter audit DK4, Nov 21), so its first render is the open tab alone; the tiles are read from the source.
+  const panel = read("components/coach/desktop/shell-list-panel.tsx");
+  it("it first renders closed, with nothing but the tab that opens it (no money anywhere)", () => {
+    for (const hideMoney of [true, false]) {
+      const html = renderToStaticMarkup(createElement(ShellListPanel, { ...props, hideMoney }));
+      expect(html).toContain('aria-label="Expand panel"');
+      expect(html).not.toMatch(/Business|WHOLE ORGANIZATION|Whole organization|Go deeper|MRR|Paying clients|Income/i);
+    }
   });
-  it("for an ordinary coach the Business tile is still there", () => {
-    const html = renderToStaticMarkup(createElement(ShellListPanel, { ...props }));
-    expect(html).toContain("Business");
-    expect(html).toContain("grid-cols-2");
+  it("with the money hidden there is no Business tile (three tiles); an ordinary coach has it (two by two); no emoji on the tiles", () => {
+    expect(panel).toContain('grid ${hideMoney ? "grid-cols-3" : "grid-cols-2"} gap-1 mb-2');
+    expect(panel).toContain("{!hideMoney && (\n          <button");
+    for (const label of ["Business", "Calendar", "Program"]) expect(panel).toContain(`            ${label}\n          </button>`);
+    expect(panel).not.toMatch(/[\u{1F300}-\u{1FAFF}]/u);
   });
 });

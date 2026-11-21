@@ -9,7 +9,6 @@ vi.mock("@/lib/supabase/client", () => ({
 
 import { SwappableTerm } from "./swappable-term";
 import { TerminologyChooser } from "./desktop/terminology-chooser";
-import { TerminologyFirstRunCard } from "./desktop/terminology-first-run-card";
 
 const read = (p: string) => readFileSync(new URL(p, import.meta.url), "utf8");
 
@@ -45,13 +44,11 @@ describe("the word is chosen once and changed in Settings", () => {
     expect(html).toContain("What do you call your people?");
     for (const w of ["Clients", "Athletes", "Players", "Members", "Something else"]) expect(html).toContain(w);
   });
-  it("the first-run card on Home is that question (not a nudge to click words), and it is asked once", () => {
-    const src = read("./desktop/terminology-first-run-card.tsx");
-    expect(src).toContain("What do you call your people?");
-    expect(src).toContain("TerminologyChooser");
-    expect(src).not.toContain("click any word");
-    // before it has read its saved state it shows nothing, so it never flashes for someone who already answered
-    expect(renderToStaticMarkup(createElement(TerminologyFirstRunCard, { groupId: "g" }))).toBe("");
+  it("Home does not ask it (clutter audit DK14, Nov 21: one place, Organization > Labels)", () => {
+    const home = read("../../app/(coach)/dashboard/page.tsx");
+    expect(home).not.toContain("TerminologyFirstRunCard");
+    expect(home).not.toContain("TerminologyChooser");
+    expect(home).not.toContain("terminology_asked_at");
   });
   it("Settings has the question for coaches, on desktop and the phone's Settings page, and the full list stays in Branding", () => {
     const settings = read("../../app/(coach)/groups/[groupId]/settings/page.tsx");

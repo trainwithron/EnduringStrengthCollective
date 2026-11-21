@@ -101,8 +101,9 @@ describe("the coach-level pages and pickers stand on the organization the coach 
       expect(src).not.toContain("pickCoachAnchor(");
     }
   });
-  it("the finder, the workspace picker and the Business widget read only the organization's groups", () => {
-    for (const f of ["components/coach/desktop/client-finder.tsx", "components/coach/workspace/pane-picker.tsx", "components/coach/desktop/rail-widgets/business-rail-widget.tsx"]) {
+  // (the rail's Business hover widget is gone: money is on the Business tab only, clutter audit DK29)
+  it("the finder and the workspace picker read only the organization's groups", () => {
+    for (const f of ["components/coach/desktop/client-finder.tsx", "components/coach/workspace/pane-picker.tsx"]) {
       expect(read(f)).toContain("activeOrgGroupsFor(");
     }
   });

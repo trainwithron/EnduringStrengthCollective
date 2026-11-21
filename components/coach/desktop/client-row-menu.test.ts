@@ -8,8 +8,9 @@ const read = (rel: string) => readFileSync(join(__dirname, "..", "..", "..", rel
 describe("the three-dot menu on a client", () => {
   const menu = read("components/coach/desktop/client-row-menu.tsx");
   const list = read("components/coach/desktop/coach-clients-list.tsx");
-  it("has exactly three actions, reusing the existing flows (Set inactive, Remove from my clients, Delete permanently), plus Take off hold for a client on hold", () => {
-    expect(menu.match(/role="menuitem"/g)?.length).toBe(4);
+  it("has the everyday links on top (DK26), then three actions reusing the existing flows (Set inactive, Remove from my clients, Delete permanently), plus Take off hold for a client on hold", () => {
+    // one menuitem for the mapped everyday links, then Set inactive, Take off hold, Remove and Delete
+    expect(menu.match(/role="menuitem"/g)?.length).toBe(5);
     // Take off hold shows only when the client is held, and uses the same call as the group's client cards (audit, Nov 21: Needs payment said a hold comes off here)
     expect(menu).toMatch(/\{held && \(\s*<button type="button" role="menuitem" onClick=\{\(\) => void takeOffHold\(\)\}/);
     expect(menu).toContain('setPaymentHold(groupId, athleteId, false)');
