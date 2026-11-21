@@ -147,7 +147,7 @@ export function homeTabs(f: HomeFacts): Record<HomeKey, HomeTab[]> {
       f.isPlatformAdmin && { key: "admin-ranking", label: "Marketplace ranking", href: "/admin/marketplace-ranking", group: ADMIN },
       // the built-in recipes' ingredient mapping, moved off the coach's Nutrition page (Ron, Nov 21)
       f.isPlatformAdmin && { key: "admin-ingredients", label: "Recipe ingredients", href: "/admin/nutrition-ingredients", group: ADMIN },
-      f.isPlatformAdmin && { key: "admin-machines", label: "Machine list", href: "/admin/machine-catalog", group: ADMIN },
+      f.isPlatformAdmin && { key: "admin-machines", label: "Machine requests", href: "/admin/machine-catalog", group: ADMIN },
       // Plan & Billing before it is switched on for coaches: previewed here, never on the organization's own page (DK2)
       f.isPlatformAdmin && { key: "admin-billing", label: "Billing preview", href: `${g}/branding?tab=billing&preview=1`, group: ADMIN },
     ],

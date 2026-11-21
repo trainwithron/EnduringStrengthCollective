@@ -18,7 +18,7 @@ describe("Settings' tabs, each group's pages picked under the strip", () => {
   });
 
   it("the platform admin also sees Admin, with every platform chore in it", () => {
-    expect(shown({ ...ordinary, isPlatformAdmin: true }).at(-1)).toEqual(["Admin", ["Support inbox", "Organizations", "Marketplace ranking", "Recipe ingredients", "Machine list", "Billing preview"]]);
+    expect(shown({ ...ordinary, isPlatformAdmin: true }).at(-1)).toEqual(["Admin", ["Support inbox", "Organizations", "Marketplace ranking", "Recipe ingredients", "Machine requests", "Billing preview"]]);
   });
 
   it("a group tab opens its first page; where money is hidden, Website & shop goes and Zapier leaves Integrations", () => {
