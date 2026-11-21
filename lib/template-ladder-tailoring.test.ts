@@ -152,7 +152,9 @@ describe("Start from a template on the phone", () => {
     const phone = readFileSync(join(__dirname, "..", "components/coach/mobile/spot-templates.tsx"), "utf8");
     expect(phone).toContain('import { UseTemplatePanel } from "@/components/coach/desktop/use-template-panel";');
     expect(phone).toContain("<UseTemplatePanel programId={open.id} programName={open.name} groupId={open.groupId}");
-    expect(phone).toContain("{NO_TEMPLATES_MESSAGE}");
+    // (PH18, Nov 21: with no templates the section is not drawn at all)
+    expect(phone).toContain('if (templates === null || (templates !== "failed" && templates.length === 0)) return null;');
+    expect(phone).not.toContain("NO_TEMPLATES_MESSAGE");
     expect(phone).toContain("min-h-11");
     expect(phone).not.toMatch(/makeTemplate|Make a template\(|is_slot: true|\.update\(|\.insert\(/);
     const card = readFileSync(join(__dirname, "..", "components/coach/desktop/program-card-menu.tsx"), "utf8");

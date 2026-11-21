@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect } from "react";
+import { SPOT_NEEDS_CACHE_KEY, badgeCountOf, fetchSpotNeeds, readSpotNeedsCache, spotNeedsCacheEntry } from "@/lib/spot-needs";
+import { ACTIVE_ORG_COOKIE, readBrowserCookie } from "@/lib/active-org";
 
-// The waiting-requests number on the installed app's icon (Ron, Nov 20, wave 3 C10). Where the device supports app badges (an installed app on most phones and desktops), the icon
-// shows how many requests are waiting on the coach's answer, and nothing when there are none. Anywhere else this does nothing. Checked when a coach page opens, when the app comes
-// back to the front, and every five minutes while it is open. Draws nothing.
+// The number on the installed app's icon (Ron, Nov 20, wave 3 C10; Nov 21, PH1: the same number as the Spotlight dot and "Waiting for you (n)", from the same answer, lib/spot-needs.ts).
+// Where the device supports app badges (an installed app on most phones and desktops), the icon shows how many things wait for the coach, and nothing when there are none. Anywhere else
+// this does nothing. Checked when a coach page opens, when the app comes back to the front, and every five minutes while it is open (an answer under a minute old is used again).
+// Spotlight also sets it each time it reads what is waiting. Draws nothing.
 const EVERY_MS = 5 * 60 * 1000;
 
 type BadgeNavigator = Navigator & { setAppBadge?: (n?: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
@@ -15,20 +18,36 @@ export function applyAppBadge(nav: BadgeNavigator | undefined, count: number | n
   else if (typeof nav.clearAppBadge === "function") void nav.clearAppBadge().catch(() => {});
 }
 
+/** Sets the icon from an answer Spotlight just read (so the icon and the dot never disagree). */
+export function syncAppBadge(count: number | null): void {
+  if (typeof navigator === "undefined") return;
+  applyAppBadge(navigator as BadgeNavigator, count);
+}
+
 export function AppBadgeSync() {
   useEffect(() => {
     const nav = typeof navigator === "undefined" ? undefined : (navigator as BadgeNavigator);
     if (!nav || typeof nav.setAppBadge !== "function") return;
     let stopped = false;
     const refresh = async () => {
+      const org = readBrowserCookie(ACTIVE_ORG_COOKIE);
       try {
-        const res = await fetch("/api/requests/waiting-count", { cache: "no-store" });
-        if (!res.ok) return;
-        const { count } = (await res.json()) as { count: number | null };
-        if (!stopped) applyAppBadge(nav, typeof count === "number" ? count : null);
+        const kept = readSpotNeedsCache(window.sessionStorage.getItem(SPOT_NEEDS_CACHE_KEY), org, Date.now());
+        if (kept) {
+          if (!stopped) applyAppBadge(nav, badgeCountOf(kept));
+          return;
+        }
       } catch {
-        // the icon stays as it was
+        // no storage: read it
       }
+      const data = await fetchSpotNeeds();
+      if (!data || stopped) return; // the icon stays as it was
+      try {
+        window.sessionStorage.setItem(SPOT_NEEDS_CACHE_KEY, spotNeedsCacheEntry(data, org, Date.now()));
+      } catch {
+        // not kept: the next check reads it again
+      }
+      applyAppBadge(nav, badgeCountOf(data));
     };
     void refresh();
     const timer = setInterval(() => void refresh(), EVERY_MS);

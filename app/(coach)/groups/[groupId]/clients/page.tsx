@@ -342,9 +342,12 @@ export default async function ClientsPage(
               <EmailAllClaimLinksButton groupId={params.groupId} />
             </div>
           </div>
-          <CoachesSection groupId={params.groupId} viewerId={user.id} coaches={coachList.coaches} pending={coachList.pending} canManage={inviteManager.ok} signIns={signIns} />
           <CoachOwnRow name={selfName} />
           <CoachRosterMobile groupId={params.groupId} members={phoneClients} />
+          {/* The coaches (and Invite a coach) under the clients on a phone (PH22): the clients are the daily job. */}
+          <div className="mt-6">
+            <CoachesSection groupId={params.groupId} viewerId={user.id} coaches={coachList.coaches} pending={coachList.pending} canManage={inviteManager.ok} signIns={signIns} />
+          </div>
         </div>
       </CoachMobileShell>
     );

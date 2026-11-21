@@ -251,7 +251,9 @@ describe("Programs on a phone", () => {
     expect(tree).toContain("Active");
     expect(tree).toContain("Not active");
     expect(tree).toContain(`/groups/${TROJANS}/programs/p1`);
-    expect(tree).toContain(`/groups/${TROJANS}/programs/new`);
+    // New program opens Spotlight's program box on the phone (PH19), not the computer's builder
+    expect(tree).toContain("/programs?spot=build");
+    expect(tree).not.toContain("/programs/new");
     expect(tree).not.toMatch(/import|filter|upload|Templates/i);
     const page = src("app/(coach)/programs/page.tsx");
     // read with the rest in one batch (SPEED, Oct 19)

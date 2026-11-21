@@ -172,7 +172,8 @@ export function BusinessMiniDashboard({ groupId, expanded = false }: { groupId: 
         </div>
         <div className="border border-steel/20 p-2.5">
           <p className="font-display font-bold text-lg leading-none">{data ? `$${data.mrr.toFixed(0)}` : "—"}</p>
-          <p className="font-body text-xs text-steel uppercase mt-1">MRR</p>
+          {/* What the monthly plans bring in each month (plain words, not "MRR"; PH17). */}
+          <p className="font-body text-xs text-steel uppercase mt-1">Monthly plans</p>
         </div>
         <div className="border border-steel/20 p-2.5 col-span-2">
           <p className="font-display font-bold text-lg leading-none">{data ? data.payingClients : "—"}</p>

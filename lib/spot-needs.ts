@@ -1,6 +1,10 @@
 // What the Spotlight button carries on a coach's phone (Ron, Oct 19: "that could be our notification bell ... just like a dull fading in and out. Or a dot."):
-// sessions waiting for "did it happen", unread notices and unread messages, for the organization the coach is working in. The button shows a small dot with the count
-// when there is anything; when something NEW arrived since the coach last opened Spotlight it fades in and out gently twice, then stays a dot.
+// what "Waiting for you" lists, for the organization the coach is working in: requests waiting on the coach's answer (sessions asked for or moved, late cancels and moves, weekly-schedule
+// changes, people asking to train), weekly check-ins to review, sessions waiting for "did it happen" and unread notices. The button shows a small dot with the count when there is anything;
+// when something NEW arrived since the coach last opened Spotlight it fades in and out gently twice, then stays a dot.
+// One number everywhere (Nov 21, PH1): the dot, "Waiting for you (n)" and the app icon's badge all show spotCount. One thing counts once (PH2): a message counts by its notice (the fold
+// lists the notice, not the message), and a notice about a request or a check-in is not counted again beside the request or check-in it is about.
+import { REQUEST_NOTICE_TYPES } from "@/lib/notice-links";
 
 export interface SpotNotice {
   id: string;
@@ -15,17 +19,34 @@ export interface SpotNeeds {
   groupIds: string[];
   timezone: string;
   sessionsToCheck: { bookingId: string; athleteId: string; groupId: string; name: string; startIso: string }[];
-  next: { athleteId: string; groupId: string; startIso: string; name: string; hasProgram: boolean } | null;
+  // startHref: the workout itself when the client's Log page would offer exactly one "Start" (PH24); otherwise null and the button opens the Log page.
+  next: { athleteId: string; groupId: string; startIso: string; name: string; hasProgram: boolean; startHref?: string | null } | null;
   open: { sessionId: string; athleteId: string; groupId: string; startedIso: string; name: string } | null;
   notices: SpotNotice[];
-  unreadMessages: number;
+  // The Requests page's own "waiting" number (PH1, PH3); 0 when it could not be read.
+  requestsWaiting: number;
+  // Weekly check-ins waiting for review, as the Check-ins page counts them; 0 when it could not be read.
+  checkinsToReview: number;
   count: number;
   // The newest thing counted (an ISO time), so the button can tell whether something arrived since it was last opened.
   newestAt: string | null;
 }
 
-export function spotCount(n: Pick<SpotNeeds, "sessionsToCheck" | "notices" | "unreadMessages">): number {
-  return n.sessionsToCheck.length + n.notices.length + Math.max(0, n.unreadMessages);
+// Notices already counted by their own row: the request or the check-in they are about.
+const COUNTED_ELSEWHERE = new Set<string>([...REQUEST_NOTICE_TYPES, "weekly_checkin"]);
+
+export function countedNotices(notices: Pick<SpotNotice, "type">[]): number {
+  return notices.filter((n) => !COUNTED_ELSEWHERE.has(n.type)).length;
+}
+
+export function spotCount(n: Pick<SpotNeeds, "sessionsToCheck" | "notices" | "requestsWaiting" | "checkinsToReview">): number {
+  return n.sessionsToCheck.length + countedNotices(n.notices) + Math.max(0, n.requestsWaiting || 0) + Math.max(0, n.checkinsToReview || 0);
+}
+
+// The workout "Start <name>'s workout" opens straight into (PH24): only when the Log page would offer exactly one "Start" choice; otherwise null (the Log page, which offers the choice).
+export function soleStartWorkoutId(choices: { kind: string; workoutId: string | null }[]): string | null {
+  const starts = choices.filter((c) => c.kind === "start" && !!c.workoutId);
+  return starts.length === 1 ? starts[0].workoutId : null;
 }
 
 export function newestOf(times: (string | null | undefined)[]): string | null {
@@ -41,6 +62,26 @@ export function shouldFade(newestAt: string | null, lastOpenedAt: string | null,
 }
 
 export const SPOT_LAST_OPENED_KEY = "spot-last-opened";
+
+// One read at a time: Spotlight and the app icon's badge (components/coach/app-badge-sync.tsx) ask at the same moment when a page opens, and share the one answer. Null when it failed.
+let inflight: Promise<SpotNeeds | null> | null = null;
+export function fetchSpotNeeds(): Promise<SpotNeeds | null> {
+  if (inflight) return inflight;
+  const request: Promise<SpotNeeds | null> = fetch("/api/coach/spot-needs", { cache: "no-store" })
+    .then((r) => (r.ok ? (r.json() as Promise<SpotNeeds>) : null))
+    .catch(() => null)
+    .finally(() => {
+      if (inflight === request) inflight = null;
+    });
+  inflight = request;
+  return request;
+}
+
+// The number on the app icon for an answer: the same count as the dot (null when the coach still has to choose an organization: the icon is left as it was).
+export function badgeCountOf(data: SpotNeeds | null): number | null {
+  if (!data || data.needsChoice || typeof data.count !== "number") return null;
+  return data.count;
+}
 
 // Moving from page to page on a phone, the dot is not asked for again within a minute (it was asked for on every page). Opening Spotlight always asks. Kept per tab (sessionStorage),
 // for the organization it was read for, and cleared on sign-out.

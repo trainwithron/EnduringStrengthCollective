@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { createGroupWithCoach } from "@/lib/create-group";
 import { useTerm } from "@/components/coach/terminology-provider";
 import { useRouter } from "next/navigation";
-import { Dumbbell, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
+import { REQUESTS_PATH } from "@/lib/requests-center";
+import { COACH_CHECKINS_PATH } from "@/lib/weekly-checkin";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { loadCoachClientList, type ListedClient } from "@/lib/coach-client-list";
 import { isOnlineClient, offeredForBooking } from "@/lib/client-type";
@@ -32,7 +34,8 @@ import { initialsOf } from "@/lib/initials";
 
 type GroupKind = "one_on_one" | "social" | "team";
 const GROUP_KIND_LABELS: Record<GroupKind, string> = { one_on_one: "1-on-1", social: "Social", team: "Groups" };
-const GROUP_KIND_ORDER: GroupKind[] = ["team", "social", "one_on_one"];
+// What + New group can make: a group or a social group. Never a 1-on-1: a one-on-one client is a client, not a group (Ron's standing rule; PH12).
+export const NEW_GROUP_KINDS: GroupKind[] = ["team", "social"];
 
 interface CoachedGroupOption {
   id: string;
@@ -52,7 +55,21 @@ async function getCurrentOrgId(supabase: ReturnType<typeof createBrowserClient>,
 // fromHub: the Spotlight hub has its own organization dropdown and gives this panel the group of the organization it chose. The panel then follows that group's organization, ignores
 // its own remembered one, hides its own organization tabs (one selector, one answer) and does not write its memory, so clients are never listed or created in a different
 // organization from the one the hub's header names.
-export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }: { groupId: string; onNavigated: () => void; fromHub?: boolean }) {
+// The one client list on a phone (PH9): each row has Log their workout (the main button), Profile and Message (and View as client), and the header links Requests and Check-ins.
+// requestsWaiting / checkinsToReview: the numbers Spotlight already read (lib/spot-needs.ts), shown beside those links when known.
+export function SpotClientsGroupsPanel({
+  groupId,
+  onNavigated,
+  fromHub = false,
+  requestsWaiting = null,
+  checkinsToReview = null,
+}: {
+  groupId: string;
+  onNavigated: () => void;
+  fromHub?: boolean;
+  requestsWaiting?: number | null;
+  checkinsToReview?: number | null;
+}) {
   const router = useRouter();
   const term = useTerm();
   const [clients, setClients] = useState<ListedClient[] | null>(null);
@@ -68,9 +85,10 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
   // different action from desktop's "Client Profile" button, which only
   // opens a read-only page. A one-tap confirm, matching Ron's own call.
   const [pendingClient, setPendingClient] = useState<ListedClient | null>(null);
-  const [myGroups, setMyGroups] = useState<{ groupId: string; name: string }[]>([]);
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
+  // + New group opens the small form (PH12: a setup task, folded away from the daily list).
+  const [newGroupOpen, setNewGroupOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupKind, setNewGroupKind] = useState<GroupKind>("team");
@@ -93,8 +111,6 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
           .eq("role", "coach"),
         getCurrentOrgId(supabase, groupId),
       ]);
-
-      if (!cancelled) setMyGroups((coachedGroups ?? []).map((g: any) => ({ groupId: g.group_id, name: g.groups?.name ?? "Group" })));
 
       // Only groups this person actually coaches, in any org they coach in.
       const orgById = new Map<string, string>();
@@ -183,12 +199,11 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
     router.refresh();
   }
 
-  // Your own training: no group to pick; it starts today's workout in your own space at once (audit P19, Nov 21; with none ready, Today says why).
-  function logMyOwnWorkout() {
+  // The conversation with this client (the same page the Clients page's Message opens).
+  function messageFor(client: ListedClient) {
     if (busy) return;
-    setBusy(true);
     onNavigated();
-    router.push("/my-space/home?start=1");
+    router.push(`/groups/${client.groupId}/messages/${client.id}`);
   }
 
   async function switchToGroup(targetGroupId: string) {
@@ -266,6 +281,7 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
     label: GROUP_KIND_LABELS[kind],
     list: (groups ?? []).filter((g) => g.orgId === selectedOrgId && g.kind === kind),
   }));
+  const hasGroups = groupSections.some((s) => s.list.length > 0);
 
   function selectOrg(id: string) {
     setSelectedOrgId(id);
@@ -309,18 +325,7 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
 
   return (
     <div className="space-y-4">
-      {myGroups.length > 0 && (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={logMyOwnWorkout}
-          className="w-full h-11 border border-rust/40 text-rust-ink font-body text-sm flex items-center justify-center gap-2 disabled:opacity-50 active:bg-rust/5"
-        >
-          <Dumbbell className="w-4 h-4 shrink-0" strokeWidth={2.25} />
-          Start your own workout
-        </button>
-      )}
-
+      {/* Your own workout is Home's job (PH10): this panel is about clients. Order, as in every Spotlight panel (PH15): the main action, then the list, then links. */}
       {error && (
         <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
@@ -359,6 +364,29 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
             + Add {term("client")}
           </button>
         </div>
+        {/* The two pages that hold what clients ask for and send in (PH9). */}
+        <div className="flex items-center gap-4 mb-1.5" data-spot-clients-links>
+          <button
+            type="button"
+            onClick={() => {
+              onNavigated();
+              router.push(REQUESTS_PATH);
+            }}
+            className="min-h-11 font-body text-sm text-rust-ink"
+          >
+            Requests{requestsWaiting ? ` (${requestsWaiting})` : ""}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onNavigated();
+              router.push(COACH_CHECKINS_PATH);
+            }}
+            className="min-h-11 font-body text-sm text-rust-ink"
+          >
+            Check-ins{checkinsToReview ? ` (${checkinsToReview})` : ""}
+          </button>
+        </div>
         <input aria-label={`Search ${term("client", "plural")}`}
           type="text"
           value={query}
@@ -366,7 +394,8 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
           placeholder={`Search ${term("client", "plural")}…`}
           className="w-full h-11 mb-2 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust"
         />
-        <div className="max-h-[55vh] overflow-y-auto space-y-1">
+        {/* No scroll area of its own: the panel scrolls (PH12). */}
+        <div className="space-y-1" data-spot-client-list>
           {clients === null && <p className="font-body text-sm text-steel px-1 py-2">Loading…</p>}
           {clients !== null && filteredClients.length === 0 && (
             <p className="font-body text-sm text-steel px-1 py-2">{query.trim() ? "No match." : `No ${term("client", "plural")} to show.`}</p>
@@ -388,30 +417,38 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
                     {c.nextStartIso && <span className="block font-body text-xs text-steel">{nextSessionLabel(c.nextStartIso, clock.timezone, clock.now)}</span>}
                   </div>
                 </div>
+                {/* Primary: the explicit in-person log route ("Logging for X",
+                    marked coach-logged, no credit spent unless chosen). */}
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => logSessionFor(c)}
+                  className="mt-2 w-full h-11 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-50 active:bg-rust/80"
+                >
+                  Log their workout
+                </button>
                 <div className="mt-2 flex items-center gap-2">
-                  {/* Primary: the explicit in-person log route ("Logging for X",
-                      marked coach-logged, no credit spent unless chosen). */}
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => logSessionFor(c)}
-                    className="flex-1 h-11 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-50 active:bg-rust/80"
-                  >
-                    Log their workout
-                  </button>
                   <button
                     type="button"
                     disabled={busy}
                     onClick={() => openProfileFor(c)}
-                    className="h-11 px-3 border border-steel/30 text-chalk font-body text-xs disabled:opacity-50 active:border-rust/50"
+                    className="flex-1 h-11 px-2 border border-steel/30 text-chalk font-body text-xs disabled:opacity-50 active:border-rust/50"
                   >
                     Profile
                   </button>
                   <button
                     type="button"
                     disabled={busy}
+                    onClick={() => messageFor(c)}
+                    className="flex-1 h-11 px-2 border border-steel/30 text-chalk font-body text-xs disabled:opacity-50 active:border-rust/50"
+                  >
+                    Message
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
                     onClick={() => requestActAsClient(c)}
-                    className="h-11 px-3 border border-steel/30 text-steel font-body text-xs disabled:opacity-50 active:border-rust/50"
+                    className="flex-1 h-11 px-2 border border-steel/30 text-steel font-body text-xs disabled:opacity-50 active:border-rust/50"
                   >
                     View as client
                   </button>
@@ -427,69 +464,83 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
         )}
       </div>
 
-      <div>
-        <p className="font-body text-xs text-steel uppercase tracking-wide mb-1.5">Groups</p>
-        <div className="max-h-40 overflow-y-auto space-y-2">
-          {groups === null && <p className="font-body text-sm text-steel px-1 py-2">Loading…</p>}
-          {groupSections.map(
-            (section) =>
-              section.list.length > 0 && (
-                <div key={section.kind}>
-                  {section.kind !== "team" && <p className="font-body text-xs text-steel uppercase tracking-wide px-1">{section.label}</p>}
-                  {section.list.map((g) => (
-                    <button
-                      key={g.id}
-                      type="button"
-                      disabled={busy}
-                      onClick={() => switchToGroup(g.id)}
-                      className={`w-full min-h-11 text-left px-2 py-2 font-body text-sm disabled:opacity-50 ${g.id === groupId ? "text-rust-ink bg-rust/10" : "text-chalk active:bg-surface/60"}`}
-                    >
-                      {g.name}
-                      {g.focusTag && <span className="text-steel"> · {g.focusTag}</span>}
-                    </button>
-                  ))}
-                </div>
-              )
-          )}
+      {/* Only when there are groups to list (PH12), with no scroll area of its own. */}
+      {hasGroups && (
+        <div data-spot-groups>
+          <p className="font-body text-xs text-steel uppercase tracking-wide mb-1.5">Groups</p>
+          <div className="space-y-2">
+            {groupSections.map(
+              (section) =>
+                section.list.length > 0 && (
+                  <div key={section.kind}>
+                    {section.kind !== "team" && <p className="font-body text-xs text-steel uppercase tracking-wide px-1">{section.label}</p>}
+                    {section.list.map((g) => (
+                      <button
+                        key={g.id}
+                        type="button"
+                        disabled={busy}
+                        onClick={() => switchToGroup(g.id)}
+                        className={`w-full min-h-11 text-left px-2 py-2 font-body text-sm disabled:opacity-50 ${g.id === groupId ? "text-rust-ink bg-rust/10" : "text-chalk active:bg-surface/60"}`}
+                      >
+                        {g.name}
+                        {g.focusTag && <span className="text-steel"> · {g.focusTag}</span>}
+                      </button>
+                    ))}
+                  </div>
+                )
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="border-t border-steel/20 pt-3">
-        <p className="font-body text-xs text-steel uppercase tracking-wide mb-1.5">+ Create Group</p>
-        <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
-          {GROUP_KIND_ORDER.map((k) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => setNewGroupKind(k)}
-              className={`h-11 px-3 font-body text-xs border ${newGroupKind === k ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"}`}
-            >
-              {GROUP_KIND_LABELS[k]}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-1.5">
-          <input aria-label="New group name"
-            type="text"
-            value={newGroupName}
-            onChange={(e) => setNewGroupName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleCreateGroup();
-            }}
-            placeholder="New group name"
-            disabled={creating}
-            className="flex-1 h-11 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust disabled:opacity-60"
-          />
-          <button
-            type="button"
-            onClick={handleCreateGroup}
-            disabled={creating || !newGroupName.trim()}
-            aria-label="Create group"
-            className="h-11 w-11 px-3 bg-rust text-graphite flex items-center justify-center disabled:opacity-40"
-          >
-            <Plus className="w-4 h-4" />
-          </button>
-        </div>
+      <div className="border-t border-steel/20 pt-2" data-spot-new-group>
+        <button
+          type="button"
+          onClick={() => setNewGroupOpen((v) => !v)}
+          aria-expanded={newGroupOpen}
+          className="min-h-11 font-body text-sm text-rust-ink"
+        >
+          + New group
+        </button>
+        {newGroupOpen && (
+          <>
+            <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+              {NEW_GROUP_KINDS.map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setNewGroupKind(k)}
+                  className={`h-11 px-3 font-body text-xs border ${newGroupKind === k ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"}`}
+                >
+                  {GROUP_KIND_LABELS[k]}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-1.5">
+              <input
+                aria-label="New group name"
+                type="text"
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleCreateGroup();
+                }}
+                placeholder="New group name"
+                disabled={creating}
+                className="flex-1 h-11 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust disabled:opacity-60"
+              />
+              <button
+                type="button"
+                onClick={handleCreateGroup}
+                disabled={creating || !newGroupName.trim()}
+                aria-label="Create group"
+                className="h-11 w-11 px-3 bg-rust text-graphite flex items-center justify-center disabled:opacity-40"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

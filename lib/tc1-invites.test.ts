@@ -374,8 +374,9 @@ describe("TC1b: one plain coach list at the top of the Clients page", () => {
     expect(page).not.toContain("Coaching Staff");
     // desktop: right under the header, before the cards
     expect(page.indexOf("<CoachesSection ", page.indexOf('active="members"'))).toBeLessThan(page.indexOf("phaseAlignmentSummary && phaseAlignmentSummary.misaligned > 0 && ("));
-    // phone: before the roster
-    expect(page.lastIndexOf("<CoachesSection ", page.indexOf("<CoachRosterMobile "))).toBeGreaterThan(-1);
+    // phone: under the client list (PH22, Nov 21: the clients are the daily job)
+    expect(page.indexOf("<CoachesSection ", page.indexOf("<CoachRosterMobile "))).toBeGreaterThan(page.indexOf("<CoachRosterMobile "));
+    expect(page.lastIndexOf("<CoachesSection ", page.indexOf("<CoachRosterMobile "))).toBe(-1);
     expect(page).toContain("canManage={inviteManager.ok}");
     const roster = src("components/group/roster-list.tsx");
     // the coach looking at it is not listed (Oct 24); with nobody else the section is not drawn
