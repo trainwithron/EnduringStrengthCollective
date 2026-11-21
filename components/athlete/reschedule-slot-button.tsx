@@ -1,11 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { QuietHoursNotice } from "@/components/athlete/quiet-hours-notice";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { mirrorGoogleCalendarEvent } from "@/lib/mirror-google-calendar-event";
 import { bookingRefusalMessage } from "@/lib/booking-refusal-copy";
+
+// How long the "Sent" line stays before the calendar comes back: a moment, or long enough to read the coach's quiet-hours line when it shows.
+export const BACK_AFTER_MS = 2500;
+export const BACK_AFTER_QUIET_MS = 6000;
 
 export function RescheduleSlotButton({
   bookingId,
@@ -22,7 +26,21 @@ export function RescheduleSlotButton({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+  // the coach's quiet-hours line is showing: the screen waits longer before going back, and offers to go now
+  const [holding, setHolding] = useState(false);
+  const backTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const router = useRouter();
+
+  function backToCalendar() {
+    if (backTimer.current) clearTimeout(backTimer.current);
+    backTimer.current = null;
+    router.push(window.location.pathname);
+    router.refresh();
+  }
+  function backAfter(ms: number) {
+    if (backTimer.current) clearTimeout(backTimer.current);
+    backTimer.current = setTimeout(backToCalendar, ms);
+  }
 
   async function handleRequest() {
     setSubmitting(true);
@@ -40,11 +58,9 @@ export function RescheduleSlotButton({
       return;
     }
     setSent(true);
-    // Back to the normal view after a moment; the session is still at its original time until the coach confirms.
-    setTimeout(() => {
-      router.push(window.location.pathname);
-      router.refresh();
-    }, 2500);
+    // Back to the normal view after a moment; the session is still at its original time until the coach confirms. When the coach's quiet-hours line shows, the wait is
+    // longer so it can be read, with a button to go back sooner (QuietHoursNotice onLine below).
+    backAfter(BACK_AFTER_MS);
   }
 
   async function handleMove() {
@@ -78,7 +94,20 @@ export function RescheduleSlotButton({
         {sent ? (
           <span className="font-body text-xs text-chalk text-right">
             Sent. Your coach will confirm your new time. Your session stays where it is until then.
-            <QuietHoursNotice bookingId={bookingId} className="mt-1 text-xs" />
+            <QuietHoursNotice
+              bookingId={bookingId}
+              className="mt-1 text-xs"
+              onLine={(line) => {
+                if (!line) return;
+                setHolding(true);
+                backAfter(BACK_AFTER_QUIET_MS);
+              }}
+            />
+            {holding && (
+              <button type="button" onClick={backToCalendar} className="mt-2 min-h-11 px-4 rounded-token-pill border border-steel/40 text-chalk font-body text-xs">
+                Back to calendar
+              </button>
+            )}
           </span>
         ) : (
           <button

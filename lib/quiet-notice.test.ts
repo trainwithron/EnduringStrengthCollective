@@ -63,7 +63,7 @@ describe("where it shows", () => {
   it("right after each kind of request a coach answers is sent, and nothing about notifying the coach changed", () => {
     expect(read("components/athlete/request-slot-button.tsx")).toContain("<QuietHoursNotice coachId={coachId}");
     expect(read("components/athlete/request-different-time.tsx")).toContain("<QuietHoursNotice coachId={coachId}");
-    expect(read("components/athlete/reschedule-slot-button.tsx")).toContain("<QuietHoursNotice bookingId={bookingId}");
+    expect(read("components/athlete/reschedule-slot-button.tsx")).toMatch(/<QuietHoursNotice\s+bookingId=\{bookingId\}/);
     expect(read("components/athlete/my-schedule.tsx")).toContain("{justSent && <QuietHoursNotice seriesId={series.id}");
     const flow = read("components/client-request/request-flow.tsx");
     expect(flow.match(/<QuietHoursNotice text=\{quietNotice\}/g)?.length).toBe(2);
@@ -72,5 +72,17 @@ describe("where it shows", () => {
       // only the line goes back, never the hours
       expect(read(route)).not.toContain("quiet_hours_start");
     }
+  });
+  it("after asking to move a session, the line can be read: the calendar comes back after 6 seconds instead of 2.5, with a button to go sooner (Commander's review)", () => {
+    const move = read("components/athlete/reschedule-slot-button.tsx");
+    expect(move).toContain("export const BACK_AFTER_MS = 2500;");
+    expect(move).toContain("export const BACK_AFTER_QUIET_MS = 6000;");
+    // no line: 2.5 seconds as before; a line: the timer starts over at 6 seconds and the button shows
+    expect(move).toContain("backAfter(BACK_AFTER_MS);");
+    expect(move).toMatch(/onLine=\{\(line\) => \{\s*if \(!line\) return;\s*setHolding\(true\);\s*backAfter\(BACK_AFTER_QUIET_MS\);\s*\}\}/);
+    expect(move).toMatch(/\{holding && \(\s*<button type="button" onClick=\{backToCalendar\}[^>]*>\s*Back to calendar\s*<\/button>/);
+    // one timer at a time: starting a new wait cancels the old one, and the button cancels it too
+    expect(move).toMatch(/function backAfter\(ms: number\) \{\s*if \(backTimer\.current\) clearTimeout\(backTimer\.current\);/);
+    expect(read("components/athlete/quiet-hours-notice.tsx")).toContain("onLine?.(next);");
   });
 });

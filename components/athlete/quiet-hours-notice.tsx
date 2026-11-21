@@ -14,6 +14,7 @@ export function QuietHoursNotice({
   bookingId,
   text,
   className = "",
+  onLine,
 }: {
   coachId?: string | null;
   // a weekly-schedule request, or a request to move a session: the coach is the schedule's or the session's own (the client can read their own)
@@ -21,6 +22,8 @@ export function QuietHoursNotice({
   bookingId?: string | null;
   text?: string | null;
   className?: string;
+  // told the line once it is known (null: no line), so a screen that moves on by itself can wait while it shows
+  onLine?: (line: string | null) => void;
 }) {
   const [line, setLine] = useState<string | null>(text ?? null);
 
@@ -45,7 +48,11 @@ export function QuietHoursNotice({
         }
         if (!coach) return;
         const prefs = await readPushPrefs(supabase, coach);
-        if (!cancelled) setLine(quietHoursNotice(prefs, deviceTimeZone()));
+        if (!cancelled) {
+          const next = quietHoursNotice(prefs, deviceTimeZone());
+          setLine(next);
+          onLine?.(next);
+        }
       } catch {
         // no line
       }
