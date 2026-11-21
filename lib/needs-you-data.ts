@@ -12,6 +12,7 @@ import { addSessionsHref } from "@/lib/add-sessions-link";
 import { requestHref } from "@/lib/requests-center";
 import { COACH_CHECKINS_PATH } from "@/lib/weekly-checkin";
 import { goalReviewCutoffIso, goalReviewDue } from "@/lib/goal-review";
+import { loadQuietInChat, quietChatSentence } from "@/lib/quiet-chat";
 
 // A weekly check-in older than this is not news for Home's strip (the Check-ins page keeps the same window).
 const CHECKIN_REVIEW_DAYS = 56;
@@ -28,6 +29,8 @@ export interface NeedsYouHomeInputs {
   quietTierByAthlete: Map<string, QuietTier>;
   needsReplyThreads: { postId: string; groupId: string; groupName: string; channel: string; authorName: string }[];
   // The one client the "Right now" box names. The strip puts that same client first among its own kind, so the two never name different people for the same reason.
+  // The signed-in coach's name, so "Message {name}" can send as them from the card (R3). Without it the card links to the conversation instead.
+  coachName?: string;
   heroFlag?: { kind: string; athleteId: string; athleteName: string; groupId: string; direction?: string; exerciseName?: string; missedCount?: number } | null;
 }
 
@@ -153,6 +156,7 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
       supabase.from("client_goal_sheets").select("athlete_id, group_id, filled_at, reviewed_at").in("group_id", g).lte("filled_at", goalReviewCutoffIso(now)).order("athlete_id", { ascending: true }).order("group_id", { ascending: true }).range(from, to)
     ).then((rows) => rows.filter((r) => goalReviewDue(r, now))),
   ]);
+  const quietChatRead = loadQuietInChat(supabase, coachId, [...groupIds].sort().join(","), now.toISOString());
   const [scheduleRequests, bookingRequests, unreadMessages, lateChanges, expiring, injured, athleteRows] = await Promise.all([
     firstIn<{ id: string; athlete_id: string; group_id: string; kind: string; created_at: string }>("schedule requests", 50, byCreatedAt, (g) => (from, to) =>
       supabase.from("schedule_requests").select("id, athlete_id, group_id, kind, created_at").eq("coach_id", coachId).in("group_id", g).in("status", ["pending", "applying"]).order("created_at", { ascending: true }).order("id", { ascending: true }).range(from, to)
@@ -216,6 +220,9 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
   ]);
 
   const [checkins, goalReviews] = await stepReads;
+  // Quiet in chat (R3): read with the panel below Home (one read for both), in parallel with the rest above.
+  const chat = await quietChatRead;
+  if (chat.failed) failed.push("quiet in chat");
   const checkinsHere = checkins.filter((c) => c.athlete_id !== coachId);
   // only someone who is still a client in that space (a sheet stays behind when a client leaves)
   const seats = new Set(athleteRows.map((r) => `${r.group_id}:${r.profile_id}`));
@@ -276,6 +283,23 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
   }
   for (const g of goalsHere) {
     items.push({ id: `goal:${g.athlete_id}:${g.group_id}`, kind: "goal_review", name: nameOf(g.athlete_id), sentence: sentences.goalReview(), button: BUTTON.open, href: clientPath(g.group_id, g.athlete_id), order: new Date(g.filled_at ?? 0).getTime() });
+  }
+  // someone with a message the coach hasn't read is waiting on the coach, not quiet
+  for (const q of chat.quiet) {
+    // a name that could not be read: say nothing rather than "Message A"
+    const name = chat.names.get(q.athleteId);
+    if (!name || q.athleteId === coachId || byClient.has(q.athleteId)) continue;
+    items.push({
+      id: `quietchat:${q.athleteId}`,
+      kind: "quiet_chat",
+      name,
+      sentence: quietChatSentence(q.days),
+      button: `Message ${name.split(" ")[0]}`,
+      href: `/groups/${q.groupId}/messages/${q.athleteId}`,
+      nudge: { athleteId: q.athleteId, groupId: q.groupId, firstName: name.split(" ")[0] },
+      // the longest quiet first
+      order: -q.days,
+    });
   }
   for (const id of injuredHere) {
     items.push({ id: `injury:${id}`, kind: "injury", name: nameOf(id), sentence: sentences.injury(), button: BUTTON.open, href: clientPath(groupOf.get(id)!, id), order: 0 });

@@ -15,7 +15,7 @@ export async function NeedsYouLoader({ input }: { input: NeedsYouHomeInputs }) {
   } catch (e) {
     console.error("[dashboard] needs-you failed:", e instanceof Error ? e.message : e);
   }
-  return <NeedsYouStrip view={view} />;
+  return <NeedsYouStrip view={view} viewer={input.coachName ? { id: input.coachId, name: input.coachName } : null} />;
 }
 
 export function NeedsYouLoading() {

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CAUGHT_UP, COULD_NOT_CHECK, moreLabel, type NeedsYouSlot, type NeedsYouView } from "@/lib/needs-you";
+import { QuietClientNudgeButton } from "@/components/coach/quiet-client-nudge-button";
 
 // Each kind on a card tinted by what it is about (Look Refresh, Nov 20): someone waiting on the coach in coral, something due in the accent, a check-in in blue.
 const SLOT_LOOK: Record<NeedsYouSlot, { card: string; title: string }> = {
@@ -10,7 +11,7 @@ const SLOT_LOOK: Record<NeedsYouSlot, { card: string; title: string }> = {
 
 // "Needs you": at most three things at the top of Home, one per slot (someone is waiting on you, something is due soon, someone may need a check-in), each the single most urgent of its
 // kind. A slot with nothing shows nothing. When nothing needs the coach it says so. "N more" jumps to the stack of panels below, which is unchanged.
-export function NeedsYouStrip({ view }: { view: NeedsYouView }) {
+export function NeedsYouStrip({ view, viewer = null }: { view: NeedsYouView; viewer?: { id: string; name: string } | null }) {
   const filled = view.slots.filter((s) => s.item);
   return (
     <section className="mb-6" aria-label="Needs you">
@@ -38,9 +39,16 @@ export function NeedsYouStrip({ view }: { view: NeedsYouView }) {
                   )}{" "}
                   {item!.sentence}
                 </p>
-                <Link prefetch={false} href={item!.href} className="mt-auto inline-flex items-center justify-center h-11 px-5 bg-rust text-graphite font-body text-sm font-medium self-start">
-                  {item!.button}
-                </Link>
+                {item!.nudge && viewer ? (
+                  // "Message {name}" sends inside Spotlight from here (R1's send), the draft editable first (R3: quiet in chat)
+                  <div className="mt-auto">
+                    <QuietClientNudgeButton athleteId={item!.nudge.athleteId} athleteFirstName={item!.nudge.firstName} groupId={item!.nudge.groupId} coachId={viewer.id} coachName={viewer.name} />
+                  </div>
+                ) : (
+                  <Link prefetch={false} href={item!.href} className="mt-auto inline-flex items-center justify-center h-11 px-5 bg-rust text-graphite font-body text-sm font-medium self-start">
+                    {item!.button}
+                  </Link>
+                )}
               </li>
             ))}
           </ul>
