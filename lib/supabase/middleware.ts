@@ -106,6 +106,8 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/api/discovery-availability/") ||
     // A coach's public booking page and a visitor's private manage link: no account, the routes check and rate-limit themselves.
     pathname.startsWith("/api/public-booking/") ||
+    // A coach's private calendar feed (wave 3 C8): a calendar app cannot sign in; the long secret in the address is the key and the route rate-limits itself.
+    pathname.startsWith("/api/calendar-feed/") ||
     // The discovery-call and gym QR forms post here with no login; each route validates and rate limits itself.
     pathname.startsWith("/api/public/") ||
     // Stripe calls this directly with no user session at all — its own

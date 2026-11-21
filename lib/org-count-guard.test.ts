@@ -38,6 +38,9 @@ const REVIEWED = new Set([
   "lib/requests-waiting.ts::booking_requests",
   "lib/requests-waiting.ts::bookings",
   "lib/requests-waiting.ts::schedule_requests",
+  // the coach's private calendar feed (wave 3 C8): their own sessions and calls across everything they teach, like Google Calendar sync, read only by that coach's calendar app
+  "app/api/calendar-feed/[token]/route.ts::bookings",
+  "app/api/calendar-feed/[token]/route.ts::discovery_bookings",
   "app/api/session-pattern-check/route.ts::session_pattern_checks",
   "app/api/stripe/webhook/route.ts::coach_quick_payments",
   "lib/series-store.ts::recurring_booking_series",

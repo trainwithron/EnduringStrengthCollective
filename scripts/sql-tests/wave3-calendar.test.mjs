@@ -85,6 +85,38 @@ expect("R8: at most once: turned off stays off", p.quiet_hours_start === null &&
 const priv = (await db.query(`select has_function_privilege('authenticated', 'public.default_new_client_quiet_hours()', 'execute') as a`)).rows[0];
 expect("R8: nobody calls the trigger function directly", priv.a === false);
 
+// C8
+const as = async (who, sql, params = []) => {
+  await db.exec("begin");
+  try {
+    await db.query("select set_config('request.jwt.claim.sub', $1, true)", [who ?? ""]);
+    await db.exec("set local role authenticated");
+    const r = await db.query(sql, params);
+    await db.exec("commit");
+    return { rows: r.rows, error: null };
+  } catch (e) {
+    await db.exec("rollback");
+    return { rows: [], error: e };
+  }
+};
+const first = await as(coach, "select public.new_calendar_feed_link() as t");
+const t1 = first.rows[0]?.t;
+expect("C8: a coach gets a 64-character secret", !first.error && /^[0-9a-f]{64}$/.test(t1 ?? ""));
+const second = await as(coach, "select public.new_calendar_feed_link() as t");
+const t2 = second.rows[0]?.t;
+const coachRows = (await db.query("select token from public.coach_calendar_feeds where coach_id = $1", [coach])).rows;
+expect("C8: a new link replaces the old one, one per coach", t2 && t2 !== t1 && coachRows.length === 1 && coachRows[0].token === t2);
+expect("C8: someone who coaches no group is refused", (await as(fresh, "select public.new_calendar_feed_link()")).error !== null);
+expect("C8: signed out is refused", (await as(null, "select public.new_calendar_feed_link()")).error !== null);
+await as(newCoach, "select public.new_calendar_feed_link()");
+expect("C8: a coach sees only their own link", (await as(coach, "select coach_id from public.coach_calendar_feeds")).rows.every((r) => r.coach_id === coach));
+expect("C8: a client sees no links at all", (await as(fresh, "select * from public.coach_calendar_feeds")).rows.length === 0);
+expect("C8: nobody writes the table directly", (await as(coach, "update public.coach_calendar_feeds set token = repeat('a', 64)")).error !== null);
+expect("C8: signed-out callers cannot run the functions", (await db.query("select has_function_privilege('anon', 'public.new_calendar_feed_link()', 'execute') as a, has_function_privilege('anon', 'public.turn_off_calendar_feed()', 'execute') as b")).rows.every((r) => r.a === false && r.b === false));
+await as(coach, "select public.turn_off_calendar_feed()");
+const left = (await db.query("select coach_id from public.coach_calendar_feeds")).rows.map((r) => r.coach_id);
+expect("C8: Turn off removes only the caller's own link", !left.includes(coach) && left.includes(newCoach));
+
 if (failures.length) {
   console.error("FAILED:\n- " + failures.join("\n- "));
   process.exit(1);
