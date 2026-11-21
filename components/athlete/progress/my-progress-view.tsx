@@ -120,7 +120,7 @@ export function MyProgressView({
             )}
             {fromSet && (
               <p className="font-body text-xs text-steel" data-latest-from>
-                From your best set that day: {shown(fromSet.weight, unit)} × {fromSet.reps} on {shortDate(fromSet.date)}
+                From your best set that day: {shown(fromSet.weight, unit)} {unitLabel} × {fromSet.reps} on {shortDate(fromSet.date)}
               </p>
             )}
             <ProgressLineChart
@@ -162,7 +162,7 @@ export function MyProgressView({
               </table>
               {table?.estimatedMax && (
                 <p className="font-body text-xs text-steel mt-2">
-                  Best estimated max {shown(table.estimatedMax.value, unit)} {unitLabel}, from {shown(table.estimatedMax.weight, unit)} × {table.estimatedMax.reps} on {shortDate(table.estimatedMax.at)}.
+                  Best estimated max {shown(table.estimatedMax.value, unit)} {unitLabel}, from {shown(table.estimatedMax.weight, unit)} {unitLabel} × {table.estimatedMax.reps} on {shortDate(table.estimatedMax.at)}.
                 </p>
               )}
             </section>

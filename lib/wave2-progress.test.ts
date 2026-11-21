@@ -293,8 +293,13 @@ describe("My progress: the latest and the best estimated max never contradict ea
   it("the card says LATEST with the set it came from; the line under the table says BEST", () => {
     const view = read("components/athlete/progress/my-progress-view.tsx");
     expect(view).toContain('"Latest estimated max"');
-    expect(view).toContain("From your best set that day: {shown(fromSet.weight, unit)} × {fromSet.reps} on {shortDate(fromSet.date)}");
-    expect(view).toContain("Best estimated max {shown(table.estimatedMax.value, unit)} {unitLabel}, from");
+    // the unit after every weight, in the reader's own (kg readers read kg), as the PR notices write it
+    expect(view).toContain("From your best set that day: {shown(fromSet.weight, unit)} {unitLabel} × {fromSet.reps} on {shortDate(fromSet.date)}");
+    expect(view).toContain("Best estimated max {shown(table.estimatedMax.value, unit)} {unitLabel}, from {shown(table.estimatedMax.weight, unit)} {unitLabel} × {table.estimatedMax.reps} on");
+    // a set with no completion time is left out of the line and the table alike, in one place
+    const loader = read("lib/my-progress.ts");
+    expect(loader).toContain(".filter((r) => !!r.completed_at)");
+    expect(loader).toContain("at: r.completed_at as string");
     expect(view).not.toContain('"Estimated 1-rep max"');
     expect(read("lib/my-progress.ts")).toContain("e1rmSeries: setLines.get(c.name.trim().toLowerCase()) ?? e1rmSeriesFor(rollup, c.name, timeZone),");
   });

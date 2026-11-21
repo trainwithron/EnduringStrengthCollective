@@ -119,10 +119,13 @@ export async function loadMyProgress(
       rows.push(...(data as any[]));
       if ((data as any[]).length < SET_PAGE) break;
     }
-    const sets = rows.map((r) => {
-      const se = Array.isArray(r.session_exercises) ? r.session_exercises[0] : r.session_exercises;
-      return { exerciseName: String(se?.exercise_name ?? ""), weight: r.weight, reps: r.reps, setType: r.set_type ?? null, at: r.completed_at ?? "" };
-    });
+    // A set with no completion time cannot be placed on the dated line or given a date in the table: it is left out of both, here, once (Assistant review of 9a1ab805).
+    const sets = rows
+      .filter((r) => !!r.completed_at)
+      .map((r) => {
+        const se = Array.isArray(r.session_exercises) ? r.session_exercises[0] : r.session_exercises;
+        return { exerciseName: String(se?.exercise_name ?? ""), weight: r.weight, reps: r.reps, setType: r.set_type ?? null, at: r.completed_at as string };
+      });
     for (const [name, table] of repMaxTablesByLift(sets)) tables.set(name.trim().toLowerCase(), table);
     const byLift = new Map<string, typeof sets>();
     for (const st of sets) {
