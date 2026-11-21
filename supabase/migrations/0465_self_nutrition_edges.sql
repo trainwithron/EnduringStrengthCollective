@@ -5,7 +5,7 @@
 -- 1. Turning off the automatic nutrition flags for oneself (client_nutrition_flags.auto_off): allowed for an athlete of the group as before, and now for the person themselves in
 --    their own personal space. A coach is still never able to turn them off for anyone who is not an athlete of that group.
 drop policy if exists "client_nutrition_flags_coach_all" on public.client_nutrition_flags;
-create policy "client_nutrition_flags_coach_all" on public.client_nutrition_flags for all
+create policy "client_nutrition_flags_coach_all" on public.client_nutrition_flags for all to authenticated
   using (public.is_group_coach(group_id))
   with check (
     public.is_group_coach(group_id)

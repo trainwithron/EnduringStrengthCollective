@@ -3,7 +3,7 @@
 begin;
 
 drop policy if exists "client_nutrition_flags_coach_all" on public.client_nutrition_flags;
-create policy "client_nutrition_flags_coach_all" on public.client_nutrition_flags for all
+create policy "client_nutrition_flags_coach_all" on public.client_nutrition_flags for all to authenticated
   using (public.is_group_coach(group_id))
   with check (public.is_group_coach(group_id) and (auto_off = false or exists (select 1 from public.group_memberships gm where gm.group_id = client_nutrition_flags.group_id and gm.profile_id = client_nutrition_flags.profile_id and gm.role = 'athlete')));
 
@@ -32,6 +32,7 @@ commit;
 
 -- Check: one row, all true.
 select
+  (select polroles::regrole[]::text[] from pg_policy where polrelid = 'public.client_nutrition_flags'::regclass and polname = 'client_nutrition_flags_coach_all') = array['authenticated'] as flags_rule_signed_in_only,
   position('organization_id IS NULL' in (select pg_get_expr(polwithcheck, polrelid) from pg_policy where polrelid = 'public.client_nutrition_flags'::regclass and polname = 'client_nutrition_flags_coach_all')) = 0 as flags_rule_as_before,
   position('g.created_by = p_athlete_id' in (select prosrc from pg_proc where oid = 'public.apply_meal_plan_try(uuid, uuid, date, jsonb, text, text)'::regprocedure)) = 0 as plan_try_as_before,
   position('g.created_by = p_athlete_id' in (select prosrc from pg_proc where oid = 'public.apply_allergy_rebuild(uuid, uuid, date, jsonb, text)'::regprocedure)) = 0 as allergy_rebuild_as_before;

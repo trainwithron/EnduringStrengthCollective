@@ -9,7 +9,7 @@ begin;
 -- 1. Turning off the automatic nutrition flags for oneself (client_nutrition_flags.auto_off): allowed for an athlete of the group as before, and now for the person themselves in
 --    their own personal space. A coach is still never able to turn them off for anyone who is not an athlete of that group.
 drop policy if exists "client_nutrition_flags_coach_all" on public.client_nutrition_flags;
-create policy "client_nutrition_flags_coach_all" on public.client_nutrition_flags for all
+create policy "client_nutrition_flags_coach_all" on public.client_nutrition_flags for all to authenticated
   using (public.is_group_coach(group_id))
   with check (
     public.is_group_coach(group_id)
@@ -67,6 +67,7 @@ commit;
 
 -- Check: one row, all true.
 select
+  (select polroles::regrole[]::text[] from pg_policy where polrelid = 'public.client_nutrition_flags'::regclass and polname = 'client_nutrition_flags_coach_all') = array['authenticated'] as flags_rule_signed_in_only,
   position('organization_id IS NULL' in (select pg_get_expr(polwithcheck, polrelid) from pg_policy where polrelid = 'public.client_nutrition_flags'::regclass and polname = 'client_nutrition_flags_coach_all')) > 0 as own_auto_flags_can_go_off,
   position('g.created_by = p_athlete_id and g.organization_id is null' in (select prosrc from pg_proc where oid = 'public.apply_meal_plan_try(uuid, uuid, date, jsonb, text, text)'::regprocedure)) > 0 as own_plan_can_be_changed,
   position('g.created_by = p_athlete_id and g.organization_id is null' in (select prosrc from pg_proc where oid = 'public.apply_allergy_rebuild(uuid, uuid, date, jsonb, text)'::regprocedure)) > 0 as own_plan_rebuilds_for_allergies,
