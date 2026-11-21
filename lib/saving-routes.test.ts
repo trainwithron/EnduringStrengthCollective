@@ -75,6 +75,10 @@ const NOT_A_SAVE = new Set([
   // Nov 20 (S4): a visitor reporting a demo, and the admin removing or dismissing it (the admin page, not a pane)
   "/api/public/report-video",
   "/api/admin/video-reports",
+  // Nov 20 (M2): one anonymous scan of a public QR page counted (the coach sees the counts on their next visit to Machines, not in an open pane)
+  "/api/public/scan",
+  // Nov 20 (R2): a push to clients who have not sent their weekly check-in; nothing a pane shows changes
+  "/api/checkins/remind",
   "/api/food/barcode",
   "/api/garmin/webhook",
   "/api/org-dispatch/submit",

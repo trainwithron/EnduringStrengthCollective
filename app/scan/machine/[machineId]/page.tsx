@@ -5,6 +5,7 @@ import { scanRows } from "@/lib/gym-machines";
 import { loadScanOrg } from "@/lib/scan-org";
 import { loadSharedDemos, scanDemo } from "@/lib/machine-catalog-scan";
 import { ReportVideoLink } from "@/components/public/report-video-link";
+import { ScanCounter } from "@/components/public/scan-counter";
 
 export const metadata = { title: "Scan" };
 
@@ -59,6 +60,8 @@ export default async function ScanMachinePage(props: { params: Promise<{ machine
 
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body px-6 py-16">
+      {/* One anonymous scan count for the gym's coaches (Ron, Nov 20: M2). */}
+      <ScanCounter machineId={machine.id} />
       <div className="w-full max-w-sm mx-auto">
         {org?.logoUrl && (
           // eslint-disable-next-line @next/next/no-img-element -- external org-uploaded logo

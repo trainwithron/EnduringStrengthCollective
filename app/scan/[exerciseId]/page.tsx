@@ -8,6 +8,7 @@ import type { TrackedField } from "@/lib/exercise-fields";
 import { loadScanOrg } from "@/lib/scan-org";
 import { loadSharedDemos, scanDemo } from "@/lib/machine-catalog-scan";
 import { ReportVideoLink } from "@/components/public/report-video-link";
+import { ScanCounter } from "@/components/public/scan-counter";
 
 export const metadata = { title: "Scan" };
 
@@ -93,6 +94,8 @@ export default async function ScanExercisePage(props: { params: Promise<{ exerci
 
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body flex items-center justify-center px-6 py-16">
+      {/* One anonymous scan count (Ron, Nov 20: M2); opened from a machine's list it was a tap, not a scan. */}
+      {!fromMachine && <ScanCounter exerciseId={exercise.id} />}
       <div className="w-full max-w-sm">
         {org?.logoUrl && (
           // eslint-disable-next-line @next/next/no-img-element -- external org-uploaded logo

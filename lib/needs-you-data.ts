@@ -10,6 +10,11 @@ import { BUTTON, sentences, type NeedsYouItem } from "@/lib/needs-you";
 import type { QuietTier } from "@/lib/quiet-client-tier";
 import { addSessionsHref } from "@/lib/add-sessions-link";
 import { requestHref } from "@/lib/requests-center";
+import { COACH_CHECKINS_PATH } from "@/lib/weekly-checkin";
+import { goalReviewCutoffIso, goalReviewDue } from "@/lib/goal-review";
+
+// A weekly check-in older than this is not news for Home's strip (the Check-ins page keeps the same window).
+const CHECKIN_REVIEW_DAYS = 56;
 
 export interface NeedsYouHomeInputs {
   coachId: string;
@@ -87,6 +92,21 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
       return [];
     }
   };
+  // A read of a table or column that step 215 adds (the first 50 rows): one that fails is a failure only when the table and column are there (a cheap probe tells).
+  const stepRead = async <T,>(label: string, table: string, column: string, make: (groupChunk: string[]) => PageQuery): Promise<T[]> => {
+    try {
+      const r = await readByIds(groupIds, make, { pageSize: 50, maxPages: 1 });
+      if (!r.failed) return (r.rows as T[]).slice(0, 50);
+      const probe = await supabase.from(table).select(column).limit(1);
+      const code = (probe.error as { code?: string } | null)?.code ?? "";
+      if (!["42P01", "PGRST205", "42703", "PGRST204"].includes(code)) failed.push(label);
+      return [];
+    } catch (e) {
+      failed.push(label);
+      console.error(`[needs-you] ${label} failed:`, e instanceof Error ? e.message : e);
+      return [];
+    }
+  };
   const byCreatedAt = (a: { created_at: string }, b: { created_at: string }) => String(a.created_at ?? "").localeCompare(String(b.created_at ?? ""));
   const nowMs = now.getTime();
 
@@ -124,6 +144,15 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
   }
 
   // ---- the small extra reads, all in parallel and all soft ------------------------------------------------------------------------
+  // Weekly check-ins waiting for review and goals set 90 days ago (step 215; Ron, Nov 20). A database without that step has neither: read as nothing, not as a failure.
+  const stepReads = Promise.all([
+    stepRead<{ id: string; athlete_id: string; group_id: string; submitted_at: string }>("check-ins", "weekly_checkins", "id", (g) => (from, to) =>
+      supabase.from("weekly_checkins").select("id, athlete_id, group_id, submitted_at").in("group_id", g).is("reviewed_at", null).gte("submitted_at", new Date(nowMs - CHECKIN_REVIEW_DAYS * 86_400_000).toISOString()).order("submitted_at", { ascending: true }).order("id", { ascending: true }).range(from, to)
+    ),
+    stepRead<{ athlete_id: string; group_id: string; filled_at: string | null; reviewed_at: string | null }>("goal reviews", "client_goal_sheets", "reviewed_at", (g) => (from, to) =>
+      supabase.from("client_goal_sheets").select("athlete_id, group_id, filled_at, reviewed_at").in("group_id", g).lte("filled_at", goalReviewCutoffIso(now)).order("athlete_id", { ascending: true }).order("group_id", { ascending: true }).range(from, to)
+    ).then((rows) => rows.filter((r) => goalReviewDue(r, now))),
+  ]);
   const [scheduleRequests, bookingRequests, unreadMessages, lateChanges, expiring, injured, athleteRows] = await Promise.all([
     firstIn<{ id: string; athlete_id: string; group_id: string; kind: string; created_at: string }>("schedule requests", 50, byCreatedAt, (g) => (from, to) =>
       supabase.from("schedule_requests").select("id, athlete_id, group_id, kind, created_at").eq("coach_id", coachId).in("group_id", g).in("status", ["pending", "applying"]).order("created_at", { ascending: true }).order("id", { ascending: true }).range(from, to)
@@ -186,6 +215,12 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
     ),
   ]);
 
+  const [checkins, goalReviews] = await stepReads;
+  const checkinsHere = checkins.filter((c) => c.athlete_id !== coachId);
+  // only someone who is still a client in that space (a sheet stays behind when a client leaves)
+  const seats = new Set(athleteRows.map((r) => `${r.group_id}:${r.profile_id}`));
+  const goalsHere = goalReviews.filter((g) => g.athlete_id !== coachId && seats.has(`${g.group_id}:${g.athlete_id}`));
+
   // The first group each client is in (for where a button goes), and every name needed, read once.
   const groupOf = new Map<string, string>();
   for (const r of athleteRows) if (!groupOf.has(r.profile_id)) groupOf.set(r.profile_id, r.group_id);
@@ -199,6 +234,8 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
     ...expiring.map((e) => e.athleteId),
     ...injuredHere,
     ...quiet.map((q) => q.id),
+    ...checkinsHere.map((c) => c.athlete_id),
+    ...goalsHere.map((g) => g.athlete_id),
   ]);
   const nameById = new Map<string, string>();
   // Whether each client has signed in (their account is claimed). A client who has not is never "gone quiet": they have not started.
@@ -233,6 +270,12 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
   }
   for (const e of expiring) {
     items.push({ id: `expiring:${e.athleteId}:${e.groupId}`, kind: "expiring_credits", name: nameOf(e.athleteId), sentence: sentences.expiringCredits(e.daysLeft), button: BUTTON.open, href: "/dashboard#expiring", profileHref: clientPath(e.groupId, e.athleteId), order: e.expiresOn.getTime() });
+  }
+  for (const c of checkinsHere) {
+    items.push({ id: `checkin:${c.id}`, kind: "checkin_review", name: nameOf(c.athlete_id), sentence: sentences.checkinReview(), button: BUTTON.review, href: COACH_CHECKINS_PATH, profileHref: clientPath(c.group_id, c.athlete_id), order: new Date(c.submitted_at).getTime() });
+  }
+  for (const g of goalsHere) {
+    items.push({ id: `goal:${g.athlete_id}:${g.group_id}`, kind: "goal_review", name: nameOf(g.athlete_id), sentence: sentences.goalReview(), button: BUTTON.open, href: clientPath(g.group_id, g.athlete_id), order: new Date(g.filled_at ?? 0).getTime() });
   }
   for (const id of injuredHere) {
     items.push({ id: `injury:${id}`, kind: "injury", name: nameOf(id), sentence: sentences.injury(), button: BUTTON.open, href: clientPath(groupOf.get(id)!, id), order: 0 });

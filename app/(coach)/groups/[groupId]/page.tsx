@@ -24,6 +24,9 @@ import { loadDoneAt, weekOf } from "@/lib/program-pickup";
 import { readRowsByIds } from "@/lib/read-by-ids";
 import { AboutYouCard } from "@/components/athlete/about-you-card";
 import { GoalSheetPromptCard } from "@/components/athlete/goal-sheet-prompt-card";
+import { WeeklyCheckinCard } from "@/components/athlete/weekly-checkin-card";
+import { GoalReviewCard } from "@/components/athlete/goal-review-card";
+import { loadClientHomeAsks } from "@/lib/client-home-asks";
 import { aboutYouComplete, rowToBodyProfile } from "@/lib/client-body-profile";
 import type { WeightUnit } from "@/lib/units";
 import { HomeWeekView, type HomeDaySummary } from "@/components/athlete/home-week-view";
@@ -588,6 +591,8 @@ export default async function GroupHubPage(
   let aboutYouNeeded = false;
   // No goal sheet filled in yet (by the client or by a coach with them): Home asks for it first. A failed read leaves it out.
   let goalSheetNeeded = false;
+  let goalReview: { text: string | null } | null = null;
+  let checkinCard = false;
   // Once the goal sheet is done: the offer to join the organization's shared group (never two prompts at once). Only for the client themselves, in their one-on-one space.
   let sharedGroupOffer: SharedGroupOffer | null = null;
   let wellnessCheckin: WellnessCheckinValues | null = null;
@@ -798,7 +803,13 @@ export default async function GroupHubPage(
 
       if (isToday && todayReads) {
         if (!isCoach && !isActingAsOther) {
-          const { data: sheetRow, error: sheetError } = await supabase.from("client_goal_sheets").select("filled_at").eq("athlete_id", athleteId).eq("group_id", params.groupId).maybeSingle();
+          // The goal sheet, with the 90-day goal look and the weekly check-in card read beside it (lib/client-home-asks.ts; Ron, Nov 20).
+          const [{ data: sheetRow, error: sheetError }, asks] = await Promise.all([
+            supabase.from("client_goal_sheets").select("filled_at").eq("athlete_id", athleteId).eq("group_id", params.groupId).maybeSingle(),
+            loadClientHomeAsks(supabase, { athleteId, groupId: params.groupId }),
+          ]);
+          goalReview = asks.goalReview;
+          checkinCard = asks.checkinCard;
           goalSheetNeeded = !sheetError && !sheetRow?.filled_at;
           if (!sheetError && !goalSheetNeeded && user && athleteId === user.id && (group as { group_kind?: string }).group_kind === "one_on_one") {
             sharedGroupOffer = await loadSharedGroupOffer(createServiceRoleClient(), user.id, params.groupId).catch(() => null);
@@ -984,6 +995,8 @@ export default async function GroupHubPage(
               />
               {isToday && <HomeThread lines={homeThreadLines} />}
               {isToday && goalSheetNeeded && <GoalSheetPromptCard groupId={params.groupId} athleteId={athleteId} />}
+              {isToday && checkinCard && <WeeklyCheckinCard groupId={params.groupId} coachName={roster.find((m) => m.role === "coach" && m.profileId !== athleteId)?.fullName ?? null} />}
+              {isToday && goalReview && <GoalReviewCard groupId={params.groupId} athleteId={athleteId} goalText={goalReview.text} />}
               {isToday && !goalSheetNeeded && sharedGroupOffer && (
                 <SharedGroupJoinCard
                   spaceGroupId={params.groupId}

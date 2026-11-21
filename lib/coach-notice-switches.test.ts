@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -22,8 +22,14 @@ describe("the kinds of notice a coach can switch", () => {
       seen.add(t);
     }
   });
-  it("the database's type -> kind list is exactly this list (migration 0423 and lib/coach-notice-kinds.ts never drift)", () => {
-    const sql = read("supabase/migrations/0423_coach_notice_switches.sql");
+  it("the database's type -> kind list is exactly this list (the latest migration that writes notice_kind_of, and lib/coach-notice-kinds.ts never drift)", () => {
+    // 0423 wrote the list; a later migration that adds a type writes the whole list again (0459: weekly_checkin). The newest one is the live list.
+    const latest = readdirSync("supabase/migrations")
+      .filter((f) => f.endsWith(".sql") && read(`supabase/migrations/${f}`).includes("create or replace function public.notice_kind_of("))
+      .sort()
+      .pop()!;
+    expect(latest >= "0423").toBe(true);
+    const sql = read(`supabase/migrations/${latest}`);
     const inSql = [...sql.matchAll(/when '([a-z_]+)' then '([a-z_]+)'/g)].map((m) => `${m[1]}:${m[2]}`).sort();
     const inCode = NOTICE_KINDS.flatMap((k) => k.types.map((t) => `${t}:${k.id}`)).sort();
     expect(inSql).toEqual(inCode);

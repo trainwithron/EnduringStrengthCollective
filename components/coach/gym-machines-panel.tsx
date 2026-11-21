@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Play, X } from "lucide-react";
+import { Play, Printer, X } from "lucide-react";
+import { scanCountLine } from "@/lib/scan-count";
+import { machineLabelsPath } from "@/lib/machine-labels";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { saved } from "@/lib/saved";
 import { checked } from "@/lib/checked-write";
@@ -25,8 +27,11 @@ export function GymMachinesPanel({
   initialMachines,
   exercises,
   isAdmin = false,
+  scanCounts = null,
 }: {
   coachId: string;
+  // How often each machine's QR code was scanned (Ron, Nov 20: M2); null before the database step that counts them, and then no line is shown.
+  scanCounts?: Record<string, { month: number; total: number }> | null;
   // The platform admin (Ron): their additions to the shared machine list go on it at once, and they review everyone else's.
   isAdmin?: boolean;
   // The workspace's organization: the gym shown on the machine's QR page (null in a coach's own space).
@@ -82,7 +87,16 @@ export function GymMachinesPanel({
         />
       )}
 
-      <h2 className="font-display font-bold uppercase text-base">Your machines</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-display font-bold uppercase text-base">Your machines</h2>
+        {machines.length > 0 && (
+          // Every machine's 4x6 label, one per page, to print at once (Ron, Nov 20: M3).
+          <a href={machineLabelsPath()} target="_blank" rel="noopener" className="min-h-11 px-3 inline-flex items-center gap-2 border border-steel/40 text-chalk font-body text-sm active:border-rust">
+            <Printer className="w-4 h-4" aria-hidden="true" />
+            Print labels
+          </a>
+        )}
+      </div>
       <form onSubmit={addMachine} className="flex flex-wrap items-center gap-2">
         <input
           aria-label="Machine name"
@@ -118,7 +132,14 @@ export function GymMachinesPanel({
                 aria-expanded={openId === m.id}
                 className="w-full min-h-12 py-2 flex items-center justify-between gap-3 text-left"
               >
-                <span className="font-body text-[15px] font-medium text-chalk break-words min-w-0">{m.name}</span>
+                <span className="min-w-0">
+                  <span className="block font-body text-[15px] font-medium text-chalk break-words">{m.name}</span>
+                  {scanCounts && (
+                    <span className="block font-body text-xs text-steel" data-scan-count>
+                      {scanCountLine(scanCounts[m.id]?.month ?? 0, scanCounts[m.id]?.total ?? 0)}
+                    </span>
+                  )}
+                </span>
                 <span className="font-body text-xs text-steel shrink-0">
                   {m.exerciseIds.length} {m.exerciseIds.length === 1 ? "exercise" : "exercises"}
                 </span>
@@ -220,6 +241,10 @@ function MachineEditor({
     <div className="pb-4 space-y-4" data-machine-editor>
       <div className="flex flex-wrap items-center gap-2">
         <ScanQrCodeButton path={machineScanPath(machine.id)} name={machine.name} what="machine" label="QR code" />
+        <a href={machineLabelsPath([machine.id])} target="_blank" rel="noopener" className="min-h-11 px-3 inline-flex items-center gap-2 border border-steel/40 text-chalk font-body text-sm active:border-rust">
+          <Printer className="w-4 h-4" aria-hidden="true" />
+          Print label
+        </a>
         {renaming ? (
           <>
             <input

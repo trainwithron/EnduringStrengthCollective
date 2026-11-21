@@ -34,9 +34,12 @@ function sentenceFor(flag: HeroFlag): string {
 export function DashboardHero({
   flag,
   emptyState,
+  viewer = null,
 }: {
   flag: (HeroFlag & { href: string; orgName: string | null }) | null;
   emptyState: HeroEmptyState | null;
+  // The signed-in coach: "Message {name}" sends as them, inside Spotlight (Ron, Nov 20). Without it the nudge is not offered.
+  viewer?: { id: string; name: string } | null;
 }) {
   if (flag) {
     return (
@@ -52,8 +55,14 @@ export function DashboardHero({
           <Link href={flag.href} className="font-body text-sm text-rust-ink font-medium">
             View {flag.athleteName.split(" ")[0]}&apos;s profile →
           </Link>
-          {flag.kind === "quiet_client" && (
-            <QuietClientNudgeButton athleteFirstName={flag.athleteName.split(" ")[0]} />
+          {flag.kind === "quiet_client" && viewer && (
+            <QuietClientNudgeButton
+              athleteId={flag.athleteId}
+              athleteFirstName={flag.athleteName.split(" ")[0]}
+              groupId={flag.groupId}
+              coachId={viewer.id}
+              coachName={viewer.name}
+            />
           )}
         </div>
       </div>

@@ -15,6 +15,8 @@ import { GroupInvitesPanel, type GroupInviteRow } from "@/components/coach/deskt
 import { AddClientButton } from "@/components/coach/desktop/add-client-button";
 import { EmailAllClaimLinksButton } from "@/components/coach/email-all-claim-links-button";
 import { RequestsLink } from "@/components/coach/requests-link";
+import { CheckinsLink } from "@/components/coach/checkins-link";
+import { pendingCheckinCount } from "@/lib/weekly-checkin-coach";
 import { pendingRequestCount } from "@/lib/client-request-count";
 import { SwappableTerm } from "@/components/coach/swappable-term";
 import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
@@ -314,7 +316,7 @@ export default async function ClientsPage(
       )
     ).map((m) => ({ ...m, sessionLine: clientSessionLine(startsByAthlete.get(m.profileId) ?? [], sessionNow, viewerZone) }));
 
-    const requestCount = await pendingRequestCount(supabase);
+    const [requestCount, checkinCount] = await Promise.all([pendingRequestCount(supabase), pendingCheckinCount(supabase, scopeIds, user.id)]);
     // The coach's own row (their personal space) leads the list, as on a computer; never counted as a client.
     const { data: selfProfile } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
     const selfName = (selfProfile?.full_name as string | null | undefined)?.trim() || "You";
@@ -333,6 +335,7 @@ export default async function ClientsPage(
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <RequestsLink count={requestCount} />
+              <CheckinsLink count={checkinCount} />
               <AddClientButton groupId={params.groupId} groupName={group?.name ?? "This group"} createdBy={user.id} defaultOpen={openAdd} initialStep={openImport ? "import" : undefined} />
             </div>
             <div className="w-full">

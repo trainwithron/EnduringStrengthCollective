@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { notifyPush } from "@/lib/push-notify";
+import { sendDirectMessage } from "@/lib/direct-message-send";
 import { attachVisibleReader } from "@/lib/visible-read";
 
 interface MessageRow {
@@ -93,15 +93,10 @@ export function DirectMessageThread({
     if (!body.trim() || sending) return;
     setSending(true);
     setError(null);
-    const trimmed = body.trim();
-    const supabase = createBrowserClient();
-    const { data: inserted, error: insertError } = await supabase
-      .from("direct_messages")
-      .insert({ group_id: groupId, sender_id: viewerId, recipient_id: otherId, body: trimmed })
-      .select("id, sender_id, body, created_at")
-      .single();
+    // The same send (and push) as every other place a message goes from (lib/direct-message-send.ts).
+    const inserted = await sendDirectMessage(createBrowserClient(), { groupId, senderId: viewerId, senderName: viewerName, recipientId: otherId, body });
     setSending(false);
-    if (insertError || !inserted) {
+    if (!inserted) {
       setError("Couldn't send — check your connection and try again.");
       return;
     }
@@ -112,7 +107,6 @@ export function DirectMessageThread({
     // postgres_changes subscription above is still what delivers the
     // OTHER party's messages while this thread is open.
     setMessages((prev) => (prev.some((m) => m.id === inserted.id) ? prev : [...prev, inserted]));
-    notifyPush(otherId, `New message from ${viewerName}`, trimmed, `/groups/${groupId}/messages/${viewerId}`);
     setBody("");
   }
 

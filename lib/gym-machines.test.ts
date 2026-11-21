@@ -69,7 +69,7 @@ describe("machines: the screens", () => {
   it("the library's Machines tab shows only once the database has machines (before step 206 the read fails and it is hidden)", () => {
     const tabs = read("components/coach/exercise-library-tabs.tsx");
     expect(tabs).toContain("{initialMachines && (");
-    expect(tabs).toContain('{tab === "machines" && initialMachines && <GymMachinesPanel coachId={coachId} orgId={orgId} initialMachines={initialMachines} exercises={initialExercises} isAdmin={isAdmin} />}');
+    expect(tabs).toContain('{tab === "machines" && initialMachines && <GymMachinesPanel coachId={coachId} orgId={orgId} initialMachines={initialMachines} exercises={initialExercises} isAdmin={isAdmin} scanCounts={scanCounts} />}');
     const page = read("app/(coach)/groups/[groupId]/exercise-library/page.tsx");
     expect(page).toContain('.from("gym_machines").select("id, name").eq("created_by", user.id)');
     expect(page).toContain("initialMachines={initialMachines}");
@@ -109,7 +109,7 @@ describe("machines: the gym and honest saves (review, Nov 19)", () => {
     expect(read("supabase/apply/apply-step206-0451.sql")).toContain("as machine_has_its_gym,");
     const panel = read("components/coach/gym-machines-panel.tsx");
     expect(panel).toContain('.from("gym_machines").insert({ created_by: coachId, organization_id: orgId, name: cleaned.name })');
-    expect(read("components/coach/exercise-library-tabs.tsx")).toContain("<GymMachinesPanel coachId={coachId} orgId={orgId} initialMachines={initialMachines} exercises={initialExercises} isAdmin={isAdmin} />");
+    expect(read("components/coach/exercise-library-tabs.tsx")).toContain("<GymMachinesPanel coachId={coachId} orgId={orgId} initialMachines={initialMachines} exercises={initialExercises} isAdmin={isAdmin} scanCounts={scanCounts} />");
   });
   it("rename, delete and taking an exercise off only say done when the row really changed (0 rows is a failure)", () => {
     const panel = read("components/coach/gym-machines-panel.tsx");

@@ -7,6 +7,8 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ExerciseLibraryTabs } from "@/components/coach/exercise-library-tabs";
 import type { EquipmentType } from "@/lib/equipment-classifier";
 import { machinesFromRows, type MachineRow } from "@/lib/gym-machines";
+import { DEFAULT_COACH_TIMEZONE, monthBoundsInZone } from "@/lib/timezone";
+import { isValidTimeZone } from "@/lib/format-in-timezone";
 
 export const metadata = { title: "Exercise library" };
 
@@ -149,7 +151,16 @@ export default async function ExerciseLibraryPage(
       );
     }
   }
-  const { data: me } = await supabase.from("profiles").select("is_platform_admin").eq("id", user.id).maybeSingle();
+  const { data: me } = await supabase.from("profiles").select("is_platform_admin, timezone").eq("id", user.id).maybeSingle();
+  // How often each machine's QR code was scanned, this month (in the coach's own time zone) and in all (step 215; before it, no counts are shown).
+  let scanCounts: Record<string, { month: number; total: number }> | null = null;
+  if (initialMachines && initialMachines.length > 0) {
+    const tz = isValidTimeZone((me as { timezone?: string | null } | null)?.timezone) ? ((me as { timezone: string }).timezone) : DEFAULT_COACH_TIMEZONE;
+    const { data: counts, error: countsError } = await supabase.rpc("count_machine_scans", { p_since: monthBoundsInZone(tz).startIso });
+    if (!countsError) {
+      scanCounts = Object.fromEntries(((counts ?? []) as { machine_id: string; since_count: number; total_count: number }[]).map((c) => [c.machine_id, { month: Number(c.since_count) || 0, total: Number(c.total_count) || 0 }]));
+    }
+  }
 
   return (
     <CoachDesktopShell
@@ -178,6 +189,7 @@ export default async function ExerciseLibraryPage(
         initialMachines={initialMachines}
         isAdmin={!!(me as { is_platform_admin?: boolean } | null)?.is_platform_admin}
         orgId={(group as { organization_id?: string | null } | null)?.organization_id ?? null}
+        scanCounts={scanCounts}
       />
     </CoachDesktopShell>
   );
