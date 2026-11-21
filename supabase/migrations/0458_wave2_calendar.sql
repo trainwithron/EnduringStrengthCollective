@@ -99,3 +99,101 @@ begin
   execute v_def;
 end
 $patch$;
+
+-- T2: a coach-typed TESTED max per athlete per lift, LOCKED so the estimates from logged sets never overwrite it (Ron, Nov 20). It is kept in the same training-max row every
+-- program rule already reads (a percent of max, the wave rules, the AI builder), so they all use it with no other change. Unlocking it goes back to the estimate from logged sets.
+-- Who set it and when are kept on the row.
+alter table public.athlete_training_maxes
+  add column if not exists locked boolean not null default false,
+  add column if not exists tested_by uuid references public.profiles(id) on delete set null,
+  add column if not exists tested_at timestamptz;
+
+-- A coach of the athlete types the max (pounds, as every weight is stored). Locked at once.
+create or replace function public.set_tested_max(p_athlete uuid, p_exercise text, p_weight numeric)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_name text := btrim(coalesce(p_exercise, ''));
+begin
+  if auth.uid() is null or not public.is_coach_of_athlete(p_athlete) then
+    raise exception 'not authorized';
+  end if;
+  if v_name = '' or length(v_name) > 120 then
+    raise exception 'name the lift';
+  end if;
+  if p_weight is null or p_weight <= 0 or p_weight > 2000 then
+    raise exception 'a tested max is a weight from 1 to 2000 lb';
+  end if;
+  insert into public.athlete_training_maxes (athlete_id, exercise_name, estimated_max, source_weight, source_reps, source_rpe, source_rpe_assumed, updated_at, locked, tested_by, tested_at)
+  values (p_athlete, v_name, round(p_weight, 1), round(p_weight, 1), 1, 10, false, now(), true, auth.uid(), now())
+  on conflict (athlete_id, exercise_name) do update
+    set estimated_max = excluded.estimated_max,
+        source_weight = excluded.source_weight,
+        source_reps = 1,
+        source_rpe = 10,
+        source_rpe_assumed = false,
+        updated_at = now(),
+        locked = true,
+        tested_by = excluded.tested_by,
+        tested_at = excluded.tested_at;
+end;
+$$;
+revoke all on function public.set_tested_max(uuid, text, numeric) from public, anon;
+grant execute on function public.set_tested_max(uuid, text, numeric) to authenticated;
+
+-- Unlock: back to the estimate from the athlete's logged sets (none logged: no max).
+create or replace function public.unlock_tested_max(p_athlete uuid, p_exercise text)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if auth.uid() is null or not public.is_coach_of_athlete(p_athlete) then
+    raise exception 'not authorized';
+  end if;
+  update public.athlete_training_maxes set locked = false, tested_by = null, tested_at = null
+    where athlete_id = p_athlete and exercise_name = p_exercise and locked;
+  perform public.recompute_training_maxes_internal(p_athlete, p_exercise);
+end;
+$$;
+revoke all on function public.unlock_tested_max(uuid, text) from public, anon;
+grant execute on function public.unlock_tested_max(uuid, text) to authenticated;
+
+-- The two estimate writers leave a locked max alone: the set-by-set trigger, and the full recompute (which also never deletes a locked one). Patched into the LIVE functions,
+-- each piece found exactly once or nothing changes; already patched: skipped.
+create or replace function pg_temp.patch_tm(p_fn text, p_def text, p_old text, p_new text) returns text language plpgsql as $f$
+declare
+  v_count int := (length(p_def) - length(replace(p_def, p_old, ''))) / greatest(length(p_old), 1);
+begin
+  if v_count <> 1 then
+    raise exception '%: expected this exactly once, found % times. NOTHING was changed: %', p_fn, v_count, left(p_old, 80);
+  end if;
+  return replace(p_def, p_old, p_new);
+end;
+$f$;
+
+do $tm$
+declare
+  v_def text;
+begin
+  v_def := replace(pg_get_functiondef('public.recompute_training_max()'::regprocedure), E'\r\n', E'\n');
+  if position('not public.athlete_training_maxes.locked' in v_def) = 0 then
+    v_def := pg_temp.patch_tm('recompute_training_max', v_def, E'    where excluded.estimated_max > public.athlete_training_maxes.estimated_max;',
+      E'    where excluded.estimated_max > public.athlete_training_maxes.estimated_max\n      and not public.athlete_training_maxes.locked;');
+    execute v_def;
+  end if;
+
+  v_def := replace(pg_get_functiondef('public.recompute_training_maxes_internal(uuid, text)'::regprocedure), E'\r\n', E'\n');
+  if position('not public.athlete_training_maxes.locked' in v_def) = 0 then
+    v_def := pg_temp.patch_tm('recompute_training_maxes_internal', v_def, E'      and not exists (select 1 from best b where b.exercise_name = m.exercise_name)\n',
+      E'      and not exists (select 1 from best b where b.exercise_name = m.exercise_name)\n      and not m.locked\n');
+    v_def := pg_temp.patch_tm('recompute_training_maxes_internal', v_def, E'else public.athlete_training_maxes.updated_at end\n    returning 1',
+      E'else public.athlete_training_maxes.updated_at end\n      where not public.athlete_training_maxes.locked\n    returning 1');
+    execute v_def;
+  end if;
+end
+$tm$;

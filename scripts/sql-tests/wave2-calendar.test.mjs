@@ -43,6 +43,21 @@ await db.exec(`
     return v_balance;
   end $$;
 `);
+// T2: the training-max tables and the two LIVE estimate writers (fixtures/training-max-live-nov20.sql; md5 of their bodies 64fe631d4c5fdb5b3a449fcc55695190 and
+// af72466742549e7cb3fac0ec9917ee42), with the trigger as live has it on set_logs.
+await db.exec(`
+  create table public.group_memberships (group_id uuid, profile_id uuid, role text);
+  create function public.is_coach_of_athlete(target_athlete_id uuid) returns boolean language sql stable security definer set search_path to 'public' as $$
+    select exists (select 1 from public.group_memberships gm_coach join public.group_memberships gm_athlete on gm_athlete.group_id = gm_coach.group_id
+      where gm_coach.profile_id = (select auth.uid()) and gm_coach.role = 'coach' and gm_athlete.profile_id = target_athlete_id and gm_athlete.role = 'athlete');
+  $$;
+  create table public.athlete_sessions (id uuid primary key, athlete_id uuid, is_historical boolean default false);
+  create table public.session_exercises (id uuid primary key, session_id uuid, exercise_name text);
+  create table public.set_logs (id serial primary key, session_exercise_id uuid, status text, weight numeric, reps int, rpe numeric, set_type text default 'working', is_historical boolean default false, data_flag text, completed_at timestamptz default now());
+  create table public.athlete_training_maxes (athlete_id uuid, exercise_name text, estimated_max numeric, source_weight numeric, source_reps int, source_rpe numeric, updated_at timestamptz, source_rpe_assumed boolean default false, primary key (athlete_id, exercise_name));
+`);
+await db.exec(lf(readFileSync(new URL("./fixtures/training-max-live-nov20.sql", import.meta.url), "utf8")));
+await db.exec(`create trigger set_logs_recompute_training_max after insert or update on public.set_logs for each row execute function public.recompute_training_max();`);
 await db.exec(lf(readFileSync(new URL("./fixtures/cancel-booking-live-nov20.sql", import.meta.url), "utf8")));
 const migration = lf(readFileSync(new URL("../../supabase/migrations/0458_wave2_calendar.sql", import.meta.url), "utf8"));
 await db.exec(migration);
@@ -126,6 +141,46 @@ expect("only the cancel itself takes a session (nobody calls it directly)", priv
 expect("a signed-in coach may give back (the function checks it is theirs); anon may not", priv.give === true && priv.anon_give === false);
 const def = (await db.query(`select prosrc from pg_proc where proname = 'cancel_booking_and_refund_credit'`)).rows[0].prosrc;
 expect("patched once, even after running twice", def.split("take_late_cancel_session").length - 1 === 1);
+
+// T2: a tested max, locked.
+const other = "44444444-4444-4444-4444-444444444444";
+await db.query(`insert into public.group_memberships values ($1, $2, 'coach'), ($1, $3, 'athlete')`, [group, coach, client]);
+await db.query(`insert into public.athlete_sessions values ('55555555-5555-5555-5555-555555555555', $1, false)`, [client]);
+await db.query(`insert into public.session_exercises values ('66666666-6666-6666-6666-666666666666', '55555555-5555-5555-5555-555555555555', 'Back Squat')`);
+const logSet = (weight, reps) => db.query(`insert into public.set_logs (session_exercise_id, status, weight, reps, rpe) values ('66666666-6666-6666-6666-666666666666', 'completed', $1, $2, 10)`, [weight, reps]);
+const squat = async () => (await db.query(`select * from public.athlete_training_maxes where athlete_id = $1 and exercise_name = 'Back Squat'`, [client])).rows[0] ?? null;
+await logSet(200, 5);
+expect("T2: a logged set makes the estimate as before", Number((await squat()).estimated_max) === 233.3 && (await squat()).locked === false);
+await as(other);
+refused = false;
+try { await db.query(`select public.set_tested_max($1, 'Back Squat', 300)`, [client]); } catch { refused = true; }
+expect("T2: only a coach of the athlete may set it", refused);
+await as(client);
+refused = false;
+try { await db.query(`select public.set_tested_max($1, 'Back Squat', 300)`, [client]); } catch { refused = true; }
+expect("T2: the athlete may not set their own", refused);
+await as(coach);
+refused = false;
+try { await db.query(`select public.set_tested_max($1, 'Back Squat', 0)`, [client]); } catch { refused = true; }
+expect("T2: a nonsense weight is refused", refused);
+await db.query(`select public.set_tested_max($1, '  Back Squat ', 225)`, [client]);
+let tm = await squat();
+expect("T2: the coach's tested max replaces the estimate and is locked, with who and when", Number(tm.estimated_max) === 225 && tm.locked === true && tm.tested_by === coach && tm.tested_at !== null);
+await logSet(260, 5);
+expect("T2: a heavier logged set does not overwrite a locked max", Number((await squat()).estimated_max) === 225);
+await db.query(`select public.recompute_training_maxes_internal($1, null)`, [client]);
+expect("T2: the full recompute leaves a locked max alone", Number((await squat()).estimated_max) === 225 && (await squat()).locked === true);
+await db.query(`delete from public.set_logs`);
+await db.query(`select public.recompute_training_maxes_internal($1, 'Back Squat')`, [client]);
+expect("T2: and never deletes it, even with nothing logged", (await squat()) !== null && Number((await squat()).estimated_max) === 225);
+await logSet(260, 5);
+await db.query(`select public.unlock_tested_max($1, 'Back Squat')`, [client]);
+tm = await squat();
+expect("T2: unlocking goes back to the estimate from logged sets", tm.locked === false && Number(tm.estimated_max) === 303.3 && tm.tested_by === null);
+const tmPriv = (await db.query(`select has_function_privilege('anon', 'public.set_tested_max(uuid, text, numeric)', 'execute') as anon_set, has_function_privilege('authenticated', 'public.set_tested_max(uuid, text, numeric)', 'execute') as auth_set`)).rows[0];
+expect("T2: signed-in only (the function checks it is the athlete's coach)", tmPriv.anon_set === false && tmPriv.auth_set === true);
+const tmDefs = (await db.query(`select string_agg(prosrc, ' ') d from pg_proc where proname in ('recompute_training_max', 'recompute_training_maxes_internal')`)).rows[0].d;
+expect("T2: each estimate writer patched once, even after running twice", tmDefs.split("not public.athlete_training_maxes.locked").length - 1 === 2 && tmDefs.split("and not m.locked").length - 1 === 1);
 
 if (failures.length) {
   console.error("FAILED:\n- " + failures.join("\n- "));
