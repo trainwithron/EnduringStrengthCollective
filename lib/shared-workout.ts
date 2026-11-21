@@ -14,6 +14,7 @@ import { parseShareParam, verifyShareSignature } from "@/lib/share-token";
 import { readLoggedSets } from "@/lib/read-logged-sets";
 import { countsForProgress } from "@/lib/set-types";
 import { pickRecordSet } from "@/lib/record-set";
+import { prRepNote } from "@/lib/pr-wording";
 
 // Shared by the public /share/[postId] page and the in-feed expanded
 // card (fetched via /api/workout-share/[postId]) so both surfaces
@@ -211,7 +212,8 @@ export async function getSharedWorkout(postId: string, opts: { fullName?: boolea
         return {
           name,
           primary: `${best.weight} lbs × ${best.reps}`,
-          secondary: estimateOneRepMax(best.weight, best.reps) != null ? `est. 1RM ${estimateOneRepMax(best.weight, best.reps)} lbs` : "new weight PR",
+          // what the record beat, then the estimate (wave 2, P3): "best ever at 5 reps · est. 1RM 262 lbs"
+          secondary: estimateOneRepMax(best.weight, best.reps) != null ? `${prRepNote(best.reps)} · est. 1RM ${estimateOneRepMax(best.weight, best.reps)} lbs` : prRepNote(best.reps),
         };
       }
       if (best.distance != null) {

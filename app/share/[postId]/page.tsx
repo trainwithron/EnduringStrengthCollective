@@ -18,6 +18,7 @@ import { loadShareCardCoach } from "@/lib/share-card-coach";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { loadLiftUnit } from "@/lib/lift-unit-server";
 import { formatVolume } from "@/lib/lift-weight";
+import { sharedPrTitle } from "@/lib/pr-wording";
 
 // Deliberately public — no auth check. Every completed workout gets a
 // shareable card now, not just PRs, so a client can post it (and tag the
@@ -35,7 +36,7 @@ export async function generateMetadata(
 
   const title =
     shared.celebratePrs.length > 0
-      ? `${shared.athleteName} just hit a new PR! 🎉`
+      ? sharedPrTitle(shared.athleteName, shared.celebratePrs)
       : `${shared.athleteName} just finished a workout! 💪`;
   // Same fix as the on-page display below: total_volume is coalesce(...,
   // 0), never null, so a null check here can never actually route a
@@ -120,7 +121,7 @@ export default async function ShareWorkoutPage(
 
   const shareTitle =
     shared.celebratePrs.length > 0
-      ? `${shared.athleteName} just hit a new PR! 🎉`
+      ? sharedPrTitle(shared.athleteName, shared.celebratePrs)
       : `${shared.athleteName} just finished a workout! 💪`;
 
   // Card style rotation (post_workout_card_v1_bevel_and_animation.md) —

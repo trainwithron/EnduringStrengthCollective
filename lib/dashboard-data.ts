@@ -18,6 +18,7 @@ import { fetchInactiveKeys, inactiveKey } from "@/lib/inactive-ids";
 import { ratesByMembership } from "@/lib/client-rates";
 import { readRowsByIds } from "@/lib/read-by-ids";
 import { pageAll } from "@/lib/page-all";
+import { prShoutout } from "@/lib/pr-wording";
 
 export interface DashboardGroupInfo {
   id: string;
@@ -544,7 +545,7 @@ export async function getCoachDashboardData(
       const athlete = athleteByProfileId.get(recentPrLog.athlete_id);
       heroEmptyState = {
         kind: "recent_pr",
-        text: `${athlete?.fullName ?? "A client"} just hit a new PR — worth a shoutout.`,
+        text: prShoutout(athlete?.fullName ?? "A client", recentPrLog.new_prs ?? []),
         href: athlete ? `/groups/${athlete.groupId}/athletes/${athlete.profileId}` : null,
       };
     } else if (athletes.length > 0) {

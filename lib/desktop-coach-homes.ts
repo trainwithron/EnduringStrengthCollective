@@ -258,6 +258,11 @@ export const DESKTOP_EXCLUDED: string[] = [
   "/groups/[groupId]/today",
   "/groups/[groupId]/workouts/[workoutId]",
   "/groups/[groupId]/progress-photos",
+  // My progress and its pages (wave 2): the client's own
+  "/groups/[groupId]/progress",
+  "/groups/[groupId]/progress/photos",
+  "/groups/[groupId]/progress/measurements",
+  "/groups/[groupId]/progress/recap",
   "/groups/[groupId]/video-checkins",
   "/groups/[groupId]/transformation/new",
   "/groups/[groupId]/billing/canceled",

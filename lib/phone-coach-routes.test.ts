@@ -49,7 +49,7 @@ const NEVER = new Set([
 
 // A client's own pages: never a coach redirect.
 const CLIENT_ONLY = [
-  "about-you", "classes", "goal", "leaderboard", "more", "my-history", "my-schedule", "progress-photos", "recipes", "today",
+  "about-you", "classes", "goal", "leaderboard", "more", "my-history", "my-schedule", "progress", "progress/photos", "progress/measurements", "progress/recap", "progress-photos", "recipes", "today",
   "tools/macro-calculator", "transformation/new", "video-checkins", "workouts/[workoutId]",
 ].map((p) => `/groups/[groupId]/${p}`);
 

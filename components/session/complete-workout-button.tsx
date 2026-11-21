@@ -19,6 +19,8 @@ import { parseWeightInput } from "@/lib/units";
 import { mirrorGoogleCalendarEvent } from "@/lib/mirror-google-calendar-event";
 import { DEFAULT_FIX_MINUTES, looksTooLong, saveFixedTime, validFixMinutes } from "@/lib/workout-time-fix";
 import { durationInWords } from "@/lib/workout-fun-line";
+import { loadPrSets } from "@/lib/pr-sets";
+import { workoutDonePushBody, type PrSet } from "@/lib/pr-wording";
 
 // This project has no generated Supabase Database type, so a fresh RPC's
 // result falls back to an untyped shape — spelled out explicitly here
@@ -394,12 +396,20 @@ export function CompleteWorkoutButton({
         .maybeSingle();
       if (coachMembership) {
         const athleteName = athleteProfile?.full_name ?? "Your client";
-        const prSuffix =
-          newRecords.length > 0 ? " — new GROUP RECORD! 🏆" : newPrs.length > 0 ? " — new PR! 🎉" : "";
+        // The record named with its weight and reps (wave 2, P3: "New PR: Back Squat 225 × 5", never a bare "new PR!"): the same set the share card shows.
+        // Never holds up the finish for long: past 1.5 seconds the lifts are named without their sets.
+        const prSets =
+          newPrs.length > 0 || newRecords.length > 0
+            ? await Promise.race([
+                loadPrSets(supabase, { athleteId: result.athlete_id, sessionId, names: [...newPrs, ...newRecords] }),
+                new Promise<PrSet[]>((resolve) => setTimeout(() => resolve([...newPrs, ...newRecords].map((name) => ({ name: name.trim(), weight: null, reps: null }))), 1500)),
+              ])
+            : [];
+        const setFor = (name: string) => prSets.find((p) => p.name === name.trim()) ?? { name, weight: null, reps: null };
         notifyPush(
           coachMembership.profile_id,
           "Workout logged",
-          `${athleteName} completed a workout${prSuffix}`,
+          workoutDonePushBody(athleteName, prSets.filter((p) => newPrs.some((n) => n.trim() === p.name)), newRecords.map(setFor)),
           `/groups/${result.group_id}/athletes/${result.athlete_id}`
         );
       }

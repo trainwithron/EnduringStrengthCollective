@@ -25,6 +25,8 @@ export function buildMoreSections(opts: {
     { label: "Hall of fame", hint: "The best lifts in the group", href: `${g}/records` },
   ];
   if (!opts.isCoach) {
+    // Wave 2, P1 (Ron, Nov 20): the client's own lifts, body weight, photos and measurements, first in Training.
+    training.unshift({ label: "My progress", hint: "Your lifts, best sets, photos and measurements", href: `${g}/progress` });
     training.push({ label: "Video check-ins", hint: "Short videos from your coach", href: `${g}/video-checkins` });
     if (opts.historyImportEnabled) training.push({ label: "My exercise history", hint: "Past lifts you brought in", href: `${g}/my-history` });
   }
