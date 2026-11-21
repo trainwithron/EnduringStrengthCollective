@@ -17,7 +17,8 @@ export function BulkEditDayPanel({
 }: {
   exercises: BuilderExercise[];
   // addedField: this exercise did not track the field before and now does (Rest on an exercise the AI wrote without one).
-  onApplied: (updates: { exerciseId: string; field: TrackedField; value: string | number | null; highValue?: number | null; addedField?: boolean }[]) => void;
+  // pctMax: a weight applied as a percent of max (wave 2 T3); the sets then have no fixed weight.
+  onApplied: (updates: { exerciseId: string; field: TrackedField; value: string | number | null; highValue?: number | null; addedField?: boolean; pctMax?: number | null }[]) => void;
   label?: string;
 }) {
   const { flashSaved, flashSaveError } = useSaveToastChannel();
@@ -38,13 +39,20 @@ export function BulkEditDayPanel({
   const hasAnyTier = exercises.some((e) => e.tier);
 
   // Writes one value onto every set of these exercises; an exercise that did not track the field starts tracking it (so the rest shows in the builder and the logger prescribes it).
-  async function writeValue(supabase: ReturnType<typeof createBrowserClient>, target: BuilderExercise[], parsed: string | number | null, high: number | null, updates: { exerciseId: string; field: TrackedField; value: string | number | null; highValue?: number | null; addedField?: boolean }[]): Promise<boolean> {
+  async function writeValue(supabase: ReturnType<typeof createBrowserClient>, target: BuilderExercise[], parsed: string | number | null, high: number | null, updates: { exerciseId: string; field: TrackedField; value: string | number | null; highValue?: number | null; addedField?: boolean; pctMax?: number | null }[], pctMax: number | null = null): Promise<boolean> {
     const setIds = target.flatMap((e) => e.sets.map((s) => s.id));
     if (setIds.length === 0) return true;
     const { error } = await supabase
       .from("group_workout_exercise_sets")
       // A rest always writes its high end too (empty for a single time), so a range never survives a change to one time.
-      .update(field === "rest" ? { [TARGET_COLUMN[field]]: parsed, target_rest_max_seconds: high } : { [TARGET_COLUMN[field]]: parsed })
+      // A weight writes its percent too (one clears the other, as in the single box).
+      .update(
+        field === "rest"
+          ? { [TARGET_COLUMN[field]]: parsed, target_rest_max_seconds: high }
+          : field === "weight"
+            ? { target_weight: pctMax != null ? null : parsed, target_pct_max: pctMax }
+            : { [TARGET_COLUMN[field]]: parsed }
+      )
       .in("id", setIds);
     if (error) return false;
     let ok = true;
@@ -57,7 +65,7 @@ export function BulkEditDayPanel({
           continue;
         }
       }
-      updates.push({ exerciseId: e.id, field, value: parsed, highValue: field === "rest" ? high : undefined, addedField: addField });
+      updates.push({ exerciseId: e.id, field, value: field === "weight" && pctMax != null ? null : parsed, highValue: field === "rest" ? high : undefined, addedField: addField, ...(field === "weight" ? { pctMax } : {}) });
     }
     return ok;
   }
@@ -83,11 +91,11 @@ export function BulkEditDayPanel({
 
     setApplying(true);
     const supabase = createBrowserClient();
-    const updates: { exerciseId: string; field: TrackedField; value: string | number | null; highValue?: number | null; addedField?: boolean }[] = [];
+    const updates: { exerciseId: string; field: TrackedField; value: string | number | null; highValue?: number | null; addedField?: boolean; pctMax?: number | null }[] = [];
     let anyFailed = false;
     for (const entry of parsedEntries) {
       const target = entry.tier === null ? exercises : exercises.filter((e) => e.tier === entry.tier);
-      if (!(await writeValue(supabase, target, entry.parsed.value, entry.parsed.ok && entry.parsed.highValue != null ? entry.parsed.highValue : null, updates))) anyFailed = true;
+      if (!(await writeValue(supabase, target, entry.parsed.value, entry.parsed.ok && entry.parsed.highValue != null ? entry.parsed.highValue : null, updates, entry.parsed.ok && !entry.parsed.blank ? entry.parsed.pctMax ?? null : null))) anyFailed = true;
     }
 
     onApplied(updates);
@@ -163,7 +171,7 @@ export function BulkEditDayPanel({
       {mode === "all" ? (
         <div className="flex items-center gap-2">
           <input aria-label="New value"
-            type={fieldDef(field).kind === "number" && field !== "rest" && field !== "time" ? "number" : "text"}
+            type={fieldDef(field).kind === "number" && field !== "rest" && field !== "time" && field !== "weight" ? "number" : "text"}
             inputMode={field === "rest" || field === "time" ? "text" : undefined}
             value={value}
             onChange={(e) => setValue(e.target.value)}
@@ -173,7 +181,7 @@ export function BulkEditDayPanel({
                 handleApply();
               }
             }}
-            placeholder={field === "rest" || field === "time" ? "90 or 1:30" : "Value"}
+            placeholder={field === "rest" || field === "time" ? "90 or 1:30" : field === "weight" ? "135 or 75%" : "Value"}
             className="w-24 h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs"
           />
         </div>
@@ -183,7 +191,7 @@ export function BulkEditDayPanel({
             <label key={tier} className="flex items-center gap-2">
               <span className="font-body text-xs text-steel w-16">Class {tier}</span>
               <input
-                type={fieldDef(field).kind === "number" && field !== "rest" && field !== "time" ? "number" : "text"}
+                type={fieldDef(field).kind === "number" && field !== "rest" && field !== "time" && field !== "weight" ? "number" : "text"}
                 value={classValues[tier]}
                 onChange={(e) => setClassValues((prev) => ({ ...prev, [tier]: e.target.value }))}
                 onKeyDown={(e) => {
@@ -192,7 +200,7 @@ export function BulkEditDayPanel({
                     handleApply();
                   }
                 }}
-                placeholder={field === "rest" || field === "time" ? "90 or 1:30" : "Value"}
+                placeholder={field === "rest" || field === "time" ? "90 or 1:30" : field === "weight" ? "135 or 75%" : "Value"}
                 className="w-24 h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs"
               />
             </label>

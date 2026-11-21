@@ -233,7 +233,7 @@ export function WeekGrid({
   );
 
   function handleWeekBulkApplied(
-    updates: { exerciseId: string; field: TrackedField; value: string | number | null; highValue?: number | null; addedField?: boolean }[]
+    updates: { exerciseId: string; field: TrackedField; value: string | number | null; highValue?: number | null; addedField?: boolean; pctMax?: number | null }[]
   ) {
     const byExercise = new Map(updates.map((u) => [u.exerciseId, u]));
     onDaysChange((prev) =>
@@ -247,7 +247,7 @@ export function WeekGrid({
           return {
             ...item,
             trackedFields: update.addedField && !item.trackedFields.includes(update.field) ? [...item.trackedFields, update.field] : item.trackedFields,
-            sets: item.sets.map((s) => ({ ...s, [prop]: update.value, ...(update.field === "rest" ? { targetRestMaxSeconds: update.highValue ?? null } : {}) })),
+            sets: item.sets.map((s) => ({ ...s, [prop]: update.value, ...(update.field === "rest" ? { targetRestMaxSeconds: update.highValue ?? null } : {}), ...(update.field === "weight" ? { targetPctMax: update.pctMax ?? null } : {}) })),
           };
         }),
       }))
