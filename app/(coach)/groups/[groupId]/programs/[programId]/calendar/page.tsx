@@ -18,6 +18,7 @@ import { UpcomingGroupEvents } from "@/components/group/group-event-answer";
 import { ActingAsBanner } from "@/components/athlete/acting-as-bar";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
 import { insideWindowHours } from "@/lib/cancel-window";
+import { readLateCancelTakesSession } from "@/lib/late-cancel-auto";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { Lock } from "lucide-react";
@@ -237,8 +238,11 @@ export default async function ProgramCalendarPage(
   let bookingMode = "free";
   // The coach's cancellation window (24 hours with no policy row): a client cancelling inside it is told the coach decides whether it counts.
   let cancelWindowHours: number | null = null;
+  // The coach's late-cancel setting, for the cancel confirm (wave 2 C5).
+  let lateCancelTakesSession: boolean | null = null;
   if (viewingAsAthlete && coachMembership) {
     const sb = await supabase.from("coach_booking_policies").select("booking_mode, cancellation_window_hours").eq("coach_id", coachMembership.profile_id).maybeSingle();
+    lateCancelTakesSession = await readLateCancelTakesSession(supabase, coachMembership.profile_id);
     if (!sb.error) {
       bookingMode = (sb.data?.booking_mode as string | null) ?? "coach_schedules";
       cancelWindowHours = (sb.data?.cancellation_window_hours as number | null) ?? null;
@@ -380,6 +384,7 @@ export default async function ProgramCalendarPage(
                     rescheduleHref={bookingMode === "coach_schedules" ? undefined : `${backHref}/calendar/${dateKeyInZone(timezone, start)}?reschedule=${b.id}`}
                     messageHref={bookingMode === "coach_schedules" ? `/groups/${params.groupId}/messages` : undefined}
                     insideWindowHours={insideWindowHours(start, cancelWindowHours)}
+                    lateCancelTakesSession={lateCancelTakesSession}
                   />
                 </div>
               );

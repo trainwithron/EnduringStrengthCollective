@@ -22,12 +22,17 @@ export function BookingPolicyControl({
   initialCancellationHours,
   initialMinimumNoticeHours,
   initialCreditExpiryDays,
+  initialLateCancelTakesSession = false,
 }: {
   coachId: string;
   initialCancellationHours: number;
   initialMinimumNoticeHours: number;
   initialCreditExpiryDays: number;
+  // Wave 2 C5: a late cancel takes the session by itself (off by default). Null: it could not be read, so the switch is not offered.
+  initialLateCancelTakesSession?: boolean | null;
 }) {
+  const [takesSession, setTakesSession] = useState(initialLateCancelTakesSession === true);
+  const [takesBusy, setTakesBusy] = useState(false);
   // What is saved, and what is being typed. A field is saved when the coach leaves it (or presses Enter), never on each keystroke: typing
   // "24" used to save "2" first, which for the expiry setting would have briefly told the nightly job to expire sessions after 2 days.
   const [saved, setSaved] = useState<Values>({
@@ -78,6 +83,23 @@ export function BookingPolicyControl({
     setTimeout(() => setStatus("idle"), 2000);
   }
 
+  // Saved on its own (only this one column), the moment the box is ticked or unticked.
+  async function saveTakesSession(next: boolean) {
+    setTakesBusy(true);
+    setError(null);
+    const { error: saveError } = await createBrowserClient()
+      .from("coach_booking_policies")
+      .upsert({ coach_id: coachId, late_cancel_takes_session: next }, { onConflict: "coach_id" });
+    setTakesBusy(false);
+    if (saveError) {
+      setError("That didn't save. Nothing was changed. Check your connection and try again.");
+      return;
+    }
+    setTakesSession(next);
+    setStatus("saved");
+    setTimeout(() => setStatus("idle"), 2000);
+  }
+
   const field = (key: keyof Values, ariaLabel: string) => (
     <input
       type="number"
@@ -100,12 +122,30 @@ export function BookingPolicyControl({
       <div>
         <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">Cancellation policy</p>
         <p className="font-body text-xs text-steel mb-2">
-          A client who cancels or reschedules within this many hours of their session is flagged to you, and you choose whether it counts as a session (Charge or Waive). Nothing is taken automatically.
+          {takesSession
+            ? "A client who cancels within this many hours of their session uses that session; you're told, and can give it back on Requests. A late move is flagged to you to Charge or Waive."
+            : "A client who cancels or reschedules within this many hours of their session is flagged to you, and you choose whether it counts as a session (Charge or Waive). Nothing is taken automatically."}
         </p>
         <div className="flex items-center gap-2">
           {field("cancellationHours", "Hours before the session")}
           <span className="font-body text-sm text-steel">hours before the session</span>
         </div>
+        {initialLateCancelTakesSession !== null && (
+          <label className="mt-3 flex items-start gap-3 min-h-11 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={takesSession}
+              disabled={takesBusy}
+              onChange={(e) => void saveTakesSession(e.target.checked)}
+              className="mt-1 w-5 h-5 shrink-0 accent-rust"
+              data-late-cancel-takes-session
+            />
+            <span className="font-body text-sm text-chalk">
+              A late cancel uses the session automatically
+              <span className="block font-body text-xs text-steel mt-0.5">Off: you choose Charge or Waive each time. Clients are told before they cancel. Sessions only, never money.</span>
+            </span>
+          </label>
+        )}
       </div>
 
       <div className="border-t border-steel/15 pt-4">

@@ -23,7 +23,7 @@ import type { RequestRow } from "@/components/coach/client-requests-panel";
 // same panels Home shows (LateChangesPanel, ScheduleRequestsPanel), so they are decided exactly as they are there.
 
 export const BOOKING_REQUEST_SELECT = "id, kind, status, from_start_at, new_start_at, decided_at, created_at, group_id, profiles!booking_requests_athlete_id_fkey ( full_name )";
-export const LATE_CHANGE_SELECT = "id, start_at, late_change_kind, late_charge_state, group_id, profiles!bookings_athlete_id_fkey ( full_name )";
+export const LATE_CHANGE_SELECT = "id, start_at, late_change_kind, late_charge_state, late_charge_auto, group_id, profiles!bookings_athlete_id_fkey ( full_name )";
 export const SCHEDULE_REQUEST_SELECT =
   "id, kind, status, effective_on, resume_on, applied_at, applied_early, dismissed_at, withdrawn_at, created_at, group_id, profiles!schedule_requests_athlete_id_fkey ( full_name ), recurring_booking_series ( weekday, start_time, duration_minutes )";
 

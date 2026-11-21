@@ -2,6 +2,7 @@
 // answered in the last 30 days. Four kinds: a session asked for (booking_requests), a late cancel or move to charge or waive (bookings.late_charge_state), a change to a weekly schedule
 // (schedule_requests) and someone asking to train with the coach (client_requests). Every notice about one of them opens this page at that request (lib/notice-links.ts).
 import { dayLabel, scheduleSummary } from "@/lib/schedule-request-ui";
+import { canGiveBack, lateOutcome } from "@/lib/late-cancel-auto";
 
 export const REQUESTS_PATH = "/requests";
 export const ANSWERED_DAYS = 30;
@@ -61,6 +62,8 @@ export interface AnsweredRequest {
   sortAt: string;
   // the organization's name, for a client request when the coach belongs to more than one
   orgName?: string | null;
+  // A charged late cancel the coach can give back from here (wave 2 C5, lib/late-cancel-auto.ts).
+  giveBack?: boolean;
 }
 
 const BOOKING_OUTCOME: Record<string, string> = {
@@ -104,6 +107,8 @@ export interface LateChangeRow {
   start_at: string;
   late_change_kind: string | null;
   late_charge_state: string | null;
+  // taken by the coach's late-cancel setting rather than by Charge (wave 2 C5)
+  late_charge_auto?: boolean | null;
   profiles?: { full_name?: string | null } | null;
 }
 
@@ -117,9 +122,10 @@ export function answeredLate(r: LateChangeRow, timeZone: string): AnsweredReques
     id: r.id,
     who: r.profiles?.full_name?.trim() || "A client",
     what: lateWhat(r, timeZone),
-    outcome: r.late_charge_state === "charged" ? "Charged one session" : r.late_charge_state === "waived" ? "Waived" : "Waiting",
+    outcome: lateOutcome(r),
     decidedAt: null,
     sortAt: r.start_at,
+    giveBack: canGiveBack(r),
   };
 }
 

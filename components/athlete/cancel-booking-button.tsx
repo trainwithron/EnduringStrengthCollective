@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { mirrorGoogleCalendarEvent } from "@/lib/mirror-google-calendar-event";
+import { lateCancelConfirmLine } from "@/lib/late-cancel-auto";
 
 export function CancelBookingButton({
   bookingId,
@@ -14,7 +15,9 @@ export function CancelBookingButton({
   recurringSeriesId,
   viewer = "client",
   insideWindowHours,
+  lateCancelTakesSession = false,
 }: {
+  // (null: the setting could not be read; the confirm then says it may use a session)
   bookingId: string;
   // When provided, links to the same day-detail page in "move this
   // booking" mode (?reschedule=<bookingId>) so the athlete can pick a new
@@ -34,6 +37,8 @@ export function CancelBookingButton({
   viewer?: "coach" | "client";
   // Set when the client is inside the coach's cancellation window, so the confirm can say it will still count.
   insideWindowHours?: number | null;
+  // The coach's late-cancel setting (wave 2 C5): a late cancel takes the session by itself, so the confirm says so plainly before anything happens.
+  lateCancelTakesSession?: boolean | null;
 }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +50,7 @@ export function CancelBookingButton({
       viewer === "coach"
         ? "Cancel this session? Anything charged for it is given back."
         : insideWindowHours
-        ? `This is inside your coach's ${insideWindowHours}-hour window. Your coach will be told and decides whether it counts as a session. Cancel anyway?`
+        ? lateCancelConfirmLine(insideWindowHours, lateCancelTakesSession)
         : "Cancel this session? If it is outside your coach's cancellation window it goes back to your balance.";
     if (!await confirmDialog({ message, confirmLabel: "Yes, cancel", cancelLabel: "Keep it" })) return;
     setSubmitting(true);
@@ -92,6 +97,8 @@ export function CancelBookingButton({
     const seriesMessage =
       viewer === "coach"
         ? "Cancel every remaining session in this weekly series? Anything charged for them is given back."
+        : lateCancelTakesSession === true
+        ? "Cancel every remaining session in this weekly series? Each one outside your coach's cancellation window goes back to your balance; one inside it uses a session (your coach can give it back)."
         : "Cancel every remaining session in this weekly series? Each one outside your coach's cancellation window goes back to your balance.";
     if (!await confirmDialog(seriesMessage)) return;
     setCancellingSeries(true);
