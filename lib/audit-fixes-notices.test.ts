@@ -125,7 +125,8 @@ describe("review fixes (Code Chat, Nov 21)", () => {
     expect(read("app/notice/[id]/route.ts")).toContain("if (!isPrefetch(request)) await supabase.from(\"notifications\").update({ read_at:");
     expect(noticeLinkPrefetch(`/notice/${N}`)).toBe(false);
     expect(noticeLinkPrefetch("/requests")).toBeUndefined();
-    for (const f of ["components/athlete/notification-bell.tsx", "components/notifications/notification-list.tsx", "components/coach/mobile/spot-needs-top.tsx"]) expect(read(f), f).toContain("prefetch={noticeLinkPrefetch(");
+    // (Spotlight's Waiting for you no longer lists notices since PH14: they are the bell's alone.)
+    for (const f of ["components/athlete/notification-bell.tsx", "components/notifications/notification-list.tsx"]) expect(read(f), f).toContain("prefetch={noticeLinkPrefetch(");
     expect(read("components/coach/desktop/org-notifications-panel.tsx")).toContain("<Link prefetch={false}");
   });
   it("B: an AI budget push opens Plan & Billing in a group the recipient coaches in that organization, else Home", async () => {

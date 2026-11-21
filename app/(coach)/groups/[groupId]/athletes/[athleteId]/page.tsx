@@ -17,6 +17,7 @@ import { isSearching, matchesLoggedSearch, namesBySessionFrom, readSearchWords }
 import { sorenessShown } from "@/lib/wellness";
 import { ClientAssessmentsSection } from "@/components/coach/desktop/client-assessments-section";
 import { ViewAsClientLink } from "@/components/coach/desktop/view-as-client-label";
+import { ViewAsClientButton } from "@/components/coach/view-as-client-button";
 import { SendSignInLinkButton } from "@/components/coach/send-signin-link-button";
 import { ClientProfileTabs } from "@/components/coach/desktop/client-profile-tabs";
 import { ClientProgramsSection } from "@/components/coach/desktop/client-programs-section";
@@ -1091,6 +1092,11 @@ export default async function AthleteProfilePage(
         {!selfView && (
           <div className="flex flex-wrap items-center gap-2 mt-4">
             <VideoCheckinRecorder athleteId={params.athleteId} groupId={params.groupId} coachId={user.id} />
+            {/* The one place "View as client" lives on a phone (PH11: it came off every Spotlight client row). Phone only: the computer has no act-as (3a34e6d4); its Program tab
+                keeps the read-only preview. Never on the coach's own profile. */}
+            <span className="lg:hidden contents">
+              <ViewAsClientButton athleteId={params.athleteId} groupId={params.groupId} name={profile?.full_name ?? "this client"} />
+            </span>
           </div>
         )}
       </div>

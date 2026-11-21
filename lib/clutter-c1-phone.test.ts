@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { badgeCountOf, countedNotices, fetchSpotNeeds, soleStartWorkoutId, spotCount, type SpotNeeds } from "./spot-needs";
+import { badgeCountOf, fetchSpotNeeds, soleStartWorkoutId, spotCount, type SpotNeeds } from "./spot-needs";
 import { phoneNewProgramHref } from "@/components/coach/mobile/programs-phone-list";
 
 // Clutter and flow, part C1 (Ron, Nov 21: "fix all clutter and flow that arent my call"): the coach's phone Spotlight hub.
@@ -11,12 +11,11 @@ const top = read("components/coach/mobile/spot-needs-top.tsx");
 const panel = read("components/coach/mobile/spot-clients-groups-panel.tsx");
 const route = read("app/api/coach/spot-needs/route.ts");
 
-const notice = (type: string) => ({ id: type, type, body: "", linkPath: "/", createdAt: "2026-11-21T10:00:00Z" });
-const base: SpotNeeds = { needsChoice: false, groupIds: ["g"], timezone: "UTC", sessionsToCheck: [], next: null, open: null, notices: [], requestsWaiting: 0, checkinsToReview: 0, count: 0, newestAt: null };
+const base: SpotNeeds = { needsChoice: false, groupIds: ["g"], timezone: "UTC", sessionsToCheck: [], next: null, open: null, requestsWaiting: 0, checkinsToReview: 0, count: 0, newestAt: null };
 
 describe("PH1: one waiting number (the dot, Waiting for you and the app icon)", () => {
-  it("counts the requests waiting, check-ins to review, did-it-happen sessions and notices", () => {
-    expect(spotCount({ ...base, requestsWaiting: 2, checkinsToReview: 1, sessionsToCheck: [{} as never], notices: [notice("milestone_celebration")] })).toBe(5);
+  it("counts the requests waiting, check-ins to review and did-it-happen sessions (notices are the bell's since PH14)", () => {
+    expect(spotCount({ ...base, requestsWaiting: 2, checkinsToReview: 1, sessionsToCheck: [{} as never] })).toBe(4);
   });
   it("the requests number is ONE function: the Requests page, Spotlight and the Clients pages' Requests link all use it", () => {
     const server = read("lib/requests-center-server.ts");
@@ -80,30 +79,26 @@ describe("the shared read", () => {
 });
 
 describe("PH2: one thing counts once", () => {
-  it("a message counts by its notice only (unread messages are not added on top)", () => {
-    expect(spotCount({ ...base, notices: [notice("direct_message")] })).toBe(1);
+  it("unread messages are not added on top (and since PH14 a message notice is the bell's, not counted here)", () => {
     expect(route).not.toContain("unreadMessages");
     expect(route).not.toContain("loadCoachInbox");
-  });
-  it("a notice about a request or a check-in is not counted again beside it", () => {
-    expect(countedNotices([notice("booking_request"), notice("late_change"), notice("schedule_request"), notice("client_request"), notice("weekly_checkin"), notice("direct_message")])).toBe(1);
   });
 });
 
 describe("PH3: Requests (n) and Check-ins (n) first in Waiting for you", () => {
-  it("only when something waits there, before the notices", () => {
+  it("only when something waits there, first in the fold", () => {
     expect(top).toContain("needs.requestsWaiting > 0 && (");
     expect(top).toContain("needs.checkinsToReview > 0 && (");
     expect(top).toContain("href={REQUESTS_PATH}");
     expect(top).toContain("href={COACH_CHECKINS_PATH}");
-    expect(top.indexOf("data-spot-waiting-pages")).toBeLessThan(top.indexOf("needs.notices.length > 0 && ("));
+    expect(top.indexOf("data-spot-waiting-pages")).toBeLessThan(top.indexOf("<SessionCheckCards"));
   });
 });
 
 describe("PH9, PH10, PH12: Spotlight's Clients is the one client list", () => {
-  it("each row: Log their workout (main), then Profile, Message and View as client; the header links Requests and Check-ins", () => {
+  it("each row: Log their workout (main), then Profile and Message (View as client moved to the Profile page, PH11); the header links Requests and Check-ins", () => {
     const row = panel.slice(panel.indexOf("{filteredClients.map((c) => {"));
-    const order = ["Log their workout", "Profile", "Message", "View as client"].map((s) => row.indexOf(s));
+    const order = ["Log their workout", "Profile", "Message"].map((s) => row.indexOf(s));
     expect(order.every((i) => i >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     expect(panel).toContain("router.push(`/groups/${client.groupId}/messages/${client.id}`);");

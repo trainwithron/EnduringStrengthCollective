@@ -88,7 +88,8 @@ describe("the Spotlight overlay's Clients panel", () => {
     expect(loader).toContain('.eq("status", "confirmed")');
     expect(loader).toContain('.is("attended_at", null)');
   });
-  it("keeps the three buttons", () => {
-    for (const label of ["Log their workout", "Profile", "View as client"]) expect(panel).toContain(label);
+  it("keeps Log their workout and Profile (View as client moved to the Profile page, PH11)", () => {
+    for (const label of ["Log their workout", "Profile"]) expect(panel).toContain(label);
+    expect(panel).not.toContain("requestActAsClient");
   });
 });

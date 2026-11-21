@@ -33,7 +33,8 @@ describe("every place a notice is opened uses it", () => {
     expect(read("app/notifications/page.tsx")).toContain("linkPath: noticeHref(n.type, n.link_path, { id: n.id, groupId: n.group_id }),");
     expect(read("app/(coach)/dashboard/page.tsx")).toContain("linkPath: noticeHref(n.type, n.link_path, { id: n.id }),");
     expect(read("app/api/messages/inbox/route.ts")).toContain("linkPath: noticeHref(n.type, n.link_path, { id: n.id, groupId: n.group_id })");
-    expect(read("app/api/coach/spot-needs/route.ts")).toContain('linkPath: noticeHref(n.type, n.link_path ?? "/", { id: n.id, groupId: n.group_id }),');
+    // Spotlight's Waiting for you lists no notices since PH14 (the bell does), so its route links none
+    expect(read("app/api/coach/spot-needs/route.ts")).not.toContain("noticeHref(");
     expect(read("app/api/cron/notification-push/route.ts")).toContain('noticeHref(n.type, n.link_path || "/dashboard", { id: n.id, groupId: n.group_id })');
   });
   it("the phone Home has the same anchors as the computer Home (/dashboard opens the phone Home on a phone)", () => {

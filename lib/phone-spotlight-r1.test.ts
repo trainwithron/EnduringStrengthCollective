@@ -44,8 +44,8 @@ describe("Spotlight tiles", () => {
 
 describe("what needs the coach is at the top of the drop-down", () => {
   const top = read("components/coach/mobile/spot-needs-top.tsx");
-  it("notices, did-it-happen cards, Resume / Start the next client's workout, then Home's panels", () => {
-    const order = ["needs.notices.length > 0", "<SessionCheckCards", "Resume {needs.open.name}", "Start {needs.next.name}", "<LateChangesPanel", "<ScheduleRequestsPanel", "<ExpiryCheckInPanel", "<InactiveClientsPanel", "<ProgressLookPanel"];
+  it("Requests / Check-ins, did-it-happen cards, Resume / Start the next client's workout, then Home's panels (no notices: they are the bell's, PH14)", () => {
+    const order = ["data-spot-waiting-pages", "<SessionCheckCards", "Resume {needs.open.name}", "Start {needs.next.name}", "<LateChangesPanel", "<ScheduleRequestsPanel", "<ExpiryCheckInPanel", "<InactiveClientsPanel", "<ProgressLookPanel"];
     const at = order.map((s) => top.indexOf(s));
     expect(at.every((i) => i >= 0)).toBe(true);
     expect([...at].sort((a, b) => a - b)).toEqual(at);
@@ -72,10 +72,9 @@ describe("what needs the coach is at the top of the drop-down", () => {
 });
 
 describe("the dot and the gentle fade", () => {
-  it("counts sessions to check, unread notices, requests waiting and check-ins to review (PH1)", () => {
-    const notice = { id: "n", type: "direct_message", body: "", linkPath: "/", createdAt: "" };
-    expect(spotCount({ sessionsToCheck: [{} as never, {} as never], notices: [notice], requestsWaiting: 2, checkinsToReview: 1 })).toBe(6);
-    expect(spotCount({ sessionsToCheck: [], notices: [], requestsWaiting: 0, checkinsToReview: 0 })).toBe(0);
+  it("counts sessions to check, requests waiting and check-ins to review (PH1); never notices (PH14)", () => {
+    expect(spotCount({ sessionsToCheck: [{} as never, {} as never], requestsWaiting: 2, checkinsToReview: 1 })).toBe(5);
+    expect(spotCount({ sessionsToCheck: [], requestsWaiting: 0, checkinsToReview: 0 })).toBe(0);
   });
   it("fades only for something newer than the last open, never with reduced motion", () => {
     expect(newestOf(["2026-10-20T01:00:00Z", null, "2026-10-20T03:00:00Z"])).toBe("2026-10-20T03:00:00Z");

@@ -1,9 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { noticeLinkPrefetch } from "@/lib/notice-links";
-import { useState } from "react";
-import { createBrowserClient } from "@/lib/supabase/client";
 import { SessionCheckCards } from "@/components/coach/session-check-cards";
 import { LateChangesPanel } from "@/components/coach/late-changes-panel";
 import { ScheduleRequestsPanel } from "@/components/coach/schedule-requests-panel";
@@ -15,36 +12,15 @@ import type { SpotNeeds } from "@/lib/spot-needs";
 import { REQUESTS_PATH } from "@/lib/requests-center";
 import { COACH_CHECKINS_PATH } from "@/lib/weekly-checkin";
 
-// The top of the Spotlight drop-down on a coach's phone: what needs the coach first. Requests (n) and Check-ins (n) when something waits there, unread notices (the bell's), "did this session happen?", the next client's workout (or one left open),
+// The top of the Spotlight drop-down on a coach's phone: what needs the coach first. Requests (n) and Check-ins (n) when something waits there, "did this session happen?", the next client's workout (or one left open),
 // then the same panels Home shows (late changes, schedule requests, expiring sessions, quiet clients, progress looks). Each part draws nothing when it has nothing.
-export function SpotNeedsTop({ needs, onNavigated, onNoticesCleared, onChanged }: { needs: SpotNeeds; onNavigated: () => void; onNoticesCleared?: () => void; onChanged?: () => void }) {
-  const [clearing, setClearing] = useState(false);
-  const [clearError, setClearError] = useState(false);
+// Notices are not listed here (Nov 21, PH14): they live only in the bell beside Spotlight, with its own unread count and Mark all read.
+export function SpotNeedsTop({ needs, onNavigated, onChanged }: { needs: SpotNeeds; onNavigated: () => void; onChanged?: () => void }) {
   const now = new Date();
   const showNext = needs.next && needs.next.athleteId !== needs.open?.athleteId;
   // Audit P11 (Nov 21): the client's log page, which offers today's workout and Wing it (it used to open their profile when they had no program). PH24: when that page would offer
   // exactly one Start, the workout itself (one Start tap, not two).
   const nextHref = needs.next ? needs.next.startHref || `/groups/${needs.next.groupId}/athletes/${needs.next.athleteId}/log` : null;
-
-  function openNotice(id: string) {
-    // Marked read the way the bell does it; the link opens either way.
-    void createBrowserClient().from("notifications").update({ read_at: new Date().toISOString() }).eq("id", id);
-    onNavigated();
-  }
-
-  // Ron, Oct 23: "there's not a way to clear notifications from the spot". The same as the bell's Mark all read: these notices are marked read and the list goes.
-  async function markAllRead() {
-    if (clearing) return;
-    setClearing(true);
-    setClearError(false);
-    const { error } = await createBrowserClient().from("notifications").update({ read_at: new Date().toISOString() }).in("id", needs.notices.map((n) => n.id));
-    setClearing(false);
-    if (error) {
-      setClearError(true);
-      return;
-    }
-    onNoticesCleared?.();
-  }
 
   return (
     <div className="col-span-2 space-y-3" data-spot-needs>
@@ -67,30 +43,6 @@ export function SpotNeedsTop({ needs, onNavigated, onNoticesCleared, onChanged }
               </Link>
             </li>
           )}
-        </ul>
-      )}
-      {needs.notices.length > 0 && (
-        <div className="flex items-center justify-between gap-3">
-          <p className="font-body text-xs text-steel uppercase tracking-wide">Notifications</p>
-          <button type="button" onClick={markAllRead} disabled={clearing} className="min-h-11 px-2 -my-2 font-body text-xs text-rust-ink underline underline-offset-2 disabled:opacity-50" data-spot-mark-all>
-            {clearing ? "Marking…" : "Mark all read"}
-          </button>
-        </div>
-      )}
-      {clearError && (
-        <p className="font-body text-xs text-rust-ink" role="alert">
-          Couldn&apos;t mark them read. Try again.
-        </p>
-      )}
-      {needs.notices.length > 0 && (
-        <ul className="border border-steel/20 divide-y divide-steel/15" aria-label="Notifications">
-          {needs.notices.map((n) => (
-            <li key={n.id}>
-              <Link href={n.linkPath} prefetch={noticeLinkPrefetch(n.linkPath)} onClick={() => openNotice(n.id)} className="block px-3 py-2.5 font-body text-sm text-chalk min-h-11">
-                {n.body}
-              </Link>
-            </li>
-          ))}
         </ul>
       )}
       {/* An answer re-reads what is waiting, so the count on the button follows (audit P31). */}

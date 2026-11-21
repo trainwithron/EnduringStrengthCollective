@@ -7,7 +7,7 @@ import { ArrowLeft, ChevronDown, Dumbbell, Mail, MessageCircle, Sparkles, Trendi
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { SpotNeedsTop } from "./spot-needs-top";
-import { SPOT_LAST_OPENED_KEY, SPOT_NEEDS_CACHE_KEY, badgeCountOf, fetchSpotNeeds, readSpotNeedsCache, shouldFade, spotCount, spotNeedsCacheEntry, type SpotNeeds } from "@/lib/spot-needs";
+import { SPOT_LAST_OPENED_KEY, SPOT_NEEDS_CACHE_KEY, badgeCountOf, fetchSpotNeeds, readSpotNeedsCache, shouldFade, spotNeedsCacheEntry, type SpotNeeds } from "@/lib/spot-needs";
 import { syncAppBadge } from "@/components/coach/app-badge-sync";
 import { isEmbeddedWindow } from "@/components/ui/loading-watchdog";
 import { PushNotificationToggle } from "@/components/athlete/push-notification-toggle";
@@ -561,16 +561,6 @@ export function CoachSpotHub({
                           needs={needs}
                           onNavigated={close}
                           onChanged={() => loadNeeds(true)}
-                          onNoticesCleared={() => {
-                            const cleared = { ...needs, notices: [] };
-                            // the dot and the remembered answer follow at once
-                            showNeeds({ ...cleared, count: spotCount(cleared) });
-                            try {
-                              window.sessionStorage.removeItem(SPOT_NEEDS_CACHE_KEY);
-                            } catch {
-                              // nothing remembered; the next read is fresh anyway
-                            }
-                          }}
                         />
                       )}
                     </>
