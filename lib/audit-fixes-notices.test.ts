@@ -147,3 +147,11 @@ describe("review fixes (Code Chat, Nov 21)", () => {
     expect(src).toContain('.eq("groups.organization_id", orgId)');
   });
 });
+
+describe("drafted notes never ride in the address (Commander, Nov 21)", () => {
+  it("the calendar spotter's Send a note opens the drafted note through a key, not its words", () => {
+    const panel = read("components/coach/desktop/calendar-spotter-panel.tsx");
+    expect(panel).toContain("<DraftMessageLink");
+    expect(panel).not.toContain("?draft=${encodeURIComponent(");
+  });
+});

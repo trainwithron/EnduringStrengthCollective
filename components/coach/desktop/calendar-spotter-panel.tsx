@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import type { CalendarSpotterFinding } from "@/lib/calendar-spotter-gather";
 import { buildComeBackDraft } from "@/lib/attendance-draft";
+import { DraftMessageLink } from "@/components/messages/draft-message-link";
 import { ATTENDANCE_LONG_SNOOZE_DAYS, attendancePatternKey, attendanceCheckKind } from "@/lib/calendar-spotter-dismiss";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
 
@@ -72,12 +72,14 @@ export function CalendarSpotterPanel({
                 <span className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${f.kind === "recovery" ? "bg-moss" : "bg-rust"}`} />
                 <p className="font-body text-sm text-chalk flex-1">{f.message}</p>
                 {f.kind === "gap" && groupId && (
-                  <Link
-                    href={`/groups/${groupId}/messages/${f.athleteId}?draft=${encodeURIComponent(buildComeBackDraft(first))}`}
+                  // the note opens drafted in the conversation, its words kept in this tab, never in the address (lib/message-draft.ts, Nov 21)
+                  <DraftMessageLink
+                    threadHref={`/groups/${groupId}/messages/${f.athleteId}`}
+                    draft={buildComeBackDraft(first)}
                     className="shrink-0 h-9 px-3 border border-rust text-rust-ink font-body text-xs inline-flex items-center"
                   >
                     Send a note
-                  </Link>
+                  </DraftMessageLink>
                 )}
               </div>
               <div className="ml-3.5 mt-1.5 flex flex-wrap items-center gap-2">
