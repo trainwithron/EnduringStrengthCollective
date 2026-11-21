@@ -110,9 +110,15 @@ describe("program text pasted into the AI builder box", () => {
 
 describe("Assign to clients on the program builder page", () => {
   const builder = read("components/coach/desktop/program-builder-desktop.tsx");
-  it("sits right after Print or PDF and opens the existing assign panel on this program", () => {
-    expect(builder.indexOf("Print or PDF")).toBeLessThan(builder.indexOf("            Assign to clients"));
-    expect(builder.indexOf("            Assign to clients")).toBeLessThan(builder.lastIndexOf("{toolbarExtra}"));
+  it("is the toolbar's one filled Assign, first, and opens the existing assign panel on this program; Print or PDF is in the menu (clutter audit DK21, Nov 21)", () => {
+    expect(builder).toContain('bg-rust text-graphite px-4"\n          >\n            Assign\n          </button>');
+    expect(builder.indexOf("            Assign\n")).toBeLessThan(builder.lastIndexOf("{toolbarExtra}"));
+    expect(builder).not.toContain(">\n            Print or PDF");
+    expect(builder).toContain("printHref={`/print/programs/${programId}`}");
+    expect(builder).toContain("assignOnPage");
+    const menu = read("components/coach/desktop/program-card-menu.tsx");
+    expect(menu).toContain(") : assignOnPage ? null : (");
+    expect(menu).toContain("{printHref && (");
     expect(builder).toContain("onClick={() => setAssignOpen(true)}");
     expect(builder).toContain("<ProgramAssignPanel programId={programId} programName={name} groupId={groupId} aiDraft={aiDraft}");
   });

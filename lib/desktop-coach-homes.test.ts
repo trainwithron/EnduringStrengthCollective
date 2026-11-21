@@ -109,9 +109,11 @@ describe("who sees which tab (the old menus' rules, moved word for word)", () =>
     expect(keys(ordinary, "clients")).toEqual(expect.arrayContaining(["leads", "waiver", "session-ledger", "packages"]));
     expect(keys(ordinary, "home")).toEqual(["today", "business", "group-dashboard"]);
   });
-  it("the platform admin gets Support inbox, Organizations and Marketplace ranking; nobody else does", () => {
-    expect(keys({ ...ordinary, isPlatformAdmin: true }, "messages")).toContain("admin-support");
-    expect(keys({ ...ordinary, isPlatformAdmin: true }, "settings")).toEqual(expect.arrayContaining(["admin-organizations", "admin-ranking"]));
+  it("the platform admin gets one Admin group under Settings (Support inbox, Organizations, ranking, machine list); nothing admin in Messages; nobody else gets any (DK3)", () => {
+    expect(keys({ ...ordinary, isPlatformAdmin: true }, "messages")).toEqual(["messages", "feed"]);
+    expect(keys({ ...ordinary, isPlatformAdmin: true }, "settings")).toEqual(expect.arrayContaining(["admin-support", "admin-organizations", "admin-ranking", "admin-machines"]));
+    expect(homeOfPath("/admin/support")).toEqual({ home: "settings", tab: "admin-support" });
+    expect(homeOfPath("/admin/machine-catalog")).toEqual({ home: "settings", tab: "admin-machines" });
     for (const h of HOMES) expect(keys(ordinary, h.key).filter((k) => k.startsWith("admin"))).toEqual([]);
   });
   it("Front desk only for a front-desk person; Team feed and Attendance only in a team or social group; Members only inside one", () => {
@@ -166,7 +168,18 @@ describe("release 2: Clients and Calendar", () => {
   it("a team-only organization's Clients and Calendar have no selling tabs", () => {
     const t = homeTabs({ ...ordinary, moneyHidden: true });
     expect(t.clients.map((x) => x.key)).toEqual(["clients", "members", "attendance"]);
-    expect(t.calendar.map((x) => x.key)).toEqual(["schedule", "group-calendar", "kiosk"]);
+    expect(t.calendar.map((x) => x.key)).toEqual(["schedule", "group-calendar", "kiosk", "display"]);
+  });
+  it("a one-on-one coach: no Group calendar or Kiosk (unless on a front desk), no Challenges, Hall of fame or Team performance (DK8, DK9)", () => {
+    const solo = homeTabs({ ...ordinary, groupKind: "one_on_one" });
+    for (const k of ["group-calendar", "kiosk"]) expect(solo.calendar.map((x) => x.key)).not.toContain(k);
+    for (const k of ["challenges", "records", "team-performance"]) expect(solo.programs.map((x) => x.key)).not.toContain(k);
+    expect(homeTabs({ ...ordinary, groupKind: "one_on_one", onFrontDesk: true }).calendar.map((x) => x.key)).toContain("kiosk");
+    expect(homeTabs({ ...ordinary, groupKind: "one_on_one", teamMode: true }).programs.map((x) => x.key)).toContain("team-performance");
+    expect(homeTabs(ordinary).programs.map((x) => x.key)).toEqual(expect.arrayContaining(["challenges", "records", "team-performance"]));
+  });
+  it("the requests page lights Clients, as /clients/requests does (DK30)", () => {
+    expect(homeOfPath("/requests")).toEqual({ home: "clients", tab: "clients" });
   });
   it("the calendar page's own Schedule / Availability pair shows only below a computer's width (the strip has them there), and follows the address", () => {
     const tabs = readFileSync(join(root, "components/coach/desktop/calendar-page-tabs.tsx"), "utf8");

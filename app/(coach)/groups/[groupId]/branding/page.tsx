@@ -57,7 +57,7 @@ const ORG_TABS: { key: OrgTab; label: string }[] = [
 export default async function BrandingPage(
   props: {
     params: Promise<{ groupId: string }>;
-    searchParams: Promise<{ tab?: string; plan?: string }>;
+    searchParams: Promise<{ tab?: string; plan?: string; preview?: string }>;
   }
 ) {
   const params = await props.params;
@@ -206,15 +206,14 @@ export default async function BrandingPage(
   const waiting = isOwner && tab === "team" && transferPool.length > 0 ? await notSignedInIds(createServiceRoleClient(), transferPool.map((m) => m.profileId)) : new Set<string>();
   const basePath = `/groups/${params.groupId}/branding`;
 
-  // Plan & Billing is invisible until COACH_BILLING_ENFORCED is on, except
-  // to the platform admin, who can preview it (and an org's real state)
-  // before anything is switched on for coaches.
+  // Plan & Billing is invisible until COACH_BILLING_ENFORCED is on. The platform admin previews it (and an org's real state) only from Settings > Admin > Billing preview
+  // (?preview=1), never on the organization's own page (clutter audit DK2, Nov 21).
   const { data: viewerProfile } = await supabase
     .from("profiles")
     .select("is_platform_admin")
     .eq("id", user.id)
     .maybeSingle();
-  const showPlanTab = isBillingEnforced() || viewerProfile?.is_platform_admin === true;
+  const showPlanTab = isBillingEnforced() || (viewerProfile?.is_platform_admin === true && searchParams.preview === "1");
   const planSummary =
     showPlanTab && tab === "billing" && org
       ? await getOrgBillingSummary(supabase, orgMembership.organization_id, org.created_at)
@@ -227,8 +226,8 @@ export default async function BrandingPage(
           {org?.name ?? "Organization"}
         </h1>
         <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">
-          Every coach and group under this organization shares one identity — branding, and
-          eventually billing, are set here rather than per-coach.
+          Every coach and group under this organization shares one identity: its branding,
+          labels and team are set here, not per coach.
         </p>
       </div>
 
@@ -247,32 +246,8 @@ export default async function BrandingPage(
       </div>
 
       {tab === "team" ? (
+        // The team first: members and the invite (the one home for coaches and invitations: clutter audit DK13, DK15, Nov 21); the marketplace listing and Coach Dispatch below.
         <div>
-          <MarketplaceListingToggle
-            organizationId={orgMembership.organization_id}
-            initialListed={!!listingRow?.listed_in_marketplace}
-            canEdit={isOwnerOrAdmin}
-            available={!listingError && !!listingRow}
-          />
-          <MarketplacePersonControl
-            profileId={user.id}
-            initialListed={!!(personRow as { marketplace_listed?: boolean } | null)?.marketplace_listed}
-            initialName={(personRow as { marketplace_display_name?: string | null } | null)?.marketplace_display_name ?? ""}
-            available={!personError && !!personRow}
-          />
-          <div className="border border-steel/20 p-4 mb-8 grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <div>
-              <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">
-                Organization
-              </p>
-              <p className="font-body text-sm">{org?.name}</p>
-              <p className="font-body text-xs text-steel mt-0.5">/{org?.slug}</p>
-              <p className="font-body text-xs text-steel mt-2">
-                Created {org?.created_at ? new Date(org.created_at).toLocaleDateString() : "—"}
-              </p>
-            </div>
-          </div>
-
           {teamInfo?.failed && (
             <p className="font-body text-xs text-rust-ink mb-4" role="alert">
               Some of this list could not be read, so the client counts may be low. Reload to try again.
@@ -289,14 +264,6 @@ export default async function BrandingPage(
             invites={teamInfo?.invites ?? []}
           />
 
-          {frontDeskError ? (
-            <p className="font-body text-xs text-rust-ink mb-4" role="alert">
-              The front desk list could not be read. Reload to try again.
-            </p>
-          ) : (
-            <FrontDeskList organizationId={orgMembership.organization_id} organizationName={org?.name ?? "this organization"} people={frontDesk.filter((p) => !pendingIds.has(p.profileId))} canManage={isOwnerOrAdmin} />
-          )}
-
           {isOwnerOrAdmin && (
             <div className="mb-8 flex flex-wrap items-start gap-4">
               <InviteCoachForm groupId={params.groupId} />
@@ -310,6 +277,14 @@ export default async function BrandingPage(
             </div>
           )}
 
+          {frontDeskError ? (
+            <p className="font-body text-xs text-rust-ink mb-4" role="alert">
+              The front desk list could not be read. Reload to try again.
+            </p>
+          ) : (
+            <FrontDeskList organizationId={orgMembership.organization_id} organizationName={org?.name ?? "this organization"} people={frontDesk.filter((p) => !pendingIds.has(p.profileId))} canManage={isOwnerOrAdmin} />
+          )}
+
           <div className="mb-8">
             <ExportBusinessButton groupId={params.groupId} />
           </div>
@@ -319,6 +294,21 @@ export default async function BrandingPage(
               View Revenue Splits →
             </Link>
           </p>
+
+          <OrgSection title="Marketplace">
+            <MarketplaceListingToggle
+              organizationId={orgMembership.organization_id}
+              initialListed={!!listingRow?.listed_in_marketplace}
+              canEdit={isOwnerOrAdmin}
+              available={!listingError && !!listingRow}
+            />
+            <MarketplacePersonControl
+              profileId={user.id}
+              initialListed={!!(personRow as { marketplace_listed?: boolean } | null)?.marketplace_listed}
+              initialName={(personRow as { marketplace_display_name?: string | null } | null)?.marketplace_display_name ?? ""}
+              available={!personError && !!personRow}
+            />
+          </OrgSection>
 
           {isOwnerOrAdmin && (
             <OrgSection title="Coach Dispatch">

@@ -16,7 +16,6 @@ import { TrainedThisWeekRing } from "@/components/coach/desktop/trained-this-wee
 import { AVAILABILITY_HREF, PUBLIC_PAGE_ANCHOR } from "@/lib/my-page-qr";
 import { PULSE_ATTENTION_HREF } from "@/lib/home-greeting";
 import { failedCardDraft } from "@/components/coach/payment-problems-section";
-import type { AttentionItem } from "@/lib/your-day";
 // a drafted-message link opens the conversation through the app's router
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => {}, refresh: () => {} }) }));
 
@@ -164,12 +163,9 @@ describe("Home", () => {
     expect(b).toContain('setTimeout(() => setState("idle"), 3000)');
     expect(b).toContain("Couldn&apos;t clear them.");
   });
-  it("D21: Your day's list shows six and a button opens the rest", () => {
-    const attention: AttentionItem[] = Array.from({ length: 9 }, (_, i) => ({ id: `a${i}`, kind: "reply", text: `Reply ${i}`, href: `/r/${i}`, urgency: 1 }) as AttentionItem);
-    const html = renderToStaticMarkup(createElement(YourDayPanel, { schedule: [], attention, timezone: "America/Los_Angeles" }));
-    expect(html).toContain("Show 3 more");
-    expect(html).not.toContain("more below");
-    expect((html.match(/href="\/r\//g) ?? []).length).toBe(6);
+  it("D21, superseded by clutter audit DK5 (Nov 21): Today has no attention list of its own; Needs you's 'N more' is the one list", () => {
+    const html = renderToStaticMarkup(createElement(YourDayPanel, { schedule: [], timezone: "America/Los_Angeles" }));
+    expect(html).not.toMatch(/need you|Show \d+ more/);
   });
 });
 

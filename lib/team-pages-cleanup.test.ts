@@ -56,12 +56,10 @@ describe("desktop Home for a team organization", () => {
     expect(page).toContain("<CoachProfileEditor");
     expect(page).toContain("<YourDayPanel");
   });
-  it("Your day says nothing about payments for a team organization, and still does for everyone else", () => {
-    expect(page).toContain("showPayments={!moneyHidden}");
-    const props = { schedule: [], attention: [], timezone: "America/Los_Angeles" };
-    const team = renderToStaticMarkup(createElement(YourDayPanel, { ...props, showPayments: false }));
-    expect(team).toContain("Replies and check-ins that need you will show up here.");
-    expect(team).not.toMatch(/payment/i);
-    expect(renderToStaticMarkup(createElement(YourDayPanel, props))).toContain("Replies, payments and check-ins");
+  it("Today (once Your day) is the schedule only: what needs the coach is Needs you alone (clutter audit DK5, Nov 21), so it says nothing about payments for anyone", () => {
+    const html = renderToStaticMarkup(createElement(YourDayPanel, { schedule: [], timezone: "America/Los_Angeles" }));
+    expect(html).toContain("Today");
+    expect(html).toContain("Nothing on the calendar today.");
+    expect(html).not.toMatch(/payment|need you/i);
   });
 });

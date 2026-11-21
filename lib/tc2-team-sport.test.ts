@@ -61,9 +61,9 @@ describe("TC2: the menus use it", () => {
     expect(homes).toContain('f.teamSport ? { key: "team-calendar", label: "Team calendar", href: `${g}/team/calendar` }');
     // no Group dashboard, Group calendar, Group sessions or kiosk tab of its own; Team sheet and the quiet Business link are its own
     expect(homes).toContain('!f.teamSport && { key: "group-dashboard"');
-    expect(homes).toContain('!f.teamSport && { key: "group-calendar"');
+    expect(homes).toContain('!f.teamSport && inGroup && { key: "group-calendar"');
     expect(homes).not.toContain('key: "group-sessions"');
-    expect(homes).toContain('!f.teamSport && { key: "kiosk"');
+    expect(homes).toContain('!f.teamSport && (f.onFrontDesk || inGroup) && { key: "kiosk"');
     expect(homes).toContain('f.teamSport && { key: "team-sheet"');
     expect(homes).toContain("f.teamSport && { key: \"business-tools\", label: TEAM_SPORT_BUSINESS_LABEL");
     // the rail's Clients and Calendar read Athletes and Team calendar there
@@ -145,6 +145,8 @@ describe("TC2: the Coaches list on the coach-level Clients page covers the whole
     expect(lib).toContain("loadPendingInvitees(");
     // a failed read lists nobody rather than a partial list that looks complete
     expect(lib).toContain("if (seats.failed) return { organizationId, coaches: [], pending: [] };");
-    expect(src("app/(coach)/clients/page.tsx")).toContain("loadOrgCoaches(anchor.id)");
+    // (the coach-level Clients page no longer shows it: coaches are on Organization > Team, clutter audit DK15, Nov 21; a coach's own page still reads it)
+    expect(src("app/(coach)/clients/page.tsx")).not.toContain("loadOrgCoaches(");
+    expect(src("app/(coach)/groups/[groupId]/coaches/[profileId]/page.tsx")).toContain("loadOrgCoaches(groupId)");
   });
 });

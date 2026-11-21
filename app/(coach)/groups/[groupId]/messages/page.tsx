@@ -125,7 +125,8 @@ export default async function MessagesPage(props: { params: Promise<{ groupId: s
       return (
         <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="messages">
           <div className="pb-6 border-b border-steel/20 mb-6 flex items-center justify-between">
-            <h1 className="font-display font-bold text-3xl uppercase leading-none">All messages</h1>
+            {/* one name for the page and its tab (clutter audit DK30, Nov 21) */}
+            <h1 className="font-display font-bold text-3xl uppercase leading-none">Messages</h1>
             <Link
               href={`/groups/${params.groupId}/messages/announce`}
               className="h-9 px-4 border border-rust/40 text-rust-ink font-body text-sm flex items-center"

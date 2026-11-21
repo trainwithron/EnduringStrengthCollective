@@ -7,6 +7,8 @@ import { MACHINE_DEMOS_BUCKET, REQUEST_SELECT, requestFromRow } from "@/lib/mach
 import { youtubeEmbedUrl } from "@/lib/exercise-demo";
 import { MachineCatalogReview, type ReviewRequest } from "@/components/admin/machine-catalog-review";
 import { VideoReportsList, type VideoReportRow } from "@/components/admin/video-reports-list";
+import { MachineCatalogCurate } from "@/components/admin/machine-catalog-curate";
+import type { LibraryExerciseRow } from "@/components/coach/exercise-library-list";
 
 export const metadata = { title: "Machine requests" };
 
@@ -22,6 +24,19 @@ export default async function AdminMachineCatalogPage() {
 
   const { data: me } = await supabase.from("profiles").select("is_platform_admin").eq("id", user.id).maybeSingle();
   if (!me?.is_platform_admin) return <NoAccess>You don&apos;t have access to this page.</NoAccess>;
+
+  // The admin's own exercises with their demos, for the curating list's "Or use one of my demos" (a failed read just offers none).
+  const { data: myExerciseRows } = await supabase.from("exercise_library").select("id, name, video_path, youtube_url").eq("created_by", user.id).order("name").limit(5000);
+  const myLibrary: LibraryExerciseRow[] = ((myExerciseRows ?? []) as { id: string; name: string; video_path: string | null; youtube_url: string | null }[]).map((e) => ({
+    id: e.id,
+    name: e.name,
+    videoPath: e.video_path,
+    youtubeUrl: e.youtube_url,
+    tier: null,
+    category: null,
+    equipmentType: null,
+    description: null,
+  }));
 
   const { data: rows, error } = await supabase.from("catalog_requests").select(REQUEST_SELECT + ", submitted_by").eq("status", "pending").order("created_at").limit(200);
   const requests = ((rows ?? []) as unknown as (Parameters<typeof requestFromRow>[0] & { submitted_by: string })[]).map((r) => ({ ...requestFromRow(r), submittedBy: r.submitted_by }));
@@ -108,7 +123,12 @@ export default async function AdminMachineCatalogPage() {
       {error ? (
         <p className="font-body text-sm text-steel mt-6">The shared machine list isn&apos;t set up yet.</p>
       ) : (
-        <MachineCatalogReview requests={list} />
+        <>
+          <MachineCatalogReview requests={list} />
+          {/* the list itself, curated directly (DK1: no longer on the coach's Exercise library) */}
+          {/* keyed on the waiting requests: an approval or denial above reads the list again */}
+          <MachineCatalogCurate key={list.map((r) => r.id).join(",")} adminId={user.id} library={myLibrary} />
+        </>
       )}
       <VideoReportsList initial={reportList} />
     </main>

@@ -14,7 +14,7 @@ describe("Your day: the time and the name are separate links", () => {
     expect(scheduleCalendarHref({ groupId: "g1", startAt: "2026-10-16T03:30:00Z" }, "UTC")).toBe("/groups/g1/calendar/2026-10-16");
   });
   it("each row has two links, side by side and never nested; the name goes where it did, the time to the calendar", () => {
-    const html = renderToStaticMarkup(createElement(YourDayPanel, { schedule: [session, klass], attention: [], timezone: "America/Los_Angeles" }));
+    const html = renderToStaticMarkup(createElement(YourDayPanel, { schedule: [session, klass], timezone: "America/Los_Angeles" }));
     const row = (id: string) => html.split("<li").filter((x) => x.includes(id))[0] ?? "";
     expect(html).toContain('href="/groups/g1/athletes/a1"');
     expect(html).toContain('href="/groups/g1/calendar/2026-10-15"');
@@ -27,7 +27,7 @@ describe("Your day: the time and the name are separate links", () => {
     expect(row("Sawyer Jones")).toContain("Sawyer Jones");
   });
   it("the time link keeps the figures lined up and is big enough to tap on a phone", () => {
-    const html = renderToStaticMarkup(createElement(YourDayPanel, { schedule: [session], attention: [], timezone: "America/Los_Angeles" }));
+    const html = renderToStaticMarkup(createElement(YourDayPanel, { schedule: [session], timezone: "America/Los_Angeles" }));
     const start = html.indexOf('href="/groups/g1/calendar/2026-10-15"');
     const time = html.slice(html.lastIndexOf("<a ", start), html.indexOf("</a>", start));
     expect(time).toContain("tabular-nums");

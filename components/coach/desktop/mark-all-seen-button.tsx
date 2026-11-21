@@ -64,7 +64,8 @@ export function MarkAllSeenButton({ groupIds }: { groupIds: string[] }) {
         type="button"
         onClick={handleClick}
         disabled={state === "busy" || groupIds.length === 0}
-        className="min-h-11 font-body text-[13px] font-semibold text-steel hover:text-chalk active:text-rust-ink transition-colors disabled:opacity-40"
+        // a small link, not one of Home's main buttons (clutter audit DK22, Nov 21)
+        className="min-h-11 font-body text-xs text-steel underline underline-offset-2 hover:text-chalk active:text-rust-ink transition-colors disabled:opacity-40"
       >
         {state === "busy" ? "Clearing…" : CLEAR_DOTS_LABEL}
       </button>

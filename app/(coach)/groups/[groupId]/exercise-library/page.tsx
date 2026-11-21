@@ -151,7 +151,7 @@ export default async function ExerciseLibraryPage(
       );
     }
   }
-  const { data: me } = await supabase.from("profiles").select("is_platform_admin, timezone").eq("id", user.id).maybeSingle();
+  const { data: me } = await supabase.from("profiles").select("timezone").eq("id", user.id).maybeSingle();
   // How often each machine's QR code was scanned, this month (in the coach's own time zone) and in all (step 215; before it, no counts are shown).
   let scanCounts: Record<string, { month: number; total: number }> | null = null;
   if (initialMachines && initialMachines.length > 0) {
@@ -187,7 +187,8 @@ export default async function ExerciseLibraryPage(
         biomechVocabulary={biomechVocabulary}
         initialBiomechTagsByExercise={initialBiomechTagsByExercise}
         initialMachines={initialMachines}
-        isAdmin={!!(me as { is_platform_admin?: boolean } | null)?.is_platform_admin}
+        // Curating the shared machine list is admin work: it lives only on /admin/machine-catalog (Settings > Admin), never on a coach's own library (clutter audit DK1, Nov 21).
+        isAdmin={false}
         orgId={(group as { organization_id?: string | null } | null)?.organization_id ?? null}
         scanCounts={scanCounts}
       />

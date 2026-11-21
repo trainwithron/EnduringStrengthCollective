@@ -46,6 +46,8 @@ export function ProgramCardMenu({
   canHide = false,
   onRename,
   slotCount = 0,
+  assignOnPage = false,
+  printHref,
 }: {
   programId: string;
   programName: string;
@@ -67,6 +69,10 @@ export function ProgramCardMenu({
   onRename?: () => void;
   // A template (a program with slots) is made into a real program with "Use this template…"; it is never assigned as it is.
   slotCount?: number;
+  // The builder has its own filled Assign button, so its menu does not offer Assign… a second time (clutter audit DK21, Nov 21).
+  assignOnPage?: boolean;
+  // The builder's "Print or PDF", kept in this menu rather than first in its toolbar (DK21).
+  printHref?: string;
 }) {
   const router = useRouter();
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -363,6 +369,11 @@ export function ProgramCardMenu({
                   Rename
                 </button>
               )}
+              {printHref && (
+                <a href={printHref} target="_blank" rel="noopener" onClick={() => setView(null)} className="block w-full text-left px-3 py-2.5 font-body text-sm text-chalk hover:bg-graphite/50">
+                  Print or PDF
+                </a>
+              )}
               {!hideAssignAndDuplicate && (
                 <>
                   {isTemplate ? (
@@ -376,7 +387,7 @@ export function ProgramCardMenu({
                     >
                       Use this template…
                     </button>
-                  ) : (
+                  ) : assignOnPage ? null : (
                     <button
                       type="button"
                       onClick={() => {

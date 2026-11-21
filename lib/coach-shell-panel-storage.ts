@@ -82,11 +82,12 @@ export function splitPathFor(view: ListPanelView, groupId: string): { path: stri
   return { path: "/clients", label: "Clients" };
 }
 
+// The panel starts closed for everyone, so the page being worked on has the whole window (clutter audit DK4, Nov 21). A coach who opened it ("0" saved by the toggle) keeps it open.
 export function readListPanelCollapsed(): boolean {
   try {
-    return window.localStorage.getItem(COLLAPSED_KEY) === "1";
+    return window.localStorage.getItem(COLLAPSED_KEY) !== "0";
   } catch {
-    return false;
+    return true;
   }
 }
 

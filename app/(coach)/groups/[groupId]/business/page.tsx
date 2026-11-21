@@ -231,7 +231,7 @@ export default async function BusinessDashboardPage(
           A snapshot of this organization.{" "}
           {realMRR > 0 || realIncomeThisMonth > 0
             ? "Income and MRR below are real, from your connected packages."
-            : "Set up packages to see real income and MRR here — until then, the manual rate estimate below is your only signal."}
+            : "Set up packages to see real income and monthly recurring revenue here. Until then, the rates you set below give an estimate."}
         </p>
       </div>
 
@@ -255,7 +255,7 @@ export default async function BusinessDashboardPage(
           </p>
         )}
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
         {hasBillingSetUp ? (
           <div className="border border-steel/20 rounded-token-lg p-3">
             <p className="font-display text-2xl leading-none">${realIncomeThisMonth.toLocaleString()}</p>
@@ -304,15 +304,11 @@ export default async function BusinessDashboardPage(
           <p className="font-display text-2xl leading-none">{bookingsThisMonthCount ?? 0}</p>
           <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Sessions this month</p>
         </div>
-        <div className="border border-steel/20 rounded-token-lg p-3">
-          <p className="font-display text-2xl leading-none">{totalReferralClicks}</p>
-          <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Referral clicks</p>
-        </div>
-        <div className="border border-steel/20 rounded-token-lg p-3">
-          <p className="font-display text-2xl leading-none">{totalProShopClicks}</p>
-          <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Pro Shop clicks</p>
-        </div>
       </div>
+      {/* Clicks are not money: one small line, not tiles beside Income (clutter audit DK29, Nov 21) */}
+      <p className="font-body text-xs text-steel mb-8" data-shop-referrals>
+        Shop &amp; referrals: {totalProShopClicks} Pro Shop {totalProShopClicks === 1 ? "click" : "clicks"}, {totalReferralClicks} referral {totalReferralClicks === 1 ? "click" : "clicks"}
+      </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <div className="border border-steel/20 rounded-token-lg p-4">
@@ -368,8 +364,8 @@ export default async function BusinessDashboardPage(
           <ChevronDown aria-hidden className="w-4 h-4 text-steel ml-auto transition-transform group-open:rotate-180" />
         </summary>
         <p className="font-body text-xs text-steel mt-2 mb-3 max-w-[70ch]">
-          Set what each client actually pays to see an estimated MRR above — this is a manual stand-in
-          until payments are turned on.
+          Set what each client pays you outside Spotlight to see an estimated monthly revenue above. Once your
+          packages bring in recurring payments, the real number is shown instead.
         </p>
         <div className="divide-y divide-steel/15">
           {clients.length === 0 ? (

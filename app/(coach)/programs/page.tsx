@@ -228,8 +228,9 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
           {cards.length} {cards.length === 1 ? "program" : "programs"}
         </p>
         <div className="flex items-center gap-4 mt-4">
-          <Link href={`/groups/${newProgramGroupId}/programs/new${newProgramQuery}`} className="font-body text-xs text-rust-ink">
-            + New program
+          {/* the page's main button (clutter audit DK22, Nov 21: it was a small text link) */}
+          <Link href={`/groups/${newProgramGroupId}/programs/new${newProgramQuery}`} className="inline-flex items-center h-11 px-5 bg-rust text-graphite font-body text-sm font-semibold">
+            New program
           </Link>
         </div>
       </div>

@@ -212,8 +212,11 @@ export function ProgramBuilderDesktop({
     if (initialExpandedWeek != null && weekNumbers.includes(initialExpandedWeek)) {
       return new Set([initialExpandedWeek]);
     }
-    return new Set(weekNumbers.length > 0 ? [Math.min(...weekNumbers)] : []);
+    // the latest week open, the one a coach is most likely building next (clutter audit DK20, Nov 21)
+    return new Set(weekNumbers.length > 0 ? [Math.max(...weekNumbers)] : []);
   });
+  // Program settings start open only on a program with no weeks yet (where the AI box and the schedule are the first job); read once, so adding a week never snaps it shut.
+  const [settingsOpenAtStart] = useState(initialDays.length === 0);
 
   function toggleWeek(weekNumber: number) {
     setExpandedWeeks((prev) => {
@@ -316,6 +319,8 @@ export function ProgramBuilderDesktop({
             aiDraft={aiDraft}
             hideAssignAndDuplicate={embedded}
             slotCount={days.reduce((n, d) => n + d.items.filter((i) => i.kind === "exercise" && !!i.slot).length, 0)}
+            assignOnPage
+            printHref={`/print/programs/${programId}`}
           />
         </div>
         <ProgramAssignedClients programId={programId} groupId={groupId} athleteId={athleteId} />
@@ -324,23 +329,14 @@ export function ProgramBuilderDesktop({
         <div className="mt-2">
           <SaveStatusBar />
         </div>
-        <ProgramDescriptionEditor programId={programId} initialDescription={programDescription} />
-        <ProgramProgressionPanel programId={programId} groupId={groupId} days={days} initialRules={initialProgressions} onDaysChange={setDays} />
+        {/* One toolbar: the one filled Assign (the menu no longer repeats it; Print is in the menu: clutter audit DK21, Nov 21) */}
         <div className="flex flex-wrap gap-3 mt-4">
-          <a
-            href={`/print/programs/${programId}`}
-            target="_blank"
-            rel="noopener"
-            className="inline-flex items-center h-9 font-body text-xs text-rust-ink border border-rust px-3"
-          >
-            Print or PDF
-          </a>
           <button
             type="button"
             onClick={() => setAssignOpen(true)}
-            className="inline-flex items-center h-11 sm:h-9 font-body text-xs text-rust-ink border border-rust px-3"
+            className="inline-flex items-center h-11 sm:h-9 font-body text-xs font-semibold bg-rust text-graphite px-4"
           >
-            Assign to clients
+            Assign
           </button>
           {toolbarExtra}
           {startDate && trainingDays && trainingDays.length > 0 && (
@@ -355,6 +351,18 @@ export function ProgramBuilderDesktop({
         {assignOpen && (
           <ProgramAssignPanel programId={programId} programName={name} groupId={groupId} aiDraft={aiDraft} orgProgram={orgProgram} onClose={() => setAssignOpen(false)} onChanged={() => router.refresh()} />
         )}
+      </div>
+
+      {/* Everything about the program that is not its days, in one fold, so the weeks start right under the name (clutter audit DK19, Nov 21). Kept mounted while closed. */}
+      <details className="group mb-6 border border-steel/20" open={settingsOpenAtStart} data-program-settings>
+        <summary className="flex items-center gap-2 min-h-11 px-4 cursor-pointer list-none [&::-webkit-details-marker]:hidden font-body text-sm font-semibold text-chalk">
+          <span aria-hidden="true" className="text-steel group-open:rotate-90 transition-transform">&#9656;</span>
+          Program settings
+          <span className="font-body text-xs font-normal text-steel">Description, progressions, AI builder, training intent, schedule</span>
+        </summary>
+        <div className="px-4 pb-4">
+        <ProgramDescriptionEditor programId={programId} initialDescription={programDescription} />
+        <ProgramProgressionPanel programId={programId} groupId={groupId} days={days} initialRules={initialProgressions} onDaysChange={setDays} />
         {!embedded && (
           <AiProgramBuilderBox
             programId={programId}
@@ -375,29 +383,40 @@ export function ProgramBuilderDesktop({
             onChange={setTrainingIntent}
           />
         </div>
-      </div>
-
-      {aiSequencingNotes && (
-        <div className="mb-6">
-          <ProgramChatPanel programId={programId} groupId={groupId} programName={name} />
+        {aiSequencingNotes && (
+          <div className="mt-4">
+            <ProgramChatPanel programId={programId} groupId={groupId} programName={name} />
+          </div>
+        )}
+        <div className="mt-4 border border-steel/20">
+          <ProgramScheduleSettings
+            programId={programId}
+            initialStartDate={initialStartDate}
+            initialTrainingDays={initialTrainingDays}
+            initialVisibilityWindow={initialVisibilityWindow}
+            onChange={(nextStartDate, nextTrainingDays) => {
+              setStartDate(nextStartDate);
+              setTrainingDays(nextTrainingDays);
+            }}
+          />
         </div>
-      )}
+        </div>
+      </details>
 
-      <div className="mb-6 border border-steel/20">
-        <ProgramScheduleSettings
-          programId={programId}
-          initialStartDate={initialStartDate}
-          initialTrainingDays={initialTrainingDays}
-          initialVisibilityWindow={initialVisibilityWindow}
-          onChange={(nextStartDate, nextTrainingDays) => {
-            setStartDate(nextStartDate);
-            setTrainingDays(nextTrainingDays);
-          }}
-        />
+      {/* Adding the next week is at the top of the weeks, not after every one of them (DK20) */}
+      <div className="mb-4">
+        <button
+          type="button"
+          onClick={handleAddWeek}
+          disabled={addWeekBusy}
+          className="w-full h-11 border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust-ink transition-colors disabled:opacity-40"
+        >
+          + Add Week {nextWeekNumber}
+        </button>
       </div>
 
       {weekNumbers.length === 0 && (
-        <p className="font-body text-sm text-steel py-4">No weeks yet. Add the first one below.</p>
+        <p className="font-body text-sm text-steel py-4">No weeks yet. Add the first one above.</p>
       )}
 
       <div className="space-y-4">
@@ -464,16 +483,6 @@ export function ProgramBuilderDesktop({
           </button>
         </div>
       )}
-      <div className="pt-4">
-        <button
-          type="button"
-          onClick={handleAddWeek}
-          disabled={addWeekBusy}
-          className="w-full h-11 border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust-ink transition-colors disabled:opacity-40"
-        >
-          + Add Week {nextWeekNumber}
-        </button>
-      </div>
     </div>
     </SaveToastChannelContext.Provider>
   );

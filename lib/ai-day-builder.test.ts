@@ -91,10 +91,10 @@ describe("Build program and New program make the program at once", () => {
     // and once even when the page is mounted twice in a row (two were made 5 ms apart on Oct 26)
     expect(c).toContain("const id = await startOnce(");
   });
-  it("the Programs page no longer has the Import or build with AI button (one + New program stays)", () => {
+  it("the Programs page no longer has the Import or build with AI button (one New program button stays, a real button since clutter audit DK22)", () => {
     const page = read("app/(coach)/programs/page.tsx");
     expect(page).not.toContain("Import or build with AI");
-    expect(page).toContain("+ New program");
+    expect(page).toMatch(/className="inline-flex items-center h-11 px-5 bg-rust text-graphite font-body text-sm font-semibold">\s*New program\s*<\/Link>/);
   });
 });
 

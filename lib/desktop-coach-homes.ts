@@ -54,7 +54,10 @@ export function stripEntries(tabs: HomeTab[]): StripEntry[] {
 }
 
 const ACCOUNT = { key: "account", label: "Account" };
+const INTEGRATIONS = { key: "integrations", label: "Integrations" };
 const ORGANIZATION = { key: "organization", label: "Organization" };
+// Booking page and Session types are set up next to Availability: one tab, its pages picked under the strip (clutter audit DK9, Nov 21).
+const AVAILABILITY = { key: "availability", label: "Availability" };
 const WEBSITE_SHOP = { key: "website-shop", label: "Website & shop" };
 const HELP = { key: "help", label: "Help" };
 const ADMIN = { key: "admin", label: "Admin" };
@@ -100,44 +103,53 @@ export function homeTabs(f: HomeFacts): Record<HomeKey, HomeTab[]> {
     calendar: [
       // a team-sport group's calendar is the team calendar (its address lights that tab)
       f.teamSport ? { key: "team-calendar", label: "Team calendar", href: `${g}/team/calendar` } : { key: "schedule", label: "Schedule", href: "/calendar" },
-      { key: "availability", label: "Availability", href: "/calendar?tab=availability" },
-      !f.teamSport && { key: "group-calendar", label: "Group calendar", href: f.coachLevel ? "/group-calendar" : `${g}/group-calendar` },
+      { key: "availability", label: "Availability", href: "/calendar?tab=availability", group: AVAILABILITY },
+      { key: "booking-page", label: "Booking page", href: `${g}/business/booking-page`, group: AVAILABILITY },
+      { key: "session-types", label: "Session types", href: `${g}/business/session-types`, group: AVAILABILITY },
+      // a coach with no group has no group calendar (DK9)
+      !f.teamSport && inGroup && { key: "group-calendar", label: "Group calendar", href: f.coachLevel ? "/group-calendar" : `${g}/group-calendar` },
       !f.teamSport && f.teamMode && { key: "team-calendar", label: "Team calendar", href: `${g}/team/calendar` },
-      { key: "booking-page", label: "Booking page", href: `${g}/business/booking-page` },
-      { key: "session-types", label: "Session types", href: `${g}/business/session-types` },
-      !f.teamSport && { key: "kiosk", label: "Kiosk check-in", href: `${g}/kiosk/settings` },
+      // a kiosk only where there is a front desk or a group to check in (DK9); the TV display sits next to it (DK17)
+      !f.teamSport && (f.onFrontDesk || inGroup) && { key: "kiosk", label: "Kiosk check-in", href: `${g}/kiosk/settings` },
+      { key: "display", label: "Display mode", href: `${g}/display`, newTab: true },
     ],
     programs: [
       { key: "programs", label: "Programs", href: ALL_PROGRAMS_HREF, termKey: "program" },
       { key: "exercise-library", label: "Exercise library", href: `${g}/exercise-library` },
-      { key: "challenges", label: "Challenges", href: `${g}/challenges` },
-      { key: "records", label: "Hall of fame", href: `${g}/records` },
+      // group features, not for a one-on-one coach (DK8)
+      inGroup && { key: "challenges", label: "Challenges", href: `${g}/challenges` },
+      inGroup && { key: "records", label: "Hall of fame", href: `${g}/records` },
       f.teamMode ? { key: "team", label: "Depth chart", href: `${g}/team` } : f.groupKind === "team" && { key: "team", label: "Seasons", href: `${g}/team` },
-      { key: "team-performance", label: "Team performance", href: `${g}/team-performance` },
+      (f.teamMode || inGroup) && { key: "team-performance", label: "Team performance", href: `${g}/team-performance` },
       f.teamSport && { key: "team-sheet", label: "Team sheet", href: `${g}/team-sheet` },
     ],
     nutrition: [{ key: "nutrition", label: "Nutrition", href: `${g}/nutrition` }],
+    // Nothing for the platform admin here: the Support inbox is under Settings > Admin with the other platform chores (DK3).
     messages: [
       { key: "messages", label: "Messages", href: `${g}/messages`, badge: "messages" },
       inGroup && { key: "feed", label: "Team feed", href: `${g}/feed`, badge: "feed" },
-      f.isPlatformAdmin && { key: "admin-support", label: "Support inbox", href: "/admin/support", badge: "support" },
     ],
-    // Five tabs (Ron, Nov 2): Account, Organization, Website & shop, Help, and Admin for the platform admin; each group's pages are picked under the strip.
+    // Account, Integrations, Organization, Website & shop, Help, and Admin for the platform admin; each group's pages are picked under the strip.
     settings: [
       { key: "settings", label: "Account", href: `${g}/settings`, group: ACCOUNT },
-      { key: "display", label: "Display mode", href: `${g}/display`, newTab: true, group: ACCOUNT },
-      { key: "sms-settings", label: "Text messages", href: `${g}/business/sms-settings`, group: ACCOUNT },
-      { key: "zapier", label: "Zapier", href: `${g}/business/zapier`, group: ACCOUNT },
+      // Text messages and Zapier connect other services: their own group, not Account (DK17)
+      { key: "sms-settings", label: "Text messages", href: `${g}/business/sms-settings`, group: INTEGRATIONS },
+      { key: "zapier", label: "Zapier", href: `${g}/business/zapier`, group: INTEGRATIONS },
       { key: "branding", label: "Organization", href: `${g}/branding`, group: ORGANIZATION },
       { key: "website", label: "My website", href: `${g}/business/website`, group: WEBSITE_SHOP },
       { key: "resources", label: "Pro shop and referrals", href: `${g}/resources`, group: WEBSITE_SHOP },
       { key: "support", label: "Support", href: `${g}/business/support`, group: HELP },
       { key: "quick-tips", label: "Quick tips", href: `${g}/quick-tips`, group: HELP },
       f.teamSport && { key: "business-tools", label: TEAM_SPORT_BUSINESS_LABEL, href: teamSportBusinessHref(f.groupId) },
+      // One Admin group for every platform chore (DK3): the support inbox, organizations, ranking, the shared machine list and the recipes' ingredients.
+      f.isPlatformAdmin && { key: "admin-support", label: "Support inbox", href: "/admin/support", badge: "support", group: ADMIN },
       f.isPlatformAdmin && { key: "admin-organizations", label: "Organizations", href: "/admin/organizations", group: ADMIN },
       f.isPlatformAdmin && { key: "admin-ranking", label: "Marketplace ranking", href: "/admin/marketplace-ranking", group: ADMIN },
       // the built-in recipes' ingredient mapping, moved off the coach's Nutrition page (Ron, Nov 21)
       f.isPlatformAdmin && { key: "admin-ingredients", label: "Recipe ingredients", href: "/admin/nutrition-ingredients", group: ADMIN },
+      f.isPlatformAdmin && { key: "admin-machines", label: "Machine list", href: "/admin/machine-catalog", group: ADMIN },
+      // Plan & Billing before it is switched on for coaches: previewed here, never on the organization's own page (DK2)
+      f.isPlatformAdmin && { key: "admin-billing", label: "Billing preview", href: `${g}/branding?tab=billing&preview=1`, group: ADMIN },
     ],
   };
   const out = {} as Record<HomeKey, HomeTab[]>;
@@ -159,7 +171,8 @@ const RULES: Rule[] = [
   // Home
   rule("/dashboard", "home", "today"),
   rule("/notifications", "home", null),
-  rule("/requests", "home", null),
+  // the requests page belongs to Clients, like /clients/requests (DK30)
+  rule("/requests", "clients", "clients"),
   rule(`${G}/business`, "home", "business"),
   rule(`${G}/dashboard`, "home", "group-dashboard"),
   // Clients
@@ -198,6 +211,7 @@ const RULES: Rule[] = [
   rule(`${G}/business/booking-page`, "calendar", "booking-page"),
   rule(`${G}/business/session-types`, "calendar", "session-types"),
   rule(`${G}/kiosk/settings`, "calendar", "kiosk"),
+  rule(`${G}/display`, "calendar", "display"),
   // Programs
   rule("/programs", "programs", "programs"),
   rule(`${G}/programs`, "programs", "programs"),
@@ -228,14 +242,13 @@ const RULES: Rule[] = [
   rule(`${G}/messages/${ID}`, "messages", "messages"),
   rule(`${G}/feed`, "messages", "feed"),
   rule(`${G}/leaderboard`, "messages", "feed"),
-  rule("/admin/support", "messages", "admin-support"),
   rule("/reports", "messages", null),
   // Settings
   rule(`${G}/settings`, "settings", "settings"),
-  rule(`${G}/display`, "settings", "display"),
   rule(`${G}/business/sms-settings`, "settings", "sms-settings"),
   rule(`${G}/business/support`, "settings", "support"),
   rule(`${G}/quick-tips`, "settings", "quick-tips"),
+  rule(`${G}/branding`, "settings", "admin-billing", (q) => q.get("preview") === "1"),
   rule(`${G}/branding`, "settings", "branding"),
   rule(`${G}/revenue-splits`, "settings", "branding"),
   rule(`${G}/team-activity`, "settings", "branding"),
@@ -248,6 +261,8 @@ const RULES: Rule[] = [
   rule("/admin/organizations", "settings", "admin-organizations"),
   rule("/admin/marketplace-ranking", "settings", "admin-ranking"),
   rule("/admin/nutrition-ingredients", "settings", "admin-ingredients"),
+  rule("/admin/support", "settings", "admin-support"),
+  rule("/admin/machine-catalog", "settings", "admin-machines"),
   rule(`/admin/${ID}`, "settings", null),
 ];
 

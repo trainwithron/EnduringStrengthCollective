@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Check, MoreVertical } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { confirmDialog } from "@/components/shared/confirm-dialog";
@@ -8,8 +9,20 @@ import { runDeleteClient, runRemoveClient } from "@/components/coach/delete-clie
 import { useTerm } from "@/components/coach/terminology-provider";
 import { CLIENT_TYPE_CHOICES, type ClientType } from "@/lib/client-type";
 import { setPaymentHold } from "@/lib/payment-hold-client";
+import { addSessionsHref } from "@/lib/add-sessions-link";
 
-// The small three-dot menu on a client's card and on a row of the Clients list: three actions, the same the client's own profile has (Release Z1 added Remove), and above them the client's type.
+/** The everyday jobs at the top of the menu (clutter audit DK26, Nov 21), each a link to the place that does it. */
+export function rowMenuLinks(groupId: string, athleteId: string): { label: string; href: string }[] {
+  return [
+    { label: "Log workout", href: `/groups/${groupId}/athletes/${athleteId}/log` },
+    { label: "Book session", href: `/calendar?view=week&client=${athleteId}` },
+    { label: "Message", href: `/groups/${groupId}/messages?with=${athleteId}` },
+    { label: "Add sessions", href: addSessionsHref(groupId, athleteId) },
+  ];
+}
+
+// The small three-dot menu on a client's card and on a row of the Clients list. At the top, the everyday jobs (Log workout, Book session, Message, Add sessions: clutter audit DK26,
+// Nov 21), then the client's type, then the profile's own actions (Release Z1 added Remove), with Delete permanently set apart at the bottom.
 //   * Client type: In person / Online / Group, one tap, no confirm. It is the tier the coach sets on the client (group_memberships.client_tier), the same value the Clients filters read; the calendar's
 //     client list leaves Online clients out until asked for. "Set inactive" below is the type's fourth choice, Set aside.
 //   * Set inactive: the existing set_client_inactive call (nothing is deleted; a workout, session or message from them brings them back). A client already set aside shows "Bring back" instead.
@@ -144,6 +157,12 @@ export function ClientRowMenu({ groupId, athleteId, athleteName, setAside = fals
       </button>
       {open && (
         <div role="menu" className="absolute right-0 top-full z-30 mt-0.5 w-56 border border-steel/30 bg-surface shadow-lg">
+          {rowMenuLinks(groupId, athleteId).map((l) => (
+            <Link key={l.label} href={l.href} role="menuitem" prefetch={false} onClick={() => setOpen(false)} className={`${item} flex items-center`}>
+              {l.label}
+            </Link>
+          ))}
+          <div className="border-t border-steel/20 my-0.5" aria-hidden="true" />
           <p className="px-3 pt-2 pb-0.5 font-body text-xs text-steel uppercase tracking-wide">Client type</p>
           {CLIENT_TYPE_CHOICES.map((choice) => (
             <button key={choice.value} type="button" role="menuitemradio" aria-checked={clientType === choice.value} onClick={() => void chooseType(choice.value)} className={`${item} flex items-center justify-between`}>
@@ -163,6 +182,8 @@ export function ClientRowMenu({ groupId, athleteId, athleteName, setAside = fals
           <button type="button" role="menuitem" onClick={() => void removeClient()} className={item}>
             Remove from my {term("client")}s
           </button>
+          {/* set apart, at the very bottom, so it is never one slip away from an everyday item */}
+          <div className="border-t border-steel/30 mt-2 mb-0.5" aria-hidden="true" />
           <button
             type="button"
             role="menuitem"

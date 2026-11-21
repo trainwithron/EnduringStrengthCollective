@@ -94,7 +94,7 @@ export default async function MessageThreadPage(
       <header className="px-5 pt-8 pb-4 border-b border-steel/20">
         {viewerIsCoach ? (
           <Link href={`/groups/${params.groupId}/messages`} className="min-h-11 inline-flex items-center font-body text-xs text-steel uppercase tracking-wide">
-            {"\u2190 All messages"}
+            {"\u2190 Messages"}
           </Link>
         ) : (
           // Audit C14 (Nov 21): back to where they came from, or Home (it always went to Settings).

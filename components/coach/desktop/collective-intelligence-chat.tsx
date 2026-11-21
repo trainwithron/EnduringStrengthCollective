@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { MessageCircle, ChevronRight, ChevronLeft } from "lucide-react";
 import {
@@ -10,9 +9,6 @@ import {
   DEFAULT_ASK_SPOT_WIDGET_STATE,
 } from "@/lib/ask-spot-widget-state";
 import { AskSpotChatPanel } from "@/components/coach/ask-spot-chat-panel";
-import { FloatingMessages } from "@/components/coach/desktop/floating-messages";
-import { afterThreadOpened, badgeText, panelHeader, shownUnread } from "@/lib/floating-panel";
-import { clientIdFromPath } from "@/lib/messages-list";
 
 const MIN_BOTTOM = 88; // clears a mobile bottom tab bar (64px) + margin
 const TOP_SAFE_MARGIN = 160; // keeps the tab and its open panel clear of a top-anchored control (e.g. The Spot)
@@ -62,21 +58,10 @@ function clampBottom(value: number): number {
 // new page even though this component remounts fresh on every page
 // (CoachDesktopShell mounts it per-page, not in a persistent root
 // layout).
-export function CollectiveIntelligenceChat({ groupId, unread = 0 }: { groupId?: string; unread?: number } = {}) {
+//
+// It is Spot only (clutter audit DK18, Nov 21): messages live on the Messages page and the rail's count, so this tab carries no Messages tab and no unread badge of its own.
+export function CollectiveIntelligenceChat() {
   const [open, setOpen] = useState(false);
-  // The panel always opens on Spot. The Messages tab (only where there is a group to read messages for) is a quick view of who needs a reply; the client whose page the coach is on is pinned in it.
-  const [tab, setTab] = useState<"spot" | "messages">("spot");
-  const [messagesOpenId, setMessagesOpenId] = useState<string | null>(null);
-  // Threads read in the panel since the page loaded its count: they come off the badge (on the tab and on the edge tab). A fresh count from the page starts this over.
-  const [readSince, setReadSince] = useState(0);
-  const [countedThreads, setCountedThreads] = useState<Set<string>>(new Set());
-  useEffect(() => {
-    setReadSince(0);
-    setCountedThreads(new Set());
-  }, [unread]);
-  const unreadNow = shownUnread(unread, readSince);
-  const header = panelHeader(tab);
-  const viewingClientId = clientIdFromPath(usePathname());
   const [side, setSide] = useState<"left" | "right">(DEFAULT_ASK_SPOT_WIDGET_STATE.side);
   const [bottomOffset, setBottomOffset] = useState(DEFAULT_ASK_SPOT_WIDGET_STATE.bottomOffsetPx);
   const tabDrag = useRef<{ x: number; y: number; startBottom: number; moved: boolean } | null>(null);
@@ -189,7 +174,7 @@ export function CollectiveIntelligenceChat({ groupId, unread = 0 }: { groupId?: 
     return (
       <button
         type="button"
-        aria-label={unreadNow > 0 ? `Open Ask Spot chat, ${unreadNow} unread ${unreadNow === 1 ? "message" : "messages"}` : "Open Ask Spot chat"}
+        aria-label="Open Ask Spot chat"
         style={edgeStyle}
         className={`fixed z-40 w-7 h-14 bg-rust/80 active:bg-rust transition-colors flex items-center justify-center touch-none select-none ${
           side === "right" ? "rounded-l-token-sm" : "rounded-r-token-sm"
@@ -199,9 +184,6 @@ export function CollectiveIntelligenceChat({ groupId, unread = 0 }: { groupId?: 
         onPointerUp={handleTabPointerUp}
       >
         <MessageCircle className="w-3.5 h-3.5 text-graphite" />
-        {unreadNow > 0 && (
-          <span className={`absolute -top-2 ${side === "right" ? "left-0" : "right-0"} h-5 min-w-[20px] px-1 rounded-full bg-chalk text-graphite font-body text-xs font-bold flex items-center justify-center shadow`}>{badgeText(unreadNow)}</span>
-        )}
       </button>
     );
   }
@@ -219,53 +201,19 @@ export function CollectiveIntelligenceChat({ groupId, unread = 0 }: { groupId?: 
       >
         <div>
           <p className="font-body text-xs text-steel uppercase tracking-wide font-bold">
-            {header.title}
+            Ask Spot
           </p>
-          <p className="font-body text-xs text-steel mt-0.5">{header.subtitle}</p>
+          <p className="font-body text-xs text-steel mt-0.5">Find a page, learn how to do something, or ask about a client.</p>
         </div>
         <ChevronIcon
           className="w-4 h-4 text-steel shrink-0"
-          aria-label={header.collapseLabel}
+          aria-label="Collapse Ask Spot chat"
         />
       </div>
 
-      {groupId && (
-        <div role="tablist" aria-label="Panel" className="flex border-b border-steel/20 shrink-0">
-          {(["spot", "messages"] as const).map((t) => (
-            <button
-              key={t}
-              type="button"
-              role="tab"
-              aria-selected={tab === t}
-              onClick={() => setTab(t)}
-              className={`flex-1 h-11 font-body text-sm flex items-center justify-center gap-2 border-b-2 ${tab === t ? "border-rust text-chalk" : "border-transparent text-steel"}`}
-            >
-              {t === "spot" ? "Spot" : "Messages"}
-              {t === "messages" && unreadNow > 0 && (
-                <span className="h-5 min-w-[20px] px-1 rounded-full bg-rust text-graphite font-body text-xs font-bold flex items-center justify-center">{badgeText(unreadNow)}</span>
-              )}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Spot stays mounted (its conversation is kept) but hidden on the other tab; Messages is mounted only while it is showing, so nothing loads or is marked read while it is hidden or the panel is closed. */}
-      <div className={tab === "spot" || !groupId ? "flex-1 min-h-0 flex flex-col" : "hidden"}>
+      <div className="flex-1 min-h-0 flex flex-col">
         <AskSpotChatPanel />
       </div>
-      {groupId && tab === "messages" && (
-        <FloatingMessages
-          groupId={groupId}
-          viewingClientId={viewingClientId}
-          openId={messagesOpenId}
-          onOpenIdChange={setMessagesOpenId}
-          onOpened={(otherId, threadUnread) => {
-            const next = afterThreadOpened(countedThreads, readSince, otherId, threadUnread);
-            setCountedThreads(next.counted);
-            setReadSince(next.readSince);
-          }}
-        />
-      )}
     </div>
   );
 }
