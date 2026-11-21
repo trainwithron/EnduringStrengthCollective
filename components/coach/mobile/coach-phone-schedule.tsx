@@ -227,6 +227,7 @@ export async function CoachPhoneSchedule({
                 >
                   {l.dot && <span aria-hidden="true" className={`inline-block w-[5px] h-[5px] rounded-full mr-0.5 align-middle ${l.dot}`} />}
                   {l.text}
+                  {"title" in l && l.title ? <span className="sr-only"> (canceled)</span> : null}
                 </span>
               ))}
               {lines.length > 2 && <span className="font-body text-[10px] leading-tight text-rust-ink mt-0.5">+{lines.length - 2}</span>}

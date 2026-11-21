@@ -44,6 +44,15 @@ describe("what it says", () => {
     expect(canceledLine(toCanceledSession(row({ cancelled_by: COACH, late_cancel: true, late_change_kind: "cancel", late_charge_state: "waived" })))).toBe("Client canceled · Waived");
     expect(lateStateLabel(null)).toBeNull();
   });
+  it("Give it back only for a charged late cancel, not for a charged late move the client cancelled afterwards (give_back_late_cancel refuses that one)", () => {
+    expect(toCanceledSession(row({ cancelled_by: COACH, late_cancel: true, late_change_kind: "cancel", late_charge_state: "charged" })).canGiveBack).toBe(true);
+    const movedThenCancelled = toCanceledSession(row({ cancelled_by: CLIENT, late_cancel: false, late_change_kind: "reschedule", late_charge_state: "charged" }));
+    expect(movedThenCancelled.state).toBe("Charged");
+    expect(movedThenCancelled.canGiveBack).toBe(false);
+    expect(toCanceledSession(row({ cancelled_by: CLIENT, late_cancel: true, late_change_kind: "cancel", late_charge_state: "waived" })).canGiveBack).toBe(false);
+    const actions = read("components/coach/canceled-session-actions.tsx");
+    expect(actions).toContain('if (lateState === "charged") return canGiveBack ? <GiveBackLateCancelButton');
+  });
 });
 
 describe("on the coach's calendar, never in the way", () => {
@@ -57,12 +66,14 @@ describe("on the coach's calendar, never in the way", () => {
     expect(grid).toContain("bookings={bookingsByDateKey.get(expandedKey) ?? []}");
     expect(grid).not.toMatch(/bookings=\{[^}]*canceled/);
     expect(grid).toContain('className="line-through"');
+    // a day with only cancelled sessions does not also say "No sessions"
+    expect(grid).toContain("(canceledByDateKey.get(key) ?? []).length === 0 && (");
   });
   it("the day page draws them in the hour grid where a tap goes through to the open time, and lists them with Charge, Waive or Give it back", () => {
     const page = read("app/(coach)/groups/[groupId]/calendar/[date]/page.tsx");
     expect(page).toContain("canceled={canceledToday.map(");
     expect(page).toContain("busyRanges={(bookingRows ?? []).map(");
-    expect(page).toContain("<CanceledSessionActions bookingId={c.id} lateState={c.lateState} name={c.name} />");
+    expect(page).toContain("<CanceledSessionActions bookingId={c.id} lateState={c.lateState} canGiveBack={c.canGiveBack} name={c.name} />");
     expect(page).toContain("id={`canceled-${c.id}`}");
     const hour = read("components/coach/desktop/day-hour-grid.tsx");
     expect(hour).toContain('className="absolute left-1 right-1 border border-dashed border-steel/50 text-steel px-2 py-0.5 overflow-hidden pointer-events-none"');
@@ -73,6 +84,8 @@ describe("on the coach's calendar, never in the way", () => {
   it("the phone month shows them struck through, never in Upcoming; the client's own calendar never reads them", () => {
     const phone = read("components/coach/mobile/coach-phone-schedule.tsx");
     expect(phone).toContain('className: "text-steel line-through"');
+    // a screen reader hears it was cancelled, not just "8:00 Hewan"
+    expect(phone).toContain('<span className="sr-only"> (canceled)</span>');
     const upcomingDef = phone.slice(phone.indexOf("const upcomingRows = ["), phone.indexOf("];", phone.indexOf("const upcomingRows = [")));
     expect(upcomingDef.length).toBeGreaterThan(0);
     expect(upcomingDef).not.toMatch(/canceled/i);

@@ -1061,7 +1061,7 @@ export default async function CoachDayDetailPage(
                     <span className="line-through">{c.name}</span> · {canceledLine(c)}
                   </span>
                 </div>
-                <CanceledSessionActions bookingId={c.id} lateState={c.lateState} name={c.name} />
+                <CanceledSessionActions bookingId={c.id} lateState={c.lateState} canGiveBack={c.canGiveBack} name={c.name} />
               </div>
             ))}
           </div>

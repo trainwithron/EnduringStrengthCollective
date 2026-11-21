@@ -339,7 +339,7 @@ export function CalendarGrid({
                     )
                   )}
 
-                {bookings.length === 0 && events.length === 0 && (
+                {bookings.length === 0 && events.length === 0 && (canceledByDateKey.get(key) ?? []).length === 0 && (
                   <span className="font-body text-xs text-steel">No sessions</span>
                 )}
               </>

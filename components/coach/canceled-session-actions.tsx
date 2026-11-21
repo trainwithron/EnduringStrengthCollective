@@ -7,7 +7,18 @@ import { GiveBackLateCancelButton } from "@/components/coach/give-back-late-canc
 
 // What the coach can still do with a session the client cancelled (Ron, Nov 21), the same actions as on Requests: a late cancel waiting for them is Charged (takes one session)
 // or Waived (takes none) through resolve_late_change; a charged one can be given back (give_back_late_cancel). Nothing to do for one cancelled in time or already waived.
-export function CanceledSessionActions({ bookingId, lateState, name }: { bookingId: string; lateState: "charged" | "waived" | "flagged" | null; name: string }) {
+export function CanceledSessionActions({
+  bookingId,
+  lateState,
+  canGiveBack,
+  name,
+}: {
+  bookingId: string;
+  lateState: "charged" | "waived" | "flagged" | null;
+  // only a charged late cancel can be given back (give_back_late_cancel refuses a charged late move that was cancelled afterwards)
+  canGiveBack: boolean;
+  name: string;
+}) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -26,7 +37,7 @@ export function CanceledSessionActions({ bookingId, lateState, name }: { booking
     router.refresh();
   }
 
-  if (lateState === "charged") return <GiveBackLateCancelButton bookingId={bookingId} who={first} />;
+  if (lateState === "charged") return canGiveBack ? <GiveBackLateCancelButton bookingId={bookingId} who={first} /> : null;
   if (lateState !== "flagged") return null;
   return (
     <div className="mt-2 flex flex-col items-start gap-1">

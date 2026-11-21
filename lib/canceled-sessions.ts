@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { readRowsByIds } from "@/lib/read-by-ids";
+import { canGiveBack } from "@/lib/late-cancel-auto";
 
 // A session the CLIENT cancelled stays on the coach's calendar, marked as cancelled (Ron, Nov 21: tapping "Client canceled" made it disappear). Shown, never counted, never blocking:
 //   * which ones: a cancel the coach recorded with "Client canceled" (mark_client_cancelled), a late cancel by the client (Charge or Waive), or one the client made themselves
@@ -35,6 +36,8 @@ export interface CanceledSession {
   /** "Charged", "Waived", "Waiting for you", or null when it was cancelled in time */
   state: string | null;
   lateState: "charged" | "waived" | "flagged" | null;
+  /** "Give it back" works here: a charged late CANCEL (not a charged late move later cancelled), as on Requests */
+  canGiveBack: boolean;
 }
 
 /** Was this cancelled session the client's cancel (and so shown to the coach)? */
@@ -63,6 +66,7 @@ export function toCanceledSession(r: CanceledRow): CanceledSession {
     label: r.cancelled_by && r.cancelled_by === r.athlete_id ? `Canceled by ${first}` : "Client canceled",
     state: lateStateLabel(lateState),
     lateState,
+    canGiveBack: canGiveBack({ late_charge_state: r.late_charge_state, late_change_kind: r.late_change_kind }),
   };
 }
 
