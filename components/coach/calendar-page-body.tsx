@@ -51,6 +51,8 @@ import { gatherSchedulingSpotterFlags } from "@/lib/calendar-spotter-phase2-gath
 import { SchedulingSpotterPanel } from "@/components/coach/desktop/scheduling-spotter-panel";
 import { NO_SESSIONS_LINE } from "@/lib/session-credit-copy";
 import { buildCreditPicture, fetchBookingCounts } from "@/lib/credit-picture";
+import { insideWindowHours } from "@/lib/cancel-window";
+import { readClientCancelPolicy } from "@/lib/late-cancel-auto";
 
 const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
@@ -396,9 +398,15 @@ export async function CoachCalendarPageBody(
 
     // When the coach schedules everyone, say so on the client's calendar (and offer a Message button).
     let bookingMode = "free";
+    // The cancel confirm says what a late cancel will do (wave 2 C5): the coach's window and late-cancel setting.
+    let cancelPolicy: { windowHours: number | null; takesSession: boolean | null } = { windowHours: null, takesSession: null };
     if (coachMembership && (!isCoach || isActingAsOther)) {
-      const sb = await supabase.from("coach_booking_policies").select("booking_mode").eq("coach_id", coachMembership.profile_id).maybeSingle();
+      const [sb, policy] = await Promise.all([
+        supabase.from("coach_booking_policies").select("booking_mode").eq("coach_id", coachMembership.profile_id).maybeSingle(),
+        readClientCancelPolicy(supabase, coachMembership.profile_id),
+      ]);
       if (!sb.error) bookingMode = (sb.data?.booking_mode as string | null) ?? "coach_schedules";
+      cancelPolicy = policy;
     }
 
     // The Schedule card (free or request mode, with open hours): it replaces the separate sessions line here.
@@ -716,6 +724,8 @@ export async function CoachCalendarPageBody(
                       rescheduleHref={bookingMode === "coach_schedules" ? undefined : `${basePath}/${dateKeyInZone(displayTz, start)}?reschedule=${b.id}`}
                       messageHref={bookingMode === "coach_schedules" ? `/groups/${params.groupId}/messages` : undefined}
                       recurringSeriesId={b.recurring_series_id}
+                      insideWindowHours={insideWindowHours(start, cancelPolicy.windowHours)}
+                      lateCancelTakesSession={cancelPolicy.takesSession}
                     />
                   </ChangeSessionDisclosure>
                 </div>

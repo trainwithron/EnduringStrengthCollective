@@ -56,6 +56,8 @@ import { RecurringConflictBadge } from "@/components/coach/desktop/recurring-con
 import { NO_SESSIONS_LINE } from "@/lib/session-credit-copy";
 import { clientSessionsLine } from "@/lib/schedule-card";
 import { coachBusyRanges, onlyOpenSlots, withBusy } from "@/lib/coach-busy";
+import { insideWindowHours } from "@/lib/cancel-window";
+import { readClientCancelPolicy } from "@/lib/late-cancel-auto";
 import { capToneClass, fetchSlotReasons, fullyBookedLine, keepOffered, limitsActive, limitsFromRow, loadCapLines } from "@/lib/session-caps";
 
 export const metadata = { title: "Calendar" };
@@ -313,12 +315,14 @@ export default async function CoachDayDetailPage(
     // Clients book themselves only when the coach has switched self-booking on (off by default; the database enforces it too). When it is
     // off, the open times are not offered; the client still sees their own sessions and can cancel or move them.
     let bookingMode = "free" as "free" | "request" | "coach_schedules";
+    // The cancel confirm says what a late cancel will do (wave 2 C5): the coach's window and late-cancel setting.
+    let cancelPolicy: { windowHours: number | null; takesSession: boolean | null } = { windowHours: null, takesSession: null };
     if (coachMembership) {
-      const sb = await supabase
-        .from("coach_booking_policies")
-        .select("booking_mode")
-        .eq("coach_id", coachMembership.profile_id)
-        .maybeSingle();
+      const [sb, policy] = await Promise.all([
+        supabase.from("coach_booking_policies").select("booking_mode").eq("coach_id", coachMembership.profile_id).maybeSingle(),
+        readClientCancelPolicy(supabase, coachMembership.profile_id),
+      ]);
+      cancelPolicy = policy;
       // Until the database update that adds the switch is applied, the select errors and booking behaves as before.
       if (!sb.error) bookingMode = ((sb.data?.booking_mode as string | null) ?? "coach_schedules") as typeof bookingMode;
     // A coach (booking for a client they are viewing as, or for themselves) is never refused: they book directly.
@@ -556,6 +560,8 @@ export default async function CoachDayDetailPage(
                               rescheduleHref={bookingMode === "coach_schedules" ? undefined : `${calendarHref}/${params.date}?reschedule=${booking.id}`}
                               messageHref={bookingMode === "coach_schedules" ? `/groups/${params.groupId}/messages` : undefined}
                               recurringSeriesId={booking.recurring_series_id}
+                              insideWindowHours={insideWindowHours(start, cancelPolicy.windowHours)}
+                              lateCancelTakesSession={cancelPolicy.takesSession}
                             />
                           ) : (
                             <span className="font-body text-xs text-steel">Your session</span>

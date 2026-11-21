@@ -58,6 +58,7 @@ function setRows(exerciseId: string, ex: BuilderExercise) {
     set_order: i,
     target_reps: st.targetReps,
     target_weight: st.targetWeight,
+    target_pct_max: st.targetPctMax ?? null,
     target_rpe: st.targetRpe,
     target_rir: st.targetRir,
     target_tempo: st.targetTempo,

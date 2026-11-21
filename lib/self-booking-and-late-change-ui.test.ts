@@ -35,10 +35,13 @@ describe("client booking screens follow the coach's booking mode", () => {
 });
 
 describe("a late change is never described to the client as a session taken", () => {
-  it("the cancel confirmation says the coach decides", () => {
+  it("the cancel confirmation says the coach decides (unless the coach turned on the late-cancel setting, wave 2 C5: then it says so before the cancel)", () => {
     const src = read("../components/athlete/cancel-booking-button.tsx");
-    expect(src).toContain("decides whether it counts as a session");
+    expect(src).toContain("lateCancelConfirmLine(insideWindowHours, lateCancelTakesSession)");
     expect(src).not.toContain("will still count as used");
+    const lines = read("../lib/late-cancel-auto.ts");
+    expect(lines).toContain("decides whether it counts as a session");
+    expect(lines).toContain("if (takesSession === true) return");
   });
   it("the two reschedule banners say the coach decides", () => {
     for (const p of dayPages) {

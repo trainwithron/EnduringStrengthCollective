@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { LateChangesPanel } from "@/components/coach/late-changes-panel";
 import { ScheduleRequestsPanel } from "@/components/coach/schedule-requests-panel";
 import { ClientRequestsPanel, type RequestRow } from "@/components/coach/client-requests-panel";
+import { GiveBackLateCancelButton } from "@/components/coach/give-back-late-cancel-button";
 import { ANSWERED_DAYS, dateLabel, FOCUSABLE_ROW, requestAnchor, type AnsweredRequest, type RequestKind } from "@/lib/requests-center";
 
 const KIND_LABEL: Record<RequestKind, string> = { booking: "Session", late: "Late change", schedule: "Schedule", client: "New client" };
@@ -81,6 +82,7 @@ export function RequestsCenter({
                   {a.outcome}
                   {a.decidedAt ? ` · ${dateLabel(a.decidedAt, timezone)}` : ""}
                 </p>
+                {a.kind === "late" && a.giveBack && <GiveBackLateCancelButton bookingId={a.id} who={a.who} />}
               </li>
             ))}
           </ul>

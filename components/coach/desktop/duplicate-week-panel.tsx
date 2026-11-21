@@ -181,6 +181,8 @@ export function DuplicateWeekPanel({
         restSeconds: number | null;
         restMaxSeconds?: number | null;
         pace: string | null;
+        // a percent of each athlete's max (wave 2 T3): carried onto the new weeks as it is
+        pctMax?: number | null;
       };
       // Carried through unchanged onto every generated week's sets — the
       // range itself doesn't move, only where reps/distance sit within
@@ -361,6 +363,7 @@ export function DuplicateWeekPanel({
               restSeconds: set.targetRestSeconds,
               restMaxSeconds: set.targetRestMaxSeconds ?? null,
               pace: set.targetPace,
+              pctMax: set.targetPctMax ?? null,
             },
             repRange: { min: set.repMin, max: set.repMax },
             results,
@@ -470,6 +473,7 @@ export function DuplicateWeekPanel({
                   set_order: i,
                   target_reps: st.targetReps,
                   target_weight: st.targetWeight,
+                  target_pct_max: st.targetPctMax ?? null,
                   target_rpe: st.targetRpe,
                   target_rir: st.targetRir,
                   target_tempo: st.targetTempo,
@@ -602,7 +606,8 @@ export function DuplicateWeekPanel({
                 set_order: track.setOrder,
                 target_reps:
                   track.preserveRepsText ?? (result.reps != null ? String(result.reps) : null),
-                target_weight: result.weight,
+                target_weight: track.otherTargets.pctMax != null ? null : result.weight,
+                target_pct_max: track.otherTargets.pctMax ?? null,
                 target_rpe: track.otherTargets.rpe,
                 target_rir: track.otherTargets.rir,
                 target_tempo: track.otherTargets.tempo,

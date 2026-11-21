@@ -4,6 +4,8 @@ import { mergeLoggedList } from "@/lib/logged-list";
 import { hindsightPrs, importedWorkouts, parseRollup } from "@/lib/imported-prs";
 import { ProgressStats } from "@/components/coach/progress/progress-stats";
 import { TrainingMaxCards } from "@/components/coach/progress/training-max-cards";
+import { testedByName, type TestedMaxRow } from "@/lib/tested-max";
+import { loadLiftUnit } from "@/lib/lift-unit-server";
 import { BodyOverlayChart } from "@/components/coach/progress/body-overlay-chart";
 import { LoggedSearch } from "@/components/coach/progress/logged-search";
 import { MakePrCountButton } from "@/components/coach/progress/make-pr-count-button";
@@ -559,6 +561,8 @@ export default async function AthleteProfilePage(
     standingHistory,
     { data: mainLiftExerciseRows },
     seriesReads,
+    testedRead,
+    coachLiftUnit,
   ] = await Promise.all([
     activeProgram
       ? supabase.from("programs").select("training_days").eq("id", activeProgram.id).maybeSingle()
@@ -673,6 +677,10 @@ export default async function AthleteProfilePage(
       ]);
       return { rows, upcomingRows: (upcomingRows ?? []) as unknown[], frozenRows: (frozenRows ?? []) as unknown[] };
     })(),
+    // Tested maxes the coach typed and locked (wave 2 T2): read on their own, so a database without them yet still shows the estimates.
+    supabase.from("athlete_training_maxes").select("exercise_name, estimated_max, locked, tested_at").eq("athlete_id", params.athleteId).eq("locked", true),
+    // the coach's own unit, for typing and reading a tested max
+    loadLiftUnit(supabase, user.id),
   ]);
   // A teen not yet let in (no signed permission and no coach tick): the checkbox is shown first, above the tabs.
   const guardianWaiting = isTeen && !!guardianStateRow && (guardianStateRow as GuardianStateInfo).state !== "signed";
@@ -746,6 +754,9 @@ export default async function AthleteProfilePage(
   const maxByName = new Map((trainingMaxRows ?? []).map((r: any) => [String(r.exercise_name).trim().toLowerCase(), r.estimated_max as number]));
   const trainingIntent = ((personalProgram ?? sharedProgramRaw) as { training_intent?: string | null } | null)?.training_intent ?? null;
   const cardMetric = defaultMetric(trainingIntent, ((progressPrefs?.metric as "weight" | "volume" | null | undefined) ?? null));
+  const testedMaxes = testedByName(testedRead.error ? [] : (testedRead.data as TestedMaxRow[]));
+  const cardNames = new Set(cardPlan.cards.map((c) => c.name.trim().toLowerCase()));
+  const testedOnly = [...testedMaxes.entries()].filter(([key]) => !cardNames.has(key)).map(([, t]) => t);
   const cardData = cardPlan.cards.map((c) => ({
     name: c.name,
     sessions: c.sessions,
@@ -755,6 +766,7 @@ export default async function AthleteProfilePage(
     weightSeries: c.weightSeries,
     volumeSeries: c.volumeSeries,
     pinned: pinnedNames.some((n) => n.trim().toLowerCase() === c.name.trim().toLowerCase()),
+    tested: testedMaxes.get(c.name.trim().toLowerCase()) ?? null,
   }));
   const overlayWeight = (weightLogs ?? []).map((w: any) => ({ date: w.logged_date as string, value: Number(w.weight) })).sort((a, b) => a.date.localeCompare(b.date));
   const overlayIntake = (intakeRows ?? []).map((r: any) => ({ date: String(r.log_date), value: Number(r.calories) }));
@@ -1383,6 +1395,9 @@ export default async function AthleteProfilePage(
             initialView={progressPrefs?.view_mode === "list" ? "list" : "cards"}
             initialMetric={cardMetric}
             canPin={!selfView}
+            canEditTested={!selfView && !testedRead.error}
+            testedOnly={testedOnly}
+            liftUnit={coachLiftUnit}
           />
           </div>
 

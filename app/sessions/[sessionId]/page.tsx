@@ -1,5 +1,6 @@
 import { linkedExercisesAmong } from "@/lib/superset-links";
 import { isTeamSportGroup } from "@/lib/team-sport";
+import { maxByLift, setWeightFor } from "@/lib/pct-of-max";
 import { COACH_HOME_HREF } from "@/lib/start-group";
 import { loadPostWorkoutCards } from "@/lib/post-workout-cards";
 import { redirect } from "next/navigation";
@@ -222,12 +223,18 @@ export default async function SessionPage(
     }
   >();
   if (templateExerciseIds.length > 0) {
-    const { data: templateSets } = await supabase
-      .from("group_workout_exercise_sets")
-      .select(
-        "group_workout_exercise_id, set_order, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance, target_rest_seconds, target_rest_max_seconds, target_pace, target_reps, target_weight"
-      )
-      .in("group_workout_exercise_id", templateExerciseIds);
+    // A set prescribed as a percent of max (wave 2 T3) shows this athlete's own weight: the percent of their training max for that lift (lib/pct-of-max.ts).
+    const [{ data: templateSets }, { data: maxRows }] = await Promise.all([
+      supabase
+        .from("group_workout_exercise_sets")
+        .select(
+          "group_workout_exercise_id, set_order, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance, target_rest_seconds, target_rest_max_seconds, target_pace, target_reps, target_weight, target_pct_max"
+        )
+        .in("group_workout_exercise_id", templateExerciseIds),
+      supabase.from("athlete_training_maxes").select("exercise_name, estimated_max").eq("athlete_id", session.athlete_id),
+    ]);
+    const athleteMaxes = maxByLift(maxRows as { exercise_name: string; estimated_max: number | null }[] | null);
+    const liftOfTemplate = new Map<string, string>(((sessionExercises ?? []) as any[]).filter((se) => se.group_workout_exercise_id).map((se) => [se.group_workout_exercise_id as string, String(se.exercise_name ?? "")]));
     for (const t of templateSets ?? []) {
       prescribedSetCountByExercise.set(t.group_workout_exercise_id, (prescribedSetCountByExercise.get(t.group_workout_exercise_id) ?? 0) + 1);
       targetsByExerciseAndOrder.set(`${t.group_workout_exercise_id}:${t.set_order}`, {
@@ -241,7 +248,7 @@ export default async function SessionPage(
         restMaxSeconds: t.target_rest_max_seconds,
         pace: t.target_pace,
         reps: parseNumericReps(t.target_reps),
-        weight: t.target_weight,
+        weight: setWeightFor({ targetWeight: t.target_weight, targetPctMax: t.target_pct_max == null ? null : Number(t.target_pct_max) }, liftOfTemplate.get(t.group_workout_exercise_id) ?? "", athleteMaxes),
       });
     }
   }

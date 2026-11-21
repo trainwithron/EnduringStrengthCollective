@@ -18,6 +18,7 @@ import { CancelBookingButton } from "@/components/athlete/cancel-booking-button"
 import { MessageCoachLink } from "@/components/athlete/message-coach-link";
 import { WithdrawRequestButton } from "@/components/athlete/withdraw-request-button";
 import { insideWindowHours } from "@/lib/cancel-window";
+import { readLateCancelTakesSession } from "@/lib/late-cancel-auto";
 import { RescheduleSlotButton } from "@/components/athlete/reschedule-slot-button";
 import { RequestSlotButton } from "@/components/athlete/request-slot-button";
 import { coachBusyRanges, onlyOpenSlots, withBusy } from "@/lib/coach-busy";
@@ -403,12 +404,15 @@ export default async function DayDetailPage(
   // off, the open times are not offered; the client still sees their own sessions and can cancel or move them.
   let bookingMode = "free" as "free" | "request" | "coach_schedules";
   let cancelWindowHours: number | null = null;
+  // The coach's late-cancel setting, for the cancel confirm (wave 2 C5).
+  let lateCancelTakesSession: boolean | null = null;
   if (coachMembership) {
     const sb = await supabase
       .from("coach_booking_policies")
       .select("booking_mode, cancellation_window_hours")
       .eq("coach_id", coachMembership.profile_id)
       .maybeSingle();
+    lateCancelTakesSession = await readLateCancelTakesSession(supabase, coachMembership.profile_id);
     // Until the database update that adds the switch is applied, the select errors and booking behaves as before.
     if (!sb.error) {
       bookingMode = ((sb.data?.booking_mode as string | null) ?? "coach_schedules") as typeof bookingMode;
@@ -644,6 +648,7 @@ export default async function DayDetailPage(
                           rescheduleHref={bookingMode === "coach_schedules" ? undefined : `${backHref}?reschedule=${booking.id}`}
                           messageHref={bookingMode === "coach_schedules" ? `/groups/${params.groupId}/messages` : undefined}
                           insideWindowHours={insideWindowHours(start, cancelWindowHours)}
+                    lateCancelTakesSession={lateCancelTakesSession}
                           recurringSeriesId={booking.recurring_series_id}
                         />
                       ) : (

@@ -7,6 +7,7 @@
 // Only the group's shared, active programs count: a program or exercise written for one athlete is not the team's. The racks are made from the roster at this moment; the sheet code keeps who was on which rack.
 import { pageAll } from "@/lib/page-all";
 import { readRowsByIds } from "@/lib/read-by-ids";
+import { maxByLift, pctText, weightFromPct } from "@/lib/pct-of-max";
 import {
   MAX_ATHLETES,
   MAX_EXERCISES_TOTAL,
@@ -39,7 +40,7 @@ export const SHEET_READS = {
   groups: "id, name, group_kind",
   programs: "id, name, created_at, start_date, training_days",
   workouts: "id, program_id, title, week_number, day_index",
-  exercises: "id, workout_id, exercise_name, display_name, exercise_order, athlete_id, tracked_fields, group_workout_exercise_sets ( set_order, target_reps, target_time_seconds, target_distance )",
+  exercises: "id, workout_id, exercise_name, display_name, exercise_order, athlete_id, tracked_fields, group_workout_exercise_sets ( set_order, target_reps, target_time_seconds, target_distance, target_pct_max )",
   roster: "profile_id, profiles ( full_name )",
 } as const;
 
@@ -53,7 +54,7 @@ type ExerciseRow = {
   exercise_order: number | null;
   athlete_id: string | null;
   tracked_fields: string[] | null;
-  group_workout_exercise_sets: { set_order: number | null; target_reps: string | null; target_time_seconds: number | null; target_distance: number | null }[] | null;
+  group_workout_exercise_sets: { set_order: number | null; target_reps: string | null; target_time_seconds: number | null; target_distance: number | null; target_pct_max?: number | string | null }[] | null;
 };
 
 const byOrder = (a: WorkoutRow, b: WorkoutRow) => (a.week_number ?? 0) - (b.week_number ?? 0) || (a.day_index ?? 0) - (b.day_index ?? 0) || a.id.localeCompare(b.id);
@@ -143,6 +144,7 @@ export async function loadSheetModel(supabase: any, input: LoadSheetInput): Prom
 
   // one block per day; two workouts on the same day share it
   const days: SheetDay[] = [];
+  const liftOfExercise = new Map<string, string>();
   for (const date of Array.from(new Set(placed.map((p) => p.date))).sort()) {
     const todays = placed.filter((p) => p.date === date);
     const exercises: SheetExercise[] = [];
@@ -156,7 +158,12 @@ export async function loadSheetModel(supabase: any, input: LoadSheetInput): Prom
         const hasReps = tracked.includes("reps");
         const unread = !hasWeight && !hasReps;
         const repsOnly = !hasWeight && hasReps;
-        exercises.push({ id: e.id, name: (e.display_name ?? "").trim() || e.exercise_name, prescription: repsOnly ? `${p.text} reps` : p.text, sets: p.sets, reps: p.reps, unread, repsOnly });
+        // A percent of max (wave 2 T3): the first set's percent says it for the sheet ("3x5 @75%"); each athlete's own weight is worked out below.
+        const pctRaw = sets.find((st) => st.target_pct_max != null)?.target_pct_max;
+        const pct = hasWeight && pctRaw != null ? Number(pctRaw) : null;
+        const text = repsOnly ? `${p.text} reps` : pct != null ? `${p.text} @${pctText(pct)}` : p.text;
+        exercises.push({ id: e.id, name: (e.display_name ?? "").trim() || e.exercise_name, prescription: text, sets: p.sets, reps: p.reps, unread, repsOnly, pct });
+        if (pct != null) liftOfExercise.set(e.id, e.exercise_name);
       }
     }
     days.push({ date, label: dayLabel(date), title: todays.map((p) => (p.workout.title ?? "").trim()).filter(Boolean).join(" / ").slice(0, 40), exercises });
@@ -173,5 +180,28 @@ export async function loadSheetModel(supabase: any, input: LoadSheetInput): Prom
   const racks = makeRacks(athletes, input.perRack);
   if (racks.length > MAX_RACKS) return { ok: false, status: 422, error: "That is more racks than one run can carry. Put more athletes on each rack." };
 
-  return { ok: true, model: { groupId: input.groupId, groupName: String(group.name ?? "Team"), mode: input.mode, unit: input.unit, days, racks } };
+  // Each athlete's own weight for an exercise written as a percent of max: their training max for that lift (a locked tested max, else the estimate). A failed read leaves the
+  // numbers off (the sheet still says the percent), never a wrong number.
+  let targets: Record<string, Record<string, number>> | undefined;
+  if (liftOfExercise.size > 0) {
+    const maxRead = await readRowsByIds(athletes.map((a) => a.id), (ids: string[]) => (from: number, to: number) =>
+      supabase.from("athlete_training_maxes").select("athlete_id, exercise_name, estimated_max").in("athlete_id", ids).order("athlete_id").order("exercise_name").range(from, to)
+    );
+    if (!maxRead.error) {
+      const maxesByAthlete = new Map<string, { exercise_name: string; estimated_max: number | null }[]>();
+      for (const r of (maxRead.data ?? []) as { athlete_id: string; exercise_name: string; estimated_max: number | null }[]) maxesByAthlete.set(r.athlete_id, [...(maxesByAthlete.get(r.athlete_id) ?? []), r]);
+      const pctOf = new Map<string, number>();
+      for (const d of days) for (const ex of d.exercises) if (ex.pct != null) pctOf.set(ex.id, ex.pct);
+      targets = {};
+      for (const a of athletes) {
+        const maxes = maxByLift(maxesByAthlete.get(a.id) ?? []);
+        for (const [exerciseId, lift] of liftOfExercise) {
+          const w = weightFromPct(pctOf.get(exerciseId) ?? null, maxes.get(lift.trim().toLowerCase()) ?? null);
+          if (w != null) (targets[a.id] ??= {})[exerciseId] = w;
+        }
+      }
+    }
+  }
+
+  return { ok: true, model: { groupId: input.groupId, groupName: String(group.name ?? "Team"), mode: input.mode, unit: input.unit, days, racks, ...(targets ? { targets } : {}) } };
 }

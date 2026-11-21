@@ -123,6 +123,7 @@ export function mapSetRow(row: {
   rep_min?: number | null;
   rep_max?: number | null;
   set_type?: string | null;
+  target_pct_max?: number | string | null;
 }): ExerciseSetTarget {
   return {
     id: row.id,
@@ -138,6 +139,7 @@ export function mapSetRow(row: {
     targetRestSeconds: row.target_rest_seconds ?? null,
     targetRestMaxSeconds: row.target_rest_max_seconds ?? null,
     targetPace: row.target_pace ?? null,
+    targetPctMax: row.target_pct_max == null ? null : Number(row.target_pct_max),
     repMin: row.rep_min ?? null,
     repMax: row.rep_max ?? null,
     setType: asSetType(row.set_type),
@@ -173,4 +175,4 @@ export function formatCondensedSets(
 }
 
 export const SET_ROW_SELECT =
-  "id, set_order, target_reps, target_weight, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance, target_rest_seconds, target_rest_max_seconds, target_pace, rep_min, rep_max, set_type";
+  "id, set_order, target_reps, target_weight, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance, target_rest_seconds, target_rest_max_seconds, target_pace, rep_min, rep_max, set_type, target_pct_max";

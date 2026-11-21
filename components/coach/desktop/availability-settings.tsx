@@ -18,7 +18,7 @@ import { limitsFromRow } from "@/lib/session-caps";
 // here. Each read that depends on a later database update hides its control until the column exists, as before.
 export async function AvailabilityBookingSettings({ coachId }: { coachId: string }) {
   const supabase = await createServerClient();
-  const [{ data: coachProfile, error: profileError }, { data: policyRow, error: policyError }, nudgeResult, headsUpResult, bookingModeResult, limitsResult] = await Promise.all([
+  const [{ data: coachProfile, error: profileError }, { data: policyRow, error: policyError }, nudgeResult, headsUpResult, bookingModeResult, limitsResult, takesSessionResult] = await Promise.all([
     supabase.from("profiles").select("timezone, full_name").eq("id", coachId).maybeSingle(),
     supabase.from("coach_booking_policies").select("cancellation_window_hours, buffer_minutes, minimum_notice_hours, credit_expiry_days").eq("coach_id", coachId).maybeSingle(),
     supabase.from("coach_booking_policies").select("reup_nudges_enabled").eq("coach_id", coachId).maybeSingle(),
@@ -26,6 +26,8 @@ export async function AvailabilityBookingSettings({ coachId }: { coachId: string
     supabase.from("coach_booking_policies").select("booking_mode").eq("coach_id", coachId).maybeSingle(),
     // Session caps, keep-together and lunch (0432): hidden until the columns exist.
     supabase.from("coach_booking_policies").select("max_sessions_per_week, max_sessions_per_month, keep_together, lunch_start, lunch_end").eq("coach_id", coachId).maybeSingle(),
+    // The late-cancel setting (step 214, wave 2 C5): hidden until the column exists.
+    supabase.from("coach_booking_policies").select("late_cancel_takes_session").eq("coach_id", coachId).maybeSingle(),
   ]);
   // A failed read must not show default settings as if they were the coach's own (the next edit would save those defaults over the real ones).
   if (profileError || policyError) {
@@ -61,6 +63,7 @@ export async function AvailabilityBookingSettings({ coachId }: { coachId: string
           initialCancellationHours={policyRow?.cancellation_window_hours ?? 24}
           initialMinimumNoticeHours={policyRow?.minimum_notice_hours ?? 0}
           initialCreditExpiryDays={policyRow?.credit_expiry_days ?? 0}
+          initialLateCancelTakesSession={takesSessionResult.error ? null : (takesSessionResult.data as { late_cancel_takes_session?: boolean | null } | null)?.late_cancel_takes_session === true}
         />
         {expiryHeadsUpDays !== null && <ExpiryHeadsUpControl coachId={coachId} initialDays={expiryHeadsUpDays} />}
         {reupNudgesEnabled !== null && <ReupNudgeToggle coachId={coachId} initialEnabled={reupNudgesEnabled} />}

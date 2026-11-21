@@ -6,6 +6,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { TrendChart } from "@/components/coach/desktop/trend-chart";
 import { computeChartGeometry } from "@/lib/trend-chart-math";
 import { hasGraph, type Metric, type SeriesPoint } from "@/lib/progress-cards";
+import { TestedMaxControl } from "@/components/coach/progress/tested-max-control";
 
 export interface CardData {
   name: string;
@@ -15,6 +16,8 @@ export interface CardData {
   weightSeries: SeriesPoint[];
   volumeSeries: SeriesPoint[];
   pinned: boolean;
+  // A tested max the coach typed and locked (wave 2 T2): shown instead of the estimate.
+  tested?: { weight: number; at: string | null } | null;
 }
 
 const MAX_SHOWN_ALL = 60;
@@ -55,6 +58,9 @@ export function TrainingMaxCards({
   initialView,
   initialMetric,
   canPin,
+  canEditTested = false,
+  testedOnly = [],
+  liftUnit = "lb",
 }: {
   cards: CardData[];
   visible: number;
@@ -65,6 +71,12 @@ export function TrainingMaxCards({
   initialView: "cards" | "list";
   initialMetric: Metric;
   canPin: boolean;
+  // A coach of the client may type and lock a tested max (wave 2 T2); hidden until the database has it.
+  canEditTested?: boolean;
+  // Tested maxes for lifts with no card (never logged here): listed under the cards.
+  testedOnly?: { name: string; weight: number; at: string | null }[];
+  // the coach's own unit, for typing and reading a tested max
+  liftUnit?: "lb" | "kg";
 }) {
   const router = useRouter();
   const [view, setView] = useState<"cards" | "list">(initialView);
@@ -109,7 +121,7 @@ export function TrainingMaxCards({
     router.refresh();
   }
 
-  if (cards.length === 0) return null;
+  if (cards.length === 0 && !canEditTested && testedOnly.length === 0) return null;
   const shown = showAll ? cards.slice(0, MAX_SHOWN_ALL) : cards.slice(0, visible);
   const seriesOf = (c: CardData) => (metric === "weight" ? c.weightSeries : c.volumeSeries);
   const expanded = open ? cards.find((c) => c.name === open) ?? null : null;
@@ -157,9 +169,9 @@ export function TrainingMaxCards({
                   className={`block w-full text-left p-3 min-h-[116px] ${open === c.name ? "bg-surface" : "hover:bg-surface/60"}`}
                 >
                   <span className="block font-body text-sm text-chalk pr-8 line-clamp-2 min-h-[2.5rem]">{c.name}</span>
-                  {c.bestE1rm != null ? (
+                  {(c.tested?.weight ?? c.bestE1rm) != null ? (
                     <span className="block font-display text-2xl text-rust-ink mt-1">
-                      {Math.round(c.bestE1rm)} <span className="font-body text-xs text-steel">lbs</span>
+                      {Math.round((c.tested?.weight ?? c.bestE1rm) as number)} <span className="font-body text-xs text-steel">{c.tested ? "lbs tested" : "lbs"}</span>
                     </span>
                   ) : (
                     <span className="block font-body text-xs text-steel mt-2">{c.sessions === 0 ? "Nothing logged yet" : "No estimate yet"}</span>
@@ -189,7 +201,7 @@ export function TrainingMaxCards({
               <li key={c.name} className="flex items-center justify-between">
                 <button type="button" aria-expanded={open === c.name} onClick={() => setOpen(open === c.name ? null : c.name)} className="flex-1 flex items-center justify-between py-2 min-h-11 text-left">
                   <span className="font-body text-sm">{c.name}</span>
-                  <span className="font-body text-sm text-rust-ink font-medium">{c.bestE1rm != null ? `${Math.round(c.bestE1rm)} lbs` : "–"}</span>
+                  <span className="font-body text-sm text-rust-ink font-medium">{c.tested ? `${Math.round(c.tested.weight)} lbs tested` : c.bestE1rm != null ? `${Math.round(c.bestE1rm)} lbs` : "–"}</span>
                 </button>
                 {canPin && (
                   <button
@@ -235,6 +247,21 @@ export function TrainingMaxCards({
             emptyLabel={expanded.sessions === 0 ? "Nothing logged for this exercise yet." : "Only logged once so far. A second workout will draw the chart."}
           />
           <p className="font-body text-xs text-steel">{metric === "weight" ? "Heaviest weight each day." : "Total weight lifted (weight times reps) each day."}</p>
+          {canEditTested && <TestedMaxControl key={expanded.name} athleteId={athleteId} exerciseName={expanded.name} tested={expanded.tested ?? null} unit={liftUnit} />}
+        </div>
+      )}
+
+      {canEditTested && (
+        <div className="mt-4" data-tested-maxes>
+          <h3 className="font-body text-[13px] font-semibold text-steel">Tested maxes</h3>
+          <p className="font-body text-xs text-steel mt-0.5">A max you tested, locked: estimates from logged sets never change it, and percent-of-max weights use it.</p>
+          {testedOnly.map((t) => (
+            <div key={t.name} className="mt-2">
+              <p className="font-body text-sm text-chalk">{t.name}</p>
+              <TestedMaxControl athleteId={athleteId} exerciseName={t.name} tested={{ weight: t.weight, at: t.at }} unit={liftUnit} />
+            </div>
+          ))}
+          <TestedMaxControl athleteId={athleteId} exerciseName="" tested={null} askName unit={liftUnit} />
         </div>
       )}
 

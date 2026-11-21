@@ -28,6 +28,8 @@ export interface SheetExercise {
   unread: boolean;
   /** reps only (a pull-up, a push-up): what is written in the box is the reps of each set */
   repsOnly?: boolean;
+  /** a percent of each athlete's max (wave 2 T3): 75 for 75%; each athlete's own weight is in SheetModel.targets */
+  pct?: number | null;
 }
 
 export interface SheetDay {
@@ -58,6 +60,9 @@ export interface SheetModel {
   unit: SheetUnit;
   days: SheetDay[];
   racks: SheetRack[];
+  /** each athlete's own weight (pounds) for an exercise prescribed as a percent of max, by athlete id then exercise id (wave 2 T3). Printed by their name on the paper sheet only:
+   *  the Excel sheet's boxes are read back as what was lifted, so no number is put in them. */
+  targets?: Record<string, Record<string, number>>;
 }
 
 /** "Marcus Taylor" -> "Marcus T."; one word stays as it is; nothing becomes "Athlete". The last word is the surname. */

@@ -326,3 +326,25 @@ export async function listPersonalCalendarEvents(
   const data = await response.json();
   return mapPersonalEventsResponse(data.items);
 }
+
+// Busy times only (wave 2 C4): Google's freeBusy for the coach's own (primary) calendar answers "when is this person busy" with start and end times and nothing else, no titles,
+// no attendees, no details. An event marked "free" (transparent) is not busy. Real endpoint per the FreeBusy.query reference (POST /freeBusy).
+export function mapFreeBusyResponse(data: unknown): { start: string; end: string }[] {
+  const cal = (data as { calendars?: Record<string, { busy?: unknown; errors?: unknown[] }> } | null)?.calendars?.primary;
+  if (!cal || (Array.isArray(cal.errors) && cal.errors.length > 0)) throw new Error("Google free/busy returned no answer for the calendar.");
+  const busy = Array.isArray(cal.busy) ? cal.busy : [];
+  return busy
+    .map((b) => b as { start?: unknown; end?: unknown })
+    .filter((b): b is { start: string; end: string } => typeof b.start === "string" && typeof b.end === "string" && Number.isFinite(Date.parse(b.start)) && Date.parse(b.end) > Date.parse(b.start));
+}
+
+export async function fetchFreeBusy(accessToken: string, timeMinIso: string, timeMaxIso: string, signal?: AbortSignal): Promise<{ start: string; end: string }[]> {
+  const response = await fetch(`${GOOGLE_CALENDAR_API_BASE}/freeBusy`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ timeMin: timeMinIso, timeMax: timeMaxIso, items: [{ id: "primary" }] }),
+    signal,
+  });
+  if (!response.ok) throw new Error(`Google free/busy failed (${response.status}).`);
+  return mapFreeBusyResponse(await response.json());
+}
