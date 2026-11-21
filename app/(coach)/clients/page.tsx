@@ -4,6 +4,8 @@ import { NoAccess } from "@/components/shared/no-access";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { CoachClientsList } from "@/components/coach/desktop/coach-clients-list";
 import { RequestsLink } from "@/components/coach/requests-link";
+import { CheckinsLink } from "@/components/coach/checkins-link";
+import { pendingCheckinCount } from "@/lib/weekly-checkin-coach";
 import { pendingRequestCount } from "@/lib/client-request-count";
 import { orgIsTeamOnly } from "@/lib/team-sport";
 import { AddClientButton } from "@/components/coach/desktop/add-client-button";
@@ -123,7 +125,7 @@ export default async function CoachClientsPage(props: { searchParams?: Promise<{
   const [coachList, inviteManager] = await Promise.all([loadOrgCoaches(anchor.id), authorizeInviteManager(supabase, user.id, anchor.id)]);
 
   const signIns = await signInsFor(coachList.coaches, inviteManager.ok, user.id);
-  const requestCount = await pendingRequestCount(supabase);
+  const [requestCount, checkinCount] = await Promise.all([pendingRequestCount(supabase), pendingCheckinCount(supabase, inOrg.map((g) => g.id), user.id)]);
 
   return (
     <CoachDesktopShell groupId={anchor.id} groupName={anchor.name} active="clients" coachLevel>
@@ -133,6 +135,7 @@ export default async function CoachClientsPage(props: { searchParams?: Promise<{
         </h1>
         <div className="flex flex-wrap items-center justify-end gap-3">
           <RequestsLink count={requestCount} />
+          <CheckinsLink count={checkinCount} />
           <EmailAllClaimLinksButton groupId={anchor.id} />
           <AddClientButton groupId={anchor.id} groupName={anchor.name} createdBy={user.id} defaultOpen={openAdd} initialStep={openImport ? "import" : undefined} />
         </div>

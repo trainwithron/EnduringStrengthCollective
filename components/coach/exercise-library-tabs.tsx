@@ -32,6 +32,7 @@ export function ExerciseLibraryTabs({
   initialMachines = null,
   orgId = null,
   isAdmin = false,
+  scanCounts = null,
 }: {
   groupId: string;
   coachId: string;
@@ -46,6 +47,8 @@ export function ExerciseLibraryTabs({
   orgId?: string | null;
   // The platform admin (Ron): the shared machine list's additions and reviews.
   isAdmin?: boolean;
+  // How often each machine's QR code was scanned (step 215); null before that database step.
+  scanCounts?: Record<string, { month: number; total: number }> | null;
 }) {
   const [tab, setTab] = useState<Tab>("exercises");
 
@@ -152,7 +155,7 @@ export function ExerciseLibraryTabs({
           ranksByPattern={Object.fromEntries(initialPatterns.map((p) => [p.name, p.ladder.map((l) => l.rank ?? 0)]))}
         />
       )}
-      {tab === "machines" && initialMachines && <GymMachinesPanel coachId={coachId} orgId={orgId} initialMachines={initialMachines} exercises={initialExercises} isAdmin={isAdmin} />}
+      {tab === "machines" && initialMachines && <GymMachinesPanel coachId={coachId} orgId={orgId} initialMachines={initialMachines} exercises={initialExercises} isAdmin={isAdmin} scanCounts={scanCounts} />}
       {tab === "one-rep-max" && <OneRepMaxCalculator />}
     </div>
   );

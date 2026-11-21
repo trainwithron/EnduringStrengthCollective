@@ -22,11 +22,13 @@ export type NeedsYouKind =
   | "booking_request"
   | "client_message"
   | "group_reply"
+  | "checkin_review"
   // due
   | "session_soon"
   | "late_change"
   | "payment"
   | "expiring_credits"
+  | "goal_review"
   // slipping
   | "injury"
   | "low_readiness"
@@ -41,10 +43,12 @@ export const KIND_SLOT: Record<NeedsYouKind, NeedsYouSlot> = {
   booking_request: "waiting",
   client_message: "waiting",
   group_reply: "waiting",
+  checkin_review: "waiting",
   session_soon: "due",
   late_change: "due",
   payment: "due",
   expiring_credits: "due",
+  goal_review: "due",
   injury: "slipping",
   low_readiness: "slipping",
   load_fatigue: "slipping",
@@ -59,10 +63,14 @@ export const KIND_ORDER: NeedsYouKind[] = [
   "booking_request",
   "client_message",
   "group_reply",
+  // a weekly check-in waiting for the coach's review (Ron, Nov 20: R2)
+  "checkin_review",
   "session_soon",
   "late_change",
   "expiring_credits",
   "payment",
+  // a client's goal set 90 days ago or more (Ron, Nov 20: R5)
+  "goal_review",
   "injury",
   // The "Right now" box on Home ranks readiness, then load fatigue, then a quiet client (strong before mild), then missed habits; the strip follows the same order and adds what that box
   // does not have. A client who has not signed in yet comes last: they have not gone quiet, they need the sign-in link.
@@ -144,6 +152,8 @@ export const sentences = {
   quietMild: () => "hasn't logged in a while.",
   missedHabits: (n: number) => `missed ${n} ${n === 1 ? "habit" : "habits"} this week.`,
   notSignedIn: () => "hasn't signed in yet. Send the sign-in link.",
+  checkinReview: () => "sent their weekly check-in.",
+  goalReview: () => "set their goal 90 days ago. Worth a goal talk.",
 };
 
 export const BUTTON = {

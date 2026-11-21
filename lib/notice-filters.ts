@@ -44,6 +44,7 @@ export const FILTER_OF_TYPE: Record<string, NoticeFilter> = {
   nutrition_prompt_answered: "clients",
   session_pattern_note: "clients",
   gym_visitor_lead: "clients",
+  weekly_checkin: "clients",
   // training and nutrition plans
   program_assigned: "programs",
   macros_assigned: "programs",

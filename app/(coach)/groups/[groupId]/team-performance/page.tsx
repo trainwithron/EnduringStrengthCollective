@@ -50,6 +50,8 @@ export default async function TeamPerformancePage(
   }
 
   // The reads run in three waves of independent requests, not nine one after another (Nov 2: the page took about a second warm and nearly three cold).
+  // The coach's own name, read alongside: "Message {client}" in the box below sends as them, inside Spotlight (Ron, Nov 20).
+  const viewerProfileRead = supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle().then((r) => r);
   const [{ data: group }, { data: memberRows }] = await Promise.all([
     supabase.from("groups").select("name").eq("id", params.groupId).single(),
     supabase.from("group_memberships").select("profile_id, profiles ( full_name )").eq("group_id", params.groupId).eq("role", "athlete"),
@@ -213,12 +215,17 @@ export default async function TeamPerformancePage(
     });
   }
   const habitCompliancePct = totalHabitsDue > 0 ? Math.round((totalHabitsCompleted / totalHabitsDue) * 100) : 0;
+  const { data: viewerProfile } = await viewerProfileRead;
 
   return (
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="team-performance">
       <div className="grid grid-cols-1 @4xl:grid-cols-3 gap-3 mb-6">
         <div className="@4xl:col-span-2">
-          <DashboardHero flag={heroData.heroFlag} emptyState={heroData.heroEmptyState} />
+          <DashboardHero
+            flag={heroData.heroFlag}
+            emptyState={heroData.heroEmptyState}
+            viewer={{ id: user.id, name: ((viewerProfile as { full_name?: string | null } | null)?.full_name ?? "").trim() || "Your coach" }}
+          />
         </div>
         <div className="space-y-3">
           {heroData.teamPulses.map((team) => (

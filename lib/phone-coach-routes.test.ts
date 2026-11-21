@@ -15,6 +15,8 @@ const ID = "11111111-2222-4333-8444-555555555555";
 const NEVER = new Set([
   "/clients",
   "/clients/requests",
+  // The weekly check-ins waiting for review (Nov 20, R2): a page on the phone too (its notice opens it).
+  "/clients/check-ins",
   // Everything waiting on the coach's answer (Nov 19): the phone keeps it as a page (a notice opens it).
   "/requests",
   "/programs",
@@ -49,7 +51,7 @@ const NEVER = new Set([
 
 // A client's own pages: never a coach redirect.
 const CLIENT_ONLY = [
-  "about-you", "classes", "goal", "leaderboard", "more", "my-history", "my-schedule", "progress-photos", "recipes", "today",
+  "about-you", "check-in", "classes", "goal", "leaderboard", "more", "my-history", "my-schedule", "progress-photos", "recipes", "today",
   "tools/macro-calculator", "transformation/new", "video-checkins", "workouts/[workoutId]",
 ].map((p) => `/groups/[groupId]/${p}`);
 

@@ -163,6 +163,8 @@ const RULES: Rule[] = [
   // Clients
   rule("/clients", "clients", "clients"),
   rule("/clients/requests", "clients", "clients"),
+  // the weekly check-ins waiting for review (Ron, Nov 20: R2)
+  rule("/clients/check-ins", "clients", "clients"),
   rule("/running-low", "clients", "clients"),
   rule(`${G}/clients`, "clients", "members", (q) => q.get("view") === "members"),
   rule(`${G}/clients`, "clients", "clients"),
@@ -258,6 +260,8 @@ export const DESKTOP_EXCLUDED: string[] = [
   "/groups/[groupId]/today",
   "/groups/[groupId]/workouts/[workoutId]",
   "/groups/[groupId]/progress-photos",
+  // the client's own weekly check-in (Ron, Nov 20: R2)
+  "/groups/[groupId]/check-in",
   "/groups/[groupId]/video-checkins",
   "/groups/[groupId]/transformation/new",
   "/groups/[groupId]/billing/canceled",
