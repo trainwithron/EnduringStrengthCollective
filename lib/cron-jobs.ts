@@ -61,6 +61,10 @@ export const JOB_ADDED: Record<string, Date> = {
   // went live with Part B at 18:40 UTC on Oct 19, after that day's 07:45 run; its first run is 07:45 UTC on Oct 20
   "purge-client-request-attempts": new Date("2026-10-19T18:40:00Z"),
   "low-session-digest": new Date("2026-10-19T00:00:00Z"),
+  // Wave 2 C6 went live 01:40 UTC Nov 21 (weekly, Mondays 14:30 UTC): without this date the watchdog called it "never run" the next night (Ron got that false alarm, Nov 21)
+  "sessions-to-mark": new Date("2026-11-21T01:40:00Z"),
+  // Wave 3 C10 went live 06:19 UTC Nov 21 (hourly)
+  "requests-digest": new Date("2026-11-21T06:19:00Z"),
 };
 export const NEW_JOB_GRACE_HOURS = 48;
 
