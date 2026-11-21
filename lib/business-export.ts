@@ -43,6 +43,7 @@ export const EXPORT_FILES: ExportFileInfo[] = [
   { file: "packages.csv", description: "Your packages (name, price in cents, sessions granted) and who has each (package_assignments.csv)." },
   { file: "package_assignments.csv", description: "Which client has which package." },
   { file: "body_weight.csv", description: "Body weight logs." },
+  { file: "body_measurements.csv", description: "Tape measurements (waist, hips, chest, arm, thigh), in inches." },
   { file: "nutrition_daily.csv", description: "Daily calories and macros logged." },
   { file: "coach_notes.csv", description: "Your notes about clients." },
 ];
@@ -212,6 +213,18 @@ export async function* exportEntries(deps: ExportDeps): AsyncGenerator<ZipEntry>
 
   // ---- measurements, food, notes
   yield file("body_weight.csv", ["id", "athlete_id", "group_id", "logged_date", "weight", "created_at"], pagedByIds(groupIds, byColumn("body_weight_logs", "group_id", ["id"]), failures, "body weight"));
+  // Tape measurements (wave 2, step 213), in inches as stored. Before step 213 is applied the table is not there: an empty file, not a failed part.
+  const measurements: Make = async (ids, from, to) => {
+    const res = await byColumn("body_measurements", "group_id", ["id"])(ids, from, to);
+    const err = res.error as { code?: string; message?: string } | null;
+    const missing = !!err && (err.code === "42P01" || err.code === "PGRST205" || /body_measurements/.test(String(err.message ?? "")));
+    return missing ? { data: [], error: null } : res;
+  };
+  yield file(
+    "body_measurements.csv",
+    ["id", "athlete_id", "group_id", "measured_on", "waist_in", "hips_in", "chest_in", "arm_in", "thigh_in", "entered_by", "created_at", "updated_at"],
+    pagedByIds(groupIds, measurements, failures, "measurements")
+  );
   yield file("nutrition_daily.csv", ["athlete_id", "group_id", "log_date", "calories", "protein_g", "carbs_g", "fat_g"], pagedByIds(groupIds, byColumn("daily_macros", "group_id", ["group_id", "athlete_id", "log_date"]), failures, "nutrition"));
   yield file("coach_notes.csv", ["id", "athlete_id", "group_id", "body", "created_by", "created_at"], pagedByIds(groupIds, byColumn("athlete_notes", "group_id", ["id"]), failures, "notes"));
 

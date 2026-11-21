@@ -20,6 +20,8 @@ import { mirrorGoogleCalendarEvent } from "@/lib/mirror-google-calendar-event";
 import { DEFAULT_FIX_MINUTES, looksTooLong, saveFixedTime, validFixMinutes } from "@/lib/workout-time-fix";
 import { durationInWords } from "@/lib/workout-fun-line";
 import { loadPrSets } from "@/lib/pr-sets";
+import { loadLiftUnit } from "@/lib/lift-unit-server";
+import type { WeightUnit } from "@/lib/units";
 import { workoutDonePushBody, type PrSet } from "@/lib/pr-wording";
 
 // This project has no generated Supabase Database type, so a fresh RPC's
@@ -398,18 +400,23 @@ export function CompleteWorkoutButton({
         const athleteName = athleteProfile?.full_name ?? "Your client";
         // The record named with its weight and reps (wave 2, P3: "New PR: Back Squat 225 × 5", never a bare "new PR!"): the same set the share card shows.
         // Never holds up the finish for long: past 1.5 seconds the lifts are named without their sets.
-        const prSets =
+        // The coach reads the weight in their own unit (their About you setting; pounds when it cannot be read), with the unit always written.
+        const bare = (): { prSets: PrSet[]; unit: WeightUnit } => ({ prSets: [...newPrs, ...newRecords].map((name) => ({ name: name.trim(), weight: null, reps: null })), unit: "lb" });
+        const { prSets, unit: coachUnit } =
           newPrs.length > 0 || newRecords.length > 0
             ? await Promise.race([
-                loadPrSets(supabase, { athleteId: result.athlete_id, sessionId, names: [...newPrs, ...newRecords] }),
-                new Promise<PrSet[]>((resolve) => setTimeout(() => resolve([...newPrs, ...newRecords].map((name) => ({ name: name.trim(), weight: null, reps: null }))), 1500)),
+                Promise.all([
+                  loadPrSets(supabase, { athleteId: result.athlete_id, sessionId, names: [...newPrs, ...newRecords] }),
+                  loadLiftUnit(supabase, coachMembership.profile_id),
+                ]).then(([found, unit]) => ({ prSets: found, unit })),
+                new Promise<{ prSets: PrSet[]; unit: WeightUnit }>((resolve) => setTimeout(() => resolve(bare()), 1500)),
               ])
-            : [];
+            : { prSets: [] as PrSet[], unit: "lb" as WeightUnit };
         const setFor = (name: string) => prSets.find((p) => p.name === name.trim()) ?? { name, weight: null, reps: null };
         notifyPush(
           coachMembership.profile_id,
           "Workout logged",
-          workoutDonePushBody(athleteName, prSets.filter((p) => newPrs.some((n) => n.trim() === p.name)), newRecords.map(setFor)),
+          workoutDonePushBody(athleteName, prSets.filter((p) => newPrs.some((n) => n.trim() === p.name)), newRecords.map(setFor), coachUnit),
           `/groups/${result.group_id}/athletes/${result.athlete_id}`
         );
       }

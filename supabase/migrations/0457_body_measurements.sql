@@ -5,7 +5,7 @@
 --   * The client and the client's coach read, add, change and delete them (the same rule as weigh-ins). A minor's writes follow the minor guard, and a coach working
 --     in one organization sees only that organization's rows (the org wall), as for every body table.
 --   * The row is the person's: "Download my data" and moving a client to another group pick it up on their own (both read every table with athlete_id and group_id),
---     and deleting the account removes it (on delete cascade).
+--     and deleting the account removes it (on delete cascade). The coach's business export lists its tables by hand: it has body_measurements.csv (lib/business-export.ts).
 -- Re-runnable.
 
 create table if not exists public.body_measurements (

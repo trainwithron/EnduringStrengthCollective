@@ -75,21 +75,28 @@ describe("P1: My progress reads the coach's cards as the client, read-only", () 
 describe("P3: a PR notice names the lift, the weight and the reps", () => {
   const squat = { name: "Back Squat", weight: 225, reps: 5 };
   const bench = { name: "Bench Press", weight: 185, reps: 8 };
-  it("New PR: Back Squat 225 × 5", () => {
-    expect(prHeadline([squat])).toBe("New PR: Back Squat 225 × 5");
-    expect(prHeadline([squat, bench])).toBe("New PRs: Back Squat 225 × 5 and Bench Press 185 × 8");
-    expect(prHeadline([squat, bench, { name: "Row", weight: 135, reps: 10 }])).toBe("New PRs: Back Squat 225 × 5 and 2 more");
+  it("New PR: Back Squat 225 lb × 5, always with the unit, in the reader's own unit", () => {
+    expect(prHeadline([squat])).toBe("New PR: Back Squat 225 lb × 5");
+    expect(prHeadline([squat, bench])).toBe("New PRs: Back Squat 225 lb × 5 and Bench Press 185 lb × 8");
+    expect(prHeadline([squat, bench, { name: "Row", weight: 135, reps: 10 }])).toBe("New PRs: Back Squat 225 lb × 5 and 2 more");
+    // a kilogram reader reads kilograms (the stored pounds, to one decimal)
+    expect(prHeadline([squat], "kg")).toBe("New PR: Back Squat 102.1 kg × 5");
+    expect(prSetText({ name: "Deadlift", weight: 220.46, reps: 3 }, "kg")).toBe("Deadlift 100 kg × 3");
     expect(prHeadline([])).toBe("");
     expect(prSetText({ name: "Mile Run", weight: null, reps: null })).toBe("Mile Run");
-    expect(prSetText({ name: "Curl", weight: 32.5, reps: 12 })).toBe("Curl 32.5 × 12");
+    expect(prSetText({ name: "Curl", weight: 32.5, reps: 12 })).toBe("Curl 32.5 lb × 12");
   });
   it("the coach's push says what the record was, never a bare 'new PR!'", () => {
-    expect(workoutDonePushBody("Sam", [squat], [])).toBe("Sam completed a workout. New PR: Back Squat 225 × 5 🎉");
-    expect(workoutDonePushBody("Sam", [], [squat])).toBe("Sam completed a workout. New group record: Back Squat 225 × 5 🏆");
+    expect(workoutDonePushBody("Sam", [squat], [])).toBe("Sam completed a workout. New PR: Back Squat 225 lb × 5 🎉");
+    expect(workoutDonePushBody("Sam", [squat], [], "kg")).toBe("Sam completed a workout. New PR: Back Squat 102.1 kg × 5 🎉");
+    expect(workoutDonePushBody("Sam", [], [squat])).toBe("Sam completed a workout. New group record: Back Squat 225 lb × 5 🏆");
     expect(workoutDonePushBody("Sam", [], [])).toBe("Sam completed a workout");
     const button = read("components/session/complete-workout-button.tsx");
     expect(button).not.toContain("new PR! 🎉");
     expect(button).toContain("workoutDonePushBody(athleteName,");
+    // the coach's own unit, read alongside the record sets under the same 1.5 s cap
+    expect(button).toContain("loadLiftUnit(supabase, coachMembership.profile_id),");
+    expect(button).toContain("newRecords.map(setFor), coachUnit),");
     expect(button).toContain("loadPrSets(supabase, { athleteId: result.athlete_id, sessionId, names: [...newPrs, ...newRecords] })");
   });
   it("the share card says what the record beat; the shared page's title and Home's shout-out name it", () => {
@@ -241,5 +248,15 @@ describe("P1 screen: My progress", () => {
   });
   it("on the client's More page, first in Training", () => {
     expect(read("lib/more-links.ts")).toContain('training.unshift({ label: "My progress", hint: "Your lifts, best sets, photos and measurements", href: `${g}/progress` });');
+  });
+});
+
+describe("P6: the coach's business export keeps the measurements", () => {
+  it("body_measurements.csv, by group like body_weight.csv, and an empty file (not a failed part) before step 213", () => {
+    const src = read("lib/business-export.ts");
+    expect(src).toContain('{ file: "body_measurements.csv", description: "Tape measurements (waist, hips, chest, arm, thigh), in inches." },');
+    expect(src).toContain('const res = await byColumn("body_measurements", "group_id", ["id"])(ids, from, to);');
+    expect(src).toContain("return missing ? { data: [], error: null } : res;");
+    expect(read("supabase/migrations/0457_body_measurements.sql")).toContain("The coach's business export lists its tables by hand: it has body_measurements.csv (lib/business-export.ts).");
   });
 });
