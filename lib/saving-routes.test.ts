@@ -85,6 +85,8 @@ const NOT_A_SAVE = new Set([
   "/api/garmin/webhook",
   "/api/org-dispatch/submit",
   "/api/public-booking/[slug]/book",
+  // wave 3 C7: a visitor starting a card payment on a public page (holds the time, opens Stripe); no pane of the app changes
+  "/api/public-booking/[slug]/pay",
   "/api/public-booking/[slug]/verify-email/confirm",
   "/api/public-booking/[slug]/verify-email/send",
   "/api/public-booking/manage/[token]",

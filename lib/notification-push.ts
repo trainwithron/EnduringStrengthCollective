@@ -1,3 +1,4 @@
+import { answerByText, isUrgentRequest, requestDeadline } from "@/lib/request-deadline";
 // Which notices the five-minute push job sends, and what their push is headed. Only notices written by the database itself (nothing else pushes them). A notice that nothing else pushes and is not here is simply
 // in the app, as before. lib/notification-push.test.ts checks none of these is also pushed from code.
 // client_request: someone asked to train with the coach from their public page (Ron, Oct 31: it was only on the bell, so he never heard).
@@ -83,9 +84,11 @@ export function shortName(full: string | null | undefined): string {
 const PUSH_WHEN = (iso: string, timeZone: string) =>
   new Date(iso).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone });
 
-export function bookingRequestLine(r: { kind?: string | null; from_start_at?: string | null; new_start_at: string }, who: string, timeZone: string): string {
-  if (r.kind === "move" && r.from_start_at) return `${who} asked to move ${PUSH_WHEN(r.from_start_at, timeZone)} to ${PUSH_WHEN(r.new_start_at, timeZone)}`;
-  return `${who} asked for ${PUSH_WHEN(r.new_start_at, timeZone)}`;
+export function bookingRequestLine(r: { kind?: string | null; from_start_at?: string | null; new_start_at: string }, who: string, timeZone: string, now: Date = new Date()): string {
+  // with when it must be answered by (wave 3 C1): it lapses at the session's time (the original time for a move)
+  const by = answerByText(requestDeadline(r), timeZone, now);
+  if (r.kind === "move" && r.from_start_at) return `${who} asked to move ${PUSH_WHEN(r.from_start_at, timeZone)} to ${PUSH_WHEN(r.new_start_at, timeZone)}. ${by}`;
+  return `${who} asked for ${PUSH_WHEN(r.new_start_at, timeZone)}. ${by}`;
 }
 
 const SCHEDULE_ASK: Record<string, string> = { pause: "pause", freeze: "freeze", cancel: "end" };
@@ -154,4 +157,27 @@ export async function requestPushLine(db: any, n: { profile_id: string; group_id
     // the notice's own line
   }
   return fallback;
+}
+
+// Wave 3 C9 (Ron, Nov 20): a session request about a session that starts soon (sent within 12 hours of when it would lapse, lib/request-deadline.ts) reaches the coach even in
+// their quiet hours. Found the way the push line finds it: the coach's own request written in the same moment as the notice. Any failure means "not urgent" (it waits for the
+// quiet hours to end, as before).
+export async function isUrgentRequestNotice(db: any, n: { profile_id: string; group_id: string | null; type: string; created_at: string }): Promise<boolean> {
+  if (n.type !== "booking_request" || !n.created_at) return false;
+  try {
+    const at = new Date(n.created_at).getTime();
+    let q = db
+      .from("booking_requests")
+      .select("kind, from_start_at, new_start_at, created_at, status")
+      .eq("coach_id", n.profile_id)
+      .gte("created_at", new Date(at - 5000).toISOString())
+      .lte("created_at", new Date(at + 5000).toISOString());
+    if (n.group_id) q = q.eq("group_id", n.group_id);
+    const { data, error } = await q.limit(10);
+    if (error) return false;
+    const r = closestTo(data, n.created_at);
+    return !!r && r.status === "pending" && isUrgentRequest(r);
+  } catch {
+    return false;
+  }
 }

@@ -9,6 +9,8 @@ import { DEFAULT_COACH_TIMEZONE, dateKeyInZone } from "@/lib/timezone";
 import { buildCreditPicture, fetchBookingCounts } from "@/lib/credit-picture";
 import { coachCreditSentence } from "@/lib/credit-sentence";
 import { FOCUSABLE_ROW, requestAnchor } from "@/lib/requests-center";
+import { answerByText, requestDeadline } from "@/lib/request-deadline";
+import { dollars as paidDollars } from "@/lib/paid-booking-money";
 
 interface MoveRequest {
   id: string;
@@ -43,6 +45,8 @@ export function LateChangesPanel({ groupIds: scopeGroupIds }: { groupIds?: strin
   const [error, setError] = useState<string | null>(null);
   // Where each client's sessions stand, in a plain sentence, so the coach can decide with the numbers in view.
   const [creditLines, setCreditLines] = useState<Record<string, string>>({});
+  // sessions paid online on the public page (wave 3 C7): Waive gives the money back, Charge keeps it
+  const [paidCents, setPaidCents] = useState<Record<string, number>>({});
   // Times are shown on the coach's own clock, not the browser's, and the card says which clock.
   const [timezone, setTimezone] = useState<string>(DEFAULT_COACH_TIMEZONE);
 
@@ -135,6 +139,12 @@ export function LateChangesPanel({ groupIds: scopeGroupIds }: { groupIds?: strin
           groupId: b.group_id as string,
         }))
       );
+      // Paid online (wave 3 C7). Soft: before step 218 the read fails and no line shows.
+      const flaggedIds = ((data ?? []) as any[]).map((b) => b.id as string);
+      if (flaggedIds.length > 0) {
+        const { data: paidRows, error: paidError } = await supabase.from("public_booking_holds").select("booking_id, amount_cents").eq("state", "booked").in("booking_id", flaggedIds);
+        if (!cancelled && !paidError) setPaidCents(Object.fromEntries(((paidRows ?? []) as { booking_id: string; amount_cents: number }[]).map((r) => [r.booking_id, r.amount_cents])));
+      }
       // The sentence about each client's sessions. If it cannot load, the rows simply show without it.
       try {
         const names = new Map<string, string>();
@@ -231,6 +241,10 @@ export function LateChangesPanel({ groupIds: scopeGroupIds }: { groupIds?: strin
                     {m.kind === "move" && m.fromStartAt ? `Move ${fmt(m.fromStartAt)} to ${fmt(m.newStartAt)}` : `New session ${fmt(m.newStartAt)}`}
                     {m.newEndAt ? ` to ${fmtTime(m.newEndAt)}` : ""} ({tzName(m.newStartAt)})
                   </p>
+                  {/* When it lapses if nobody answers (wave 3 C1): the session's time, or the original time for a move. Nothing here changes when that is. */}
+                  <p className="font-body text-xs font-semibold text-alert" data-answer-by>
+                    {answerByText(requestDeadline({ kind: m.kind, from_start_at: m.fromStartAt, new_start_at: m.newStartAt }), timezone)}
+                  </p>
                   {m.outsideHours && <p className="font-body text-xs text-rust-ink">Outside your open hours or on your time off. You can still confirm it.</p>}
                   {creditLines[`${m.athleteId}:${m.groupId}`] && <p className="font-body text-xs text-steel">{creditLines[`${m.athleteId}:${m.groupId}`]}</p>}
                 </div>
@@ -272,6 +286,9 @@ export function LateChangesPanel({ groupIds: scopeGroupIds }: { groupIds?: strin
                 {new Date(i.startAt).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
               </p>
               {creditLines[`${i.athleteId}:${i.groupId}`] && <p className="font-body text-xs text-steel">{creditLines[`${i.athleteId}:${i.groupId}`]}</p>}
+              {paidCents[i.id] !== undefined && (
+                <p className="font-body text-xs text-rust-ink">Paid {paidDollars(paidCents[i.id])} online. Charge keeps it; Waive refunds it in full.</p>
+              )}
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <button

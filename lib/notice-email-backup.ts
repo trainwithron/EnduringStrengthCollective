@@ -29,12 +29,14 @@ export function noticeBackupEmail(n: { id: string; type: string; group_id: strin
 export async function emailNoticeBackup(
   db: SupabaseClient,
   n: { id: string; profile_id: string; type: string; group_id: string | null; link_path: string | null },
-  line: string
+  line: string,
+  // a request about a session starting soon reaches the coach even in their quiet hours (wave 3 C9)
+  opts: { ignoreQuiet?: boolean } = {}
 ): Promise<EmailOutcome | null> {
   if (!emailsWhenNoPhone(n.type)) return null;
   try {
     const mail = noticeBackupEmail(n, line);
-    return await emailClientNotice(db, n.profile_id, mail.subject, mail.text);
+    return await emailClientNotice(db, n.profile_id, mail.subject, mail.text, opts);
   } catch {
     return "failed";
   }

@@ -31,6 +31,8 @@ export function RequestDifferentTime({
   const [choice, setChoice] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [sentLabel, setSentLabel] = useState<string | null>(null);
+  // the time asked for: the request lapses then if unanswered (wave 3 C9)
+  const [sentAt, setSentAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   // The Schedule card on the Calendar links here (#request-different-time) when there is no open time in the next 14 days: arrive with it open.
@@ -73,6 +75,7 @@ export function RequestDifferentTime({
       return;
     }
     setSentLabel(picked.label);
+    setSentAt(picked.startAt);
     router.refresh();
   }
 
@@ -80,7 +83,7 @@ export function RequestDifferentTime({
     return (
       <div className="mt-4">
         <p className="font-body text-sm text-chalk">Asked for {sentLabel}. Your coach will confirm, and you will be told either way.</p>
-        <QuietHoursNotice coachId={coachId} className="mt-1" />
+        <QuietHoursNotice coachId={coachId} lapsesAt={sentAt} className="mt-1" />
       </div>
     );
   }

@@ -60,7 +60,7 @@ export function RequestSlotButton({
     return (
       <span className="font-body text-xs text-chalk text-right max-w-[200px]">
         Requested. Your coach will confirm; you will be told either way.
-        <QuietHoursNotice coachId={coachId} className="mt-1 text-xs" />
+        <QuietHoursNotice coachId={coachId} lapsesAt={startAt} className="mt-1 text-xs" />
       </span>
     );
   }

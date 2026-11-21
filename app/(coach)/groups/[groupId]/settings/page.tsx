@@ -1,5 +1,6 @@
 import { ChangeMyEmail } from "@/components/athlete/change-my-email";
 import { LeaveOrganizationControl } from "@/components/org/leave-organization-control";
+import { CalendarFeedLink } from "@/components/coach/calendar-feed-link";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { orgIdOfGroup } from "@/lib/org-of-group";
 import { loadTeamInfo } from "@/lib/org-team";
@@ -339,6 +340,8 @@ export default async function SettingsPage(
                 personalEmail={googleCalendarConnection?.personal_email ?? null}
                 initialError={searchParams.google_calendar_error ?? null}
               />
+              {/* Apple, Outlook or any calendar app: a private read-only link (wave 3 C8) */}
+              <CalendarFeedLink />
             </div>
             {!viewingOther && (
               <div className="mt-4 pt-4 border-t border-steel/15">

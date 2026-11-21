@@ -3,6 +3,7 @@
 // is soft: one that fails just leaves its kind out, never the strip and never the page. The ranking and the sentences are lib/needs-you.ts.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { formatInTimezone } from "@/lib/format-in-timezone";
+import { answerByText, requestDeadline } from "@/lib/request-deadline";
 import type { PageQuery } from "@/lib/page-all";
 import { readByIds, readRowsByIds } from "@/lib/read-by-ids";
 import { DEFAULT_HEADS_UP_DAYS, expiringSoon, expiryDismissalKey, isSnoozed } from "@/lib/expiry-checkin";
@@ -161,8 +162,8 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
     firstIn<{ id: string; athlete_id: string; group_id: string; kind: string; created_at: string }>("schedule requests", 50, byCreatedAt, (g) => (from, to) =>
       supabase.from("schedule_requests").select("id, athlete_id, group_id, kind, created_at").eq("coach_id", coachId).in("group_id", g).in("status", ["pending", "applying"]).order("created_at", { ascending: true }).order("id", { ascending: true }).range(from, to)
     ),
-    firstIn<{ id: string; athlete_id: string; group_id: string; created_at: string }>("booking requests", 50, byCreatedAt, (g) => (from, to) =>
-      supabase.from("booking_requests").select("id, athlete_id, group_id, created_at").eq("coach_id", coachId).in("group_id", g).eq("status", "pending").order("created_at", { ascending: true }).order("id", { ascending: true }).range(from, to)
+    firstIn<{ id: string; athlete_id: string; group_id: string; created_at: string; kind: string | null; from_start_at: string | null; new_start_at: string }>("booking requests", 50, byCreatedAt, (g) => (from, to) =>
+      supabase.from("booking_requests").select("id, athlete_id, group_id, created_at, kind, from_start_at, new_start_at").eq("coach_id", coachId).in("group_id", g).eq("status", "pending").order("created_at", { ascending: true }).order("id", { ascending: true }).range(from, to)
     ),
     pagedIn<{ id: string; sender_id: string; group_id: string; created_at: string }>("unread messages", (g) => (from, to) =>
       supabase.from("direct_messages").select("id, sender_id, group_id, created_at").eq("recipient_id", coachId).in("group_id", g).is("read_at", null).order("created_at", { ascending: true }).order("id", { ascending: true }).range(from, to)
@@ -261,7 +262,7 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
     items.push({ id: `schedule:${r.id}`, kind: "schedule_request", name: nameOf(r.athlete_id), sentence: sentences.scheduleRequest(r.kind), button: BUTTON.review, href: requestHref("schedule", r.id), profileHref: clientPath(r.group_id, r.athlete_id), order: new Date(r.created_at).getTime() });
   }
   for (const r of bookingRequests) {
-    items.push({ id: `request:${r.id}`, kind: "booking_request", name: nameOf(r.athlete_id), sentence: sentences.bookingRequest(), button: BUTTON.decide, href: requestHref("booking", r.id), profileHref: clientPath(r.group_id, r.athlete_id), order: new Date(r.created_at).getTime() });
+    items.push({ id: `request:${r.id}`, kind: "booking_request", name: nameOf(r.athlete_id), sentence: sentences.bookingRequest(r.kind, answerByText(requestDeadline(r), input.timezone)), button: BUTTON.decide, href: requestHref("booking", r.id), profileHref: clientPath(r.group_id, r.athlete_id), order: new Date(r.created_at).getTime() });
   }
   // One entry per client who has unread messages: how many, and the oldest first.
   const byClient = new Map<string, { groupId: string; count: number; oldest: number }>();

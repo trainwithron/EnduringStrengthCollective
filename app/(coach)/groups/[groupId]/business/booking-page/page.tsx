@@ -12,6 +12,7 @@ import { ShareCardSettings } from "@/components/coach/share-card-settings";
 import { readShareCardSettings } from "@/lib/share-card-settings";
 import { PublicSessionTypesEditor, type PublicTypeEditRow } from "@/components/coach/desktop/public-session-types-editor";
 import { normalizeSlug, slugProblem } from "@/lib/public-booking";
+import { payeeReadyForGroup } from "@/lib/connect-payee";
 
 export const metadata = { title: "Booking page" };
 
@@ -57,6 +58,10 @@ export default async function BookingPageSettingsPage(props: { params: Promise<{
       .order("created_at", { ascending: true }),
     supabase.from("coach_availability_windows").select("id", { count: "exact", head: true }).eq("coach_id", user.id),
   ]);
+  // "Pay when booking" (wave 3 C7): its own read, so the page works the same before step 218 adds the column; and whether this organization can take card payments yet.
+  const [payToBookResult, payeeReady] = await Promise.all([supabase.from("session_types").select("id, pay_to_book").eq("coach_id", user.id), payeeReadyForGroup(params.groupId)]);
+  const payToBook = new Set(((payToBookResult.error ? [] : payToBookResult.data) ?? []).filter((r: any) => r.pay_to_book === true).map((r: any) => r.id as string));
+  const payToBookAvailable = !payToBookResult.error;
 
   const notReady = !!pageResult.error || !!typesResult.error;
 
@@ -83,6 +88,7 @@ export default async function BookingPageSettingsPage(props: { params: Promise<{
     description: t.description ?? "",
     displayPrice: t.display_price_cents == null ? "" : String(t.display_price_cents / 100),
     publicVisible: !!t.public_visible,
+    payToBook: payToBook.has(t.id),
   }));
 
   // The share-picture settings live on the same row; shown once the page exists (and the database update that adds them is in).
@@ -126,7 +132,7 @@ export default async function BookingPageSettingsPage(props: { params: Promise<{
 
             <section className="min-w-0">
               <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">Sessions people can book</h2>
-              <PublicSessionTypesEditor initialTypes={types} organizationId={typesOrgId} />
+              <PublicSessionTypesEditor initialTypes={types} organizationId={typesOrgId} payeeReady={payeeReady} payToBookAvailable={payToBookAvailable} />
             </section>
           </div>
         </div>

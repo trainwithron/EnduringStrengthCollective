@@ -29,13 +29,14 @@ describe("what the email says", () => {
 describe("where it is sent from", () => {
   it("the five-minute job emails only when the push reached no phone, after the notice was claimed", () => {
     const job = read("app/api/cron/notification-push/route.ts");
-    expect(job).toContain("if (reached === 0 && (await emailNoticeBackup(db, n, isRequest ? line : n.body || line)) === \"sent\") emailed += 1;");
+    // (an urgent session request, wave 3 C9, also skips the coach's quiet hours for the email)
+    expect(job).toContain("if (reached === 0 && (await emailNoticeBackup(db, n, isRequest ? line : n.body || line, { ignoreQuiet: urgent.has(n.id) })) === \"sent\") emailed += 1;");
   });
   it("the answer pushed right away does the same", () => {
     const now = read("lib/push-now.ts");
     expect(now).toContain("if (reached === 0) await emailNoticeBackup(db, { ...n, profile_id: profileId }, n.body || pushBodyFor(n.type));");
   });
   it("goes through the client notice sender: quiet hours and placeholder addresses are respected", () => {
-    expect(read("lib/notice-email-backup.ts")).toContain("return await emailClientNotice(db, n.profile_id, mail.subject, mail.text);");
+    expect(read("lib/notice-email-backup.ts")).toContain("return await emailClientNotice(db, n.profile_id, mail.subject, mail.text, opts);");
   });
 });

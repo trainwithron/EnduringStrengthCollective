@@ -61,6 +61,11 @@ export function PublicBookingFlow({ slug, page, logoUrl = null, orgName = null }
   const [verifyNoteIsError, setVerifyNoteIsError] = useState(false);
   const [formTokenError, setFormTokenError] = useState(false);
   const [verifyBusy, setVerifyBusy] = useState(false);
+  // back from Stripe without paying (wave 3 C7)
+  const [paymentLeft, setPaymentLeft] = useState(false);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("payment") === "cancelled") setPaymentLeft(true);
+  }, []);
 
   const type = types.find((t) => t.id === typeId) ?? null;
   const cleanEmail = email.trim().toLowerCase();
@@ -182,7 +187,9 @@ export function PublicBookingFlow({ slug, page, logoUrl = null, orgName = null }
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch(`/api/public-booking/${slug}/book`, {
+      // "Pay when booking" (wave 3 C7): the time is held and the visitor pays by card on Stripe; the booking is made once the payment goes through.
+      const paying = !!type?.payToBook;
+      const res = await fetch(`/api/public-booking/${slug}/${paying ? "pay" : "book"}`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ sessionTypeId: typeId, startIso, name, email, phone, note, website, formToken, emailProof: emailProof.proof }),
@@ -196,6 +203,14 @@ export function PublicBookingFlow({ slug, page, logoUrl = null, orgName = null }
           const fresh = await fetch(`/api/public-booking/${slug}/slots?type=${encodeURIComponent(typeId)}`).then((r) => r.json()).catch(() => null);
           if (fresh?.slots) setSlots(fresh.slots);
         }
+        return;
+      }
+      if (paying) {
+        if (typeof data.url === "string") {
+          window.location.href = data.url;
+          return;
+        }
+        setError("We couldn't start your payment. Please try again.");
         return;
       }
       setBooked(data as Booked);
@@ -256,6 +271,11 @@ export function PublicBookingFlow({ slug, page, logoUrl = null, orgName = null }
       <p className="font-display uppercase text-sm tracking-wide text-steel">{page.coachName}</p>
       <h1 className="font-display font-bold text-3xl uppercase leading-none mt-2">{page.headline || "Book a consultation"}</h1>
       {page.intro && <p className="font-body text-base text-steel mt-3 whitespace-pre-line">{page.intro}</p>}
+      {paymentLeft && (
+        <p className="font-body text-sm text-chalk border border-steel/30 px-3 py-2 mt-4" role="status">
+          You left the payment, so nothing was booked or charged. Pick a time to try again.
+        </p>
+      )}
 
       {types.length === 0 ? (
         <p className="font-body text-sm text-steel mt-8">No consultations are available to book online right now.</p>
@@ -433,8 +453,14 @@ export function PublicBookingFlow({ slug, page, logoUrl = null, orgName = null }
                 disabled={busy || !emailVerified}
                 className="mt-4 w-full bg-rust text-graphite font-display font-bold uppercase tracking-wide px-4 py-3 disabled:opacity-40"
               >
-                {busy ? "Booking…" : "Book this consultation"}
+                {type.payToBook ? (busy ? "Opening payment…" : `Pay ${type.priceLabel ?? ""} and book`) : busy ? "Booking…" : "Book this consultation"}
               </button>
+              {type.payToBook && (
+                <p className="font-body text-xs text-steel mt-3">
+                  You pay by card on the next page. Nothing is booked until your payment goes through, and if the time can&apos;t be booked you&apos;re refunded in full. Cancel in time with
+                  your private link and you&apos;re refunded in full.
+                </p>
+              )}
               <p className="font-body text-xs text-steel mt-3">
                 By booking you agree to be contacted about this consultation. You&apos;ll get a private link to change or cancel.
               </p>

@@ -3,7 +3,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { sendPushToProfile } from "@/lib/send-push";
 import { withCronRun } from "@/lib/cron-monitor";
 import { runPool } from "@/lib/run-pool";
-import { PUSHED_BY_JOB, pushBodyFor, pushTitleFor, REQUEST_PUSH_TYPES, requestPushLine, STALE_PUSH_HOURS, waitingRequestFor } from "@/lib/notification-push";
+import { isUrgentRequestNotice, PUSHED_BY_JOB, pushBodyFor, pushTitleFor, REQUEST_PUSH_TYPES, requestPushLine, STALE_PUSH_HOURS, waitingRequestFor } from "@/lib/notification-push";
 import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { isQuietNow, readPushPrefs } from "@/lib/push-prefs";
 import { noticeHref } from "@/lib/notice-links";
@@ -29,14 +29,14 @@ async function handler(request: Request) {
 
   const { data: waiting, error: readError } = await db
     .from("notifications")
-    .select("id, profile_id")
+    .select("id, profile_id, group_id, type, created_at")
     .is("pushed_at", null)
     .in("type", [...PUSHED_BY_JOB])
     .gte("created_at", staleBefore)
     .order("created_at", { ascending: true })
     .limit(300);
   if (readError) return NextResponse.json({ error: "Could not read the notices." }, { status: 500 });
-  const candidates = (waiting ?? []) as { id: string; profile_id: string }[];
+  const candidates = (waiting ?? []) as { id: string; profile_id: string; group_id: string | null; type: string; created_at: string }[];
   if (candidates.length === 0) return NextResponse.json({ claimed: 0, sent: 0 });
 
   // Quiet hours DEFER, they do not drop: a notice for someone who is in their quiet hours right now is left unclaimed, and the first run after the window ends sends it (until it is too old to be news).
@@ -48,7 +48,12 @@ async function handler(request: Request) {
     zoneOf.set(profileId, prefs.timeZone);
     if (isQuietNow(prefs)) quietNow.add(profileId);
   }, { deadlineMs: 30_000 });
-  const ids = candidates.filter((c) => !quietNow.has(c.profile_id)).map((c) => c.id);
+  // Wave 3 C9: a request about a session that starts soon is not held for the coach's quiet hours (it would lapse, or be too late, by morning).
+  const urgent = new Set<string>();
+  await runPool(candidates.filter((c) => quietNow.has(c.profile_id) && c.type === "booking_request"), AT_ONCE, async (c) => {
+    if (await isUrgentRequestNotice(db, c)) urgent.add(c.id);
+  }, { deadlineMs: 20_000 });
+  const ids = candidates.filter((c) => !quietNow.has(c.profile_id) || urgent.has(c.id)).map((c) => c.id);
   if (ids.length === 0) return NextResponse.json({ claimed: 0, sent: 0, deferred: candidates.length });
 
   // Claim them: only the rows this call marks are sent by it, so two overlapping runs never send the same notice.
@@ -70,12 +75,12 @@ async function handler(request: Request) {
       pushTitleFor(n.type),
       line,
       noticeHref(n.type, n.link_path || "/dashboard", { id: n.id, groupId: n.group_id }),
-      requestId ? { answer: { requestId } } : {}
+      { ...(requestId ? { answer: { requestId } } : {}), ...(urgent.has(n.id) ? { ignoreQuiet: true } : {}) }
     );
     sent += reached;
     // No phone was reached (no alerts turned on, or every phone gone): a request to answer, or the answer to a client's request, goes by email instead (wave 2 C3).
     // An answer's email carries the database's own line (what was decided); a request's, who and when.
-    if (reached === 0 && (await emailNoticeBackup(db, n, isRequest ? line : n.body || line)) === "sent") emailed += 1;
+    if (reached === 0 && (await emailNoticeBackup(db, n, isRequest ? line : n.body || line, { ignoreQuiet: urgent.has(n.id) })) === "sent") emailed += 1;
   }, { deadlineMs: 90_000 });
   if (run.failed.length > 0) console.error(`notification-push: ${run.failed.length} pushes failed`);
 

@@ -29,6 +29,10 @@
       "schedule": "30 14 * * 1"
     },
     {
+      "path": "/api/cron/requests-digest",
+      "schedule": "5 * * * *"
+    },
+    {
       "path": "/api/cron/nutrition-checkin-suggestions",
       "schedule": "0 15 * * 1"
     },

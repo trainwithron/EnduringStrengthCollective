@@ -5,7 +5,7 @@ import { dispatchSms } from "@/lib/sms-dispatch";
 import { formatInTimezone, timezoneForProfiles } from "@/lib/format-in-timezone";
 import { withCronRun } from "@/lib/cron-monitor";
 import { dayBeforeEmail, emailClientNotice, reminderEmail, shouldReleaseClaim, wasDelivered, type EmailOutcome } from "@/lib/client-notice-email";
-import { DAY_BEFORE_MIN_AHEAD_HOURS, dayBeforeDue, dayBeforeMessage, freeCancelUntil } from "@/lib/day-before-reminder";
+import { DAY_BEFORE_MIN_AHEAD_HOURS, dayBeforeDue, dayBeforeMessage, dayBeforeWindow, type QuietPrefs } from "@/lib/day-before-reminder";
 import { DEFAULT_CANCELLATION_WINDOW_HOURS } from "@/lib/cancel-window";
 import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 
@@ -74,12 +74,14 @@ async function handler(request: Request) {
       await timezoneForProfiles(supabase, [booking.athlete_id, booking.coach_id]),
       "time"
     );
+    // About their own session, an hour away: it goes through their quiet hours (Ron, Nov 20, R8), by push and by the email backup alike.
     const count = await sendPushToProfile(
       supabase,
       booking.athlete_id,
       "Upcoming session",
       `Your session with ${coachName} starts at ${when}.`,
-      `/groups/${booking.group_id}/calendar`
+      `/groups/${booking.group_id}/calendar`,
+      { ignoreQuiet: true }
     );
 
     // SMS mirror — a separate, opt-in channel a coach can turn on
@@ -100,7 +102,7 @@ async function handler(request: Request) {
     let email: EmailOutcome | null = null;
     if (count === 0 && !smsResult.sent) {
       const mail = reminderEmail({ coachName: (booking as any).profiles?.full_name, time: when, groupId: booking.group_id });
-      email = await emailClientNotice(supabase, booking.athlete_id, mail.subject, mail.text).catch(() => "failed" as EmailOutcome);
+      email = await emailClientNotice(supabase, booking.athlete_id, mail.subject, mail.text, { ignoreQuiet: true }).catch(() => "failed" as EmailOutcome);
       if (email === "sent") emailed += 1;
     }
 
@@ -140,11 +142,24 @@ async function dayBeforePass(supabase: ReturnType<typeof createServiceRoleClient
     const { data: policies } = await supabase.from("coach_booking_policies").select("coach_id, cancellation_window_hours").in("coach_id", coachIds.slice(i, i + 100));
     for (const p of (policies ?? []) as { coach_id: string; cancellation_window_hours: number | null }[]) windowByCoach.set(p.coach_id, p.cancellation_window_hours ?? DEFAULT_CANCELLATION_WINDOW_HOURS);
   }
+  // Each client's quiet hours (R8): the reminder never goes out inside them; it moves to just before they begin. In the client's own time zone, else their coach's.
+  const people = [...new Set(bookings.flatMap((b) => [b.athlete_id, b.coach_id]))];
+  const prefsById = new Map<string, { quiet_hours_start: number | null; quiet_hours_end: number | null; timezone: string | null }>();
+  for (let i = 0; i < people.length; i += 100) {
+    const { data: profs, error: profError } = await supabase.from("profiles").select("id, quiet_hours_start, quiet_hours_end, timezone").in("id", people.slice(i, i + 100));
+    // unknown quiet hours: nothing is sent this run rather than one landing inside them
+    if (profError) return { error: "day-before reminders skipped: " + profError.message };
+    for (const p of (profs ?? []) as any[]) prefsById.set(p.id, p);
+  }
+  const quietOf = (b: Row): QuietPrefs => {
+    const me = prefsById.get(b.athlete_id);
+    return { quietStart: me?.quiet_hours_start ?? null, quietEnd: me?.quiet_hours_end ?? null, timeZone: me?.timezone || prefsById.get(b.coach_id)?.timezone || DEFAULT_COACH_TIMEZONE };
+  };
   let sent = 0;
   let emailed = 0;
   let released = 0;
   const due = bookings.filter((b) =>
-    dayBeforeDue({ startAt: b.start_at, createdAt: b.created_at, remindedFor: b.day_before_reminded_for, windowHours: windowByCoach.get(b.coach_id) }, now)
+    dayBeforeDue({ startAt: b.start_at, createdAt: b.created_at, remindedFor: b.day_before_reminded_for, windowHours: windowByCoach.get(b.coach_id) }, now, quietOf(b))
   );
   for (const b of due) {
     // One spelling of the time for every write below (the database compares the moment, not the text).
@@ -169,7 +184,7 @@ async function dayBeforePass(supabase: ReturnType<typeof createServiceRoleClient
       if (email === "sent") emailed += 1;
     }
     const delivered = wasDelivered({ pushCount: count, smsSent: false, email });
-    if (!delivered && now.getTime() < freeCancelUntil(startIso, windowByCoach.get(b.coach_id)).getTime()) {
+    if (!delivered && now.getTime() < dayBeforeWindow(startIso, windowByCoach.get(b.coach_id), quietOf(b)).until.getTime()) {
       await supabase.from("bookings").update({ day_before_reminded_for: null }).eq("id", b.id).eq("day_before_reminded_for", startIso);
       released += 1;
       continue;

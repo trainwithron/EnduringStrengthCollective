@@ -1,11 +1,13 @@
 import { generateClaimToken, hashClaimToken } from "@/lib/client-claim-token";
 import {
   computePublicSlots,
+  paysWhenBooking,
   guestChangeAllowed,
   isBotSubmission,
   publicSessionTypes,
   slotIsOffered,
   validateGuestInput,
+  type GuestInput,
   type OpenSlot,
   type PublicSessionTypeRow,
   type PublicSessionTypeView,
@@ -58,7 +60,8 @@ export interface PublicBookingStore {
   coachName(coachId: string): Promise<string | null>;
   sessionTypes(coachId: string): Promise<PublicSessionTypeRow[]>;
   coachContext(coachId: string): Promise<PublicCoachContext>;
-  busy(coachId: string, from: Date, to: Date): Promise<{ start: Date; end: Date }[]>;
+  // Includes times held for a visitor who is paying (wave 3 C7), except the hold named, which is the one being booked.
+  busy(coachId: string, from: Date, to: Date, exceptHoldId?: string): Promise<{ start: Date; end: Date }[]>;
   // The visitor already has an upcoming booking with this coach.
   hasUpcomingPublicBooking(coachId: string, email: string, now: Date): Promise<boolean>;
   findGuestClient(coachId: string, email: string): Promise<{ athleteId: string; groupId: string } | null>;
@@ -78,7 +81,7 @@ export interface PublicBookingStore {
     guestEmail: string;
     guestPhone: string | null;
     note: string | null;
-  }): Promise<{ ok: true } | { ok: false; message: string }>;
+  }): Promise<{ ok: true; linkId?: string } | { ok: false; message: string }>;
   linkByHash(tokenHash: string): Promise<ManagedBooking | null>;
   repointLink(linkId: string, bookingId: string): Promise<void>;
   cancel(bookingId: string): Promise<{ ok: true } | { ok: false; message: string }>;
@@ -154,6 +157,8 @@ export type PublicBookingResult =
   | {
       ok: true;
       bookingId: string;
+      // the visitor's private link row (a paid booking's payment follows it when they move the session)
+      linkId?: string;
       coachId: string;
       groupId: string;
       manageToken: string;
@@ -167,7 +172,17 @@ export type PublicBookingResult =
     }
   | { ok: false; status: number; error: string };
 
-export async function createPublicBooking(store: PublicBookingStore, input: PublicBookingInput, now: Date = new Date()): Promise<PublicBookingResult> {
+export interface CheckedBooking {
+  page: PublicPage;
+  type: PublicSessionTypeRow;
+  guest: GuestInput;
+  start: Date;
+  end: Date;
+  timezone: string;
+}
+
+// Everything a booking must pass before it is made, for the free booking and for "Pay and book" alike.
+export async function checkPublicBooking(store: PublicBookingStore, input: PublicBookingInput, now: Date = new Date()): Promise<({ ok: true } & CheckedBooking) | { ok: false; status: number; error: string }> {
   if (isBotSubmission({ honeypot: input.honeypot, renderedAtMs: input.renderedAtMs, now, requireRenderedAt: true })) {
     return { ok: false, status: 400, error: "That didn't go through. Please try again." };
   }
@@ -191,22 +206,36 @@ export async function createPublicBooking(store: PublicBookingStore, input: Publ
     return { ok: false, status: 409, error: `This email can't book another session with ${page.coachName} right now. If you already have one booked, use your private link to change or cancel it.` };
   }
 
+  const start = new Date(input.startIso);
+  const end = new Date(start.getTime() + type.durationMinutes * 60000);
+  return { ok: true, page, type, guest: guest.value, start, end, timezone };
+}
+
+export async function createPublicBooking(store: PublicBookingStore, input: PublicBookingInput, now: Date = new Date()): Promise<PublicBookingResult> {
+  const checked = await checkPublicBooking(store, input, now);
+  if (!checked.ok) return checked;
+  // A session the coach set to "Pay when booking" is never booked without paying (wave 3 C7): only a paid checkout books it (lib/paid-booking.ts).
+  if (paysWhenBooking(checked.type)) return { ok: false, status: 402, error: "This session is paid when you book. Please reload the page and try again." };
+  return commitPublicBooking(store, checked, { countNewGuest: true });
+}
+
+// Makes the client record (or finds the returning one), the booking and the private link. The time was already checked.
+export async function commitPublicBooking(store: PublicBookingStore, checked: CheckedBooking, opts: { countNewGuest: boolean }): Promise<PublicBookingResult> {
+  const { page, type, guest, start, end, timezone } = checked;
   // The visitor becomes a client record the coach can see. Found by email next time so repeat visitors stay one person.
   let created = false;
-  let client = await store.findGuestClient(page.coachId, guest.value.email);
+  let client = await store.findGuestClient(page.coachId, guest.email);
   if (!client) {
     // Each new visitor becomes a client record, so cap how many a page can add in a day. A returning visitor is not counted.
-    if (!(await store.allowNewGuestClient(page.coachId))) {
+    if (opts.countNewGuest && !(await store.allowNewGuestClient(page.coachId))) {
       return { ok: false, status: 429, error: "This page can't take new visitors right now. Please try again tomorrow, or contact your coach directly." };
     }
-    const made = await store.createGuestClient(page.coachId, guest.value.name, type.organizationId ?? null);
+    const made = await store.createGuestClient(page.coachId, guest.name, type.organizationId ?? null);
     if (!made.ok) return { ok: false, status: 502, error: "We couldn't complete your booking. Please try again in a moment." };
     client = { athleteId: made.athleteId, groupId: made.groupId };
     created = true;
   }
 
-  const start = new Date(input.startIso);
-  const end = new Date(start.getTime() + type.durationMinutes * 60000);
   const booked = await store.book({ coachId: page.coachId, athleteId: client.athleteId, groupId: client.groupId, start, end, sessionTypeId: type.id });
   if (!booked.ok) {
     if (created) await store.discardGuestClient(client.athleteId, client.groupId);
@@ -220,10 +249,10 @@ export async function createPublicBooking(store: PublicBookingStore, input: Publ
     coachId: page.coachId,
     athleteId: client.athleteId,
     tokenHash: hashClaimToken(token),
-    guestName: guest.value.name,
-    guestEmail: guest.value.email,
-    guestPhone: guest.value.phone,
-    note: guest.value.note,
+    guestName: guest.name,
+    guestEmail: guest.email,
+    guestPhone: guest.phone,
+    note: guest.note,
   });
   if (!linked.ok) {
     // Without the link the visitor could never manage this booking, so undo it rather than leave an orphan.
@@ -236,6 +265,7 @@ export async function createPublicBooking(store: PublicBookingStore, input: Publ
   return {
     ok: true,
     bookingId: booked.bookingId,
+    linkId: linked.linkId,
     coachId: page.coachId,
     groupId: client.groupId,
     manageToken: token,
@@ -244,8 +274,8 @@ export async function createPublicBooking(store: PublicBookingStore, input: Publ
     endIso: end.toISOString(),
     timezone,
     typeName: type.name,
-    guestName: guest.value.name,
-    guestEmail: guest.value.email,
+    guestName: guest.name,
+    guestEmail: guest.email,
   };
 }
 
@@ -335,8 +365,11 @@ export async function rescheduleManagedBooking(
     const booked = await store.book({ ...args, start: newStart, end: newEnd });
     if (!booked.ok) return { ok: false, message: "That time was just taken. Please pick another." };
     newBookingId = booked.bookingId;
+    // The link points at the new session BEFORE the old one is cancelled, so a payment for it (wave 3 C7) follows at once and is never refunded in between.
+    await store.repointLink(link.linkId, newBookingId);
     const cancelled = await store.cancel(link.bookingId);
     if (!cancelled.ok) {
+      await store.repointLink(link.linkId, link.bookingId);
       await store.cancel(newBookingId);
       return { ok: false, message: "We couldn't move your session. Nothing was changed." };
     }
