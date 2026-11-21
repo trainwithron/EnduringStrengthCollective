@@ -1,6 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
+import { AppBadgeSync } from "@/components/coach/app-badge-sync";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { CoachSpotHub } from "./coach-spot-hub";
 import { TerminologyProvider } from "@/components/coach/terminology-provider";
@@ -33,6 +34,8 @@ export function CoachMobileShell({
   return (
     <TerminologyProvider groupId={groupId}>
       {children}
+      {/* the waiting-requests number on the installed app's icon (wave 3 C10); draws nothing */}
+      <AppBadgeSync />
       <CoachSpotHub
         key={spotBuilderAthleteId ?? "none"}
         groupId={groupId}

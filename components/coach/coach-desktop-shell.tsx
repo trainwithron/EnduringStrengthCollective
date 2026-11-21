@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AppBadgeSync } from "@/components/coach/app-badge-sync";
 import { usePathname, useSearchParams } from "next/navigation";
 import { homeOfPath, homeTabs, homeHref, HOMES, type HomeKey } from "@/lib/desktop-coach-homes";
 import { HomeTabStrip } from "@/components/coach/desktop/home-tab-strip";
@@ -562,6 +563,8 @@ function CoachDesktopShellFull({
 
         {/* The page area is a size container: pages switch to two or three columns on the width THEY have (@3xl:, @5xl:), so the split panel never squeezes a two-column page. Capped pages sit centred, not pinned to the left edge (layout audit, Oct 31). */}
         <main id="main-content" tabIndex={-1} className="@container flex-1 min-w-0 px-4 pt-6 pb-[calc(6.5rem+env(safe-area-inset-bottom))] md:px-10 md:pt-8 lg:pb-8 lg:mr-[var(--ws-dock,0px)] focus:outline-none">
+          {/* the waiting-requests number on the installed app's icon (wave 3 C10); draws nothing */}
+          <AppBadgeSync />
           <div className={wide ? "" : "mx-auto w-full max-w-[1400px]"}>
           <PendingNoticeFlusher />
           {here && (
@@ -603,6 +606,7 @@ export function CoachDesktopShell(props: React.ComponentProps<typeof CoachDeskto
         <div data-embedded="1" className="min-h-screen bg-graphite text-chalk font-body">
           <EmbeddedActivityReporter />
           <main id="main-content" className="px-4 pt-4 pb-8">
+            <AppBadgeSync />
             {props.children}
           </main>
         </div>

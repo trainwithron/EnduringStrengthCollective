@@ -20,6 +20,8 @@ export const CRON_JOBS: CronJob[] = [
   { job: "milestone-scan", path: "/api/cron/milestone-scan", maxAgeHours: WEEKLY },
   // Wave 2 C6: the weekly "sessions to mark" line for coaches.
   { job: "sessions-to-mark", path: "/api/cron/sessions-to-mark", maxAgeHours: WEEKLY },
+  // Wave 3 C10: the coach's morning "N requests waiting" line (hourly, so each coach's 8 AM is reached).
+  { job: "requests-digest", path: "/api/cron/requests-digest", maxAgeHours: FREQUENT * 3 },
   { job: "nutrition-checkin-suggestions", path: "/api/cron/nutrition-checkin-suggestions", maxAgeHours: WEEKLY },
   { job: "rest-day-nudge", path: "/api/cron/rest-day-nudge", maxAgeHours: DAILY },
   { job: "withings-sync", path: "/api/withings/sync", maxAgeHours: DAILY },
