@@ -9,6 +9,7 @@ import { DEFAULT_COACH_TIMEZONE, dateKeyInZone } from "@/lib/timezone";
 import { buildCreditPicture, fetchBookingCounts } from "@/lib/credit-picture";
 import { coachCreditSentence } from "@/lib/credit-sentence";
 import { FOCUSABLE_ROW, requestAnchor } from "@/lib/requests-center";
+import { answerByText, requestDeadline } from "@/lib/request-deadline";
 
 interface MoveRequest {
   id: string;
@@ -230,6 +231,10 @@ export function LateChangesPanel({ groupIds: scopeGroupIds }: { groupIds?: strin
                   <p className="font-body text-xs text-steel">
                     {m.kind === "move" && m.fromStartAt ? `Move ${fmt(m.fromStartAt)} to ${fmt(m.newStartAt)}` : `New session ${fmt(m.newStartAt)}`}
                     {m.newEndAt ? ` to ${fmtTime(m.newEndAt)}` : ""} ({tzName(m.newStartAt)})
+                  </p>
+                  {/* When it lapses if nobody answers (wave 3 C1): the session's time, or the original time for a move. Nothing here changes when that is. */}
+                  <p className="font-body text-xs font-semibold text-alert" data-answer-by>
+                    {answerByText(requestDeadline({ kind: m.kind, from_start_at: m.fromStartAt, new_start_at: m.newStartAt }), timezone)}
                   </p>
                   {m.outsideHours && <p className="font-body text-xs text-rust-ink">Outside your open hours or on your time off. You can still confirm it.</p>}
                   {creditLines[`${m.athleteId}:${m.groupId}`] && <p className="font-body text-xs text-steel">{creditLines[`${m.athleteId}:${m.groupId}`]}</p>}

@@ -169,7 +169,7 @@ describe("buttons on a notifications row answer that row's own request", () => {
         { coach_id: "coach", kind: "new", new_start_at: "2026-11-19T14:00:00Z", created_at: at, profiles: { full_name: "Hewan Belete" } },
       ],
     });
-    expect(await requestPushLine(two, { profile_id: "coach", group_id: null, type: "booking_request", body: "", created_at: at }, TZ)).toBe("Hewan B. asked for Thu, Nov 19, 9:00 AM");
+    expect(await requestPushLine(two, { profile_id: "coach", group_id: null, type: "booking_request", body: "", created_at: at }, TZ)).toMatch(/^Hewan B. asked for Thu, Nov 19, 9:00 AM. Answer by /);
   });
 });
 
@@ -213,15 +213,17 @@ describe("a request's push says who and when", () => {
     expect(shortName("Hewan Belete")).toBe("Hewan B.");
     expect(shortName("Cher")).toBe("Cher");
     expect(shortName("  ")).toBe("Someone");
-    expect(bookingRequestLine({ kind: "new", new_start_at: "2026-11-19T14:00:00Z" }, "Hewan B.", TZ)).toBe("Hewan B. asked for Thu, Nov 19, 9:00 AM");
-    expect(bookingRequestLine({ kind: "move", from_start_at: "2026-11-19T14:00:00Z", new_start_at: "2026-11-20T15:00:00Z" }, "Hewan B.", TZ)).toBe("Hewan B. asked to move Thu, Nov 19, 9:00 AM to Fri, Nov 20, 10:00 AM");
+    // with when to answer by (wave 3 C1): a new session lapses at its time, a move at the ORIGINAL time
+    const evening = new Date("2026-11-18T23:00:00Z");
+    expect(bookingRequestLine({ kind: "new", new_start_at: "2026-11-19T14:00:00Z" }, "Hewan B.", TZ, evening)).toBe("Hewan B. asked for Thu, Nov 19, 9:00 AM. Answer by tomorrow 9:00 AM");
+    expect(bookingRequestLine({ kind: "move", from_start_at: "2026-11-19T14:00:00Z", new_start_at: "2026-11-20T15:00:00Z" }, "Hewan B.", TZ, evening)).toBe("Hewan B. asked to move Thu, Nov 19, 9:00 AM to Fri, Nov 20, 10:00 AM. Answer by tomorrow 9:00 AM");
     expect(scheduleRequestLine({ kind: "pause", effective_on: "2026-11-24", recurring_booking_series: { weekday: 2, start_time: "06:00:00" } }, "Hewan B.")).toBe("Hewan B. asked to pause Tuesdays at 6:00 AM after Nov 24");
     expect(scheduleRequestLine({ kind: "freeze", effective_on: "2026-11-24", resume_on: "2026-12-15", recurring_booking_series: null }, "Hewan B.")).toBe("Hewan B. asked to freeze their weekly schedule after Nov 24 until Dec 15");
   });
   it("found from the request written with the notice; the notice's own line when there is none", async () => {
     const n = { profile_id: "coach", group_id: "g1", type: "booking_request", body: "Hewan Belete asked for a session on Thu Nov 19, 9:00 AM. Confirm or decline.", created_at: "2026-11-18T19:00:00.000Z" };
     const db = fakeDb({ booking_requests: [{ coach_id: "coach", group_id: "g1", kind: "new", new_start_at: "2026-11-19T14:00:00Z", created_at: "2026-11-18T19:00:00.000Z", profiles: { full_name: "Hewan Belete" } }] });
-    expect(await requestPushLine(db, n, TZ)).toBe("Hewan B. asked for Thu, Nov 19, 9:00 AM");
+    expect(await requestPushLine(db, n, TZ)).toMatch(/^Hewan B. asked for Thu, Nov 19, 9:00 AM. Answer by /);
     expect(await requestPushLine(fakeDb({}), n, TZ)).toBe("Hewan Belete asked for a session on Thu Nov 19, 9:00 AM.");
     const c = { ...n, type: "client_request", body: "Hewan B. asked to train with you." };
     expect(await requestPushLine(fakeDb({ client_requests: [{ coach_id: "coach", created_at: n.created_at, profiles: { full_name: "Hewan Belete" } }] }), c, TZ)).toBe("Hewan B. asked to train with you");

@@ -48,10 +48,11 @@ export function movedEmail(opts: { coachName: string | null | undefined; when: s
 export type EmailOutcome = "sent" | "quiet" | "no_address" | "not_configured" | "failed";
 
 /** Emails the client the notice when allowed. Used only AFTER a phone alert reached no one. */
-export async function emailClientNotice(db: SupabaseClient, profileId: string, subject: string, text: string): Promise<EmailOutcome> {
+// ignoreQuiet: a request about a session starting soon (wave 3 C9) reaches the coach even in their quiet hours, by email too when no phone was reached.
+export async function emailClientNotice(db: SupabaseClient, profileId: string, subject: string, text: string, opts: { ignoreQuiet?: boolean } = {}): Promise<EmailOutcome> {
   if (!isEmailConfigured()) return "not_configured";
   const prefs = await readPushPrefs(db, profileId);
-  if (isQuietNow(prefs)) return "quiet";
+  if (!opts.ignoreQuiet && isQuietNow(prefs)) return "quiet";
   const { data } = await db.auth.admin.getUserById(profileId);
   const to = data?.user?.email;
   if (!to || isPlaceholderEmail(to)) return "no_address";

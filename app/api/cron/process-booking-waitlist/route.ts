@@ -4,6 +4,7 @@ import { sendPushToProfile } from "@/lib/send-push";
 import { formatInTimezone, timezoneForProfiles } from "@/lib/format-in-timezone";
 import { dateKeyInZone } from "@/lib/timezone";
 import { withCronRun } from "@/lib/cron-monitor";
+import { tellLapsed, warnBeforeLapse } from "@/lib/request-lapse-job";
 
 // acuity_replacement_gap_audit_sept16.md — waitlists. The instant "a
 // slot just freed up" moment is handled synchronously inside
@@ -74,9 +75,12 @@ async function handler(request: Request) {
 
   // A pending booking request whose time has passed lapses and the client is told (needs the booking requests database update; until then
   // the call fails quietly).
+  // Wave 3 C1: the coach is warned about two hours before a request lapses, and told once it has (lib/request-lapse-job.ts). When it lapses is unchanged.
+  const lapseWarnings = await warnBeforeLapse(supabase, now);
   const { data: lapsed } = await supabase.rpc("expire_stale_booking_requests");
+  const lapseNotices = await tellLapsed(supabase, now);
 
-  return NextResponse.json({ ok: true, pushed, expired, lapsedRequests: typeof lapsed === "number" ? lapsed : 0 });
+  return NextResponse.json({ ok: true, pushed, expired, lapsedRequests: typeof lapsed === "number" ? lapsed : 0, lapseWarnings, lapseNotices });
 }
 
 export const GET = withCronRun("process-booking-waitlist", handler);

@@ -138,7 +138,8 @@ const SCHEDULE_VERB: Record<string, string> = { pause: "pause", freeze: "freeze"
 // Every sentence follows the client's name on the card ("Sam has gone quiet."), so none starts with a capital letter.
 export const sentences = {
   scheduleRequest: (kind: string) => `asked to ${SCHEDULE_VERB[kind] ?? "change"} their recurring sessions.`,
-  bookingRequest: () => "asked to move a session.",
+  // with when it must be answered by (wave 3 C1): "asked for a session. Answer by 4:00 PM."
+  bookingRequest: (kind?: string | null, answerBy?: string | null) => `${kind === "move" ? "asked to move a session." : kind ? "asked for a session." : "asked to move a session."}${answerBy ? ` ${answerBy}.` : ""}`,
   clientMessage: (count: number) => (count > 1 ? `sent you ${count} messages you haven't read.` : "sent you a message you haven't read."),
   groupReply: (groupName: string) => `is waiting for a reply in ${groupName}.`,
   sessionSoon: (timeLabel: string) => `has a session at ${timeLabel}.`,
