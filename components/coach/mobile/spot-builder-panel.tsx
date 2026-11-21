@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useDialogA11y } from "@/lib/use-dialog-a11y";
 import { useTerm } from "@/components/coach/terminology-provider";
 import dynamic from "next/dynamic";
@@ -71,7 +72,8 @@ export function SpotBuilderPanel({
     });
   }, [groupId, initialAthleteId]);
 
-  return (
+  // Drawn on the page itself, not inside the Spotlight card (whose blurred glass holds a fixed box inside the card): the builder fills the screen (audit P34, Nov 21).
+  const box = (
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Build a program" className="fixed inset-0 z-50 bg-graphite overflow-y-auto" data-spot-program-box>
       <div className="sticky top-0 z-10 bg-graphite border-b border-steel/20 px-4 py-3 flex items-center justify-between gap-3">
         <p className="font-display font-bold text-lg uppercase leading-none">Build a program</p>
@@ -122,4 +124,5 @@ export function SpotBuilderPanel({
       </div>
     </div>
   );
+  return typeof document === "undefined" ? box : createPortal(box, document.body);
 }

@@ -62,8 +62,8 @@ export default async function MyHistoryPage(
 
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24 px-5 pt-8">
-      <Link href={`/groups/${params.groupId}/settings`} className="font-body text-xs text-steel mb-4 inline-block">
-        ← Back to Settings
+      <Link href={`/groups/${params.groupId}/more`} className="font-body text-xs text-steel mb-4 min-h-11 inline-flex items-center">
+        ← More
       </Link>
       <h1 className="font-display font-bold text-2xl uppercase mb-1">Your exercise history</h1>
       <p className="font-body text-sm text-steel mb-6">

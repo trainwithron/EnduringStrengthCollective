@@ -155,12 +155,12 @@ export function ViewAsClientPicker({ onClose }: { onClose: () => void }) {
     await actAs(pendingClient.id, pendingClient.groupId);
   }
 
-  // Your own training: no group to pick; "My training" finds your program (lib/my-training.ts).
+  // Your own training: no group to pick; it starts today's workout in your own space at once (audit P19, Nov 21, the same as Spotlight's; with none ready, Today says why).
   function logMyOwnWorkout() {
     if (switching) return;
     setSwitching(true);
     onClose();
-    router.push("/my-space/home");
+    router.push("/my-space/home?start=1");
   }
 
   const filtered = (clients ?? []).filter((c) =>

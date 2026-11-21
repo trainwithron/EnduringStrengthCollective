@@ -5,6 +5,8 @@ import { loadReupState } from "@/lib/reup-server";
 import { isStripeConfigured } from "@/lib/stripe";
 import { ReupCard } from "@/components/athlete/reup-card";
 import { MyScheduleCard, type MyScheduleCardState } from "@/components/athlete/my-schedule-card";
+import { loadScheduleCardHref } from "@/lib/schedule-card";
+import type { CheckinCardState } from "@/lib/client-home-asks";
 import { loadMySchedule } from "@/lib/my-schedule-data";
 import { openRequest, scheduleStateLine, scheduleSummary } from "@/lib/schedule-request-ui";
 import { FirstRunGuideCard } from "@/components/athlete/first-run-guide-card";
@@ -416,13 +418,19 @@ export default async function GroupHubPage(
             // same "additive, only if the coach has configured hours" gate as
             // the existing per-program calendar page. The coach is the roster's.
             (async () => {
-              if (!coachId) return { canBook: false, sessionsLeft: null as number | null };
+              if (!coachId) return { canBook: false, sessionsLeft: null as number | null, bookHref: null as string | null };
               const { count } = await supabase
                 .from("coach_availability_windows")
                 .select("id", { count: "exact", head: true })
                 .eq("coach_id", coachId);
-              const canBook = (count ?? 0) > 0;
-              if (!canBook) return { canBook, sessionsLeft: null as number | null };
+              if ((count ?? 0) === 0) return { canBook: false, sessionsLeft: null as number | null, bookHref: null as string | null };
+              // Audit C1 (Ron, Nov 21): the link goes where the client's Calendar card goes: the first day with an open time, the day to ask for a time, or Messages; in
+              // "I schedule everyone" mode (no row) there is no link at all. Read the way the Calendar reads it (a failed read counts as free).
+              const sb = await supabase.from("coach_booking_policies").select("booking_mode").eq("coach_id", coachId).maybeSingle();
+              const bookingMode = sb.error ? "free" : ((sb.data?.booking_mode as string | null) ?? "coach_schedules");
+              const bookHref = await loadScheduleCardHref(supabase, { coachId, timezone, bookingMode, dayBase: `/groups/${params.groupId}/calendar`, messagesHref: `/groups/${params.groupId}/messages` }).catch(() => null);
+              const canBook = !!bookHref;
+              if (!canBook) return { canBook, sessionsLeft: null as number | null, bookHref };
               // How many sessions the client has left, shown next to "Book a session". Failure just leaves it off.
               try {
                 const { data: creditRow } = await supabase
@@ -431,9 +439,9 @@ export default async function GroupHubPage(
                   .eq("athlete_id", athleteId)
                   .eq("group_id", params.groupId)
                   .maybeSingle();
-                return { canBook, sessionsLeft: typeof creditRow?.balance === "number" ? creditRow.balance : null };
+                return { canBook, sessionsLeft: typeof creditRow?.balance === "number" ? creditRow.balance : null, bookHref };
               } catch {
-                return { canBook, sessionsLeft: null as number | null };
+                return { canBook, sessionsLeft: null as number | null, bookHref };
               }
             })(),
           ]);
@@ -584,6 +592,7 @@ export default async function GroupHubPage(
   // a mobility program and a warm-up flow at once). dayWorkout above is only the fallback
   // for a day with nothing in any of them.
   let daySessions: DaySession[] = [];
+  const doneSessionByWorkout: Record<string, string> = {};
   let dayMacros: TodayMacros | null = null;
   let dayHabits: TodayHabit[] = [];
   let weightLogs: WeightLogEntry[] = [];
@@ -593,13 +602,14 @@ export default async function GroupHubPage(
   // No goal sheet filled in yet (by the client or by a coach with them): Home asks for it first. A failed read leaves it out.
   let goalSheetNeeded = false;
   let goalReview: { text: string | null } | null = null;
-  let checkinCard = false;
+  let checkinCard: CheckinCardState = false;
   // Once the goal sheet is done: the offer to join the organization's shared group (never two prompts at once). Only for the client themselves, in their one-on-one space.
   let sharedGroupOffer: SharedGroupOffer | null = null;
   let wellnessCheckin: WellnessCheckinValues | null = null;
   let lifeImpactPrompt: string | null = null;
   const canBook = mobileBase?.booking.canBook ?? false;
   const sessionsLeft = mobileBase?.booking.sessionsLeft ?? null;
+  const bookHref = mobileBase?.booking.bookHref ?? null;
   let nextWorkoutText: string | null = null;
   // No workout logged yet: the wellness check-in becomes a plain card under the workout, not a full-screen block.
   let isFirstDay = false;
@@ -628,8 +638,8 @@ export default async function GroupHubPage(
     // Wave D: what was logged, and (for the day) the day's own reads, at once.
     const [{ data: logRows }, dayReads] = await Promise.all([
       workoutIdsForLogCheck.length > 0
-        ? supabase.from("workout_logs").select("workout_id").eq("athlete_id", athleteId).in("workout_id", workoutIdsForLogCheck)
-        : Promise.resolve({ data: [] as { workout_id: string }[] }),
+        ? supabase.from("workout_logs").select("workout_id, session_id").eq("athlete_id", athleteId).in("workout_id", workoutIdsForLogCheck).order("created_at", { ascending: true })
+        : Promise.resolve({ data: [] as { workout_id: string; session_id: string | null }[] }),
       dayView
         ? Promise.all([
             isToday
@@ -717,6 +727,8 @@ export default async function GroupHubPage(
         : Promise.resolve(null),
     ]);
     const loggedIds = new Set((logRows ?? []).map((l) => l.workout_id));
+    // Audit C13 (Nov 21): "View" on a finished workout opens that session (the latest one for the workout), not the workout's preview.
+    for (const l of (logRows ?? []) as { workout_id: string; session_id: string | null }[]) if (l.session_id) doneSessionByWorkout[l.workout_id] = l.session_id;
 
     if (dayView && dayReads) {
       const [priorCount, threadReads, [macroResult, mealPlanResult, standingTarget, { data: dueLogRows }], todayReads] = dayReads;
@@ -981,6 +993,8 @@ export default async function GroupHubPage(
                 wellnessCheckin={wellnessCheckin}
                 mealLine={mealLine}
                 sessionsLeft={sessionsLeft}
+                bookHref={bookHref}
+                doneSessionByWorkout={doneSessionByWorkout}
                 ownChoice={isCoach && !isActingAsOther && athleteId === user?.id}
                 programs={programsBlockReady ? homePrograms : []}
                 checkin={
@@ -998,7 +1012,7 @@ export default async function GroupHubPage(
               />
               {isToday && <HomeThread lines={homeThreadLines} />}
               {isToday && goalSheetNeeded && <GoalSheetPromptCard groupId={params.groupId} athleteId={athleteId} />}
-              {isToday && checkinCard && <WeeklyCheckinCard groupId={params.groupId} coachName={roster.find((m) => m.role === "coach" && m.profileId !== athleteId)?.fullName ?? null} />}
+              {isToday && checkinCard && <WeeklyCheckinCard groupId={params.groupId} coachName={roster.find((m) => m.role === "coach" && m.profileId !== athleteId)?.fullName ?? null} sent={checkinCard === "sent"} />}
               {isToday && goalReview && <GoalReviewCard groupId={params.groupId} athleteId={athleteId} goalText={goalReview.text} />}
               {isToday && !goalSheetNeeded && sharedGroupOffer && (
                 <SharedGroupJoinCard
@@ -1032,7 +1046,7 @@ export default async function GroupHubPage(
               {isToday && weekClasses && (
                 <section aria-label="Group sessions this week">
                   <h2 className="font-body text-[13px] font-semibold text-steel mb-2">Group sessions this week</h2>
-                  <ClassesList classes={weekClasses.classes} balance={weekClasses.balance} timezone={timezone} nowIso={weekClasses.nowIso} />
+                  <ClassesList classes={weekClasses.classes} balance={weekClasses.balance} timezone={timezone} nowIso={weekClasses.nowIso} groupId={params.groupId} />
                   <Link href={`/groups/${params.groupId}/classes`} className="inline-block mt-2 font-body text-xs text-rust-ink min-h-11 leading-[44px]">
                     See all group sessions
                   </Link>

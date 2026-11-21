@@ -183,12 +183,12 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
     router.refresh();
   }
 
-  // Your own training: no group to pick; "My training" finds your program (lib/my-training.ts).
+  // Your own training: no group to pick; it starts today's workout in your own space at once (audit P19, Nov 21; with none ready, Today says why).
   function logMyOwnWorkout() {
     if (busy) return;
     setBusy(true);
     onNavigated();
-    router.push("/my-space/home");
+    router.push("/my-space/home?start=1");
   }
 
   async function switchToGroup(targetGroupId: string) {
@@ -248,7 +248,8 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
       return;
     }
     onNavigated();
-    router.push(`/groups/${made.id}/dashboard`);
+    // Audit P20: a new group opens on its clients, to add the first ones (the dashboard landed on the grid).
+    router.push(`/groups/${made.id}/clients`);
   }
 
   // Same rule as the calendar's client list: set-aside and Online clients are left out until asked for (lib/client-type.ts).
@@ -289,7 +290,7 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
             type="button"
             disabled={busy}
             onClick={confirmActAsClient}
-            className="h-10 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-50"
+            className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-50"
           >
             View as {pendingClient.fullName}
           </button>
@@ -313,7 +314,7 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
           type="button"
           disabled={busy}
           onClick={logMyOwnWorkout}
-          className="w-full h-10 border border-rust/40 text-rust-ink font-body text-sm flex items-center justify-center gap-2 disabled:opacity-50 active:bg-rust/5"
+          className="w-full h-11 border border-rust/40 text-rust-ink font-body text-sm flex items-center justify-center gap-2 disabled:opacity-50 active:bg-rust/5"
         >
           <Dumbbell className="w-4 h-4 shrink-0" strokeWidth={2.25} />
           Start your own workout
@@ -335,7 +336,7 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
               role="tab"
               aria-selected={o.id === selectedOrgId}
               onClick={() => selectOrg(o.id)}
-              className={`h-8 px-3 shrink-0 whitespace-nowrap font-body text-xs border ${o.id === selectedOrgId ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"}`}
+              className={`h-11 px-3 shrink-0 whitespace-nowrap font-body text-xs border ${o.id === selectedOrgId ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"}`}
             >
               {o.name}
             </button>
@@ -353,7 +354,7 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
               onNavigated();
               router.push(`/groups/${clientAnchorGroup ?? groupId}/clients?add=1`);
             }}
-            className="h-9 px-3 border border-rust/60 text-rust-ink font-body text-sm active:bg-rust/10"
+            className="h-11 px-3 border border-rust/60 text-rust-ink font-body text-sm active:bg-rust/10"
           >
             + Add {term("client")}
           </button>
@@ -363,7 +364,7 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={`Search ${term("client", "plural")}…`}
-          className="w-full h-9 mb-2 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust"
+          className="w-full h-11 mb-2 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust"
         />
         <div className="max-h-[55vh] overflow-y-auto space-y-1">
           {clients === null && <p className="font-body text-sm text-steel px-1 py-2">Loading…</p>}
@@ -394,7 +395,7 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
                     type="button"
                     disabled={busy}
                     onClick={() => logSessionFor(c)}
-                    className="flex-1 h-9 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-50 active:bg-rust/80"
+                    className="flex-1 h-11 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-50 active:bg-rust/80"
                   >
                     Log their workout
                   </button>
@@ -410,7 +411,7 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
                     type="button"
                     disabled={busy}
                     onClick={() => requestActAsClient(c)}
-                    className="h-9 px-3 border border-steel/30 text-steel font-body text-xs disabled:opacity-50 active:border-rust/50"
+                    className="h-11 px-3 border border-steel/30 text-steel font-body text-xs disabled:opacity-50 active:border-rust/50"
                   >
                     View as client
                   </button>
@@ -441,7 +442,7 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
                       type="button"
                       disabled={busy}
                       onClick={() => switchToGroup(g.id)}
-                      className={`w-full text-left px-2 py-2 font-body text-sm disabled:opacity-50 ${g.id === groupId ? "text-rust-ink bg-rust/10" : "text-chalk active:bg-surface/60"}`}
+                      className={`w-full min-h-11 text-left px-2 py-2 font-body text-sm disabled:opacity-50 ${g.id === groupId ? "text-rust-ink bg-rust/10" : "text-chalk active:bg-surface/60"}`}
                     >
                       {g.name}
                       {g.focusTag && <span className="text-steel"> · {g.focusTag}</span>}
@@ -455,13 +456,13 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
 
       <div className="border-t border-steel/20 pt-3">
         <p className="font-body text-xs text-steel uppercase tracking-wide mb-1.5">+ Create Group</p>
-        <div className="flex items-center gap-1 mb-1.5">
+        <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
           {GROUP_KIND_ORDER.map((k) => (
             <button
               key={k}
               type="button"
               onClick={() => setNewGroupKind(k)}
-              className={`h-6 px-2 font-body text-xs border ${newGroupKind === k ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"}`}
+              className={`h-11 px-3 font-body text-xs border ${newGroupKind === k ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"}`}
             >
               {GROUP_KIND_LABELS[k]}
             </button>
@@ -477,14 +478,14 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
             }}
             placeholder="New group name"
             disabled={creating}
-            className="flex-1 h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust disabled:opacity-60"
+            className="flex-1 h-11 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust disabled:opacity-60"
           />
           <button
             type="button"
             onClick={handleCreateGroup}
             disabled={creating || !newGroupName.trim()}
             aria-label="Create group"
-            className="h-9 px-3 bg-rust text-graphite flex items-center justify-center disabled:opacity-40"
+            className="h-11 w-11 px-3 bg-rust text-graphite flex items-center justify-center disabled:opacity-40"
           >
             <Plus className="w-4 h-4" />
           </button>

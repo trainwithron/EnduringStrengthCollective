@@ -42,6 +42,8 @@ export function DayCard({
   nextLabel = null,
   mealLine = null,
   sessionsLeft = null,
+  bookHref = null,
+  doneSessionByWorkout = {},
   ownChoice = false,
   afterWorkout = null,
   programs = [],
@@ -68,6 +70,10 @@ export function DayCard({
   mealLine?: string | null;
   // The client's sessions left, shown beside "Book a session" when they have any.
   sessionsLeft?: number | null;
+  // Where "Book a session" goes (audit C1): the Calendar card's place (first open day, the day to ask, or Messages). Absent: the day's own page, as before.
+  bookHref?: string | null;
+  // The session each finished workout was logged in (audit C13): "View" opens it.
+  doneSessionByWorkout?: Record<string, string>;
   // A coach looking at their OWN training: today's workout offers the same small choice as the client Log page, "Start [Day]'s workout" and "View whole program".
   ownChoice?: boolean;
   // Shown right under the workout card(s) for the day, before nutrition and weight (the client's programs on Home).
@@ -89,6 +95,8 @@ export function DayCard({
         sessions={sessions}
         canBook={canBook}
         sessionsLeft={sessionsLeft}
+        bookHref={bookHref}
+        doneSessionByWorkout={doneSessionByWorkout}
         wellnessCheckin={isToday ? wellnessCheckin ?? null : null}
         nextLabel={nextLabel}
         programs={programs}
@@ -156,6 +164,17 @@ function ProgramProgress({ program }: { program: HomeProgramCard | null }) {
   );
 }
 
+// Today's "Start workout" starts it in one tap (audit C8, Nov 21: ?start=1 runs the same Start as the preview); another day's link opens the preview.
+export function startHref(groupId: string, workoutId: string | null, isToday: boolean): string {
+  return `/groups/${groupId}/workouts/${workoutId}${isToday ? "?start=1" : ""}`;
+}
+
+// A finished workout's "View" opens the session it was logged in (audit C13); with none known, the workout's own page as before.
+export function viewHref(groupId: string, workoutId: string | null, doneSessionByWorkout: Record<string, string>): string {
+  const sessionId = workoutId ? doneSessionByWorkout[workoutId] : undefined;
+  return sessionId ? `/sessions/${sessionId}` : `/groups/${groupId}/workouts/${workoutId}`;
+}
+
 const START_BUTTON = "w-full h-[52px] flex items-center justify-center bg-rust text-graphite font-body text-base font-semibold";
 const SECOND_BUTTON = "w-full h-11 flex items-center justify-center rounded-token-pill border border-rust/50 text-rust-ink font-body text-sm font-semibold";
 
@@ -169,6 +188,8 @@ function WorkoutSection({
   sessions,
   canBook,
   sessionsLeft,
+  bookHref,
+  doneSessionByWorkout,
   wellnessCheckin,
   nextLabel,
   programs,
@@ -182,6 +203,8 @@ function WorkoutSection({
   sessions: DaySession[];
   canBook: boolean;
   sessionsLeft?: number | null;
+  bookHref?: string | null;
+  doneSessionByWorkout: Record<string, string>;
   wellnessCheckin?: WellnessCheckinValues | null;
   nextLabel?: string | null;
   programs: HomeProgramCard[];
@@ -213,7 +236,7 @@ function WorkoutSection({
           </div>
           {finished[0].workoutId && (
             <Link
-              href={`/groups/${groupId}/workouts/${finished[0].workoutId}`}
+              href={viewHref(groupId, finished[0].workoutId, doneSessionByWorkout)}
               className="inline-flex items-center min-h-11 font-body text-sm text-chalk underline underline-offset-2 shrink-0"
             >
               View
@@ -235,7 +258,7 @@ function WorkoutSection({
           <div key={x.programId} className={i === 0 ? "pt-2" : "pt-4 mt-4 border-t border-steel/20"}>
             {x.status === "done" ? (
               <Link
-                href={`/groups/${groupId}/workouts/${x.workoutId}`}
+                href={viewHref(groupId, x.workoutId, doneSessionByWorkout)}
                 className="flex items-center gap-2 min-h-11 font-body text-sm text-steel"
               >
                 <Check className="w-4 h-4 text-win shrink-0" strokeWidth={3} />
@@ -253,7 +276,7 @@ function WorkoutSection({
                 <div className="mt-3">
                   {x.status === "planned" && (
                     <Link
-                      href={`/groups/${groupId}/workouts/${x.workoutId}`}
+                      href={startHref(groupId, x.workoutId, isToday)}
                       className={
                         isToday && i === firstPlannedIndex
                           ? START_BUTTON
@@ -324,8 +347,9 @@ function WorkoutSection({
 
         {canBook && (
           <Link
-            href={`/groups/${groupId}/calendar/${dateKey}`}
+            href={bookHref ?? `/groups/${groupId}/calendar/${dateKey}`}
             className="font-body text-sm text-rust-ink mt-3 inline-flex items-center min-h-11"
+            data-book-from-home
           >
             Book a session with your coach &rarr;
           </Link>
@@ -350,7 +374,7 @@ function WorkoutSection({
       <div className="mt-4">
         {workout.status === "done" && workout.workoutId && (
           <Link
-            href={`/groups/${groupId}/workouts/${workout.workoutId}`}
+            href={viewHref(groupId, workout.workoutId, doneSessionByWorkout)}
             className="inline-flex items-center min-h-11 font-body text-sm text-win"
           >
             Completed — view workout
@@ -369,7 +393,7 @@ function WorkoutSection({
         )}
         {workout.status === "planned" && (
           <Link
-            href={`/groups/${groupId}/workouts/${workout.workoutId}`}
+            href={startHref(groupId, workout.workoutId, isToday)}
             className={
               isPrimary
                 ? START_BUTTON

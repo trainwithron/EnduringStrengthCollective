@@ -304,7 +304,9 @@ export function FreeTextFoodLog({
     <div className="mt-2 space-y-2">
       {!estimate ? (
         <>
+          {/* It only opens on a tap (Modify, Snack or ate out), so the box is ready to type in (audit C18). */}
           <textarea aria-label={placeholder}
+            autoFocus
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder={placeholder}

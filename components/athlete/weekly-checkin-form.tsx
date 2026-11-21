@@ -101,10 +101,16 @@ export function WeeklyCheckinForm({
     return (
       <div className="tint-win rounded-card p-5" role="status" data-checkin-sent>
         <p className="font-display font-semibold text-xl text-chalk">Sent to {coach === "your coach" ? "your coach" : coach}</p>
-        <p className="font-body text-sm text-steel mt-1">You can change it until {coach} reviews it. Open this page again to make a change.</p>
-        <Link href={`/groups/${groupId}`} className="inline-flex items-center min-h-11 mt-2 font-body text-sm text-rust-ink font-medium">
-          Back to Home
-        </Link>
+        <p className="font-body text-sm text-steel mt-1">You can change it until {coach} reviews it. It is under More, Weekly check-in, too.</p>
+        <div className="flex flex-wrap items-center gap-x-5 mt-2">
+          {/* Audit C2: change it right here (what was sent is still in the form). */}
+          <button type="button" onClick={() => setSent(false)} className="inline-flex items-center min-h-11 font-body text-sm text-rust-ink font-medium" data-checkin-change>
+            Change it
+          </button>
+          <Link href={`/groups/${groupId}`} className="inline-flex items-center min-h-11 font-body text-sm text-chalk">
+            Back to Home
+          </Link>
+        </div>
       </div>
     );
   }

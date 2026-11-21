@@ -6,6 +6,8 @@ export type MySpaceTab = (typeof MY_SPACE_TABS)[number];
 export function mySpaceTarget(spaceId: string, params: URLSearchParams): string {
   const to = params.get("to");
   const tab = (MY_SPACE_TABS as readonly string[]).includes(to ?? "") ? `/${to}` : "";
+  // Spotlight's "Start your own workout" (audit P19, Nov 21): straight into today's workout (Today finds it and starts it), not Home first.
+  if (!tab && params.get("start") === "1") return `/groups/${spaceId}/today?start=1`;
   const next = new URLSearchParams();
   const month = params.get("month");
   if (month && /^\d{4}-\d{2}$/.test(month)) next.set("month", month);
@@ -33,6 +35,7 @@ export function placeParams(place: MySpacePlace, search: URLSearchParams): URLSe
   const month = search.get("month");
   if (month && /^\d{4}-\d{2}$/.test(month)) q.set("month", month);
   if (place === "feed" && search.get("view") === "clients") q.set("feedView", "clients"); // "view" on this query already means which app
+  if (place === "home" && search.get("start") === "1") q.set("start", "1");
   return q;
 }
 

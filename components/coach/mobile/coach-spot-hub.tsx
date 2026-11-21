@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Dumbbell, Mail, MessageCircle, Sparkles, TrendingUp, Users, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, Dumbbell, Mail, MessageCircle, Sparkles, TrendingUp, Users, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { SpotNeedsTop } from "./spot-needs-top";
@@ -83,6 +83,8 @@ export function CoachSpotHub({
   const [activeGroupId, setActiveGroupId] = useState(groupId);
   // What needs the coach first (lib/spot-needs.ts): read when the page opens and every time Spotlight opens. It fills the top of the drop-down and the dot on the button.
   const [needs, setNeeds] = useState<SpotNeeds | null>(null);
+  // Ron, Nov 21 (audit P30): the tiles come first; what is waiting sits under them, folded, and opens on a tap (or by itself for a notice that names a panel).
+  const [needsOpen, setNeedsOpen] = useState(false);
   const [fade, setFade] = useState(false);
   const needsRequest = useRef(0);
   function showNeeds(data: SpotNeeds) {
@@ -155,6 +157,7 @@ export function CoachSpotHub({
     setView("grid");
     loadNeeds(true);
     if (!anchor) return;
+    setNeedsOpen(true);
     // the panel reads its own rows; look for it for a few seconds
     let tries = 0;
     const timer = window.setInterval(() => {
@@ -307,6 +310,7 @@ export function CoachSpotHub({
     setOpen(false);
     setView("grid");
     setBuilderOpen(false);
+    setNeedsOpen(false);
   }
 
   function toggle() {
@@ -334,6 +338,8 @@ export function CoachSpotHub({
     function onPointerDown(e: PointerEvent) {
       const target = e.target as Node;
       if (panelRef.current?.contains(target) || triggerRef.current?.contains(target)) return;
+      // A sheet or pop-up opened from inside Spotlight (Start from a template, a confirm box) is drawn outside the panel: a tap in it is not a tap outside (audit P10, Nov 21).
+      if (target instanceof Element && target.closest('[role="dialog"], [role="alertdialog"], [aria-modal="true"], [data-spot-keep-open]')) return;
       close();
     }
     document.addEventListener("keydown", onKeyDown);
@@ -452,7 +458,7 @@ export function CoachSpotHub({
                   type="button"
                   onClick={goBack}
                   aria-label="Back"
-                  className="w-8 h-8 flex items-center justify-center text-steel active:text-rust-ink shrink-0"
+                  className="w-11 h-11 -my-1.5 flex items-center justify-center text-steel active:text-rust-ink shrink-0"
                 >
                   <ArrowLeft className="w-4 h-4" />
                 </button>
@@ -463,7 +469,7 @@ export function CoachSpotHub({
                   value={orgId ?? ""}
                   onChange={(e) => chooseOrg(e.target.value)}
                   aria-label="Organization"
-                  className="h-8 max-w-[9rem] bg-graphite border border-steel/30 text-chalk font-body text-xs px-1 truncate"
+                  className="h-11 -my-1.5 max-w-[9rem] bg-graphite border border-steel/30 text-chalk font-body text-xs px-1 truncate"
                 >
                   {orgId === null && (
                     <option value="" disabled>
@@ -481,7 +487,7 @@ export function CoachSpotHub({
                 type="button"
                 onClick={close}
                 aria-label="Close"
-                className="w-8 h-8 flex items-center justify-center text-steel active:text-rust-ink shrink-0"
+                className="w-11 h-11 -my-1.5 flex items-center justify-center text-steel active:text-rust-ink shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -490,22 +496,6 @@ export function CoachSpotHub({
             <div className="flex-1 min-h-0 overflow-hidden">
               {view === "grid" && (
                 <div className="h-full overflow-y-auto grid grid-cols-2 gap-2 p-4 content-start">
-                  {needs && !needs.needsChoice && (
-                    <SpotNeedsTop
-                      needs={needs}
-                      onNavigated={close}
-                      onNoticesCleared={() => {
-                        const cleared = { ...needs, notices: [] };
-                        // the dot and the remembered answer follow at once
-                        showNeeds({ ...cleared, count: spotCount(cleared) });
-                        try {
-                          window.sessionStorage.removeItem(SPOT_NEEDS_CACHE_KEY);
-                        } catch {
-                          // nothing remembered; the next read is fresh anyway
-                        }
-                      }}
-                    />
-                  )}
                   {homeHref && (
                     <a
                       href={homeHref}
@@ -528,6 +518,37 @@ export function CoachSpotHub({
                       </button>
                     );
                   })}
+                  {needs && !needs.needsChoice && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setNeedsOpen((v) => !v)}
+                        aria-expanded={needsOpen}
+                        className="col-span-2 min-h-11 border border-steel/20 px-3 flex items-center justify-between gap-2 active:border-rust transition-colors"
+                        data-spot-needs-fold
+                      >
+                        <span className="font-body text-sm text-chalk">{needs.count > 0 ? `Waiting for you (${needs.count})` : "Waiting for you"}</span>
+                        <ChevronDown className={`w-4 h-4 text-steel transition-transform ${needsOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+                      </button>
+                      {needsOpen && (
+                        <SpotNeedsTop
+                          needs={needs}
+                          onNavigated={close}
+                          onChanged={() => loadNeeds(true)}
+                          onNoticesCleared={() => {
+                            const cleared = { ...needs, notices: [] };
+                            // the dot and the remembered answer follow at once
+                            showNeeds({ ...cleared, count: spotCount(cleared) });
+                            try {
+                              window.sessionStorage.removeItem(SPOT_NEEDS_CACHE_KEY);
+                            } catch {
+                              // nothing remembered; the next read is fresh anyway
+                            }
+                          }}
+                        />
+                      )}
+                    </>
+                  )}
                   {/* How everything works: the help center, one tap from the coaching button. */}
                   <Link
                     href="/help"

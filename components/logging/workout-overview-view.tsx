@@ -27,6 +27,7 @@ export async function WorkoutOverviewView({
   loggedByCoach,
   actingAs,
   sessionTypes,
+  autoStart = false,
 }: {
   data: WorkoutOverviewData;
   groupId: string;
@@ -39,6 +40,8 @@ export async function WorkoutOverviewView({
   loggedByCoach?: boolean;
   actingAs?: { fullName: string; groupId: string };
   sessionTypes?: { id: string; name: string }[];
+  // Home's "Start workout" (audit C8): the Start below runs by itself as the page opens.
+  autoStart?: boolean;
 }) {
   const { workout, exercises, dayNotes, headersByExerciseId, lastTimeByExercise, videoUrlByExerciseId, goalByExerciseId, existingSession } =
     data;
@@ -122,6 +125,7 @@ export async function WorkoutOverviewView({
             sessionTypes={sessionTypes}
             clientName={loggingForName}
             coachTimezone={coachTimezone}
+            autoStart={autoStart && !loggedByCoach}
             exercises={exercises.map((ex) => ({
               id: ex.id,
               exerciseName: ex.exerciseName,

@@ -8,6 +8,13 @@ import { mirrorGoogleCalendarEvent } from "@/lib/mirror-google-calendar-event";
 import { CANT_BOOK_NO_SESSIONS } from "@/lib/session-credit-copy";
 import { bookingRefusalMessage } from "@/lib/booking-refusal-copy";
 
+// The same day page, marked with the time just booked (any other query, such as ?client=, is kept).
+export function justBookedHref(pathname: string, search: string, startAt: string): string {
+  const q = new URLSearchParams(search);
+  q.set("booked", startAt);
+  return `${pathname}?${q.toString()}`;
+}
+
 export function BookSlotButton({
   coachId,
   athleteId,
@@ -53,7 +60,8 @@ export function BookSlotButton({
 
     notifyBookingConfirmed(athleteId, groupId, startAt);
     if (bookingId) mirrorGoogleCalendarEvent(bookingId);
-    router.refresh();
+    // Audit C7 (Nov 21): the page comes back with the row saying "You're booked for 3:00 PM" (?booked=<start>; the day pages read it).
+    router.replace(justBookedHref(window.location.pathname, window.location.search, startAt), { scroll: false });
   }
 
   // Booking spends a session credit, so a second tap confirms it.

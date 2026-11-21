@@ -15,9 +15,12 @@ export const metadata = { title: "Today" };
 export default async function TodayPage(
   props: {
     params: Promise<{ groupId: string }>;
+    searchParams?: Promise<{ start?: string }>;
   }
 ) {
   const params = await props.params;
+  // ?start=1 starts the workout it opens (audit P19 / C8, Nov 21).
+  const start = (await props.searchParams)?.start === "1";
   const supabase = await createServerClient();
   const {
     data: { user },
@@ -52,7 +55,7 @@ export default async function TodayPage(
   const showList = !sessions.overrideWorkoutId && sessions.cards.length >= 2;
 
   if (result.status === "ready" && !showList) {
-    redirect(`/groups/${params.groupId}/workouts/${result.workoutId}`);
+    redirect(`/groups/${params.groupId}/workouts/${result.workoutId}${start ? "?start=1" : ""}`);
   }
 
   const message =

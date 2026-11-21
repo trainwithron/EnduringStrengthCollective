@@ -16,6 +16,7 @@ import { TrendChart } from "@/components/coach/desktop/trend-chart";
 import { resolveDayMacros, standingForDate, coachRowsOnly } from "@/lib/macro-resolution";
 import { fetchStandingHistory } from "@/lib/standing-macros";
 import { SetMyTargetsCard } from "@/components/athlete/set-my-targets-card";
+import { SetMyTargetsSheet } from "@/components/athlete/set-my-targets-sheet";
 import { estimateRealMaintenance } from "@/lib/real-maintenance";
 import { computeBaseline } from "@/lib/nutrition-baseline";
 import { readDateOfBirth, rowToBodyProfile } from "@/lib/client-body-profile";
@@ -544,7 +545,7 @@ export default async function NutritionPage(
                   totalsTitle={loggedTotalsTitle(shownDay, todayKey)}
                   isToday={shownIsToday}
                   planHeading={shownIsToday ? "Today's meal plan" : `Meal plan: ${foodDayLabel(shownDay, todayKey)}`}
-                  // The totals card's "Set my targets" opens this page's own targets card, further down.
+                  // The totals card's "Set my targets" opens the targets card in a pop-up right there (audit C10; #my-targets further down is the fallback).
                   setTargetsHref={macrosEnabled && setMyTargets ? "#my-targets" : null}
                 />
               </>
@@ -609,6 +610,7 @@ export default async function NutritionPage(
                 <SetMyTargetsCard {...setMyTargets} />
               </div>
             )}
+            {setMyTargets && <SetMyTargetsSheet {...setMyTargets} />}
           </section>
           )}
 
@@ -633,7 +635,7 @@ export default async function NutritionPage(
           {macrosEnabled && (
           <section>
             <h2 className="font-body text-[15px] font-semibold text-chalk mb-2">
-              Weekly check-in
+              Why your target is what it is
             </h2>
             {latestCheckin ? (
               // The actual target numbers already render once, above, in
@@ -659,8 +661,7 @@ export default async function NutritionPage(
                   SELF_NO_CHECKIN_LINE
                 ) : (
                   <>
-                    Your coach hasn&apos;t run a weekly check-in yet — once they do, the result and the
-                    reasoning behind it will show up here.
+                    Your coach hasn&apos;t changed your target yet. When they do, why they changed it shows up here.
                   </>
                 )}
               </p>

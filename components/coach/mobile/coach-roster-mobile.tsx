@@ -113,6 +113,13 @@ export function CoachRosterMobile({
   function scrollToLetter(letter: string) {
     document.getElementById(`roster-letter-${letter}`)?.scrollIntoView({ block: "start" });
   }
+  // Audit P28 (Nov 21): 26 letters at 44px would not fit a phone's height, so each letter is 44px wide and a finger slid down the strip jumps letter by letter (as a phone's own contacts do).
+  function scrubTo(e: React.PointerEvent) {
+    if (e.pointerType === "mouse" && e.buttons === 0) return;
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const letter = el instanceof HTMLElement ? el.dataset.rosterLetter : undefined;
+    if (letter) scrollToLetter(letter);
+  }
 
   if (members.length === 0) {
     return (
@@ -151,14 +158,15 @@ export function CoachRosterMobile({
       </div>
 
       {letters.length > 3 && (
-        <div className="fixed right-1 top-1/2 -translate-y-1/2 flex flex-col items-center gap-0.5 z-10">
+        <div className="fixed right-0 top-1/2 -translate-y-1/2 flex flex-col items-center z-10 touch-none" onPointerMove={scrubTo} data-roster-letters>
           {letters.map((letter) => (
             <button
               key={letter}
               type="button"
               onClick={() => scrollToLetter(letter)}
               aria-label={`Jump to ${letter}`}
-              className="font-body text-xs text-steel active:text-rust-ink w-4 h-4 flex items-center justify-center"
+              data-roster-letter={letter}
+              className="font-body text-xs text-steel active:text-rust-ink w-11 h-[min(1.5rem,calc(70vh/26))] flex items-center justify-center"
             >
               {letter}
             </button>
@@ -182,8 +190,7 @@ function RosterRow({
   return (
     <QuickViewBubble
       title={member.fullName}
-      deeperHref={`/groups/${groupId}/athletes/${member.profileId}`}
-      deeperLabel="Open full profile"
+      // (no "Open full profile" under it: "Open profile" is the first link inside; audit P32)
       trigger={
         <div className="flex items-center gap-3 px-3 py-2.5 active:bg-surface/40">
           {member.avatarUrl ? (

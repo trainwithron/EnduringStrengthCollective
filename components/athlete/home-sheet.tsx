@@ -26,6 +26,7 @@ export function HomeSheet({
   guard,
   ask = DISCARD,
   returnFocusTo,
+  focusFirstField = false,
   children,
 }: {
   open: boolean;
@@ -37,6 +38,8 @@ export function HomeSheet({
   guard?: () => EscapeAction;
   ask?: SheetAsk;
   returnFocusTo?: string;
+  // Focus the first box to type in, not the close button (Nutrition's Set my targets, audit C10).
+  focusFirstField?: boolean;
   children: React.ReactNode;
 }) {
   function requestClose() {
@@ -60,6 +63,11 @@ export function HomeSheet({
       return "block";
     },
   });
+
+  useEffect(() => {
+    if (!open || !focusFirstField) return;
+    ref.current?.querySelector<HTMLElement>('input:not([type="hidden"]):not([type="checkbox"]):not([disabled]), select:not([disabled]), textarea:not([disabled])')?.focus();
+  }, [open, focusFirstField, ref]);
 
   useEffect(() => {
     if (!open || !returnFocusTo) return;

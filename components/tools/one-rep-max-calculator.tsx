@@ -4,9 +4,12 @@ import { useState } from "react";
 import { estimateOneRepMax, percentageTable } from "@/lib/one-rep-max";
 import { estimateTrainingMaxFromSet } from "@/lib/rpe-training-max";
 import { MAX_ESTIMATE_REPS, TRAINING_MAX_REPS_NOTE } from "@/lib/training-max";
+import { weightUnitLabel, type WeightUnit } from "@/lib/units";
 
-export function OneRepMaxCalculator() {
-  const [weight, setWeight] = useState("225");
+// In the person's own unit (audit C17, Nov 21): the estimate is the same ratio either way, so only the labels, the starting number and the rounding change.
+export function OneRepMaxCalculator({ unit = "lb" }: { unit?: WeightUnit }) {
+  const label = weightUnitLabel(unit);
+  const [weight, setWeight] = useState(unit === "kg" ? "100" : "225");
   const [reps, setReps] = useState("5");
   // Optional — same RPE-aware formula already backing the real, persisted
   // athlete_training_maxes estimate (lib/rpe-training-max.ts) rather than
@@ -21,17 +24,18 @@ export function OneRepMaxCalculator() {
   const hasRpe = rpe.trim() !== "" && rpeNum >= 1 && rpeNum <= 10;
   const valid = weightNum > 0 && repsNum >= 1 && repsNum <= MAX_ESTIMATE_REPS;
   const oneRm = valid ? (hasRpe ? estimateTrainingMaxFromSet(weightNum, repsNum, rpeNum) : estimateOneRepMax(weightNum, repsNum)) : null;
-  const table = oneRm ? percentageTable(oneRm) : [];
+  const table = oneRm ? percentageTable(oneRm, unit === "kg" ? 2.5 : 5) : [];
 
   return (
     <div className="max-w-md">
       <div className="flex gap-4">
         <label className="flex flex-col gap-1 flex-1">
           <span className="font-body text-xs text-steel uppercase tracking-wide">
-            Weight (lbs)
+            Weight ({label})
           </span>
           <input
             type="number"
+            inputMode="decimal"
             value={weight}
             onChange={(e) => setWeight(e.target.value)}
             className="h-11 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
@@ -41,6 +45,7 @@ export function OneRepMaxCalculator() {
           <span className="font-body text-xs text-steel uppercase tracking-wide">Reps</span>
           <input
             type="number"
+            inputMode="numeric"
             value={reps}
             onChange={(e) => setReps(e.target.value)}
             className="h-11 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
@@ -50,6 +55,7 @@ export function OneRepMaxCalculator() {
           <span className="font-body text-xs text-steel uppercase tracking-wide">RPE (optional)</span>
           <input
             type="number"
+            inputMode="decimal"
             min={1}
             max={10}
             value={rpe}
@@ -72,7 +78,7 @@ export function OneRepMaxCalculator() {
           <div className="mt-6 pb-4 border-b border-steel/15">
             <p className="font-display text-4xl leading-none">{oneRm}</p>
             <p className="font-body text-xs text-steel mt-1">
-              {hasRpe ? "Estimated 1-rep max (lbs) — RPE-adjusted" : "Estimated 1-rep max (lbs)"}
+              {hasRpe ? `Estimated 1-rep max (${label}) — RPE-adjusted` : `Estimated 1-rep max (${label})`}
             </p>
           </div>
 
@@ -80,7 +86,9 @@ export function OneRepMaxCalculator() {
             {table.map((row) => (
               <div key={row.pct} className="flex items-center justify-between py-2">
                 <span className="font-body text-sm text-steel">{row.pct}%</span>
-                <span className="font-body text-sm">{row.weight} lbs</span>
+                <span className="font-body text-sm">
+                  {row.weight} {label}
+                </span>
               </div>
             ))}
           </div>

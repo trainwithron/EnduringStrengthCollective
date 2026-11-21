@@ -15,12 +15,13 @@ import type { SpotNeeds } from "@/lib/spot-needs";
 
 // The top of the Spotlight drop-down on a coach's phone: what needs the coach first. Unread notices (the bell's), "did this session happen?", the next client's workout (or one left open),
 // then the same panels Home shows (late changes, schedule requests, expiring sessions, quiet clients, progress looks). Each part draws nothing when it has nothing.
-export function SpotNeedsTop({ needs, onNavigated, onNoticesCleared }: { needs: SpotNeeds; onNavigated: () => void; onNoticesCleared?: () => void }) {
+export function SpotNeedsTop({ needs, onNavigated, onNoticesCleared, onChanged }: { needs: SpotNeeds; onNavigated: () => void; onNoticesCleared?: () => void; onChanged?: () => void }) {
   const [clearing, setClearing] = useState(false);
   const [clearError, setClearError] = useState(false);
   const now = new Date();
   const showNext = needs.next && needs.next.athleteId !== needs.open?.athleteId;
-  const nextHref = needs.next ? (needs.next.hasProgram ? `/groups/${needs.next.groupId}/athletes/${needs.next.athleteId}/log` : `/groups/${needs.next.groupId}/athletes/${needs.next.athleteId}`) : null;
+  // Audit P11 (Nov 21): always the client's log page, which offers today's workout and Wing it (it used to open their profile when they had no program).
+  const nextHref = needs.next ? `/groups/${needs.next.groupId}/athletes/${needs.next.athleteId}/log` : null;
 
   function openNotice(id: string) {
     // Marked read the way the bell does it; the link opens either way.
@@ -68,7 +69,8 @@ export function SpotNeedsTop({ needs, onNavigated, onNoticesCleared }: { needs: 
           ))}
         </ul>
       )}
-      {needs.sessionsToCheck.length > 0 && <SessionCheckCards sessions={needs.sessionsToCheck} timezone={needs.timezone} />}
+      {/* An answer re-reads what is waiting, so the count on the button follows (audit P31). */}
+      {needs.sessionsToCheck.length > 0 && <SessionCheckCards sessions={needs.sessionsToCheck} timezone={needs.timezone} onAnswered={onChanged} />}
       {needs.open && (
         <Link href={`/sessions/${needs.open.sessionId}?resume=1`} onClick={onNavigated} className="block w-full min-h-14 px-4 py-2.5 bg-rust text-graphite text-center">
           <span className="block font-display uppercase text-base font-bold leading-tight">Resume {needs.open.name}&apos;s workout</span>

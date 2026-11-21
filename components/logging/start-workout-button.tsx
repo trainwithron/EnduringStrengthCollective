@@ -1,7 +1,7 @@
 "use client";
 
 import { loggableReps, loggableWeight } from "@/lib/set-value-limits";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { ExerciseSetTarget } from "@/lib/types";
@@ -37,6 +37,7 @@ export function StartWorkoutButton({
   sessionTypes,
   clientName,
   coachTimezone,
+  autoStart = false,
 }: {
   workoutId: string;
   groupId: string;
@@ -58,6 +59,8 @@ export function StartWorkoutButton({
   clientName?: string;
   // The coach's time zone: "today" for finding the session this workout belongs to is the coach's day, not this phone's.
   coachTimezone?: string;
+  // Start as soon as it is on the screen, once (Home's one-tap "Start workout", audit C8, Nov 21). A failure shows here with the button to try again.
+  autoStart?: boolean;
 }) {
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -110,6 +113,14 @@ export function StartWorkoutButton({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [athleteId, groupId, loggedByCoach]);
+
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (!autoStart || autoStarted.current) return;
+    autoStarted.current = true;
+    void handleStart();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart]);
 
   async function handleStart() {
     setStarting(true);

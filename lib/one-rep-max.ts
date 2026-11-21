@@ -6,9 +6,10 @@ export function estimateOneRepMax(weight: number, reps: number): number | null {
   return t == null ? null : Math.round(t);
 }
 
-export function percentageTable(oneRepMax: number): { pct: number; weight: number }[] {
+// Rounded to a loadable weight: 5 lb, or 2.5 kg for someone who lifts in kilograms (audit C17).
+export function percentageTable(oneRepMax: number, step = 5): { pct: number; weight: number }[] {
   return [95, 90, 85, 80, 75, 70, 65, 60].map((pct) => ({
     pct,
-    weight: Math.round((oneRepMax * pct) / 100 / 5) * 5,
+    weight: Math.round((oneRepMax * pct) / 100 / step) * step,
   }));
 }

@@ -14,7 +14,21 @@ export function FoldSection({ id, title, note, flag, defaultOpen = false, childr
     };
     openIfAsked();
     window.addEventListener("hashchange", openIfAsked);
-    return () => window.removeEventListener("hashchange", openIfAsked);
+    // Audit P33 (Nov 21): a tap on a link to this section opens it even when the address already ends in #id (no hashchange then: the second tap did nothing).
+    const onClick = (e: MouseEvent) => {
+      const link = e.target instanceof Element ? e.target.closest("a[href]") : null;
+      const href = link?.getAttribute("href") ?? "";
+      if (!href.endsWith(`#${id}`) || !ref.current) return;
+      const path = href.slice(0, href.length - id.length - 1);
+      if (path && path !== window.location.pathname) return; // a link to another page
+      ref.current.open = true;
+      ref.current.scrollIntoView({ block: "start" });
+    };
+    document.addEventListener("click", onClick);
+    return () => {
+      window.removeEventListener("hashchange", openIfAsked);
+      document.removeEventListener("click", onClick);
+    };
   }, [id]);
   return (
     <details ref={ref} id={id} open={defaultOpen} className="group border-t border-steel/20 scroll-mt-24" data-fold-section={id}>

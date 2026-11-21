@@ -14,6 +14,7 @@ import { getBlockedRangesForDate } from "@/lib/availability-exceptions";
 import { zonedTimeToUtc, DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { addDaysToDateKey } from "@/lib/series-schedule";
 import { BookSlotButton } from "@/components/athlete/book-slot-button";
+import { JustBookedLine } from "@/components/athlete/just-booked-line";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
 import { MessageCoachLink } from "@/components/athlete/message-coach-link";
 import { WithdrawRequestButton } from "@/components/athlete/withdraw-request-button";
@@ -49,7 +50,7 @@ export const metadata = { title: "Calendar" };
 export default async function DayDetailPage(
   props: {
     params: Promise<{ groupId: string; programId: string; date: string }>;
-    searchParams: Promise<{ reschedule?: string }>;
+    searchParams: Promise<{ reschedule?: string; booked?: string }>;
   }
 ) {
   const searchParams = await props.searchParams;
@@ -643,14 +644,17 @@ export default async function DayDetailPage(
                     isMine ? (
                       // A session that has started can no longer be cancelled or moved by the client (the database refuses it too); the coach decides.
                       start.getTime() > Date.now() ? (
-                        <CancelBookingButton
-                          bookingId={booking.id}
-                          rescheduleHref={bookingMode === "coach_schedules" ? undefined : `${backHref}?reschedule=${booking.id}`}
-                          messageHref={bookingMode === "coach_schedules" ? `/groups/${params.groupId}/messages` : undefined}
-                          insideWindowHours={insideWindowHours(start, cancelWindowHours)}
-                    lateCancelTakesSession={lateCancelTakesSession}
-                          recurringSeriesId={booking.recurring_series_id}
-                        />
+                        <div className="flex flex-col items-end gap-1">
+                          {searchParams.booked === iso && <JustBookedLine time={formatSlotTime(start, timezone)} />}
+                          <CancelBookingButton
+                            bookingId={booking.id}
+                            rescheduleHref={bookingMode === "coach_schedules" ? undefined : `${backHref}?reschedule=${booking.id}`}
+                            messageHref={bookingMode === "coach_schedules" ? `/groups/${params.groupId}/messages` : undefined}
+                            insideWindowHours={insideWindowHours(start, cancelWindowHours)}
+                            lateCancelTakesSession={lateCancelTakesSession}
+                            recurringSeriesId={booking.recurring_series_id}
+                          />
+                        </div>
                       ) : (
                         <span className="font-body text-xs text-steel">Your session</span>
                       )

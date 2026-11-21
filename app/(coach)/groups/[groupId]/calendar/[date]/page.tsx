@@ -28,6 +28,7 @@ import { AssignWorkoutToDateButton } from "@/components/coach/desktop/assign-wor
 import { AddDayEventForm } from "@/components/coach/desktop/add-day-event-form";
 import { getActiveProgramForAthlete, getAllProgramWorkouts, getScheduledWorkouts, dateKeyOf } from "@/lib/athlete-day-schedule";
 import { BookSlotButton } from "@/components/athlete/book-slot-button";
+import { JustBookedLine } from "@/components/athlete/just-booked-line";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
 import { MessageCoachLink } from "@/components/athlete/message-coach-link";
 import { WithdrawRequestButton } from "@/components/athlete/withdraw-request-button";
@@ -76,7 +77,7 @@ export const metadata = { title: "Calendar" };
 export default async function CoachDayDetailPage(
   props: {
     params: Promise<{ groupId: string; date: string }>;
-    searchParams: Promise<{ client?: string; reschedule?: string; month?: string }>;
+    searchParams: Promise<{ client?: string; reschedule?: string; month?: string; booked?: string }>;
   }
 ) {
   const searchParams = await props.searchParams;
@@ -562,7 +563,8 @@ export default async function CoachDayDetailPage(
                       )
                     ) : booking ? (
                       isMine ? (
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          {searchParams.booked === iso && <JustBookedLine time={formatSlotTime(start, timezone)} />}
                           {booking.session_type === "video" && <VideoCallButton bookingId={booking.id} />}
                           {/* A session that has started can no longer be cancelled or moved by the client (the database refuses it too); the coach decides. */}
                           {start.getTime() > Date.now() ? (

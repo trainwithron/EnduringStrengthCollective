@@ -21,8 +21,10 @@ export const metadata = { title: "Goal" };
 // programming_idea.md) — this is deliberately an athlete-only page, not
 // a coach-authored one. The coach confirms from the client's profile
 // page instead of proposing here.
-export default async function GoalPage(props: { params: Promise<{ groupId: string }> }) {
+export default async function GoalPage(props: { params: Promise<{ groupId: string }>; searchParams?: Promise<{ edit?: string }> }) {
   const params = await props.params;
+  // ?edit=1: "Update my goal" and the coach's goal sheet notice open the sheet for writing (audit C4 / C12, Nov 21).
+  const startEditing = (await props.searchParams)?.edit === "1";
   const supabase = await createServerClient();
   const {
     data: { user },
@@ -79,10 +81,10 @@ export default async function GoalPage(props: { params: Promise<{ groupId: strin
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
       <header className="px-5 pt-8 pb-6 border-b border-steel/20">
         <Link
-          href={`/groups/${params.groupId}/settings`}
-          className="font-body text-xs text-steel uppercase tracking-wide"
+          href={`/groups/${params.groupId}/more`}
+          className="min-h-11 inline-flex items-center font-body text-xs text-steel uppercase tracking-wide"
         >
-          &larr; Back to settings
+          &larr; More
         </Link>
         <h1 className="font-display font-bold text-3xl leading-none mt-3 uppercase">My Goal</h1>
         <p className="font-body text-sm text-steel mt-2 max-w-[60ch]">
@@ -121,7 +123,7 @@ export default async function GoalPage(props: { params: Promise<{ groupId: strin
 
       <SubGoalsSection groupId={params.groupId} athleteId={user.id} viewerId={user.id} otherName="your coach" items={subGoals} />
 
-      <GoalSheetSection groupId={params.groupId} athleteId={user.id} sheet={(goalSheetRow as GoalSheetRow | null) ?? null} viewer="client" />
+      <GoalSheetSection groupId={params.groupId} athleteId={user.id} sheet={(goalSheetRow as GoalSheetRow | null) ?? null} viewer="client" startEditing={startEditing} />
 
       <div className="border border-steel/20 p-4 mb-6">
         <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">
