@@ -12,8 +12,12 @@ export const metadata = { title: "Dispute evidence" };
 
 // Evidence for a card dispute, as a page to print or save as a PDF ($6, Ron Nov 20): one payment by one client, with only facts the app holds (lib/dispute-evidence.ts).
 // Plain black on white. For a coach of that client only. Nothing is sent to Stripe: the coach uploads it in Stripe's dispute screen themselves.
-export default async function DisputeEvidencePage(props: { params: Promise<{ purchaseId: string }> }) {
+// A Quick Payment opens with ?kind=quick&groupId=... (the space is checked before the charge is read).
+export default async function DisputeEvidencePage(props: { params: Promise<{ purchaseId: string }>; searchParams: Promise<{ kind?: string; groupId?: string }> }) {
   const { purchaseId } = await props.params;
+  const search = await props.searchParams;
+  const kind = search.kind === "quick" ? "quick" : "package";
+  const groupId = typeof search.groupId === "string" && /^[0-9a-f-]{36}$/i.test(search.groupId) ? search.groupId : undefined;
   const supabase = await createServerClient();
   const {
     data: { user },
@@ -21,7 +25,7 @@ export default async function DisputeEvidencePage(props: { params: Promise<{ pur
   if (!user) redirect("/login");
   if (!/^[0-9a-f-]{36}$/i.test(purchaseId)) return <NoAccess>That payment isn&apos;t there.</NoAccess>;
 
-  const loaded = await loadDisputeEvidence(supabase, createServiceRoleClient(), { purchaseId, viewerId: user.id });
+  const loaded = await loadDisputeEvidence(supabase, createServiceRoleClient(), { purchaseId, viewerId: user.id, kind, groupId });
   if (!loaded.ok) return <NoAccess>{loaded.error}</NoAccess>;
   const e = loaded.evidence;
   const tz = await getViewerDisplayTimezone(supabase, user.id);
@@ -51,7 +55,7 @@ export default async function DisputeEvidencePage(props: { params: Promise<{ pur
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-gray-700">Use Print, then choose &quot;Save as PDF&quot; to keep a copy.</p>
           <div className="flex flex-wrap gap-2">
-            <a href={`/api/coach/dispute-evidence?purchaseId=${e.payment.id}`} className="inline-flex items-center h-10 px-4 border border-black text-sm font-medium">
+            <a href={`/api/coach/dispute-evidence?purchaseId=${e.payment.id}${e.payment.kind === "quick" ? `&kind=quick&groupId=${e.payment.groupId}` : ""}`} className="inline-flex items-center h-10 px-4 border border-black text-sm font-medium">
               Download the files (ZIP)
             </a>
             <PrintButton />
@@ -98,7 +102,7 @@ export default async function DisputeEvidencePage(props: { params: Promise<{ pur
             <p className="text-xs text-gray-700 mt-1">The package as it is today. The app does not keep a copy of the terms shown at checkout.</p>
           </>
         ) : (
-          <p className="text-sm">No package is linked to this payment.</p>
+          <p className="text-sm">{e.payment.kind === "quick" ? "This was a Quick Payment the coach charged, not a package." : "No package is linked to this payment."}</p>
         )}
       </section>
 
@@ -148,7 +152,9 @@ export default async function DisputeEvidencePage(props: { params: Promise<{ pur
       {e.classes && (
         <section className="mb-5">
           <h2 className="text-sm font-bold uppercase tracking-wide border-b border-gray-400 mb-2">Group classes ({e.classes.length})</h2>
-          <p className="text-xs text-gray-700 mb-1">A class takes a session from the same balance this payment filled.</p>
+          <p className="text-xs text-gray-700 mb-1">
+            {e.payment.kind === "quick" ? "The group classes the client joined in the same time." : "A class takes a session from the same balance this payment filled."}
+          </p>
           {e.classes.length === 0 ? (
             <p className="text-sm">No classes were joined in this time.</p>
           ) : (

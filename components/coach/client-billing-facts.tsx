@@ -11,11 +11,38 @@ const PAYMENTS_SHOWN = 12;
 // payments, each with Evidence for a dispute ($6). Read as the signed-in coach (row security decides what shows). Nothing here changes anything.
 export async function ClientBillingFacts({ groupId, athleteId, timeZone }: { groupId: string; athleteId: string; timeZone: string }) {
   const supabase = await createServerClient();
-  const [failed, { data: payments, error: paymentsError }] = await Promise.all([
+  const [failed, { data: payments, error: paymentsError }, { data: quick, error: quickError }] = await Promise.all([
     loadFailedPayment(supabase, { athleteId, groupId }),
     supabase.from("credit_purchases").select("id, created_at, amount_cents, credits_purchased").eq("athlete_id", athleteId).eq("group_id", groupId).order("created_at", { ascending: false }).limit(PAYMENTS_SHOWN),
+    // Quick Payments (Stripe card charges a coach made): row security shows the ones this coach charged (an owner or admin sees the organization's)
+    supabase
+      .from("coach_quick_payments")
+      .select("id, created_at, amount_cents, description, stripe_checkout_session_id")
+      .eq("athlete_id", athleteId)
+      .eq("group_id", groupId)
+      .like("stripe_checkout_session_id", "cs_%")
+      .order("created_at", { ascending: false })
+      .limit(PAYMENTS_SHOWN),
   ]);
-  const rows = (payments ?? []) as { id: string; created_at: string; amount_cents: number; credits_purchased: number }[];
+  type Row = { id: string; created_at: string; amount_cents: number; label: string | null; href: string };
+  const rows: Row[] = [
+    ...((payments ?? []) as { id: string; created_at: string; amount_cents: number; credits_purchased: number }[]).map((p) => ({
+      id: p.id,
+      created_at: p.created_at,
+      amount_cents: p.amount_cents,
+      label: p.credits_purchased > 0 ? `${p.credits_purchased} session${p.credits_purchased === 1 ? "" : "s"}` : null,
+      href: `/print/dispute-evidence/${p.id}`,
+    })),
+    ...((quickError ? [] : quick ?? []) as { id: string; created_at: string; amount_cents: number; description: string | null }[]).map((q) => ({
+      id: q.id,
+      created_at: q.created_at,
+      amount_cents: q.amount_cents,
+      label: `Quick Payment${q.description?.trim() ? `: ${q.description.trim()}` : ""}`,
+      href: `/print/dispute-evidence/${q.id}?kind=quick&groupId=${groupId}`,
+    })),
+  ]
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .slice(0, PAYMENTS_SHOWN);
 
   return (
     <div className="space-y-3 mb-4" data-client-billing-facts>
@@ -41,9 +68,9 @@ export async function ClientBillingFacts({ groupId, athleteId, timeZone }: { gro
                 <li key={p.id} className="py-2 flex flex-wrap items-center justify-between gap-2 font-body text-sm">
                   <span className="text-chalk">
                     {formatInTimezone(p.created_at, timeZone, "date")} · {money(p.amount_cents)}
-                    {p.credits_purchased > 0 ? <span className="text-steel"> · {p.credits_purchased} session{p.credits_purchased === 1 ? "" : "s"}</span> : null}
+                    {p.label ? <span className="text-steel"> · {p.label}</span> : null}
                   </span>
-                  <Link href={`/print/dispute-evidence/${p.id}`} className="min-h-11 inline-flex items-center text-rust-ink text-sm" target="_blank" rel="noopener">
+                  <Link href={p.href} className="min-h-11 inline-flex items-center text-rust-ink text-sm" target="_blank" rel="noopener">
                     Evidence for a dispute
                   </Link>
                 </li>

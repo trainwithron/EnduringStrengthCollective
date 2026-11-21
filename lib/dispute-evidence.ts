@@ -17,7 +17,13 @@ import { formatVoiceTime } from "@/lib/voice-note";
 //                     Stripe checkout, so each has its checkout id; anything without one is left out)
 // The classes and quick payments are read with the server's key, after the coach has been checked, and only for this client in this space (a coach's own row rules show
 // only the classes they run and the quick payments they charged).
+export type EvidenceKind = "package" | "quick";
+
 export interface EvidencePayment {
+  // package: a package or sessions payment (credit_purchases); quick: a coach's Quick Payment card charge (coach_quick_payments)
+  kind: EvidenceKind;
+  // a Quick Payment's own words for what it was for
+  what: string | null;
   id: string;
   createdAt: string;
   amountCents: number;
@@ -123,34 +129,78 @@ export type EvidenceLoad = { ok: true; evidence: DisputeEvidence } | { ok: false
 
 // db: the signed-in coach's own client. server: the server's client, used only after the coach has been checked, and only for this payment's package (which belongs to
 // whichever coach of the space made it) and for this client's classes and Quick Payments in this space.
-export async function loadDisputeEvidence(db: any, server: any, args: { purchaseId: string; viewerId: string; now?: Date }): Promise<EvidenceLoad> {
+// A Quick Payment ({ kind: "quick", groupId }): the coach is checked in that space FIRST, and only then is the charge read with the server's key, by its id, in that space,
+// and only when it is a Stripe card charge (a Stripe checkout id). Its window runs to the client's next payment of either kind in the space, or today.
+export async function loadDisputeEvidence(
+  db: any,
+  server: any,
+  args: { purchaseId: string; viewerId: string; kind?: EvidenceKind; groupId?: string; now?: Date }
+): Promise<EvidenceLoad> {
   const now = args.now ?? new Date();
-  const { data: row, error } = await db
-    .from("credit_purchases")
-    .select("id, created_at, amount_cents, credits_purchased, coach_package_id, stripe_checkout_session_id, athlete_id, group_id")
-    .eq("id", args.purchaseId)
-    .maybeSingle();
-  if (error) return { ok: false, status: 500, error: "Couldn't read the payment. Try again." };
-  if (!row || !row.athlete_id) return { ok: false, status: 404, error: "That payment isn't there, or it isn't yours to see." };
-
-  // Only a coach of the space the payment was made in.
-  const { data: seat } = await db.from("group_memberships").select("role").eq("group_id", row.group_id).eq("profile_id", args.viewerId).maybeSingle();
-  if (seat?.role !== "coach") return { ok: false, status: 403, error: "Only a coach of this client can gather this." };
-
-  const payment: EvidencePayment = {
-    id: row.id,
-    createdAt: row.created_at,
-    amountCents: row.amount_cents ?? 0,
-    sessions: row.credits_purchased ?? 0,
-    packageId: row.coach_package_id ?? null,
-    checkoutId: row.stripe_checkout_session_id ?? null,
-    athleteId: row.athlete_id,
-    groupId: row.group_id,
+  const kind: EvidenceKind = args.kind ?? "package";
+  const notThere: EvidenceLoad = { ok: false, status: 404, error: "That payment isn't there, or it isn't yours to see." };
+  const notCoach: EvidenceLoad = { ok: false, status: 403, error: "Only a coach of this client can gather this." };
+  const coachOf = async (groupId: string) => {
+    const { data: seat } = await db.from("group_memberships").select("role").eq("group_id", groupId).eq("profile_id", args.viewerId).maybeSingle();
+    return seat?.role === "coach";
   };
+
+  let payment: EvidencePayment;
+  if (kind === "quick") {
+    if (!args.groupId) return notThere;
+    if (!(await coachOf(args.groupId))) return notCoach;
+    const { data: q, error } = await server
+      .from("coach_quick_payments")
+      .select("id, created_at, amount_cents, description, stripe_checkout_session_id, athlete_id, group_id")
+      .eq("id", args.purchaseId)
+      .eq("group_id", args.groupId)
+      .like("stripe_checkout_session_id", "cs_%")
+      .maybeSingle();
+    if (error) return { ok: false, status: 500, error: "Couldn't read the payment. Try again." };
+    if (!q || !q.athlete_id || q.group_id !== args.groupId || !String(q.stripe_checkout_session_id ?? "").startsWith("cs_")) return notThere;
+    payment = {
+      kind,
+      what: (q.description as string | null)?.trim() || null,
+      id: q.id,
+      createdAt: q.created_at,
+      amountCents: q.amount_cents ?? 0,
+      sessions: 0,
+      packageId: null,
+      checkoutId: q.stripe_checkout_session_id,
+      athleteId: q.athlete_id,
+      groupId: q.group_id,
+    };
+  } else {
+    const { data: row, error } = await db
+      .from("credit_purchases")
+      .select("id, created_at, amount_cents, credits_purchased, coach_package_id, stripe_checkout_session_id, athlete_id, group_id")
+      .eq("id", args.purchaseId)
+      .maybeSingle();
+    if (error) return { ok: false, status: 500, error: "Couldn't read the payment. Try again." };
+    if (!row || !row.athlete_id) return notThere;
+    // Only a coach of the space the payment was made in.
+    if (!(await coachOf(row.group_id))) return notCoach;
+    payment = {
+      kind,
+      what: null,
+      id: row.id,
+      createdAt: row.created_at,
+      amountCents: row.amount_cents ?? 0,
+      sessions: row.credits_purchased ?? 0,
+      packageId: row.coach_package_id ?? null,
+      checkoutId: row.stripe_checkout_session_id ?? null,
+      athleteId: row.athlete_id,
+      groupId: row.group_id,
+    };
+  }
   let incomplete = false;
 
-  const [next, people, group, intake, legal] = await Promise.all([
+  const [next, nextQuick, people, group, intake, legal] = await Promise.all([
     db.from("credit_purchases").select("created_at").eq("athlete_id", payment.athleteId).eq("group_id", payment.groupId).gt("created_at", payment.createdAt).order("created_at", { ascending: true }).limit(1),
+    // a Quick Payment's window also ends at the client's next Quick Payment
+    kind === "quick"
+      ? server.from("coach_quick_payments").select("created_at").eq("athlete_id", payment.athleteId).eq("group_id", payment.groupId).like("stripe_checkout_session_id", "cs_%").gt("created_at", payment.createdAt).order("created_at", { ascending: true }).limit(1)
+      : Promise.resolve({ data: [], error: null }),
     db.from("profiles").select("id, full_name").in("id", [payment.athleteId, args.viewerId]),
     db.from("groups").select("name").eq("id", payment.groupId).maybeSingle(),
     // athlete_id is the table's primary key (0116), so there is one form per person, whichever space it was filled in; filtering by this space would hide a waiver signed
@@ -158,8 +208,11 @@ export async function loadDisputeEvidence(db: any, server: any, args: { purchase
     db.from("client_intake").select("waiver_signed_name, waiver_accepted, completed_at").eq("athlete_id", payment.athleteId).order("completed_at", { ascending: false, nullsFirst: false }).limit(1),
     db.from("legal_acceptances").select("version, accepted_at").eq("profile_id", payment.athleteId).eq("document", "waiver").order("accepted_at", { ascending: true }),
   ]);
-  for (const r of [next, people, group, intake, legal]) if (r.error) incomplete = true;
-  const nextAt = ((next.data ?? []) as { created_at: string }[])[0]?.created_at ?? null;
+  for (const r of [next, nextQuick, people, group, intake, legal]) if (r.error) incomplete = true;
+  const nextAt =
+    [((next.data ?? []) as { created_at: string }[])[0]?.created_at, ((nextQuick.data ?? []) as { created_at: string }[])[0]?.created_at]
+      .filter((x): x is string => typeof x === "string")
+      .sort((a, b) => Date.parse(a) - Date.parse(b))[0] ?? null;
   const windowEnd = nextAt ?? now.toISOString();
   const names = new Map(((people.data ?? []) as { id: string; full_name: string | null }[]).map((p) => [p.id, p.full_name ?? ""]));
 
@@ -222,9 +275,10 @@ export async function loadDisputeEvidence(db: any, server: any, args: { purchase
     }
   }
 
-  // Group classes in the same time, only when the payment gave sessions (classes take sessions from the balance it fills). Waiting-list places took nothing and are left out.
+  // Group classes in the same time: for a package payment only when it gave sessions (classes take sessions from the balance it fills); for a Quick Payment always (the
+  // client's sessions and classes around the charge). Waiting-list places took nothing and are left out.
   let classes: EvidenceClass[] | null = null;
-  if (payment.sessions > 0) {
+  if (payment.kind === "quick" || payment.sessions > 0) {
     const { data: rows, error: classError } = await server
       .from("group_session_attendees")
       .select("status, credit_taken, attended_at, created_at, group_sessions!inner ( title, start_at, status )")
@@ -252,10 +306,10 @@ export async function loadDisputeEvidence(db: any, server: any, args: { purchase
       .sort((x, y) => x.startAt.localeCompare(y.startAt));
   }
 
-  // The client's Quick Payments in this space: Stripe card charges only (each has its Stripe checkout id).
+  // The client's other Quick Payments in this space: Stripe card charges only (each has its Stripe checkout id); the disputed one itself is the payment above.
   const { data: quickRows, error: quickError } = await server
     .from("coach_quick_payments")
-    .select("created_at, amount_cents, description, stripe_checkout_session_id")
+    .select("id, created_at, amount_cents, description, stripe_checkout_session_id")
     .eq("athlete_id", payment.athleteId)
     .eq("group_id", payment.groupId)
     .like("stripe_checkout_session_id", "cs_%")
@@ -263,7 +317,7 @@ export async function loadDisputeEvidence(db: any, server: any, args: { purchase
     .limit(QUICK_LIMIT);
   if (quickError) incomplete = true;
   const quickPayments: EvidenceQuickPayment[] = ((quickRows ?? []) as any[])
-    .filter((q) => typeof q.stripe_checkout_session_id === "string" && q.stripe_checkout_session_id.startsWith("cs_"))
+    .filter((q) => typeof q.stripe_checkout_session_id === "string" && q.stripe_checkout_session_id.startsWith("cs_") && !(payment.kind === "quick" && q.id === payment.id))
     .map((q) => ({ paidAt: q.created_at, amountCents: q.amount_cents ?? 0, what: (q.description as string | null)?.trim() || "Quick payment", checkoutId: q.stripe_checkout_session_id }));
 
   const i = (((intake.data ?? []) as unknown[])[0] ?? null) as { waiver_signed_name: string | null; waiver_accepted: boolean | null; completed_at: string | null } | null;
@@ -303,6 +357,7 @@ export async function loadDisputeEvidence(db: any, server: any, args: { purchase
 }
 
 export function packageWhat(e: DisputeEvidence): string {
+  if (e.payment.kind === "quick") return `Quick Payment: ${e.payment.what ?? "no description given"}`;
   const parts: string[] = [];
   if (e.pkg?.name) parts.push(e.pkg.name);
   if (e.payment.sessions > 0) parts.push(`${e.payment.sessions} session${e.payment.sessions === 1 ? "" : "s"}`);
@@ -361,7 +416,11 @@ export function evidenceFiles(e: DisputeEvidence, timeZone: string, uploadLine: 
   const notes = [
     `Evidence for a card dispute: ${e.clientName}, payment of ${money(e.payment.amountCents)} on ${day(e.payment.createdAt)}.`,
     `Sessions, classes and messages run from the payment to ${e.windowEndIsNextPayment ? "their next payment" : "the day this was made"} (${day(e.windowEnd)}). Times are in ${timeZone}.`,
-    e.classes ? "Classes take a session from the same balance this payment filled." : "This payment gave no sessions, so classes are not part of it.",
+    e.payment.kind === "quick"
+      ? "This was a Quick Payment: the client's sessions, classes and messages around it are listed."
+      : e.classes
+        ? "Classes take a session from the same balance this payment filled."
+        : "This payment gave no sessions, so classes are not part of it.",
     "Quick payments: every other card payment this client made in this space through Stripe.",
     "Only what Spotlight holds is here. Nothing was sent to Stripe.",
     uploadLine,

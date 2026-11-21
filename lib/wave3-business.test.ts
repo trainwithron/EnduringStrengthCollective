@@ -477,6 +477,69 @@ describe("$6 evidence for a dispute", () => {
     });
     expect(writers).toEqual(["app/api/stripe/webhook/route.ts"]);
   });
+  describe("from a Quick Payment", () => {
+    const QP = "eeeeeeee-0000-4000-8000-000000000001";
+    const qpRow = { id: QP, created_at: "2026-10-04T12:00:00Z", amount_cents: 2500, description: "Protein shake", stripe_checkout_session_id: "cs_q1", athlete_id: ANN, group_id: G1 };
+    const coachDb = (role: string | null) =>
+      fakeDb((q, single) => {
+        if (q.table === "group_memberships") return { data: role ? { role } : null, error: null };
+        // the client's next package payment
+        if (q.table === "credit_purchases") return { data: [{ created_at: "2026-11-01T15:00:00Z" }], error: null };
+        if (q.table === "client_intake") return { data: [{ waiver_signed_name: "Ann Lee", waiver_accepted: true, completed_at: "2026-09-30T12:00:00Z" }], error: null };
+        if (q.table === "profiles") return { data: [{ id: ANN, full_name: "Ann Lee" }], error: null };
+        return { data: single ? null : [], error: null };
+      });
+    const quickServer = (row: unknown = qpRow) =>
+      fakeDb((q, single) => {
+        if (q.table === "coach_quick_payments" && single) return { data: row, error: null };
+        // the next Quick Payment comes before the next package payment, so it ends the window
+        if (q.table === "coach_quick_payments" && q.filters["gt:created_at"]) return { data: [{ created_at: "2026-10-20T12:00:00Z" }], error: null };
+        if (q.table === "coach_quick_payments") return { data: [{ ...qpRow }, { id: "other", created_at: "2026-10-20T12:00:00Z", amount_cents: 1500, description: "Bands", stripe_checkout_session_id: "cs_q2" }], error: null };
+        if (q.table === "group_session_attendees")
+          return { data: [{ status: "joined", credit_taken: true, attended_at: null, created_at: "2026-10-05T10:00:00Z", group_sessions: { title: "Saturday class", start_at: "2026-10-10T14:00:00Z", status: "scheduled" } }], error: null };
+        return { data: null, error: null };
+      });
+
+    it("the coach is checked in the space before the server key reads anything", async () => {
+      const s1 = quickServer();
+      expect(await loadDisputeEvidence(coachDb("athlete"), s1, { purchaseId: QP, viewerId: COACH, kind: "quick", groupId: G1 })).toMatchObject({ ok: false, status: 403 });
+      expect(s1.calls).toHaveLength(0);
+      const s2 = quickServer();
+      expect(await loadDisputeEvidence(coachDb("coach"), s2, { purchaseId: QP, viewerId: COACH, kind: "quick" })).toMatchObject({ ok: false, status: 404 });
+      expect(s2.calls).toHaveLength(0);
+    });
+    it("only a Stripe card charge in that space, for that client", async () => {
+      expect(await loadDisputeEvidence(coachDb("coach"), quickServer({ ...qpRow, stripe_checkout_session_id: "manual" }), { purchaseId: QP, viewerId: COACH, kind: "quick", groupId: G1 })).toMatchObject({ ok: false, status: 404 });
+      expect(await loadDisputeEvidence(coachDb("coach"), quickServer({ ...qpRow, group_id: "elsewhere" }), { purchaseId: QP, viewerId: COACH, kind: "quick", groupId: G1 })).toMatchObject({ ok: false, status: 404 });
+      expect(await loadDisputeEvidence(coachDb("coach"), quickServer(null), { purchaseId: QP, viewerId: COACH, kind: "quick", groupId: G1 })).toMatchObject({ ok: false, status: 404 });
+    });
+    it("holds the charge, the waiver, and the sessions, classes and messages until the next payment", async () => {
+      const d = coachDb("coach");
+      const s = quickServer();
+      const loaded = await loadDisputeEvidence(d, s, { purchaseId: QP, viewerId: COACH, kind: "quick", groupId: G1 });
+      if (!loaded.ok) throw new Error(loaded.error);
+      const e = loaded.evidence;
+      expect(e.payment).toMatchObject({ kind: "quick", what: "Protein shake", amountCents: 2500, sessions: 0, packageId: null, checkoutId: "cs_q1", athleteId: ANN, groupId: G1 });
+      expect(s.calls[0]).toMatchObject({ table: "coach_quick_payments", filters: { id: QP, group_id: G1, "like:stripe_checkout_session_id": "cs_%" } });
+      expect(e.windowEnd).toBe("2026-10-20T12:00:00Z");
+      expect(e.pkg).toBeNull();
+      expect(e.waiver?.signedName).toBe("Ann Lee");
+      expect(e.classes?.map((c) => c.title)).toEqual(["Saturday class"]);
+      expect(e.quickPayments.map((q) => q.what)).toEqual(["Bands"]);
+      expect(d.calls.find((c) => c.table === "bookings")!.filters).toMatchObject({ athlete_id: ANN, group_id: G1, "gte:start_at": qpRow.created_at, "lt:start_at": "2026-10-20T12:00:00Z" });
+      const files = evidenceFiles(e, "UTC", DISPUTE_UPLOAD_LINE);
+      expect(files.find((f) => f.name === "payment.csv")!.text).toContain("Quick Payment: Protein shake");
+      expect(files.find((f) => f.name === "README.txt")!.text).toContain("This was a Quick Payment");
+    });
+    it("the client's Quick Payments are listed beside their payments with Evidence for a dispute, and the page and download pass the space along", () => {
+      const facts = read("components/coach/client-billing-facts.tsx");
+      expect(facts).toContain('from("coach_quick_payments")');
+      expect(facts).toContain('.like("stripe_checkout_session_id", "cs_%")');
+      expect(facts).toContain("/print/dispute-evidence/${q.id}?kind=quick&groupId=${groupId}");
+      expect(read("app/print/dispute-evidence/[purchaseId]/page.tsx")).toContain("{ purchaseId, viewerId: user.id, kind, groupId }");
+      expect(read("app/api/coach/dispute-evidence/route.ts")).toContain("{ purchaseId, viewerId: user.id, kind, groupId }");
+    });
+  });
   it("the page prints, the download is read only, and the client's payments link to it", () => {
     const page = read("app/print/dispute-evidence/[purchaseId]/page.tsx");
     expect(page).toContain("@media print");

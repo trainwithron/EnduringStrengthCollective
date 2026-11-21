@@ -16,13 +16,18 @@ export async function GET(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-  const purchaseId = new URL(request.url).searchParams.get("purchaseId") ?? "";
+  const url = new URL(request.url);
+  const purchaseId = url.searchParams.get("purchaseId") ?? "";
   if (!/^[0-9a-f-]{36}$/i.test(purchaseId)) return NextResponse.json({ error: "Missing the payment." }, { status: 400 });
+  // A Quick Payment: ?kind=quick&groupId=... (the coach is checked in that space before the charge is read)
+  const kind = url.searchParams.get("kind") === "quick" ? "quick" : "package";
+  const groupParam = url.searchParams.get("groupId") ?? "";
+  const groupId = /^[0-9a-f-]{36}$/i.test(groupParam) ? groupParam : undefined;
 
   const limited = await rateLimitResponse("coach-dispute-evidence", user.id, 30, 3600);
   if (limited) return limited;
 
-  const loaded = await loadDisputeEvidence(supabase, createServiceRoleClient(), { purchaseId, viewerId: user.id });
+  const loaded = await loadDisputeEvidence(supabase, createServiceRoleClient(), { purchaseId, viewerId: user.id, kind, groupId });
   if (!loaded.ok) return NextResponse.json({ error: loaded.error }, { status: loaded.status });
 
   const timeZone = await getViewerDisplayTimezone(supabase, user.id);
