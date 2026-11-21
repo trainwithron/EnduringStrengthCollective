@@ -4,6 +4,13 @@ import { useMemo, useState } from "react";
 import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { describeCell, readBox } from "@/lib/team-sheet/cell-parser";
 import type { Review } from "@/lib/team-sheet/review";
+import { resizePhoto } from "@/lib/image-resize";
+import { readSheetCodeFromPhoto } from "@/lib/team-sheet/photo-code";
+import { MAX_PHOTOS, UNCLEAR_CELL } from "@/lib/team-sheet/photo-read";
+
+// Photos of the printed sheet (Nov 20): the sheet code is read from each photo here, in the browser, before anything is sent; a photo whose code cannot be read is taken again, never guessed at.
+export const PHOTO_DISCLOSURE = "The photo is read by an outside AI service (Anthropic's Claude) to pull out the numbers. The photo is not kept.";
+export const NO_CODE_IN_PHOTO = "The sheet code (the square in the bottom right corner of the page) couldn't be read. Take the photo again with the whole page flat, in good light and in view, code included.";
 
 // Upload a filled team sheet (Excel or CSV), check what was read, and save it. Every box can be corrected here; the server reads the boxes again from the text left in them, so what is saved is exactly what this
 // screen shows after the reading. Boxes the reader is not sure of are highlighted and, if left, save nothing.
@@ -14,9 +21,11 @@ const WEEKDAY = (label: string) => label.split(" ")[0];
 
 export function TeamSheetUpload({ groupId }: { groupId: string }) {
   const [busy, setBusy] = useState(false);
+  const [busyLabel, setBusyLabel] = useState("Reading the sheet...");
   const [error, setError] = useState<string | null>(null);
   const [review, setReview] = useState<Review | null>(null);
-  const [source, setSource] = useState<"xlsx" | "csv">("xlsx");
+  const [source, setSource] = useState<"xlsx" | "csv" | "photo">("xlsx");
+  const [unclear, setUnclear] = useState(0);
   const [texts, setTexts] = useState<Record<string, string>>({});
   const [skip, setSkip] = useState<Record<string, boolean>>({});
   const [replace, setReplace] = useState(false);
@@ -25,39 +34,78 @@ export function TeamSheetUpload({ groupId }: { groupId: string }) {
   const [undone, setUndone] = useState(false);
   const [ignored, setIgnored] = useState<string[]>([]);
 
-  async function onFile(file: File | null) {
-    if (!file) return;
+  // a new file or photo starts clean: nothing from the last one carries over (nor a choice made for it)
+  function startReading(label: string) {
     setBusy(true);
+    setBusyLabel(label);
     setError(null);
     setReview(null);
     setResult(null);
     setUndone(false);
-    // a choice made for the last file does not carry over to this one
     setReplace(false);
     setIgnored([]);
+    setUnclear(0);
+  }
+
+  function showReview(data: { review: Review; source?: unknown; ignoredSheets?: unknown; unclear?: unknown }) {
+    const r = data.review;
+    const t: Record<string, string> = {};
+    r.sheets.forEach((s, si) => s.rows.forEach((row, ri) => row.days.forEach((cells, di) => cells.forEach((c, ei) => (t[`${si}:${ri}:${di}:${ei}`] = c.text)))));
+    setTexts(t);
+    // a row whose name is not the seat's, or a rack whose columns moved, starts left out: the coach ticks it in once they have checked
+    const sk: Record<string, boolean> = {};
+    r.sheets.forEach((s, si) => s.rows.forEach((row, ri) => { if (!row.gone && (row.nameChanged || s.columnsChanged)) sk[`${si}:${ri}`] = true; }));
+    setSkip(sk);
+    setIgnored(Array.isArray(data.ignoredSheets) ? data.ignoredSheets : []);
+    setUnclear(typeof data.unclear === "number" ? data.unclear : 0);
+    setReview(r);
+    setSource(data.source === "csv" ? "csv" : data.source === "photo" ? "photo" : "xlsx");
+  }
+
+  async function onFile(file: File | null) {
+    if (!file) return;
+    startReading("Reading the sheet...");
     try {
       const form = new FormData();
       form.set("groupId", groupId);
       form.set("file", file);
       const res = await fetch("/api/team-sheet/upload", { method: "POST", body: form });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(data.error ?? "That file could not be read. Try again.");
-      } else {
-        const r = data.review as Review;
-        const t: Record<string, string> = {};
-        r.sheets.forEach((s, si) => s.rows.forEach((row, ri) => row.days.forEach((cells, di) => cells.forEach((c, ei) => (t[`${si}:${ri}:${di}:${ei}`] = c.text)))));
-        setTexts(t);
-        // a row whose name is not the seat's, or a rack whose columns moved, starts left out: the coach ticks it in once they have checked
-        const sk: Record<string, boolean> = {};
-        r.sheets.forEach((s, si) => s.rows.forEach((row, ri) => { if (!row.gone && (row.nameChanged || s.columnsChanged)) sk[`${si}:${ri}`] = true; }));
-        setSkip(sk);
-        setIgnored(Array.isArray(data.ignoredSheets) ? data.ignoredSheets : []);
-        setReview(r);
-        setSource(data.source === "csv" ? "csv" : "xlsx");
-      }
+      if (!res.ok) setError(data.error ?? "That file could not be read. Try again.");
+      else showReview(data);
     } catch {
       setError("That file could not be sent. Check your connection and try again.");
+    }
+    setBusy(false);
+  }
+
+  async function onPhotos(files: File[]) {
+    if (files.length === 0) return;
+    if (files.length > MAX_PHOTOS) {
+      setError(`Up to ${MAX_PHOTOS} photos at a time. Read the rest after these are saved.`);
+      return;
+    }
+    startReading(files.length === 1 ? "Reading the photo... this can take up to a minute." : `Reading ${files.length} photos... this can take a minute or two.`);
+    try {
+      const photos: { imageBase64: string; mediaType: string; codeText: string }[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const which = files.length > 1 ? `Photo ${i + 1}: ` : "";
+        // the code is read from the photo as taken (its small squares are lost once a photo is shrunk), then the photo is shrunk to send
+        const codeText = await readSheetCodeFromPhoto(files[i]).catch(() => null);
+        if (!codeText) {
+          setError(`${which}${NO_CODE_IN_PHOTO}`);
+          setBusy(false);
+          return;
+        }
+        const resized = await resizePhoto(files[i]);
+        photos.push({ imageBase64: resized.base64, mediaType: resized.mediaType, codeText });
+      }
+      const res = await fetch("/api/team-sheet/photo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ groupId, photos }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) setError(data.error ?? "The photo could not be read. Try again.");
+      else showReview(data);
+    } catch {
+      setError("The photo could not be sent. Check your connection and try again.");
     }
     setBusy(false);
   }
@@ -197,9 +245,18 @@ export function TeamSheetUpload({ groupId }: { groupId: string }) {
           <input id="team-sheet-file" type="file" accept=".xlsx,.csv" disabled={busy} onChange={(e) => { const f = e.target.files?.[0] ?? null; e.target.value = ""; void onFile(f); }} className="block w-full font-body text-sm text-chalk file:mr-3 file:h-11 file:px-4 file:border file:border-steel/40 file:bg-graphite file:text-chalk" />
         </label>
         <p className="font-body text-xs text-steel">Use the Excel file from the Team sheet page, filled in. Nothing is saved until you check it here and press Save.</p>
+        <div className="border-t border-steel/20 pt-3 space-y-2">
+          <span className="font-body text-xs text-steel uppercase tracking-wide block">Or a photo of the printed sheet</span>
+          {/* the file box itself is hidden behind the button-shaped label; focus on it shows on the label */}
+          <label className={`${button} border border-steel/40 text-chalk hover:border-rust cursor-pointer focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-rust ${busy ? "opacity-40 pointer-events-none" : ""}`}>
+            Take a photo
+            <input id="team-sheet-photo" type="file" accept="image/*" multiple disabled={busy} onChange={(e) => { const fs = Array.from(e.target.files ?? []); e.target.value = ""; void onPhotos(fs); }} className="sr-only" data-team-sheet-photo />
+          </label>
+          <p className="font-body text-xs text-steel">One photo per printed page, up to {MAX_PHOTOS}, flat and in good light with the square sheet code in the bottom right corner in view. {PHOTO_DISCLOSURE}</p>
+        </div>
         {busy && (
           <p className="font-body text-sm" role="status">
-            Reading the sheet...
+            {busyLabel}
           </p>
         )}
         {error && (
@@ -208,6 +265,12 @@ export function TeamSheetUpload({ groupId }: { groupId: string }) {
           </p>
         )}
         {review && ignored.length > 0 && <p className="font-body text-xs text-steel">Not read (not a rack sheet): {ignored.join(", ")}.</p>}
+        {review && source === "photo" && (
+          <p className="font-body text-sm" data-team-sheet-photo-note>
+            Read from a photo: check every box against the paper before you save.
+            {unclear > 0 ? ` A box showing ${UNCLEAR_CELL} is one the reader couldn't read with certainty (${unclear} of them); type what the paper says, or it is left blank.` : ""}
+          </p>
+        )}
       </div>
 
       {review && read && (

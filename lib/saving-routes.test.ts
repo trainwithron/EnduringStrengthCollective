@@ -29,6 +29,8 @@ const NOT_A_SAVE = new Set([
   "/api/client-requests/signup",
   // reading a filled team sheet for the review screen: nothing is written (saving and undoing are the saves)
   "/api/team-sheet/upload",
+  // reading photos of a filled printed team sheet for the same review screen: nothing is written and the photos are not kept
+  "/api/team-sheet/photo",
   // a guardian's consent: emailed links and a server-only record; nothing a pane shows changes
   "/api/guardian-consent/request",
   "/api/guardian-consent/coach-confirm",
