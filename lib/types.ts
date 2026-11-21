@@ -160,6 +160,8 @@ export interface ExerciseSetTarget {
   repMax: number | null;
   // What kind of set the coach prescribes (group_workout_exercise_sets.set_type): a warm-up, a working set, as many reps as possible, a back-off or a drop set (Ron, Nov 20: B2).
   setType?: "warmup" | "working" | "amrap" | "backoff" | "drop";
+  // A percent of the athlete's max in place of a fixed weight (wave 2 T3, lib/pct-of-max.ts): 75 means 75%. Null when the set has a fixed weight or none.
+  targetPctMax?: number | null;
 }
 
 export interface BuilderExercise {

@@ -8,6 +8,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { saved } from "@/lib/saved";
 import { MAX_TIME_SECONDS, formatRest, parseRestInput, parseRestSpan } from "@/lib/rest-time";
 import { cellWrite } from "@/lib/cell-write";
+import { pctText } from "@/lib/pct-of-max";
 import { ExerciseNameInput } from "./exercise-name-input";
 import { BuilderDemoThumb } from "@/components/coach/builder-demo-thumb";
 import { builderDemoFor, type BuilderDemo } from "@/lib/builder-demo";
@@ -135,6 +136,8 @@ function builderLabel(field: TrackedField, label: string): string {
 }
 
 function targetValue(set: ExerciseSetTarget, field: TrackedField): string {
+  // A percent of each athlete's max (wave 2 T3) shows as typed: "75%".
+  if (field === "weight" && set.targetWeight == null && set.targetPctMax != null) return pctText(set.targetPctMax);
   const prop = TARGET_PROP[field] as keyof ExerciseSetTarget;
   const v = set[prop];
   if (v === null || v === undefined) return "";
@@ -473,6 +476,7 @@ export function ExerciseBuilderCard({
           set_order: nextOrder,
           target_reps: last?.targetReps ?? null,
           target_weight: last?.targetWeight ?? null,
+          target_pct_max: last?.targetPctMax ?? null,
           target_rpe: last?.targetRpe ?? null,
           target_rir: last?.targetRir ?? null,
           target_tempo: last?.targetTempo ?? null,
@@ -565,7 +569,8 @@ export function ExerciseBuilderCard({
   }
 
   // The gray weight suggestions for the sets that have no weight yet, taken in one tap as the real prescription.
-  const openSuggestions = exercise.sets.filter((s) => s.targetWeight === null && suggestedWeights?.[s.id] !== undefined);
+  // (a set prescribed as a percent of max is not open: its weight is each athlete's own)
+  const openSuggestions = exercise.sets.filter((s) => s.targetWeight === null && s.targetPctMax == null && suggestedWeights?.[s.id] !== undefined);
   async function acceptSuggestedWeights() {
     if (openSuggestions.length === 0) return;
     const supabase = createBrowserClient();
@@ -831,6 +836,7 @@ export function ExerciseBuilderCard({
             set_order: s.setOrder,
             target_reps: s.targetReps,
             target_weight: s.targetWeight,
+            target_pct_max: s.targetPctMax ?? null,
             target_rpe: s.targetRpe,
             target_rir: s.targetRir,
             target_tempo: s.targetTempo,
@@ -1090,7 +1096,7 @@ export function ExerciseBuilderCard({
                         logged={isLoggedDay ? loggedText(loggedBySet?.[set.setOrder], field) : undefined}
                         suggestion={field === "weight" && !isLoggedDay && targetValue(set, field) === "" && suggestedWeights?.[set.id] !== undefined ? String(suggestedWeights[set.id]) : undefined}
                         value={targetValue(set, field)}
-                        kind={field === "rest" || field === "time" ? "text" : def.kind}
+                        kind={field === "rest" || field === "time" || field === "weight" ? "text" : def.kind}
                         label={field === "rest" || field === "time" ? `${builderLabel(field, def.label)} (m:ss), set ${i + 1}` : `${def.label}, set ${i + 1}`}
                         onCommit={async (typed) => {
                           let raw = typed;

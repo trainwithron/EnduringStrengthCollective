@@ -1,5 +1,6 @@
 import { getProgressionGoalsBatch } from "@/lib/progressions";
 import { findDemo, withPlatformDemos, type DemoRow } from "@/lib/exercise-demo";
+import { maxByLift, setWeightFor } from "@/lib/pct-of-max";
 import { loadPlatformDemos } from "@/lib/platform-demos";
 import { DEFAULT_TRACKED_FIELDS, mapSetRow, SET_ROW_SELECT, type TrackedField } from "@/lib/exercise-fields";
 import { PRIOR_SETS_SELECT, suggestedWeightsFromHistory } from "@/lib/suggested-weights";
@@ -189,7 +190,7 @@ export async function getWorkoutOverviewData(
   const exerciseNames = exercises.map((ex) => ex.exerciseName);
   const videoUrlByExerciseId = new Map<string, string>();
 
-  const [priorSetsResult, , goalsBatch] = await Promise.all([
+  const [priorSetsResult, , goalsBatch, maxesResult] = await Promise.all([
     exerciseNames.length > 0
       ? supabase
           .from("set_logs")
@@ -229,7 +230,18 @@ export async function getWorkoutOverviewData(
             loggedExerciseName: ex.exerciseName,
           })),
         }),
+    // This athlete's training maxes, for a set prescribed as a percent of max (wave 2 T3).
+    exercises.some((ex) => ex.sets.some((st) => st.targetWeight == null && st.targetPctMax != null))
+      ? supabase.from("athlete_training_maxes").select("exercise_name, estimated_max").eq("athlete_id", athleteId)
+      : Promise.resolve({ data: [] }),
   ]);
+
+  // A set prescribed as a percent of max shows THIS athlete's own weight (lib/pct-of-max.ts): the percent of their training max for that lift, to the nearest 5 lb.
+  // Without a max for it, the weight stays empty and the set keeps its percent.
+  const athleteMaxes = maxByLift((maxesResult as { data: { exercise_name: string; estimated_max: number | null }[] | null }).data);
+  for (const ex of exercises) {
+    ex.sets = ex.sets.map((st) => (st.targetWeight == null && st.targetPctMax != null ? { ...st, targetWeight: setWeightFor(st, ex.exerciseName, athleteMaxes) } : st));
+  }
 
   const lastTimeByExercise: Record<string, { weight: number; reps: number }> = {};
   for (const row of (priorSetsResult.data ?? []) as any[]) {

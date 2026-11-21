@@ -2,6 +2,7 @@
 import { buildPdf, PdfPage, PAGE_H, PAGE_W, wrapToWidth } from "@/lib/team-sheet/grid-pdf";
 import { encodeSheetCode, type SheetCode } from "@/lib/team-sheet/sheet-code";
 import { pageRack, type SheetModel, type SheetRack } from "@/lib/team-sheet/sheet-model";
+import { liftDisplayValue } from "@/lib/lift-weight";
 
 const MARGIN = 30;
 const NAME_W = 108;
@@ -68,7 +69,7 @@ function drawRackPage(model: SheetModel, rack: SheetRack, blocks: ReturnType<typ
   page.rect(MARGIN, y, NAME_W, NAME_ROW_H + RX_ROW_H, { fill: 0.9, stroke: 0.4 });
   page.text(MARGIN + 4, y + 13, "Athlete", { size: 8.5, bold: true });
   let x = MARGIN + NAME_W;
-  const columns: { x: number; w: number; sets: number }[] = [];
+  const columns: { x: number; w: number; sets: number; exerciseId: string | null }[] = [];
   for (const b of blocks) {
     const list = b.exercises.length > 0 ? b.exercises : [null];
     for (const ex of list) {
@@ -80,7 +81,7 @@ function drawRackPage(model: SheetModel, rack: SheetRack, blocks: ReturnType<typ
       } else {
         page.text(x + 3, y + 12, "(no exercises)", { size: 7, gray: 0.4 });
       }
-      columns.push({ x, w: colW, sets: ex && !ex.unread ? ex.sets : 0 });
+      columns.push({ x, w: colW, sets: ex && !ex.unread ? ex.sets : 0, exerciseId: ex && ex.pct != null ? ex.id : null });
       x += colW;
     }
   }
@@ -106,6 +107,12 @@ function drawRackPage(model: SheetModel, rack: SheetRack, blocks: ReturnType<typ
         const r = Math.floor(s / perRow);
         const k = s % perRow;
         page.rect(c.x + 2 + k * (w + 1.5), top + 4 + r * (h + 2), w, h, { stroke: 0.3, lineWidth: 0.5 });
+      }
+      // A percent of max (wave 2 T3): this athlete's own weight, small, under the boxes ("185 lb"), in the sheet's unit. Paper only: nothing printed here is read back.
+      const own = c.exerciseId ? model.targets?.[a.id]?.[c.exerciseId] : undefined;
+      if (own != null) {
+        const v = liftDisplayValue(own, model.unit === "kg" ? "kg" : "lb");
+        page.text(c.x + 3, top + ROW_H - 4, `${Number.isInteger(v) ? v : v.toFixed(1)} ${model.unit}`, { size: 6.5, gray: 0.4 });
       }
     }
   });
