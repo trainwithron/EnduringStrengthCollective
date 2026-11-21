@@ -6,7 +6,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { zonedTimeToUtc } from "@/lib/timezone";
 import { notifyBookingConfirmed } from "@/lib/notify-booking-confirmed";
 import { mirrorGoogleCalendarEvent } from "@/lib/mirror-google-calendar-event";
-import { DayHourGrid, minutesToTimeInput, type GridBlocked, type GridBooking, type GridEvent, type GridWindow } from "@/components/coach/desktop/day-hour-grid";
+import { DayHourGrid, minutesToTimeInput, type GridBlocked, type GridCanceled, type GridBooking, type GridEvent, type GridWindow } from "@/components/coach/desktop/day-hour-grid";
 import { addTimeChoices, endFrom, minutesBetween, overlapWarning, parseTimeInput, shiftTime, timeOptions15, type AddKind } from "@/lib/day-add";
 
 export interface DayClient {
@@ -30,6 +30,7 @@ export function DayCalendar({
   bookings,
   events,
   blocked,
+  canceled = [],
   openRanges,
   busyRanges,
 }: {
@@ -45,6 +46,8 @@ export function DayCalendar({
   bookings: GridBooking[];
   events: GridEvent[];
   blocked: GridBlocked[];
+  // sessions the client cancelled: shown, never blocking (busyRanges never has them)
+  canceled?: GridCanceled[];
   openRanges: { startMs: number; endMs: number }[];
   busyRanges: { startMs: number; endMs: number }[];
 }) {
@@ -152,7 +155,7 @@ export function DayCalendar({
   return (
     <>
       <p className="font-body text-xs text-steel mb-2">Tap a time to add a session, an event or time off.</p>
-      <DayHourGrid windows={windows} bookings={bookings} events={events} blocked={blocked} timeZone={timezone} onPickTime={openAt} />
+      <DayHourGrid windows={windows} bookings={bookings} events={events} blocked={blocked} canceled={canceled} timeZone={timezone} onPickTime={openAt} />
 
       {pickedTime !== null && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60" onClick={close}>

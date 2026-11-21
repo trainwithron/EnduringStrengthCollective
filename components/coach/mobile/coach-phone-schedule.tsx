@@ -13,6 +13,7 @@ import { SessionCountLine } from "@/components/coach/session-count-line";
 import { SessionCheckSection } from "@/components/coach/session-check-section";
 import { ScheduleClientPicker } from "@/components/coach/schedule-client-picker";
 import { UpcomingSessionsList } from "@/components/coach/upcoming-sessions-list";
+import { readCanceledSessions } from "@/lib/canceled-sessions";
 
 const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 // The same dots as the computer's month (components/coach/desktop/calendar-grid.tsx): an event the coach put on the calendar glows rust, a suggestion is yellow.
@@ -115,6 +116,8 @@ export async function CoachPhoneSchedule({
   const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   const monthStart = new Date(year, monthIndex, 1);
   const monthEnd = new Date(year, monthIndex + 1, 1);
+  // Sessions the client cancelled stay on the month, struck through (Ron, Nov 21); read on their own, never counted or in Upcoming (lib/canceled-sessions.ts).
+  const canceledRead = readCanceledSessions(supabase, userId, orgGroupIds, new Date(monthStart.getTime() - 86400000).toISOString(), new Date(monthEnd.getTime() + 86400000).toISOString());
   const { data: monthRows } = await readRowsByIds(orgGroupIds, (g) => (from, to) =>
     supabase
       .from("bookings")
@@ -134,6 +137,11 @@ export async function CoachPhoneSchedule({
     const list = sessionsByDay.get(k) ?? [];
     list.push({ time: formatInTimezone(new Date(b.start_at), timezone, "time"), name: String(b.profiles?.full_name ?? "Client").split(" ")[0], at: b.start_at as string });
     sessionsByDay.set(k, list);
+  }
+  const canceledByDay = new Map<string, { time: string; name: string; at: string; line: string }[]>();
+  for (const c of await canceledRead) {
+    const k = dateKeyInZone(timezone, new Date(c.startAt));
+    canceledByDay.set(k, [...(canceledByDay.get(k) ?? []), { time: formatInTimezone(new Date(c.startAt), timezone, "time"), name: c.name.split(" ")[0], at: c.startAt, line: c.label }]);
   }
   // The coach's own calendar events (a consult they put on their calendar, a suggestion; Ron, Nov 19: "needs to show up on my calendar ... i almost missed it"): on the month's days
   // with a dot, in time order among the sessions (one with no time after them), and in the upcoming list. Only the coach's own rows.
@@ -196,6 +204,7 @@ export async function CoachPhoneSchedule({
           const dayEvents = eventsByDay.get(dayKey(date)) ?? [];
           const timed = [
             ...(sessionsByDay.get(dayKey(date)) ?? []).map((s, idx) => ({ key: `s${idx}`, at: s.at, text: `${s.time} ${s.name}`, className: "text-chalk", dot: null as string | null })),
+            ...(canceledByDay.get(dayKey(date)) ?? []).map((s, idx) => ({ key: `c${idx}`, at: s.at, text: `${s.time} ${s.name}`, className: "text-steel line-through", dot: null as string | null, title: `${s.name}: ${s.line}` })),
             ...dayEvents
               .filter((e) => e.event_time)
               .map((e) => ({ key: `e${e.id}`, at: eventAt(e), text: `${formatInTimezone(new Date(eventAt(e)), timezone, "time")} ${e.title}`, className: "text-chalk", dot: e.event_type === "suggestion" ? DOT_SUGGESTION : DOT_EVENT })),
@@ -210,7 +219,12 @@ export async function CoachPhoneSchedule({
             <Link key={i} href={`/groups/${anchorGroupId}/calendar/${dayKey(date)}`} prefetch={false} className={`bg-graphite min-h-[56px] p-1.5 flex flex-col ${isToday ? "ring-1 ring-inset ring-rust" : ""}`}>
               <span className={`font-body text-xs ${isToday ? "text-rust-ink font-bold" : "text-steel"}`}>{date.getDate()}</span>
               {lines.slice(0, 2).map((l) => (
-                <span key={l.key} className={`font-body text-[10px] leading-tight mt-0.5 truncate ${l.className}`} {...(l.dot ? { "data-calendar-event": "" } : {})}>
+                <span
+                  key={l.key}
+                  className={`font-body text-[10px] leading-tight mt-0.5 truncate ${l.className}`}
+                  {...(l.dot ? { "data-calendar-event": "" } : {})}
+                  {...("title" in l && l.title ? { title: l.title as string, "aria-label": l.title as string, "data-canceled-session": "" } : {})}
+                >
                   {l.dot && <span aria-hidden="true" className={`inline-block w-[5px] h-[5px] rounded-full mr-0.5 align-middle ${l.dot}`} />}
                   {l.text}
                 </span>

@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { CalendarPageTabs } from "@/components/coach/desktop/calendar-page-tabs";
-import { CalendarGrid, type CalendarEventEntry } from "@/components/coach/desktop/calendar-grid";
+import { CalendarGrid, type CalendarEventEntry, type CanceledEntry } from "@/components/coach/desktop/calendar-grid";
 import { CalendarClientRail } from "@/components/coach/desktop/calendar-client-rail";
 import { CalendarAttentionChip } from "@/components/coach/desktop/calendar-attention-chip";
 import { CalendarSchedulingProvider } from "@/components/coach/desktop/calendar-scheduling-context";
@@ -53,6 +53,7 @@ import { NO_SESSIONS_LINE } from "@/lib/session-credit-copy";
 import { buildCreditPicture, fetchBookingCounts } from "@/lib/credit-picture";
 import { insideWindowHours } from "@/lib/cancel-window";
 import { readClientCancelPolicy } from "@/lib/late-cancel-auto";
+import { canceledLine, readCanceledSessions } from "@/lib/canceled-sessions";
 
 const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
@@ -782,6 +783,14 @@ export async function CoachCalendarPageBody(
   const rangeStart = view === "week" ? weekStart : firstOfMonth;
   const rangeEnd = view === "week" ? weekEnd : new Date(year, monthIndex + 1, 1);
 
+  // Sessions the client cancelled stay on the calendar, marked (Ron, Nov 21): read on their own, so they never join the sessions that block times or count (lib/canceled-sessions.ts).
+  const canceledRead = readCanceledSessions(
+    supabase,
+    user.id,
+    orgGroupIds,
+    new Date(rangeStart.getTime() - 36 * 3600000).toISOString(),
+    new Date(rangeEnd.getTime() + 36 * 3600000).toISOString()
+  );
   // Every one of these 8 queries is independent of the others — none
   // reads a result another produces — so they run as one batch instead
   // of 8 sequential round trips. This is the real fix for this page's
@@ -984,6 +993,15 @@ export async function CoachCalendarPageBody(
     const name = b.profiles?.full_name ?? "A client";
     if (!bookingsByDateKey.has(key)) bookingsByDateKey.set(key, []);
     bookingsByDateKey.get(key)!.push({ time, name, startMs: d.getTime(), endMs: b.end_at ? new Date(b.end_at).getTime() : undefined, bookingId: b.id, seriesId: b.recurring_series_id ?? null });
+  }
+
+  const canceledByDateKey = new Map<string, CanceledEntry[]>();
+  for (const c of await canceledRead) {
+    const d = new Date(c.startAt);
+    const key = dateKeyInZone(bookingTz, d);
+    const list = canceledByDateKey.get(key) ?? [];
+    list.push({ id: c.id, time: formatSlotTime(d, bookingTz), name: c.name, line: canceledLine(c), startMs: d.getTime() });
+    canceledByDateKey.set(key, list);
   }
 
   const eventsByDateKey = new Map<string, CalendarEventEntry[]>();
@@ -1298,6 +1316,7 @@ export async function CoachCalendarPageBody(
                 cellKeys={cells}
                 todayKey={todayKeyCoach}
                 bookingsByDateKey={bookingsByDateKey}
+                canceledByDateKey={canceledByDateKey}
                 eventsByDateKey={eventsByDateKey}
                 blockedRanges={blockedRanges}
                 availabilityWindows={windowsWithTypes}
@@ -1330,6 +1349,7 @@ export async function CoachCalendarPageBody(
                 cellKeys={weekKeys(dateKey(weekStart))}
                 todayKey={todayKeyCoach}
                 bookingsByDateKey={bookingsByDateKey}
+                canceledByDateKey={canceledByDateKey}
                 eventsByDateKey={eventsByDateKey}
                 blockedRanges={blockedRanges}
                 availabilityWindows={windowsWithTypes}

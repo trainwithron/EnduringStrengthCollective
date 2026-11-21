@@ -17,6 +17,8 @@ import { zonedTimeToUtc, DEFAULT_COACH_TIMEZONE, dateKeyInZone, getGroupCoachTim
 import { loadClientCalendar } from "@/lib/client-calendar";
 import { addDaysToDateKey } from "@/lib/series-schedule";
 import { coachCreditSentence } from "@/lib/credit-sentence";
+import { canceledLine, readCanceledSessions } from "@/lib/canceled-sessions";
+import { CanceledSessionActions } from "@/components/coach/canceled-session-actions";
 import { dollars as paidDollars } from "@/lib/paid-booking-money";
 import { buildCreditPicture, fetchBookingCounts } from "@/lib/credit-picture";
 import { AssignSlotButton } from "@/components/coach/desktop/assign-slot-button";
@@ -716,9 +718,13 @@ export default async function CoachDayDetailPage(
   // Wave 2: blockedRanges/bookingRows need wave 1's timezone but not each
   // other; the credits/program lookups need only clientId (gated on
   // clientMembership existing, resolved in wave 1) — all four independent.
+  const dayOrgGroupIds = await orgGroupIdsOf(supabase, user.id, params.groupId);
+  // Sessions the client cancelled stay on the day, marked, with Charge or Waive where it waits for the coach (Ron, Nov 21). Read on their own: never among the sessions that
+  // block times or count (lib/canceled-sessions.ts).
+  const canceledRead = readCanceledSessions(supabase, user.id, dayOrgGroupIds, zonedDayStart.toISOString(), zonedDayEnd.toISOString());
   const [blockedRanges, { data: bookingRows }, { data: creditsForClient }, activeProgram] = await Promise.all([
     getBlockedRangesForDate(supabase, user.id, date, timezone),
-    readRowsByIds(await orgGroupIdsOf(supabase, user.id, params.groupId), (g) => (from, to) =>
+    readRowsByIds(dayOrgGroupIds, (g) => (from, to) =>
       supabase
         .from("bookings")
         .select(
@@ -773,6 +779,7 @@ export default async function CoachDayDetailPage(
     if (!paidError) for (const r of (paidRows ?? []) as { booking_id: string; amount_cents: number }[]) paidByBooking.set(r.booking_id, r.amount_cents);
   }
 
+  const canceledToday = await canceledRead;
   const slots = generateSlotsForDate(date, windows, blockedRanges, timezone);
   const bookingByTime = new Map(
     (bookingRows ?? []).map((b) => [new Date(b.start_at).getTime(), b as any])
@@ -944,6 +951,7 @@ export default async function CoachDayDetailPage(
         }))}
         events={(dayEventRows ?? []).map((e) => ({ id: e.id, time: e.event_time, title: e.title }))}
         blocked={blockedRanges.map((b, i) => ({ id: `blocked-${i}`, start: b.start, end: b.end, label: "Blocked" }))}
+        canceled={canceledToday.map((c) => ({ id: c.id, start: new Date(c.startAt), end: new Date(c.endAt ?? new Date(new Date(c.startAt).getTime() + 3600000).toISOString()), label: `${c.name} · ${canceledLine(c)}` }))}
         openRanges={windows
           .filter((w) => w.weekday === date.getDay())
           .map((w) => ({ startMs: zonedTimeToUtc(params.date, w.startTime, timezone).getTime(), endMs: zonedTimeToUtc(params.date, w.endTime, timezone).getTime() }))}
@@ -1038,6 +1046,26 @@ export default async function CoachDayDetailPage(
             .map((w) => ({ startMs: zonedTimeToUtc(params.date, w.startTime, timezone).getTime(), endMs: zonedTimeToUtc(params.date, w.endTime, timezone).getTime() }))}
           busyRanges={(bookingRows ?? []).map((b: any) => ({ startMs: new Date(b.start_at).getTime(), endMs: new Date(b.end_at).getTime() }))}
         />
+      )}
+
+      {/* Sessions the client cancelled (Ron, Nov 21): still here, marked, with what the coach can still do. The time is open again above. */}
+      {canceledToday.length > 0 && (
+        <div className="mt-6 max-w-lg" data-canceled-list>
+          <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">Canceled</h2>
+          <div className="divide-y divide-steel/15">
+            {canceledToday.map((c) => (
+              <div key={c.id} id={`canceled-${c.id}`} className="py-3 scroll-mt-24">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <span className="font-body font-medium text-[15px] text-steel line-through">{formatSlotTime(new Date(c.startAt), timezone)}</span>
+                  <span className="font-body text-sm text-steel">
+                    <span className="line-through">{c.name}</span> · {canceledLine(c)}
+                  </span>
+                </div>
+                <CanceledSessionActions bookingId={c.id} lateState={c.lateState} name={c.name} />
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Sessions at a time that is not one of the open slots (booked outside hours, or hours changed since) still need Mark attended
