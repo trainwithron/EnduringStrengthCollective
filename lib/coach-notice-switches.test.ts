@@ -52,7 +52,9 @@ describe("a push the browser asks the server to send is judged by the page it op
   });
   it("the route checks the recipient's switch before sending", () => {
     const route = read("app/api/push/send/route.ts");
-    expect(route.indexOf("coachNoticeIsOff(db, profileId, kind)")).toBeLessThan(route.indexOf("sendPushToProfile(db, profileId, title, body, url)"));
+    // (the body sent is `text`: the sender's own, or a finished workout's words in the recipient's unit, wave 2)
+    expect(route.indexOf("coachNoticeIsOff(db, profileId, kind)")).toBeLessThan(route.indexOf("sendPushToProfile(db, profileId, title, text, url)"));
+    expect(route.indexOf("sendPushToProfile(db, profileId, title, text, url)")).toBeGreaterThan(-1);
   });
 });
 

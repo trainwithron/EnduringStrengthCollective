@@ -63,3 +63,30 @@ export function prShoutout(athleteName: string, liftNames: string[]): string {
   const what = names.length === 1 ? names[0] : `${names[0]} and ${names.length - 1} more`;
   return `${athleteName} just hit a new PR on ${what} — worth a shoutout.`;
 }
+
+// The workout-done push is built in the CLIENT's browser, which cannot read the coach's unit (row security on athlete_profile_details). So the browser sends the record sets
+// themselves and the push route, on the server, writes the words in the coach's own unit (Commander, Nov 20). This checks what the browser sent; anything odd is dropped,
+// and the route then sends the browser's own text (in pounds) as before.
+export interface WorkoutDonePayload {
+  athleteName: string;
+  prs: PrSet[];
+  records: PrSet[];
+}
+
+const cleanSet = (v: unknown): PrSet | null => {
+  const o = v as { name?: unknown; weight?: unknown; reps?: unknown } | null;
+  if (!o || typeof o.name !== "string") return null;
+  const name = o.name.trim().slice(0, 120);
+  if (!name) return null;
+  const weight = typeof o.weight === "number" && Number.isFinite(o.weight) && o.weight > 0 && o.weight <= 5000 ? o.weight : null;
+  const reps = typeof o.reps === "number" && Number.isInteger(o.reps) && o.reps >= 1 && o.reps <= 1000 ? o.reps : null;
+  return { name, weight: weight != null && reps != null ? weight : null, reps: weight != null && reps != null ? reps : null };
+};
+
+export function parseWorkoutDonePayload(raw: unknown): WorkoutDonePayload | null {
+  const o = raw as { athleteName?: unknown; prs?: unknown; records?: unknown } | null;
+  if (!o || typeof o !== "object") return null;
+  if (typeof o.athleteName !== "string" || !o.athleteName.trim()) return null;
+  const list = (v: unknown) => (Array.isArray(v) ? v.slice(0, 10).map(cleanSet).filter((s): s is PrSet => !!s) : []);
+  return { athleteName: o.athleteName.trim().slice(0, 120), prs: list(o.prs), records: list(o.records) };
+}

@@ -1,3 +1,5 @@
+import type { WorkoutDonePayload } from "@/lib/pr-wording";
+
 // The real web-push infrastructure (VAPID keys, /api/push/send, the
 // subscribe/unsubscribe routes) was only ever wired to one caller — the
 // coach's manual "Needs Attention" nudge. Every other event that already
@@ -14,11 +16,13 @@
 // surface as if the actual comment/post/reply itself failed. The
 // in-app notification bell (written by the DB trigger, unaffected by
 // this) is the reliable fallback either way.
-export function notifyPush(profileId: string, title: string, body: string, url: string) {
+// `workoutDone` (a finished workout's records): the server writes the body itself in the RECIPIENT's own unit (lib/pr-wording.ts parseWorkoutDonePayload); `body` is the
+// fallback it sends when that cannot be done.
+export function notifyPush(profileId: string, title: string, body: string, url: string, extra: { workoutDone?: WorkoutDonePayload } = {}) {
   fetch("/api/push/send", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ profileId, title, body, url }),
+    body: JSON.stringify({ profileId, title, body, url, ...(extra.workoutDone ? { workoutDone: extra.workoutDone } : {}) }),
     // So it still goes out if the page is closed or refreshed right after.
     keepalive: true,
   }).catch(() => {});

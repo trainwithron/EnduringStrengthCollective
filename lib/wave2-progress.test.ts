@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { repMaxTable, repMaxTablesByLift } from "@/lib/rep-maxes";
-import { prHeadline, prRepNote, prSetText, prShoutout, sharedPrTitle, workoutDonePushBody } from "@/lib/pr-wording";
+import { parseWorkoutDonePayload, prHeadline, prRepNote, prSetText, prShoutout, sharedPrTitle, workoutDonePushBody } from "@/lib/pr-wording";
 import { loadPrSets } from "@/lib/pr-sets";
 import { defaultPair, gapWords, orderPair, photoDays, weightNear } from "@/lib/photo-compare";
 import { recapYearFor, yearRecap, RECAP_MIN_WORKOUTS, type RecapLog } from "@/lib/year-recap";
@@ -94,10 +94,32 @@ describe("P3: a PR notice names the lift, the weight and the reps", () => {
     const button = read("components/session/complete-workout-button.tsx");
     expect(button).not.toContain("new PR! 🎉");
     expect(button).toContain("workoutDonePushBody(athleteName,");
-    // the coach's own unit, read alongside the record sets under the same 1.5 s cap
-    expect(button).toContain("loadLiftUnit(supabase, coachMembership.profile_id),");
-    expect(button).toContain("newRecords.map(setFor), coachUnit),");
-    expect(button).toContain("loadPrSets(supabase, { athleteId: result.athlete_id, sessionId, names: [...newPrs, ...newRecords] })");
+    // the coach's own unit is read on the SERVER (the client's browser cannot read it): the browser sends the sets, the push route writes the words; the browser's
+    // text, in pounds with the unit written, is only the fallback
+    expect(button).not.toContain("loadLiftUnit");
+    expect(button).toContain("{ workoutDone: { athleteName, prs, records } }");
+    const route = read("app/api/push/send/route.ts");
+    expect(route).toContain("const workoutDone = parseWorkoutDonePayload(payload.workoutDone);");
+    expect(route).toContain('const unit = await Promise.race([loadLiftUnit(db, profileId), new Promise<WeightUnit>((resolve) => setTimeout(() => resolve("lb"), 1500))]);');
+    expect(route).toContain("text = clampPush(title, workoutDonePushBody(workoutDone.athleteName, workoutDone.prs, workoutDone.records, unit)).body;");
+    // the route still answers only { sent }: nothing about the coach's unit goes back
+    expect(route).toContain("return NextResponse.json({ sent });");
+  });
+  it("what the browser sends about the records is checked; anything odd is dropped", () => {
+    expect(parseWorkoutDonePayload({ athleteName: " Sam ", prs: [{ name: "Back Squat", weight: 225, reps: 5 }], records: [] })).toEqual({
+      athleteName: "Sam",
+      prs: [{ name: "Back Squat", weight: 225, reps: 5 }],
+      records: [],
+    });
+    // a weight without reps (or nonsense) keeps the lift's name, without numbers
+    expect(parseWorkoutDonePayload({ athleteName: "Sam", prs: [{ name: "Row", weight: 135, reps: 0 }, { name: "Curl", weight: "x", reps: 5 }, { name: "" }, 7], records: [] })!.prs).toEqual([
+      { name: "Row", weight: null, reps: null },
+      { name: "Curl", weight: null, reps: null },
+    ]);
+    expect(parseWorkoutDonePayload({ prs: [] })).toBeNull();
+    expect(parseWorkoutDonePayload(null)).toBeNull();
+    expect(parseWorkoutDonePayload({ athleteName: "Sam", prs: Array.from({ length: 50 }, (_, i) => ({ name: `L${i}`, weight: 100, reps: 5 })), records: [] })!.prs).toHaveLength(10);
+    expect(read("components/session/complete-workout-button.tsx")).toContain("loadPrSets(supabase, { athleteId: result.athlete_id, sessionId, names: [...newPrs, ...newRecords] })");
   });
   it("the share card says what the record beat; the shared page's title and Home's shout-out name it", () => {
     expect(prRepNote(5)).toBe("best ever at 5 reps");
