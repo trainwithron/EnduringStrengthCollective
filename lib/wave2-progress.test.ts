@@ -273,6 +273,33 @@ describe("P1 screen: My progress", () => {
   });
 });
 
+describe("My progress: the latest and the best estimated max never contradict each other (live finding, Nov 20)", () => {
+  it("the line is built from the same counted sets and the same estimate as the best under the table, one point a day (that day's best set)", async () => {
+    const { e1rmSeriesFromSets } = await import("@/lib/progress-lines");
+    const sets = [
+      { weight: 205, reps: 5, at: "2026-08-17T15:00:00Z" },
+      { weight: 185, reps: 3, at: "2026-08-17T15:10:00Z" },
+      { weight: 225, reps: 1, setType: "warmup", at: "2026-11-18T15:00:00Z" }, // a warm-up never counts
+      { weight: 135, reps: 12, at: "2026-11-18T15:05:00Z" }, // a light high-rep set gives no estimate, so no low point
+      { weight: 155, reps: 5, at: "2026-11-10T15:00:00Z" },
+    ];
+    const line = e1rmSeriesFromSets(sets, "America/Chicago");
+    expect(line.map((p) => [p.date, p.weight, p.reps])).toEqual([["2026-08-17", 205, 5], ["2026-11-10", 155, 5]]);
+    const best = repMaxTable(sets).estimatedMax!;
+    // the best under the table is the top of the line, from the same set
+    expect(Math.max(...line.map((p) => p.value))).toBe(best.value);
+    expect([best.weight, best.reps]).toEqual([205, 5]);
+  });
+  it("the card says LATEST with the set it came from; the line under the table says BEST", () => {
+    const view = read("components/athlete/progress/my-progress-view.tsx");
+    expect(view).toContain('"Latest estimated max"');
+    expect(view).toContain("From your best set that day: {shown(fromSet.weight, unit)} × {fromSet.reps} on {shortDate(fromSet.date)}");
+    expect(view).toContain("Best estimated max {shown(table.estimatedMax.value, unit)} {unitLabel}, from");
+    expect(view).not.toContain('"Estimated 1-rep max"');
+    expect(read("lib/my-progress.ts")).toContain("e1rmSeries: setLines.get(c.name.trim().toLowerCase()) ?? e1rmSeriesFor(rollup, c.name, timeZone),");
+  });
+});
+
 describe("P6: the coach's business export keeps the measurements", () => {
   it("body_measurements.csv, by group like body_weight.csv, and an empty file (not a failed part) before step 213", () => {
     const src = read("lib/business-export.ts");

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import type { MyProgressCard } from "@/lib/my-progress";
-import { changeOver } from "@/lib/progress-lines";
+import { changeOver, type E1rmPoint } from "@/lib/progress-lines";
 import type { SeriesPoint } from "@/lib/progress-cards";
 import { liftDisplayValue, liftUnitLabel } from "@/lib/lift-weight";
 import type { WeightUnit } from "@/lib/units";
@@ -57,7 +57,11 @@ export function MyProgressView({
   const unitLabel = liftUnitLabel(unit);
   // a lift with no estimate (only high-rep sets) shows its heaviest set instead
   const series: SeriesPoint[] = chosen === BODY ? bodyWeight : card ? (card.e1rmSeries.length > 0 ? card.e1rmSeries : card.weightSeries) : [];
-  const measure = chosen === BODY ? "Body weight" : card && card.e1rmSeries.length > 0 ? "Estimated 1-rep max" : "Heaviest set";
+  // The card's number is the LATEST estimate (its last point); the line under the table is the BEST one (live finding, Nov 20: two "estimated max" numbers read as a contradiction).
+  const measure = chosen === BODY ? "Body weight" : card && card.e1rmSeries.length > 0 ? "Latest estimated max" : "Heaviest set";
+  // the set the latest estimate came from, when the line was built from the lift's own sets
+  const lastPoint = chosen !== BODY && card && card.e1rmSeries.length > 0 ? card.e1rmSeries[card.e1rmSeries.length - 1] : null;
+  const fromSet = lastPoint && "weight" in lastPoint ? (lastPoint as E1rmPoint) : null;
   const inUnit = series.map((p) => ({ date: p.date, value: liftDisplayValue(p.value, unit) }));
   const latest = inUnit[inUnit.length - 1] ?? null;
   const moved = changeOver(inUnit, todayKey);
@@ -114,6 +118,11 @@ export function MyProgressView({
                 {shown(series[series.length - 1].value, unit)} {unitLabel}
               </p>
             )}
+            {fromSet && (
+              <p className="font-body text-xs text-steel" data-latest-from>
+                From your best set that day: {shown(fromSet.weight, unit)} × {fromSet.reps} on {shortDate(fromSet.date)}
+              </p>
+            )}
             <ProgressLineChart
               points={inUnit}
               label={latest && inUnit.length > 1 ? `${measure}, from ${inUnit[0].value} to ${latest.value} ${unitLabel}` : measure}
@@ -153,7 +162,7 @@ export function MyProgressView({
               </table>
               {table?.estimatedMax && (
                 <p className="font-body text-xs text-steel mt-2">
-                  Estimated max {shown(table.estimatedMax.value, unit)} {unitLabel}, from {shown(table.estimatedMax.weight, unit)} × {table.estimatedMax.reps} on {shortDate(table.estimatedMax.at)}.
+                  Best estimated max {shown(table.estimatedMax.value, unit)} {unitLabel}, from {shown(table.estimatedMax.weight, unit)} × {table.estimatedMax.reps} on {shortDate(table.estimatedMax.at)}.
                 </p>
               )}
             </section>

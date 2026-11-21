@@ -4,7 +4,7 @@ import { planCards, summarizeExercises, type LadderInput, type SeriesPoint } fro
 import { dateKeyInZone, type StatEvent } from "@/lib/progress-periods";
 import { repMaxTablesByLift, type RepMaxTable } from "@/lib/rep-maxes";
 import { readLoggedSets } from "@/lib/read-logged-sets";
-import { e1rmSeriesFor } from "@/lib/progress-lines";
+import { e1rmSeriesFor, e1rmSeriesFromSets, type E1rmPoint } from "@/lib/progress-lines";
 
 // "My progress" (wave 2, P1 + P2; Ron, Nov 20): the client's own read-only view of the coach's Progress tab. The same cards (lib/progress-cards.ts: the coach's
 // pins first, then the big five, then the rest), the same period stats (lib/progress-periods.ts) and the same sets (client_exercise_rollup, a plain SQL function
@@ -20,7 +20,8 @@ export interface MyProgressCard {
   weightSeries: SeriesPoint[];
   volumeSeries: SeriesPoint[];
   // the estimated max of each workout's best set, by the person's own day (the best of the day when there were two), oldest first: the line on the card
-  e1rmSeries: SeriesPoint[];
+  // each point carries the set it came from when the lift's sets were read (weight × reps), so the card can say which set its latest number is
+  e1rmSeries: (SeriesPoint | E1rmPoint)[];
   repMaxes: RepMaxTable | null;
 }
 
@@ -93,6 +94,8 @@ export async function loadMyProgress(
   // Best at each rep count, for the first cards' lifts (the ones a person looks at; the address of the read stays short): their counted sets, a page at a time.
   const names = plan.cards.slice(0, REP_TABLE_CARDS).map((c) => c.name);
   const tables = new Map<string, RepMaxTable>();
+  // the estimated-max line from the same sets and the same estimate as the best-at-each-rep table (lib/progress-lines.ts e1rmSeriesFromSets)
+  const setLines = new Map<string, E1rmPoint[]>();
   if (names.length > 0) {
     const rows: { weight: number | null; reps: number | null; set_type?: string | null; completed_at: string | null; session_exercises: any }[] = [];
     for (let page = 0; page < SET_PAGES; page++) {
@@ -121,6 +124,15 @@ export async function loadMyProgress(
       return { exerciseName: String(se?.exercise_name ?? ""), weight: r.weight, reps: r.reps, setType: r.set_type ?? null, at: r.completed_at ?? "" };
     });
     for (const [name, table] of repMaxTablesByLift(sets)) tables.set(name.trim().toLowerCase(), table);
+    const byLift = new Map<string, typeof sets>();
+    for (const st of sets) {
+      const key = st.exerciseName.trim().toLowerCase();
+      if (!key) continue;
+      const list = byLift.get(key) ?? [];
+      list.push(st);
+      byLift.set(key, list);
+    }
+    for (const [key, list] of byLift) setLines.set(key, e1rmSeriesFromSets(list, timeZone));
   }
 
   const cards: MyProgressCard[] = plan.cards.map((c) => ({
@@ -130,7 +142,8 @@ export async function loadMyProgress(
     bestWeight: c.bestWeight,
     weightSeries: c.weightSeries,
     volumeSeries: c.volumeSeries,
-    e1rmSeries: e1rmSeriesFor(rollup, c.name, timeZone),
+    // the lift's own sets when they were read (the first cards), else the per-workout estimate from the rollup
+    e1rmSeries: setLines.get(c.name.trim().toLowerCase()) ?? e1rmSeriesFor(rollup, c.name, timeZone),
     repMaxes: tables.get(c.name.trim().toLowerCase()) ?? null,
   }));
   // Body weight, the client's own weigh-ins in this space (a chip beside the lifts).
