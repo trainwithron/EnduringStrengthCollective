@@ -7,6 +7,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => {} }), usePathname: () => "/groups/g1/athletes/a1" }));
 
 import { ClientProfileTabs } from "@/components/coach/desktop/client-profile-tabs";
+import { MessageClientButton } from "@/components/coach/desktop/message-client-button";
+import { OPEN_CLIENT_MESSAGES_EVENT, openClientMessages } from "@/lib/open-client-messages";
 import { CLIENT_PROFILE_TABS, LOADED_ON_OPEN, isClientProfileTab } from "@/lib/client-profile-tabs";
 import { loadDirectThread } from "@/lib/direct-thread";
 
@@ -57,15 +59,43 @@ describe("the profile page", () => {
     const head = page.slice(page.indexOf("<h1"), page.indexOf("{profileFlag && ("));
     const actions = head.slice(head.indexOf("data-profile-header-actions") - 80, head.indexOf("</div>", head.indexOf("data-profile-header-actions")));
     expect(actions).toContain('className="hidden lg:flex');
-    expect(actions).toContain("/calendar?client=${params.athleteId}");
+    // the same address every other schedule link uses
+    expect(actions).toContain("/calendar?client=${params.athleteId}&scheduleFor=${params.athleteId}");
     expect(actions).toMatch(/>\s*Schedule\s*</);
-    expect(actions).toMatch(/>\s*Message\s*</);
-    expect(actions).toContain("?tab=messages");
+    // a button, not a link: it opens the box from any tab and adds no step for Back
+    expect(actions).toContain("<MessageClientButton");
+    expect(actions).not.toContain("?tab=messages");
     expect(actions).not.toContain("/log`");
     expect(actions).not.toMatch(/>\s*Log/);
-    // Back returns where the coach came from (the Clients page, or Spotlight on a phone, when there is no step back)
+    // Back returns where the coach came from (the Clients page, or Spotlight on a phone, when there is no step back), and says just "Back"
     expect(page).toContain("<BackLink fallbackHref={backFallback}");
     expect(page).toContain("(await prefersAthleteStyleView()) ? PHONE_SPOTLIGHT : \"/clients\"");
+    expect(page).toMatch(/&larr; Back\s*<\/BackLink>/);
+    expect(page).not.toContain("Back to clients");
+  });
+  it("Message: the strip goes to Overview and the box opens, both on the one event; a fresh ?tab=messages still opens it", () => {
+    const button = renderToStaticMarkup(createElement(MessageClientButton, {}));
+    expect(button).toContain('<button type="button"');
+    expect(button).toContain(">Message</button>");
+    const target = new EventTarget();
+    let heard = 0;
+    target.addEventListener(OPEN_CLIENT_MESSAGES_EVENT, () => heard++);
+    openClientMessages(target);
+    expect(heard).toBe(1);
+    const tabs = src("./client-profile-tabs.tsx");
+    expect(tabs).toContain("window.addEventListener(OPEN_CLIENT_MESSAGES_EVENT, onOpenMessages);");
+    expect(tabs).toContain('chooseRef.current("overview")');
+    expect(tabs).not.toContain("useSearchParams");
+    const box = src("./overview-message-box.tsx");
+    expect(box).toContain("window.addEventListener(OPEN_CLIENT_MESSAGES_EVENT, onOpen);");
+    expect(box).toContain('setMode((m) => (m === "closed" ? "open" : m));');
+    expect(page).toContain('(tabParam as string | undefined) === "messages" || draftParam !== ""');
+    expect(page).toContain("initialOpen={openMessages}");
+  });
+  it("the Calendar tab's month arrows replace the entry, so Back still leaves the profile", () => {
+    const section = src("./client-calendar-section.tsx");
+    expect(section).toContain("<Link href={prevHref} replace");
+    expect(section).toContain("<Link href={nextHref} replace");
   });
   it("Nutrition opens with the nutrition panel; the Injured toggle and the food-diary import come after it", () => {
     const nutrition = page.slice(page.indexOf('<div data-tab="nutrition"'));

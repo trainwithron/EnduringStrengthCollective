@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { OPEN_CLIENT_MESSAGES_EVENT } from "@/lib/open-client-messages";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { DirectMessageThread } from "@/components/messages/direct-message-thread";
 import { loadDirectThread, type ThreadMessage } from "@/lib/direct-thread";
@@ -41,6 +42,18 @@ export function OverviewMessageBox({
   const [messages, setMessages] = useState<ThreadMessage[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const first = clientName.trim().split(/\s+/)[0] || "Client";
+  const sectionRef = useRef<HTMLElement>(null);
+
+  // The profile header's Message button (lib/open-client-messages.ts): the tab strip goes to Overview, and this box opens and comes into view.
+  useEffect(() => {
+    const onOpen = () => {
+      setMode((m) => (m === "closed" ? "open" : m));
+      // two frames: the strip shows Overview first (it was hidden on the other tab)
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => sectionRef.current?.scrollIntoView({ block: "nearest" })));
+    };
+    window.addEventListener(OPEN_CLIENT_MESSAGES_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_CLIENT_MESSAGES_EVENT, onOpen);
+  }, []);
 
   useEffect(() => {
     if (mode === "closed" || messages !== null) return;
@@ -58,7 +71,7 @@ export function OverviewMessageBox({
   }, [mode, messages, groupId, viewerId, athleteId]);
 
   return (
-    <section aria-labelledby={`overview-messages-${athleteId}`} className="border border-steel/20 p-3">
+    <section ref={sectionRef} aria-labelledby={`overview-messages-${athleteId}`} className="border border-steel/20 p-3 scroll-mt-24">
       <div className="flex items-center justify-between gap-2">
         <h2 id={`overview-messages-${athleteId}`} className="font-display uppercase text-sm tracking-wide text-steel">
           Messages

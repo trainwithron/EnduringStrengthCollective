@@ -23,6 +23,7 @@ import { ClientProgramsSection } from "@/components/coach/desktop/client-program
 import { isClientProfileTab, SELF_HIDDEN_TABS } from "@/lib/client-profile-tabs";
 import Link from "next/link";
 import { BackLink } from "@/components/coach/back-link";
+import { MessageClientButton } from "@/components/coach/desktop/message-client-button";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { PHONE_SPOTLIGHT } from "@/lib/phone-coach-routes";
 import { NoAccess } from "@/components/shared/no-access";
@@ -995,8 +996,8 @@ export default async function AthleteProfilePage(
   // The coach's own profile lives in their personal space, which is in no organization: the coach rail around it stays on the organization they have open.
   // The coach's own profile lives in their personal space, which is in no organization: the page around it is the normal coach page of the organization they have open.
   // ONE session control (clutter pass, Nov 21: Billing had Add sessions, then −/+ and an editable number under it, and the Calendar tab a third copy): the balance with − and +,
-  // and Add sessions (an amount, a note) beside it. On Overview and first on Billing & settings; both are the same control.
-  const sessionsControl = (where: "overview" | "billing") => (
+  // and Add sessions (an amount, a note) beside it. On Overview, at the top of Calendar and first on Billing & settings; all three are the same control.
+  const sessionsControl = (where: "overview" | "calendar" | "billing") => (
     <div className="flex flex-wrap items-end gap-x-6 gap-y-3" data-sessions-control={where}>
       <SessionCreditsControl key={`${where}-credits-${creditsRow?.balance ?? 0}`} athleteId={params.athleteId} groupId={params.groupId} initialBalance={creditsRow?.balance ?? 0} />
       <AssignSessionsControl
@@ -1010,7 +1011,7 @@ export default async function AthleteProfilePage(
     </div>
   );
 
-  // Where "Back to clients" goes when there is no step back to take: Spotlight (which holds the client list) on a phone, the Clients page on a computer.
+  // Where "Back" goes when there is no step back to take: Spotlight (which holds the client list) on a phone, the Clients page on a computer.
   const backFallback = (await prefersAthleteStyleView()) ? PHONE_SPOTLIGHT : "/clients";
 
   let shellGroupId = params.groupId;
@@ -1028,7 +1029,7 @@ export default async function AthleteProfilePage(
       <div className="pb-6 border-b border-steel/20 mb-6">
         {/* Back to where the coach came from (Spotlight, the calendar, the Clients page); opened straight from a link, the Clients page, or Spotlight's list on a phone. */}
         <BackLink fallbackHref={backFallback} className="inline-flex items-center min-h-11 -mt-3 font-body text-xs text-steel uppercase tracking-wide">
-          &larr; Back to clients
+          &larr; Back
         </BackLink>
         <div className="flex items-center gap-3 mt-3">
           {profile?.avatar_url ? (
@@ -1062,12 +1063,11 @@ export default async function AthleteProfilePage(
           {/* On a computer, the everyday jobs beside the name (clutter pass, Nov 21): book them, message them. Logging stays phone-only (decided Oct 24). */}
           {!selfView && (
             <div className="hidden lg:flex items-center gap-2 ml-auto" data-profile-header-actions>
-              <Link href={`/groups/${params.groupId}/calendar?client=${params.athleteId}`} className="min-h-11 px-4 inline-flex items-center border border-steel/40 text-chalk font-body text-sm">
+              <Link href={`/groups/${params.groupId}/calendar?client=${params.athleteId}&scheduleFor=${params.athleteId}`} className="min-h-11 px-4 inline-flex items-center border border-steel/40 text-chalk font-body text-sm">
                 Schedule
               </Link>
-              <Link href={`/groups/${params.groupId}/athletes/${params.athleteId}?tab=messages`} scroll={false} className="min-h-11 px-4 inline-flex items-center border border-steel/40 text-chalk font-body text-sm">
-                Message
-              </Link>
+              {/* Opens the message box on Overview from any tab, with no address change and no step for Back (lib/open-client-messages.ts). */}
+              <MessageClientButton className="min-h-11 px-4 inline-flex items-center border border-steel/40 text-chalk font-body text-sm" />
             </div>
           )}
         </div>
@@ -1109,7 +1109,7 @@ export default async function AthleteProfilePage(
         <ScrollToHash ids={[SIGN_IN_OPTIONS_ANCHOR, ADD_SESSIONS_ANCHOR, GOAL_SHEET_ANCHOR, PAYMENT_HOLD_ANCHOR]} />
         <ClientProfileTabs groupId={params.groupId} athleteId={params.athleteId} initial={initialTab} hide={selfView ? SELF_HIDDEN_TABS : []} />
         {/* Under Log their workout, Overview opens with how many sessions they have and the one control that changes it (clutter pass, Nov 21: adding a package meant a tab
-            switch). The same control is first on Billing & settings; the Calendar tab's copy is gone. */}
+            switch). The same control is at the top of Calendar and first on Billing & settings. */}
         {!selfView && (
           <div data-tab="overview" className="mb-6" data-overview-sessions>
             <p className="font-body text-sm text-chalk mb-3">{sessionsSentence}</p>
@@ -1117,6 +1117,12 @@ export default async function AthleteProfilePage(
           </div>
         )}
         <div data-tab="calendar" className="mb-8">
+          {/* Sessions can be added right here too (Ron, Oct 19: "it would be nice to be able to do it from the calendar also. That's where I'd be looking at it most likely"): the same
+              sentence as Billing and the same session control (links still point at the Billing copy). */}
+          <div className="mb-4 flex flex-col lg:flex-row lg:items-center gap-2 lg:gap-6" data-calendar-add-sessions>
+            <p className="font-body text-sm text-chalk lg:flex-1">{sessionsSentence}</p>
+            {sessionsControl("calendar")}
+          </div>
           {initialTab === "calendar" && (
             <Suspense fallback={<SectionLoading />}>
             <ClientCalendarSection
@@ -1171,8 +1177,6 @@ export default async function AthleteProfilePage(
           <div data-tab="overview" className="space-y-4">
           {!selfView && (
             <OverviewMessageBox
-              // the header's Message button (?tab=messages) opens it even when the page is already showing
-              key={openMessages ? "messages-open" : "messages"}
               groupId={params.groupId}
               viewerId={user.id}
               viewerName={(viewerProfile as { full_name?: string | null } | null)?.full_name ?? "You"}

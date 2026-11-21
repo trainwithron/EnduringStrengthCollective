@@ -12,11 +12,21 @@ import { AssignSessionsControl } from "@/components/coach/assign-sessions-contro
 const read = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
 const page = read("app/(coach)/groups/[groupId]/athletes/[athleteId]/page.tsx");
 
-// Clutter pass, Nov 21 (DK24, PH21): ONE session control (the balance with - and +, and Add sessions), on Overview under Log their workout and first on Billing & settings.
-// The Calendar tab's copy is gone.
+// Clutter pass, Nov 21 (DK24, PH21): ONE session control (the balance with - and +, and Add sessions), on Overview under Log their workout, at the top of Calendar (Ron, Oct 19)
+// and first on Billing & settings.
+describe("adding sessions from the client's calendar tab", () => {
+  it("the calendar tab shows the same sessions sentence and the same session control", () => {
+    const cal = page.slice(page.indexOf('<div data-tab="calendar" className="mb-8">'), page.indexOf("<ClientCalendarSection"));
+    expect(cal).toContain("<p className=\"font-body text-sm text-chalk lg:flex-1\">{sessionsSentence}</p>");
+    expect(cal).toContain('{sessionsControl("calendar")}');
+    expect(cal).toContain("lg:flex-row");
+    expect(cal).not.toContain('id="add-sessions"');
+  });
+});
+
 describe("adding sessions on the client's profile", () => {
   it("one control: the balance with - and + and the compact Add sessions, side by side", () => {
-    const control = page.slice(page.indexOf("const sessionsControl = ("), page.indexOf("// Where \"Back to clients\" goes"));
+    const control = page.slice(page.indexOf("const sessionsControl = ("), page.indexOf("// Where \"Back\" goes"));
     expect(control).toContain("<SessionCreditsControl");
     expect(control).toContain("<AssignSessionsControl");
     expect(control).toContain("compact");
@@ -30,12 +40,6 @@ describe("adding sessions on the client's profile", () => {
     expect(overview).toContain('data-tab="overview"');
     expect(overview).toContain("{sessionsSentence}");
     expect(overview).toContain('{sessionsControl("overview")}');
-  });
-  it("the Calendar tab no longer has its own copy", () => {
-    const cal = page.slice(page.indexOf('<div data-tab="calendar" className="mb-8">'), page.indexOf("<ClientCalendarSection"));
-    expect(cal).not.toContain("sessionsControl");
-    expect(cal).not.toContain("<AssignSessionsControl");
-    expect(page).not.toContain("data-calendar-add-sessions");
   });
   it("the Billing copy (FIX 3) is the one the links point at, and Billing is the first thing on its tab", () => {
     expect(page).toContain('<div id="add-sessions" className="scroll-mt-24 mb-4">');

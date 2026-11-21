@@ -3,11 +3,12 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { CLIENT_PROFILE_TABS, LOADED_ON_OPEN, type ClientProfileTab } from "@/lib/client-profile-tabs";
+import { OPEN_CLIENT_MESSAGES_EVENT } from "@/lib/open-client-messages";
 
 // The strip across the top of one client's profile (Ron, Oct 6: "I want my Facebook page, but if I'm on their profile I see what's about them"). It sits in the
 // normal coach layout, beside the coach's own rail, which never changes. Every tab shows its content right below the strip, on this page. Overview, Programs, Nutrition,
 // Progress, Forms & notes and Billing & settings are already loaded, so they switch instantly; Messages and Calendar are loaded when opened (the address gets ?tab=...,
-// so a link, a reload or the phone's full pages still work). The tab is remembered in the address, replacing the entry (a tab is not a step back: "Back to clients" and the
+// so a link, a reload or the phone's full pages still work). The tab is remembered in the address, replacing the entry (a tab is not a step back: the profile's "Back" and the
 // phone's back go where the coach came from). On a computer the strip wraps; on a phone it is one line that scrolls sideways.
 export function ClientProfileTabs({ groupId, athleteId, initial = "overview", hide = [] }: { groupId?: string; athleteId?: string; initial?: ClientProfileTab; hide?: ClientProfileTab[] }) {
   const router = useRouter();
@@ -47,6 +48,15 @@ export function ClientProfileTabs({ groupId, athleteId, initial = "overview", hi
       // The tab still switches; it just is not remembered in the address.
     }
   }
+
+  // The header's Message button (lib/open-client-messages.ts): go to Overview, where the message box opens. The box listens for the same event.
+  const chooseRef = useRef(choose);
+  chooseRef.current = choose;
+  useEffect(() => {
+    const onOpenMessages = () => chooseRef.current("overview");
+    window.addEventListener(OPEN_CLIENT_MESSAGES_EVENT, onOpenMessages);
+    return () => window.removeEventListener(OPEN_CLIENT_MESSAGES_EVENT, onOpenMessages);
+  }, []);
 
   // On a phone the strip is one line that scrolls sideways (clutter pass, Nov 21: seven tabs wrapped onto about three rows); the chosen tab is scrolled into view.
   const navRef = useRef<HTMLElement>(null);
