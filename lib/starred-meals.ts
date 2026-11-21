@@ -3,7 +3,8 @@ import { checkPlanAgainstPreferences, describeFlagged } from "@/lib/plan-prefere
 import type { FoodRules } from "@/lib/allergen-check";
 import type { LibraryRecipe } from "@/lib/library-scaling";
 import { scaleStarForMeal } from "@/lib/star-to-plan";
-import { choiceFromOption, optionFromScaled } from "@/lib/library-meal-plan";
+import { choiceFromOption, libraryDietFor, optionFromScaled } from "@/lib/library-meal-plan";
+import { ENABLED_TEMPLATES } from "@/lib/meal-templates";
 import { allergyKeysOf } from "@/lib/allergen-check";
 import { checkTolerance } from "@/lib/meal-templates/tolerance";
 
@@ -148,8 +149,15 @@ export function addStarredToPlan(args: { plan: MealPlanRow; bucket: MealPlanBuck
     if (diet) return { ok: false, reason: `Not added: ${args.star.name} is a whole meal with no amounts to adjust, so it can't go into ${args.clientFirst}'s ${diet} plan.` };
     if (scaled && target && checkTolerance(scaled.macros, target).misses.includes("carbs")) return { ok: false, reason: `Not added: ${args.star.name} has more carbs than ${entry.title} allows for ${args.clientFirst}.` };
   }
-  // A coach recipe tagged with one of the client's allergies when it was saved is never added (the builder's second net).
   const recipe = args.coachRecipe && args.star.meal.key === `r:${args.coachRecipe.id}` ? args.coachRecipe : null;
+  // A star scaled from its template or recipe keeps that meal's diets: an omnivore "chicken and rice" never goes into a paleo or carnivore plan (the builder filters the same way).
+  if (scaled && scaled.portion == null) {
+    const diet = libraryDietFor(args.rules.dietType, args.plan.archetype);
+    const key = args.star.meal.key ?? "";
+    const diets = key.startsWith("t:") ? ENABLED_TEMPLATES.find((r) => `t:${r.id}` === key)?.archetypes : key.startsWith("r:") ? recipe?.diets : undefined;
+    if (diets && !(diets as string[]).includes(diet)) return { ok: false, reason: `Not added: ${args.star.name} isn't made for a ${diet} diet, so it can't go into ${args.clientFirst}'s ${diet} plan.` };
+  }
+  // A coach recipe tagged with one of the client's allergies when it was saved is never added (the builder's second net).
   const allergyKeys = allergyKeysOf(args.rules.allergies) as Set<string>;
   const taggedHit = (recipe?.allergens ?? []).find((t) => allergyKeys.has(t));
   if (taggedHit) return { ok: false, reason: `Not added: ${args.star.name} is marked as containing ${taggedHit}, against ${args.clientFirst}'s food preferences.` };

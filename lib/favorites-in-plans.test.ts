@@ -12,6 +12,10 @@ import { choiceFromOption, optionFromScaled } from "@/lib/library-meal-plan";
 import type { MealPlanRow } from "@/lib/meal-plan-assignment";
 import type { LibraryRecipe } from "@/lib/library-scaling";
 import { loadCoachRecipe } from "@/lib/library-data";
+import { ENABLED_TEMPLATES } from "@/lib/meal-templates";
+import { scaleTemplate } from "@/lib/meal-templates/scale";
+import type { DietType } from "@/lib/meal-templates/types";
+import { fromTemplateMeal } from "@/lib/scaled-meal";
 
 // Ron, Nov 21 (approved): the coach's starred meals feed every new plan, first, scaled to each client; a star with no amounts goes in as whole portions; the plan marks them.
 const read = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
@@ -271,5 +275,44 @@ describe("loadCoachRecipe reads only the coach's own recipe, with its matched fo
     const f = fake({ data: null, error: { message: "boom" } });
     expect(await loadCoachRecipe(f.db as never, "rec1", "coach-1")).toBe("unreadable");
     expect(read("components/coach/nutrition/favorite-meals-list.tsx")).toContain('if (loaded === "unreadable") {');
+  });
+});
+
+describe("Add to plan keeps a scaled star's diet", () => {
+  const planFor = (t: { proteinG: number; carbsG: number; fatG: number }): MealPlanRow =>
+    ({ meals: { daily: [{ mealId: "m1", title: "Lunch", proteinTarget: Math.round(t.proteinG), carbsTarget: Math.round(t.carbsG), fatTarget: Math.round(t.fatG), recipes: [] }] }, archetype: "standard", meal_count: 3, include_snack: false, carb_cycling: false, macros: null } as unknown as MealPlanRow);
+  // a starred library meal, and the target it lands on
+  const starredTemplate = (diet: DietType, wanted: (archetypes: string[]) => boolean) => {
+    for (const recipe of ENABLED_TEMPLATES.filter((r) => r.slot === "lunch" && wanted(r.archetypes))) {
+      const scaled = scaleTemplate(recipe, lunch);
+      if (!scaled || !checkTolerance(scaled.macros, lunch).ok) continue;
+      const meal = fromTemplateMeal(scaled, recipe);
+      return { star: starFromChoice(choiceFromOption(optionFromScaled(meal)))!, target: meal.macros, diet };
+    }
+    throw new Error("no template");
+  };
+  it("an omnivore-only library meal is refused for a paleo or carnivore client", () => {
+    for (const diet of ["paleo", "carnivore"] as const) {
+      const { star, target } = starredTemplate(diet, (a) => a.includes("omnivore") && !a.includes(diet));
+      const r = addStarredToPlan({ plan: planFor(target), bucket: "daily", mealId: "m1", star, rules: { dietType: diet }, clientFirst: "Sawyer" });
+      expect(r.ok, diet).toBe(false);
+      if (!r.ok) expect(r.reason).toContain(`can't go into Sawyer's ${diet} plan`);
+    }
+  });
+  it("a library meal made for that diet still goes in", () => {
+    const { star, target } = starredTemplate("paleo", (a) => a.includes("paleo"));
+    expect(addStarredToPlan({ plan: planFor(target), bucket: "daily", mealId: "m1", star, rules: { dietType: "paleo" }, clientFirst: "Sawyer" }).ok).toBe(true);
+  });
+  it("the same for a coach recipe: its own diets decide", () => {
+    const line = (id: string, label: string, role: "protein_source" | "carb_source" | "fat_source", p: number, c: number, f: number, gramsRef: number) => ({ id, label, role, proteinPer100g: p, carbsPer100g: c, fatPer100g: f, fixedDisplayText: null, usdaFdcId: null, gramsRef });
+    const bowl: LibraryRecipe = { id: "rec9", name: "Chicken and rice", slot: "lunch", diets: ["omnivore"], keywords: [], lines: [line("l1", "Chicken breast", "protein_source", 31, 0, 3.6, 100), line("l2", "White rice", "carb_source", 2.8, 28, 0.3, 150), line("l3", "Olive oil", "fat_source", 0, 0, 100, 10)], mainProtein: "chicken", source: "coach" };
+    const star: StarredMeal = { key: "meal:chicken and rice", name: "Chicken and rice", calories: 400, proteinG: 35, carbsG: 42, fatG: 14, meal: { recipeId: "rec9", recipeName: "Chicken and rice", ingredients: ["Chicken breast", "White rice", "Olive oil"], key: "r:rec9", macros: { proteinG: 35, carbsG: 42, fatG: 14, calories: 434 } } };
+    const plan = planFor({ proteinG: 35, carbsG: 42, fatG: 14 });
+    const refused = addStarredToPlan({ plan, bucket: "daily", mealId: "m1", star, rules: { dietType: "paleo" }, clientFirst: "Sawyer", coachRecipe: bowl });
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) expect(refused.reason).toContain("can't go into Sawyer's paleo plan");
+    expect(addStarredToPlan({ plan, bucket: "daily", mealId: "m1", star, rules: { dietType: "paleo" }, clientFirst: "Sawyer", coachRecipe: { ...bowl, diets: ["omnivore", "paleo"] } }).ok).toBe(true);
+    // an omnivore client is unchanged
+    expect(addStarredToPlan({ plan, bucket: "daily", mealId: "m1", star, rules: {}, clientFirst: "Sawyer", coachRecipe: bowl }).ok).toBe(true);
   });
 });
