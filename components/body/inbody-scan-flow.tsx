@@ -8,6 +8,10 @@ import { EMPTY_SCAN, FIELD_LABELS, numberFromField, sanityChecks, valuesForSave,
 export type InbodyStep = "pick" | "reading" | "review" | "saving";
 type Step = InbodyStep;
 
+// A reading that never answers must not leave the person waiting (Nov 21): after this long it stops, and the same screen opens blank to type the numbers in, with the photo kept.
+export const READ_TIMEOUT_MS = 60_000;
+export const READ_TOO_LONG = "Reading took too long. Type the numbers in from the photo, or Cancel and try again.";
+
 const field = "h-11 w-full bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm";
 
 function todayKey(): string {
@@ -57,6 +61,9 @@ export function InbodyScanFlow({
   const [segments, setSegments] = useState<ScanValues["segments"]>(null);
   const [useAsWeighIn, setUseAsWeighIn] = useState(!coachAdding);
   const [existingWeighIn, setExistingWeighIn] = useState<number | null>(null);
+  // The reading in flight: stopped when the flow closes (a pop-up closed while it reads), or when it takes too long.
+  const readAbort = useRef<AbortController | null>(null);
+  useEffect(() => () => readAbort.current?.abort(), []);
 
   useEffect(() => {
     return () => {
@@ -118,22 +125,35 @@ export function InbodyScanFlow({
     }
     setPhoto(resized);
     setPhotoUrl(URL.createObjectURL(resized.blob));
+    const controller = new AbortController();
+    readAbort.current = controller;
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, READ_TIMEOUT_MS);
     try {
       const res = await fetch("/api/ai/parse-inbody-scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ imageBase64: resized.base64, mediaType: resized.mediaType }),
+        signal: controller.signal,
       });
       const data = await res.json().catch(() => ({}));
+      if (controller.signal.aborted && !timedOut) return; // closed while it read: nothing more to show
       if (res.ok && data.values) {
         fill(data.values as ScanValues);
       } else {
         fill(EMPTY_SCAN);
-        setNotice((data.error as string | undefined) ?? "Couldn't read that sheet. You can type the numbers in and keep the photo.");
+        setNotice(timedOut ? READ_TOO_LONG : (data.error as string | undefined) ?? "Couldn't read that sheet. You can type the numbers in and keep the photo.");
       }
     } catch {
+      if (controller.signal.aborted && !timedOut) return;
       fill(EMPTY_SCAN);
-      setNotice("Couldn't read that sheet. You can type the numbers in and keep the photo.");
+      setNotice(timedOut ? READ_TOO_LONG : "Couldn't read that sheet. You can type the numbers in and keep the photo.");
+    } finally {
+      clearTimeout(timer);
+      if (readAbort.current === controller) readAbort.current = null;
     }
     setStep("review");
   }

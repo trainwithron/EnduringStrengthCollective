@@ -8,7 +8,15 @@ import { confirmDialog } from "@/components/shared/confirm-dialog";
 
 // The pop-up the three tiles on a client's Home open (Ron, Nov 21: a tile must OPEN its thing, not scroll the page). A sheet from the bottom on a phone, a centred box on a wider screen.
 // Focus moves into it and stays there, Escape or the close button closes it, and focus goes back to the tile that opened it (`returnFocusTo`, a selector: a tap on a phone does not always focus the tile).
-// `guard` says what closing does while there is work in it: "close", "ask" (Discard what you have here?) or "block" (something is saving).
+// `guard` says what closing does while there is work in it: "close", "ask" (the question in `ask`, or "Discard what you have here?") or "block". Escape, the close button and a
+// tap outside all go the same way.
+export interface SheetAsk {
+  message: string;
+  confirmLabel: string;
+  cancelLabel: string;
+}
+const DISCARD: SheetAsk = { message: "Discard what you have here?", confirmLabel: "Discard", cancelLabel: "Keep working" };
+
 export function HomeSheet({
   open,
   title,
@@ -16,6 +24,7 @@ export function HomeSheet({
   wide = false,
   onClose,
   guard,
+  ask = DISCARD,
   returnFocusTo,
   children,
 }: {
@@ -26,10 +35,31 @@ export function HomeSheet({
   wide?: boolean;
   onClose: () => void;
   guard?: () => EscapeAction;
+  ask?: SheetAsk;
   returnFocusTo?: string;
   children: React.ReactNode;
 }) {
-  const ref = useDialogA11y<HTMLDivElement>(open, onClose, undefined, { guard });
+  function requestClose() {
+    const action = guard?.() ?? "close";
+    if (action === "block") return;
+    if (action === "ask") {
+      void confirmDialog({ message: ask.message, confirmLabel: ask.confirmLabel, cancelLabel: ask.cancelLabel, destructive: true }).then((yes) => {
+        if (yes) onClose();
+      });
+      return;
+    }
+    onClose();
+  }
+
+  // Escape asks this sheet's own question (with its own buttons), so the dialog helper is told "block" and the question is asked here.
+  const ref = useDialogA11y<HTMLDivElement>(open, onClose, undefined, {
+    guard: () => {
+      const action = guard?.() ?? "close";
+      if (action !== "ask") return action;
+      requestClose();
+      return "block";
+    },
+  });
 
   useEffect(() => {
     if (!open || !returnFocusTo) return;
@@ -37,18 +67,6 @@ export function HomeSheet({
   }, [open, returnFocusTo]);
 
   if (!open) return null;
-
-  function requestClose() {
-    const action = guard?.() ?? "close";
-    if (action === "block") return;
-    if (action === "ask") {
-      void confirmDialog({ message: "Discard what you have here?", confirmLabel: "Discard", cancelLabel: "Keep working", destructive: true }).then((yes) => {
-        if (yes) onClose();
-      });
-      return;
-    }
-    onClose();
-  }
 
   const sheet = (
     <div

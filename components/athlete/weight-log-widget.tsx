@@ -62,6 +62,8 @@ export function WeightLogWidget({
   const [sheetOpen, setSheetOpen] = useState(initialSheetOpen);
   const [sheetWeight, setSheetWeight] = useState("");
   const [sheetSaved, setSheetSaved] = useState<string | null>(null);
+  // Its own problem line: one left in the pop-up never turns up in the form below, nor the other way round.
+  const [sheetError, setSheetError] = useState<string | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -72,7 +74,7 @@ export function WeightLogWidget({
       flushSync(() => {
         setSheetWeight("");
         setSheetSaved(null);
-        setError(null);
+        setSheetError(null);
         setSheetOpen(true);
       });
     };
@@ -139,16 +141,12 @@ export function WeightLogWidget({
   }
 
   // The one weight save, for the form below and the tile's pop-up: what was typed, in the client's unit, read once as pounds (what is stored). A converted number is never saved twice.
-  // Returns the pounds saved, or null (the problem is in `error`).
-  async function saveWeight(typed: string): Promise<number | null> {
+  // Returns the pounds saved, or the problem in words for whichever of the two asked (each shows its own).
+  async function saveWeight(typed: string): Promise<{ weight: number } | { problem: string }> {
     const value = parseWeightInput(typed, weightUnit);
-    if (value == null) {
-      setError("That doesn't look like a body weight. Check the number.");
-      return null;
-    }
+    if (value == null) return { problem: "That doesn't look like a body weight. Check the number." };
 
     setSubmitting(true);
-    setError(null);
     const supabase = createBrowserClient();
     const date = todayIso();
 
@@ -162,9 +160,8 @@ export function WeightLogWidget({
       .single();
 
     if (upsertError || !data) {
-      setError(upsertError?.message ?? "Couldn't save weight.");
       setSubmitting(false);
-      return null;
+      return { problem: upsertError?.message ?? "Couldn't save weight." };
     }
 
     setLogs((prev) => [
@@ -172,14 +169,19 @@ export function WeightLogWidget({
       ...prev.filter((l) => l.loggedDate !== date),
     ]);
     setSubmitting(false);
-    return data.weight;
+    return { weight: data.weight };
   }
 
   async function handleSheetSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (submitting) return;
-    const saved = await saveWeight(sheetWeight);
-    if (saved == null) return;
+    setSheetError(null);
+    const result = await saveWeight(sheetWeight);
+    if ("problem" in result) {
+      setSheetError(result.problem);
+      return;
+    }
+    const saved = result.weight;
     setSheetSaved(savedWeightLine(saved, weightUnit));
     // A milestone just reached stays on the screen until they choose; otherwise the pop-up closes on its own.
     const milestone = await checkTransformationMilestone(saved);
@@ -238,9 +240,9 @@ export function WeightLogWidget({
             onChange={(e) => setSheetWeight(e.target.value)}
             className="mt-2 w-full h-14 rounded-row bg-surface-2 border border-steel/30 text-chalk px-4 font-display text-2xl tabular-nums focus:outline-none focus:border-rust"
           />
-          {error && (
+          {sheetError && (
             <p className="font-body text-xs text-rust-ink mt-2" role="alert">
-              {error}
+              {sheetError}
             </p>
           )}
           <div className="mt-4 grid grid-cols-2 gap-2.5">
@@ -279,11 +281,15 @@ export function WeightLogWidget({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const saved = await saveWeight(weight);
-    if (saved == null) return;
+    setError(null);
+    const result = await saveWeight(weight);
+    if ("problem" in result) {
+      setError(result.problem);
+      return;
+    }
     setWeight("");
     setExpanded(false);
-    await checkTransformationMilestone(saved);
+    await checkTransformationMilestone(result.weight);
   }
 
   return (
@@ -320,7 +326,7 @@ export function WeightLogWidget({
         </button>
       </form>
 
-      {error && !sheetOpen && (
+      {error && (
         <p className="font-body text-xs text-rust-ink mt-2" role="alert">
           {error}
         </p>
