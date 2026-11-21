@@ -22,7 +22,7 @@ async function handler(request: Request) {
   const now = Date.now();
   // The same sessions the "Did this session happen?" cards list (components/coach/session-check-section.tsx): confirmed, still unsettled, not attended, not a no-show, over.
   // Every page of them (the database answers at most 1000 rows a request); a failed page means no line at all rather than a short count.
-  const { rows, failed } = await pageAll(
+  const read = await pageAll(
     (from, to) =>
       db
         .from("bookings")
@@ -37,7 +37,9 @@ async function handler(request: Request) {
         .range(from, to),
     { maxPages: 50 }
   );
-  if (failed) return NextResponse.json({ error: "Could not read the sessions." }, { status: 500 });
+  const { rows, failed, truncated } = read;
+  // More than the pages read (a cut-off list) counts the same as a failed read: no short counts.
+  if (failed || truncated) return NextResponse.json({ error: failed ? "Could not read the sessions." : "Too many sessions to count in one run." }, { status: 500 });
   const counts = countByCoach(rows as { coach_id: string }[]);
   if (counts.size === 0) return NextResponse.json({ coaches: 0, pushed: 0, emailed: 0 });
 
@@ -58,7 +60,15 @@ async function handler(request: Request) {
     for (const n of (nudges ?? []) as { coach_id: string }[]) recent.add(n.coach_id);
   }
 
-  const markNudged = (coachId: string) => db.from("coach_nudges").upsert({ coach_id: coachId, kind: NUDGE_KIND, sent_at: new Date().toISOString() }, { onConflict: "coach_id,kind" });
+  // A record that did not save is logged (the run's own log keeps it); the line was still delivered, so it is counted.
+  let recordFailures = 0;
+  const markNudged = async (coachId: string) => {
+    const { error } = await db.from("coach_nudges").upsert({ coach_id: coachId, kind: NUDGE_KIND, sent_at: new Date().toISOString() }, { onConflict: "coach_id,kind" });
+    if (error) {
+      recordFailures += 1;
+      console.error(`sessions-to-mark: could not record the nudge for a coach: ${error.message}`);
+    }
+  };
 
   let pushed = 0;
   let emailed = 0;
@@ -82,7 +92,7 @@ async function handler(request: Request) {
       await markNudged(coachId);
     }
   }
-  return NextResponse.json({ coaches: counts.size, pushed, emailed, skipped });
+  return NextResponse.json({ coaches: counts.size, pushed, emailed, skipped, recordFailures });
 }
 
 export const GET = withCronRun("sessions-to-mark", handler);

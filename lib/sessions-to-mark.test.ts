@@ -21,10 +21,14 @@ describe("the job", () => {
     expect(route).toContain('.eq("no_show", false)');
     expect(route).toContain('.lt("end_at", new Date(now - TO_MARK_AFTER_HOURS * 3600000).toISOString())');
   });
-  it("reads every page of them (the database answers 1000 rows a request), and a failed page sends nothing", () => {
+  it("reads every page of them (the database answers 1000 rows a request); a failed page or a cut-off list sends nothing", () => {
     expect(route).toContain("await pageAll(");
     expect(route).toMatch(/\.order\("id"\)\s*\.range\(from, to\)/);
-    expect(route).toContain('if (failed) return NextResponse.json({ error: "Could not read the sessions." }, { status: 500 });');
+    expect(route).toContain("if (failed || truncated) return NextResponse.json(");
+  });
+  it("a nudge record that did not save is logged and counted in the run's result", () => {
+    expect(route).toMatch(/const \{ error \} = await db\.from\("coach_nudges"\)\.upsert\([\s\S]*?\);\s*if \(error\) \{\s*recordFailures \+= 1;\s*console\.error\(/);
+    expect(route).toContain("recordFailures });");
   });
   it("nothing about a session is marked, charged or changed: the only write is the record that a coach was reached", () => {
     expect(route).not.toMatch(/\.(update|insert|delete)\(/);
