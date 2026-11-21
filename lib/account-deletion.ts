@@ -47,6 +47,9 @@ export const STORAGE_FILES: { bucket: string; table: string; column: string; own
   { bucket: "post-media", table: "posts", column: "media_url", owner: "author_id" },
   { bucket: "post-media", table: "challenge_participants", column: "before_photo_url", owner: "profile_id" },
   { bucket: "post-media", table: "challenge_participants", column: "after_photo_url", owner: "profile_id" },
+  // Voice notes (R7, migration 0464): the ones they sent, and the ones sent to them (the conversation goes with the account, so its sound goes too).
+  { bucket: "voice-notes", table: "direct_messages", column: "voice_path", owner: "sender_id" },
+  { bucket: "voice-notes", table: "direct_messages", column: "voice_path", owner: "recipient_id" },
 ];
 
 // A stored value is a plain path, or (feed posts, challenge photos) a signed link that has the path inside it.
@@ -72,6 +75,9 @@ export function pathBelongsToPerson(bucket: string, path: string, userId: string
   if (bucket === "coach-video-checkins") return parts[1] === userId;
   if (bucket === "client-assessments") return parts[1] === userId;
   if (bucket === "inbody-scans") return parts[1] === userId; // group / person / file
+  // A voice note's path is fixed by the database: always in its sender's folder, named by exactly one message, never changed. A path read from a message this person sent or
+  // received is that message's own recording, and the message goes with the account.
+  if (bucket === "voice-notes") return parts.length === 3;
   return true;
 }
 
@@ -128,6 +134,8 @@ export async function eraseAccount(db: any, userId: string, opts: { eraseHistory
   const files = new Map<string, Set<string>>();
   for (const f of STORAGE_FILES) {
     const { data, error } = await db.from(f.table).select(f.column).eq(f.owner, userId);
+    // a column a database update has not added yet (voice notes before 0464): there are no such files
+    if (error && error.code === "42703") continue;
     if (error) return fail("Couldn't list their photos and videos", error.message);
     for (const row of data ?? []) {
       const path = storagePathOf((row as Record<string, string | null>)[f.column], f.bucket);

@@ -1,6 +1,8 @@
 // The help center: short answers to the questions a coach or a client actually asks, written in plain words. Eleven articles (Oct 27: the 21 short ones were folded into these, every sentence
 // checked against the live app; docs/help-rewrite-draft-oct27.md), each in headed sections. Nothing here promises a feature the app does not have, and nothing states a price, a deadline or a
 // legal term (those live in the Terms, Privacy and Refunds pages, which the articles point to rather than repeat). Button names are written exactly as they appear on screen.
+import { DISPUTE_HELP, FAILED_CARD_HELP, PAUSE_CLIENT_HELP } from "@/lib/billing-help";
+
 export type HelpAudience = "coach" | "client";
 
 export interface HelpBullet {
@@ -388,6 +390,18 @@ export const HELP_ARTICLES: HelpArticle[] = [
         body: [
           "A failed payment, a refund or a disputed charge is written down and you get a notice, once. Business lists the last 90 days. Nothing changes by itself: a refund doesn't take sessions back, and a failed payment doesn't end access. You decide, and you can adjust sessions by hand. Receipts come from Stripe's own emails.",
         ],
+      },
+      {
+        heading: "A failed card payment",
+        body: [FAILED_CARD_HELP],
+      },
+      {
+        heading: "A disputed payment",
+        body: [DISPUTE_HELP],
+      },
+      {
+        heading: "Pausing a client",
+        body: [...PAUSE_CLIENT_HELP],
       },
       {
         heading: "Support",

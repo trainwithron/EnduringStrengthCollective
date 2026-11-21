@@ -1,12 +1,17 @@
-// The person's own photo and video files in "Download my data" (Ron, Nov 20, S5): the export listed the photo and InBody rows but not the pictures themselves. Each file is given as a
+// The person's own photo, video and voice note files in "Download my data" (Ron, Nov 20, S5): the export listed the photo and InBody rows but not the pictures themselves. Each file is given as a
 // download link that works for 7 days, made under the person's own sign-in (storage's own rules decide what they may read; a file they can't read is left out and counted).
 export const EXPORT_FILE_LINK_SECONDS = 7 * 24 * 3600;
 
-const SOURCES = [
-  { kind: "progress_photo", bucket: "progress-photos", table: "progress_photos", column: "storage_path" },
-  { kind: "inbody_scan_photo", bucket: "inbody-scans", table: "body_scans", column: "photo_path" },
-  { kind: "form_check_video", bucket: "athlete-exercise-videos", table: "session_exercise_videos", column: "video_path" },
+// owner: the column that names the person (the voice notes they sent: R7, Ron Nov 20).
+export const SOURCES = [
+  { kind: "progress_photo", bucket: "progress-photos", table: "progress_photos", column: "storage_path", owner: "athlete_id" },
+  { kind: "inbody_scan_photo", bucket: "inbody-scans", table: "body_scans", column: "photo_path", owner: "athlete_id" },
+  { kind: "form_check_video", bucket: "athlete-exercise-videos", table: "session_exercise_videos", column: "video_path", owner: "athlete_id" },
+  { kind: "voice_note", bucket: "voice-notes", table: "direct_messages", column: "voice_path", owner: "sender_id" },
 ] as const;
+
+// A column a database update has not added yet (the voice notes before migration 0464): nothing of that kind exists, so nothing is missing.
+const NOT_THERE_YET = "42703";
 
 export interface ExportFile {
   kind: (typeof SOURCES)[number]["kind"];
@@ -23,7 +28,8 @@ export async function collectExportFiles(supabase: Client, userId: string): Prom
   const files: ExportFile[] = [];
   let notIncluded = 0;
   for (const s of SOURCES) {
-    const { data, error } = await supabase.from(s.table).select(s.column).eq("athlete_id", userId).not(s.column, "is", null).limit(2000);
+    const { data, error } = await supabase.from(s.table).select(s.column).eq(s.owner, userId).not(s.column, "is", null).limit(2000);
+    if (error && (error as { code?: string }).code === NOT_THERE_YET) continue;
     // a list that could not be read is counted as not included (the note then says to download again)
     if (error) {
       notIncluded++;

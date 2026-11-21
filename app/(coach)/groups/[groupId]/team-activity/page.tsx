@@ -8,6 +8,7 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { activityPeriod, loadCoachActivity } from "@/lib/coach-activity";
 import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { CoachActivityTable } from "@/components/org/coach-activity-table";
+import { SavedPayPeriods } from "@/components/org/saved-pay-periods";
 
 export const metadata = { title: "Team activity" };
 
@@ -62,6 +63,7 @@ export default async function TeamActivityPage(props: { params: Promise<{ groupI
         </p>
       )}
       <CoachActivityTable groupId={params.groupId} fromDay={period.fromDay} toDay={period.toDay} timeZone={period.timeZone} rows={activity.rows} creditsSold={activity.creditsSold} />
+      <SavedPayPeriods orgId={group!.organization_id as string} timeZone={timeZone} />
     </CoachDesktopShell>
   );
 }

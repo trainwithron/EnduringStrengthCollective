@@ -55,6 +55,7 @@ import { GoalWaitingOnClient } from "@/components/coach/goal-waiting-on-client";
 import { GoalProposalForm } from "@/components/athlete/goal-proposal-form";
 import { findHelpAnswer } from "@/lib/help-answer";
 import { PackageAssignmentControl } from "@/components/coach/package-assignment-control";
+import { ClientBillingFacts } from "@/components/coach/client-billing-facts";
 import { PrivateFromOrgToggle } from "@/components/coach/private-from-org-toggle";
 import { ClientTagAssignmentControl } from "@/components/coach/client-tag-assignment-control";
 import { DeleteClientControl } from "@/components/coach/delete-client-control";
@@ -1614,6 +1615,8 @@ export default async function AthleteProfilePage(
           <section className="space-y-4">
             <div data-tab="settings">
             <SettingsGroup label="Billing">
+              {/* A failed card payment, how to pause them today, and their card payments with Evidence for a dispute (Ron, Nov 20). */}
+              {!selfView && <ClientBillingFacts groupId={params.groupId} athleteId={params.athleteId} timeZone={displayZone} />}
               <p className="font-body text-sm text-chalk mb-3">{sessionsSentence}</p>
               {/* Add sessions sits right under the sentence (FIX 3): every "out of sessions" and "running low" link lands here (lib/add-sessions-link.ts). */}
               <div id="add-sessions" className="scroll-mt-24 mb-4">

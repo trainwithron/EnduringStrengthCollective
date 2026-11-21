@@ -18,6 +18,7 @@ import { WellnessCheckinPopup } from "@/components/athlete/wellness-checkin-popu
 import { shouldShowLifeImpactPrompt, pickLifeImpactPrompt } from "@/lib/life-impact-prompt";
 import type { WellnessCheckinValues } from "@/components/athlete/wellness-checkin-widget";
 import { DayCard } from "@/components/athlete/day-card";
+import { PaymentFailedNotice } from "@/components/athlete/payment-failed-notice";
 import { MyProgramsBlock } from "@/components/athlete/my-programs-block";
 import { homeProgramCards, programPickups } from "@/lib/home-programs";
 import { loadDoneAt, weekOf } from "@/lib/program-pickup";
@@ -957,6 +958,8 @@ export default async function GroupHubPage(
                   <span className="block font-body text-sm text-steel">You left one open. Pick up where you stopped.</span>
                 </Link>
               )}
+              {/* A monthly card payment that failed while Stripe is still trying it: a friendly line and Update my card. It only informs. */}
+              {isToday && !isCoach && !isActingAsOther && athleteId === user?.id && <PaymentFailedNotice groupId={params.groupId} athleteId={athleteId} />}
               <DayCard
                 groupId={params.groupId}
                 athleteId={athleteId}

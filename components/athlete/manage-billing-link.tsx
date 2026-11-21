@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 
-export function ManageBillingLink({ groupId }: { groupId: string }) {
+// label/className: the failed-payment note on Home uses the same portal as a button that says what it is for ("Update my card").
+export function ManageBillingLink({ groupId, label = "Manage billing", className = "min-h-11 font-body text-sm text-rust-ink disabled:opacity-40" }: { groupId: string; label?: string; className?: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,9 +28,9 @@ export function ManageBillingLink({ groupId }: { groupId: string }) {
         type="button"
         onClick={handleClick}
         disabled={loading}
-        className="min-h-11 font-body text-sm text-rust-ink disabled:opacity-40"
+        className={className}
       >
-        {loading ? "Opening…" : "Manage billing"}
+        {loading ? "Opening…" : label}
       </button>
       {error && (
         <p className="font-body text-xs text-rust-ink mt-1" role="alert">
