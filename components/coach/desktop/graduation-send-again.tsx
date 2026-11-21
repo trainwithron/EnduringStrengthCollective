@@ -47,7 +47,7 @@ export function GraduationSendAgain({ groupId }: { groupId: string }) {
       {problems.length > 0 && (
         <ul className="mt-2 space-y-1">
           {problems.map((p) => (
-            <li key={p.name + p.why} className="font-body text-xs text-rust">
+            <li key={p.name + p.why} className="font-body text-xs text-rust-ink">
               {p.name}: {p.why}.
             </li>
           ))}
@@ -60,7 +60,7 @@ export function GraduationSendAgain({ groupId }: { groupId: string }) {
             {uncertain.map((u) => (
               <li key={u.id} className="flex items-center gap-3 font-body text-sm">
                 <span className="flex-1 truncate">{u.name}</span>
-                <button type="button" onClick={() => call(u.id)} disabled={busy} className="text-xs text-rust underline disabled:opacity-40">
+                <button type="button" onClick={() => call(u.id)} disabled={busy} className="text-xs text-rust-ink underline disabled:opacity-40">
                   Send anyway
                 </button>
               </li>

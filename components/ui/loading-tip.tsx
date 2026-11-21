@@ -9,7 +9,7 @@ export function LoadingTip() {
   const tip = pickLoadingTip();
   return (
     <p className="font-body text-xs text-steel leading-relaxed px-1">
-      <span className="text-rust">💡</span> {tip.text}
+      <span className="text-rust-ink">💡</span> {tip.text}
     </p>
   );
 }

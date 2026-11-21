@@ -66,7 +66,7 @@ export function MicButton({
       onClick={toggle}
       aria-label={listening ? stopLabel ?? "Stop listening" : startLabel ?? label}
       aria-pressed={listening}
-      className={`min-h-11 min-w-11 px-2 border font-body text-xs ${listening ? "border-rust text-rust animate-pulse" : "border-steel/30 text-steel"}`}
+      className={`min-h-11 min-w-11 px-2 border font-body text-xs ${listening ? "border-rust text-rust-ink animate-pulse" : "border-steel/30 text-steel"}`}
     >
       {listening ? "Listening…" : "Mic"}
     </button>

@@ -1017,7 +1017,7 @@ export default async function GroupHubPage(
                 <section aria-label="Group sessions this week">
                   <h2 className="font-body text-[13px] font-semibold text-steel mb-2">Group sessions this week</h2>
                   <ClassesList classes={weekClasses.classes} balance={weekClasses.balance} timezone={timezone} nowIso={weekClasses.nowIso} />
-                  <Link href={`/groups/${params.groupId}/classes`} className="inline-block mt-2 font-body text-xs text-rust min-h-11 leading-[44px]">
+                  <Link href={`/groups/${params.groupId}/classes`} className="inline-block mt-2 font-body text-xs text-rust-ink min-h-11 leading-[44px]">
                     See all group sessions
                   </Link>
                 </section>

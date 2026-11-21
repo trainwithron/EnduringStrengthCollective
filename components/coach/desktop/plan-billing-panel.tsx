@@ -132,7 +132,7 @@ export function PlanBillingPanel({
           </div>
         </div>
         {quote.overCap ? (
-          <p className="font-body text-xs text-rust mt-3">
+          <p className="font-body text-xs text-rust-ink mt-3">
             You&apos;re past {MAX_AUTO_CLIENTS} clients. Plans this size are set up individually —
             you won&apos;t be charged beyond the {MAX_AUTO_CLIENTS}-client price, and we&apos;ll be in
             touch.

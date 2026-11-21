@@ -300,7 +300,7 @@ export function InviteJoinFlow({
           </p>
         )}
         {error && (
-          <p className="font-body text-sm text-rust mt-3" role="alert">
+          <p className="font-body text-sm text-rust-ink mt-3" role="alert">
             {error}
           </p>
         )}
@@ -324,7 +324,7 @@ export function InviteJoinFlow({
               setMode("signup");
               setPhase("guest");
             }}
-            className="font-body text-sm text-rust underline"
+            className="font-body text-sm text-rust-ink underline"
           >
             Wrong address? Use a different email
           </button>
@@ -353,7 +353,7 @@ export function InviteJoinFlow({
           Signed in as <span className="text-chalk">{authedEmail}</span>.
         </p>
         {error && (
-          <p className="font-body text-sm text-rust mt-3" role="alert">
+          <p className="font-body text-sm text-rust-ink mt-3" role="alert">
             {error}
           </p>
         )}
@@ -470,7 +470,7 @@ export function InviteJoinFlow({
         {mode === "signup" && <LegalAcceptance checked={legalAccepted} onChange={setLegalAccepted} />}
 
         {error && (
-          <p className="font-body text-sm text-rust" role="alert">
+          <p className="font-body text-sm text-rust-ink" role="alert">
             {error}
           </p>
         )}

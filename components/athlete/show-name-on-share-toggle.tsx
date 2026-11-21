@@ -29,7 +29,7 @@ export function ShowNameOnShareToggle({ profileId, initialOn }: { profileId: str
           <span className="block font-body text-sm text-chalk">Show my first name on shared workout pictures</span>
           <span className="block font-body text-xs text-steel mt-0.5">When this is off, the picture you share has no name on it.</span>
           {notSaved && (
-            <span className="block font-body text-xs text-rust mt-0.5" role="alert">
+            <span className="block font-body text-xs text-rust-ink mt-0.5" role="alert">
               {"Couldn't save that. Check your connection and try again."}
             </span>
           )}

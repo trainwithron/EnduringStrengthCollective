@@ -5,7 +5,7 @@ import { foodDayHref, foodDaySwitcher } from "@/lib/food-day";
 // Up to a week back and a week ahead; past that edge the arrow is not shown. The middle is the day shown; when it is not today, tapping it goes back to today.
 export function FoodDaySwitcher({ groupId, shownKey, todayKey }: { groupId: string; shownKey: string; todayKey: string }) {
   const s = foodDaySwitcher(shownKey, todayKey);
-  const link = "min-h-[44px] px-2 inline-flex items-center font-body text-sm text-steel active:text-rust";
+  const link = "min-h-[44px] px-2 inline-flex items-center font-body text-sm text-steel active:text-rust-ink";
   return (
     <nav aria-label="Day" className="flex items-center justify-between gap-2 mb-2" data-testid="food-day-switcher">
       {s.prev ? (

@@ -60,7 +60,7 @@ describe("the thumbnail", () => {
   it("names the exercise the video belongs to under the picture when it is stored under another name", () => {
     const html = renderToStaticMarkup(createElement(BuilderDemoThumb, { exerciseName: "Bulgarian Split Squat", demo: builderDemoFor(LIBRARY, "Bulgarian Split Squat") }));
     expect(html).toContain("Demo: Rear Foot Elevated Split Squat");
-    expect(html).toContain("text-rust");
+    expect(html).toContain("text-rust-ink");
   });
   it("shows just 'Demo' under the picture when it is the exercise's own video, and no caption in the collapsed card", () => {
     const own = renderToStaticMarkup(createElement(BuilderDemoThumb, { exerciseName: "Barbell Row", demo: builderDemoFor(LIBRARY, "Barbell Row") }));

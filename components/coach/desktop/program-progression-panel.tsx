@@ -139,7 +139,7 @@ export function ProgramProgressionPanel({
             </>
           )}
           <div className="flex flex-wrap items-center gap-4">
-            <button type="button" onClick={() => void save()} disabled={busy || (choice === "double" && !!problem)} className="min-h-11 px-5 border border-rust text-rust font-display font-bold uppercase tracking-wide disabled:opacity-40">
+            <button type="button" onClick={() => void save()} disabled={busy || (choice === "double" && !!problem)} className="min-h-11 px-5 border border-rust text-rust-ink font-display font-bold uppercase tracking-wide disabled:opacity-40">
               {busy ? "Saving…" : choice === "double" ? `Apply to all ${names.length} exercise${names.length === 1 ? "" : "s"}` : "Save"}
             </button>
             <Link href={`/groups/${groupId}/programs/${programId}/progressions`} className="font-body text-xs text-steel underline underline-offset-2">
@@ -152,7 +152,7 @@ export function ProgramProgressionPanel({
             </p>
           )}
           {error && (
-            <p className="font-body text-sm text-rust" role="alert">
+            <p className="font-body text-sm text-rust-ink" role="alert">
               {error}
             </p>
           )}

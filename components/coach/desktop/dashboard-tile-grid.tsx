@@ -114,7 +114,7 @@ export function DashboardTileGrid({
                     <button
                       type="button"
                       onClick={() => hideTile(key)}
-                      className="w-6 h-6 flex items-center justify-center text-rust"
+                      className="w-6 h-6 flex items-center justify-center text-rust-ink"
                       aria-label={`Hide ${tile.label}`}
                     >
                       <X className="w-3.5 h-3.5" />
@@ -140,7 +140,7 @@ export function DashboardTileGrid({
                   key={key}
                   type="button"
                   onClick={() => unhideTile(key)}
-                  className="font-body text-xs text-steel border border-steel/30 px-2 py-1 active:border-rust active:text-rust"
+                  className="font-body text-xs text-steel border border-steel/30 px-2 py-1 active:border-rust active:text-rust-ink"
                 >
                   + {tile.label}
                 </button>

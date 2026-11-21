@@ -50,7 +50,7 @@ export function OneScreenCard({
               <p className="font-body text-steel text-[clamp(10px,1.5dvh,12px)] mt-0.5">{mascot.archetype.caption}</p>
             </div>
           )}
-          <p className="font-display uppercase text-[clamp(10px,1.6dvh,12px)] tracking-[0.2em] text-rust truncate">
+          <p className="font-display uppercase text-[clamp(10px,1.6dvh,12px)] tracking-[0.2em] text-rust-ink truncate">
             {model.brand}
           </p>
           <h1 className="font-display font-bold uppercase leading-none mt-[clamp(6px,1.4dvh,12px)] text-[clamp(34px,min(7.5dvh,11.5vw),68px)] drop-shadow-[0_2px_6px_rgba(0,0,0,.6)]">
@@ -91,7 +91,7 @@ export function OneScreenCard({
         )}
 
         {model.chip && (
-          <p className="font-display text-rust text-[clamp(11px,1.8dvh,14px)] tracking-[0.18em] [@media(max-height:620px)]:hidden">
+          <p className="font-display text-rust-ink text-[clamp(11px,1.8dvh,14px)] tracking-[0.18em] [@media(max-height:620px)]:hidden">
             {model.chip}
           </p>
         )}

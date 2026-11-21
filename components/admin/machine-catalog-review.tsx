@@ -86,7 +86,7 @@ function ReviewCard({ request: r, outcome, onDone }: { request: ReviewRequest; o
           <iframe src={r.youtubeEmbed} title={r.exercise ?? "Demo"} allow="encrypted-media; picture-in-picture" allowFullScreen className="w-full h-full" />
         </div>
       ) : r.kind === "demo" ? (
-        <p className="font-body text-xs text-rust">The video can&apos;t be played here.</p>
+        <p className="font-body text-xs text-rust-ink">The video can&apos;t be played here.</p>
       ) : null}
       {outcome ? (
         <p className={`font-body text-sm ${outcome === "approved" ? "text-positive" : "text-steel"}`} role="status">
@@ -109,7 +109,7 @@ function ReviewCard({ request: r, outcome, onDone }: { request: ReviewRequest; o
         </>
       )}
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

@@ -124,7 +124,7 @@ export function ExerciseVerticalCarousel({
           <button
             type="button"
             onClick={() => setOverviewOpen(false)}
-            className="flex items-center gap-1 font-body text-xs text-steel uppercase tracking-wide active:text-rust transition-colors"
+            className="flex items-center gap-1 font-body text-xs text-steel uppercase tracking-wide active:text-rust-ink transition-colors"
           >
             Close
             <X className="w-3.5 h-3.5" />
@@ -178,7 +178,7 @@ export function ExerciseVerticalCarousel({
             type="button"
             onClick={() => setOverviewOpen(true)}
             aria-label="See all exercises"
-            className="flex items-center gap-1 font-body text-xs text-steel uppercase tracking-wide active:text-rust transition-colors shrink-0"
+            className="flex items-center gap-1 font-body text-xs text-steel uppercase tracking-wide active:text-rust-ink transition-colors shrink-0"
           >
             <List className="w-3.5 h-3.5" />
             See all {exercises.length}
@@ -209,7 +209,7 @@ export function ExerciseVerticalCarousel({
                 <button
                   type="button"
                   onClick={() => setExpandedId(expanded ? null : exercise.id)}
-                  className="flex items-center gap-1 min-h-[44px] px-2 -mr-2 font-body text-xs text-steel active:text-rust"
+                  className="flex items-center gap-1 min-h-[44px] px-2 -mr-2 font-body text-xs text-steel active:text-rust-ink"
                 >
                   {expanded ? "Less room" : "More room"}
                   {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}

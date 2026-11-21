@@ -84,7 +84,7 @@ export function PackageAssignmentControl({
         Assigned to this client
       </p>
       {error && (
-        <p className="font-body text-sm text-rust mb-2" role="alert">
+        <p className="font-body text-sm text-rust-ink mb-2" role="alert">
           {error}
         </p>
       )}

@@ -96,7 +96,7 @@ export function MarketplaceRankingWeightsForm({
         </label>
       </div>
 
-      <p className={`font-body text-xs ${Math.abs(total - 1) > 0.01 ? "text-rust" : "text-steel"}`}>
+      <p className={`font-body text-xs ${Math.abs(total - 1) > 0.01 ? "text-rust-ink" : "text-steel"}`}>
         Sum: {total.toFixed(2)}
         {Math.abs(total - 1) > 0.01
           ? " — doesn't need to be exactly 1.00 (the ranking normalizes it), but keeping it near 1 keeps these numbers legible as percentages."
@@ -111,7 +111,7 @@ export function MarketplaceRankingWeightsForm({
         {saving ? "Saving…" : "Save weights"}
       </button>
 
-      {error && <p className="font-body text-xs text-rust">{error}</p>}
+      {error && <p className="font-body text-xs text-rust-ink">{error}</p>}
       {savedAt && (
         <p className="font-body text-xs text-steel">Last updated {new Date(savedAt).toLocaleString()}</p>
       )}

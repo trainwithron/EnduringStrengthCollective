@@ -54,7 +54,7 @@ export function DispatchStepActions({ stepId }: { stepId: string }) {
   return (
     <div className="mt-6 space-y-3">
       {error && (
-        <p className="font-body text-xs text-rust text-center" role="alert">
+        <p className="font-body text-xs text-rust-ink text-center" role="alert">
           {error}
         </p>
       )}

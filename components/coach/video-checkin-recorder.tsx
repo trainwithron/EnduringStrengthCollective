@@ -164,7 +164,7 @@ export function VideoCheckinRecorder({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="h-10 px-4 border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors"
+        className="h-10 px-4 border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust-ink transition-colors"
       >
         🎥 Record check-in
       </button>
@@ -186,7 +186,7 @@ export function VideoCheckinRecorder({
             setSummary("");
             setActionItems([]);
           }}
-          className="font-body text-xs text-rust mt-2"
+          className="font-body text-xs text-rust-ink mt-2"
         >
           Close
         </button>
@@ -248,7 +248,7 @@ export function VideoCheckinRecorder({
             type="button"
             onClick={handleGenerate}
             disabled={generating || !notes.trim()}
-            className="h-9 px-3 border border-rust/40 text-rust font-body text-xs font-medium disabled:opacity-40"
+            className="h-9 px-3 border border-rust/40 text-rust-ink font-body text-xs font-medium disabled:opacity-40"
           >
             {generating ? "Generating…" : "Generate summary + action items"}
           </button>
@@ -269,7 +269,7 @@ export function VideoCheckinRecorder({
           )}
 
           {error && (
-            <p className="font-body text-xs text-rust" role="alert">
+            <p className="font-body text-xs text-rust-ink" role="alert">
               {error}
             </p>
           )}
@@ -285,7 +285,7 @@ export function VideoCheckinRecorder({
         </>
       )}
       {error && !previewUrl && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

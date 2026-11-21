@@ -73,7 +73,7 @@ export function LikeClientSuggestion({ text, groupId, athleteId, onUse }: { text
         <p className="font-body text-sm text-chalk">Which client?</p>
         <div className="mt-2 flex flex-wrap gap-2">
           {options.map((c) => (
-            <button key={c.id} type="button" onClick={() => pick(c)} className={`${button} border border-rust text-rust`}>
+            <button key={c.id} type="button" onClick={() => pick(c)} className={`${button} border border-rust text-rust-ink`}>
               {c.fullName}
             </button>
           ))}

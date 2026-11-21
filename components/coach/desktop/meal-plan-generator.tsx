@@ -909,13 +909,13 @@ export function MealPlanGenerator({
       </div>
 
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}
 
       {!rulesReadable && (
-        <p className="font-body text-xs text-rust border border-rust/40 p-2.5" role="alert">
+        <p className="font-body text-xs text-rust-ink border border-rust/40 p-2.5" role="alert">
           {RULES_UNREADABLE}
         </p>
       )}
@@ -984,7 +984,7 @@ export function MealPlanGenerator({
               type="button"
               disabled={aiSuggestingAll || meals.length === 0 || !rulesReadable}
               onClick={handleAiSuggestAll}
-              className="min-h-11 px-4 border border-rust/40 text-rust font-body text-sm disabled:opacity-50"
+              className="min-h-11 px-4 border border-rust/40 text-rust-ink font-body text-sm disabled:opacity-50"
             >
               {aiSuggestingAll ? "Generating full plan…" : "AI Suggest All — 3 credits"}
             </button>
@@ -992,7 +992,7 @@ export function MealPlanGenerator({
               <AiUsageMeter groupId={groupId} focus="mealplan" compact refreshKey={lastChargeReferenceId} />
             </div>
             {aiSuggestAllError && (
-              <p className="font-body text-xs text-rust mt-1" role="alert">
+              <p className="font-body text-xs text-rust-ink mt-1" role="alert">
                 {aiSuggestAllError}
               </p>
             )}
@@ -1072,7 +1072,7 @@ export function MealPlanGenerator({
                           <input type="checkbox" checked={checked} readOnly className="w-4 h-4" />
                           <span className="font-body text-sm font-medium flex-1 min-w-0 break-words">{opt.recipeName}</span>
                           {opt.isAi && (
-                            <span className="font-body text-xs uppercase tracking-wide text-rust border border-rust/40 px-1.5 py-0.5">
+                            <span className="font-body text-xs uppercase tracking-wide text-rust-ink border border-rust/40 px-1.5 py-0.5">
                               Nutrition Spot · verified
                             </span>
                           )}
@@ -1138,7 +1138,7 @@ export function MealPlanGenerator({
                                           </button>
                                         ))}
                                       </div>
-                                      {swapError && <p className="text-rust mt-1" role="alert">{swapError}</p>}
+                                      {swapError && <p className="text-rust-ink mt-1" role="alert">{swapError}</p>}
                                     </div>
                                   )}
                                 </li>
@@ -1177,12 +1177,12 @@ export function MealPlanGenerator({
                       type="button"
                       onClick={() => handleAiSuggest(meal)}
                       disabled={aiSuggesting[meal.spec.id] || !rulesReadable}
-                      className="min-h-11 px-3 font-body text-xs border border-rust/40 text-rust disabled:opacity-40"
+                      className="min-h-11 px-3 font-body text-xs border border-rust/40 text-rust-ink disabled:opacity-40"
                     >
                       {aiSuggesting[meal.spec.id] ? "Asking the Nutrition Spot…" : "Ask the Nutrition Spot"}
                     </button>
                     {aiError[meal.spec.id] && (
-                      <p className="font-body text-xs text-rust" role="alert">
+                      <p className="font-body text-xs text-rust-ink" role="alert">
                         {aiError[meal.spec.id]}
                       </p>
                     )}
@@ -1227,7 +1227,7 @@ export function MealPlanGenerator({
           </div>
 
           <details className="border border-dashed border-steel/30 p-2.5">
-            <summary className="font-body text-xs text-rust cursor-pointer min-h-11 flex items-center">Quick food swaps & conversions</summary>
+            <summary className="font-body text-xs text-rust-ink cursor-pointer min-h-11 flex items-center">Quick food swaps & conversions</summary>
             <ul className="mt-2 space-y-1">
               {QUICK_SWAP_NOTES.map((note, i) => (
                 <li key={i} className="font-body text-xs text-steel">

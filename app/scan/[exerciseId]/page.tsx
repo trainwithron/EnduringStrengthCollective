@@ -98,7 +98,7 @@ export default async function ScanExercisePage(props: { params: Promise<{ exerci
           // eslint-disable-next-line @next/next/no-img-element -- external org-uploaded logo
           <img src={org.logoUrl} alt="" className="w-16 h-16 mx-auto mb-4 object-contain" />
         )}
-        <p className="font-display uppercase text-xs tracking-[0.2em] text-rust text-center">
+        <p className="font-display uppercase text-xs tracking-[0.2em] text-rust-ink text-center">
           {orgDisplayName}
         </p>
         <h1 className="font-display font-bold text-3xl uppercase leading-tight mt-2 text-center">

@@ -251,7 +251,7 @@ export function PackageManager({
               aria-pressed={kind === k}
               className={`text-left border p-3.5 flex flex-col gap-1 min-w-0 ${kind === k ? "border-rust bg-rust/10" : "border-steel/25 bg-surface/40 hover:border-steel/50"}`}
             >
-              <span className={`font-display uppercase text-base leading-tight ${kind === k ? "text-rust" : "text-chalk"}`}>{PACKAGE_KIND_LABEL[k]}</span>
+              <span className={`font-display uppercase text-base leading-tight ${kind === k ? "text-rust-ink" : "text-chalk"}`}>{PACKAGE_KIND_LABEL[k]}</span>
               <span className="font-body text-xs text-steel leading-snug">{KIND_BLURB[k]}</span>
             </button>
           ))}
@@ -389,7 +389,7 @@ export function PackageManager({
               {submitting ? "Saving…" : "Save package"}
             </button>
             {error && (
-              <p className="font-body text-xs text-rust" role="alert">
+              <p className="font-body text-xs text-rust-ink" role="alert">
                 {error}
               </p>
             )}
@@ -420,7 +420,7 @@ export function PackageManager({
         </div>
         )}
         {rowError && (
-          <p className="font-body text-sm text-rust mb-3" role="alert">
+          <p className="font-body text-sm text-rust-ink mb-3" role="alert">
             {rowError}
           </p>
         )}
@@ -468,7 +468,7 @@ export function PackageManager({
                     onClick={() => handleDeactivate(p.id)}
                     disabled={busyId === p.id}
                     aria-label={`Deactivate ${p.name}`}
-                    className="hidden sm:inline-flex ml-auto w-9 h-9 items-center justify-center text-steel hover:text-rust transition-colors disabled:opacity-40"
+                    className="hidden sm:inline-flex ml-auto w-9 h-9 items-center justify-center text-steel hover:text-rust-ink transition-colors disabled:opacity-40"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -490,7 +490,7 @@ export function PackageManager({
                         buyerJoinsSpace: p.buyerJoinsSpace !== false,
                       }}
                     />
-                    <button type="button" onClick={() => handleDeactivate(p.id)} disabled={busyId === p.id} className="sm:hidden mt-2 min-h-11 font-body text-xs text-rust">
+                    <button type="button" onClick={() => handleDeactivate(p.id)} disabled={busyId === p.id} className="sm:hidden mt-2 min-h-11 font-body text-xs text-rust-ink">
                       Deactivate this package
                     </button>
                   </div>

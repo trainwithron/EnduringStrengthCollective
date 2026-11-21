@@ -31,7 +31,7 @@ export function MacrosOffToggle({ athleteId, groupId, initialOff, clientFirstNam
       {off ? (
         <p className="flex flex-wrap items-center gap-x-2">
           <span>Macros are off for {clientFirstName}.</span>
-          <button type="button" onClick={() => void set(false)} disabled={saving} className="min-h-11 px-1 text-rust underline underline-offset-2 disabled:opacity-40">
+          <button type="button" onClick={() => void set(false)} disabled={saving} className="min-h-11 px-1 text-rust-ink underline underline-offset-2 disabled:opacity-40">
             Turn on
           </button>
         </p>
@@ -41,7 +41,7 @@ export function MacrosOffToggle({ athleteId, groupId, initialOff, clientFirstNam
         </button>
       )}
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

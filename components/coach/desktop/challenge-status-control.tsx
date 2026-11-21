@@ -42,7 +42,7 @@ export function ChallengeStatusControl({
             ? "border-positive text-positive"
             : status === "completed"
             ? "border-steel/40 text-steel"
-            : "border-rust text-rust"
+            : "border-rust text-rust-ink"
         }`}
       >
         {status}

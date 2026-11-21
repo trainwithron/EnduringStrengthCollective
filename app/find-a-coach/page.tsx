@@ -123,7 +123,7 @@ export default async function FindACoachPage(props: {
         </form>
 
         {hasSearched && goal === null && (
-          <p className="font-body text-sm text-rust">Pick a goal to see results.</p>
+          <p className="font-body text-sm text-rust-ink">Pick a goal to see results.</p>
         )}
 
         {goal && results.length === 0 && (
@@ -150,7 +150,7 @@ export default async function FindACoachPage(props: {
                   <p className="font-body text-xs text-moss mt-2">{scoreLabel(r)}</p>
                 )}
                 {slugByCoach.get(r.coachId) && (
-                  <Link href={`/book/${slugByCoach.get(r.coachId)}`} className="inline-flex items-center h-11 mt-2 font-body text-sm text-rust underline">
+                  <Link href={`/book/${slugByCoach.get(r.coachId)}`} className="inline-flex items-center h-11 mt-2 font-body text-sm text-rust-ink underline">
                     Book a time →
                   </Link>
                 )}

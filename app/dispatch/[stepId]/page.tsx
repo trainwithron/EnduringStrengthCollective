@@ -60,7 +60,7 @@ export default async function DispatchStepPage(props: { params: Promise<{ stepId
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body flex items-center justify-center px-6 py-16">
       <div className="max-w-sm w-full">
-        <p className="font-display uppercase text-xs tracking-[0.2em] text-rust text-center">
+        <p className="font-display uppercase text-xs tracking-[0.2em] text-rust-ink text-center">
           New client request
         </p>
         <h1 className="font-display font-bold text-2xl uppercase leading-tight mt-2 text-center">

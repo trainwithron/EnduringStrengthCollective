@@ -69,7 +69,7 @@ export function TriviaMiniGame({ onClose }: { onClose: () => void }) {
         <p className="font-body text-xs text-steel">
           Trivia isn&apos;t ready yet — no questions in the bank.
         </p>
-        <button type="button" onClick={onClose} className="font-body text-xs text-rust mt-2">
+        <button type="button" onClick={onClose} className="font-body text-xs text-rust-ink mt-2">
           Close
         </button>
       </div>
@@ -92,7 +92,7 @@ export function TriviaMiniGame({ onClose }: { onClose: () => void }) {
         <span>
           Score: <span className="text-chalk">{round.score}</span> / {round.answered}
         </span>
-        <button type="button" onClick={onClose} className="text-steel active:text-rust transition-colors">
+        <button type="button" onClick={onClose} className="text-steel active:text-rust-ink transition-colors">
           Close ✕
         </button>
       </div>
@@ -112,7 +112,7 @@ export function TriviaMiniGame({ onClose }: { onClose: () => void }) {
         <button
           type="button"
           onClick={() => handleAnswer(false)}
-          className="h-11 px-5 border border-rust/50 text-rust font-body text-sm font-medium"
+          className="h-11 px-5 border border-rust/50 text-rust-ink font-body text-sm font-medium"
         >
           ← False
         </button>

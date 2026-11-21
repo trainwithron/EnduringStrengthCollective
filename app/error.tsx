@@ -45,7 +45,7 @@ export default function Error({
           >
             Try again
           </button>
-          <Link href="/" className="font-body text-sm text-steel active:text-rust">
+          <Link href="/" className="font-body text-sm text-steel active:text-rust-ink">
             Go home
           </Link>
         </div>

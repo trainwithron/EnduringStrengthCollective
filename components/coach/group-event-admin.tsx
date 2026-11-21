@@ -63,10 +63,10 @@ export function GroupEventAdmin({
           {event.note && <p className="font-body text-xs text-steel mt-1">{event.note}</p>}
         </div>
         {cancelled ? (
-          <span className="font-body text-xs text-rust uppercase tracking-wide">Cancelled</span>
+          <span className="font-body text-xs text-rust-ink uppercase tracking-wide">Cancelled</span>
         ) : (
           !started && (
-            <button type="button" onClick={cancel} disabled={busy} className="font-body text-xs text-rust underline underline-offset-2 disabled:opacity-40">
+            <button type="button" onClick={cancel} disabled={busy} className="font-body text-xs text-rust-ink underline underline-offset-2 disabled:opacity-40">
               Cancel event
             </button>
           )
@@ -105,7 +105,7 @@ export function GroupEventAdmin({
         </div>
       )}
       {error && (
-        <p className="font-body text-xs text-rust mt-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-2" role="alert">
           {error}
         </p>
       )}

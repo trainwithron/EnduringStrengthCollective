@@ -132,7 +132,7 @@ export function LearnedSuggestionCard({ ruleId, text }: { ruleId: string; text: 
         </p>
       )}
       {error && (
-        <p className="mt-2 text-xs text-rust" role="alert">
+        <p className="mt-2 text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

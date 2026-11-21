@@ -58,7 +58,7 @@ export function StripeConnectPanel({ groupId, status, isOwner, feePercent }: { g
       {!isOwner && status !== "ready" && <p className="font-body text-xs text-steel mt-1">Your organization&apos;s owner connects Stripe.</p>}
       {feePercent != null && <p className="font-body text-xs text-steel mt-1 max-w-[70ch]">Spotlight&apos;s fee is {feePercent}% of each payment made in the app. Stripe&apos;s own card fee also comes out of your account.</p>}
       {error && (
-        <p className="font-body text-xs text-rust mt-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-2" role="alert">
           {error}
         </p>
       )}

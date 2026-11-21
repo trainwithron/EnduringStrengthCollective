@@ -61,7 +61,7 @@ export function WorkoutSummaryCard({
         </div>
         {post.workoutSummary?.loggedByCoach && <CoachLoggedBadge />}
         {post.pinnedAt && !isCoach && (
-          <span className="flex items-center gap-1 font-body text-xs text-rust shrink-0">
+          <span className="flex items-center gap-1 font-body text-xs text-rust-ink shrink-0">
             <Pin className="w-3.5 h-3.5" fill="currentColor" />
             Pinned
           </span>
@@ -80,7 +80,7 @@ export function WorkoutSummaryCard({
         role="button"
         tabIndex={0}
       >
-        <div className="flex items-center gap-2 text-rust mb-2">
+        <div className="flex items-center gap-2 text-rust-ink mb-2">
           <Dumbbell className="w-4 h-4" />
           <span className="font-display uppercase text-sm tracking-wide">
             Workout complete
@@ -116,7 +116,7 @@ export function WorkoutSummaryCard({
 
         {hasPrs && (
           <div className="mt-3 pt-3 border-t border-steel/20">
-            <p className="font-display uppercase text-sm text-rust tracking-wide mb-1">
+            <p className="font-display uppercase text-sm text-rust-ink tracking-wide mb-1">
               New PR{post.workoutSummary!.newPrs.length > 1 ? "s" : ""} 🎉
             </p>
             <p className="font-body text-sm">

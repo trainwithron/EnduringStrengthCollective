@@ -57,7 +57,7 @@ export function ExpiryHeadsUpControl({ coachId, initialDays }: { coachId: string
         <span className="font-body text-sm text-steel">days before</span>
       </div>
       {error && (
-        <p className="font-body text-xs text-rust mt-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-2" role="alert">
           {error}
         </p>
       )}

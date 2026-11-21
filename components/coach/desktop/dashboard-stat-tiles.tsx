@@ -73,7 +73,7 @@ export function DashboardStatTiles({
                     key={v.key}
                     type="button"
                     onClick={() => pick(tile.key, v.key)}
-                    className="w-full flex items-center justify-between gap-3 px-3 py-1.5 font-body text-xs text-chalk active:text-rust whitespace-nowrap"
+                    className="w-full flex items-center justify-between gap-3 px-3 py-1.5 font-body text-xs text-chalk active:text-rust-ink whitespace-nowrap"
                   >
                     <span className="text-steel">{v.label}</span>
                     <span>{v.display}</span>

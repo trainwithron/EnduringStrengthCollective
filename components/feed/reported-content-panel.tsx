@@ -30,7 +30,7 @@ export async function ReportedContentPanel({ groupId, title = "Reported in this 
     const code = (error as { code?: string }).code ?? "";
     if (code === "42P01" || code === "PGRST205") return null;
     return (
-      <p className="font-body text-sm text-rust mb-4" role="alert">
+      <p className="font-body text-sm text-rust-ink mb-4" role="alert">
         Couldn&apos;t load reported posts. Reload to try again.
       </p>
     );
@@ -44,7 +44,7 @@ export async function ReportedContentPanel({ groupId, title = "Reported in this 
 
   return (
     <section aria-label="Reported posts" className="border border-rust/40 bg-rust/5 p-4 mb-6">
-      <h2 className="font-display uppercase text-sm tracking-wide text-rust">
+      <h2 className="font-display uppercase text-sm tracking-wide text-rust-ink">
         {title} ({total})
       </h2>
       {total > rows.length && <p className="font-body text-xs text-steel mt-1">Showing the newest {rows.length} of {total}.</p>}

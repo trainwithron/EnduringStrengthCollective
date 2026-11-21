@@ -45,7 +45,7 @@ export function LeaderboardRows({
           <span className="font-body text-sm">
             <span className="text-steel mr-2 w-6 inline-block">#{entry.rank}</span>
             {entry.fullName}
-            {entry.profileId === viewerId && <span className="text-rust"> (you)</span>}
+            {entry.profileId === viewerId && <span className="text-rust-ink"> (you)</span>}
           </span>
           <span className="font-body text-xs text-steel">
             {Math.round(entry.score).toLocaleString()} {scoreUnit(scoreLabel, Math.round(entry.score))}

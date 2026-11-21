@@ -150,7 +150,7 @@ export function TeamSheetUpload({ groupId }: { groupId: string }) {
         <p className="font-body text-sm" role="status">
           {undone ? "That upload was undone." : result.partial ? `Saved ${result.saved} workout${result.saved === 1 ? "" : "s"}, but ${result.notSaved ?? "the rest"} could not be saved.` : `Saved ${result.saved} workout${result.saved === 1 ? "" : "s"}.`}
         </p>
-        {!undone && result.partial && <p className="font-body text-sm text-rust" role="alert">Something went wrong part-way. What was saved stays saved and can be undone below; uploading the same file again keeps those and saves the rest.</p>}
+        {!undone && result.partial && <p className="font-body text-sm text-rust-ink" role="alert">Something went wrong part-way. What was saved stays saved and can be undone below; uploading the same file again keeps those and saves the rest.</p>}
         {!undone && (
           <ul className="font-body text-sm text-steel list-disc pl-5 space-y-1">
             {result.kept > 0 && <li>{result.kept} already had a session and were left as they were.</li>}
@@ -161,7 +161,7 @@ export function TeamSheetUpload({ groupId }: { groupId: string }) {
           </ul>
         )}
         {error && (
-          <p className="font-body text-sm text-rust" role="alert">
+          <p className="font-body text-sm text-rust-ink" role="alert">
             {error}
           </p>
         )}
@@ -203,7 +203,7 @@ export function TeamSheetUpload({ groupId }: { groupId: string }) {
           </p>
         )}
         {error && (
-          <p className="font-body text-sm text-rust" role="alert">
+          <p className="font-body text-sm text-rust-ink" role="alert">
             {error}
           </p>
         )}
@@ -218,7 +218,7 @@ export function TeamSheetUpload({ groupId }: { groupId: string }) {
             </p>
             <p className="font-body text-sm">
               <b>{totals.workouts}</b> workout{totals.workouts === 1 ? "" : "s"} for <b>{totals.athletes}</b> athlete{totals.athletes === 1 ? "" : "s"} are ready to save.
-              {totals.unsure > 0 && <span className="text-rust"> {totals.unsure} box{totals.unsure === 1 ? " is" : "es are"} highlighted because the reader was not sure; fix them or they will be left blank.</span>}
+              {totals.unsure > 0 && <span className="text-rust-ink"> {totals.unsure} box{totals.unsure === 1 ? " is" : "es are"} highlighted because the reader was not sure; fix them or they will be left blank.</span>}
             </p>
             {review.summary.existing > 0 && (
               <fieldset className="space-y-1">
@@ -239,7 +239,7 @@ export function TeamSheetUpload({ groupId }: { groupId: string }) {
           {review.sheets.map((s, si) => (
             <section key={s.rack} aria-label={`Rack ${s.rack}`} className="space-y-2">
               <h2 className="font-display uppercase text-xl">Rack {s.rack}</h2>
-              {s.columnsChanged && <p className="font-body text-sm text-rust" role="alert">The exercise names across the top are not the ones this sheet was printed with. A column may have been added, removed or moved, so a box may be under the wrong exercise. Every row here starts left out; tick a row in once you have checked it, or download a fresh sheet.</p>}
+              {s.columnsChanged && <p className="font-body text-sm text-rust-ink" role="alert">The exercise names across the top are not the ones this sheet was printed with. A column may have been added, removed or moved, so a box may be under the wrong exercise. Every row here starts left out; tick a row in once you have checked it, or download a fresh sheet.</p>}
               <div className="overflow-x-auto border border-steel/20">
                 <table className="border-collapse font-body text-sm min-w-full">
                   <caption className="sr-only">Rack {s.rack}: what was read from each box, by athlete and exercise</caption>
@@ -282,8 +282,8 @@ export function TeamSheetUpload({ groupId }: { groupId: string }) {
                               <input id={`team-sheet-include-${si}-${ri}`} type="checkbox" checked={!off} disabled={row.gone} onChange={() => setSkip((cur) => ({ ...cur, [`${si}:${ri}`]: !cur[`${si}:${ri}`] }))} className="mt-1 accent-rust" aria-label={`Include ${row.name}`} />
                               <span>
                                 {row.name}
-                                {row.gone && <span className="block text-xs text-rust font-normal">not in this group any more</span>}
-                                {row.nameChanged && <span className="block text-xs text-rust font-normal">printed as {row.printedName}: check it is the right person, then tick it in</span>}
+                                {row.gone && <span className="block text-xs text-rust-ink font-normal">not in this group any more</span>}
+                                {row.nameChanged && <span className="block text-xs text-rust-ink font-normal">printed as {row.printedName}: check it is the right person, then tick it in</span>}
                                 {row.existing.some(Boolean) && <span className="block text-xs text-steel font-normal">already has: {row.existing.map((e, di) => (e ? WEEKDAY(s.days[di].label) : null)).filter(Boolean).join(", ")}</span>}
                               </span>
                             </label>
@@ -308,7 +308,7 @@ export function TeamSheetUpload({ groupId }: { groupId: string }) {
                                       aria-label={`${row.name}, ${ex.name}, ${d.label}`}
                                       className="w-full h-9 bg-transparent border border-steel/30 px-1.5 font-mono text-sm focus:outline-none focus:border-rust"
                                     />
-                                    {kind === "unsure" && <span className="block text-xs text-rust mt-0.5">not sure: left blank</span>}
+                                    {kind === "unsure" && <span className="block text-xs text-rust-ink mt-0.5">not sure: left blank</span>}
                                     {kind === "sets" && cell.described !== cell.text && <span className="block text-xs text-steel mt-0.5">{cell.described}</span>}
                                     {kind === "skipped" && <span className="block text-xs text-steel mt-0.5">skipped</span>}
                                   </td>

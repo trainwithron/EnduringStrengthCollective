@@ -74,14 +74,14 @@ export function AiBudgetMeter({ variant = "meter", groupId }: { variant?: "meter
               type="button"
               disabled={buying !== null}
               onClick={() => buy(p.cents)}
-              className="min-h-[44px] px-4 py-2 border border-rust text-rust font-body text-sm hover:bg-rust hover:text-chalk transition-colors disabled:opacity-50"
+              className="min-h-[44px] px-4 py-2 border border-rust text-rust-ink font-body text-sm hover:bg-rust hover:text-chalk transition-colors disabled:opacity-50"
             >
               {buying === p.cents ? "Opening…" : `Add $${p.cents / 100} top-up (+$${p.addUsd.toFixed(2).replace(/\.00$/, "")} of AI)`}
             </button>
           ))}
         </div>
       )}
-      {buyError && <p className="font-body text-xs text-rust mt-2" role="alert">{buyError}</p>}
+      {buyError && <p className="font-body text-xs text-rust-ink mt-2" role="alert">{buyError}</p>}
     </div>
   );
 }

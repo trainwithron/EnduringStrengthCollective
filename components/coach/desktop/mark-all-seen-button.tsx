@@ -51,7 +51,7 @@ export function MarkAllSeenButton({ groupIds }: { groupIds: string[] }) {
       type="button"
       onClick={handleClick}
       disabled={busy || groupIds.length === 0}
-      className="font-body text-xs text-steel active:text-rust transition-colors disabled:opacity-40"
+      className="font-body text-xs text-steel active:text-rust-ink transition-colors disabled:opacity-40"
     >
       {busy ? "Clearing…" : "Mark all as seen"}
     </button>

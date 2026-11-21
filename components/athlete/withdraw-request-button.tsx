@@ -27,11 +27,11 @@ export function WithdrawRequestButton({ requestId }: { requestId: string }) {
 
   return (
     <span className="inline-flex flex-col items-start">
-      <button type="button" onClick={() => void withdraw()} disabled={busy} className="h-11 px-3 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust disabled:opacity-40">
+      <button type="button" onClick={() => void withdraw()} disabled={busy} className="h-11 px-3 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust-ink disabled:opacity-40">
         {busy ? "Withdrawing…" : "Withdraw"}
       </button>
       {error && (
-        <span className="font-body text-xs text-rust" role="alert">
+        <span className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </span>
       )}

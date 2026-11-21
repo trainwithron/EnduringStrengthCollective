@@ -70,14 +70,14 @@ export function EmailAllClaimLinksButton({ groupId }: { groupId: string }) {
   return (
     <div data-email-all-claim-links>
       {count.eligible > 0 && count.emailReady && (
-        <button type="button" onClick={send} disabled={busy} className="min-h-11 px-4 border border-rust text-rust font-body text-sm active:bg-rust active:text-graphite disabled:opacity-40">
+        <button type="button" onClick={send} disabled={busy} className="min-h-11 px-4 border border-rust text-rust-ink font-body text-sm active:bg-rust active:text-graphite disabled:opacity-40">
           {busy ? "Sending…" : `Email sign-in links to ${count.eligible}${count.more ? "+" : ""} not signed in yet`}
         </button>
       )}
       {count.eligible > 0 && !count.emailReady && <p className="font-body text-xs text-steel">{count.eligible} haven&apos;t signed in yet. Email isn&apos;t set up, so send each link from their profile.</p>}
       {result && <p className="font-body text-xs text-positive mt-1.5">{result}</p>}
       {error && (
-        <p className="font-body text-xs text-rust mt-1.5" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-1.5" role="alert">
           {error}
         </p>
       )}

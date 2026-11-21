@@ -26,7 +26,7 @@ export function ClientProgramRow({
         <Link href={`/groups/${groupId}/programs/${program.id}`} className="block flex-1 min-w-0 px-4 py-3 hover:bg-surface/40 transition-colors">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="min-w-0">
-              <span className={`font-body text-xs shrink-0 ${program.ai_draft ? "text-rust" : program.is_active ? "text-positive" : "text-steel"}`}>{program.ai_draft ? "AI draft" : program.is_active ? "Active" : "Not active"}</span>
+              <span className={`font-body text-xs shrink-0 ${program.ai_draft ? "text-rust-ink" : program.is_active ? "text-positive" : "text-steel"}`}>{program.ai_draft ? "AI draft" : program.is_active ? "Active" : "Not active"}</span>
               <p className="font-display uppercase text-xl leading-tight mt-0.5 break-words">{program.name}</p>
             </div>
             {stats.length > 0 && (

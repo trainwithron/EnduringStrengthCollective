@@ -66,7 +66,7 @@ export default async function AdminHealthPage() {
                     <td className="py-2 pr-4 text-steel whitespace-nowrap">{formatInTimezone(r.last_run_at, tz, "dateTime")}</td>
                     <td className="py-2 pr-4 text-steel whitespace-nowrap">{r.last_success_at ? formatInTimezone(r.last_success_at, tz, "dateTime") : "never"}</td>
                     <td className="py-2 pr-4">
-                      <span className={r.last_status === "ok" ? "text-steel" : "text-rust"}>{r.last_status === "ok" ? "Worked" : "Failed"}</span>
+                      <span className={r.last_status === "ok" ? "text-steel" : "text-rust-ink"}>{r.last_status === "ok" ? "Worked" : "Failed"}</span>
                       {r.last_error && <span className="block text-xs text-steel break-words">{r.last_error}</span>}
                     </td>
                     <td className="py-2 tabular-nums">{r.consecutive_failures}</td>

@@ -108,7 +108,7 @@ export function GroceryListPanel({ days, clientName, metric, audience = "coach",
       <p className="no-print font-body text-xs text-steel">
         Tick what {audience === "client" ? "you" : "they"} already have: it stays on the list, crossed off. Tap it again to untick it.
         {have.size > 0 && (
-          <button type="button" onClick={() => { setHave(new Set()); if (storageKey) { try { window.localStorage.removeItem(storageKey); } catch { /* nothing kept */ } } }} className="ml-2 min-h-[44px] px-2 text-rust underline underline-offset-2">
+          <button type="button" onClick={() => { setHave(new Set()); if (storageKey) { try { window.localStorage.removeItem(storageKey); } catch { /* nothing kept */ } } }} className="ml-2 min-h-[44px] px-2 text-rust-ink underline underline-offset-2">
             Untick all
           </button>
         )}

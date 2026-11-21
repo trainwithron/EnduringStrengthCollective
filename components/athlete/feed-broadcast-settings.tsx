@@ -65,7 +65,7 @@ export function FeedBroadcastSettings({
         {saving ? "Saving…" : "Applies the next time you complete a workout."}
       </p>
       {error && (
-        <p className="font-body text-xs text-rust mb-3" role="alert">
+        <p className="font-body text-xs text-rust-ink mb-3" role="alert">
           {error}
         </p>
       )}

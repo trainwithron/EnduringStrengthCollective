@@ -103,7 +103,7 @@ export function AwayReplyCard({ coachId, initial, today }: { coachId: string; in
           <p className="font-body text-sm text-chalk">
             {state === "on" ? (
               <>
-                <span className="font-bold text-rust">Away reply is ON</span>
+                <span className="font-bold text-rust-ink">Away reply is ON</span>
                 {setting?.endsOn ? ` until ${readableDay(setting.endsOn)}` : ""}. Clients who message you get your reply.
               </>
             ) : state === "ended" ? (
@@ -128,7 +128,7 @@ export function AwayReplyCard({ coachId, initial, today }: { coachId: string; in
             </>
           ) : (
             !editing && (
-              <button type="button" onClick={() => setEditing(true)} className="min-h-[44px] sm:min-h-0 sm:h-9 px-4 border border-rust/40 text-rust font-body text-sm">
+              <button type="button" onClick={() => setEditing(true)} className="min-h-[44px] sm:min-h-0 sm:h-9 px-4 border border-rust/40 text-rust-ink font-body text-sm">
                 {state === "ended" ? "Turn on again" : "I'm away"}
               </button>
             )
@@ -137,7 +137,7 @@ export function AwayReplyCard({ coachId, initial, today }: { coachId: string; in
       </div>
       {editing && form}
       {error && (
-        <p className="font-body text-xs text-rust mt-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-2" role="alert">
           {error}
         </p>
       )}

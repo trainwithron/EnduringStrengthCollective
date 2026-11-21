@@ -98,7 +98,7 @@ export function FeedbackButton({ variant = "link" }: { variant?: "icon" | "link"
           <MessageSquarePlus className="w-4 h-4" strokeWidth={2.25} />
         </button>
       ) : (
-        <button type="button" onClick={() => setOpen(true)} className="font-body text-sm font-bold text-rust">
+        <button type="button" onClick={() => setOpen(true)} className="font-body text-sm font-bold text-rust-ink">
           Report a problem or suggest something &rarr;
         </button>
       )}
@@ -151,7 +151,7 @@ export function FeedbackButton({ variant = "link" }: { variant?: "icon" | "link"
                 />
                 <p className="font-body text-xs text-steel mt-1">We attach the page you are on and your screen size.</p>
                 {error && (
-                  <p className="font-body text-sm text-rust mt-2" role="alert">
+                  <p className="font-body text-sm text-rust-ink mt-2" role="alert">
                     {error}
                   </p>
                 )}

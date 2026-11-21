@@ -53,7 +53,7 @@ export function BuiltinIngredientMappings({ initialRows }: { initialRows: Builti
         built-in recipe across every coach&apos;s clients.
       </p>
       {error && (
-        <p className="font-body text-sm text-rust mb-3" role="alert">
+        <p className="font-body text-sm text-rust-ink mb-3" role="alert">
           {error}
         </p>
       )}

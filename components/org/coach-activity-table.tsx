@@ -43,7 +43,7 @@ export function CoachActivityTable({ groupId, fromDay, toDay, timeZone, rows, cr
           To (included)
           <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="block h-11 mt-1 bg-graphite border border-steel/30 text-chalk px-2.5 font-body text-sm" />
         </label>
-        <button type="submit" className="h-11 px-4 border border-rust text-rust font-body text-sm font-medium">
+        <button type="submit" className="h-11 px-4 border border-rust text-rust-ink font-body text-sm font-medium">
           Show
         </button>
       </form>
@@ -83,7 +83,7 @@ export function CoachActivityTable({ groupId, fromDay, toDay, timeZone, rows, cr
                     aria-invalid={rateInvalid(r.coachId)}
                     className={`w-24 h-9 bg-graphite border text-chalk px-2 text-right font-body text-sm ${rateInvalid(r.coachId) ? "border-rust" : "border-steel/30"}`}
                   />
-                  {rateInvalid(r.coachId) && <span className="block font-body text-xs text-rust mt-1">Use dollars and cents, like 45 or 45.50.</span>}
+                  {rateInvalid(r.coachId) && <span className="block font-body text-xs text-rust-ink mt-1">Use dollars and cents, like 45 or 45.50.</span>}
                 </td>
                 <td className="p-3 text-right tabular-nums">{money(estimateCents(r.sessionsDelivered, rateCents(r.coachId)))}</td>
               </tr>
@@ -107,7 +107,7 @@ export function CoachActivityTable({ groupId, fromDay, toDay, timeZone, rows, cr
       <p className="font-body text-xs text-steel mt-1 max-w-[70ch]">
         The estimate is sessions delivered times the rate you type. It is an estimate to check against pay, not payroll: the rates are not saved and nothing is paid from here. The spreadsheet lists every session behind the numbers.
       </p>
-      <a href={csvHref()} className="inline-flex items-center h-11 px-4 mt-4 border border-rust text-rust font-body text-sm font-medium">
+      <a href={csvHref()} className="inline-flex items-center h-11 px-4 mt-4 border border-rust text-rust-ink font-body text-sm font-medium">
         Download the sessions (spreadsheet)
       </a>
     </div>

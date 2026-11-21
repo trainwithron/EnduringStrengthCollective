@@ -56,13 +56,13 @@ export function RosterSection({
       >
         <div className="flex items-center gap-2">
           {expanded ? (
-            <ChevronDown className={`w-4 h-4 shrink-0 ${glow ? "text-rust" : "text-steel"}`} />
+            <ChevronDown className={`w-4 h-4 shrink-0 ${glow ? "text-rust-ink" : "text-steel"}`} />
           ) : (
-            <ChevronRight className={`w-4 h-4 shrink-0 ${glow ? "text-rust" : "text-steel"}`} />
+            <ChevronRight className={`w-4 h-4 shrink-0 ${glow ? "text-rust-ink" : "text-steel"}`} />
           )}
           <div>
             {glow && (
-              <p className="font-body text-xs text-rust uppercase tracking-wide mb-0.5">
+              <p className="font-body text-xs text-rust-ink uppercase tracking-wide mb-0.5">
                 One-time setup
               </p>
             )}
@@ -77,7 +77,7 @@ export function RosterSection({
           </div>
         </div>
         {!!needsAttentionCount && needsAttentionCount > 0 && (
-          <span className="font-body text-xs text-rust border border-rust/40 px-2 py-0.5 uppercase tracking-wide">
+          <span className="font-body text-xs text-rust-ink border border-rust/40 px-2 py-0.5 uppercase tracking-wide">
             {needsAttentionCount} need{needsAttentionCount === 1 ? "s" : ""} attention
           </span>
         )}

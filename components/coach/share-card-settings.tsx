@@ -44,7 +44,7 @@ export function ShareCardSettings({ coachId, initialHandle, initialQr }: { coach
         <span className="font-body text-sm text-chalk">Put a QR code to my public page on my clients&apos; share cards</span>
       </label>
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

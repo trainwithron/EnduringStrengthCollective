@@ -24,11 +24,11 @@ export function UnarchiveGroupButton({ groupId }: { groupId: string }) {
 
   return (
     <span>
-      <button type="button" onClick={bringBack} disabled={busy} className="font-body text-xs text-rust underline disabled:opacity-40">
+      <button type="button" onClick={bringBack} disabled={busy} className="font-body text-xs text-rust-ink underline disabled:opacity-40">
         {busy ? "Bringing it back…" : "Bring it back"}
       </button>
       {error && (
-        <span className="font-body text-xs text-rust ml-2" role="alert">
+        <span className="font-body text-xs text-rust-ink ml-2" role="alert">
           {error}
         </span>
       )}

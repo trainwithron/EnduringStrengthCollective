@@ -60,7 +60,7 @@ export function TransferOwnershipButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 h-11 px-4 border border-steel/30 text-steel font-body text-sm font-medium active:border-rust active:text-rust transition-colors"
+        className="inline-flex items-center gap-2 h-11 px-4 border border-steel/30 text-steel font-body text-sm font-medium active:border-rust active:text-rust-ink transition-colors"
       >
         <Crown className="w-4 h-4" strokeWidth={2.25} />
         Transfer ownership
@@ -101,7 +101,7 @@ export function TransferOwnershipButton({
             <button
               type="button"
               onClick={() => setConfirming(true)}
-              className="h-9 px-4 border border-rust text-rust font-body text-sm font-medium active:bg-rust active:text-graphite transition-colors"
+              className="h-9 px-4 border border-rust text-rust-ink font-body text-sm font-medium active:bg-rust active:text-graphite transition-colors"
             >
               Continue
             </button>
@@ -116,12 +116,12 @@ export function TransferOwnershipButton({
         </div>
       ) : (
         <div className="space-y-3">
-          <p className="font-body text-sm text-rust">
+          <p className="font-body text-sm text-rust-ink">
             Make {selected?.fullName} the owner of this organization? This can&apos;t be undone
             except by them transferring it back.
           </p>
           {error && (
-            <p className="font-body text-xs text-rust" role="alert">
+            <p className="font-body text-xs text-rust-ink" role="alert">
               {error}
             </p>
           )}

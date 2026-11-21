@@ -27,12 +27,12 @@ export function ManageBillingLink({ groupId }: { groupId: string }) {
         type="button"
         onClick={handleClick}
         disabled={loading}
-        className="min-h-11 font-body text-sm text-rust disabled:opacity-40"
+        className="min-h-11 font-body text-sm text-rust-ink disabled:opacity-40"
       >
         {loading ? "Opening…" : "Manage billing"}
       </button>
       {error && (
-        <p className="font-body text-xs text-rust mt-1" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-1" role="alert">
           {error}
         </p>
       )}

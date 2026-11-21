@@ -68,7 +68,7 @@ export function RecipeLibraryRail({ coachId }: { coachId: string }) {
             type="button"
             onClick={() => setFilter(f.value)}
             className={`font-body text-xs uppercase tracking-wide px-2 py-0.5 border ${
-              filter === f.value ? "border-rust text-rust" : "border-steel/30 text-steel"
+              filter === f.value ? "border-rust text-rust-ink" : "border-steel/30 text-steel"
             }`}
           >
             {f.label}

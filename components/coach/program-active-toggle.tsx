@@ -61,7 +61,7 @@ export function ProgramActiveToggle({
 
   if (aiDraft) {
     return (
-      <button type="button" onClick={handleSignOff} className="font-body text-xs shrink-0 text-rust underline underline-offset-2">
+      <button type="button" onClick={handleSignOff} className="font-body text-xs shrink-0 text-rust-ink underline underline-offset-2">
         AI draft: sign off
       </button>
     );
@@ -72,7 +72,7 @@ export function ProgramActiveToggle({
       type="button"
       onClick={handleToggle}
       className={`font-body text-xs shrink-0 transition-colors ${
-        optimisticActive ? "text-moss active:text-steel" : "text-steel active:text-rust"
+        optimisticActive ? "text-moss active:text-steel" : "text-steel active:text-rust-ink"
       }`}
     >
       {optimisticActive ? "Active" : unassigned ? "In your library" : "Set active"}

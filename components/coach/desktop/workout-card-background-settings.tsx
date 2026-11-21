@@ -178,7 +178,7 @@ export function WorkoutCardBackgroundSettings({
       )}
 
       {error && (
-        <p className="font-body text-xs text-rust mb-4" role="alert">
+        <p className="font-body text-xs text-rust-ink mb-4" role="alert">
           {error}
         </p>
       )}

@@ -11,7 +11,7 @@ export function AddSetButton({ busy, onAdd }: { busy: boolean; onAdd: () => void
       onClick={onAdd}
       disabled={busy}
       aria-label="Add a set"
-      className="flex-1 min-w-0 h-11 rounded-row border border-dashed border-steel/60 text-steel font-body text-sm font-medium inline-flex items-center justify-center gap-1.5 active:border-rust active:text-rust transition-colors disabled:opacity-40"
+      className="flex-1 min-w-0 h-11 rounded-row border border-dashed border-steel/60 text-steel font-body text-sm font-medium inline-flex items-center justify-center gap-1.5 active:border-rust active:text-rust-ink transition-colors disabled:opacity-40"
     >
       <Plus className="w-4 h-4" aria-hidden="true" />
       Add a set
@@ -46,7 +46,7 @@ export function SetStepper({
   trailing?: ReactNode;
 }) {
   const stepBtn =
-    "h-10 w-10 rounded-row flex items-center justify-center border border-steel/30 text-steel active:border-rust active:text-rust transition-colors disabled:opacity-30 disabled:active:border-steel/30 disabled:active:text-steel";
+    "h-10 w-10 rounded-row flex items-center justify-center border border-steel/30 text-steel active:border-rust active:text-rust-ink transition-colors disabled:opacity-30 disabled:active:border-steel/30 disabled:active:text-steel";
   return (
     <div className="mt-1">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -63,7 +63,7 @@ export function SetStepper({
       {confirmText && (
         <div className="mt-2 flex items-center gap-3" role="alert">
           <p className="font-body text-xs text-chalk">{confirmText}</p>
-          <button type="button" onClick={onConfirmRemove} className="min-h-11 px-2 -mx-2 font-body text-xs text-rust">
+          <button type="button" onClick={onConfirmRemove} className="min-h-11 px-2 -mx-2 font-body text-xs text-rust-ink">
             Remove
           </button>
           <button type="button" onClick={onKeep} className="min-h-11 px-2 -mx-2 font-body text-xs text-steel">
@@ -74,7 +74,7 @@ export function SetStepper({
       {undo && !confirmText && (
         <div className="mt-2 flex items-center gap-3" role="status">
           <p className="font-body text-xs text-steel">{undo.text}</p>
-          <button type="button" onClick={undo.onUndo} disabled={undo.pending} className="min-h-11 px-2 -mx-2 font-body text-xs text-rust disabled:opacity-40">
+          <button type="button" onClick={undo.onUndo} disabled={undo.pending} className="min-h-11 px-2 -mx-2 font-body text-xs text-rust-ink disabled:opacity-40">
             {undo.pending ? "Removing…" : "Undo"}
           </button>
         </div>

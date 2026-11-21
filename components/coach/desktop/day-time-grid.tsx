@@ -403,7 +403,7 @@ export function DayTimeGrid({
         )}
       </div>
 
-      {error && <p className="px-3 py-2 font-body text-xs text-rust border-b border-steel/20">{error}</p>}
+      {error && <p className="px-3 py-2 font-body text-xs text-rust-ink border-b border-steel/20">{error}</p>}
 
       <div
         ref={scrollerRef}
@@ -569,12 +569,12 @@ export function DayTimeGrid({
             {!repeating && <p className="font-body text-xs text-steel mt-1">This books one session. Nothing else on the calendar is changed.</p>}
             {(problem || mismatch) && (
               <div className="mt-2 space-y-0.5">
-                {problem && pendingMin != null && <p className="font-body text-xs text-rust">{clashText({ problem, startMin: pendingMin, endMin: pendingMin + lengthMin, sessions: sessionSpans, bufferMin: bufferMinutes, clientName: client.fullName })}</p>}
+                {problem && pendingMin != null && <p className="font-body text-xs text-rust-ink">{clashText({ problem, startMin: pendingMin, endMin: pendingMin + lengthMin, sessions: sessionSpans, bufferMin: bufferMinutes, clientName: client.fullName })}</p>}
                 {mismatch && <p className="font-body text-xs text-steel">{mismatch}</p>}
               </div>
             )}
             {error && (
-              <p className="font-body text-xs text-rust mt-2" role="alert">
+              <p className="font-body text-xs text-rust-ink mt-2" role="alert">
                 {error}
               </p>
             )}
@@ -651,7 +651,7 @@ export function DayTimeGrid({
       {booked && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-md px-3 py-2 border border-positive/60 bg-surface shadow-lg flex flex-wrap items-center gap-3" role="status">
           <span className="font-body text-sm text-chalk">Booked {booked.label}.</span>
-          <button type="button" onClick={undo} className="font-body text-sm text-rust underline underline-offset-2">
+          <button type="button" onClick={undo} className="font-body text-sm text-rust-ink underline underline-offset-2">
             Undo ({booked.secondsLeft}s)
           </button>
           <span className="font-body text-xs text-steel">They are told when this runs out.</span>
@@ -672,7 +672,7 @@ export function DayTimeGrid({
             className="h-7 bg-graphite border border-steel/30 text-chalk px-1.5 font-body text-xs"
           />
         </label>
-        <Link href={dayHref} className="font-body text-xs text-rust underline underline-offset-2 ml-auto">
+        <Link href={dayHref} className="font-body text-xs text-rust-ink underline underline-offset-2 ml-auto">
           Open day page &rarr;
         </Link>
       </div>

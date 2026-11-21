@@ -238,7 +238,7 @@ export function CalendarGrid({
             <span className="inline-flex items-center gap-1">
               <span
                 className={`font-body text-xs ${
-                  isToday ? "text-rust font-bold" : isWeekend ? "text-steel" : "text-steel"
+                  isToday ? "text-rust-ink font-bold" : isWeekend ? "text-steel" : "text-steel"
                 }`}
               >
                 {date.getDate()}
@@ -281,7 +281,7 @@ export function CalendarGrid({
                   <div
                     key={row.e.id}
                     className={`flex items-center gap-1 font-body text-xs leading-tight ${
-                      row.e.type === "suggestion" ? "text-yellow-500" : "text-rust"
+                      row.e.type === "suggestion" ? "text-yellow-500" : "text-rust-ink"
                     }`}
                   >
                     <span className="truncate flex-1">

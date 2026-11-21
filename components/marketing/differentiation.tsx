@@ -28,7 +28,7 @@ export function Differentiation() {
       <div className="grid sm:grid-cols-3 gap-8 mt-12 text-left">
         {POINTS.map((p) => (
           <div key={p.label}>
-            <p className="font-display uppercase text-lg font-bold text-rust">
+            <p className="font-display uppercase text-lg font-bold text-rust-ink">
               {p.label}
             </p>
             <p className="font-body text-chalk/80 text-sm mt-2 leading-relaxed">

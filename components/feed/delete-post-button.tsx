@@ -35,7 +35,7 @@ export function DeletePostButton({ postId }: { postId: string }) {
           type="button"
           onClick={handleDelete}
           disabled={deleting}
-          className="font-body text-xs text-rust font-medium disabled:opacity-40"
+          className="font-body text-xs text-rust-ink font-medium disabled:opacity-40"
         >
           {deleting ? "Deleting…" : "Confirm delete"}
         </button>
@@ -48,7 +48,7 @@ export function DeletePostButton({ postId }: { postId: string }) {
           Cancel
         </button>
         {error && (
-          <span className="font-body text-xs text-rust" role="alert">
+          <span className="font-body text-xs text-rust-ink" role="alert">
             {error}
           </span>
         )}
@@ -60,7 +60,7 @@ export function DeletePostButton({ postId }: { postId: string }) {
     <button
       type="button"
       onClick={() => setConfirming(true)}
-      className="flex items-center gap-1 font-body text-xs text-steel active:text-rust transition-colors"
+      className="flex items-center gap-1 font-body text-xs text-steel active:text-rust-ink transition-colors"
     >
       <Trash2 className="w-3.5 h-3.5" />
       Delete

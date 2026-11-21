@@ -157,7 +157,7 @@ export function ChallengeParticipantPanel({
           Today&apos;s habits
         </h3>
         {habitError && (
-          <p className="font-body text-xs text-rust mb-2" role="alert">
+          <p className="font-body text-xs text-rust-ink mb-2" role="alert">
             {habitError}
           </p>
         )}

@@ -94,7 +94,7 @@ export function LearnedList({
       </label>
       <p className="font-body text-xs text-steel">Off: I still notice, but I won&apos;t ask. The AI builder gives less tailored results if I don&apos;t learn from you.</p>
       {error && (
-        <p className="font-body text-xs text-rust mt-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-2" role="alert">
           {error}
         </p>
       )}

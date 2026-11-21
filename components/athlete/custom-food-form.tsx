@@ -144,7 +144,7 @@ export function CustomFoodFormPanel({
       </label>
 
       {errors.length > 0 && (
-        <ul className="font-body text-xs text-rust space-y-0.5" role="alert">
+        <ul className="font-body text-xs text-rust-ink space-y-0.5" role="alert">
           {errors.map((e) => (
             <li key={e}>{e}</li>
           ))}
@@ -158,7 +158,7 @@ export function CustomFoodFormPanel({
         </ul>
       )}
       {failed && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {failed}
         </p>
       )}

@@ -68,7 +68,7 @@ export function GoalProposalForm({ athleteId, groupId, suggestedBy, fromWords }:
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

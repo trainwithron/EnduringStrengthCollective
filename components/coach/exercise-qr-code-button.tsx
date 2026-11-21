@@ -40,7 +40,7 @@ export function ScanQrCodeButton({ path, name, what, label }: { path: string; na
         type="button"
         onClick={handleOpen}
         aria-label={`Get QR code for ${name}`}
-        className={label ? "min-h-11 px-3 inline-flex items-center gap-2 border border-steel/40 text-chalk font-body text-sm active:border-rust" : "w-8 h-8 flex items-center justify-center text-steel active:text-rust transition-colors"}
+        className={label ? "min-h-11 px-3 inline-flex items-center gap-2 border border-steel/40 text-chalk font-body text-sm active:border-rust" : "w-8 h-8 flex items-center justify-center text-steel active:text-rust-ink transition-colors"}
       >
         <QrCode className="w-4 h-4" aria-hidden={label ? true : undefined} />
         {label}

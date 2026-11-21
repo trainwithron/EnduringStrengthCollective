@@ -55,18 +55,18 @@ export default async function AttendancePage(props: { params: Promise<{ groupId:
           >
             Open check-in kiosk
           </a>
-          <Link href={`/groups/${params.groupId}/kiosk/settings`} className="font-body text-xs text-steel underline underline-offset-4 hover:text-rust">
+          <Link href={`/groups/${params.groupId}/kiosk/settings`} className="font-body text-xs text-steel underline underline-offset-4 hover:text-rust-ink">
             Kiosk PIN and settings
           </Link>
         </div>
       </div>
       {attendance.failed && (
-        <p className="font-body text-sm text-rust mb-4" role="alert">
+        <p className="font-body text-sm text-rust-ink mb-4" role="alert">
           Some of this could not be read, so people may show as absent who were there. Reload the page to try again.
         </p>
       )}
       {attendance.truncated && (
-        <p className="font-body text-sm text-rust mb-4" role="alert">
+        <p className="font-body text-sm text-rust-ink mb-4" role="alert">
           This period has more than the page can show. Choose a shorter period.
         </p>
       )}

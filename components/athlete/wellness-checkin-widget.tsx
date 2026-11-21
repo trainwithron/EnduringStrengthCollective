@@ -147,7 +147,7 @@ export function WellnessCheckinWidget({
       </div>
 
       {error && (
-        <p className="font-body text-xs text-rust mb-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mb-2" role="alert">
           {error}
         </p>
       )}
@@ -164,7 +164,7 @@ export function WellnessCheckinWidget({
               setStep(0);
               setEditing(true);
             }}
-            className="inline-flex items-center min-h-11 px-2 font-body text-xs text-rust"
+            className="inline-flex items-center min-h-11 px-2 font-body text-xs text-rust-ink"
           >
             Edit
           </button>

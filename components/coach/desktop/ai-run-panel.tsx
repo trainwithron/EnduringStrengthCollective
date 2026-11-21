@@ -84,7 +84,7 @@ export function AiRunPanel({ programId, request, corrections }: { programId: str
           />
         </div>
         <div className="mt-2 flex items-center gap-3">
-          <button type="button" onClick={() => void explain()} disabled={!question.trim() || busy} className="min-h-11 px-5 border border-rust text-rust font-display font-bold uppercase tracking-wide disabled:opacity-40">
+          <button type="button" onClick={() => void explain()} disabled={!question.trim() || busy} className="min-h-11 px-5 border border-rust text-rust-ink font-display font-bold uppercase tracking-wide disabled:opacity-40">
             {busy ? "One moment…" : "Explain"}
           </button>
           <p className="font-body text-xs text-steel">It only explains. It changes nothing unless you ask.</p>
@@ -95,7 +95,7 @@ export function AiRunPanel({ programId, request, corrections }: { programId: str
               {answer}
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-4">
-              <button type="button" onClick={() => void explain(TELL_ME_MORE_QUESTION)} disabled={busy} className="min-h-11 font-body text-sm text-rust underline underline-offset-2 disabled:opacity-40">
+              <button type="button" onClick={() => void explain(TELL_ME_MORE_QUESTION)} disabled={busy} className="min-h-11 font-body text-sm text-rust-ink underline underline-offset-2 disabled:opacity-40">
                 Tell me more
               </button>
               <button
@@ -113,7 +113,7 @@ export function AiRunPanel({ programId, request, corrections }: { programId: str
           </>
         )}
         {error && (
-          <p className="font-body text-xs text-rust mt-2" role="alert">
+          <p className="font-body text-xs text-rust-ink mt-2" role="alert">
             {error}
           </p>
         )}

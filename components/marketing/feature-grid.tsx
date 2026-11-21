@@ -44,7 +44,7 @@ export function FeatureGrid() {
             key={f.title}
             className="bg-surface border border-steel/20 p-6"
           >
-            <h3 className="font-display uppercase text-xl font-bold text-rust">
+            <h3 className="font-display uppercase text-xl font-bold text-rust-ink">
               {f.title}
             </h3>
             <p className="font-body text-chalk/80 text-sm mt-2 leading-relaxed">

@@ -82,7 +82,7 @@ export function PreferencesSection({
               setPrefs(prefillFromRestrictionsText(prefs, checkinRestrictions));
               setMessage("Filled in from the check-in. Look it over, then save.");
             }}
-            className="h-10 px-4 border border-rust text-rust font-body text-sm"
+            className="h-10 px-4 border border-rust text-rust-ink font-body text-sm"
           >
             Fill in the form from it
           </button>
@@ -99,7 +99,7 @@ export function PreferencesSection({
         {message && <span className="font-body text-xs text-positive">{message}</span>}
       </div>
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

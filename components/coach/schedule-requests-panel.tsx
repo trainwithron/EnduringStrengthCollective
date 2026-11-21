@@ -210,7 +210,7 @@ export function ScheduleRequestsPanel({ groupIds: scopeGroupIds }: { groupIds?: 
         ))}
       </ul>
       {message && (
-        <p className={`mt-3 font-body text-sm ${message.error ? "text-rust" : "text-chalk"}`} role={message.error ? "alert" : "status"}>
+        <p className={`mt-3 font-body text-sm ${message.error ? "text-rust-ink" : "text-chalk"}`} role={message.error ? "alert" : "status"}>
           {message.text}
         </p>
       )}

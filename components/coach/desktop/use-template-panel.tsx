@@ -297,11 +297,11 @@ export function UseTemplatePanel({
                 </label>
                 {clientId && client && <PastAiNotes athleteId={clientId} groupId={client.destinationGroupId} />}
                 <LikeClientSuggestion text={aiText} groupId={groupId} athleteId={clientId || null} onUse={setReferenceId} />
-                <button type="button" onClick={pickForMe} disabled={picking || aiText.trim() === ""} className="mt-2 min-h-11 px-4 border border-rust text-rust font-body text-sm disabled:opacity-40">
+                <button type="button" onClick={pickForMe} disabled={picking || aiText.trim() === ""} className="mt-2 min-h-11 px-4 border border-rust text-rust-ink font-body text-sm disabled:opacity-40">
                   {picking ? "Picking…" : "Pick for me"}
                 </button>
                 {aiError && (
-                  <p className="font-body text-xs text-rust mt-2" role="alert">
+                  <p className="font-body text-xs text-rust-ink mt-2" role="alert">
                     {aiError}
                   </p>
                 )}
@@ -345,10 +345,10 @@ export function UseTemplatePanel({
                     <div className="border border-steel/20 p-2.5">
                       <p className="font-body text-xs text-steel">
                         {r.label}
-                        {tailored && <span className="ml-2 text-rust" data-tailored>{TAILORED_MARK}</span>}
+                        {tailored && <span className="ml-2 text-rust-ink" data-tailored>{TAILORED_MARK}</span>}
                       </p>
                       {r.choices.length === 0 ? (
-                        <p className="font-body text-xs text-rust mt-1" role="alert">
+                        <p className="font-body text-xs text-rust-ink mt-1" role="alert">
                           {NO_LADDER_MESSAGE}
                         </p>
                       ) : (
@@ -378,10 +378,10 @@ export function UseTemplatePanel({
                           </button>
                         </div>
                       )}
-                      {ai && ai.source === "request" && value === ai.exercise && <p className="font-body text-xs text-rust mt-1">{YOUR_REQUEST_TAG}</p>}
+                      {ai && ai.source === "request" && value === ai.exercise && <p className="font-body text-xs text-rust-ink mt-1">{YOUR_REQUEST_TAG}</p>}
                       {ai && (ai.source === "ai" || ai.source === "request") && value === ai.exercise && ai.reason && <p className="font-body text-xs text-steel mt-1">{ai.reason}</p>}
                       {ai && ai.source === "none" && value === "" && r.choices.length > 0 && (
-                        <p className="font-body text-xs text-rust mt-1" role="alert">
+                        <p className="font-body text-xs text-rust-ink mt-1" role="alert">
                           {NOTHING_FITS_MESSAGE}
                         </p>
                       )}
@@ -393,7 +393,7 @@ export function UseTemplatePanel({
             </div>
 
             {error && (
-              <p className="font-body text-xs text-rust mt-3" role="alert">
+              <p className="font-body text-xs text-rust-ink mt-3" role="alert">
                 {error}
               </p>
             )}

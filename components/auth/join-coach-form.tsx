@@ -112,7 +112,7 @@ export function JoinCoachForm({
           </div>
         )}
         {error && (
-          <p className="font-body text-sm text-rust mt-4" role="alert">
+          <p className="font-body text-sm text-rust-ink mt-4" role="alert">
             {error}{" "}
             {signIn && (
               <a href="/login" className="underline">

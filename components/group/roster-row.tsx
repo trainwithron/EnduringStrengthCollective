@@ -142,7 +142,7 @@ export function RosterRow({
         )}
 
         {optimisticRole === "coach" && (
-          <span className="font-body text-xs tracking-wide text-rust shrink-0">
+          <span className="font-body text-xs tracking-wide text-rust-ink shrink-0">
             Coach
           </span>
         )}
@@ -152,7 +152,7 @@ export function RosterRow({
             {optimisticRole === "athlete" && (
               <Link
                 href={`/groups/${groupId}/athletes/${member.profileId}/log`}
-                className="font-body text-xs text-rust"
+                className="font-body text-xs text-rust-ink"
               >
                 Log
               </Link>
@@ -161,7 +161,7 @@ export function RosterRow({
               type="button"
               onClick={handleRoleToggle}
               disabled={busy}
-              className="font-body text-xs text-steel active:text-rust transition-colors disabled:opacity-40"
+              className="font-body text-xs text-steel active:text-rust-ink transition-colors disabled:opacity-40"
             >
               {optimisticRole === "coach" ? "Make athlete" : "Make coach"}
             </button>
@@ -169,7 +169,7 @@ export function RosterRow({
               type="button"
               onClick={handleRemove}
               disabled={busy}
-              className="font-body text-xs text-steel active:text-rust transition-colors disabled:opacity-40"
+              className="font-body text-xs text-steel active:text-rust-ink transition-colors disabled:opacity-40"
             >
               Remove
             </button>
@@ -177,7 +177,7 @@ export function RosterRow({
         )}
       </div>
 
-      {error && <p className="font-body text-xs text-rust mt-1">{error}</p>}
+      {error && <p className="font-body text-xs text-rust-ink mt-1">{error}</p>}
     </div>
   );
 }

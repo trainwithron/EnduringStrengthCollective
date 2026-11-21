@@ -26,7 +26,7 @@ export function HelpShell({ title, intro, children }: { title: string; intro?: s
               <>
                 {" "}
                 Anyone can write to{" "}
-                <a href={`mailto:${email}`} className="text-rust underline underline-offset-2">
+                <a href={`mailto:${email}`} className="text-rust-ink underline underline-offset-2">
                   {email}
                 </a>
                 .

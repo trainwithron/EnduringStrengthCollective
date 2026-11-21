@@ -64,7 +64,7 @@ export function EmailClaimLinkButton({
         {busy ? "Sending…" : "Email the sign-in link"}
       </button>
       {msg && (
-        <p className={`font-body text-xs mt-1.5 ${msg.kind === "error" ? "text-rust" : "text-positive"}`} role={msg.kind === "error" ? "alert" : "status"}>
+        <p className={`font-body text-xs mt-1.5 ${msg.kind === "error" ? "text-rust-ink" : "text-positive"}`} role={msg.kind === "error" ? "alert" : "status"}>
           {msg.text}
         </p>
       )}

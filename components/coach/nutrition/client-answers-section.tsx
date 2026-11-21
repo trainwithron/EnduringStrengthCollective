@@ -44,7 +44,7 @@ export function ClientAnswersSection({
           {rows.map((r) => (
             <div key={r.label}>
               <dt className="font-body text-xs text-steel">{r.label}</dt>
-              <dd className={`font-body text-sm ${r.label === "Allergies" && prefs.allergies.length > 0 ? "text-rust" : "text-chalk"}`}>{r.value}</dd>
+              <dd className={`font-body text-sm ${r.label === "Allergies" && prefs.allergies.length > 0 ? "text-rust-ink" : "text-chalk"}`}>{r.value}</dd>
             </div>
           ))}
         </dl>
@@ -55,7 +55,7 @@ export function ClientAnswersSection({
       )}
       <p className="font-body text-xs text-steel">
         {answered && updatedByName && updatedAtLabel ? `Answered by ${updatedByName} on ${updatedAtLabel}. ` : ""}
-        <button type="button" onClick={() => setEditing((v) => !v)} aria-expanded={editing} className="text-rust underline underline-offset-2 min-h-[44px] px-1 -my-3">
+        <button type="button" onClick={() => setEditing((v) => !v)} aria-expanded={editing} className="text-rust-ink underline underline-offset-2 min-h-[44px] px-1 -my-3">
           {editing ? "Close" : answered ? "Edit" : "Answer for them"}
         </button>
       </p>

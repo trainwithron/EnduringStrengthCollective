@@ -87,7 +87,7 @@ export function GoalAnswerControl({ goal, groupId, coachIds }: { goal: Suggested
 
   return (
     <div className="border border-rust/40 bg-rust/5 p-4 mb-6">
-      <p className="font-body text-xs text-rust uppercase tracking-wide font-bold mb-1">Your coach suggested a goal</p>
+      <p className="font-body text-xs text-rust-ink uppercase tracking-wide font-bold mb-1">Your coach suggested a goal</p>
       {mode === "view" ? (
         <>
           <p className="font-body text-lg">{label}</p>
@@ -140,7 +140,7 @@ export function GoalAnswerControl({ goal, groupId, coachIds }: { goal: Suggested
         </div>
       )}
       {error && (
-        <p className="font-body text-xs text-rust mt-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-2" role="alert">
           {error}
         </p>
       )}

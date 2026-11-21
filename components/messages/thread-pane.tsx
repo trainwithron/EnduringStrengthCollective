@@ -58,7 +58,7 @@ export function ThreadPane({
   }, [groupId, otherId]);
 
   if (failed) {
-    return <p className="font-body text-sm text-rust px-5 py-4" role="alert">Couldn&apos;t open this conversation. Check your connection and pick it again.</p>;
+    return <p className="font-body text-sm text-rust-ink px-5 py-4" role="alert">Couldn&apos;t open this conversation. Check your connection and pick it again.</p>;
   }
   if (!messages) {
     return <p className="font-body text-sm text-steel px-5 py-4">Opening…</p>;

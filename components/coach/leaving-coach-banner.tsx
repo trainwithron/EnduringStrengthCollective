@@ -39,7 +39,7 @@ function DepartureSection({ departure: d, supportEmail }: { departure: MyDepartu
         )}
         {!works && supportEmail && (
           <p className="font-body text-xs text-steel mt-2">
-            Questions: <a href={`mailto:${supportEmail}`} className="text-rust underline underline-offset-2">{supportEmail}</a>
+            Questions: <a href={`mailto:${supportEmail}`} className="text-rust-ink underline underline-offset-2">{supportEmail}</a>
           </p>
         )}
       </section>

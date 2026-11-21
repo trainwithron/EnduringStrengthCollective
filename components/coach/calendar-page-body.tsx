@@ -268,7 +268,7 @@ export async function CoachCalendarPageBody(
                       isToday ? "ring-1 ring-inset ring-rust" : ""
                     }`}
                   >
-                    <span className={`font-body text-xs ${isToday ? "text-rust font-bold" : "text-steel"}`}>
+                    <span className={`font-body text-xs ${isToday ? "text-rust-ink font-bold" : "text-steel"}`}>
                       {date.getDate()}
                     </span>
                     {(sessionsByDay.get(dateKey(date)) ?? []).slice(0, 2).map((t, idx) => (
@@ -636,7 +636,7 @@ export async function CoachCalendarPageBody(
               const isToday = isSameDayLocal(date, today);
               const rowClass = `flex items-center gap-3 py-3 ${isToday ? "text-chalk" : ""}`;
               const rowInner = (
-                <div className={`w-11 shrink-0 text-center ${isToday ? "text-rust" : "text-steel"}`}>
+                <div className={`w-11 shrink-0 text-center ${isToday ? "text-rust-ink" : "text-steel"}`}>
                   <p className="font-body text-xs font-semibold">{WEEKDAY_LABELS[i]}</p>
                   <p className="font-display font-bold text-lg leading-none">{date.getDate()}</p>
                 </div>
@@ -1201,7 +1201,7 @@ export async function CoachCalendarPageBody(
           Your sessions with clients, your time off and your own events. A
           client&apos;s workouts live on their own calendar: tap a name to open
           it. Let clients book:{" "}
-          <Link href={`${basePath}?tab=availability`} className="text-rust underline underline-offset-2">
+          <Link href={`${basePath}?tab=availability`} className="text-rust-ink underline underline-offset-2">
             Availability
           </Link>
           .
@@ -1250,7 +1250,7 @@ export async function CoachCalendarPageBody(
               className={`h-8 px-3 flex items-center font-body text-xs border ${
                 view === "month"
                   ? "bg-rust text-graphite border-rust"
-                  : "border-steel/30 text-steel active:border-rust active:text-rust"
+                  : "border-steel/30 text-steel active:border-rust active:text-rust-ink"
               }`}
             >
               Month
@@ -1260,7 +1260,7 @@ export async function CoachCalendarPageBody(
               className={`h-8 px-3 flex items-center font-body text-xs border ${
                 view === "week"
                   ? "bg-rust text-graphite border-rust"
-                  : "border-steel/30 text-steel active:border-rust active:text-rust"
+                  : "border-steel/30 text-steel active:border-rust active:text-rust-ink"
               }`}
             >
               Week
@@ -1270,13 +1270,13 @@ export async function CoachCalendarPageBody(
           {view === "month" ? (
             <>
               <div className="flex items-center justify-between mb-3">
-                <Link href={prevHref} className="font-body text-[13px] font-semibold text-rust">
+                <Link href={prevHref} className="font-body text-[13px] font-semibold text-rust-ink">
                   &larr; Prev
                 </Link>
                 <h2 className="font-body text-[15px] font-semibold text-chalk">
                   {monthLabel(year, monthIndex)}
                 </h2>
-                <Link href={nextHref} className="font-body text-[13px] font-semibold text-rust">
+                <Link href={nextHref} className="font-body text-[13px] font-semibold text-rust-ink">
                   Next &rarr;
                 </Link>
               </div>
@@ -1302,13 +1302,13 @@ export async function CoachCalendarPageBody(
           ) : (
             <>
               <div className="flex items-center justify-between mb-3">
-                <Link href={prevWeekHref} className="font-body text-[13px] font-semibold text-rust">
+                <Link href={prevWeekHref} className="font-body text-[13px] font-semibold text-rust-ink">
                   &larr; Prev
                 </Link>
                 <h2 className="font-body text-[15px] font-semibold text-chalk">
                   {weekLabel(weekStart, weekDays[6])}
                 </h2>
-                <Link href={nextWeekHref} className="font-body text-[13px] font-semibold text-rust">
+                <Link href={nextWeekHref} className="font-body text-[13px] font-semibold text-rust-ink">
                   Next &rarr;
                 </Link>
               </div>

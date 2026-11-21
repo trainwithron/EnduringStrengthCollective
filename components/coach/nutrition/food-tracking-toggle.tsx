@@ -36,7 +36,7 @@ export function FoodTrackingToggle({ athleteId, groupId, initialEnabled, clientF
         <input type="checkbox" checked={enabled} onChange={toggle} disabled={saving} aria-label={`Food tracking for ${clientFirstName}`} className="w-5 h-5 shrink-0 mt-0.5 accent-rust" />
       </label>
       {error && (
-        <p className="font-body text-xs text-rust mt-1" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-1" role="alert">
           {error}
         </p>
       )}

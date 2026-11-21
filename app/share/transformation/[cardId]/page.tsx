@@ -43,7 +43,7 @@ export default async function ShareTransformationCardPage(
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body flex items-center justify-center px-6 py-16">
       <div className="w-full max-w-sm border border-rust/40 bg-surface/40 p-8 text-center">
-        <p className="font-display uppercase text-xs tracking-[0.2em] text-rust">
+        <p className="font-display uppercase text-xs tracking-[0.2em] text-rust-ink">
           {shared.groupName}
         </p>
 
@@ -80,7 +80,7 @@ export default async function ShareTransformationCardPage(
         )}
 
         <div className="mt-6 pb-6 border-b border-steel/20">
-          <p className="font-display text-5xl leading-none text-rust">
+          <p className="font-display text-5xl leading-none text-rust-ink">
             Down {shared.totalLossLbs} lbs
           </p>
           <p className="font-body text-xs text-steel mt-2 uppercase tracking-wide">
@@ -103,7 +103,7 @@ export default async function ShareTransformationCardPage(
         </div>
 
         <p className="font-body text-xs text-steel mt-6 pt-4 border-t border-steel/20">
-          Trained with <span className="text-rust">{shared.groupName}</span>
+          Trained with <span className="text-rust-ink">{shared.groupName}</span>
         </p>
       </div>
     </main>

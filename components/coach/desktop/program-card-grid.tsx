@@ -209,7 +209,7 @@ function ProgramCard({
             <p className={`font-body font-medium ${titleSize} text-chalk truncate`}>
               {program.name}
               {program.looksUnfinished && (
-                <span className="text-rust" title="Does this one need work? Many of its days have no exercises yet." aria-label="Looks unfinished. Does this one need work?">
+                <span className="text-rust-ink" title="Does this one need work? Many of its days have no exercises yet." aria-label="Looks unfinished. Does this one need work?">
                   {" "}
                   *
                 </span>
@@ -224,14 +224,14 @@ function ProgramCard({
               </p>
             )}
             {!program.sourceProgramId && <p className="font-body text-xs text-steel mt-0.5">Assigned to ({program.assignedCount ?? 0})</p>}
-            {program.athleteName && <p className="font-body text-xs text-rust mt-0.5 truncate">For {firstName(program.athleteName)}</p>}
+            {program.athleteName && <p className="font-body text-xs text-rust-ink mt-0.5 truncate">For {firstName(program.athleteName)}</p>}
           </Link>
           )}
           <ProgramCardMenu onRename={() => setRenaming(true)} programId={program.id} programName={program.name} groupId={groupId} aiDraft={program.aiDraft} canHide={!program.athleteId && !program.isActive} showAssignButton={!program.athleteId && !program.isActive && !program.aiDraft} slotCount={program.slotCount ?? 0} />
         </div>
         <div className="mt-auto flex items-center justify-between pt-2 border-t border-steel/15">
           <ProgramActiveToggle programId={program.id} isActive={program.isActive} aiDraft={program.aiDraft} programName={program.name} unassigned={!program.athleteId} />
-          <Link href={`/groups/${groupId}/programs/${program.id}`} className="font-body text-xs text-rust">
+          <Link href={`/groups/${groupId}/programs/${program.id}`} className="font-body text-xs text-rust-ink">
             Open &rarr;
           </Link>
         </div>

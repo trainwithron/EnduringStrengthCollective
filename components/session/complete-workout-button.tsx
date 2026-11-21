@@ -504,7 +504,7 @@ export function CompleteWorkoutButton({
           </button>
         </div>
         {walkInError && (
-          <p className="font-body text-xs text-rust mt-2" role="alert">
+          <p className="font-body text-xs text-rust-ink mt-2" role="alert">
             {walkInError}
           </p>
         )}
@@ -635,7 +635,7 @@ export function CompleteWorkoutButton({
             </button>
           </div>
           {fixMinutesError && (
-            <p className="font-body text-xs text-rust mt-2" role="alert">
+            <p className="font-body text-xs text-rust-ink mt-2" role="alert">
               {fixMinutesError}
             </p>
           )}
@@ -649,7 +649,7 @@ export function CompleteWorkoutButton({
               type="button"
               onClick={() => void handleDelete()}
               disabled={submitting}
-              className="h-11 px-4 border border-rust text-rust font-body text-sm font-medium disabled:opacity-40"
+              className="h-11 px-4 border border-rust text-rust-ink font-body text-sm font-medium disabled:opacity-40"
             >
               {submitting ? "Deleting…" : "Delete"}
             </button>
@@ -691,7 +691,7 @@ export function CompleteWorkoutButton({
               type="button"
               onClick={() => void handlePause()}
               disabled={submitting}
-              className="h-11 px-4 border border-rust text-rust font-body text-sm font-medium disabled:opacity-40"
+              className="h-11 px-4 border border-rust text-rust-ink font-body text-sm font-medium disabled:opacity-40"
             >
               Pause for now
             </button>
@@ -721,7 +721,7 @@ export function CompleteWorkoutButton({
         </div>
       )}
       {error && (
-        <p className="font-body text-xs text-rust mb-2 text-center" role="alert">
+        <p className="font-body text-xs text-rust-ink mb-2 text-center" role="alert">
           {error}
         </p>
       )}

@@ -13,7 +13,7 @@ export interface SessionLedgerRow {
   balance: number | null;
 }
 
-const balanceClass = (b: number | null) => (b === null ? "text-steel" : b <= 1 ? "text-rust" : b <= 3 ? "text-yellow-500" : "text-chalk");
+const balanceClass = (b: number | null) => (b === null ? "text-steel" : b <= 1 ? "text-rust-ink" : b <= 3 ? "text-yellow-500" : "text-chalk");
 
 // The organization's session ledger. Tapping a client opens a small box right under the row with the same sessions control as their profile (Ron, Oct 31: "when i click a client
 // name it should allow me to adjust their session count from that screen instead of taking me to their client profile ... a small floaty pop up"). The profile is one link inside it.
@@ -70,7 +70,7 @@ export function SessionLedgerRows({ rows }: { rows: SessionLedgerRow[] }) {
                   </button>
                 </div>
                 <SessionCreditsControl key={key} athleteId={r.athleteId} groupId={r.groupId} initialBalance={r.balance ?? 0} />
-                <Link href={`/groups/${r.groupId}/athletes/${r.athleteId}`} className="inline-flex min-h-11 sm:min-h-0 items-center font-body text-xs text-rust underline underline-offset-2">
+                <Link href={`/groups/${r.groupId}/athletes/${r.athleteId}`} className="inline-flex min-h-11 sm:min-h-0 items-center font-body text-xs text-rust-ink underline underline-offset-2">
                   Open profile
                 </Link>
               </div>

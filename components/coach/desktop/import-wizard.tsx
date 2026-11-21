@@ -981,7 +981,7 @@ export function ImportWizard({
             className="mt-1 w-full bg-graphite border border-steel/40 text-chalk px-2 py-2 font-body text-base sm:text-sm focus:outline-none focus:border-rust"
           />
           <span className="flex items-center justify-between mt-1">
-            <span className={`font-body text-xs ${descriptionCounter(pending.description).nearLimit ? "text-rust" : "text-steel"}`}>{descriptionCounter(pending.description).label}</span>
+            <span className={`font-body text-xs ${descriptionCounter(pending.description).nearLimit ? "text-rust-ink" : "text-steel"}`}>{descriptionCounter(pending.description).label}</span>
             <button type="button" onClick={() => setPending((prev) => (prev ? { ...prev, description: "" } : prev))} disabled={pending.description === ""} className="font-body text-xs text-steel underline underline-offset-2 disabled:opacity-40 min-h-8">
               Clear
             </button>
@@ -1015,7 +1015,7 @@ export function ImportWizard({
         )}
         {pending.isAiSourced && pending.checkFlags.length > 0 && (
           <div className="mb-4 border border-rust/60 bg-rust/10 p-3" role="alert">
-            <p className="font-body text-xs text-rust font-medium mb-1.5">Check these before you sign off:</p>
+            <p className="font-body text-xs text-rust-ink font-medium mb-1.5">Check these before you sign off:</p>
             <ul className="font-body text-xs text-chalk space-y-1 list-disc list-inside">
               {pending.checkFlags.map((f, i) => (
                 <li key={i}>{f}</li>
@@ -1025,7 +1025,7 @@ export function ImportWizard({
         )}
         {pending.isAiSourced && pending.injuryConsiderations && (
           <div className="mb-4 border border-rust/40 bg-rust/5 p-3">
-            <p className="font-body text-xs text-rust font-medium mb-1">
+            <p className="font-body text-xs text-rust-ink font-medium mb-1">
               How this handled {athleteName ?? "this client"}&apos;s flagged health/injury concern:
             </p>
             <p className="font-body text-xs text-chalk leading-snug">{pending.injuryConsiderations}</p>
@@ -1168,7 +1168,7 @@ export function ImportWizard({
         )}
         {summary.injuryConsiderations && (
           <div className="mb-4 border border-rust/40 bg-rust/5 p-3">
-            <p className="font-body text-xs text-rust font-medium mb-1">
+            <p className="font-body text-xs text-rust-ink font-medium mb-1">
               How this handled {athleteName ?? "this client"}&apos;s flagged health/injury concern:
             </p>
             <p className="font-body text-xs text-chalk leading-snug">{summary.injuryConsiderations}</p>
@@ -1245,14 +1245,14 @@ export function ImportWizard({
     <div className="max-w-2xl space-y-4">
       {showInjuryBanner && (
         <div className="border border-rust/40 bg-rust/5 p-4 flex items-start justify-between gap-4">
-          <p className="font-body text-sm text-rust">
+          <p className="font-body text-sm text-rust-ink">
             <span className="font-medium">{athleteName ?? "This client"} has a flagged health/injury
             concern</span> on their intake screening — review anything generated for them closely.
           </p>
           <button
             type="button"
             onClick={dismissInjuryBanner}
-            className="shrink-0 font-body text-xs text-rust underline underline-offset-2"
+            className="shrink-0 font-body text-xs text-rust-ink underline underline-offset-2"
           >
             Got it
           </button>
@@ -1344,7 +1344,7 @@ export function ImportWizard({
           </div>
         )}
         {status === "error" && error && (
-          <p className="font-body text-xs text-rust mt-3" role="alert">
+          <p className="font-body text-xs text-rust-ink mt-3" role="alert">
             {error}
           </p>
         )}

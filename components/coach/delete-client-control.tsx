@@ -53,12 +53,12 @@ export function DeleteClientControl({ groupId, athleteId, athleteName }: { group
         <button type="button" onClick={() => void remove()} disabled={busy} className="min-h-11 font-body text-sm text-chalk underline underline-offset-2 disabled:opacity-40">
           {busy ? "Working…" : `Remove ${athleteName} from my clients…`}
         </button>
-        <button type="button" onClick={() => void start()} disabled={busy} className="min-h-11 font-body text-sm text-rust underline underline-offset-2 disabled:opacity-40">
+        <button type="button" onClick={() => void start()} disabled={busy} className="min-h-11 font-body text-sm text-rust-ink underline underline-offset-2 disabled:opacity-40">
           {busy ? "Working…" : `Delete ${athleteName} permanently…`}
         </button>
       </div>
       {error && (
-        <p className="font-body text-xs text-rust mt-2 max-w-[60ch]" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-2 max-w-[60ch]" role="alert">
           {error}
         </p>
       )}

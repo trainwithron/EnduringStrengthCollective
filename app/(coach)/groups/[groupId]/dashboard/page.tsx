@@ -347,7 +347,7 @@ export default async function CoachDashboardPage(
                 {entry.sessionId && (
                   <Link
                     href={`/sessions/${entry.sessionId}`}
-                    className="block px-5 pb-3 -mt-2 font-body text-xs text-rust"
+                    className="block px-5 pb-3 -mt-2 font-body text-xs text-rust-ink"
                   >
                     View full session log (every set, rep, weight &amp; note) &rarr;
                   </Link>

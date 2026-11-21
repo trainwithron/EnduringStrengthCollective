@@ -120,7 +120,7 @@ export function AutoCategorizeButton({
           </div>
 
           {failedCount > 0 && (
-            <p className="px-4 pb-2 font-body text-xs text-rust" role="alert">
+            <p className="px-4 pb-2 font-body text-xs text-rust-ink" role="alert">
               {failedCount} categor{failedCount === 1 ? "y" : "ies"} did not save, so {failedCount === 1 ? "it was" : "they were"} not applied. Try again.
             </p>
           )}
@@ -152,7 +152,7 @@ export function AutoCategorizeButton({
       type="button"
       onClick={handleOpen}
       disabled={uncategorized.length === 0}
-      className="h-10 px-3 border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors disabled:opacity-40"
+      className="h-10 px-3 border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust-ink transition-colors disabled:opacity-40"
     >
       Auto-categorize{uncategorized.length > 0 ? ` (${uncategorized.length})` : ""}
     </button>

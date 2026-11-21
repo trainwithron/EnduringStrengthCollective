@@ -112,7 +112,7 @@ export function CancelBookingButton({
         {!rescheduleHref && messageHref && (
           <Link
             href={messageHref}
-            className="h-11 px-3 flex items-center border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust transition-colors"
+            className="h-11 px-3 flex items-center border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust-ink transition-colors"
           >
             Message your coach to move it
           </Link>
@@ -120,7 +120,7 @@ export function CancelBookingButton({
         {rescheduleHref && (
           <Link
             href={rescheduleHref}
-            className="h-11 px-3 flex items-center border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust transition-colors"
+            className="h-11 px-3 flex items-center border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust-ink transition-colors"
           >
             Reschedule
           </Link>
@@ -129,13 +129,13 @@ export function CancelBookingButton({
           type="button"
           onClick={handleCancel}
           disabled={submitting}
-          className="h-11 px-3 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust transition-colors disabled:opacity-40"
+          className="h-11 px-3 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust-ink transition-colors disabled:opacity-40"
         >
           {submitting ? "Cancelling…" : viewer === "coach" ? "Cancel" : "Cancel session"}
         </button>
       </div>
       {error && (
-        <p className="font-body text-xs text-rust max-w-[220px] text-right" role="alert">
+        <p className="font-body text-xs text-rust-ink max-w-[220px] text-right" role="alert">
           {error}
         </p>
       )}
@@ -144,7 +144,7 @@ export function CancelBookingButton({
           type="button"
           onClick={handleCancelSeries}
           disabled={cancellingSeries}
-          className="min-h-11 px-2 font-body text-xs text-rust disabled:opacity-40"
+          className="min-h-11 px-2 font-body text-xs text-rust-ink disabled:opacity-40"
         >
           {cancellingSeries ? "Cancelling series…" : "Cancel entire series"}
         </button>

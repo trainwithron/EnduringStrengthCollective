@@ -50,7 +50,7 @@ export function TeamGameForm({ groupId, createdBy }: { groupId: string; createdB
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="h-10 px-4 border border-steel/30 text-rust font-body text-sm"
+        className="h-10 px-4 border border-steel/30 text-rust-ink font-body text-sm"
       >
         + Add game
       </button>
@@ -104,7 +104,7 @@ export function TeamGameForm({ groupId, createdBy }: { groupId: string; createdB
           );
         })}
       </div>
-      {error && <p className="font-body text-xs text-rust">{error}</p>}
+      {error && <p className="font-body text-xs text-rust-ink">{error}</p>}
       <div className="flex items-center gap-3">
         <button
           type="button"

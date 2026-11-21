@@ -40,7 +40,7 @@ export function ProgramBuilderPreview() {
                   className="flex items-center justify-between text-xs font-body"
                 >
                   <span className="text-chalk/80 truncate pr-2">{r.name}</span>
-                  <span className="text-rust font-medium shrink-0">{r.sets}</span>
+                  <span className="text-rust-ink font-medium shrink-0">{r.sets}</span>
                 </div>
               ))}
             </div>

@@ -115,7 +115,7 @@ export default async function KioskSettingsPage(
       {cardsReady && organizationId && mode === "front_desk" && <CardCsvImport organizationId={organizationId} />}
 
       {rosterFailed ? (
-        <p className="font-body text-sm text-rust" role="alert">
+        <p className="font-body text-sm text-rust-ink" role="alert">
           The client list could not be read. Reload to try again.
         </p>
       ) : (

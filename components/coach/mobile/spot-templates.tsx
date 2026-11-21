@@ -35,7 +35,7 @@ export function SpotTemplates({ groupId }: { groupId: string }) {
       {templates === null ? (
         <p className="font-body text-xs text-steel">One moment…</p>
       ) : templates === "failed" ? (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           Couldn&apos;t load your templates. Close this and try again.
         </p>
       ) : templates.length === 0 ? (

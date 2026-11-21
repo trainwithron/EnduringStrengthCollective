@@ -19,7 +19,7 @@ export function NutritionClientList({ athletes, week, selectedId }: { athletes: 
   return (
     <div>
       {week.failed && (
-        <p className="font-body text-xs text-rust px-3 py-2 border-b border-steel/15" role="alert">
+        <p className="font-body text-xs text-rust-ink px-3 py-2 border-b border-steel/15" role="alert">
           Couldn&apos;t load this week&apos;s numbers. Reload to try again.
         </p>
       )}
@@ -39,7 +39,7 @@ function Row({ href, name, facts, selected }: { href: string; name: string; fact
   return (
     <li>
       <Link href={href} aria-current={selected ? "page" : undefined} className={`block min-h-11 px-3 py-2 ${selected ? "bg-rust/10" : "hover:bg-surface/40"}`}>
-        <span className={`block font-body text-sm ${selected ? "text-rust" : "text-chalk"}`}>{name}</span>
+        <span className={`block font-body text-sm ${selected ? "text-rust-ink" : "text-chalk"}`}>{name}</span>
         {facts.length > 0 && (
           <span className="block font-body text-xs text-steel [font-variant-numeric:tabular-nums]" data-week-facts>
             {facts.join(" · ")}

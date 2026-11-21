@@ -125,7 +125,7 @@ export function GroupEventForm({
       </label>
       <p className="font-body text-xs text-steel">Costs no session. Members answer In or Out. Times are in your time zone ({timezone.replace("_", " ")}).</p>
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

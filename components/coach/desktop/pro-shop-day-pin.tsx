@@ -86,7 +86,7 @@ export function ProShopDayPin({
           {pins.map((p) => (
             <div key={p.id} className="flex items-center justify-between gap-2 border border-steel/15 px-3 py-2">
               <span className="font-body text-sm text-chalk">{p.linkTitle}</span>
-              <button type="button" onClick={() => handleUnpin(p.id)} className="text-steel active:text-rust" aria-label={`Unpin ${p.linkTitle}`}>
+              <button type="button" onClick={() => handleUnpin(p.id)} className="text-steel active:text-rust-ink" aria-label={`Unpin ${p.linkTitle}`}>
                 <Trash2 className="w-4 h-4" />
               </button>
             </div>

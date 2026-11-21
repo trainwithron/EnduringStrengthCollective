@@ -94,7 +94,7 @@ export function BirthdayForm({
         className="w-full h-11 bg-surface border border-steel/30 text-chalk px-3 font-body focus:outline-none focus:border-rust"
       />
       {error && (
-        <p className="font-body text-sm text-rust" role="alert">
+        <p className="font-body text-sm text-rust-ink" role="alert">
           {error}
         </p>
       )}

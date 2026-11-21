@@ -28,7 +28,7 @@ describe("the coach's limits", () => {
     expect(capLine(98, 100, "month")).toEqual({ text: "98 of 100 this month", tone: "plain" });
     expect(capLine(10, null, "week")).toBeNull();
     expect(capToneClass("amber")).toBe("text-amber");
-    expect(capToneClass("rust")).toBe("text-rust");
+    expect(capToneClass("rust")).toBe("text-rust-ink");
   });
 });
 

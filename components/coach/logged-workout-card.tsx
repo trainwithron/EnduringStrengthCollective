@@ -55,13 +55,13 @@ export function LoggedWorkoutCard({
               {loggedByCoach && <CoachLoggedBadge className="normal-case" />}
             </p>
             {exerciseNames.length > 0 && <p className="font-body text-xs text-steel mt-1 line-clamp-1">{exerciseNames.join(", ")}</p>}
-            {prs.length > 0 && <p className="font-body text-xs text-rust mt-1">PR: {prs.join(", ")}</p>}
+            {prs.length > 0 && <p className="font-body text-xs text-rust-ink mt-1">PR: {prs.join(", ")}</p>}
           </div>
           {stats.length > 0 && (
             <div className="flex gap-5 shrink-0">
               {stats.map((s) => (
                 <div key={s.label} className="min-w-0">
-                  <p className={`font-display text-2xl leading-none [font-variant-numeric:tabular-nums] ${s.accent ? "text-rust" : ""}`}>{s.value}</p>
+                  <p className={`font-display text-2xl leading-none [font-variant-numeric:tabular-nums] ${s.accent ? "text-rust-ink" : ""}`}>{s.value}</p>
                   <p className="font-body text-[10px] text-steel uppercase tracking-wide mt-1">{s.label}</p>
                 </div>
               ))}
@@ -70,7 +70,7 @@ export function LoggedWorkoutCard({
         </div>
       </Link>
       {sessionId && (
-        <Link href={`/sessions/${sessionId}/recap`} className="font-body text-xs text-rust px-4 min-h-11 inline-flex items-center">
+        <Link href={`/sessions/${sessionId}/recap`} className="font-body text-xs text-rust-ink px-4 min-h-11 inline-flex items-center">
           Recap &amp; Up Next &rarr;
         </Link>
       )}

@@ -190,7 +190,7 @@ export function TeamMembersPanel({
             className="w-full mt-1 bg-graphite border border-steel/30 text-chalk px-2.5 py-2 font-body text-base sm:text-sm focus:outline-none focus:border-rust"
           />
           <div className="flex items-center gap-3 mt-2">
-            <button type="button" onClick={announce} disabled={busy === "announce" || !announcement.trim()} className="h-11 px-4 border border-rust text-rust font-body text-sm font-medium disabled:opacity-40">
+            <button type="button" onClick={announce} disabled={busy === "announce" || !announcement.trim()} className="h-11 px-4 border border-rust text-rust-ink font-body text-sm font-medium disabled:opacity-40">
               {busy === "announce" ? "Sending…" : "Send to the team"}
             </button>
             {announceNote && (
@@ -200,7 +200,7 @@ export function TeamMembersPanel({
             )}
           </div>
           <p className="font-body text-xs mt-3">
-            <Link href={`/groups/${groupId}/team-activity`} className="text-rust">
+            <Link href={`/groups/${groupId}/team-activity`} className="text-rust-ink">
               Coach activity and payroll estimate &rarr;
             </Link>
           </p>
@@ -220,7 +220,7 @@ export function TeamMembersPanel({
                   {m.fullName}
                   {m.profileId === me ? <span className="text-steel"> (you)</span> : null}
                   <span className="text-steel text-xs uppercase tracking-wide ml-2">{ROLE_WORD[m.role] ?? m.role}</span>
-                  {m.leaving ? <span className="text-rust text-xs uppercase tracking-wide ml-2">{m.fired ? "Let go" : "Leaving"}</span> : null}
+                  {m.leaving ? <span className="text-rust-ink text-xs uppercase tracking-wide ml-2">{m.fired ? "Let go" : "Leaving"}</span> : null}
                 </p>
                 {isOwnerOrAdmin && (
                   <p className="font-body text-xs text-steel">
@@ -246,7 +246,7 @@ export function TeamMembersPanel({
                       {m.role === "admin" ? "Make a coach" : "Make an admin"}
                     </button>
                   )}
-                  <button type="button" onClick={() => { setRemoving(m.profileId); setError(null); setHandTo(""); setKind(""); }} className="font-body text-xs text-rust">
+                  <button type="button" onClick={() => { setRemoving(m.profileId); setError(null); setHandTo(""); setKind(""); }} className="font-body text-xs text-rust-ink">
                     Remove
                   </button>
                 </div>
@@ -299,7 +299,7 @@ export function TeamMembersPanel({
       <InvitationsList groupId={groupId} canManage={isOwnerOrAdmin} invites={invites} newInvites={newInvites} busy={busy} onResendExisting={resend} onCancelExisting={cancel} />
 
       {error && (
-        <p className="font-body text-xs text-rust mt-3" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-3" role="alert">
           {error}
         </p>
       )}
@@ -307,7 +307,7 @@ export function TeamMembersPanel({
       {isOwner && members.length > 1 && (
         <div className="mt-8 border-t border-steel/20 pt-4">
           {!closing ? (
-            <button type="button" onClick={() => { setClosing(true); setError(null); }} className="font-body text-xs text-rust">
+            <button type="button" onClick={() => { setClosing(true); setError(null); }} className="font-body text-xs text-rust-ink">
               Close this organization
             </button>
           ) : (

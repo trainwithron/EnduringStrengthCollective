@@ -75,7 +75,7 @@ export function InbodyScansSection({ athleteId, groupId, viewerId, athleteName }
           InBody scans
         </h2>
         {!adding && (
-          <button type="button" onClick={() => setAdding(true)} className="min-h-11 font-body text-sm text-rust underline underline-offset-2">
+          <button type="button" onClick={() => setAdding(true)} className="min-h-11 font-body text-sm text-rust-ink underline underline-offset-2">
             Scan an InBody sheet
           </button>
         )}
@@ -121,7 +121,7 @@ export function InbodyScansSection({ athleteId, groupId, viewerId, athleteName }
                 {row.source === "photo" && <p className="text-xs text-steel mt-0.5">Imported from a photo, check the numbers.</p>}
                 <div className="mt-1 flex flex-wrap gap-x-4">
                   {row.photo_path && (
-                    <button type="button" onClick={() => void viewSheet(row.photo_path as string)} className="min-h-11 text-xs text-rust underline underline-offset-2">
+                    <button type="button" onClick={() => void viewSheet(row.photo_path as string)} className="min-h-11 text-xs text-rust-ink underline underline-offset-2">
                       View the sheet
                     </button>
                   )}
@@ -137,7 +137,7 @@ export function InbodyScansSection({ athleteId, groupId, viewerId, athleteName }
         </>
       )}
       {error && (
-        <p className="font-body text-xs text-rust mt-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-2" role="alert">
           {error}
         </p>
       )}

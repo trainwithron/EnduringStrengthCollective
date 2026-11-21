@@ -105,9 +105,9 @@ export function AssignOtherTime({
         </button>
       </div>
       {valid && outside && !clash && <p className="font-body text-xs text-steel mt-2">This is outside your open hours. You can still book it.</p>}
-      {clash && <p className="font-body text-xs text-rust mt-2">That overlaps another session on this day.</p>}
+      {clash && <p className="font-body text-xs text-rust-ink mt-2">That overlaps another session on this day.</p>}
       {error && (
-        <p className="font-body text-xs text-rust mt-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-2" role="alert">
           {error}
         </p>
       )}

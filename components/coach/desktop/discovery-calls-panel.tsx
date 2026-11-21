@@ -76,13 +76,13 @@ export function DiscoveryCallsPanel({
         <button
           type="button"
           onClick={handleCopy}
-          className="h-10 px-3 border border-rust text-rust font-body text-xs shrink-0"
+          className="h-10 px-3 border border-rust text-rust-ink font-body text-xs shrink-0"
         >
           {copied ? "Copied" : "Copy"}
         </button>
       </div>
 
-      {error && <p className="font-body text-xs text-rust mb-2">{error}</p>}
+      {error && <p className="font-body text-xs text-rust-ink mb-2">{error}</p>}
 
       {calls.length === 0 ? (
         <p className="font-body text-sm text-steel">No discovery calls booked yet.</p>
@@ -115,7 +115,7 @@ export function DiscoveryCallsPanel({
                 type="button"
                 onClick={() => handleCancel(call.id)}
                 disabled={busyId === call.id}
-                className="font-body text-xs text-steel active:text-rust transition-colors shrink-0 disabled:opacity-40"
+                className="font-body text-xs text-steel active:text-rust-ink transition-colors shrink-0 disabled:opacity-40"
               >
                 Cancel
               </button>

@@ -286,7 +286,7 @@ function EntryRow({
           </>
         )}
         {warning && <p className="font-body text-xs text-amber-400" role="alert">{warning}</p>}
-        {error && <p className="font-body text-xs text-rust" role="alert">{error}</p>}
+        {error && <p className="font-body text-xs text-rust-ink" role="alert">{error}</p>}
         <div className="flex items-center gap-2">
           <button type="button" onClick={save} disabled={busy} className="min-h-[44px] px-4 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40">
             {warning ? "Save anyway" : "Save"}
@@ -316,7 +316,7 @@ function EntryRow({
           Delete
         </button>
       </div>
-      {error && <p className="font-body text-xs text-rust" role="alert">{error}</p>}
+      {error && <p className="font-body text-xs text-rust-ink" role="alert">{error}</p>}
     </li>
   );
 }

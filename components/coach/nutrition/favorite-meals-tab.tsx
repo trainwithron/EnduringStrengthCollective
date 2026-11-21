@@ -39,7 +39,7 @@ export async function FavoriteMealsTab({ userId, clients, todayKey }: { userId: 
   return (
     <div>
       {starError ? (
-        <p className="font-body text-sm text-rust" role="alert">
+        <p className="font-body text-sm text-rust-ink" role="alert">
           Couldn&apos;t load your favorite meals just now. Reload the page to try again.
         </p>
       ) : (

@@ -76,7 +76,7 @@ export function GroupInvitesPanel({ groupId, groupName, coachName, invites }: { 
               </p>
               <div className="flex items-center gap-2 mt-1.5">
                 <input aria-label="Invite link" readOnly value={inviteUrl(appOriginBrowser(), plan.current.code)} onFocus={(e) => e.target.select()} className="flex-1 min-w-0 h-10 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none" />
-                <button type="button" onClick={copy} className="h-10 px-3 border border-rust text-rust font-body text-sm shrink-0">
+                <button type="button" onClick={copy} className="h-10 px-3 border border-rust text-rust-ink font-body text-sm shrink-0">
                   {copied ? "Copied" : "Copy"}
                 </button>
               </div>
@@ -135,7 +135,7 @@ export function GroupInvitesPanel({ groupId, groupName, coachName, invites }: { 
                 {plan.extra.map((l) => (
                   <li key={l.id} className="py-2 flex flex-wrap items-center gap-x-3 gap-y-1">
                     <span className="font-body text-sm text-chalk">Made {formatDay(l.createdAt)}</span>
-                    <span className={`font-body text-xs ${l.neverExpires ? "text-rust" : "text-steel"}`}>{l.neverExpires ? "never expires: cancel it" : `expires ${formatDay(l.expiresAt!)}`}</span>
+                    <span className={`font-body text-xs ${l.neverExpires ? "text-rust-ink" : "text-steel"}`}>{l.neverExpires ? "never expires: cancel it" : `expires ${formatDay(l.expiresAt!)}`}</span>
                     <button
                       type="button"
                       onClick={() => call({ action: "revoke", inviteId: l.id }, `x-${l.id}`, "Cancel this link? Anyone who has it will no longer be able to join with it.")}
@@ -150,7 +150,7 @@ export function GroupInvitesPanel({ groupId, groupName, coachName, invites }: { 
             </div>
           )}
           {error && (
-            <p className="font-body text-xs text-rust mt-2" role="alert">
+            <p className="font-body text-xs text-rust-ink mt-2" role="alert">
               {error}
             </p>
           )}

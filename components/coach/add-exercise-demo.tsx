@@ -144,7 +144,7 @@ export function AddExerciseDemo({
               {chosen.name}
             </p>
             {!uploading && (
-              <button type="button" onClick={() => setChosen(null)} className="min-h-11 px-2 font-body text-xs text-rust shrink-0">
+              <button type="button" onClick={() => setChosen(null)} className="min-h-11 px-2 font-body text-xs text-rust-ink shrink-0">
                 Change
               </button>
             )}
@@ -180,7 +180,7 @@ export function AddExerciseDemo({
       )}
 
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

@@ -56,7 +56,7 @@ export async function PaymentProblemsSection({ groupIds, timezone }: { groupIds:
   }
   if (failed) {
     return (
-      <p className="font-body text-sm text-rust mb-8" role="alert">
+      <p className="font-body text-sm text-rust-ink mb-8" role="alert">
         Couldn&apos;t load payment problems. Reload to try again.
       </p>
     );

@@ -102,7 +102,7 @@ export function WeightLogWidget({
       <div className="flex items-center gap-3 mt-2">
         <Link
           href={`/groups/${groupId}/transformation/new?milestone=${newMilestone.id}`}
-          className="inline-flex items-center min-h-11 font-body text-xs text-rust font-medium"
+          className="inline-flex items-center min-h-11 font-body text-xs text-rust-ink font-medium"
         >
           Create a card →
         </Link>
@@ -129,7 +129,7 @@ export function WeightLogWidget({
           <span className="font-body text-sm text-chalk">
             {todayLog ? `Today's weight: ${formatWeight(todayLog.weight, weightUnit)}` : "Log today's weight"}
           </span>
-          <span className="font-body text-xs text-rust">{todayLog ? "Update" : "Log"}</span>
+          <span className="font-body text-xs text-rust-ink">{todayLog ? "Update" : "Log"}</span>
         </button>
       </div>
     );
@@ -208,7 +208,7 @@ export function WeightLogWidget({
       </form>
 
       {error && (
-        <p className="font-body text-xs text-rust mt-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-2" role="alert">
           {error}
         </p>
       )}

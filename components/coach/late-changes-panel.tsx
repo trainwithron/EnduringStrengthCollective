@@ -231,7 +231,7 @@ export function LateChangesPanel({ groupIds: scopeGroupIds }: { groupIds?: strin
                     {m.kind === "move" && m.fromStartAt ? `Move ${fmt(m.fromStartAt)} to ${fmt(m.newStartAt)}` : `New session ${fmt(m.newStartAt)}`}
                     {m.newEndAt ? ` to ${fmtTime(m.newEndAt)}` : ""} ({tzName(m.newStartAt)})
                   </p>
-                  {m.outsideHours && <p className="font-body text-xs text-rust">Outside your open hours or on your time off. You can still confirm it.</p>}
+                  {m.outsideHours && <p className="font-body text-xs text-rust-ink">Outside your open hours or on your time off. You can still confirm it.</p>}
                   {creditLines[`${m.athleteId}:${m.groupId}`] && <p className="font-body text-xs text-steel">{creditLines[`${m.athleteId}:${m.groupId}`]}</p>}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -239,7 +239,7 @@ export function LateChangesPanel({ groupIds: scopeGroupIds }: { groupIds?: strin
                     type="button"
                     disabled={busyId === m.id}
                     onClick={() => answerMove(m.id, true)}
-                    className="h-11 px-4 border border-rust text-rust font-body text-sm disabled:opacity-50"
+                    className="h-11 px-4 border border-rust text-rust-ink font-body text-sm disabled:opacity-50"
                   >
                     Confirm
                   </button>
@@ -278,7 +278,7 @@ export function LateChangesPanel({ groupIds: scopeGroupIds }: { groupIds?: strin
                 type="button"
                 disabled={busyId === i.id}
                 onClick={() => decide(i.id, true)}
-                className="h-11 px-4 border border-rust text-rust font-body text-sm disabled:opacity-50"
+                className="h-11 px-4 border border-rust text-rust-ink font-body text-sm disabled:opacity-50"
               >
                 Charge
               </button>
@@ -295,7 +295,7 @@ export function LateChangesPanel({ groupIds: scopeGroupIds }: { groupIds?: strin
         ))}
       </ul>
       {error && (
-        <p className="font-body text-xs text-rust mt-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-2" role="alert">
           {error}
         </p>
       )}

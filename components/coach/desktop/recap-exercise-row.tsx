@@ -112,7 +112,7 @@ export function RecapExerciseRow({
       </button>
 
       {exercise.isPr && showTrainingMaxOnPr && exercise.trainingMaxBumped && (
-        <p className="font-body text-xs text-rust px-4 pb-2 -mt-1">
+        <p className="font-body text-xs text-rust-ink px-4 pb-2 -mt-1">
           Also bumped their training-max estimate to {exercise.trainingMaxEstimate} lb
           {exercise.trainingMaxAssumedEffort ? " (assumed near-max effort — no RPE logged on this set)" : ""}.
         </p>
@@ -172,7 +172,7 @@ export function RecapExerciseRow({
               </span>
             </label>
             {saveError && (
-              <p className="font-body text-xs text-rust mt-2" role="alert">
+              <p className="font-body text-xs text-rust-ink mt-2" role="alert">
                 {saveError}
               </p>
             )}

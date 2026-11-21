@@ -53,7 +53,7 @@ export function DownloadAppButton({
           onClick={() => setOpen(true)}
           title="Get the app on your phone"
           aria-label="Get the app on your phone"
-          className="w-9 h-9 flex items-center justify-center text-steel active:text-rust transition-colors shrink-0"
+          className="w-9 h-9 flex items-center justify-center text-steel active:text-rust-ink transition-colors shrink-0"
         >
           <Smartphone className="w-[18px] h-[18px]" strokeWidth={2.25} />
         </button>
@@ -90,7 +90,7 @@ export function DownloadAppButton({
               type="button"
               onClick={() => setOpen(false)}
               aria-label="Close"
-              className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center text-steel active:text-rust transition-colors"
+              className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center text-steel active:text-rust-ink transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
@@ -111,7 +111,7 @@ export function DownloadAppButton({
               <button
                 type="button"
                 onClick={handleCopy}
-                className="h-10 px-3 border border-steel/30 text-steel active:border-rust active:text-rust transition-colors shrink-0 flex items-center gap-1.5"
+                className="h-10 px-3 border border-steel/30 text-steel active:border-rust active:text-rust-ink transition-colors shrink-0 flex items-center gap-1.5"
               >
                 {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                 <span className="font-body text-xs">{copied ? "Copied" : "Copy"}</span>
@@ -120,7 +120,7 @@ export function DownloadAppButton({
 
             <div className="mt-5 space-y-4">
               <div>
-                <p className="font-body text-xs text-rust uppercase tracking-wide font-medium">
+                <p className="font-body text-xs text-rust-ink uppercase tracking-wide font-medium">
                   On an iPhone
                 </p>
                 <p className="font-body text-sm text-chalk mt-1">
@@ -128,7 +128,7 @@ export function DownloadAppButton({
                 </p>
               </div>
               <div>
-                <p className="font-body text-xs text-rust uppercase tracking-wide font-medium">
+                <p className="font-body text-xs text-rust-ink uppercase tracking-wide font-medium">
                   On Android
                 </p>
                 <p className="font-body text-sm text-chalk mt-1">

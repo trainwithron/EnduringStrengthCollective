@@ -312,12 +312,12 @@ export function ProgramCardMenu({
   return (
     <div className="relative flex items-center gap-1">
       {showAssignButton && !isTemplate && (
-        <button type="button" onClick={openAssign} className="min-h-11 px-2 font-body text-xs text-rust underline underline-offset-2">
+        <button type="button" onClick={openAssign} className="min-h-11 px-2 font-body text-xs text-rust-ink underline underline-offset-2">
           Assign
         </button>
       )}
       {isTemplate && !hideAssignAndDuplicate && (
-        <button type="button" onClick={() => setTemplateOpen(true)} className="min-h-11 px-2 font-body text-xs text-rust underline underline-offset-2">
+        <button type="button" onClick={() => setTemplateOpen(true)} className="min-h-11 px-2 font-body text-xs text-rust-ink underline underline-offset-2">
           Use template
         </button>
       )}
@@ -326,7 +326,7 @@ export function ProgramCardMenu({
         type="button"
         onClick={() => (view ? setView(null) : openMenu())}
         aria-label="Program options"
-        className="w-7 h-7 flex items-center justify-center text-steel active:text-rust transition-colors"
+        className="w-7 h-7 flex items-center justify-center text-steel active:text-rust-ink transition-colors"
       >
         <MoreVertical className="w-4 h-4" />
       </button>
@@ -344,7 +344,7 @@ export function ProgramCardMenu({
           className="bg-surface border border-steel/30 z-50 shadow-lg"
         >
           {error && (
-            <p className="font-body text-xs text-rust px-3 pt-2.5" role="alert">
+            <p className="font-body text-xs text-rust-ink px-3 pt-2.5" role="alert">
               {error}
             </p>
           )}
@@ -423,7 +423,7 @@ export function ProgramCardMenu({
                 type="button"
                 disabled={busy}
                 onClick={handleDelete}
-                className="w-full text-left px-3 py-2.5 font-body text-sm text-rust hover:bg-graphite/50 disabled:opacity-40 border-t border-steel/15"
+                className="w-full text-left px-3 py-2.5 font-body text-sm text-rust-ink hover:bg-graphite/50 disabled:opacity-40 border-t border-steel/15"
               >
                 {busy ? "Deleting…" : "Delete"}
               </button>

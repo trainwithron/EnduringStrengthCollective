@@ -40,14 +40,14 @@ export function CalendarClientList({ clients, selectedClientId }: { clients: Cal
                 type="button"
                 aria-pressed={isSelected}
                 onClick={() => setClient(isSelected ? null : { athleteId: c.profileId, fullName: c.fullName, balance: c.balance, groupId: c.groupId })}
-                className={`font-body text-sm text-left min-h-[32px] w-full truncate ${isSelected ? "text-rust font-medium" : "text-chalk"}`}
+                className={`font-body text-sm text-left min-h-[32px] w-full truncate ${isSelected ? "text-rust-ink font-medium" : "text-chalk"}`}
               >
                 {c.fullName}
               </button>
             </DraggableClientName>
             <span className="flex items-center justify-end gap-2 shrink-0 pr-2">
               {picture.owed > 0 && (
-                <span title="Already delivered beyond what they had" className="font-body text-[11px] text-rust">
+                <span title="Already delivered beyond what they had" className="font-body text-[11px] text-rust-ink">
                   owed {picture.owed}
                 </span>
               )}

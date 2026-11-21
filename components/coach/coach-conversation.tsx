@@ -191,7 +191,7 @@ function ConversationPanel({ onClose }: { onClose: () => void }) {
         </>
       )}
       {error && (
-        <p className="mt-2 font-body text-xs text-rust" role="alert">
+        <p className="mt-2 font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

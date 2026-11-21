@@ -191,7 +191,7 @@ export function ClientSignInPanel({
             <button
               type="button"
               onClick={copy}
-              className="h-11 px-4 border border-rust text-rust font-body text-sm shrink-0"
+              className="h-11 px-4 border border-rust text-rust-ink font-body text-sm shrink-0"
             >
               {copied ? "Copied" : "Copy"}
             </button>
@@ -247,7 +247,7 @@ export function ClientSignInPanel({
         </div>
       )}
       {error && (
-        <p className="font-body text-xs text-rust mt-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-2" role="alert">
           {error}
         </p>
       )}
@@ -280,7 +280,7 @@ export function ClientSignInPanel({
           </form>
         )}
         {emailMsg && (
-          <p className={`font-body text-xs mt-1.5 ${emailMsg.kind === "error" ? "text-rust" : "text-steel"}`} role="status">
+          <p className={`font-body text-xs mt-1.5 ${emailMsg.kind === "error" ? "text-rust-ink" : "text-steel"}`} role="status">
             {emailMsg.text}
           </p>
         )}

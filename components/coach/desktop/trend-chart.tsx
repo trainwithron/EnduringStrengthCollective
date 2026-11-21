@@ -78,7 +78,7 @@ export function TrendChart({
       </div>
       <div className="flex items-center justify-between font-body text-xs text-steel mt-1">
         <span>{new Date(first.date + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
-        <span className={delta === 0 ? "" : delta > 0 ? "text-positive" : "text-rust"}>
+        <span className={delta === 0 ? "" : delta > 0 ? "text-positive" : "text-rust-ink"}>
           {delta > 0 ? "+" : ""}
           {Math.round(delta * 10) / 10}
           {unit} since first entry

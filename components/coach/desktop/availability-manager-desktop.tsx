@@ -308,7 +308,7 @@ export function AvailabilityManagerDesktop({
   );
 
   const errorLine = rowError && (
-    <p className="basis-full font-body text-xs text-rust" role="alert">
+    <p className="basis-full font-body text-xs text-rust-ink" role="alert">
       {rowError}
     </p>
   );
@@ -375,7 +375,7 @@ export function AvailabilityManagerDesktop({
           </p>
         )}
         {timingError && (
-          <p className="font-body text-xs text-rust mt-2" role="alert">
+          <p className="font-body text-xs text-rust-ink mt-2" role="alert">
             {timingError}
           </p>
         )}
@@ -424,7 +424,7 @@ export function AvailabilityManagerDesktop({
                           <button type="button" onClick={() => startCopy(w)} aria-label={`Copy ${WEEKDAYS[w.weekday]} hours to other days`} title="Copy to other days" className={iconBtn}>
                             <Copy className="w-4 h-4" />
                           </button>
-                          <button type="button" onClick={() => handleDelete(w.id)} aria-label="Delete window" title="Delete" className={`${iconBtn} active:text-rust`}>
+                          <button type="button" onClick={() => handleDelete(w.id)} aria-label="Delete window" title="Delete" className={`${iconBtn} active:text-rust-ink`}>
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </span>
@@ -452,7 +452,7 @@ export function AvailabilityManagerDesktop({
                           </div>
                           {editorButtons("Copy", () => saveCopy(w))}
                           {rowError && (
-                            <p className="font-body text-xs text-rust mt-2" role="alert">
+                            <p className="font-body text-xs text-rust-ink mt-2" role="alert">
                               {rowError}
                             </p>
                           )}
@@ -472,7 +472,7 @@ export function AvailabilityManagerDesktop({
                     type="button"
                     onClick={() => startAdd(day)}
                     aria-label={`Add ${WEEKDAYS[day]} hours`}
-                    className="h-8 inline-flex items-center gap-1 font-body text-xs text-rust"
+                    className="h-8 inline-flex items-center gap-1 font-body text-xs text-rust-ink"
                   >
                     <Plus className="w-3.5 h-3.5" aria-hidden />
                     Add hours

@@ -126,7 +126,7 @@ export function CoachRosterMobile({
     <div className="relative">
       {needsAttention.length > 0 && (
         <div className="mb-4">
-          <p className="font-body text-xs text-rust uppercase tracking-wide font-bold px-1 mb-1.5">
+          <p className="font-body text-xs text-rust-ink uppercase tracking-wide font-bold px-1 mb-1.5">
             Needs attention
           </p>
           <div className="divide-y divide-steel/15 border border-steel/20 rounded-token-lg overflow-hidden">
@@ -158,7 +158,7 @@ export function CoachRosterMobile({
               type="button"
               onClick={() => scrollToLetter(letter)}
               aria-label={`Jump to ${letter}`}
-              className="font-body text-xs text-steel active:text-rust w-4 h-4 flex items-center justify-center"
+              className="font-body text-xs text-steel active:text-rust-ink w-4 h-4 flex items-center justify-center"
             >
               {letter}
             </button>
@@ -215,28 +215,28 @@ function RosterRow({
             <Link
               href={`/groups/${groupId}/athletes/${member.profileId}`}
               onClick={close}
-              className="font-body text-sm text-rust min-h-11 inline-flex items-center"
+              className="font-body text-sm text-rust-ink min-h-11 inline-flex items-center"
             >
               Open profile
             </Link>
             <Link
               href={`/groups/${groupId}/athletes/${member.profileId}/log`}
               onClick={close}
-              className="font-body text-sm text-rust min-h-11 inline-flex items-center"
+              className="font-body text-sm text-rust-ink min-h-11 inline-flex items-center"
             >
               Log their workout
             </Link>
             <Link
               href={`/groups/${groupId}/messages/${member.profileId}`}
               onClick={close}
-              className="font-body text-sm text-rust min-h-11 inline-flex items-center"
+              className="font-body text-sm text-rust-ink min-h-11 inline-flex items-center"
             >
               Message
             </Link>
             <Link
               href={`/groups/${groupId}/clients?spotBuilder=${member.profileId}&spotBuilderName=${encodeURIComponent(member.fullName)}`}
               onClick={close}
-              className="font-body text-sm text-rust min-h-11 inline-flex items-center"
+              className="font-body text-sm text-rust-ink min-h-11 inline-flex items-center"
             >
               Build with AI
             </Link>

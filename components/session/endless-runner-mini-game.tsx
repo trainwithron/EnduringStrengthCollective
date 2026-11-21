@@ -142,7 +142,7 @@ export function EndlessRunnerMiniGame({
           Score: <span className="text-chalk">{score}</span> · Best:{" "}
           <span className="text-chalk">{highScore}</span>
         </span>
-        <button type="button" onClick={onClose} className="text-steel active:text-rust transition-colors">
+        <button type="button" onClick={onClose} className="text-steel active:text-rust-ink transition-colors">
           Close ✕
         </button>
       </div>

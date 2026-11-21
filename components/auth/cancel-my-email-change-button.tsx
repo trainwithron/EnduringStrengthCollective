@@ -28,7 +28,7 @@ export function CancelMyEmailChangeButton() {
         {busy ? "Cancelling…" : "Cancel the change"}
       </button>
       {error && (
-        <p className="font-body text-xs text-rust mt-1" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-1" role="alert">
           {error}
         </p>
       )}

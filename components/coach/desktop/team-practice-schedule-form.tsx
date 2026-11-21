@@ -102,7 +102,7 @@ export function TeamPracticeScheduleForm({
                 type="button"
                 onClick={() => handleDelete(s.id)}
                 aria-label="Delete practice slot"
-                className="w-7 h-7 inline-flex items-center justify-center text-steel active:text-rust transition-colors shrink-0"
+                className="w-7 h-7 inline-flex items-center justify-center text-steel active:text-rust-ink transition-colors shrink-0"
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
@@ -161,7 +161,7 @@ export function TeamPracticeScheduleForm({
           Add
         </button>
       </div>
-      {error && <p className="font-body text-xs text-rust mt-2">{error}</p>}
+      {error && <p className="font-body text-xs text-rust-ink mt-2">{error}</p>}
     </div>
   );
 }

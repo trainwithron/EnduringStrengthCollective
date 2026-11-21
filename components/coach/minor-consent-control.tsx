@@ -74,7 +74,7 @@ export function MinorConsentControl({
 
   return (
     <div className="border border-rust/40 p-4 space-y-3">
-      <h2 className="font-display uppercase text-sm tracking-wide text-rust">
+      <h2 className="font-display uppercase text-sm tracking-wide text-rust-ink">
         Parental consent (under 13)
       </h2>
       <p className="font-body text-xs text-steel">
@@ -88,7 +88,7 @@ export function MinorConsentControl({
           {verifiedAt ? `, ${new Date(verifiedAt).toLocaleDateString()}` : ""}
         </p>
       ) : (
-        <p className="font-body text-sm text-rust">⚠ Not yet verified</p>
+        <p className="font-body text-sm text-rust-ink">⚠ Not yet verified</p>
       )}
 
       <label className="block">
@@ -132,7 +132,7 @@ export function MinorConsentControl({
         {saving ? "Saving…" : verified ? "Undo verification" : "Mark parental consent verified"}
       </button>
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

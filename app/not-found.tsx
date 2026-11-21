@@ -20,7 +20,7 @@ export default function NotFound() {
           >
             Go home
           </Link>
-          <Link href="/login" className="font-body text-sm text-steel active:text-rust">
+          <Link href="/login" className="font-body text-sm text-steel active:text-rust-ink">
             Sign in
           </Link>
         </div>

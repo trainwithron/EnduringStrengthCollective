@@ -38,11 +38,11 @@ export function HomeWeekView({
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <Link href={prevHref} className="inline-flex items-center min-h-11 font-body text-xs text-rust uppercase tracking-wide">
+        <Link href={prevHref} className="inline-flex items-center min-h-11 font-body text-xs text-rust-ink uppercase tracking-wide">
           &larr; Prev
         </Link>
         <h2 className="font-display uppercase text-sm tracking-wide text-steel">{weekLabel}</h2>
-        <Link href={nextHref} className="inline-flex items-center min-h-11 font-body text-xs text-rust uppercase tracking-wide">
+        <Link href={nextHref} className="inline-flex items-center min-h-11 font-body text-xs text-rust-ink uppercase tracking-wide">
           Next &rarr;
         </Link>
       </div>
@@ -58,7 +58,7 @@ export function HomeWeekView({
                 isToday ? "border-rust/50 bg-surface/40" : "border-steel/20"
               }`}
             >
-              <div className={`w-11 shrink-0 text-center ${isToday ? "text-rust" : "text-steel"}`}>
+              <div className={`w-11 shrink-0 text-center ${isToday ? "text-rust-ink" : "text-steel"}`}>
                 <p className="font-body text-xs uppercase tracking-wide">
                   {WEEKDAY_SHORT[day.date.getDay()]}
                 </p>

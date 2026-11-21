@@ -39,7 +39,7 @@ export function RailWidgetRow({
 
 export function RailWidgetDeeperLink({ href, label }: { href: string; label: string }) {
   return (
-    <Link href={href} className="block mt-2.5 font-body text-xs text-rust underline underline-offset-2">
+    <Link href={href} className="block mt-2.5 font-body text-xs text-rust-ink underline underline-offset-2">
       {label}
     </Link>
   );

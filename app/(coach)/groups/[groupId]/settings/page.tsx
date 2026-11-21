@@ -313,7 +313,7 @@ export default async function SettingsPage(
                 <DownloadAppButton />
               </div>
             ) : (
-              <Link href={`/groups/${params.groupId}/dashboard`} className="font-body text-sm font-bold text-rust inline-flex items-center min-h-11">
+              <Link href={`/groups/${params.groupId}/dashboard`} className="font-body text-sm font-bold text-rust-ink inline-flex items-center min-h-11">
                 Coach home →
               </Link>
             )}
@@ -433,7 +433,7 @@ export default async function SettingsPage(
 
         {isCoach && !effective.isActingAsOther && (
           <SettingsGroup label="Coaches and invitations">
-            <Link href={`/groups/${params.groupId}/clients`} className="font-body text-sm font-bold text-rust inline-flex items-center min-h-11">
+            <Link href={`/groups/${params.groupId}/clients`} className="font-body text-sm font-bold text-rust-ink inline-flex items-center min-h-11">
               See your coaches and invite one →
             </Link>
             <Link href={`/groups/${params.groupId}/branding?tab=team`} className="font-body text-sm text-steel underline underline-offset-2 inline-flex items-center min-h-11">
@@ -444,7 +444,7 @@ export default async function SettingsPage(
 
         {canEditBranding && (
           <SettingsGroup label="Organization look">
-            <Link href={`/groups/${params.groupId}/branding?tab=branding`} className="font-body text-sm font-bold text-rust" data-organization-look>
+            <Link href={`/groups/${params.groupId}/branding?tab=branding`} className="font-body text-sm font-bold text-rust-ink" data-organization-look>
               Colors, logo and fonts →
             </Link>
           </SettingsGroup>
@@ -602,7 +602,7 @@ export default async function SettingsPage(
 
         {onFrontDesk && (
           <p className="font-body text-sm pt-2">
-            <Link href="/front-desk" className="text-rust">
+            <Link href="/front-desk" className="text-rust-ink">
               Open the front desk check-in screen →
             </Link>
           </p>

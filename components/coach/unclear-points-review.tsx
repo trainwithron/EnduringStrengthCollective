@@ -137,11 +137,11 @@ export function UnclearPointsReview({ athleteId, groupId, initial }: { athleteId
             ) : (
               <div className="mt-1 flex flex-wrap items-center gap-x-4">
                 {p.flag === "unclear" ? (
-                  <button type="button" disabled={busyId === p.id} onClick={() => void decide(p.id, true)} className="min-h-11 text-rust underline underline-offset-2 disabled:opacity-40">
+                  <button type="button" disabled={busyId === p.id} onClick={() => void decide(p.id, true)} className="min-h-11 text-rust-ink underline underline-offset-2 disabled:opacity-40">
                     Count it
                   </button>
                 ) : (
-                  <button type="button" disabled={busyId === p.id} onClick={() => void decide(p.id, false)} className="min-h-11 text-rust underline underline-offset-2 disabled:opacity-40">
+                  <button type="button" disabled={busyId === p.id} onClick={() => void decide(p.id, false)} className="min-h-11 text-rust-ink underline underline-offset-2 disabled:opacity-40">
                     Leave it out
                   </button>
                 )}
@@ -165,7 +165,7 @@ export function UnclearPointsReview({ athleteId, groupId, initial }: { athleteId
         ))}
       </ul>
       {error && (
-        <p className="font-body text-sm text-rust mt-2" role="alert">
+        <p className="font-body text-sm text-rust-ink mt-2" role="alert">
           {error}
         </p>
       )}

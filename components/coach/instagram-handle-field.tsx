@@ -56,13 +56,13 @@ export function InstagramHandleField({ coachId, initialHandle, id = "instagram-h
           placeholder="yourname"
           className="flex-1 min-w-0 min-h-11 bg-surface border border-steel/30 text-chalk px-3 font-body text-base sm:text-sm focus:outline-none focus:border-rust"
         />
-        <button type="button" onClick={() => void save()} disabled={busy || handle === savedHandle} className="min-h-11 px-4 border border-rust text-rust font-body text-sm disabled:opacity-50">
+        <button type="button" onClick={() => void save()} disabled={busy || handle === savedHandle} className="min-h-11 px-4 border border-rust text-rust-ink font-body text-sm disabled:opacity-50">
           Save
         </button>
       </div>
       <p className="font-body text-xs text-steel mt-1">Shown on your clients&apos; share pictures. Leave it empty for none.</p>
       {message && (
-        <p className={`font-body text-xs mt-1 ${message.error ? "text-rust" : "text-steel"}`} role={message.error ? "alert" : "status"}>
+        <p className={`font-body text-xs mt-1 ${message.error ? "text-rust-ink" : "text-steel"}`} role={message.error ? "alert" : "status"}>
           {message.text}
         </p>
       )}

@@ -81,7 +81,7 @@ export function RequestDifferentTime({
 
   return (
     <div id="request-different-time" className="mt-4 border border-steel/20 p-3 scroll-mt-20">
-      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="font-body text-sm text-rust min-h-11">
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="font-body text-sm text-rust-ink min-h-11">
         Ask for a different time
       </button>
       {open && (
@@ -108,12 +108,12 @@ export function RequestDifferentTime({
             type="button"
             onClick={send}
             disabled={submitting || !choice}
-            className="h-11 px-4 border border-rust text-rust font-body text-sm font-medium disabled:opacity-40"
+            className="h-11 px-4 border border-rust text-rust-ink font-body text-sm font-medium disabled:opacity-40"
           >
             {submitting ? "Sending…" : "Ask for this time"}
           </button>
           {error && (
-            <p className="font-body text-xs text-rust" role="alert">
+            <p className="font-body text-xs text-rust-ink" role="alert">
               {error}
             </p>
           )}

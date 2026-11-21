@@ -93,7 +93,7 @@ function TargetCell({
       <span
         title="Logged by the client"
         aria-label={`${label}, logged: ${logged || "nothing"}`}
-        className="w-12 h-9 flex items-center justify-center border border-rust/40 bg-rust/10 text-rust font-body text-xs shrink-0"
+        className="w-12 h-9 flex items-center justify-center border border-rust/40 bg-rust/10 text-rust-ink font-body text-xs shrink-0"
       >
         {logged || "–"}
       </span>
@@ -899,7 +899,7 @@ export function ExerciseBuilderCard({
         </div>
         {exercise.tier && (
           <span
-            className="w-6 h-6 shrink-0 flex items-center justify-center border border-rust text-rust font-display text-xs font-bold"
+            className="w-6 h-6 shrink-0 flex items-center justify-center border border-rust text-rust-ink font-display text-xs font-bold"
             title={`Class ${exercise.tier} (from its movement pattern in Exercise Library)`}
           >
             {exercise.tier}
@@ -919,7 +919,7 @@ export function ExerciseBuilderCard({
           onClick={handleDuplicate}
           disabled={busy}
           aria-label="Duplicate exercise"
-          className="w-11 h-11 sm:w-7 sm:h-7 flex items-center justify-center text-steel active:text-rust transition-colors shrink-0 disabled:opacity-40"
+          className="w-11 h-11 sm:w-7 sm:h-7 flex items-center justify-center text-steel active:text-rust-ink transition-colors shrink-0 disabled:opacity-40"
         >
           <Copy className="w-3.5 h-3.5" />
         </button>
@@ -928,7 +928,7 @@ export function ExerciseBuilderCard({
           onClick={handleDelete}
           disabled={busy}
           aria-label="Delete exercise"
-          className="w-11 h-11 sm:w-7 sm:h-7 flex items-center justify-center text-steel active:text-rust transition-colors shrink-0 disabled:opacity-40"
+          className="w-11 h-11 sm:w-7 sm:h-7 flex items-center justify-center text-steel active:text-rust-ink transition-colors shrink-0 disabled:opacity-40"
         >
           <Trash2 className="w-3.5 h-3.5" />
         </button>
@@ -947,7 +947,7 @@ export function ExerciseBuilderCard({
         />
         <div className="flex-1 min-w-0 pt-0.5">
           {supersetLabel && (
-            <p className="flex items-center gap-1.5 mb-0.5 font-body text-xs text-rust" data-superset-label>
+            <p className="flex items-center gap-1.5 mb-0.5 font-body text-xs text-rust-ink" data-superset-label>
               <span className="px-1.5 bg-rust text-graphite font-display font-bold">{supersetLabel}</span>
               {supersetKind ?? "Superset"}: done back to back, then rest
             </p>
@@ -977,7 +977,7 @@ export function ExerciseBuilderCard({
           {notInLibrary && (
             <p className="mt-0.5 flex flex-wrap items-center gap-x-2 font-body text-xs text-steel">
               <span>Not in your library</span>
-              <button type="button" onClick={addToLibrary} className="min-h-11 sm:min-h-0 text-rust underline underline-offset-2">
+              <button type="button" onClick={addToLibrary} className="min-h-11 sm:min-h-0 text-rust-ink underline underline-offset-2">
                 Add to my library
               </button>
             </p>
@@ -1020,7 +1020,7 @@ export function ExerciseBuilderCard({
                   className={`h-8 px-3 border font-body text-xs transition-colors ${
                     rung.exerciseName === exercise.exerciseName
                       ? "bg-rust border-rust text-graphite"
-                      : "border-steel/30 text-steel active:border-rust active:text-rust"
+                      : "border-steel/30 text-steel active:border-rust active:text-rust-ink"
                   }`}
                 >
                   {rung.exerciseName}
@@ -1043,7 +1043,7 @@ export function ExerciseBuilderCard({
               type="button"
               onClick={handleAddSet}
               disabled={setsBusy}
-              className="w-7 h-7 flex items-center justify-center border border-steel/30 text-steel active:border-rust active:text-rust disabled:opacity-30"
+              className="w-7 h-7 flex items-center justify-center border border-steel/30 text-steel active:border-rust active:text-rust-ink disabled:opacity-30"
             >
               +
             </button>
@@ -1061,7 +1061,7 @@ export function ExerciseBuilderCard({
                       title={SET_TYPE_LABELS[set.setType ?? "working"]}
                       value={set.setType ?? "working"}
                       onChange={(e) => void handleSetTypeChange(set.id, e.target.value as SetType)}
-                      className={`w-12 h-11 sm:h-9 shrink-0 appearance-none bg-graphite border text-center font-body text-[10px] focus:outline-none focus:border-rust ${(set.setType ?? "working") === "working" ? "border-steel/30 text-steel" : "border-rust/60 text-rust"}`}
+                      className={`w-12 h-11 sm:h-9 shrink-0 appearance-none bg-graphite border text-center font-body text-[10px] focus:outline-none focus:border-rust ${(set.setType ?? "working") === "working" ? "border-steel/30 text-steel" : "border-rust/60 text-rust-ink"}`}
                     >
                       {SET_TYPES.map((t) => (
                         <option key={t} value={t}>
@@ -1116,7 +1116,7 @@ export function ExerciseBuilderCard({
                       type="button"
                       onClick={() => handleRemoveField(field)}
                       aria-label={`Stop tracking ${builderLabel(field, def.label)}`}
-                      className="w-11 h-11 sm:w-6 sm:h-9 flex items-center justify-center text-steel active:text-rust shrink-0"
+                      className="w-11 h-11 sm:w-6 sm:h-9 flex items-center justify-center text-steel active:text-rust-ink shrink-0"
                     >
                       ×
                     </button>
@@ -1127,10 +1127,10 @@ export function ExerciseBuilderCard({
           </div>
 
           {isLoggedDay && (
-            <p className="font-body text-[13px] font-semibold text-rust mt-1.5">Logged</p>
+            <p className="font-body text-[13px] font-semibold text-rust-ink mt-1.5">Logged</p>
           )}
           {openSuggestions.length > 0 && (
-            <button type="button" onClick={acceptSuggestedWeights} className="mt-1.5 min-h-11 sm:min-h-0 font-body text-xs text-rust underline underline-offset-2">
+            <button type="button" onClick={acceptSuggestedWeights} className="mt-1.5 min-h-11 sm:min-h-0 font-body text-xs text-rust-ink underline underline-offset-2">
               Use the suggested weights
             </button>
           )}
@@ -1141,7 +1141,7 @@ export function ExerciseBuilderCard({
                 type="button"
                 onClick={onToggleLink}
                 aria-pressed={linkedToNext}
-                className={`min-h-11 sm:min-h-0 inline-flex items-center gap-1 font-body text-xs ${linkedToNext ? "text-rust" : "text-steel"}`}
+                className={`min-h-11 sm:min-h-0 inline-flex items-center gap-1 font-body text-xs ${linkedToNext ? "text-rust-ink" : "text-steel"}`}
                 data-superset-link
               >
                 <Link2 className="w-3.5 h-3.5" aria-hidden="true" />
@@ -1153,7 +1153,7 @@ export function ExerciseBuilderCard({
                 type="button"
                 onClick={() => setAddFieldOpen((v) => !v)}
                 disabled={untrackedFields.length === 0}
-                className="min-h-11 sm:min-h-0 px-2 sm:px-0 font-body text-xs text-steel active:text-rust transition-colors disabled:opacity-30"
+                className="min-h-11 sm:min-h-0 px-2 sm:px-0 font-body text-xs text-steel active:text-rust-ink transition-colors disabled:opacity-30"
               >
                 + Add
               </button>
@@ -1164,7 +1164,7 @@ export function ExerciseBuilderCard({
                       key={f}
                       type="button"
                       onClick={() => handleAddField(f)}
-                      className="h-7 px-2 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust"
+                      className="h-7 px-2 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust-ink"
                     >
                       {builderLabel(f, fieldDef(f).label)}
                     </button>
@@ -1178,7 +1178,7 @@ export function ExerciseBuilderCard({
                 type="button"
                 onClick={() => setPresetMenuOpen((v) => !v)}
                 disabled={presetBusy}
-                className="font-body text-xs text-steel active:text-rust transition-colors disabled:opacity-30"
+                className="font-body text-xs text-steel active:text-rust-ink transition-colors disabled:opacity-30"
               >
                 ⚡ Energy System
               </button>
@@ -1206,7 +1206,7 @@ export function ExerciseBuilderCard({
               type="button"
               onClick={applyRunnerMode}
               disabled={presetBusy}
-              className="font-body text-xs text-steel active:text-rust transition-colors disabled:opacity-30"
+              className="font-body text-xs text-steel active:text-rust-ink transition-colors disabled:opacity-30"
             >
               🏃 Runner mode
             </button>
@@ -1217,7 +1217,7 @@ export function ExerciseBuilderCard({
                   type="button"
                   onClick={() => setRestMenuOpen((v) => !v)}
                   disabled={presetBusy}
-                  className="font-body text-xs text-steel active:text-rust transition-colors disabled:opacity-30"
+                  className="font-body text-xs text-steel active:text-rust-ink transition-colors disabled:opacity-30"
                 >
                   ⏱ Rest
                 </button>
@@ -1265,7 +1265,7 @@ export function ExerciseBuilderCard({
             <button
               type="button"
               onClick={() => setShowDetails((v) => !v)}
-              className="font-body text-xs text-steel active:text-rust transition-colors"
+              className="font-body text-xs text-steel active:text-rust-ink transition-colors"
             >
               {showDetails ? "Hide details" : "Edit details"}
             </button>

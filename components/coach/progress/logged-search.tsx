@@ -23,7 +23,7 @@ export function LoggedSearch({ action, q, from, to }: { action: string; q: strin
         Search
       </button>
       {searching && (
-        <Link href={action} className="min-h-11 inline-flex items-center font-body text-sm text-rust underline underline-offset-2">
+        <Link href={action} className="min-h-11 inline-flex items-center font-body text-sm text-rust-ink underline underline-offset-2">
           Clear
         </Link>
       )}

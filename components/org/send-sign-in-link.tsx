@@ -30,7 +30,7 @@ export function SendSignInLink({ groupId, profileId, name, label = "Send sign-in
         {working ? "Sending…" : label}
       </button>
       {message && (
-        <p className={`basis-full font-body text-xs ${message.kind === "ok" ? "text-positive" : "text-rust"}`} role={message.kind === "ok" ? "status" : "alert"}>
+        <p className={`basis-full font-body text-xs ${message.kind === "ok" ? "text-positive" : "text-rust-ink"}`} role={message.kind === "ok" ? "status" : "alert"}>
           {message.text}
         </p>
       )}

@@ -85,7 +85,7 @@ export function PushNotificationToggle({
           </button>
         )}
         {error && (
-          <p className="font-body text-xs text-rust mt-2" role="alert">
+          <p className="font-body text-xs text-rust-ink mt-2" role="alert">
             {error}
           </p>
         )}
@@ -158,7 +158,7 @@ export function PushNotificationToggle({
         </p>
       )}
       {error && (
-        <p className="font-body text-xs text-rust mt-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-2" role="alert">
           {error}
         </p>
       )}

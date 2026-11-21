@@ -20,7 +20,7 @@ function TipList({ tips }: { tips: QuickTip[] }) {
       {tips.map((tip, i) => (
         <li key={i} className="border border-steel/20 p-4">
           <div className="flex items-start gap-3">
-            <Lightbulb className="w-4 h-4 text-rust shrink-0 mt-0.5" />
+            <Lightbulb className="w-4 h-4 text-rust-ink shrink-0 mt-0.5" />
             <div>
               <p className="font-body text-sm font-bold text-chalk">{tip.hook}</p>
               <p className="font-body text-sm text-steel mt-1.5 leading-relaxed">{tip.detail}</p>

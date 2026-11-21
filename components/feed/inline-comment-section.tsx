@@ -297,13 +297,13 @@ export function InlineCommentSection({
           <p className="font-body text-xs text-steel">
             Replying to {replyTarget.profiles?.full_name ?? "a former member"}
           </p>
-          <button onClick={() => setReplyTo(null)} className="font-body text-xs text-rust">
+          <button onClick={() => setReplyTo(null)} className="font-body text-xs text-rust-ink">
             Cancel
           </button>
         </div>
       )}
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

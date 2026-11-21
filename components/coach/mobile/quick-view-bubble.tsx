@@ -136,7 +136,7 @@ export function QuickViewBubble({
               <div className="px-5 pb-5">
                 <Link
                   href={deeperHref}
-                  className="font-body text-xs text-rust underline underline-offset-2"
+                  className="font-body text-xs text-rust-ink underline underline-offset-2"
                 >
                   {deeperLabel ?? "Open"}
                 </Link>

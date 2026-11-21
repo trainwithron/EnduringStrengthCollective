@@ -90,23 +90,23 @@ export function SessionCreditsControl({
           type="button"
           onClick={() => adjust(-1)}
           aria-label="Remove one session"
-          className="w-11 h-11 flex items-center justify-center border border-steel/30 text-steel font-body text-lg active:border-rust active:text-rust transition-colors disabled:opacity-40"
+          className="w-11 h-11 flex items-center justify-center border border-steel/30 text-steel font-body text-lg active:border-rust active:text-rust-ink transition-colors disabled:opacity-40"
         >
           &minus;
         </button>
         <EditableBalance value={balance} label="Sessions left" className="font-display text-lg min-w-6 text-center" onCommit={typeBalance} />
-        {balance < 0 && <span className="font-body text-xs text-rust">Owed {Math.abs(balance)}</span>}
+        {balance < 0 && <span className="font-body text-xs text-rust-ink">Owed {Math.abs(balance)}</span>}
         <button
           type="button"
           onClick={() => adjust(1)}
           aria-label="Add one session"
-          className="w-11 h-11 flex items-center justify-center border border-steel/30 text-steel font-body text-lg active:border-rust active:text-rust transition-colors disabled:opacity-40"
+          className="w-11 h-11 flex items-center justify-center border border-steel/30 text-steel font-body text-lg active:border-rust active:text-rust-ink transition-colors disabled:opacity-40"
         >
           +
         </button>
       </div>
       {error && (
-        <p className="font-body text-xs text-rust mt-1" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-1" role="alert">
           {error}
         </p>
       )}

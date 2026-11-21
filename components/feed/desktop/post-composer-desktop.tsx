@@ -160,7 +160,7 @@ export function PostComposerDesktop({
       )}
 
       {error && (
-        <p className="font-body text-xs text-rust mt-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-2" role="alert">
           {error}
         </p>
       )}
@@ -169,7 +169,7 @@ export function PostComposerDesktop({
         <button
           type="button"
           onClick={() => fileInput.current?.click()}
-          className="flex items-center gap-2 h-9 px-3 border border-steel/30 text-steel text-xs active:border-rust active:text-rust transition-colors"
+          className="flex items-center gap-2 h-9 px-3 border border-steel/30 text-steel text-xs active:border-rust active:text-rust-ink transition-colors"
         >
           <Camera className="w-4 h-4" />
           {file ? file.name.slice(0, 24) : "Add photo or video"}

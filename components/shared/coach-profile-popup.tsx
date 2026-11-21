@@ -86,7 +86,7 @@ export function CoachProfilePopup({
           >
             <div className="flex items-center justify-between px-5 pt-5">
               <p className="font-body text-xs text-steel uppercase tracking-wide">Coach</p>
-              <button type="button" onClick={() => setOpen(false)} aria-label="Close" className="text-steel active:text-rust">
+              <button type="button" onClick={() => setOpen(false)} aria-label="Close" className="text-steel active:text-rust-ink">
                 <X className="w-5 h-5" strokeWidth={2.5} />
               </button>
             </div>

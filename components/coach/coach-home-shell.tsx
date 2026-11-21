@@ -28,7 +28,7 @@ function CoachHomeShellFull({ orgName, children }: { orgName: string; children: 
     <div className="min-h-screen bg-graphite text-chalk lg:flex">
       {/* On a phone the 240px sidebar would take two thirds of the screen: it becomes a slim top bar, and the sidebar returns from the lg breakpoint. */}
       <header className="lg:hidden flex items-center justify-between gap-3 px-4 min-h-14 border-b border-steel/20">
-        <Link href="/dashboard" className="flex items-center gap-2 min-h-11 font-body text-sm text-rust">
+        <Link href="/dashboard" className="flex items-center gap-2 min-h-11 font-body text-sm text-rust-ink">
           <Home className="w-4 h-4 shrink-0" strokeWidth={2.25} />
           Home
         </Link>

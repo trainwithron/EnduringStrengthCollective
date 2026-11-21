@@ -38,11 +38,11 @@ export function AiDraftBanner({ programId, programName }: { programId: string; p
   return (
     <div className="mb-4 border border-rust/50 bg-rust/5 p-3 flex flex-wrap items-center justify-between gap-3" role="status">
       <p className="font-body text-sm text-chalk max-w-[60ch]">
-        <span className="font-medium text-rust">AI draft.</span> Nothing reaches a client until you sign off. Check it, change anything you like, then sign off.
+        <span className="font-medium text-rust-ink">AI draft.</span> Nothing reaches a client until you sign off. Check it, change anything you like, then sign off.
       </p>
       <div className="flex items-center gap-3">
         {error && (
-          <span className="font-body text-xs text-rust" role="alert">
+          <span className="font-body text-xs text-rust-ink" role="alert">
             {error}
           </span>
         )}

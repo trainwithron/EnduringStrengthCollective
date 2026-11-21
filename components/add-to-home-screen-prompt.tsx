@@ -134,7 +134,7 @@ export function AddToHomeScreenPrompt({ slot = "top" }: { slot?: "top" | "home" 
               type="button"
               onClick={dismiss}
               aria-label="Dismiss"
-              className="w-11 h-11 flex items-center justify-center text-steel active:text-rust transition-colors shrink-0"
+              className="w-11 h-11 flex items-center justify-center text-steel active:text-rust-ink transition-colors shrink-0"
             >
               <X className="w-4 h-4" />
             </button>
@@ -178,7 +178,7 @@ export function AddToHomeScreenPrompt({ slot = "top" }: { slot?: "top" | "home" 
         type="button"
         onClick={dismiss}
         aria-label="Dismiss"
-        className="w-11 h-11 flex items-center justify-center text-steel active:text-rust transition-colors shrink-0"
+        className="w-11 h-11 flex items-center justify-center text-steel active:text-rust-ink transition-colors shrink-0"
       >
         <X className="w-4 h-4" />
       </button>

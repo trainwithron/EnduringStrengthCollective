@@ -117,7 +117,7 @@ export function NewProgramForm({
             That looks like {namedClient.fullName}&apos;s name. A program made here is shared with everyone in {groupName}, so they
             would see it.
           </p>
-          <Link href={`/groups/${namedClient.groupId}/programs/new`} className="inline-block mt-2 font-body text-sm text-rust underline">
+          <Link href={`/groups/${namedClient.groupId}/programs/new`} className="inline-block mt-2 font-body text-sm text-rust-ink underline">
             Build it in {namedClient.fullName}&apos;s own space instead
           </Link>
           <label className="flex items-start gap-2 mt-3 font-body text-xs text-steel cursor-pointer">
@@ -128,7 +128,7 @@ export function NewProgramForm({
       )}
 
       {error && (
-        <p className="font-body text-sm text-rust" role="alert">
+        <p className="font-body text-sm text-rust-ink" role="alert">
           {error}
         </p>
       )}

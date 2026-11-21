@@ -31,7 +31,7 @@ export function AddStarterLaddersButton() {
 
   return (
     <div className="mb-4">
-      <button type="button" onClick={add} disabled={busy} className="min-h-11 px-4 border border-rust text-rust font-body text-sm font-medium disabled:opacity-40">
+      <button type="button" onClick={add} disabled={busy} className="min-h-11 px-4 border border-rust text-rust-ink font-body text-sm font-medium disabled:opacity-40">
         {busy ? "Adding…" : "Add the starter ladders"}
       </button>
       <p className="font-body text-xs text-steel mt-1">Adds a ladder for each movement pattern, easiest at the top. Yours stay as they are.</p>
@@ -41,7 +41,7 @@ export function AddStarterLaddersButton() {
         </p>
       )}
       {error && (
-        <p className="font-body text-xs text-rust mt-1" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-1" role="alert">
           {error}
         </p>
       )}

@@ -37,7 +37,7 @@ export default async function TeamSheetUploadPage(props: { params: Promise<{ gro
         <h1 className="font-display font-bold text-3xl uppercase leading-none">Upload team sheets</h1>
         <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">Upload the filled Excel file, check what was read, and save it as workouts on their real days. Nothing is saved until you press Save, and a whole upload can be undone.</p>
         <p className="font-body text-xs text-steel mt-2">
-          <Link href={`/groups/${params.groupId}/team-sheet`} className="text-rust underline underline-offset-4">
+          <Link href={`/groups/${params.groupId}/team-sheet`} className="text-rust-ink underline underline-offset-4">
             Make a team sheet to print
           </Link>
         </p>

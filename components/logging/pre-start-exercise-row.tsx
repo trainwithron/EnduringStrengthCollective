@@ -77,7 +77,7 @@ export function PreStartExerciseRow({
             </p>
           )}
           {goal && (goal.weight != null || goal.reps != null) && (
-            <p className="font-body text-xs text-rust mt-0.5">
+            <p className="font-body text-xs text-rust-ink mt-0.5">
               Goal: {goal.weight != null ? formatLift(goal.weight, unit) : ""}
               {goal.weight != null && goal.reps != null ? " × " : ""}
               {goal.reps != null ? `${goal.reps} reps` : ""}
@@ -99,7 +99,7 @@ export function PreStartExerciseRow({
             <button
               type="button"
               onClick={() => setSwapping((v) => !v)}
-              className="shrink-0 font-body text-xs text-steel active:text-rust transition-colors"
+              className="shrink-0 font-body text-xs text-steel active:text-rust-ink transition-colors"
             >
               Swap Exercise
             </button>
@@ -115,7 +115,7 @@ export function PreStartExerciseRow({
               type="button"
               onClick={() => handleSwap(name)}
               disabled={busy}
-              className="h-11 px-3 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust transition-colors disabled:opacity-40"
+              className="h-11 px-3 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust-ink transition-colors disabled:opacity-40"
             >
               {busy ? "Swapping…" : name}
             </button>
@@ -123,7 +123,7 @@ export function PreStartExerciseRow({
         </div>
       )}
       {error && (
-        <p className="font-body text-xs text-rust mt-1.5" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-1.5" role="alert">
           {error}
         </p>
       )}

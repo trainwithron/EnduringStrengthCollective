@@ -152,7 +152,7 @@ export function FirstRunGuideCard({
                   {platform === "ios-safari" && (
                     <>
                       <p>
-                        Tap the Share icon <Share className="inline w-4 h-4 -mt-0.5 text-rust" aria-label="Share" /> at
+                        Tap the Share icon <Share className="inline w-4 h-4 -mt-0.5 text-rust-ink" aria-label="Share" /> at
                         the bottom of Safari.
                       </p>
                       <p>Scroll down and tap &ldquo;Add to Home Screen&rdquo;.</p>
@@ -211,7 +211,7 @@ export function FirstRunGuideCard({
           <button
             type="button"
             onClick={dismiss}
-            className="h-11 mt-3 font-body text-sm text-steel active:text-rust"
+            className="h-11 mt-3 font-body text-sm text-steel active:text-rust-ink"
           >
             Not now
           </button>

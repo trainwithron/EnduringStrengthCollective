@@ -106,7 +106,7 @@ export function CalendarMiniView({ groupId }: { groupId: string }) {
     <div>
       <Link
         href={`/groups/${groupId}/calendar`}
-        className="block font-body text-xs text-rust px-1 mb-2"
+        className="block font-body text-xs text-rust-ink px-1 mb-2"
       >
         Open full calendar &rarr;
       </Link>
@@ -127,7 +127,7 @@ export function CalendarMiniView({ groupId }: { groupId: string }) {
                 className="flex items-center justify-between gap-2 px-1.5 py-2 hover:bg-surface/40 transition-colors"
               >
                 <span className="font-body text-sm text-chalk truncate">{b.athleteName}</span>
-                <span className={`font-body text-xs shrink-0 ${isToday ? "text-rust" : "text-steel"}`}>
+                <span className={`font-body text-xs shrink-0 ${isToday ? "text-rust-ink" : "text-steel"}`}>
                   {isToday
                     ? start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
                     : start.toLocaleDateString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" })}

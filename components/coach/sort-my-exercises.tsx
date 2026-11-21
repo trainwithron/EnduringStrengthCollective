@@ -124,7 +124,7 @@ export function SortMyExercises({
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-3 mt-4">
-            <button type="button" onClick={suggest} disabled={suggesting} className="min-h-11 px-4 border border-rust text-rust font-body text-sm font-medium disabled:opacity-40">
+            <button type="button" onClick={suggest} disabled={suggesting} className="min-h-11 px-4 border border-rust text-rust-ink font-body text-sm font-medium disabled:opacity-40">
               {suggesting ? "Thinking…" : `Suggest for the next ${batch.length}`}
             </button>
             <button type="button" onClick={() => confirm(batch)} disabled={busy || batch.every((n) => !rowFor(n).pattern)} className="min-h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40">
@@ -132,7 +132,7 @@ export function SortMyExercises({
             </button>
           </div>
           {error && (
-            <p className="font-body text-xs text-rust mt-2" role="alert">
+            <p className="font-body text-xs text-rust-ink mt-2" role="alert">
               {error}
             </p>
           )}
@@ -180,7 +180,7 @@ export function SortMyExercises({
                         ))}
                       </select>
                     </label>
-                    <button type="button" onClick={() => confirm([name])} disabled={busy || !r.pattern} className="min-h-10 px-3 border border-rust text-rust font-body text-sm disabled:opacity-40">
+                    <button type="button" onClick={() => confirm([name])} disabled={busy || !r.pattern} className="min-h-10 px-3 border border-rust text-rust-ink font-body text-sm disabled:opacity-40">
                       Confirm
                     </button>
                     <button type="button" onClick={() => setSkipped((prev) => new Set([...prev, name]))} className="min-h-10 px-3 font-body text-sm text-steel">

@@ -281,7 +281,7 @@ export function StandingMacroTargetCard({
         {message && <span className="font-body text-xs text-positive">{message}</span>}
       </div>
       {error && (
-        <p className="font-body text-xs text-rust mt-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-2" role="alert">
           {error}
         </p>
       )}
@@ -321,7 +321,7 @@ export function StandingMacroTargetCard({
               setDraft((prev) => ({ ...prev, calories: String(latestExplicit.calories) }));
               setMessage(null);
             }}
-            className="h-11 mt-1 font-body text-sm text-rust"
+            className="h-11 mt-1 font-body text-sm text-rust-ink"
           >
             Start from {latestExplicit.calories} kcal &rarr;
           </button>
@@ -342,7 +342,7 @@ export function StandingMacroTargetCard({
             {upcomingOverrides.length > 4 ? ", and more" : ""}.
           </p>
         )}
-        <Link href={calendarHref} className="inline-flex items-center h-11 font-body text-sm text-rust">
+        <Link href={calendarHref} className="inline-flex items-center h-11 font-body text-sm text-rust-ink">
           Set or change a single day &rarr;
         </Link>
       </div>

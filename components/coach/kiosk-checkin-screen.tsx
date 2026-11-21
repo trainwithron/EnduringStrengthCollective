@@ -122,7 +122,7 @@ export function KioskCheckinScreen({
         <h1 className="font-display font-bold text-3xl uppercase mb-8">{athlete.fullName}</h1>
 
         {!athlete.hasPin ? (
-          <p className="font-body text-rust text-center max-w-xs mb-8">
+          <p className="font-body text-rust-ink text-center max-w-xs mb-8">
             No PIN has been set for you yet — ask your coach to set one.
           </p>
         ) : (
@@ -137,7 +137,7 @@ export function KioskCheckinScreen({
                 />
               ))}
             </div>
-            {error && <p className="font-body text-sm text-rust mb-4">{error}</p>}
+            {error && <p className="font-body text-sm text-rust-ink mb-4">{error}</p>}
             <div className="grid grid-cols-3 gap-4 w-72">
               {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d) => (
                 <button
@@ -202,7 +202,7 @@ export function KioskCheckinScreen({
       <h1 className="font-display font-bold text-3xl uppercase text-center mb-1">{groupName}</h1>
       <p className="font-body text-sm text-steel text-center mb-8">{organizationId ? "Scan your card, or tap your name to check in" : "Tap your name to check in"}</p>
       {scanError && (
-        <p className="font-body text-sm text-rust text-center mb-4 max-w-md mx-auto" role="alert">
+        <p className="font-body text-sm text-rust-ink text-center mb-4 max-w-md mx-auto" role="alert">
           {scanError}
         </p>
       )}

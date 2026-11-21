@@ -91,7 +91,7 @@ export function BookSlotButton({
       >
         {submitting ? "Booking…" : "Book"}
       </button>
-      {error && <span className="font-body text-xs text-rust">{error}</span>}
+      {error && <span className="font-body text-xs text-rust-ink">{error}</span>}
     </div>
   );
 }

@@ -135,7 +135,7 @@ export function ProgramScheduleSettings({
             className={`h-6 w-6 flex items-center justify-center border font-body text-xs transition-colors disabled:opacity-40 ${
               trainingDays.includes(day.value)
                 ? "bg-rust border-rust text-graphite"
-                : "border-steel/30 text-steel active:border-rust active:text-rust"
+                : "border-steel/30 text-steel active:border-rust active:text-rust-ink"
             }`}
           >
             {day.label[0]}
@@ -178,7 +178,7 @@ export function ProgramScheduleSettings({
           type="button"
           onClick={handleShift}
           disabled={saving || !startDate}
-          className="h-8 px-3 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust transition-colors disabled:opacity-40"
+          className="h-8 px-3 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust-ink transition-colors disabled:opacity-40"
         >
           Shift
         </button>

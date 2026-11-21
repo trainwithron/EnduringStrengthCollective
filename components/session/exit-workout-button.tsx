@@ -8,7 +8,7 @@ export function ExitWorkoutButton({ sessionId, backHref }: { sessionId: string; 
   void sessionId;
   void backHref;
   return (
-    <button type="button" onClick={askWorkoutChoice} aria-label="Back" className="h-11 px-3.5 rounded-token-pill bg-surface font-body text-[13px] font-medium text-chalk active:text-rust shrink-0">
+    <button type="button" onClick={askWorkoutChoice} aria-label="Back" className="h-11 px-3.5 rounded-token-pill bg-surface font-body text-[13px] font-medium text-chalk active:text-rust-ink shrink-0">
       &larr; Back
     </button>
   );

@@ -245,7 +245,7 @@ export function ClientSchedulePanel({ client, timezone, sessionTypes }: { client
                     {typeName(b.session_type_id) ? ` · ${typeName(b.session_type_id)}` : ""}
                     <span className="text-steel"> · {STATE_TEXT[b.credit_state]}</span>
                   </span>
-                  <Link href={`/groups/${groupId}/calendar/${dateKeyInZone(timezone, new Date(b.start_at))}?client=${client.athleteId}`} className="font-body text-xs text-rust underline underline-offset-2">
+                  <Link href={`/groups/${groupId}/calendar/${dateKeyInZone(timezone, new Date(b.start_at))}?client=${client.athleteId}`} className="font-body text-xs text-rust-ink underline underline-offset-2">
                     Open day
                   </Link>
                   <button type="button" onClick={() => cancel(b)} disabled={busyId === b.id} className="font-body text-xs text-steel underline underline-offset-2 disabled:opacity-40">
@@ -255,7 +255,7 @@ export function ClientSchedulePanel({ client, timezone, sessionTypes }: { client
               ))}
               {upcoming.length > 8 && !showAllUpcoming && (
                 <li className="py-2">
-                  <button type="button" onClick={() => setShowAllUpcoming(true)} className="font-body text-xs text-rust underline underline-offset-2">
+                  <button type="button" onClick={() => setShowAllUpcoming(true)} className="font-body text-xs text-rust-ink underline underline-offset-2">
                     and {upcoming.length - 8} more
                   </button>
                 </li>
@@ -264,13 +264,13 @@ export function ClientSchedulePanel({ client, timezone, sessionTypes }: { client
           )}
         </>
       )}
-      {error && <p className="font-body text-xs text-rust mt-2">{error}</p>}
+      {error && <p className="font-body text-xs text-rust-ink mt-2">{error}</p>}
       {addedNote && <p className="font-body text-xs text-positive mt-2" role="status">{addedNote}</p>}
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
-        <Link href={`/groups/${groupId}/athletes/${client.athleteId}/calendar`} className="font-body text-xs text-rust underline underline-offset-2">
+        <Link href={`/groups/${groupId}/athletes/${client.athleteId}/calendar`} className="font-body text-xs text-rust-ink underline underline-offset-2">
           Their calendar &rarr;
         </Link>
-        <Link href={`/groups/${groupId}/athletes/${client.athleteId}`} className="font-body text-xs text-rust underline underline-offset-2">
+        <Link href={`/groups/${groupId}/athletes/${client.athleteId}`} className="font-body text-xs text-rust-ink underline underline-offset-2">
           Profile &rarr;
         </Link>
       </div>

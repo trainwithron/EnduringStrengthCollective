@@ -162,7 +162,7 @@ export function TeamDepthChart({
                 type="button"
                 onClick={() => handleDeletePosition(pos.id)}
                 aria-label={`Delete position ${pos.name}`}
-                className="text-steel active:text-rust transition-colors"
+                className="text-steel active:text-rust-ink transition-colors"
               >
                 <Trash2 className="w-3 h-3" />
               </button>
@@ -187,7 +187,7 @@ export function TeamDepthChart({
             type="button"
             onClick={handleAddPosition}
             disabled={addPositionBusy || !newPositionName.trim()}
-            className="h-9 px-3 border border-steel/30 text-rust font-body text-xs flex items-center gap-1 disabled:opacity-40"
+            className="h-9 px-3 border border-steel/30 text-rust-ink font-body text-xs flex items-center gap-1 disabled:opacity-40"
           >
             <Plus className="w-3.5 h-3.5" />
             Add

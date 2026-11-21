@@ -57,7 +57,7 @@ export function TextSignInLinkButton({ groupId, athleteId, clientName }: { group
       {body && (
         <div className="flex items-center gap-3">
           {sharable && (
-            <button type="button" onClick={() => void shareText(body)} className="font-body text-sm text-rust min-h-11">
+            <button type="button" onClick={() => void shareText(body)} className="font-body text-sm text-rust-ink min-h-11">
               Share
             </button>
           )}
@@ -68,7 +68,7 @@ export function TextSignInLinkButton({ groupId, athleteId, clientName }: { group
       )}
       <p className="font-body text-xs text-steel">Works until {first || "they"} sign{first ? "s" : ""} in. Any earlier link stops working.</p>
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

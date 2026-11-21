@@ -40,7 +40,7 @@ export function ProgramDescriptionEditor({ programId, initialDescription }: { pr
             setMessage(null);
             setEditing(true);
           }}
-          className="font-body text-xs text-rust underline underline-offset-2 min-h-8"
+          className="font-body text-xs text-rust-ink underline underline-offset-2 min-h-8"
         >
           {current ? "Edit description" : "Add a description"}
         </button>
@@ -67,7 +67,7 @@ export function ProgramDescriptionEditor({ programId, initialDescription }: { pr
         />
       </label>
       <div className="flex items-center justify-between gap-3 mt-1">
-        <span className={`font-body text-xs ${counter.nearLimit ? "text-rust" : "text-steel"}`}>{counter.label}</span>
+        <span className={`font-body text-xs ${counter.nearLimit ? "text-rust-ink" : "text-steel"}`}>{counter.label}</span>
         <div className="flex items-center gap-3">
           <button type="button" onClick={() => setText("")} disabled={busy || text === ""} className="font-body text-xs text-steel underline underline-offset-2 disabled:opacity-40 min-h-8">
             Clear
@@ -89,7 +89,7 @@ export function ProgramDescriptionEditor({ programId, initialDescription }: { pr
         </div>
       </div>
       {message?.kind === "failed" && (
-        <p className="font-body text-xs text-rust mt-1" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-1" role="alert">
           {message.text}
         </p>
       )}

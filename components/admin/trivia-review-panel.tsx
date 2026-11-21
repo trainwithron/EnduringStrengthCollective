@@ -72,7 +72,7 @@ export function TriviaReviewPanel({ initialQuestions }: { initialQuestions: Triv
         {generating ? "Generating…" : "Generate 10 more with AI"}
       </button>
       {error && (
-        <p className="font-body text-xs text-rust mb-3" role="alert">
+        <p className="font-body text-xs text-rust-ink mb-3" role="alert">
           {error}
         </p>
       )}

@@ -83,7 +83,7 @@ export function ClassesList({ classes, balance, timezone, nowIso }: { classes: C
               {view.note && <span className="font-body text-xs text-steel">{view.note}</span>}
             </div>
             {message?.id === c.id && (
-              <p className={`font-body text-xs mt-2 ${message.error ? "text-rust" : "text-chalk"}`} role={message.error ? "alert" : "status"}>
+              <p className={`font-body text-xs mt-2 ${message.error ? "text-rust-ink" : "text-chalk"}`} role={message.error ? "alert" : "status"}>
                 {message.text}
               </p>
             )}

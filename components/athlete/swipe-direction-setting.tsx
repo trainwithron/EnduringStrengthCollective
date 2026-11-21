@@ -46,7 +46,7 @@ export function SwipeDirectionSetting({
             className={`flex-1 min-h-11 font-body text-xs font-medium border transition-colors disabled:opacity-60 ${
               direction === option
                 ? "bg-rust text-graphite border-rust"
-                : "border-steel/30 text-steel active:border-rust active:text-rust"
+                : "border-steel/30 text-steel active:border-rust active:text-rust-ink"
             }`}
           >
             {option === "horizontal" ? "Side to side" : "Up and down"}

@@ -81,7 +81,7 @@ export function WaitlistJoinButton({
           type="button"
           onClick={handleLeave}
           disabled={submitting}
-          className="min-h-11 px-2 font-body text-xs text-rust disabled:opacity-40"
+          className="min-h-11 px-2 font-body text-xs text-rust-ink disabled:opacity-40"
         >
           {submitting ? "…" : "Leave"}
         </button>
@@ -99,7 +99,7 @@ export function WaitlistJoinButton({
       >
         {submitting ? "Joining…" : "Join waitlist"}
       </button>
-      {error && <span className="font-body text-xs text-rust">{error}</span>}
+      {error && <span className="font-body text-xs text-rust-ink">{error}</span>}
     </div>
   );
 }

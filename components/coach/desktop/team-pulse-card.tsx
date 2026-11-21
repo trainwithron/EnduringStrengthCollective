@@ -4,7 +4,7 @@ import type { TeamPulseResult } from "@/lib/dashboard-data";
 function pulseColor(pulse: number): string {
   if (pulse >= 70) return "text-positive";
   if (pulse >= 40) return "text-chalk";
-  return "text-rust";
+  return "text-rust-ink";
 }
 
 // One gauge per real team-mode group, never blended across groups or

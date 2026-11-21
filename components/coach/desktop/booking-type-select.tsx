@@ -39,7 +39,7 @@ export function BookingTypeSelect({ bookingId, types, current }: { bookingId: st
           </option>
         ))}
       </select>
-      {error && <span className="font-body text-xs text-rust">{error}</span>}
+      {error && <span className="font-body text-xs text-rust-ink">{error}</span>}
     </span>
   );
 }

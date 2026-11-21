@@ -58,7 +58,7 @@ export function PrivateFromOrgToggle({
         this client&apos;s group themselves becomes a coach there and can still
         see it.
       </p>
-      {error && <p className="font-body text-xs text-rust mt-1">{error}</p>}
+      {error && <p className="font-body text-xs text-rust-ink mt-1">{error}</p>}
     </div>
   );
 }

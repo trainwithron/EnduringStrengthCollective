@@ -74,12 +74,12 @@ export function FavoriteStar({
         disabled={busy}
         aria-pressed={state === "on"}
         aria-label={state === "on" ? `Remove ${fav.label} from favorites` : `Save ${fav.label} as a favorite`}
-        className={`h-8 px-2 font-body text-xs border disabled:opacity-40 ${state === "on" ? "border-rust text-rust" : "border-steel/30 text-steel"}`}
+        className={`h-8 px-2 font-body text-xs border disabled:opacity-40 ${state === "on" ? "border-rust text-rust-ink" : "border-steel/30 text-steel"}`}
       >
         {state === "on" ? "★ Favorite" : "☆ Save as favorite"}
       </button>
       {error && (
-        <span className="font-body text-xs text-rust mt-1" role="alert">
+        <span className="font-body text-xs text-rust-ink mt-1" role="alert">
           {error}
         </span>
       )}

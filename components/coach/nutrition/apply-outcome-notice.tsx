@@ -71,7 +71,7 @@ export function ApplyOutcomeNotice({
           {fixes.planDates.length > 0 && (
             <p className="font-body text-xs text-steel">
               A meal plan isn&apos;t changed from here, because the meals were built for the old number. Build a new plan for those days in{" "}
-              <a href="#meal-plan" className="text-rust underline underline-offset-2">
+              <a href="#meal-plan" className="text-rust-ink underline underline-offset-2">
                 Meal plan
               </a>
               .
@@ -81,7 +81,7 @@ export function ApplyOutcomeNotice({
       )}
       {done && <p className="font-body text-xs text-positive">{done}</p>}
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

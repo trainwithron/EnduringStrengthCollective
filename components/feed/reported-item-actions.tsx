@@ -56,7 +56,7 @@ export function ReportedItemActions({ reportId, isComment, contentGone }: { repo
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 font-body text-xs">
       {!contentGone && (
-        <button type="button" onClick={() => void remove()} disabled={busy} className="min-h-8 text-rust underline underline-offset-2 disabled:opacity-40">
+        <button type="button" onClick={() => void remove()} disabled={busy} className="min-h-8 text-rust-ink underline underline-offset-2 disabled:opacity-40">
           Remove this {noun}
         </button>
       )}
@@ -64,7 +64,7 @@ export function ReportedItemActions({ reportId, isComment, contentGone }: { repo
         {contentGone ? "Mark handled" : "Leave it up, mark handled"}
       </button>
       {error && (
-        <span className="text-rust" role="alert">
+        <span className="text-rust-ink" role="alert">
           {error}
         </span>
       )}

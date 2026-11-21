@@ -93,7 +93,7 @@ export function KioskPinManager({ initialRoster, organizationId = null, showGrou
         />
       )}
       {error && (
-        <p className="font-body text-xs text-rust mb-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mb-2" role="alert">
           {error}
         </p>
       )}

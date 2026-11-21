@@ -201,21 +201,21 @@ export async function CoachPhoneSchedule({
               .map((e) => ({ key: `e${e.id}`, at: eventAt(e), text: `${formatInTimezone(new Date(eventAt(e)), timezone, "time")} ${e.title}`, className: "text-chalk", dot: e.event_type === "suggestion" ? DOT_SUGGESTION : DOT_EVENT })),
           ].sort((a, b) => a.at.localeCompare(b.at));
           const lines = [
-            ...(own?.byDay.get(dayKey(date)) ?? []).map((w) => ({ key: w.key, text: `You: ${w.title}`, className: w.done ? "text-positive" : "text-rust", dot: null as string | null })),
+            ...(own?.byDay.get(dayKey(date)) ?? []).map((w) => ({ key: w.key, text: `You: ${w.title}`, className: w.done ? "text-positive" : "text-rust-ink", dot: null as string | null })),
             ...timed,
             ...dayEvents.filter((e) => !e.event_time).map((e) => ({ key: `e${e.id}`, text: e.title, className: "text-chalk", dot: e.event_type === "suggestion" ? DOT_SUGGESTION : DOT_EVENT })),
           ];
           // A day page loads when it is tapped. Prefetched, every day in view was drawn on the server at once (31 per month open, Oct 27), slowing the phone.
           return (
             <Link key={i} href={`/groups/${anchorGroupId}/calendar/${dayKey(date)}`} prefetch={false} className={`bg-graphite min-h-[56px] p-1.5 flex flex-col ${isToday ? "ring-1 ring-inset ring-rust" : ""}`}>
-              <span className={`font-body text-xs ${isToday ? "text-rust font-bold" : "text-steel"}`}>{date.getDate()}</span>
+              <span className={`font-body text-xs ${isToday ? "text-rust-ink font-bold" : "text-steel"}`}>{date.getDate()}</span>
               {lines.slice(0, 2).map((l) => (
                 <span key={l.key} className={`font-body text-[10px] leading-tight mt-0.5 truncate ${l.className}`} {...(l.dot ? { "data-calendar-event": "" } : {})}>
                   {l.dot && <span aria-hidden="true" className={`inline-block w-[5px] h-[5px] rounded-full mr-0.5 align-middle ${l.dot}`} />}
                   {l.text}
                 </span>
               ))}
-              {lines.length > 2 && <span className="font-body text-[10px] leading-tight text-rust mt-0.5">+{lines.length - 2}</span>}
+              {lines.length > 2 && <span className="font-body text-[10px] leading-tight text-rust-ink mt-0.5">+{lines.length - 2}</span>}
             </Link>
           );
         })}

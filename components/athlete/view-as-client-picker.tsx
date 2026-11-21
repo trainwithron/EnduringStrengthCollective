@@ -176,7 +176,7 @@ export function ViewAsClientPicker({ onClose }: { onClose: () => void }) {
             type="button"
             onClick={() => setPendingClient(null)}
             aria-label="Cancel"
-            className="text-steel active:text-rust"
+            className="text-steel active:text-rust-ink"
           >
             <X className="w-5 h-5" strokeWidth={2.5} />
           </button>
@@ -211,7 +211,7 @@ export function ViewAsClientPicker({ onClose }: { onClose: () => void }) {
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="View as client" className="fixed inset-0 z-40 bg-graphite text-chalk font-body flex flex-col">
       <header className="px-5 pt-8 pb-4 border-b border-steel/20 flex items-center justify-between gap-3">
         <h1 className="font-display font-bold text-2xl uppercase leading-none">View as Client</h1>
-        <button type="button" onClick={onClose} aria-label="Close" className="text-steel active:text-rust">
+        <button type="button" onClick={onClose} aria-label="Close" className="text-steel active:text-rust-ink">
           <X className="w-5 h-5" strokeWidth={2.5} />
         </button>
       </header>
@@ -221,7 +221,7 @@ export function ViewAsClientPicker({ onClose }: { onClose: () => void }) {
           type="button"
           disabled={switching}
           onClick={logMyOwnWorkout}
-          className="w-full text-left px-5 py-4 border-b border-steel/20 font-body text-base flex items-center gap-2.5 text-rust disabled:opacity-50 active:bg-surface/60"
+          className="w-full text-left px-5 py-4 border-b border-steel/20 font-body text-base flex items-center gap-2.5 text-rust-ink disabled:opacity-50 active:bg-surface/60"
         >
           <Dumbbell className="w-4 h-4 shrink-0" strokeWidth={2.25} />
           Start your own workout

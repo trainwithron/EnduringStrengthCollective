@@ -31,7 +31,7 @@ export function WaiverStatusLine({
     );
   }
   return (
-    <div className="flex items-center gap-2 font-body text-xs text-rust">
+    <div className="flex items-center gap-2 font-body text-xs text-rust-ink">
       <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
       <span>Intake started but the waiver isn&apos;t signed yet.</span>
     </div>

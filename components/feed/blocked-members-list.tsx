@@ -44,14 +44,14 @@ export function BlockedMembersList({ initial }: { initial: BlockedMember[] }) {
         {members.map((m) => (
           <li key={m.id} className="p-3 flex items-center justify-between gap-3">
             <span className="text-chalk">{m.name}</span>
-            <button type="button" onClick={() => void unblock(m.id)} disabled={busy !== null} className="min-h-11 px-2 text-rust underline underline-offset-2 disabled:opacity-40">
+            <button type="button" onClick={() => void unblock(m.id)} disabled={busy !== null} className="min-h-11 px-2 text-rust-ink underline underline-offset-2 disabled:opacity-40">
               Unblock
             </button>
           </li>
         ))}
       </ul>
       {error && (
-        <p className="text-xs text-rust mt-2" role="alert">
+        <p className="text-xs text-rust-ink mt-2" role="alert">
           {error}
         </p>
       )}

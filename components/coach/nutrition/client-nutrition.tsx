@@ -565,7 +565,7 @@ export async function ClientNutrition({
             <p className="font-body text-sm text-steel">No standing target yet</p>
           )}
           {phaseTag && (
-            <span className="font-body text-xs text-rust border border-rust/40 px-2 py-0.5">Phase: {PHASE_TAG_LABEL[phaseTag]}</span>
+            <span className="font-body text-xs text-rust-ink border border-rust/40 px-2 py-0.5">Phase: {PHASE_TAG_LABEL[phaseTag]}</span>
           )}
           {pendingSuggestions.length > 0 && (
             <a href="#targets" className="inline-flex items-center min-h-11 font-body text-xs text-chalk">
@@ -573,7 +573,7 @@ export async function ClientNutrition({
             </a>
           )}
           {variant === "profile" && (
-            <Link href={`/groups/${groupId}/nutrition?athleteId=${athleteId}`} className="inline-flex items-center min-h-11 font-body text-xs text-rust ml-auto">
+            <Link href={`/groups/${groupId}/nutrition?athleteId=${athleteId}`} className="inline-flex items-center min-h-11 font-body text-xs text-rust-ink ml-auto">
               Open in Nutrition &rarr;
             </Link>
           )}
@@ -581,7 +581,7 @@ export async function ClientNutrition({
         <div className="mt-1.5">
           <CalorieFloorWarning calories={currentCalories} floor={floorCalories} who={firstName} note={floorNote} />
           {minorLine && (
-            <p className="font-body text-xs text-rust mt-1" role="note">
+            <p className="font-body text-xs text-rust-ink mt-1" role="note">
               {minorLine}
             </p>
           )}
@@ -624,7 +624,7 @@ export async function ClientNutrition({
                 <p className="font-body text-xs text-steel">{lastCheckinLine}</p>
               </div>
               <details className="border-t border-steel/15">
-                <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden min-h-[44px] flex items-center px-4 font-body text-sm text-rust">Run a check-in now</summary>
+                <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden min-h-[44px] flex items-center px-4 font-body text-sm text-rust-ink">Run a check-in now</summary>
                 <div className="px-4 pb-4 pt-2 border-t border-steel/15">
                   <WeeklyCheckinPanel
                     athleteId={athleteId}
@@ -746,7 +746,7 @@ export async function ClientNutrition({
                   todayKey={todayKey}
                 />
                 {trendAlignment && (
-                  <p className={`font-body text-xs mt-2 ${trendAlignment.aligned ? "text-positive" : "text-rust"}`}>
+                  <p className={`font-body text-xs mt-2 ${trendAlignment.aligned ? "text-positive" : "text-rust-ink"}`}>
                     {trendAlignment.aligned
                       ? "✓ Trending as expected for this phase"
                       : `⚠ Trend reads as "${trendAlignment.trend.replace("_", " ")}", which doesn't match the tagged goal yet. Worth a look.`}

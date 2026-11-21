@@ -26,7 +26,7 @@ export function SpaceInviteAnswer({ inviteId }: { inviteId: string }) {
   return (
     <div className="mt-6 flex flex-col gap-2">
       {error && (
-        <p className="font-body text-sm text-rust" role="alert">
+        <p className="font-body text-sm text-rust-ink" role="alert">
           {error}
         </p>
       )}

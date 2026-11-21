@@ -178,7 +178,7 @@ export function ChallengeCreator({
               </button>
             </div>
           ))}
-          <button type="button" onClick={addHabit} className="font-body text-xs text-rust">
+          <button type="button" onClick={addHabit} className="font-body text-xs text-rust-ink">
             + Add habit
           </button>
         </div>
@@ -205,7 +205,7 @@ export function ChallengeCreator({
       )}
 
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

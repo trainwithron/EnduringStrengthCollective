@@ -38,7 +38,7 @@ export function AutoSuggestOffToggle({ athleteId, groupId, initialState, clientF
       {state === "this" && (
         <p className="flex flex-wrap items-center gap-x-2">
           <span>Automatic nutrition suggestions are off for {clientFirstName}, in all their groups. Doesn&apos;t stop suggestions you ask for yourself.</span>
-          <button type="button" onClick={() => void set(false)} disabled={saving} className="min-h-11 px-1 text-rust underline underline-offset-2 disabled:opacity-40">
+          <button type="button" onClick={() => void set(false)} disabled={saving} className="min-h-11 px-1 text-rust-ink underline underline-offset-2 disabled:opacity-40">
             Turn on
           </button>
         </p>
@@ -46,7 +46,7 @@ export function AutoSuggestOffToggle({ athleteId, groupId, initialState, clientF
       {state === "other" && (
         <p className="flex flex-wrap items-center gap-x-2">
           <span>Automatic nutrition suggestions are off for {clientFirstName} (set in another of their groups). Doesn&apos;t stop suggestions you ask for yourself.</span>
-          <button type="button" onClick={() => void set(true)} disabled={saving} className="min-h-11 px-1 text-rust underline underline-offset-2 disabled:opacity-40">
+          <button type="button" onClick={() => void set(true)} disabled={saving} className="min-h-11 px-1 text-rust-ink underline underline-offset-2 disabled:opacity-40">
             Switch off here too
           </button>
         </p>
@@ -57,7 +57,7 @@ export function AutoSuggestOffToggle({ athleteId, groupId, initialState, clientF
         </button>
       )}
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

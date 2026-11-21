@@ -275,7 +275,7 @@ export function WeekGrid({
           type="button"
           onClick={() => setCompactIds(toggleWeek(new Set(compactIds), dayIds))}
           title="Switches every day of this week between one line per exercise and the full editor. A single day can be switched on its own from its header."
-          className="font-body text-xs text-steel active:text-rust transition-colors shrink-0"
+          className="font-body text-xs text-steel active:text-rust-ink transition-colors shrink-0"
         >
           {dayIds.length > 0 && dayIds.every((id) => compactIds.has(id)) ? "Full view" : "Compact view"}
         </button>
@@ -283,7 +283,7 @@ export function WeekGrid({
           type="button"
           onClick={() => setCollapsedDayIds((prev) => toggleAll(prev, dayIds))}
           disabled={dayIds.length === 0}
-          className="font-body text-xs text-steel active:text-rust transition-colors shrink-0 min-h-11 sm:min-h-0 px-1 disabled:opacity-40"
+          className="font-body text-xs text-steel active:text-rust-ink transition-colors shrink-0 min-h-11 sm:min-h-0 px-1 disabled:opacity-40"
         >
           {allCollapsed(collapsedDayIds, dayIds) ? "Expand all days" : "Collapse all days"}
         </button>
@@ -292,14 +292,14 @@ export function WeekGrid({
           type="button"
           onClick={handleDeleteWeek}
           disabled={deleting}
-          className="font-body text-xs text-steel active:text-rust transition-colors shrink-0 disabled:opacity-40"
+          className="font-body text-xs text-steel active:text-rust-ink transition-colors shrink-0 disabled:opacity-40"
         >
           Delete week
         </button>
       </div>
 
       {deleteError && (
-        <p className="font-body text-xs text-rust px-5 pb-2" role="alert">
+        <p className="font-body text-xs text-rust-ink px-5 pb-2" role="alert">
           {deleteError}
         </p>
       )}
@@ -382,7 +382,7 @@ export function WeekGrid({
               type="button"
               onClick={handleAddDay}
               disabled={addDayBusy}
-              className="w-[72px] shrink-0 min-h-[120px] border border-dashed border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors disabled:opacity-40"
+              className="w-[72px] shrink-0 min-h-[120px] border border-dashed border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust-ink transition-colors disabled:opacity-40"
             >
               + Day
             </button>

@@ -31,7 +31,7 @@ export function UndoToast() {
             clearUndo();
           }
         }}
-        className="min-h-11 px-3 font-display font-bold uppercase tracking-wide text-rust disabled:opacity-40"
+        className="min-h-11 px-3 font-display font-bold uppercase tracking-wide text-rust-ink disabled:opacity-40"
       >
         {busy ? "Putting back…" : "Undo"}
       </button>

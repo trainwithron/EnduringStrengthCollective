@@ -126,7 +126,7 @@ export function AddSocialOnlyMembershipControl({
           setOpen(true);
           loadOrgGroups();
         }}
-        className="font-body text-xs text-steel underline decoration-dotted active:text-rust"
+        className="font-body text-xs text-steel underline decoration-dotted active:text-rust-ink"
       >
         Add to a group for social access only
       </button>
@@ -162,7 +162,7 @@ export function AddSocialOnlyMembershipControl({
           </option>
         ))}
       </select>
-      {error && <p className="font-body text-xs text-rust mt-2">{error}</p>}
+      {error && <p className="font-body text-xs text-rust-ink mt-2">{error}</p>}
       <div className="flex items-center gap-3 mt-3">
         <button
           type="button"

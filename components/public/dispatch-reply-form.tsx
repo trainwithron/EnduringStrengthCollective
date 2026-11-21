@@ -51,7 +51,7 @@ export function DispatchReplyForm({ replyToken }: { replyToken: string }) {
         className="w-full bg-surface border border-steel/30 text-chalk px-3 py-2 font-body text-sm focus:outline-none focus:border-rust"
       />
       {error && (
-        <p className="font-body text-xs text-rust text-center" role="alert">
+        <p className="font-body text-xs text-rust-ink text-center" role="alert">
           {error}
         </p>
       )}

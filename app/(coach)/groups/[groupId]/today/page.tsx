@@ -85,7 +85,7 @@ export default async function TodayPage(
         <ul className="px-5 space-y-3">
           {sessions.cards.map((c, i) => (
             <li key={c.programId} className="border border-steel/20 p-4">
-              <p className="font-body text-xs text-rust uppercase tracking-wide">{c.heading}</p>
+              <p className="font-body text-xs text-rust-ink uppercase tracking-wide">{c.heading}</p>
               <p className="font-display font-bold text-xl uppercase leading-none mt-1">{c.title}</p>
               {c.status === "done" ? (
                 <Link
@@ -98,7 +98,7 @@ export default async function TodayPage(
                 <Link
                   href={`/groups/${params.groupId}/workouts/${c.workoutId}`}
                   className={`mt-3 w-full h-11 flex items-center justify-center font-display uppercase text-sm font-bold ${
-                    i === firstReady ? "bg-rust text-graphite" : "border border-rust text-rust"
+                    i === firstReady ? "bg-rust text-graphite" : "border border-rust text-rust-ink"
                   }`}
                 >
                   Start workout
@@ -124,7 +124,7 @@ export default async function TodayPage(
         <p className="font-body text-steel text-center max-w-[40ch]">{message}</p>
         {/* Never a dead end: the next step is a tap away. */}
         {isCoach && !effective.isActingAsOther ? (
-          <Link href={`/groups/${params.groupId}`} className="mt-3 inline-flex items-center min-h-11 font-body text-sm text-rust">
+          <Link href={`/groups/${params.groupId}`} className="mt-3 inline-flex items-center min-h-11 font-body text-sm text-rust-ink">
             &larr; Home
           </Link>
         ) : (

@@ -61,7 +61,7 @@ export function NutritionPreferencesCard({ athleteId, initial }: { athleteId: st
             {message && <span className="font-body text-xs text-positive">{message}</span>}
           </div>
           {error && (
-            <p className="font-body text-xs text-rust" role="alert">
+            <p className="font-body text-xs text-rust-ink" role="alert">
               {error}
             </p>
           )}

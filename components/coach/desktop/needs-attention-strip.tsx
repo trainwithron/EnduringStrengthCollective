@@ -104,7 +104,7 @@ export function NeedsAttentionStrip({ coachId, groupId }: { coachId: string; gro
             setFailed(false);
             setAttempt((n) => n + 1);
           }}
-          className="mt-1 min-h-9 font-body text-xs text-rust underline underline-offset-2"
+          className="mt-1 min-h-9 font-body text-xs text-rust-ink underline underline-offset-2"
         >
           Try again
         </button>

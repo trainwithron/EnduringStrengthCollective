@@ -66,7 +66,7 @@ describe("B1: the builder", () => {
     expect(card).toContain("{onToggleLink && (canLink || linkedToNext) && (");
     expect(card).toContain('aria-pressed={linkedToNext}');
     // in the row that wraps, never the header row (which is full on a 375px phone)
-    expect(card).toContain('className={`min-h-11 sm:min-h-0 inline-flex items-center gap-1 font-body text-xs ${linkedToNext ? "text-rust" : "text-steel"}`}');
+    expect(card).toContain('className={`min-h-11 sm:min-h-0 inline-flex items-center gap-1 font-body text-xs ${linkedToNext ? "text-rust-ink" : "text-steel"}`}');
     expect(card).toContain("{supersetLabel}");
     const day = read("components/coach/desktop/day-card.tsx");
     expect(day).toContain('.update({ superset_next: next }).eq("id", item.id)');

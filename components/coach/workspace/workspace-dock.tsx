@@ -103,7 +103,7 @@ export function WorkspaceDock() {
         <a href={active.dest.path} target="_blank" rel="noopener noreferrer" aria-label={`Open ${active.dest.label} as a full page`} title="Open as a full page" className={`${small} flex`}>
           <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
         </a>
-        <button type="button" onClick={() => ws.requestClose(active.id)} aria-label={`Close ${active.dest.label}`} title="Close" className="w-9 h-10 shrink-0 flex items-center justify-center text-steel hover:text-rust">
+        <button type="button" onClick={() => ws.requestClose(active.id)} aria-label={`Close ${active.dest.label}`} title="Close" className="w-9 h-10 shrink-0 flex items-center justify-center text-steel hover:text-rust-ink">
           <X className="w-3.5 h-3.5" aria-hidden="true" />
         </button>
       </div>

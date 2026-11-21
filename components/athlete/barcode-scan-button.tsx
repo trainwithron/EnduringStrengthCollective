@@ -41,7 +41,7 @@ export function BarcodeScanButton({
         aria-label="Scan a barcode"
         className={LOG_TILE_CLASS}
       >
-        <ScanBarcode className="w-[22px] h-[22px] text-rust" aria-hidden="true" />
+        <ScanBarcode className="w-[22px] h-[22px] text-rust-ink" aria-hidden="true" />
         Scan
       </button>
     );
@@ -300,7 +300,7 @@ function BarcodeScanPanel({
             Cancel
           </button>
         </div>
-        {error && <p className="font-body text-xs text-rust mt-2" role="alert">{error}</p>}
+        {error && <p className="font-body text-xs text-rust-ink mt-2" role="alert">{error}</p>}
       </div>
     );
   }
@@ -336,7 +336,7 @@ function BarcodeScanPanel({
             Cancel
           </button>
         </div>
-        {error && <p className="font-body text-xs text-rust mt-2" role="alert">{error}</p>}
+        {error && <p className="font-body text-xs text-rust-ink mt-2" role="alert">{error}</p>}
       </div>
     );
   }
@@ -353,7 +353,7 @@ function BarcodeScanPanel({
         </p>
       )}
       {looking && <p className="font-body text-xs text-steel">Looking that up…</p>}
-      {error && <p className="font-body text-xs text-rust">{error}</p>}
+      {error && <p className="font-body text-xs text-rust-ink">{error}</p>}
       {missCode && (
         <div className="border border-steel/20 p-2.5" data-testid="barcode-not-found">
           <p className="font-body text-sm text-chalk">We couldn&apos;t find that barcode.</p>

@@ -246,7 +246,7 @@ export function DayCalendar({
 
             {warning && <p className="font-body text-xs text-steel mb-3">{warning}</p>}
             {error && (
-              <p className="font-body text-xs text-rust mb-3" role="alert">
+              <p className="font-body text-xs text-rust-ink mb-3" role="alert">
                 {error}
               </p>
             )}

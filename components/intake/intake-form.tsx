@@ -174,7 +174,7 @@ export function IntakeForm({
         </section>
 
         {dobError && (
-          <p className="font-body text-sm text-rust" role="alert">
+          <p className="font-body text-sm text-rust-ink" role="alert">
             {dobError}
           </p>
         )}
@@ -253,7 +253,7 @@ export function IntakeForm({
               href={waiverPdfUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-body text-sm text-rust"
+              className="font-body text-sm text-rust-ink"
             >
               Open the waiver document (PDF) →
             </a>
@@ -305,7 +305,7 @@ export function IntakeForm({
       </section>
 
       {error && (
-        <p className="font-body text-sm text-rust" role="alert">
+        <p className="font-body text-sm text-rust-ink" role="alert">
           {error}
         </p>
       )}

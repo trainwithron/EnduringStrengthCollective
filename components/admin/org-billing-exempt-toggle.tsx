@@ -48,13 +48,13 @@ export function OrgBillingExemptToggle({
         disabled={busy}
         aria-pressed={exempt}
         className={`h-8 px-3 border font-body text-xs disabled:opacity-50 ${
-          exempt ? "border-rust text-rust" : "border-steel/30 text-steel"
+          exempt ? "border-rust text-rust-ink" : "border-steel/30 text-steel"
         }`}
       >
         {exempt ? "Exempt from billing" : "Billed normally"}
       </button>
       {error && (
-        <p className="font-body text-xs text-rust mt-1" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-1" role="alert">
           {error}
         </p>
       )}

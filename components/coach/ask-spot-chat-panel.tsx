@@ -239,7 +239,7 @@ export function AskSpotChatPanel() {
                       {s.href && (
                         <>
                           {" "}
-                          <Link href={s.href} className="text-rust underline">
+                          <Link href={s.href} className="text-rust-ink underline">
                             {s.linkLabel ?? "Open"}
                           </Link>
                         </>
@@ -255,7 +255,7 @@ export function AskSpotChatPanel() {
                     <Link
                       key={c.href + c.label}
                       href={c.href}
-                      className="inline-flex items-center h-8 px-3 border border-rust text-rust font-body text-xs font-medium"
+                      className="inline-flex items-center h-8 px-3 border border-rust text-rust-ink font-body text-xs font-medium"
                     >
                       {c.label} &rarr;
                     </Link>
@@ -294,7 +294,7 @@ export function AskSpotChatPanel() {
                   <p className="text-xs text-steel">
                     After: <span className="text-chalk">{m.card.afterText}</span>
                   </p>
-                  {m.card.caution && <p className="text-xs text-rust">{m.card.caution}</p>}
+                  {m.card.caution && <p className="text-xs text-rust-ink">{m.card.caution}</p>}
                   {m.card.state === "open" && (
                     <div className="flex flex-wrap gap-2">
                       <button
@@ -323,7 +323,7 @@ export function AskSpotChatPanel() {
                   type="button"
                   disabled={sending}
                   onClick={() => runAction(i, "undo", m.undoToken!)}
-                  className="mt-2 inline-flex items-center h-8 px-3 border border-rust text-rust font-body text-xs font-medium disabled:opacity-40"
+                  className="mt-2 inline-flex items-center h-8 px-3 border border-rust text-rust-ink font-body text-xs font-medium disabled:opacity-40"
                 >
                   Undo
                 </button>
@@ -342,7 +342,7 @@ export function AskSpotChatPanel() {
           </div>
         ))}
         {sending && <p className="font-body text-xs text-steel">Checking…</p>}
-        {error && <p className="font-body text-xs text-rust">{error}</p>}
+        {error && <p className="font-body text-xs text-rust-ink">{error}</p>}
       </div>
 
       <div className="p-3 border-t border-steel/20 flex gap-2 shrink-0">

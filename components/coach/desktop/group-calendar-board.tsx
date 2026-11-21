@@ -156,7 +156,7 @@ export function GroupCalendarBoard({
           <button
             type="button"
             onClick={() => setOpenId(null)}
-            className="ml-auto h-8 px-3 inline-flex items-center font-body text-xs border border-rust text-rust hover:bg-rust/10"
+            className="ml-auto h-8 px-3 inline-flex items-center font-body text-xs border border-rust text-rust-ink hover:bg-rust/10"
           >
             + New
           </button>
@@ -186,7 +186,7 @@ export function GroupCalendarBoard({
         {day && (
           <p className="font-body text-xs text-steel">
             Showing {formatInTimezone(new Date(`${day}T12:00:00Z`), "UTC", "date")} only.{" "}
-            <button type="button" onClick={() => setDay(null)} className="text-rust underline underline-offset-2">
+            <button type="button" onClick={() => setDay(null)} className="text-rust-ink underline underline-offset-2">
               Show every day
             </button>
           </p>

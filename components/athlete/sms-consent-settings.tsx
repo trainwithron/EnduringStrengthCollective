@@ -59,7 +59,7 @@ export function SmsConsentSettings({
       <p className="font-body text-xs text-steel mt-0.5">Off unless you turn them on.</p>
 
       {optedOut && (
-        <p className="font-body text-xs text-rust mt-2" role="status">
+        <p className="font-body text-xs text-rust-ink mt-2" role="status">
           You replied STOP, so texts are off for this number. Reply START to a text from us to turn them
           back on, or enter a different number below.
         </p>
@@ -103,7 +103,7 @@ export function SmsConsentSettings({
       <p className="font-body text-xs text-steel mt-3">{SMS_DISCLOSURE_TEXT}</p>
 
       {message && (
-        <p className={`font-body text-xs mt-3 ${message.kind === "error" ? "text-rust" : "text-steel"}`} role="status">
+        <p className={`font-body text-xs mt-3 ${message.kind === "error" ? "text-rust-ink" : "text-steel"}`} role="status">
           {message.text}
         </p>
       )}

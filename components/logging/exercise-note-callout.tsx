@@ -18,7 +18,7 @@ export function ExerciseNoteCallout({ coachNote }: { coachNote: string | null })
   if (coachNote) {
     return (
       <div className="border-l-2 border-rust bg-surface/40 px-3 py-2.5">
-        <p className="font-body text-xs text-rust uppercase tracking-wide mb-1">
+        <p className="font-body text-xs text-rust-ink uppercase tracking-wide mb-1">
           From your coach
         </p>
         <p className="font-body text-sm text-chalk">{coachNote}</p>

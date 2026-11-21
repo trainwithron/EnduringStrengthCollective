@@ -83,7 +83,7 @@ export function InvitationsList({
                   <button type="button" onClick={() => copyExisting(i)} className={`${button} text-steel`}>
                     Copy link
                   </button>
-                  <button type="button" onClick={() => onCancelExisting(i)} disabled={busy === `cancel-${i.id}`} className={`${button} text-rust no-underline`}>
+                  <button type="button" onClick={() => onCancelExisting(i)} disabled={busy === `cancel-${i.id}`} className={`${button} text-rust-ink no-underline`}>
                     Cancel
                   </button>
                 </div>

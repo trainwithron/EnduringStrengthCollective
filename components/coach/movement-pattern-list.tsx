@@ -42,7 +42,7 @@ export function MovementPatternList({
           className={`h-7 px-2.5 border font-body text-xs transition-colors ${
             filter === null
               ? "bg-rust border-rust text-graphite"
-              : "border-steel/30 text-steel active:border-rust active:text-rust"
+              : "border-steel/30 text-steel active:border-rust active:text-rust-ink"
           }`}
         >
           All
@@ -55,7 +55,7 @@ export function MovementPatternList({
             className={`h-7 px-2.5 border font-body text-xs capitalize transition-colors ${
               filter === p
                 ? "bg-rust border-rust text-graphite"
-                : "border-steel/30 text-steel active:border-rust active:text-rust"
+                : "border-steel/30 text-steel active:border-rust active:text-rust-ink"
             }`}
           >
             {p}

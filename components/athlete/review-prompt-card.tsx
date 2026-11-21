@@ -52,7 +52,7 @@ export function ReviewPromptCard({ groupId, athleteId, coachId, coachName, first
           <span>I agree {coachName} may share this, with my first name, publicly, for example on their website.</span>
         </label>
         {error && (
-          <p className="font-body text-xs text-rust" role="alert">
+          <p className="font-body text-xs text-rust-ink" role="alert">
             {error}
           </p>
         )}

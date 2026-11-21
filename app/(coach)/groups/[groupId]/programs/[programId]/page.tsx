@@ -209,13 +209,13 @@ export default async function ProgramDetailPage(
             {program.description}
           </p>
         )}
-        <a href={`/print/programs/${params.programId}`} target="_blank" rel="noopener" className="inline-flex items-center h-9 mt-4 mr-2 font-body text-xs text-rust border border-rust px-3">
+        <a href={`/print/programs/${params.programId}`} target="_blank" rel="noopener" className="inline-flex items-center h-9 mt-4 mr-2 font-body text-xs text-rust-ink border border-rust px-3">
           Print or PDF
         </a>
         {program.start_date && program.training_days && program.training_days.length > 0 && (
           <Link
             href={`/groups/${params.groupId}/programs/${params.programId}/calendar`}
-            className="inline-flex items-center h-9 mt-4 font-body text-xs text-rust border border-rust px-3"
+            className="inline-flex items-center h-9 mt-4 font-body text-xs text-rust-ink border border-rust px-3"
           >
             View as calendar &rarr;
           </Link>
@@ -263,7 +263,7 @@ export default async function ProgramDetailPage(
                       <span className="font-body font-medium text-[15px]">
                         {w.title}
                         {isToday && (
-                          <span className="font-body text-[13px] font-semibold text-rust ml-2 align-middle">
+                          <span className="font-body text-[13px] font-semibold text-rust-ink ml-2 align-middle">
                             Today
                           </span>
                         )}
@@ -285,7 +285,7 @@ export default async function ProgramDetailPage(
                     ) : (
                       <Link
                         href={`/groups/${params.groupId}/workouts/${w.id}`}
-                        className="font-body text-xs text-rust mt-1.5 inline-block"
+                        className="font-body text-xs text-rust-ink mt-1.5 inline-block"
                       >
                         Log &rarr;
                       </Link>

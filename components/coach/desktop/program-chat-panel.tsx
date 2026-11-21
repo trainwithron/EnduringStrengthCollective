@@ -105,7 +105,7 @@ export function ProgramChatPanel({
         className="w-full flex items-center justify-between gap-2 px-4 py-3"
       >
         <span className="flex items-center gap-2 font-body text-sm text-chalk">
-          <MessageCircleQuestion className="w-4 h-4 text-rust shrink-0" strokeWidth={2.25} />
+          <MessageCircleQuestion className="w-4 h-4 text-rust-ink shrink-0" strokeWidth={2.25} />
           Ask the AI why it built this program this way
         </span>
         {open ? (
@@ -135,7 +135,7 @@ export function ProgramChatPanel({
                 </p>
                 {m.proposedRule && (
                   <div className="mt-2 border border-rust/40 bg-rust/5 p-3 text-left max-w-[85%] ml-0">
-                    <p className="font-body text-xs text-rust uppercase tracking-wide font-bold mb-1">
+                    <p className="font-body text-xs text-rust-ink uppercase tracking-wide font-bold mb-1">
                       Proposed standing preference
                     </p>
                     <p className="font-body text-xs text-chalk">
@@ -159,7 +159,7 @@ export function ProgramChatPanel({
               </div>
             ))}
             {sending && <p className="font-body text-xs text-steel">Thinking…</p>}
-            {error && <p className="font-body text-xs text-rust">{error}</p>}
+            {error && <p className="font-body text-xs text-rust-ink">{error}</p>}
           </div>
 
           <p className="px-3 pb-1 font-body text-xs text-steel">

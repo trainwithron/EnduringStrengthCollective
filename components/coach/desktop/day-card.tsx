@@ -593,7 +593,7 @@ export function DayCard({
           <button
             type="button"
             onClick={() => setCollapsedExerciseIds((prev) => toggleAll(prev, exerciseIds))}
-            className="font-body text-xs text-steel active:text-rust transition-colors shrink-0 min-h-11 sm:min-h-0 px-1"
+            className="font-body text-xs text-steel active:text-rust-ink transition-colors shrink-0 min-h-11 sm:min-h-0 px-1"
           >
             {allCollapsed(collapsedExerciseIds, exerciseIds) ? "Expand all" : "Collapse all"}
           </button>
@@ -604,7 +604,7 @@ export function DayCard({
             onClick={onToggleCondensed}
             aria-pressed={condensed}
             title={condensed ? "Show this day in full" : "Show this day as one line per exercise"}
-            className={`font-body text-xs transition-colors shrink-0 min-h-11 sm:min-h-0 px-1 ${condensed ? "text-rust" : "text-steel active:text-rust"}`}
+            className={`font-body text-xs transition-colors shrink-0 min-h-11 sm:min-h-0 px-1 ${condensed ? "text-rust-ink" : "text-steel active:text-rust-ink"}`}
           >
             {condensed ? "Full" : "Compact"}
           </button>
@@ -612,7 +612,7 @@ export function DayCard({
         <ClientPreviewButton days={[day]} heading={day.title || `Day ${day.dayIndex + 1}`} label="Preview" demoLibrary={demoLibrary} />
         <Link
           href={`/groups/${groupId}/workouts/${day.id}/clients`}
-          className="font-body text-xs text-steel active:text-rust transition-colors shrink-0"
+          className="font-body text-xs text-steel active:text-rust-ink transition-colors shrink-0"
         >
           Clients
         </Link>
@@ -620,7 +620,7 @@ export function DayCard({
           type="button"
           onClick={handleDeleteDay}
           disabled={busy}
-          className="font-body text-xs text-steel active:text-rust transition-colors shrink-0 disabled:opacity-40"
+          className="font-body text-xs text-steel active:text-rust-ink transition-colors shrink-0 disabled:opacity-40"
         >
           Delete
         </button>
@@ -628,14 +628,14 @@ export function DayCard({
           type="button"
           onClick={onToggleCollapse}
           aria-label={collapsed ? "Expand day" : "Collapse day"}
-          className="w-6 h-6 flex items-center justify-center text-steel active:text-rust transition-colors shrink-0"
+          className="w-6 h-6 flex items-center justify-center text-steel active:text-rust-ink transition-colors shrink-0"
         >
           {collapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
         </button>
       </div>
 
       {error && (
-        <p className="font-body text-xs text-rust px-4 pt-2" role="alert">
+        <p className="font-body text-xs text-rust-ink px-4 pt-2" role="alert">
           {error}
         </p>
       )}
@@ -661,7 +661,7 @@ export function DayCard({
             className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust disabled:opacity-50"
           />
           {quickEntryError && (
-            <p className="font-body text-xs text-rust mt-1">{quickEntryError}</p>
+            <p className="font-body text-xs text-rust-ink mt-1">{quickEntryError}</p>
           )}
         </div>
       )}
@@ -690,7 +690,7 @@ export function DayCard({
                         <button
                           type="button"
                           onClick={() => setOpenCompactIds((prev) => toggleCollapsed(prev, item.id))}
-                          className="font-body text-xs text-steel active:text-rust min-h-9 px-1"
+                          className="font-body text-xs text-steel active:text-rust-ink min-h-9 px-1"
                         >
                           Close editor
                         </button>
@@ -831,7 +831,7 @@ export function DayCard({
               type="button"
               onClick={handleAddExercise}
               disabled={addItemBusy}
-              className="flex-1 h-9 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust transition-colors disabled:opacity-40"
+              className="flex-1 h-9 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust-ink transition-colors disabled:opacity-40"
             >
               + Exercise
             </button>
@@ -839,7 +839,7 @@ export function DayCard({
               type="button"
               onClick={handleAddNote}
               disabled={addItemBusy}
-              className="h-9 px-3 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust transition-colors disabled:opacity-40"
+              className="h-9 px-3 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust-ink transition-colors disabled:opacity-40"
             >
               + Note
             </button>
@@ -848,7 +848,7 @@ export function DayCard({
               type="button"
               onClick={() => void openSlotForm()}
               disabled={addItemBusy || slotBusy}
-              className="h-9 px-3 border border-dashed border-steel/40 text-steel font-body text-xs active:border-rust active:text-rust transition-colors disabled:opacity-40"
+              className="h-9 px-3 border border-dashed border-steel/40 text-steel font-body text-xs active:border-rust active:text-rust-ink transition-colors disabled:opacity-40"
             >
               {slotBusy ? "Adding ladders…" : "+ Slot"}
             </button>

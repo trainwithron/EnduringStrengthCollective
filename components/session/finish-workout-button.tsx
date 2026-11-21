@@ -10,7 +10,7 @@ export function FinishWorkoutButton() {
       type="button"
       onClick={askWorkoutChoice}
       data-finish-button
-      className="h-11 px-4 rounded-token-pill border border-steel/50 text-chalk font-body text-[13px] font-semibold active:border-rust active:text-rust"
+      className="h-11 px-4 rounded-token-pill border border-steel/50 text-chalk font-body text-[13px] font-semibold active:border-rust active:text-rust-ink"
     >
       Finish
     </button>

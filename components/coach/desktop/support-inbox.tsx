@@ -118,7 +118,7 @@ ${trimmedBody}`,
             className="w-full bg-surface border border-steel/30 text-chalk px-3 py-2 font-body text-sm focus:outline-none focus:border-rust"
           />
           {error && (
-            <p className="font-body text-xs text-rust" role="alert">
+            <p className="font-body text-xs text-rust-ink" role="alert">
               {error}
             </p>
           )}
@@ -164,7 +164,7 @@ ${trimmedBody}`,
                     aria-current={r.id === selectedId ? "true" : undefined}
                     className={`w-full text-left px-3 py-2.5 min-h-11 ${r.id === selectedId ? "bg-rust/10" : "hover:bg-surface"}`}
                   >
-                    <span className={`block font-body text-sm truncate ${r.id === selectedId ? "text-rust" : "text-chalk"}`}>{r.subject}</span>
+                    <span className={`block font-body text-sm truncate ${r.id === selectedId ? "text-rust-ink" : "text-chalk"}`}>{r.subject}</span>
                   </button>
                 </li>
               );

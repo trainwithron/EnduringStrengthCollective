@@ -101,7 +101,7 @@ export function GymMachinesPanel({
         </button>
       </form>
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}
@@ -250,14 +250,14 @@ function MachineEditor({
             <button type="button" onClick={() => setRenaming(true)} className="min-h-11 px-3 border border-steel/40 text-chalk font-body text-sm">
               Rename
             </button>
-            <button type="button" onClick={() => void remove()} disabled={busy} className="min-h-11 px-3 font-body text-sm text-rust disabled:opacity-40">
+            <button type="button" onClick={() => void remove()} disabled={busy} className="min-h-11 px-3 font-body text-sm text-rust-ink disabled:opacity-40">
               Delete machine
             </button>
           </>
         )}
       </div>
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}
@@ -284,7 +284,7 @@ function MachineEditor({
                 onClick={() => void removeExercise(row)}
                 disabled={busy}
                 aria-label={`Take ${row.name} off ${machine.name}`}
-                className="w-11 h-11 shrink-0 flex items-center justify-center text-steel hover:text-rust disabled:opacity-40"
+                className="w-11 h-11 shrink-0 flex items-center justify-center text-steel hover:text-rust-ink disabled:opacity-40"
               >
                 <X className="w-4 h-4" />
               </button>

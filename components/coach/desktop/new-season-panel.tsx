@@ -97,13 +97,13 @@ export function NewSeasonPanel({ groupId, groupName, athletes }: { groupId: stri
         {finished.problems.length > 0 && (
           <ul className="mt-2 space-y-1">
             {finished.problems.map((p) => (
-              <li key={p.name + p.why} className="font-body text-xs text-rust">
+              <li key={p.name + p.why} className="font-body text-xs text-rust-ink">
                 {p.name}: {p.why}.
               </li>
             ))}
           </ul>
         )}
-        <Link href={`/groups/${finished.id}/team`} className="inline-block mt-3 font-body text-sm text-rust">
+        <Link href={`/groups/${finished.id}/team`} className="inline-block mt-3 font-body text-sm text-rust-ink">
           Go to the new season →
         </Link>
       </div>
@@ -112,7 +112,7 @@ export function NewSeasonPanel({ groupId, groupName, athletes }: { groupId: stri
 
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} className="h-11 px-4 border border-rust text-rust font-body text-sm font-medium">
+      <button type="button" onClick={() => setOpen(true)} className="h-11 px-4 border border-rust text-rust-ink font-body text-sm font-medium">
         Start next season
       </button>
     );
@@ -146,7 +146,7 @@ export function NewSeasonPanel({ groupId, groupName, athletes }: { groupId: stri
         </button>
       </div>
       {error && (
-        <p className="font-body text-xs text-rust mt-3" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-3" role="alert">
           {error}
         </p>
       )}

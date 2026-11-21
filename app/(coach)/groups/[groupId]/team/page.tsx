@@ -137,7 +137,7 @@ export default async function TeamPage(props: { params: Promise<{ groupId: strin
         <p className="font-body text-sm text-steel mb-4">
           This season is retired. It and its records are kept here.{" "}
           {nextSeason ? (
-            <Link href={`/groups/${nextSeason.id}/team`} className="text-rust">
+            <Link href={`/groups/${nextSeason.id}/team`} className="text-rust-ink">
               {nextSeason.name} took over from it.
             </Link>
           ) : null}{" "}
@@ -148,7 +148,7 @@ export default async function TeamPage(props: { params: Promise<{ groupId: strin
       {archivedAt && nextSeasonId && group?.group_kind === "team" && [...gradById.values()].some((y) => y != null) && <GraduationSendAgain groupId={params.groupId} />}
 
       {rosterFailed && (
-        <p className="font-body text-sm text-rust mb-4" role="alert">
+        <p className="font-body text-sm text-rust-ink mb-4" role="alert">
           The roster could not be read in full, so starting next season is not offered. Reload the page to try again.
         </p>
       )}
@@ -170,7 +170,7 @@ export default async function TeamPage(props: { params: Promise<{ groupId: strin
           <ul className="space-y-1">
             {pastSeasons.map((s) => (
               <li key={s.id} className="font-body text-sm">
-                <Link href={`/groups/${s.id}/team`} className="text-rust">
+                <Link href={`/groups/${s.id}/team`} className="text-rust-ink">
                   {s.name}
                 </Link>
               </li>

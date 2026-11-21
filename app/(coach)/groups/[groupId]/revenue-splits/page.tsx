@@ -140,7 +140,7 @@ export default async function RevenueSplitsPage(
         isOwner={isOwner}
       />
       <p className="font-body text-xs text-steel mt-6">
-        <Link href={`/groups/${params.groupId}/branding?tab=team`} className="text-rust">
+        <Link href={`/groups/${params.groupId}/branding?tab=team`} className="text-rust-ink">
           ← Back to Team
         </Link>
       </p>

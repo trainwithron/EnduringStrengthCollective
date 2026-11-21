@@ -152,7 +152,7 @@ export function SwappableTerm({
             <button
               type="button"
               onClick={pickDefault}
-              className="w-full text-left px-3 py-1 font-body text-xs text-chalk active:text-rust whitespace-nowrap"
+              className="w-full text-left px-3 py-1 font-body text-xs text-chalk active:text-rust-ink whitespace-nowrap"
             >
               {TERM_DEFAULTS[termKey][form]}
             </button>
@@ -161,7 +161,7 @@ export function SwappableTerm({
                 key={p.value}
                 type="button"
                 onClick={(e) => pickPreset(e, p.value)}
-                className="w-full text-left px-3 py-1 font-body text-xs text-chalk active:text-rust whitespace-nowrap"
+                className="w-full text-left px-3 py-1 font-body text-xs text-chalk active:text-rust-ink whitespace-nowrap"
               >
                 {p[form]}
               </button>
@@ -178,7 +178,7 @@ export function SwappableTerm({
                   placeholder="Custom"
                   className="w-20 h-6 bg-surface border border-steel/30 text-chalk px-1 font-body text-xs"
                 />
-                <button type="button" onClick={submitCustom} className="font-body text-xs text-rust">
+                <button type="button" onClick={submitCustom} className="font-body text-xs text-rust-ink">
                   ✓
                 </button>
               </div>

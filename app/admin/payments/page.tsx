@@ -46,7 +46,7 @@ export default async function AdminPaymentsPage() {
                 {rows.map((r) => (
                   <tr key={r.check_name} className="align-top">
                     <td className="py-2 pr-4 text-chalk">{r.what}</td>
-                    <td className={`py-2 pr-4 text-right tabular-nums ${Number(r.issue_count) > 0 ? "text-rust" : "text-steel"}`}>{Number(r.issue_count)}</td>
+                    <td className={`py-2 pr-4 text-right tabular-nums ${Number(r.issue_count) > 0 ? "text-rust-ink" : "text-steel"}`}>{Number(r.issue_count)}</td>
                     <td className="py-2 text-steel break-all">{r.example ?? "–"}</td>
                   </tr>
                 ))}

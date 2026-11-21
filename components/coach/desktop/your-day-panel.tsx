@@ -38,9 +38,9 @@ export function YourDayPanel({
                 <Link prefetch={false} href={e.href} className="min-w-0 group">
                   <span className="font-body text-sm text-chalk group-hover:underline">{e.title}</span>
                   {e.kind === "class" && <span className="font-body text-xs text-steel ml-2">Class</span>}
-                  {e.kind === "event" && <span className="font-body text-xs text-rust ml-2">Event</span>}
+                  {e.kind === "event" && <span className="font-body text-xs text-rust-ink ml-2">Event</span>}
                   {e.needsPayment && (
-                    <span className="ml-2 font-body text-xs text-rust border border-rust/50 rounded-token-pill px-1.5 py-0.5">Needs payment</span>
+                    <span className="ml-2 font-body text-xs text-rust-ink border border-rust/50 rounded-token-pill px-1.5 py-0.5">Needs payment</span>
                   )}
                   <span className="block font-body text-xs text-steel truncate">{e.detail}</span>
                 </Link>

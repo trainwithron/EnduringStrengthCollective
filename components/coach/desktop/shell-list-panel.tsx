@@ -135,7 +135,7 @@ export function ShellListPanel({
             type="button"
             onClick={() => selectView("roster")}
             className={`h-7 font-body text-xs uppercase tracking-wide border ${
-              view === "roster" ? "border-rust text-rust bg-rust/10" : "border-steel/30 text-steel"
+              view === "roster" ? "border-rust text-rust-ink bg-rust/10" : "border-steel/30 text-steel"
             }`}
           >
             {/* The coach's own word (Settings > Organization > Labels), like the rest of the page: Members, Athletes... */}
@@ -146,7 +146,7 @@ export function ShellListPanel({
             type="button"
             onClick={() => selectView("business")}
             className={`h-7 font-body text-xs uppercase tracking-wide border ${
-              view === "business" ? "border-rust text-rust bg-rust/10" : "border-steel/30 text-steel"
+              view === "business" ? "border-rust text-rust-ink bg-rust/10" : "border-steel/30 text-steel"
             }`}
             title="Your Business page, in this half"
           >
@@ -157,7 +157,7 @@ export function ShellListPanel({
             type="button"
             onClick={() => selectView("calendar")}
             className={`h-7 font-body text-xs uppercase tracking-wide border ${
-              view === "calendar" ? "border-rust text-rust bg-rust/10" : "border-steel/30 text-steel"
+              view === "calendar" ? "border-rust text-rust-ink bg-rust/10" : "border-steel/30 text-steel"
             }`}
             title="Your Calendar, in this half"
           >
@@ -167,7 +167,7 @@ export function ShellListPanel({
             type="button"
             onClick={() => selectView("program")}
             className={`h-7 font-body text-xs uppercase tracking-wide border ${
-              view === "program" ? "border-rust text-rust bg-rust/10" : "border-steel/30 text-steel"
+              view === "program" ? "border-rust text-rust-ink bg-rust/10" : "border-steel/30 text-steel"
             }`}
             title="Your programs, in this half: build one here while the other side stays put"
           >

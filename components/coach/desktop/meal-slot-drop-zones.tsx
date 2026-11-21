@@ -222,7 +222,7 @@ export function MealSlotDropZones({
           </div>
         );
       })}
-      {error && <p className="font-body text-xs text-rust">{error}</p>}
+      {error && <p className="font-body text-xs text-rust-ink">{error}</p>}
     </div>
   );
 }

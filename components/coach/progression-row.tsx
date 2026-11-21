@@ -326,7 +326,7 @@ export function ProgressionRow({
           )}
 
           {error && (
-            <p className="font-body text-xs text-rust" role="alert">
+            <p className="font-body text-xs text-rust-ink" role="alert">
               {error}
             </p>
           )}
@@ -345,7 +345,7 @@ export function ProgressionRow({
                 type="button"
                 onClick={handleRemove}
                 disabled={submitting}
-                className="font-body text-xs text-steel active:text-rust transition-colors"
+                className="font-body text-xs text-steel active:text-rust-ink transition-colors"
               >
                 Remove progression
               </button>

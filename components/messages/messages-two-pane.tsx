@@ -108,7 +108,7 @@ export function MessagesTwoPane({
         {selected ? (
           <>
             <div className="px-5 py-3 border-b border-steel/15 flex items-baseline justify-between gap-3 shrink-0">
-              <Link href={`/groups/${selected.groupId}/athletes/${selected.otherId}`} className="font-display uppercase text-lg tracking-wide text-chalk hover:text-rust">
+              <Link href={`/groups/${selected.groupId}/athletes/${selected.otherId}`} className="font-display uppercase text-lg tracking-wide text-chalk hover:text-rust-ink">
                 {selected.fullName}
               </Link>
               <span className="font-body text-xs text-steel">Open profile</span>

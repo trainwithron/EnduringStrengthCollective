@@ -120,11 +120,11 @@ export function ClientProgramMenu({
               {isActive ? "Make inactive" : "Make active"}
             </button>
           )}
-          <button type="button" role="menuitem" disabled={busy} onClick={removeFromProfile} className={`${item} text-rust ${aiDraft || self ? "" : "border-t border-steel/15"}`}>
+          <button type="button" role="menuitem" disabled={busy} onClick={removeFromProfile} className={`${item} text-rust-ink ${aiDraft || self ? "" : "border-t border-steel/15"}`}>
             {self ? "Remove from my profile" : `Remove from ${clientName.trim() || "this client"}`}
           </button>
           {error && (
-            <p className="px-3 py-2 font-body text-xs text-rust" role="alert">
+            <p className="px-3 py-2 font-body text-xs text-rust-ink" role="alert">
               {error}
             </p>
           )}

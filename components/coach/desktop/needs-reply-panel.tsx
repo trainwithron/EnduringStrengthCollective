@@ -59,7 +59,7 @@ export function NeedsReplyPanel({
               href={`/groups/${t.groupId}/feed?channel=${t.channel}&highlight=${t.postId}`}
               className="min-w-0 flex-1 group"
             >
-              <p className="font-body text-sm text-chalk group-active:text-rust">
+              <p className="font-body text-sm text-chalk group-active:text-rust-ink">
                 <span className="font-medium">{t.authorName}</span> in {t.groupName}
               </p>
               <p className="font-body text-xs text-steel truncate mt-0.5">{t.snippet}</p>
@@ -69,7 +69,7 @@ export function NeedsReplyPanel({
               onClick={() => dismiss(t.postId)}
               disabled={dismissingId === t.postId}
               aria-label="Dismiss"
-              className="shrink-0 text-steel active:text-rust transition-colors disabled:opacity-40"
+              className="shrink-0 text-steel active:text-rust-ink transition-colors disabled:opacity-40"
             >
               <X className="w-4 h-4" />
             </button>

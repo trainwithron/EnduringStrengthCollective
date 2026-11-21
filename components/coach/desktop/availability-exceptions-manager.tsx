@@ -151,7 +151,7 @@ export function AvailabilityExceptionsManager({
               <button
                 type="button"
                 onClick={() => handleDelete(e.id)}
-                className="shrink-0 font-body text-xs text-steel active:text-rust"
+                className="shrink-0 font-body text-xs text-steel active:text-rust-ink"
               >
                 Remove
               </button>
@@ -236,7 +236,7 @@ export function AvailabilityExceptionsManager({
         )}
 
         {error && (
-          <p className="font-body text-xs text-rust" role="alert">
+          <p className="font-body text-xs text-rust-ink" role="alert">
             {error}
           </p>
         )}

@@ -95,7 +95,7 @@ export default async function ProgramsListPage(
           <span>
             Showing only <span className="font-medium">{group?.name ?? "this group"}</span>&apos;s programs
           </span>
-          <Link href={ALL_PROGRAMS_HREF} className="font-body text-sm text-rust underline underline-offset-2 min-h-11 sm:min-h-0 inline-flex items-center">
+          <Link href={ALL_PROGRAMS_HREF} className="font-body text-sm text-rust-ink underline underline-offset-2 min-h-11 sm:min-h-0 inline-flex items-center">
             Show all programs
           </Link>
         </p>
@@ -106,7 +106,7 @@ export default async function ProgramsListPage(
           <ProgramImportLauncher groupId={params.groupId} />
           <Link
             href={`/groups/${params.groupId}/programs/new`}
-            className="font-body text-xs text-rust"
+            className="font-body text-xs text-rust-ink"
           >
             + New program
           </Link>

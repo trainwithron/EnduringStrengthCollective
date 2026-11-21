@@ -124,7 +124,7 @@ export function ExerciseAthleteNote({
           {ownNote ? "Your notes" : "Notes for this exercise"}
         </label>
         {status === "error" ? (
-          <button type="button" onClick={() => void saver.retry()} className="min-h-[44px] -my-2 px-2 font-body text-xs text-rust">
+          <button type="button" onClick={() => void saver.retry()} className="min-h-[44px] -my-2 px-2 font-body text-xs text-rust-ink">
             Couldn&apos;t save. Retry
           </button>
         ) : (
@@ -148,7 +148,7 @@ export function ExerciseAthleteNote({
                 saver.change(staleDraft);
                 setStaleDraft(null);
               }}
-              className="min-h-[44px] font-body text-xs text-rust"
+              className="min-h-[44px] font-body text-xs text-rust-ink"
             >
               Use it
             </button>

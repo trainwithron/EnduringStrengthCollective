@@ -93,7 +93,7 @@ export function ProgrammingSpotterPanel({ programId, flags }: { programId: strin
   return (
     <div className="border border-rust/40 bg-rust/5 px-4 py-3 mb-4">
       <div className="flex items-center justify-between mb-2">
-        <p className="font-body text-xs text-rust uppercase tracking-wide font-bold">
+        <p className="font-body text-xs text-rust-ink uppercase tracking-wide font-bold">
           Programming Spotter
         </p>
         {visible.length > 1 && (
@@ -102,7 +102,7 @@ export function ProgrammingSpotterPanel({ programId, flags }: { programId: strin
               type="button"
               onClick={() => setExpanded((v) => !v)}
               aria-expanded={expanded}
-              className="font-body text-xs text-rust uppercase tracking-wide font-bold"
+              className="font-body text-xs text-rust-ink uppercase tracking-wide font-bold"
             >
               {expanded ? "Hide" : "Review"}
             </button>
@@ -136,7 +136,7 @@ export function ProgrammingSpotterPanel({ programId, flags }: { programId: strin
                     type="button"
                     onClick={() => handleStopSuggesting(flag)}
                     disabled={busy}
-                    className="font-body text-xs text-rust uppercase tracking-wide font-bold disabled:opacity-40"
+                    className="font-body text-xs text-rust-ink uppercase tracking-wide font-bold disabled:opacity-40"
                   >
                     Yes, stop showing this
                   </button>
@@ -177,7 +177,7 @@ export function ProgrammingSpotterPanel({ programId, flags }: { programId: strin
                       type="button"
                       onClick={() => sendFeedback(flag, "edited", { condition, preference })}
                       disabled={busy || !condition.trim() || !preference.trim()}
-                      className="font-body text-xs text-rust uppercase tracking-wide font-bold disabled:opacity-40"
+                      className="font-body text-xs text-rust-ink uppercase tracking-wide font-bold disabled:opacity-40"
                     >
                       Save preference
                     </button>
@@ -220,7 +220,7 @@ export function ProgrammingSpotterPanel({ programId, flags }: { programId: strin
                   type="button"
                   onClick={() => sendFeedback(flag, "denied")}
                   disabled={busy}
-                  className="font-body text-xs text-rust uppercase tracking-wide font-bold disabled:opacity-40"
+                  className="font-body text-xs text-rust-ink uppercase tracking-wide font-bold disabled:opacity-40"
                 >
                   Deny
                 </button>

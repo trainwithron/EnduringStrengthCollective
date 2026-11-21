@@ -42,7 +42,7 @@ export function GoalWaitingOnClient({ goal, clientName }: { goal: PendingGoal; c
         Take it back
       </button>
       {error && (
-        <p className="font-body text-xs text-rust mt-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-2" role="alert">
           {error}
         </p>
       )}

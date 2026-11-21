@@ -89,7 +89,7 @@ export default async function TrainingPartnersPage() {
 
         <Link
           href="/partners/requests"
-          className="font-body text-sm text-rust block mb-6"
+          className="font-body text-sm text-rust-ink block mb-6"
         >
           View your requests &amp; matches →
         </Link>

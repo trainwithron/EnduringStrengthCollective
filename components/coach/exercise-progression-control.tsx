@@ -120,7 +120,7 @@ export function ExerciseProgressionControl({
           </div>
           <p>{problem ?? describeDouble(settings)}</p>
           <div className="flex items-center gap-4">
-            <button type="button" onClick={() => void save()} disabled={busy || !!problem || setIds.length === 0} className="min-h-9 text-rust underline underline-offset-2 disabled:opacity-40">
+            <button type="button" onClick={() => void save()} disabled={busy || !!problem || setIds.length === 0} className="min-h-9 text-rust-ink underline underline-offset-2 disabled:opacity-40">
               {model === "double_progression" ? "Update" : "Use double progression"}
             </button>
             {model === "double_progression" && (
@@ -133,7 +133,7 @@ export function ExerciseProgressionControl({
         </>
       )}
       {error && (
-        <p className="text-rust" role="alert">
+        <p className="text-rust-ink" role="alert">
           {error}
         </p>
       )}

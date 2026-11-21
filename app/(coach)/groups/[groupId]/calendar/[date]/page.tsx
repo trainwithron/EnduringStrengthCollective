@@ -436,7 +436,7 @@ export default async function CoachDayDetailPage(
             </div>
           )}
           {reschedulingBooking && (
-            <p className="font-body text-xs text-rust mt-2">
+            <p className="font-body text-xs text-rust-ink mt-2">
               Picking a new time for your{" "}
               {new Date(reschedulingBooking.start_at).toLocaleDateString("en-US", {
                 weekday: "short",
@@ -466,7 +466,7 @@ export default async function CoachDayDetailPage(
                       <span className="block font-body text-sm text-chalk truncate">{w.title}</span>
                       <span className="block font-body text-xs text-steel truncate">{w.heading}</span>
                     </span>
-                    <span className={`font-body text-xs shrink-0 ${w.status === "done" ? "text-positive" : "text-rust"}`}>{w.status === "done" ? "Done" : "Open \u2192"}</span>
+                    <span className={`font-body text-xs shrink-0 ${w.status === "done" ? "text-positive" : "text-rust-ink"}`}>{w.status === "done" ? "Done" : "Open \u2192"}</span>
                   </Link>
                 )
               )}

@@ -534,7 +534,7 @@ export default async function DayDetailPage(
           </div>
         )}
         {reschedulingBooking && (
-          <p className="font-body text-xs text-rust mt-2">
+          <p className="font-body text-xs text-rust-ink mt-2">
             Picking a new time for your{" "}
             {new Date(reschedulingBooking.start_at).toLocaleDateString("en-US", {
               weekday: "short",
@@ -557,7 +557,7 @@ export default async function DayDetailPage(
               </h2>
               <Link
                 href={`/groups/${params.groupId}/workouts/${dayWorkout.id}`}
-                className="font-body text-sm text-rust"
+                className="font-body text-sm text-rust-ink"
               >
                 {dayWorkout.title} &rarr;
               </Link>

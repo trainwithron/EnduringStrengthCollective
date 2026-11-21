@@ -40,7 +40,7 @@ export function NutritionYouthModeToggle({
         Youth/Team mode — protein-first, no calorie-deficit framing
       </label>
       {error && (
-        <p className="font-body text-xs text-rust mt-1" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-1" role="alert">
           {error}
         </p>
       )}

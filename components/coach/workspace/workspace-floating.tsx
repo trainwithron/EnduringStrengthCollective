@@ -104,7 +104,7 @@ function Card({ card, z }: { card: FloatingPane; z: number }) {
         <button type="button" onClick={() => ws.dispatch({ type: "minimize", id: card.id, minimized: !card.minimized })} aria-label={card.minimized ? "Restore" : "Minimize"} title={card.minimized ? "Restore" : "Minimize"} className={btn}>
           <Minus className="w-3.5 h-3.5" aria-hidden="true" />
         </button>
-        <button type="button" onClick={() => ws.requestClose(card.id)} aria-label={`Close ${card.dest.label}`} title="Close" className="w-7 h-7 flex items-center justify-center text-steel hover:text-rust">
+        <button type="button" onClick={() => ws.requestClose(card.id)} aria-label={`Close ${card.dest.label}`} title="Close" className="w-7 h-7 flex items-center justify-center text-steel hover:text-rust-ink">
           <X className="w-3.5 h-3.5" aria-hidden="true" />
         </button>
       </div>

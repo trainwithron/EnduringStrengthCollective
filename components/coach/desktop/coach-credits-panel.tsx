@@ -64,19 +64,19 @@ export function CoachCreditsPanel({
       <div className="border border-steel/20 p-4 mb-4">
         <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">Your balance</p>
         {unlimited ? (
-          <p className="font-display text-2xl uppercase text-rust">Unlimited</p>
+          <p className="font-display text-2xl uppercase text-rust-ink">Unlimited</p>
         ) : (
           <p className="font-display text-2xl uppercase">{balance} credits</p>
         )}
         {liftOffActive && (
-          <p className="font-body text-xs text-rust mt-1">
+          <p className="font-body text-xs text-rust-ink mt-1">
             Lift Off active — {LIFT_OFF_MONTHLY_CREDITS} credits every month
           </p>
         )}
       </div>
 
       {error && (
-        <p className="font-body text-xs text-rust mb-3" role="alert">
+        <p className="font-body text-xs text-rust-ink mb-3" role="alert">
           {error}
         </p>
       )}

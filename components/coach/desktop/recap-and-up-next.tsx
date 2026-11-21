@@ -158,7 +158,7 @@ export function RecapAndUpNext({
               className="w-full flex items-center justify-between gap-3 px-5 py-3 text-left"
             >
               <span className="font-body text-sm font-medium">{recap.workoutTitle} — completed</span>
-              <span className="font-body text-xs text-rust">Show recap</span>
+              <span className="font-body text-xs text-rust-ink">Show recap</span>
             </button>
           ) : (
             <div className="p-5">
@@ -217,7 +217,7 @@ export function RecapAndUpNext({
                 <button
                   type="button"
                   onClick={() => setSessionNoteOpen((v) => !v)}
-                  className="font-body text-xs text-steel active:text-rust transition-colors"
+                  className="font-body text-xs text-steel active:text-rust-ink transition-colors"
                 >
                   {sessionNoteOpen ? "Hide session note" : "Session note"}
                 </button>
@@ -251,7 +251,7 @@ export function RecapAndUpNext({
           <div className="border border-steel/20 bg-surface/40 rounded-token-lg p-5 recap-bounce-in">
             <div className="flex items-center justify-between gap-3">
               <h2 className="font-display font-bold text-xl uppercase leading-none">{nextWorkout.title}</h2>
-              <span className="font-body text-xs text-rust uppercase tracking-wide border border-rust/40 rounded-token-pill px-2 py-1">
+              <span className="font-body text-xs text-rust-ink uppercase tracking-wide border border-rust/40 rounded-token-pill px-2 py-1">
                 {programIsShared ? "Group program" : "Editable draft"}
               </span>
             </div>

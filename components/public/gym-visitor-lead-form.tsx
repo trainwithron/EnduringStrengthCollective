@@ -55,7 +55,7 @@ export function GymVisitorLeadForm({
 
   return (
     <form onSubmit={handleSubmit} className="mt-6 space-y-3">
-      <p className="font-display uppercase text-sm tracking-wide text-rust text-center">
+      <p className="font-display uppercase text-sm tracking-wide text-rust-ink text-center">
         Join {orgName}
       </p>
       <p className="font-body text-xs text-steel text-center">
@@ -85,7 +85,7 @@ export function GymVisitorLeadForm({
         className="w-full bg-surface border border-steel/30 text-chalk px-3 py-2 font-body text-sm focus:outline-none focus:border-rust"
       />
       {error && (
-        <p className="font-body text-xs text-rust text-center" role="alert">
+        <p className="font-body text-xs text-rust-ink text-center" role="alert">
           {error}
         </p>
       )}

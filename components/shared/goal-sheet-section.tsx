@@ -112,7 +112,7 @@ export function GoalSheetSection({
   return (
     <section id="goal-sheet" aria-label={GOAL_SHEET_HEADING} className="border border-steel/20 p-4 mb-6 scroll-mt-4">
       <h2 className="font-display uppercase text-sm tracking-wide text-steel">{GOAL_SHEET_HEADING}</h2>
-      {status && <p className={`font-body text-sm mt-1 ${viewer === "client" ? "text-rust" : "text-steel"}`}>{status}</p>}
+      {status && <p className={`font-body text-sm mt-1 ${viewer === "client" ? "text-rust-ink" : "text-steel"}`}>{status}</p>}
 
       {editing ? (
         <div className="space-y-4 mt-3">
@@ -223,7 +223,7 @@ export function GoalSheetSection({
             <p className="font-body text-sm text-steel mt-2">Not filled in yet.</p>
           )}
           <div className="flex flex-wrap gap-2 mt-4">
-            <button type="button" onClick={() => setEditing(true)} className="h-11 px-4 border border-rust/60 text-rust font-body text-sm active:bg-rust/10">
+            <button type="button" onClick={() => setEditing(true)} className="h-11 px-4 border border-rust/60 text-rust-ink font-body text-sm active:bg-rust/10">
               {hasAnswers ? "Edit" : viewer === "coach" ? `Fill in with ${first}` : "Fill it in"}
             </button>
             {viewer === "coach" && (
@@ -241,7 +241,7 @@ export function GoalSheetSection({
         </p>
       )}
       {error && (
-        <p className="font-body text-sm text-rust mt-3" role="alert">
+        <p className="font-body text-sm text-rust-ink mt-3" role="alert">
           {error}
         </p>
       )}

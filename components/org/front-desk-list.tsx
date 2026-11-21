@@ -52,7 +52,7 @@ export function FrontDeskList({
             <div key={p.profileId} className="p-3 flex flex-wrap items-center justify-between gap-2">
               <p className="font-body text-sm">{p.fullName}</p>
               {canManage && (
-                <button type="button" onClick={() => remove(p)} disabled={busy === p.profileId} className="font-body text-xs text-rust disabled:opacity-40">
+                <button type="button" onClick={() => remove(p)} disabled={busy === p.profileId} className="font-body text-xs text-rust-ink disabled:opacity-40">
                   Remove
                 </button>
               )}
@@ -61,11 +61,11 @@ export function FrontDeskList({
         </div>
       )}
       {error && (
-        <p className="font-body text-xs text-rust mb-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mb-2" role="alert">
           {error}
         </p>
       )}
-      <Link href={`/front-desk?org=${organizationId}`} className="font-body text-xs text-rust">
+      <Link href={`/front-desk?org=${organizationId}`} className="font-body text-xs text-rust-ink">
         Open the check-in screen →
       </Link>
     </div>

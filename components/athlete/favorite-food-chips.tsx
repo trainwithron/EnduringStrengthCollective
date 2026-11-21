@@ -80,14 +80,14 @@ export function FavoriteFoodChips({
             onClick={() => tap(f)}
             disabled={loggingKey === f.key}
             title={`${Math.round(f.calories)} kcal`}
-            className="h-11 px-3 rounded-token-pill bg-surface-2 border border-steel/30 text-chalk font-body text-xs active:border-rust active:text-rust transition-colors disabled:opacity-40"
+            className="h-11 px-3 rounded-token-pill bg-surface-2 border border-steel/30 text-chalk font-body text-xs active:border-rust active:text-rust-ink transition-colors disabled:opacity-40"
           >
             {loggingKey === f.key ? "Logging…" : f.label}
           </button>
         ))}
       </div>
       {error && (
-        <p className="font-body text-xs text-rust mt-1" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-1" role="alert">
           {error}
         </p>
       )}

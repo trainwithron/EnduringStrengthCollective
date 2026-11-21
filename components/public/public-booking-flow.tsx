@@ -289,7 +289,7 @@ export function PublicBookingFlow({ slug, page, logoUrl = null, orgName = null }
             <section className="mt-8" aria-label="Choose a time">
               <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">2. Day and time</h2>
               {loadError && (
-                <p className="font-body text-sm text-rust" role="alert">
+                <p className="font-body text-sm text-rust-ink" role="alert">
                   {loadError}
                 </p>
               )}
@@ -335,7 +335,7 @@ export function PublicBookingFlow({ slug, page, logoUrl = null, orgName = null }
                   </div>
                   <p className="font-body text-xs text-steel mt-2">Times are in the coach&apos;s time zone ({zoneLabel(timezone)}).</p>
                   {error && !startIso && (
-                    <p className="font-body text-sm text-rust mt-3" role="alert">
+                    <p className="font-body text-sm text-rust-ink mt-3" role="alert">
                       {error}
                     </p>
                   )}
@@ -374,7 +374,7 @@ export function PublicBookingFlow({ slug, page, logoUrl = null, orgName = null }
                         {verifyBusy && !codeSent ? "Sending…" : codeSent === cleanEmail ? "Send the code again" : "Email me a code to confirm"}
                       </button>
                       {formTokenError && !formToken && (
-                        <p className="font-body text-xs text-rust mt-2" role="alert">
+                        <p className="font-body text-xs text-rust-ink mt-2" role="alert">
                           We couldn&apos;t start the form. Reload the page.
                         </p>
                       )}
@@ -400,7 +400,7 @@ export function PublicBookingFlow({ slug, page, logoUrl = null, orgName = null }
                         </div>
                       )}
                       {verifyNote && (
-                        <p className={`font-body text-xs mt-2 ${verifyNoteIsError ? "text-rust" : "text-steel"}`} role={verifyNoteIsError ? "alert" : "status"}>
+                        <p className={`font-body text-xs mt-2 ${verifyNoteIsError ? "text-rust-ink" : "text-steel"}`} role={verifyNoteIsError ? "alert" : "status"}>
                           {verifyNote}
                         </p>
                       )}
@@ -424,7 +424,7 @@ export function PublicBookingFlow({ slug, page, logoUrl = null, orgName = null }
                 </div>
               </div>
               {error && (
-                <p className="font-body text-sm text-rust mt-3" role="alert">
+                <p className="font-body text-sm text-rust-ink mt-3" role="alert">
                   {error}
                 </p>
               )}

@@ -169,7 +169,7 @@ export function ExerciseMediaPicker({
           <button
             type="button"
             onClick={handleRemoveVideo}
-            className="h-8 px-3 border border-steel/30 font-body text-xs text-steel active:border-rust active:text-rust transition-colors"
+            className="h-8 px-3 border border-steel/30 font-body text-xs text-steel active:border-rust active:text-rust-ink transition-colors"
           >
             Remove
           </button>
@@ -188,7 +188,7 @@ export function ExerciseMediaPicker({
             alt="YouTube thumbnail"
             className="w-24 h-16 object-cover"
           />
-          <span className="font-body text-xs text-rust">Open on YouTube</span>
+          <span className="font-body text-xs text-rust-ink">Open on YouTube</span>
         </a>
       )}
 
@@ -196,7 +196,7 @@ export function ExerciseMediaPicker({
         <div>
           {/* A styled button instead of the browser's raw "Choose File / No file chosen". */}
           <label
-            className={`inline-flex items-center h-9 px-3 border border-steel/40 text-chalk font-body text-xs font-medium cursor-pointer active:border-rust active:text-rust focus-within:border-rust ${uploading ? "opacity-40 pointer-events-none" : ""}`}
+            className={`inline-flex items-center h-9 px-3 border border-steel/40 text-chalk font-body text-xs font-medium cursor-pointer active:border-rust active:text-rust-ink focus-within:border-rust ${uploading ? "opacity-40 pointer-events-none" : ""}`}
           >
             Upload video
             <input
@@ -223,7 +223,7 @@ export function ExerciseMediaPicker({
           <button
             type="button"
             onClick={handleSaveYoutubeUrl}
-            className="font-body text-xs text-rust shrink-0"
+            className="font-body text-xs text-rust-ink shrink-0"
           >
             Save
           </button>
@@ -237,14 +237,14 @@ export function ExerciseMediaPicker({
             setUrlDraft("");
             onChange({ youtubeUrl: null });
           }}
-          className="h-8 px-3 border border-steel/30 font-body text-xs text-steel active:border-rust active:text-rust transition-colors"
+          className="h-8 px-3 border border-steel/30 font-body text-xs text-steel active:border-rust active:text-rust-ink transition-colors"
         >
           Remove YouTube link
         </button>
       )}
 
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

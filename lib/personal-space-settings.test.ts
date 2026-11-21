@@ -16,7 +16,7 @@ describe("Settings in the coach's own personal space", () => {
     expect(page).toContain("{inPersonalSpace ? (");
     expect(page).toContain('<TabletLayoutSwitch to="desktop" />');
     expect(page).toContain("<DownloadAppButton />");
-    expect(page).toContain("<Link href={`/groups/${params.groupId}/dashboard`} className=\"font-body text-sm font-bold text-rust inline-flex items-center min-h-11\">");
+    expect(page).toContain("<Link href={`/groups/${params.groupId}/dashboard`} className=\"font-body text-sm font-bold text-rust-ink inline-flex items-center min-h-11\">");
     expect(page).toContain("const viewingOther = effective.isActingAsOther && athleteId !== user.id;");
   });
 });

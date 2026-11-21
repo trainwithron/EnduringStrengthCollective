@@ -120,7 +120,7 @@ export function FoodSearchLog({
         onClick={() => setOpen(true)}
         className="w-full min-h-[44px] h-[52px] px-5 rounded-token-pill bg-surface-2 border border-rust/30 flex items-center gap-2.5 text-left font-body text-[15px] font-medium text-chalk active:border-rust transition-colors"
       >
-        <Search className="w-5 h-5 text-rust shrink-0" aria-hidden="true" />
+        <Search className="w-5 h-5 text-rust-ink shrink-0" aria-hidden="true" />
         Search foods
       </button>
     );
@@ -147,10 +147,10 @@ export function FoodSearchLog({
             aria-label="Search foods"
             className="w-full min-h-[44px] bg-surface border border-steel/30 px-3 font-body text-sm text-chalk placeholder:text-steel"
           />
-          {added && <p className="font-body text-xs text-rust mt-2">{added}</p>}
+          {added && <p className="font-body text-xs text-rust-ink mt-2">{added}</p>}
           {searching && <p className="font-body text-xs text-steel mt-2">Searching…</p>}
           {!searching && searchFailed && (
-            <p className="font-body text-xs text-rust mt-2" role="alert">
+            <p className="font-body text-xs text-rust-ink mt-2" role="alert">
               Couldn&apos;t search just now. Check your connection and try again.
             </p>
           )}
@@ -231,7 +231,7 @@ export function FoodSearchLog({
             </label>
           </div>
 
-          {problem && <p className="font-body text-xs text-rust mt-2" role="alert">{problem}</p>}
+          {problem && <p className="font-body text-xs text-rust-ink mt-2" role="alert">{problem}</p>}
           {grams != null && <p className="font-body text-xs text-steel mt-2">That is {formatAmount(grams)}.</p>}
 
           {macros && (
@@ -272,7 +272,7 @@ export function FoodSearchLog({
         </div>
       )}
 
-      {error && <p className="font-body text-xs text-rust mt-2" role="alert">{error}</p>}
+      {error && <p className="font-body text-xs text-rust-ink mt-2" role="alert">{error}</p>}
     </div>
   );
 }

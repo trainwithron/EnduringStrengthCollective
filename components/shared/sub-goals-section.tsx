@@ -139,10 +139,10 @@ export function SubGoalsSection({
         </div>
       ) : choosing ? (
         <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" onClick={() => { setChoosing(false); setAdding(true); }} className={`${small} text-rust border-rust`}>
+          <button type="button" onClick={() => { setChoosing(false); setAdding(true); }} className={`${small} text-rust-ink border-rust`}>
             A smaller goal
           </button>
-          <button type="button" onClick={() => { setChoosing(false); setSuggestingMain(true); }} className={`${small} text-rust border-rust`}>
+          <button type="button" onClick={() => { setChoosing(false); setSuggestingMain(true); }} className={`${small} text-rust-ink border-rust`}>
             Suggest their main goal
           </button>
           <button type="button" onClick={() => setChoosing(false)} className={`${small} text-chalk border-steel/40`}>
@@ -150,12 +150,12 @@ export function SubGoalsSection({
           </button>
         </div>
       ) : (
-        <button type="button" onClick={() => (mainGoalForm ? setChoosing(true) : setAdding(true))} className={`${small} text-rust border-rust mt-3`}>
+        <button type="button" onClick={() => (mainGoalForm ? setChoosing(true) : setAdding(true))} className={`${small} text-rust-ink border-rust mt-3`}>
           {mainGoalForm ? "Add or suggest a goal" : "Add a smaller goal"}
         </button>
       )}
       {error && (
-        <p className="font-body text-sm text-rust mt-2" role="alert">
+        <p className="font-body text-sm text-rust-ink mt-2" role="alert">
           {error}
         </p>
       )}

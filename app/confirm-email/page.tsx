@@ -68,7 +68,7 @@ function ConfirmEmailStatus() {
         <h1 className="font-display uppercase text-2xl font-bold">Link invalid or expired</h1>
         <p className="font-body text-steel text-sm mt-2">
           This link has expired or was already used. If you already confirmed, just{" "}
-          <Link href="/login" className="text-rust">
+          <Link href="/login" className="text-rust-ink">
             sign in
           </Link>
           . If not, sign in with your email and password and we will offer to send a new confirmation email.

@@ -81,7 +81,7 @@ export function OrgTrainerRequestForm({ organizationId, orgName }: { organizatio
   if (result) {
     return (
       <div className="max-w-sm mx-auto px-6 py-16 text-center">
-        <p className="font-display uppercase text-xs tracking-[0.2em] text-rust">{orgName}</p>
+        <p className="font-display uppercase text-xs tracking-[0.2em] text-rust-ink">{orgName}</p>
         <h1 className="font-display font-bold text-2xl uppercase leading-tight mt-2">Request sent!</h1>
         <p className="font-body text-sm text-steel mt-4">{result.message}</p>
         <Link href="/" className="inline-flex items-center justify-center h-11 px-6 mt-5 bg-rust text-graphite font-body text-sm font-medium">
@@ -93,7 +93,7 @@ export function OrgTrainerRequestForm({ organizationId, orgName }: { organizatio
 
   return (
     <div className="max-w-sm mx-auto px-6 py-16">
-      <p className="font-display uppercase text-xs tracking-[0.2em] text-rust text-center">{orgName}</p>
+      <p className="font-display uppercase text-xs tracking-[0.2em] text-rust-ink text-center">{orgName}</p>
       <h1 className="font-display font-bold text-2xl uppercase leading-tight mt-2 text-center">
         Train with us
       </h1>
@@ -182,7 +182,7 @@ export function OrgTrainerRequestForm({ organizationId, orgName }: { organizatio
         </div>
 
         {error && (
-          <p className="font-body text-xs text-rust text-center" role="alert">
+          <p className="font-body text-xs text-rust-ink text-center" role="alert">
             {error}
           </p>
         )}

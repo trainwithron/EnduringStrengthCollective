@@ -97,7 +97,7 @@ export function MealPlanRetryBox({ groupId, state }: { groupId: string; state: R
             />
           </label>
           {error && (
-            <p className="font-body text-sm text-rust" role="alert">
+            <p className="font-body text-sm text-rust-ink" role="alert">
               {error}
             </p>
           )}

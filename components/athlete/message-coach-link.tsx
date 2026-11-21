@@ -4,7 +4,7 @@ import Link from "next/link";
 // page said "Message them" with no way to).
 export function MessageCoachLink({ groupId }: { groupId: string }) {
   return (
-    <Link href={`/groups/${groupId}/messages`} className="inline-flex items-center h-11 mt-2 px-4 border border-rust text-rust font-body text-sm">
+    <Link href={`/groups/${groupId}/messages`} className="inline-flex items-center h-11 mt-2 px-4 border border-rust text-rust-ink font-body text-sm">
       Message your coach
     </Link>
   );

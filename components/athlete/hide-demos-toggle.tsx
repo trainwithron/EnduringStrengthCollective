@@ -22,7 +22,7 @@ export function HideDemosToggle() {
           <span className="block font-body text-sm text-chalk">Hide exercise demos</span>
           <span className="block font-body text-xs text-steel mt-0.5">Removes the Demo button from each exercise while you log. This follows you to your other devices.</span>
           {notSaved && (
-            <span className="block font-body text-xs text-rust mt-0.5" role="status">
+            <span className="block font-body text-xs text-rust-ink mt-0.5" role="status">
               {"It's off on this device, but it didn't save to your account. Try again when you're online."}
             </span>
           )}

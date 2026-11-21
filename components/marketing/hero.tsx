@@ -7,7 +7,7 @@ export function Hero() {
     <section className="px-6 pt-20 pb-16 md:pt-28 md:pb-24 max-w-6xl mx-auto">
       <div className="grid md:grid-cols-2 gap-12 items-center">
         <div>
-          <p className="font-display uppercase tracking-widest text-rust text-sm font-bold mb-4">
+          <p className="font-display uppercase tracking-widest text-rust-ink text-sm font-bold mb-4">
             For coaches who run their own program
           </p>
           <h1 className="font-display uppercase text-4xl sm:text-5xl md:text-6xl font-bold leading-[1.05]">

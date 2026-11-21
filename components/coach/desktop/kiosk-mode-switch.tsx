@@ -48,13 +48,13 @@ export function KioskModeSwitch({ groupId, groupName, orgName, initialMode }: { 
             disabled={busy}
             className={`text-left border p-4 flex flex-col gap-1 disabled:opacity-60 ${mode === o.value ? "border-rust bg-rust/10" : "border-steel/25 hover:border-steel/50"}`}
           >
-            <span className={`font-display uppercase text-base leading-tight ${mode === o.value ? "text-rust" : "text-chalk"}`}>{o.title}</span>
+            <span className={`font-display uppercase text-base leading-tight ${mode === o.value ? "text-rust-ink" : "text-chalk"}`}>{o.title}</span>
             <span className="font-body text-xs text-steel leading-snug">{o.body}</span>
           </button>
         ))}
       </div>
       {error && (
-        <p className="font-body text-xs text-rust mt-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-2" role="alert">
           {error}
         </p>
       )}

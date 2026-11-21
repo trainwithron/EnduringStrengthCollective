@@ -118,7 +118,7 @@ export function ClientSeriesPanel({
               <p className="font-body text-sm text-chalk">
                 {WEEKDAYS[s.weekday]} at {clock12(s.startTime)} <span className="text-steel">· {s.durationMinutes} min · {label}</span>
               </p>
-              <span className={`font-body text-xs px-1.5 py-0.5 border ${s.status === "paused" ? "border-steel/40 text-steel" : "border-rust text-rust"}`}>
+              <span className={`font-body text-xs px-1.5 py-0.5 border ${s.status === "paused" ? "border-steel/40 text-steel" : "border-rust text-rust-ink"}`}>
                 {s.status === "paused" ? (s.frozenUntil ? `Frozen until ${dayLabel(s.frozenUntil)}` : "Paused") : "Running"}
               </span>
             </div>
@@ -270,7 +270,7 @@ export function ClientSeriesPanel({
       )}
 
       {message && (
-        <p className={`font-body text-sm ${message.error ? "text-rust" : "text-chalk"}`} role={message.error ? "alert" : "status"}>
+        <p className={`font-body text-sm ${message.error ? "text-rust-ink" : "text-chalk"}`} role={message.error ? "alert" : "status"}>
           {message.text}
         </p>
       )}

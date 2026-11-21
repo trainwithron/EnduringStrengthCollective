@@ -73,7 +73,7 @@ export function ChangeMyEmail({ currentEmail }: { currentEmail: string }) {
             </button>
           </div>
           {error && (
-            <p className="font-body text-xs text-rust" role="alert">
+            <p className="font-body text-xs text-rust-ink" role="alert">
               {error}
             </p>
           )}

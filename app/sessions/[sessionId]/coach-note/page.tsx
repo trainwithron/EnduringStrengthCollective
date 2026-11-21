@@ -77,7 +77,7 @@ export default async function SessionPatternNotePage(props: { params: Promise<{ 
     </div>
   );
   const back = (
-    <Link href={profileHref} className="inline-flex items-center min-h-11 mb-2 font-body text-sm text-steel active:text-rust">
+    <Link href={profileHref} className="inline-flex items-center min-h-11 mb-2 font-body text-sm text-steel active:text-rust-ink">
       &larr; {athleteName}
     </Link>
   );
@@ -114,7 +114,7 @@ export default async function SessionPatternNotePage(props: { params: Promise<{ 
     <main className="min-h-screen bg-graphite text-chalk font-body px-5 pt-6 pb-28 lg:pb-10">
       <div className="max-w-xl mx-auto">
         {back}
-        <p className="font-body text-xs text-rust uppercase tracking-wide font-bold mb-2">
+        <p className="font-body text-xs text-rust-ink uppercase tracking-wide font-bold mb-2">
           Session Pattern Spot
         </p>
         <h1 className="font-display font-bold text-2xl uppercase leading-tight mb-4">

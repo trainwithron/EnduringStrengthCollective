@@ -66,15 +66,15 @@ export function ReactionButton({
         onClick={toggle}
         className={`flex items-center gap-1.5 h-11 px-3 border transition-colors ${
           reacted
-            ? "border-rust text-rust bg-rust/10"
-            : "border-steel/30 text-steel active:border-rust active:text-rust"
+            ? "border-rust text-rust-ink bg-rust/10"
+            : "border-steel/30 text-steel active:border-rust active:text-rust-ink"
         }`}
       >
         <span aria-hidden="true">👊</span>
         <span className="font-body text-sm tabular-nums">{count}</span>
       </button>
       {error && (
-        <p className="font-body text-xs text-rust mt-1" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-1" role="alert">
           {error}
         </p>
       )}

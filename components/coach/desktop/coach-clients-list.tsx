@@ -41,7 +41,7 @@ export function CoachClientsList({ rows, selfName = null, oneView = false }: { r
             type="button"
             aria-pressed={filter === f}
             onClick={() => setFilter(f)}
-            className={`h-9 px-4 rounded-token-pill font-body text-[13px] transition-colors ${filter === f ? "bg-rust/15 text-rust-ink font-semibold" : "bg-surface-2 text-chalk hover:text-rust"}`}
+            className={`h-9 px-4 rounded-token-pill font-body text-[13px] transition-colors ${filter === f ? "bg-rust/15 text-rust-ink font-semibold" : "bg-surface-2 text-chalk hover:text-rust-ink"}`}
           >
             {FILTER_LABELS[f]} <span className={filter === f ? "text-rust-ink" : "text-steel"}>{counts[f]}</span>
           </button>
@@ -54,7 +54,7 @@ export function CoachClientsList({ rows, selfName = null, oneView = false }: { r
               type="button"
               aria-pressed={view === v}
               onClick={() => chooseView(v)}
-              className={`h-11 sm:h-9 px-3 rounded-token-pill font-body text-[13px] flex items-center gap-1.5 ${view === v ? "bg-rust/15 text-rust-ink font-semibold" : "text-chalk hover:text-rust"}`}
+              className={`h-11 sm:h-9 px-3 rounded-token-pill font-body text-[13px] flex items-center gap-1.5 ${view === v ? "bg-rust/15 text-rust-ink font-semibold" : "text-chalk hover:text-rust-ink"}`}
             >
               {v === "cards" ? <LayoutGrid className="w-3.5 h-3.5" aria-hidden="true" /> : <List className="w-3.5 h-3.5" aria-hidden="true" />}
               {v === "cards" ? "Cards" : "List"}
@@ -100,13 +100,13 @@ export function ClientsListView({ rows }: { rows: CoachClientRow[] }) {
               <li key={`${c.id}:${c.groupId}`} className="flex items-center">
                 <Link href={`/groups/${c.groupId}/athletes/${c.id}`} className="flex flex-1 min-w-0 items-center gap-3 py-2.5 px-1 hover:bg-surface/60">
                   <span className="font-body text-sm text-chalk flex-1 min-w-0 truncate">{c.fullName}</span>
-                  {c.waitingOnGuardian && <span className="font-body text-xs text-rust shrink-0">{WAITING_ON_GUARDIAN_LABEL}</span>}
-                  {c.emailUnconfirmed && <span className="font-body text-xs text-rust shrink-0">{EMAIL_NOT_CONFIRMED_LABEL}</span>}
+                  {c.waitingOnGuardian && <span className="font-body text-xs text-rust-ink shrink-0">{WAITING_ON_GUARDIAN_LABEL}</span>}
+                  {c.emailUnconfirmed && <span className="font-body text-xs text-rust-ink shrink-0">{EMAIL_NOT_CONFIRMED_LABEL}</span>}
                   <span className="font-body text-xs text-steel shrink-0 hidden sm:inline">{KIND_LABEL[clientKind(c)]}</span>
                   {c.groupKind !== "one_on_one" && <span className="font-body text-xs text-steel hidden md:inline truncate min-w-0 max-w-[22rem]">{c.groupName}</span>}
                   <span className="flex items-center justify-end gap-2 shrink-0 w-24 pr-2">
                     {c.owed > 0 && (
-                      <span title="Already delivered beyond what they had" className="font-body text-[11px] text-rust">
+                      <span title="Already delivered beyond what they had" className="font-body text-[11px] text-rust-ink">
                         owed {c.owed}
                       </span>
                     )}
@@ -142,8 +142,8 @@ export function ClientsCardView({ rows }: { rows: CoachClientRow[] }) {
                   {c.setAside ? " · set aside" : ""}
                 </span>
                 {c.groupKind !== "one_on_one" && c.groupName && <span className="block font-body text-xs text-steel truncate">{c.groupName}</span>}
-                {c.waitingOnGuardian && <span className="block font-body text-xs text-rust truncate">{WAITING_ON_GUARDIAN_LABEL}</span>}
-                {c.emailUnconfirmed && <span className="block font-body text-xs text-rust truncate">{EMAIL_NOT_CONFIRMED_LABEL}</span>}
+                {c.waitingOnGuardian && <span className="block font-body text-xs text-rust-ink truncate">{WAITING_ON_GUARDIAN_LABEL}</span>}
+                {c.emailUnconfirmed && <span className="block font-body text-xs text-rust-ink truncate">{EMAIL_NOT_CONFIRMED_LABEL}</span>}
               </span>
               <span className="flex flex-col items-end shrink-0">
                 <span title={`${c.toBook} left to schedule`} aria-label={`${c.toBook} left to schedule`} className={`font-display text-xl tabular-nums leading-none ${c.toBook > 0 ? "text-chalk" : "text-steel"}`}>
@@ -151,7 +151,7 @@ export function ClientsCardView({ rows }: { rows: CoachClientRow[] }) {
                 </span>
                 <span className="font-body text-[10px] text-steel mt-1">to schedule</span>
                 {c.owed > 0 && (
-                  <span title="Already delivered beyond what they had" className="font-body text-[11px] text-rust mt-0.5">
+                  <span title="Already delivered beyond what they had" className="font-body text-[11px] text-rust-ink mt-0.5">
                     owed {c.owed}
                   </span>
                 )}

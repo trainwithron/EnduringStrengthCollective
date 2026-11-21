@@ -31,7 +31,7 @@ export function AttendanceView({ groupId, fromDay, toDay, athletes, dayKeys }: {
           To (included)
           <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="block h-11 mt-1 bg-graphite border border-steel/30 text-chalk px-2.5 font-body text-sm" />
         </label>
-        <button type="submit" className="h-11 px-4 border border-rust text-rust font-body text-sm font-medium">
+        <button type="submit" className="h-11 px-4 border border-rust text-rust-ink font-body text-sm font-medium">
           Show
         </button>
         <a href={`/api/coach/attendance-csv?groupId=${groupId}&from=${from}&to=${to}`} className="inline-flex items-center h-11 px-4 border border-steel/40 text-chalk font-body text-sm">

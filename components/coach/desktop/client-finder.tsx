@@ -128,7 +128,7 @@ export function ClientFinder({ currentGroupId, align = "right" }: { currentGroup
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-label={label}
-        className="flex items-center gap-1.5 h-9 px-2.5 md:px-3 border border-steel/30 text-chalk active:border-rust active:text-rust transition-colors"
+        className="flex items-center gap-1.5 h-9 px-2.5 md:px-3 border border-steel/30 text-chalk active:border-rust active:text-rust-ink transition-colors"
       >
         <Search className="w-4 h-4 shrink-0" strokeWidth={2.25} />
         <span className="font-body text-sm hidden sm:inline">{label}</span>

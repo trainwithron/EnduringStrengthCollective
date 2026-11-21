@@ -118,7 +118,7 @@ export function MealCheckoffList({
   return (
     <div className="space-y-2">
       {logError && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {logError}
         </p>
       )}
@@ -182,7 +182,7 @@ export function MealCheckoffList({
                   type="button"
                   onClick={() => setModifyingSlot(meal.spec.id)}
                   disabled={saving}
-                  className="h-11 px-3 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust transition-colors disabled:opacity-40"
+                  className="h-11 px-3 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust-ink transition-colors disabled:opacity-40"
                 >
                   Modified
                 </button>
@@ -311,7 +311,7 @@ export function FreeTextFoodLog({
             rows={2}
             className="w-full bg-graphite border border-steel/30 text-chalk px-2 py-1.5 font-body text-sm focus:outline-none focus:border-rust resize-none"
           />
-          {error && <p className="font-body text-xs text-rust">{error}</p>}
+          {error && <p className="font-body text-xs text-rust-ink">{error}</p>}
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -340,7 +340,7 @@ export function FreeTextFoodLog({
           </p>
           <p className="font-body text-xs text-steel mt-1">Rough estimate — not lab-precise.</p>
           {error && (
-            <p className="font-body text-xs text-rust mt-1" role="alert">
+            <p className="font-body text-xs text-rust-ink mt-1" role="alert">
               {error}
             </p>
           )}

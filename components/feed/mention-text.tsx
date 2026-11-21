@@ -15,7 +15,7 @@ export function renderWithMentions(body: string): ReactNode[] {
     out.push(part);
     if (matches[i]) {
       out.push(
-        <span key={i} className="text-rust font-medium">
+        <span key={i} className="text-rust-ink font-medium">
           {matches[i]}
         </span>
       );

@@ -111,7 +111,7 @@ export function LearnLine({ correction, programId, groupId, athleteId }: { corre
                 type="button"
                 onClick={() => setWhyChips((prev) => (prev.includes(c.key) ? prev.filter((x) => x !== c.key) : [...prev, c.key]))}
                 aria-pressed={whyChips.includes(c.key)}
-                className={`${button} border ${whyChips.includes(c.key) ? "border-rust text-rust" : "border-steel/30 text-chalk"}`}
+                className={`${button} border ${whyChips.includes(c.key) ? "border-rust text-rust-ink" : "border-steel/30 text-chalk"}`}
               >
                 {c.label}
               </button>
@@ -184,7 +184,7 @@ export function LearnLine({ correction, programId, groupId, athleteId }: { corre
                   type="button"
                   onClick={() => setKeys((prev) => (prev.includes(k.key) ? prev.filter((x) => x !== k.key) : [...prev, k.key]))}
                   aria-pressed={keys.includes(k.key)}
-                  className={`${button} border ${keys.includes(k.key) ? "border-rust text-rust" : "border-steel/30 text-chalk"}`}
+                  className={`${button} border ${keys.includes(k.key) ? "border-rust text-rust-ink" : "border-steel/30 text-chalk"}`}
                 >
                   {k.label}
                 </button>
@@ -203,7 +203,7 @@ export function LearnLine({ correction, programId, groupId, athleteId }: { corre
       )}
 
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

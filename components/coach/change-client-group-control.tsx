@@ -186,7 +186,7 @@ export function ChangeClientGroupControl({
           // leaving the dropdown stuck on "No other groups yet" forever.
           loadOrgGroups();
         }}
-        className="font-body text-xs text-steel underline decoration-dotted active:text-rust"
+        className="font-body text-xs text-steel underline decoration-dotted active:text-rust-ink"
       >
         Move to a different group
       </button>
@@ -241,7 +241,7 @@ export function ChangeClientGroupControl({
           className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust"
         />
       )}
-      {error && <p className="font-body text-xs text-rust mt-2">{error}</p>}
+      {error && <p className="font-body text-xs text-rust-ink mt-2">{error}</p>}
       <div className="flex items-center gap-3 mt-3">
         <button
           type="button"

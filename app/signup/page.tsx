@@ -77,17 +77,17 @@ export default function SignupPage() {
             We sent a confirmation link to <span className="text-chalk">{submittedEmail}</span>. Click it
             to activate your account and sign in — your organization is already set up and waiting.
           </p>
-          <p className="font-body text-xs text-steel mt-3">If you already have an account, <a href="/login" className="text-rust underline underline-offset-2">sign in</a> instead.</p>
-          <button type="button" onClick={resend} className="font-body text-sm text-rust underline underline-offset-2 mt-4">
+          <p className="font-body text-xs text-steel mt-3">If you already have an account, <a href="/login" className="text-rust-ink underline underline-offset-2">sign in</a> instead.</p>
+          <button type="button" onClick={resend} className="font-body text-sm text-rust-ink underline underline-offset-2 mt-4">
             Send the email again
           </button>
           {emailNote && <p className="font-body text-xs text-steel mt-2">{emailNote}</p>}
           <p className="font-body text-xs text-steel mt-4">
             Wrong address?{" "}
-            <button type="button" onClick={() => { setSubmittedEmail(null); setSubmitting(false); }} className="text-rust underline underline-offset-2">
+            <button type="button" onClick={() => { setSubmittedEmail(null); setSubmitting(false); }} className="text-rust-ink underline underline-offset-2">
               Go back
             </button>{" "}
-            (if it was already used, <Link href="/login" className="text-rust">sign in</Link>).
+            (if it was already used, <Link href="/login" className="text-rust-ink">sign in</Link>).
           </p>
         </div>
       </main>
@@ -184,7 +184,7 @@ export default function SignupPage() {
           <LegalAcceptance checked={legalAccepted} onChange={setLegalAccepted} />
 
           {error && (
-            <p className="font-body text-sm text-rust" role="alert">
+            <p className="font-body text-sm text-rust-ink" role="alert">
               {error}
             </p>
           )}
@@ -200,7 +200,7 @@ export default function SignupPage() {
 
         <p className="font-body text-sm text-steel text-center mt-4">
           Already have an account?{" "}
-          <Link href="/login" className="text-rust">
+          <Link href="/login" className="text-rust-ink">
             Sign in
           </Link>
         </p>

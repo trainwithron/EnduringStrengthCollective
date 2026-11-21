@@ -34,7 +34,7 @@ export default async function DispatchReplyPage(props: { params: Promise<{ token
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body flex items-center justify-center px-6 py-16">
       <div className="max-w-sm w-full">
-        <p className="font-display uppercase text-xs tracking-[0.2em] text-rust text-center">
+        <p className="font-display uppercase text-xs tracking-[0.2em] text-rust-ink text-center">
           {(question.profiles as any)?.full_name ?? "Your coach"} asked
         </p>
         <p className="font-body text-lg mt-3 text-center">{question.question}</p>

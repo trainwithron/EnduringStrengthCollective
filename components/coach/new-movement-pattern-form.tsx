@@ -71,14 +71,14 @@ export function NewMovementPatternForm() {
             className={`h-7 px-2.5 border font-body text-xs capitalize transition-colors ${
               plane === p
                 ? "bg-rust border-rust text-graphite"
-                : "border-steel/30 text-steel active:border-rust active:text-rust"
+                : "border-steel/30 text-steel active:border-rust active:text-rust-ink"
             }`}
           >
             {p}
           </button>
         ))}
       </div>
-      {error && <p className="font-body text-xs text-rust">{error}</p>}
+      {error && <p className="font-body text-xs text-rust-ink">{error}</p>}
     </form>
   );
 }

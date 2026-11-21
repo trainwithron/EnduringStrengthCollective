@@ -17,7 +17,7 @@ export function PatternEvidence({ evidence, timeZone, unit }: { evidence: Findin
           <div key={i} className={row}>
             <span className="font-body text-xs text-steel tabular-nums">{day(r.startedAt)}</span>
             <span className="font-body text-sm text-chalk">{r.exerciseName}</span>
-            <span className={`font-body text-xs ${r.done < r.total ? "text-rust" : "text-steel"}`}>
+            <span className={`font-body text-xs ${r.done < r.total ? "text-rust-ink" : "text-steel"}`}>
               {r.done} of {r.total} sets done
             </span>
             <span className="basis-full font-body text-xs text-steel tabular-nums">{evidenceRowText(r.sets, lift)}</span>

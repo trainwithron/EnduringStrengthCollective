@@ -259,7 +259,7 @@ export function ExerciseHistoryUploader({
   // The rows of the file that were not read, with why.
   const skippedList = csvSkipped.length > 0 && (
     <div className="mb-3">
-      <p className="font-body text-xs text-rust mb-1">
+      <p className="font-body text-xs text-rust-ink mb-1">
         {csvSkipped.length} row{csvSkipped.length === 1 ? " was" : "s were"} not read. Fix {csvSkipped.length === 1 ? "it" : "them"} in the file and import again; nothing here is lost.
       </p>
       <div className="max-h-40 overflow-y-auto border border-steel/20">
@@ -323,7 +323,7 @@ export function ExerciseHistoryUploader({
           <WeightUnitChoice value={quickUnit} onChange={setQuickUnit} />
         </div>
         {manualError && (
-          <p className="font-body text-xs text-rust mb-2" role="alert">
+          <p className="font-body text-xs text-rust-ink mb-2" role="alert">
             {manualError}
           </p>
         )}
@@ -364,7 +364,7 @@ export function ExerciseHistoryUploader({
         )}
         {csvStatus === "error" && csvError && (
           <div>
-            <p className="font-body text-xs text-rust mb-2" role="alert">
+            <p className="font-body text-xs text-rust-ink mb-2" role="alert">
               {csvError}
             </p>
             {skippedList}
@@ -380,7 +380,7 @@ export function ExerciseHistoryUploader({
         {csvStatus === "reviewing" && (
           <div>
             {csvNotice && (
-              <p className="font-body text-sm text-rust mb-2" role="alert">
+              <p className="font-body text-sm text-rust-ink mb-2" role="alert">
                 {csvNotice}
               </p>
             )}
@@ -444,14 +444,14 @@ export function ExerciseHistoryUploader({
                   type="button"
                   onClick={() => handleUndoBatch(b)}
                   disabled={undoingBatch === b.id}
-                  className="font-body text-xs text-rust disabled:opacity-40"
+                  className="font-body text-xs text-rust-ink disabled:opacity-40"
                 >
                   {undoingBatch === b.id ? "Undoing…" : "Undo this import"}
                 </button>
               </div>
             ))}
             {undoError && (
-              <p className="font-body text-xs text-rust" role="alert">
+              <p className="font-body text-xs text-rust-ink" role="alert">
                 {undoError}
               </p>
             )}
@@ -473,7 +473,7 @@ export function ExerciseHistoryUploader({
                     type="button"
                     onClick={() => handleDelete(group.sessionId)}
                     disabled={deletingId === group.sessionId}
-                    className="font-body text-xs text-rust disabled:opacity-40"
+                    className="font-body text-xs text-rust-ink disabled:opacity-40"
                   >
                     {deletingId === group.sessionId ? "Deleting…" : "Delete"}
                   </button>

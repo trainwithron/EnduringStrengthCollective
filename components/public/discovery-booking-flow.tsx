@@ -171,7 +171,7 @@ export function DiscoveryBookingFlow({ coachId }: { coachId: string }) {
               className={`h-10 font-body text-sm border transition-colors ${
                 selectedSlot?.start === slot.start
                   ? "bg-rust text-graphite border-rust"
-                  : "border-steel/30 text-chalk active:border-rust active:text-rust"
+                  : "border-steel/30 text-chalk active:border-rust active:text-rust-ink"
               }`}
             >
               {formatSlotTime(slot.start)}
@@ -224,7 +224,7 @@ export function DiscoveryBookingFlow({ coachId }: { coachId: string }) {
             />
           </label>
 
-          {formError && <p className="font-body text-xs text-rust">{formError}</p>}
+          {formError && <p className="font-body text-xs text-rust-ink">{formError}</p>}
 
           <button
             type="button"

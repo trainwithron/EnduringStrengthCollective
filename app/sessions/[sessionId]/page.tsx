@@ -651,7 +651,7 @@ export default async function SessionPage(
             the moment they open it themselves (existingSession handles
             that); this just makes sure they know to. */}
         {workoutCardHref && (
-          <Link href={workoutCardHref} className="inline-flex items-center min-h-11 mt-3 font-body text-sm text-rust underline underline-offset-2">
+          <Link href={workoutCardHref} className="inline-flex items-center min-h-11 mt-3 font-body text-sm text-rust-ink underline underline-offset-2">
             View workout card &rarr;
           </Link>
         )}

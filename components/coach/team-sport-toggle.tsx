@@ -38,7 +38,7 @@ export function TeamSportToggle({ groupId, initialEnabled }: { groupId: string; 
         <input type="checkbox" checked={enabled} onChange={toggle} disabled={saving} aria-label="This group is a team sport" className="w-5 h-5 shrink-0 accent-rust" />
       </label>
       {error && (
-        <p className="font-body text-xs text-rust mt-1" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-1" role="alert">
           {error}
         </p>
       )}

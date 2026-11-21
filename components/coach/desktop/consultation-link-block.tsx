@@ -89,7 +89,7 @@ export function ConsultationLinkBlock({ coachId, slug, enabled: initialEnabled, 
         </span>
       </label>
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

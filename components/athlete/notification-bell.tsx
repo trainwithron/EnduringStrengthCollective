@@ -165,7 +165,7 @@ export function NotificationBell({
                 <button
                   type="button"
                   onClick={() => markRead(items.filter((n) => !n.readAt).map((n) => n.id))}
-                  className="font-body text-xs text-rust"
+                  className="font-body text-xs text-rust-ink"
                 >
                   Mark all read
                 </button>

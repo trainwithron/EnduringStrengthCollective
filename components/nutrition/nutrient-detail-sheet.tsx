@@ -79,7 +79,7 @@ export function NutrientDetailSheet({
           </button>
         </div>
         {problem ? (
-          <p className="font-body text-sm text-rust" role="alert">
+          <p className="font-body text-sm text-rust-ink" role="alert">
             {problem}
           </p>
         ) : !facts ? (

@@ -80,7 +80,7 @@ export function LiveGroupLeaderboard({
               type="button"
               onClick={() => setView(v)}
               className={`h-8 px-3 font-body text-xs border ${
-                view === v ? "border-rust text-rust" : "border-steel/30 text-steel"
+                view === v ? "border-rust text-rust-ink" : "border-steel/30 text-steel"
               }`}
             >
               {v === "roster" ? "Whole Roster" : "By Position"}

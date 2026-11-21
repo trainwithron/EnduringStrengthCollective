@@ -28,7 +28,7 @@ export function TodayTiles({ showCheckin = true }: { showCheckin?: boolean }) {
         Log weight
       </a>
       <button type="button" onClick={() => window.dispatchEvent(new Event(OPEN_INBODY_EVENT))} className={tile} data-tile="inbody">
-        <ClipboardList className="w-5 h-5 text-rust" aria-hidden="true" />
+        <ClipboardList className="w-5 h-5 text-rust-ink" aria-hidden="true" />
         InBody
       </button>
     </nav>

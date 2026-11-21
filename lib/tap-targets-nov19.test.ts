@@ -8,7 +8,7 @@ const read = (p: string) => readFileSync(join(__dirname, "..", p), "utf8");
 describe("small text links are full-size tap targets on a phone", () => {
   it("the Connect links (Google Calendar, Oura, Withings, Google Health, Garmin)", () => {
     for (const f of ["components/coach/google-calendar-connection.tsx", "components/athlete/oura-connection.tsx", "components/athlete/withings-connection.tsx", "components/athlete/google-health-connection.tsx", "components/athlete/garmin-connection.tsx"]) {
-      expect(read(f), f).toContain('className="font-body text-xs text-rust inline-flex items-center min-h-11 px-2 -mx-2"');
+      expect(read(f), f).toContain('className="font-body text-xs text-rust-ink inline-flex items-center min-h-11 px-2 -mx-2"');
     }
   });
   it("Settings' Coach home and coach-invite links, the coaches section link, and Skip this on the check-in", () => {

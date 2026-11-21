@@ -52,7 +52,7 @@ export function AiUsageMeter({
     return (
       <p className="font-body text-xs text-steel" data-testid="free-tier-ai-meter">
         {text}{" "}
-        <Link href={`/groups/${groupId}/branding?tab=credits`} className="text-rust underline underline-offset-2">
+        <Link href={`/groups/${groupId}/branding?tab=credits`} className="text-rust-ink underline underline-offset-2">
           {left > 0 ? "See plans" : "Buy credits or subscribe"}
         </Link>
       </p>
@@ -82,7 +82,7 @@ export function AiUsageMeter({
       <p className="font-body text-xs text-steel">
         Included in your plan: {summary} this month.{message ? ` ${message}` : ""}{" "}
         {(atLimit || nearLimit) && (
-          <Link href={creditsHref} className="text-rust underline underline-offset-2">
+          <Link href={creditsHref} className="text-rust-ink underline underline-offset-2">
             {atLimit ? "Buy credits" : "See usage"}
           </Link>
         )}
@@ -99,7 +99,7 @@ export function AiUsageMeter({
         client{usage.clients === 1 ? "" : "s"} right now).
       </p>
       {message && (
-        <p className={`font-body text-xs mt-2 ${atLimit ? "text-rust" : "text-steel"}`}>
+        <p className={`font-body text-xs mt-2 ${atLimit ? "text-rust-ink" : "text-steel"}`}>
           {message}
           {atLimit && " Buy credits below to keep going."}
         </p>

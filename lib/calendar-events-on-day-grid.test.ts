@@ -61,7 +61,7 @@ describe("Home's Your day lists today's calendar events", () => {
     expect(page).toContain("buildSchedule(user.id, dashboardData.todayBookings, todaysClasses, todaysEvents)");
     const panel = read("components/coach/desktop/your-day-panel.tsx");
     expect(panel).toContain('{e.allDay ? "All day" : formatInTimezone(e.startAt, timezone, "time")}');
-    expect(panel).toContain('{e.kind === "event" && <span className="font-body text-xs text-rust ml-2">Event</span>}');
+    expect(panel).toContain('{e.kind === "event" && <span className="font-body text-xs text-rust-ink ml-2">Event</span>}');
   });
 });
 

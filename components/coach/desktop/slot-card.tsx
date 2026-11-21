@@ -320,7 +320,7 @@ export function SlotCard({
           Reps
           <input type="text" value={reps} onChange={(e) => setReps(e.target.value)} onBlur={() => void saveReps()} className={`${select} block mt-1 w-20`} />
         </label>
-        <button type="button" onClick={remove} className="min-h-10 px-3 font-body text-sm text-steel active:text-rust">
+        <button type="button" onClick={remove} className="min-h-10 px-3 font-body text-sm text-steel active:text-rust-ink">
           Remove
         </button>
       </div>

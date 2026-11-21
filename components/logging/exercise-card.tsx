@@ -355,7 +355,7 @@ export function ExerciseCard({
                   applySwap(typed ? existingLibraryName(typed, libraryNames) ?? capitalizeWords(typed) : "");
                 }}
                 disabled={swapBusy || !nameDraft.trim()}
-                className="min-h-11 px-2 font-body text-xs text-rust disabled:opacity-40"
+                className="min-h-11 px-2 font-body text-xs text-rust-ink disabled:opacity-40"
               >
                 {swapBusy ? "Saving…" : "Swap"}
               </button>
@@ -372,7 +372,7 @@ export function ExerciseCard({
               </button>
             </div>
             {swapError && (
-              <p className="font-body text-xs text-rust mt-1" role="alert">
+              <p className="font-body text-xs text-rust-ink mt-1" role="alert">
                 {swapError}
               </p>
             )}
@@ -425,7 +425,7 @@ export function ExerciseCard({
                       onDelete();
                     }}
                     disabled={deleting}
-                    className="min-h-11 px-2 -mx-2 font-body text-xs text-rust disabled:opacity-40"
+                    className="min-h-11 px-2 -mx-2 font-body text-xs text-rust-ink disabled:opacity-40"
                     data-remove-from-today={exercise.isAdded ? undefined : true}
                   >
                     {deleting ? "Removing…" : exercise.isAdded ? "Remove" : "Remove from today"}
@@ -439,7 +439,7 @@ export function ExerciseCard({
 
       {/* A superset or circuit (B1): what to do with the exercises linked to this one. */}
       {exercise.superset && (
-        <p className="font-body text-xs text-rust mb-2" data-superset-line>
+        <p className="font-body text-xs text-rust-ink mb-2" data-superset-line>
           {exercise.superset.line}
         </p>
       )}
@@ -469,7 +469,7 @@ export function ExerciseCard({
               className={`min-h-11 px-2.5 border font-body text-xs transition-colors ${
                 name === exercise.exerciseName
                   ? "bg-rust border-rust text-graphite"
-                  : "border-steel/30 text-steel active:border-rust active:text-rust"
+                  : "border-steel/30 text-steel active:border-rust active:text-rust-ink"
               }`}
             >
               {name}
@@ -527,7 +527,7 @@ export function ExerciseCard({
       />
 
       {addSetError && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {addSetError}
         </p>
       )}
@@ -572,12 +572,12 @@ export function ExerciseCard({
               <button
                 type="button"
                 onClick={() => setFieldsOpen((v) => !v)}
-                className="font-body text-xs text-steel active:text-rust transition-colors min-h-11"
+                className="font-body text-xs text-steel active:text-rust-ink transition-colors min-h-11"
               >
                 Edit metrics
               </button>
               {canAddLoad && (
-                <button type="button" onClick={() => setShowLoad(true)} className="font-body text-xs text-steel active:text-rust min-h-11">
+                <button type="button" onClick={() => setShowLoad(true)} className="font-body text-xs text-steel active:text-rust-ink min-h-11">
                   Add weight / RPE
                 </button>
               )}
@@ -592,7 +592,7 @@ export function ExerciseCard({
                           type="button"
                           onClick={() => handleRemoveField(f)}
                           disabled={fieldsBusy}
-                          className="min-h-11 px-2 border border-rust/40 text-rust font-body text-xs disabled:opacity-40"
+                          className="min-h-11 px-2 border border-rust/40 text-rust-ink font-body text-xs disabled:opacity-40"
                         >
                           {metricName(f)} &times;
                         </button>
@@ -607,7 +607,7 @@ export function ExerciseCard({
                           type="button"
                           onClick={() => handleAddField(f)}
                           disabled={fieldsBusy}
-                          className="min-h-11 px-2 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust disabled:opacity-40"
+                          className="min-h-11 px-2 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust-ink disabled:opacity-40"
                         >
                           + {metricName(f)}
                         </button>

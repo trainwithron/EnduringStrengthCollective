@@ -144,7 +144,7 @@ export function DemoSheet({
                 type="button"
                 onClick={nav.onPrev}
                 disabled={!nav.prev}
-                className="flex-1 min-w-0 h-14 flex items-center gap-2 text-left disabled:opacity-30 active:text-rust"
+                className="flex-1 min-w-0 h-14 flex items-center gap-2 text-left disabled:opacity-30 active:text-rust-ink"
               >
                 <ChevronLeft className="w-5 h-5 shrink-0 text-steel" aria-hidden="true" />
                 <span className="min-w-0">
@@ -156,7 +156,7 @@ export function DemoSheet({
                 type="button"
                 onClick={nav.onNext}
                 disabled={!nav.next}
-                className="flex-1 min-w-0 h-14 flex items-center justify-end gap-2 text-right disabled:opacity-30 active:text-rust"
+                className="flex-1 min-w-0 h-14 flex items-center justify-end gap-2 text-right disabled:opacity-30 active:text-rust-ink"
               >
                 <span className="min-w-0">
                   <span className="block font-body text-xs text-steel">Next</span>

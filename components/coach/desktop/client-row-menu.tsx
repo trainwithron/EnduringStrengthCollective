@@ -113,7 +113,7 @@ export function ClientRowMenu({ groupId, athleteId, athleteName, setAside = fals
           {CLIENT_TYPE_CHOICES.map((choice) => (
             <button key={choice.value} type="button" role="menuitemradio" aria-checked={clientType === choice.value} onClick={() => void chooseType(choice.value)} className={`${item} flex items-center justify-between`}>
               {choice.label}
-              {clientType === choice.value && <Check className="w-4 h-4 text-rust" aria-hidden="true" />}
+              {clientType === choice.value && <Check className="w-4 h-4 text-rust-ink" aria-hidden="true" />}
             </button>
           ))}
           <div className="border-t border-steel/20 my-0.5" aria-hidden="true" />
@@ -127,14 +127,14 @@ export function ClientRowMenu({ groupId, athleteId, athleteName, setAside = fals
             type="button"
             role="menuitem"
             onClick={() => void deleteClient()}
-            className={`${item} text-rust`}
+            className={`${item} text-rust-ink`}
           >
             Delete {term("client")} permanently
           </button>
         </div>
       )}
       {error && (
-        <p className="absolute right-0 top-full z-30 mt-0.5 w-56 bg-graphite border border-rust p-2 font-body text-xs text-rust" role="alert">
+        <p className="absolute right-0 top-full z-30 mt-0.5 w-56 bg-graphite border border-rust p-2 font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

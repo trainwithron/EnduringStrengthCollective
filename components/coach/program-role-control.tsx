@@ -108,7 +108,7 @@ export function ProgramRoleControl({
       </button>
       {message && <span className="font-body text-xs text-positive">{message}</span>}
       {error && (
-        <span className="font-body text-xs text-rust" role="alert">
+        <span className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </span>
       )}

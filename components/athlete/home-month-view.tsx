@@ -42,11 +42,11 @@ export function HomeMonthView({
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <Link href={prevHref} className="inline-flex items-center min-h-11 font-body text-xs text-rust uppercase tracking-wide">
+        <Link href={prevHref} className="inline-flex items-center min-h-11 font-body text-xs text-rust-ink uppercase tracking-wide">
           &larr; Prev
         </Link>
         <h2 className="font-display uppercase text-sm tracking-wide text-steel">{monthLabel}</h2>
-        <Link href={nextHref} className="inline-flex items-center min-h-11 font-body text-xs text-rust uppercase tracking-wide">
+        <Link href={nextHref} className="inline-flex items-center min-h-11 font-body text-xs text-rust-ink uppercase tracking-wide">
           Next &rarr;
         </Link>
       </div>
@@ -72,7 +72,7 @@ export function HomeMonthView({
 
           return (
             <Link key={i} href={`/groups/${groupId}?view=day&date=${key}`} className={cellClass}>
-              <span className={`font-body text-xs ${isToday ? "text-rust font-bold" : "text-steel"}`}>
+              <span className={`font-body text-xs ${isToday ? "text-rust-ink font-bold" : "text-steel"}`}>
                 {date.getDate()}
               </span>
               {/* A 45px-wide cell has no room for a title or numbers: one mark says what the day is, and tapping it opens the day's full card. */}

@@ -59,8 +59,8 @@ export function ProgramImportLauncher({
           onClick={() => fileRef.current?.click()}
           className={
             tone === "button"
-              ? "min-h-11 px-4 border border-rust text-rust font-body text-sm font-medium"
-              : "min-h-11 inline-flex items-center font-body text-sm text-rust font-medium underline underline-offset-2"
+              ? "min-h-11 px-4 border border-rust text-rust-ink font-body text-sm font-medium"
+              : "min-h-11 inline-flex items-center font-body text-sm text-rust-ink font-medium underline underline-offset-2"
           }
         >
           Import program
@@ -146,7 +146,7 @@ export function ProgramImportPanel({
           </button>
         </div>
         {failed ? (
-          <p className="font-body text-sm text-rust" role="alert">
+          <p className="font-body text-sm text-rust-ink" role="alert">
             Couldn&apos;t open the import. Close this and try again.
           </p>
         ) : !loaded ? (

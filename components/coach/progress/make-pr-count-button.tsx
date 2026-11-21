@@ -32,11 +32,11 @@ export function MakePrCountButton({ sessionId, exerciseName, control, clientName
   if (state.kind === "declined") return <span className="font-body text-xs text-steel">Said not now. You can ask again on {state.askAgainOn}.</span>;
   return (
     <>
-      <button type="button" disabled={busy} onClick={() => void ask()} className="min-h-11 font-body text-xs text-rust underline underline-offset-2 disabled:opacity-40">
+      <button type="button" disabled={busy} onClick={() => void ask()} className="min-h-11 font-body text-xs text-rust-ink underline underline-offset-2 disabled:opacity-40">
         {state.kind === "ask_again" ? "Ask again" : "Make this PR count"}
       </button>
       {error && (
-        <span className="font-body text-xs text-rust" role="alert">
+        <span className="font-body text-xs text-rust-ink" role="alert">
           {" "}
           {error}
         </span>

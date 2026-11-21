@@ -41,11 +41,11 @@ export function ClientNameControl({ groupId, athleteId, profileName, spaceName, 
         <p className="font-body text-sm text-chalk">
           Their space is named &ldquo;{spaceName}&rdquo; but they use &ldquo;{profileName}&rdquo;.
         </p>
-        <button type="button" onClick={() => void send({ matchSpace: true })} disabled={busy} className="h-10 px-4 border border-rust text-rust font-body text-sm disabled:opacity-40">
+        <button type="button" onClick={() => void send({ matchSpace: true })} disabled={busy} className="h-10 px-4 border border-rust text-rust-ink font-body text-sm disabled:opacity-40">
           {busy ? "Saving…" : `Name the space “${profileName}”`}
         </button>
         {error && (
-          <p className="font-body text-xs text-rust" role="alert">
+          <p className="font-body text-xs text-rust-ink" role="alert">
             {error}
           </p>
         )}
@@ -80,7 +80,7 @@ export function ClientNameControl({ groupId, athleteId, profileName, spaceName, 
         </form>
       )}
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

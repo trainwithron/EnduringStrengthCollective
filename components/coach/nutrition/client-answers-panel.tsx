@@ -108,7 +108,7 @@ export function ClientAnswersPanel({
       {open.map((a) => (
         <div key={a.id} className="border-t border-steel/15 pt-3 space-y-1.5">
           <p className="font-body text-sm text-chalk">
-            <span className={a.happy ? "text-positive" : "text-rust"}>{a.happy ? "Happy with it" : "Would change something"}</span>
+            <span className={a.happy ? "text-positive" : "text-rust-ink"}>{a.happy ? "Happy with it" : "Would change something"}</span>
             <span className="text-steel"> · target from {shortDateLabel(a.targetEffectiveFrom)}</span>
           </p>
           {a.changeText && <p className="font-body text-sm text-chalk">&ldquo;{a.changeText}&rdquo;</p>}
@@ -131,7 +131,7 @@ export function ClientAnswersPanel({
           >
             {busy === "scale" ? "Scaling…" : "Scale my plan to the new target"}
           </button>
-          <a href="#meal-plan" className="h-11 px-5 border border-rust text-rust font-body text-sm flex items-center">
+          <a href="#meal-plan" className="h-11 px-5 border border-rust text-rust-ink font-body text-sm flex items-center">
             Rebuild with their requests
           </a>
           {wantsVariety && (
@@ -153,7 +153,7 @@ export function ClientAnswersPanel({
         </p>
       )}
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

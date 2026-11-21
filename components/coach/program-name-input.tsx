@@ -71,7 +71,7 @@ export function ProgramNameInput({ programId, initial, onDone, className = "" }:
         className="w-full min-h-11 bg-graphite border border-steel/40 text-chalk px-2 font-body text-base sm:text-sm focus:outline-none focus:border-rust"
       />
       {error && (
-        <p className="font-body text-xs text-rust mt-1" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-1" role="alert">
           {error}
         </p>
       )}

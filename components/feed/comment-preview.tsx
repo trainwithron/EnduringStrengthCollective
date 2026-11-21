@@ -17,8 +17,8 @@ export function CommentPreview({
       onClick={onToggle}
       className={`flex items-center gap-1.5 h-11 px-3 border transition-colors ${
         open
-          ? "border-rust text-rust bg-rust/10"
-          : "border-steel/30 text-steel active:border-rust active:text-rust"
+          ? "border-rust text-rust-ink bg-rust/10"
+          : "border-steel/30 text-steel active:border-rust active:text-rust-ink"
       }`}
     >
       <MessageCircle className="w-4 h-4" />

@@ -183,7 +183,7 @@ export function InbodyScanFlow({
           </button>
         </div>
         {error && (
-          <p className="font-body text-sm text-rust mt-2" role="alert">
+          <p className="font-body text-sm text-rust-ink mt-2" role="alert">
             {error}
           </p>
         )}
@@ -204,7 +204,7 @@ export function InbodyScanFlow({
       <h3 className="font-display uppercase text-sm tracking-wide text-steel">Check the numbers before you save</h3>
       <p className="font-body text-xs text-steel mt-1">Imported from a photo, check the numbers. Leave a box blank if you can&apos;t read it.</p>
       {notice && (
-        <p className="font-body text-sm text-rust mt-2" role="alert">
+        <p className="font-body text-sm text-rust-ink mt-2" role="alert">
           {notice}
         </p>
       )}
@@ -245,7 +245,7 @@ export function InbodyScanFlow({
       {checks.length > 0 && (
         <ul className="mt-3 space-y-1">
           {checks.map((c) => (
-            <li key={c.key} className={`font-body text-xs ${c.ok ? "text-steel" : "text-rust"}`}>
+            <li key={c.key} className={`font-body text-xs ${c.ok ? "text-steel" : "text-rust-ink"}`}>
               <span aria-hidden>{c.ok ? "✓ " : "! "}</span>
               {c.ok ? c.label : `${c.label}: ${c.detail}. Check this one against the photo.`}
             </li>
@@ -267,7 +267,7 @@ export function InbodyScanFlow({
       )}
 
       {error && (
-        <p className="font-body text-sm text-rust mt-3" role="alert">
+        <p className="font-body text-sm text-rust-ink mt-3" role="alert">
           {error}
         </p>
       )}

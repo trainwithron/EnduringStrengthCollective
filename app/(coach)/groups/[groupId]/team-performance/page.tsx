@@ -259,7 +259,7 @@ export default async function TeamPerformancePage(
           </p>
           <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Avg readiness today</p>
           {lowReadinessToday > 0 ? (
-            <p className="font-body text-xs text-rust mt-0.5">{lowReadinessToday} flagged low</p>
+            <p className="font-body text-xs text-rust-ink mt-0.5">{lowReadinessToday} flagged low</p>
           ) : (
             <p className="font-body text-xs text-steel mt-0.5">
               {avgReadinessToday != null ? "Out of 5" : "No check-ins yet"}
@@ -314,7 +314,7 @@ export default async function TeamPerformancePage(
           <h2 className="font-display uppercase text-sm tracking-wide text-steel">Roster</h2>
           <Link
             href={`/groups/${params.groupId}/feed?channel=general`}
-            className="font-body text-xs text-rust"
+            className="font-body text-xs text-rust-ink"
           >
             See full leaderboard →
           </Link>

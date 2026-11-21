@@ -39,12 +39,12 @@ export function GuardianRequestPanel({ state, guardianEmail, requestedAt, coachN
   return (
     <div className="border border-steel/20 p-6 space-y-4">
       {state === "expired" && (
-        <p className="font-body text-sm text-rust" role="status">
+        <p className="font-body text-sm text-rust-ink" role="status">
           The last request ran out of time. Send a new one.
         </p>
       )}
       {state === "withdrawn" && (
-        <p className="font-body text-sm text-rust" role="status">
+        <p className="font-body text-sm text-rust-ink" role="status">
           A parent or guardian took back their permission, so training is paused until they give it again.
         </p>
       )}
@@ -87,7 +87,7 @@ export function GuardianRequestPanel({ state, guardianEmail, requestedAt, coachN
           />
           <p className="font-body text-xs text-steel">It has to be their own email, not yours.</p>
           {error && (
-            <p className="font-body text-sm text-rust" role="alert">
+            <p className="font-body text-sm text-rust-ink" role="alert">
               {error}
             </p>
           )}

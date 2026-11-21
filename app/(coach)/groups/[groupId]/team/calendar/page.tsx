@@ -147,7 +147,7 @@ export default async function TeamCalendarPage(
               className={`bg-graphite p-1.5 flex flex-col gap-0.5 ${isToday ? "ring-1 ring-inset ring-rust" : ""}`}
               style={{ minHeight: 72 }}
             >
-              <span className={`font-body text-xs ${isToday ? "text-rust font-bold" : "text-steel"}`}>
+              <span className={`font-body text-xs ${isToday ? "text-rust-ink font-bold" : "text-steel"}`}>
                 {date.getDate()}
               </span>
               {dayPractices.map((p) => (
@@ -159,7 +159,7 @@ export default async function TeamCalendarPage(
                 <Link
                   key={g.id}
                   href={`${basePath}/games/${g.id}`}
-                  className="font-body text-xs text-rust leading-tight truncate"
+                  className="font-body text-xs text-rust-ink leading-tight truncate"
                 >
                   vs {g.opponent} {g.our_score != null ? `(${g.our_score}-${g.opponent_score})` : ""}
                 </Link>

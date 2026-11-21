@@ -122,7 +122,7 @@ export function GroupSessionForm({ groupId, timezone, nowIso }: { groupId: strin
         who joins uses one session. When it is full, the next people go on a waiting list.
       </p>
       {message && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {message}
         </p>
       )}
@@ -151,7 +151,7 @@ export function GroupSessionDetail({ cls: c, clients, timezone, nowIso }: { cls:
     <div className="border border-steel/25 bg-surface p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="font-body text-base text-chalk">
-          {c.title} {cancelled && <span className="text-xs text-rust border border-rust/50 px-1.5 py-0.5 ml-1">Cancelled</span>}
+          {c.title} {cancelled && <span className="text-xs text-rust-ink border border-rust/50 px-1.5 py-0.5 ml-1">Cancelled</span>}
         </p>
         <p className="font-body text-sm text-steel">{formatInTimezone(new Date(c.startIso), timezone, "dateTime")}</p>
       </div>
@@ -232,7 +232,7 @@ export function GroupSessionDetail({ cls: c, clients, timezone, nowIso }: { cls:
           </button>
           <button
             type="button"
-            className="border border-rust text-rust font-body text-xs px-3 py-1.5 disabled:opacity-40 ml-auto"
+            className="border border-rust text-rust-ink font-body text-xs px-3 py-1.5 disabled:opacity-40 ml-auto"
             disabled={busy !== null}
             onClick={async () => {
               if (await confirmDialog(`Cancel ${c.title}? Everyone is told, and any session they used is returned.`)) {
@@ -245,7 +245,7 @@ export function GroupSessionDetail({ cls: c, clients, timezone, nowIso }: { cls:
         </div>
       )}
       {message && (
-        <p className="font-body text-xs text-rust mt-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-2" role="alert">
           {message}
         </p>
       )}

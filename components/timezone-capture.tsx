@@ -86,7 +86,7 @@ export function TimezoneCapture() {
           }
           setNoteZone(null);
         }}
-        className="text-steel active:text-rust"
+        className="text-steel active:text-rust-ink"
       >
         ✕
       </button>

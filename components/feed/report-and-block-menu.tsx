@@ -104,7 +104,7 @@ export function ReportAndBlockMenu({
                 className="w-full bg-graphite border border-steel/30 text-chalk px-2 py-1.5 text-sm"
               />
               <div className="flex items-center gap-3">
-                <button type="button" onClick={() => void sendReport()} disabled={busy || !reason.trim()} className="min-h-11 px-2 text-rust underline underline-offset-2 disabled:opacity-40">
+                <button type="button" onClick={() => void sendReport()} disabled={busy || !reason.trim()} className="min-h-11 px-2 text-rust-ink underline underline-offset-2 disabled:opacity-40">
                   Send report
                 </button>
                 <button type="button" onClick={() => setReporting(false)} className="min-h-11 px-2 text-steel">
@@ -116,7 +116,7 @@ export function ReportAndBlockMenu({
         </div>
       )}
       {error && (
-        <p className="text-rust mt-1" role="alert">
+        <p className="text-rust-ink mt-1" role="alert">
           {error}
         </p>
       )}

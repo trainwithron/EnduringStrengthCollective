@@ -89,7 +89,7 @@ export default async function AdminSupportPage() {
         </div>
 
         <p className="font-body text-xs text-steel mt-8">
-          <Link href="/" className="text-rust">
+          <Link href="/" className="text-rust-ink">
             ← Back home
           </Link>
         </p>

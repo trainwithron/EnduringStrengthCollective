@@ -99,7 +99,7 @@ export default async function MacroCalculatorPage(
         />
         <Link
           href={`/groups/${params.groupId}/nutrition`}
-          className="inline-block mt-6 font-body text-sm text-rust"
+          className="inline-block mt-6 font-body text-sm text-rust-ink"
         >
           Your coach sets your meal plan. See what is planned today &rarr;
         </Link>

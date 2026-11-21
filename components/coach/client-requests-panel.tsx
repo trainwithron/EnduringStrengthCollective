@@ -90,7 +90,7 @@ export function ClientRequestsPanel({ requests, supportEmail, title = "Waiting f
             {title} ({requests.length})
           </h2>
           {requests.length > 1 && (
-            <button type="button" onClick={declineAll} disabled={busy !== null} className={`${small} text-rust`}>
+            <button type="button" onClick={declineAll} disabled={busy !== null} className={`${small} text-rust-ink`}>
               {busy === "all" ? "Declining…" : "Decline all waiting"}
             </button>
           )}
@@ -125,7 +125,7 @@ export function ClientRequestsPanel({ requests, supportEmail, title = "Waiting f
                   </div>
                 </div>
                 {answers[r.id] && (
-                  <p className={`font-body text-xs ${answers[r.id].kind === "ok" ? "text-positive" : "text-rust"}`} role={answers[r.id].kind === "ok" ? "status" : "alert"}>
+                  <p className={`font-body text-xs ${answers[r.id].kind === "ok" ? "text-positive" : "text-rust-ink"}`} role={answers[r.id].kind === "ok" ? "status" : "alert"}>
                     {answers[r.id].text}
                     {answers[r.id].help && (
                       <>
@@ -155,7 +155,7 @@ export function ClientRequestsPanel({ requests, supportEmail, title = "Waiting f
         {Object.entries(answers)
           .filter(([id]) => !requests.some((r) => r.id === id))
           .map(([id, a]) => (
-            <p key={id} className={`font-body text-xs ${a.kind === "ok" ? "text-positive" : "text-rust"}`} role="status">
+            <p key={id} className={`font-body text-xs ${a.kind === "ok" ? "text-positive" : "text-rust-ink"}`} role="status">
               {a.text}
             </p>
           ))}

@@ -118,7 +118,7 @@ export function ClientCalendarGrid({
   return (
     <div className="border border-steel/15">
       {dropError && (
-        <p className="font-body text-sm text-rust px-2 py-1.5" role="alert">
+        <p className="font-body text-sm text-rust-ink px-2 py-1.5" role="alert">
           {dropError}
         </p>
       )}
@@ -174,7 +174,7 @@ export function ClientCalendarGrid({
                   >
                     <div className="flex items-center justify-between">
                       <span
-                        className={`font-body text-xs ${d.isToday ? "text-rust font-bold" : "text-steel"}`}
+                        className={`font-body text-xs ${d.isToday ? "text-rust-ink font-bold" : "text-steel"}`}
                       >
                         {d.dayNumber}
                       </span>
@@ -193,7 +193,7 @@ export function ClientCalendarGrid({
                       </div>
                     </div>
                     {d.overrideTitle ? (
-                      <span className="font-body text-xs leading-tight text-rust">{d.overrideTitle}</span>
+                      <span className="font-body text-xs leading-tight text-rust-ink">{d.overrideTitle}</span>
                     ) : d.programWorkoutTitle ? (
                       <span
                         className={`font-body text-xs leading-tight ${
@@ -209,7 +209,7 @@ export function ClientCalendarGrid({
                         {d.active.proteinG != null && ` ${d.active.proteinG}p`}
                         {d.active.carbsG != null && ` ${d.active.carbsG}c`}
                         {d.active.fatG != null && ` ${d.active.fatG}f`}
-                        <span className={d.active.source === "override" ? "text-rust" : ""}>
+                        <span className={d.active.source === "override" ? "text-rust-ink" : ""}>
                           {" · "}
                           {d.active.source === "override" ? "set for day" : d.active.source === "meal_plan" ? "plan" : "standing"}
                         </span>
@@ -249,7 +249,7 @@ export function ClientCalendarGrid({
                   <div className="flex items-center gap-3">
                     <Link
                       href={`${backHref}/calendar/${expandedData.dateKey}`}
-                      className="font-body text-xs text-rust uppercase tracking-wide"
+                      className="font-body text-xs text-rust-ink uppercase tracking-wide"
                     >
                       Open full page ↗
                     </Link>

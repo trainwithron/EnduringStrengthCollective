@@ -108,7 +108,7 @@ export function NotificationList({ initial, timezone }: { initial: CenterEntry[]
       )}
 
       {error && (
-        <p role="alert" className="font-body text-sm text-rust mb-3">
+        <p role="alert" className="font-body text-sm text-rust-ink mb-3">
           {error}
         </p>
       )}
@@ -147,7 +147,7 @@ export function NotificationList({ initial, timezone }: { initial: CenterEntry[]
                       </div>
                     )}
                     {answers[n.id] && (
-                      <p className={`px-4 pb-3 pl-[2.125rem] font-body text-xs ${answers[n.id].ok ? "text-positive" : "text-rust"}`} role={answers[n.id].ok ? "status" : "alert"}>
+                      <p className={`px-4 pb-3 pl-[2.125rem] font-body text-xs ${answers[n.id].ok ? "text-positive" : "text-rust-ink"}`} role={answers[n.id].ok ? "status" : "alert"}>
                         {answers[n.id].text}
                       </p>
                     )}

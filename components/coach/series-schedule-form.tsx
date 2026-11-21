@@ -290,7 +290,7 @@ export function SeriesScheduleForm({
           </div>
         ))}
         {rows.length < 7 && (
-          <button type="button" onClick={addRow} className="font-body text-sm text-rust underline underline-offset-2">
+          <button type="button" onClick={addRow} className="font-body text-sm text-rust-ink underline underline-offset-2">
             Add another day
           </button>
         )}
@@ -338,7 +338,7 @@ export function SeriesScheduleForm({
           {loading ? "Checking your calendar…" : shown.length > 0 ? `${bookableCount} of ${shown.length} dates will be booked` : "Dates"}
         </p>
         {previewError && (
-          <p className="font-body text-sm text-rust" role="alert">
+          <p className="font-body text-sm text-rust-ink" role="alert">
             {previewError}
           </p>
         )}
@@ -370,7 +370,7 @@ export function SeriesScheduleForm({
                     {formatInTimezone(new Date(r.startIso), timezone, "dateTime")}
                   </span>
                   {detail?.conflictLabel && (
-                    <span className={`font-body text-xs ${r.blocking ? "text-rust" : "text-steel"}`}>{detail.conflictLabel}</span>
+                    <span className={`font-body text-xs ${r.blocking ? "text-rust-ink" : "text-steel"}`}>{detail.conflictLabel}</span>
                   )}
                 </li>
               );
@@ -383,7 +383,7 @@ export function SeriesScheduleForm({
       </div>
 
       {error && (
-        <p className="font-body text-sm text-rust" role="alert">
+        <p className="font-body text-sm text-rust-ink" role="alert">
           {error}
         </p>
       )}

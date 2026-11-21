@@ -138,7 +138,7 @@ export default async function ChallengeDetailPage(
               <span className="font-body text-sm">
                 <span className="text-steel mr-2">#{entry.rank}</span>
                 {entry.fullName}
-                {entry.profileId === user.id && <span className="text-rust"> (you)</span>}
+                {entry.profileId === user.id && <span className="text-rust-ink"> (you)</span>}
               </span>
               <span className="font-body text-xs text-steel">{entry.score} check-offs</span>
             </div>
@@ -178,7 +178,7 @@ export default async function ChallengeDetailPage(
           {challenge.program_id && (challenge as any).programs?.name && (
             <Link
               href={`/groups/${params.groupId}/programs/${challenge.program_id}`}
-              className="font-body text-xs text-rust mt-1 inline-block"
+              className="font-body text-xs text-rust-ink mt-1 inline-block"
             >
               Running alongside: {(challenge as any).programs.name} &rarr;
             </Link>
@@ -269,7 +269,7 @@ export default async function ChallengeDetailPage(
         {challenge.program_id && (challenge as any).programs?.name && (
           <Link
             href={`/groups/${params.groupId}/programs/${challenge.program_id}`}
-            className="font-body text-xs text-rust mt-2 inline-block"
+            className="font-body text-xs text-rust-ink mt-2 inline-block"
           >
             Running alongside: {(challenge as any).programs.name} &rarr;
           </Link>

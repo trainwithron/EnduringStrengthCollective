@@ -87,7 +87,7 @@ export function ReportVideoLink({ videos, machineId }: { videos: { id: string; n
         className="w-full bg-graphite border border-steel/30 text-chalk px-3 py-2 font-body text-base sm:text-sm focus:outline-none focus:border-rust resize-none"
       />
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

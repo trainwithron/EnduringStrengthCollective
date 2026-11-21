@@ -70,12 +70,12 @@ export function LeaveOrganizationControl({
         </div>
       )}
       {error && (
-        <p className="font-body text-xs text-rust mt-1" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-1" role="alert">
           {error}
         </p>
       )}
       {unknown && (
-        <p className="font-body text-xs text-rust mt-1" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-1" role="alert">
           We could not check which clients only you coach. Reload the page to leave.
         </p>
       )}

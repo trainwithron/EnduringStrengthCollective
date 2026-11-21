@@ -38,14 +38,14 @@ function ContrastCheckRow({
     <div className="flex items-center justify-between gap-3 py-1.5">
       <span className="font-body text-xs text-steel">{label}</span>
       <div className="flex items-center gap-2">
-        <span className={`font-body text-xs ${passes ? "text-moss" : "text-rust"}`}>
+        <span className={`font-body text-xs ${passes ? "text-moss" : "text-rust-ink"}`}>
           {ratio === null ? "—" : `${ratio.toFixed(2)}:1`} {passes ? "· Passes AA" : `· Needs ${minRatio}:1`}
         </span>
         {!passes && onUseSuggested && (
           <button
             type="button"
             onClick={onUseSuggested}
-            className="font-body text-xs text-rust underline underline-offset-2"
+            className="font-body text-xs text-rust-ink underline underline-offset-2"
           >
             Use closer color
           </button>
@@ -299,7 +299,7 @@ export function BrandingForm({
             Used to show real distance when a prospect searches the coach marketplace near them.
             Optional — leave blank to skip location-based search for now.
           </p>
-          {zipError && <p className="font-body text-xs text-rust">{zipError}</p>}
+          {zipError && <p className="font-body text-xs text-rust-ink">{zipError}</p>}
           {zipSaved && !zipError && <p className="font-body text-xs text-moss">Saved.</p>}
         </div>
       </Section>

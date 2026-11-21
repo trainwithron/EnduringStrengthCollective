@@ -151,7 +151,7 @@ export function BottomTabBar({
           <>
             <span className={`relative inline-flex items-center justify-center h-7 px-3.5 rounded-full transition-colors ${isActive ? "bg-rust/15" : ""}`}>
               <Icon
-                className={`w-5 h-5 ${isActive ? "text-rust" : "text-steel"}`}
+                className={`w-5 h-5 ${isActive ? "text-rust-ink" : "text-steel"}`}
                 strokeWidth={2.5}
               />
               {tab.key === "settings" && pushState === "off" && (
@@ -163,7 +163,7 @@ export function BottomTabBar({
             </span>
             <span
               className={`font-body text-[11px] ${
-                isActive ? "text-rust font-semibold" : "text-steel"
+                isActive ? "text-rust-ink font-semibold" : "text-steel"
               }`}
             >
               {tab.label}

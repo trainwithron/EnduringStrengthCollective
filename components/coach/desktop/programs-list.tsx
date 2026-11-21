@@ -153,10 +153,10 @@ function RemovedRows({ rows }: { rows: RemovedProgram[] }) {
               </span>
             </span>
             <span className="flex items-center shrink-0">
-              <button type="button" disabled={busyId !== null} onClick={() => putBack(r.id)} className="min-h-11 px-3 font-body text-xs text-rust disabled:opacity-40">
+              <button type="button" disabled={busyId !== null} onClick={() => putBack(r.id)} className="min-h-11 px-3 font-body text-xs text-rust-ink disabled:opacity-40">
                 {busyId === r.id ? "Working…" : "Put back"}
               </button>
-              <button type="button" disabled={busyId !== null} onClick={() => remove(r)} className="min-h-11 px-3 font-body text-xs text-steel active:text-rust disabled:opacity-40">
+              <button type="button" disabled={busyId !== null} onClick={() => remove(r)} className="min-h-11 px-3 font-body text-xs text-steel active:text-rust-ink disabled:opacity-40">
                 Delete
               </button>
             </span>
@@ -164,7 +164,7 @@ function RemovedRows({ rows }: { rows: RemovedProgram[] }) {
         ))}
       </ul>
       {error && (
-        <p className="font-body text-xs text-rust mt-1" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-1" role="alert">
           {error}
         </p>
       )}

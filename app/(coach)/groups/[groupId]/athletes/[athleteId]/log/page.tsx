@@ -138,7 +138,7 @@ export default async function LogForClientPage(
       <ul className="px-5 pt-2 space-y-3">
         {choices.map((c) => (
           <li key={c.programId} className="border border-steel/20 bg-surface/40 p-4" data-testid="log-choice">
-            <p className="font-body text-xs text-rust uppercase tracking-wide">{c.heading}</p>
+            <p className="font-body text-xs text-rust-ink uppercase tracking-wide">{c.heading}</p>
             {c.kind === "start" && (
               <>
                 <Link

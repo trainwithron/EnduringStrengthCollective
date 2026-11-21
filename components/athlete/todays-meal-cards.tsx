@@ -91,7 +91,7 @@ export function TodaysMealCards({
         </p>
       )}
       {error && (
-        <p role="alert" className="font-body text-xs text-rust mb-2">
+        <p role="alert" className="font-body text-xs text-rust-ink mb-2">
           {error}
         </p>
       )}
@@ -177,7 +177,7 @@ export function TodaysMealCards({
                               type="button"
                               onClick={() => setModifying(`${bucket}-${meal.mealId}`)}
                               disabled={busy}
-                              className="h-11 px-3 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust transition-colors disabled:opacity-40"
+                              className="h-11 px-3 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust-ink transition-colors disabled:opacity-40"
                             >
                               Ate something else
                             </button>
@@ -224,7 +224,7 @@ function OptionCard({ choice, featured, busy, onAte }: { choice: MealRecipeChoic
     <div className={`border p-3 ${featured ? "border-rust/50" : "border-steel/20"}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          {featured && <p className="font-body text-[11px] uppercase tracking-wide text-rust mb-0.5">Today&apos;s pick</p>}
+          {featured && <p className="font-body text-[11px] uppercase tracking-wide text-rust-ink mb-0.5">Today&apos;s pick</p>}
           <p className="font-body text-sm font-medium text-chalk">{choice.recipeName ?? "Meal"}</p>
           {m && (
             <p className="font-body text-xs text-steel mt-0.5">

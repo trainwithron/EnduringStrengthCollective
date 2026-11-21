@@ -192,7 +192,7 @@ export function WingItBox({
           <p className="font-body text-xs text-steel mb-1.5">&quot;{c.line.exerciseName}&quot; could be:</p>
           <div className="flex flex-wrap gap-1.5">
             {c.options.map((o) => (
-              <button key={o} type="button" onClick={() => pick(c.key, o)} disabled={busy} className="min-h-11 px-3 border border-steel/30 text-chalk font-body text-xs active:border-rust active:text-rust disabled:opacity-40">
+              <button key={o} type="button" onClick={() => pick(c.key, o)} disabled={busy} className="min-h-11 px-3 border border-steel/30 text-chalk font-body text-xs active:border-rust active:text-rust-ink disabled:opacity-40">
                 {o}
               </button>
             ))}
@@ -225,7 +225,7 @@ export function WingItBox({
       )}
 
       {problem && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {problem}
         </p>
       )}

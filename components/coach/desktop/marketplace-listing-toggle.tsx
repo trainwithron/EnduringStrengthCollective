@@ -57,7 +57,7 @@ export function MarketplaceListingToggle({
           </span>
         </span>
       </label>
-      {error && <p className="font-body text-xs text-rust mt-2">{error}</p>}
+      {error && <p className="font-body text-xs text-rust-ink mt-2">{error}</p>}
     </div>
   );
 }

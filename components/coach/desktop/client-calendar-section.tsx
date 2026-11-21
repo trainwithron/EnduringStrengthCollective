@@ -305,13 +305,13 @@ export async function ClientCalendarSection({
     <div className="grid grid-cols-[1fr_280px] gap-8 items-start">
       <div>
         <div className="flex items-center justify-between mb-3">
-          <Link href={prevHref} className="font-body text-xs text-rust uppercase tracking-wide">
+          <Link href={prevHref} className="font-body text-xs text-rust-ink uppercase tracking-wide">
             &larr; Prev
           </Link>
           <h2 className="font-display uppercase text-sm tracking-wide text-steel">
             {monthLabel(year, monthIndex)}
           </h2>
-          <Link href={nextHref} className="font-body text-xs text-rust uppercase tracking-wide">
+          <Link href={nextHref} className="font-body text-xs text-rust-ink uppercase tracking-wide">
             Next &rarr;
           </Link>
         </div>

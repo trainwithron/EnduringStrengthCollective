@@ -114,7 +114,7 @@ export function SwipeDirectionDiscovery({
         type="button"
         onClick={dismiss}
         aria-label="Dismiss"
-        className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center text-steel active:text-rust transition-colors"
+        className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center text-steel active:text-rust-ink transition-colors"
       >
         <X className="w-3.5 h-3.5" />
       </button>
@@ -125,7 +125,7 @@ export function SwipeDirectionDiscovery({
         Swipe the samples below to feel each one, then pick whichever you liked better.
       </p>
       {error && (
-        <p className="font-body text-xs text-rust mt-1" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-1" role="alert">
           {error}
         </p>
       )}

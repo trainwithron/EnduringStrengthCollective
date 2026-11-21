@@ -66,7 +66,7 @@ export function QuickLogFoodButton({
     <button
       type="button"
       onClick={() => setOpen(true)}
-      className="min-h-[44px] px-4 rounded-token-pill border border-steel/40 text-chalk font-body text-[13px] font-medium active:border-rust active:text-rust transition-colors"
+      className="min-h-[44px] px-4 rounded-token-pill border border-steel/40 text-chalk font-body text-[13px] font-medium active:border-rust active:text-rust-ink transition-colors"
     >
       + Snack or ate out
     </button>
@@ -140,7 +140,7 @@ function JustTheNumbers({
         <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={QUICK_ADD_DEFAULT_NAME} aria-label="Name (optional)" className={field} />
       </label>
       {problem && (
-        <p className="font-body text-xs text-rust mt-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-2" role="alert">
           {problem}
         </p>
       )}

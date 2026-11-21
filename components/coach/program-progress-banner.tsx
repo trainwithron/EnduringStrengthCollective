@@ -26,7 +26,7 @@ export function ProgramProgressBanner({
       </p>
       <p className="font-body text-sm text-chalk mt-1">
         You&apos;ve moved{" "}
-        <span className="text-rust font-medium">{Math.round(totalVolumeLbs).toLocaleString()} lbs</span> so far.
+        <span className="text-rust-ink font-medium">{Math.round(totalVolumeLbs).toLocaleString()} lbs</span> so far.
       </p>
       {equivalence && <p className="font-body text-xs text-steel mt-1">{equivalence.text}</p>}
     </div>

@@ -76,7 +76,7 @@ export function BuilderDemoThumb({
           {picture}
         </button>
         {showCaption && (
-          <span className={`font-body text-[10px] leading-tight max-w-[72px] break-words ${demo.storedUnder ? "text-rust" : "text-steel"}`}>{demo.storedUnder ? caption : "Demo"}</span>
+          <span className={`font-body text-[10px] leading-tight max-w-[72px] break-words ${demo.storedUnder ? "text-rust-ink" : "text-steel"}`}>{demo.storedUnder ? caption : "Demo"}</span>
         )}
       </span>
       {open && (

@@ -142,7 +142,7 @@ export function RosterImportPanel({
 
   const skippedList = parsed && parsed.skipped.length > 0 && (
     <div className="mb-3">
-      <p className="font-body text-xs text-rust mb-1">
+      <p className="font-body text-xs text-rust-ink mb-1">
         {parsed.skipped.length} line{parsed.skipped.length === 1 ? " was" : "s were"} not used. Fix {parsed.skipped.length === 1 ? "it" : "them"} and add {parsed.skipped.length === 1 ? "it" : "them"} again if you want {parsed.skipped.length === 1 ? "it" : "them"}.
       </p>
       <div className="max-h-36 overflow-y-auto border border-steel/20">
@@ -183,7 +183,7 @@ export function RosterImportPanel({
         )}
         {failed.length > 0 && (
           <div className="mt-2">
-            <p className="font-body text-xs text-rust mb-1">{failed.length} not added:</p>
+            <p className="font-body text-xs text-rust-ink mb-1">{failed.length} not added:</p>
             <div className="max-h-36 overflow-y-auto border border-steel/20">
               {failed.map((f, i) => (
                 <p key={i} className="font-body text-xs text-steel px-2 py-1 border-b border-steel/10 last:border-b-0">
@@ -203,7 +203,7 @@ export function RosterImportPanel({
           </div>
         )}
         {error && (
-          <p className="font-body text-xs text-rust mt-2" role="alert">
+          <p className="font-body text-xs text-rust-ink mt-2" role="alert">
             {error}
           </p>
         )}
@@ -212,7 +212,7 @@ export function RosterImportPanel({
             Done
           </button>
           {!undone && addedIds.length > 0 && (
-            <button type="button" onClick={undo} disabled={undoing} className="font-body text-xs text-rust disabled:opacity-40">
+            <button type="button" onClick={undo} disabled={undoing} className="font-body text-xs text-rust-ink disabled:opacity-40">
               {undoing ? "Undoing…" : "Undo this import"}
             </button>
           )}
@@ -239,7 +239,7 @@ export function RosterImportPanel({
           {parsed.rows.length > 50 && <p className="font-body text-xs text-steel px-2 py-1">…and {parsed.rows.length - 50} more</p>}
         </div>
         {error && (
-          <p className="font-body text-xs text-rust mb-2" role="alert">
+          <p className="font-body text-xs text-rust-ink mb-2" role="alert">
             {error}
           </p>
         )}
@@ -286,7 +286,7 @@ export function RosterImportPanel({
         </button>
       </div>
       {error && (
-        <p className="font-body text-xs text-rust mt-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-2" role="alert">
           {error}
         </p>
       )}

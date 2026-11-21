@@ -129,7 +129,7 @@ export function ShareActions({
       {/* One row, always 44 px tall: a note about a save or copy takes the whole row for a few seconds (it never wraps beside the links and shrinks the card above). */}
       <div className={`flex items-center min-h-11 ${note ? "justify-center" : "justify-between"}`} aria-live="polite">
         {note ? (
-          <span className="font-body text-xs text-rust text-center">{note}</span>
+          <span className="font-body text-xs text-rust-ink text-center">{note}</span>
         ) : (
           <>
             {homeHref ? (
@@ -140,7 +140,7 @@ export function ShareActions({
               <span />
             )}
             {failed ? (
-              <span className="font-body text-xs text-rust text-center">The picture didn&apos;t load. Tap to try again.</span>
+              <span className="font-body text-xs text-rust-ink text-center">The picture didn&apos;t load. Tap to try again.</span>
             ) : (
               <details className="relative">
                 <summary className="min-h-11 flex items-center font-body text-xs text-steel cursor-pointer list-none">Save or copy</summary>

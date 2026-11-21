@@ -17,7 +17,7 @@ export function ProgramsPhoneList({ programs, groupIdFor, newProgramGroupId, new
               <Link href={`/groups/${groupIdFor(p)}/programs/${p.id}`} className="block border border-steel/25 p-4 active:border-rust">
                 <span className="flex items-start justify-between gap-3">
                   <span className="font-display font-bold text-lg leading-tight">{p.name}</span>
-                  <span className={`shrink-0 font-body text-xs uppercase tracking-wide font-bold ${p.isActive && !p.aiDraft ? "text-rust" : "text-steel"}`}>{p.aiDraft ? "Draft" : p.isActive ? "Active" : "Not active"}</span>
+                  <span className={`shrink-0 font-body text-xs uppercase tracking-wide font-bold ${p.isActive && !p.aiDraft ? "text-rust-ink" : "text-steel"}`}>{p.aiDraft ? "Draft" : p.isActive ? "Active" : "Not active"}</span>
                 </span>
                 <span className="block font-body text-sm text-steel mt-1">
                   {p.workoutCount} {p.workoutCount === 1 ? "day" : "days"}

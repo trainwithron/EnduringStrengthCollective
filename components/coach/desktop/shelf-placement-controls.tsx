@@ -120,7 +120,7 @@ export function ShelfPlacementControls({
       )}
       {target === "package" && <p className="font-body text-xs text-steel">Buy buttons appear on their own once your Stripe account is connected.</p>}
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

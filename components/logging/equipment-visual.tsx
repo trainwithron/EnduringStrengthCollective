@@ -132,7 +132,7 @@ function BarbellVisual({
         popping && isMilestone ? "animate-[equipment-pop_0.6s_ease-out]" : popping ? "animate-[equipment-pop-subtle_0.4s_ease-out]" : ""
       } ${finale ? "animate-[equipment-finale-flash_1s_ease-out]" : ""}`}
     >
-      <BarbellIcon perSide={breakdown.perSide} className={isMilestone ? "text-rust" : "text-chalk"} />
+      <BarbellIcon perSide={breakdown.perSide} className={isMilestone ? "text-rust-ink" : "text-chalk"} />
       <span className="font-display text-sm">
         {liftDisplayValue(weight, unit)}
         <span className="font-body text-xs text-steel ml-0.5">{liftUnitLabel(unit)}</span>

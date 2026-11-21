@@ -127,7 +127,7 @@ export function FrontDeskScreen({ organizationId, organizationName }: { organiza
         <p className="font-body text-sm text-steel mb-1">Enter your check-in code</p>
         <h1 className="font-display font-bold text-3xl uppercase mb-8">{client.display_name ?? "Client"}</h1>
         {!client.has_pin ? (
-          <p className="font-body text-rust text-center max-w-xs mb-8">{checkInMessage("no_pin")}</p>
+          <p className="font-body text-rust-ink text-center max-w-xs mb-8">{checkInMessage("no_pin")}</p>
         ) : (
           <>
             <div className="flex gap-4 mb-8" aria-hidden="true">
@@ -136,7 +136,7 @@ export function FrontDeskScreen({ organizationId, organizationName }: { organiza
               ))}
             </div>
             {error && (
-              <p className="font-body text-sm text-rust mb-4 text-center max-w-xs" role="alert">
+              <p className="font-body text-sm text-rust-ink mb-4 text-center max-w-xs" role="alert">
                 {error}
               </p>
             )}
@@ -192,7 +192,7 @@ export function FrontDeskScreen({ organizationId, organizationName }: { organiza
       <h1 className="font-display font-bold text-3xl uppercase text-center mb-1">{organizationName}</h1>
       <p className="font-body text-sm text-steel text-center mb-8">Scan your card, or type your name to check in</p>
       {scanError && (
-        <p className="font-body text-sm text-rust text-center mb-4 max-w-md mx-auto" role="alert">
+        <p className="font-body text-sm text-rust-ink text-center mb-4 max-w-md mx-auto" role="alert">
           {scanError}
         </p>
       )}
@@ -215,7 +215,7 @@ export function FrontDeskScreen({ organizationId, organizationName }: { organiza
 
       <div className="max-w-md mx-auto space-y-2 max-h-[60vh] overflow-y-auto">
         {searchError && (
-          <p className="font-body text-sm text-rust text-center py-4" role="alert">
+          <p className="font-body text-sm text-rust-ink text-center py-4" role="alert">
             {searchError}
           </p>
         )}

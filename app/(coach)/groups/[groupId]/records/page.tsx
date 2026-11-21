@@ -94,7 +94,7 @@ function RecordsList({ records }: { records: RecordRow[] }) {
         <div key={r.exerciseName} className="border border-steel/20 p-4">
           <div className="flex items-center justify-between">
             <h3 className="font-body text-sm font-medium min-w-0 break-words">{r.exerciseName}</h3>
-            <p className="font-display text-lg leading-none text-rust">{r.value} lb</p>
+            <p className="font-display text-lg leading-none text-rust-ink">{r.value} lb</p>
           </div>
           <p className="font-body text-xs text-steel mt-1">
             {r.athleteName} &middot;{" "}

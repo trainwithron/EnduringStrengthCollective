@@ -34,7 +34,7 @@ export default async function StatusPage() {
         : body.jobs?.status === "ok"
           ? "Everything is working"
           : "The app and your data are working";
-  const tone = reading.status === "ok" ? "text-chalk" : "text-rust";
+  const tone = reading.status === "ok" ? "text-chalk" : "text-rust-ink";
   return (
     <HelpShell title="Status" intro="Checked when you opened this page.">
       <p className={`font-display uppercase text-xl tracking-wide ${tone}`} role="status">
@@ -47,7 +47,7 @@ export default async function StatusPage() {
               <p className="text-sm text-chalk">{p.name}</p>
               <p className="text-xs text-steel mt-0.5">{p.note}</p>
             </div>
-            <span className={`text-xs uppercase tracking-wide shrink-0 ${p.state === "ok" ? "text-steel" : "text-rust"}`}>
+            <span className={`text-xs uppercase tracking-wide shrink-0 ${p.state === "ok" ? "text-steel" : "text-rust-ink"}`}>
               {p.state === "ok" ? "OK" : p.state === "attention" ? "Delayed" : p.state === "paused" ? "Paused" : p.state === "unchecked" ? "Not checked" : "Down"}
             </span>
           </li>

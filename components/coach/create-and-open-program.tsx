@@ -68,10 +68,10 @@ export function CreateAndOpenProgram({
 
   return error ? (
     <div className="p-8">
-      <p className="font-body text-sm text-rust" role="alert">
+      <p className="font-body text-sm text-rust-ink" role="alert">
         {error}
       </p>
-      <button type="button" onClick={() => router.refresh()} className="mt-3 min-h-11 px-4 border border-rust text-rust font-body text-sm">
+      <button type="button" onClick={() => router.refresh()} className="mt-3 min-h-11 px-4 border border-rust text-rust-ink font-body text-sm">
         Try again
       </button>
     </div>

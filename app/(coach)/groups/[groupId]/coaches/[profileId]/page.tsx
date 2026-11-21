@@ -85,7 +85,7 @@ export default async function CoachProfilePage(props: { params: Promise<{ groupI
           )}
           <div>
             <h1 className="font-display font-bold text-3xl uppercase leading-none">{coach.fullName}</h1>
-            <p className="font-body text-sm text-rust mt-1">
+            <p className="font-body text-sm text-rust-ink mt-1">
               {ROLE_WORD[coach.orgRole] ?? "Coach"}
               {isSelf && <span className="text-steel ml-2">You</span>}
             </p>
@@ -125,7 +125,7 @@ export default async function CoachProfilePage(props: { params: Promise<{ groupI
                 <SendSignInLink groupId={groupId} profileId={profileId} name={coach.fullName} />
               )}
             </div>
-            {pending && facts && inviteLinkProbablyDead(facts) && <p className="font-body text-xs text-rust">That link expired or was already used. Send a new one.</p>}
+            {pending && facts && inviteLinkProbablyDead(facts) && <p className="font-body text-xs text-rust-ink">That link expired or was already used. Send a new one.</p>}
             {!pending && <p className="font-body text-xs text-steel">A link goes to their own email address. You never see it.</p>}
           </section>
         )}

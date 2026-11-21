@@ -152,7 +152,7 @@ export function SmsSettingsForm({
 
       <p className="font-body text-xs text-steel">{saving ? "Saving…" : saved ? "Saved." : ""}</p>
       {saveError && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {saveError}
         </p>
       )}

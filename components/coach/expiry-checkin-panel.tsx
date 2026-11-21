@@ -280,7 +280,7 @@ export function ExpiryCheckInPanel({ groupIds: scopeGroupIds }: { groupIds?: str
               <div className="flex flex-wrap items-center gap-2 mt-2">
                 <Link prefetch={false}
                   href={`/groups/${i.groupId}/messages/${i.athleteId}?draft=${encodeURIComponent(draft)}`}
-                  className={`${btn} border-rust text-rust inline-flex items-center`}
+                  className={`${btn} border-rust text-rust-ink inline-flex items-center`}
                 >
                   Message them
                 </Link>
@@ -302,7 +302,7 @@ export function ExpiryCheckInPanel({ groupIds: scopeGroupIds }: { groupIds?: str
                   <p className="font-body text-xs text-steel">The note is saved in their session history, which they can see.</p>
                   <div className="flex flex-wrap gap-2">
                     {[30, 60, 90].map((d) => (
-                      <button key={d} type="button" disabled={busyKey === key} onClick={() => extend(i, d)} className={`${btn} border-rust text-rust`}>
+                      <button key={d} type="button" disabled={busyKey === key} onClick={() => extend(i, d)} className={`${btn} border-rust text-rust-ink`}>
                         {d} more days
                       </button>
                     ))}
@@ -326,7 +326,7 @@ export function ExpiryCheckInPanel({ groupIds: scopeGroupIds }: { groupIds?: str
                 {i.reinstatable} {i.reinstatable === 1 ? "session" : "sessions"} expired on {fmtDate(i.expiredOn)}. Reinstate any, or none: your call.
               </p>
               <div className="flex flex-wrap items-center gap-2 mt-2">
-                <button type="button" onClick={() => { setOpenReinstate(openReinstate === key ? null : key); setAmount(String(i.reinstatable)); setNote(""); }} className={`${btn} border-rust text-rust`}>
+                <button type="button" onClick={() => { setOpenReinstate(openReinstate === key ? null : key); setAmount(String(i.reinstatable)); setNote(""); }} className={`${btn} border-rust text-rust-ink`}>
                   Reinstate sessions
                 </button>
                 <button type="button" onClick={() => notNow(i.athleteId, i.groupId, "returning", `${i.name} returned; ${i.reinstatable} expired`)} className={`${btn} border-steel/30 text-steel`}>
@@ -364,7 +364,7 @@ export function ExpiryCheckInPanel({ groupIds: scopeGroupIds }: { groupIds?: str
         })}
       </ul>
       {error && (
-        <p className="font-body text-xs text-rust mt-1" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-1" role="alert">
           {error}
         </p>
       )}

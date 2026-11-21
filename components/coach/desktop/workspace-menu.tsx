@@ -134,7 +134,7 @@ export function WorkspaceMenu({ groupId, orgName, large = false }: { groupId: st
     router.push(`/groups/${made.id}/dashboard`);
   }
 
-  const itemClass = "flex items-center h-10 px-3 font-body text-sm text-chalk hover:bg-surface active:text-rust w-full text-left";
+  const itemClass = "flex items-center h-10 px-3 font-body text-sm text-chalk hover:bg-surface active:text-rust-ink w-full text-left";
 
   return (
     <div className="relative min-w-0" ref={wrapRef}>
@@ -187,7 +187,7 @@ export function WorkspaceMenu({ groupId, orgName, large = false }: { groupId: st
                 return (
                   <a key={o.id} href={`/choose-organization/select?org=${o.id}&next=/dashboard`} role="menuitemradio" aria-checked={here} className={`${itemClass} justify-between`}>
                     <span className="truncate">{o.name}</span>
-                    {here && <Check className="w-4 h-4 shrink-0 text-rust ml-2" aria-label="Current organization" />}
+                    {here && <Check className="w-4 h-4 shrink-0 text-rust-ink ml-2" aria-label="Current organization" />}
                   </a>
                 );
               })}
@@ -220,7 +220,7 @@ export function WorkspaceMenu({ groupId, orgName, large = false }: { groupId: st
                   <option value="social">Social group (community only)</option>
                 </select>
                 {error && (
-                  <p className="font-body text-xs text-rust" role="alert">
+                  <p className="font-body text-xs text-rust-ink" role="alert">
                     {error}
                   </p>
                 )}

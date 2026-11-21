@@ -100,7 +100,7 @@ export function ClientPreviewButton({ days, heading, label, demoLibrary }: { day
         type="button"
         onClick={() => setOpen(true)}
         aria-label={`${label}: ${heading}`}
-        className="font-body text-xs text-steel active:text-rust transition-colors shrink-0 min-h-11 sm:min-h-0 px-1"
+        className="font-body text-xs text-steel active:text-rust-ink transition-colors shrink-0 min-h-11 sm:min-h-0 px-1"
       >
         {label}
       </button>

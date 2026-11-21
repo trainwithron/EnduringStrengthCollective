@@ -185,7 +185,7 @@ export function MovementPatternRow({
                       className={`w-6 h-7 flex items-center justify-center border font-body text-xs transition-colors ${
                         item.tier === t
                           ? "bg-rust border-rust text-graphite"
-                          : "border-steel/30 text-steel active:border-rust active:text-rust"
+                          : "border-steel/30 text-steel active:border-rust active:text-rust-ink"
                       }`}
                     >
                       {t}
@@ -198,7 +198,7 @@ export function MovementPatternRow({
                   aria-pressed={!!item.unilateral}
                   aria-label="Unilateral"
                   className={`h-7 px-1.5 flex items-center justify-center border font-body text-xs transition-colors shrink-0 ${
-                    item.unilateral ? "bg-rust border-rust text-graphite" : "border-steel/30 text-steel active:border-rust active:text-rust"
+                    item.unilateral ? "bg-rust border-rust text-graphite" : "border-steel/30 text-steel active:border-rust active:text-rust-ink"
                   }`}
                 >
                   Unilateral
@@ -258,13 +258,13 @@ export function MovementPatternRow({
                 { key: crypto.randomUUID(), exerciseName: "", tier: null, unilateral: false, plane: null },
               ])
             }
-            className="w-full h-9 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust transition-colors"
+            className="w-full h-9 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust-ink transition-colors"
           >
             + Add exercise
           </button>
 
           {error && (
-            <p className="font-body text-xs text-rust" role="alert">
+            <p className="font-body text-xs text-rust-ink" role="alert">
               {error}
             </p>
           )}
@@ -282,7 +282,7 @@ export function MovementPatternRow({
               type="button"
               onClick={handleDeletePattern}
               disabled={submitting}
-              className="font-body text-xs text-steel active:text-rust transition-colors"
+              className="font-body text-xs text-steel active:text-rust-ink transition-colors"
             >
               Delete pattern
             </button>

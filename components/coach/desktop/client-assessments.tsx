@@ -109,7 +109,7 @@ export function ClientAssessments({ groupId, athleteId, initial }: { groupId: st
       <div className="flex items-center justify-between gap-3 mb-2">
         <h2 className="font-display uppercase text-sm tracking-wide text-steel">Assessments</h2>
         {!adding && (
-          <button type="button" onClick={() => setAdding(true)} className="min-h-11 px-3 font-body text-sm text-rust underline underline-offset-2">
+          <button type="button" onClick={() => setAdding(true)} className="min-h-11 px-3 font-body text-sm text-rust-ink underline underline-offset-2">
             Add
           </button>
         )}
@@ -163,7 +163,7 @@ export function ClientAssessments({ groupId, athleteId, initial }: { groupId: st
                 />
               </div>
             ))}
-            <button type="button" onClick={() => setCustom((prev) => [...prev, { name: "", unit: "", value: "" }])} className="min-h-11 font-body text-sm text-rust underline underline-offset-2">
+            <button type="button" onClick={() => setCustom((prev) => [...prev, { name: "", unit: "", value: "" }])} className="min-h-11 font-body text-sm text-rust-ink underline underline-offset-2">
               + Add a test
             </button>
           </div>
@@ -172,7 +172,7 @@ export function ClientAssessments({ groupId, athleteId, initial }: { groupId: st
             <input type="file" accept="application/pdf,image/*,video/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="hidden" />
           </label>
           {error && (
-            <p className="font-body text-xs text-rust" role="alert">
+            <p className="font-body text-xs text-rust-ink" role="alert">
               {error}
             </p>
           )}
@@ -188,7 +188,7 @@ export function ClientAssessments({ groupId, athleteId, initial }: { groupId: st
       )}
 
       {!adding && error && (
-        <p className="font-body text-xs text-rust mb-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mb-2" role="alert">
           {error}
         </p>
       )}
@@ -201,14 +201,14 @@ export function ClientAssessments({ groupId, athleteId, initial }: { groupId: st
             <li key={r.id} className="py-3">
               <div className="flex items-start justify-between gap-3">
                 <p className="font-body text-xs text-steel">{new Date(r.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</p>
-                <button type="button" onClick={() => remove(r)} className="min-h-11 px-2 font-body text-xs text-steel active:text-rust">
+                <button type="button" onClick={() => remove(r)} className="min-h-11 px-2 font-body text-xs text-steel active:text-rust-ink">
                   Delete
                 </button>
               </div>
               {r.measurements && <p className="font-body text-sm text-chalk whitespace-pre-wrap">{r.measurements}</p>}
               {r.notes && <p className="font-body text-sm text-chalk whitespace-pre-wrap">{r.notes}</p>}
               {r.filePath && (
-                <button type="button" onClick={() => openFile(r)} className="min-h-11 font-body text-sm text-rust underline underline-offset-2">
+                <button type="button" onClick={() => openFile(r)} className="min-h-11 font-body text-sm text-rust-ink underline underline-offset-2">
                   {r.fileName ?? "Open file"}
                 </button>
               )}

@@ -81,7 +81,7 @@ export function NeedsPaymentPanel({ rows }: { rows: NeedsPaymentRow[] }) {
               <Link prefetch={false} href={`/groups/${r.groupId}/athletes/${r.athleteId}`} className="font-body text-sm text-chalk flex-1 min-w-[8rem] truncate hover:underline">
                 {r.name}
               </Link>
-              <span className="font-body text-xs text-rust">{coachBalanceLabel(r.balance)}</span>
+              <span className="font-body text-xs text-rust-ink">{coachBalanceLabel(r.balance)}</span>
               <Link prefetch={false} href={addSessionsHref(r.groupId, r.athleteId)} className="font-body text-xs text-chalk underline">
                 Add sessions
               </Link>
@@ -93,7 +93,7 @@ export function NeedsPaymentPanel({ rows }: { rows: NeedsPaymentRow[] }) {
               </button>
             </div>
             {note?.id === r.athleteId && (
-              <p className={`font-body text-xs mt-1 ${note.error ? "text-rust" : "text-steel"}`} role={note.error ? "alert" : "status"}>
+              <p className={`font-body text-xs mt-1 ${note.error ? "text-rust-ink" : "text-steel"}`} role={note.error ? "alert" : "status"}>
                 {note.text}
               </p>
             )}

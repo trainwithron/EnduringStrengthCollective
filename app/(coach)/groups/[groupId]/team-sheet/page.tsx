@@ -38,7 +38,7 @@ export default async function TeamSheetPage(props: { params: Promise<{ groupId: 
         <h1 className="font-display font-bold text-3xl uppercase leading-none">Team sheet</h1>
         <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">Print the workout for the weight room, one sheet for each rack. Athletes write their weights on paper; the coach keeps the sheets.</p>
         <p className="font-body text-xs text-steel mt-2">
-          <Link href={`/groups/${params.groupId}/team-sheet/upload`} className="text-rust underline underline-offset-4">
+          <Link href={`/groups/${params.groupId}/team-sheet/upload`} className="text-rust-ink underline underline-offset-4">
             Upload filled sheets
           </Link>
         </p>

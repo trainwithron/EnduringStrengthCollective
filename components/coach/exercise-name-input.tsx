@@ -227,7 +227,7 @@ export function ExerciseNameInput({
                   pickRow(rows.length);
                 }}
                 onMouseEnter={() => setActive(rows.length)}
-                className={`w-full flex items-center px-3 min-h-11 sm:min-h-9 py-1 font-body text-sm text-rust cursor-pointer border-t border-steel/20 ${active === rows.length ? "bg-graphite" : ""}`}
+                className={`w-full flex items-center px-3 min-h-11 sm:min-h-9 py-1 font-body text-sm text-rust-ink cursor-pointer border-t border-steel/20 ${active === rows.length ? "bg-graphite" : ""}`}
               >
                 <span className="break-words">Add &ldquo;{trimmed}&rdquo; as a new exercise</span>
               </div>

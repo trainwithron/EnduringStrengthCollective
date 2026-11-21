@@ -55,7 +55,7 @@ export function PrPromotionAnswerCard({ promotionId, groupId, athleteId, postCar
         Not now
       </button>
       {error && (
-        <p className="w-full font-body text-sm text-rust" role="alert">
+        <p className="w-full font-body text-sm text-rust-ink" role="alert">
           {error}
         </p>
       )}

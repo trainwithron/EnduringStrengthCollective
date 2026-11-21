@@ -51,7 +51,7 @@ export function ZapierSettings({ initialSubscriptions }: { initialSubscriptions:
             <code className="block bg-surface border border-steel/30 px-3 py-2 font-body text-xs text-chalk break-all">
               {apiKey}
             </code>
-            <p className="font-body text-xs text-rust">
+            <p className="font-body text-xs text-rust-ink">
               Copy this now — it won&apos;t be shown again. Generating a new key immediately
               invalidates this one.
             </p>
@@ -69,7 +69,7 @@ export function ZapierSettings({ initialSubscriptions }: { initialSubscriptions:
         >
           {generating ? "Generating…" : apiKey ? "Generate a new key" : "Generate key"}
         </button>
-        {error && <p className="font-body text-xs text-rust">{error}</p>}
+        {error && <p className="font-body text-xs text-rust-ink">{error}</p>}
       </div>
 
       <div>

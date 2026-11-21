@@ -293,7 +293,7 @@ export function ProgramAssignPanel({ programId, programName, groupId, aiDraft, o
                     {a.athleteName}
                     {a.startDate ? <span className="text-steel text-xs"> · starts {a.startDate}</span> : null}
                   </span>
-                  <button type="button" disabled={busy} onClick={() => void removeOne(a)} className="min-h-11 px-2 font-body text-xs text-rust disabled:opacity-40 shrink-0">
+                  <button type="button" disabled={busy} onClick={() => void removeOne(a)} className="min-h-11 px-2 font-body text-xs text-rust-ink disabled:opacity-40 shrink-0">
                     Remove
                   </button>
                 </li>
@@ -400,7 +400,7 @@ export function ProgramAssignPanel({ programId, programName, groupId, aiDraft, o
             </p>
           )}
           {error && (
-            <p className="font-body text-xs text-rust mt-2" role="alert">
+            <p className="font-body text-xs text-rust-ink mt-2" role="alert">
               {error}
             </p>
           )}

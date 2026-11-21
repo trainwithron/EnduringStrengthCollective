@@ -27,7 +27,7 @@ export function PendingRequestsLine({ groupId }: { groupId: string }) {
   if (count <= 0) return null;
   return (
     <Link href={REQUESTS_PATH} className="block border border-rust/60 bg-surface/30 p-3 mb-3 font-body text-xs text-chalk leading-snug">
-      {count === 1 ? "1 person asked" : `${count} people asked`} to train with you. <span className="text-rust underline underline-offset-2">Review</span>
+      {count === 1 ? "1 person asked" : `${count} people asked`} to train with you. <span className="text-rust-ink underline underline-offset-2">Review</span>
     </Link>
   );
 }

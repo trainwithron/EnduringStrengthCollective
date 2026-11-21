@@ -33,7 +33,7 @@ export function TabletLayoutSwitch({ to, variant = "row" }: { to: "desktop" | "m
     );
   }
   return (
-    <button type="button" onClick={go} className="flex items-center gap-3 h-11 px-5 w-full font-body text-sm text-chalk active:text-rust" data-tablet-switch={to}>
+    <button type="button" onClick={go} className="flex items-center gap-3 h-11 px-5 w-full font-body text-sm text-chalk active:text-rust-ink" data-tablet-switch={to}>
       <Icon className="w-4 h-4 shrink-0 text-steel" strokeWidth={2.25} />
       {label}
     </button>

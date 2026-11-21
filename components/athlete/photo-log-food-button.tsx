@@ -170,7 +170,7 @@ export function PhotoLogFoodButton({
         aria-label={estimating ? "Estimating from photo" : "Take a photo"}
         className={LOG_TILE_CLASS}
       >
-        <Camera className="w-[22px] h-[22px] text-rust" aria-hidden="true" />
+        <Camera className="w-[22px] h-[22px] text-rust-ink" aria-hidden="true" />
         {estimating ? "Estimating…" : "Photo"}
       </button>
       {error && <p className="basis-full order-last font-body text-xs text-rust-ink" role="alert">{error}</p>}

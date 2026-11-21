@@ -118,7 +118,7 @@ export function TextNoteCard({
             <button
               type="button"
               onClick={() => setEditing(true)}
-              className="font-body text-xs text-steel active:text-rust transition-colors"
+              className="font-body text-xs text-steel active:text-rust-ink transition-colors"
             >
               Edit
             </button>
@@ -127,7 +127,7 @@ export function TextNoteCard({
             type="button"
             onClick={handleDelete}
             aria-label="Delete note"
-            className="text-steel active:text-rust transition-colors"
+            className="text-steel active:text-rust-ink transition-colors"
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>
@@ -144,7 +144,7 @@ export function TextNoteCard({
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => applyFormat("bold")}
               aria-label="Bold"
-              className="w-7 h-7 flex items-center justify-center text-steel border border-steel/30 active:border-rust active:text-rust"
+              className="w-7 h-7 flex items-center justify-center text-steel border border-steel/30 active:border-rust active:text-rust-ink"
             >
               <Bold className="w-3.5 h-3.5" />
             </button>
@@ -153,7 +153,7 @@ export function TextNoteCard({
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => applyFormat("italic")}
               aria-label="Italic"
-              className="w-7 h-7 flex items-center justify-center text-steel border border-steel/30 active:border-rust active:text-rust"
+              className="w-7 h-7 flex items-center justify-center text-steel border border-steel/30 active:border-rust active:text-rust-ink"
             >
               <Italic className="w-3.5 h-3.5" />
             </button>
@@ -162,7 +162,7 @@ export function TextNoteCard({
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => applyFormat("link")}
               aria-label="Link"
-              className="w-7 h-7 flex items-center justify-center text-steel border border-steel/30 active:border-rust active:text-rust"
+              className="w-7 h-7 flex items-center justify-center text-steel border border-steel/30 active:border-rust active:text-rust-ink"
             >
               <LinkIcon className="w-3.5 h-3.5" />
             </button>

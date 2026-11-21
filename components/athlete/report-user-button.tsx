@@ -66,7 +66,7 @@ export function ReportUserButton({ reportedId }: { reportedId: string }) {
         className="h-11 w-40 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust"
       />
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}
@@ -74,7 +74,7 @@ export function ReportUserButton({ reportedId }: { reportedId: string }) {
         type="button"
         onClick={submit}
         disabled={!reason.trim() || submitting}
-        className="font-body text-xs text-rust disabled:opacity-40"
+        className="font-body text-xs text-rust-ink disabled:opacity-40"
       >
         Submit
       </button>

@@ -479,7 +479,7 @@ function CoachDesktopShellFull({
             <WorkspaceMenu groupId={groupId} orgName={orgName} large />
           ) : groupKind === "one_on_one" && soloClientId ? (
             <p className="font-display font-bold text-lg md:text-2xl uppercase tracking-wide truncate">
-              <Link href={`/groups/${groupId}/athletes/${soloClientId}`} className="hover:text-rust underline-offset-4 hover:underline" title="Open this client's profile">
+              <Link href={`/groups/${groupId}/athletes/${soloClientId}`} className="hover:text-rust-ink underline-offset-4 hover:underline" title="Open this client's profile">
                 {groupName}
               </Link>
             </p>
@@ -492,7 +492,7 @@ function CoachDesktopShellFull({
             <span
               className={`shrink-0 font-body text-xs uppercase tracking-wide px-1.5 py-0.5 border ${
                 groupKind === "one_on_one"
-                  ? "border-rust text-rust"
+                  ? "border-rust text-rust-ink"
                   : groupKind === "social"
                   ? "border-moss text-moss"
                   : "border-steel/40 text-steel"

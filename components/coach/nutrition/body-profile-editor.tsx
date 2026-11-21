@@ -91,7 +91,7 @@ export function BodyProfileEditor({
     <div className="border border-steel/20 p-4 space-y-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="font-display font-bold text-sm uppercase tracking-wide text-steel">About {clientName}</h3>
-        <button type="button" onClick={() => setOpen((o) => !o)} className="font-body text-xs text-rust">
+        <button type="button" onClick={() => setOpen((o) => !o)} className="font-body text-xs text-rust-ink">
           {open ? "Close" : "Edit"}
         </button>
       </div>
@@ -140,7 +140,7 @@ export function BodyProfileEditor({
           </div>
           <p className="font-body text-xs text-steel">Leave a box as it is to keep what is saved. Only the client can take back a sex or activity they gave.</p>
           {error && (
-            <p className="font-body text-xs text-rust" role="alert">
+            <p className="font-body text-xs text-rust-ink" role="alert">
               {error}
             </p>
           )}

@@ -127,7 +127,7 @@ export function ClientTagManager({
               type="button"
               onClick={() => handleDelete(tag.id)}
               aria-label={`Delete ${tag.name}`}
-              className="w-7 h-7 flex items-center justify-center text-steel active:text-rust transition-colors"
+              className="w-7 h-7 flex items-center justify-center text-steel active:text-rust-ink transition-colors"
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
@@ -160,7 +160,7 @@ export function ClientTagManager({
           Add
         </button>
       </div>
-      {error && <p className="font-body text-xs text-rust mt-2">{error}</p>}
+      {error && <p className="font-body text-xs text-rust-ink mt-2">{error}</p>}
     </div>
   );
 }

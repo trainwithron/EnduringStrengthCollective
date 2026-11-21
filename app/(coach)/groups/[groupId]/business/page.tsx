@@ -285,7 +285,7 @@ export default async function BusinessDashboardPage(
             <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">
               Paying <SwappableTerm termKey="client" form="plural" />
             </p>
-            <p className="font-body text-xs text-rust mt-0.5">Set up packages &rarr;</p>
+            <p className="font-body text-xs text-rust-ink mt-0.5">Set up packages &rarr;</p>
           </Link>
         )}
         <div className="border border-steel/20 rounded-token-lg p-3">

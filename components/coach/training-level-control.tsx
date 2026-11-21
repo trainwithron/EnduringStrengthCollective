@@ -42,7 +42,7 @@ export function TrainingLevelControl({ athleteId, groupId, initialLevel }: { ath
       </label>
       <p className="font-body text-xs text-steel mt-1">Used to pre-fill the level when you use a template for them.</p>
       {error && (
-        <p className="font-body text-xs text-rust mt-1" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-1" role="alert">
           {error}
         </p>
       )}

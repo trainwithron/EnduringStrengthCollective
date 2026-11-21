@@ -196,7 +196,7 @@ export function PublicSessionTypesEditor({ initialTypes , organizationId}: { ini
         </button>
       </div>
       {note && (
-        <p className={`font-body text-sm mt-3 ${note.error ? "text-rust" : "text-steel"}`} role={note.error ? "alert" : "status"}>
+        <p className={`font-body text-sm mt-3 ${note.error ? "text-rust-ink" : "text-steel"}`} role={note.error ? "alert" : "status"}>
           {note.text}
         </p>
       )}

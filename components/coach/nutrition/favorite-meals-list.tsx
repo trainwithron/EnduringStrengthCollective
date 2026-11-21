@@ -186,7 +186,7 @@ function AddToPlan({ meal, clients, todayKey }: { meal: StarredMeal; clients: Fa
       </div>
       {state.kind === "loading" && <p className="font-body text-xs text-steel">Reading that day&apos;s plan…</p>}
       {state.kind === "error" && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {state.message}
         </p>
       )}
@@ -219,7 +219,7 @@ function AddToPlan({ meal, clients, todayKey }: { meal: StarredMeal; clients: Fa
         </p>
       )}
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

@@ -537,7 +537,7 @@ export function SessionLogger({
                 </button>
               </div>
               {addNameProblem && (
-                <p className="font-body text-xs text-rust" role="alert">
+                <p className="font-body text-xs text-rust-ink" role="alert">
                   {addNameProblem}
                 </p>
               )}
@@ -551,7 +551,7 @@ export function SessionLogger({
             <button
               type="button"
               onClick={() => setAddingExercise(true)}
-              className="min-h-11 px-3 border border-rust/60 text-rust font-body text-xs font-medium active:bg-rust active:text-graphite transition-colors"
+              className="min-h-11 px-3 border border-rust/60 text-rust-ink font-body text-xs font-medium active:bg-rust active:text-graphite transition-colors"
             >
               + Add exercise
             </button>

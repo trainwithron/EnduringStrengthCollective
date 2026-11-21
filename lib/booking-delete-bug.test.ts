@@ -69,7 +69,7 @@ describe("the Book pop-up appears at the time that was picked", () => {
   it("is green and the cancel dialog is red, so the two can never be mistaken for each other", () => {
     expect(grid).toContain("bg-positive text-graphite");
     const cancel = read("components/coach/session-cancel-dialog.tsx");
-    expect(cancel).toContain("text-rust");
+    expect(cancel).toContain("text-rust-ink");
     expect(cancel).not.toContain("positive");
   });
   it("the Undo notice stays in view at the bottom of the screen", () => {

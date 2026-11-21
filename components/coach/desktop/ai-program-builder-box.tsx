@@ -399,7 +399,7 @@ export function AiProgramBuilderBox({
           />
         </div>
         {building ? (
-          <button type="button" onClick={pause} className="min-h-11 px-5 border border-rust text-rust font-display font-bold uppercase tracking-wide sm:self-start">
+          <button type="button" onClick={pause} className="min-h-11 px-5 border border-rust text-rust-ink font-display font-bold uppercase tracking-wide sm:self-start">
             Pause
           </button>
         ) : phase === "paused" ? (
@@ -453,7 +453,7 @@ export function AiProgramBuilderBox({
         </p>
       )}
       {error && (
-        <p className="font-body text-xs text-rust mt-1" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-1" role="alert">
           {error}
         </p>
       )}

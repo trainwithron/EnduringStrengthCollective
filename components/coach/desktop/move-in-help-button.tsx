@@ -33,7 +33,7 @@ export function MoveInHelpButton() {
   if (done) return <p className="font-body text-xs text-positive" data-move-in-help-sent>Sent. We&apos;ll email you to set up a time to move your clients in together.</p>;
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} className="font-body text-xs text-rust underline underline-offset-2 min-h-11" data-move-in-help>
+      <button type="button" onClick={() => setOpen(true)} className="font-body text-xs text-rust-ink underline underline-offset-2 min-h-11" data-move-in-help>
         Want a hand moving in? Ask for help
       </button>
     );
@@ -59,7 +59,7 @@ export function MoveInHelpButton() {
         <textarea id="move-note" value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={500} className="w-full mt-1 bg-graphite border border-steel/30 text-chalk px-2.5 py-2 font-body text-base sm:text-sm focus:outline-none focus:border-rust" />
       </div>
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

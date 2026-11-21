@@ -89,7 +89,7 @@ export function LegalReacceptGate() {
           <p className="font-body text-sm text-steel mt-2 mb-5">{copy.body}</p>
           <LegalAcceptance checked={checked} onChange={setChecked} id="legal-gate-accept" />
           {error && (
-            <p className="font-body text-sm text-rust mt-3" role="alert">
+            <p className="font-body text-sm text-rust-ink mt-3" role="alert">
               {error}
             </p>
           )}

@@ -48,7 +48,7 @@ export function QuietClientNudgeButton({ athleteFirstName }: { athleteFirstName:
 
   return (
     <div className="relative inline-block">
-      <button type="button" onClick={() => setOpen((v) => !v)} className="font-body text-sm text-rust font-medium">
+      <button type="button" onClick={() => setOpen((v) => !v)} className="font-body text-sm text-rust-ink font-medium">
         Message {athleteFirstName} →
       </button>
       {open && (

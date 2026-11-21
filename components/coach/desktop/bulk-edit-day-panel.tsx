@@ -110,7 +110,7 @@ export function BulkEditDayPanel({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="font-body text-xs text-steel border border-steel/30 px-2 h-7 active:border-rust active:text-rust transition-colors"
+        className="font-body text-xs text-steel border border-steel/30 px-2 h-7 active:border-rust active:text-rust-ink transition-colors"
       >
         {label}
       </button>
@@ -201,7 +201,7 @@ export function BulkEditDayPanel({
       )}
 
       {message && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {message}
         </p>
       )}

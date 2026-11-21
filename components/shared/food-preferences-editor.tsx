@@ -43,7 +43,7 @@ function ChipList({ label, hint, items, onChange, placeholder, max }: { label: s
         {items.map((item) => (
           <span key={item} className="inline-flex items-center gap-1 border border-steel/30 bg-surface/40 pl-2.5 font-body text-sm text-chalk">
             {item}
-            <button type="button" onClick={() => onChange(removeItem(items, item))} aria-label={`Remove ${item}`} className="w-8 h-8 flex items-center justify-center text-steel hover:text-rust">
+            <button type="button" onClick={() => onChange(removeItem(items, item))} aria-label={`Remove ${item}`} className="w-8 h-8 flex items-center justify-center text-steel hover:text-rust-ink">
               ×
             </button>
           </span>
@@ -73,7 +73,7 @@ function ChipList({ label, hint, items, onChange, placeholder, max }: { label: s
         </button>
       </div>
       {error && (
-        <p className="font-body text-xs text-rust mt-1" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-1" role="alert">
           {error}
         </p>
       )}
@@ -115,7 +115,7 @@ export function FoodPreferencesEditor({
                 type="button"
                 aria-pressed={on}
                 onClick={() => set({ allergies: toggleAllergy(prefs.allergies, key) })}
-                className={`h-9 px-2.5 font-body text-xs border ${on ? "bg-rust/15 text-rust border-rust/50" : "text-steel border-steel/30"}`}
+                className={`h-9 px-2.5 font-body text-xs border ${on ? "bg-rust/15 text-rust-ink border-rust/50" : "text-steel border-steel/30"}`}
               >
                 {ALLERGY_LABELS[key]}
               </button>
@@ -124,7 +124,7 @@ export function FoodPreferencesEditor({
         </div>
         <div className="flex flex-wrap gap-1.5 mt-2">
           {otherAllergies.map((a) => (
-            <span key={a} className="inline-flex items-center gap-1 border border-rust/40 bg-rust/10 pl-2.5 font-body text-sm text-rust">
+            <span key={a} className="inline-flex items-center gap-1 border border-rust/40 bg-rust/10 pl-2.5 font-body text-sm text-rust-ink">
               {allergyLabel(a)}
               <button type="button" onClick={() => set({ allergies: prefs.allergies.filter((x) => x !== a) })} aria-label={`Remove ${allergyLabel(a)}`} className="w-8 h-8 flex items-center justify-center">
                 ×
@@ -172,7 +172,7 @@ export function FoodPreferencesEditor({
           </button>
         </div>
         {otherError && (
-          <p className="font-body text-xs text-rust mt-1" role="alert">
+          <p className="font-body text-xs text-rust-ink mt-1" role="alert">
             {otherError}
           </p>
         )}
@@ -222,7 +222,7 @@ export function FoodPreferencesEditor({
                 type="button"
                 aria-pressed={prefs.mealsPerDay === n}
                 onClick={() => set({ mealsPerDay: n })}
-                className={`w-11 h-11 font-body text-sm border ${prefs.mealsPerDay === n ? "bg-rust/15 text-rust border-rust/50" : "text-steel border-steel/30"}`}
+                className={`w-11 h-11 font-body text-sm border ${prefs.mealsPerDay === n ? "bg-rust/15 text-rust-ink border-rust/50" : "text-steel border-steel/30"}`}
               >
                 {n}
               </button>
@@ -253,7 +253,7 @@ export function FoodPreferencesEditor({
               <span>
                 {DIET_LABELS[prefs.dietType]} - {CARB_SPLIT_LABELS[prefs.carbSplit]} - {prefs.proteinGPerLb} g/lb (floor {prefs.proteinFloorGPerLb})
               </span>
-              <span className="font-body text-xs text-rust shrink-0">Edit</span>
+              <span className="font-body text-xs text-rust-ink shrink-0">Edit</span>
             </summary>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
             <label className="block">

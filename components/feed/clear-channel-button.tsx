@@ -93,7 +93,7 @@ export function ClearChannelButton({ groupId, channel }: { groupId: string; chan
         onClick={() => setConfirming(true)}
         aria-label={`Clear ${CHANNEL_LABELS[channel]}`}
         title={`Clear ${CHANNEL_LABELS[channel]}`}
-        className="w-11 h-11 flex items-center justify-center text-steel active:text-rust transition-colors"
+        className="w-11 h-11 flex items-center justify-center text-steel active:text-rust-ink transition-colors"
       >
         <Trash2 className="w-4 h-4" />
       </button>
@@ -107,7 +107,7 @@ export function ClearChannelButton({ groupId, channel }: { groupId: string; chan
             This can&apos;t be undone — every post and comment in this channel is gone for everyone.
           </p>
           {error && (
-            <p className="font-body text-xs text-rust mt-2" role="alert">
+            <p className="font-body text-xs text-rust-ink mt-2" role="alert">
               {error}
             </p>
           )}

@@ -42,7 +42,7 @@ export function EditDisplayName({ initialName, profileId }: { initialName: strin
         className="text-left"
       >
         <p className="font-body font-medium text-[15px]">{name}</p>
-        <p className="font-body text-xs text-rust">Edit display name</p>
+        <p className="font-body text-xs text-rust-ink">Edit display name</p>
       </button>
     );
   }
@@ -60,7 +60,7 @@ export function EditDisplayName({ initialName, profileId }: { initialName: strin
         This is what other members see on the feed and roster — it doesn&apos;t have to be your legal name.
       </p>
       {error && (
-        <p className="font-body text-xs text-rust mt-1" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-1" role="alert">
           {error}
         </p>
       )}

@@ -60,7 +60,7 @@ export function ClassYearPanel({ groupId, players }: { groupId: string; players:
               className="w-24 h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-base sm:text-sm"
             />
             {errors[p.profileId] ? (
-              <span className="text-xs text-rust" role="alert">
+              <span className="text-xs text-rust-ink" role="alert">
                 {errors[p.profileId]}
               </span>
             ) : null}

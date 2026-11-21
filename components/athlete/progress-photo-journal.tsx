@@ -154,7 +154,7 @@ export function ProgressPhotoJournal({ athleteId, groupId }: { athleteId: string
       </div>
 
       {error && (
-        <p className="font-body text-xs text-rust mb-3" role="alert">
+        <p className="font-body text-xs text-rust-ink mb-3" role="alert">
           {error}
         </p>
       )}
@@ -192,7 +192,7 @@ export function ProgressPhotoJournal({ athleteId, groupId }: { athleteId: string
                 <button
                   type="button"
                   onClick={() => handleDelete(photo)}
-                  className="font-body text-xs text-steel active:text-rust transition-colors mt-1"
+                  className="font-body text-xs text-steel active:text-rust-ink transition-colors mt-1"
                 >
                   Delete
                 </button>

@@ -180,7 +180,7 @@ export function DailyMacrosForm({
             <button
               type="button"
               onClick={applySuggestion}
-              className="h-7 px-3 border border-rust text-rust font-body text-xs uppercase tracking-wide active:bg-rust active:text-graphite"
+              className="h-7 px-3 border border-rust text-rust-ink font-body text-xs uppercase tracking-wide active:bg-rust active:text-graphite"
             >
               Apply
             </button>
@@ -229,7 +229,7 @@ export function DailyMacrosForm({
           type="button"
           onClick={suggestCaloriesFromTdee}
           disabled={!bodyWeight || Number(bodyWeight) <= 0}
-          className="w-full h-8 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust disabled:opacity-40"
+          className="w-full h-8 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust-ink disabled:opacity-40"
         >
           Suggest calories from TDEE
         </button>
@@ -287,7 +287,7 @@ export function DailyMacrosForm({
           type="button"
           onClick={() => fillCarbsAndFat("high")}
           disabled={!calories || !protein}
-          className="flex-1 h-8 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust disabled:opacity-40"
+          className="flex-1 h-8 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust-ink disabled:opacity-40"
         >
           High carb fill
         </button>
@@ -295,13 +295,13 @@ export function DailyMacrosForm({
           type="button"
           onClick={() => fillCarbsAndFat("low")}
           disabled={!calories || !protein}
-          className="flex-1 h-8 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust disabled:opacity-40"
+          className="flex-1 h-8 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust-ink disabled:opacity-40"
         >
           Low carb fill
         </button>
       </div>
 
-      {error && <p className="font-body text-xs text-rust">{error}</p>}
+      {error && <p className="font-body text-xs text-rust-ink">{error}</p>}
 
       <div className="flex gap-2">
         <button
@@ -318,7 +318,7 @@ export function DailyMacrosForm({
             onClick={handleClear}
             disabled={saving}
             title="Remove this day's saved target entirely — use this instead of leaving a test number in place"
-            className="h-9 px-3 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust disabled:opacity-40"
+            className="h-9 px-3 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust-ink disabled:opacity-40"
           >
             Clear this day
           </button>

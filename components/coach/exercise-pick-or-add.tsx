@@ -113,13 +113,13 @@ export function ExercisePickOrAdd({
           type="button"
           onClick={() => void addNew()}
           disabled={adding}
-          className="w-full min-h-12 px-3 border border-dashed border-rust/60 text-rust font-body text-sm text-left disabled:opacity-40"
+          className="w-full min-h-12 px-3 border border-dashed border-rust/60 text-rust-ink font-body text-sm text-left disabled:opacity-40"
         >
           {adding ? "Adding…" : `+ Add “${query.trim()}” as a new exercise`}
         </button>
       )}
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

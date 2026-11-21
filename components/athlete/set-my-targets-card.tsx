@@ -108,7 +108,7 @@ export function SetMyTargetsCard({
           {current ? "This is your own target. When your coach sets one, theirs takes over." : "Your coach hasn't set a nutrition target yet. Work one out here and save it as yours until they do."}
         </p>
         {current && !calculatorOpen && (
-          <button type="button" onClick={() => setCalculatorOpen(true)} className="mt-2 min-h-11 font-body text-sm text-rust underline underline-offset-2">
+          <button type="button" onClick={() => setCalculatorOpen(true)} className="mt-2 min-h-11 font-body text-sm text-rust-ink underline underline-offset-2">
             Change my target
           </button>
         )}
@@ -128,7 +128,7 @@ export function SetMyTargetsCard({
             {!canSave && (
               <p className="font-body text-xs text-steel mt-3" data-cannot-save>
                 To save a target of your own, add your birthday in{" "}
-                <Link href={`/groups/${groupId}/settings`} className="text-rust underline underline-offset-2">
+                <Link href={`/groups/${groupId}/settings`} className="text-rust-ink underline underline-offset-2">
                   Settings › Profile
                 </Link>{" "}
                 first (under 18, a parent or guardian also needs to give permission).
@@ -168,7 +168,7 @@ export function SetMyTargetsCard({
         </div>
       )}
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

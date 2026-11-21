@@ -50,10 +50,10 @@ export function MarkNoShowToggle({
   if (noShow) {
     return (
       <span className="inline-flex flex-col items-start gap-1">
-        <button type="button" onClick={undo} disabled={busy} className="h-8 px-3 border border-rust/40 text-rust font-body text-xs disabled:opacity-40">
+        <button type="button" onClick={undo} disabled={busy} className="h-8 px-3 border border-rust/40 text-rust-ink font-body text-xs disabled:opacity-40">
           {busy ? "Undoing…" : "No-show ✓ Undo"}
         </button>
-        {error && <span className="font-body text-xs text-rust" role="alert">{error}</span>}
+        {error && <span className="font-body text-xs text-rust-ink" role="alert">{error}</span>}
       </span>
     );
   }
@@ -61,7 +61,7 @@ export function MarkNoShowToggle({
   if (asking) {
     return (
       <span className="inline-flex flex-wrap items-center gap-2" data-no-show-choice>
-        <button type="button" onClick={() => mark(true)} disabled={busy} className="h-8 px-3 border border-rust text-rust font-body text-xs disabled:opacity-40">
+        <button type="button" onClick={() => mark(true)} disabled={busy} className="h-8 px-3 border border-rust text-rust-ink font-body text-xs disabled:opacity-40">
           Charge 1 session
         </button>
         <button type="button" onClick={() => mark(false)} disabled={busy} className="h-8 px-3 border border-steel/40 text-chalk font-body text-xs disabled:opacity-40">
@@ -70,7 +70,7 @@ export function MarkNoShowToggle({
         <button type="button" onClick={() => setAsking(false)} disabled={busy} className="h-8 px-2 font-body text-xs text-steel underline underline-offset-2">
           Cancel
         </button>
-        {error && <span className="w-full font-body text-xs text-rust" role="alert">{error}</span>}
+        {error && <span className="w-full font-body text-xs text-rust-ink" role="alert">{error}</span>}
       </span>
     );
   }
@@ -80,7 +80,7 @@ export function MarkNoShowToggle({
       type="button"
       onClick={() => setAsking(true)}
       disabled={busy}
-      className="h-8 px-3 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust transition-colors disabled:opacity-40"
+      className="h-8 px-3 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust-ink transition-colors disabled:opacity-40"
     >
       Mark no-show
     </button>

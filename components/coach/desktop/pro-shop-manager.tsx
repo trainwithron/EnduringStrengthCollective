@@ -311,7 +311,7 @@ export function ProShopManager({ initialLinks, organizationId, groups = [] }: { 
                 <button
                   type="button"
                   onClick={() => handleDelete(l.id)}
-                  className="w-9 h-9 inline-flex items-center justify-center text-steel active:text-rust"
+                  className="w-9 h-9 inline-flex items-center justify-center text-steel active:text-rust-ink"
                   aria-label={`Delete ${l.title}`}
                 >
                   <Trash2 className="w-4 h-4" />
@@ -388,7 +388,7 @@ export function ProShopManager({ initialLinks, organizationId, groups = [] }: { 
           </label>
         </div>
         {error && (
-          <p className="font-body text-xs text-rust" role="alert">
+          <p className="font-body text-xs text-rust-ink" role="alert">
             {error}
           </p>
         )}

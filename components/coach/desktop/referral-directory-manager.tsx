@@ -184,7 +184,7 @@ export function ReferralDirectoryManager({ initialPartners, organizationId }: { 
                 <button
                   type="button"
                   onClick={() => handleDelete(p.id)}
-                  className="w-9 h-9 inline-flex items-center justify-center text-steel active:text-rust"
+                  className="w-9 h-9 inline-flex items-center justify-center text-steel active:text-rust-ink"
                   aria-label={`Delete ${p.name}`}
                 >
                   <Trash2 className="w-4 h-4" />
@@ -246,7 +246,7 @@ export function ReferralDirectoryManager({ initialPartners, organizationId }: { 
           className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm"
         />
         {error && (
-          <p className="font-body text-xs text-rust" role="alert">
+          <p className="font-body text-xs text-rust-ink" role="alert">
             {error}
           </p>
         )}

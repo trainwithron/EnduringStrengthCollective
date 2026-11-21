@@ -100,7 +100,7 @@ export function TrainingPartnerProfileEditor({
       )}
 
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

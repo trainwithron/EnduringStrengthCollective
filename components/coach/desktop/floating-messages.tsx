@@ -70,7 +70,7 @@ export function FloatingMessages({
     };
   }, [groupId]);
 
-  if (failed) return <p className="font-body text-sm text-rust px-4 py-3" role="alert">Couldn&apos;t load your messages. Close the panel and open it again.</p>;
+  if (failed) return <p className="font-body text-sm text-rust-ink px-4 py-3" role="alert">Couldn&apos;t load your messages. Close the panel and open it again.</p>;
   if (!data) return <p className="font-body text-sm text-steel px-4 py-3">Loading…</p>;
 
   const opened = data.conversations.find((c) => c.otherId === openId) ?? null;
@@ -78,7 +78,7 @@ export function FloatingMessages({
     return (
       <div className="flex-1 min-h-0 flex flex-col">
         <div className="px-3 py-2 border-b border-steel/15 flex items-center gap-2 shrink-0">
-          <button type="button" onClick={() => onOpenIdChange(null)} className="h-11 px-2 font-body text-xs text-steel active:text-rust">
+          <button type="button" onClick={() => onOpenIdChange(null)} className="h-11 px-2 font-body text-xs text-steel active:text-rust-ink">
             &larr; Back
           </button>
           <Link href={`/groups/${opened.groupId}/athletes/${opened.otherId}`} className="font-display uppercase text-sm tracking-wide text-chalk truncate">
@@ -113,7 +113,7 @@ export function FloatingMessages({
         <span className="flex-1 min-w-0">
           <span className="flex items-baseline gap-2">
             <span className={`font-body text-sm truncate ${c.unreadCount > 0 ? "font-semibold" : "font-medium"}`}>{c.fullName}</span>
-            {label && <span className="font-body text-[10px] uppercase tracking-wide text-rust shrink-0">{label}</span>}
+            {label && <span className="font-body text-[10px] uppercase tracking-wide text-rust-ink shrink-0">{label}</span>}
           </span>
           <span className="block font-body text-xs text-steel truncate">{c.lastBody ?? "No messages yet"}</span>
         </span>

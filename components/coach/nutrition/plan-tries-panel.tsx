@@ -30,7 +30,7 @@ function MealsBefore({ meals }: { meals?: MealRecipeChoice[] }) {
   if (!meals || meals.length === 0) return null;
   return (
     <details className="mt-1 border border-steel/15" data-meals-before>
-      <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden min-h-11 flex items-center px-2 font-body text-xs text-rust">
+      <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden min-h-11 flex items-center px-2 font-body text-xs text-rust-ink">
         Meals before this change ({meals.length})
       </summary>
       <ul className="border-t border-steel/15 divide-y divide-steel/10">
@@ -117,7 +117,7 @@ export function PlanTriesPanel({ clientName, tries }: { clientName: string; trie
         </p>
       )}
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

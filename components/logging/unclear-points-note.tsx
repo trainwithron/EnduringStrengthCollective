@@ -49,7 +49,7 @@ export function UnclearPointsNote({
               type="button"
               disabled={busy === s.id}
               onClick={() => void decide(s.id, s.dataFlag === "unclear")}
-              className="min-h-11 text-rust underline underline-offset-2 disabled:opacity-40"
+              className="min-h-11 text-rust-ink underline underline-offset-2 disabled:opacity-40"
             >
               {s.dataFlag === "unclear" ? "Count it" : "Leave it out"}
             </button>
@@ -57,7 +57,7 @@ export function UnclearPointsNote({
         </div>
       ))}
       {error && (
-        <p className="text-rust" role="alert">
+        <p className="text-rust-ink" role="alert">
           {error}
         </p>
       )}

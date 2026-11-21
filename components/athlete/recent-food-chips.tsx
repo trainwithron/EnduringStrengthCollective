@@ -54,14 +54,14 @@ export function RecentFoodChips({
             type="button"
             onClick={() => handleTap(r)}
             disabled={loggingKey === r.key}
-            className="min-h-11 px-3 py-1 rounded-row bg-surface-2 border border-steel/30 text-chalk font-body text-xs text-left active:border-rust active:text-rust transition-colors disabled:opacity-40"
+            className="min-h-11 px-3 py-1 rounded-row bg-surface-2 border border-steel/30 text-chalk font-body text-xs text-left active:border-rust active:text-rust-ink transition-colors disabled:opacity-40"
           >
             {loggingKey === r.key ? "Logging…" : r.label}
           </button>
         ))}
       </div>
       {error && (
-        <p className="font-body text-xs text-rust mt-1" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-1" role="alert">
           {error}
         </p>
       )}

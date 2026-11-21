@@ -227,7 +227,7 @@ export function MachineCatalogSection({
             {requests.map((r) => (
               <li key={r.id} className="border border-steel/15 p-2">
                 <p className="font-body text-sm text-chalk break-words">{requestSummary(r, itemLabel)}</p>
-                <p className={`font-body text-xs ${r.status === "approved" ? "text-positive" : r.status === "denied" ? "text-rust" : "text-steel"}`}>{requestStatusLabel(r.status)}</p>
+                <p className={`font-body text-xs ${r.status === "approved" ? "text-positive" : r.status === "denied" ? "text-rust-ink" : "text-steel"}`}>{requestStatusLabel(r.status)}</p>
                 {r.reviewNote && <p className="font-body text-xs text-steel mt-1 break-words">Note from Spotlight: {r.reviewNote}</p>}
               </li>
             ))}
@@ -295,12 +295,12 @@ function CatalogMachineDetail({
                   type="button"
                   onClick={() => setDemoFor((id) => (id === item.id ? null : item.id))}
                   aria-expanded={demoFor === item.id}
-                  className="min-h-11 px-2 font-body text-xs text-rust shrink-0"
+                  className="min-h-11 px-2 font-body text-xs text-rust-ink shrink-0"
                 >
                   {isAdmin ? (demo ? "Change demo" : "Add demo") : "Send a demo"}
                 </button>
                 {isAdmin && (
-                  <button type="button" onClick={() => void removeItem(item)} disabled={busy} aria-label={`Take ${item.name} off the shared list`} className="w-11 h-11 shrink-0 flex items-center justify-center text-steel hover:text-rust disabled:opacity-40">
+                  <button type="button" onClick={() => void removeItem(item)} disabled={busy} aria-label={`Take ${item.name} off the shared list`} className="w-11 h-11 shrink-0 flex items-center justify-center text-steel hover:text-rust-ink disabled:opacity-40">
                     <X className="w-4 h-4" />
                   </button>
                 )}
@@ -328,7 +328,7 @@ function CatalogMachineDetail({
           {isAdmin ? "Add exercises" : "Send more exercises"}
         </button>
         {isAdmin && (
-          <button type="button" onClick={() => void removeMachine()} disabled={busy} className="min-h-11 px-3 font-body text-sm text-rust disabled:opacity-40">
+          <button type="button" onClick={() => void removeMachine()} disabled={busy} className="min-h-11 px-3 font-body text-sm text-rust-ink disabled:opacity-40">
             Take off the shared list
           </button>
         )}
@@ -616,7 +616,7 @@ function DemoRequestForm({
         </>
       )}
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}
@@ -707,7 +707,7 @@ function MachineRequestForm({
                 <span className="flex-1 min-w-0 font-body text-sm text-chalk break-words">
                   {i + 1}. {e.name}
                 </span>
-                <button type="button" onClick={() => setExercises((prev) => prev.filter((x) => x.name !== e.name))} aria-label={`Remove ${e.name}`} className="w-11 h-11 shrink-0 flex items-center justify-center text-steel hover:text-rust">
+                <button type="button" onClick={() => setExercises((prev) => prev.filter((x) => x.name !== e.name))} aria-label={`Remove ${e.name}`} className="w-11 h-11 shrink-0 flex items-center justify-center text-steel hover:text-rust-ink">
                   <X className="w-4 h-4" />
                 </button>
               </li>
@@ -750,7 +750,7 @@ function MachineRequestForm({
         {busy ? "Sending…" : isAdmin ? "Put it on the shared list" : "Send for review"}
       </button>
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

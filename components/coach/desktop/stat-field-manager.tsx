@@ -59,7 +59,7 @@ export function StatFieldManager({
         {fields.map((f) => (
           <span key={f.id} className="h-7 px-2 border border-steel/30 flex items-center gap-1.5 font-body text-xs">
             {f.name}
-            <button type="button" onClick={() => handleDelete(f.id)} aria-label={`Delete ${f.name}`} className="text-steel active:text-rust">
+            <button type="button" onClick={() => handleDelete(f.id)} aria-label={`Delete ${f.name}`} className="text-steel active:text-rust-ink">
               <Trash2 className="w-3 h-3" />
             </button>
           </span>
@@ -78,7 +78,7 @@ export function StatFieldManager({
           type="button"
           onClick={handleAdd}
           disabled={busy || !name.trim()}
-          className="h-8 px-2.5 border border-steel/30 text-rust font-body text-xs flex items-center gap-1 disabled:opacity-40"
+          className="h-8 px-2.5 border border-steel/30 text-rust-ink font-body text-xs flex items-center gap-1 disabled:opacity-40"
         >
           <Plus className="w-3.5 h-3.5" />
           Add

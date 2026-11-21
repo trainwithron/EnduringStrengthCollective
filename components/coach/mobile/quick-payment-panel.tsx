@@ -79,7 +79,7 @@ export function QuickPaymentPanel({ groupId }: { groupId: string }) {
         {selected ? (
           <div className="mt-1 flex items-center justify-between border border-rust/40 bg-rust/5 px-3 h-10">
             <span className="font-body text-sm text-chalk">{selected.fullName}</span>
-            <button type="button" onClick={() => setSelected(null)} className="font-body text-xs text-rust">
+            <button type="button" onClick={() => setSelected(null)} className="font-body text-xs text-rust-ink">
               Change
             </button>
           </div>
@@ -140,7 +140,7 @@ export function QuickPaymentPanel({ groupId }: { groupId: string }) {
       </div>
 
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

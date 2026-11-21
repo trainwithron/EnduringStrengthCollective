@@ -94,7 +94,7 @@ export function TimezoneControl({ initialTimezone }: { initialTimezone: string |
         Your recurring hours below are in this timezone and stay put when you travel — clients booking
         from anywhere always see the correct real time. Other times in the app show in the zone your device is in.
       </p>
-      {error && <p className="font-body text-xs text-rust mt-1">{error}</p>}
+      {error && <p className="font-body text-xs text-rust-ink mt-1">{error}</p>}
     </div>
   );
 }

@@ -59,7 +59,7 @@ export async function WorkoutOverviewView({
           &larr; Back to program
         </Link>
         {loggingForName && (
-          <p className="font-body text-xs text-rust uppercase tracking-wide mt-3">
+          <p className="font-body text-xs text-rust-ink uppercase tracking-wide mt-3">
             Logging for {loggingForName}
           </p>
         )}

@@ -86,7 +86,7 @@ export default async function LeadsPage(props: { params: Promise<{ groupId: stri
           {leads.map((lead: any) => (
             <div key={lead.id} className="py-3 grid grid-cols-1 gap-0.5 @3xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)_5rem] @3xl:gap-4 @3xl:items-baseline">
               <p className="font-body font-medium text-[15px] break-words">{lead.full_name}</p>
-              <p className="font-body text-sm text-rust break-words">{lead.contact_info}</p>
+              <p className="font-body text-sm text-rust-ink break-words">{lead.contact_info}</p>
               <p className="font-body text-xs text-steel">{lead.exercise_library?.name ? <><span className="@3xl:hidden">Scanned: </span>{lead.exercise_library.name}</> : <span className="hidden @3xl:inline">—</span>}</p>
               <p className="font-body text-sm text-chalk break-words">{lead.note ?? ""}</p>
               <p className="font-body text-xs text-steel @3xl:text-right">
@@ -100,9 +100,9 @@ export default async function LeadsPage(props: { params: Promise<{ groupId: stri
         </div>
         {pages > 1 && (
           <nav className="flex items-center gap-4 mt-4 font-body text-sm" aria-label="Pages">
-            {page > 1 && <Link href={pageHref(page - 1)} className="text-rust">&larr; Newer</Link>}
+            {page > 1 && <Link href={pageHref(page - 1)} className="text-rust-ink">&larr; Newer</Link>}
             <span className="text-steel">Page {page} of {pages}</span>
-            {page < pages && <Link href={pageHref(page + 1)} className="text-rust">Older &rarr;</Link>}
+            {page < pages && <Link href={pageHref(page + 1)} className="text-rust-ink">Older &rarr;</Link>}
           </nav>
         )}
         </>

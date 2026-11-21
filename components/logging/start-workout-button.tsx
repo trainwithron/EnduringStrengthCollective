@@ -257,7 +257,7 @@ export function StartWorkoutButton({
         <p className="mb-2 text-center font-body text-xs text-steel">{bookingCreditLine(linked.startAt, clientName, linked.prepaid, coachTimezone)}</p>
       )}
       {error && (
-        <p className="font-body text-xs text-rust mb-2 text-center" role="alert">
+        <p className="font-body text-xs text-rust-ink mb-2 text-center" role="alert">
           {error}
         </p>
       )}

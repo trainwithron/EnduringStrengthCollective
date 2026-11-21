@@ -77,7 +77,7 @@ export function MarkAttendedControl({
         >
           {busy ? "Undoing…" : "Undo"}
         </button>
-        {error && <span className="font-body text-xs text-rust">{error}</span>}
+        {error && <span className="font-body text-xs text-rust-ink">{error}</span>}
       </span>
     );
   }
@@ -92,7 +92,7 @@ export function MarkAttendedControl({
         type="button"
         onClick={() => run("mark_booking_attended")}
         disabled={busy}
-        className="h-11 px-3 border border-rust/50 text-rust font-body text-xs disabled:opacity-40"
+        className="h-11 px-3 border border-rust/50 text-rust-ink font-body text-xs disabled:opacity-40"
       >
         {busy ? "Saving…" : "Mark attended"}
       </button>
@@ -109,7 +109,7 @@ export function MarkAttendedControl({
           Don&apos;t charge
         </button>
       )}
-      {error && <span className="font-body text-xs text-rust">{error}</span>}
+      {error && <span className="font-body text-xs text-rust-ink">{error}</span>}
     </span>
   );
 }

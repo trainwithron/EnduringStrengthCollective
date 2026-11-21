@@ -68,7 +68,7 @@ export function ReadSlot({
         </div>
       )}
       <p className="font-body text-sm text-chalk leading-relaxed">{text}</p>
-      <p className="font-display text-sm text-rust mt-2 tracking-wide">{reference} (KJV)</p>
+      <p className="font-display text-sm text-rust-ink mt-2 tracking-wide">{reference} (KJV)</p>
       <div className="flex items-center gap-3 mt-3">
         <button type="button" onClick={onClose} className="min-h-[44px] px-4 border border-steel/30 text-steel font-body text-xs">
           Close
@@ -76,7 +76,7 @@ export function ReadSlot({
         <button type="button" onClick={turnOff} disabled={busy} className="min-h-[44px] px-3 font-body text-xs text-steel underline disabled:opacity-40">
           {busy ? "Turning off…" : "Turn this off"}
         </button>
-        {failed && <span className="font-body text-xs text-rust">Could not save. Try again.</span>}
+        {failed && <span className="font-body text-xs text-rust-ink">Could not save. Try again.</span>}
       </div>
     </div>
   );

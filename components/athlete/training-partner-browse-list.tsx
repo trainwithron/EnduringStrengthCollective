@@ -80,7 +80,7 @@ export function TrainingPartnerBrowseList({
   return (
     <div className="space-y-3">
       {error && !openRequestFor && (
-        <p className="font-body text-sm text-rust" role="alert">
+        <p className="font-body text-sm text-rust-ink" role="alert">
           {error}
         </p>
       )}
@@ -110,7 +110,7 @@ export function TrainingPartnerBrowseList({
                 className="w-full bg-graphite border border-steel/30 text-chalk px-2.5 py-2 font-body text-sm focus:outline-none focus:border-rust resize-none"
               />
               {error && (
-                <p className="font-body text-xs text-rust" role="alert">
+                <p className="font-body text-xs text-rust-ink" role="alert">
                   {error}
                 </p>
               )}

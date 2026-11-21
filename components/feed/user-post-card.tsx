@@ -55,7 +55,7 @@ export function UserPostCard({
           </p>
         </div>
         {post.pinnedAt && !isCoach && (
-          <span className="flex items-center gap-1 font-body text-xs text-rust shrink-0">
+          <span className="flex items-center gap-1 font-body text-xs text-rust-ink shrink-0">
             <Pin className="w-3.5 h-3.5" fill="currentColor" />
             Pinned
           </span>

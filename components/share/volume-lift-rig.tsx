@@ -8,7 +8,7 @@ export function VolumeLiftRig({ emoji }: { emoji: string }) {
     <div className="relative h-[110px] flex items-center justify-center overflow-hidden">
       <div className="absolute left-0 right-0 bottom-5 h-px bg-steel/15" />
       <div className="share-card-lift-rig relative">
-        <span className="share-card-spark absolute -top-2 left-1/2 -translate-x-1/2 text-rust text-xs">
+        <span className="share-card-spark absolute -top-2 left-1/2 -translate-x-1/2 text-rust-ink text-xs">
           ✦
         </span>
         <div className="flex items-center">

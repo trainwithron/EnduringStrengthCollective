@@ -85,7 +85,7 @@ export function OverviewMessageBox({
           <button type="button" onClick={() => setMode("open")} className="mt-3 w-full min-h-11 text-left px-3 bg-graphite border border-steel/30 font-body text-sm text-steel">
             Write a reply…
           </button>
-          <button type="button" onClick={() => setMode("full")} className="mt-1 min-h-11 font-body text-xs text-rust underline underline-offset-2">
+          <button type="button" onClick={() => setMode("full")} className="mt-1 min-h-11 font-body text-xs text-rust-ink underline underline-offset-2">
             See full conversation
           </button>
         </>
@@ -98,7 +98,7 @@ export function OverviewMessageBox({
           <div className={`mt-2 border border-steel/20 ${mode === "full" ? "h-[70vh]" : "h-[340px]"}`}>
             <DirectMessageThread groupId={groupId} viewerId={viewerId} viewerName={viewerName} otherId={athleteId} otherName={clientName} initialMessages={messages} initialDraft={initialDraft} />
           </div>
-          <button type="button" onClick={() => setMode(mode === "full" ? "open" : "full")} className="mt-1 min-h-11 font-body text-xs text-rust underline underline-offset-2">
+          <button type="button" onClick={() => setMode(mode === "full" ? "open" : "full")} className="mt-1 min-h-11 font-body text-xs text-rust-ink underline underline-offset-2">
             {mode === "full" ? "Show less" : "See full conversation"}
           </button>
         </>

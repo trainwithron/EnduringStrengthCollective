@@ -313,7 +313,7 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
           type="button"
           disabled={busy}
           onClick={logMyOwnWorkout}
-          className="w-full h-10 border border-rust/40 text-rust font-body text-sm flex items-center justify-center gap-2 disabled:opacity-50 active:bg-rust/5"
+          className="w-full h-10 border border-rust/40 text-rust-ink font-body text-sm flex items-center justify-center gap-2 disabled:opacity-50 active:bg-rust/5"
         >
           <Dumbbell className="w-4 h-4 shrink-0" strokeWidth={2.25} />
           Start your own workout
@@ -321,7 +321,7 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
       )}
 
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}
@@ -353,7 +353,7 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
               onNavigated();
               router.push(`/groups/${clientAnchorGroup ?? groupId}/clients?add=1`);
             }}
-            className="h-9 px-3 border border-rust/60 text-rust font-body text-sm active:bg-rust/10"
+            className="h-9 px-3 border border-rust/60 text-rust-ink font-body text-sm active:bg-rust/10"
           >
             + Add {term("client")}
           </button>
@@ -441,7 +441,7 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
                       type="button"
                       disabled={busy}
                       onClick={() => switchToGroup(g.id)}
-                      className={`w-full text-left px-2 py-2 font-body text-sm disabled:opacity-50 ${g.id === groupId ? "text-rust bg-rust/10" : "text-chalk active:bg-surface/60"}`}
+                      className={`w-full text-left px-2 py-2 font-body text-sm disabled:opacity-50 ${g.id === groupId ? "text-rust-ink bg-rust/10" : "text-chalk active:bg-surface/60"}`}
                     >
                       {g.name}
                       {g.focusTag && <span className="text-steel"> · {g.focusTag}</span>}

@@ -48,18 +48,18 @@ export function GoogleHealthConnection({
             <button
               onClick={handleDisconnect}
               disabled={disconnecting}
-              className="font-body text-xs text-rust disabled:opacity-40"
+              className="font-body text-xs text-rust-ink disabled:opacity-40"
             >
               {disconnecting ? "Disconnecting…" : "Disconnect"}
             </button>
           </div>
         ) : (
-          <a href={`/api/google-health/connect?groupId=${groupId}`} className="font-body text-xs text-rust inline-flex items-center min-h-11 px-2 -mx-2">
+          <a href={`/api/google-health/connect?groupId=${groupId}`} className="font-body text-xs text-rust-ink inline-flex items-center min-h-11 px-2 -mx-2">
             Connect
           </a>
         )}
       </div>
-      {error && <p className="font-body text-xs text-rust px-3 pb-2">{error}</p>}
+      {error && <p className="font-body text-xs text-rust-ink px-3 pb-2">{error}</p>}
     </div>
   );
 }

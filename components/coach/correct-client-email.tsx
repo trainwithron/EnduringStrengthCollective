@@ -96,7 +96,7 @@ export function CorrectClientEmail({
             {busy ? "Changing…" : "Change email"}
           </button>
           {message && (
-            <p className={`font-body text-xs ${message.kind === "error" ? "text-rust" : "text-steel"}`} role="status">
+            <p className={`font-body text-xs ${message.kind === "error" ? "text-rust-ink" : "text-steel"}`} role="status">
               {message.text}
             </p>
           )}

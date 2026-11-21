@@ -30,7 +30,7 @@ export async function AvailabilityBookingSettings({ coachId }: { coachId: string
   // A failed read must not show default settings as if they were the coach's own (the next edit would save those defaults over the real ones).
   if (profileError || policyError) {
     return (
-      <p className="font-body text-sm text-rust mb-6" role="alert">
+      <p className="font-body text-sm text-rust-ink mb-6" role="alert">
         Couldn&apos;t load your booking settings. Refresh the page to try again.
       </p>
     );
@@ -69,7 +69,7 @@ export async function AvailabilityBookingSettings({ coachId }: { coachId: string
 
     <div className="min-w-0">
       {!coachProfile?.timezone && (
-        <p className="font-body text-sm text-rust border border-rust/40 bg-rust/5 p-3 mb-4 max-w-md" role="status">
+        <p className="font-body text-sm text-rust-ink border border-rust/40 bg-rust/5 p-3 mb-4 max-w-md" role="status">
           Set your time zone below. Until you do, clients cannot send you a booking request, and your hours are read in Eastern time.
         </p>
       )}
@@ -90,7 +90,7 @@ export async function AvailabilityTimeOff({ coachId }: { coachId: string }) {
   ]);
   if (exceptionsError) {
     return (
-      <p className="font-body text-sm text-rust mt-6" role="alert">
+      <p className="font-body text-sm text-rust-ink mt-6" role="alert">
         Couldn&apos;t load your time off. Refresh the page to try again.
       </p>
     );

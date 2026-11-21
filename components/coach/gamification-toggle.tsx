@@ -52,7 +52,7 @@ export function GamificationToggle({
         className="w-5 h-5 shrink-0 accent-rust"
       />
       {error && (
-        <span className="block font-body text-xs text-rust" role="alert">
+        <span className="block font-body text-xs text-rust-ink" role="alert">
           {error}
         </span>
       )}

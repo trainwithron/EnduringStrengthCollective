@@ -46,12 +46,12 @@ export function CardCsvImport({ organizationId }: { organizationId: string }) {
       <p className="font-body text-xs text-steel mt-1 max-w-[70ch]">
         Export your client list from your old system (Mindbody or another) as a CSV file and upload it here. Each card is matched to a client by email, then by name.
       </p>
-      <label className={`mt-3 inline-flex h-9 px-4 items-center border font-body text-sm cursor-pointer ${busy ? "border-steel/30 text-steel" : "border-rust text-rust"}`}>
+      <label className={`mt-3 inline-flex h-9 px-4 items-center border font-body text-sm cursor-pointer ${busy ? "border-steel/30 text-steel" : "border-rust text-rust-ink"}`}>
         {busy ? "Linking cards…" : "Upload CSV"}
         <input type="file" accept=".csv,text/csv" onChange={onFile} disabled={busy} className="hidden" />
       </label>
       {error && (
-        <p className="font-body text-xs text-rust mt-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-2" role="alert">
           {error}
         </p>
       )}
@@ -66,7 +66,7 @@ export function CardCsvImport({ organizationId }: { organizationId: string }) {
               {result.unmatched.length > 12 ? `, and ${result.unmatched.length - 12} more` : ""}. Link those by hand below, or add them as clients first.
             </p>
           )}
-          {result.taken.length > 0 && <p className="text-rust">Already another client&apos;s card: {result.taken.slice(0, 12).join(", ")}.</p>}
+          {result.taken.length > 0 && <p className="text-rust-ink">Already another client&apos;s card: {result.taken.slice(0, 12).join(", ")}.</p>}
           {result.skipped > 0 && <p className="text-steel">{result.skipped} row{result.skipped === 1 ? "" : "s"} had no card number and were skipped.</p>}
         </div>
       )}

@@ -54,12 +54,12 @@ export function OrgAiScaleControl({ organizationId, initialScale }: { organizati
         </button>
       </div>
       {!valid && (
-        <p className="font-body text-xs text-rust mt-1" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-1" role="alert">
           Use a number from 0 to 10, or leave it blank.
         </p>
       )}
       {error && (
-        <p className="font-body text-xs text-rust mt-1" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-1" role="alert">
           {error}
         </p>
       )}

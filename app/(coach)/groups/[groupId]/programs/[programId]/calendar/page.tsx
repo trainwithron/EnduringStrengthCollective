@@ -163,7 +163,7 @@ export default async function ProgramCalendarPage(
               ? "No days set. Your coach hasn't put this program on the calendar yet. Open it from Home."
               : "Set a start date and training days on this program to see it as a calendar."}
           </p>
-          <Link href={backHref} className="inline-flex items-center h-11 mt-3 font-body text-sm text-rust">
+          <Link href={backHref} className="inline-flex items-center h-11 mt-3 font-body text-sm text-rust-ink">
             {viewingAsAthlete ? "Open this program" : "Go to program settings"} &rarr;
           </Link>
           {viewingAsAthlete && (
@@ -394,7 +394,7 @@ export default async function ProgramCalendarPage(
           className={`h-8 px-3 flex items-center font-body text-xs border ${
             view === "month"
               ? "bg-rust text-graphite border-rust"
-              : "border-steel/30 text-steel active:border-rust active:text-rust"
+              : "border-steel/30 text-steel active:border-rust active:text-rust-ink"
           }`}
         >
           Month
@@ -404,7 +404,7 @@ export default async function ProgramCalendarPage(
           className={`h-8 px-3 flex items-center font-body text-xs border ${
             view === "week"
               ? "bg-rust text-graphite border-rust"
-              : "border-steel/30 text-steel active:border-rust active:text-rust"
+              : "border-steel/30 text-steel active:border-rust active:text-rust-ink"
           }`}
         >
           Week
@@ -414,13 +414,13 @@ export default async function ProgramCalendarPage(
       {view === "month" ? (
         <>
           <div className="flex items-center justify-between px-5 pt-4">
-            <Link href={prevHref} className="font-body text-xs text-rust uppercase tracking-wide">
+            <Link href={prevHref} className="font-body text-xs text-rust-ink uppercase tracking-wide">
               &larr; Prev
             </Link>
             <h2 className="font-display uppercase text-sm tracking-wide text-steel">
               {monthLabel(year, monthIndex)}
             </h2>
-            <Link href={nextHref} className="font-body text-xs text-rust uppercase tracking-wide">
+            <Link href={nextHref} className="font-body text-xs text-rust-ink uppercase tracking-wide">
               Next &rarr;
             </Link>
           </div>
@@ -450,7 +450,7 @@ export default async function ProgramCalendarPage(
                 <>
                   <span
                     className={`font-body text-xs ${
-                      isToday ? "text-rust font-bold" : "text-steel"
+                      isToday ? "text-rust-ink font-bold" : "text-steel"
                     }`}
                   >
                     {date.getDate()}
@@ -511,13 +511,13 @@ export default async function ProgramCalendarPage(
       ) : (
         <>
           <div className="flex items-center justify-between px-5 pt-4">
-            <Link href={prevWeekHref} className="font-body text-xs text-rust uppercase tracking-wide">
+            <Link href={prevWeekHref} className="font-body text-xs text-rust-ink uppercase tracking-wide">
               &larr; Prev
             </Link>
             <h2 className="font-display uppercase text-sm tracking-wide text-steel">
               {weekLabel(weekStart, weekDays[6])}
             </h2>
-            <Link href={nextWeekHref} className="font-body text-xs text-rust uppercase tracking-wide">
+            <Link href={nextWeekHref} className="font-body text-xs text-rust-ink uppercase tracking-wide">
               Next &rarr;
             </Link>
           </div>
@@ -538,7 +538,7 @@ export default async function ProgramCalendarPage(
 
               const rowInner = (
                 <>
-                  <div className={`w-11 shrink-0 text-center ${isToday ? "text-rust" : "text-steel"}`}>
+                  <div className={`w-11 shrink-0 text-center ${isToday ? "text-rust-ink" : "text-steel"}`}>
                     <p className="font-body text-xs uppercase tracking-wide">{WEEKDAY_LABELS[i]}</p>
                     <p className="font-display font-bold text-lg leading-none">{date.getDate()}</p>
                   </div>

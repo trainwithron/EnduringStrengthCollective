@@ -104,7 +104,7 @@ export function SessionTypeManager({ initialTypes, teamMode = false , organizati
                 type="button"
                 disabled={busy || left.length === 0}
                 onClick={() => addPresets(key)}
-                className={`min-h-11 px-4 border font-body text-sm disabled:opacity-40 ${suggested ? "border-rust text-rust" : "border-steel/30 text-chalk"}`}
+                className={`min-h-11 px-4 border font-body text-sm disabled:opacity-40 ${suggested ? "border-rust text-rust-ink" : "border-steel/30 text-chalk"}`}
               >
                 {PRESET_SETS[key].label}: {PRESET_SETS[key].presets.map((p) => p.name).join(", ")}
                 {left.length === 0 ? " (added)" : ""}
@@ -116,7 +116,7 @@ export function SessionTypeManager({ initialTypes, teamMode = false , organizati
           They are ordinary types you can rename or delete, and they are not shown on your public booking page. Giving hours or a booked session a type never changes what the booking costs: every session is 1 credit.
         </p>
         {presetError && (
-          <p className="font-body text-xs text-rust mt-1" role="alert">
+          <p className="font-body text-xs text-rust-ink mt-1" role="alert">
             {presetError}
           </p>
         )}
@@ -132,7 +132,7 @@ export function SessionTypeManager({ initialTypes, teamMode = false , organizati
                   type="button"
                   onClick={() => handleDelete(t.id)}
                   aria-label={`Delete ${t.name}`}
-                  className="text-steel active:text-rust"
+                  className="text-steel active:text-rust-ink"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>

@@ -163,7 +163,7 @@ export function NutritionHistoryUploader({ athleteId, groupId, clientName }: { a
   if (!open) {
     return (
       <div className="mb-6">
-        <button type="button" onClick={() => setOpen(true)} className="min-h-11 inline-flex items-center font-body text-xs text-rust border border-rust px-3" data-nutrition-history-upload>
+        <button type="button" onClick={() => setOpen(true)} className="min-h-11 inline-flex items-center font-body text-xs text-rust-ink border border-rust px-3" data-nutrition-history-upload>
           Upload nutrition history
         </button>
       </div>
@@ -203,7 +203,7 @@ export function NutritionHistoryUploader({ athleteId, groupId, clientName }: { a
 
       {status === "error" && error && (
         <div>
-          <p className="font-body text-sm text-rust mb-3" role="alert">
+          <p className="font-body text-sm text-rust-ink mb-3" role="alert">
             {error}
           </p>
           {filePicker("Choose another file")}
@@ -245,7 +245,7 @@ export function NutritionHistoryUploader({ athleteId, groupId, clientName }: { a
             ))}
           </div>
           {error && (
-            <p className="font-body text-sm text-rust mb-2" role="alert">
+            <p className="font-body text-sm text-rust-ink mb-2" role="alert">
               {error}
             </p>
           )}
@@ -273,7 +273,7 @@ export function NutritionHistoryUploader({ athleteId, groupId, clientName }: { a
       {importedCount != null && importedCount > 0 && status !== "saving" && (
         <div className="mt-5 pt-4 border-t border-steel/15 flex flex-wrap items-center justify-between gap-2">
           <p className="font-body text-xs text-steel">{plural(importedCount, "imported food", "imported foods")} on file for {first}.</p>
-          <button type="button" onClick={handleRemove} disabled={removing} className="min-h-11 px-2 font-body text-xs text-rust disabled:opacity-40">
+          <button type="button" onClick={handleRemove} disabled={removing} className="min-h-11 px-2 font-body text-xs text-rust-ink disabled:opacity-40">
             {removing ? "Removing…" : "Remove imported history"}
           </button>
         </div>

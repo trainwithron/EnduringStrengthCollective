@@ -74,7 +74,7 @@ export function SuggestionSettings({
         Suggestion settings
       </p>
       {error && (
-        <p className="font-body text-xs text-rust mb-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mb-2" role="alert">
           {error}
         </p>
       )}
@@ -90,7 +90,7 @@ export function SuggestionSettings({
             className={`h-8 px-3 font-body text-xs border ${
               mode === "list"
                 ? "bg-rust text-graphite border-rust"
-                : "border-steel/30 text-steel active:border-rust active:text-rust"
+                : "border-steel/30 text-steel active:border-rust active:text-rust-ink"
             }`}
           >
             Show me a list
@@ -105,7 +105,7 @@ export function SuggestionSettings({
             className={`h-8 px-3 font-body text-xs border ${
               mode === "auto_add"
                 ? "bg-rust text-graphite border-rust"
-                : "border-steel/30 text-steel active:border-rust active:text-rust"
+                : "border-steel/30 text-steel active:border-rust active:text-rust-ink"
             }`}
           >
             Auto-add to my calendar
@@ -123,7 +123,7 @@ export function SuggestionSettings({
             className={`h-8 px-3 font-body text-xs border ${
               leadMode === "days_before"
                 ? "bg-rust text-graphite border-rust"
-                : "border-steel/30 text-steel active:border-rust active:text-rust"
+                : "border-steel/30 text-steel active:border-rust active:text-rust-ink"
             }`}
           >
             N days before
@@ -138,7 +138,7 @@ export function SuggestionSettings({
             className={`h-8 px-3 font-body text-xs border ${
               leadMode === "weekday_before"
                 ? "bg-rust text-graphite border-rust"
-                : "border-steel/30 text-steel active:border-rust active:text-rust"
+                : "border-steel/30 text-steel active:border-rust active:text-rust-ink"
             }`}
           >
             A specific weekday

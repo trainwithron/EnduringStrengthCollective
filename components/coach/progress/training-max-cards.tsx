@@ -158,7 +158,7 @@ export function TrainingMaxCards({
                 >
                   <span className="block font-body text-sm text-chalk pr-8 line-clamp-2 min-h-[2.5rem]">{c.name}</span>
                   {c.bestE1rm != null ? (
-                    <span className="block font-display text-2xl text-rust mt-1">
+                    <span className="block font-display text-2xl text-rust-ink mt-1">
                       {Math.round(c.bestE1rm)} <span className="font-body text-xs text-steel">lbs</span>
                     </span>
                   ) : (
@@ -172,7 +172,7 @@ export function TrainingMaxCards({
                     aria-pressed={isPinned}
                     aria-label={isPinned ? `Unpin ${c.name}` : `Pin ${c.name} to the front`}
                     onClick={() => void togglePin(c.name)}
-                    className={`absolute top-0 right-0 min-h-11 min-w-11 inline-flex items-center justify-center ${isPinned ? "text-rust" : "text-steel hover:text-chalk"}`}
+                    className={`absolute top-0 right-0 min-h-11 min-w-11 inline-flex items-center justify-center ${isPinned ? "text-rust-ink" : "text-steel hover:text-chalk"}`}
                   >
                     <PinIcon filled={isPinned} />
                   </button>
@@ -189,7 +189,7 @@ export function TrainingMaxCards({
               <li key={c.name} className="flex items-center justify-between">
                 <button type="button" aria-expanded={open === c.name} onClick={() => setOpen(open === c.name ? null : c.name)} className="flex-1 flex items-center justify-between py-2 min-h-11 text-left">
                   <span className="font-body text-sm">{c.name}</span>
-                  <span className="font-body text-sm text-rust font-medium">{c.bestE1rm != null ? `${Math.round(c.bestE1rm)} lbs` : "–"}</span>
+                  <span className="font-body text-sm text-rust-ink font-medium">{c.bestE1rm != null ? `${Math.round(c.bestE1rm)} lbs` : "–"}</span>
                 </button>
                 {canPin && (
                   <button
@@ -197,7 +197,7 @@ export function TrainingMaxCards({
                     aria-pressed={isPinned}
                     aria-label={isPinned ? `Unpin ${c.name}` : `Pin ${c.name} to the front`}
                     onClick={() => void togglePin(c.name)}
-                    className={`min-h-11 min-w-11 inline-flex items-center justify-center ${isPinned ? "text-rust" : "text-steel hover:text-chalk"}`}
+                    className={`min-h-11 min-w-11 inline-flex items-center justify-center ${isPinned ? "text-rust-ink" : "text-steel hover:text-chalk"}`}
                   >
                     <PinIcon filled={isPinned} />
                   </button>
@@ -209,7 +209,7 @@ export function TrainingMaxCards({
       )}
 
       {cards.length > visible && (
-        <button type="button" onClick={() => setShowAll(!showAll)} className="mt-2 min-h-11 font-body text-sm text-rust underline underline-offset-2">
+        <button type="button" onClick={() => setShowAll(!showAll)} className="mt-2 min-h-11 font-body text-sm text-rust-ink underline underline-offset-2">
           {showAll ? "Show fewer" : `Show all (${Math.min(cards.length, MAX_SHOWN_ALL)})`}
         </button>
       )}
@@ -239,7 +239,7 @@ export function TrainingMaxCards({
       )}
 
       {error && (
-        <p className="font-body text-xs text-rust mt-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-2" role="alert">
           {error}
         </p>
       )}

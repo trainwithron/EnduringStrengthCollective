@@ -50,7 +50,7 @@ export function SaveStatusBar() {
     <div className="flex items-center gap-3">
       <span
         className={`font-body text-xs ${
-          status === "error" ? "text-rust" : status === "saved" ? "text-positive" : "text-steel"
+          status === "error" ? "text-rust-ink" : status === "saved" ? "text-positive" : "text-steel"
         }`}
         role={status === "error" ? "alert" : undefined}
       >

@@ -143,7 +143,7 @@ export function DirectMessageThread({
       </div>
 
       {error && (
-        <p className="font-body text-xs text-rust px-5" role="alert">
+        <p className="font-body text-xs text-rust-ink px-5" role="alert">
           {error}
         </p>
       )}

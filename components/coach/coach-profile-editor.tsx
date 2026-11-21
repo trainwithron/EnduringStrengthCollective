@@ -138,7 +138,7 @@ export function CoachProfileEditor({
       )}
       {saving && <p className="font-body text-xs text-steel">Saving…</p>}
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

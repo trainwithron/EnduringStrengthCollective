@@ -95,7 +95,7 @@ export function QrQuickLogStart({
   return (
     <div className="mt-6">
       {error && (
-        <p className="font-body text-xs text-rust mb-2 text-center" role="alert">
+        <p className="font-body text-xs text-rust-ink mb-2 text-center" role="alert">
           {error}
         </p>
       )}

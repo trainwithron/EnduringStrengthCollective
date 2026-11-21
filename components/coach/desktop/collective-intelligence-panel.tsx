@@ -48,7 +48,7 @@ export function CollectiveIntelligencePanel({
                 }`}
               />
               <p className="font-body text-sm text-chalk">
-                <Link href={`/groups/${item.groupId}/athletes/${item.athleteId}`} className="text-rust hover:underline">
+                <Link href={`/groups/${item.groupId}/athletes/${item.athleteId}`} className="text-rust-ink hover:underline">
                   {item.headline}
                 </Link>
               </p>

@@ -144,7 +144,7 @@ export function NextWorkoutExerciseRow({
               e.stopPropagation();
               onSwap(exercise.id, exercise.exerciseName);
             }}
-            className="font-body text-xs text-rust shrink-0"
+            className="font-body text-xs text-rust-ink shrink-0"
           >
             Swap
           </button>
@@ -223,7 +223,7 @@ export function NextWorkoutExerciseRow({
                     setNoteDraft(carriedForwardNote!.body);
                     void commitNote(carriedForwardNote!.body);
                   }}
-                  className="font-body text-xs text-rust underline underline-offset-2 mt-0.5"
+                  className="font-body text-xs text-rust-ink underline underline-offset-2 mt-0.5"
                 >
                   Use it as the note the athlete sees
                 </button>

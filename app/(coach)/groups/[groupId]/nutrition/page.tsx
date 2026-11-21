@@ -502,7 +502,7 @@ export default async function NutritionPage(
               href="https://www.childrensmercy.org/departments-and-clinics/orthopedics/sports-medicine/nutrition-for-injury-recovery-in-athletes/"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-rust underline underline-offset-2"
+              className="text-rust-ink underline underline-offset-2"
             >
               Why eating enough matters for recovery &rarr;
             </a>

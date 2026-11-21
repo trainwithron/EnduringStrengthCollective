@@ -81,8 +81,8 @@ export function GetStartedList({
                 <span className="sr-only">(done)</span>
               </span>
             ) : (
-              <Link href={s.href} className="flex items-center gap-2 min-h-11 font-body text-sm text-chalk hover:text-rust" data-step-open={s.key}>
-                <span className="w-4 text-center font-display text-xs text-rust shrink-0">{i + 1}</span>
+              <Link href={s.href} className="flex items-center gap-2 min-h-11 font-body text-sm text-chalk hover:text-rust-ink" data-step-open={s.key}>
+                <span className="w-4 text-center font-display text-xs text-rust-ink shrink-0">{i + 1}</span>
                 {s.label}
               </Link>
             )}
@@ -92,7 +92,7 @@ export function GetStartedList({
       <button type="button" onClick={onHideAll} className="mt-1 min-h-11 font-body text-xs text-steel hover:text-chalk">
         Don&apos;t show for new {t("client", "plural")}
       </button>
-      {error && <p className="font-body text-xs text-rust">{error}</p>}
+      {error && <p className="font-body text-xs text-rust-ink">{error}</p>}
     </section>
   );
 }

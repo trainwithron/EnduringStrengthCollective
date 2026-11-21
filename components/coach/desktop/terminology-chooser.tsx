@@ -32,7 +32,7 @@ function Chooser({ onChosen }: { onChosen?: () => void }) {
               else setOverride("client", { kind: "preset", value: o.id });
               onChosen?.();
             }}
-            className={`h-11 px-4 border font-body text-sm ${o.selected ? "border-rust text-rust" : "border-steel/30 text-chalk"}`}
+            className={`h-11 px-4 border font-body text-sm ${o.selected ? "border-rust text-rust-ink" : "border-steel/30 text-chalk"}`}
           >
             {o.label}
           </button>
@@ -41,7 +41,7 @@ function Chooser({ onChosen }: { onChosen?: () => void }) {
           type="button"
           aria-pressed={customSelected}
           onClick={() => setCustom((v) => !v)}
-          className={`h-11 px-4 border font-body text-sm ${customSelected ? "border-rust text-rust" : "border-steel/30 text-chalk"}`}
+          className={`h-11 px-4 border font-body text-sm ${customSelected ? "border-rust text-rust-ink" : "border-steel/30 text-chalk"}`}
         >
           {customSelected ? capFirst(current.value) : "Something else"}
         </button>
@@ -67,7 +67,7 @@ function Chooser({ onChosen }: { onChosen?: () => void }) {
             aria-label="Your word, plural"
             className="h-11 flex-1 max-w-xs bg-graphite border border-steel/30 text-chalk px-2 font-body text-base sm:text-sm"
           />
-          <button type="submit" className="h-11 px-4 border border-rust text-rust font-body text-sm">
+          <button type="submit" className="h-11 px-4 border border-rust text-rust-ink font-body text-sm">
             Use this word
           </button>
         </form>

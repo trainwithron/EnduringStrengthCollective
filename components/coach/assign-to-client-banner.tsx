@@ -63,7 +63,7 @@ export function AssignToClientBanner({
         </>
       )}
       {error && (
-        <p className="font-body text-sm text-rust w-full" role="alert">
+        <p className="font-body text-sm text-rust-ink w-full" role="alert">
           {error}
         </p>
       )}

@@ -58,7 +58,7 @@ export default async function ShareMilestonePage(
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body flex items-center justify-center px-6 py-16">
       <div className="w-full max-w-sm border border-rust/40 bg-surface/40 p-8 text-center">
-        <p className="font-display uppercase text-xs tracking-[0.2em] text-rust">
+        <p className="font-display uppercase text-xs tracking-[0.2em] text-rust-ink">
           {shared.groupName}
         </p>
 
@@ -71,7 +71,7 @@ export default async function ShareMilestonePage(
               Over the last {shared.windowWeeks} weeks, calories went up — deliberately, as part of
               a real reverse diet.
             </p>
-            <p className="font-display text-3xl leading-none text-rust">
+            <p className="font-display text-3xl leading-none text-rust-ink">
               ~{shared.weeklyExpectedGainLbs} lb/week
             </p>
             <p className="font-body text-xs text-steel uppercase tracking-wide">
@@ -91,7 +91,7 @@ export default async function ShareMilestonePage(
               {shared.volumeChangePct > 0 ? ` about ${shared.volumeChangePct}%` : ""} — and instead of
               burning out, their own readiness check-ins held steady or improved right alongside it.
             </p>
-            <p className="font-display text-3xl leading-none text-rust">
+            <p className="font-display text-3xl leading-none text-rust-ink">
               +{shared.volumeChangePct}% volume
             </p>
             <p className="font-body text-xs text-steel uppercase tracking-wide">
@@ -110,7 +110,7 @@ export default async function ShareMilestonePage(
               Over the last {shared.windowWeeks} weeks, the plan was a real {shared.phase} — and the
               numbers actually followed it.
             </p>
-            <p className="font-display text-3xl leading-none text-rust">
+            <p className="font-display text-3xl leading-none text-rust-ink">
               {shared.calorieChangePct > 0 ? "+" : ""}
               {shared.calorieChangePct}% calories
             </p>
@@ -134,7 +134,7 @@ export default async function ShareMilestonePage(
         </div>
 
         <p className="font-body text-xs text-steel mt-6 pt-4 border-t border-steel/20">
-          Trained with <span className="text-rust">{shared.groupName}</span>
+          Trained with <span className="text-rust-ink">{shared.groupName}</span>
         </p>
       </div>
     </main>

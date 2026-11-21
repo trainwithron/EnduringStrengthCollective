@@ -195,7 +195,7 @@ export function QrPosterButton({
                   type="button"
                   onClick={save}
                   disabled={!ready || saving}
-                  className="min-h-11 border border-rust text-rust font-body text-sm disabled:opacity-40"
+                  className="min-h-11 border border-rust text-rust-ink font-body text-sm disabled:opacity-40"
                 >
                   {saving ? "Saving…" : "Save picture"}
                 </button>
@@ -208,7 +208,7 @@ export function QrPosterButton({
                 Close
               </button>
               {error && (
-                <p className="font-body text-xs text-rust mt-2" role="alert">
+                <p className="font-body text-xs text-rust-ink mt-2" role="alert">
                   {error}
                 </p>
               )}

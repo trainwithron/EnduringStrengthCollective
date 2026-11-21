@@ -1035,14 +1035,14 @@ export default async function AthleteProfilePage(
           </Link>
         )}
         {profileFlag && (
-          <p className="font-body text-xs text-rust border border-rust/40 bg-rust/5 px-3 py-1.5 mt-3 inline-block">
+          <p className="font-body text-xs text-rust-ink border border-rust/40 bg-rust/5 px-3 py-1.5 mt-3 inline-block">
             {profileFlag}
           </p>
         )}
         <div className="flex flex-wrap items-center gap-2 mt-4">
           <Link
             href={`/groups/${params.groupId}/athletes/${params.athleteId}/history`}
-            className="inline-flex items-center h-9 font-body text-xs text-rust border border-rust px-3"
+            className="inline-flex items-center h-9 font-body text-xs text-rust-ink border border-rust px-3"
             title="Backfill training history from before this client joined — grounds the AI program builder"
           >
             Upload exercise history
@@ -1135,14 +1135,14 @@ export default async function AthleteProfilePage(
           {!selfView && signInStatus !== "active" && (
             <p className="font-body text-sm text-steel">
               Hasn&apos;t signed in yet.{" "}
-              <Link href={`/groups/${params.groupId}/athletes/${params.athleteId}?tab=settings`} className="text-rust underline underline-offset-2">
+              <Link href={`/groups/${params.groupId}/athletes/${params.athleteId}?tab=settings`} className="text-rust-ink underline underline-offset-2">
                 Sign-in options
               </Link>
             </p>
           )}
           {injuryStatusRow?.is_injured && (
             <p>
-              <span className="inline-block font-body text-xs border border-rust text-rust px-2 py-0.5">Injured</span>
+              <span className="inline-block font-body text-xs border border-rust text-rust-ink px-2 py-0.5">Injured</span>
             </p>
           )}
           {parqNotice && <ParqFlagNotice athleteId={params.athleteId} coachId={user.id} flagged={parQFlaggedCount} />}
@@ -1238,7 +1238,7 @@ export default async function AthleteProfilePage(
                           .join(" + ")}
                 </p>
                 {answersFailed ? (
-                  <p className="font-body text-sm text-rust" role="alert">
+                  <p className="font-body text-sm text-rust-ink" role="alert">
                     Couldn&apos;t load this client&apos;s health screening. Reload the page to try again.
                   </p>
                 ) : answersHidden ? (
@@ -1407,7 +1407,7 @@ export default async function AthleteProfilePage(
                   should stay level or increase, not fall with it.
                 </p>
                 {eventWindow.weightClassFlag && (
-                  <p className="font-body text-xs text-rust mt-2">
+                  <p className="font-body text-xs text-rust-ink mt-2">
                     ⚠ Flagged as also cutting weight for a weight class — peaking and cutting at the same time has
                     no real evidence base to automate. Worth a direct conversation, not an automatic plan.
                   </p>
@@ -1489,7 +1489,7 @@ export default async function AthleteProfilePage(
           {isMinor && (
             <section className="space-y-2">
               <p className="font-body text-xs text-steel uppercase tracking-wide">Under 13</p>
-              <p className="font-body text-sm text-rust">Spotlight Coaching is for people 13 and older, so this client is stopped at the start and nothing more is collected. No consent from a parent lets them in.</p>
+              <p className="font-body text-sm text-rust-ink">Spotlight Coaching is for people 13 and older, so this client is stopped at the start and nothing more is collected. No consent from a parent lets them in.</p>
             </section>
           )}
           {isTeen && !guardianWaiting && (
@@ -1530,7 +1530,7 @@ export default async function AthleteProfilePage(
                   </p>
                   {latestGoalRow?.status !== "proposed" && (
                     <details className="mt-3">
-                      <summary className="font-body text-sm text-rust cursor-pointer">Turn this into a goal</summary>
+                      <summary className="font-body text-sm text-rust-ink cursor-pointer">Turn this into a goal</summary>
                       <div className="mt-3">
                         <GoalProposalForm athleteId={params.athleteId} groupId={params.groupId} suggestedBy={user.id} fromWords={helpAnswer.answer} />
                       </div>
@@ -1772,7 +1772,7 @@ export default async function AthleteProfilePage(
               </span>
             )}
           </h2>
-          <Link href={`/groups/${params.groupId}/athletes/${params.athleteId}/history`} className="min-h-11 inline-flex items-center font-body text-xs text-rust underline underline-offset-2">
+          <Link href={`/groups/${params.groupId}/athletes/${params.athleteId}/history`} className="min-h-11 inline-flex items-center font-body text-xs text-rust-ink underline underline-offset-2">
             Import or add past history
           </Link>
           </div>

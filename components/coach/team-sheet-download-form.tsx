@@ -127,7 +127,7 @@ export function TeamSheetDownloadForm({ groupId, today, options }: { groupId: st
               </label>
             ))}
           </div>
-          <p className={`font-body text-xs mt-2 ${tooFewDays ? "text-rust" : "text-steel"}`} role={tooFewDays ? "alert" : undefined}>
+          <p className={`font-body text-xs mt-2 ${tooFewDays ? "text-rust-ink" : "text-steel"}`} role={tooFewDays ? "alert" : undefined}>
             {tooFewDays
               ? `Week ${weekRow?.week} has ${needed} workouts, so choose at least ${needed} days.`
               : `Week ${weekRow?.week} has ${needed} workout${needed === 1 ? "" : "s"}: Day 1 goes on the first chosen day, Day 2 on the next, and so on.`}

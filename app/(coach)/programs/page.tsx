@@ -177,7 +177,7 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
             {clientId ? (
               <p className="font-body text-sm text-chalk mt-2" role="status">
                 {scopedName}&apos;s programs.{" "}
-                <Link href={ALL_PROGRAMS_HREF} className="text-rust underline underline-offset-2">
+                <Link href={ALL_PROGRAMS_HREF} className="text-rust-ink underline underline-offset-2">
                   Show all programs
                 </Link>
               </p>
@@ -185,7 +185,7 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
             {coachedOrgs(groups).length > 1 && (
               <p className="font-body text-sm text-steel mt-2">
                 Programs of <span className="text-chalk">{anchor.orgName}</span>{periodAfter(anchor.orgName)}{" "}
-                <Link href={`${CHOOSE_ORGANIZATION_PATH}?next=/programs`} className="text-rust underline underline-offset-2">
+                <Link href={`${CHOOSE_ORGANIZATION_PATH}?next=/programs`} className="text-rust-ink underline underline-offset-2">
                   Change organization
                 </Link>
               </p>
@@ -211,7 +211,7 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
             <span>
               Showing <span className="font-medium">{scopedName}</span>&apos;s programs only
             </span>
-            <Link href={ALL_PROGRAMS_HREF} className="font-body text-sm text-rust underline underline-offset-2 min-h-11 sm:min-h-0 inline-flex items-center">
+            <Link href={ALL_PROGRAMS_HREF} className="font-body text-sm text-rust-ink underline underline-offset-2 min-h-11 sm:min-h-0 inline-flex items-center">
               Show all programs
             </Link>
           </p>
@@ -219,7 +219,7 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
         {coachedOrgs(groups).length > 1 && (
           <p className="font-body text-sm text-steel mt-2">
             Programs of <span className="text-chalk">{anchor.orgName}</span>{periodAfter(anchor.orgName)}{" "}
-            <Link href={`${CHOOSE_ORGANIZATION_PATH}?next=/programs`} className="text-rust underline underline-offset-2">
+            <Link href={`${CHOOSE_ORGANIZATION_PATH}?next=/programs`} className="text-rust-ink underline underline-offset-2">
               Change organization
             </Link>
           </p>
@@ -228,7 +228,7 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
           {cards.length} {cards.length === 1 ? "program" : "programs"}
         </p>
         <div className="flex items-center gap-4 mt-4">
-          <Link href={`/groups/${newProgramGroupId}/programs/new${newProgramQuery}`} className="font-body text-xs text-rust">
+          <Link href={`/groups/${newProgramGroupId}/programs/new${newProgramQuery}`} className="font-body text-xs text-rust-ink">
             + New program
           </Link>
         </div>

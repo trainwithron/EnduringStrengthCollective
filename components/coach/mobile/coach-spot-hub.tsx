@@ -387,7 +387,7 @@ export function CoachSpotHub({
           compact ? "top-[calc(env(safe-area-inset-top)+1px)] h-[30px] w-[30px]" : "top-3 h-10 w-10"
         }`}
       >
-        <Sparkles className={compact ? "w-4 h-4 text-rust" : "w-5 h-5 text-rust"} strokeWidth={2.25} />
+        <Sparkles className={compact ? "w-4 h-4 text-rust-ink" : "w-5 h-5 text-rust-ink"} strokeWidth={2.25} />
         {needs && needs.count > 0 && (
           <>
             <span
@@ -433,7 +433,7 @@ export function CoachSpotHub({
                   type="button"
                   onClick={goBack}
                   aria-label="Back"
-                  className="w-8 h-8 flex items-center justify-center text-steel active:text-rust shrink-0"
+                  className="w-8 h-8 flex items-center justify-center text-steel active:text-rust-ink shrink-0"
                 >
                   <ArrowLeft className="w-4 h-4" />
                 </button>
@@ -462,7 +462,7 @@ export function CoachSpotHub({
                 type="button"
                 onClick={close}
                 aria-label="Close"
-                className="w-8 h-8 flex items-center justify-center text-steel active:text-rust shrink-0"
+                className="w-8 h-8 flex items-center justify-center text-steel active:text-rust-ink shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -504,7 +504,7 @@ export function CoachSpotHub({
                         onClick={() => setView(tile.key)}
                         className="border border-steel/20 p-4 flex flex-col items-center gap-2 active:border-rust active:bg-rust/5 transition-colors"
                       >
-                        <Icon className="w-6 h-6 text-rust" strokeWidth={2.25} />
+                        <Icon className="w-6 h-6 text-rust-ink" strokeWidth={2.25} />
                         <span className="font-body text-sm text-chalk text-center">{labelOf(tile)}</span>
                       </button>
                     );
@@ -550,7 +550,7 @@ export function CoachSpotHub({
                   </div>
                   {/* The organization's own settings (colors, team, plan live on its pages) and, for a platform admin, their tools: they used to be in the phone's More list. */}
                   <div className="border-t border-steel/20 pt-3 space-y-1" data-business-links>
-                    <a href={`/groups/${activeGroupId}/settings`} className="block min-h-11 leading-[2.75rem] font-body text-sm text-rust">
+                    <a href={`/groups/${activeGroupId}/settings`} className="block min-h-11 leading-[2.75rem] font-body text-sm text-rust-ink">
                       Organization settings →
                     </a>
                     {platformAdmin && (
@@ -591,10 +591,10 @@ export function CoachSpotHub({
                       <p className="font-body text-xs text-steel mb-4">Describe it, paste one, or attach a file or photo. You check it before anything is made.</p>
                       {/* Exercise library beside All programs (Ron, Nov 12): where demos are added from the phone. */}
                       <div className="flex items-center justify-between gap-4 mb-2">
-                        <a href="/programs" className="min-h-11 leading-[2.75rem] font-body text-sm text-rust" data-all-programs>
+                        <a href="/programs" className="min-h-11 leading-[2.75rem] font-body text-sm text-rust-ink" data-all-programs>
                           All programs →
                         </a>
-                        <a href={`/groups/${activeGroupId}/exercise-library`} className="min-h-11 leading-[2.75rem] font-body text-sm text-rust" data-exercise-library>
+                        <a href={`/groups/${activeGroupId}/exercise-library`} className="min-h-11 leading-[2.75rem] font-body text-sm text-rust-ink" data-exercise-library>
                           Exercise library →
                         </a>
                       </div>

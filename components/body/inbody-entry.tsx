@@ -20,7 +20,7 @@ export function InbodyEntry({ athleteId, groupId }: { athleteId: string; groupId
   }, []);
   return (
     <div ref={ref} id="inbody" className="mt-2 scroll-mt-4">
-      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="min-h-11 font-body text-xs text-rust underline underline-offset-2">
+      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="min-h-11 font-body text-xs text-rust-ink underline underline-offset-2">
         {open ? "Hide InBody scans" : "InBody scans"}
       </button>
       {open && (

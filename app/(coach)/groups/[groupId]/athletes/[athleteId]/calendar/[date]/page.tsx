@@ -331,7 +331,7 @@ export default async function ClientCalendarDayPage(
           </h2>
           {macrosEnabled && activeMacros.source && (
             <p className="font-body text-xs text-steel mb-3">
-              Athlete sees: <span className={activeMacros.source === "override" ? "text-rust" : "text-chalk"}>{SOURCE_LABEL[activeMacros.source]}</span>
+              Athlete sees: <span className={activeMacros.source === "override" ? "text-rust-ink" : "text-chalk"}>{SOURCE_LABEL[activeMacros.source]}</span>
               {activeMacros.target?.calories != null ? ` (${activeMacros.target.calories} kcal)` : ""}
               {activeMacros.mealPlanDiffers ? ". A meal plan with different totals is also saved for this day." : "."}
               {activeMacros.source !== "override" ? " Saving numbers below sets a target for this day only." : " Clear this day to go back to the standing target."}

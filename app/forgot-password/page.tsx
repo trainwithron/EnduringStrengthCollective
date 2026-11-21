@@ -64,7 +64,7 @@ export default function ForgotPasswordPage() {
             </div>
 
             {error && (
-              <p className="font-body text-sm text-rust" role="alert">
+              <p className="font-body text-sm text-rust-ink" role="alert">
                 {error}
               </p>
             )}
@@ -80,7 +80,7 @@ export default function ForgotPasswordPage() {
         )}
 
         <p className="font-body text-sm text-steel text-center mt-6">
-          <Link href="/login" className="text-rust">
+          <Link href="/login" className="text-rust-ink">
             Back to sign in
           </Link>
         </p>

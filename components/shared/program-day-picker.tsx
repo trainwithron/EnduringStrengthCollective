@@ -13,7 +13,7 @@ function AssignToClients({ programId, programName, groupId, aiDraft }: { program
   const router = useRouter();
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className="min-h-11 inline-flex items-center px-4 border border-rust text-rust font-body text-sm rounded-full">
+      <button type="button" onClick={() => setOpen(true)} className="min-h-11 inline-flex items-center px-4 border border-rust text-rust-ink font-body text-sm rounded-full">
         Assign to clients
       </button>
       {open && <ProgramAssignPanel programId={programId} programName={programName} groupId={groupId} aiDraft={aiDraft} onClose={() => setOpen(false)} onChanged={() => router.refresh()} />}
@@ -75,13 +75,13 @@ export function ProgramDayPicker({
     <main className="min-h-screen bg-graphite text-chalk font-body pb-28">
       <header className={`px-5 ${belowSpotlight ? "pt-16" : "pt-8"} pb-3`}>
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-          <Link href={backHref} className="font-body text-sm text-rust min-h-11 inline-flex items-center">
+          <Link href={backHref} className="font-body text-sm text-rust-ink min-h-11 inline-flex items-center">
             &larr; Back
           </Link>
           <span className="flex flex-wrap items-center justify-end gap-2">
             {assign && <AssignToClients {...assign} />}
             {canEdit && editHref && (
-              <Link href={editHref} className="min-h-11 inline-flex items-center px-4 border border-rust text-rust font-body text-sm rounded-full">
+              <Link href={editHref} className="min-h-11 inline-flex items-center px-4 border border-rust text-rust-ink font-body text-sm rounded-full">
                 Edit program
               </Link>
             )}
@@ -117,7 +117,7 @@ export function ProgramDayPicker({
                   strokeLinecap="round"
                   strokeDasharray={`${(stats.percent / 100) * circumference} ${circumference}`}
                   transform="rotate(-90 28 28)"
-                  className="text-rust"
+                  className="text-rust-ink"
                 />
                 <text x="28" y="32" textAnchor="middle" fontSize="12" fontWeight="700" fill="currentColor" className="text-chalk">
                   {stats.percent}%
@@ -159,7 +159,7 @@ export function ProgramDayPicker({
                       Week {w.weekNumber}
                       {weekIsComplete(w) && <Check className="w-4 h-4 text-positive" strokeWidth={3} aria-label="Week complete" />}
                     </span>
-                    {currentWeek === w.weekNumber && <span className="font-body text-[10px] text-rust leading-none">{programComplete ? "Last week" : "Up next"}</span>}
+                    {currentWeek === w.weekNumber && <span className="font-body text-[10px] text-rust-ink leading-none">{programComplete ? "Last week" : "Up next"}</span>}
                   </button>
                 );
               })}
@@ -176,16 +176,16 @@ export function ProgramDayPicker({
                     onClick={() => setOpen({ week: weekNumber, day: d })}
                     className="w-full flex items-center gap-3 rounded-2xl bg-surface/70 border border-steel/20 p-4 text-left active:bg-surface min-h-[88px]"
                   >
-                    <span className={`shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${done ? "bg-positive/20 text-positive" : "bg-rust/15 text-rust"}`} aria-hidden="true">
+                    <span className={`shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${done ? "bg-positive/20 text-positive" : "bg-rust/15 text-rust-ink"}`} aria-hidden="true">
                       {done ? <Check className="w-6 h-6" strokeWidth={3} /> : <Dumbbell className="w-5 h-5" />}
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block font-body text-lg font-semibold leading-tight break-words">
                         {dayCardTitle(weekNumber, d)}
                         {d.id === upNextDayId ? (
-                          <span className="ml-2 font-display text-xs uppercase tracking-wide text-rust align-middle">Up next</span>
+                          <span className="ml-2 font-display text-xs uppercase tracking-wide text-rust-ink align-middle">Up next</span>
                         ) : (
-                          d.isToday && <span className="ml-2 font-display text-xs uppercase tracking-wide text-rust align-middle">Today</span>
+                          d.isToday && <span className="ml-2 font-display text-xs uppercase tracking-wide text-rust-ink align-middle">Today</span>
                         )}
                       </span>
                       <span className="block font-body text-sm text-steel truncate mt-0.5">{d.lockedLabel ?? (previewLine(d.exercises) || "Nothing in this day yet.")}</span>

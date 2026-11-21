@@ -46,13 +46,13 @@ export function SpotNeedsTop({ needs, onNavigated, onNoticesCleared }: { needs: 
       {needs.notices.length > 0 && (
         <div className="flex items-center justify-between gap-3">
           <p className="font-body text-xs text-steel uppercase tracking-wide">Notifications</p>
-          <button type="button" onClick={markAllRead} disabled={clearing} className="min-h-11 px-2 -my-2 font-body text-xs text-rust underline underline-offset-2 disabled:opacity-50" data-spot-mark-all>
+          <button type="button" onClick={markAllRead} disabled={clearing} className="min-h-11 px-2 -my-2 font-body text-xs text-rust-ink underline underline-offset-2 disabled:opacity-50" data-spot-mark-all>
             {clearing ? "Marking…" : "Mark all read"}
           </button>
         </div>
       )}
       {clearError && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           Couldn&apos;t mark them read. Try again.
         </p>
       )}

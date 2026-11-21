@@ -74,7 +74,7 @@ export function SetAsideControl({ athleteId, groupId }: { athleteId: string; gro
         {state === "inactive" ? "Bring back" : "Set aside as inactive"}
       </button>
       {error && (
-        <p className="font-body text-xs text-rust mt-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-2" role="alert">
           {error}
         </p>
       )}

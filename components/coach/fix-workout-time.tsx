@@ -26,7 +26,7 @@ export function FixWorkoutTime({ sessionId }: { sessionId: string }) {
 
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} className="font-body text-xs text-rust px-4 min-h-11 inline-flex items-center">
+      <button type="button" onClick={() => setOpen(true)} className="font-body text-xs text-rust-ink px-4 min-h-11 inline-flex items-center">
         Fix time
       </button>
     );
@@ -52,7 +52,7 @@ export function FixWorkoutTime({ sessionId }: { sessionId: string }) {
         Cancel
       </button>
       {error && (
-        <p className="w-full font-body text-xs text-rust" role="alert">
+        <p className="w-full font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

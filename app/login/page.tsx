@@ -139,7 +139,7 @@ function LoginForm() {
           </div>
 
           {error && (
-            <p className="font-body text-sm text-rust" role="alert">
+            <p className="font-body text-sm text-rust-ink" role="alert">
               {error}
             </p>
           )}
@@ -148,7 +148,7 @@ function LoginForm() {
               <button
                 type="button"
                 onClick={resendConfirmation}
-                className="font-body text-sm text-rust underline underline-offset-2"
+                className="font-body text-sm text-rust-ink underline underline-offset-2"
               >
                 Send the confirmation email again
               </button>
@@ -166,13 +166,13 @@ function LoginForm() {
         </form>
 
         <p className="font-body text-sm text-steel text-center mt-4">
-          <Link href="/forgot-password" className="text-rust">
+          <Link href="/forgot-password" className="text-rust-ink">
             Forgot password?
           </Link>
         </p>
         <p className="font-body text-sm text-steel text-center mt-2">
           New coach?{" "}
-          <Link href="/signup" className="text-rust">
+          <Link href="/signup" className="text-rust-ink">
             Create your coaching account
           </Link>
         </p>

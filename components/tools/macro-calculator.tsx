@@ -221,7 +221,7 @@ export function MacroCalculator({
             <button
               type="button"
               onClick={() => setShowMaintenanceExplainer((v) => !v)}
-              className="font-body text-xs text-steel uppercase tracking-wide active:text-rust transition-colors"
+              className="font-body text-xs text-steel uppercase tracking-wide active:text-rust-ink transition-colors"
             >
               {showMaintenanceExplainer ? "▾" : "▸"} Finding your real maintenance
             </button>

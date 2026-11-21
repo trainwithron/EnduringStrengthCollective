@@ -128,7 +128,7 @@ export default async function MessagesPage(props: { params: Promise<{ groupId: s
             <h1 className="font-display font-bold text-3xl uppercase leading-none">All messages</h1>
             <Link
               href={`/groups/${params.groupId}/messages/announce`}
-              className="h-9 px-4 border border-rust/40 text-rust font-body text-sm flex items-center"
+              className="h-9 px-4 border border-rust/40 text-rust-ink font-body text-sm flex items-center"
             >
               Message all clients
             </Link>
@@ -155,7 +155,7 @@ export default async function MessagesPage(props: { params: Promise<{ groupId: s
               <h1 className="font-display font-bold text-3xl uppercase leading-none">Messages</h1>
               <Link
                 href={`/groups/${params.groupId}/messages/announce`}
-                className="h-9 px-3 border border-rust/40 text-rust font-body text-xs flex items-center shrink-0"
+                className="h-9 px-3 border border-rust/40 text-rust-ink font-body text-xs flex items-center shrink-0"
               >
                 Message all
               </Link>

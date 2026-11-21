@@ -102,7 +102,7 @@ export function BookingPageSettings({
           />
         </div>
         {problem && slug && (
-          <p className="font-body text-xs text-rust mt-1" role="alert">
+          <p className="font-body text-xs text-rust-ink mt-1" role="alert">
             {problem}
           </p>
         )}
@@ -178,7 +178,7 @@ export function BookingPageSettings({
           {busy ? "Saving…" : "Save"}
         </button>
         {message && (
-          <p className={`font-body text-sm ${message.error ? "text-rust" : "text-chalk"}`} role={message.error ? "alert" : "status"}>
+          <p className={`font-body text-sm ${message.error ? "text-rust-ink" : "text-chalk"}`} role={message.error ? "alert" : "status"}>
             {message.text}
           </p>
         )}

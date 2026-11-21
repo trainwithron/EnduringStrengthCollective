@@ -51,7 +51,7 @@ export function InviteCoachForm({ groupId }: { groupId: string }) {
           setOpen(true);
           setSuccess(false);
         }}
-        className="inline-flex items-center gap-2 h-11 px-4 border border-rust text-rust font-body text-sm font-medium active:bg-rust active:text-graphite transition-colors"
+        className="inline-flex items-center gap-2 h-11 px-4 border border-rust text-rust-ink font-body text-sm font-medium active:bg-rust active:text-graphite transition-colors"
       >
         <UserPlus className="w-4 h-4" strokeWidth={2.5} />
         Invite coach
@@ -71,14 +71,14 @@ export function InviteCoachForm({ groupId }: { groupId: string }) {
               If that person has no open invitation, we sent one, and they join once they accept. Check Invitations on the Team page for anything already open: you can send it again, copy the link or cancel it there.
             </p>
           ) : (
-            <p className="font-body text-sm text-rust" role="alert">
+            <p className="font-body text-sm text-rust-ink" role="alert">
               The invitation was made, but the email did not go out. Open Invitations on the Team page and choose Send again, or Copy link and send it yourself.
             </p>
           )}
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="font-body text-xs text-rust mt-3"
+            className="font-body text-xs text-rust-ink mt-3"
           >
             Done
           </button>
@@ -132,7 +132,7 @@ export function InviteCoachForm({ groupId }: { groupId: string }) {
             </p>
           </div>
           {error && (
-            <p className="font-body text-xs text-rust" role="alert">
+            <p className="font-body text-xs text-rust-ink" role="alert">
               {error}
             </p>
           )}

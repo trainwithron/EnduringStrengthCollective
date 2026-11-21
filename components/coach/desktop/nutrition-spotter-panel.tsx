@@ -16,7 +16,7 @@ export function NutritionSpotterPanel({ findings }: { findings: NutritionSpotter
 
   return (
     <div className="border border-rust/40 bg-rust/5 p-4">
-      <p className="font-body text-xs text-rust uppercase tracking-wide font-medium mb-2">Nutrition Spotter</p>
+      <p className="font-body text-xs text-rust-ink uppercase tracking-wide font-medium mb-2">Nutrition Spotter</p>
       <div className="space-y-2">
         {findings.map((f) => (
           <div key={f.id} className="flex items-start gap-2">

@@ -56,7 +56,7 @@ export function HabitManager({
               <button
                 type="button"
                 onClick={() => handleDelete(h.id)}
-                className="text-steel active:text-rust shrink-0"
+                className="text-steel active:text-rust-ink shrink-0"
                 aria-label={`Delete habit ${h.title}`}
               >
                 <Trash2 className="w-4 h-4" />

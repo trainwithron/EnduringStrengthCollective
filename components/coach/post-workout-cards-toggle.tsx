@@ -35,7 +35,7 @@ export function PostWorkoutCardsToggle({ groupId, initialEnabled }: { groupId: s
         <input type="checkbox" checked={enabled} onChange={toggle} disabled={saving} aria-label="Post-workout cards and PR notices" className="w-5 h-5 shrink-0 accent-rust" />
       </label>
       {error && (
-        <p className="font-body text-xs text-rust mt-1" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-1" role="alert">
           {error}
         </p>
       )}

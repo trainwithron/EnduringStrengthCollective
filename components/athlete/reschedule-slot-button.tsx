@@ -88,7 +88,7 @@ export function RescheduleSlotButton({
             {submitting ? "Sending…" : "Ask to move here"}
           </button>
         )}
-        {error && <span className="font-body text-xs text-rust text-right">{error}</span>}
+        {error && <span className="font-body text-xs text-rust-ink text-right">{error}</span>}
       </div>
     );
   }
@@ -103,7 +103,7 @@ export function RescheduleSlotButton({
       >
         {submitting ? "Moving…" : "Move here"}
       </button>
-      {error && <span className="font-body text-xs text-rust">{error}</span>}
+      {error && <span className="font-body text-xs text-rust-ink">{error}</span>}
     </div>
   );
 }

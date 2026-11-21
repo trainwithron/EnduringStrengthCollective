@@ -20,7 +20,7 @@ export default async function YourCoachesPage() {
         <h1 className="font-display font-bold text-3xl uppercase leading-none">Your coaches</h1>
         <p className="font-body text-sm text-steel mt-2">Pick who you are training with. Each coach has their own space, and what you do in one is not shown in the others.</p>
         {failed && (
-          <p className="font-body text-sm text-rust mt-4" role="alert">
+          <p className="font-body text-sm text-rust-ink mt-4" role="alert">
             Some of your spaces could not be loaded. Reload the page to try again.
           </p>
         )}

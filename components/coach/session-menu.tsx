@@ -231,7 +231,7 @@ function SessionMenuPopup({ session, x, y, timezone, settled, onPick, onClose }:
           Client canceled
         </button>
         {canRemove && (
-          <button type="button" role="menuitem" className={`${item} text-rust`} onClick={() => pick("remove")}>
+          <button type="button" role="menuitem" className={`${item} text-rust-ink`} onClick={() => pick("remove")}>
             Remove
           </button>
         )}
@@ -306,7 +306,7 @@ function RescheduleDialog({ session, timezone, onClose, onDone }: { session: Men
 
   return (
     <DialogFrame label="Reschedule this session" busy={busy} onClose={onClose}>
-      <p className="font-display font-bold uppercase text-sm tracking-wide text-rust">Reschedule</p>
+      <p className="font-display font-bold uppercase text-sm tracking-wide text-rust-ink">Reschedule</p>
       <p className="font-display font-bold text-lg leading-tight text-chalk mt-2">{session.name}</p>
       <p className="font-body text-sm text-steel">Now {formatInTimezone(new Date(session.startMs), timezone, "dateTime")}</p>
       <div className="grid grid-cols-2 gap-2 mt-4">
@@ -325,7 +325,7 @@ function RescheduleDialog({ session, timezone, onClose, onDone }: { session: Men
       </div>
       <p className="font-body text-xs text-steel mt-2">It stays the same session: nothing is taken from or given back to their sessions. {session.name.split(" ")[0]} is told the new time.</p>
       {error && (
-        <p className="font-body text-xs text-rust mt-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-2" role="alert">
           {error}
         </p>
       )}
@@ -375,7 +375,7 @@ function ClientCanceledDialog({ session, timezone, onClose, onDone }: { session:
 
   return (
     <DialogFrame label="Client canceled" busy={busy} onClose={onClose}>
-      <p className="font-display font-bold uppercase text-sm tracking-wide text-rust">Client canceled</p>
+      <p className="font-display font-bold uppercase text-sm tracking-wide text-rust-ink">Client canceled</p>
       <p className="font-display font-bold text-lg leading-tight text-chalk mt-2">{session.name}</p>
       <p className="font-body text-sm text-chalk">{formatInTimezone(new Date(session.startMs), timezone, "dateTime")}</p>
       <p className="font-body text-sm text-steel mt-3">
@@ -383,7 +383,7 @@ function ClientCanceledDialog({ session, timezone, onClose, onDone }: { session:
         {session.seriesId ? " Only this one: the weekly schedule carries on." : ""}
       </p>
       {error && (
-        <p className="font-body text-xs text-rust mt-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-2" role="alert">
           {error}
         </p>
       )}
@@ -482,7 +482,7 @@ function DuplicateDialog({ session, timezone, onClose, onDone }: { session: Menu
   if (result) {
     return (
       <DialogFrame label="Duplicated" busy={false} onClose={onClose}>
-        <p className="font-display font-bold uppercase text-sm tracking-wide text-rust">Duplicated</p>
+        <p className="font-display font-bold uppercase text-sm tracking-wide text-rust-ink">Duplicated</p>
         <p className="font-body text-sm text-chalk mt-2" role="status">
           Booked {result.booked} {result.booked === 1 ? "session" : "sessions"} for {session.name}.
         </p>
@@ -507,7 +507,7 @@ function DuplicateDialog({ session, timezone, onClose, onDone }: { session: Menu
 
   return (
     <DialogFrame label="Duplicate this session" busy={busy} onClose={onClose}>
-      <p className="font-display font-bold uppercase text-sm tracking-wide text-rust">Duplicate</p>
+      <p className="font-display font-bold uppercase text-sm tracking-wide text-rust-ink">Duplicate</p>
       <p className="font-display font-bold text-lg leading-tight text-chalk mt-2">{session.name}</p>
       <p className="font-body text-sm text-steel">
         {formatInTimezone(new Date(session.startMs), timezone, "dateTime")}, {durationMinutes} min
@@ -541,7 +541,7 @@ function DuplicateDialog({ session, timezone, onClose, onDone }: { session: Menu
       {dateKey && timeLabel && <p className="font-body text-xs text-chalk mt-2">{duplicateSummary(dateKey, timeLabel, weeks)}</p>}
       <p className="font-body text-xs text-steel mt-1">Each one counts like any session you book. {first} gets one notice for all of them.</p>
       {error && (
-        <p className="font-body text-xs text-rust mt-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-2" role="alert">
           {error}
         </p>
       )}

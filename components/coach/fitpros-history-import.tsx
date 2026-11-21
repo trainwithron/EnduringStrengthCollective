@@ -202,7 +202,7 @@ export function FitprosHistoryImport({ athleteId, groupId, athleteName }: { athl
           </label>
 
           {layoutProblem && (
-            <p className="font-body text-sm text-rust mt-4" role="alert">
+            <p className="font-body text-sm text-rust-ink mt-4" role="alert">
               {layoutProblem}
             </p>
           )}
@@ -214,7 +214,7 @@ export function FitprosHistoryImport({ athleteId, groupId, athleteName }: { athl
               </p>
 
               {needsEarlierStart && firstDate && !moveStart && (
-                <p className="font-body text-sm text-rust" role="alert">
+                <p className="font-body text-sm text-rust-ink" role="alert">
                   These workouts start on {firstDate}, before the program starts{currentStart ? ` (${currentStart})` : ""}. Nothing before the start can be matched to a program day, so it will import as plain history. Tick the box below to move the start.
                 </p>
               )}
@@ -264,7 +264,7 @@ export function FitprosHistoryImport({ athleteId, groupId, athleteName }: { athl
                     {notInLibrary.map((name) => (
                       <li key={name} className="flex items-center gap-2">
                         <span>{name}</span>
-                        <button type="button" disabled={busy} onClick={() => void addToLibrary(name)} className="min-h-11 text-rust underline underline-offset-2 disabled:opacity-40">
+                        <button type="button" disabled={busy} onClick={() => void addToLibrary(name)} className="min-h-11 text-rust-ink underline underline-offset-2 disabled:opacity-40">
                           Add to library
                         </button>
                       </li>
@@ -285,7 +285,7 @@ export function FitprosHistoryImport({ athleteId, groupId, athleteName }: { athl
 
               {noSetsText && (
                 <div className="border border-rust/50 p-3 font-body text-sm" role="alert">
-                  <p className="text-rust">{noSetsText}</p>
+                  <p className="text-rust-ink">{noSetsText}</p>
                   <label className="flex items-start gap-2 min-h-11 cursor-pointer mt-1">
                     <input type="checkbox" checked={confirmedLayout} onChange={(e) => setConfirmedLayout(e.target.checked)} className="mt-1" />
                     <span>Import anyway</span>
@@ -301,7 +301,7 @@ export function FitprosHistoryImport({ athleteId, groupId, athleteName }: { athl
 
           {existing.length > 0 && (
             <div className="mt-4">
-              <button type="button" disabled={busy} onClick={() => void undo()} className="min-h-11 font-body text-sm text-rust underline underline-offset-2 disabled:opacity-40">
+              <button type="button" disabled={busy} onClick={() => void undo()} className="min-h-11 font-body text-sm text-rust-ink underline underline-offset-2 disabled:opacity-40">
                 Undo this import ({existing.length} workout{existing.length === 1 ? "" : "s"})
               </button>
             </div>
@@ -315,7 +315,7 @@ export function FitprosHistoryImport({ athleteId, groupId, athleteName }: { athl
         </p>
       )}
       {error && (
-        <p className="font-body text-sm text-rust mt-3" role="alert">
+        <p className="font-body text-sm text-rust-ink mt-3" role="alert">
           {error}
         </p>
       )}

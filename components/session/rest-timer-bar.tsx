@@ -412,7 +412,7 @@ export function RestTimerBar({
                           setPickerOpen(false);
                           setReadOpen(false);
                         }}
-                        className="w-full min-h-11 text-left px-3 font-body text-sm text-chalk active:text-rust"
+                        className="w-full min-h-11 text-left px-3 font-body text-sm text-chalk active:text-rust-ink"
                       >
                         {GAME_LABELS[key]}
                       </button>

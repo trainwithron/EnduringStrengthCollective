@@ -60,7 +60,7 @@ export function TemplateSuggestion({ text }: { text: string }) {
         {matches.length === 1 ? (
           <>
             <p className="font-body text-sm text-chalk">Use your template &lsquo;{matches[0].name}&rsquo; for this?</p>
-            <button type="button" onClick={() => setOpen(matches[0])} className="mt-2 min-h-11 px-4 border border-rust text-rust font-body text-sm">
+            <button type="button" onClick={() => setOpen(matches[0])} className="mt-2 min-h-11 px-4 border border-rust text-rust-ink font-body text-sm">
               Open template
             </button>
           </>
@@ -69,7 +69,7 @@ export function TemplateSuggestion({ text }: { text: string }) {
             <p className="font-body text-sm text-chalk">Which template?</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {matches.map((m) => (
-                <button key={m.id} type="button" onClick={() => setOpen(m)} className="min-h-11 px-4 border border-rust text-rust font-body text-sm">
+                <button key={m.id} type="button" onClick={() => setOpen(m)} className="min-h-11 px-4 border border-rust text-rust-ink font-body text-sm">
                   {m.name}
                 </button>
               ))}

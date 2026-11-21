@@ -61,7 +61,7 @@ export function CalendarSpotterPanel({
 
   return (
     <div className="border border-rust/40 bg-rust/5 p-4">
-      <p className="font-body text-xs text-rust uppercase tracking-wide font-medium mb-2">Calendar Spot</p>
+      <p className="font-body text-xs text-rust-ink uppercase tracking-wide font-medium mb-2">Calendar Spot</p>
       <div className="space-y-3">
         {visible.map((f) => {
           const id = `${f.athleteId}::${f.kind}`;
@@ -74,7 +74,7 @@ export function CalendarSpotterPanel({
                 {f.kind === "gap" && groupId && (
                   <Link
                     href={`/groups/${groupId}/messages/${f.athleteId}?draft=${encodeURIComponent(buildComeBackDraft(first))}`}
-                    className="shrink-0 h-9 px-3 border border-rust text-rust font-body text-xs inline-flex items-center"
+                    className="shrink-0 h-9 px-3 border border-rust text-rust-ink font-body text-xs inline-flex items-center"
                   >
                     Send a note
                   </Link>
@@ -115,7 +115,7 @@ export function CalendarSpotterPanel({
         })}
       </div>
       {error && (
-        <p className="font-body text-xs text-rust mt-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-2" role="alert">
           {error}
         </p>
       )}

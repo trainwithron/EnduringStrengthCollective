@@ -20,7 +20,7 @@ export function PrListToggle({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between font-display uppercase text-sm text-rust tracking-wide"
+        className="w-full flex items-center justify-between font-display uppercase text-sm text-rust-ink tracking-wide"
       >
         <span>
           New PR{items.length > 1 ? "s" : ""} 🎉 ({items.length})
@@ -35,7 +35,7 @@ export function PrListToggle({
               <p className="font-display text-lg uppercase">{pr.name}</p>
               <p className="font-body text-sm text-steel">
                 {pr.primary}
-                <span className="text-rust"> &middot; {pr.secondary}</span>
+                <span className="text-rust-ink"> &middot; {pr.secondary}</span>
               </p>
             </div>
           ))}

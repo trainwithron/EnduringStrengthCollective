@@ -40,7 +40,7 @@ export function ParqFlagNotice({ athleteId, coachId, flagged }: { athleteId: str
       <p className="font-body text-sm text-chalk">Health screening: {flagged} flagged. What do you decide?</p>
       <div className="flex flex-wrap gap-2">
         {COACH_DECISIONS.map((d) => (
-          <button key={d} type="button" disabled={busy} onClick={() => void decide(d)} className="min-h-11 px-3 border border-rust/50 font-body text-sm text-rust disabled:opacity-40">
+          <button key={d} type="button" disabled={busy} onClick={() => void decide(d)} className="min-h-11 px-3 border border-rust/50 font-body text-sm text-rust-ink disabled:opacity-40">
             {DECISION_BUTTON[d]}
           </button>
         ))}
@@ -55,7 +55,7 @@ export function ParqFlagNotice({ athleteId, coachId, flagged }: { athleteId: str
         className="w-full h-11 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
       />
       {error && (
-        <p className="w-full font-body text-xs text-rust" role="alert">
+        <p className="w-full font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

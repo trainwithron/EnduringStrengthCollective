@@ -83,7 +83,7 @@ export function WorkoutCardExpanded({ postId }: { postId: string }) {
   }
 
   if (error) {
-    return <p className="font-body text-xs text-rust mt-3">{error}</p>;
+    return <p className="font-body text-xs text-rust-ink mt-3">{error}</p>;
   }
   if (!data) {
     return <p className="font-body text-xs text-steel mt-3">Loading…</p>;
@@ -99,7 +99,7 @@ export function WorkoutCardExpanded({ postId }: { postId: string }) {
         ref={cardRef}
         className="border border-rust/40 bg-surface p-6 text-center"
       >
-        <p className="font-display uppercase text-xs tracking-[0.2em] text-rust">
+        <p className="font-display uppercase text-xs tracking-[0.2em] text-rust-ink">
           {exporting ? data.publicGroupName : data.groupName}
         </p>
         <h3 className="font-display font-bold text-2xl uppercase leading-tight mt-3">
@@ -116,10 +116,10 @@ export function WorkoutCardExpanded({ postId }: { postId: string }) {
               {weightUnitLabel(weightUnit)} total volume &middot; {data.totalSetsCompleted} sets
             </p>
             {volumeEquivalence && (
-              <p className="font-body text-sm text-rust mt-2">{volumeEquivalence.text}</p>
+              <p className="font-body text-sm text-rust-ink mt-2">{volumeEquivalence.text}</p>
             )}
             {data.weekStreak >= 2 && (
-              <p className="font-body text-sm text-rust mt-1">🔥 {data.weekStreak} week streak</p>
+              <p className="font-body text-sm text-rust-ink mt-1">🔥 {data.weekStreak} week streak</p>
             )}
           </div>
         )}
@@ -127,7 +127,7 @@ export function WorkoutCardExpanded({ postId }: { postId: string }) {
         {data.relativeStrengthMilestones.length > 0 && (
           <div className="mt-4 space-y-1">
             {data.relativeStrengthMilestones.map((m) => (
-              <p key={m.exerciseName} className="font-display text-base text-rust leading-tight">
+              <p key={m.exerciseName} className="font-display text-base text-rust-ink leading-tight">
                 💪 {m.multiple}&times; bodyweight {m.exerciseName}!
               </p>
             ))}
@@ -135,7 +135,7 @@ export function WorkoutCardExpanded({ postId }: { postId: string }) {
         )}
 
         {data.compoundCelebration && (
-          <p className="font-display text-base text-rust mt-4 leading-snug">
+          <p className="font-display text-base text-rust-ink mt-4 leading-snug">
             {data.compoundCelebration}
           </p>
         )}
@@ -162,7 +162,7 @@ export function WorkoutCardExpanded({ postId }: { postId: string }) {
 
         {data.celebratePrs.length > 0 && (
           <div className="mt-4 pt-4 border-t border-steel/20">
-            <p className="font-body text-xs text-rust uppercase tracking-wide mb-2">
+            <p className="font-body text-xs text-rust-ink uppercase tracking-wide mb-2">
               New PRs
             </p>
             <div className="space-y-1">
@@ -184,7 +184,7 @@ export function WorkoutCardExpanded({ postId }: { postId: string }) {
               {data.baselinePrs.map((p) => p.name).join(", ")}
             </p>
             {data.totalWorkoutCount != null && data.celebratePrs.length === 0 && (
-              <p className="font-body text-sm text-rust mt-2">
+              <p className="font-body text-sm text-rust-ink mt-2">
                 💪 Workout #{data.totalWorkoutCount} in the books
               </p>
             )}

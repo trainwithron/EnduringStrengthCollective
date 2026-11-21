@@ -76,7 +76,7 @@ export function DispatchSettings({
         <button
           type="button"
           onClick={handleCopy}
-          className="h-9 px-3 flex items-center gap-1.5 border border-steel/30 text-steel font-body text-xs active:text-rust"
+          className="h-9 px-3 flex items-center gap-1.5 border border-steel/30 text-steel font-body text-xs active:text-rust-ink"
         >
           {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
           {copied ? "Copied" : "Copy"}
@@ -99,7 +99,7 @@ export function DispatchSettings({
         <span className="font-body text-xs text-steel">minutes before moving to the next coach</span>
       </label>
       {ttlError && (
-        <p className="font-body text-xs text-rust mt-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-2" role="alert">
           {ttlError}
         </p>
       )}

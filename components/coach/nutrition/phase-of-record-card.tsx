@@ -58,7 +58,7 @@ export function PhaseOfRecordCard({
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="font-display font-bold text-sm uppercase tracking-wide text-steel">Phase</h3>
         {!editing && (
-          <button type="button" onClick={() => setEditing(true)} className="font-body text-xs text-rust">
+          <button type="button" onClick={() => setEditing(true)} className="font-body text-xs text-rust-ink">
             {current ? "Change" : "Set a phase"}
           </button>
         )}
@@ -122,7 +122,7 @@ export function PhaseOfRecordCard({
               Review date (optional)
               <input type="date" value={reviewOn} min={todayKey} onChange={(e) => setReviewOn(e.target.value)} className={`${selectClass} block mt-1`} />
             </label>
-            <div className="flex flex-wrap gap-3 mt-1 font-body text-xs text-rust">
+            <div className="flex flex-wrap gap-3 mt-1 font-body text-xs text-rust-ink">
               <button type="button" onClick={() => setReviewOn(addDaysToKey(todayKey, 7))}>In 1 week</button>
               <button type="button" onClick={() => setReviewOn(suggestedReviewDate(todayKey))}>In 2 weeks</button>
               <button type="button" onClick={() => setReviewOn("")} className="text-steel">No review</button>
@@ -132,7 +132,7 @@ export function PhaseOfRecordCard({
             <p className="font-body text-xs text-steel">Changing the phase starts a new one from today and updates the milestone tag.</p>
           )}
           {error && (
-            <p className="font-body text-xs text-rust" role="alert">
+            <p className="font-body text-xs text-rust-ink" role="alert">
               {error}
             </p>
           )}

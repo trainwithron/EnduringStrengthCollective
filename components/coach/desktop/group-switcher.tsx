@@ -339,7 +339,7 @@ export function GroupSwitcher({
             </div>
             <div className="border-t border-steel/20 p-2.5">
               {error && (
-                <p className="font-body text-xs text-rust mb-1.5" role="alert">
+                <p className="font-body text-xs text-rust-ink mb-1.5" role="alert">
                   {error}
                 </p>
               )}
@@ -417,7 +417,7 @@ export function GroupSwitcher({
               setNameDraft(groupName);
               setEditingName(true);
             }}
-            className="opacity-0 group-hover:opacity-100 text-steel active:text-rust shrink-0"
+            className="opacity-0 group-hover:opacity-100 text-steel active:text-rust-ink shrink-0"
             aria-label="Rename group"
           >
             <Pencil className="w-3.5 h-3.5" />
@@ -460,7 +460,7 @@ export function GroupSwitcher({
                           onClick={() => switchTo(g.id)}
                           disabled={switching}
                           className={`flex-1 min-w-0 text-left px-3 py-2.5 font-body text-sm disabled:opacity-50 ${
-                            g.id === groupId ? "text-rust" : "text-chalk"
+                            g.id === groupId ? "text-rust-ink" : "text-chalk"
                           }`}
                         >
                           {editingTagFor === g.id ? (
@@ -506,7 +506,7 @@ export function GroupSwitcher({
                                 setTagDraft(g.focusTag ?? "");
                                 setEditingTagFor(g.id);
                               }}
-                              className="opacity-0 group-hover:opacity-100 shrink-0 px-2 text-steel active:text-rust"
+                              className="opacity-0 group-hover:opacity-100 shrink-0 px-2 text-steel active:text-rust-ink"
                               aria-label={`Tag ${g.name}`}
                             >
                               <Pencil className="w-3 h-3" />
@@ -524,7 +524,7 @@ export function GroupSwitcher({
           </div>
           <div className="border-t border-steel/20 p-2.5">
             {error && (
-              <p className="font-body text-xs text-rust mb-1.5" role="alert">
+              <p className="font-body text-xs text-rust-ink mb-1.5" role="alert">
                 {error}
               </p>
             )}

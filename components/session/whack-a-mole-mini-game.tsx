@@ -123,9 +123,9 @@ export function WhackAMoleMiniGame({
         <span>
           Score: <span className="text-chalk">{score}</span> · Best:{" "}
           <span className="text-chalk">{highScore}</span> · Misses:{" "}
-          <span className="text-rust">{misses}</span>
+          <span className="text-rust-ink">{misses}</span>
         </span>
-        <button type="button" onClick={onClose} className="text-steel active:text-rust transition-colors">
+        <button type="button" onClick={onClose} className="text-steel active:text-rust-ink transition-colors">
           Close ✕
         </button>
       </div>

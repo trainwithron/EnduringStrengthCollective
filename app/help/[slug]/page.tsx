@@ -46,7 +46,7 @@ export default async function HelpArticlePage(props: { params: Promise<{ slug: s
         ))}
       </article>
       <p className="font-body text-sm mt-8">
-        <Link href="/help" className="text-rust underline underline-offset-2">
+        <Link href="/help" className="text-rust-ink underline underline-offset-2">
           All help articles
         </Link>
       </p>

@@ -99,7 +99,7 @@ describe("vitamins and minerals with the food log", () => {
     const html = render(datesEndingOn(TODAY, 6).flatMap((d) => day(d, 300)));
     expect(html).toContain("bg-moss");
     expect(html).not.toContain("bg-rust");
-    expect(html).not.toContain("text-rust");
+    expect(html).not.toContain("text-rust-ink");
     expect(html).not.toContain("bg-red");
   });
   it("updates the moment another food is logged, from the same past days", () => {

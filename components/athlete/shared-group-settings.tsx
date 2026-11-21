@@ -67,7 +67,7 @@ export function SharedGroupSettings({ groupId, groupName, initialShares, allowSh
         </span>
       </label>
       {error && (
-        <p className="font-body text-xs text-rust mt-1" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-1" role="alert">
           {error}
         </p>
       )}
@@ -80,7 +80,7 @@ export function SharedGroupSettings({ groupId, groupName, initialShares, allowSh
           <p className="font-body text-sm text-chalk">Leave {groupName}?</p>
           <p className="font-body text-xs text-steel mt-0.5">You stop seeing its feed and chat, and your workout cards come off its feed. Your own training is not changed.</p>
           <div className="mt-2 flex gap-3">
-            <button type="button" disabled={busy} onClick={() => void leave()} className="min-h-11 border border-rust/60 px-4 font-body text-sm text-rust disabled:opacity-40">
+            <button type="button" disabled={busy} onClick={() => void leave()} className="min-h-11 border border-rust/60 px-4 font-body text-sm text-rust-ink disabled:opacity-40">
               {busy ? "Leaving…" : "Leave"}
             </button>
             <button type="button" disabled={busy} onClick={() => setLeaveAsked(false)} className="min-h-11 px-4 font-body text-sm text-steel">

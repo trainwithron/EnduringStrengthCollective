@@ -46,18 +46,18 @@ export default async function TeamActivityPage(props: { params: Promise<{ groupI
           What each coach has done in the period. A session counts when it was confirmed, its time has passed and it was not a no-show. Clients who keep their records private from the organization are not counted.
         </p>
         <p className="font-body text-xs mt-2">
-          <Link href={`/groups/${params.groupId}/branding?tab=team`} className="text-rust">
+          <Link href={`/groups/${params.groupId}/branding?tab=team`} className="text-rust-ink">
             &larr; Back to the team
           </Link>
         </p>
       </div>
       {activity.failed && (
-        <p className="font-body text-sm text-rust mb-4" role="alert">
+        <p className="font-body text-sm text-rust-ink mb-4" role="alert">
           Some of this could not be read, so the numbers below may be too low. Reload the page to try again.
         </p>
       )}
       {activity.truncated && (
-        <p className="font-body text-sm text-rust mb-4" role="alert">
+        <p className="font-body text-sm text-rust-ink mb-4" role="alert">
           This period has more than the page can show. Choose a shorter period.
         </p>
       )}

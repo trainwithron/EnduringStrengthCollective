@@ -60,7 +60,7 @@ export function MyFoodsPanel({ athleteId, groupId, logDate, onLogged }: { athlet
     return (
       // A tile in the row of three (Look Refresh, Nov 20); the list opens full width under the row.
       <button type="button" onClick={() => setOpen(true)} aria-label="My foods and saved meals" className={LOG_TILE_CLASS}>
-        <Bookmark className="w-[22px] h-[22px] text-rust" aria-hidden="true" />
+        <Bookmark className="w-[22px] h-[22px] text-rust-ink" aria-hidden="true" />
         My foods
       </button>
     );
@@ -100,13 +100,13 @@ export function MyFoodsPanel({ athleteId, groupId, logDate, onLogged }: { athlet
               </select>
             </label>
           </div>
-          {notice && <p className="font-body text-xs text-rust" role="status">{notice}</p>}
-          {loadError && <p className="font-body text-xs text-rust" role="alert">Couldn&apos;t load your foods. Try again in a moment.</p>}
+          {notice && <p className="font-body text-xs text-rust-ink" role="status">{notice}</p>}
+          {loadError && <p className="font-body text-xs text-rust-ink" role="alert">Couldn&apos;t load your foods. Try again in a moment.</p>}
 
           <section>
             <div className="flex items-center justify-between gap-2">
               <h3 className="font-display uppercase text-xs tracking-wide text-steel">My foods</h3>
-              <button type="button" onClick={() => setEditing("new")} className="min-h-[44px] px-2 font-body text-xs text-rust underline">
+              <button type="button" onClick={() => setEditing("new")} className="min-h-[44px] px-2 font-body text-xs text-rust-ink underline">
                 Add a food
               </button>
             </div>
@@ -193,8 +193,8 @@ function CustomFoodRowItem({ food, athleteId, groupId, logDate, slot, onLogged, 
         <button type="button" onClick={onEdit} className="min-h-[44px] px-2 font-body text-xs text-steel underline">Edit</button>
         <button type="button" onClick={remove} disabled={busy} className="min-h-[44px] px-2 font-body text-xs text-steel underline disabled:opacity-50">Delete</button>
       </div>
-      {(problem && qty !== "") && <p className="font-body text-xs text-rust">{problem}</p>}
-      {error && <p className="font-body text-xs text-rust" role="alert">{error}</p>}
+      {(problem && qty !== "") && <p className="font-body text-xs text-rust-ink">{problem}</p>}
+      {error && <p className="font-body text-xs text-rust-ink" role="alert">{error}</p>}
     </li>
   );
 }
@@ -250,8 +250,8 @@ function SavedMealRowItem({ meal, athleteId, groupId, logDate, slot, onLogged, o
         </button>
         <button type="button" onClick={remove} disabled={busy} className="min-h-[44px] px-2 font-body text-xs text-steel underline disabled:opacity-50">Delete</button>
       </div>
-      {(problem && servings !== "") && <p className="font-body text-xs text-rust">{problem}</p>}
-      {error && <p className="font-body text-xs text-rust" role="alert">{error}</p>}
+      {(problem && servings !== "") && <p className="font-body text-xs text-rust-ink">{problem}</p>}
+      {error && <p className="font-body text-xs text-rust-ink" role="alert">{error}</p>}
     </li>
   );
 }

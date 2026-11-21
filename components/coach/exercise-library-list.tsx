@@ -424,7 +424,7 @@ export function ExerciseLibraryList({
             type="button"
             onClick={() => handleSuggestTags(ex.name, ex.name)}
             disabled={suggestingKey === ex.name}
-            className="font-body text-xs text-rust uppercase tracking-wide disabled:opacity-40"
+            className="font-body text-xs text-rust-ink uppercase tracking-wide disabled:opacity-40"
           >
             {suggestingKey === ex.name ? "Asking AI…" : "✨ Suggest tags (AI)"}
           </button>
@@ -433,7 +433,7 @@ export function ExerciseLibraryList({
           {breakdown?.summary ?? "No biomechanical tags added yet."}
         </p>
         {suggestionError && (
-          <p className="font-body text-xs text-rust mb-2">{suggestionError}</p>
+          <p className="font-body text-xs text-rust-ink mb-2">{suggestionError}</p>
         )}
         {(pendingSuggestions[ex.name]?.length ?? 0) > 0 && (
           <div className="border border-rust/30 bg-rust/5 px-3 py-2 mb-2">
@@ -444,7 +444,7 @@ export function ExerciseLibraryList({
               <button
                 type="button"
                 onClick={() => acceptAllSuggestedTags(ex.name)}
-                className="font-body text-xs text-rust uppercase tracking-wide font-bold"
+                className="font-body text-xs text-rust-ink uppercase tracking-wide font-bold"
               >
                 Accept all
               </button>
@@ -455,7 +455,7 @@ export function ExerciseLibraryList({
                   key={s.tagId}
                   type="button"
                   onClick={() => acceptSuggestedTag(ex.name, s.tagId, s.role)}
-                  className="h-6 px-2 border border-steel/30 text-chalk font-body text-xs active:border-rust active:text-rust"
+                  className="h-6 px-2 border border-steel/30 text-chalk font-body text-xs active:border-rust active:text-rust-ink"
                 >
                   {s.label} · {s.role === "prime_mover" ? "Prime mover" : "Stabilizer"}
                 </button>
@@ -522,7 +522,7 @@ export function ExerciseLibraryList({
         </label>
         <span className="font-body text-xs text-steel">{TIER_KEY}</span>
         {filtersActive(filters) && (
-          <button type="button" onClick={() => setFilters(NO_FILTERS)} className="min-h-10 px-2 font-body text-xs text-rust">
+          <button type="button" onClick={() => setFilters(NO_FILTERS)} className="min-h-10 px-2 font-body text-xs text-rust-ink">
             Clear filters
           </button>
         )}
@@ -596,7 +596,7 @@ export function ExerciseLibraryList({
         </button>
       </div>
       {nameProblem && (
-        <p className="font-body text-xs text-rust mt-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-2" role="alert">
           {nameProblem}
         </p>
       )}
@@ -616,7 +616,7 @@ export function ExerciseLibraryList({
               type="button"
               onClick={() => handleSuggestTags(newName, "new")}
               disabled={suggestingKey === "new"}
-              className="font-body text-xs text-rust uppercase tracking-wide disabled:opacity-40"
+              className="font-body text-xs text-rust-ink uppercase tracking-wide disabled:opacity-40"
             >
               {suggestingKey === "new" ? "Asking AI…" : "✨ Suggest tags (AI)"}
             </button>
@@ -631,7 +631,7 @@ export function ExerciseLibraryList({
                   }))
                 ).summary}
           </p>
-          {suggestionError && <p className="font-body text-xs text-rust mb-2">{suggestionError}</p>}
+          {suggestionError && <p className="font-body text-xs text-rust-ink mb-2">{suggestionError}</p>}
           <BiomechTagPicker
             vocabulary={biomechVocabulary}
             selected={newTags}
@@ -650,7 +650,7 @@ export function ExerciseLibraryList({
           {exercises.length - withVideoCount > 0 && (
             <>
               {" "}
-              <button type="button" onClick={() => setOnlyWithoutVideo((v) => !v)} aria-pressed={onlyWithoutVideo} className="text-rust underline underline-offset-2">
+              <button type="button" onClick={() => setOnlyWithoutVideo((v) => !v)} aria-pressed={onlyWithoutVideo} className="text-rust-ink underline underline-offset-2">
                 {onlyWithoutVideo ? "Show all exercises" : "Show only those without a video"}
               </button>
             </>
@@ -740,7 +740,7 @@ export function ExerciseLibraryList({
                       <Link
                         href={`/groups/${groupId}/games/${ex.id}`}
                         aria-label={`Leaderboard for ${ex.name}`}
-                        className="w-8 h-8 flex items-center justify-center text-steel active:text-rust transition-colors"
+                        className="w-8 h-8 flex items-center justify-center text-steel active:text-rust-ink transition-colors"
                       >
                         <Trophy className="w-4 h-4" />
                       </Link>
@@ -748,7 +748,7 @@ export function ExerciseLibraryList({
                       <button
                         type="button"
                         onClick={() => setExpandedId((prev) => (prev === ex.id ? null : ex.id))}
-                        className="font-body text-xs text-rust"
+                        className="font-body text-xs text-rust-ink"
                       >
                         {expandedId === ex.id ? "Close" : "Edit"}
                       </button>
@@ -756,7 +756,7 @@ export function ExerciseLibraryList({
                         type="button"
                         onClick={() => handleDelete(ex.id)}
                         aria-label={`Delete ${ex.name}`}
-                        className="w-8 h-8 flex items-center justify-center text-steel active:text-rust transition-colors"
+                        className="w-8 h-8 flex items-center justify-center text-steel active:text-rust-ink transition-colors"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>

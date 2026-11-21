@@ -27,7 +27,7 @@ export default async function PrPromotionPage(props: { params: Promise<{ id: str
     return (
       <main className="min-h-screen bg-graphite text-chalk px-5 py-10 max-w-md mx-auto">
         <p className="font-body text-sm text-steel">We couldn&apos;t find that.</p>
-        <Link href="/" className="inline-block mt-4 min-h-11 font-body text-sm text-rust underline underline-offset-2">
+        <Link href="/" className="inline-block mt-4 min-h-11 font-body text-sm text-rust-ink underline underline-offset-2">
           Go home
         </Link>
       </main>
@@ -48,7 +48,7 @@ export default async function PrPromotionPage(props: { params: Promise<{ id: str
       ) : (
         <p className="font-body text-sm text-steel mt-6">{promo.status === "agreed" ? "It counts as a PR now." : "You said not now."}</p>
       )}
-      <Link href={`/groups/${promo.group_id}`} className="inline-block mt-6 min-h-11 font-body text-sm text-rust underline underline-offset-2">
+      <Link href={`/groups/${promo.group_id}`} className="inline-block mt-6 min-h-11 font-body text-sm text-rust-ink underline underline-offset-2">
         Back
       </Link>
     </main>

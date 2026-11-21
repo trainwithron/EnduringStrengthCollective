@@ -44,7 +44,7 @@ function Tile({ label, value, warn }: { label: string; value: string; warn?: boo
       }`}
     >
       <p className="font-body text-xs text-steel uppercase tracking-wide">{label}</p>
-      <p className={`font-display text-lg leading-none mt-1 truncate ${warn ? "text-rust" : ""}`}>{value}</p>
+      <p className={`font-display text-lg leading-none mt-1 truncate ${warn ? "text-rust-ink" : ""}`}>{value}</p>
     </div>
   );
 }
@@ -145,7 +145,7 @@ export function TheSpotRail({
                     .
                   </p>
                 ) : credits.balance <= 1 ? (
-                  <p className="font-body text-xs text-rust">
+                  <p className="font-body text-xs text-rust-ink">
                     Low on credits with no active membership — worth a check-in before their next session.
                   </p>
                 ) : null}
@@ -170,7 +170,7 @@ export function TheSpotRail({
               <div className="space-y-3">
                 <p className="font-body text-sm text-chalk">
                   PAR-Q+ & waiver:{" "}
-                  <span className={waiver.completed ? "text-chalk" : "text-rust"}>
+                  <span className={waiver.completed ? "text-chalk" : "text-rust-ink"}>
                     {waiver.completed ? "Signed" : "Not yet completed"}
                   </span>
                 </p>

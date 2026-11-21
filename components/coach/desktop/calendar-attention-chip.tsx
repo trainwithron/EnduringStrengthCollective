@@ -89,7 +89,7 @@ export function CalendarAttentionChip({ items }: { items: AttentionItem[] }) {
           <ul className="divide-y divide-steel/15">
             {shown.map((i) => (
               <li key={i.key} className="py-2 flex items-start justify-between gap-2">
-                <Link href={i.href} className="font-body text-xs text-chalk hover:text-rust min-w-0 flex-1">
+                <Link href={i.href} className="font-body text-xs text-chalk hover:text-rust-ink min-w-0 flex-1">
                   {i.label}
                 </Link>
                 <button
@@ -104,11 +104,11 @@ export function CalendarAttentionChip({ items }: { items: AttentionItem[] }) {
             ))}
           </ul>
           {remaining > 0 && (
-            <button type="button" onClick={() => setPage((p) => p + 1)} className="my-2 font-body text-xs text-rust underline underline-offset-2">
+            <button type="button" onClick={() => setPage((p) => p + 1)} className="my-2 font-body text-xs text-rust-ink underline underline-offset-2">
               Show {Math.min(3, remaining)} more ({remaining} left)
             </button>
           )}
-          {error && <p className="font-body text-xs text-rust pb-2">{error}</p>}
+          {error && <p className="font-body text-xs text-rust-ink pb-2">{error}</p>}
         </div>
       )}
     </div>

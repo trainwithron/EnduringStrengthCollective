@@ -78,11 +78,11 @@ export function GuardianConsentForm({ token, childName, coachName, signed }: { t
         </p>
         {done && <pre className="font-body text-xs whitespace-pre-wrap border border-steel/20 p-4 mt-5">{done.text}</pre>}
         {error && (
-          <p className="font-body text-sm text-rust mt-4" role="alert">
+          <p className="font-body text-sm text-rust-ink mt-4" role="alert">
             {error}
           </p>
         )}
-        <button type="button" onClick={withdraw} disabled={busy} className="mt-6 font-body text-sm text-rust underline disabled:opacity-40">
+        <button type="button" onClick={withdraw} disabled={busy} className="mt-6 font-body text-sm text-rust-ink underline disabled:opacity-40">
           Withdraw my permission
         </button>
       </div>
@@ -139,7 +139,7 @@ export function GuardianConsentForm({ token, childName, coachName, signed }: { t
           <span>I know I may refuse to sign, and that I can take back my permission later.</span>
         </label>
         {error && (
-          <p className="font-body text-sm text-rust" role="alert">
+          <p className="font-body text-sm text-rust-ink" role="alert">
             {error}
           </p>
         )}

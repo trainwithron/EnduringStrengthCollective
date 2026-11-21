@@ -42,14 +42,14 @@ export function DashboardHero({
     return (
       <div className="border border-rust/40 bg-rust/5 p-5">
         <div className="flex items-center gap-2 mb-2">
-          <p className="font-body text-xs text-rust uppercase tracking-wide font-bold">Right now</p>
+          <p className="font-body text-xs text-rust-ink uppercase tracking-wide font-bold">Right now</p>
           {flag.orgName && (
             <p className="font-body text-xs text-steel uppercase tracking-wide">— {flag.orgName}</p>
           )}
         </div>
         <p className="font-body text-lg text-chalk mb-3">{sentenceFor(flag)}</p>
         <div className="flex items-center gap-4">
-          <Link href={flag.href} className="font-body text-sm text-rust font-medium">
+          <Link href={flag.href} className="font-body text-sm text-rust-ink font-medium">
             View {flag.athleteName.split(" ")[0]}&apos;s profile →
           </Link>
           {flag.kind === "quiet_client" && (
@@ -66,7 +66,7 @@ export function DashboardHero({
         <p className="font-body text-xs text-steel uppercase tracking-wide font-bold mb-2">Right now</p>
         <p className="font-body text-lg text-chalk">{emptyState.text}</p>
         {emptyState.href && (
-          <Link href={emptyState.href} className="font-body text-sm text-rust font-medium mt-3 inline-block">
+          <Link href={emptyState.href} className="font-body text-sm text-rust-ink font-medium mt-3 inline-block">
             View profile →
           </Link>
         )}

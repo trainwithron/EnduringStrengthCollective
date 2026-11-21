@@ -259,7 +259,7 @@ function SetPasswordForm() {
         </p>
 
         {error && (
-          <p className="font-body text-sm text-rust mt-3" role="alert">
+          <p className="font-body text-sm text-rust-ink mt-3" role="alert">
             {error}
           </p>
         )}

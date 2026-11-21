@@ -101,7 +101,7 @@ export function AvailabilityManager({
               type="button"
               onClick={() => handleDelete(w.id)}
               aria-label="Delete window"
-              className="w-9 h-9 flex items-center justify-center text-steel active:text-rust transition-colors"
+              className="w-9 h-9 flex items-center justify-center text-steel active:text-rust-ink transition-colors"
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -169,7 +169,7 @@ export function AvailabilityManager({
             Add
           </button>
         </div>
-        {error && <p className="font-body text-xs text-rust">{error}</p>}
+        {error && <p className="font-body text-xs text-rust-ink">{error}</p>}
       </div>
     </div>
   );

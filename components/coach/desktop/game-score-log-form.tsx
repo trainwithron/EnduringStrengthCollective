@@ -88,7 +88,7 @@ export function GameScoreLogForm({
       >
         {submitting ? "Logging…" : "Log score"}
       </button>
-      {error && <span className="font-body text-xs text-rust">{error}</span>}
+      {error && <span className="font-body text-xs text-rust-ink">{error}</span>}
     </div>
   );
 }

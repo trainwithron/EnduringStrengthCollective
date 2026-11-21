@@ -62,7 +62,7 @@ export function AiOutputWrongButton({ action, referenceId }: { action: AiRefundA
   }
 
   if (status === "error") {
-    return <p className="font-body text-xs text-rust">Couldn&apos;t refund — try again.</p>;
+    return <p className="font-body text-xs text-rust-ink">Couldn&apos;t refund — try again.</p>;
   }
 
   // "refunded" or "already-refunded" — either way the credit is back

@@ -54,14 +54,14 @@ export function OrgNotificationsPanel({ initialNotifications }: { initialNotific
               onClick={() => dismiss(n.id)}
               className="min-w-0 flex-1 group"
             >
-              <p className="font-body text-sm text-chalk group-active:text-rust">{n.body}</p>
+              <p className="font-body text-sm text-chalk group-active:text-rust-ink">{n.body}</p>
             </Link>
             <button
               type="button"
               onClick={() => dismiss(n.id)}
               disabled={dismissingId === n.id}
               aria-label="Dismiss"
-              className="shrink-0 text-steel active:text-rust transition-colors disabled:opacity-40"
+              className="shrink-0 text-steel active:text-rust-ink transition-colors disabled:opacity-40"
             >
               <X className="w-4 h-4" />
             </button>

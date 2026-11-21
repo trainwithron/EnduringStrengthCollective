@@ -140,7 +140,7 @@ export function ProgressLookPanel({ groupIds: scopeGroupIds }: { groupIds?: stri
                   ))}
                 </select>
                 <span>same-load sessions</span>
-                <button type="button" onClick={saveThreshold} className="h-10 px-3 border border-rust text-rust text-sm">
+                <button type="button" onClick={saveThreshold} className="h-10 px-3 border border-rust text-rust-ink text-sm">
                   Save
                 </button>
                 <button type="button" onClick={() => setEditing(false)} className="h-10 px-3 text-steel text-sm">
@@ -311,7 +311,7 @@ export function ProgressCardView({
         <button type="button" disabled={busy} onClick={deliberate} className={`${btn} border-steel/30 text-chalk`}>
           Yes, deliberate
         </button>
-        <button type="button" disabled={busy} onClick={() => setOptionsOpen((v) => !v)} aria-expanded={optionsOpen} className={`${btn} border-rust text-rust`}>
+        <button type="button" disabled={busy} onClick={() => setOptionsOpen((v) => !v)} aria-expanded={optionsOpen} className={`${btn} border-rust text-rust-ink`}>
           Show me options
         </button>
         <button type="button" disabled={busy} onClick={notNow} className={`${btn} border-steel/30 text-steel`}>
@@ -360,7 +360,7 @@ export function ProgressCardView({
                         className="w-20 h-11 bg-graphite border border-steel/30 text-chalk px-2 font-body text-base sm:text-sm"
                       />
                     )}
-                    <button type="button" disabled={busy} onClick={() => apply(o)} className={`${btn} border-rust text-rust`}>
+                    <button type="button" disabled={busy} onClick={() => apply(o)} className={`${btn} border-rust text-rust-ink`}>
                       Apply
                     </button>
                   </div>
@@ -374,7 +374,7 @@ export function ProgressCardView({
                       aria-label={`${o.label}, wording`}
                       className="w-full bg-graphite border border-steel/30 text-chalk px-2 py-1.5 font-body text-base sm:text-sm"
                     />
-                    <button type="button" disabled={busy} onClick={() => apply(o)} className={`${btn} border-rust text-rust`}>
+                    <button type="button" disabled={busy} onClick={() => apply(o)} className={`${btn} border-rust text-rust-ink`}>
                       Apply to their next workout
                     </button>
                   </div>
@@ -388,20 +388,20 @@ export function ProgressCardView({
             ))}
           </ul>
           {message && (
-            <p className="font-body text-xs text-rust" role="alert">
+            <p className="font-body text-xs text-rust-ink" role="alert">
               {message}
             </p>
           )}
         </div>
       )}
       {!optionsOpen && message && (
-        <p className="font-body text-xs text-rust mt-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-2" role="alert">
           {message}
         </p>
       )}
 
       <div className="mt-3 flex flex-wrap items-center gap-3 font-body text-xs">
-        <Link prefetch={false} href={`/groups/${card.groupId}/messages/${card.athleteId}?draft=${encodeURIComponent(noteDraft)}`} className="text-rust underline">
+        <Link prefetch={false} href={`/groups/${card.groupId}/messages/${card.athleteId}?draft=${encodeURIComponent(noteDraft)}`} className="text-rust-ink underline">
           Draft a note to {first || "them"}
         </Link>
         <Link prefetch={false} href={`/groups/${card.groupId}/calendar?client=${card.athleteId}&scheduleFor=${card.athleteId}`} className="text-steel underline">

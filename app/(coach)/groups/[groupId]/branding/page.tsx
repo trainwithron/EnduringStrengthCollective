@@ -272,7 +272,7 @@ export default async function BrandingPage(
           </div>
 
           {teamInfo?.failed && (
-            <p className="font-body text-xs text-rust mb-4" role="alert">
+            <p className="font-body text-xs text-rust-ink mb-4" role="alert">
               Some of this list could not be read, so the client counts may be low. Reload to try again.
             </p>
           )}
@@ -288,7 +288,7 @@ export default async function BrandingPage(
           />
 
           {frontDeskError ? (
-            <p className="font-body text-xs text-rust mb-4" role="alert">
+            <p className="font-body text-xs text-rust-ink mb-4" role="alert">
               The front desk list could not be read. Reload to try again.
             </p>
           ) : (
@@ -313,7 +313,7 @@ export default async function BrandingPage(
           </div>
 
           <p className="font-body text-xs text-steel">
-            <Link href={`/groups/${params.groupId}/revenue-splits`} className="text-rust">
+            <Link href={`/groups/${params.groupId}/revenue-splits`} className="text-rust-ink">
               View Revenue Splits →
             </Link>
           </p>

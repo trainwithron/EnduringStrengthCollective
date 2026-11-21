@@ -65,7 +65,7 @@ export function PastAiNotes({ athleteId, groupId }: { athleteId: string; groupId
                     aria-label={`Note ${i + 1}`}
                     className="flex-1 min-w-0 h-11 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust"
                   />
-                  <button type="button" onClick={() => void save(bullets.filter((_, j) => j !== i))} aria-label={`Delete note ${i + 1}`} className="w-11 h-11 flex items-center justify-center text-steel active:text-rust">
+                  <button type="button" onClick={() => void save(bullets.filter((_, j) => j !== i))} aria-label={`Delete note ${i + 1}`} className="w-11 h-11 flex items-center justify-center text-steel active:text-rust-ink">
                     ×
                   </button>
                 </li>
@@ -93,7 +93,7 @@ export function PastAiNotes({ athleteId, groupId }: { athleteId: string; groupId
             </p>
           )}
           {error && (
-            <p className="font-body text-xs text-rust" role="alert">
+            <p className="font-body text-xs text-rust-ink" role="alert">
               {error}
             </p>
           )}

@@ -141,7 +141,7 @@ export function FoodLogSection({
           logDate={logDate}
           isToday={isToday}
           onAdded={handleAdded}
-          className="min-h-[44px] px-4 rounded-token-pill border border-steel/40 text-chalk font-body text-[13px] font-medium active:border-rust active:text-rust transition-colors disabled:opacity-50"
+          className="min-h-[44px] px-4 rounded-token-pill border border-steel/40 text-chalk font-body text-[13px] font-medium active:border-rust active:text-rust-ink transition-colors disabled:opacity-50"
         />
         <QuickLogFoodButton athleteId={athleteId} groupId={groupId} logDate={logDate} onLogged={handleQuickLogged} />
       </div>

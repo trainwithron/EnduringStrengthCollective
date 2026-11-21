@@ -100,7 +100,7 @@ export default async function ViewAsClientPage(props: {
       const weeks = Array.from(new Set(chosen.days.map((d) => d.weekNumber))).sort((a, b) => a - b);
       body = (
         <div className="space-y-3">
-          <Link href={`${viewBase}?tab=home`} className="font-body text-xs text-rust underline underline-offset-2">
+          <Link href={`${viewBase}?tab=home`} className="font-body text-xs text-rust-ink underline underline-offset-2">
             Back to Home
           </Link>
           <p className="font-display font-bold text-xl uppercase leading-tight">{chosen.program.label ?? chosen.program.name}</p>
@@ -118,7 +118,7 @@ export default async function ViewAsClientPage(props: {
                       return (
                         <li key={d.id} className="px-3 py-2 flex items-center justify-between gap-2">
                           <span className="font-body text-sm truncate">{d.title}</span>
-                          <span className={`font-body text-xs shrink-0 ${status === "done" ? "text-moss" : status === "available" ? "text-rust" : "text-steel"}`}>
+                          <span className={`font-body text-xs shrink-0 ${status === "done" ? "text-moss" : status === "available" ? "text-rust-ink" : "text-steel"}`}>
                             {status === "done" ? "Done" : status === "available" ? "Available" : d.date ? `Unlocks ${formatShortDate(d.date)}` : "Locked"}
                           </span>
                         </li>
@@ -150,7 +150,7 @@ export default async function ViewAsClientPage(props: {
               <ul className="space-y-2">
                 {cards.map((c) => (
                   <li key={c.programId} className="border border-steel/20 p-3">
-                    <p className="font-body text-xs text-rust uppercase tracking-wide">{c.heading}</p>
+                    <p className="font-body text-xs text-rust-ink uppercase tracking-wide">{c.heading}</p>
                     <p className="font-display font-bold text-lg uppercase leading-tight mt-0.5">{c.title}</p>
                     <p className="font-body text-xs text-steel mt-1">{c.status === "done" ? "Done today" : "Ready to start"}</p>
                   </li>
@@ -185,7 +185,7 @@ export default async function ViewAsClientPage(props: {
                             {progress.next.date ? ` · ${formatShortDate(progress.next.date)}` : ""}
                           </p>
                         )}
-                        <p className="font-body text-xs text-rust mt-2">See the whole program &rarr;</p>
+                        <p className="font-body text-xs text-rust-ink mt-2">See the whole program &rarr;</p>
                       </Link>
                     </li>
                   );
@@ -324,7 +324,7 @@ export default async function ViewAsClientPage(props: {
             </p>
             <div className="flex items-center gap-3 shrink-0 font-body text-xs">
               <details className="relative">
-                <summary className="cursor-pointer text-rust underline underline-offset-2 list-none">Change</summary>
+                <summary className="cursor-pointer text-rust-ink underline underline-offset-2 list-none">Change</summary>
                 <ul className="absolute right-0 top-full mt-1 z-20 w-56 max-h-64 overflow-y-auto border border-steel/30 bg-graphite shadow-lg">
                   {choices.length === 0 && <li className="px-3 py-2 text-steel">No other clients.</li>}
                   {choices.map((c) => (
@@ -336,7 +336,7 @@ export default async function ViewAsClientPage(props: {
                   ))}
                 </ul>
               </details>
-              <Link href={here} className="text-rust underline underline-offset-2">
+              <Link href={here} className="text-rust-ink underline underline-offset-2">
                 Exit
               </Link>
             </div>
@@ -348,7 +348,7 @@ export default async function ViewAsClientPage(props: {
                 key={t.key}
                 href={`${viewBase}?tab=${t.key}`}
                 aria-current={t.key === tab ? "page" : undefined}
-                className={`py-3 text-center font-body text-xs ${t.key === tab ? "text-rust font-semibold" : "text-steel"}`}
+                className={`py-3 text-center font-body text-xs ${t.key === tab ? "text-rust-ink font-semibold" : "text-steel"}`}
               >
                 {t.label}
               </Link>

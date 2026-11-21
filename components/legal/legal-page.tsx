@@ -29,7 +29,7 @@ export function LegalPage({
         <p className="font-body text-sm text-steel mt-10 pt-6 border-t border-steel/20">
           Questions or problems:{" "}
           {email ? (
-            <a href={`mailto:${email}`} className="text-rust underline underline-offset-2">
+            <a href={`mailto:${email}`} className="text-rust-ink underline underline-offset-2">
               {email}
             </a>
           ) : (

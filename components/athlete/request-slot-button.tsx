@@ -69,11 +69,11 @@ export function RequestSlotButton({
         type="button"
         onClick={handleRequest}
         disabled={submitting}
-        className="h-11 px-3 border border-rust text-rust font-body text-xs font-medium disabled:opacity-40"
+        className="h-11 px-3 border border-rust text-rust-ink font-body text-xs font-medium disabled:opacity-40"
       >
         {submitting ? "Sending…" : "Request this time"}
       </button>
-      {error && <span className="font-body text-xs text-rust text-right max-w-[200px]">{error}</span>}
+      {error && <span className="font-body text-xs text-rust-ink text-right max-w-[200px]">{error}</span>}
     </div>
   );
 }

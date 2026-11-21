@@ -247,7 +247,7 @@ export function RequestFlow({ slug, coachName, coachId, logoUrl = null, orgName 
           </p>
         )}
         {error && (
-          <p className="font-body text-sm text-rust mt-3" role="alert">
+          <p className="font-body text-sm text-rust-ink mt-3" role="alert">
             {error}
           </p>
         )}
@@ -282,7 +282,7 @@ export function RequestFlow({ slug, coachName, coachId, logoUrl = null, orgName 
           </p>
         )}
         {error && (
-          <p className="font-body text-sm text-rust mt-3" role="alert">
+          <p className="font-body text-sm text-rust-ink mt-3" role="alert">
             {error}
           </p>
         )}
@@ -323,7 +323,7 @@ export function RequestFlow({ slug, coachName, coachId, logoUrl = null, orgName 
           </div>
         )}
         {error && (
-          <p className="font-body text-sm text-rust mt-3" role="alert">
+          <p className="font-body text-sm text-rust-ink mt-3" role="alert">
             {error}
           </p>
         )}
@@ -391,7 +391,7 @@ export function RequestFlow({ slug, coachName, coachId, logoUrl = null, orgName 
         )}
         {mode === "signup" && <LegalAcceptance checked={legalAccepted} onChange={setLegalAccepted} />}
         {error && (
-          <p className="font-body text-sm text-rust" role="alert">
+          <p className="font-body text-sm text-rust-ink" role="alert">
             {error}
           </p>
         )}

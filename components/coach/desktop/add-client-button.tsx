@@ -278,7 +278,7 @@ export function AddClientButton({
 
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} className="inline-flex items-center gap-2 h-11 px-4 border border-rust text-rust font-body text-sm font-medium active:bg-rust active:text-graphite transition-colors">
+      <button type="button" onClick={() => setOpen(true)} className="inline-flex items-center gap-2 h-11 px-4 border border-rust text-rust-ink font-body text-sm font-medium active:bg-rust active:text-graphite transition-colors">
         <UserPlus className="w-4 h-4" strokeWidth={2.5} />
         Add {t("client")}
       </button>
@@ -305,7 +305,7 @@ export function AddClientButton({
         <input id="client-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputClass} />
       </div>
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}
@@ -332,7 +332,7 @@ export function AddClientButton({
               <button
                 type="button"
                 onClick={() => void navigator.clipboard.writeText(resentNote.link!).catch(() => setError("Couldn't copy. Select the link and copy it by hand."))}
-                className="h-11 px-3 border border-rust text-rust font-body text-xs shrink-0"
+                className="h-11 px-3 border border-rust text-rust-ink font-body text-xs shrink-0"
               >
                 Copy
               </button>
@@ -477,7 +477,7 @@ export function AddClientButton({
               <p className="font-body text-xs text-steel mb-2">{linkNeverExpires ? NEVER_EXPIRES_NOTE : "Works for 7 days."}</p>
               <div className="flex items-center gap-2">
                 <input aria-label="Invite link" readOnly value={link} onFocus={(e) => e.target.select()} className="flex-1 h-11 min-w-0 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none" />
-                <button type="button" onClick={() => void copy()} className="h-11 px-3 border border-rust text-rust font-body text-xs shrink-0">
+                <button type="button" onClick={() => void copy()} className="h-11 px-3 border border-rust text-rust-ink font-body text-xs shrink-0">
                   {copied ? "Copied" : "Copy"}
                 </button>
               </div>
@@ -495,7 +495,7 @@ export function AddClientButton({
                   <p className="font-body text-xs text-steel mb-2">The current link {linkLifetimeText(currentLink)}.</p>
                   <div className="flex items-center gap-2">
                     <input aria-label="Current invite link" readOnly value={currentLink.url} onFocus={(e) => e.target.select()} className="flex-1 h-11 min-w-0 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none" />
-                    <button type="button" onClick={() => void copy(currentLink.url)} className="h-11 px-3 border border-rust text-rust font-body text-xs shrink-0">
+                    <button type="button" onClick={() => void copy(currentLink.url)} className="h-11 px-3 border border-rust text-rust-ink font-body text-xs shrink-0">
                       {copied ? "Copied" : "Copy"}
                     </button>
                   </div>
@@ -518,7 +518,7 @@ export function AddClientButton({
                 </button>
               </div>
               {error && (
-                <p className="font-body text-xs text-rust mt-2" role="alert">
+                <p className="font-body text-xs text-rust-ink mt-2" role="alert">
                   {error}
                 </p>
               )}

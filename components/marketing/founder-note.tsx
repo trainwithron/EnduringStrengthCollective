@@ -32,7 +32,7 @@ export function WhyIBuiltThis() {
             </p>
           ))}
         </div>
-        <p className="font-display uppercase tracking-wide text-rust font-bold mt-8">{FOUNDER_SIGN_OFF}</p>
+        <p className="font-display uppercase tracking-wide text-rust-ink font-bold mt-8">{FOUNDER_SIGN_OFF}</p>
       </div>
     </section>
   );

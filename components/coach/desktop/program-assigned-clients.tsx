@@ -68,14 +68,14 @@ export function ProgramAssignedClients({ programId, groupId, athleteId }: { prog
   if (!label) return null;
   return (
     <div ref={boxRef} className="relative mt-2">
-      <button type="button" onClick={() => void toggle()} aria-expanded={open} className="font-body text-sm text-rust underline underline-offset-2">
+      <button type="button" onClick={() => void toggle()} aria-expanded={open} className="font-body text-sm text-rust-ink underline underline-offset-2">
         {label}
       </button>
       {open && (
         <div role="dialog" aria-label="Clients assigned to this program" className="absolute z-20 left-0 top-full mt-1 w-64 max-h-72 overflow-y-auto border border-steel/30 bg-graphite p-3 shadow-lg">
           <p className="font-body text-xs text-steel mb-2">Clients assigned to this program</p>
           {failed ? (
-            <p className="font-body text-xs text-rust">Couldn&apos;t load the list. Close this and try again.</p>
+            <p className="font-body text-xs text-rust-ink">Couldn&apos;t load the list. Close this and try again.</p>
           ) : !clients ? (
             <p className="font-body text-xs text-steel">Loading…</p>
           ) : clients.length === 0 ? (
@@ -84,7 +84,7 @@ export function ProgramAssignedClients({ programId, groupId, athleteId }: { prog
             <ul className="space-y-1">
               {clients.map((c) => (
                 <li key={c.id}>
-                  <Link href={c.href} className="font-body text-sm text-chalk hover:text-rust">
+                  <Link href={c.href} className="font-body text-sm text-chalk hover:text-rust-ink">
                     {c.name}
                   </Link>
                 </li>

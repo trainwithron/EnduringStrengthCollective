@@ -111,7 +111,7 @@ export function TodayWidget({
       )}
 
       {error && (
-        <p className="font-body text-xs text-rust mb-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mb-2" role="alert">
           {error}
         </p>
       )}
@@ -147,7 +147,7 @@ export function TodayWidget({
               href={l.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="block font-body text-sm text-rust underline underline-offset-2"
+              className="block font-body text-sm text-rust-ink underline underline-offset-2"
             >
               {l.title}
             </a>

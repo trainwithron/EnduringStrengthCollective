@@ -99,7 +99,7 @@ export function GuardianConsentStatus({ athleteId, info }: { athleteId: string; 
             Signed by {info?.guardian_name} ({info?.relationship}), {info?.guardian_email}, on {when(info?.signed_at)}.
           </p>
           <p className="font-body text-xs text-steel mt-1">{"The client chose this email address themselves. Phone the parent to confirm it was really them who signed."}</p>
-          <button type="button" onClick={voidIt} disabled={busy} className="mt-2 font-body text-xs text-rust underline disabled:opacity-40">
+          <button type="button" onClick={voidIt} disabled={busy} className="mt-2 font-body text-xs text-rust-ink underline disabled:opacity-40">
             Cancel this permission
           </button>
         </>
@@ -113,12 +113,12 @@ export function GuardianConsentStatus({ athleteId, info }: { athleteId: string; 
         </>
       )}
       {state === "expired" && (
-        <p className="font-body text-sm text-rust">The link to {info?.guardian_email} ran out of time on {when(info?.expires_at)}. This client is stopped until a parent or guardian signs.</p>
+        <p className="font-body text-sm text-rust-ink">The link to {info?.guardian_email} ran out of time on {when(info?.expires_at)}. This client is stopped until a parent or guardian signs.</p>
       )}
       {state === "withdrawn" && (
-        <p className="font-body text-sm text-rust">The permission was taken back on {when(info?.withdrawn_at)}. This client is stopped until it is given again.</p>
+        <p className="font-body text-sm text-rust-ink">The permission was taken back on {when(info?.withdrawn_at)}. This client is stopped until it is given again.</p>
       )}
-      {state === "none" && <p className="font-body text-sm text-rust">Not asked yet. This client is stopped at a permission screen where they give a parent or guardian&apos;s email. Nothing else is collected until it is signed.</p>}
+      {state === "none" && <p className="font-body text-sm text-rust-ink">Not asked yet. This client is stopped at a permission screen where they give a parent or guardian&apos;s email. Nothing else is collected until it is signed.</p>}
       {state !== "signed" && (
         <label className="mt-3 flex items-start gap-2 font-body text-sm cursor-pointer" data-guardian-checkbox>
           <input type="checkbox" checked={false} onChange={() => void setConfirmed(true)} disabled={busy} className="mt-0.5 w-4 h-4 accent-[#D2703B]" />
@@ -129,7 +129,7 @@ export function GuardianConsentStatus({ athleteId, info }: { athleteId: string; 
         </label>
       )}
       {(state === "pending" || state === "expired" || state === "withdrawn") && info?.guardian_email && (
-        <button type="button" onClick={() => post("/api/guardian-consent/resend", "Sent again.")} disabled={busy} className="mt-2 font-body text-xs text-rust underline disabled:opacity-40">
+        <button type="button" onClick={() => post("/api/guardian-consent/resend", "Sent again.")} disabled={busy} className="mt-2 font-body text-xs text-rust-ink underline disabled:opacity-40">
           Resend
         </button>
       )}

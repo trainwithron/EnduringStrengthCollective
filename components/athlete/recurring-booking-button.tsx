@@ -70,7 +70,7 @@ export function RecurringBookingButton({
         {result.failed > 0 && (
           <p className="mt-1">
             Couldn&apos;t book {result.failedDates.length > 0 ? result.failedDates.map((d) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" })).join(", ") : `${result.failed} of them`}. Check how many sessions you have left, and that the time is inside your coach&apos;s hours.{" "}
-            <Link href={`/groups/${groupId}/calendar`} className="text-rust underline">
+            <Link href={`/groups/${groupId}/calendar`} className="text-rust-ink underline">
               Open your calendar
             </Link>
           </p>
@@ -81,7 +81,7 @@ export function RecurringBookingButton({
 
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} className="min-h-11 px-1 font-body text-xs text-rust">
+      <button type="button" onClick={() => setOpen(true)} className="min-h-11 px-1 font-body text-xs text-rust-ink">
         Book weekly →
       </button>
     );
@@ -118,7 +118,7 @@ export function RecurringBookingButton({
           {submitting ? "Booking…" : "Confirm"}
         </button>
       </div>
-      {error && <span className="font-body text-xs text-rust">{error}</span>}
+      {error && <span className="font-body text-xs text-rust-ink">{error}</span>}
     </div>
   );
 }

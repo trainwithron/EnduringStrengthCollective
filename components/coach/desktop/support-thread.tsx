@@ -76,7 +76,7 @@ export function SupportThread({
         <div className="flex items-center gap-2 shrink-0">
           <span
             className={`font-body text-xs uppercase tracking-wide px-2 h-5 flex items-center ${
-              currentStatus === "open" ? "bg-rust/20 text-rust" : "bg-steel/20 text-steel"
+              currentStatus === "open" ? "bg-rust/20 text-rust-ink" : "bg-steel/20 text-steel"
             }`}
           >
             {currentStatus}
@@ -85,7 +85,7 @@ export function SupportThread({
             <button
               type="button"
               onClick={handleToggleStatus}
-              className="font-body text-xs text-steel active:text-rust transition-colors"
+              className="font-body text-xs text-steel active:text-rust-ink transition-colors"
             >
               {currentStatus === "open" ? "Mark resolved" : "Reopen"}
             </button>
@@ -125,7 +125,7 @@ export function SupportThread({
         </button>
       </div>
       {error && (
-        <p className="font-body text-xs text-rust mt-1.5" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-1.5" role="alert">
           {error}
         </p>
       )}

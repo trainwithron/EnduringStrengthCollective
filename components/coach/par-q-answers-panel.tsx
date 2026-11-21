@@ -48,8 +48,8 @@ export function ParQAnswersPanel({
       {reviewLine && <p className="font-body text-sm text-chalk mb-2">{reviewLine}</p>}
       {flagged.length > 0 && (
         <div className="flex items-start gap-2 border border-rust/40 bg-rust/5 p-3 mb-2">
-          <AlertTriangle className="w-4 h-4 shrink-0 text-rust mt-0.5" />
-          <p className="font-body text-xs text-rust">
+          <AlertTriangle className="w-4 h-4 shrink-0 text-rust-ink mt-0.5" />
+          <p className="font-body text-xs text-rust-ink">
             Answered &ldquo;Yes&rdquo; to {flagged.length} screening{" "}
             {flagged.length === 1 ? "question" : "questions"} — this client should consult a
             doctor before starting or continuing an exercise program.
@@ -61,7 +61,7 @@ export function ParQAnswersPanel({
           <div key={i} className="flex items-start justify-between gap-3 text-sm">
             <p className="font-body text-steel flex-1">{a.question}</p>
             <span
-              className={`font-body font-medium shrink-0 ${a.answer ? "text-rust" : "text-chalk"}`}
+              className={`font-body font-medium shrink-0 ${a.answer ? "text-rust-ink" : "text-chalk"}`}
             >
               {a.answer ? "Yes" : "No"}
             </span>

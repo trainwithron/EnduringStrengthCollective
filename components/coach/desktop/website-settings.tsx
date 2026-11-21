@@ -174,7 +174,7 @@ export function WebsiteSettings({ coachId, slug, initial, pendingQuotes = [] }: 
         </label>
         {slug ? (
           <>
-            <a href={`/c/${slug}?preview=1`} target="_blank" rel="noopener" className="inline-flex items-center min-h-11 font-body text-sm text-rust underline">
+            <a href={`/c/${slug}?preview=1`} target="_blank" rel="noopener" className="inline-flex items-center min-h-11 font-body text-sm text-rust-ink underline">
               Preview
             </a>
             {published && (
@@ -271,7 +271,7 @@ export function WebsiteSettings({ coachId, slug, initial, pendingQuotes = [] }: 
                 <p className="font-body text-sm text-chalk">&ldquo;{q.body}&rdquo;{q.firstName && <span className="text-steel"> &mdash; {q.firstName}</span>}</p>
                 <div className="mt-1 flex flex-wrap items-center gap-2">
                   {q.sharePublicly ? (
-                    <button type="button" disabled={busy} onClick={() => void addQuoteToPage(q)} className="min-h-11 px-3 font-body text-sm text-rust underline underline-offset-2 disabled:opacity-40">
+                    <button type="button" disabled={busy} onClick={() => void addQuoteToPage(q)} className="min-h-11 px-3 font-body text-sm text-rust-ink underline underline-offset-2 disabled:opacity-40">
                       Add to my page
                     </button>
                   ) : (
@@ -315,7 +315,7 @@ export function WebsiteSettings({ coachId, slug, initial, pendingQuotes = [] }: 
         <p className={label}>Background</p>
         <div className="flex flex-wrap gap-2 mt-2" role="group" aria-label="Background">
           {SITE_BACKGROUNDS.map((b) => (
-            <button key={b.value} type="button" aria-pressed={background === b.value} onClick={() => setBackground(b.value)} className={`h-11 px-4 font-body text-sm border ${background === b.value ? "bg-rust/15 text-rust border-rust/50" : "text-steel border-steel/30"}`}>
+            <button key={b.value} type="button" aria-pressed={background === b.value} onClick={() => setBackground(b.value)} className={`h-11 px-4 font-body text-sm border ${background === b.value ? "bg-rust/15 text-rust-ink border-rust/50" : "text-steel border-steel/30"}`}>
               {b.label}
             </button>
           ))}
@@ -330,7 +330,7 @@ export function WebsiteSettings({ coachId, slug, initial, pendingQuotes = [] }: 
           {busy ? "Saving…" : "Save"}
         </button>
         {message && (
-          <p className={`font-body text-sm ${message.error ? "text-rust" : "text-positive"}`} role={message.error ? "alert" : "status"}>
+          <p className={`font-body text-sm ${message.error ? "text-rust-ink" : "text-positive"}`} role={message.error ? "alert" : "status"}>
             {message.text}
           </p>
         )}

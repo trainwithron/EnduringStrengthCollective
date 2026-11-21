@@ -64,14 +64,14 @@ export function CancelSessionDialog({ target, onClose, onDone }: { target: Cance
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-graphite/70 px-4" role="presentation" onClick={busy ? undefined : onClose}>
       <div role="dialog" aria-modal="true" aria-label="Cancel this session" className="w-full max-w-sm bg-surface border border-steel/30 p-4" onClick={(e) => e.stopPropagation()}>
-        <p className="font-display font-bold uppercase text-sm tracking-wide text-rust">Cancel a booked session</p>
+        <p className="font-display font-bold uppercase text-sm tracking-wide text-rust-ink">Cancel a booked session</p>
         <p className="font-display font-bold text-lg leading-tight text-chalk mt-2">{target.name}</p>
         <p className="font-body text-sm text-chalk">{target.whenLabel}</p>
         <p className="font-body text-sm text-steel mt-3">
           This takes {target.name}&apos;s session off the calendar. It does not book anything. Anything already taken for it goes back to their sessions.
         </p>
         {error && (
-          <p className="font-body text-xs text-rust mt-2" role="alert">
+          <p className="font-body text-xs text-rust-ink mt-2" role="alert">
             {error}
           </p>
         )}
@@ -81,7 +81,7 @@ export function CancelSessionDialog({ target, onClose, onDone }: { target: Cance
               <button type="button" disabled={busy} onClick={() => seriesAction("skip")} className="min-h-11 bg-rust text-graphite font-display font-bold uppercase tracking-wide px-4 py-2 disabled:opacity-40">
                 {busy ? "Cancelling…" : `Cancel only this one (${target.whenLabel})`}
               </button>
-              <button type="button" disabled={busy} onClick={() => seriesAction("end_from_here")} className="min-h-11 border border-rust text-rust font-display font-bold uppercase tracking-wide px-4 py-2 disabled:opacity-40">
+              <button type="button" disabled={busy} onClick={() => seriesAction("end_from_here")} className="min-h-11 border border-rust text-rust-ink font-display font-bold uppercase tracking-wide px-4 py-2 disabled:opacity-40">
                 Cancel this one and every later one
               </button>
             </>

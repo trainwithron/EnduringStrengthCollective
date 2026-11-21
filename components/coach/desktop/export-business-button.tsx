@@ -37,12 +37,12 @@ export function ExportBusinessButton({ groupId }: { groupId: string }) {
 
   return (
     <div>
-      <button type="button" onClick={download} disabled={working} className="h-11 px-4 border border-rust text-rust font-body text-sm font-medium disabled:opacity-40">
+      <button type="button" onClick={download} disabled={working} className="h-11 px-4 border border-rust text-rust-ink font-body text-sm font-medium disabled:opacity-40">
         {working ? "Preparing… this can take a minute" : "Export my business"}
       </button>
       <p className="font-body text-xs text-steel mt-1.5 max-w-[60ch]">A zip of spreadsheets: your clients, programs, workouts, every logged set, bookings, credits and notes. It is yours to keep, any time.</p>
       {error && (
-        <p className="font-body text-xs text-rust mt-1" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-1" role="alert">
           {error}
         </p>
       )}

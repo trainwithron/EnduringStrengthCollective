@@ -528,7 +528,7 @@ export function ClientCardGrid({
 
   return (
     <div>
-      {error && <p className="font-body text-sm text-rust mb-3">{error}</p>}
+      {error && <p className="font-body text-sm text-rust-ink mb-3">{error}</p>}
 
       <div className="mb-3">
         <input aria-label="Search by name"
@@ -549,7 +549,7 @@ export function ClientCardGrid({
               type="button"
               onClick={() => setTierFilter(t)}
               className={`font-body text-xs px-2 py-1 border ${
-                tierFilter === t ? "text-rust border-rust" : "text-steel border-steel/30"
+                tierFilter === t ? "text-rust-ink border-rust" : "text-steel border-steel/30"
               }`}
             >
               {t === "all" ? "All" : TIER_LABELS[t]}
@@ -564,7 +564,7 @@ export function ClientCardGrid({
               type="button"
               onClick={() => setSortMode("attention")}
               className={`font-body text-xs px-2 py-1 border ${
-                sortMode === "attention" ? "text-rust border-rust" : "text-steel border-steel/30"
+                sortMode === "attention" ? "text-rust-ink border-rust" : "text-steel border-steel/30"
               }`}
             >
               Needs attention
@@ -573,7 +573,7 @@ export function ClientCardGrid({
               type="button"
               onClick={() => setSortMode("name")}
               className={`font-body text-xs px-2 py-1 border ${
-                sortMode === "name" ? "text-rust border-rust" : "text-steel border-steel/30"
+                sortMode === "name" ? "text-rust-ink border-rust" : "text-steel border-steel/30"
               }`}
             >
               A–Z
@@ -584,7 +584,7 @@ export function ClientCardGrid({
                 onClick={() => setPaymentFilter((v) => !v)}
                 aria-pressed={paymentFilter}
                 className={`font-body text-xs px-2 py-1 border ${
-                  paymentFilter ? "text-rust border-rust" : "text-steel border-steel/30"
+                  paymentFilter ? "text-rust-ink border-rust" : "text-steel border-steel/30"
                 }`}
               >
                 Needs payment ({needsPaymentCount})
@@ -604,7 +604,7 @@ export function ClientCardGrid({
               type="button"
               onClick={() => setGoalFilter(g)}
               className={`font-body text-xs px-2 py-1 border ${
-                goalFilter === g ? "text-rust border-rust" : "text-steel border-steel/30"
+                goalFilter === g ? "text-rust-ink border-rust" : "text-steel border-steel/30"
               }`}
             >
               {g === "all" ? "All" : GOAL_LABELS[g]}
@@ -620,7 +620,7 @@ export function ClientCardGrid({
             type="button"
             onClick={() => setPositionFilter("all")}
             className={`font-body text-xs px-2 py-1 border ${
-              positionFilter === "all" ? "text-rust border-rust" : "text-steel border-steel/30"
+              positionFilter === "all" ? "text-rust-ink border-rust" : "text-steel border-steel/30"
             }`}
           >
             All
@@ -631,7 +631,7 @@ export function ClientCardGrid({
               type="button"
               onClick={() => setPositionFilter(p.id)}
               className={`font-body text-xs px-2 py-1 border ${
-                positionFilter === p.id ? "text-rust border-rust" : "text-steel border-steel/30"
+                positionFilter === p.id ? "text-rust-ink border-rust" : "text-steel border-steel/30"
               }`}
             >
               {p.name}
@@ -795,7 +795,7 @@ export function ClientCardGrid({
                     <option value="online">Online</option>
                     <option value="group">Group</option>
                   </select>
-                  <span className={`font-body text-xs whitespace-nowrap ${credits !== null && credits <= 0 && !owed?.hold ? "text-rust" : "text-steel"}`}>
+                  <span className={`font-body text-xs whitespace-nowrap ${credits !== null && credits <= 0 && !owed?.hold ? "text-rust-ink" : "text-steel"}`}>
                     {coachBalanceLabel(credits)}
                     {(bookedByAthleteId.get(member.profileId) ?? 0) > 0 ? ` \u00B7 ${bookedByAthleteId.get(member.profileId)} booked` : ""}
                   </span>
@@ -818,7 +818,7 @@ export function ClientCardGrid({
                     ) : (
                       owesNow && (
                         <>
-                          <span className="font-body text-xs text-rust border border-rust/50 rounded-token-pill px-2 py-0.5">Needs payment</span>
+                          <span className="font-body text-xs text-rust-ink border border-rust/50 rounded-token-pill px-2 py-0.5">Needs payment</span>
                           <button
                             type="button"
                             disabled={reupBusyId === member.profileId}
@@ -841,7 +841,7 @@ export function ClientCardGrid({
                   </div>
                 )}
                 {reupNote?.id === member.profileId && (
-                  <p className={`font-body text-xs ${reupNote.error ? "text-rust" : "text-steel"}`} role={reupNote.error ? "alert" : "status"}>
+                  <p className={`font-body text-xs ${reupNote.error ? "text-rust-ink" : "text-steel"}`} role={reupNote.error ? "alert" : "status"}>
                     {reupNote.text}
                   </p>
                 )}
@@ -849,13 +849,13 @@ export function ClientCardGrid({
                 <div className="relative flex items-center justify-center gap-3 w-full pt-2 mt-1 border-t border-steel/15">
                   <Link
                     href={`/groups/${groupId}/athletes/${member.profileId}/log`}
-                    className="font-body text-xs text-rust"
+                    className="font-body text-xs text-rust-ink"
                   >
                     Log
                   </Link>
                   <Link
                     href={`/groups/${groupId}/athletes/${member.profileId}/view`}
-                    className="hidden lg:inline font-body text-xs text-rust"
+                    className="hidden lg:inline font-body text-xs text-rust-ink"
                     title="See what this client sees (read only)"
                   >
                     View
@@ -863,7 +863,7 @@ export function ClientCardGrid({
                   <button
                     type="button"
                     onClick={() => handleRemove(member)}
-                    className="font-body text-xs text-steel active:text-rust transition-colors disabled:opacity-40"
+                    className="font-body text-xs text-steel active:text-rust-ink transition-colors disabled:opacity-40"
                   >
                     Remove
                   </button>
@@ -871,7 +871,7 @@ export function ClientCardGrid({
                     type="button"
                     onClick={() => setOpenMenuId((id) => (id === member.profileId ? null : member.profileId))}
                     aria-label="More actions"
-                    className="text-steel active:text-rust transition-colors disabled:opacity-40"
+                    className="text-steel active:text-rust-ink transition-colors disabled:opacity-40"
                   >
                     <MoreVertical className="w-3.5 h-3.5" />
                   </button>
@@ -904,7 +904,7 @@ export function ClientCardGrid({
             onClick={() => setPage((p) => Math.max(0, p - 1))}
             disabled={clampedPage === 0}
             aria-label="Previous page"
-            className="flex items-center gap-1 font-body text-xs text-steel active:text-rust transition-colors disabled:opacity-30"
+            className="flex items-center gap-1 font-body text-xs text-steel active:text-rust-ink transition-colors disabled:opacity-30"
           >
             <ChevronLeft className="w-4 h-4" />
             Prev
@@ -918,7 +918,7 @@ export function ClientCardGrid({
             onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
             disabled={clampedPage >= totalPages - 1}
             aria-label="Next page"
-            className="flex items-center gap-1 font-body text-xs text-steel active:text-rust transition-colors disabled:opacity-30"
+            className="flex items-center gap-1 font-body text-xs text-steel active:text-rust-ink transition-colors disabled:opacity-30"
           >
             Next
             <ChevronRight className="w-4 h-4" />

@@ -47,7 +47,7 @@ export function TeamSheetSavedUploads({ groupId, uploads }: { groupId: string; u
   return (
     <div className="space-y-3">
       {error && (
-        <p className="font-body text-sm text-rust" role="alert">
+        <p className="font-body text-sm text-rust-ink" role="alert">
           {error}
         </p>
       )}

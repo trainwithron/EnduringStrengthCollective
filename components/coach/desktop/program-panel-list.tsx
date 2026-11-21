@@ -112,7 +112,7 @@ export function ProgramPanelList({ groupId }: { groupId: string }) {
       {items.map((r) => (
         <Link key={r.id} href={open(r)} className={row}>
           <span className="block font-body text-sm text-chalk truncate">{r.name}</span>
-          <span className={`block font-body text-xs truncate ${r.aiDraft ? "text-rust" : "text-steel"}`}>{panelProgramLabel(r)}</span>
+          <span className={`block font-body text-xs truncate ${r.aiDraft ? "text-rust-ink" : "text-steel"}`}>{panelProgramLabel(r)}</span>
         </Link>
       ))}
     </div>
@@ -125,7 +125,7 @@ export function ProgramPanelList({ groupId }: { groupId: string }) {
       </Link>
 
       {view === null && <p className="font-body text-xs text-steel px-1">Loading…</p>}
-      {error && <p className="font-body text-xs text-rust px-1">Couldn&apos;t load your programs. Try again in a moment.</p>}
+      {error && <p className="font-body text-xs text-rust-ink px-1">Couldn&apos;t load your programs. Try again in a moment.</p>}
 
       {view && view.forClient.length > 0 && (
         <div className="mb-3">
@@ -143,7 +143,7 @@ export function ProgramPanelList({ groupId }: { groupId: string }) {
             <p className="font-body text-xs text-steel px-1">No active programs yet.</p>
           ) : null}
           {view.moreCount > 0 && (
-            <Link href="/programs" className="block min-h-11 px-2 py-3 font-body text-xs text-rust">
+            <Link href="/programs" className="block min-h-11 px-2 py-3 font-body text-xs text-rust-ink">
               See all programs ({view.moreCount} more) &rarr;
             </Link>
           )}

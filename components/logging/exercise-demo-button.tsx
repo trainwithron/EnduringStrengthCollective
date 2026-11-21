@@ -30,7 +30,7 @@ export function ExerciseDemoButton({
         type="button"
         onClick={() => setOpen(true)}
         aria-label={`Watch the ${title} demo`}
-        className={`shrink-0 inline-flex items-center gap-1.5 border border-rust/60 text-rust font-body font-medium active:bg-rust active:text-graphite transition-colors ${
+        className={`shrink-0 inline-flex items-center gap-1.5 border border-rust/60 text-rust-ink font-body font-medium active:bg-rust active:text-graphite transition-colors ${
           compact ? "h-9 px-3 text-xs" : "h-11 px-4 text-sm"
         }`}
       >

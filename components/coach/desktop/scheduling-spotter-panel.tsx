@@ -87,7 +87,7 @@ export function SchedulingSpotterPanel({
   return (
     <div className="border border-rust/40 bg-rust/5 px-4 py-3 mb-4">
       <div className="flex items-center justify-between mb-2">
-        <p className="font-body text-xs text-rust uppercase tracking-wide font-bold">
+        <p className="font-body text-xs text-rust-ink uppercase tracking-wide font-bold">
           Scheduling Spot
         </p>
         {visible.length > 1 && (
@@ -115,7 +115,7 @@ export function SchedulingSpotterPanel({
                   <div className="flex flex-wrap items-center gap-2 mt-2">
                     {stage === "ask" ? (
                       <>
-                        <button type="button" disabled={busy} onClick={() => answerGaps(flag, "ask", "fill")} className={`${choice} border-rust text-rust`}>
+                        <button type="button" disabled={busy} onClick={() => answerGaps(flag, "ask", "fill")} className={`${choice} border-rust text-rust-ink`}>
                           Looking to fill them
                         </button>
                         <button type="button" disabled={busy} onClick={() => answerGaps(flag, "ask", "happy")} className={`${choice} border-steel/30 text-chalk`}>
@@ -136,7 +136,7 @@ export function SchedulingSpotterPanel({
                               disabled={busy}
                               aria-pressed={on}
                               onClick={() => setKinds((prev) => (on ? prev.filter((x) => x !== k.id) : [...prev, k.id]))}
-                              className={`${choice} border-rust ${on ? "bg-rust text-graphite" : "text-rust"}`}
+                              className={`${choice} border-rust ${on ? "bg-rust text-graphite" : "text-rust-ink"}`}
                             >
                               {on ? "✓ " : ""}
                               {k.label}
@@ -180,7 +180,7 @@ export function SchedulingSpotterPanel({
                   type="button"
                   onClick={() => sendFeedback(flag, "denied")}
                   disabled={busy}
-                  className="font-body text-xs text-rust uppercase tracking-wide font-bold disabled:opacity-40"
+                  className="font-body text-xs text-rust-ink uppercase tracking-wide font-bold disabled:opacity-40"
                 >
                   Deny
                 </button>

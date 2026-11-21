@@ -42,14 +42,14 @@ export function PinPostButton({
         type="button"
         onClick={handleToggle}
         className={`flex items-center gap-1 font-body text-xs transition-colors ${
-          optimisticPinned ? "text-rust" : "text-steel active:text-rust"
+          optimisticPinned ? "text-rust-ink" : "text-steel active:text-rust-ink"
         }`}
       >
         <Pin className="w-3.5 h-3.5" fill={optimisticPinned ? "currentColor" : "none"} />
         {optimisticPinned ? "Unpin" : "Pin"}
       </button>
       {error && (
-        <span className="font-body text-xs text-rust" role="alert">
+        <span className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </span>
       )}

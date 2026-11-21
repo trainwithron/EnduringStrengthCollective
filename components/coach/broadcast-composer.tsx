@@ -169,7 +169,7 @@ export function BroadcastComposer({
           <button
             type="button"
             onClick={insertToken}
-            className="font-body text-xs text-rust underline underline-offset-2"
+            className="font-body text-xs text-rust-ink underline underline-offset-2"
           >
             Insert first name
           </button>
@@ -182,7 +182,7 @@ export function BroadcastComposer({
           className="w-full bg-surface border border-steel/30 text-chalk px-3 py-2 font-body text-sm focus:outline-none focus:border-rust"
           placeholder="Hey {first_name}, I'm out of town for six days. Sessions start back up next week."
         />
-        <p className={`font-body text-xs mt-1 ${tooLong ? "text-rust" : "text-steel"}`}>
+        <p className={`font-body text-xs mt-1 ${tooLong ? "text-rust-ink" : "text-steel"}`}>
           {template.length}/{MAX_BROADCAST_LENGTH} — {FIRST_NAME_TOKEN} becomes each client&apos;s first name.
         </p>
       </div>
@@ -196,7 +196,7 @@ export function BroadcastComposer({
             <button
               type="button"
               onClick={() => setSampleIndex((i) => i + 1)}
-              className="font-body text-xs text-rust underline underline-offset-2"
+              className="font-body text-xs text-rust-ink underline underline-offset-2"
             >
               Next sample
             </button>
@@ -246,7 +246,7 @@ export function BroadcastComposer({
                   <span className="text-xs text-steel">{groupNameById.get(a.groupId)?.name}</span>
                 )}
                 {a.excludedByDefault && (
-                  <span className="text-xs text-rust">Under 13, no verified parental consent</span>
+                  <span className="text-xs text-rust-ink">Under 13, no verified parental consent</span>
                 )}
               </label>
             );
@@ -255,7 +255,7 @@ export function BroadcastComposer({
       </div>
 
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}
@@ -290,7 +290,7 @@ export function BroadcastComposer({
               )}
             </div>
             {error && (
-              <p className="font-body text-xs text-rust mb-3" role="alert">
+              <p className="font-body text-xs text-rust-ink mb-3" role="alert">
                 {error}
               </p>
             )}

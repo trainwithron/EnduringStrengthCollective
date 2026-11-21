@@ -35,7 +35,7 @@ export function DeleteAccountButton() {
       <button
         type="button"
         onClick={() => setConfirming(true)}
-        className="min-h-11 font-body text-sm text-rust"
+        className="min-h-11 font-body text-sm text-rust-ink"
       >
         Delete my account
       </button>
@@ -62,7 +62,7 @@ export function DeleteAccountButton() {
         />
       </label>
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

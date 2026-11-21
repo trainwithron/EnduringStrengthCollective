@@ -123,7 +123,7 @@ export default async function DisplayModePage(
   return (
     <main className="min-h-screen bg-graphite text-chalk p-10">
       <DisplayAutoRefresh />
-      <p className="font-display uppercase text-sm tracking-[0.2em] text-rust mb-8">
+      <p className="font-display uppercase text-sm tracking-[0.2em] text-rust-ink mb-8">
         {group?.name ?? "Weight Room"}
       </p>
 

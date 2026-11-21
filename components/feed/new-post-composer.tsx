@@ -205,7 +205,7 @@ export function NewPostComposer({
           <button
             type="button"
             onClick={() => fileInput.current?.click()}
-            className="flex items-center gap-2 h-11 px-3 border border-steel/30 text-steel text-sm active:border-rust active:text-rust transition-colors"
+            className="flex items-center gap-2 h-11 px-3 border border-steel/30 text-steel text-sm active:border-rust active:text-rust-ink transition-colors"
           >
             <Camera className="w-4 h-4" />
             {file ? file.name.slice(0, 20) : "Add photo or video"}
@@ -218,7 +218,7 @@ export function NewPostComposer({
                 if (fileInput.current) fileInput.current.value = "";
               }}
               aria-label="Remove photo or video"
-              className="w-11 h-11 flex items-center justify-center border border-steel/30 text-steel active:border-rust active:text-rust transition-colors"
+              className="w-11 h-11 flex items-center justify-center border border-steel/30 text-steel active:border-rust active:text-rust-ink transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
@@ -233,7 +233,7 @@ export function NewPostComposer({
         </div>
 
         {error && (
-          <p className="font-body text-xs text-rust mt-2" role="alert">
+          <p className="font-body text-xs text-rust-ink mt-2" role="alert">
             {error}
           </p>
         )}

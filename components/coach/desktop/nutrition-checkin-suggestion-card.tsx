@@ -168,7 +168,7 @@ export function NutritionCheckinSuggestionCard({
   return (
     <div className="border border-rust/40 bg-surface/60 p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <p className="font-body text-xs text-rust uppercase tracking-wide font-bold">
+        <p className="font-body text-xs text-rust-ink uppercase tracking-wide font-bold">
           {isBaseline ? `Starting target for ${clientName}` : "Weekly check-in suggestion"} — {PHASE_LABELS[suggestion.phase] ?? suggestion.phase}
         </p>
         <p className="font-body text-xs text-steel">
@@ -196,7 +196,7 @@ export function NutritionCheckinSuggestionCard({
       </div>
       <CalorieFloorWarning calories={suggestion.newCalories} floor={floorCalories} who={clientName} note={floorNote} />
       {!ageKnown && !isBaseline && (
-        <p className="font-body text-xs text-rust" role="note">
+        <p className="font-body text-xs text-rust-ink" role="note">
           {AGE_UNKNOWN_NOTE}
         </p>
       )}
@@ -210,7 +210,7 @@ export function NutritionCheckinSuggestionCard({
             startKey={outcome.startKey}
             todayKey={todayKey}
           />
-          {phaseNote && <p className="font-body text-xs text-rust">{phaseNote}</p>}
+          {phaseNote && <p className="font-body text-xs text-rust-ink">{phaseNote}</p>}
           <button type="button" onClick={onResolved} className="h-9 px-3 bg-rust text-graphite font-body text-xs font-medium">
             Done
           </button>
@@ -218,7 +218,7 @@ export function NutritionCheckinSuggestionCard({
       ) : (
         <>
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

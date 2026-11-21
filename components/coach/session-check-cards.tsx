@@ -156,7 +156,7 @@ export function SessionCheckCards({ sessions, timezone }: { sessions: SessionToC
           {askingNoShow === s.bookingId && (
             <div className="mt-2 flex flex-wrap items-center gap-2" data-no-show-choice>
               <p className="w-full font-body text-xs text-steel">A no-show. Use 1 of {s.name}&apos;s sessions?</p>
-              <button type="button" disabled={busy === s.bookingId} onClick={() => noShow(s, true)} className="min-h-11 px-4 border border-rust text-rust font-body text-sm font-medium disabled:opacity-40">
+              <button type="button" disabled={busy === s.bookingId} onClick={() => noShow(s, true)} className="min-h-11 px-4 border border-rust text-rust-ink font-body text-sm font-medium disabled:opacity-40">
                 Charge 1 session
               </button>
               <button type="button" disabled={busy === s.bookingId} onClick={() => noShow(s, false)} className="min-h-11 px-4 border border-steel/40 text-chalk font-body text-sm disabled:opacity-40">
@@ -178,14 +178,14 @@ export function SessionCheckCards({ sessions, timezone }: { sessions: SessionToC
             />
           )}
           {errors[s.bookingId] && (
-            <p className="font-body text-xs text-rust mt-2" role="alert">
+            <p className="font-body text-xs text-rust-ink mt-2" role="alert">
               {errors[s.bookingId]}
             </p>
           )}
         </div>
       ))}
       {!showAll && left.length > SHOWN && (
-        <button type="button" onClick={() => setShowAll(true)} className="font-body text-sm text-rust underline underline-offset-2 min-h-11">
+        <button type="button" onClick={() => setShowAll(true)} className="font-body text-sm text-rust-ink underline underline-offset-2 min-h-11">
           {left.length - SHOWN} more
         </button>
       )}

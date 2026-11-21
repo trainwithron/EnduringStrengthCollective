@@ -669,7 +669,7 @@ export function ExerciseSetGrid({
             const label = (
               <>
                 {warmup ? "W" : i + 1}
-                {special && <span className="block font-body text-[9px] leading-tight text-rust uppercase">{SET_TYPE_SHORT_LABEL[special]}</span>}
+                {special && <span className="block font-body text-[9px] leading-tight text-rust-ink uppercase">{SET_TYPE_SHORT_LABEL[special]}</span>}
               </>
             );
             // Tap the set number to mark it a warm-up (it then never counts toward goals, records or your max) and tap again to undo.
@@ -693,7 +693,7 @@ export function ExerciseSetGrid({
                     onSetChange(set.id, { setType: next });
                     save(set.id, { set_type: next });
                   }}
-                  className={`w-full min-h-12 text-center font-display text-lg leading-none ${doneMark || (warmup ? "text-rust font-bold" : "text-steel")}`}
+                  className={`w-full min-h-12 text-center font-display text-lg leading-none ${doneMark || (warmup ? "text-rust-ink font-bold" : "text-steel")}`}
                 >
                   {label}
                 </button>
@@ -729,7 +729,7 @@ export function ExerciseSetGrid({
       {invalidLines.length > 0 && (
         <div role="alert" className="mt-1.5 space-y-0.5">
           {invalidLines.map((line) => (
-            <p key={line} className="font-body text-xs text-rust">
+            <p key={line} className="font-body text-xs text-rust-ink">
               {line}
             </p>
           ))}

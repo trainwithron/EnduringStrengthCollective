@@ -45,7 +45,7 @@ export function capLine(count: number, cap: number | null, period: "week" | "mon
   return { text: `${count} of ${cap} this ${period}`, tone: count > cap ? "rust" : count === cap ? "amber" : "plain" };
 }
 
-export const capToneClass = (tone: "plain" | "amber" | "rust"): string => (tone === "rust" ? "text-rust" : tone === "amber" ? "text-amber" : "text-steel");
+export const capToneClass = (tone: "plain" | "amber" | "rust"): string => (tone === "rust" ? "text-rust-ink" : tone === "amber" ? "text-amber" : "text-steel");
 
 /** Ask the server about the times a client screen is about to offer. Null when it cannot answer (the screen then offers as before). */
 export async function fetchSlotReasons(supabase: any, coachId: string, slots: { start: Date; end: Date }[], ignoreBookingId: string | null = null): Promise<(string | null)[] | null> {

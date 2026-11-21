@@ -76,7 +76,7 @@ export function TransformationCardCreator({
   return (
     <div>
       <div className="border border-rust/40 bg-surface/40 p-6 text-center mb-6">
-        <p className="font-display font-bold text-4xl leading-none text-rust">
+        <p className="font-display font-bold text-4xl leading-none text-rust-ink">
           Down {totalLossLbs} lbs
         </p>
         <p className="font-body text-xs text-steel mt-2 uppercase tracking-wide">
@@ -139,7 +139,7 @@ export function TransformationCardCreator({
       )}
 
       {error && (
-        <p className="font-body text-xs text-rust mb-3" role="alert">
+        <p className="font-body text-xs text-rust-ink mb-3" role="alert">
           {error}
         </p>
       )}

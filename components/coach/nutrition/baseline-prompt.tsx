@@ -48,7 +48,7 @@ export function BaselinePrompt({
 
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} className="font-body text-xs text-rust">
+      <button type="button" onClick={() => setOpen(true)} className="font-body text-xs text-rust-ink">
         Suggest a starting target from {clientName}&apos;s numbers
       </button>
     );
@@ -65,7 +65,7 @@ export function BaselinePrompt({
           </p>
           <p className="font-body text-xs text-steel max-w-[70ch]">{outcome.rationale}</p>
           {error && (
-            <p className="font-body text-xs text-rust" role="alert">
+            <p className="font-body text-xs text-rust-ink" role="alert">
               {error}
             </p>
           )}

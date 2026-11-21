@@ -60,7 +60,7 @@ export function SendSignInLinkButton({ groupId, athleteId, clientName }: { group
         {busy ? "Sending…" : note ? "Send it again" : "Resend invite / sign-in link"}
       </button>
       {error && (
-        <p className="font-body text-xs text-rust mt-2" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-2" role="alert">
           {error}
         </p>
       )}

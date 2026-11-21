@@ -119,7 +119,7 @@ export function AddHabitForm({
             key={preset}
             type="button"
             onClick={() => setTitle(preset)}
-            className="font-body text-xs text-steel border border-steel/30 px-2 py-1 active:border-rust active:text-rust"
+            className="font-body text-xs text-steel border border-steel/30 px-2 py-1 active:border-rust active:text-rust-ink"
           >
             {preset}
           </button>

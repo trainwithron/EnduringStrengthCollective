@@ -88,14 +88,14 @@ export function PendingInviteActions({ groupId, profileId, name, email, sendLabe
         <button type="button" onClick={copyLink} disabled={working !== null} className={`${button} text-steel`}>
           {working === "copy" ? "Getting…" : "Copy invite link"}
         </button>
-        <button type="button" onClick={cancel} disabled={working !== null} className={`${button} text-rust no-underline`}>
+        <button type="button" onClick={cancel} disabled={working !== null} className={`${button} text-rust-ink no-underline`}>
           Cancel
         </button>
       </div>
       <p className="basis-full font-body text-xs text-steel">The email and the copied link are the same link. Copying or emailing it again never cancels anything; opening it does not use it up.</p>
       {shownLink && <input readOnly value={shownLink} onFocus={(e) => e.currentTarget.select()} aria-label="Invitation link" className="basis-full w-full h-10 bg-graphite border border-steel/30 text-chalk px-2.5 font-body text-xs" />}
       {message && (
-        <p className={`basis-full font-body text-xs ${message.kind === "ok" ? "text-positive" : "text-rust"}`} role={message.kind === "ok" ? "status" : "alert"}>
+        <p className={`basis-full font-body text-xs ${message.kind === "ok" ? "text-positive" : "text-rust-ink"}`} role={message.kind === "ok" ? "status" : "alert"}>
           {message.text}
         </p>
       )}

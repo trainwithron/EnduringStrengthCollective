@@ -131,7 +131,7 @@ export function ExerciseVideoUpload({
           </label>
         )}
         {error && (
-          <p className="font-body text-xs text-rust mt-1 text-right" role="alert">
+          <p className="font-body text-xs text-rust-ink mt-1 text-right" role="alert">
             {error}
           </p>
         )}
@@ -152,7 +152,7 @@ export function ExerciseVideoUpload({
         </div>
       ) : (
         <>
-          <label className="inline-flex items-center gap-1.5 min-h-11 font-body text-xs text-rust cursor-pointer">
+          <label className="inline-flex items-center gap-1.5 min-h-11 font-body text-xs text-rust-ink cursor-pointer">
             <input type="file" accept="video/*" onChange={(e) => void handleFileChange(e)} className="hidden" />
             🎥 Record or attach a form-check video
           </label>
@@ -162,7 +162,7 @@ export function ExerciseVideoUpload({
         </>
       )}
       {error && (
-        <p className="font-body text-xs text-rust mt-1" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-1" role="alert">
           {error}
         </p>
       )}

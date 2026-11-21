@@ -39,7 +39,7 @@ function renderLine(line: string): ReactNode[] {
           href={linkUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="underline text-rust"
+          className="underline text-rust-ink"
         >
           {linkText}
         </a>

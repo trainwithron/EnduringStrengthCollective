@@ -10,7 +10,7 @@ export function ProgramLoadRetry() {
   return (
     <div className="border border-rust/50 p-4 max-w-xl" role="alert">
       <p className="font-body text-sm text-chalk">{LOAD_FAILED_MESSAGE}</p>
-      <button type="button" onClick={() => router.refresh()} className="mt-3 min-h-11 px-5 border border-rust text-rust font-display font-bold uppercase tracking-wide">
+      <button type="button" onClick={() => router.refresh()} className="mt-3 min-h-11 px-5 border border-rust text-rust-ink font-display font-bold uppercase tracking-wide">
         Try again
       </button>
     </div>

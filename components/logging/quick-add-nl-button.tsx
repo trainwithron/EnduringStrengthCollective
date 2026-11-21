@@ -107,7 +107,7 @@ export function QuickAddNlButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="w-full h-11 border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors"
+        className="w-full h-11 border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust-ink transition-colors"
       >
         + Quick add (say it)
       </button>
@@ -125,7 +125,7 @@ export function QuickAddNlButton({
           </p>
         ))}
         {error && (
-          <p className="font-body text-xs text-rust" role="alert">
+          <p className="font-body text-xs text-rust-ink" role="alert">
             {error}
           </p>
         )}
@@ -161,7 +161,7 @@ export function QuickAddNlButton({
         rows={2}
         className="w-full bg-surface border border-steel/30 text-chalk px-3 py-2 font-body text-sm focus:outline-none focus:border-rust resize-none"
       />
-      {error && <p className="font-body text-xs text-rust">{error}</p>}
+      {error && <p className="font-body text-xs text-rust-ink">{error}</p>}
       <div className="flex items-center gap-2">
         <button
           type="button"

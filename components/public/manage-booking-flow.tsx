@@ -106,7 +106,7 @@ export function ManageBookingFlow({
             onClick={async () => {
               if (await confirmDialog("Cancel this session?")) act({ action: "cancel" });
             }}
-            className="min-h-11 border border-rust text-rust font-body text-sm px-4 py-2.5 disabled:opacity-40"
+            className="min-h-11 border border-rust text-rust-ink font-body text-sm px-4 py-2.5 disabled:opacity-40"
           >
             Cancel session
           </button>
@@ -162,7 +162,7 @@ export function ManageBookingFlow({
       )}
 
       {message && (
-        <p className={`font-body text-sm mt-4 ${message.error ? "text-rust" : "text-chalk"}`} role={message.error ? "alert" : "status"}>
+        <p className={`font-body text-sm mt-4 ${message.error ? "text-rust-ink" : "text-chalk"}`} role={message.error ? "alert" : "status"}>
           {message.text}
         </p>
       )}

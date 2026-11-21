@@ -53,7 +53,7 @@ export function ShareWorkoutButton({
     <button
       type="button"
       onClick={handleShare}
-      className="flex items-center gap-1.5 font-body text-xs text-rust active:opacity-70 transition-opacity"
+      className="flex items-center gap-1.5 font-body text-xs text-rust-ink active:opacity-70 transition-opacity"
     >
       <Share2 className="w-3.5 h-3.5" />
       {copied ? "Link copied" : "Share"}

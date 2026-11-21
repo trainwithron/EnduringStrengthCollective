@@ -38,7 +38,7 @@ export function ExerciseVolumeHistory({ history }: { history: VolumeHistoryPoint
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="font-body text-xs text-steel active:text-rust transition-colors"
+        className="font-body text-xs text-steel active:text-rust-ink transition-colors"
       >
         {open ? "Hide" : "Show"} volume history ({history.length} sessions)
       </button>

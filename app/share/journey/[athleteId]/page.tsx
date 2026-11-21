@@ -50,7 +50,7 @@ export default async function ShareJourneyPage(
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body flex items-center justify-center px-6 py-16">
       <div className="w-full max-w-sm border border-rust/40 bg-surface/40 p-8 text-center">
-        <p className="font-display uppercase text-xs tracking-[0.2em] text-rust">
+        <p className="font-display uppercase text-xs tracking-[0.2em] text-rust-ink">
           {recap.groupName}
         </p>
 
@@ -79,7 +79,7 @@ export default async function ShareJourneyPage(
         </div>
 
         {recap.weightChangeLabel && (
-          <p className="font-body text-sm text-rust mt-4">
+          <p className="font-body text-sm text-rust-ink mt-4">
             Body weight: {recap.weightChangeLabel} since day one
           </p>
         )}
@@ -89,7 +89,7 @@ export default async function ShareJourneyPage(
         </div>
 
         <p className="font-body text-xs text-steel mt-6 pt-4 border-t border-steel/20">
-          Trained with <span className="text-rust">{recap.groupName}</span>
+          Trained with <span className="text-rust-ink">{recap.groupName}</span>
         </p>
       </div>
     </main>

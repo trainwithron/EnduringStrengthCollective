@@ -78,7 +78,7 @@ export function ClientSlotRow({
         <p className="font-body font-medium text-[15px]">
           {resolvedExerciseName}
           {isOverridden && (
-            <span className="font-body text-xs text-rust ml-2 align-middle">customized</span>
+            <span className="font-body text-xs text-rust-ink ml-2 align-middle">customized</span>
           )}
         </p>
         {isOverridden && (
@@ -86,7 +86,7 @@ export function ClientSlotRow({
             type="button"
             onClick={handleReset}
             disabled={busy}
-            className="font-body text-xs text-steel active:text-rust transition-colors"
+            className="font-body text-xs text-steel active:text-rust-ink transition-colors"
           >
             Reset to default
           </button>
@@ -101,7 +101,7 @@ export function ClientSlotRow({
         </p>
       )}
       {readyToMoveBack && (
-        <p className="font-body text-xs text-rust mt-1">
+        <p className="font-body text-xs text-rust-ink mt-1">
           Hit the rep ceiling on their last logged set here — worth considering moving them back to the regular exercise.
         </p>
       )}
@@ -117,7 +117,7 @@ export function ClientSlotRow({
               className={`h-8 px-3 border font-body text-xs transition-colors ${
                 rung.exerciseName === resolvedExerciseName
                   ? "bg-rust border-rust text-graphite"
-                  : "border-steel/30 text-steel active:border-rust active:text-rust"
+                  : "border-steel/30 text-steel active:border-rust active:text-rust-ink"
               }`}
             >
               {rung.exerciseName}

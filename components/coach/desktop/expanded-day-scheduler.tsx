@@ -183,7 +183,7 @@ export function ExpandedDayScheduler({
             type="button"
             onClick={() => adjustCredits(-1)}
             disabled={adjustingCredits}
-            className="w-8 h-8 flex items-center justify-center border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors disabled:opacity-40"
+            className="w-8 h-8 flex items-center justify-center border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust-ink transition-colors disabled:opacity-40"
           >
             &minus;
           </button>
@@ -192,7 +192,7 @@ export function ExpandedDayScheduler({
             type="button"
             onClick={() => adjustCredits(1)}
             disabled={adjustingCredits}
-            className="w-8 h-8 flex items-center justify-center border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors disabled:opacity-40"
+            className="w-8 h-8 flex items-center justify-center border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust-ink transition-colors disabled:opacity-40"
           >
             +
           </button>
@@ -230,7 +230,7 @@ export function ExpandedDayScheduler({
                   </span>
                   <span
                     className={`font-body text-sm ${
-                      row.kind === "event" ? "text-rust" : "text-chalk"
+                      row.kind === "event" ? "text-rust-ink" : "text-chalk"
                     }`}
                   >
                     {row.label}
@@ -246,7 +246,7 @@ export function ExpandedDayScheduler({
             Open time slots
           </h3>
           {assignError && (
-            <p className="font-body text-xs text-rust mb-2">{assignError}</p>
+            <p className="font-body text-xs text-rust-ink mb-2">{assignError}</p>
           )}
           {daySlots.length === 0 ? (
             <p className="font-body text-sm text-steel">No open hours this day.</p>
@@ -269,7 +269,7 @@ export function ExpandedDayScheduler({
                       setRepeating(false);
                       setPending({ start: slot.start, durationMinutes: slot.durationMinutes });
                     }}
-                    className="flex items-center justify-between h-9 px-2.5 font-body text-xs border border-steel/20 text-chalk disabled:opacity-30 active:border-rust active:text-rust"
+                    className="flex items-center justify-between h-9 px-2.5 font-body text-xs border border-steel/20 text-chalk disabled:opacity-30 active:border-rust active:text-rust-ink"
                   >
                     {label}
                     <span className="text-steel">{taken ? "Booked" : "Open"}</span>
@@ -314,7 +314,7 @@ export function ExpandedDayScheduler({
                   setRepeating(false);
                   setPending({ start: otherStart, durationMinutes: otherMinutesNumber });
                 }}
-                className="h-10 px-4 border border-rust text-rust font-body text-sm disabled:opacity-40"
+                className="h-10 px-4 border border-rust text-rust-ink font-body text-sm disabled:opacity-40"
               >
                 Choose this time
               </button>
@@ -322,7 +322,7 @@ export function ExpandedDayScheduler({
             {otherStart && otherOutsideHours && !otherClash && (
               <p className="font-body text-xs text-steel mt-2">This is outside your open hours or on your time off. You can still book it.</p>
             )}
-            {otherClash && <p className="font-body text-xs text-rust mt-2">That overlaps another session on this day.</p>}
+            {otherClash && <p className="font-body text-xs text-rust-ink mt-2">That overlaps another session on this day.</p>}
           </div>
 
           {pending && (

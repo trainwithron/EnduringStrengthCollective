@@ -681,7 +681,7 @@ export function DuplicateWeekPanel({
           type="button"
           onClick={() => setOpen(true)}
           disabled={generating}
-          className="font-body text-xs text-rust border border-rust px-3 h-8 disabled:opacity-40"
+          className="font-body text-xs text-rust-ink border border-rust px-3 h-8 disabled:opacity-40"
         >
           Duplicate with progressions →
         </button>
@@ -790,7 +790,7 @@ export function DuplicateWeekPanel({
         see{" "}
         <Link
           href={`/groups/${groupId}/programs/${programId}/progressions`}
-          className="text-rust underline underline-offset-2"
+          className="text-rust-ink underline underline-offset-2"
         >
           Exercise Progressions
         </Link>

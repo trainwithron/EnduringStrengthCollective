@@ -107,7 +107,7 @@ export function ClientProgramActions({ groupId, athleteId, athleteFullName, extr
   return (
     <div>
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" onClick={() => (open ? setOpen(false) : void openPicker())} aria-expanded={open} className={`${button} text-rust border-rust`}>
+        <button type="button" onClick={() => (open ? setOpen(false) : void openPicker())} aria-expanded={open} className={`${button} text-rust-ink border-rust`}>
           Assign program
         </button>
         <button type="button" onClick={() => router.push(`/groups/${groupId}/programs/new?athleteId=${athleteId}`)} className={`${button} text-chalk border-steel/40`}>
@@ -128,7 +128,7 @@ export function ClientProgramActions({ groupId, athleteId, athleteFullName, extr
             <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="block w-full sm:w-48 h-11 sm:h-8 mt-1 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust" />
           </label>
           {error && (
-            <p className="font-body text-xs text-rust mb-2" role="alert">
+            <p className="font-body text-xs text-rust-ink mb-2" role="alert">
               {error}
             </p>
           )}

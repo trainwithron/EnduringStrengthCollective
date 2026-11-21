@@ -144,7 +144,7 @@ export function EmailMessageEditor() {
         className="block w-full mt-1 bg-graphite border border-steel/30 text-chalk p-2 font-body text-sm focus:outline-none focus:border-rust"
       />
       {!body.includes("{link}") && (
-        <p className="font-body text-xs text-rust mt-1" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-1" role="alert">
           The message needs {"{link}"} in it, or your client has no way to sign in.
         </p>
       )}
@@ -160,7 +160,7 @@ export function EmailMessageEditor() {
         </button>
       </div>
       {msg && (
-        <p className={`font-body text-xs mt-2 ${msg.kind === "error" ? "text-rust" : "text-positive"}`} role={msg.kind === "error" ? "alert" : "status"}>
+        <p className={`font-body text-xs mt-2 ${msg.kind === "error" ? "text-rust-ink" : "text-positive"}`} role={msg.kind === "error" ? "alert" : "status"}>
           {msg.text}
         </p>
       )}

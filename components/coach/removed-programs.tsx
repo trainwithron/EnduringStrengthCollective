@@ -37,7 +37,7 @@ export function RemovedPrograms({ programs, label = "Removed programs" }: { prog
           {programs.map((p) => (
             <li key={p.id} className="flex items-center justify-between gap-3 px-1">
               <span className="font-body text-sm text-steel truncate">{p.name}</span>
-              <button type="button" disabled={busyId !== null} onClick={() => putBack(p.id)} className="min-h-11 px-3 font-body text-xs text-rust disabled:opacity-40 shrink-0">
+              <button type="button" disabled={busyId !== null} onClick={() => putBack(p.id)} className="min-h-11 px-3 font-body text-xs text-rust-ink disabled:opacity-40 shrink-0">
                 {busyId === p.id ? "Putting back…" : "Put back"}
               </button>
             </li>
@@ -45,7 +45,7 @@ export function RemovedPrograms({ programs, label = "Removed programs" }: { prog
         </ul>
       )}
       {error && (
-        <p className="font-body text-xs text-rust mt-1" role="alert">
+        <p className="font-body text-xs text-rust-ink mt-1" role="alert">
           {error}
         </p>
       )}

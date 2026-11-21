@@ -36,13 +36,13 @@ export function RecurringConflictBadge({ bookingId }: { bookingId: string }) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         title="No longer fits your availability — resolve"
-        className="text-rust"
+        className="text-rust-ink"
       >
         <AlertTriangle className="w-3.5 h-3.5" />
       </button>
       {open && (
         <div className="absolute right-0 top-5 z-20 w-56 bg-surface border border-rust/40 shadow-lg p-2 space-y-1.5">
-          <p className="font-body text-xs text-rust">This no longer fits your available hours.</p>
+          <p className="font-body text-xs text-rust-ink">This no longer fits your available hours.</p>
           <button
             type="button"
             disabled={busy}
@@ -55,7 +55,7 @@ export function RecurringConflictBadge({ bookingId }: { bookingId: string }) {
             type="button"
             disabled={busy}
             onClick={() => resolve(true)}
-            className="w-full text-left font-body text-xs text-rust hover:bg-graphite/50 px-1.5 py-1 disabled:opacity-40"
+            className="w-full text-left font-body text-xs text-rust-ink hover:bg-graphite/50 px-1.5 py-1 disabled:opacity-40"
           >
             {busy ? "Cancelling…" : "Cancel this session"}
           </button>

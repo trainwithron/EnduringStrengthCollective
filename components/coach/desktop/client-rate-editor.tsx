@@ -67,7 +67,7 @@ export function ClientRateEditor({
         <span className="font-body text-xs text-steel">/mo</span>
       </div>
       {error && (
-        <p className="font-body text-xs text-rust" role="alert">
+        <p className="font-body text-xs text-rust-ink" role="alert">
           {error}
         </p>
       )}

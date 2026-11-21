@@ -328,14 +328,14 @@ export function ProgramBuilderDesktop({
             href={`/print/programs/${programId}`}
             target="_blank"
             rel="noopener"
-            className="inline-flex items-center h-9 font-body text-xs text-rust border border-rust px-3"
+            className="inline-flex items-center h-9 font-body text-xs text-rust-ink border border-rust px-3"
           >
             Print or PDF
           </a>
           <button
             type="button"
             onClick={() => setAssignOpen(true)}
-            className="inline-flex items-center h-11 sm:h-9 font-body text-xs text-rust border border-rust px-3"
+            className="inline-flex items-center h-11 sm:h-9 font-body text-xs text-rust-ink border border-rust px-3"
           >
             Assign to clients
           </button>
@@ -343,7 +343,7 @@ export function ProgramBuilderDesktop({
           {startDate && trainingDays && trainingDays.length > 0 && (
             <Link
               href={`/groups/${groupId}/programs/${programId}/calendar`}
-              className="inline-flex items-center h-9 font-body text-xs text-rust border border-rust px-3"
+              className="inline-flex items-center h-9 font-body text-xs text-rust-ink border border-rust px-3"
             >
               View as calendar &rarr;
             </Link>
@@ -455,7 +455,7 @@ export function ProgramBuilderDesktop({
             type="button"
             onClick={removeEmptyDays}
             disabled={sweepBusy}
-            className="w-full min-h-11 border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors disabled:opacity-40"
+            className="w-full min-h-11 border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust-ink transition-colors disabled:opacity-40"
           >
             {sweepBusy ? "Removing…" : `Remove ${emptyDayIds.length} empty ${emptyDayIds.length === 1 ? "day" : "days"}`}
           </button>
@@ -466,7 +466,7 @@ export function ProgramBuilderDesktop({
           type="button"
           onClick={handleAddWeek}
           disabled={addWeekBusy}
-          className="w-full h-11 border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors disabled:opacity-40"
+          className="w-full h-11 border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust-ink transition-colors disabled:opacity-40"
         >
           + Add Week {nextWeekNumber}
         </button>
