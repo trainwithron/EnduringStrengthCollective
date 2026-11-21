@@ -61,11 +61,10 @@ describe("Spotlight", () => {
     expect(hub).toContain('if (spotParam !== "1" && !anchor) return;');
     expect(hub).toContain("const anchor = SPOT_OPEN_HASHES.find((h) => hash === `#${h}`) ?? null;");
   });
-  it("Business has the organization's settings (Support inbox and Organizations moved to Settings > Admin, PH16); Program has All programs", () => {
+  it("Business has the organization's settings and no admin tools (they moved to Settings > Admin, PH16); Program has All programs", () => {
     expect(hub).toContain("href={`/groups/${activeGroupId}/settings`}");
-    expect(hub).not.toContain('href="/admin/support"');
-    expect(hub).not.toContain('href="/admin/organizations"');
-    expect(hub).toContain("{platformAdmin && (");
+    expect(hub).not.toContain('href="/admin/');
+    expect(hub).not.toContain("platformAdmin");
     expect(hub).toContain('<a href="/programs"');
   });
   it("on their own space choosing another organization reloads the page instead of leaving it (on a phone, a team organization opens its team Home: lib/home-org.test.ts)", () => {

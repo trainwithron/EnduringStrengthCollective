@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { describe, expect, it, vi } from "vitest";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { badgeCountOf, countedNotices, soleStartWorkoutId, spotCount, type SpotNeeds } from "./spot-needs";
+import { badgeCountOf, countedNotices, fetchSpotNeeds, soleStartWorkoutId, spotCount, type SpotNeeds } from "./spot-needs";
 import { phoneNewProgramHref } from "@/components/coach/mobile/programs-phone-list";
 
 // Clutter and flow, part C1 (Ron, Nov 21: "fix all clutter and flow that arent my call"): the coach's phone Spotlight hub.
@@ -18,10 +18,30 @@ describe("PH1: one waiting number (the dot, Waiting for you and the app icon)", 
   it("counts the requests waiting, check-ins to review, did-it-happen sessions and notices", () => {
     expect(spotCount({ ...base, requestsWaiting: 2, checkinsToReview: 1, sessionsToCheck: [{} as never], notices: [notice("milestone_celebration")] })).toBe(5);
   });
-  it("the requests number is the Requests page's own: the same four kinds, the open organization's groups", () => {
-    for (const t of ['from("booking_requests")', 'from("bookings")', 'from("schedule_requests")', "pendingRequestCount(supabase)", "pendingCheckinCount(supabase, groupIds, user.id)"]) expect(route).toContain(t);
-    expect(route).toContain('.eq("late_charge_state", "flagged")');
-    expect(route).toContain('.in("status", ["pending", "applying"])');
+  it("the requests number is ONE function: the Requests page, Spotlight and the Clients pages' Requests link all use it", () => {
+    const server = read("lib/requests-center-server.ts");
+    const fn = server.slice(server.indexOf("export async function requestsWaitingCount"), server.indexOf("export async function requestsWaitingForSignedIn"));
+    for (const t of ['from("booking_requests")', 'from("bookings")', 'from("schedule_requests")', "pendingRequestCount(supabase)", '.eq("late_charge_state", "flagged")', '.in("status", ["pending", "applying"])']) expect(fn).toContain(t);
+    expect(server).toContain("requestsWaitingCount(supabase, opts.userId, ids, now),");
+    expect(route).toContain("requestsWaitingCount(supabase, user.id, groupIds, now)");
+    expect(route).toContain("pendingCheckinCount(supabase, groupIds, user.id)");
+    const link = read("components/coach/requests-link.tsx");
+    expect(link).toContain("await requestsWaitingForSignedIn(await createServerClient())");
+    expect(existsSync(join(__dirname, "..", "app/api/requests/waiting-count/route.ts"))).toBe(false);
+  });
+  it("a hidden tab never asks; coming back to the front asks once; a read that hangs gives up after 15 seconds", () => {
+    const badge = read("components/coach/app-badge-sync.tsx");
+    expect(badge).toContain('if (document.visibilityState !== "visible") return;');
+    expect(badge).toContain('if (document.visibilityState === "visible") void refresh();');
+    expect(read("lib/spot-needs.ts")).toContain("signal: AbortSignal.timeout(SPOT_NEEDS_TIMEOUT_MS)");
+  });
+  it("an answer inside Waiting for you re-reads the count, and so does closing Spotlight after the fold was open", () => {
+    expect(top).toContain("<LateChangesPanel groupIds={needs.groupIds} onChanged={onChanged} />");
+    expect(top).toContain("<ScheduleRequestsPanel groupIds={needs.groupIds} onChanged={onChanged} />");
+    expect(read("components/coach/late-changes-panel.tsx").match(/onChanged\?\.\(\);/g)?.length).toBe(2);
+    expect(read("components/coach/schedule-requests-panel.tsx")).toContain("onChanged?.();");
+    const close = hub.slice(hub.indexOf("  function close() {"), hub.indexOf("  function toggle() {"));
+    expect(close).toMatch(/if \(needsOpen\) \{[\s\S]*window\.sessionStorage\.removeItem\(SPOT_NEEDS_CACHE_KEY\);[\s\S]*loadNeeds\(true\);/);
   });
   it("the fold label and the dot read the same count, and the app icon is set from the same answer", () => {
     expect(hub).toContain("`Waiting for you (${needs.count})`");
@@ -33,6 +53,29 @@ describe("PH1: one waiting number (the dot, Waiting for you and the app icon)", 
     expect(badgeCountOf({ ...base, count: 4 })).toBe(4);
     expect(badgeCountOf({ ...base, needsChoice: true })).toBeNull();
     expect(badgeCountOf(null)).toBeNull();
+  });
+});
+
+describe("the shared read", () => {
+  it("a full read answers a plain ask in flight; a plain read does not answer a full ask; a failed or timed-out read is null", async () => {
+    const urls: string[] = [];
+    let fail = false;
+    vi.stubGlobal("fetch", (url: string) => {
+      urls.push(url);
+      return fail ? Promise.reject(new DOMException("timed out", "TimeoutError")) : Promise.resolve({ ok: true, json: () => Promise.resolve(base) });
+    });
+    const full = fetchSpotNeeds(true);
+    const plain = fetchSpotNeeds();
+    expect(await plain).toEqual(base);
+    await full;
+    expect(urls).toEqual(["/api/coach/spot-needs?full=1"]);
+    const plain2 = fetchSpotNeeds();
+    const full2 = fetchSpotNeeds(true);
+    await Promise.all([plain2, full2]);
+    expect(urls.slice(1)).toEqual(["/api/coach/spot-needs", "/api/coach/spot-needs?full=1"]);
+    fail = true;
+    expect(await fetchSpotNeeds()).toBeNull();
+    vi.unstubAllGlobals();
   });
 });
 
@@ -90,9 +133,11 @@ describe("PH15, PH16, PH17, PH18: the panels", () => {
     expect(program.indexOf("Build a program")).toBeLessThan(program.indexOf("<SpotTemplates"));
     expect(program.indexOf("<SpotTemplates")).toBeLessThan(program.indexOf("All programs"));
   });
-  it("Business keeps business: no Support inbox or Organizations", () => {
+  it("Business keeps business: no admin links at all (Settings > Admin holds them)", () => {
     expect(hub).not.toContain("Support inbox →");
     expect(hub).not.toContain("Organizations →");
+    expect(hub).not.toContain("Recipe ingredients →");
+    expect(hub).not.toContain("is_platform_admin");
   });
   it("plain words: Monthly plans, not MRR", () => {
     const dash = read("components/coach/desktop/business-mini-dashboard.tsx");
@@ -126,6 +171,11 @@ describe("PH24: Start <name>'s workout opens the workout when there is exactly o
     expect(soleStartWorkoutId([{ kind: "start", workoutId: "w1" }, { kind: "start", workoutId: "w2" }])).toBeNull();
     expect(soleStartWorkoutId([{ kind: "done", workoutId: "w1" }])).toBeNull();
     expect(route).toContain("buildLogChoices(");
+    // only when Spotlight is opened (?full=1), not for the dot or the icon
+    expect(route).toContain('const full = new URL(request.url).searchParams.get("full") === "1";');
+    expect(route).toMatch(/full && nextClient && nextClient\.hasProgram/);
+    expect(hub).toContain("void fetchSpotNeeds(opening).then(");
+    expect(read("components/coach/app-badge-sync.tsx")).toContain("await fetchSpotNeeds()");
     expect(route).toContain("`/groups/${groupId}/athletes/${athleteId}/log/${workoutId}`");
     expect(top).toContain("needs.next.startHref ||");
   });

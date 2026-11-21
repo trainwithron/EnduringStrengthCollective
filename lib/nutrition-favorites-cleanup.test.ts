@@ -28,12 +28,13 @@ describe("the built-in recipe ingredients are a platform admin's page, not a coa
     const users = execSync('git grep --untracked -l "<BuiltinIngredientMappings" -- app components', { cwd: join(__dirname, ".."), encoding: "utf8" }).split("\n").filter(Boolean);
     expect(users).toEqual(["app/admin/nutrition-ingredients/page.tsx"]);
   });
-  it("are linked from the admin menu (computer and Spotlight) and from Machine requests", () => {
+  it("are linked from the admin menu (computer; on a phone Settings > Admin) and from Machine requests", () => {
     const base: HomeFacts = { groupId: "g", coachLevel: false, groupKind: "team", teamMode: false, teamSport: false, moneyHidden: false, navFacts: null, isPlatformAdmin: false, onFrontDesk: false };
     expect(homeTabs({ ...base, isPlatformAdmin: true }).settings.map((t) => t.key)).toContain("admin-ingredients");
     expect(homeTabs(base).settings.map((t) => t.key)).not.toContain("admin-ingredients");
     expect(homeOfPath("/admin/nutrition-ingredients")).toEqual({ home: "settings", tab: "admin-ingredients" });
-    expect(read("components/coach/mobile/coach-spot-hub.tsx")).toContain('<a href="/admin/nutrition-ingredients"');
+    // not on Spotlight's Business tile (Nov 21, PH16: the phone's admin tools are in Settings > Admin)
+    expect(read("components/coach/mobile/coach-spot-hub.tsx")).not.toContain("/admin/nutrition-ingredients");
     expect(read("app/admin/machine-catalog/page.tsx")).toContain('<Link href="/admin/nutrition-ingredients"');
   });
 });

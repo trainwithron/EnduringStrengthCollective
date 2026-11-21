@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { getActiveAnchor } from "@/lib/active-anchor";
+import { pendingRequestCount } from "@/lib/client-request-count";
 import { countByIds, readRowsByIds } from "@/lib/read-by-ids";
 import {
   ANSWERED_DAYS,
@@ -29,6 +31,32 @@ export const SCHEDULE_REQUEST_SELECT =
 
 // schedule_applied: the coach's copy of "the change was applied" (on the day, by the app), found by the moment it was applied.
 const REQUEST_NOTICE_KIND: Record<string, RequestKind> = { booking_request: "booking", late_change: "late", schedule_request: "schedule", schedule_applied: "schedule", client_request: "client" };
+
+// How many requests wait on the coach's answer: ONE number, the same on the Requests page, in Spotlight (its dot, Waiting for you and the app icon; lib/spot-needs.ts) and on the Clients
+// pages' Requests link (Nov 21, PH1). Sessions asked for or moved (still ahead), late cancels and moves to charge or waive, and weekly-schedule changes in the open organization's groups, plus
+// people asking to train with the coach in every organization (read through the database function). A read that fails counts 0 (no number rather than a wrong one).
+export async function requestsWaitingCount(supabase: SupabaseClient, coachId: string, groupIds: string[], now: Date = new Date()): Promise<number> {
+  const nowIso = now.toISOString();
+  const [bookings, lates, schedules, clients] = await Promise.all([
+    countByIds(groupIds, (g) => supabase.from("booking_requests").select("id", { count: "exact", head: true }).eq("coach_id", coachId).in("group_id", g).eq("status", "pending").gt("new_start_at", nowIso)),
+    countByIds(groupIds, (g) => supabase.from("bookings").select("id", { count: "exact", head: true }).eq("coach_id", coachId).in("group_id", g).eq("late_charge_state", "flagged")),
+    countByIds(groupIds, (g) => supabase.from("schedule_requests").select("id", { count: "exact", head: true }).in("group_id", g).in("status", ["pending", "applying"])),
+    pendingRequestCount(supabase),
+  ]);
+  return (bookings.failed ? 0 : bookings.count) + (lates.failed ? 0 : lates.count) + (schedules.failed ? 0 : schedules.count) + (clients ?? 0);
+}
+
+/** The same number for the signed-in coach in the organization they are working in (the one the Requests page shows); null when not signed in, not a coach, or an organization must be chosen. */
+export async function requestsWaitingForSignedIn(supabase: SupabaseClient): Promise<number | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  const active = await getActiveAnchor(supabase, user.id);
+  if (!active || active.needsChoice) return null;
+  const groupIds = active.groups.filter((g) => g.orgId === active.orgId).map((g) => g.id);
+  return requestsWaitingCount(supabase, user.id, groupIds);
+}
 
 export interface RequestsCenterData {
   clients: RequestRow[];
@@ -61,7 +89,7 @@ export async function loadRequestsCenter(
   // The open organization's groups, inside each query (a coach in several organizations sees only this one's here); the ids go in groups of 100 (lib/read-by-ids.ts).
   const ids = opts.orgGroupIds;
   const page = { pageSize: 200, maxPages: 1 };
-  const [bookingsDecided, bookingsLapsed, lates, schedules, clientLists, waitingCounts] = await Promise.all([
+  const [bookingsDecided, bookingsLapsed, lates, schedules, clientLists, waitingCount] = await Promise.all([
     readRowsByIds(ids, (g) => (from, to) =>
       supabase.from("booking_requests").select(BOOKING_REQUEST_SELECT).eq("coach_id", opts.userId).in("group_id", g).neq("status", "pending").gte("decided_at", since).order("decided_at", { ascending: false }).order("id").range(from, to), page),
     // asked for and never answered before the time came: closed by the time passing
@@ -85,11 +113,8 @@ export async function loadRequestsCenter(
         (["pending", "approved", "declined"] as const).map(async (status) => ({ org: o, status, res: await supabase.rpc("coach_client_requests", { p_status: status, p_org: o.id }) }))
       )
     ),
-    Promise.all([
-      countByIds(ids, (g) => supabase.from("booking_requests").select("id", { count: "exact", head: true }).eq("coach_id", opts.userId).in("group_id", g).eq("status", "pending").gt("new_start_at", nowIso)),
-      countByIds(ids, (g) => supabase.from("bookings").select("id", { count: "exact", head: true }).eq("coach_id", opts.userId).in("group_id", g).eq("late_charge_state", "flagged")),
-      countByIds(ids, (g) => supabase.from("schedule_requests").select("id", { count: "exact", head: true }).in("group_id", g).in("status", ["pending", "applying"])),
-    ]),
+    // the one waiting number (also Spotlight's and the Clients pages'): requestsWaitingCount above
+    requestsWaitingCount(supabase, opts.userId, ids, now),
   ]);
   for (const r of [bookingsDecided, bookingsLapsed, lates, schedules]) if (r.error) failed = true;
   if (clientLists.some((c) => !!c.res.error)) failed = true;
@@ -139,7 +164,6 @@ export async function loadRequestsCenter(
     if (one) answered.push(one);
   }
 
-  const waitingCount = clients.length + waitingCounts.reduce((sum, c) => sum + c.count, 0);
   return { clients, answered: sortAnswered(answered), waitingCount, focus, failed };
 }
 

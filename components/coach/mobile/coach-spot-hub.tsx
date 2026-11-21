@@ -120,8 +120,8 @@ export function CoachSpotHub({
       }
     }
     const request = ++needsRequest.current;
-    // shared with the app icon's badge when both ask at once; a failed read leaves the button with no dot
-    void fetchSpotNeeds().then((data) => {
+    // shared with the app icon's badge when both ask at once; a failed read leaves the button with no dot. Opening Spotlight asks for the full answer (where Start goes).
+    void fetchSpotNeeds(opening).then((data) => {
       if (!data || request !== needsRequest.current) return;
       try {
         window.sessionStorage.setItem(SPOT_NEEDS_CACHE_KEY, spotNeedsCacheEntry(data, org, Date.now()));
@@ -215,19 +215,13 @@ export function CoachSpotHub({
   // The coach's groups (read with the organizations), so choosing a team organization on the phone can open its team Home.
   const coachedGroups = useRef<CoachedGroup[]>([]);
   const orgsRequested = useRef(false);
-  // A platform admin's Recipe ingredients link sits under Business (Support inbox and Organizations moved to Settings > Admin, PH16).
-  const [platformAdmin, setPlatformAdmin] = useState(false);
-  // Business: Take a payment opens Quick payment in place (PH15: the main action on top).
+  // Business: Take a payment opens Quick payment in place (PH15: the main action on top). A platform admin's tools are in Settings > Admin, not here (PH16).
   const [paymentOpen, setPaymentOpen] = useState(false);
   useEffect(() => {
-    // Only needed for the notification tile's test message, and the admin links.
-    const supabase = createBrowserClient();
-    supabase.auth.getUser().then(async ({ data }) => {
-      setProfileId(data.user?.id);
-      if (!data.user) return;
-      const { data: me } = await supabase.from("profiles").select("is_platform_admin").eq("id", data.user.id).maybeSingle();
-      setPlatformAdmin((me as { is_platform_admin?: boolean } | null)?.is_platform_admin === true);
-    });
+    // Only needed for the notification tile's test message and the bell.
+    createBrowserClient()
+      .auth.getUser()
+      .then(({ data }) => setProfileId(data.user?.id));
   }, []);
   useEffect(() => {
     // Which organizations this coach has: read the first time the hub is opened (the dropdown is only visible then), not on every page.
@@ -318,6 +312,15 @@ export function CoachSpotHub({
   const headerDrag = useRef<{ x: number; y: number; moved: boolean } | null>(null);
 
   function close() {
+    // Something may have been answered inside Waiting for you (a check-in, a request): the dot and the icon are read again, not taken from the remembered answer.
+    if (needsOpen) {
+      try {
+        window.sessionStorage.removeItem(SPOT_NEEDS_CACHE_KEY);
+      } catch {
+        // nothing remembered
+      }
+      loadNeeds(true);
+    }
     setOpen(false);
     setView("grid");
     setBuilderOpen(false);
@@ -629,16 +632,11 @@ export function CoachSpotHub({
                     </div>
                   )}
                   <BusinessMiniDashboard key={activeGroupId} groupId={activeGroupId} expanded />
-                  {/* The organization's own settings (colors, team, plan live on its pages). A platform admin's Support inbox and Organizations are in Settings > Admin (PH16). */}
+                  {/* The organization's own settings (colors, team, plan live on its pages). No admin tools here: a platform admin's are in Settings > Admin (PH16). */}
                   <div className="border-t border-steel/20 pt-3 space-y-1" data-business-links>
                     <a href={`/groups/${activeGroupId}/settings`} className="block min-h-11 leading-[2.75rem] font-body text-sm text-rust-ink">
                       Organization settings →
                     </a>
-                    {platformAdmin && (
-                      <a href="/admin/nutrition-ingredients" className="block min-h-11 leading-[2.75rem] font-body text-sm text-chalk">
-                        Recipe ingredients →
-                      </a>
-                    )}
                   </div>
                 </div>
               )}

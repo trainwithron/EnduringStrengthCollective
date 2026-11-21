@@ -116,7 +116,8 @@ export function ScheduleRequestCard({
 
 // Client requests to pause, freeze or cancel their weekly schedule (migration 0297), shown with the other things that need the coach's decision. Shows nothing when there is
 // none, and before the database update is applied the lookup fails quietly and the panel stays empty.
-export function ScheduleRequestsPanel({ groupIds: scopeGroupIds }: { groupIds?: string[] } = {}) {
+// onChanged: called after a request is answered (Spotlight re-reads what is waiting, so its count follows).
+export function ScheduleRequestsPanel({ groupIds: scopeGroupIds, onChanged }: { groupIds?: string[]; onChanged?: () => void } = {}) {
   const scopeKey = scopeGroupIds ? scopeGroupIds.join(",") : "";
   const [items, setItems] = useState<ScheduleRequestCardData[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -183,6 +184,7 @@ export function ScheduleRequestsPanel({ groupIds: scopeGroupIds }: { groupIds?: 
       } else {
         setMessage({ text: action === "done" ? "Done. The schedule was changed and the client was told." : "Marked as handled.", error: false });
         setItems((prev) => prev.filter((i) => i.id !== id));
+        onChanged?.();
       }
     } catch {
       setMessage({ text: "That didn't save. Check your connection and try again.", error: true });

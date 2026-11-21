@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { inDigestMorning, requestsWaitingLine } from "./requests-waiting";
@@ -48,8 +48,8 @@ describe("the app icon", () => {
     expect(() => applyAppBadge({} as Navigator, 3)).not.toThrow();
   });
   it("the number is the signed-in coach's own: every read is narrowed to them", () => {
-    const route = read("app/api/requests/waiting-count/route.ts");
-    expect(route).toContain("countWaitingByCoach(createServiceRoleClient(), new Date(), user.id)");
+    // (Nov 21, PH1: the icon shows Spotlight's count from /api/coach/spot-needs; lib/clutter-c1-phone.test.ts)
+    expect(existsSync(join(__dirname, "..", "app/api/requests/waiting-count/route.ts"))).toBe(false);
     expect(read("lib/requests-waiting.ts")).toContain('const narrow = (q: any) => (onlyCoach ? q.eq("coach_id", onlyCoach) : q);');
     expect(read("components/coach/coach-desktop-shell.tsx")).toContain("<AppBadgeSync />");
     expect(read("components/coach/mobile/coach-mobile-shell.tsx")).toContain("<AppBadgeSync />");

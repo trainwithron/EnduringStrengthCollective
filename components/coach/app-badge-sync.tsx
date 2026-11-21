@@ -6,7 +6,8 @@ import { ACTIVE_ORG_COOKIE, readBrowserCookie } from "@/lib/active-org";
 
 // The number on the installed app's icon (Ron, Nov 20, wave 3 C10; Nov 21, PH1: the same number as the Spotlight dot and "Waiting for you (n)", from the same answer, lib/spot-needs.ts).
 // Where the device supports app badges (an installed app on most phones and desktops), the icon shows how many things wait for the coach, and nothing when there are none. Anywhere else
-// this does nothing. Checked when a coach page opens, when the app comes back to the front, and every five minutes while it is open (an answer under a minute old is used again).
+// this does nothing. Checked when a coach page opens, once when the app comes back to the front, and every five minutes while it is on screen (never in a hidden tab; an answer under a
+// minute old is used again).
 // Spotlight also sets it each time it reads what is waiting. Draws nothing.
 const EVERY_MS = 5 * 60 * 1000;
 
@@ -30,6 +31,8 @@ export function AppBadgeSync() {
     if (!nav || typeof nav.setAppBadge !== "function") return;
     let stopped = false;
     const refresh = async () => {
+      // A hidden tab never asks (an idle open page must not keep polling); coming back to the front asks once.
+      if (document.visibilityState !== "visible") return;
       const org = readBrowserCookie(ACTIVE_ORG_COOKIE);
       try {
         const kept = readSpotNeedsCache(window.sessionStorage.getItem(SPOT_NEEDS_CACHE_KEY), org, Date.now());

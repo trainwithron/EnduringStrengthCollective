@@ -37,7 +37,8 @@ interface FlaggedChange {
 // A client who cancels or moves a session inside your cancellation window is flagged here for YOU to decide: Charge takes one session, Waive
 // takes nothing. Nothing is taken automatically. Shows nothing at all when no change is waiting (and before the database update that adds the
 // flag is applied, the lookup fails quietly and the panel stays empty).
-export function LateChangesPanel({ groupIds: scopeGroupIds }: { groupIds?: string[] } = {}) {
+// onChanged: called after a change or a move is answered (Spotlight re-reads what is waiting, so its count follows).
+export function LateChangesPanel({ groupIds: scopeGroupIds, onChanged }: { groupIds?: string[]; onChanged?: () => void } = {}) {
   const scopeKey = scopeGroupIds ? scopeGroupIds.join(",") : "";
   const [items, setItems] = useState<FlaggedChange[]>([]);
   const [moves, setMoves] = useState<MoveRequest[]>([]);
@@ -193,6 +194,7 @@ export function LateChangesPanel({ groupIds: scopeGroupIds }: { groupIds?: strin
       return;
     }
     setItems((prev) => prev.filter((i) => i.id !== id));
+    onChanged?.();
   }
 
   async function answerMove(id: string, confirm: boolean) {
@@ -215,6 +217,7 @@ export function LateChangesPanel({ groupIds: scopeGroupIds }: { groupIds?: strin
     if (data === "closed") setError("That session is no longer scheduled, so the request was closed.");
     if (data === "slot_taken") setError("Someone else took that time first, so the request was declined and the client told.");
     setMoves((prev) => prev.filter((m) => m.id !== id));
+    onChanged?.();
   }
 
   const fmt = (iso: string) =>

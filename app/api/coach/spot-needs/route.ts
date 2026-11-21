@@ -6,27 +6,12 @@ import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { loadSessionsToCheck } from "@/components/coach/session-check-section";
 import { loadNextClientToday, loadOpenClientWorkout } from "@/components/coach/next-client-workout-section";
 import { noticeHref } from "@/lib/notice-links";
-import { countByIds } from "@/lib/read-by-ids";
-import { pendingRequestCount } from "@/lib/client-request-count";
 import { pendingCheckinCount } from "@/lib/weekly-checkin-coach";
 import { getActivePrograms } from "@/lib/active-programs";
 import { getTodaysSessions } from "@/lib/todays-workout";
 import { buildLogChoices } from "@/lib/coach-log-choice";
+import { requestsWaitingCount } from "@/lib/requests-center-server";
 import { newestOf, soleStartWorkoutId, spotCount, type SpotNeeds } from "@/lib/spot-needs";
-
-// How many requests wait on the coach's answer: the Requests page's own number (lib/requests-center-server.ts, waitingCount). Sessions asked for or moved (still ahead), late cancels and
-// moves to charge or waive, and weekly-schedule changes in the open organization, plus people asking to train with the coach in every organization. 0 when a read fails (no dot rather
-// than a wrong one).
-async function requestsWaitingCount(supabase: Awaited<ReturnType<typeof createServerClient>>, coachId: string, groupIds: string[], now: Date): Promise<number> {
-  const nowIso = now.toISOString();
-  const [bookings, lates, schedules, clients] = await Promise.all([
-    countByIds(groupIds, (g) => supabase.from("booking_requests").select("id", { count: "exact", head: true }).eq("coach_id", coachId).in("group_id", g).eq("status", "pending").gt("new_start_at", nowIso)),
-    countByIds(groupIds, (g) => supabase.from("bookings").select("id", { count: "exact", head: true }).eq("coach_id", coachId).in("group_id", g).eq("late_charge_state", "flagged")),
-    countByIds(groupIds, (g) => supabase.from("schedule_requests").select("id", { count: "exact", head: true }).in("group_id", g).in("status", ["pending", "applying"])),
-    pendingRequestCount(supabase),
-  ]);
-  return (bookings.failed ? 0 : bookings.count) + (lates.failed ? 0 : lates.count) + (schedules.failed ? 0 : schedules.count) + (clients ?? 0);
-}
 
 // PH24: the workout "Start <name>'s workout" opens straight into, when the client's Log page would offer exactly one "Start" (the same choices that page builds); otherwise null.
 async function soleStartHref(supabase: Awaited<ReturnType<typeof createServerClient>>, groupId: string, athleteId: string): Promise<string | null> {
@@ -46,7 +31,9 @@ async function soleStartHref(supabase: Awaited<ReturnType<typeof createServerCli
 
 // The top of the Spotlight drop-down on a coach's phone, its dot and the app icon's badge (lib/spot-needs.ts): for the organization the coach is working in (the active one), the requests
 // waiting, the check-ins to review, the sessions waiting for "did it happen", the next client's workout (or one left open) and unread notices. Reads only; nothing is marked read here.
-export async function GET() {
+// ?full=1 (opening Spotlight): also where "Start <name>'s workout" goes. The dot and the app icon's badge ask without it and need only the count.
+export async function GET(request: Request) {
+  const full = new URL(request.url).searchParams.get("full") === "1";
   const supabase = await createServerClient();
   const {
     data: { user },
@@ -97,8 +84,11 @@ export async function GET() {
     linkPath: noticeHref(n.type, n.link_path ?? "/", { id: n.id, groupId: n.group_id }),
     createdAt: n.created_at,
   }));
-  // Only for the client the button names (not the one left open, which says Resume instead).
-  const next = nextClient && nextClient.hasProgram && nextClient.athleteId !== open?.athleteId ? { ...nextClient, startHref: await soleStartHref(supabase, nextClient.groupId, nextClient.athleteId) } : nextClient;
+  // Only on a full read, and only for the client the button names (not the one left open, which says Resume instead).
+  const next =
+    full && nextClient && nextClient.hasProgram && nextClient.athleteId !== open?.athleteId
+      ? { ...nextClient, startHref: await soleStartHref(supabase, nextClient.groupId, nextClient.athleteId) }
+      : nextClient;
   const result: SpotNeeds = {
     needsChoice: false,
     groupIds,

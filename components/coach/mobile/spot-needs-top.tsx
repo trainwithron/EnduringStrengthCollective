@@ -111,10 +111,10 @@ export function SpotNeedsTop({ needs, onNavigated, onNoticesCleared, onChanged }
         <>
           {/* Notice links (#late-changes, #schedule-requests, #expiring) open Spotlight on the panel they name (coach-spot-hub.tsx). */}
           <div data-spot-anchor="late-changes">
-            <LateChangesPanel groupIds={needs.groupIds} />
+            <LateChangesPanel groupIds={needs.groupIds} onChanged={onChanged} />
           </div>
           <div data-spot-anchor="schedule-requests">
-            <ScheduleRequestsPanel groupIds={needs.groupIds} />
+            <ScheduleRequestsPanel groupIds={needs.groupIds} onChanged={onChanged} />
           </div>
           <div data-spot-anchor="expiring">
             <ExpiryCheckInPanel groupIds={needs.groupIds} />

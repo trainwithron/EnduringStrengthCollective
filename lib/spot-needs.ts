@@ -63,17 +63,20 @@ export function shouldFade(newestAt: string | null, lastOpenedAt: string | null,
 
 export const SPOT_LAST_OPENED_KEY = "spot-last-opened";
 
-// One read at a time: Spotlight and the app icon's badge (components/coach/app-badge-sync.tsx) ask at the same moment when a page opens, and share the one answer. Null when it failed.
-let inflight: Promise<SpotNeeds | null> | null = null;
-export function fetchSpotNeeds(): Promise<SpotNeeds | null> {
-  if (inflight) return inflight;
-  const request: Promise<SpotNeeds | null> = fetch("/api/coach/spot-needs", { cache: "no-store" })
+// One read at a time: Spotlight and the app icon's badge (components/coach/app-badge-sync.tsx) ask at the same moment when a page opens, and share the one answer. Null when it failed
+// or took longer than 15 seconds. `full`: opening Spotlight also works out where "Start <name>'s workout" goes (next.startHref, ?full=1); the dot and the badge need only the count.
+// A full read answers a plain ask too; a plain one in flight does not answer a full ask.
+export const SPOT_NEEDS_TIMEOUT_MS = 15_000;
+let inflight: { full: boolean; request: Promise<SpotNeeds | null> } | null = null;
+export function fetchSpotNeeds(full = false): Promise<SpotNeeds | null> {
+  if (inflight && (inflight.full || !full)) return inflight.request;
+  const request: Promise<SpotNeeds | null> = fetch(full ? "/api/coach/spot-needs?full=1" : "/api/coach/spot-needs", { cache: "no-store", signal: AbortSignal.timeout(SPOT_NEEDS_TIMEOUT_MS) })
     .then((r) => (r.ok ? (r.json() as Promise<SpotNeeds>) : null))
     .catch(() => null)
     .finally(() => {
-      if (inflight === request) inflight = null;
+      if (inflight?.request === request) inflight = null;
     });
-  inflight = request;
+  inflight = { full, request };
   return request;
 }
 
