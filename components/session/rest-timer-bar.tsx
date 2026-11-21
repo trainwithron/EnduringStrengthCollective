@@ -7,6 +7,7 @@ import { playRestAlert } from "@/lib/rest-alert";
 import { formatRest, formatRestSpan } from "@/lib/rest-time";
 import { MIN_REST_SECONDS_FOR_GAME } from "@/lib/rest-timer-difficulty";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { miniRestLabel, nextRestView, restProgress, swipeDirection, type RestSheetEvent, type RestSheetView } from "@/lib/rest-sheet-view";
 import { SnakeMiniGame } from "./snake-mini-game";
 import { FlappyMiniGame } from "./flappy-mini-game";
 import { EndlessRunnerMiniGame } from "./endless-runner-mini-game";
@@ -64,7 +65,13 @@ export function RestTimerBar({
   todayDate,
   read,
   nextUp = null,
+  raised = false,
+  onMinimizedChange,
 }: {
+  // The logger's bottom bar sits above the tab bar (raised): the slim rest bar docks above it either way.
+  raised?: boolean;
+  // Told when the slim bar is on the screen, so the logger keeps room under the last set for it.
+  onMinimizedChange?: (minimized: boolean) => void;
   // The exercise that comes after this rest (the bottom bar's Next), shown on the rest sheet.
   nextUp?: string | null;
   sessionId: string;
@@ -99,6 +106,13 @@ export function RestTimerBar({
   const [taskResolved, setTaskResolved] = useState(!pendingTask);
   const [gateOpen, setGateOpen] = useState(false);
   const [habitSaving, setHabitSaving] = useState(false);
+  // Full sheet or slim bar (Ron, Nov 21: swipe it down to see the sets). Kept for the rest of the workout: a rest after one minimized starts minimized too.
+  const [view, setView] = useState<RestSheetView>("sheet");
+  // A drag on the handle (or the slim bar): where it started, and how far the sheet follows the finger down.
+  const drag = useRef<{ y: number } | null>(null);
+  const [dragDy, setDragDy] = useState(0);
+  // A press that was a swipe must not also count as a tap on what it started on.
+  const swipeTookTap = useRef(false);
   const wakeLockRef = useRef<any>(null);
   // A rest range: the alert for reaching its low end is played once.
   const readyAlerted = useRef(false);
@@ -243,7 +257,66 @@ export function RestTimerBar({
     }
   }
 
+  function changeView(event: RestSheetEvent) {
+    const next = nextRestView(view, event);
+    if (next === view) return;
+    if (next === "mini") {
+      // nothing open behind a bar that cannot show it
+      setSelectedGame(null);
+      setPickerOpen(false);
+      setReadOpen(false);
+      setGateOpen(false);
+    }
+    setView(next);
+  }
+
+  // Pointer events with a small threshold (SWIPE_THRESHOLD_PX). Only the handle and the slim bar take them (touch-action none there), so the page and the sheet still scroll anywhere else.
+  function swipeHandlers(onSwipe: (direction: "down" | "up") => void, follow: boolean) {
+    return {
+      onPointerDown: (e: React.PointerEvent<HTMLElement>) => {
+        drag.current = { y: e.clientY };
+        swipeTookTap.current = false;
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        } catch {
+          // the moves still bubble here
+        }
+      },
+      onPointerMove: (e: React.PointerEvent<HTMLElement>) => {
+        if (!drag.current || !follow) return;
+        setDragDy(Math.max(0, e.clientY - drag.current.y));
+      },
+      onPointerUp: (e: React.PointerEvent<HTMLElement>) => {
+        const start = drag.current;
+        drag.current = null;
+        setDragDy(0);
+        if (!start) return;
+        const direction = swipeDirection(start.y, e.clientY);
+        if (!direction) return;
+        swipeTookTap.current = true;
+        onSwipe(direction);
+      },
+      onPointerCancel: () => {
+        drag.current = null;
+        setDragDy(0);
+      },
+    };
+  }
+
+  function tap(event: RestSheetEvent) {
+    if (swipeTookTap.current) {
+      swipeTookTap.current = false;
+      return;
+    }
+    changeView(event);
+  }
+
   const showPrompt = pendingPrompt && !running;
+  const minimizedShown = view === "mini" && (!!running || (justFinished && !showPrompt));
+  useEffect(() => {
+    onMinimizedChange?.(minimizedShown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [minimizedShown]);
   // A rest can be started any time from the workout's bottom bar ("Rest 90s"), not only when a set is ticked (Ron, Oct 31: he fills all the sets in up front once the weight is agreed, and
   // still needs the timer between them). Nothing asked and nothing running: nothing here.
   if (!showPrompt && !running && !justFinished) return null;
@@ -254,14 +327,48 @@ export function RestTimerBar({
   const ringLeft = running && running.durationSeconds > 0 ? Math.max(0, Math.min(1, remaining / running.durationSeconds)) : 0;
   const chip = (on: boolean) =>
     `flex-1 min-w-0 h-11 rounded-token-pill font-body text-[13px] ${on ? "bg-rust/15 text-rust-ink font-semibold" : "bg-surface-2 text-steel"}`;
+  // The slim bar docks just above the logger's bottom bar (5.5rem tall, and 4.75rem higher when the tab bar is under it).
+  const miniBottom = raised ? "bottom-[calc(10.5rem+env(safe-area-inset-bottom))]" : "bottom-[calc(5.75rem+env(safe-area-inset-bottom))]";
 
   return (
     <>
-      {/* "Rest complete" for a few seconds after the countdown ends, above the bottom bar. */}
-      {justFinished && !running && !showPrompt && (
+      {/* "Rest complete" for a few seconds after the countdown ends, above the bottom bar (in the slim bar's place when the timer was minimized). */}
+      {justFinished && !running && !showPrompt && view === "sheet" && (
         <p role="status" className="fixed left-5 right-5 bottom-[calc(6.5rem+env(safe-area-inset-bottom))] z-40 rounded-card tint-win bg-surface px-4 py-3 font-body text-sm text-chalk text-center">
           Rest complete! 💪
         </p>
+      )}
+      {justFinished && !running && !showPrompt && view === "mini" && (
+        <p role="status" className={`fixed left-3 right-3 ${miniBottom} z-40 h-14 rounded-card tint-win bg-surface px-4 flex items-center justify-center font-body text-sm font-semibold text-chalk`} data-rest-mini-done>
+          {miniRestLabel("", true)} 💪
+        </p>
+      )}
+
+      {/* Minimized (Ron, Nov 21: swipe it down): a slim bar above the logger's bottom bar with the time left, a progress line and Skip. A tap or a swipe up brings the sheet back.
+          The countdown is the same one: only how it shows changed. */}
+      {running && view === "mini" && (
+        <section aria-label="Rest timer" data-rest-mini className={`fixed left-3 right-3 ${miniBottom} z-40 rounded-card bg-surface border border-rust/25 shadow-[0_-8px_24px_rgb(0_0_0/0.45)] overflow-hidden`}>
+          <div className="flex items-center gap-2 pl-1 pr-2 h-14">
+            <button
+              type="button"
+              onClick={() => tap("tap-mini")}
+              {...swipeHandlers((d) => d === "up" && changeView("drag-up"), false)}
+              aria-label="Show rest timer"
+              className="flex-1 min-w-0 h-12 px-3 flex items-center gap-2 text-left touch-none select-none"
+              data-rest-show
+            >
+              <span aria-hidden="true" className="w-6 h-1 rounded-full bg-steel/40 shrink-0" />
+              <span className="font-body text-[15px] font-semibold text-chalk tabular-nums">{miniRestLabel(formatMMSS(remaining), false)}</span>
+              {nextUp && <span className="font-body text-xs text-steel truncate">· {nextUp}</span>}
+            </button>
+            <button type="button" onClick={skip} className="h-11 px-4 shrink-0 rounded-token-pill bg-rust text-graphite font-body text-sm font-semibold" data-rest-mini-skip>
+              Skip
+            </button>
+          </div>
+          <div className="h-1 bg-line" aria-hidden="true">
+            <div className="h-full bg-rust" style={{ width: `${(restProgress(remaining, running.durationSeconds) * 100).toFixed(1)}%` }} />
+          </div>
+        </section>
       )}
 
       {/* A set was just done and the coach set no rest for it: "Rest?" with the three lengths (the one that fits highlighted), or ✕. */}
@@ -294,13 +401,25 @@ export function RestTimerBar({
 
       {/* Resting (Look Refresh, client step, Ron Nov 20): a sheet up from the bottom with a big countdown ring, what is next, +15s, the 60 / 90 / 120 lengths, Read and the game, and a big
           Skip rest. The coach's own rest keeps its rule: no +15s and no other length on it (Skip stays). */}
-      {running && (
+      {running && view === "sheet" && (
         <section
           aria-label="Rest timer"
           data-rest-sheet
-          className="fixed inset-x-0 bottom-0 z-50 max-h-[88dvh] overflow-y-auto overscroll-contain rounded-t-[28px] bg-surface border-t border-rust/25 px-5 pt-3 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-[0_-16px_40px_rgb(0_0_0/0.5)] flex flex-col gap-3.5"
+          // follows the finger down while the handle is dragged; snaps back (or minimizes) on release, with no animation for reduced motion
+          style={dragDy > 0 ? { transform: `translateY(${dragDy}px)` } : undefined}
+          className={`fixed inset-x-0 bottom-0 z-50 max-h-[88dvh] overflow-y-auto overscroll-contain rounded-t-[28px] bg-surface border-t border-rust/25 px-5 pt-1 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-[0_-16px_40px_rgb(0_0_0/0.5)] flex flex-col gap-3.5 ${dragDy > 0 ? "" : "motion-safe:transition-transform"}`}
         >
-          <span aria-hidden="true" className="block mx-auto w-10 h-1 rounded-full bg-steel/40" />
+          {/* The handle: a tap or a swipe down minimizes the timer (Ron, Nov 21: it did nothing). Only here does a drag move the sheet, so the sheet still scrolls. */}
+          <button
+            type="button"
+            onClick={() => tap("tap-handle")}
+            {...swipeHandlers((d) => d === "down" && changeView("drag-down"), true)}
+            aria-label="Minimize rest timer"
+            className="-mx-5 h-11 shrink-0 flex items-center justify-center touch-none select-none cursor-grab"
+            data-rest-minimize
+          >
+            <span aria-hidden="true" className="block w-10 h-1 rounded-full bg-steel/40" />
+          </button>
 
           {readOpen && read && !readTurnedOff && athleteId && (
             <ReadSlot
