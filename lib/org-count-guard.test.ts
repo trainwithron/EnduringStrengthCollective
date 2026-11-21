@@ -32,6 +32,8 @@ const REVIEWED = new Set([
   "app/api/cron/process-booking-waitlist/route.ts::booking_waitlist_entries",
   "app/api/cron/series-top-up/route.ts::recurring_booking_series",
   "app/api/cron/session-reminder/route.ts::bookings",
+  // the weekly "sessions to mark" line (wave 2 C6): a count per coach across everything they teach, sent only to that coach, no client named
+  "app/api/cron/sessions-to-mark/route.ts::bookings",
   "app/api/session-pattern-check/route.ts::session_pattern_checks",
   "app/api/stripe/webhook/route.ts::coach_quick_payments",
   "lib/series-store.ts::recurring_booking_series",
